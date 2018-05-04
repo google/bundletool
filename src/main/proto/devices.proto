@@ -1,0 +1,41 @@
+syntax = "proto3";
+
+package android.bundle;
+
+option java_package = "com.android.bundle";
+
+import "commands.proto";
+import "targeting.proto";
+
+// Describes the targeting and other information embedded in the APK to help
+// calculate if it should be delivered to the connected device.
+message ApkMatchingMetadata {
+  // The variant and its alternatives.
+  VariantTargeting variant_targeting = 1;
+
+  ApkTargeting apk_targeting = 2;
+
+  // For detecting dynamic modules.
+  ModuleMetadata module_metadata = 3;
+}
+
+message DeviceSpec {
+  // Supported ABI architectures in the order of preference.
+  // The values should be the string as reported by the platform, e.g.
+  // "armeabi-v7a" or "x86_64".
+  repeated string supported_abis = 1;
+
+  // All installed locales represented as BCP-47 strings.
+  repeated string supported_locales = 2;
+
+  // List of device features returned by the package manager utility.
+  repeated string device_features = 3;
+
+  // List of OpenGL extension strings supported by the device.
+  repeated string gl_extensions = 4;
+
+  // Screen dpi.
+  uint32 screen_density = 5;
+
+  uint32 sdk_version = 6;
+}

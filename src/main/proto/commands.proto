@@ -1,0 +1,71 @@
+syntax = "proto3";
+
+package android.bundle;
+
+option java_package = "com.android.bundle";
+
+import "targeting.proto";
+
+// Describes the output of the "build-apks" command.
+message BuildApksResult {
+  // Variants.
+  // Variant is a group of APKs that covers a part of the device configuration
+  // space. APKs from multiple variants are never combined on one device.
+  repeated Variant variant = 1;
+}
+
+message Variant {
+  // Variant-level targeting.
+  // This targeting is fairly high-level and each APK has its own targeting as
+  // well.
+  VariantTargeting targeting = 1;
+
+  // Set of APKs, one set per module.
+  repeated ApkSet apk_set = 2;
+}
+
+// Represents a module.
+// For pre-L devices multiple modules (possibly all) may be merged into one.
+message ApkSet {
+  ModuleMetadata module_metadata = 1;
+
+  // APKs.
+  repeated ApkDescription apk_description = 2;
+}
+
+message ModuleMetadata {
+  // Module name.
+  string name = 1;
+
+  // Indicates whether this module is marked "on demand".
+  // Set only for Split APKs.
+  bool on_demand = 2;
+}
+
+message ApkDescription {
+  ApkTargeting targeting = 1;
+
+  // Path to the APK file.
+  string path = 2;
+
+  oneof apk_metadata_oneof_value {
+    // Set only for Split APKs.
+    SplitApkMetadata split_apk_metadata = 3;
+    // Set only for standalone APKs.
+    StandaloneApkMetadata standalone_apk_metadata = 4;
+  }
+}
+
+// Holds data specific to Split APKs.
+message SplitApkMetadata {
+  string split_id = 1;
+
+  // Indicates whether this APK is the master split of the module.
+  bool is_master_split = 2;
+}
+
+// Holds data specific to Standalone APKs.
+message StandaloneApkMetadata {
+  // Names of the modules fused in this standalone APK.
+  repeated string fused_module_name = 1;
+}

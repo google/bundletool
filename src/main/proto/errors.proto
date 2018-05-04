@@ -1,0 +1,142 @@
+syntax = "proto3";
+
+package android.bundle;
+
+option java_package = "com.android.bundle";
+
+message BundleToolError {
+
+  // The exception message that the bundle tool outputs.
+  // NOTE: this may not be safe to show to users since it might
+  // include server paths and configuration.
+  string exception_message = 1;
+
+  oneof custom_error {
+    ManifestMissingVersionCodeError manifest_missing_version_code = 2;
+    ManifestInvalidVersionCodeError manifest_invalid_version_code = 3;
+
+    ManifestBaseModuleExcludedFromFusingError manifest_fusing_base_module_excluded = 4;
+    ManifestModuleFusingConfigurationMissingError manifest_fusing_configuration_missing = 5;
+    ManifestFusingMissingIncludeAttributeError
+        manifest_fusing_missing_include_attribute = 21;
+
+    ManifestMaxSdkInvalidError manifest_max_sdk_invalid = 22;
+    ManifestMinSdkInvalidError manifest_min_sdk_invalid = 19;
+    ManifestMinSdkGreaterThanMaxSdkError manifest_min_sdk_greater_than_max = 20;
+
+    FileTypeInvalidFileExtensionError file_type_invalid_file_extension = 6;
+    FileTypeInvalidFileNameInDirectoryError file_type_invalid_file_name = 7;
+    FileTypeInvalidNativeLibraryPathError
+        file_type_invalid_native_library_path = 8;
+    FileTypeInvalidNativeArchitectureError
+        file_type_invalid_native_architecture = 9;
+    FileTypeFilesInResourceDirectoryRootError
+        file_type_file_in_resource_directory_root = 10;
+    FileTypeUnknownFileOrDirectoryFoundInModuleError
+        file_type_unknown_file_or_directory_in_module = 11;
+    FileTypeFileUsesReservedNameError file_type_file_uses_reserved_name = 12;
+    FileTypeDirectoryInBundleError file_type_directory_in_bundle = 18;
+
+    MandatoryBundleFileMissingError mandatory_bundle_file_missing = 14;
+    MandatoryModuleFileMissingError mandatory_module_file_missing = 13;
+
+    ResourceTableReferencesFilesOutsideResError
+        resource_table_references_files_outside_res = 15;
+    ResourceTableReferencesMissingFilesError
+        resouce_table_references_missing_files = 16;
+    ResourceTableUnreferencedFilesError resouce_table_unreferenced_files = 17;
+  }
+}
+
+message ManifestMaxSdkInvalidError {
+  string max_sdk = 1;
+}
+
+message ManifestMinSdkInvalidError {
+  string min_sdk = 1;
+}
+
+message ManifestMinSdkGreaterThanMaxSdkError {
+  int32 min_sdk = 1;
+  int32 max_sdk = 2;
+}
+
+message ManifestMissingVersionCodeError {
+}
+
+message ManifestInvalidVersionCodeError {
+}
+
+message ManifestBaseModuleExcludedFromFusingError {
+}
+
+message ManifestModuleFusingConfigurationMissingError {
+  string module_name = 1;
+}
+
+message ManifestFusingMissingIncludeAttributeError {
+  string module_name = 1;
+}
+
+message FileTypeInvalidFileExtensionError {
+  string bundle_directory = 1;
+  string required_extension = 2;
+  string invalid_file = 3;
+}
+
+message FileTypeInvalidFileNameInDirectoryError {
+  string bundle_directory = 1;
+  repeated string allowed_file_name = 2;
+  string invalid_file = 3;
+}
+
+message FileTypeInvalidNativeLibraryPathError {
+  string bundle_directory = 1;
+  string invalid_file = 2;
+}
+
+message FileTypeInvalidNativeArchitectureError {
+  string invalid_architecture_directory = 1;
+}
+
+message FileTypeFilesInResourceDirectoryRootError {
+  string resource_directory = 1;
+  string invalid_file = 2;
+}
+
+message FileTypeUnknownFileOrDirectoryFoundInModuleError {
+  string invalid_file = 1;
+}
+
+message FileTypeFileUsesReservedNameError {
+  string invalid_file = 1;
+}
+
+message FileTypeDirectoryInBundleError {
+  string invalid_directory = 1;
+}
+
+message MandatoryBundleFileMissingError {
+  string missing_file = 1;
+}
+
+message MandatoryModuleFileMissingError {
+  string module_name = 1;
+  string missing_file = 2;
+}
+
+message ResourceTableReferencesFilesOutsideResError {
+  string module_name = 1;
+  string file_path = 2;
+}
+
+message ResourceTableReferencesMissingFilesError {
+  string module_name = 1;
+  repeated string file_path = 2;
+}
+
+message ResourceTableUnreferencedFilesError {
+  string module_name = 1;
+  repeated string file_path = 2;
+}
+

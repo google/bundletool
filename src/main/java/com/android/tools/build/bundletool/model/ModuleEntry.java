@@ -1,0 +1,64 @@
+/*
+ * Copyright (C) 2017 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License
+ */
+package com.android.tools.build.bundletool.model;
+
+import com.android.tools.build.bundletool.exceptions.CommandExecutionException;
+import com.android.tools.build.bundletool.utils.files.FileUtils;
+import java.io.IOException;
+import java.io.InputStream;
+
+/** Represents an entry in a an App Bundle's module. */
+public interface ModuleEntry {
+
+  /**
+   * Returns the content of the entry as a stream of bytes.
+   *
+   * <p>Each implementation should strongly consider returning {@link java.io.BufferedInputStream}
+   * for efficiency.
+   */
+  InputStream getContent();
+
+  /** Path of the entry inside the module. */
+  ZipPath getPath();
+
+  /** Whether the entry is a directory. */
+  boolean isDirectory();
+
+  /** Checks whether the given entries are identical. */
+  static boolean equal(ModuleEntry entry1, ModuleEntry entry2) {
+    if (!entry1.getPath().equals(entry2.getPath())) {
+      return false;
+    }
+
+    if (entry1.isDirectory() != entry2.isDirectory()) {
+      return false;
+    } else if (entry1.isDirectory() && entry2.isDirectory()) {
+      return true;
+    }
+
+    try (InputStream inputStream1 = entry1.getContent();
+        InputStream inputStream2 = entry2.getContent()) {
+      return FileUtils.equalContent(inputStream1, inputStream2);
+    } catch (IOException e) {
+      throw CommandExecutionException.builder()
+          .withCause(e)
+          .withMessage(
+              "Failed to compare contents of module entries '%s' and '%s'.",
+              entry1.getPath(), entry2.getPath())
+          .build();
+    }
+  }
+}
