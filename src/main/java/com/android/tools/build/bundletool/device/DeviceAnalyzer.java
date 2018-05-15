@@ -31,7 +31,8 @@ public class DeviceAnalyzer {
   private final AdbServer adb;
 
   // For API M+.
-  private static final String LOCALE_PROPERTY = "ro.product.locale";
+  private static final String LOCALE_PROPERTY_SYS = "persist.sys.locale";
+  private static final String LOCALE_PROPERTY_PRODUCT = "ro.product.locale";
   // Older APIs.
   private static final String LEGACY_LANGUAGE_PROPERTY = "ro.product.locale.language";
   private static final String LEGACY_REGION_PROPERTY = "ro.product.locale.region";
@@ -74,7 +75,10 @@ public class DeviceAnalyzer {
         locale = Optional.of(language.get() + "-" + region.get());
       }
     } else {
-      locale = device.getProperty(LOCALE_PROPERTY);
+      locale = device.getProperty(LOCALE_PROPERTY_SYS);
+      if (!locale.isPresent()) {
+        locale = device.getProperty(LOCALE_PROPERTY_PRODUCT);
+      }
     }
     return locale.orElseGet(
         () -> {
