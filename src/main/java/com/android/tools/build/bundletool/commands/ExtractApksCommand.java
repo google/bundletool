@@ -143,7 +143,7 @@ public abstract class ExtractApksCommand {
       for (Path matchedApk : matchedApks) {
         ZipEntry entry = apksArchive.getEntry(matchedApk.toString());
         checkNotNull(entry);
-        Path extractedApkPath = getOutputDirectory().resolve(matchedApk);
+        Path extractedApkPath = getOutputDirectory().resolve(matchedApk.getFileName());
         try (InputStream inputStream = BufferedIo.inputStream(apksArchive, entry);
             OutputStream outputApk = BufferedIo.outputStream(extractedApkPath)) {
           ByteStreams.copy(inputStream, outputApk);

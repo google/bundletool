@@ -25,6 +25,7 @@ import static com.android.tools.build.bundletool.utils.ResourcesUtils.SCREEN_DEN
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.collect.ImmutableList.toImmutableList;
+import static com.google.common.collect.MoreCollectors.toOptional;
 
 import com.android.aapt.Resources.ResourceTable;
 import com.android.bundle.Files.Assets;
@@ -34,14 +35,19 @@ import com.android.bundle.Targeting.ApkTargeting;
 import com.android.bundle.Targeting.GraphicsApi;
 import com.android.bundle.Targeting.GraphicsApiTargeting;
 import com.android.bundle.Targeting.OpenGlVersion;
+import com.android.bundle.Targeting.SdkVersion;
+import com.android.bundle.Targeting.SdkVersionTargeting;
 import com.android.bundle.Targeting.TextureCompressionFormatTargeting;
+import com.android.bundle.Targeting.VariantTargeting;
 import com.android.tools.build.bundletool.manifest.AndroidManifest;
 import com.android.tools.build.bundletool.utils.ResourcesUtils;
+import com.android.tools.build.bundletool.utils.Versions;
 import com.google.auto.value.AutoValue;
 import com.google.common.base.Predicate;
 import com.google.common.base.Predicates;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
+import com.google.protobuf.Int32Value;
 import java.util.List;
 import java.util.Optional;
 import java.util.StringJoiner;
@@ -52,7 +58,14 @@ import javax.annotation.CheckReturnValue;
 @AutoValue
 public abstract class ModuleSplit {
 
-  public abstract ApkTargeting getTargeting();
+  /** Returns the targeting of the APK represented by this instance. */
+  public abstract ApkTargeting getApkTargeting();
+
+  /** Returns the targeting of the Variant this instance belongs to. */
+  public abstract VariantTargeting getVariantTargeting();
+
+  /** Whether this ModuleSplit instance represents a standalone APK. */
+  public abstract boolean isStandalone();
 
   /**
    * Returns AppBundle's ZipEntries copied to be included in this split.
@@ -93,7 +106,7 @@ public abstract class ModuleSplit {
 
     // The dimensions below should be ordered by their priority.
 
-    AbiTargeting abiTargeting = getTargeting().getAbiTargeting();
+    AbiTargeting abiTargeting = getApkTargeting().getAbiTargeting();
     if (!abiTargeting.getValueList().isEmpty()) {
       abiTargeting
           .getValueList()
@@ -105,9 +118,9 @@ public abstract class ModuleSplit {
       suffixJoiner.add("other_abis");
     }
 
-    getTargeting().getLanguageTargeting().getValueList().forEach(suffixJoiner::add);
+    getApkTargeting().getLanguageTargeting().getValueList().forEach(suffixJoiner::add);
 
-    getTargeting()
+    getApkTargeting()
         .getScreenDensityTargeting()
         .getValueList()
         .forEach(
@@ -118,7 +131,7 @@ public abstract class ModuleSplit {
                         .get(value.getDensityAlias())
                         .replace('-', '_')));
 
-    GraphicsApiTargeting graphicsApiTargeting = getTargeting().getGraphicsApiTargeting();
+    GraphicsApiTargeting graphicsApiTargeting = getApkTargeting().getGraphicsApiTargeting();
     if (!graphicsApiTargeting.getValueList().isEmpty()) {
       graphicsApiTargeting
           .getValueList()
@@ -128,7 +141,7 @@ public abstract class ModuleSplit {
     }
 
     TextureCompressionFormatTargeting textureFormatTargeting =
-        getTargeting().getTextureCompressionFormatTargeting();
+        getApkTargeting().getTextureCompressionFormatTargeting();
     if (!textureFormatTargeting.getValueList().isEmpty()) {
       textureFormatTargeting
           .getValueList()
@@ -206,7 +219,7 @@ public abstract class ModuleSplit {
    * <p>Prefer static factory methods when creating {@link ModuleSplit} from {@link BundleModule}.
    */
   public static Builder builder() {
-    return new AutoValue_ModuleSplit.Builder().setEntries(ImmutableList.of());
+    return new AutoValue_ModuleSplit.Builder().setEntries(ImmutableList.of()).setStandalone(false);
   }
 
   /**
@@ -254,7 +267,11 @@ public abstract class ModuleSplit {
         /* setResourceTable= */ false);
   }
 
-  /** Creates a {@link ModuleSplit} with entries from the Bundle Module satisfying the predicate. */
+  /**
+   * Creates a {@link ModuleSplit} with entries from the Bundle Module satisfying the predicate.
+   *
+   * <p>The created instance is not standalone thus its variant targets L+ devices initially.
+   */
   private static ModuleSplit fromBundleModule(
       BundleModule bundleModule,
       Predicate<ModuleEntry> entriesPredicate,
@@ -271,7 +288,9 @@ public abstract class ModuleSplit {
             .setAndroidManifest(bundleModule.getAndroidManifest())
             // Initially each split is master split.
             .setMasterSplit(true)
-            .setTargeting(ApkTargeting.getDefaultInstance());
+            .setStandalone(false)
+            .setApkTargeting(ApkTargeting.getDefaultInstance())
+            .setVariantTargeting(lPlusVariantTargeting());
 
     bundleModule.getNativeConfig().ifPresent(splitBuilder::setNativeConfig);
     bundleModule.getAssetsConfig().ifPresent(splitBuilder::setAssetsConfig);
@@ -297,6 +316,24 @@ public abstract class ModuleSplit {
         .filter(entry -> entry.getPath().getParent().equals(ZipPath.create(directory)));
   }
 
+  /** Returns the {@link ModuleEntry} associated with the given path, or empty if not found. */
+  public Optional<ModuleEntry> findEntry(String path) {
+    return getEntries()
+        .stream()
+        .filter(entry -> entry.getPath().equals(ZipPath.create(path)))
+        .collect(toOptional());
+  }
+
+  private static VariantTargeting lPlusVariantTargeting() {
+    return VariantTargeting.newBuilder()
+        .setSdkVersionTargeting(
+            SdkVersionTargeting.newBuilder()
+                .addValue(
+                    SdkVersion.newBuilder()
+                        .setMin(Int32Value.newBuilder().setValue(Versions.ANDROID_L_API_VERSION))))
+        .build();
+  }
+
   /** Builder for {@link ModuleSplit}. */
   @AutoValue.Builder
   public abstract static class Builder {
@@ -309,7 +346,11 @@ public abstract class ModuleSplit {
 
     public abstract Builder setAssetsConfig(Assets assetsConfig);
 
-    public abstract Builder setTargeting(ApkTargeting targeting);
+    public abstract Builder setApkTargeting(ApkTargeting targeting);
+
+    public abstract Builder setVariantTargeting(VariantTargeting targeting);
+
+    public abstract Builder setStandalone(boolean isStandalone);
 
     public abstract Builder setEntries(List<ModuleEntry> entries);
 
@@ -324,7 +365,7 @@ public abstract class ModuleSplit {
       if (moduleSplit.isMasterSplit()) {
         checkState(
             moduleSplit
-                .getTargeting()
+                .getApkTargeting()
                 .toBuilder()
                 .clearSdkVersionTargeting()
                 .build()

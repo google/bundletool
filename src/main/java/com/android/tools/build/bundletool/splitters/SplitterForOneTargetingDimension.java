@@ -29,7 +29,7 @@ public abstract class SplitterForOneTargetingDimension implements ModuleSplitSpl
 
   @Override
   public ImmutableCollection<ModuleSplit> split(ModuleSplit split) {
-    if (!split.getTargeting().equals(ApkTargeting.getDefaultInstance())) {
+    if (!split.getApkTargeting().equals(ApkTargeting.getDefaultInstance())) {
       return ImmutableList.of(split);
     }
     return splitInternal(split);

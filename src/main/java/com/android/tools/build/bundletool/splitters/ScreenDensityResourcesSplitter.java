@@ -21,6 +21,7 @@ import static com.android.tools.build.bundletool.utils.ResourcesUtils.MIPMAP_TYP
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.collect.ImmutableList.toImmutableList;
+import static java.util.stream.Collectors.groupingBy;
 
 import com.android.aapt.ConfigurationOuterClass.Configuration;
 import com.android.aapt.Resources.ConfigValue;
@@ -35,16 +36,18 @@ import com.android.tools.build.bundletool.model.ModuleSplit;
 import com.android.tools.build.bundletool.model.PackageTypeEntry;
 import com.android.tools.build.bundletool.targeting.ScreenDensitySelector;
 import com.android.tools.build.bundletool.utils.ResourcesUtils;
+import com.android.tools.build.bundletool.version.Version;
 import com.google.common.collect.ImmutableCollection;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMultimap;
 import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
-import java.util.stream.Collectors;
 
 /** Splits module resources by screen density. */
 public class ScreenDensityResourcesSplitter extends SplitterForOneTargetingDimension {
@@ -60,13 +63,16 @@ public class ScreenDensityResourcesSplitter extends SplitterForOneTargetingDimen
           DensityAlias.TVDPI);
 
   private final ImmutableSet<DensityAlias> densityBuckets;
+  private final Version bundleVersion;
 
-  public ScreenDensityResourcesSplitter() {
-    this(DEFAULT_DENSITY_BUCKETS);
+  public ScreenDensityResourcesSplitter(Version bundleVersion) {
+    this(DEFAULT_DENSITY_BUCKETS, bundleVersion);
   }
 
-  public ScreenDensityResourcesSplitter(ImmutableSet<DensityAlias> densityBuckets) {
+  public ScreenDensityResourcesSplitter(
+      ImmutableSet<DensityAlias> densityBuckets, Version bundleVersion) {
     this.densityBuckets = densityBuckets;
+    this.bundleVersion = bundleVersion;
   }
 
   @Override
@@ -89,9 +95,9 @@ public class ScreenDensityResourcesSplitter extends SplitterForOneTargetingDimen
       ModuleSplit.Builder moduleSplitBuilder =
           split
               .toBuilder()
-              .setTargeting(
+              .setApkTargeting(
                   split
-                      .getTargeting()
+                      .getApkTargeting()
                       .toBuilder()
                       .setScreenDensityTargeting(
                           ScreenDensityTargeting.newBuilder()
@@ -205,18 +211,26 @@ public class ScreenDensityResourcesSplitter extends SplitterForOneTargetingDimen
    */
   private Entry filterEntryForDensity(Entry initialEntry, DensityAlias targetDensity) {
     // Groups together configs that only differ on density.
+    Map<Configuration, List<ConfigValue>> configValuesByConfiguration =
+        initialEntry
+            .getConfigValueList()
+            .stream()
+            // Remove this filter entirely once 0.4.0 is no longer being actively used.
+            .filter(
+                configValue ->
+                    !bundleVersion.isOlderThan(Version.of("0.4.0"))
+                        || configValue.getConfig().getDensity() != DEFAULT_DENSITY_VALUE)
+            .collect(groupingBy(configValue -> clearDensity(configValue.getConfig())));
+
+    // Filter out configs that don't have alternatives on density. These configurations can go in
+    // the master split.
+    if (!bundleVersion.isOlderThan(Version.of("0.4.0"))) {
+      configValuesByConfiguration =
+          Maps.filterValues(configValuesByConfiguration, configValues -> configValues.size() > 1);
+    }
+
     ImmutableList<List<ConfigValue>> densityGroups =
-        ImmutableList.copyOf(
-            initialEntry
-                .getConfigValueList()
-                .stream()
-                // The below filter resembles how aapt2 works today. This filtering should be
-                // reconsidered when we start supporting non-platform dimension(s).
-                .filter(
-                    configValue -> configValue.getConfig().getDensity() != DEFAULT_DENSITY_VALUE)
-                .collect(
-                    Collectors.groupingBy(configValue -> clearDensity(configValue.getConfig())))
-                .values());
+        ImmutableList.copyOf(configValuesByConfiguration.values());
     ImmutableList<ConfigValue> valuesToKeep =
         pickBestDensityForEachGroup(densityGroups, targetDensity);
     return initialEntry.toBuilder().clearConfigValue().addAllConfigValue(valuesToKeep).build();

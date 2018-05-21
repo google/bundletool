@@ -20,6 +20,7 @@ import static com.android.tools.build.bundletool.utils.files.FilePreconditions.c
 import static com.google.common.base.Predicates.not;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.ImmutableMap.toImmutableMap;
+import static com.google.common.collect.ImmutableSet.toImmutableSet;
 import static java.nio.charset.StandardCharsets.UTF_8;
 
 import com.android.tools.build.bundletool.exceptions.CommandExecutionException;
@@ -30,6 +31,7 @@ import com.google.common.base.MoreObjects;
 import com.google.common.base.Splitter;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableSet;
 import com.google.common.io.Files;
 import java.io.IOException;
 import java.nio.file.Path;
@@ -57,10 +59,14 @@ public abstract class Flag<T> {
     return new BooleanFlag(name);
   }
 
-  /** Enum flag holding a list of comma-delimited values. */
-  public static <T extends Enum<T>> Flag<ImmutableList<T>> enumList(
-      String name, Class<T> enumClass) {
-    return new ListFlag<>(new EnumFlag<>(name, enumClass));
+  /** Enum flag holding a single value. */
+  public static <T extends Enum<T>> Flag<T> enumFlag(String name, Class<T> enumClass) {
+    return new EnumFlag<>(name, enumClass);
+  }
+
+  /** Enum flag holding a set of comma-delimited values. */
+  public static <T extends Enum<T>> Flag<ImmutableSet<T>> enumSet(String name, Class<T> enumClass) {
+    return new SetFlag<>(new EnumFlag<>(name, enumClass));
   }
 
   public static <K, V> Flag<Map.Entry<K, V>> keyValue(
@@ -113,6 +119,11 @@ public abstract class Flag<T> {
   /** String flag holding a list of comma-delimited values. */
   public static Flag<ImmutableList<String>> stringList(String name) {
     return new ListFlag<>(new StringFlag(name));
+  }
+
+  /** String flag holding a set of comma-delimited values. */
+  public static Flag<ImmutableSet<String>> stringSet(String name) {
+    return new SetFlag<>(new StringFlag(name));
   }
 
   // Implementation of the flags starts here.
@@ -401,6 +412,32 @@ public abstract class Flag<T> {
           .stream()
           .map(singleFlag::parse)
           .collect(toImmutableList());
+    }
+  }
+
+  /**
+   * Flag that can contain multiple comma-separated values.
+   *
+   * <p>Duplicates are filtered out.
+   */
+  static class SetFlag<T> extends SingleValueFlag<ImmutableSet<T>> {
+    private final SingleValueFlag<T> singleFlag;
+
+    SetFlag(SingleValueFlag<T> singleFlag) {
+      super(singleFlag.name);
+      this.singleFlag = singleFlag;
+    }
+
+    @Override
+    protected ImmutableSet<T> parse(String value) {
+      if (value.isEmpty()) {
+        return ImmutableSet.of();
+      }
+      return ITEM_SPLITTER
+          .splitToList(value)
+          .stream()
+          .map(singleFlag::parse)
+          .collect(toImmutableSet());
     }
   }
 

@@ -17,10 +17,12 @@
 package com.android.tools.build.bundletool.mergers;
 
 import static com.android.tools.build.bundletool.mergers.MergingUtils.getSameValueOrNonNull;
+import static com.google.common.base.Preconditions.checkArgument;
 
 import com.android.aapt.Resources.ResourceTable;
 import com.android.bundle.Files.NativeLibraries;
 import com.android.bundle.Targeting.ApkTargeting;
+import com.android.bundle.Targeting.VariantTargeting;
 import com.android.tools.build.bundletool.manifest.AndroidManifest;
 import com.android.tools.build.bundletool.model.BundleModuleName;
 import com.android.tools.build.bundletool.model.ModuleEntry;
@@ -30,14 +32,21 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableListMultimap;
 import com.google.common.collect.Multimaps;
 
-/** Merges module splits together that have the same targeting. */
+/**
+ * Merges module splits together that have the same targeting.
+ *
+ * <p>The current implementation assumes all splits belong to the same variant.
+ */
 public class SameTargetingMerger implements ModuleSplitMerger {
 
   @Override
   public ImmutableList<ModuleSplit> merge(ImmutableCollection<ModuleSplit> moduleSplits) {
+    checkArgument(
+        moduleSplits.stream().map(ModuleSplit::getVariantTargeting).distinct().count() == 1,
+        "SameTargetingMerger doesn't support merging splits from different variants.");
     ImmutableList.Builder<ModuleSplit> result = ImmutableList.builder();
     ImmutableListMultimap<ApkTargeting, ModuleSplit> splitsByTargeting =
-        Multimaps.index(moduleSplits, ModuleSplit::getTargeting);
+        Multimaps.index(moduleSplits, ModuleSplit::getApkTargeting);
     for (ApkTargeting targeting : splitsByTargeting.keySet()) {
       result.add(mergeSplits(splitsByTargeting.get(targeting)));
     }
@@ -52,6 +61,7 @@ public class SameTargetingMerger implements ModuleSplitMerger {
     NativeLibraries mergedNativeConfig = null;
     BundleModuleName mergedModuleName = null;
     Boolean mergedIsMasterSplit = null;
+    VariantTargeting mergedVariantTargeting = null;
 
     for (ModuleSplit split : splits) {
       if (split.getAndroidManifest().isPresent()) {
@@ -91,8 +101,14 @@ public class SameTargetingMerger implements ModuleSplitMerger {
                   () ->
                       new IllegalStateException(
                           "Encountered conflicting isMasterSplit flag values while merging."));
+      mergedVariantTargeting =
+          getSameValueOrNonNull(mergedVariantTargeting, split.getVariantTargeting())
+              .orElseThrow(
+                  () ->
+                      new IllegalStateException(
+                          "Encountered conflicting variant targeting values while merging."));
       entries.addAll(split.getEntries());
-      builder.setTargeting(split.getTargeting());
+      builder.setApkTargeting(split.getApkTargeting());
     }
 
     if (mergedManifest != null) {
@@ -110,6 +126,7 @@ public class SameTargetingMerger implements ModuleSplitMerger {
     if (mergedIsMasterSplit != null) {
       builder.setMasterSplit(mergedIsMasterSplit);
     }
+    builder.setVariantTargeting(mergedVariantTargeting);
     builder.setEntries(entries.build());
     return builder.build();
   }

@@ -19,9 +19,11 @@ package com.android.tools.build.bundletool.model;
 import com.android.aapt.Resources.ResourceTable;
 import com.android.aapt.Resources.XmlNode;
 import com.android.bundle.Commands.ModuleMetadata;
+import com.android.bundle.Config.BundleConfig;
 import com.android.bundle.Files.Assets;
 import com.android.bundle.Files.NativeLibraries;
 import com.android.tools.build.bundletool.manifest.AndroidManifest;
+import com.android.tools.build.bundletool.version.BundleToolVersion;
 import com.google.auto.value.AutoValue;
 import com.google.common.collect.ImmutableCollection;
 import com.google.common.collect.ImmutableMap;
@@ -57,6 +59,9 @@ public abstract class BundleModule {
 
   public abstract BundleModuleName getName();
 
+  /** The version of Bundletool that built this module, taken from BundleConfig. */
+  public abstract BundleConfig getBundleConfig();
+
   public abstract AndroidManifest getAndroidManifest();
 
   public abstract Optional<ResourceTable> getResourceTable();
@@ -89,7 +94,11 @@ public abstract class BundleModule {
 
   public boolean isIncludedInFusing() {
     // The following should never throw if the module/bundle has been validated.
-    return isBaseModule() || getAndroidManifest().getIsModuleIncludedInFusing().get();
+    return isBaseModule()
+        || getAndroidManifest()
+            .getIsModuleIncludedInFusing(
+                BundleToolVersion.getVersionFromBundleConfig(getBundleConfig()))
+            .get();
   }
 
   /**
@@ -121,7 +130,10 @@ public abstract class BundleModule {
   public ModuleMetadata getModuleMetadata() {
     return ModuleMetadata.newBuilder()
         .setName(getName().getName())
-        .setOnDemand(getAndroidManifest().isOnDemandModule().orElse(false))
+        .setOnDemand(
+            getAndroidManifest()
+                .isOnDemandModule(BundleToolVersion.getVersionFromBundleConfig(getBundleConfig()))
+                .orElse(false))
         .build();
   }
 
@@ -135,6 +147,8 @@ public abstract class BundleModule {
   @AutoValue.Builder
   public abstract static class Builder {
     public abstract Builder setName(BundleModuleName value);
+
+    public abstract Builder setBundleConfig(BundleConfig value);
 
     abstract ImmutableMap.Builder<ZipPath, ModuleEntry> entryMapBuilder();
 

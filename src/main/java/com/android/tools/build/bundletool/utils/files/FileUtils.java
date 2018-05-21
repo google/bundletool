@@ -18,17 +18,32 @@ package com.android.tools.build.bundletool.utils.files;
 
 import static com.google.common.collect.ImmutableList.toImmutableList;
 
+import com.android.tools.build.bundletool.exceptions.CommandExecutionException;
 import com.android.tools.build.bundletool.model.ZipPath;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSortedSet;
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Collection;
 import java.util.List;
 
 /** Misc utilities for working with files. */
 public final class FileUtils {
+
+  /** Creates the parent directories of the given path. */
+  public static void createParentDirectories(Path path) {
+    Path dirs = path.getParent();
+    try {
+      Files.createDirectories(dirs);
+    } catch (IOException e) {
+      throw CommandExecutionException.builder()
+          .withCause(e)
+          .withMessage("Error creating directories '%s'.", dirs)
+          .build();
+    }
+  }
 
   /** Gets distinct parents for given paths. */
   public static ImmutableList<Path> getDistinctParentPaths(Collection<Path> paths) {

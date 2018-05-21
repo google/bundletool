@@ -70,9 +70,9 @@ public class AbiNativeLibrariesSplitter implements ModuleSplitSplitter {
       ModuleSplit.Builder splitBuilder =
           moduleSplit
               .toBuilder()
-              .setTargeting(
+              .setApkTargeting(
                   moduleSplit
-                      .getTargeting()
+                      .getApkTargeting()
                       .toBuilder()
                       .setAbiTargeting(
                           AbiTargeting.newBuilder()

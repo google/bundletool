@@ -24,6 +24,7 @@ import com.android.tools.build.bundletool.exceptions.manifest.ManifestSdkTargeti
 import com.android.tools.build.bundletool.exceptions.manifest.ManifestSdkTargetingException.MinSdkInvalidException;
 import com.android.tools.build.bundletool.manifest.AndroidManifest;
 import com.android.tools.build.bundletool.model.BundleModule;
+import com.android.tools.build.bundletool.version.BundleToolVersion;
 import java.util.Optional;
 
 /** Validates {@code AndroidManifest.xml} file of each module. */
@@ -37,7 +38,11 @@ public class AndroidManifestValidator extends SubValidator {
   }
 
   private void validateOnDemand(BundleModule module) {
-    Optional<Boolean> isDynamicModule = module.getAndroidManifest().isOnDemandModule();
+    Optional<Boolean> isDynamicModule =
+        module
+            .getAndroidManifest()
+            .isOnDemandModule(
+                BundleToolVersion.getVersionFromBundleConfig(module.getBundleConfig()));
 
     if (module.isBaseModule()) {
       // In the base module, onDemand must be either not set or false
@@ -60,7 +65,10 @@ public class AndroidManifestValidator extends SubValidator {
 
   private void validateFusingConfig(BundleModule module) {
     Optional<Boolean> includedInFusingByManifest =
-        module.getAndroidManifest().getIsModuleIncludedInFusing();
+        module
+            .getAndroidManifest()
+            .getIsModuleIncludedInFusing(
+                BundleToolVersion.getVersionFromBundleConfig(module.getBundleConfig()));
 
     if (module.isBaseModule()) {
       if (includedInFusingByManifest.isPresent() && !includedInFusingByManifest.get()) {

@@ -76,7 +76,7 @@ public class AssetsDimensionSplitterFactory {
       @Override
       public ImmutableCollection<ModuleSplit> split(ModuleSplit split) {
         checkArgument(
-            !hasTargeting.test(split.getTargeting()),
+            !hasTargeting.test(split.getApkTargeting()),
             "Split is already targeting the splitting dimension.");
         if (!split.getAssetsConfig().isPresent()) {
           return ImmutableList.of(split);
@@ -102,7 +102,7 @@ public class AssetsDimensionSplitterFactory {
                     split
                         .toBuilder()
                         .setEntries(findEntriesInDirectories(entry.getValue(), split))
-                        .setTargeting(generateTargeting(split.getTargeting(), entry.getKey()))
+                        .setApkTargeting(generateTargeting(split.getApkTargeting(), entry.getKey()))
                         .setMasterSplit(split.isMasterSplit() && isDefaultTargeting(entry.getKey()))
                         .build())
             .filter(moduleSplit -> !moduleSplit.getEntries().isEmpty())

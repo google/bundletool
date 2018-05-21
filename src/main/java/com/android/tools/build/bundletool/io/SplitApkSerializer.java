@@ -26,14 +26,16 @@ import com.android.tools.build.bundletool.model.Aapt2Command;
 import com.android.tools.build.bundletool.model.BundleModuleName;
 import com.android.tools.build.bundletool.model.ModuleSplit;
 import com.android.tools.build.bundletool.model.SigningConfiguration;
+import com.android.tools.build.bundletool.model.ZipPath;
 import com.google.common.collect.Iterables;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.Arrays;
 import java.util.Optional;
 
 /** Serializes split APKs on disk. */
 public class SplitApkSerializer {
+
+  public static final String SPLIT_APKS_SUB_DIR = "splits";
 
   private final ApkSerializerHelper apkSerializerHelper;
 
@@ -46,12 +48,16 @@ public class SplitApkSerializer {
 
   public ApkDescription writeSplitToDisk(ModuleSplit split, Path outputDirectory) {
     checkState(isDirectory(outputDirectory));
+
     String apkFileName = getApkFileName(split, split.getModuleName());
-    apkSerializerHelper.writeToZipFile(split, outputDirectory.resolve(Paths.get(apkFileName)));
+    // Using ZipPath to ensure '/' path delimiter in the ApkDescription proto.
+    String apkFileRelPath = ZipPath.create(SPLIT_APKS_SUB_DIR).resolve(apkFileName).toString();
+
+    apkSerializerHelper.writeToZipFile(split, outputDirectory.resolve(apkFileRelPath));
 
     return ApkDescription.newBuilder()
-        .setPath(apkFileName)
-        .setTargeting(split.getTargeting())
+        .setPath(apkFileRelPath)
+        .setTargeting(split.getApkTargeting())
         .setSplitApkMetadata(
             SplitApkMetadata.newBuilder()
                 .setSplitId(split.getAndroidManifest().get().getSplitId().orElse(""))

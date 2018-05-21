@@ -21,6 +21,7 @@ import static com.android.tools.build.bundletool.model.BundleModule.RESOURCES_PR
 import static com.android.tools.build.bundletool.model.BundleModule.ROOT_DIRECTORY;
 import static com.android.tools.build.bundletool.utils.files.FilePreconditions.checkFileDoesNotExist;
 import static com.android.tools.build.bundletool.utils.files.FilePreconditions.checkFileHasExtension;
+import static com.android.tools.build.bundletool.utils.files.FileUtils.createParentDirectories;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.collect.ImmutableList.toImmutableList;
@@ -127,6 +128,8 @@ final class ApkSerializerHelper {
 
   void writeToZipFile(ModuleSplit split, Path outputPath, Path tempDir) {
     checkFileDoesNotExist(outputPath);
+    createParentDirectories(outputPath);
+
     // Write a Proto-APK with only files that aapt2 requires as part of the convert command.
     Path partialProtoApk = tempDir.resolve("proto.apk");
     writeProtoApk(split, partialProtoApk);

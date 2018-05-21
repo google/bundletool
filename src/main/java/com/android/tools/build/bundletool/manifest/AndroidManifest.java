@@ -18,6 +18,7 @@ package com.android.tools.build.bundletool.manifest;
 
 import static com.android.tools.build.bundletool.manifest.ProtoXmlHelper.NO_NAMESPACE_URI;
 import static com.android.tools.build.bundletool.manifest.ProtoXmlHelper.findAttribute;
+import static com.android.tools.build.bundletool.manifest.ProtoXmlHelper.findAttributeIgnoringNamespace;
 import static com.android.tools.build.bundletool.manifest.ProtoXmlHelper.findAttributeWithName;
 import static com.android.tools.build.bundletool.manifest.ProtoXmlHelper.findAttributeWithResourceId;
 import static com.android.tools.build.bundletool.manifest.ProtoXmlHelper.findElementFromDirectChildren;
@@ -39,6 +40,7 @@ import com.android.tools.build.bundletool.exceptions.manifest.ManifestSdkTargeti
 import com.android.tools.build.bundletool.exceptions.manifest.ManifestValidationException;
 import com.android.tools.build.bundletool.exceptions.manifest.ManifestVersionException.VersionCodeInvalidException;
 import com.android.tools.build.bundletool.exceptions.manifest.ManifestVersionException.VersionCodeMissingException;
+import com.android.tools.build.bundletool.version.Version;
 import com.google.auto.value.AutoValue;
 import com.google.common.base.Splitter;
 import com.google.common.collect.ImmutableList;
@@ -167,15 +169,21 @@ public abstract class AndroidManifest {
         .map(ProtoXmlHelper::getAttributeValueAsBoolean);
   }
 
-  public Optional<Boolean> getIsModuleIncludedInFusing() {
+  public Optional<Boolean> getIsModuleIncludedInFusing(Version bundleToolVersion) {
     XmlElement manifest = getExactlyOneElement(getManifestRoot(), "manifest");
 
     return findElementFromDirectChildren(manifest, "module", DISTRIBUTION_NAMESPACE)
         .flatMap(module -> findElementFromDirectChildren(module, "fusing", DISTRIBUTION_NAMESPACE))
         .map(
-            fusing ->
-                findAttribute(fusing, NO_NAMESPACE_URI, "include")
-                    .orElseThrow(() -> new FusingMissingIncludeAttribute(getSplitId())))
+            fusing -> {
+              if (bundleToolVersion.isOlderThan(Version.of("0.3.4-dev"))) {
+                return findAttributeIgnoringNamespace(fusing, "include")
+                    .orElseThrow(() -> new FusingMissingIncludeAttribute(getSplitId()));
+              } else {
+                return findAttribute(fusing, DISTRIBUTION_NAMESPACE, "include")
+                    .orElseThrow(() -> new FusingMissingIncludeAttribute(getSplitId()));
+              }
+            })
         .map(ProtoXmlHelper::getAttributeValueAsBoolean);
   }
 
@@ -216,13 +224,20 @@ public abstract class AndroidManifest {
         .collect(toImmutableList());
   }
 
-  public Optional<Boolean> isOnDemandModule() {
+  public Optional<Boolean> isOnDemandModule(Version bundleToolVersion) {
     XmlElement manifest = getExactlyOneElement(getManifestRoot(), "manifest");
     Optional<XmlElement> moduleElement =
         findElementFromDirectChildren(manifest, "module", DISTRIBUTION_NAMESPACE);
 
     return moduleElement
-        .flatMap(el -> findAttribute(el, DISTRIBUTION_NAMESPACE, "onDemand"))
+        .flatMap(
+            el -> {
+              if (bundleToolVersion.isOlderThan(Version.of("0.3.4-dev"))) {
+                return findAttributeIgnoringNamespace(el, "onDemand");
+              } else {
+                return findAttribute(el, DISTRIBUTION_NAMESPACE, "onDemand");
+              }
+            })
         .map(ProtoXmlHelper::getAttributeValueAsBoolean);
   }
 

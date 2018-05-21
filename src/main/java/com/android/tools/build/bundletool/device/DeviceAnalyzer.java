@@ -16,7 +16,6 @@
 
 package com.android.tools.build.bundletool.device;
 
-
 import com.android.bundle.Devices.DeviceSpec;
 import com.android.ddmlib.IDevice.DeviceState;
 import com.android.tools.build.bundletool.exceptions.CommandExecutionException;

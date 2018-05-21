@@ -48,28 +48,38 @@ public class ValidatorRunner {
     }
   }
 
-  /** Validates the given App Bundle. */
-  public void validateBundle(AppBundle bundle) {
-    subValidators.forEach(subValidator -> subValidator.validateBundle(bundle));
-
-    validateBundleModules(ImmutableList.copyOf(bundle.getModules().values()));
-  }
-
   /** Validates the given App Bundle module zip file. */
   public void validateModuleZipFile(ZipFile moduleFile) {
     subValidators.forEach(subValidator -> subValidator.validateModuleZipFile(moduleFile));
   }
 
+  /** Validates the given App Bundle. */
+  public void validateBundle(AppBundle bundle) {
+    subValidators.forEach(subValidator -> validateBundleUsingSubValidator(bundle, subValidator));
+  }
+
   /** Interprets given modules as a bundle and validates it. */
   public void validateBundleModules(ImmutableList<BundleModule> modules) {
-    subValidators.forEach(subValidator -> subValidator.validateAllModules(modules));
+    subValidators.forEach(
+        subValidator -> validateBundleModulesUsingSubValidator(modules, subValidator));
+  }
+
+  private static void validateBundleUsingSubValidator(AppBundle bundle, SubValidator subValidator) {
+    subValidator.validateBundle(bundle);
+    validateBundleModulesUsingSubValidator(
+        ImmutableList.copyOf(bundle.getModules().values()), subValidator);
+  }
+
+  private static void validateBundleModulesUsingSubValidator(
+      ImmutableList<BundleModule> modules, SubValidator subValidator) {
+    subValidator.validateAllModules(modules);
 
     for (BundleModule module : modules) {
-        subValidators.forEach(subValidator -> subValidator.validateModule(module));
+      subValidator.validateModule(module);
 
-        for (ZipPath moduleFile : getModuleFiles(module)) {
-          subValidators.forEach(subValidator -> subValidator.validateModuleFile(moduleFile));
-        }
+      for (ZipPath moduleFile : getModuleFiles(module)) {
+        subValidator.validateModuleFile(moduleFile);
+      }
     }
   }
 

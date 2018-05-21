@@ -39,6 +39,7 @@ public class AppBundleValidator {
           // Fundamental file validations first.
           new BundleFilesValidator(),
           new AndroidManifestValidator(),
+          new BundleConfigValidator(),
           // More specific file validations.
           new EntryClashValidator(),
           new AbiParityValidator(),
@@ -48,8 +49,7 @@ public class AppBundleValidator {
           new NativeTargetingValidator(),
           // Other.
           new ModuleDependencyValidator(),
-          new ResourceTableValidator(),
-          new BundleConfigValidator());
+          new ResourceTableValidator());
 
   /**
    * Validates the given App Bundle zip file.

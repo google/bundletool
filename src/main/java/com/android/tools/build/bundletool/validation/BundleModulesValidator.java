@@ -22,11 +22,14 @@ import static com.google.common.base.Predicates.not;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.io.MoreFiles.getNameWithoutExtension;
 
+import com.android.bundle.Config.BundleConfig;
+import com.android.bundle.Config.Bundletool;
 import com.android.tools.build.bundletool.exceptions.ValidationException;
 import com.android.tools.build.bundletool.model.BundleModule;
 import com.android.tools.build.bundletool.model.BundleModuleName;
 import com.android.tools.build.bundletool.model.ModuleZipEntry;
 import com.android.tools.build.bundletool.utils.ZipUtils;
+import com.android.tools.build.bundletool.version.BundleToolVersion;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
 import java.io.IOException;
@@ -67,6 +70,12 @@ public class BundleModulesValidator {
           new ModuleDependencyValidator(),
           new ResourceTableValidator());
 
+  private static final BundleConfig EMPTY_CONFIG_WITH_CURRENT_VERSION =
+      BundleConfig.newBuilder()
+          .setBundletool(
+              Bundletool.newBuilder().setVersion(BundleToolVersion.getCurrentVersion().toString()))
+          .build();
+
   public void validate(ImmutableList<Path> modulePaths) {
     // Name of the module zip file is name of the module it contains. Therefore filenames must
     // be unique.
@@ -103,6 +112,7 @@ public class BundleModulesValidator {
     try {
       return BundleModule.builder()
           .setName(moduleName)
+          .setBundleConfig(EMPTY_CONFIG_WITH_CURRENT_VERSION)
           .addEntries(
               moduleZipFile
                   .stream()

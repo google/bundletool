@@ -28,6 +28,7 @@ import com.android.tools.build.bundletool.mergers.SameTargetingMerger;
 import com.android.tools.build.bundletool.model.BundleModule;
 import com.android.tools.build.bundletool.model.ModuleSplit;
 import com.android.tools.build.bundletool.model.OptimizationDimension;
+import com.android.tools.build.bundletool.version.Version;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.protobuf.Int32Value;
@@ -47,12 +48,16 @@ public class ModuleSplitter {
   private final BundleModule module;
   private final ImmutableSet<OptimizationDimension> optimizationDimensions;
   private final SuffixManager suffixManager = new SuffixManager();
+  private final Version bundleVersion;
 
 
   public ModuleSplitter(
-      BundleModule module, ImmutableSet<OptimizationDimension> optimizationDimensions) {
+      BundleModule module,
+      ImmutableSet<OptimizationDimension> optimizationDimensions,
+      Version bundleVersion) {
     this.optimizationDimensions = optimizationDimensions;
     this.module = module;
+    this.bundleVersion = bundleVersion;
   }
 
 
@@ -99,7 +104,7 @@ public class ModuleSplitter {
     ImmutableList<ModuleSplit> defaultTargetingSplits =
         mergedSplits
             .stream()
-            .filter(split -> split.getTargeting().equals(ApkTargeting.getDefaultInstance()))
+            .filter(split -> split.getApkTargeting().equals(ApkTargeting.getDefaultInstance()))
             .collect(toImmutableList());
     checkState(defaultTargetingSplits.size() == 1, "Expected one split with default targeting.");
 
@@ -115,7 +120,7 @@ public class ModuleSplitter {
   private SplittingPipeline createResourcesSplittingPipeline() {
     ImmutableList.Builder<ModuleSplitSplitter> resourceSplitters = ImmutableList.builder();
     if (optimizationDimensions.contains(OptimizationDimension.SCREEN_DENSITY)) {
-      resourceSplitters.add(new ScreenDensityResourcesSplitter());
+      resourceSplitters.add(new ScreenDensityResourcesSplitter(bundleVersion));
     }
     if (optimizationDimensions.contains(OptimizationDimension.LANGUAGE)) {
       resourceSplitters.add(new LanguageResourcesSplitter());
@@ -146,13 +151,13 @@ public class ModuleSplitter {
 
   private ModuleSplit addLPlusTargeting(ModuleSplit split) {
     checkState(
-        !split.getTargeting().hasSdkVersionTargeting(), "Split already targets SDK version.");
+        !split.getApkTargeting().hasSdkVersionTargeting(), "Split already targets SDK version.");
 
     return split
         .toBuilder()
-        .setTargeting(
+        .setApkTargeting(
             split
-                .getTargeting()
+                .getApkTargeting()
                 .toBuilder()
                 .setSdkVersionTargeting(
                     SdkVersionTargeting.newBuilder()

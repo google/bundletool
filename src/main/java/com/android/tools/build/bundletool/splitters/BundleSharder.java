@@ -32,6 +32,7 @@ import com.android.tools.build.bundletool.model.BundleMetadata;
 import com.android.tools.build.bundletool.model.BundleModule;
 import com.android.tools.build.bundletool.model.ModuleSplit;
 import com.android.tools.build.bundletool.model.OptimizationDimension;
+import com.android.tools.build.bundletool.version.Version;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Multimaps;
@@ -51,9 +52,11 @@ import java.util.function.Predicate;
 public class BundleSharder {
 
   private final Path globalTempDir;
+  private final Version bundleVersion;
 
-  public BundleSharder(Path globalTempDir) {
+  public BundleSharder(Path globalTempDir, Version bundleVersion) {
     this.globalTempDir = globalTempDir;
+    this.bundleVersion = bundleVersion;
   }
 
   /**
@@ -138,7 +141,7 @@ public class BundleSharder {
       ImmutableSet<OptimizationDimension> shardingDimensions) {
     ImmutableList.Builder<ModuleSplitSplitter> resourceSplitters = ImmutableList.builder();
     if (shardingDimensions.contains(OptimizationDimension.SCREEN_DENSITY)) {
-      resourceSplitters.add(new ScreenDensityResourcesSplitter());
+      resourceSplitters.add(new ScreenDensityResourcesSplitter(bundleVersion));
     }
     return SplittingPipeline.create(resourceSplitters.build());
   }
@@ -168,16 +171,16 @@ public class BundleSharder {
     checkState(
         masterSplits
             .stream()
-            .allMatch(split -> split.getTargeting().equals(ApkTargeting.getDefaultInstance())),
+            .allMatch(split -> split.getApkTargeting().equals(ApkTargeting.getDefaultInstance())),
         "Master splits are expected to have default targeting.");
     checkState(
         Sets.intersection(Sets.newHashSet(abiSplits), Sets.newHashSet(densitySplits)).isEmpty(),
         "No split is expected to have both ABI and screen density targeting.");
     // Density splitter is expected to produce the same density universe for any module.
     checkState(
-        sameTargetedUniverse(densitySplits, split -> densityUniverse(split.getTargeting())),
+        sameTargetedUniverse(densitySplits, split -> densityUniverse(split.getApkTargeting())),
         "Density splits are expected to cover the same densities.");
-    if (!sameTargetedUniverse(abiSplits, split -> abiUniverse(split.getTargeting()))) {
+    if (!sameTargetedUniverse(abiSplits, split -> abiUniverse(split.getApkTargeting()))) {
       throw CommandExecutionException.builder()
           .withMessage(
               "Modules for standalone APKs must cover the same ABIs when optimizing for ABI.")
@@ -226,13 +229,13 @@ public class BundleSharder {
       ImmutableList<ModuleSplit> splits, Predicate<ApkTargeting> predicate) {
     return splits
         .stream()
-        .filter(split -> predicate.test(split.getTargeting()))
+        .filter(split -> predicate.test(split.getApkTargeting()))
         .collect(toImmutableSet());
   }
 
   private static Collection<Collection<ModuleSplit>> partitionByTargeting(
       Collection<ModuleSplit> splits) {
-    return Multimaps.index(splits, ModuleSplit::getTargeting).asMap().values();
+    return Multimaps.index(splits, ModuleSplit::getApkTargeting).asMap().values();
   }
 
   private static <T> Collection<Collection<T>> nonEmpty(Collection<Collection<T>> x) {

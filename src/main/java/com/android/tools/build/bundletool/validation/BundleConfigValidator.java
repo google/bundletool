@@ -15,13 +15,22 @@
  */
 package com.android.tools.build.bundletool.validation;
 
+import static com.google.common.collect.ImmutableList.toImmutableList;
+
 import com.android.bundle.Config.BundleConfig;
 import com.android.bundle.Config.Compression;
+import com.android.bundle.Config.Optimizations;
+import com.android.bundle.Config.SplitDimension;
 import com.android.tools.build.bundletool.exceptions.ValidationException;
 import com.android.tools.build.bundletool.model.AppBundle;
+import com.android.tools.build.bundletool.version.BundleToolVersion;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import java.nio.file.FileSystem;
 import java.nio.file.FileSystems;
+import java.util.Map;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 /** Validator of the BundleConfig. */
 public final class BundleConfigValidator extends SubValidator {
@@ -36,7 +45,9 @@ public final class BundleConfigValidator extends SubValidator {
   public void validateBundle(AppBundle bundle) {
     BundleConfig bundleConfig = bundle.getBundleConfig();
 
+    validateVersion(bundleConfig);
     validateCompression(bundleConfig.getCompression());
+    validateOptimizations(bundleConfig.getOptimizations());
   }
 
   private void validateCompression(Compression compression) {
@@ -57,6 +68,40 @@ public final class BundleConfigValidator extends SubValidator {
             .withMessage("Invalid uncompressed glob: '%s'.", pattern)
             .build();
       }
+    }
+  }
+
+  private void validateOptimizations(Optimizations optimizations) {
+    ImmutableList<SplitDimension.Value> duplicateSplitDimensions =
+        optimizations
+            // Construct Map<SplitDimension.Value, Long> that counts dimension occurrences.
+            .getSplitsConfig()
+            .getSplitDimensionList()
+            .stream()
+            .map(SplitDimension::getValue)
+            .collect(Collectors.groupingBy(Function.identity(), Collectors.counting()))
+            // Find dimension(s) occurring more than once.
+            .entrySet()
+            .stream()
+            .filter(mapEntry -> mapEntry.getValue() > 1)
+            .map(Map.Entry::getKey)
+            .collect(toImmutableList());
+    if (!duplicateSplitDimensions.isEmpty()) {
+      throw ValidationException.builder()
+          .withMessage(
+              "BundleConfig.pb contains duplicate split dimensions: %s", duplicateSplitDimensions)
+          .build();
+    }
+  }
+
+  private void validateVersion(BundleConfig bundleConfig) {
+    try {
+      BundleToolVersion.getVersionFromBundleConfig(bundleConfig);
+    } catch (ValidationException e) {
+      throw ValidationException.builder()
+          .withCause(e)
+          .withMessage("Invalid version in the BundleConfig.pb file.")
+          .build();
     }
   }
 }

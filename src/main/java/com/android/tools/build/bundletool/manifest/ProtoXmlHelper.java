@@ -63,6 +63,10 @@ public final class ProtoXmlHelper {
         .findFirst();
   }
 
+  public static Optional<XmlAttribute> findAttributeIgnoringNamespace(XmlElement el, String name) {
+    return el.getAttributeList().stream().filter(attributeWithName(name)).findFirst();
+  }
+
   /**
    * Returns the boolean value of the attribute.
    *

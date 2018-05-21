@@ -24,6 +24,7 @@ import static com.google.common.collect.ImmutableList.toImmutableList;
 
 import com.android.aapt.Resources.ResourceTable;
 import com.android.bundle.Targeting.ApkTargeting;
+import com.android.bundle.Targeting.VariantTargeting;
 import com.android.tools.build.bundletool.exceptions.CommandExecutionException;
 import com.android.tools.build.bundletool.manifest.AndroidManifest;
 import com.android.tools.build.bundletool.model.BundleMetadata;
@@ -147,12 +148,14 @@ public class ModuleSplitsToShardMerger {
                     .addAll(mergedEntriesByPath.values())
                     .addAll(mergedDexFiles)
                     .build())
-            .setTargeting(mergedSplitTargeting)
+            .setApkTargeting(mergedSplitTargeting)
+            .setStandalone(true)
             // We don't care about the following properties for shards. The values are set just to
             // satisfy contract of @AutoValue.Builder.
             // `nativeConfig` is optional and therefore not being set.
             .setMasterSplit(false)
-            .setModuleName(SHARD_MODULE_NAME);
+            .setModuleName(SHARD_MODULE_NAME)
+            .setVariantTargeting(VariantTargeting.getDefaultInstance());
     mergedResourceTable.ifPresent(shard::setResourceTable);
     return shard.build();
   }
@@ -266,7 +269,7 @@ public class ModuleSplitsToShardMerger {
 
   private ApkTargeting mergeSplitTargetings(ApkTargeting merged, ModuleSplit split) {
     try {
-      return MergingUtils.mergeShardTargetings(merged, split.getTargeting());
+      return MergingUtils.mergeShardTargetings(merged, split.getApkTargeting());
     } catch (CommandExecutionException | IllegalStateException e) {
       throw CommandExecutionException.builder()
           .withCause(e)

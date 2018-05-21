@@ -72,14 +72,14 @@ public class LanguageResourcesSplitter extends SplitterForOneTargetingDimension 
               .setEntries(
                   getEntriesForSplit(split.getEntries(), language, byLanguage.get(language)))
               .setResourceTable(byLanguage.get(language))
-              .setTargeting(
+              .setApkTargeting(
                   // Grouping by language may produce a special value "" for non-language specific
                   // resources. This won't end up in any language split hence we exclude it for the
                   // generation of language split targeting.
                   language.isEmpty()
-                      ? split.getTargeting()
+                      ? split.getApkTargeting()
                       : split
-                          .getTargeting()
+                          .getApkTargeting()
                           .toBuilder()
                           .setLanguageTargeting(
                               // Don't set alternatives for language targeting.

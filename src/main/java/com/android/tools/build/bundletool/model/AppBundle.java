@@ -67,7 +67,7 @@ public class AppBundle {
   public static AppBundle buildFromZip(ZipFile bundleFile) {
     BundleConfig bundleConfig = readBundleConfig(bundleFile);
     return new AppBundle(
-        sanitize(extractModules(bundleFile), bundleConfig),
+        sanitize(extractModules(bundleFile, bundleConfig), bundleConfig),
         bundleConfig,
         readBundleMetadata(bundleFile));
   }
@@ -106,7 +106,8 @@ public class AppBundle {
     return bundleMetadata;
   }
 
-  private static Map<BundleModuleName, BundleModule> extractModules(ZipFile bundleFile) {
+  private static Map<BundleModuleName, BundleModule> extractModules(
+      ZipFile bundleFile, BundleConfig bundleConfig) {
     Map<BundleModuleName, BundleModule.Builder> moduleBuilders = new HashMap<>();
     Enumeration<? extends ZipEntry> entries = bundleFile.entries();
     while (entries.hasMoreElements()) {
@@ -145,6 +146,9 @@ public class AppBundle {
                 "Error processing zip entry '%s' of module '%s'.", entry.getName(), moduleName)
             .build();
       }
+    }
+    for (BundleModule.Builder value : moduleBuilders.values()) {
+      value.setBundleConfig(bundleConfig);
     }
     return Maps.transformValues(moduleBuilders, BundleModule.Builder::build);
   }

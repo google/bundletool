@@ -16,6 +16,7 @@
 package com.android.tools.build.bundletool.optimizations;
 
 import static com.android.tools.build.bundletool.model.OptimizationDimension.ABI;
+import static com.android.tools.build.bundletool.model.OptimizationDimension.LANGUAGE;
 import static com.android.tools.build.bundletool.model.OptimizationDimension.SCREEN_DENSITY;
 import static com.google.common.base.Preconditions.checkNotNull;
 
@@ -42,7 +43,7 @@ public abstract class ApkOptimizations {
               .put(
                   Version.of("0.0.0-dev"),
                   ApkOptimizations.builder()
-                      .setSplitDimensions(ImmutableSet.of(ABI, SCREEN_DENSITY))
+                      .setSplitDimensions(ImmutableSet.of(ABI, SCREEN_DENSITY, LANGUAGE))
                       .build())
               .build();
 

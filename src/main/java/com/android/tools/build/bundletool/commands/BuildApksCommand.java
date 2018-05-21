@@ -61,6 +61,8 @@ import com.android.tools.build.bundletool.utils.flags.Flag;
 import com.android.tools.build.bundletool.utils.flags.Flag.Password;
 import com.android.tools.build.bundletool.utils.flags.ParsedFlags;
 import com.android.tools.build.bundletool.validation.AppBundleValidator;
+import com.android.tools.build.bundletool.version.BundleToolVersion;
+import com.android.tools.build.bundletool.version.Version;
 import com.google.auto.value.AutoValue;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
@@ -88,8 +90,8 @@ public abstract class BuildApksCommand {
 
   private static final Flag<Path> BUNDLE_LOCATION_FLAG = Flag.path("bundle");
   private static final Flag<Path> OUTPUT_FILE_FLAG = Flag.path("output");
-  private static final Flag<ImmutableList<OptimizationDimension>> OPTIMIZE_FOR_FLAG =
-      Flag.enumList("optimize-for", OptimizationDimension.class);
+  private static final Flag<ImmutableSet<OptimizationDimension>> OPTIMIZE_FOR_FLAG =
+      Flag.enumSet("optimize-for", OptimizationDimension.class);
   private static final Flag<Path> AAPT2_PATH_FLAG = Flag.path("aapt2");
   private static final Flag<Boolean> GENERATE_UNIVERSAL_APK_FLAG = Flag.booleanFlag("universal");
   private static final Flag<Integer> MAX_THREADS_FLAG = Flag.positiveInteger("max-threads");
@@ -211,10 +213,7 @@ public abstract class BuildApksCommand {
         .ifPresent(
             maxThreads ->
                 buildApksCommand.setExecutorService(createInternalExecutorService(maxThreads)));
-    OPTIMIZE_FOR_FLAG
-        .getValue(flags)
-        .ifPresent(
-            values -> buildApksCommand.setOptimizationDimensions(ImmutableSet.copyOf(values)));
+    OPTIMIZE_FOR_FLAG.getValue(flags).ifPresent(buildApksCommand::setOptimizationDimensions);
 
     // Signing-related arguments.
     Optional<Path> keystorePath = KEYSTORE_FLAG.getValue(flags);
@@ -258,6 +257,7 @@ public abstract class BuildApksCommand {
       bundleValidator.validate(appBundle);
 
       BundleConfig bundleConfig = appBundle.getBundleConfig();
+      Version bundleVersion = BundleToolVersion.getVersionFromBundleConfig(bundleConfig);
 
       ImmutableList<BundleModule> allModules =
           ImmutableList.copyOf(appBundle.getModules().values());
@@ -270,7 +270,7 @@ public abstract class BuildApksCommand {
           getGenerateOnlyUniversalApk()
               ? ApkOptimizations.getOptimizationsForUniversalApk()
               : new OptimizationsMerger()
-                  .mergeWithDefaults(appBundle.getBundleConfig(), getOptimizationDimensions());
+                  .mergeWithDefaults(bundleConfig, getOptimizationDimensions());
 
       // Generate APK variants.
       ImmutableList<Variant> splitApkVariants = ImmutableList.of();
@@ -280,7 +280,8 @@ public abstract class BuildApksCommand {
       boolean generateStandaloneApks = getGenerateOnlyUniversalApk() || targetsPreL(appBundle);
 
       if (generateSplitApks) {
-        splitApkVariants = generateSplitApkVariants(allModules, apkSetBuilder, apkOptimizations);
+        splitApkVariants =
+            generateSplitApkVariants(allModules, apkSetBuilder, apkOptimizations, bundleVersion);
       }
       if (generateStandaloneApks) {
         // Note: Universal APK is a special type of standalone, with no optimization dimensions.
@@ -293,7 +294,8 @@ public abstract class BuildApksCommand {
                 getGenerateOnlyUniversalApk(),
                 tempDir,
                 apkSetBuilder,
-                apkOptimizations);
+                apkOptimizations,
+                bundleVersion);
       }
 
       // Populate alternative targeting based on targeting of all variants.
@@ -349,12 +351,13 @@ public abstract class BuildApksCommand {
   private ImmutableList<Variant> generateSplitApkVariants(
       ImmutableList<BundleModule> modules,
       ApkSetBuilder apkSetBuilder,
-      ApkOptimizations apkOptimizations) {
+      ApkOptimizations apkOptimizations,
+      Version bundleVersion) {
     // For now we build just a single variant with hard-coded L+ targeting.
     Variant.Builder variant = Variant.newBuilder().setTargeting(lPlusVariantTargeting());
     for (BundleModule module : modules) {
       ModuleSplitter moduleSplitter =
-          new ModuleSplitter(module, apkOptimizations.getSplitDimensions());
+          new ModuleSplitter(module, apkOptimizations.getSplitDimensions(), bundleVersion);
       ImmutableList<ModuleSplit> splitApks = moduleSplitter.splitModule();
 
       List<ApkDescription> apkDescriptions =
@@ -382,10 +385,11 @@ public abstract class BuildApksCommand {
       boolean isUniversalApk,
       Path tempDir,
       ApkSetBuilder apkSetBuilder,
-      ApkOptimizations apkOptimizations) {
+      ApkOptimizations apkOptimizations,
+      Version bundleVersion) {
 
     ImmutableList<ModuleSplit> standaloneApks =
-        new BundleSharder(tempDir)
+        new BundleSharder(tempDir, bundleVersion)
             .shardBundle(modules, apkOptimizations.getSplitDimensions(), bundleMetadata);
 
     // Wait for all concurrent tasks to succeed, or any to fail.
@@ -445,7 +449,7 @@ public abstract class BuildApksCommand {
   }
 
   private static VariantTargeting standaloneApkVariantTargeting(ModuleSplit standaloneApk) {
-    ApkTargeting apkTargeting = standaloneApk.getTargeting();
+    ApkTargeting apkTargeting = standaloneApk.getApkTargeting();
 
     VariantTargeting.Builder variantTargeting = VariantTargeting.newBuilder();
     if (apkTargeting.hasAbiTargeting()) {
