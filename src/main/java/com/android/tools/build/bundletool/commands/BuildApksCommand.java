@@ -21,12 +21,10 @@ import static com.android.tools.build.bundletool.utils.files.FilePreconditions.c
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 
-import com.android.bundle.Commands.ApkDescription;
-import com.android.bundle.Commands.ApkSet;
 import com.android.bundle.Commands.BuildApksResult;
-import com.android.bundle.Commands.ModuleMetadata;
 import com.android.bundle.Commands.Variant;
 import com.android.bundle.Config.BundleConfig;
+import com.android.bundle.Config.Bundletool;
 import com.android.bundle.Config.Compression;
 import com.android.bundle.Targeting.ApkTargeting;
 import com.android.bundle.Targeting.SdkVersion;
@@ -36,6 +34,7 @@ import com.android.tools.build.bundletool.commands.CommandHelp.CommandDescriptio
 import com.android.tools.build.bundletool.commands.CommandHelp.FlagDescription;
 import com.android.tools.build.bundletool.exceptions.CommandExecutionException;
 import com.android.tools.build.bundletool.exceptions.ValidationException;
+import com.android.tools.build.bundletool.io.ApkSerializerManager;
 import com.android.tools.build.bundletool.io.ApkSetBuilderFactory;
 import com.android.tools.build.bundletool.io.ApkSetBuilderFactory.ApkSetBuilder;
 import com.android.tools.build.bundletool.io.SplitApkSerializer;
@@ -45,7 +44,6 @@ import com.android.tools.build.bundletool.model.Aapt2Command;
 import com.android.tools.build.bundletool.model.AppBundle;
 import com.android.tools.build.bundletool.model.BundleMetadata;
 import com.android.tools.build.bundletool.model.BundleModule;
-import com.android.tools.build.bundletool.model.BundleModuleName;
 import com.android.tools.build.bundletool.model.ModuleSplit;
 import com.android.tools.build.bundletool.model.OptimizationDimension;
 import com.android.tools.build.bundletool.model.SigningConfiguration;
@@ -54,7 +52,6 @@ import com.android.tools.build.bundletool.optimizations.OptimizationsMerger;
 import com.android.tools.build.bundletool.splitters.BundleSharder;
 import com.android.tools.build.bundletool.splitters.ModuleSplitter;
 import com.android.tools.build.bundletool.targeting.AlternativeVariantTargetingPopulator;
-import com.android.tools.build.bundletool.utils.ConcurrencyUtils;
 import com.android.tools.build.bundletool.utils.SdkToolsLocator;
 import com.android.tools.build.bundletool.utils.Versions;
 import com.android.tools.build.bundletool.utils.flags.Flag;
@@ -69,12 +66,10 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.io.MoreFiles;
 import com.google.common.util.concurrent.ListeningExecutorService;
 import com.google.common.util.concurrent.MoreExecutors;
-import com.google.protobuf.Int32Value;
 import java.io.IOException;
 import java.io.PrintStream;
 import java.nio.file.Path;
 import java.util.Arrays;
-import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.Executors;
 import java.util.stream.Collectors;
@@ -102,8 +97,6 @@ public abstract class BuildApksCommand {
   private static final Flag<Password> KEYSTORE_PASSWORD = Flag.password("ks-pass");
   private static final Flag<Password> KEY_PASSWORD = Flag.password("key-pass");
 
-  private static final ModuleMetadata STANDALONE_MODULE_METADATA =
-      ModuleMetadata.newBuilder().setName(BundleModuleName.BASE_MODULE_NAME).build();
   private static final String APK_SET_ARCHIVE_EXTENSION = "apks";
 
   public abstract Path getBundlePath();
@@ -272,40 +265,48 @@ public abstract class BuildApksCommand {
               : new OptimizationsMerger()
                   .mergeWithDefaults(bundleConfig, getOptimizationDimensions());
 
-      // Generate APK variants.
-      ImmutableList<Variant> splitApkVariants = ImmutableList.of();
-      ImmutableList<Variant> standaloneVariants = ImmutableList.of();
+      ImmutableList<ModuleSplit> splitApks = ImmutableList.of();
+      ImmutableList<ModuleSplit> standaloneApks = ImmutableList.of();
 
       boolean generateSplitApks = !getGenerateOnlyUniversalApk() && !targetsOnlyPreL(appBundle);
       boolean generateStandaloneApks = getGenerateOnlyUniversalApk() || targetsPreL(appBundle);
 
       if (generateSplitApks) {
-        splitApkVariants =
-            generateSplitApkVariants(allModules, apkSetBuilder, apkOptimizations, bundleVersion);
+        splitApks = generateSplitApks(allModules, apkOptimizations, bundleVersion);
       }
       if (generateStandaloneApks) {
         // Note: Universal APK is a special type of standalone, with no optimization dimensions.
         ImmutableList<BundleModule> modulesForFusing =
             allModules.stream().filter(BundleModule::isIncludedInFusing).collect(toImmutableList());
-        standaloneVariants =
-            generateStandaloneApkVariants(
+        standaloneApks =
+            generateStandaloneApks(
                 modulesForFusing,
                 appBundle.getBundleMetadata(),
                 getGenerateOnlyUniversalApk(),
                 tempDir,
-                apkSetBuilder,
                 apkOptimizations,
                 bundleVersion);
       }
 
-      // Populate alternative targeting based on targeting of all variants.
-      ImmutableList<Variant> allVariantsWithTargeting =
+      // Populate alternative targeting based on variant targeting of all APKs.
+      ImmutableList<ModuleSplit> allApks =
           AlternativeVariantTargetingPopulator.populateAlternativeVariantTargeting(
-              splitApkVariants, standaloneVariants);
+              splitApks, standaloneApks);
+
+      // Create variants and serialize APKs.
+      ImmutableList<Variant> allVariantsWithTargeting =
+          new ApkSerializerManager(getExecutorService())
+              .serializeAndGenerateAllVariants(
+                  allApks, apkSetBuilder, appBundle, getGenerateOnlyUniversalApk());
 
       // Finalize the output archive.
       apkSetBuilder.setTableOfContentsFile(
-          BuildApksResult.newBuilder().addAllVariant(allVariantsWithTargeting).build());
+          BuildApksResult.newBuilder()
+              .addAllVariant(allVariantsWithTargeting)
+              .setBundletool(
+                  Bundletool.newBuilder()
+                      .setVersion(BundleToolVersion.getCurrentVersion().toString()))
+              .build());
       apkSetBuilder.writeTo(getOutputFile());
     } catch (IOException e) {
       throw ValidationException.builder()
@@ -348,43 +349,25 @@ public abstract class BuildApksCommand {
     checkFileDoesNotExist(getOutputFile());
   }
 
-  private ImmutableList<Variant> generateSplitApkVariants(
+  private ImmutableList<ModuleSplit> generateSplitApks(
       ImmutableList<BundleModule> modules,
-      ApkSetBuilder apkSetBuilder,
       ApkOptimizations apkOptimizations,
       Version bundleVersion) {
-    // For now we build just a single variant with hard-coded L+ targeting.
-    Variant.Builder variant = Variant.newBuilder().setTargeting(lPlusVariantTargeting());
+    ImmutableList.Builder<ModuleSplit> builder = ImmutableList.builder();
     for (BundleModule module : modules) {
       ModuleSplitter moduleSplitter =
           new ModuleSplitter(module, apkOptimizations.getSplitDimensions(), bundleVersion);
       ImmutableList<ModuleSplit> splitApks = moduleSplitter.splitModule();
-
-      List<ApkDescription> apkDescriptions =
-          // Wait for all concurrent tasks to succeed, or any to fail.
-          ConcurrencyUtils.waitForAll(
-              splitApks
-                  .stream()
-                  .map(
-                      splitApk ->
-                          getExecutorService().submit(() -> apkSetBuilder.addSplitApk(splitApk)))
-                  .collect(toImmutableList()));
-
-      variant.addApkSet(
-          ApkSet.newBuilder()
-              .setModuleMetadata(module.getModuleMetadata())
-              .addAllApkDescription(apkDescriptions)
-              .build());
+      builder.addAll(splitApks);
     }
-    return ImmutableList.of(variant.build());
+    return builder.build();
   }
 
-  private ImmutableList<Variant> generateStandaloneApkVariants(
+  private ImmutableList<ModuleSplit> generateStandaloneApks(
       ImmutableList<BundleModule> modules,
       BundleMetadata bundleMetadata,
       boolean isUniversalApk,
       Path tempDir,
-      ApkSetBuilder apkSetBuilder,
       ApkOptimizations apkOptimizations,
       Version bundleVersion) {
 
@@ -392,39 +375,19 @@ public abstract class BuildApksCommand {
         new BundleSharder(tempDir, bundleVersion)
             .shardBundle(modules, apkOptimizations.getSplitDimensions(), bundleMetadata);
 
-    // Wait for all concurrent tasks to succeed, or any to fail.
-    return ConcurrencyUtils.waitForAll(
-        standaloneApks
-            .stream()
-            .map(
-                standaloneApk ->
-                    getExecutorService()
-                        .submit(
-                            () ->
-                                writeStandaloneApkVariant(
-                                    standaloneApk, isUniversalApk, apkSetBuilder)))
-            .collect(toImmutableList()));
-  }
-
-  private Variant writeStandaloneApkVariant(
-      ModuleSplit standaloneApk, boolean isUniversalApk, ApkSetBuilder apkSetBuilder) {
-
-    ApkDescription apkDescription =
-        isUniversalApk
-            ? apkSetBuilder.addStandaloneUniversalApk(standaloneApk)
-            : apkSetBuilder.addStandaloneApk(standaloneApk);
-
-    // Each standalone APK is represented as a single variant.
-    return Variant.newBuilder()
-        .setTargeting(
-            isUniversalApk
-                ? VariantTargeting.getDefaultInstance()
-                : standaloneApkVariantTargeting(standaloneApk))
-        .addApkSet(
-            ApkSet.newBuilder()
-                .setModuleMetadata(STANDALONE_MODULE_METADATA)
-                .addApkDescription(apkDescription))
-        .build();
+    return standaloneApks
+        .stream()
+        .map(
+            moduleSplit ->
+                moduleSplit
+                    .toBuilder()
+                    .setVariantTargeting(
+                        isUniversalApk
+                            ? VariantTargeting.getDefaultInstance()
+                            : standaloneApkVariantTargeting(moduleSplit))
+                    .setStandalone(true)
+                    .build())
+        .collect(toImmutableList());
   }
 
   private static boolean targetsOnlyPreL(AppBundle bundle) {
@@ -436,16 +399,6 @@ public abstract class BuildApksCommand {
   private static boolean targetsPreL(AppBundle bundle) {
     int baseMinSdkVersion = bundle.getBaseModule().getAndroidManifest().getEffectiveMinSdkVersion();
     return baseMinSdkVersion < Versions.ANDROID_L_API_VERSION;
-  }
-
-  private static VariantTargeting lPlusVariantTargeting() {
-    return VariantTargeting.newBuilder()
-        .setSdkVersionTargeting(
-            SdkVersionTargeting.newBuilder()
-                .addValue(
-                    SdkVersion.newBuilder()
-                        .setMin(Int32Value.newBuilder().setValue(Versions.ANDROID_L_API_VERSION))))
-        .build();
   }
 
   private static VariantTargeting standaloneApkVariantTargeting(ModuleSplit standaloneApk) {

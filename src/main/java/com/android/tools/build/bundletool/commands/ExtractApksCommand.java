@@ -20,21 +20,25 @@ import static com.android.tools.build.bundletool.utils.FileNames.TABLE_OF_CONTEN
 import static com.android.tools.build.bundletool.utils.files.FilePreconditions.checkDirectoryExists;
 import static com.android.tools.build.bundletool.utils.files.FilePreconditions.checkFileExistsAndReadable;
 import static com.google.common.base.Preconditions.checkNotNull;
+import static com.google.common.collect.ImmutableSet.toImmutableSet;
 
+import com.android.bundle.Commands.ApkSet;
 import com.android.bundle.Commands.BuildApksResult;
-import com.android.bundle.Devices.ApkMatchingMetadata;
+import com.android.bundle.Commands.ModuleMetadata;
 import com.android.bundle.Devices.DeviceSpec;
 import com.android.tools.build.bundletool.commands.CommandHelp.CommandDescription;
 import com.android.tools.build.bundletool.commands.CommandHelp.FlagDescription;
 import com.android.tools.build.bundletool.device.ApkMatcher;
-import com.android.tools.build.bundletool.device.ApkMatchingMetadataUtils;
 import com.android.tools.build.bundletool.exceptions.CommandExecutionException;
+import com.android.tools.build.bundletool.exceptions.ValidationException;
+import com.android.tools.build.bundletool.model.ZipPath;
 import com.android.tools.build.bundletool.utils.files.BufferedIo;
 import com.android.tools.build.bundletool.utils.flags.Flag;
 import com.android.tools.build.bundletool.utils.flags.ParsedFlags;
 import com.google.auto.value.AutoValue;
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.Sets;
 import com.google.common.io.ByteStreams;
 import com.google.common.io.MoreFiles;
 import com.google.protobuf.util.JsonFormat;
@@ -43,7 +47,8 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.Reader;
 import java.nio.file.Path;
-import java.util.Map.Entry;
+import java.util.Optional;
+import java.util.Set;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 
@@ -56,6 +61,8 @@ public abstract class ExtractApksCommand {
   private static final Flag<Path> APKS_ARCHIVE_FILE_FLAG = Flag.path("apks");
   private static final Flag<Path> DEVICE_SPEC_FLAG = Flag.path("device-spec");
   private static final Flag<Path> OUTPUT_DIRECTORY = Flag.path("output-dir");
+  private static final Flag<ImmutableSet<String>> MODULES_FLAG = Flag.stringSet("modules");
+
   private static final String JSON_EXTENSION = "json";
 
   public abstract Path getApksArchivePath();
@@ -63,6 +70,8 @@ public abstract class ExtractApksCommand {
   public abstract DeviceSpec getDeviceSpec();
 
   public abstract Path getOutputDirectory();
+
+  public abstract Optional<ImmutableSet<String>> getModules();
 
   public static Builder builder() {
     return new AutoValue_ExtractApksCommand.Builder();
@@ -77,6 +86,8 @@ public abstract class ExtractApksCommand {
 
     public abstract Builder setOutputDirectory(Path outputDirectory);
 
+    public abstract Builder setModules(ImmutableSet<String> modules);
+
     public abstract ExtractApksCommand build();
   }
 
@@ -84,20 +95,23 @@ public abstract class ExtractApksCommand {
     Path apksArchivePath = APKS_ARCHIVE_FILE_FLAG.getRequiredValue(flags);
     Path deviceSpecPath = DEVICE_SPEC_FLAG.getRequiredValue(flags);
     Path outputDirectory = OUTPUT_DIRECTORY.getRequiredValue(flags);
+    Optional<ImmutableSet<String>> modules = MODULES_FLAG.getValue(flags);
     flags.checkNoUnknownFlags();
 
-    ExtractApksCommand.Builder commandBuilder = builder();
+    ExtractApksCommand.Builder command = builder();
 
     checkFileExistsAndReadable(apksArchivePath);
-    commandBuilder.setApksArchivePath(apksArchivePath);
+    command.setApksArchivePath(apksArchivePath);
 
     checkFileExistsAndReadable(deviceSpecPath);
-    commandBuilder.setDeviceSpec(parseDeviceSpec(deviceSpecPath));
+    command.setDeviceSpec(parseDeviceSpec(deviceSpecPath));
 
     checkDirectoryExists(outputDirectory);
-    commandBuilder.setOutputDirectory(outputDirectory);
+    command.setOutputDirectory(outputDirectory);
 
-    return commandBuilder.build();
+    modules.ifPresent(command::setModules);
+
+    return command.build();
   }
 
   private static DeviceSpec parseDeviceSpec(Path deviceSpecFile) {
@@ -122,28 +136,49 @@ public abstract class ExtractApksCommand {
   }
 
   public ImmutableList<Path> execute() {
-    ImmutableMap<Path, ApkMatchingMetadata> apksToProcess =
-        ApkMatchingMetadataUtils.toApkMatchingMap(readTableOfContents());
+    validateInput();
 
-    ImmutableList.Builder<Path> matchedApksBuilder = ImmutableList.builder();
-    ApkMatcher apkMatcher = new ApkMatcher(getDeviceSpec());
-    for (Entry<Path, ApkMatchingMetadata> apk : apksToProcess.entrySet()) {
-      Path apkPath = apk.getKey();
-      ApkMatchingMetadata apkMatchingMetadata = apk.getValue();
-      if (apkMatcher.matchesApk(apkMatchingMetadata)) {
-        matchedApksBuilder.add(apkPath);
-      }
-    }
-    return extractMatchedApks(matchedApksBuilder.build());
+    ApkMatcher apkMatcher =
+        new ApkMatcher(getDeviceSpec(), /* allowedSplitModules= */ getModules());
+    ImmutableList<ZipPath> matchedApks = apkMatcher.getMatchingApks(readTableOfContents());
+
+    return extractMatchedApks(matchedApks);
   }
 
-  private ImmutableList<Path> extractMatchedApks(ImmutableList<Path> matchedApks) {
+  private void validateInput() {
+    if (getModules().isPresent()) {
+      ImmutableSet<String> modules = getModules().get();
+
+      if (modules.isEmpty()) {
+        throw new ValidationException("The set of modules cannot be empty.");
+      }
+
+      Set<String> unknownModules =
+          Sets.difference(
+              modules,
+              readTableOfContents()
+                  .getVariantList()
+                  .stream()
+                  .flatMap(variant -> variant.getApkSetList().stream())
+                  .map(ApkSet::getModuleMetadata)
+                  .map(ModuleMetadata::getName)
+                  .collect(toImmutableSet()));
+      if (!unknownModules.isEmpty()) {
+        throw ValidationException.builder()
+            .withMessage(
+                "The APK Set archive does not contain the following modules: %s", unknownModules)
+            .build();
+      }
+    }
+  }
+
+  private ImmutableList<Path> extractMatchedApks(ImmutableList<ZipPath> matchedApkPaths) {
     ImmutableList.Builder<Path> builder = ImmutableList.builder();
     try (ZipFile apksArchive = new ZipFile(getApksArchivePath().toFile())) {
-      for (Path matchedApk : matchedApks) {
+      for (ZipPath matchedApk : matchedApkPaths) {
         ZipEntry entry = apksArchive.getEntry(matchedApk.toString());
         checkNotNull(entry);
-        Path extractedApkPath = getOutputDirectory().resolve(matchedApk.getFileName());
+        Path extractedApkPath = getOutputDirectory().resolve(matchedApk.getFileName().toString());
         try (InputStream inputStream = BufferedIo.inputStream(apksArchive, entry);
             OutputStream outputApk = BufferedIo.outputStream(extractedApkPath)) {
           ByteStreams.copy(inputStream, outputApk);
@@ -151,14 +186,14 @@ public abstract class ExtractApksCommand {
         } catch (IOException e) {
           throw CommandExecutionException.builder()
               .withCause(e)
-              .withMessage("I/O error while extracting APK '%s' from the APK set.", matchedApk)
+              .withMessage("I/O error while extracting APK '%s' from the APK Set.", matchedApk)
               .build();
         }
       }
     } catch (IOException e) {
       throw CommandExecutionException.builder()
           .withCause(e)
-          .withMessage("I/O error while processing the APK set archive '%s'.", getApksArchivePath())
+          .withMessage("I/O error while processing the APK Set archive '%s'.", getApksArchivePath())
           .build();
     }
     return builder.build();
@@ -208,6 +243,16 @@ public abstract class ExtractApksCommand {
                 .setExampleValue("output-dir")
                 .setDescription(
                     "Path to where the matched APKs will be extracted from the archive file.")
+                .build())
+        .addFlag(
+            FlagDescription.builder()
+                .setFlagName(MODULES_FLAG.getName())
+                .setExampleValue("base,module1,module2")
+                .setOptional(true)
+                .setDescription(
+                    "When specified and the device matches split APKs, then only APKs of the "
+                        + "specified modules will be extracted. Cannot be used if the device "
+                        + "matches a non-split APK.")
                 .build())
         .build();
   }

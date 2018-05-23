@@ -4,21 +4,6 @@ package android.bundle;
 
 option java_package = "com.android.bundle";
 
-import "commands.proto";
-import "targeting.proto";
-
-// Describes the targeting and other information embedded in the APK to help
-// calculate if it should be delivered to the connected device.
-message ApkMatchingMetadata {
-  // The variant and its alternatives.
-  VariantTargeting variant_targeting = 1;
-
-  ApkTargeting apk_targeting = 2;
-
-  // For detecting dynamic modules.
-  ModuleMetadata module_metadata = 3;
-}
-
 message DeviceSpec {
   // Supported ABI architectures in the order of preference.
   // The values should be the string as reported by the platform, e.g.

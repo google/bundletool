@@ -34,6 +34,7 @@ import com.android.tools.build.bundletool.utils.flags.Flag;
 import com.android.tools.build.bundletool.utils.flags.ParsedFlags;
 import com.google.auto.value.AutoValue;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableSet;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Optional;
@@ -47,6 +48,7 @@ public abstract class InstallApksCommand {
   private static final Flag<Path> ADB_PATH_FLAG = Flag.path("adb");
   private static final Flag<Path> APKS_ARCHIVE_FILE_FLAG = Flag.path("apks");
   private static final Flag<String> DEVICE_ID_FLAG = Flag.string("device-id");
+  private static final Flag<ImmutableSet<String>> MODULES_FLAG = Flag.stringSet("modules");
 
   private static final String ANDROID_HOME_VARIABLE = "ANDROID_HOME";
 
@@ -59,6 +61,8 @@ public abstract class InstallApksCommand {
 
   public abstract Optional<String> getDeviceId();
 
+  public abstract Optional<ImmutableSet<String>> getModules();
+
   abstract AdbServer getAdbServer();
 
   public static Builder builder() {
@@ -68,14 +72,16 @@ public abstract class InstallApksCommand {
   /** Builder for the {@link InstallApksCommand}. */
   @AutoValue.Builder
   public abstract static class Builder {
-    public abstract InstallApksCommand.Builder setAdbPath(Path adbPath);
+    public abstract Builder setAdbPath(Path adbPath);
 
-    public abstract InstallApksCommand.Builder setApksArchivePath(Path apksArchivePath);
+    public abstract Builder setApksArchivePath(Path apksArchivePath);
 
-    public abstract InstallApksCommand.Builder setDeviceId(String deviceId);
+    public abstract Builder setDeviceId(String deviceId);
+
+    public abstract Builder setModules(ImmutableSet<String> modules);
 
     /** The caller is responsible for the lifecycle of the {@link AdbServer}. */
-    public abstract InstallApksCommand.Builder setAdbServer(AdbServer adbServer);
+    public abstract Builder setAdbServer(AdbServer adbServer);
 
     public abstract InstallApksCommand build();
   }
@@ -103,13 +109,14 @@ public abstract class InstallApksCommand {
                                     "Unable to determine the location of ADB. Please set the --adb "
                                         + "flag or define ANDROID_HOME environment variable.")));
     Optional<String> deviceSerialName = DEVICE_ID_FLAG.getValue(flags);
+    Optional<ImmutableSet<String>> modules = MODULES_FLAG.getValue(flags);
     flags.checkNoUnknownFlags();
 
-    InstallApksCommand.Builder commandBuilder =
+    InstallApksCommand.Builder command =
         builder().setAdbPath(adbPath).setAdbServer(adbServer).setApksArchivePath(apksArchivePath);
-    deviceSerialName.ifPresent(deviceSerialValue -> commandBuilder.setDeviceId(deviceSerialValue));
-
-    return commandBuilder.build();
+    deviceSerialName.ifPresent(command::setDeviceId);
+    modules.ifPresent(command::setModules);
+    return command.build();
   }
 
   public void execute() {
@@ -123,13 +130,13 @@ public abstract class InstallApksCommand {
         tempDir -> {
           DeviceSpec deviceSpec = new DeviceAnalyzer(adbServer).getDeviceSpec(getDeviceId());
 
-          ImmutableList<Path> extractedApks =
+          ExtractApksCommand.Builder extractApksCommand =
               ExtractApksCommand.builder()
                   .setApksArchivePath(getApksArchivePath())
                   .setDeviceSpec(deviceSpec)
-                  .setOutputDirectory(tempDir)
-                  .build()
-                  .execute();
+                  .setOutputDirectory(tempDir);
+          getModules().ifPresent(extractApksCommand::setModules);
+          ImmutableList<Path> extractedApks = extractApksCommand.build().execute();
 
           ApksInstaller installer = new ApksInstaller(adbServer);
           if (getDeviceId().isPresent()) {
@@ -180,6 +187,16 @@ public abstract class InstallApksCommand {
                 .setDescription(
                     "Device serial name. Required when more than one device or emulator is "
                         + "connected.")
+                .build())
+        .addFlag(
+            FlagDescription.builder()
+                .setFlagName(MODULES_FLAG.getName())
+                .setExampleValue("base,module1,module2")
+                .setOptional(true)
+                .setDescription(
+                    "When specified and the device matches split APKs, then only APKs of the "
+                        + "specified modules will be installed. Cannot be used if the device "
+                        + "matches a non-split APK.")
                 .build())
         .build();
   }

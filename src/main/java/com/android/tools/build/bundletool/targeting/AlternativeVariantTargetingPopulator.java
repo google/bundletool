@@ -17,14 +17,15 @@
 package com.android.tools.build.bundletool.targeting;
 
 import static com.google.common.base.Preconditions.checkArgument;
+import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.ImmutableSet.toImmutableSet;
 
-import com.android.bundle.Commands.Variant;
 import com.android.bundle.Targeting.Abi;
 import com.android.bundle.Targeting.ScreenDensity;
 import com.android.bundle.Targeting.SdkVersion;
 import com.android.bundle.Targeting.VariantTargeting;
+import com.android.tools.build.bundletool.model.ModuleSplit;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableCollection;
 import com.google.common.collect.ImmutableList;
@@ -39,65 +40,73 @@ import javax.annotation.CheckReturnValue;
 /** Adds alternative targeting in the {@code T} dimension. */
 public abstract class AlternativeVariantTargetingPopulator<T extends Message> {
 
-  public static ImmutableList<Variant> populateAlternativeVariantTargeting(
-      ImmutableList<Variant> splitApkVariants, ImmutableList<Variant> standaloneVariants) {
-    // Standalone variants currently target only ABI and density.
-    standaloneVariants =
-        new AbiAlternativesPopulator().addAlternativeVariantTargeting(standaloneVariants);
-    standaloneVariants =
-        new ScreenDensityAlternativesPopulator().addAlternativeVariantTargeting(standaloneVariants);
+  public static ImmutableList<ModuleSplit> populateAlternativeVariantTargeting(
+      ImmutableList<ModuleSplit> splitApks, ImmutableList<ModuleSplit> standaloneApks) {
+    standaloneApks = new AbiAlternativesPopulator().addAlternativeVariantTargeting(standaloneApks);
+    standaloneApks =
+        new ScreenDensityAlternativesPopulator().addAlternativeVariantTargeting(standaloneApks);
 
-    // Both standalone and split APK variants differ by SDK targeting.
     return new SdkVersionAlternativesPopulator()
-        .addAlternativeVariantTargeting(splitApkVariants, standaloneVariants);
+        .addAlternativeVariantTargeting(splitApks, standaloneApks);
   }
 
   /**
-   * Populates alternative targeting in dimension {@code T} in all variants.
+   * See AlternativeVariantTargetingPopulator#addAlternativeVariantTargeting(ImmutableList...)
    *
-   * <p>Does nothing when none of the variants targets dimension {@code T}.
-   *
-   * <p>Throws when some variants target dimension {@code T} and some don't. This is to protect the
-   * caller from mixing inappropriate variants.
+   * <p>This is a version for {@link ModuleSplit} type.
    */
   @CheckReturnValue
-  ImmutableList<Variant> addAlternativeVariantTargeting(ImmutableList<Variant>... variants) {
+  ImmutableList<ModuleSplit> addAlternativeVariantTargeting(ImmutableList<ModuleSplit>... splits) {
     return addAlternativeVariantTargeting(
-        Arrays.stream(variants).flatMap(Collection::stream).collect(toImmutableList()));
+        Arrays.stream(splits).flatMap(Collection::stream).collect(toImmutableList()));
   }
 
-  /** @see AlternativeVariantTargetingPopulator#addAlternativeVariantTargeting(ImmutableList...) */
   @CheckReturnValue
-  ImmutableList<Variant> addAlternativeVariantTargeting(ImmutableList<Variant> variants) {
+  ImmutableList<ModuleSplit> addAlternativeVariantTargeting(ImmutableList<ModuleSplit> apks) {
+    ImmutableList<VariantTargeting> variantTargeting =
+        apks.stream().map(ModuleSplit::getVariantTargeting).collect(toImmutableList());
+    variantTargeting = addAlternativeVariantTargetingInternal(variantTargeting);
+    checkState(variantTargeting.size() == apks.size());
+
+    ImmutableList.Builder<ModuleSplit> result = ImmutableList.builder();
+    for (int i = 0; i < apks.size(); i++) {
+      result.add(apks.get(i).toBuilder().setVariantTargeting(variantTargeting.get(i)).build());
+    }
+    return result.build();
+  }
+
+  @CheckReturnValue
+  ImmutableList<VariantTargeting> addAlternativeVariantTargetingInternal(
+      ImmutableList<VariantTargeting> variantTargetings) {
     ImmutableSet<Boolean> dimensionIsTargeted =
-        variants
+        variantTargetings
             .stream()
-            .map(variant -> !getValues(variant.getTargeting()).isEmpty())
+            .map(variantTargeting -> !getValues(variantTargeting).isEmpty())
             .collect(toImmutableSet());
     checkArgument(
         dimensionIsTargeted.size() <= 1,
         "Some variants are agnostic to the dimension, and some are not.");
-    if (variants.isEmpty() || !Iterables.getOnlyElement(dimensionIsTargeted)) {
+    if (variantTargetings.isEmpty() || !Iterables.getOnlyElement(dimensionIsTargeted)) {
       // Variants are entirely agnostic to the given dimension.
-      return variants;
+      return variantTargetings;
     }
 
     ImmutableSet<T> allValues =
-        variants
+        variantTargetings
             .stream()
-            .flatMap(variant -> getValues(variant.getTargeting()).stream())
+            .flatMap(variantTargeting -> getValues(variantTargeting).stream())
             .collect(toImmutableSet());
 
-    return variants
+    return variantTargetings
         .stream()
         .map(
-            variant -> {
-              Variant.Builder result = variant.toBuilder();
+            variantTargeting -> {
+              VariantTargeting.Builder result = variantTargeting.toBuilder();
               setDimensionAlternatives(
-                  result.getTargetingBuilder(),
+                  result,
                   ImmutableSet.copyOf(
                       Sets.difference(
-                          allValues, ImmutableSet.copyOf(getValues(variant.getTargeting())))));
+                          allValues, ImmutableSet.copyOf(getValues(variantTargeting)))));
               return result.build();
             })
         .collect(toImmutableList());

@@ -4,6 +4,7 @@ package android.bundle;
 
 option java_package = "com.android.bundle";
 
+import "config.proto";
 import "targeting.proto";
 
 // Describes the output of the "build-apks" command.
@@ -12,6 +13,9 @@ message BuildApksResult {
   // Variant is a group of APKs that covers a part of the device configuration
   // space. APKs from multiple variants are never combined on one device.
   repeated Variant variant = 1;
+
+  // Metadata about BundleTool used to build the APKs.
+  Bundletool bundletool = 2;
 }
 
 message Variant {
