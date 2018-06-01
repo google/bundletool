@@ -18,9 +18,11 @@ package com.android.tools.build.bundletool.device;
 
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.collect.ImmutableList.toImmutableList;
+import static java.lang.Thread.sleep;
 
 import com.android.ddmlib.AndroidDebugBridge;
 import com.android.tools.build.bundletool.exceptions.CommandExecutionException;
+import com.google.common.base.Stopwatch;
 import com.google.common.collect.ImmutableList;
 import com.google.errorprone.annotations.concurrent.GuardedBy;
 import java.nio.file.Path;
@@ -36,6 +38,7 @@ import javax.annotation.Nullable;
 public class DdmlibAdbServer extends AdbServer {
 
   private static final DdmlibAdbServer instance = new DdmlibAdbServer();
+  final private static long WAIT_DEVICE_LIST_TIMEOUT = 10000; // 10 seconds
 
   @Nullable private AndroidDebugBridge adb;
 
@@ -88,6 +91,11 @@ public class DdmlibAdbServer extends AdbServer {
   @Override
   public synchronized ImmutableList<Device> getDevicesInternal() {
     checkState(state == State.INITIALIZED, "Android Debug Bridge is not initialized.");
+
+    if (adb.isConnected() && !adb.hasInitialDeviceList()) {
+      waitTillDeviceListInit(WAIT_DEVICE_LIST_TIMEOUT);
+    }
+
     return Arrays.stream(adb.getDevices()).map(DdmlibDevice::new).collect(toImmutableList());
   }
 
@@ -103,5 +111,27 @@ public class DdmlibAdbServer extends AdbServer {
       AndroidDebugBridge.terminate();
     }
     state = State.CLOSED;
+  }
+
+  private void waitTillDeviceListInit(long timeoutMs) {
+    final long period = 100;
+    final Stopwatch stopwatch = Stopwatch.createStarted();
+    try {
+      // com.android.ddmlib.DeviceMonitor.updateDevices runs in another thread.
+      // Even if a device already connected, adb.getDevices() in our thread might still get zero
+      // since DeviceMonitor has not detected the connected-device yet.
+      // For that, we wait until 1) timeout  2) adb tell us the list has initialized
+      while (!adb.hasInitialDeviceList()
+              && stopwatch.elapsed().toMillis() < timeoutMs) {
+        sleep(period);
+      }
+    } catch (InterruptedException e) {
+      throw CommandExecutionException.builder()
+          .withCause(e)
+          .withMessage("Interrupted while waiting for ADB.")
+          .build();
+    } finally {
+      stopwatch.stop();
+    }
   }
 }
