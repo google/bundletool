@@ -25,6 +25,7 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 
 import com.android.tools.build.bundletool.exceptions.CommandExecutionException;
 import com.android.tools.build.bundletool.model.ZipPath;
+import com.android.tools.build.bundletool.utils.OsPlatform;
 import com.android.tools.build.bundletool.utils.flags.FlagParser.FlagParseException;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.MoreObjects;
@@ -43,6 +44,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 /**
@@ -53,6 +55,7 @@ import java.util.stream.Collectors;
 public abstract class Flag<T> {
 
   private static final Splitter KEY_VALUE_SPLITTER = Splitter.on(':').limit(2);
+  private static final Pattern HOME_DIRECTORY_ALIAS = Pattern.compile("^~");
 
   /** Boolean flag holding a single value. */
   public static Flag<Boolean> booleanFlag(String name) {
@@ -338,6 +341,9 @@ public abstract class Flag<T> {
 
     @Override
     protected Path parse(String value) {
+      if (OsPlatform.getCurrentPlatform() != OsPlatform.WINDOWS) {
+        value = HOME_DIRECTORY_ALIAS.matcher(value).replaceFirst(System.getProperty("user.home"));
+      }
       return Paths.get(value);
     }
   }

@@ -11,6 +11,7 @@ message BundleToolError {
   // include server paths and configuration.
   string exception_message = 1;
 
+  // Next id: 25
   oneof custom_error {
     ManifestMissingVersionCodeError manifest_missing_version_code = 2;
     ManifestInvalidVersionCodeError manifest_invalid_version_code = 3;
@@ -21,6 +22,7 @@ message BundleToolError {
         manifest_fusing_missing_include_attribute = 21;
 
     ManifestMaxSdkInvalidError manifest_max_sdk_invalid = 22;
+    ManifestMaxSdkLessThanMinInstantSdkError manifest_max_sdk_less_than_min_instant_sdk = 23;
     ManifestMinSdkInvalidError manifest_min_sdk_invalid = 19;
     ManifestMinSdkGreaterThanMaxSdkError manifest_min_sdk_greater_than_max = 20;
 
@@ -45,11 +47,16 @@ message BundleToolError {
     ResourceTableReferencesMissingFilesError
         resouce_table_references_missing_files = 16;
     ResourceTableUnreferencedFilesError resouce_table_unreferenced_files = 17;
+    ResourceTableMissingError resource_table_missing = 24;
   }
 }
 
 message ManifestMaxSdkInvalidError {
   string max_sdk = 1;
+}
+
+message ManifestMaxSdkLessThanMinInstantSdkError {
+  int32 max_sdk = 1;
 }
 
 message ManifestMinSdkInvalidError {
@@ -140,3 +147,6 @@ message ResourceTableUnreferencedFilesError {
   repeated string file_path = 2;
 }
 
+message ResourceTableMissingError {
+  string module_name = 1;
+}

@@ -23,12 +23,17 @@ import com.android.bundle.Targeting.ApkTargeting;
 import com.android.bundle.Targeting.SdkVersion;
 import com.android.bundle.Targeting.SdkVersionTargeting;
 import com.android.bundle.Targeting.VariantTargeting;
+import com.android.tools.build.bundletool.exceptions.CommandExecutionException;
+import java.util.stream.Stream;
 
-/** A {@link TargetingDimensionMatcher} that provides matching on SDK level. */
+/** A {@link TargetingDimensionMatcher} that provides matching on SDK version. */
 public final class SdkVersionMatcher extends TargetingDimensionMatcher<SdkVersionTargeting> {
+
+  private final int deviceSdkVersion;
 
   public SdkVersionMatcher(DeviceSpec deviceSpec) {
     super(deviceSpec);
+    deviceSdkVersion = deviceSpec.getSdkVersion();
   }
 
   @Override
@@ -40,16 +45,29 @@ public final class SdkVersionMatcher extends TargetingDimensionMatcher<SdkVersio
     SdkVersion sdkValue =
         targeting.getValueCount() == 0 ? SdkVersion.getDefaultInstance() : targeting.getValue(0);
 
-    if (!matchesDeviceSdk(sdkValue, getDeviceSpec().getSdkVersion())) {
+    // First check if any value or alternative matches the device spec. If not, this device is
+    // incompatible with the app.
+
+    boolean anyMatch =
+        Stream.concat(Stream.of(sdkValue), targeting.getAlternativesList().stream())
+            .anyMatch(sdkVal -> matchesDeviceSdk(sdkVal, deviceSdkVersion));
+
+    if (!anyMatch) {
+      throw CommandExecutionException.builder()
+          .withMessage(
+              "The app doesn't support SDK version of the device: (%d).",
+              getDeviceSpec().getSdkVersion())
+          .build();
+    }
+
+    if (!matchesDeviceSdk(sdkValue, deviceSdkVersion)) {
       return false;
     }
 
     // Check if there is a better match among alternatives.
     for (SdkVersion alternativeSdkValue : targeting.getAlternativesList()) {
       if (isBetterSdkMatch(
-          /* candidate= */ alternativeSdkValue,
-          /* contestedValue= */ sdkValue,
-          getDeviceSpec().getSdkVersion())) {
+          /* candidate= */ alternativeSdkValue, /* contestedValue= */ sdkValue, deviceSdkVersion)) {
         return false;
       }
     }

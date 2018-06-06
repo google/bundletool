@@ -23,10 +23,10 @@ import com.android.tools.build.bundletool.exceptions.CommandExecutionException;
 import com.android.tools.build.bundletool.utils.ThrowableUtils;
 import com.android.tools.build.bundletool.utils.files.FilePreconditions;
 import com.android.tools.r8.CompilationFailedException;
+import com.android.tools.r8.CompilationMode;
 import com.android.tools.r8.D8;
 import com.android.tools.r8.D8Command;
 import com.android.tools.r8.OutputMode;
-import com.android.tools.r8.errors.DexOverflowException;
 import com.google.common.collect.ImmutableList;
 import java.io.File;
 import java.nio.file.Path;
@@ -38,7 +38,10 @@ public class D8DexMerger implements DexMerger {
 
   @Override
   public ImmutableList<Path> merge(
-      ImmutableList<Path> dexFiles, Path outputDir, Optional<Path> mainDexListFile) {
+      ImmutableList<Path> dexFiles,
+      Path outputDir,
+      Optional<Path> mainDexListFile,
+      boolean isDebuggable) {
 
     try {
       validateInput(dexFiles, outputDir);
@@ -47,9 +50,15 @@ public class D8DexMerger implements DexMerger {
       // however we are merging existing dex files. The parameters considered are:
       // - classpathFiles, libraryFiles: Required for desugaring during compilation.
       // - minApiLevel: Corresponds to the minSdkVersion in the manifest.
-      // - mode (compilation mode): Controls type of debugging information in output dex files.
       D8Command.Builder command =
-          D8Command.builder().setOutput(outputDir, OutputMode.DexIndexed).addProgramFiles(dexFiles);
+          D8Command.builder()
+              .setOutput(outputDir, OutputMode.DexIndexed)
+              .addProgramFiles(dexFiles)
+              // Compilation mode affects whether D8 produces minimal main-dex.
+              // In debug mode minimal main-dex is always produced, so that the validity of the
+              // main-dex can be debugged. For release mode minimal main-dex is not produced and the
+              // primary dex file will be filled as appropriate.
+              .setMode(isDebuggable ? CompilationMode.DEBUG : CompilationMode.RELEASE);
       mainDexListFile.ifPresent(command::addMainDexListFiles);
 
       // D8 throws when main dex list is not provided and the merge result doesn't fit into a single
@@ -76,7 +85,8 @@ public class D8DexMerger implements DexMerger {
     // `mainDexClasses` is empty. Detection of the exception in the stacktrace is non-trivial and at
     // the time of writing this code it is suppressed exception of the root cause.
     if (ThrowableUtils.anyInCausalChainOrSuppressedMatches(
-        d8Exception, t -> t instanceof DexOverflowException)) {
+        d8Exception,
+        t -> t.getMessage().contains("Cannot fit requested classes in a single dex file"))) {
       return new CommandExecutionException(
           "Dex merging failed because the result does not fit into a single dex file and"
               + " multidex is not supported by the input.",

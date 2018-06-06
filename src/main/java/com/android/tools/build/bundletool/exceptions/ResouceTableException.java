@@ -20,6 +20,7 @@ import static com.google.common.base.Preconditions.checkNotNull;
 import static java.util.stream.Collectors.toList;
 
 import com.android.bundle.Errors.BundleToolError;
+import com.android.bundle.Errors.ResourceTableMissingError;
 import com.android.bundle.Errors.ResourceTableReferencesFilesOutsideResError;
 import com.android.bundle.Errors.ResourceTableReferencesMissingFilesError;
 import com.android.bundle.Errors.ResourceTableUnreferencedFilesError;
@@ -36,6 +37,25 @@ public class ResouceTableException extends ValidationException {
     super(String.format(checkNotNull(message), args));
   }
 
+  /**
+   * Resource table missing but there are references in {@code /res} (e.g. references {@code
+   * /raw/img.png})
+   */
+  public static class ResourceTableMissingException extends ResouceTableException {
+
+    private final String moduleName;
+
+    public ResourceTableMissingException(String moduleName) {
+      super("Module '%s' is missing resource table but contains resource files.", moduleName);
+      this.moduleName = moduleName;
+    }
+
+    @Override
+    protected void customizeProto(BundleToolError.Builder builder) {
+      builder.setResourceTableMissing(
+          ResourceTableMissingError.newBuilder().setModuleName(moduleName));
+    }
+  }
   /**
    * Resource table references a file outside of {@code /res} (e.g. references {@code /raw/img.png})
    */

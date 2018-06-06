@@ -19,6 +19,7 @@ package com.android.tools.build.bundletool.exceptions.manifest;
 import com.android.aapt.Resources.XmlAttribute;
 import com.android.bundle.Errors.BundleToolError;
 import com.android.bundle.Errors.ManifestMaxSdkInvalidError;
+import com.android.bundle.Errors.ManifestMaxSdkLessThanMinInstantSdkError;
 import com.android.bundle.Errors.ManifestMinSdkGreaterThanMaxSdkError;
 import com.android.bundle.Errors.ManifestMinSdkInvalidError;
 import com.google.errorprone.annotations.FormatMethod;
@@ -46,7 +47,7 @@ public abstract class ManifestSdkTargetingException extends ManifestValidationEx
     }
     
     public MaxSdkInvalidException(int value) {
-      super("maxSdkVersion must be nonnegative, found: '%d'.", value);
+      super("maxSdkVersion must be nonnegative, found: (%d).", value);
       this.maxSdk = Integer.toString(value);
     }
 
@@ -68,7 +69,7 @@ public abstract class ManifestSdkTargetingException extends ManifestValidationEx
     }
     
     public MinSdkInvalidException(int value) {
-      super("minSdkVersion must be nonnegative, found: '%d'.", value);
+      super("minSdkVersion must be nonnegative, found: (%d).", value);
       this.minSdk = Integer.toString(value);
     }
 
@@ -85,7 +86,7 @@ public abstract class ManifestSdkTargetingException extends ManifestValidationEx
     private final int maxSdk;
 
     public MinSdkGreaterThanMaxSdkException(int minSdk, int maxSdk) {
-      super("minSdkVersion ('%d') is greater than maxSdkVersion('%d').", minSdk, maxSdk);
+      super("minSdkVersion (%d) is greater than maxSdkVersion (%d).", minSdk, maxSdk);
       this.minSdk = minSdk;
       this.maxSdk = maxSdk;
     }
@@ -94,6 +95,26 @@ public abstract class ManifestSdkTargetingException extends ManifestValidationEx
     protected void customizeProto(BundleToolError.Builder builder) {
       builder.setManifestMinSdkGreaterThanMax(
           ManifestMinSdkGreaterThanMaxSdkError.newBuilder().setMinSdk(minSdk).setMaxSdk(maxSdk));
+    }
+  }
+
+  /** Thrown when {@code android:maxSdkVersion} is less than 21 */
+  public static class MaxSdkLessThanMinInstantSdk extends ManifestSdkTargetingException {
+
+    public static final int MIN_INSTANT_SDK_VERSION = 21;
+    private final int maxSdk;
+
+    public MaxSdkLessThanMinInstantSdk(int maxSdk) {
+      super(
+          "maxSdkVersion (%d) is less than minimum sdk allowed for instant apps (%d).",
+          maxSdk, MIN_INSTANT_SDK_VERSION);
+      this.maxSdk = maxSdk;
+    }
+
+    @Override
+    protected void customizeProto(BundleToolError.Builder builder) {
+      builder.setManifestMaxSdkLessThanMinInstantSdk(
+          ManifestMaxSdkLessThanMinInstantSdkError.newBuilder().setMaxSdk(maxSdk));
     }
   }
 }

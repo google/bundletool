@@ -70,9 +70,11 @@ public class ModuleSplitsToShardMerger {
       BundleModuleName.create(BundleModuleName.BASE_MODULE_NAME);
   private static final BundleModuleName SHARD_MODULE_NAME = BundleModuleName.create("base");
 
+  private final DexMerger dexMerger;
   private final Path globalTempDir;
 
-  public ModuleSplitsToShardMerger(Path globalTempDir) {
+  public ModuleSplitsToShardMerger(DexMerger dexMerger, Path globalTempDir) {
+    this.dexMerger = dexMerger;
     this.globalTempDir = globalTempDir;
   }
 
@@ -129,10 +131,11 @@ public class ModuleSplitsToShardMerger {
       }
     }
 
-    Collection<ModuleEntry> mergedDexFiles =
-        mergeDexFilesAndCache(dexFilesToMergeByModule, bundleMetadata, mergedDexCache);
-
     AndroidManifest mergedAndroidManifest = mergeAndroidManifests(androidManifestsToMergeByModule);
+
+    Collection<ModuleEntry> mergedDexFiles =
+        mergeDexFilesAndCache(
+            dexFilesToMergeByModule, bundleMetadata, mergedAndroidManifest, mergedDexCache);
 
     // Record names of the modules this shard was fused from.
     ImmutableList<String> fusedModuleNames = getUniqueModuleNames(splitsOfShard);
@@ -162,24 +165,15 @@ public class ModuleSplitsToShardMerger {
 
   private AndroidManifest mergeAndroidManifests(
       SetMultimap<BundleModuleName, AndroidManifest> manifestsToMergeByModule) {
-
-    Set<AndroidManifest> baseManifests = manifestsToMergeByModule.get(BASE_MODULE_NAME);
-
-    if (baseManifests.size() != 1) {
-      throw CommandExecutionException.builder()
-          .withMessage(
-              "Expected exactly one base module manifest, but found %d.", baseManifests.size())
-          .build();
-    }
-
     // For now assume that all necessary information has been propagated to the base manifest when
     // building the bundle. Actual manifest merging will be implemented later.
-    return Iterables.getOnlyElement(baseManifests);
+    return getOnlyBaseAndroidManifest(manifestsToMergeByModule);
   }
 
   private Collection<ModuleEntry> mergeDexFilesAndCache(
       ListMultimap<BundleModuleName, ModuleEntry> dexFilesToMergeByModule,
       BundleMetadata bundleMetadata,
+      AndroidManifest androidManifest,
       Map<ImmutableSet<ModuleEntry>, ImmutableList<Path>> mergedDexCache) {
 
     if (dexFilesToMergeByModule.keySet().size() <= 1) {
@@ -193,7 +187,8 @@ public class ModuleSplitsToShardMerger {
 
       ImmutableList<Path> mergedDexFiles =
           mergedDexCache.computeIfAbsent(
-              ImmutableSet.copyOf(dexEntries), key -> mergeDexFiles(dexEntries, bundleMetadata));
+              ImmutableSet.copyOf(dexEntries),
+              key -> mergeDexFiles(dexEntries, bundleMetadata, androidManifest));
 
       // Names of the merged dex files need to be preserved ("classes.dex", "classes2.dex" etc.).
       return mergedDexFiles
@@ -208,7 +203,9 @@ public class ModuleSplitsToShardMerger {
   }
 
   private ImmutableList<Path> mergeDexFiles(
-      List<ModuleEntry> dexEntries, BundleMetadata bundleMetadata) {
+      List<ModuleEntry> dexEntries,
+      BundleMetadata bundleMetadata,
+      AndroidManifest androidManifest) {
     try {
       Path dexOriginalDir = Files.createTempDirectory(globalTempDir, "dex-merging-in");
       // The merged dex files will be written to a sub-directory of the global temp directory
@@ -218,13 +215,15 @@ public class ModuleSplitsToShardMerger {
       // The dex merger requires the main dex list represented as a file.
       Optional<Path> mainDexListFile = writeMainDexListFileIfPresent(bundleMetadata);
 
+      boolean isDebuggable = androidManifest.getEffectiveApplicationDebuggable();
+
       // Write input dex data to temporary files "0.dex", "1.dex" etc. The names/order is not
       // important. The filenames just need to be unique and have the ".dex" extension.
       ImmutableList<Path> dexFiles =
           writeModuleEntriesToIndexedFiles(dexEntries, dexOriginalDir, /* fileSuffix= */ ".dex");
 
       ImmutableList<Path> mergedDexFiles =
-          new D8DexMerger().merge(dexFiles, dexMergedDir, mainDexListFile);
+          dexMerger.merge(dexFiles, dexMergedDir, mainDexListFile, isDebuggable);
 
       return mergedDexFiles;
 
@@ -293,6 +292,21 @@ public class ModuleSplitsToShardMerger {
       Files.copy(inputStream, mainDexListFile, StandardCopyOption.REPLACE_EXISTING);
     }
     return Optional.of(mainDexListFile);
+  }
+
+  private static AndroidManifest getOnlyBaseAndroidManifest(
+      SetMultimap<BundleModuleName, AndroidManifest> manifestsToMergeByModule) {
+
+    Set<AndroidManifest> baseManifests = manifestsToMergeByModule.get(BASE_MODULE_NAME);
+
+    if (baseManifests.size() != 1) {
+      throw CommandExecutionException.builder()
+          .withMessage(
+              "Expected exactly one base module manifest, but found %d.", baseManifests.size())
+          .build();
+    }
+
+    return Iterables.getOnlyElement(baseManifests);
   }
 
   private static ImmutableList<String> getUniqueModuleNames(

@@ -20,6 +20,7 @@ import com.android.tools.build.bundletool.exceptions.ValidationException;
 import com.android.tools.build.bundletool.exceptions.manifest.ManifestFusingException.BaseModuleExcludedFromFusingException;
 import com.android.tools.build.bundletool.exceptions.manifest.ManifestFusingException.ModuleFusingConfigurationMissingException;
 import com.android.tools.build.bundletool.exceptions.manifest.ManifestSdkTargetingException.MaxSdkInvalidException;
+import com.android.tools.build.bundletool.exceptions.manifest.ManifestSdkTargetingException.MaxSdkLessThanMinInstantSdk;
 import com.android.tools.build.bundletool.exceptions.manifest.ManifestSdkTargetingException.MinSdkGreaterThanMaxSdkException;
 import com.android.tools.build.bundletool.exceptions.manifest.ManifestSdkTargetingException.MinSdkInvalidException;
 import com.android.tools.build.bundletool.manifest.AndroidManifest;
@@ -32,9 +33,23 @@ public class AndroidManifestValidator extends SubValidator {
 
   @Override
   public void validateModule(BundleModule module) {
+    validateInstant(module);
     validateOnDemand(module);
     validateFusingConfig(module);
     validateMinMaxSdk(module);
+  }
+
+  private void validateInstant(BundleModule module) {
+    AndroidManifest manifest = module.getAndroidManifest();
+    Optional<Boolean> isInstantModule = manifest.isInstantModule();
+    if (isInstantModule.orElse(false)) {
+      // if it is an instant module, ensure that max sdk is > 21, as we cannot serve anything less
+      Optional<Integer> maxSdk = manifest.getMaxSdkVersion();
+      if (maxSdk.isPresent()
+          && maxSdk.get() < MaxSdkLessThanMinInstantSdk.MIN_INSTANT_SDK_VERSION) {
+        throw new MaxSdkLessThanMinInstantSdk(maxSdk.get());
+      }
+    }
   }
 
   private void validateOnDemand(BundleModule module) {

@@ -32,7 +32,7 @@ configurations {
 
 // The repackaging rules are defined in the "shadowJar" task below.
 dependencies {
-    compile "com.android.tools:r8:1.0.10"
+    compile "com.android.tools:r8:1.0.25"
     compile "com.android.tools.build:apkzlib:3.2.0-alpha06"
     compile "com.android.tools.ddms:ddmlib:26.2.0-alpha04"
 

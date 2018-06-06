@@ -16,6 +16,8 @@
 
 package com.android.tools.build.bundletool.device;
 
+import static com.google.common.base.Preconditions.checkState;
+
 import com.android.bundle.Devices.DeviceSpec;
 import com.android.ddmlib.IDevice.DeviceState;
 import com.android.tools.build.bundletool.exceptions.CommandExecutionException;
@@ -49,11 +51,19 @@ public class DeviceAnalyzer {
     try {
       Device device = getAndValidateDevice(deviceId);
 
+      // device.getVersion().getApiLevel() returns 1 in case of failure.
+      int deviceSdkVersion = device.getVersion().getApiLevel();
+      checkState(deviceSdkVersion > 1, "Error retrieving device SDK version. Please try again.");
+      int deviceDensity = device.getDensity();
+      checkState(deviceDensity > 0, "Error retrieving device density. Please try again.");
+      ImmutableList<String> supportedAbis = device.getAbis();
+      checkState(!supportedAbis.isEmpty(), "Error retrieving device ABIs. Please try again.");
+
       return DeviceSpec.newBuilder()
-          .setSdkVersion(device.getVersion().getApiLevel())
-          .addAllSupportedAbis(device.getAbis())
+          .setSdkVersion(deviceSdkVersion)
+          .addAllSupportedAbis(supportedAbis)
           .addSupportedLocales(getMainLocale(device))
-          .setScreenDensity(device.getDensity())
+          .setScreenDensity(deviceDensity)
           .build();
     } catch (TimeoutException e) {
       throw CommandExecutionException.builder()

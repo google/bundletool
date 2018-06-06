@@ -16,13 +16,16 @@
 package com.android.tools.build.bundletool.io;
 
 import static com.google.common.base.Preconditions.checkArgument;
+import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 
 import com.android.bundle.Commands.ApkDescription;
 import com.android.bundle.Commands.ApkSet;
 import com.android.bundle.Commands.ModuleMetadata;
 import com.android.bundle.Commands.Variant;
+import com.android.bundle.Devices.DeviceSpec;
 import com.android.bundle.Targeting.VariantTargeting;
+import com.android.tools.build.bundletool.device.ApkMatcher;
 import com.android.tools.build.bundletool.io.ApkSetBuilderFactory.ApkSetBuilder;
 import com.android.tools.build.bundletool.model.AppBundle;
 import com.android.tools.build.bundletool.model.BundleModule;
@@ -72,6 +75,29 @@ public class ApkSerializerManager {
     return Stream.of(standaloneVariants, splitVariants)
         .flatMap(Collection::stream)
         .collect(toImmutableList());
+  }
+
+  public Variant serializeAndGenerateVariantForDevice(
+      DeviceSpec deviceSpec,
+      ImmutableList<ModuleSplit> allApks,
+      ApkSetBuilder apkSetBuilder,
+      AppBundle appBundle) {
+
+    ImmutableList<ModuleSplit> filteredApks = filterApksForDevice(allApks, deviceSpec);
+
+    ImmutableList<Variant> variantList;
+    if (isAllStandalone(filteredApks)) {
+      variantList =
+          serializeAndGenerateStandaloneApkVariants(
+              filteredApks, apkSetBuilder, /* isUniversalApk= */ false);
+    } else if (isAllNotStandalone(filteredApks)) {
+      variantList = serializeAndGenerateSplitApkVariants(filteredApks, apkSetBuilder, appBundle);
+    } else {
+      throw new IllegalStateException("Expected APKs to be either all split or standalone.");
+    }
+
+    checkState(variantList.size() == 1);
+    return variantList.get(0);
   }
 
   private ImmutableList<Variant> serializeAndGenerateSplitApkVariants(
@@ -144,5 +170,19 @@ public class ApkSerializerManager {
                 .setModuleMetadata(STANDALONE_MODULE_METADATA)
                 .addApkDescription(apkDescription))
         .build();
+  }
+
+  private static ImmutableList<ModuleSplit> filterApksForDevice(
+      ImmutableList<ModuleSplit> allApks, DeviceSpec deviceSpec) {
+    ApkMatcher apkMatcher = new ApkMatcher(deviceSpec);
+    return allApks.stream().filter(apkMatcher::matchesModuleSplit).collect(toImmutableList());
+  }
+
+  private static boolean isAllStandalone(ImmutableList<ModuleSplit> moduleSplits) {
+    return moduleSplits.stream().allMatch(ModuleSplit::isStandalone);
+  }
+
+  private static boolean isAllNotStandalone(ImmutableList<ModuleSplit> moduleSplits) {
+    return moduleSplits.stream().noneMatch(ModuleSplit::isStandalone);
   }
 }

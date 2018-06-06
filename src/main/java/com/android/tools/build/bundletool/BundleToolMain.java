@@ -69,7 +69,9 @@ public class BundleToolMain {
           BuildBundleCommand.fromFlags(flags).execute();
           break;
         case BuildApksCommand.COMMAND_NAME:
-          BuildApksCommand.fromFlags(flags).execute();
+          try (AdbServer adbServer = DdmlibAdbServer.getInstance()) {
+            BuildApksCommand.fromFlags(flags, adbServer).execute();
+          }
           break;
         case ExtractApksCommand.COMMAND_NAME:
           ExtractApksCommand.fromFlags(flags).execute();

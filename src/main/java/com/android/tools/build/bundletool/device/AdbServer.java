@@ -33,23 +33,23 @@ public abstract class AdbServer implements Closeable {
   public abstract void init(Path pathToAdb);
 
   public ImmutableList<Device> getDevices() throws TimeoutException {
-    waitTillConnected(ADB_TIMEOUT_MS);
+    waitTillInitialDeviceListPopulated(ADB_TIMEOUT_MS);
     return getDevicesInternal();
   }
 
   protected abstract ImmutableList<Device> getDevicesInternal();
 
-  public abstract boolean isConnected();
+  public abstract boolean hasInitialDeviceList();
 
-  private final void waitTillConnected(long timeoutMs) throws TimeoutException {
-    if (isConnected()) {
+  private final void waitTillInitialDeviceListPopulated(long timeoutMs) throws TimeoutException {
+    if (hasInitialDeviceList()) {
       return;
     }
     Stopwatch stopwatch = Stopwatch.createStarted();
     try {
       // We typically need to wait a little for the ADB connection.
       sleep(50);
-      while (!isConnected()) {
+      while (!hasInitialDeviceList()) {
         if (stopwatch.elapsed().toMillis() > timeoutMs) {
           throw new TimeoutException(
               String.format("Timed out (%d ms) while waiting for ADB.", timeoutMs));

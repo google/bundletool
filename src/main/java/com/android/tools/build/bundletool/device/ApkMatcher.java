@@ -27,6 +27,7 @@ import com.android.bundle.Devices.DeviceSpec;
 import com.android.bundle.Targeting.ApkTargeting;
 import com.android.bundle.Targeting.VariantTargeting;
 import com.android.tools.build.bundletool.exceptions.CommandExecutionException;
+import com.android.tools.build.bundletool.model.ModuleSplit;
 import com.android.tools.build.bundletool.model.ZipPath;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
@@ -95,7 +96,7 @@ public class ApkMatcher {
         ApkTargeting apkTargeting = apkDescription.getTargeting();
         boolean isSplitApk = apkDescription.hasSplitApkMetadata();
 
-        if (matchesApk(apkTargeting, isSplitApk, moduleName)) {
+        if (matchesApkTargeting(apkTargeting, isSplitApk, moduleName)) {
           matchedApksBuilder.add(ZipPath.create(apkDescription.getPath()));
         }
       }
@@ -109,7 +110,8 @@ public class ApkMatcher {
    *
    * @return whether to deliver the APK to the device
    */
-  public boolean matchesApk(ApkTargeting apkTargeting, boolean isSplit, String moduleName) {
+  public boolean matchesApkTargeting(
+      ApkTargeting apkTargeting, boolean isSplit, String moduleName) {
     boolean matchesTargeting = matchesApkTargeting(apkTargeting);
 
     if (isSplit) {
@@ -126,14 +128,6 @@ public class ApkMatcher {
     }
   }
 
-  private boolean matchesVariantTargeting(VariantTargeting variantTargeting) {
-    return sdkVersionMatcher
-        .getVariantTargetingPredicate()
-        .and(abiMatcher.getVariantTargetingPredicate())
-        .and(screenDensityMatcher.getVariantTargetingPredicate())
-        .test(variantTargeting);
-  }
-
   private boolean matchesApkTargeting(ApkTargeting apkTargeting) {
     return sdkVersionMatcher
         .getApkTargetingPredicate()
@@ -141,5 +135,21 @@ public class ApkMatcher {
         .and(screenDensityMatcher.getApkTargetingPredicate())
         .and(languageMatcher.getApkTargetingPredicate())
         .test(apkTargeting);
+  }
+
+  public boolean matchesModuleSplit(ModuleSplit moduleSplit) {
+    return matchesVariantTargeting(moduleSplit.getVariantTargeting())
+        && matchesApkTargeting(
+            moduleSplit.getApkTargeting(),
+            /* isSplit= */ !moduleSplit.isStandalone(),
+            moduleSplit.getModuleName().getName());
+  }
+
+  private boolean matchesVariantTargeting(VariantTargeting variantTargeting) {
+    return sdkVersionMatcher
+        .getVariantTargetingPredicate()
+        .and(abiMatcher.getVariantTargetingPredicate())
+        .and(screenDensityMatcher.getVariantTargetingPredicate())
+        .test(variantTargeting);
   }
 }

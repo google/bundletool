@@ -22,6 +22,7 @@ import static com.google.common.collect.Sets.difference;
 import com.android.aapt.Resources.ResourceTable;
 import com.android.tools.build.bundletool.exceptions.ResouceTableException.ReferencesFileOutsideOfResException;
 import com.android.tools.build.bundletool.exceptions.ResouceTableException.ReferencesMissingFilesException;
+import com.android.tools.build.bundletool.exceptions.ResouceTableException.ResourceTableMissingException;
 import com.android.tools.build.bundletool.exceptions.ResouceTableException.UnreferencedResourcesException;
 import com.android.tools.build.bundletool.model.BundleModule;
 import com.android.tools.build.bundletool.model.ModuleEntry;
@@ -55,6 +56,10 @@ public class ResourceTableValidator extends SubValidator {
             .findEntriesUnderPath(BundleModule.RESOURCES_DIRECTORY)
             .map(ModuleEntry::getPath)
             .collect(toImmutableSet());
+
+    if (!resFiles.isEmpty() && !module.getResourceTable().isPresent()) {
+      throw new ResourceTableMissingException(moduleName);
+    }
 
     ImmutableSet<ZipPath> referencedFiles = ResourcesUtils.getAllFileReferences(resourceTable);
 

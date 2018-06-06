@@ -68,11 +68,13 @@ public abstract class AndroidManifest {
   public static final String USES_FEATURE_ELEMENT_NAME = "uses-feature";
   public static final String USES_SDK_ELEMENT_NAME = "uses-sdk";
 
+  public static final String DEBUGGABLE_ATTRIBUTE_NAME = "debuggable";
   public static final String EXTRACT_NATIVE_LIBS_ATTRIBUTE_NAME = "extractNativeLibs";
   public static final String GL_VERSION_ATTRIBUTE_NAME = "glEsVersion";
   public static final String MAX_SDK_VERSION_ATTRIBUTE_NAME = "maxSdkVersion";
   public static final String MIN_SDK_VERSION_ATTRIBUTE_NAME = "minSdkVersion";
 
+  public static final int DEBUGGABLE_RESOURCE_ID = 0x0101000f;
   public static final int EXTRACT_NATIVE_LIBS_RESOURCE_ID = 0x10104ea;
   public static final int HAS_CODE_RESOURCE_ID = 0x101000c;
   public static final int MAX_SDK_VERSION_RESOURCE_ID = 0x01010271;
@@ -136,6 +138,22 @@ public abstract class AndroidManifest {
                 .addNamespaceDeclaration(
                     XmlNamespace.newBuilder().setPrefix("android").setUri(ANDROID_NAMESPACE)))
         .build();
+  }
+
+  public boolean getEffectiveApplicationDebuggable() {
+    return getApplicationDebuggable().orElse(false);
+  }
+
+  /**
+   * Extracts value of the {@code <application android:debuggable>} attribute.
+   *
+   * @return An optional containing the value of the {@code debuggable} attribute if set, or an
+   *     empty optional if not set.
+   */
+  public Optional<Boolean> getApplicationDebuggable() {
+    return ProtoXmlHelper.getFirstElement(getManifestRoot(), APPLICATION_ELEMENT_NAME)
+        .flatMap(el -> findAttributeWithResourceId(el, DEBUGGABLE_RESOURCE_ID))
+        .map(ProtoXmlHelper::getAttributeValueAsBoolean);
   }
 
   public Optional<Integer> getMinSdkVersion() {
@@ -238,6 +256,15 @@ public abstract class AndroidManifest {
                 return findAttribute(el, DISTRIBUTION_NAMESPACE, "onDemand");
               }
             })
+        .map(ProtoXmlHelper::getAttributeValueAsBoolean);
+  }
+
+  public Optional<Boolean> isInstantModule() {
+    XmlElement manifest = getExactlyOneElement(getManifestRoot(), "manifest");
+    Optional<XmlElement> moduleElement =
+        findElementFromDirectChildren(manifest, "module", DISTRIBUTION_NAMESPACE);
+    return moduleElement
+        .flatMap(el -> findAttribute(el, DISTRIBUTION_NAMESPACE, "instant"))
         .map(ProtoXmlHelper::getAttributeValueAsBoolean);
   }
 

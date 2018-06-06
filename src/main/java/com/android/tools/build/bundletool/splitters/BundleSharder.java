@@ -26,6 +26,7 @@ import static com.google.common.collect.ImmutableSet.toImmutableSet;
 
 import com.android.bundle.Targeting.ApkTargeting;
 import com.android.tools.build.bundletool.exceptions.CommandExecutionException;
+import com.android.tools.build.bundletool.mergers.D8DexMerger;
 import com.android.tools.build.bundletool.mergers.ModuleSplitsToShardMerger;
 import com.android.tools.build.bundletool.mergers.SameTargetingMerger;
 import com.android.tools.build.bundletool.model.BundleMetadata;
@@ -98,7 +99,8 @@ public class BundleSharder {
     ImmutableList<ImmutableList<ModuleSplit>> unfusedShards = groupSplitsToShards(moduleSplits);
 
     // Fuse each group of splits into a sharded APK.
-    return new ModuleSplitsToShardMerger(globalTempDir).merge(unfusedShards, bundleMetadata);
+    return new ModuleSplitsToShardMerger(new D8DexMerger(), globalTempDir)
+        .merge(unfusedShards, bundleMetadata);
   }
 
   private ImmutableList<ModuleSplit> generateSplits(

@@ -32,9 +32,13 @@ public interface DexMerger {
    * @param outputDir an empty directory to write the merged dex files into
    * @param mainDexListFile file containing names of classes that need to be in the primary dex
    *     file. Specified using format "com/example/MyClass.class", one class name per line.
+   * @param isDebuggable indicates whether the Android app has the 'debuggable' flag set
    * @return merged dex files
    * @throws com.android.tools.build.bundletool.exceptions.CommandExecutionException on failure
    */
   ImmutableList<Path> merge(
-      ImmutableList<Path> dexFiles, Path outputDir, Optional<Path> mainDexListFile);
+      ImmutableList<Path> dexFiles,
+      Path outputDir,
+      Optional<Path> mainDexListFile,
+      boolean isDebuggable);
 }

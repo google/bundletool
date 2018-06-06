@@ -17,6 +17,7 @@
 package com.android.tools.build.bundletool.device;
 
 import static com.google.common.base.Preconditions.checkArgument;
+import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.ImmutableSet.toImmutableSet;
 
 import com.android.bundle.Devices.DeviceSpec;
@@ -25,11 +26,14 @@ import com.android.bundle.Targeting.Abi.AbiAlias;
 import com.android.bundle.Targeting.AbiTargeting;
 import com.android.bundle.Targeting.ApkTargeting;
 import com.android.bundle.Targeting.VariantTargeting;
+import com.android.tools.build.bundletool.exceptions.CommandExecutionException;
 import com.android.tools.build.bundletool.exceptions.ValidationException;
 import com.android.tools.build.bundletool.model.AbiName;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Sets;
 import com.google.common.collect.Sets.SetView;
+import java.util.stream.Stream;
 
 /** A {@link TargetingDimensionMatcher} that provides matching on ABI architecture. */
 public final class AbiMatcher extends TargetingDimensionMatcher<AbiTargeting> {
@@ -75,9 +79,24 @@ public final class AbiMatcher extends TargetingDimensionMatcher<AbiTargeting> {
         return false;
       }
     }
-    // Nothing matched. We successfully match only if we are supposed to match
-    // "everything else than in alternatives" when our values set is empty.
-    return valuesList.isEmpty();
+    // At this point we know that any device's abiAlias is not within values or alternatives.
+    // The only viable scenario is when the split has no values and the semantic is to match
+    // "all but alternatives". Otherwise, neither value or alternative can satisfy the device spec
+    // therefore this module can't be supported by the device.
+    if (!valuesList.isEmpty()) {
+      ImmutableList<String> supportedAbis =
+          Stream.concat(valuesList.stream(), alternativesList.stream())
+              .map(AbiName::fromProto)
+              .map(AbiName::getPlatformName)
+              .collect(toImmutableList());
+      throw CommandExecutionException.builder()
+          .withMessage(
+              "The app doesn't support ABI architectures of the device. "
+                  + "Device ABIs: %s, app ABIs: %s.",
+              getDeviceSpec().getSupportedAbisList(), supportedAbis)
+          .build();
+    }
+    return true;
   }
 
   @Override

@@ -92,9 +92,9 @@ public class DdmlibAdbServer extends AdbServer {
   }
 
   @Override
-  public synchronized boolean isConnected() {
+  public synchronized boolean hasInitialDeviceList() {
     checkState(state == State.INITIALIZED, "Android Debug Bridge is not initialized.");
-    return adb.isConnected();
+    return adb.hasInitialDeviceList();
   }
 
   @Override

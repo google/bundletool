@@ -17,6 +17,7 @@
 package com.android.tools.build.bundletool.commands;
 
 import static com.android.tools.build.bundletool.utils.files.FilePreconditions.checkFileDoesNotExist;
+import static com.android.tools.build.bundletool.utils.files.FilePreconditions.checkFileExistsAndExecutable;
 import static com.android.tools.build.bundletool.utils.files.FilePreconditions.checkFileExistsAndReadable;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.collect.ImmutableList.toImmutableList;
@@ -26,12 +27,15 @@ import com.android.bundle.Commands.Variant;
 import com.android.bundle.Config.BundleConfig;
 import com.android.bundle.Config.Bundletool;
 import com.android.bundle.Config.Compression;
+import com.android.bundle.Devices.DeviceSpec;
 import com.android.bundle.Targeting.ApkTargeting;
 import com.android.bundle.Targeting.SdkVersion;
 import com.android.bundle.Targeting.SdkVersionTargeting;
 import com.android.bundle.Targeting.VariantTargeting;
 import com.android.tools.build.bundletool.commands.CommandHelp.CommandDescription;
 import com.android.tools.build.bundletool.commands.CommandHelp.FlagDescription;
+import com.android.tools.build.bundletool.device.AdbServer;
+import com.android.tools.build.bundletool.device.DeviceAnalyzer;
 import com.android.tools.build.bundletool.exceptions.CommandExecutionException;
 import com.android.tools.build.bundletool.exceptions.ValidationException;
 import com.android.tools.build.bundletool.io.ApkSerializerManager;
@@ -52,7 +56,9 @@ import com.android.tools.build.bundletool.optimizations.OptimizationsMerger;
 import com.android.tools.build.bundletool.splitters.BundleSharder;
 import com.android.tools.build.bundletool.splitters.ModuleSplitter;
 import com.android.tools.build.bundletool.targeting.AlternativeVariantTargetingPopulator;
+import com.android.tools.build.bundletool.utils.EnvironmentVariableProvider;
 import com.android.tools.build.bundletool.utils.SdkToolsLocator;
+import com.android.tools.build.bundletool.utils.SystemEnvironmentVariableProvider;
 import com.android.tools.build.bundletool.utils.Versions;
 import com.android.tools.build.bundletool.utils.flags.Flag;
 import com.android.tools.build.bundletool.utils.flags.Flag.Password;
@@ -69,6 +75,7 @@ import com.google.common.util.concurrent.MoreExecutors;
 import java.io.IOException;
 import java.io.PrintStream;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.Arrays;
 import java.util.Optional;
 import java.util.concurrent.Executors;
@@ -91,6 +98,11 @@ public abstract class BuildApksCommand {
   private static final Flag<Boolean> GENERATE_UNIVERSAL_APK_FLAG = Flag.booleanFlag("universal");
   private static final Flag<Integer> MAX_THREADS_FLAG = Flag.positiveInteger("max-threads");
 
+  private static final Flag<Path> ADB_PATH_FLAG = Flag.path("adb");
+  private static final Flag<Boolean> CONNECTED_DEVICE_FLAG = Flag.booleanFlag("connected-device");
+  private static final Flag<String> DEVICE_ID_FLAG = Flag.string("device-id");
+  private static final String ANDROID_HOME_VARIABLE = "ANDROID_HOME";
+
   // Signing-related flags: should match flags from apksig library.
   private static final Flag<Path> KEYSTORE_FLAG = Flag.path("ks");
   private static final Flag<String> KEY_ALIAS_FLAG = Flag.string("ks-key-alias");
@@ -99,11 +111,24 @@ public abstract class BuildApksCommand {
 
   private static final String APK_SET_ARCHIVE_EXTENSION = "apks";
 
+  private static final EnvironmentVariableProvider DEFAULT_PROVIDER =
+      new SystemEnvironmentVariableProvider();
+
   public abstract Path getBundlePath();
 
   public abstract Path getOutputFile();
 
   public abstract ImmutableSet<OptimizationDimension> getOptimizationDimensions();
+
+  public abstract boolean getGenerateOnlyForConnectedDevice();
+
+  public abstract Optional<String> getDeviceId();
+
+  /** Required when getGenerateOnlyForConnectedDevice is true. */
+  abstract Optional<AdbServer> getAdbServer();
+
+  /** Required when getGenerateOnlyForConnectedDevice is true. */
+  public abstract Optional<Path> getAdbPath();
 
   public abstract boolean getGenerateOnlyUniversalApk();
 
@@ -117,6 +142,7 @@ public abstract class BuildApksCommand {
   public static Builder builder() {
     return new AutoValue_BuildApksCommand.Builder()
         .setGenerateOnlyUniversalApk(false)
+        .setGenerateOnlyForConnectedDevice(false)
         .setOptimizationDimensions(ImmutableSet.of())
         .setExecutorService(createInternalExecutorService(DEFAULT_THREAD_POOL_SIZE));
   }
@@ -141,6 +167,23 @@ public abstract class BuildApksCommand {
      * <p>The default is false. If this is set to {@code true}, no other APKs will be generated.
      */
     public abstract Builder setGenerateOnlyUniversalApk(boolean universalOnly);
+
+    /**
+     * Sets if the generated APK Set will contain APKs compatible only with the connected device.
+     */
+    public abstract Builder setGenerateOnlyForConnectedDevice(boolean onlyForConnectedDevice);
+
+    /**
+     * Sets the device serial number. Required if more than one device including emulators is
+     * connected.
+     */
+    public abstract Builder setDeviceId(String deviceId);
+
+    /** Path to the ADB binary. Required if ANDROID_HOME environment variable is not set. */
+    public abstract Builder setAdbPath(Path adbPath);
+
+    /** The caller is responsible for the lifecycle of the {@link AdbServer}. */
+    public abstract Builder setAdbServer(AdbServer adbServer);
 
     /** Provides a wrapper around the execution of the aapt2 command. */
     public abstract Builder setAapt2Command(Aapt2Command aapt2Command);
@@ -170,6 +213,12 @@ public abstract class BuildApksCommand {
             "Cannot generate universal APK and specify optimization dimensions at the same time.");
       }
 
+      if (command.getGenerateOnlyForConnectedDevice() && command.getGenerateOnlyUniversalApk()) {
+        throw new ValidationException(
+            "Cannot generate universal APK and optimize for the connected device "
+                + "at the same time.");
+      }
+
       if (!APK_SET_ARCHIVE_EXTENSION.equals(MoreFiles.getFileExtension(command.getOutputFile()))) {
         throw ValidationException.builder()
             .withMessage(
@@ -182,11 +231,15 @@ public abstract class BuildApksCommand {
     }
   }
 
-  public static BuildApksCommand fromFlags(ParsedFlags flags) {
-    return fromFlags(flags, System.out);
+  public static BuildApksCommand fromFlags(ParsedFlags flags, AdbServer adbServer) {
+    return fromFlags(flags, System.out, DEFAULT_PROVIDER, adbServer);
   }
 
-  static BuildApksCommand fromFlags(ParsedFlags flags, PrintStream out) {
+  static BuildApksCommand fromFlags(
+      ParsedFlags flags,
+      PrintStream out,
+      EnvironmentVariableProvider environmentVariableProvider,
+      AdbServer adbServer) {
     BuildApksCommand.Builder buildApksCommand =
         BuildApksCommand.builder()
             .setBundlePath(BUNDLE_LOCATION_FLAG.getRequiredValue(flags))
@@ -228,6 +281,31 @@ public abstract class BuildApksCommand {
               + "keystore via the flag --ks. See the command help for more information.");
     }
 
+    boolean connectedDeviceMode = CONNECTED_DEVICE_FLAG.getValue(flags).orElse(false);
+    CONNECTED_DEVICE_FLAG
+        .getValue(flags)
+        .ifPresent(buildApksCommand::setGenerateOnlyForConnectedDevice);
+    DEVICE_ID_FLAG.getValue(flags).ifPresent(buildApksCommand::setDeviceId);
+
+    // Applied only when --connected-device flag is set, because we don't want to fail command
+    // if ADB cannot be found in a normal mode.
+    if (connectedDeviceMode) {
+      Path adbPath =
+          ADB_PATH_FLAG
+              .getValue(flags)
+              .orElseGet(
+                  () ->
+                      environmentVariableProvider
+                          .getVariable(ANDROID_HOME_VARIABLE)
+                          .flatMap(path -> new SdkToolsLocator().locateAdb(Paths.get(path)))
+                          .orElseThrow(
+                              () ->
+                                  new CommandExecutionException(
+                                      "Unable to determine the location of ADB. Please set the "
+                                          + "--adb flag or define ANDROID_HOME environment "
+                                          + "variable.")));
+      buildApksCommand.setAdbPath(adbPath).setAdbServer(adbServer);
+    }
     flags.checkNoUnknownFlags();
 
     return buildApksCommand.build();
@@ -241,6 +319,12 @@ public abstract class BuildApksCommand {
     validateInput();
 
     Aapt2Command aapt2Command = getAapt2Command().orElseGet(() -> extractAapt2FromJar(tempDir));
+
+    // Fail fast with ADB before generating any APKs.
+    Optional<DeviceSpec> targetedDevice = Optional.empty();
+    if (getGenerateOnlyForConnectedDevice()) {
+      targetedDevice = Optional.of(getDeviceSpec());
+    }
 
     try (ZipFile bundleZip = new ZipFile(getBundlePath().toFile())) {
       AppBundleValidator bundleValidator = new AppBundleValidator();
@@ -271,6 +355,23 @@ public abstract class BuildApksCommand {
       boolean generateSplitApks = !getGenerateOnlyUniversalApk() && !targetsOnlyPreL(appBundle);
       boolean generateStandaloneApks = getGenerateOnlyUniversalApk() || targetsPreL(appBundle);
 
+      if (targetedDevice.isPresent()) {
+        if (targetedDevice.get().getSdkVersion() >= Versions.ANDROID_L_API_VERSION) {
+          generateStandaloneApks = false;
+          if (!generateSplitApks) {
+            throw new CommandExecutionException(
+                "App Bundle targets pre-L devices, but the device has SDK version higher "
+                    + "or equal to L.");
+          }
+        } else {
+          generateSplitApks = false;
+          if (!generateStandaloneApks) {
+            throw new CommandExecutionException(
+                "App Bundle targets L+ devices, but the device has SDK version lower than L.");
+          }
+        }
+      }
+
       if (generateSplitApks) {
         splitApks = generateSplitApks(allModules, apkOptimizations, bundleVersion);
       }
@@ -294,11 +395,18 @@ public abstract class BuildApksCommand {
               splitApks, standaloneApks);
 
       // Create variants and serialize APKs.
-      ImmutableList<Variant> allVariantsWithTargeting =
-          new ApkSerializerManager(getExecutorService())
-              .serializeAndGenerateAllVariants(
-                  allApks, apkSetBuilder, appBundle, getGenerateOnlyUniversalApk());
-
+      ApkSerializerManager apkSerializerManager = new ApkSerializerManager(getExecutorService());
+      ImmutableList<Variant> allVariantsWithTargeting = ImmutableList.of();
+      if (targetedDevice.isPresent()) {
+        allVariantsWithTargeting =
+            ImmutableList.of(
+                apkSerializerManager.serializeAndGenerateVariantForDevice(
+                    targetedDevice.get(), allApks, apkSetBuilder, appBundle));
+      } else {
+        allVariantsWithTargeting =
+            apkSerializerManager.serializeAndGenerateAllVariants(
+                allApks, apkSetBuilder, appBundle, getGenerateOnlyUniversalApk());
+      }
       // Finalize the output archive.
       apkSetBuilder.setTableOfContentsFile(
           BuildApksResult.newBuilder()
@@ -317,6 +425,13 @@ public abstract class BuildApksCommand {
 
 
     return getOutputFile();
+  }
+
+  private DeviceSpec getDeviceSpec() {
+    AdbServer adbServer = getAdbServer().get();
+    adbServer.init(getAdbPath().get());
+
+    return new DeviceAnalyzer(adbServer).getDeviceSpec(getDeviceId());
   }
 
   private ApkSetBuilder createApkSetBuilder(
@@ -347,6 +462,16 @@ public abstract class BuildApksCommand {
   private void validateInput() {
     checkFileExistsAndReadable(getBundlePath());
     checkFileDoesNotExist(getOutputFile());
+
+    if (getGenerateOnlyForConnectedDevice()) {
+      checkArgument(
+          getAdbServer().isPresent(),
+          "Property 'adbServer' is required when 'generateOnlyForConnectedDevice' is true.");
+      checkArgument(
+          getAdbPath().isPresent(),
+          "Property 'adbPath' is required when 'generateOnlyForConnectedDevice' is true.");
+      checkFileExistsAndExecutable(getAdbPath().get());
+    }
   }
 
   private ImmutableList<ModuleSplit> generateSplitApks(
@@ -438,8 +563,10 @@ public abstract class BuildApksCommand {
         .setCommandDescription(
             CommandDescription.builder()
                 .setShortDescription(
-                    "Generates an APK Set archive containing all possible split APKs and "
-                        + "standalone APKs.")
+                    "Generates an APK Set archive containing either all possible split APKs and "
+                        + "standalone APKs or APKs optimized for the connected device "
+                        + "(see %s flag).",
+                    CONNECTED_DEVICE_FLAG)
                 .build())
         .addFlag(
             FlagDescription.builder()
@@ -533,6 +660,35 @@ public abstract class BuildApksCommand {
                         + "is the first line of a file, e.g. 'file:/tmp/myPassword.txt'). If this "
                         + "flag is not set, the keystore password will be tried. If that fails, "
                         + "the password will be requested on the prompt.")
+                .build())
+        .addFlag(
+            FlagDescription.builder()
+                .setFlagName(CONNECTED_DEVICE_FLAG.getName())
+                .setOptional(true)
+                .setDescription(
+                    "If set, will generate APK Set optimized for the connected device. The "
+                        + "generated APK Set will only be installable on that specific class of "
+                        + "devices.")
+                .build())
+        .addFlag(
+            FlagDescription.builder()
+                .setFlagName(ADB_PATH_FLAG.getName())
+                .setExampleValue("path/to/adb")
+                .setOptional(true)
+                .setDescription(
+                    "Path to the adb utility. If absent, an attempt will be made to locate it if "
+                        + "the %s environment variable is set. Used only if %s flag is set.",
+                    ANDROID_HOME_VARIABLE, CONNECTED_DEVICE_FLAG)
+                .build())
+        .addFlag(
+            FlagDescription.builder()
+                .setFlagName(DEVICE_ID_FLAG.getName())
+                .setExampleValue("device-serial-name")
+                .setOptional(true)
+                .setDescription(
+                    "Device serial name. Required when more than one device or emulator is "
+                        + "connected. Used only if %s flag is set.",
+                    CONNECTED_DEVICE_FLAG)
                 .build())
         .build();
   }

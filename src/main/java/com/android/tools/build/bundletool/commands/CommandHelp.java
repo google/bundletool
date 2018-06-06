@@ -151,6 +151,12 @@ public abstract class CommandHelp {
       /** Sets the short description of the command. */
       abstract Builder setShortDescription(String shortDescription);
 
+      /** Same as {@link #setShortDescription(String)} but allowing formatted string. */
+      @FormatMethod
+      Builder setShortDescription(String shortDescriptionFormat, Object... args) {
+        return setShortDescription(String.format(shortDescriptionFormat, args));
+      }
+
       abstract ImmutableList.Builder<String> additionalParagraphsBuilder();
 
       /** Adds an additional paragraph of the command description. */
