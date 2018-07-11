@@ -26,7 +26,7 @@ import com.android.aapt.Resources.ResourceTable;
 import com.android.bundle.Targeting.ApkTargeting;
 import com.android.bundle.Targeting.VariantTargeting;
 import com.android.tools.build.bundletool.exceptions.CommandExecutionException;
-import com.android.tools.build.bundletool.manifest.AndroidManifest;
+import com.android.tools.build.bundletool.model.AndroidManifest;
 import com.android.tools.build.bundletool.model.BundleMetadata;
 import com.android.tools.build.bundletool.model.BundleModuleName;
 import com.android.tools.build.bundletool.model.FileSystemModuleEntry;
@@ -119,7 +119,7 @@ public class ModuleSplitsToShardMerger {
       mergedSplitTargeting = mergeSplitTargetings(mergedSplitTargeting, split);
 
       // Android manifests need to be merged later, globally for all splits.
-      androidManifestsToMergeByModule.put(split.getModuleName(), split.getAndroidManifest().get());
+      androidManifestsToMergeByModule.put(split.getModuleName(), split.getAndroidManifest());
 
       for (ModuleEntry entry : split.getEntries()) {
         if (entry.getPath().startsWith(DEX_DIRECTORY) && !entry.isDirectory()) {

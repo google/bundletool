@@ -1,0 +1,81 @@
+/*
+ * Copyright (C) 2018 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License
+ */
+
+package com.android.tools.build.bundletool.device;
+
+import com.android.bundle.Devices.DeviceSpec;
+import com.android.tools.build.bundletool.exceptions.ValidationException;
+import com.android.tools.build.bundletool.utils.files.BufferedIo;
+import com.google.common.io.MoreFiles;
+import com.google.protobuf.util.JsonFormat;
+import java.io.IOException;
+import java.io.Reader;
+import java.io.UncheckedIOException;
+import java.nio.file.Path;
+
+/** Parses the device spec JSON files. */
+public class DeviceSpecParser {
+
+  private static final String JSON_EXTENSION = "json";
+
+  public static DeviceSpec parseDeviceSpec(Path deviceSpecFile) {
+    if (!JSON_EXTENSION.equals(MoreFiles.getFileExtension(deviceSpecFile))) {
+      throw ValidationException.builder()
+          .withMessage(
+              "Expected .json extension for the device spec file but found '%s'.",
+              deviceSpecFile.getFileName())
+          .build();
+    }
+    try (Reader deviceSpecReader = BufferedIo.reader(deviceSpecFile)) {
+      return parseDeviceSpec(deviceSpecReader);
+    } catch (IOException e) {
+      throw new UncheckedIOException(
+          String.format("Error while reading the device spec file '%s'.", deviceSpecFile), e);
+    }
+  }
+
+  public static DeviceSpec parseDeviceSpec(Reader deviceSpecReader) throws IOException {
+    DeviceSpec.Builder builder = DeviceSpec.newBuilder();
+    JsonFormat.parser().merge(deviceSpecReader, builder);
+    DeviceSpec deviceSpec = builder.build();
+    validateDeviceSpec(deviceSpec);
+    return deviceSpec;
+  }
+
+  public static void validateDeviceSpec(DeviceSpec deviceSpec) {
+    if (deviceSpec.getSdkVersion() <= 0) {
+      throw ValidationException.builder()
+          .withMessage(
+              "Device spec SDK version (%d) is not a positive number.", deviceSpec.getSdkVersion())
+          .build();
+    }
+    if (deviceSpec.getScreenDensity() <= 0) {
+      throw ValidationException.builder()
+          .withMessage(
+              "Device spec screen density (%d) is not a positive number.",
+              deviceSpec.getScreenDensity())
+          .build();
+    }
+    if (deviceSpec.getSupportedAbisList().isEmpty()) {
+      throw new ValidationException("Device spec supported ABI list is empty.");
+    }
+    if (deviceSpec.getSupportedLocalesList().isEmpty()) {
+      throw new ValidationException("Device spec supported locales list is empty.");
+    }
+  }
+
+  private DeviceSpecParser() {}
+}

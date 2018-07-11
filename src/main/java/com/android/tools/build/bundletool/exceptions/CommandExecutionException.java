@@ -38,14 +38,14 @@ public class CommandExecutionException extends RuntimeException {
   public CommandExecutionException(Throwable cause) {
     super(cause);
   }
-  
+
   public BundleToolError toProto() {
     BundleToolError.Builder builder =
         BundleToolError.newBuilder().setExceptionMessage(getMessage());
     customizeProto(builder);
     return builder.build();
   }
-  
+
   protected void customizeProto(BundleToolError.Builder builder) {}
 
   public static Builder builder() {

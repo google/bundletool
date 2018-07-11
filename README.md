@@ -3,7 +3,7 @@
 Bundletool is a tool to manipulate Android App Bundles.
 
 The **Android App Bundle** is a new format for publishing Android apps in app
-distribution stores such as the Play Store.
+distribution stores such as Google Play.
 
 Bundletool has a few different responsibilities:
 
@@ -24,5 +24,4 @@ Read more about the App Bundle format and Bundletool's usage at
 
 ## Releases
 
-Latest release: [0.4.2](https://github.com/google/bundletool/releases)
-
+Latest release: [0.5.0](https://github.com/google/bundletool/releases)

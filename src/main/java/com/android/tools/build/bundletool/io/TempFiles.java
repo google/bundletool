@@ -21,6 +21,7 @@ import static com.google.common.io.RecursiveDeleteOption.ALLOW_INSECURE;
 import com.google.common.base.Throwables;
 import com.google.common.io.MoreFiles;
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.logging.Logger;
@@ -50,7 +51,7 @@ public final class TempFiles {
       tempDir = Files.createTempDirectory("temp");
       return action.apply(tempDir);
     } catch (IOException e) {
-      throw new RuntimeException(e);
+      throw new UncheckedIOException(e);
     } finally {
       if (tempDir != null) {
         deleteRecursivelyIgnoringErrors(tempDir);

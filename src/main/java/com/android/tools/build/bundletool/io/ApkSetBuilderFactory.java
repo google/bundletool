@@ -21,7 +21,6 @@ import static com.android.tools.build.bundletool.utils.files.FilePreconditions.c
 
 import com.android.bundle.Commands.ApkDescription;
 import com.android.bundle.Commands.BuildApksResult;
-import com.android.tools.build.bundletool.exceptions.CommandExecutionException;
 import com.android.tools.build.bundletool.io.ZipBuilder.EntryOption;
 import com.android.tools.build.bundletool.model.ModuleSplit;
 import com.android.tools.build.bundletool.model.ZipPath;
@@ -30,6 +29,7 @@ import com.google.protobuf.Message;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.OutputStream;
+import java.io.UncheckedIOException;
 import java.nio.file.Path;
 
 /** Factory for {@link ApkSetBuilder}. */
@@ -118,10 +118,8 @@ public final class ApkSetBuilderFactory {
       try {
         apkSetZipBuilder.writeTo(destinationPath);
       } catch (IOException e) {
-        throw CommandExecutionException.builder()
-            .withCause(e)
-            .withMessage("Error while writing the APK Set archive to '%s'.", destinationPath)
-            .build();
+        throw new UncheckedIOException(
+            String.format("Error while writing the APK Set archive to '%s'.", destinationPath), e);
       }
     }
   }

@@ -49,6 +49,7 @@ public class AppBundleValidator {
           new NativeTargetingValidator(),
           // Other.
           new ModuleDependencyValidator(),
+          new ModuleTitleValidator(),
           new ResourceTableValidator());
 
   /**

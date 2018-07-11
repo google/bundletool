@@ -20,6 +20,7 @@ import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
 
 import com.android.bundle.Targeting.AssetsDirectoryTargeting;
+import com.android.bundle.Targeting.GraphicsApiTargeting;
 import com.android.bundle.Targeting.LanguageTargeting;
 import com.android.tools.build.bundletool.exceptions.ValidationException;
 import com.android.tools.build.bundletool.model.ZipPath;
@@ -41,14 +42,21 @@ public abstract class TargetedDirectorySegment {
 
   private static final Pattern LANGUAGE_CODE_PATTERN = Pattern.compile("^[a-zA-Z]{2,3}$");
 
+  private static final String OPENGL_KEY = "opengl";
+  private static final String VULKAN_KEY = "vulkan";
+  private static final String LANG_KEY = "lang";
+  private static final String TCF_KEY = "tcf";
+
   private static final ImmutableMap<String, TargetingDimension> KEY_TO_DIMENSION =
       ImmutableMap.<String, TargetingDimension>builder()
-          .put("opengl", TargetingDimension.GRAPHICS_API)
-          .put("lang", TargetingDimension.LANGUAGE)
-          .put("tcf", TargetingDimension.TEXTURE_COMPRESSION_FORMAT)
+          .put(OPENGL_KEY, TargetingDimension.GRAPHICS_API)
+          .put(VULKAN_KEY, TargetingDimension.GRAPHICS_API)
+          .put(LANG_KEY, TargetingDimension.LANGUAGE)
+          .put(TCF_KEY, TargetingDimension.TEXTURE_COMPRESSION_FORMAT)
           .build();
 
   private static final Pattern OPENGL_VALUE_PATTERN = Pattern.compile("(\\d)\\.(\\d)");
+  private static final Pattern VULKAN_VALUE_PATTERN = Pattern.compile("(\\d)\\.(\\d)");
 
   public abstract String getName();
 
@@ -106,7 +114,7 @@ public abstract class TargetedDirectorySegment {
 
     switch (KEY_TO_DIMENSION.get(key)) {
       case GRAPHICS_API:
-        return parseGraphicsApi(name, value);
+        return parseGraphicsApi(name, key, value);
       case LANGUAGE:
         return parseLanguage(name, value);
       case TEXTURE_COMPRESSION_FORMAT:
@@ -116,19 +124,41 @@ public abstract class TargetedDirectorySegment {
     }
   }
 
-  private static AssetsDirectoryTargeting parseGraphicsApi(String name, String value) {
-    Matcher matcher = OPENGL_VALUE_PATTERN.matcher(value);
-    if (matcher.matches()) {
-      return AssetsDirectoryTargeting.newBuilder()
-          .setGraphicsApi(
-              GraphicsApiUtils.openGlVersionFrom(
-                  Integer.parseInt(matcher.group(1)), Integer.parseInt(matcher.group(2))))
-          .build();
-    } else {
-      throw ValidationException.builder()
-          .withMessage("Unrecognized opengl version '%s' for the directory '%s'.", value, name)
-          .build();
+  private static AssetsDirectoryTargeting parseGraphicsApi(String name, String key, String value) {
+    GraphicsApiTargeting graphicsApiTargeting;
+    Matcher matcher;
+    switch (key) {
+      case OPENGL_KEY:
+        matcher = OPENGL_VALUE_PATTERN.matcher(value);
+        if (!matcher.matches()) {
+          throw ValidationException.builder()
+              .withMessage(
+                  "Could not parse OpenGL version '%s' for the directory '%s'.", value, name)
+              .build();
+        }
+        graphicsApiTargeting =
+            GraphicsApiUtils.openGlVersionFrom(
+                Integer.parseInt(matcher.group(1)), Integer.parseInt(matcher.group(2)));
+        break;
+
+      case VULKAN_KEY:
+        matcher = VULKAN_VALUE_PATTERN.matcher(value);
+        if (!matcher.matches()) {
+          throw ValidationException.builder()
+              .withMessage(
+                  "Could not parse Vulkan version '%s' for the directory '%s'.", value, name)
+              .build();
+        }
+        graphicsApiTargeting =
+            GraphicsApiUtils.vulkanVersionFrom(
+                Integer.parseInt(matcher.group(1)), Integer.parseInt(matcher.group(2)));
+        break;
+
+      default:
+        throw new ValidationException("Not a valid graphics API identifier: " + key);
     }
+
+    return AssetsDirectoryTargeting.newBuilder().setGraphicsApi(graphicsApiTargeting).build();
   }
 
   private static AssetsDirectoryTargeting parseTextureCompressionFormat(String name, String value) {

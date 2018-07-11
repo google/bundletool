@@ -22,7 +22,6 @@ import static com.android.tools.build.bundletool.model.BundleModule.LIB_DIRECTOR
 import static com.android.tools.build.bundletool.model.BundleModule.RESOURCES_DIRECTORY;
 import static com.android.tools.build.bundletool.model.BundleModule.ROOT_DIRECTORY;
 import static com.android.tools.build.bundletool.utils.ResourcesUtils.SCREEN_DENSITY_TO_PROTO_VALUE_MAP;
-import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.MoreCollectors.toOptional;
@@ -34,12 +33,13 @@ import com.android.bundle.Targeting.AbiTargeting;
 import com.android.bundle.Targeting.ApkTargeting;
 import com.android.bundle.Targeting.GraphicsApi;
 import com.android.bundle.Targeting.GraphicsApiTargeting;
+import com.android.bundle.Targeting.LanguageTargeting;
 import com.android.bundle.Targeting.OpenGlVersion;
 import com.android.bundle.Targeting.SdkVersion;
 import com.android.bundle.Targeting.SdkVersionTargeting;
 import com.android.bundle.Targeting.TextureCompressionFormatTargeting;
 import com.android.bundle.Targeting.VariantTargeting;
-import com.android.tools.build.bundletool.manifest.AndroidManifest;
+import com.android.bundle.Targeting.VulkanVersion;
 import com.android.tools.build.bundletool.utils.ResourcesUtils;
 import com.android.tools.build.bundletool.utils.Versions;
 import com.google.auto.value.AutoValue;
@@ -78,7 +78,7 @@ public abstract class ModuleSplit {
 
   public abstract Optional<ResourceTable> getResourceTable();
 
-  public abstract Optional<AndroidManifest> getAndroidManifest();
+  public abstract AndroidManifest getAndroidManifest();
 
   public abstract BundleModuleName getModuleName();
 
@@ -118,7 +118,12 @@ public abstract class ModuleSplit {
       suffixJoiner.add("other_abis");
     }
 
-    getApkTargeting().getLanguageTargeting().getValueList().forEach(suffixJoiner::add);
+    LanguageTargeting languageTargeting = getApkTargeting().getLanguageTargeting();
+    if (!languageTargeting.getValueList().isEmpty()) {
+      languageTargeting.getValueList().forEach(suffixJoiner::add);
+    } else if (!languageTargeting.getAlternativesList().isEmpty()) {
+      suffixJoiner.add("other_lang");
+    }
 
     getApkTargeting()
         .getScreenDensityTargeting()
@@ -137,7 +142,7 @@ public abstract class ModuleSplit {
           .getValueList()
           .forEach(value -> suffixJoiner.add(formatGraphicsApi(value)));
     } else if (!graphicsApiTargeting.getAlternativesList().isEmpty()) {
-      suffixJoiner.add("other_gl");
+      suffixJoiner.add("other_gfx");
     }
 
     TextureCompressionFormatTargeting textureFormatTargeting =
@@ -157,8 +162,15 @@ public abstract class ModuleSplit {
     StringJoiner result = new StringJoiner("_");
     if (graphicsTargeting.hasMinOpenGlVersion()) {
       result.add("gl" + formatGlVersion(graphicsTargeting.getMinOpenGlVersion()));
+    } else if (graphicsTargeting.hasMinVulkanVersion()) {
+      result.add("vk" + formatVulkanVersion(graphicsTargeting.getMinVulkanVersion()));
     }
     return result.toString();
+  }
+
+  private static String formatVulkanVersion(VulkanVersion vulkanVersion) {
+    // Will treat missing minor as 0 which is fine.
+    return vulkanVersion.getMajor() + "_" + vulkanVersion.getMinor();
   }
 
   private static String formatGlVersion(OpenGlVersion glVersion) {
@@ -179,8 +191,7 @@ public abstract class ModuleSplit {
   /** Writes the final manifest that reflects the Split ID. */
   @CheckReturnValue
   public ModuleSplit writeSplitIdInManifest(String resolvedSplitIdSuffix) {
-    checkArgument(getAndroidManifest().isPresent(), "Missing Android Manifest");
-    AndroidManifest moduleManifest = getAndroidManifest().get();
+    AndroidManifest moduleManifest = getAndroidManifest();
     String splitId = generateSplitId(resolvedSplitIdSuffix);
     AndroidManifest apkManifest;
     if (isMasterSplit()) {
@@ -317,11 +328,16 @@ public abstract class ModuleSplit {
   }
 
   /** Returns the {@link ModuleEntry} associated with the given path, or empty if not found. */
-  public Optional<ModuleEntry> findEntry(String path) {
+  public Optional<ModuleEntry> findEntry(ZipPath path) {
     return getEntries()
         .stream()
-        .filter(entry -> entry.getPath().equals(ZipPath.create(path)))
+        .filter(entry -> entry.getPath().equals(path))
         .collect(toOptional());
+  }
+
+  /** Returns the {@link ModuleEntry} associated with the given path, or empty if not found. */
+  public Optional<ModuleEntry> findEntry(String path) {
+    return findEntry(ZipPath.create(path));
   }
 
   private static VariantTargeting lPlusVariantTargeting() {

@@ -17,11 +17,11 @@ package com.android.tools.build.bundletool.model;
 
 import static com.google.common.base.Preconditions.checkArgument;
 
-import com.android.tools.build.bundletool.exceptions.CommandExecutionException;
 import com.android.tools.build.bundletool.utils.files.BufferedIo;
 import com.google.auto.value.AutoValue;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.UncheckedIOException;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 
@@ -51,15 +51,20 @@ public abstract class ModuleZipEntry implements ModuleEntry {
    */
   abstract int getPathNamesToSkip();
 
+  /**
+   * Expresses whether this entry is compressed or uncompressed in the final output APK. This might
+   * not match the compression method of the input ZipEntry.
+   */
+  @Override
+  public abstract boolean shouldCompress();
+
   @Override
   public InputStream getContent() {
     try {
       return BufferedIo.inputStream(getZipFile(), getZipEntry());
     } catch (IOException e) {
-      throw CommandExecutionException.builder()
-          .withCause(e)
-          .withMessage("Error while reading the zip entry '%s'.", getZipEntry().getName())
-          .build();
+      throw new UncheckedIOException(
+          String.format("Error while reading the zip entry '%s'.", getZipEntry().getName()), e);
     }
   }
 
@@ -76,16 +81,17 @@ public abstract class ModuleZipEntry implements ModuleEntry {
 
   /** Constructs a {@link ModuleEntry} for {@link ZipEntry} contained in a bundle zip file. */
   public static ModuleZipEntry fromBundleZipEntry(ZipEntry zipEntry, ZipFile zipFile) {
-    return create(zipEntry, zipFile, /* pathNamesToSkip= */ 1);
+    return create(zipEntry, zipFile, /* pathNamesToSkip= */ 1, /* shouldCompress= */ true);
   }
 
   /** Constructs a {@link ModuleEntry} for {@link ZipEntry} contained in a module zip file. */
   public static ModuleZipEntry fromModuleZipEntry(ZipEntry zipEntry, ZipFile zipFile) {
-    return create(zipEntry, zipFile, /* pathNamesToSkip= */ 0);
+    return create(zipEntry, zipFile, /* pathNamesToSkip= */ 0, /* shouldCompress= */ true);
   }
 
-  private static ModuleZipEntry create(ZipEntry zipEntry, ZipFile zipFile, int pathNamesToSkip) {
+  private static ModuleZipEntry create(
+      ZipEntry zipEntry, ZipFile zipFile, int pathNamesToSkip, boolean shouldCompress) {
     checkArgument(ZipPath.create(zipEntry.getName()).getNameCount() > pathNamesToSkip);
-    return new AutoValue_ModuleZipEntry(zipEntry, zipFile, pathNamesToSkip);
+    return new AutoValue_ModuleZipEntry(zipEntry, zipFile, pathNamesToSkip, shouldCompress);
   }
 }

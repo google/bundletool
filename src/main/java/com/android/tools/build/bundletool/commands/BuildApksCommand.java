@@ -36,6 +36,7 @@ import com.android.tools.build.bundletool.commands.CommandHelp.CommandDescriptio
 import com.android.tools.build.bundletool.commands.CommandHelp.FlagDescription;
 import com.android.tools.build.bundletool.device.AdbServer;
 import com.android.tools.build.bundletool.device.DeviceAnalyzer;
+import com.android.tools.build.bundletool.device.DeviceSpecParser;
 import com.android.tools.build.bundletool.exceptions.CommandExecutionException;
 import com.android.tools.build.bundletool.exceptions.ValidationException;
 import com.android.tools.build.bundletool.io.ApkSerializerManager;
@@ -48,6 +49,7 @@ import com.android.tools.build.bundletool.model.Aapt2Command;
 import com.android.tools.build.bundletool.model.AppBundle;
 import com.android.tools.build.bundletool.model.BundleMetadata;
 import com.android.tools.build.bundletool.model.BundleModule;
+import com.android.tools.build.bundletool.model.GeneratedApks;
 import com.android.tools.build.bundletool.model.ModuleSplit;
 import com.android.tools.build.bundletool.model.OptimizationDimension;
 import com.android.tools.build.bundletool.model.SigningConfiguration;
@@ -74,6 +76,8 @@ import com.google.common.util.concurrent.ListeningExecutorService;
 import com.google.common.util.concurrent.MoreExecutors;
 import java.io.IOException;
 import java.io.PrintStream;
+import java.io.UncheckedIOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Arrays;
@@ -92,6 +96,7 @@ public abstract class BuildApksCommand {
 
   private static final Flag<Path> BUNDLE_LOCATION_FLAG = Flag.path("bundle");
   private static final Flag<Path> OUTPUT_FILE_FLAG = Flag.path("output");
+  private static final Flag<Boolean> OVERWRITE_OUTPUT_FLAG = Flag.booleanFlag("overwrite");
   private static final Flag<ImmutableSet<OptimizationDimension>> OPTIMIZE_FOR_FLAG =
       Flag.enumSet("optimize-for", OptimizationDimension.class);
   private static final Flag<Path> AAPT2_PATH_FLAG = Flag.path("aapt2");
@@ -102,6 +107,8 @@ public abstract class BuildApksCommand {
   private static final Flag<Boolean> CONNECTED_DEVICE_FLAG = Flag.booleanFlag("connected-device");
   private static final Flag<String> DEVICE_ID_FLAG = Flag.string("device-id");
   private static final String ANDROID_HOME_VARIABLE = "ANDROID_HOME";
+
+  private static final Flag<Path> DEVICE_SPEC_FLAG = Flag.path("device-spec");
 
   // Signing-related flags: should match flags from apksig library.
   private static final Flag<Path> KEYSTORE_FLAG = Flag.path("ks");
@@ -118,7 +125,11 @@ public abstract class BuildApksCommand {
 
   public abstract Path getOutputFile();
 
+  public abstract boolean getOverwriteOutput();
+
   public abstract ImmutableSet<OptimizationDimension> getOptimizationDimensions();
+
+  public abstract Optional<Path> getDeviceSpecPath();
 
   public abstract boolean getGenerateOnlyForConnectedDevice();
 
@@ -141,6 +152,7 @@ public abstract class BuildApksCommand {
 
   public static Builder builder() {
     return new AutoValue_BuildApksCommand.Builder()
+        .setOverwriteOutput(false)
         .setGenerateOnlyUniversalApk(false)
         .setGenerateOnlyForConnectedDevice(false)
         .setOptimizationDimensions(ImmutableSet.of())
@@ -155,6 +167,14 @@ public abstract class BuildApksCommand {
 
     /** Sets the path to where the APK Set must be generated. Must have the extension ".apks". */
     public abstract Builder setOutputFile(Path outputFile);
+
+    /**
+     * Sets whether to overwrite the contents of the output file.
+     *
+     * <p>The default is {@code false}. If set to {@code false} and a file is present, exception is
+     * thrown.
+     */
+    public abstract Builder setOverwriteOutput(boolean overwriteOutput);
 
     /** List of config dimensions to split the APKs by. */
     @Deprecated // Use setBundleConfig() instead.
@@ -172,6 +192,9 @@ public abstract class BuildApksCommand {
      * Sets if the generated APK Set will contain APKs compatible only with the connected device.
      */
     public abstract Builder setGenerateOnlyForConnectedDevice(boolean onlyForConnectedDevice);
+
+    /** Sets the path for the device spec for which the only the matching APKs will be generated. */
+    public abstract Builder setDeviceSpecPath(Path deviceSpec);
 
     /**
      * Sets the device serial number. Required if more than one device including emulators is
@@ -219,6 +242,21 @@ public abstract class BuildApksCommand {
                 + "at the same time.");
       }
 
+      if (command.getDeviceSpecPath().isPresent() && command.getGenerateOnlyUniversalApk()) {
+        throw new ValidationException(
+            "Cannot generate universal APK and optimize for the device spec at the same time.");
+      }
+
+      if (command.getGenerateOnlyForConnectedDevice() && command.getDeviceSpecPath().isPresent()) {
+        throw new ValidationException(
+            "Cannot optimize for the device spec and connected device at the same time.");
+      }
+
+      if (command.getDeviceId().isPresent() && !command.getGenerateOnlyForConnectedDevice()) {
+        throw new ValidationException(
+            "Setting --device-id requires using the --connected-device flag.");
+      }
+
       if (!APK_SET_ARCHIVE_EXTENSION.equals(MoreFiles.getFileExtension(command.getOutputFile()))) {
         throw ValidationException.builder()
             .withMessage(
@@ -246,6 +284,7 @@ public abstract class BuildApksCommand {
             .setOutputFile(OUTPUT_FILE_FLAG.getRequiredValue(flags));
 
     // Optional arguments.
+    OVERWRITE_OUTPUT_FLAG.getValue(flags).ifPresent(buildApksCommand::setOverwriteOutput);
     AAPT2_PATH_FLAG
         .getValue(flags)
         .ifPresent(
@@ -306,6 +345,9 @@ public abstract class BuildApksCommand {
                                           + "variable.")));
       buildApksCommand.setAdbPath(adbPath).setAdbServer(adbServer);
     }
+
+    DEVICE_SPEC_FLAG.getValue(flags).ifPresent(buildApksCommand::setDeviceSpecPath);
+
     flags.checkNoUnknownFlags();
 
     return buildApksCommand.build();
@@ -321,9 +363,11 @@ public abstract class BuildApksCommand {
     Aapt2Command aapt2Command = getAapt2Command().orElseGet(() -> extractAapt2FromJar(tempDir));
 
     // Fail fast with ADB before generating any APKs.
-    Optional<DeviceSpec> targetedDevice = Optional.empty();
+    Optional<DeviceSpec> deviceSpec = Optional.empty();
     if (getGenerateOnlyForConnectedDevice()) {
-      targetedDevice = Optional.of(getDeviceSpec());
+      deviceSpec = Optional.of(getDeviceSpec());
+    } else if (getDeviceSpecPath().isPresent()) {
+      deviceSpec = Optional.of(DeviceSpecParser.parseDeviceSpec(getDeviceSpecPath().get()));
     }
 
     try (ZipFile bundleZip = new ZipFile(getBundlePath().toFile())) {
@@ -349,14 +393,11 @@ public abstract class BuildApksCommand {
               : new OptimizationsMerger()
                   .mergeWithDefaults(bundleConfig, getOptimizationDimensions());
 
-      ImmutableList<ModuleSplit> splitApks = ImmutableList.of();
-      ImmutableList<ModuleSplit> standaloneApks = ImmutableList.of();
-
       boolean generateSplitApks = !getGenerateOnlyUniversalApk() && !targetsOnlyPreL(appBundle);
       boolean generateStandaloneApks = getGenerateOnlyUniversalApk() || targetsPreL(appBundle);
 
-      if (targetedDevice.isPresent()) {
-        if (targetedDevice.get().getSdkVersion() >= Versions.ANDROID_L_API_VERSION) {
+      if (deviceSpec.isPresent()) {
+        if (deviceSpec.get().getSdkVersion() >= Versions.ANDROID_L_API_VERSION) {
           generateStandaloneApks = false;
           if (!generateSplitApks) {
             throw new CommandExecutionException(
@@ -372,40 +413,41 @@ public abstract class BuildApksCommand {
         }
       }
 
+      GeneratedApks.Builder generatedApksBuilder = GeneratedApks.builder();
       if (generateSplitApks) {
-        splitApks = generateSplitApks(allModules, apkOptimizations, bundleVersion);
+        generatedApksBuilder.setSplitApks(
+            generateSplitApks(allModules, apkOptimizations, bundleVersion));
       }
       if (generateStandaloneApks) {
         // Note: Universal APK is a special type of standalone, with no optimization dimensions.
         ImmutableList<BundleModule> modulesForFusing =
             allModules.stream().filter(BundleModule::isIncludedInFusing).collect(toImmutableList());
-        standaloneApks =
+        generatedApksBuilder.setStandaloneApks(
             generateStandaloneApks(
                 modulesForFusing,
                 appBundle.getBundleMetadata(),
                 getGenerateOnlyUniversalApk(),
                 tempDir,
                 apkOptimizations,
-                bundleVersion);
+                bundleVersion));
       }
-
       // Populate alternative targeting based on variant targeting of all APKs.
-      ImmutableList<ModuleSplit> allApks =
+      GeneratedApks generatedApks =
           AlternativeVariantTargetingPopulator.populateAlternativeVariantTargeting(
-              splitApks, standaloneApks);
+              generatedApksBuilder.build());
 
       // Create variants and serialize APKs.
       ApkSerializerManager apkSerializerManager = new ApkSerializerManager(getExecutorService());
-      ImmutableList<Variant> allVariantsWithTargeting = ImmutableList.of();
-      if (targetedDevice.isPresent()) {
+      ImmutableList<Variant> allVariantsWithTargeting;
+      if (deviceSpec.isPresent()) {
         allVariantsWithTargeting =
             ImmutableList.of(
-                apkSerializerManager.serializeAndGenerateVariantForDevice(
-                    targetedDevice.get(), allApks, apkSetBuilder, appBundle));
+                apkSerializerManager.serializeApksForDevice(
+                    deviceSpec.get(), generatedApks, apkSetBuilder, appBundle));
       } else {
         allVariantsWithTargeting =
-            apkSerializerManager.serializeAndGenerateAllVariants(
-                allApks, apkSetBuilder, appBundle, getGenerateOnlyUniversalApk());
+            apkSerializerManager.serializeApks(
+                generatedApks, apkSetBuilder, appBundle, getGenerateOnlyUniversalApk());
       }
       // Finalize the output archive.
       apkSetBuilder.setTableOfContentsFile(
@@ -415,12 +457,13 @@ public abstract class BuildApksCommand {
                   Bundletool.newBuilder()
                       .setVersion(BundleToolVersion.getCurrentVersion().toString()))
               .build());
+      if (getOverwriteOutput()) {
+        Files.deleteIfExists(getOutputFile());
+      }
       apkSetBuilder.writeTo(getOutputFile());
     } catch (IOException e) {
-      throw ValidationException.builder()
-          .withCause(e)
-          .withMessage("Error reading zip file '%s'.", getBundlePath())
-          .build();
+      throw new UncheckedIOException(
+          String.format("An error occurred when processing the bundle '%s'.", getBundlePath()), e);
     }
 
 
@@ -461,7 +504,9 @@ public abstract class BuildApksCommand {
 
   private void validateInput() {
     checkFileExistsAndReadable(getBundlePath());
-    checkFileDoesNotExist(getOutputFile());
+    if (!getOverwriteOutput()) {
+      checkFileDoesNotExist(getOutputFile());
+    }
 
     if (getGenerateOnlyForConnectedDevice()) {
       checkArgument(
@@ -582,6 +627,12 @@ public abstract class BuildApksCommand {
                 .build())
         .addFlag(
             FlagDescription.builder()
+                .setFlagName(OVERWRITE_OUTPUT_FLAG.getName())
+                .setOptional(true)
+                .setDescription("If set, any previous existing output will be overwritten.")
+                .build())
+        .addFlag(
+            FlagDescription.builder()
                 .setFlagName(AAPT2_PATH_FLAG.getName())
                 .setExampleValue("path/to/aapt2")
                 .setOptional(true)
@@ -689,6 +740,15 @@ public abstract class BuildApksCommand {
                     "Device serial name. Required when more than one device or emulator is "
                         + "connected. Used only if %s flag is set.",
                     CONNECTED_DEVICE_FLAG)
+                .build())
+        .addFlag(
+            FlagDescription.builder()
+                .setFlagName(DEVICE_SPEC_FLAG.getName())
+                .setExampleValue("device-spec.json")
+                .setDescription(
+                    "Path to the device spec file generated by the '%s' command. If present, "
+                        + "it will generate an APK Set optimized for the specified device spec.",
+                    GetDeviceSpecCommand.COMMAND_NAME)
                 .build())
         .build();
   }

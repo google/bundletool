@@ -28,6 +28,7 @@ import com.android.ddmlib.TimeoutException;
 import com.android.sdklib.AndroidVersion;
 import com.android.tools.build.bundletool.exceptions.InstallationException;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.Iterables;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Path;
@@ -88,9 +89,15 @@ public class DdmlibDevice implements Device {
   public void installApks(
       ImmutableList<Path> apks, boolean reinstall, long timeout, TimeUnit timeoutUnit) {
     ImmutableList<File> apkFiles = apks.stream().map(Path::toFile).collect(toImmutableList());
+
     try {
-      device.installPackages(
-          apkFiles, reinstall, /* installOptions= */ ImmutableList.of(), timeout, timeoutUnit);
+      if (getVersion()
+          .isGreaterOrEqualThan(AndroidVersion.ALLOW_SPLIT_APK_INSTALLATION.getApiLevel())) {
+        device.installPackages(
+            apkFiles, reinstall, /* installOptions= */ ImmutableList.of(), timeout, timeoutUnit);
+      } else {
+        device.installPackage(Iterables.getOnlyElement(apkFiles).toString(), reinstall);
+      }
     } catch (InstallException e) {
       throw InstallationException.builder()
           .withCause(e)

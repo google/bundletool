@@ -15,10 +15,10 @@
  */
 package com.android.tools.build.bundletool.model;
 
-import com.android.tools.build.bundletool.exceptions.CommandExecutionException;
 import com.android.tools.build.bundletool.utils.files.FileUtils;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.UncheckedIOException;
 
 /** Represents an entry in a an App Bundle's module. */
 public interface ModuleEntry {
@@ -37,6 +37,8 @@ public interface ModuleEntry {
   /** Whether the entry is a directory. */
   boolean isDirectory();
 
+  boolean shouldCompress();
+
   /** Checks whether the given entries are identical. */
   static boolean equal(ModuleEntry entry1, ModuleEntry entry2) {
     if (!entry1.getPath().equals(entry2.getPath())) {
@@ -53,12 +55,11 @@ public interface ModuleEntry {
         InputStream inputStream2 = entry2.getContent()) {
       return FileUtils.equalContent(inputStream1, inputStream2);
     } catch (IOException e) {
-      throw CommandExecutionException.builder()
-          .withCause(e)
-          .withMessage(
+      throw new UncheckedIOException(
+          String.format(
               "Failed to compare contents of module entries '%s' and '%s'.",
-              entry1.getPath(), entry2.getPath())
-          .build();
+              entry1.getPath(), entry2.getPath()),
+          e);
     }
   }
 }

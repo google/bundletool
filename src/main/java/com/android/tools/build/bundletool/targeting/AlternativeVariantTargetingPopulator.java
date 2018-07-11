@@ -25,6 +25,7 @@ import com.android.bundle.Targeting.Abi;
 import com.android.bundle.Targeting.ScreenDensity;
 import com.android.bundle.Targeting.SdkVersion;
 import com.android.bundle.Targeting.VariantTargeting;
+import com.android.tools.build.bundletool.model.GeneratedApks;
 import com.android.tools.build.bundletool.model.ModuleSplit;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableCollection;
@@ -40,14 +41,16 @@ import javax.annotation.CheckReturnValue;
 /** Adds alternative targeting in the {@code T} dimension. */
 public abstract class AlternativeVariantTargetingPopulator<T extends Message> {
 
-  public static ImmutableList<ModuleSplit> populateAlternativeVariantTargeting(
-      ImmutableList<ModuleSplit> splitApks, ImmutableList<ModuleSplit> standaloneApks) {
-    standaloneApks = new AbiAlternativesPopulator().addAlternativeVariantTargeting(standaloneApks);
+  public static GeneratedApks populateAlternativeVariantTargeting(GeneratedApks generatedApks) {
+    ImmutableList<ModuleSplit> standaloneApks =
+        new AbiAlternativesPopulator()
+            .addAlternativeVariantTargeting(generatedApks.getStandaloneApks());
     standaloneApks =
         new ScreenDensityAlternativesPopulator().addAlternativeVariantTargeting(standaloneApks);
 
-    return new SdkVersionAlternativesPopulator()
-        .addAlternativeVariantTargeting(splitApks, standaloneApks);
+    return GeneratedApks.fromModuleSplits(
+        new SdkVersionAlternativesPopulator()
+            .addAlternativeVariantTargeting(generatedApks.getSplitApks(), standaloneApks));
   }
 
   /**

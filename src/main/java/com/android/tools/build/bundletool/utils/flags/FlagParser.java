@@ -27,17 +27,20 @@ import java.util.List;
  *
  * <p>The flags follow the below convention:
  *
- * <p>[bundle-tool] [command1] [command2] .. [command-n] [--flag1] [--flag2=v2].. [--flagn] where:
+ * <p>[bundle-tool] [command1] [command2] .. [command-n] [--flag1] [--flag2=v2] [--flag3] [v3]..
+ *    [--flagn] where:
  *
  * <ul>
  *   <li>commands: cannot start with "-".
- *   <li>flags: have to start with "--". If they have "=" anything after the first occurrence is
- *       considered a flag value. By default the flag value is an empty string.
+ *   <li>flags: have to start with "--". They can have the format "--flag=value" or "--flag value",
+ *       but when "=" is omitted, values cannot start with "--". A value does not have to be set
+ *       and is empty string by default.
  * </ul>
  */
 public class FlagParser {
 
-  private static final Splitter KEY_VALUE_SPLITTER = Splitter.on('=').limit(2);
+  private static final String KEY_VALUE_SEPARATOR = "=";
+  private static final Splitter KEY_VALUE_SPLITTER = Splitter.on(KEY_VALUE_SEPARATOR).limit(2);
 
   /**
    * Parses the given arguments populating the structures.
@@ -57,17 +60,31 @@ public class FlagParser {
 
   private ImmutableListMultimap<String, String> parseFlags(List<String> args) {
     ImmutableListMultimap.Builder<String, String> flagMap = ImmutableListMultimap.builder();
+    String lastFlag = null;
     for (String arg : args) {
-      if (!arg.startsWith("--")) {
-        throw new FlagParseException(
-            String.format("Syntax error: flags should start with -- (%s)", arg));
-      }
-      List<String> segments = KEY_VALUE_SPLITTER.splitToList(arg.substring(2));
-      if (segments.size() == 2) {
-        flagMap.put(segments.get(0), segments.get(1));
+      if (arg.startsWith("--")) {
+        if (lastFlag != null) {
+          flagMap.put(lastFlag, "");
+          lastFlag = null;
+        }
+        if (arg.contains(KEY_VALUE_SEPARATOR)) {
+          List<String> segments = KEY_VALUE_SPLITTER.splitToList(arg);
+          flagMap.put(segments.get(0).substring(2), segments.get(1));
+        } else {
+          lastFlag = arg.substring(2);
+        }
       } else {
-        flagMap.put(segments.get(0), "");
+        if (lastFlag == null) {
+          throw new FlagParseException(
+              String.format("Syntax error: flags should start with -- (%s)", arg));
+        } else {
+          flagMap.put(lastFlag, arg);
+          lastFlag = null;
+        }
       }
+    }
+    if (lastFlag != null) {
+      flagMap.put(lastFlag, "");
     }
     return flagMap.build();
   }

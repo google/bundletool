@@ -24,7 +24,6 @@ import static com.google.common.io.MoreFiles.getNameWithoutExtension;
 
 import com.android.bundle.Config.BundleConfig;
 import com.android.bundle.Config.Bundletool;
-import com.android.tools.build.bundletool.exceptions.ValidationException;
 import com.android.tools.build.bundletool.model.BundleModule;
 import com.android.tools.build.bundletool.model.BundleModuleName;
 import com.android.tools.build.bundletool.model.ModuleZipEntry;
@@ -33,6 +32,7 @@ import com.android.tools.build.bundletool.version.BundleToolVersion;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.Map;
@@ -68,6 +68,7 @@ public class BundleModulesValidator {
           new DexFilesValidator(),
           // Other.
           new ModuleDependencyValidator(),
+          new ModuleTitleValidator(),
           new ResourceTableValidator());
 
   private static final BundleConfig EMPTY_CONFIG_WITH_CURRENT_VERSION =
@@ -121,10 +122,8 @@ public class BundleModulesValidator {
                   .collect(toImmutableList()))
           .build();
     } catch (IOException e) {
-      throw ValidationException.builder()
-          .withCause(e)
-          .withMessage("Error reading module zip file '%s'.", modulePath)
-          .build();
+      throw new UncheckedIOException(
+          String.format("Error reading module zip file '%s'.", modulePath), e);
     }
   }
 }

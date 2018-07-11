@@ -123,6 +123,11 @@ public class ClassesDexNameSanitizer {
     }
 
     @Override
+    public boolean shouldCompress() {
+      return moduleEntry.shouldCompress();
+    }
+
+    @Override
     public boolean equals(Object obj) {
       if (!(obj instanceof ModuleEntry)) {
         return false;

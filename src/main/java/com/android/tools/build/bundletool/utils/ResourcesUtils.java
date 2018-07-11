@@ -17,6 +17,7 @@
 package com.android.tools.build.bundletool.utils;
 
 import static com.google.common.collect.ImmutableSet.toImmutableSet;
+import static com.google.common.collect.MoreCollectors.toOptional;
 
 import com.android.aapt.Resources.ConfigValue;
 import com.android.aapt.Resources.Entry;
@@ -30,7 +31,10 @@ import com.google.common.collect.ImmutableBiMap;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import java.util.Collection;
+import java.util.HashSet;
 import java.util.Locale;
+import java.util.Optional;
+import java.util.Set;
 import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.stream.Stream;
@@ -132,6 +136,30 @@ public final class ResourcesUtils {
     return filteredTable.build();
   }
 
+  public static Set<Integer> resourceIds(
+      ResourceTable table, Function<Type, Boolean> typeFilterFn) {
+    Set<Integer> resourceIds = new HashSet<>();
+    for (Package pkg : table.getPackageList()) {
+      for (Type type : pkg.getTypeList()) {
+        if (typeFilterFn.apply(type)) {
+          for (Entry entry : type.getEntryList()) {
+            resourceIds.add(
+                makeResourceIdentifier(
+                    pkg.getPackageId().getId(),
+                    type.getTypeId().getId(),
+                    entry.getEntryId().getId()));
+          }
+        }
+      }
+    }
+    return resourceIds;
+  }
+
+  public static int makeResourceIdentifier(
+      int packageIdentifier, int typeIdentifier, int entryIdentifier) {
+    return packageIdentifier << 24 | typeIdentifier << 16 | entryIdentifier;
+  }
+
   public static Stream<Entry> entries(ResourceTable resourceTable) {
     return resourceTable
         .getPackageList()
@@ -178,6 +206,22 @@ public final class ResourcesUtils {
    */
   public static String convertLocaleToLanguage(String locale) {
     return Locale.forLanguageTag(locale).getLanguage();
+  }
+
+  public static Optional<Entry> lookupEntryByResourceId(
+      ResourceTable resourceTable, int resourceId) {
+    int packageId = (resourceId >> 24) & 0xFF;
+    int typeId = (resourceId >> 16) & 0xFF;
+    int entryId = (resourceId >> 0) & 0xFFFF;
+    return resourceTable
+        .getPackageList()
+        .stream()
+        .filter(pkg -> pkg.getPackageId().getId() == packageId)
+        .flatMap(pkg -> pkg.getTypeList().stream())
+        .filter(type -> type.getTypeId().getId() == typeId)
+        .flatMap(type -> type.getEntryList().stream())
+        .filter(entry -> entry.getEntryId().getId() == entryId)
+        .collect(toOptional());
   }
 
   // Not meant to be instantiated.

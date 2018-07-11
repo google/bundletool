@@ -59,7 +59,7 @@ public class AppBundleSerializer {
       // Special module files are not represented as module entries (above).
       zipBuilder.addFileWithProtoContent(
           moduleDir.resolve(BundleModule.MANIFEST_PATH),
-          module.getAndroidManifest().getManifestRoot());
+          module.getAndroidManifest().getManifestRoot().getProto());
       module
           .getAssetsConfig()
           .ifPresent(

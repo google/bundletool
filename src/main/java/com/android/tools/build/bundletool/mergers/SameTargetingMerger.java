@@ -23,7 +23,7 @@ import com.android.aapt.Resources.ResourceTable;
 import com.android.bundle.Files.NativeLibraries;
 import com.android.bundle.Targeting.ApkTargeting;
 import com.android.bundle.Targeting.VariantTargeting;
-import com.android.tools.build.bundletool.manifest.AndroidManifest;
+import com.android.tools.build.bundletool.model.AndroidManifest;
 import com.android.tools.build.bundletool.model.BundleModuleName;
 import com.android.tools.build.bundletool.model.ModuleEntry;
 import com.android.tools.build.bundletool.model.ModuleSplit;
@@ -64,14 +64,12 @@ public class SameTargetingMerger implements ModuleSplitMerger {
     VariantTargeting mergedVariantTargeting = null;
 
     for (ModuleSplit split : splits) {
-      if (split.getAndroidManifest().isPresent()) {
-        mergedManifest =
-            getSameValueOrNonNull(mergedManifest, split.getAndroidManifest().get())
-                .orElseThrow(
-                    () ->
-                        new IllegalStateException(
-                            "Encountered two distinct manifests while merging."));
-      }
+      mergedManifest =
+          getSameValueOrNonNull(mergedManifest, split.getAndroidManifest())
+              .orElseThrow(
+                  () ->
+                      new IllegalStateException(
+                          "Encountered two distinct manifests while merging."));
       if (split.getResourceTable().isPresent()) {
         mergedResourceTable =
             getSameValueOrNonNull(mergedResourceTable, split.getResourceTable().get())

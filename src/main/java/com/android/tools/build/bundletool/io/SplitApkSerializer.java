@@ -60,13 +60,13 @@ public class SplitApkSerializer {
         .setTargeting(split.getApkTargeting())
         .setSplitApkMetadata(
             SplitApkMetadata.newBuilder()
-                .setSplitId(split.getAndroidManifest().get().getSplitId().orElse(""))
+                .setSplitId(split.getAndroidManifest().getSplitId().orElse(""))
                 .setIsMasterSplit(split.isMasterSplit()))
         .build();
   }
 
   private static String getApkFileName(ModuleSplit apk, BundleModuleName moduleName) {
-    String splitId = apk.getAndroidManifest().get().getSplitId().orElse("");
+    String splitId = apk.getAndroidManifest().getSplitId().orElse("");
     String fileSuffix =
         apk.isMasterSplit() ? "master" : Iterables.getLast(Arrays.asList(splitId.split("\\.")));
     return String.format("%s-%s.apk", moduleName.getName(), fileSuffix);

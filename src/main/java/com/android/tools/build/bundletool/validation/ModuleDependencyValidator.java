@@ -20,7 +20,7 @@ import static com.android.tools.build.bundletool.model.BundleModuleName.BASE_MOD
 import static com.google.common.base.Preconditions.checkArgument;
 
 import com.android.tools.build.bundletool.exceptions.ValidationException;
-import com.android.tools.build.bundletool.manifest.AndroidManifest;
+import com.android.tools.build.bundletool.model.AndroidManifest;
 import com.android.tools.build.bundletool.model.BundleModule;
 import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.ImmutableList;

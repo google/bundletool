@@ -16,7 +16,6 @@
 
 package com.android.tools.build.bundletool.model;
 
-import com.android.tools.build.bundletool.exceptions.CommandExecutionException;
 import com.android.tools.build.bundletool.utils.files.BufferedIo;
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -55,20 +54,17 @@ public interface Aapt2Command {
         Process process = new ProcessBuilder(command).redirectErrorStream(true).start();
         if (!process.waitFor(TIMEOUT_AAPT2_COMMANDS_SECONDS, TimeUnit.SECONDS)) {
           printOutput(process);
-          throw new CommandExecutionException("Command timed out: " + Arrays.toString(command));
+          throw new Aapt2Exception("Command timed out: " + Arrays.toString(command));
         }
         if (process.exitValue() != 0) {
           printOutput(process);
-          throw new CommandExecutionException(
+          throw new Aapt2Exception(
               String.format(
                   "Command '%s' didn't terminate successfully (exit code: %d). Check the logs.",
                   Arrays.toString(command), process.exitValue()));
         }
       } catch (IOException | InterruptedException e) {
-        throw CommandExecutionException.builder()
-            .withCause(e)
-            .withMessage("Error when executing 'aapt2 convert' command.")
-            .build();
+        throw new Aapt2Exception("Error when executing command: " + Arrays.toString(command), e);
       }
     }
 
@@ -79,8 +75,24 @@ public interface Aapt2Command {
           System.err.println(line);
         }
       } catch (IOException e) {
-        // Ignore.
+        System.err.println("Error when printing output of aapt2 command:" + e.getMessage());
       }
+    }
+  }
+
+  /**
+   * Exception thrown during execution of aapt2.
+   *
+   * <p>This does not extend CommandExecutionException on purpose because the message may contain
+   * paths to files.
+   */
+  class Aapt2Exception extends RuntimeException {
+    private Aapt2Exception(String message) {
+      super(message);
+    }
+
+    private Aapt2Exception(String message, Throwable cause) {
+      super(message, cause);
     }
   }
 }

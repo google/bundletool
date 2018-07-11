@@ -18,12 +18,12 @@ package com.android.tools.build.bundletool.utils.files;
 
 import static com.google.common.collect.ImmutableList.toImmutableList;
 
-import com.android.tools.build.bundletool.exceptions.CommandExecutionException;
 import com.android.tools.build.bundletool.model.ZipPath;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSortedSet;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Collection;
@@ -38,10 +38,7 @@ public final class FileUtils {
     try {
       Files.createDirectories(dirs);
     } catch (IOException e) {
-      throw CommandExecutionException.builder()
-          .withCause(e)
-          .withMessage("Error creating directories '%s'.", dirs)
-          .build();
+      throw new UncheckedIOException(String.format("Error creating directories '%s'.", dirs), e);
     }
   }
 

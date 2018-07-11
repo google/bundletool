@@ -18,11 +18,11 @@ package com.android.tools.build.bundletool.model;
 
 import static com.google.common.base.Preconditions.checkArgument;
 
-import com.android.tools.build.bundletool.exceptions.CommandExecutionException;
 import com.android.tools.build.bundletool.utils.files.BufferedIo;
 import com.google.auto.value.AutoValue;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 
@@ -43,6 +43,9 @@ public abstract class FileSystemModuleEntry implements ModuleEntry {
   @Override
   public abstract boolean isDirectory();
 
+  @Override
+  public abstract boolean shouldCompress();
+
   abstract Path getFileSystemPath();
 
   @Override
@@ -50,10 +53,8 @@ public abstract class FileSystemModuleEntry implements ModuleEntry {
     try {
       return BufferedIo.inputStream(getFileSystemPath());
     } catch (IOException e) {
-      throw CommandExecutionException.builder()
-          .withCause(e)
-          .withMessage("Error while reading file '%s'.", getFileSystemPath())
-          .build();
+      throw new UncheckedIOException(
+          String.format("Error while reading file '%s'.", getFileSystemPath()), e);
     }
   }
 
@@ -68,11 +69,12 @@ public abstract class FileSystemModuleEntry implements ModuleEntry {
         Files.isRegularFile(fileSystemPath),
         "Expecting '%s' to be an existing regular file.",
         fileSystemPath);
-    return create(entryPath, /* isDirectory= */ false, fileSystemPath);
+    return create(entryPath, /* isDirectory= */ false, /* shouldCompress= */ true, fileSystemPath);
   }
 
   private static FileSystemModuleEntry create(
-      ZipPath entryPath, boolean isDirectory, Path fileSystemPath) {
-    return new AutoValue_FileSystemModuleEntry(entryPath, isDirectory, fileSystemPath);
+      ZipPath entryPath, boolean isDirectory, boolean shouldCompress, Path fileSystemPath) {
+    return new AutoValue_FileSystemModuleEntry(
+        entryPath, isDirectory, shouldCompress, fileSystemPath);
   }
 }

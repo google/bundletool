@@ -16,8 +16,8 @@
 
 package com.android.tools.build.bundletool.splitters;
 
+import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.ImmutableSet.toImmutableSet;
-import static java.util.stream.Collectors.toList;
 
 import com.android.bundle.Files.TargetedNativeDirectory;
 import com.android.bundle.Targeting.Abi;
@@ -31,6 +31,7 @@ import com.google.common.collect.ImmutableMultimap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Multimaps;
 import com.google.common.collect.Sets;
+import java.util.HashSet;
 import java.util.List;
 
 /** Splits the native libraries in the module by ABI. */
@@ -57,15 +58,17 @@ public class AbiNativeLibrariesSplitter implements ModuleSplitSplitter {
             .stream()
             .map(NativeDirectoryTargeting::getAbi)
             .collect(toImmutableSet());
+
+    // Any entries not claimed by the ABI splits will be returned in a separate split using the
+    // original targeting.
+    HashSet<ModuleEntry> leftOverEntries = new HashSet<>(moduleSplit.getEntries());
     for (NativeDirectoryTargeting targeting : targetingMap.keySet()) {
-      ImmutableList.Builder<ModuleEntry> entriesList =
-          new ImmutableList.Builder<ModuleEntry>()
-              .addAll(
-                  targetingMap
-                      .get(targeting)
-                      .stream()
-                      .flatMap(directory -> moduleSplit.findEntriesUnderPath(directory.getPath()))
-                      .collect(toList()));
+      ImmutableList<ModuleEntry> entriesList =
+          targetingMap
+              .get(targeting)
+              .stream()
+              .flatMap(directory -> moduleSplit.findEntriesUnderPath(directory.getPath()))
+              .collect(toImmutableList());
 
       ModuleSplit.Builder splitBuilder =
           moduleSplit
@@ -81,8 +84,12 @@ public class AbiNativeLibrariesSplitter implements ModuleSplitSplitter {
                                   Sets.difference(allAbis, ImmutableSet.of(targeting.getAbi()))))
                       .build())
               .setMasterSplit(false)
-              .setEntries(entriesList.build());
+              .setEntries(entriesList);
       splits.add(splitBuilder.build());
+      leftOverEntries.removeAll(entriesList);
+    }
+    if (!leftOverEntries.isEmpty()) {
+      splits.add(moduleSplit.toBuilder().setEntries(ImmutableList.copyOf(leftOverEntries)).build());
     }
     return splits.build();
   }

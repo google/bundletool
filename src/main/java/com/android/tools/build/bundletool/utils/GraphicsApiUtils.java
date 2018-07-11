@@ -19,6 +19,7 @@ package com.android.tools.build.bundletool.utils;
 import com.android.bundle.Targeting.GraphicsApi;
 import com.android.bundle.Targeting.GraphicsApiTargeting;
 import com.android.bundle.Targeting.OpenGlVersion;
+import com.android.bundle.Targeting.VulkanVersion;
 
 /** Helpers related to the Graphics API. */
 public final class GraphicsApiUtils {
@@ -28,6 +29,14 @@ public final class GraphicsApiUtils {
         .addValue(
             GraphicsApi.newBuilder()
                 .setMinOpenGlVersion(OpenGlVersion.newBuilder().setMajor(major).setMinor(minor)))
+        .build();
+  }
+
+  public static GraphicsApiTargeting vulkanVersionFrom(int major, int minor) {
+    return GraphicsApiTargeting.newBuilder()
+        .addValue(
+            GraphicsApi.newBuilder()
+                .setMinVulkanVersion(VulkanVersion.newBuilder().setMajor(major).setMinor(minor)))
         .build();
   }
 }

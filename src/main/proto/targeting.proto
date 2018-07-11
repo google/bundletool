@@ -51,9 +51,15 @@ message GraphicsApi {
   oneof api_oneof {
     // Inclusive.
     OpenGlVersion min_open_gl_version = 1;
+    // Inclusive.
+    VulkanVersion min_vulkan_version = 2;
   }
 }
 
+message VulkanVersion {
+  int32 major = 1;  // VK_VERSION_MAJOR
+  int32 minor = 2;  // VK_VERSION_MINOR
+}
 
 message OpenGlVersion {
   // e.g. OpenGL ES 3.2 is represented as { major: 3, minor: 2 }

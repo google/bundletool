@@ -26,21 +26,24 @@ import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 
+import com.android.apksig.ApkSigner;
+import com.android.apksig.ApkSigner.SignerConfig;
+import com.android.apksig.apk.ApkFormatException;
 import com.android.bundle.Config.Compression;
 import com.android.tools.build.apkzlib.zfile.ZFiles;
 import com.android.tools.build.apkzlib.zip.AlignmentRule;
 import com.android.tools.build.apkzlib.zip.AlignmentRules;
 import com.android.tools.build.apkzlib.zip.ZFile;
 import com.android.tools.build.apkzlib.zip.ZFileOptions;
-import com.android.tools.build.bundletool.exceptions.CommandExecutionException;
+import com.android.tools.build.bundletool.exceptions.ValidationException;
 import com.android.tools.build.bundletool.io.ZipBuilder.EntryOption;
 import com.android.tools.build.bundletool.model.Aapt2Command;
 import com.android.tools.build.bundletool.model.ModuleEntry;
 import com.android.tools.build.bundletool.model.ModuleSplit;
 import com.android.tools.build.bundletool.model.SigningConfiguration;
+import com.android.tools.build.bundletool.model.WearApkLocator;
 import com.android.tools.build.bundletool.model.ZipPath;
 import com.android.tools.build.bundletool.utils.files.FileUtils;
-import com.android.tools.build.bundletool.version.BundleToolVersion;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Predicate;
 import com.google.common.base.Predicates;
@@ -48,11 +51,15 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.UncheckedIOException;
 import java.nio.file.FileSystem;
 import java.nio.file.FileSystems;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.PathMatcher;
+import java.security.InvalidKeyException;
+import java.security.NoSuchAlgorithmException;
+import java.security.SignatureException;
 import java.util.Optional;
 import java.util.regex.Pattern;
 
@@ -63,6 +70,9 @@ final class ApkSerializerHelper {
   private static final String NATIVE_LIBRARIES_SUFFIX = ".so";
 
   private static final Pattern NATIVE_LIBRARIES_PATTERN = Pattern.compile("lib/[^/]+/[^/]+\\.so");
+
+  /** Name identifying uniquely the {@link SignerConfig} passed to the engine. */
+  private static final String SIGNER_CONFIG_NAME = "BNDLTOOL";
 
   /**
    * Alignment rule for all APKs.
@@ -88,7 +98,7 @@ final class ApkSerializerHelper {
               || path.equals(RESOURCES_PROTO_PATH)
               || path.equals(ZipPath.create(MANIFEST_FILENAME));
 
-  private static final String BUILT_BY = "BundleTool " + BundleToolVersion.getCurrentVersion();
+  private static final String BUILT_BY = "BundleTool";
   private static final String CREATED_BY = BUILT_BY;
   private static final ImmutableSet<String> NO_COMPRESSION_EXTENSIONS =
       ImmutableSet.of(
@@ -132,7 +142,7 @@ final class ApkSerializerHelper {
 
     // Write a Proto-APK with only files that aapt2 requires as part of the convert command.
     Path partialProtoApk = tempDir.resolve("proto.apk");
-    writeProtoApk(split, partialProtoApk);
+    writeProtoApk(split, partialProtoApk, tempDir);
 
     // Have aapt2 convert the Proto-APK to a Binary-APK.
     Path binaryApk = tempDir.resolve("binary.apk");
@@ -140,7 +150,7 @@ final class ApkSerializerHelper {
     checkState(Files.exists(binaryApk), "No APK created by aapt2 convert command.");
 
     // Create a new APK that includes files processed by aapt2 and the other ones.
-    int minSdkVersion = split.getAndroidManifest().get().getEffectiveMinSdkVersion();
+    int minSdkVersion = split.getAndroidManifest().getEffectiveMinSdkVersion();
     try (ZFile zOutputApk =
             ZFiles.apk(
                 outputPath.toFile(),
@@ -166,10 +176,8 @@ final class ApkSerializerHelper {
       addNonAapt2Files(zOutputApk, split);
       zOutputApk.sortZipContents();
     } catch (IOException e) {
-      throw CommandExecutionException.builder()
-          .withCause(e)
-          .withMessage("Failed to write APK file '%s'.", outputPath)
-          .build();
+      throw new UncheckedIOException(
+          String.format("Failed to write APK file '%s'.", outputPath), e);
     }
   }
 
@@ -183,18 +191,29 @@ final class ApkSerializerHelper {
    * @param outputPath Path to where the APK should be created.
    * @return The path to the created APK.
    */
-  private Path writeProtoApk(ModuleSplit split, Path outputPath) {
-    checkState(split.getAndroidManifest().isPresent(), "Missing AndroidManifest");
+  private Path writeProtoApk(ModuleSplit split, Path outputPath, Path tempDir) {
+    boolean extractNativeLibs = split.getAndroidManifest().getExtractNativeLibsValue().orElse(true);
 
-    boolean extractNativeLibs =
-        split.getAndroidManifest().get().getExtractNativeLibsValue().orElse(true);
+    // Embedded Wear 1.x APKs are supposed to be under res/raw/*
+    Optional<ZipPath> wear1ApkPath = WearApkLocator.findEmbeddedWearApkPath(split);
 
     ZipBuilder zipBuilder = new ZipBuilder();
     for (ModuleEntry entry : split.getEntries()) {
       ZipPath pathInApk = toApkEntryPath(entry.getPath());
-      if (FILES_FOR_AAPT2.apply(pathInApk)) {
-        zipBuilder.addFile(
-            pathInApk, () -> entry.getContent(), entryOptionForPath(pathInApk, !extractNativeLibs));
+      if (!FILES_FOR_AAPT2.apply(pathInApk)) {
+        continue;
+      }
+
+      EntryOption[] entryOptions =
+          entryOptionForPath(pathInApk, !extractNativeLibs, entry.shouldCompress());
+      if (signingConfig.isPresent()
+          && wear1ApkPath.isPresent()
+          && wear1ApkPath.get().equals(pathInApk)) {
+        // Sign the Wear 1.x embedded APK if there is one.
+        Path signedWearApk = signWearApk(entry, signingConfig.get(), tempDir);
+        zipBuilder.addFileFromDisk(pathInApk, signedWearApk.toFile(), entryOptions);
+      } else {
+        zipBuilder.addFile(pathInApk, () -> entry.getContent(), entryOptions);
       }
     }
 
@@ -204,31 +223,36 @@ final class ApkSerializerHelper {
             resourceTable ->
                 zipBuilder.addFileWithProtoContent(RESOURCES_PROTO_PATH, resourceTable));
     zipBuilder.addFileWithProtoContent(
-        ZipPath.create(MANIFEST_FILENAME), split.getAndroidManifest().get().getManifestRoot());
+        ZipPath.create(MANIFEST_FILENAME), split.getAndroidManifest().getManifestRoot().getProto());
 
     try {
       zipBuilder.writeTo(outputPath);
     } catch (IOException e) {
-      throw CommandExecutionException.builder()
-          .withCause(e)
-          .withMessage("Error while writing APK to file '%s'.", outputPath.getFileName())
-          .build();
+      throw new UncheckedIOException(
+          String.format("Error while writing APK to file '%s'.", outputPath), e);
     }
 
     return outputPath;
   }
 
-  private EntryOption[] entryOptionForPath(ZipPath path, boolean uncompressNativeLibs) {
-    if (shouldCompress(path, uncompressNativeLibs)) {
+  private EntryOption[] entryOptionForPath(
+      ZipPath path, boolean uncompressNativeLibs, boolean entryShouldCompress) {
+    if (shouldCompress(path, uncompressNativeLibs, entryShouldCompress)) {
       return new EntryOption[] {};
     } else {
       return new EntryOption[] {EntryOption.UNCOMPRESSED};
     }
   }
 
-  private boolean shouldCompress(ZipPath path, boolean uncompressNativeLibs) {
+  private boolean shouldCompress(
+      ZipPath path, boolean uncompressNativeLibs, boolean entryShouldCompress) {
     // Developer knows best: when they provide the uncompressed glob, we respect it.
     if (uncompressedPathMatchers.stream().anyMatch(pathMatcher -> pathMatcher.matches(path))) {
+      return false;
+    }
+
+    // The Module entries with shouldCompress flag turned off should be uncompressed.
+    if (!entryShouldCompress) {
       return false;
     }
 
@@ -248,8 +272,7 @@ final class ApkSerializerHelper {
 
   /** Takes the given APK and adds the files that weren't processed by AAPT2. */
   private void addNonAapt2Files(ZFile zFile, ModuleSplit split) throws IOException {
-    boolean extractNativeLibs =
-        split.getAndroidManifest().get().getExtractNativeLibsValue().orElse(true);
+    boolean extractNativeLibs = split.getAndroidManifest().getExtractNativeLibsValue().orElse(true);
 
     // Add the non-Aapt2 files.
     for (ModuleEntry entry : split.getEntries()) {
@@ -259,7 +282,7 @@ final class ApkSerializerHelper {
           zFile.add(
               pathInApk.toString(),
               entryInputStream,
-              shouldCompress(pathInApk, !extractNativeLibs));
+              shouldCompress(pathInApk, !extractNativeLibs, entry.shouldCompress()));
         }
       }
     }
@@ -288,5 +311,45 @@ final class ApkSerializerHelper {
       return pathInModule.subpath(1, pathInModule.getNameCount());
     }
     return pathInModule;
+  }
+
+  /**
+   * Signs the Wear APK.
+   *
+   * @return the Path on disk to the signed APK.
+   */
+  private static Path signWearApk(
+      ModuleEntry wearApkEntry, SigningConfiguration signingConfig, Path tempDir) {
+    try {
+      SignerConfig signerConfig =
+          new SignerConfig.Builder(
+                  SIGNER_CONFIG_NAME,
+                  signingConfig.getPrivateKey(),
+                  signingConfig.getCertificates())
+              .build();
+
+      // Input
+      Path unsignedApk = tempDir.resolve("wear-unsigned.apk");
+      Files.copy(wearApkEntry.getContent(), unsignedApk);
+
+      // Output
+      Path signedApk = tempDir.resolve("wear-signed.apk");
+
+      ApkSigner apkSigner =
+          new ApkSigner.Builder(ImmutableList.of(signerConfig))
+              .setInputApk(unsignedApk.toFile())
+              .setOutputApk(signedApk.toFile())
+              .build();
+      apkSigner.sign();
+
+      return signedApk;
+    } catch (ApkFormatException
+        | NoSuchAlgorithmException
+        | InvalidKeyException
+        | SignatureException e) {
+      throw new ValidationException("Unable to sign the embedded Wear APK.", e);
+    } catch (IOException e) {
+      throw new UncheckedIOException("Unable to sign the embedded Wear APK.", e);
+    }
   }
 }

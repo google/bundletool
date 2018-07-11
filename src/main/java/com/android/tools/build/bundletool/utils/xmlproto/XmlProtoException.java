@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2017 The Android Open Source Project
+ * Copyright (C) 2018 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,20 +13,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License
  */
+package com.android.tools.build.bundletool.utils.xmlproto;
 
-package com.android.tools.build.bundletool.utils;
+import com.android.tools.build.bundletool.exceptions.ValidationException;
 
-import com.android.bundle.Targeting.OpenGlVersion;
-import java.util.Comparator;
+/** Exception thrown when an error occurs on reading or writing the XML Proto format. */
+public class XmlProtoException extends ValidationException {
 
-/** Utilities for GraphicsApi protobuf messages. */
-public final class GraphicsApiVersions {
-
-  public static Comparator<OpenGlVersion> getOpenGlVersionComparator() {
-    return Comparator.comparingInt(OpenGlVersion::getMajor)
-        .thenComparingInt(OpenGlVersion::getMinor);
+  XmlProtoException(String message, Object... args) {
+    super(String.format(message, args));
   }
-
-  // Do not instantiate.
-  private GraphicsApiVersions() {}
 }

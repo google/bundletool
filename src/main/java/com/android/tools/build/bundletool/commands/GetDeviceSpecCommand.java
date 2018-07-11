@@ -35,6 +35,7 @@ import com.google.auto.value.AutoValue;
 import com.google.common.io.MoreFiles;
 import com.google.protobuf.util.JsonFormat;
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -150,10 +151,8 @@ public abstract class GetDeviceSpecCommand {
     try {
       Files.write(outputFile, JsonFormat.printer().print(deviceSpec).getBytes(UTF_8));
     } catch (IOException e) {
-      throw CommandExecutionException.builder()
-          .withCause(e)
-          .withMessage("I/O error while writing the output file '%s'.", outputFile)
-          .build();
+      throw new UncheckedIOException(
+          String.format("Error while writing the output file '%s'.", outputFile), e);
     }
   }
 

@@ -22,7 +22,6 @@ import com.android.bundle.Commands.ModuleMetadata;
 import com.android.bundle.Config.BundleConfig;
 import com.android.bundle.Files.Assets;
 import com.android.bundle.Files.NativeLibraries;
-import com.android.tools.build.bundletool.manifest.AndroidManifest;
 import com.android.tools.build.bundletool.version.BundleToolVersion;
 import com.google.auto.value.AutoValue;
 import com.google.common.collect.ImmutableCollection;
@@ -90,6 +89,13 @@ public abstract class BundleModule {
 
   public boolean isBaseModule() {
     return BundleModuleName.BASE_MODULE_NAME.equals(getName().getName());
+  }
+
+  public boolean isDynamicModule() {
+    Optional<Boolean> isDynamicModule =
+        getAndroidManifest()
+            .isOnDemandModule(BundleToolVersion.getVersionFromBundleConfig(getBundleConfig()));
+    return isDynamicModule.orElse(false);
   }
 
   public boolean isIncludedInFusing() {

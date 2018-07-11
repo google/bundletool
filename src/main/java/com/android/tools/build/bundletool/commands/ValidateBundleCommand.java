@@ -30,6 +30,7 @@ import com.android.tools.build.bundletool.utils.flags.ParsedFlags;
 import com.android.tools.build.bundletool.validation.AppBundleValidator;
 import com.google.auto.value.AutoValue;
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.nio.file.Path;
 import java.util.Map.Entry;
 import java.util.zip.ZipFile;
@@ -82,9 +83,8 @@ public abstract class ValidateBundleCommand {
         printBundleSummary(appBundle);
       }
     } catch (IOException e) {
-      throw CommandExecutionException.builder()
-          .withMessage("Error reading zip file '%s'", getBundlePath())
-          .build();
+      throw new UncheckedIOException(
+          String.format("Error reading zip file '%s'", getBundlePath()), e);
     }
   }
 

@@ -29,7 +29,7 @@ import com.android.bundle.Devices.DeviceSpec;
 import com.android.tools.build.bundletool.commands.CommandHelp.CommandDescription;
 import com.android.tools.build.bundletool.commands.CommandHelp.FlagDescription;
 import com.android.tools.build.bundletool.device.ApkMatcher;
-import com.android.tools.build.bundletool.exceptions.CommandExecutionException;
+import com.android.tools.build.bundletool.device.DeviceSpecParser;
 import com.android.tools.build.bundletool.exceptions.ValidationException;
 import com.android.tools.build.bundletool.model.ZipPath;
 import com.android.tools.build.bundletool.utils.files.BufferedIo;
@@ -40,12 +40,10 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Sets;
 import com.google.common.io.ByteStreams;
-import com.google.common.io.MoreFiles;
-import com.google.protobuf.util.JsonFormat;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.io.Reader;
+import java.io.UncheckedIOException;
 import java.nio.file.Path;
 import java.util.Optional;
 import java.util.Set;
@@ -62,8 +60,6 @@ public abstract class ExtractApksCommand {
   private static final Flag<Path> DEVICE_SPEC_FLAG = Flag.path("device-spec");
   private static final Flag<Path> OUTPUT_DIRECTORY = Flag.path("output-dir");
   private static final Flag<ImmutableSet<String>> MODULES_FLAG = Flag.stringSet("modules");
-
-  private static final String JSON_EXTENSION = "json";
 
   public abstract Path getApksArchivePath();
 
@@ -104,7 +100,7 @@ public abstract class ExtractApksCommand {
     command.setApksArchivePath(apksArchivePath);
 
     checkFileExistsAndReadable(deviceSpecPath);
-    command.setDeviceSpec(parseDeviceSpec(deviceSpecPath));
+    command.setDeviceSpec(DeviceSpecParser.parseDeviceSpec(deviceSpecPath));
 
     checkDirectoryExists(outputDirectory);
     command.setOutputDirectory(outputDirectory);
@@ -112,27 +108,6 @@ public abstract class ExtractApksCommand {
     modules.ifPresent(command::setModules);
 
     return command.build();
-  }
-
-  private static DeviceSpec parseDeviceSpec(Path deviceSpecFile) {
-    DeviceSpec.Builder builder = DeviceSpec.newBuilder();
-    try {
-      if (!JSON_EXTENSION.equals(MoreFiles.getFileExtension(deviceSpecFile))) {
-        throw CommandExecutionException.builder()
-            .withMessage(
-                "Expected .json extension of the device spec file but found '%s'.", deviceSpecFile)
-            .build();
-      }
-      try (Reader deviceSpecReader = BufferedIo.reader(deviceSpecFile)) {
-        JsonFormat.parser().merge(deviceSpecReader, builder);
-      }
-    } catch (IOException e) {
-      throw CommandExecutionException.builder()
-          .withCause(e)
-          .withMessage("I/O error while reading the device spec file '%s'.", deviceSpecFile)
-          .build();
-    }
-    return builder.build();
   }
 
   public ImmutableList<Path> execute() {
@@ -184,17 +159,14 @@ public abstract class ExtractApksCommand {
           ByteStreams.copy(inputStream, outputApk);
           builder.add(extractedApkPath);
         } catch (IOException e) {
-          throw CommandExecutionException.builder()
-              .withCause(e)
-              .withMessage("I/O error while extracting APK '%s' from the APK Set.", matchedApk)
-              .build();
+          throw new UncheckedIOException(
+              String.format("Error while extracting APK '%s' from the APK Set.", matchedApk), e);
         }
       }
     } catch (IOException e) {
-      throw CommandExecutionException.builder()
-          .withCause(e)
-          .withMessage("I/O error while processing the APK Set archive '%s'.", getApksArchivePath())
-          .build();
+      throw new UncheckedIOException(
+          String.format("Error while processing the APK Set archive '%s'.", getApksArchivePath()),
+          e);
     }
     return builder.build();
   }
@@ -205,11 +177,10 @@ public abstract class ExtractApksCommand {
             BufferedIo.inputStream(apksArchive, new ZipEntry(TABLE_OF_CONTENTS_FILE))) {
       return BuildApksResult.parseFrom(tocStream);
     } catch (IOException e) {
-      throw CommandExecutionException.builder()
-          .withCause(e)
-          .withMessage(
-              "I/O error while reading the table of contents file from '%s'.", getApksArchivePath())
-          .build();
+      throw new UncheckedIOException(
+          String.format(
+              "Error while reading the table of contents file from '%s'.", getApksArchivePath()),
+          e);
     }
   }
 

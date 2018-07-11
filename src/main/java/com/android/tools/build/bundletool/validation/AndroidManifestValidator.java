@@ -23,7 +23,7 @@ import com.android.tools.build.bundletool.exceptions.manifest.ManifestSdkTargeti
 import com.android.tools.build.bundletool.exceptions.manifest.ManifestSdkTargetingException.MaxSdkLessThanMinInstantSdk;
 import com.android.tools.build.bundletool.exceptions.manifest.ManifestSdkTargetingException.MinSdkGreaterThanMaxSdkException;
 import com.android.tools.build.bundletool.exceptions.manifest.ManifestSdkTargetingException.MinSdkInvalidException;
-import com.android.tools.build.bundletool.manifest.AndroidManifest;
+import com.android.tools.build.bundletool.model.AndroidManifest;
 import com.android.tools.build.bundletool.model.BundleModule;
 import com.android.tools.build.bundletool.version.BundleToolVersion;
 import java.util.Optional;

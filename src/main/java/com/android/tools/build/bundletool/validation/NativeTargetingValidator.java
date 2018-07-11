@@ -17,6 +17,7 @@
 package com.android.tools.build.bundletool.validation;
 
 import static com.android.tools.build.bundletool.model.BundleModule.LIB_DIRECTORY;
+import static com.google.common.collect.ImmutableSet.toImmutableSet;
 
 import com.android.bundle.Files.NativeLibraries;
 import com.android.bundle.Files.TargetedNativeDirectory;
@@ -24,8 +25,8 @@ import com.android.bundle.Targeting.NativeDirectoryTargeting;
 import com.android.tools.build.bundletool.exceptions.ValidationException;
 import com.android.tools.build.bundletool.model.BundleModule;
 import com.android.tools.build.bundletool.model.ZipPath;
-import java.util.ArrayList;
-import java.util.List;
+import com.google.common.collect.Sets;
+import com.google.common.collect.Sets.SetView;
 
 /** Validates targeting of native libraries. */
 public class NativeTargetingValidator extends SubValidator {
@@ -36,8 +37,6 @@ public class NativeTargetingValidator extends SubValidator {
   }
 
   private static void validateTargeting(BundleModule module, NativeLibraries nativeLibraries) {
-    List<String> targetedDirs = new ArrayList<>();
-
     for (TargetedNativeDirectory targetedDirectory : nativeLibraries.getDirectoryList()) {
       ZipPath path = ZipPath.create(targetedDirectory.getPath());
       NativeDirectoryTargeting targeting = targetedDirectory.getTargeting();
@@ -64,8 +63,19 @@ public class NativeTargetingValidator extends SubValidator {
             .withMessage("Targeted directory '%s' is empty.", path)
             .build();
       }
+    }
 
-      targetedDirs.add(path.toString());
+    SetView<String> libDirsWithoutTargeting = Sets.difference(
+        module.findEntriesUnderPath(LIB_DIRECTORY)
+            .map(libFile -> libFile.getPath().subpath(0, 2).toString())
+            .collect(toImmutableSet()),
+        nativeLibraries.getDirectoryList().stream()
+            .map(TargetedNativeDirectory::getPath)
+            .collect(toImmutableSet()));
+    if (!libDirsWithoutTargeting.isEmpty()) {
+      throw ValidationException.builder()
+          .withMessage("Following native directories are not targeted: %s", libDirsWithoutTargeting)
+          .build();
     }
   }
 }

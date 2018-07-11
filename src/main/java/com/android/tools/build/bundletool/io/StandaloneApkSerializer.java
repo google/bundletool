@@ -65,8 +65,7 @@ public class StandaloneApkSerializer {
         .setPath(apkFileRelPath)
         .setStandaloneApkMetadata(
             StandaloneApkMetadata.newBuilder()
-                .addAllFusedModuleName(
-                    standaloneSplit.getAndroidManifest().get().getFusedModuleNames()))
+                .addAllFusedModuleName(standaloneSplit.getAndroidManifest().getFusedModuleNames()))
         .setTargeting(standaloneSplit.getApkTargeting())
         .build();
   }

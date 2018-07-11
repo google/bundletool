@@ -22,6 +22,7 @@ import static com.google.common.base.Predicates.not;
 import com.android.tools.build.bundletool.exceptions.ValidationException;
 import com.android.tools.build.bundletool.model.ZipPath;
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.nio.file.Path;
 import java.util.Collection;
 import java.util.stream.Stream;
@@ -57,10 +58,7 @@ public final class ZipUtils {
     try {
       return new ZipFile(path.toFile());
     } catch (IOException e) {
-      throw ValidationException.builder()
-          .withCause(e)
-          .withMessage("Error reading zip file '%s'.", path)
-          .build();
+      throw new UncheckedIOException(String.format("Error reading zip file '%s'.", path), e);
     }
   }
 
