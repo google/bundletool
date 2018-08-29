@@ -32,7 +32,7 @@ configurations {
 
 // The repackaging rules are defined in the "shadowJar" task below.
 dependencies {
-    compile "com.android.tools:r8:1.0.25"
+    compile "com.android.tools:r8:1.0.37"
     compile "com.android.tools.build:apkzlib:3.2.0-alpha06"
     compile "com.android.tools.ddms:ddmlib:26.2.0-alpha04"
 
@@ -40,13 +40,41 @@ dependencies {
     shadow "com.google.auto.value:auto-value:1.5.2"
     apt "com.google.auto.value:auto-value:1.5.2"
     shadow "com.google.errorprone:error_prone_annotations:2.2.0"
-    shadow "com.google.guava:guava:22.0"
+    shadow "com.google.guava:guava:26.0-jre"
     shadow "com.google.protobuf:protobuf-java:3.4.0"
     shadow "com.google.protobuf:protobuf-java-util:3.4.0"
 
     compileWindows "com.android.tools.build:aapt2:3.2.0-alpha14-4748712:windows"
     compileMacOs "com.android.tools.build:aapt2:3.2.0-alpha14-4748712:osx"
     compileLinux "com.android.tools.build:aapt2:3.2.0-alpha14-4748712:linux"
+
+    testCompile "com.android.tools.build:aapt2-proto:0.3.1"
+    testCompile "com.google.auto.value:auto-value-annotations:1.5.2"
+    testApt "com.google.auto.value:auto-value:1.5.2"
+    testCompile "com.google.errorprone:error_prone_annotations:2.2.0"
+    testCompile "com.google.guava:guava:26.0-jre"
+    testCompile "com.google.truth.extensions:truth-java8-extension:0.42"
+    testCompile "com.google.truth.extensions:truth-proto-extension:0.42"
+    testCompile "com.google.jimfs:jimfs:1.1"
+    testCompile "com.google.protobuf:protobuf-java:3.4.0"
+    testCompile "com.google.protobuf:protobuf-java-util:3.4.0"
+    testCompile "org.mockito:mockito-core:2.18.3"
+    testCompile "junit:junit:4.12"
+    testCompile "org.junit.jupiter:junit-jupiter-api:5.2.0"
+    testCompile "org.junit.vintage:junit-vintage-engine:5.2.0"
+    testRuntime "org.junit.jupiter:junit-jupiter-engine:5.2.0"
+    testCompile "org.junit.platform:junit-platform-runner:1.2.0"
+}
+
+test {
+    testLogging {
+        events "passed", "skipped", "failed"
+        showStandardStreams = true
+    }
+
+    reports {
+        html.enabled = false
+    }
 }
 
 protobuf {

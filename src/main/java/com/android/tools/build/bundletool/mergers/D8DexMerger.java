@@ -36,12 +36,16 @@ import java.util.Optional;
 /** Merges dex files using D8. */
 public class D8DexMerger implements DexMerger {
 
+  private static final String DEX_OVERFLOW_MSG =
+      "Cannot fit requested classes in a single dex file";
+
   @Override
   public ImmutableList<Path> merge(
       ImmutableList<Path> dexFiles,
       Path outputDir,
       Optional<Path> mainDexListFile,
-      boolean isDebuggable) {
+      boolean isDebuggable,
+      int minSdkVersion) {
 
     try {
       validateInput(dexFiles, outputDir);
@@ -49,11 +53,11 @@ public class D8DexMerger implements DexMerger {
       // Many of the D8 parameters are not being set because those are used when compiling into dex,
       // however we are merging existing dex files. The parameters considered are:
       // - classpathFiles, libraryFiles: Required for desugaring during compilation.
-      // - minApiLevel: Corresponds to the minSdkVersion in the manifest.
       D8Command.Builder command =
           D8Command.builder()
               .setOutput(outputDir, OutputMode.DexIndexed)
               .addProgramFiles(dexFiles)
+              .setMinApiLevel(minSdkVersion)
               // Compilation mode affects whether D8 produces minimal main-dex.
               // In debug mode minimal main-dex is always produced, so that the validity of the
               // main-dex can be debugged. For release mode minimal main-dex is not produced and the
@@ -85,8 +89,7 @@ public class D8DexMerger implements DexMerger {
     // `mainDexClasses` is empty. Detection of the exception in the stacktrace is non-trivial and at
     // the time of writing this code it is suppressed exception of the root cause.
     if (ThrowableUtils.anyInCausalChainOrSuppressedMatches(
-        d8Exception,
-        t -> t.getMessage().contains("Cannot fit requested classes in a single dex file"))) {
+        d8Exception, t -> t.getMessage() != null && t.getMessage().contains(DEX_OVERFLOW_MSG))) {
       return new CommandExecutionException(
           "Dex merging failed because the result does not fit into a single dex file and"
               + " multidex is not supported by the input.",

@@ -16,40 +16,25 @@
 
 package com.android.tools.build.bundletool.targeting;
 
-import com.android.bundle.Targeting.Abi;
-import com.android.bundle.Targeting.ApkTargeting;
+import static com.android.tools.build.bundletool.utils.TargetingProtoUtils.sdkVersionTargeting;
+import static com.google.common.base.Preconditions.checkState;
+import static com.google.common.collect.ImmutableList.toImmutableList;
+import static com.google.common.collect.ImmutableSet.toImmutableSet;
+
 import com.android.bundle.Targeting.AssetsDirectoryTargeting;
-import com.android.bundle.Targeting.ScreenDensity;
+import com.android.bundle.Targeting.SdkVersion;
+import com.android.bundle.Targeting.SdkVersionTargeting;
+import com.android.bundle.Targeting.VariantTargeting;
+import com.android.tools.build.bundletool.model.ModuleSplit;
+import com.android.tools.build.bundletool.utils.TargetingProtoUtils;
+import com.google.common.collect.ImmutableCollection;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMultimap;
 import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.Sets;
 
 /** Utility functions for Targeting proto. */
 public final class TargetingUtils {
-
-  /** Moves targeting values to the alternatives. */
-  public static AssetsDirectoryTargeting toAlternativeTargeting(
-      AssetsDirectoryTargeting targeting) {
-    AssetsDirectoryTargeting.Builder alternativeTargeting = AssetsDirectoryTargeting.newBuilder();
-    if (targeting.hasTextureCompressionFormat()) {
-      alternativeTargeting
-          .getTextureCompressionFormatBuilder()
-          .addAllAlternatives(targeting.getTextureCompressionFormat().getValueList());
-    }
-    if (targeting.hasGraphicsApi()) {
-      alternativeTargeting
-          .getGraphicsApiBuilder()
-          .addAllAlternatives(targeting.getGraphicsApi().getValueList());
-    }
-    if (targeting.hasAbi()) {
-      alternativeTargeting.getAbiBuilder().addAllAlternatives(targeting.getAbi().getValueList());
-    }
-    if (targeting.hasLanguage()) {
-      alternativeTargeting
-          .getLanguageBuilder()
-          .addAllAlternatives(targeting.getLanguage().getValueList());
-    }
-    return alternativeTargeting.build();
-  }
 
   /** Returns the targeting dimensions of the targeting proto. */
   public static ImmutableList<TargetingDimension> getTargetingDimensions(
@@ -70,39 +55,139 @@ public final class TargetingUtils {
     return dimensions.build();
   }
 
-  /** Extracts ABI values from the targeting. */
-  public static ImmutableSet<Abi> abiValues(ApkTargeting targeting) {
-    return ImmutableSet.copyOf(targeting.getAbiTargeting().getValueList());
+  /**
+   * Checks if the sdk range supported by the variant is completely enclosed in the sdk range
+   * supported by the moduleSplit. Also ensures that variant does not partially cover a module split
+   * range.
+   */
+  private static boolean checkVariantMatchWithModuleSplit(
+      VariantTargeting variantTargeting, ModuleSplit moduleSplit) {
+
+    SdkVersionTargeting variantSdkTargeting = variantTargeting.getSdkVersionTargeting();
+    int variantTargetingMinSdk = getMinSdk(variantSdkTargeting);
+    int variantTargetingMaxSdk = getMaxSdk(variantSdkTargeting);
+
+    SdkVersionTargeting moduleSplitSdkTargeting =
+        moduleSplit.getVariantTargeting().getSdkVersionTargeting();
+    int moduleSplitMinSdk = getMinSdk(moduleSplitSdkTargeting);
+    int moduleSplitMaxSdk = getMaxSdk(moduleSplitSdkTargeting);
+
+    boolean encloses =
+        variantTargetingMinSdk >= moduleSplitMinSdk && variantTargetingMaxSdk <= moduleSplitMaxSdk;
+
+    if (!encloses) {
+      checkState(
+          variantTargetingMaxSdk <= moduleSplitMinSdk
+              || moduleSplitMaxSdk <= variantTargetingMinSdk,
+          "Partial overlap between the sdk ranges of "
+              + "variant [ %s, %s )  and module split [ %s, %s ).",
+          variantTargetingMinSdk,
+          variantTargetingMaxSdk,
+          moduleSplitMinSdk,
+          moduleSplitMaxSdk);
+      return false;
+    }
+    return true;
   }
 
-  /** Extracts ABI alternatives from the targeting. */
-  public static ImmutableSet<Abi> abiAlternatives(ApkTargeting targeting) {
-    return ImmutableSet.copyOf(targeting.getAbiTargeting().getAlternativesList());
+  /** Returns a map of variants with a list of all the splits supported by each variant. */
+  public static ImmutableMultimap<VariantTargeting, ModuleSplit> matchModuleSplitWithVariants(
+      ImmutableCollection<VariantTargeting> variants,
+      ImmutableCollection<ModuleSplit> moduleSplits) {
+
+    ImmutableMultimap.Builder<VariantTargeting, ModuleSplit> mapping = ImmutableMultimap.builder();
+
+    for (VariantTargeting variant : variants) {
+      for (ModuleSplit moduleSplit : moduleSplits) {
+        if (checkVariantMatchWithModuleSplit(variant, moduleSplit)) {
+          mapping.put(variant, moduleSplit);
+        }
+      }
+    }
+    return mapping.build();
   }
 
-  /** Extracts targeted ABI universe (values and alternatives) from the targeting. */
-  public static ImmutableSet<Abi> abiUniverse(ApkTargeting targeting) {
-    return ImmutableSet.<Abi>builder()
-        .addAll(abiValues(targeting))
-        .addAll(abiAlternatives(targeting))
-        .build();
+  /**
+   * Given a set of potentially overlapping variant targetings generate smallest set of disjoint
+   * variant targetings covering all of them.
+   *
+   * <p>Assumption: All Variants only support sdk targeting.
+   */
+  public static ImmutableSet<VariantTargeting> generateAllVariantTargetings(
+      ImmutableSet<VariantTargeting> variantTargetings) {
+
+    if (variantTargetings.size() <= 1) {
+      return variantTargetings;
+    }
+
+    ImmutableList<SdkVersionTargeting> sdkVersionTargetings =
+        generateAllSdkTargetings(
+            variantTargetings
+                .stream()
+                .map(variantTargeting -> variantTargeting.getSdkVersionTargeting())
+                .collect(toImmutableList()));
+
+    return sdkVersionTargetings
+        .stream()
+        .map(
+            sdkVersionTargeting ->
+                VariantTargeting.newBuilder().setSdkVersionTargeting(sdkVersionTargeting).build())
+        .collect(toImmutableSet());
   }
 
-  /** Extracts screen density values from the targeting. */
-  public static ImmutableSet<ScreenDensity> densityValues(ApkTargeting targeting) {
-    return ImmutableSet.copyOf(targeting.getScreenDensityTargeting().getValueList());
+  /**
+   * Given a set of potentially overlapping sdk targetings generate set of disjoint sdk targetings
+   * covering all of them.
+   *
+   * <p>Assumption: There are no sdk range gaps in targetings.
+   */
+  private static ImmutableList<SdkVersionTargeting> generateAllSdkTargetings(
+      ImmutableList<SdkVersionTargeting> sdkVersionTargetings) {
+
+    sdkVersionTargetings.forEach(
+        sdkVersionTargeting -> checkState(sdkVersionTargeting.getValueList().size() == 1));
+
+    ImmutableList<Integer> minSdkValues =
+        sdkVersionTargetings
+            .stream()
+            .map(sdkVersionTargeting -> sdkVersionTargeting.getValue(0).getMin().getValue())
+            .distinct()
+            .sorted()
+            .collect(toImmutableList());
+
+    ImmutableSet<SdkVersion> sdkVersions =
+        minSdkValues.stream().map(TargetingProtoUtils::sdkVersionFrom).collect(toImmutableSet());
+
+    return sdkVersions
+        .stream()
+        .map(
+            sdkVersion ->
+                sdkVersionTargeting(
+                    sdkVersion,
+                    Sets.difference(sdkVersions, ImmutableSet.of(sdkVersion)).immutableCopy()))
+        .collect(toImmutableList());
   }
 
-  /** Extracts screen density alternatives from the targeting. */
-  public static ImmutableSet<ScreenDensity> densityAlternatives(ApkTargeting targeting) {
-    return ImmutableSet.copyOf(targeting.getScreenDensityTargeting().getAlternativesList());
+  /** Extracts the minimum sdk (inclusive) supported by the targeting. */
+  private static int getMinSdk(SdkVersionTargeting sdkVersionTargeting) {
+    if (sdkVersionTargeting.getValueList().isEmpty()) {
+      return 1;
+    }
+    return sdkVersionTargeting.getValue(0).getMin().getValue();
   }
 
-  /** Extracts targeted screen density universe (values and alternatives) from the targeting. */
-  public static ImmutableSet<ScreenDensity> densityUniverse(ApkTargeting targeting) {
-    return ImmutableSet.<ScreenDensity>builder()
-        .addAll(densityValues(targeting))
-        .addAll(densityAlternatives(targeting))
-        .build();
+  /** Extracts the maximum sdk (exclusive) supported by the targeting. */
+  private static int getMaxSdk(SdkVersionTargeting sdkVersionTargeting) {
+    int minSdk = getMinSdk(sdkVersionTargeting);
+    int alternativeMinSdk =
+        sdkVersionTargeting
+            .getAlternativesList()
+            .stream()
+            .mapToInt(alternativeSdk -> alternativeSdk.getMin().getValue())
+            .filter(sdkValue -> minSdk < sdkValue)
+            .min()
+            .orElse(Integer.MAX_VALUE);
+
+    return alternativeMinSdk;
   }
 }

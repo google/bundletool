@@ -33,6 +33,7 @@ import com.android.tools.build.bundletool.model.FileSystemModuleEntry;
 import com.android.tools.build.bundletool.model.InputStreamSupplier;
 import com.android.tools.build.bundletool.model.ModuleEntry;
 import com.android.tools.build.bundletool.model.ModuleSplit;
+import com.android.tools.build.bundletool.model.ModuleSplit.SplitType;
 import com.android.tools.build.bundletool.model.ZipPath;
 import com.android.tools.build.bundletool.utils.files.BufferedIo;
 import com.google.common.annotations.VisibleForTesting;
@@ -152,7 +153,7 @@ public class ModuleSplitsToShardMerger {
                     .addAll(mergedDexFiles)
                     .build())
             .setApkTargeting(mergedSplitTargeting)
-            .setStandalone(true)
+            .setSplitType(SplitType.STANDALONE)
             // We don't care about the following properties for shards. The values are set just to
             // satisfy contract of @AutoValue.Builder.
             // `nativeConfig` is optional and therefore not being set.
@@ -215,15 +216,18 @@ public class ModuleSplitsToShardMerger {
       // The dex merger requires the main dex list represented as a file.
       Optional<Path> mainDexListFile = writeMainDexListFileIfPresent(bundleMetadata);
 
-      boolean isDebuggable = androidManifest.getEffectiveApplicationDebuggable();
-
       // Write input dex data to temporary files "0.dex", "1.dex" etc. The names/order is not
       // important. The filenames just need to be unique and have the ".dex" extension.
       ImmutableList<Path> dexFiles =
           writeModuleEntriesToIndexedFiles(dexEntries, dexOriginalDir, /* fileSuffix= */ ".dex");
 
       ImmutableList<Path> mergedDexFiles =
-          dexMerger.merge(dexFiles, dexMergedDir, mainDexListFile, isDebuggable);
+          dexMerger.merge(
+              dexFiles,
+              dexMergedDir,
+              mainDexListFile,
+              androidManifest.getEffectiveApplicationDebuggable(),
+              androidManifest.getEffectiveMinSdkVersion());
 
       return mergedDexFiles;
 

@@ -46,6 +46,9 @@ public final class ApkSetBuilderFactory {
     /** Adds a standalone universal APK to the APK Set archive. */
     ApkDescription addStandaloneUniversalApk(ModuleSplit split);
 
+    /** Adds an instant split APK to the APK Set archive. */
+    ApkDescription addInstantApk(ModuleSplit split);
+
     /** Sets the TOC file in the APK Set archive. */
     void setTableOfContentsFile(BuildApksResult tableOfContentsProto);
 
@@ -81,6 +84,14 @@ public final class ApkSetBuilderFactory {
     @Override
     public ApkDescription addSplitApk(ModuleSplit split) {
       ApkDescription apkDescription = splitApkSerializer.writeSplitToDisk(split, tempDirectory);
+      addToApkSetArchive(apkDescription);
+      return apkDescription;
+    }
+
+    @Override
+    public ApkDescription addInstantApk(ModuleSplit split) {
+      ApkDescription apkDescription =
+          splitApkSerializer.writeInstantSplitToDisk(split, tempDirectory);
       addToApkSetArchive(apkDescription);
       return apkDescription;
     }

@@ -29,6 +29,7 @@ import com.android.bundle.Targeting.NativeDirectoryTargeting;
 import com.android.tools.build.bundletool.exceptions.ValidationException;
 import com.android.tools.build.bundletool.model.AbiName;
 import com.android.tools.build.bundletool.model.ZipPath;
+import com.android.tools.build.bundletool.utils.TargetingProtoUtils;
 import com.android.tools.build.bundletool.utils.files.FileUtils;
 import com.google.common.collect.HashMultimap;
 import com.google.common.collect.ImmutableList;
@@ -107,7 +108,7 @@ public class TargetingGenerator {
                     targetingByBaseName.get(targetedDirectory.getSubPathBaseName(i)),
                     ImmutableSet.of(segment.getTargeting()))
                 .stream()
-                .map(TargetingUtils::toAlternativeTargeting)
+                .map(TargetingProtoUtils::toAlternativeTargeting)
                 .reduce(
                     AssetsDirectoryTargeting.newBuilder(),
                     (builder, targetingValue) -> builder.mergeFrom(targetingValue),

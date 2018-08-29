@@ -20,21 +20,27 @@ import static com.android.tools.build.bundletool.utils.Versions.ANDROID_L_API_VE
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 
-import com.android.bundle.Targeting.ApkTargeting;
 import com.android.bundle.Targeting.SdkVersion;
 import com.android.bundle.Targeting.SdkVersionTargeting;
+import com.android.bundle.Targeting.VariantTargeting;
 import com.android.tools.build.bundletool.exceptions.CommandExecutionException;
 import com.android.tools.build.bundletool.mergers.SameTargetingMerger;
+import com.android.tools.build.bundletool.model.AndroidManifest;
 import com.android.tools.build.bundletool.model.BundleModule;
+import com.android.tools.build.bundletool.model.ManifestMutator;
 import com.android.tools.build.bundletool.model.ModuleSplit;
+import com.android.tools.build.bundletool.model.ModuleSplit.SplitType;
 import com.android.tools.build.bundletool.model.OptimizationDimension;
 import com.android.tools.build.bundletool.version.Version;
+import com.google.common.collect.HashMultimap;
+import com.google.common.collect.ImmutableCollection;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMultimap;
 import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.Multimap;
 import com.google.protobuf.Int32Value;
-import java.util.HashSet;
+import java.util.Collection;
 import java.util.Optional;
-import java.util.Set;
 import javax.annotation.concurrent.GuardedBy;
 
 /**
@@ -51,6 +57,8 @@ public class ModuleSplitter {
   private final Version bundleVersion;
 
 
+  private boolean enableNativeLibraryCompressionSplitter = false;
+
   public ModuleSplitter(
       BundleModule module,
       ImmutableSet<OptimizationDimension> optimizationDimensions,
@@ -61,15 +69,36 @@ public class ModuleSplitter {
   }
 
 
+  public void setEnableNativeLibraryCompressionSplitter(boolean value) {
+    this.enableNativeLibraryCompressionSplitter = value;
+  }
+
   public ImmutableList<ModuleSplit> splitModule() {
     return splitModuleInternal()
+        .stream()
+        .map(this::removeSplitName)
+        .collect(toImmutableList());
+  }
+
+  /** Returns the list of module splits, ready for use as an instant app. */
+  public ImmutableList<ModuleSplit> splitInstantModule() {
+    return splitModuleInternal()
+        .stream()
+        .map(ModuleSplitter::writeTargetSandboxVersion)
+        .map(moduleSplit -> moduleSplit.toBuilder().setSplitType(SplitType.INSTANT).build())
+        .collect(toImmutableList());
+  }
+
+  /** Common modifications to both the instant and installed splits. */
+  private ImmutableList<ModuleSplit> splitModuleInternal() {
+    return runSplitters()
         .stream()
         .map(this::addLPlusTargeting)
         .map(this::writeSplitIdInManifest)
         .collect(toImmutableList());
   }
 
-  private ImmutableList<ModuleSplit> splitModuleInternal() {
+  private ImmutableList<ModuleSplit> runSplitters() {
     if (targetsOnlyPreL(module)) {
       throw CommandExecutionException.builder()
           .withMessage(
@@ -97,24 +126,40 @@ public class ModuleSplitter {
     splits.add(ModuleSplit.forCode(module));
     splits.add(ModuleSplit.forRoot(module));
 
-    // Merging and making a master split.
-    ImmutableList<ModuleSplit> mergedSplits = new SameTargetingMerger().merge(splits.build());
+    ImmutableMultimap<VariantTargeting, ModuleSplit> variantModuleSplitMap =
+        new VariantGrouper().groupByVariant(splits.build());
 
-    // Check that we have only one split with default targeting - the master split.
-    ImmutableList<ModuleSplit> defaultTargetingSplits =
-        mergedSplits
-            .stream()
-            .filter(split -> split.getApkTargeting().equals(ApkTargeting.getDefaultInstance()))
-            .collect(toImmutableList());
-    checkState(defaultTargetingSplits.size() == 1, "Expected one split with default targeting.");
+    ImmutableList.Builder<ModuleSplit> mergedSplits = ImmutableList.builder();
+    for (Collection<ModuleSplit> moduleSplits : variantModuleSplitMap.asMap().values()) {
+      // Merging and making a master split from single variant.
+      mergedSplits.addAll(
+          new SameTargetingMerger()
+              .merge(applyMasterManifestMutators(ImmutableList.copyOf(moduleSplits))));
+    }
 
-    return mergedSplits;
+    return mergedSplits.build();
   }
 
   /* Writes the final manifest that reflects the Split ID. */
   public ModuleSplit writeSplitIdInManifest(ModuleSplit moduleSplit) {
-    String resolvedSuffix = suffixManager.resolveSuffix(moduleSplit.getSuffix());
+    String resolvedSuffix =
+        suffixManager.createSuffix(moduleSplit);
     return moduleSplit.writeSplitIdInManifest(resolvedSuffix);
+  }
+
+  /* Removes the {@code splitName} attribute, if it exists in the manifest. */
+  public ModuleSplit removeSplitName(ModuleSplit moduleSplit) {
+
+    return moduleSplit.removeSplitName();
+  }
+
+  /**
+   * Updates the split to insert the targetSandboxVersion as 2, which is required for instant apps.
+   */
+  public static ModuleSplit writeTargetSandboxVersion(ModuleSplit moduleSplit) {
+    AndroidManifest apkManifest =
+        moduleSplit.getAndroidManifest().toEditor().setTargetSandboxVersion(2).save();
+    return moduleSplit.toBuilder().setAndroidManifest(apkManifest).build();
   }
 
   private SplittingPipeline createResourcesSplittingPipeline() {
@@ -128,8 +173,42 @@ public class ModuleSplitter {
     return SplittingPipeline.create(resourceSplitters.build());
   }
 
+  /**
+   * Updates the android manifest of the master splits, using manifest mutators across all splits.
+   */
+  public static ImmutableList<ModuleSplit> applyMasterManifestMutators(
+      ImmutableCollection<ModuleSplit> moduleSplits) {
+    checkState(
+        moduleSplits.stream().map(ModuleSplit::getVariantTargeting).distinct().count() == 1,
+        "Expected same variant targeting across all splits.");
+    ImmutableList<ManifestMutator> manifestMutators =
+        moduleSplits
+            .stream()
+            .flatMap(moduleSplit -> moduleSplit.getMasterManifestMutators().stream())
+            .collect(toImmutableList());
+
+    return moduleSplits
+        .stream()
+        .map(
+            moduleSplit -> {
+              if (moduleSplit.isMasterSplit()) {
+                moduleSplit =
+                    moduleSplit
+                        .toBuilder()
+                        .setAndroidManifest(
+                            moduleSplit.getAndroidManifest().applyMutators(manifestMutators))
+                        .build();
+              }
+              return moduleSplit;
+            })
+        .collect(toImmutableList());
+  }
+
   private SplittingPipeline createNativeLibrariesSplittingPipeline() {
     ImmutableList.Builder<ModuleSplitSplitter> nativeSplitters = ImmutableList.builder();
+    if (enableNativeLibraryCompressionSplitter) {
+      nativeSplitters.add(new NativeLibrariesCompressionSplitter());
+    }
     if (optimizationDimensions.contains(OptimizationDimension.ABI)) {
       nativeSplitters.add(new AbiNativeLibrariesSplitter());
     }
@@ -149,9 +228,18 @@ public class ModuleSplitter {
     return maxSdkVersion.isPresent() && maxSdkVersion.get() < ANDROID_L_API_VERSION;
   }
 
+  /**
+   * Adds L+ targeting to the module split. If SDK targeting already exists, it's not overridden but
+   * checked that it targets no L- devices.
+   */
   private ModuleSplit addLPlusTargeting(ModuleSplit split) {
-    checkState(
-        !split.getApkTargeting().hasSdkVersionTargeting(), "Split already targets SDK version.");
+    if (split.getApkTargeting().hasSdkVersionTargeting()) {
+      checkState(
+          split.getApkTargeting().getSdkVersionTargeting().getValue(0).getMin().getValue()
+              >= ANDROID_L_API_VERSION,
+          "Module Split should target SDK versions above L.");
+      return split;
+    }
 
     return split
         .toBuilder()
@@ -170,16 +258,16 @@ public class ModuleSplitter {
 
   private static class SuffixManager {
     @GuardedBy("this")
-    private final Set<String> usedSuffixes = new HashSet<>();
+    private final Multimap<VariantTargeting, String> usedSuffixes = HashMultimap.create();
 
-    synchronized String resolveSuffix(String proposedSuffix) {
-      String currentProposal = proposedSuffix;
+    synchronized String createSuffix(ModuleSplit moduleSplit) {
+      String currentProposal = moduleSplit.getSuffix();
       int serialNumber = 1;
-      while (usedSuffixes.contains(currentProposal)) {
+      while (usedSuffixes.containsEntry(moduleSplit.getVariantTargeting(), currentProposal)) {
         serialNumber++;
-        currentProposal = String.format("%s_%d", proposedSuffix, serialNumber);
+        currentProposal = String.format("%s_%d", moduleSplit.getSuffix(), serialNumber);
       }
-      usedSuffixes.add(currentProposal);
+      usedSuffixes.put(moduleSplit.getVariantTargeting(), currentProposal);
       return currentProposal;
     }
   }

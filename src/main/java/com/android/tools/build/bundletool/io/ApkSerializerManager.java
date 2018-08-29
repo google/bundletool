@@ -15,159 +15,237 @@
  */
 package com.android.tools.build.bundletool.io;
 
+import static com.android.tools.build.bundletool.model.ModuleSplit.SplitType.INSTANT;
+import static com.android.tools.build.bundletool.model.ModuleSplit.SplitType.SPLIT;
+import static com.android.tools.build.bundletool.model.ModuleSplit.SplitType.STANDALONE;
+import static com.android.tools.build.bundletool.targeting.TargetingComparators.VARIANT_TARGETING_COMPARATOR;
+import static com.android.tools.build.bundletool.utils.CollectorUtils.groupingBySortedKeys;
 import static com.google.common.base.Preconditions.checkArgument;
-import static com.google.common.base.Preconditions.checkState;
+import static com.google.common.base.Predicates.alwaysTrue;
 import static com.google.common.collect.ImmutableList.toImmutableList;
+import static com.google.common.collect.ImmutableMap.toImmutableMap;
+import static java.util.Comparator.comparing;
+import static java.util.function.Function.identity;
 
 import com.android.bundle.Commands.ApkDescription;
 import com.android.bundle.Commands.ApkSet;
-import com.android.bundle.Commands.ModuleMetadata;
 import com.android.bundle.Commands.Variant;
 import com.android.bundle.Devices.DeviceSpec;
 import com.android.bundle.Targeting.VariantTargeting;
 import com.android.tools.build.bundletool.device.ApkMatcher;
 import com.android.tools.build.bundletool.io.ApkSetBuilderFactory.ApkSetBuilder;
+import com.android.tools.build.bundletool.model.ApkModifier;
+import com.android.tools.build.bundletool.model.ApkModifier.ApkDescription.ApkType;
 import com.android.tools.build.bundletool.model.AppBundle;
-import com.android.tools.build.bundletool.model.BundleModule;
 import com.android.tools.build.bundletool.model.BundleModuleName;
 import com.android.tools.build.bundletool.model.GeneratedApks;
 import com.android.tools.build.bundletool.model.ModuleSplit;
+import com.android.tools.build.bundletool.model.ModuleSplit.SplitType;
 import com.android.tools.build.bundletool.utils.ConcurrencyUtils;
+import com.google.auto.value.AutoValue;
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableMultimap;
-import com.google.common.collect.Multimaps;
+import com.google.common.collect.ImmutableListMultimap;
+import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.Multimap;
+import com.google.common.collect.Ordering;
 import com.google.common.util.concurrent.ListeningExecutorService;
-import java.util.Collection;
-import java.util.List;
-import java.util.stream.Stream;
+import java.util.Optional;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Predicate;
+import java.util.stream.Collectors;
 
 /** Creates parts of table of contents and writes out APKs. */
 public class ApkSerializerManager {
 
-  private static final ModuleMetadata STANDALONE_MODULE_METADATA =
-      ModuleMetadata.newBuilder().setName(BundleModuleName.BASE_MODULE_NAME).build();
-
   private final ListeningExecutorService executorService;
+  private final ApkModifier apkModifier;
+  private final int firstVariantNumber;
+  private final AppBundle appBundle;
+  private final ApkSetBuilder apkSetBuilder;
 
-  public ApkSerializerManager(ListeningExecutorService executorService) {
-    this.executorService = executorService;
-  }
-
-  public ImmutableList<Variant> serializeApks(
-      GeneratedApks generatedApks,
-      ApkSetBuilder apkSetBuilder,
+  public ApkSerializerManager(
       AppBundle appBundle,
-      boolean isUniversalApk) {
+      ApkSetBuilder apkSetBuilder,
+      ListeningExecutorService executorService,
+      ApkModifier apkModifier,
+      int firstVariantNumber) {
+    this.appBundle = appBundle;
+    this.apkSetBuilder = apkSetBuilder;
+    this.executorService = executorService;
+    this.apkModifier = apkModifier;
+    this.firstVariantNumber = firstVariantNumber;
+  }
+
+  public ImmutableList<Variant> serializeUniversalApk(GeneratedApks generatedApks) {
     checkArgument(
-        generatedApks.getSplitApks().isEmpty() || !isUniversalApk,
+        generatedApks.getSplitApks().isEmpty() && generatedApks.getInstantApks().isEmpty(),
         "Internal error: For universal APK expecting only standalone APKs.");
-    ImmutableList<Variant> standaloneVariants =
-        serializeStandaloneApks(generatedApks.getStandaloneApks(), apkSetBuilder, isUniversalApk);
-    ImmutableList<Variant> splitVariants =
-        serializeSplitApks(generatedApks.getSplitApks(), apkSetBuilder, appBundle);
-    return Stream.of(standaloneVariants, splitVariants)
-        .flatMap(Collection::stream)
-        .collect(toImmutableList());
+    return serializeApks(generatedApks, /* isUniversalApk= */ true, Optional.empty());
   }
 
-  public Variant serializeApksForDevice(
-      DeviceSpec deviceSpec,
-      GeneratedApks generatedApks,
-      ApkSetBuilder apkSetBuilder,
-      AppBundle appBundle) {
-    ImmutableList<Variant> variantList;
-    ImmutableList<ModuleSplit> filteredStandaloneApks =
-        filterApksForDevice(generatedApks.getStandaloneApks(), deviceSpec);
-    if (!filteredStandaloneApks.isEmpty()) {
-      variantList =
-          serializeStandaloneApks(
-              filteredStandaloneApks, apkSetBuilder, /* isUniversalApk= */ false);
-    } else {
-      variantList =
-          serializeSplitApks(
-              filterApksForDevice(generatedApks.getSplitApks(), deviceSpec),
-              apkSetBuilder,
-              appBundle);
-    }
-    checkState(variantList.size() == 1);
-    return variantList.get(0);
+  public ImmutableList<Variant> serializeApksForDevice(
+      GeneratedApks generatedApks, DeviceSpec deviceSpec) {
+    return serializeApks(generatedApks, /* isUniversalApk= */ false, Optional.of(deviceSpec));
   }
 
-  private ImmutableList<Variant> serializeSplitApks(
-      ImmutableList<ModuleSplit> splitApks, ApkSetBuilder apkSetBuilder, AppBundle appBundle) {
-    // Group splits by variant.
-    ImmutableMultimap<VariantTargeting, ModuleSplit> targetingToSplits =
-        Multimaps.index(splitApks, ModuleSplit::getVariantTargeting);
-    ImmutableList.Builder<Variant> variantsBuilder = ImmutableList.builder();
-    for (VariantTargeting variantTargeting : targetingToSplits.keySet()) {
-      // Group splits in each variant by the module which they belong to.
-      ImmutableMultimap<BundleModule, ModuleSplit> splitsByModule =
-          Multimaps.index(
-              targetingToSplits.get(variantTargeting),
-              moduleSplit -> appBundle.getModule(moduleSplit.getModuleName()));
-      Variant.Builder variantBuilder = Variant.newBuilder().setTargeting(variantTargeting);
-      for (BundleModule module : splitsByModule.keySet()) {
-        List<ApkDescription> apkDescriptions =
-            // Wait for all concurrent tasks to succeed, or any to fail.
-            ConcurrencyUtils.waitForAll(
-                splitsByModule
-                    .get(module)
-                    .stream()
-                    .map(
-                        splitApk ->
-                            executorService.submit(() -> apkSetBuilder.addSplitApk(splitApk)))
-                    .collect(toImmutableList()));
-
-        variantBuilder.addApkSet(
-            ApkSet.newBuilder()
-                .setModuleMetadata(module.getModuleMetadata())
-                .addAllApkDescription(apkDescriptions)
-                .build());
-      }
-      variantsBuilder.add(variantBuilder.build());
-    }
-    return variantsBuilder.build();
+  public ImmutableList<Variant> serializeApks(GeneratedApks generatedApks) {
+    return serializeApks(generatedApks, /* isUniversalApk= */ false, Optional.empty());
   }
 
-  private ImmutableList<Variant> serializeStandaloneApks(
-      ImmutableList<ModuleSplit> standaloneApks,
-      ApkSetBuilder apkSetBuilder,
-      boolean isUniversalApk) {
+  private ImmutableList<Variant> serializeApks(
+      GeneratedApks generatedApks, boolean isUniversalApk, Optional<DeviceSpec> deviceSpec) {
+    Predicate<ModuleSplit> deviceFilter =
+        deviceSpec.isPresent()
+            ? new ApkMatcher(deviceSpec.get())::matchesModuleSplitByTargeting
+            : alwaysTrue();
 
-    // Wait for all concurrent tasks to succeed, or any to fail.
-    return ConcurrencyUtils.waitForAll(
-        standaloneApks
-            .stream()
+    // Assign the variant numbers to each variant present.
+    AtomicInteger variantNumberCounter = new AtomicInteger(firstVariantNumber);
+    ImmutableMap<VariantKey, Integer> variantNumberByVariantKey =
+        generatedApks
+            .getAllApksStream()
+            .map(VariantKey::create)
+            .sorted()
+            .distinct()
+            .collect(toImmutableMap(identity(), unused -> variantNumberCounter.getAndIncrement()));
+
+    // 1. Remove APKs not matching the device spec.
+    // 2. Modify the APKs based on the ApkModifier.
+    // 3. Serialize all APKs in parallel.
+    ApkSerializer apkSerializer = new ApkSerializer(isUniversalApk);
+
+    // Modifies the APK using APK modifier, then returns a map by extracting the variant
+    // of APK first and later clearing out its variant targeting.
+    ImmutableListMultimap<VariantKey, ModuleSplit> splitByVariant =
+        generatedApks
+            .getAllApksStream()
+            .filter(deviceFilter)
             .map(
-                standaloneApk ->
-                    executorService.submit(
-                        () ->
-                            writeStandaloneApkVariant(
-                                standaloneApk, isUniversalApk, apkSetBuilder)))
-            .collect(toImmutableList()));
+                split -> {
+                  int variantNumber = variantNumberByVariantKey.get(VariantKey.create(split));
+                  return modifyApk(split, variantNumber);
+                })
+            .collect(
+                groupingBySortedKeys(
+                    VariantKey::create, ApkSerializerManager::clearVariantTargeting));
+
+    // After variant targeting of APKs are cleared, there might be duplicate APKs
+    // which are removed and the distinct APKs are then serialized in parallel.
+    ImmutableMap<ModuleSplit, ApkDescription> apkDescriptionBySplit =
+        splitByVariant
+            .values()
+            .stream()
+            .distinct()
+            .collect(
+                Collectors.collectingAndThen(
+                    toImmutableMap(
+                        identity(),
+                        split -> executorService.submit(() -> apkSerializer.serialize(split))),
+                    ConcurrencyUtils::waitForAll));
+
+    // Build the result proto.
+    ImmutableList.Builder<Variant> variants = ImmutableList.builder();
+    for (VariantKey variantKey : splitByVariant.keySet()) {
+      Variant.Builder variant =
+          Variant.newBuilder()
+              .setVariantNumber(variantNumberByVariantKey.get(variantKey))
+              .setTargeting(variantKey.getVariantTargeting());
+
+      Multimap<BundleModuleName, ModuleSplit> splitsByModuleName =
+          splitByVariant
+              .get(variantKey)
+              .stream()
+              .collect(groupingBySortedKeys(ModuleSplit::getModuleName));
+
+      for (BundleModuleName moduleName : splitsByModuleName.keySet()) {
+        variant.addApkSet(
+            ApkSet.newBuilder()
+                .setModuleMetadata(appBundle.getModule(moduleName).getModuleMetadata())
+                .addAllApkDescription(
+                    splitsByModuleName
+                        .get(moduleName)
+                        .stream()
+                        .map(apkDescriptionBySplit::get)
+                        .collect(toImmutableList())));
+      }
+      variants.add(variant.build());
+    }
+
+    return variants.build();
   }
 
-  private Variant writeStandaloneApkVariant(
-      ModuleSplit standaloneApk, boolean isUniversalApk, ApkSetBuilder apkSetBuilder) {
+  private ModuleSplit modifyApk(ModuleSplit moduleSplit, int variantNumber) {
+    ApkModifier.ApkDescription apkDescription =
+        ApkModifier.ApkDescription.builder()
+            .setBase(moduleSplit.isBaseModuleSplit())
+            .setApkType(
+                moduleSplit.getSplitType().equals(SplitType.STANDALONE)
+                    ? ApkType.STANDALONE
+                    : (moduleSplit.isMasterSplit() ? ApkType.MASTER_SPLIT : ApkType.CONFIG_SPLIT))
+            .setVariantNumber(variantNumber)
+            .setVariantTargeting(moduleSplit.getVariantTargeting())
+            .setApkTargeting(moduleSplit.getApkTargeting())
+            .build();
 
-    ApkDescription apkDescription =
-        isUniversalApk
-            ? apkSetBuilder.addStandaloneUniversalApk(standaloneApk)
-            : apkSetBuilder.addStandaloneApk(standaloneApk);
-
-    // Each standalone APK is represented as a single variant.
-    return Variant.newBuilder()
-        .setTargeting(standaloneApk.getVariantTargeting())
-        .addApkSet(
-            ApkSet.newBuilder()
-                .setModuleMetadata(STANDALONE_MODULE_METADATA)
-                .addApkDescription(apkDescription))
+    return moduleSplit
+        .toBuilder()
+        .setAndroidManifest(
+            apkModifier.modifyManifest(moduleSplit.getAndroidManifest(), apkDescription))
         .build();
   }
 
-  private static ImmutableList<ModuleSplit> filterApksForDevice(
-      ImmutableList<ModuleSplit> allApks, DeviceSpec deviceSpec) {
-    ApkMatcher apkMatcher = new ApkMatcher(deviceSpec);
-    return allApks.stream().filter(apkMatcher::matchesModuleSplit).collect(toImmutableList());
+  private static ModuleSplit clearVariantTargeting(ModuleSplit moduleSplit) {
+    return moduleSplit
+        .toBuilder()
+        .setVariantTargeting(VariantTargeting.getDefaultInstance())
+        .build();
+  }
+
+  /**
+   * Key identifying a variant.
+   *
+   * <p>A variant is a set of APKs. One device is guaranteed to receive only APKs from the same
+   * variant.
+   */
+  @AutoValue
+  abstract static class VariantKey implements Comparable<VariantKey> {
+    static VariantKey create(ModuleSplit moduleSplit) {
+      return new AutoValue_ApkSerializerManager_VariantKey(
+          moduleSplit.getSplitType(), moduleSplit.getVariantTargeting());
+    }
+
+    abstract SplitType getSplitType();
+
+    abstract VariantTargeting getVariantTargeting();
+
+    @Override
+    public int compareTo(VariantKey o) {
+      // Instant APKs get the lowest variant numbers followed by standalone and then split APKs.
+      return comparing(VariantKey::getSplitType, Ordering.explicit(INSTANT, STANDALONE, SPLIT))
+          .thenComparing(VariantKey::getVariantTargeting, VARIANT_TARGETING_COMPARATOR)
+          .compare(this, o);
+    }
+  }
+
+  private final class ApkSerializer {
+    private final boolean isUniversalApk;
+
+    public ApkSerializer(boolean isUniversalApk) {
+      this.isUniversalApk = isUniversalApk;
+    }
+
+    public ApkDescription serialize(ModuleSplit split) {
+      switch (split.getSplitType()) {
+        case INSTANT:
+          return apkSetBuilder.addInstantApk(split);
+        case SPLIT:
+          return apkSetBuilder.addSplitApk(split);
+        case STANDALONE:
+          return isUniversalApk
+              ? apkSetBuilder.addStandaloneUniversalApk(split)
+              : apkSetBuilder.addStandaloneApk(split);
+      }
+      throw new IllegalStateException("Unexpected splitType: " + split.getSplitType());
+    }
   }
 }

@@ -16,6 +16,7 @@
 
 package com.android.tools.build.bundletool.model;
 
+import static com.android.tools.build.bundletool.model.AndroidManifest.ACTIVITY_ELEMENT_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.APPLICATION_ELEMENT_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.EXTRACT_NATIVE_LIBS_ATTRIBUTE_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.EXTRACT_NATIVE_LIBS_RESOURCE_ID;
@@ -30,16 +31,20 @@ import static com.android.tools.build.bundletool.model.AndroidManifest.META_DATA
 import static com.android.tools.build.bundletool.model.AndroidManifest.MIN_SDK_VERSION_ATTRIBUTE_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.MIN_SDK_VERSION_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.NAME_RESOURCE_ID;
+import static com.android.tools.build.bundletool.model.AndroidManifest.PROVIDER_ELEMENT_NAME;
+import static com.android.tools.build.bundletool.model.AndroidManifest.SERVICE_ELEMENT_NAME;
+import static com.android.tools.build.bundletool.model.AndroidManifest.SPLIT_NAME_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.SUPPORTS_GL_TEXTURE_ELEMENT_NAME;
+import static com.android.tools.build.bundletool.model.AndroidManifest.TARGET_SANDBOX_VERSION_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.USES_FEATURE_ELEMENT_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.USES_SDK_ELEMENT_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.VALUE_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.VERSION_CODE_RESOURCE_ID;
+import static com.android.tools.build.bundletool.utils.xmlproto.XmlProtoAttributeBuilder.createAndroidAttribute;
 import static com.android.tools.build.bundletool.utils.xmlproto.XmlProtoElement.ANDROID_NAMESPACE_URI;
 import static com.android.tools.build.bundletool.utils.xmlproto.XmlProtoElement.NO_NAMESPACE_URI;
 import static java.util.stream.Collectors.joining;
 
-import com.android.tools.build.bundletool.utils.xmlproto.XmlProtoAttributeBuilder;
 import com.android.tools.build.bundletool.utils.xmlproto.XmlProtoElementBuilder;
 import com.android.tools.build.bundletool.utils.xmlproto.XmlProtoNode;
 import com.android.tools.build.bundletool.utils.xmlproto.XmlProtoNodeBuilder;
@@ -50,6 +55,8 @@ import javax.annotation.CheckReturnValue;
 public class ManifestEditor {
 
   private static final int OPEN_GL_VERSION_MULTIPLIER = 0x10000;
+  private static final ImmutableList<String> SPLIT_NAME_ELEMENT_NAMES =
+      ImmutableList.of(ACTIVITY_ELEMENT_NAME, SERVICE_ELEMENT_NAME, PROVIDER_ELEMENT_NAME);
 
   private final XmlProtoNodeBuilder rootNode;
   private final XmlProtoElementBuilder manifestElement;
@@ -57,6 +64,10 @@ public class ManifestEditor {
   public ManifestEditor(XmlProtoNode rootNode) {
     this.rootNode = rootNode.toBuilder();
     this.manifestElement = this.rootNode.getElement();
+  }
+
+  public XmlProtoElementBuilder getRawProto() {
+    return manifestElement;
   }
 
   /** Sets the minSdkVersion attribute. */
@@ -118,6 +129,38 @@ public class ManifestEditor {
     return this;
   }
 
+  public ManifestEditor setTargetSandboxVersion(int version) {
+    manifestElement
+        .getOrCreateAndroidAttribute("targetSandboxVersion", TARGET_SANDBOX_VERSION_RESOURCE_ID)
+        .setValueAsDecimalInteger(version);
+    return this;
+  }
+
+  public ManifestEditor addMetaDataString(String key, String value) {
+    manifestElement
+        .getOrCreateChildElement(APPLICATION_ELEMENT_NAME)
+        .addChildElement(
+            XmlProtoElementBuilder.create("meta-data")
+                .addAttribute(
+                    createAndroidAttribute("name", NAME_RESOURCE_ID).setValueAsString(key))
+                .addAttribute(
+                    createAndroidAttribute("value", VALUE_RESOURCE_ID).setValueAsString(value)));
+    return this;
+  }
+
+  public ManifestEditor addMetaDataInteger(String key, int value) {
+    manifestElement
+        .getOrCreateChildElement(APPLICATION_ELEMENT_NAME)
+        .addChildElement(
+            XmlProtoElementBuilder.create("meta-data")
+                .addAttribute(
+                    createAndroidAttribute("name", NAME_RESOURCE_ID).setValueAsString(key))
+                .addAttribute(
+                    createAndroidAttribute("value", VALUE_RESOURCE_ID)
+                        .setValueAsDecimalInteger(value)));
+    return this;
+  }
+
 
   /**
    * Sets the 'android:extractNativeLibs' value in the {@code application} tag.
@@ -146,11 +189,25 @@ public class ManifestEditor {
         .addChildElement(
             XmlProtoElementBuilder.create(META_DATA_ELEMENT_NAME)
                 .addAttribute(
-                    XmlProtoAttributeBuilder.createAndroidAttribute("name", NAME_RESOURCE_ID)
+                    createAndroidAttribute("name", NAME_RESOURCE_ID)
                         .setValueAsString(META_DATA_KEY_FUSED_MODULE_NAMES))
                 .addAttribute(
-                    XmlProtoAttributeBuilder.createAndroidAttribute("value", VALUE_RESOURCE_ID)
+                    createAndroidAttribute("value", VALUE_RESOURCE_ID)
                         .setValueAsString(moduleNamesString)));
+    return this;
+  }
+
+  /**
+   * Removes the {@code splitName} attribute from activities, services and providers.
+   *
+   * <p>This is useful for converting between install and instant splits.
+   */
+  public ManifestEditor removeSplitName() {
+    manifestElement
+        .getOrCreateChildElement(APPLICATION_ELEMENT_NAME)
+        .getChildrenElements(el -> SPLIT_NAME_ELEMENT_NAMES.contains(el.getName()))
+        .forEach(element -> element.removeAndroidAttribute(SPLIT_NAME_RESOURCE_ID));
+
     return this;
   }
 

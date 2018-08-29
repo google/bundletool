@@ -128,6 +128,11 @@ public class ClassesDexNameSanitizer {
     }
 
     @Override
+    public ModuleEntry setCompression(boolean shouldCompress) {
+      throw new UnsupportedOperationException();
+    }
+
+    @Override
     public boolean equals(Object obj) {
       if (!(obj instanceof ModuleEntry)) {
         return false;

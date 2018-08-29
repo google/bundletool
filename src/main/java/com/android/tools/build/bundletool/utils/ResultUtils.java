@@ -34,6 +34,14 @@ public final class ResultUtils {
         .collect(toImmutableList());
   }
 
+  public static ImmutableList<Variant> instantApkVariants(BuildApksResult result) {
+    return result
+        .getVariantList()
+        .stream()
+        .filter(ResultUtils::isInstantApkVariant)
+        .collect(toImmutableList());
+  }
+
   public static ImmutableList<Variant> standaloneApkVariants(BuildApksResult result) {
     return result
         .getVariantList()
@@ -51,7 +59,19 @@ public final class ResultUtils {
   }
 
   public static boolean isStandaloneApkVariant(Variant variant) {
-    return !isSplitApkVariant(variant);
+    return variant
+        .getApkSetList()
+        .stream()
+        .flatMap(apkSet -> apkSet.getApkDescriptionList().stream())
+        .allMatch(ApkDescription::hasStandaloneApkMetadata);
+  }
+
+  public static boolean isInstantApkVariant(Variant variant) {
+    return variant
+        .getApkSetList()
+        .stream()
+        .flatMap(apkSet -> apkSet.getApkDescriptionList().stream())
+        .allMatch(ApkDescription::hasInstantApkMetadata);
   }
 
   private ResultUtils() {}

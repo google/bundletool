@@ -58,14 +58,21 @@ import javax.annotation.CheckReturnValue;
 @AutoValue
 public abstract class ModuleSplit {
 
+  /** The split type being represented by this split. It can be a standalone, split, or instant. */
+  public enum SplitType {
+    STANDALONE,
+    SPLIT,
+    INSTANT
+  }
+
   /** Returns the targeting of the APK represented by this instance. */
   public abstract ApkTargeting getApkTargeting();
 
   /** Returns the targeting of the Variant this instance belongs to. */
   public abstract VariantTargeting getVariantTargeting();
 
-  /** Whether this ModuleSplit instance represents a standalone APK. */
-  public abstract boolean isStandalone();
+  /** Whether this ModuleSplit instance represents a standalone, split or instant apk. */
+  public abstract SplitType getSplitType();
 
   /**
    * Returns AppBundle's ZipEntries copied to be included in this split.
@@ -79,6 +86,8 @@ public abstract class ModuleSplit {
   public abstract Optional<ResourceTable> getResourceTable();
 
   public abstract AndroidManifest getAndroidManifest();
+
+  public abstract ImmutableList<ManifestMutator> getMasterManifestMutators();
 
   public abstract BundleModuleName getModuleName();
 
@@ -188,6 +197,13 @@ public abstract class ModuleSplit {
         .collect(toImmutableList());
   }
 
+  /** Removes the {@code splitName} attribute from elements in the manifest. */
+  @CheckReturnValue
+  public ModuleSplit removeSplitName() {
+    AndroidManifest apkManifest = getAndroidManifest().toEditor().removeSplitName().save();
+    return toBuilder().setAndroidManifest(apkManifest).build();
+  }
+
   /** Writes the final manifest that reflects the Split ID. */
   @CheckReturnValue
   public ModuleSplit writeSplitIdInManifest(String resolvedSplitIdSuffix) {
@@ -230,7 +246,10 @@ public abstract class ModuleSplit {
    * <p>Prefer static factory methods when creating {@link ModuleSplit} from {@link BundleModule}.
    */
   public static Builder builder() {
-    return new AutoValue_ModuleSplit.Builder().setEntries(ImmutableList.of()).setStandalone(false);
+    return new AutoValue_ModuleSplit.Builder()
+        .setEntries(ImmutableList.of())
+        .setMasterManifestMutators(ImmutableList.of())
+        .setSplitType(SplitType.SPLIT);
   }
 
   /**
@@ -299,7 +318,7 @@ public abstract class ModuleSplit {
             .setAndroidManifest(bundleModule.getAndroidManifest())
             // Initially each split is master split.
             .setMasterSplit(true)
-            .setStandalone(false)
+            .setSplitType(SplitType.SPLIT)
             .setApkTargeting(ApkTargeting.getDefaultInstance())
             .setVariantTargeting(lPlusVariantTargeting());
 
@@ -366,13 +385,16 @@ public abstract class ModuleSplit {
 
     public abstract Builder setVariantTargeting(VariantTargeting targeting);
 
-    public abstract Builder setStandalone(boolean isStandalone);
+    public abstract Builder setSplitType(SplitType splitType);
 
     public abstract Builder setEntries(List<ModuleEntry> entries);
 
     public abstract Builder setResourceTable(ResourceTable resourceTable);
 
     public abstract Builder setAndroidManifest(AndroidManifest androidManifest);
+
+    public abstract Builder setMasterManifestMutators(
+        ImmutableList<ManifestMutator> manifestMutators);
 
     protected abstract ModuleSplit autoBuild();
 

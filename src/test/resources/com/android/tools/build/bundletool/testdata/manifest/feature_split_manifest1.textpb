@@ -1,0 +1,635 @@
+# proto-file: third_party/android/aapt2/proto/Resources.proto
+# proto-message: aapt.pb.XmlNode
+
+element: {
+  # (aapt.pb.XmlElement) size=2.3K
+  namespace_declaration: {
+    # (aapt.pb.XmlNamespace) size=57B
+    prefix: "android"  # size=7
+    uri: "http://schemas.android.com/apk/res/android"  # size=42
+    source: {
+      # (aapt.pb.SourcePosition) size=2B
+      line_number: 0x00000002
+    }
+    # element.namespace_declaration[0].source
+  }
+  # element.namespace_declaration[0]
+  name: "manifest"  # size=8
+  attribute: {
+    # (aapt.pb.XmlAttribute) size=33B
+    name: "package"  # size=7
+    value: "com.example.appproject"  # size=22
+  }
+  # element.attribute[0]
+  attribute: {
+    # (aapt.pb.XmlAttribute) size=77B
+    namespace_uri: "http://schemas.android.com/apk/res/android"  # size=42
+    name: "versionCode"  # size=11
+    value: "1"
+    source: {
+      # (aapt.pb.SourcePosition) size=2B
+      line_number: 0x00000002
+    }
+    # element.attribute[1].source
+    resource_id: 0x0101021b  # 16_843_291; as IP:27.2.1.1 (swapped=1.1.2.27)
+    compiled_item: {
+      # (aapt.pb.Item) size=6B
+      prim: {
+        # (aapt.pb.Primitive)
+        int_decimal_value: 1
+      }
+      # element.attribute[1].compiled_item.prim
+    }
+    # element.attribute[1].compiled_item
+  }
+  # element.attribute[1]
+  attribute: {
+    # (aapt.pb.XmlAttribute) size=67B
+    namespace_uri: "http://schemas.android.com/apk/res/android"  # size=42
+    name: "versionName"  # size=11
+    value: "1.0"
+    resource_id: 0x0101021c  # 16_843_292; as IP:28.2.1.1 (swapped=1.1.2.28)
+  }
+  # element.attribute[2]
+  attribute: {
+    name: "split"
+    value: "testModule"
+    compiled_item: {
+      str: {
+        value: "testModule"
+      }
+    }
+  }
+  attribute: {
+    namespace_uri: "http://schemas.android.com/apk/res/android"
+    name: "isFeatureSplit"
+    resource_id: 0x0101055b
+    compiled_item: {
+      prim: {
+        boolean_value: true
+      }
+    }
+  }
+  child: {
+    # (aapt.pb.XmlNode) size=14B
+    text: "\n\n    "  # size=6
+    source: {
+      # (aapt.pb.SourcePosition) size=4B
+      line_number: 0x00000005
+      column_number: 0x0000001f  # 31
+    }
+    # element.child[0].source
+  }
+  # element.child[0]
+  child: {
+    # (aapt.pb.XmlNode) size=186B
+    element: {
+      # (aapt.pb.XmlElement) size=177B
+      name: "uses-sdk"  # size=8
+      attribute: {
+        # (aapt.pb.XmlAttribute) size=80B
+        namespace_uri: "http://schemas.android.com/apk/res/android"  # size=42
+        name: "minSdkVersion"  # size=13
+        value: "23"
+        source: {
+          # (aapt.pb.SourcePosition) size=2B
+          line_number: 0x00000007
+        }
+        # element.child[1].element.attribute[0].source
+        resource_id: 0x0101020c  # 16_843_276; as IP:12.2.1.1 (swapped=1.1.2.12)
+        compiled_item: {
+          # (aapt.pb.Item) size=6B
+          prim: {
+            # (aapt.pb.Primitive)
+            int_decimal_value: 23
+          }
+          # element.child[1].element.attribute[0].compiled_item.prim
+        }
+        # element.child[1].element.attribute[0].compiled_item
+      }
+      # element.child[1].element.attribute[0]
+      attribute: {
+        # (aapt.pb.XmlAttribute) size=83B
+        namespace_uri: "http://schemas.android.com/apk/res/android"  # size=42
+        name: "targetSdkVersion"  # size=16
+        value: "26"
+        source: {
+          # (aapt.pb.SourcePosition) size=2B
+          line_number: 0x00000007
+        }
+        # element.child[1].element.attribute[1].source
+        resource_id: 0x01010270  # 16_843_376; as IP:112.2.1.1 (swapped=1.1.2.112)
+        compiled_item: {
+          # (aapt.pb.Item) size=6B
+          prim: {
+            # (aapt.pb.Primitive)
+            int_decimal_value: 26
+          }
+          # element.child[1].element.attribute[1].compiled_item.prim
+        }
+        # element.child[1].element.attribute[1].compiled_item
+      }
+      # element.child[1].element.attribute[1]
+    }
+    # element.child[1].element
+    source: {
+      # (aapt.pb.SourcePosition) size=4B
+      line_number: 0x00000007
+      column_number: 0x00000004
+    }
+    # element.child[1].source
+  }
+  # element.child[1]
+  child: {
+    # (aapt.pb.XmlNode) size=14B
+    text: "\n\n    "  # size=6
+    source: {
+      # (aapt.pb.SourcePosition) size=4B
+      line_number: 0x00000009
+      column_number: 0x00000028  # 40
+    }
+    # element.child[2].source
+  }
+  # element.child[2]
+  child: {
+    # (aapt.pb.XmlNode) size=1.8K
+    element: {
+      # (aapt.pb.XmlElement) size=1.8K
+      name: "application"  # size=11
+      attribute: {
+        # (aapt.pb.XmlAttribute) size=84B
+        namespace_uri: "http://schemas.android.com/apk/res/android"  # size=42
+        name: "allowBackup"  # size=11
+        value: "true"
+        source: {
+          # (aapt.pb.SourcePosition) size=2B
+          line_number: 0x0000000b  # 11
+        }
+        # element.child[3].element.attribute[0].source
+        resource_id: 0x01010280  # 16_843_392; as IP:128.2.1.1 (swapped=1.1.2.128)
+        compiled_item: {
+          # (aapt.pb.Item) size=10B
+          prim: {
+            # (aapt.pb.Primitive)
+            boolean_value: true
+          }
+          # element.child[3].element.attribute[0].compiled_item.prim
+        }
+        # element.child[3].element.attribute[0].compiled_item
+      }
+      # element.child[3].element.attribute[0]
+      attribute: {
+        # (aapt.pb.XmlAttribute) size=83B
+        namespace_uri: "http://schemas.android.com/apk/res/android"  # size=42
+        name: "debuggable"  # size=10
+        value: "true"
+        source: {
+          # (aapt.pb.SourcePosition) size=2B
+          line_number: 0x0000000b  # 11
+        }
+        # element.child[3].element.attribute[1].source
+        resource_id: 0x0101000f  # 16_842_767; as IP:15.0.1.1 (swapped=1.1.0.15)
+        compiled_item: {
+          # (aapt.pb.Item) size=10B
+          prim: {
+            # (aapt.pb.Primitive)
+            boolean_value: true
+          }
+          # element.child[3].element.attribute[1].compiled_item.prim
+        }
+        # element.child[3].element.attribute[1].compiled_item
+      }
+      # element.child[3].element.attribute[1]
+      attribute: {
+        # (aapt.pb.XmlAttribute) size=110B
+        namespace_uri: "http://schemas.android.com/apk/res/android"  # size=42
+        name: "icon"
+        value: "@mipmap/ic_launcher"  # size=19
+        source: {
+          # (aapt.pb.SourcePosition) size=2B
+          line_number: 0x0000000b  # 11
+        }
+        # element.child[3].element.attribute[2].source
+        resource_id: 0x01010002  # 16_842_754; as IP:2.0.1.1 (swapped=1.1.0.2)
+        compiled_item: {
+          # (aapt.pb.Item) size=28B
+          ref: {
+            # (aapt.pb.Reference) size=26B
+            id: 0x7f0c0000  # 2_131_492_864; [if milliseconds]: 3 weeks 3 days; as IP:0.0.12.127 (swapped=127.12.0.0)
+            name: "mipmap/ic_launcher"  # size=18
+          }
+          # element.child[3].element.attribute[2].compiled_item.ref
+        }
+        # element.child[3].element.attribute[2].compiled_item
+      }
+      # element.child[3].element.attribute[2]
+      attribute: {
+        # (aapt.pb.XmlAttribute) size=105B
+        namespace_uri: "http://schemas.android.com/apk/res/android"  # size=42
+        name: "label"  # size=5
+        value: "@string/app_name"  # size=16
+        source: {
+          # (aapt.pb.SourcePosition) size=2B
+          line_number: 0x0000000b  # 11
+        }
+        # element.child[3].element.attribute[3].source
+        resource_id: 0x01010001  # 16_842_753; as IP:1.0.1.1 (swapped=1.1.0.1)
+        compiled_item: {
+          # (aapt.pb.Item) size=25B
+          ref: {
+            # (aapt.pb.Reference) size=23B
+            id: 0x7f0d0020  # 2_131_558_432; [if milliseconds]: 3 weeks 3 days; as IP:32.0.13.127 (swapped=127.13.0.32)
+            name: "string/app_name"  # size=15
+          }
+          # element.child[3].element.attribute[3].compiled_item.ref
+        }
+        # element.child[3].element.attribute[3].compiled_item
+      }
+      # element.child[3].element.attribute[3]
+      attribute: {
+        # (aapt.pb.XmlAttribute) size=127B
+        namespace_uri: "http://schemas.android.com/apk/res/android"  # size=42
+        name: "roundIcon"  # size=9
+        value: "@mipmap/ic_launcher_round"  # size=25
+        source: {
+          # (aapt.pb.SourcePosition) size=2B
+          line_number: 0x0000000b  # 11
+        }
+        # element.child[3].element.attribute[4].source
+        resource_id: 0x0101052c  # 16_844_076; as IP:44.5.1.1 (swapped=1.1.5.44)
+        compiled_item: {
+          # (aapt.pb.Item) size=34B
+          ref: {
+            # (aapt.pb.Reference) size=32B
+            id: 0x7f0c0001  # 2_131_492_865; [if milliseconds]: 3 weeks 3 days; as IP:1.0.12.127 (swapped=127.12.0.1)
+            name: "mipmap/ic_launcher_round"  # size=24
+          }
+          # element.child[3].element.attribute[4].compiled_item.ref
+        }
+        # element.child[3].element.attribute[4].compiled_item
+      }
+      # element.child[3].element.attribute[4]
+      attribute: {
+        # (aapt.pb.XmlAttribute) size=84B
+        namespace_uri: "http://schemas.android.com/apk/res/android"  # size=42
+        name: "supportsRtl"  # size=11
+        value: "true"
+        source: {
+          # (aapt.pb.SourcePosition) size=2B
+          line_number: 0x0000000b  # 11
+        }
+        # element.child[3].element.attribute[5].source
+        resource_id: 0x010103af  # 16_843_695; as IP:175.3.1.1 (swapped=1.1.3.175)
+        compiled_item: {
+          # (aapt.pb.Item) size=10B
+          prim: {
+            # (aapt.pb.Primitive)
+            boolean_value: true
+          }
+          # element.child[3].element.attribute[5].compiled_item.prim
+        }
+        # element.child[3].element.attribute[5].compiled_item
+      }
+      # element.child[3].element.attribute[5]
+      attribute: {
+        # (aapt.pb.XmlAttribute) size=103B
+        namespace_uri: "http://schemas.android.com/apk/res/android"  # size=42
+        name: "theme"  # size=5
+        value: "@style/AppTheme"  # size=15
+        source: {
+          # (aapt.pb.SourcePosition) size=2B
+          line_number: 0x0000000b  # 11
+        }
+        # element.child[3].element.attribute[6].source
+        resource_id: 0x01010000  # 16_842_752; as IP:0.0.1.1 (swapped=1.1.0.0)
+        compiled_item: {
+          # (aapt.pb.Item) size=24B
+          ref: {
+            # (aapt.pb.Reference) size=22B
+            id: 0x7f0e0006  # 2_131_623_942; [if milliseconds]: 3 weeks 3 days; as IP:6.0.14.127 (swapped=127.14.0.6)
+            name: "style/AppTheme"  # size=14
+          }
+          # element.child[3].element.attribute[6].compiled_item.ref
+        }
+        # element.child[3].element.attribute[6].compiled_item
+      }
+      # element.child[3].element.attribute[6]
+      child: {
+        # (aapt.pb.XmlNode) size=17B
+        text: "\n        "  # size=9
+        source: {
+          # (aapt.pb.SourcePosition) size=4B
+          line_number: 0x00000012  # 18
+          column_number: 0x00000029  # 41
+        }
+        # element.child[3].element.child[0].source
+      }
+      # element.child[3].element.child[0]
+      child: {
+        # (aapt.pb.XmlNode) size=710B
+        element: {
+          # (aapt.pb.XmlElement) size=701B
+          name: "activity"  # size=8
+          attribute: {
+            # (aapt.pb.XmlAttribute) size=105B
+            namespace_uri: "http://schemas.android.com/apk/res/android"  # size=42
+            name: "label"  # size=5
+            value: "@string/app_name"  # size=16
+            source: {
+              # (aapt.pb.SourcePosition) size=2B
+              line_number: 0x00000013  # 19
+            }
+            # element.child[3].element.child[1].element.attribute[0].source
+            resource_id: 0x01010001  # 16_842_753; as IP:1.0.1.1 (swapped=1.1.0.1)
+            compiled_item: {
+              # (aapt.pb.Item) size=25B
+              ref: {
+                # (aapt.pb.Reference) size=23B
+                id: 0x7f0d0020  # 2_131_558_432; [if milliseconds]: 3 weeks 3 days; as IP:32.0.13.127 (swapped=127.13.0.32)
+                name: "string/app_name"  # size=15
+              }
+              # element.child[3].element.child[1].element.attribute[0].compiled_item.ref
+            }
+            # element.child[3].element.child[1].element.attribute[0].compiled_item
+          }
+          # element.child[3].element.child[1].element.attribute[0]
+          attribute: {
+            # (aapt.pb.XmlAttribute) size=92B
+            namespace_uri: "http://schemas.android.com/apk/res/android"  # size=42
+            name: "name"
+            value: "com.example.appproject.MainActivity"  # size=35
+            resource_id: 0x01010003  # 16_842_755; as IP:3.0.1.1 (swapped=1.1.0.3)
+          }
+          # element.child[3].element.child[1].element.attribute[1]
+          attribute: {
+            # (aapt.pb.XmlAttribute) size=127B
+            namespace_uri: "http://schemas.android.com/apk/res/android"  # size=42
+            name: "theme"  # size=5
+            value: "@style/AppTheme.NoActionBar"  # size=27
+            source: {
+              # (aapt.pb.SourcePosition) size=2B
+              line_number: 0x00000013  # 19
+            }
+            # element.child[3].element.child[1].element.attribute[2].source
+            resource_id: 0x01010000  # 16_842_752; as IP:0.0.1.1 (swapped=1.1.0.0)
+            compiled_item: {
+              # (aapt.pb.Item) size=36B
+              ref: {
+                # (aapt.pb.Reference) size=34B
+                id: 0x7f0e0008  # 2_131_623_944; [if milliseconds]: 3 weeks 3 days; as IP:8.0.14.127 (swapped=127.14.0.8)
+                name: "style/AppTheme.NoActionBar"  # size=26
+              }
+              # element.child[3].element.child[1].element.attribute[2].compiled_item.ref
+            }
+            # element.child[3].element.child[1].element.attribute[2].compiled_item
+          }
+          # element.child[3].element.child[1].element.attribute[2]
+          child: {
+            # (aapt.pb.XmlNode) size=21B
+            text: "\n            "  # size=13
+            source: {
+              # (aapt.pb.SourcePosition) size=4B
+              line_number: 0x00000016  # 22
+              column_number: 0x00000039  # 57
+            }
+            # element.child[3].element.child[1].element.child[0].source
+          }
+          # element.child[3].element.child[1].element.child[0]
+          child: {
+            # (aapt.pb.XmlNode) size=316B
+            element: {
+              # (aapt.pb.XmlElement) size=307B
+              name: "intent-filter"  # size=13
+              child: {
+                # (aapt.pb.XmlNode) size=25B
+                text: "\n                "  # size=17
+                source: {
+                  # (aapt.pb.SourcePosition) size=4B
+                  line_number: 0x00000017  # 23
+                  column_number: 0x0000001b  # 27
+                }
+                # element.child[3].element.child[1].element.child[1].element.child[0].source
+              }
+              # element.child[3].element.child[1].element.child[1].element.child[0]
+              child: {
+                # (aapt.pb.XmlNode) size=101B
+                element: {
+                  # (aapt.pb.XmlElement) size=93B
+                  name: "action"  # size=6
+                  attribute: {
+                    # (aapt.pb.XmlAttribute) size=83B
+                    namespace_uri: "http://schemas.android.com/apk/res/android"  # size=42
+                    name: "name"
+                    value: "android.intent.action.MAIN"  # size=26
+                    resource_id: 0x01010003  # 16_842_755; as IP:3.0.1.1 (swapped=1.1.0.3)
+                  }
+                  # element.child[3].element.child[1].element.child[1].element.child[1].element.attribute[0]
+                }
+                # element.child[3].element.child[1].element.child[1].element.child[1].element
+                source: {
+                  # (aapt.pb.SourcePosition) size=4B
+                  line_number: 0x00000018  # 24
+                  column_number: 0x00000010  # 16
+                }
+                # element.child[3].element.child[1].element.child[1].element.child[1].source
+              }
+              # element.child[3].element.child[1].element.child[1].element.child[1]
+              child: {
+                # (aapt.pb.XmlNode) size=26B
+                text: "\n\n                "  # size=18
+                source: {
+                  # (aapt.pb.SourcePosition) size=4B
+                  line_number: 0x00000018  # 24
+                  column_number: 0x00000044  # 68
+                }
+                # element.child[3].element.child[1].element.child[1].element.child[2].source
+              }
+              # element.child[3].element.child[1].element.child[1].element.child[2]
+              child: {
+                # (aapt.pb.XmlNode) size=109B
+                element: {
+                  # (aapt.pb.XmlElement) size=101B
+                  name: "category"  # size=8
+                  attribute: {
+                    # (aapt.pb.XmlAttribute) size=89B
+                    namespace_uri: "http://schemas.android.com/apk/res/android"  # size=42
+                    name: "name"
+                    value: "android.intent.category.LAUNCHER"  # size=32
+                    resource_id: 0x01010003  # 16_842_755; as IP:3.0.1.1 (swapped=1.1.0.3)
+                  }
+                  # element.child[3].element.child[1].element.child[1].element.child[3].element.attribute[0]
+                }
+                # element.child[3].element.child[1].element.child[1].element.child[3].element
+                source: {
+                  # (aapt.pb.SourcePosition) size=4B
+                  line_number: 0x0000001a  # 26
+                  column_number: 0x00000010  # 16
+                }
+                # element.child[3].element.child[1].element.child[1].element.child[3].source
+              }
+              # element.child[3].element.child[1].element.child[1].element.child[3]
+              child: {
+                # (aapt.pb.XmlNode) size=21B
+                text: "\n            "  # size=13
+                source: {
+                  # (aapt.pb.SourcePosition) size=4B
+                  line_number: 0x0000001a  # 26
+                  column_number: 0x0000004c  # 76
+                }
+                # element.child[3].element.child[1].element.child[1].element.child[4].source
+              }
+              # element.child[3].element.child[1].element.child[1].element.child[4]
+            }
+            # element.child[3].element.child[1].element.child[1].element
+            source: {
+              # (aapt.pb.SourcePosition) size=4B
+              line_number: 0x00000017  # 23
+              column_number: 0x0000000c  # 12
+            }
+            # element.child[3].element.child[1].element.child[1].source
+          }
+          # element.child[3].element.child[1].element.child[1]
+          child: {
+            # (aapt.pb.XmlNode) size=17B
+            text: "\n        "  # size=9
+            source: {
+              # (aapt.pb.SourcePosition) size=4B
+              line_number: 0x0000001b  # 27
+              column_number: 0x0000001c  # 28
+            }
+            # element.child[3].element.child[1].element.child[2].source
+          }
+          # element.child[3].element.child[1].element.child[2]
+        }
+        # element.child[3].element.child[1].element
+        source: {
+          # (aapt.pb.SourcePosition) size=4B
+          line_number: 0x00000013  # 19
+          column_number: 0x00000008
+        }
+        # element.child[3].element.child[1].source
+      }
+      # element.child[3].element.child[1]
+      child: {
+        # (aapt.pb.XmlNode) size=18B
+        text: "\n\n        "  # size=10
+        source: {
+          # (aapt.pb.SourcePosition) size=4B
+          line_number: 0x0000001c  # 28
+          column_number: 0x00000013  # 19
+        }
+        # element.child[3].element.child[2].source
+      }
+      # element.child[3].element.child[2]
+      child: {
+        # (aapt.pb.XmlNode) size=168B
+        element: {
+          # (aapt.pb.XmlElement) size=159B
+          name: "meta-testdata"  # size=9
+          attribute: {
+            # (aapt.pb.XmlAttribute) size=80B
+            namespace_uri: "http://schemas.android.com/apk/res/android"  # size=42
+            name: "name"
+            value: "android.support.VERSION"  # size=23
+            resource_id: 0x01010003  # 16_842_755; as IP:3.0.1.1 (swapped=1.1.0.3)
+          }
+          # element.child[3].element.child[3].element.attribute[0]
+          attribute: {
+            # (aapt.pb.XmlAttribute) size=64B
+            namespace_uri: "http://schemas.android.com/apk/res/android"  # size=42
+            name: "value"  # size=5
+            value: "26.1.0"  # size=6
+            resource_id: 0x01010024  # 16_842_788; as IP:36.0.1.1 (swapped=1.1.0.36)
+          }
+          # element.child[3].element.child[3].element.attribute[1]
+        }
+        # element.child[3].element.child[3].element
+        source: {
+          # (aapt.pb.SourcePosition) size=4B
+          line_number: 0x0000001e  # 30
+          column_number: 0x00000008
+        }
+        # element.child[3].element.child[3].source
+      }
+      # element.child[3].element.child[3]
+      child: {
+        # (aapt.pb.XmlNode) size=17B
+        text: "\n        "  # size=9
+        source: {
+          # (aapt.pb.SourcePosition) size=4B
+          line_number: 0x00000020  # 32
+          column_number: 0x00000025  # 37
+        }
+        # element.child[3].element.child[4].source
+      }
+      # element.child[3].element.child[4]
+      child: {
+        # (aapt.pb.XmlNode) size=184B
+        element: {
+          # (aapt.pb.XmlElement) size=175B
+          name: "meta-testdata"  # size=9
+          attribute: {
+            # (aapt.pb.XmlAttribute) size=87B
+            namespace_uri: "http://schemas.android.com/apk/res/android"  # size=42
+            name: "name"
+            value: "android.arch.lifecycle.VERSION"  # size=30
+            resource_id: 0x01010003  # 16_842_755; as IP:3.0.1.1 (swapped=1.1.0.3)
+          }
+          # element.child[3].element.child[5].element.attribute[0]
+          attribute: {
+            # (aapt.pb.XmlAttribute) size=73B
+            namespace_uri: "http://schemas.android.com/apk/res/android"  # size=42
+            name: "value"  # size=5
+            value: "27.0.0-SNAPSHOT"  # size=15
+            resource_id: 0x01010024  # 16_842_788; as IP:36.0.1.1 (swapped=1.1.0.36)
+          }
+          # element.child[3].element.child[5].element.attribute[1]
+        }
+        # element.child[3].element.child[5].element
+        source: {
+          # (aapt.pb.SourcePosition) size=4B
+          line_number: 0x00000021  # 33
+          column_number: 0x00000008
+        }
+        # element.child[3].element.child[5].source
+      }
+      # element.child[3].element.child[5]
+      child: {
+        # (aapt.pb.XmlNode) size=13B
+        text: "\n    "  # size=5
+        source: {
+          # (aapt.pb.SourcePosition) size=4B
+          line_number: 0x00000023  # 35
+          column_number: 0x0000002e  # 46
+        }
+        # element.child[3].element.child[6].source
+      }
+      # element.child[3].element.child[6]
+    }
+    # element.child[3].element
+    source: {
+      # (aapt.pb.SourcePosition) size=4B
+      line_number: 0x0000000b  # 11
+      column_number: 0x00000004
+    }
+    # element.child[3].source
+  }
+  # element.child[3]
+  child: {
+    # (aapt.pb.XmlNode) size=10B
+    text: "\n\n"
+    source: {
+      # (aapt.pb.SourcePosition) size=4B
+      line_number: 0x00000024  # 36
+      column_number: 0x00000012  # 18
+    }
+    # element.child[4].source
+  }
+  # element.child[4]
+}
+# element
+source: {
+  # (aapt.pb.SourcePosition) size=2B
+  line_number: 0x00000002
+}
+# source

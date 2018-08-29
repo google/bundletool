@@ -194,9 +194,9 @@ public abstract class InstallApksCommand {
                 .setExampleValue("base,module1,module2")
                 .setOptional(true)
                 .setDescription(
-                    "When specified and the device matches split APKs, then only APKs of the "
-                        + "specified modules will be installed. Cannot be used if the device "
-                        + "matches a non-split APK.")
+                    "List of modules to be installed (defaults to all of them). Note that the "
+                        + "dependent modules will also be installed. Ignored if the device "
+                        + "receives a standalone APK.")
                 .build())
         .build();
   }

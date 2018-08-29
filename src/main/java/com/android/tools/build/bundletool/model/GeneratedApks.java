@@ -16,41 +16,56 @@
 
 package com.android.tools.build.bundletool.model;
 
-import static com.google.common.base.Predicates.not;
 import static com.google.common.collect.ImmutableList.toImmutableList;
+import static java.util.stream.Collectors.groupingBy;
 
+import com.android.tools.build.bundletool.model.ModuleSplit.SplitType;
 import com.google.auto.value.AutoValue;
 import com.google.common.collect.ImmutableList;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Stream;
 
-/** Represents generated APKs and groups them into standalone and split ones. */
+/** Represents generated APKs and groups them into standalone, split, and instant ones. */
 @AutoValue
 public abstract class GeneratedApks {
+
+  public abstract ImmutableList<ModuleSplit> getInstantApks();
 
   public abstract ImmutableList<ModuleSplit> getSplitApks();
 
   public abstract ImmutableList<ModuleSplit> getStandaloneApks();
 
   public int size() {
-    return getSplitApks().size() + getStandaloneApks().size();
+    return getInstantApks().size() + getSplitApks().size() + getStandaloneApks().size();
+  }
+
+  public Stream<ModuleSplit> getAllApksStream() {
+    return Stream.of(getStandaloneApks(), getInstantApks(), getSplitApks()).flatMap(List::stream);
   }
 
   public static Builder builder() {
     return new AutoValue_GeneratedApks.Builder()
+        .setInstantApks(ImmutableList.of())
         .setSplitApks(ImmutableList.of())
         .setStandaloneApks(ImmutableList.of());
   }
 
+  /** Creates a GeneratedApk instance from a list of module splits. */
   public static GeneratedApks fromModuleSplits(ImmutableList<ModuleSplit> moduleSplits) {
+    Map<SplitType, ImmutableList<ModuleSplit>> groups =
+        moduleSplits.stream().collect(groupingBy(ModuleSplit::getSplitType, toImmutableList()));
     return builder()
-        .setSplitApks(
-            moduleSplits.stream().filter(not(ModuleSplit::isStandalone)).collect(toImmutableList()))
-        .setStandaloneApks(
-            moduleSplits.stream().filter(ModuleSplit::isStandalone).collect(toImmutableList()))
+        .setInstantApks(groups.getOrDefault(SplitType.INSTANT, ImmutableList.of()))
+        .setSplitApks(groups.getOrDefault(SplitType.SPLIT, ImmutableList.of()))
+        .setStandaloneApks(groups.getOrDefault(SplitType.STANDALONE, ImmutableList.of()))
         .build();
   }
   /** Builder for {@link GeneratedApks}. */
   @AutoValue.Builder
   public abstract static class Builder {
+
+    public abstract GeneratedApks.Builder setInstantApks(ImmutableList<ModuleSplit> instantApks);
 
     public abstract GeneratedApks.Builder setSplitApks(ImmutableList<ModuleSplit> splitApks);
 

@@ -39,6 +39,12 @@ public interface ModuleEntry {
 
   boolean shouldCompress();
 
+  /**
+   * Creates a new instance if passed shouldCompress doesnt match object's shouldCompress, otherwise
+   * returns original object.
+   */
+  ModuleEntry setCompression(boolean shouldCompress);
+
   /** Checks whether the given entries are identical. */
   static boolean equal(ModuleEntry entry1, ModuleEntry entry2) {
     if (!entry1.getPath().equals(entry2.getPath())) {

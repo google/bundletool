@@ -131,9 +131,22 @@ public final class XmlProtoElementBuilder
   }
 
   public XmlProtoElementBuilder removeAttribute(String namespaceUri, String name) {
+    return removeAttributeInternal(
+        attribute ->
+            attribute.getName().equals(name) && attribute.getNamespaceUri().equals(namespaceUri));
+  }
+
+  public XmlProtoElementBuilder removeAndroidAttribute(int resourceId) {
+    return removeAttributeInternal(
+        attribute ->
+            attribute.getResourceId() == resourceId
+                && attribute.getNamespaceUri().equals(ANDROID_NAMESPACE_URI));
+  }
+
+  private XmlProtoElementBuilder removeAttributeInternal(
+      Predicate<XmlAttribute> attributePredicate) {
     for (int i = 0; i < element.getAttributeCount(); i++) {
-      if (element.getAttribute(i).getName().equals(name)
-          && element.getAttribute(i).getNamespaceUri().equals(namespaceUri)) {
+      if (attributePredicate.test(element.getAttribute(i))) {
         element.removeAttribute(i);
         break;
       }

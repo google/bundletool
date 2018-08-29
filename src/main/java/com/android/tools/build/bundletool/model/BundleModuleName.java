@@ -17,6 +17,7 @@
 package com.android.tools.build.bundletool.model;
 
 import com.google.auto.value.AutoValue;
+import java.util.Comparator;
 import java.util.regex.Pattern;
 
 /**
@@ -25,7 +26,7 @@ import java.util.regex.Pattern;
  * <p>This class ensures that module names meet the required naming format.
  */
 @AutoValue
-public abstract class BundleModuleName {
+public abstract class BundleModuleName implements Comparable<BundleModuleName> {
 
   public static final String BASE_MODULE_NAME = "base";
 
@@ -54,7 +55,7 @@ public abstract class BundleModuleName {
   }
 
   @Override
-  public String toString() {
+  public final String toString() {
     return getName();
   }
 
@@ -62,5 +63,10 @@ public abstract class BundleModuleName {
     InvalidBundleModuleNameException(String name) {
       super("Module names with special characters not supported: " + name);
     }
+  }
+
+  @Override
+  public final int compareTo(BundleModuleName o) {
+    return Comparator.comparing(BundleModuleName::getName).compare(this, o);
   }
 }

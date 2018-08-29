@@ -1,0 +1,6 @@
+{
+  "supportedAbis": ["armeabi-v7a"],
+  "supportedLocales": ["en-US", "es-US"],
+  "screenDensity": 411,
+  "sdkVersion": 0
+}

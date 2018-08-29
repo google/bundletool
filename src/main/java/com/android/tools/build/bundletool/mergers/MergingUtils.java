@@ -16,10 +16,10 @@
 
 package com.android.tools.build.bundletool.mergers;
 
-import static com.android.tools.build.bundletool.targeting.TargetingUtils.abiUniverse;
-import static com.android.tools.build.bundletool.targeting.TargetingUtils.abiValues;
-import static com.android.tools.build.bundletool.targeting.TargetingUtils.densityUniverse;
-import static com.android.tools.build.bundletool.targeting.TargetingUtils.densityValues;
+import static com.android.tools.build.bundletool.utils.TargetingProtoUtils.abiUniverse;
+import static com.android.tools.build.bundletool.utils.TargetingProtoUtils.abiValues;
+import static com.android.tools.build.bundletool.utils.TargetingProtoUtils.densityUniverse;
+import static com.android.tools.build.bundletool.utils.TargetingProtoUtils.densityValues;
 import static com.google.common.base.Preconditions.checkNotNull;
 
 import com.android.bundle.Targeting.Abi;

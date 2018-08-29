@@ -23,6 +23,13 @@ message ApkTargeting {
   TextureCompressionFormatTargeting texture_compression_format_targeting = 6;
 }
 
+// Targeting on the module level.
+// The semantic of the targeting is the "AND" rule on all immediate values.
+message ModuleTargeting {
+  SdkVersionTargeting sdk_version_targeting = 1;
+  repeated DeviceFeatureTargeting device_feature_targeting = 2;
+}
+
 message ScreenDensity {
   enum DensityAlias {
     DENSITY_UNSPECIFIED = 0;
@@ -96,6 +103,10 @@ message Abi {
   AbiAlias alias = 1;
 }
 
+message DeviceFeature {
+  string feature_name = 1;
+}
+
 // Targeting specific for directories under assets/.
 message AssetsDirectoryTargeting {
   AbiTargeting abi = 1;
@@ -152,4 +163,11 @@ message TextureCompressionFormatTargeting {
   // Targeting of other sibling directories that were in the Bundle.
   // For master splits this is targeting of other master splits.
   repeated TextureCompressionFormat alternatives = 2;
+}
+
+// Since other atom targeting messages have the "OR" semantic on values
+// the DeviceFeatureTargeting represents only one device feature to retain
+// that convention.
+message DeviceFeatureTargeting {
+  DeviceFeature required_feature = 1;
 }

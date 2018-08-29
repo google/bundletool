@@ -1,0 +1,319 @@
+/*
+ * Copyright (C) 2018 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License
+ */
+
+package com.android.tools.build.bundletool.device;
+
+import static com.android.tools.build.bundletool.testing.DeviceFactory.abis;
+import static com.android.tools.build.bundletool.testing.DeviceFactory.density;
+import static com.android.tools.build.bundletool.testing.DeviceFactory.locales;
+import static com.android.tools.build.bundletool.testing.DeviceFactory.mergeSpecs;
+import static com.android.tools.build.bundletool.testing.DeviceFactory.sdkVersion;
+import static com.google.common.truth.Truth.assertThat;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+
+import com.android.bundle.Devices.DeviceSpec;
+import com.android.ddmlib.IDevice.DeviceState;
+import com.android.tools.build.bundletool.exceptions.CommandExecutionException;
+import com.android.tools.build.bundletool.testing.FakeAdbServer;
+import com.android.tools.build.bundletool.testing.FakeDevice;
+import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
+import java.nio.file.Paths;
+import java.util.Optional;
+import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.junit.runners.JUnit4;
+
+@RunWith(JUnit4.class)
+public class DeviceAnalyzerTest {
+
+  @Test
+  public void noDeviceId_noConnectedDevices_throws() {
+    FakeAdbServer fakeAdbServer =
+        new FakeAdbServer(/* hasInitialDeviceList= */ true, /* devices= */ ImmutableList.of());
+    fakeAdbServer.init(Paths.get("path/to/adb"));
+
+    DeviceAnalyzer analyzer = new DeviceAnalyzer(fakeAdbServer);
+
+    Throwable exception =
+        assertThrows(
+            CommandExecutionException.class, () -> analyzer.getDeviceSpec(Optional.empty()));
+    assertThat(exception).hasMessageThat().contains("No connected devices found");
+  }
+
+  @Test
+  public void deviceId_noConnectedDevices_throws() {
+    FakeAdbServer fakeAdbServer =
+        new FakeAdbServer(/* hasInitialDeviceList= */ true, /* devices= */ ImmutableList.of());
+    fakeAdbServer.init(Paths.get("path/to/adb"));
+
+    DeviceAnalyzer analyzer = new DeviceAnalyzer(fakeAdbServer);
+
+    Throwable exception =
+        assertThrows(
+            CommandExecutionException.class, () -> analyzer.getDeviceSpec(Optional.of("a")));
+    assertThat(exception).hasMessageThat().contains("No connected devices found");
+  }
+
+  @Test
+  public void noDeviceId_oneConnectedDevice_sdk21_fine() {
+    FakeAdbServer fakeAdbServer =
+        new FakeAdbServer(
+            /* hasInitialDeviceList= */ true,
+            /* devices= */ ImmutableList.of(
+                createUsbEnabledDevice("a", /* sdkVersion= */ 21, "fr-CA")));
+    fakeAdbServer.init(Paths.get("path/to/adb"));
+
+    DeviceSpec spec = new DeviceAnalyzer(fakeAdbServer).getDeviceSpec(Optional.empty());
+
+    assertThat(spec.getScreenDensity()).isEqualTo(480);
+    assertThat(spec.getSupportedAbisList()).containsExactly("armeabi");
+    assertThat(spec.getSdkVersion()).isEqualTo(21);
+    assertThat(spec.getSupportedLocalesList()).containsExactly("fr-CA");
+  }
+
+  @Test
+  public void noDeviceId_oneConnectedDevice_sdk21_fallBack() {
+    FakeAdbServer fakeAdbServer =
+        new FakeAdbServer(
+            /* hasInitialDeviceList= */ true,
+            /* devices= */ ImmutableList.of(
+                createDeviceWithNoProperties("a", /* sdkVersion= */ 21, /* locale= */ "de-DE")));
+    fakeAdbServer.init(Paths.get("path/to/adb"));
+
+    DeviceSpec spec = new DeviceAnalyzer(fakeAdbServer).getDeviceSpec(Optional.empty());
+
+    assertThat(spec.getScreenDensity()).isEqualTo(480);
+    assertThat(spec.getSupportedAbisList()).containsExactly("armeabi");
+    assertThat(spec.getSdkVersion()).isEqualTo(21);
+
+    // We couldn't detect locale so we expect to fallback to en-US.
+    assertThat(spec.getSupportedLocalesList()).containsExactly("en-US");
+  }
+
+  @Test
+  public void noDeviceId_oneConnectedDevice_sdk26_fine() {
+    FakeAdbServer fakeAdbServer =
+        new FakeAdbServer(
+            /* hasInitialDeviceList= */ true,
+            /* devices= */ ImmutableList.of(
+                createUsbEnabledDevice("a", /* sdkVersion= */ 26, /* locale= */ "pt-PT")));
+    fakeAdbServer.init(Paths.get("path/to/adb"));
+
+    DeviceSpec spec = new DeviceAnalyzer(fakeAdbServer).getDeviceSpec(Optional.empty());
+
+    assertThat(spec.getScreenDensity()).isEqualTo(480);
+    assertThat(spec.getSupportedAbisList()).containsExactly("armeabi");
+    assertThat(spec.getSdkVersion()).isEqualTo(26);
+    assertThat(spec.getSupportedLocalesList()).containsExactly("pt-PT");
+  }
+
+  @Test
+  public void noDeviceId_oneConnectedDevice_sdk26_fallBack() {
+    FakeAdbServer fakeAdbServer =
+        new FakeAdbServer(
+            /* hasInitialDeviceList= */ true,
+            /* devices= */ ImmutableList.of(
+                createDeviceWithNoProperties("a", /* sdkVersion= */ 26, /* locale= */ "de-DE")));
+    fakeAdbServer.init(Paths.get("path/to/adb"));
+
+    DeviceSpec spec = new DeviceAnalyzer(fakeAdbServer).getDeviceSpec(Optional.empty());
+
+    assertThat(spec.getScreenDensity()).isEqualTo(480);
+    assertThat(spec.getSupportedAbisList()).containsExactly("armeabi");
+    assertThat(spec.getSdkVersion()).isEqualTo(26);
+
+    // We couldn't detect locale so we expect to fallback to en-US.
+    assertThat(spec.getSupportedLocalesList()).containsExactly("en-US");
+  }
+
+  @Test
+  public void noDeviceId_multipleConnectedDevices_throws() {
+    FakeAdbServer fakeAdbServer =
+        new FakeAdbServer(
+            /* hasInitialDeviceList= */ true,
+            /* devices= */ ImmutableList.of(
+                createUsbEnabledDevice("a"), createUsbEnabledDevice("b")));
+    fakeAdbServer.init(Paths.get("path/to/adb"));
+
+    DeviceAnalyzer analyzer = new DeviceAnalyzer(fakeAdbServer);
+
+    Throwable exception =
+        assertThrows(
+            CommandExecutionException.class, () -> analyzer.getDeviceSpec(Optional.empty()));
+    assertThat(exception)
+        .hasMessageThat()
+        .contains("More than one device connected, please provide --device-id.");
+  }
+
+  @Test
+  public void deviceId_multipleConnectedDevices_match() {
+    FakeAdbServer fakeAdbServer =
+        new FakeAdbServer(
+            /* hasInitialDeviceList= */ true,
+            /* devices= */ ImmutableList.of(
+                createUsbEnabledDevice("a"),
+                createUsbEnabledDevice("b", /* sdkVersion= */ 23, /* locale= */ "pt-BR")));
+    fakeAdbServer.init(Paths.get("path/to/adb"));
+
+    DeviceSpec spec = new DeviceAnalyzer(fakeAdbServer).getDeviceSpec(Optional.of("b"));
+
+    assertThat(spec.getScreenDensity()).isEqualTo(480);
+    assertThat(spec.getSupportedAbisList()).containsExactly("armeabi");
+    assertThat(spec.getSdkVersion()).isEqualTo(23);
+    assertThat(spec.getSupportedLocalesList()).containsExactly("pt-BR");
+  }
+
+  @Test
+  public void deviceId_multipleConnectedDevices_noMatch() {
+    FakeAdbServer fakeAdbServer =
+        new FakeAdbServer(
+            /* hasInitialDeviceList= */ true,
+            /* devices= */ ImmutableList.of(
+                createUsbEnabledDevice("a"),
+                createUsbEnabledDevice("b", /* sdkVersion= */ 23, /* locale= */ "ja-JP")));
+    fakeAdbServer.init(Paths.get("path/to/adb"));
+
+    DeviceAnalyzer analyzer = new DeviceAnalyzer(fakeAdbServer);
+
+    Throwable exception =
+        assertThrows(
+            CommandExecutionException.class,
+            () -> analyzer.getDeviceSpec(Optional.of("non_existent_id")));
+    assertThat(exception).hasMessageThat().contains("Unable to find the requested device.");
+  }
+
+  @Test
+  public void deviceIdMatch_debuggingNotEnabled_throws() {
+    FakeAdbServer fakeAdbServer =
+        new FakeAdbServer(
+            /* hasInitialDeviceList= */ true,
+            /* devices= */ ImmutableList.of(
+                FakeDevice.inDisconnectedState("a", DeviceState.UNAUTHORIZED)));
+    fakeAdbServer.init(Paths.get("path/to/adb"));
+
+    DeviceAnalyzer analyzer = new DeviceAnalyzer(fakeAdbServer);
+
+    Throwable exception =
+        assertThrows(
+            CommandExecutionException.class, () -> analyzer.getDeviceSpec(Optional.of("a")));
+    assertThat(exception)
+        .hasMessageThat()
+        .contains("Device found but not authorized for connecting.");
+  }
+
+  @Test
+  public void deviceIdMatch_otherUnsupportedState_throws() {
+    FakeAdbServer fakeAdbServer =
+        new FakeAdbServer(
+            /* hasInitialDeviceList= */ true,
+            /* devices= */ ImmutableList.of(
+                FakeDevice.inDisconnectedState("a", DeviceState.BOOTLOADER)));
+    fakeAdbServer.init(Paths.get("path/to/adb"));
+
+    DeviceAnalyzer analyzer = new DeviceAnalyzer(fakeAdbServer);
+
+    Throwable exception =
+        assertThrows(
+            CommandExecutionException.class, () -> analyzer.getDeviceSpec(Optional.of("a")));
+    assertThat(exception)
+        .hasMessageThat()
+        .contains("Unable to connect to the device (device state: 'BOOTLOADER')");
+  }
+
+  @Test
+  public void deviceWithBadSdkVersion_throws() {
+    FakeAdbServer fakeAdbServer =
+        new FakeAdbServer(
+            /* hasInitialDeviceList= */ true,
+            /* devices= */ ImmutableList.of(
+                FakeDevice.fromDeviceSpec(
+                    "id1",
+                    DeviceState.ONLINE,
+                    mergeSpecs(density(240), locales("en-US"), abis("armeabi"), sdkVersion(1)))));
+    fakeAdbServer.init(Paths.get("path/to/adb"));
+
+    DeviceAnalyzer analyzer = new DeviceAnalyzer(fakeAdbServer);
+
+    Throwable exception =
+        assertThrows(IllegalStateException.class, () -> analyzer.getDeviceSpec(Optional.empty()));
+    assertThat(exception)
+        .hasMessageThat()
+        .contains("Error retrieving device SDK version. Please try again.");
+  }
+
+  @Test
+  public void deviceWithBadDensity_throws() {
+    FakeAdbServer fakeAdbServer =
+        new FakeAdbServer(
+            /* hasInitialDeviceList= */ true,
+            /* devices= */ ImmutableList.of(
+                FakeDevice.fromDeviceSpec(
+                    "id1",
+                    DeviceState.ONLINE,
+                    mergeSpecs(density(-1), locales("en-US"), abis("armeabi"), sdkVersion(21)))));
+    fakeAdbServer.init(Paths.get("path/to/adb"));
+
+    DeviceAnalyzer analyzer = new DeviceAnalyzer(fakeAdbServer);
+
+    Throwable exception =
+        assertThrows(IllegalStateException.class, () -> analyzer.getDeviceSpec(Optional.empty()));
+    assertThat(exception)
+        .hasMessageThat()
+        .contains("Error retrieving device density. Please try again.");
+  }
+
+  @Test
+  public void deviceWithBadAbis_throws() {
+    FakeAdbServer fakeAdbServer =
+        new FakeAdbServer(
+            /* hasInitialDeviceList= */ true,
+            /* devices= */ ImmutableList.of(
+                FakeDevice.fromDeviceSpec(
+                    "id1",
+                    DeviceState.ONLINE,
+                    mergeSpecs(density(240), locales("en-US"), abis(), sdkVersion(21)))));
+    fakeAdbServer.init(Paths.get("path/to/adb"));
+
+    DeviceAnalyzer analyzer = new DeviceAnalyzer(fakeAdbServer);
+
+    Throwable exception =
+        assertThrows(IllegalStateException.class, () -> analyzer.getDeviceSpec(Optional.empty()));
+    assertThat(exception)
+        .hasMessageThat()
+        .contains("Error retrieving device ABIs. Please try again.");
+  }
+
+  private static Device createUsbEnabledDevice(String serialNumber) {
+    return createUsbEnabledDevice(serialNumber, /* sdkVersion= */ 21, /* locale= */ "en-US");
+  }
+
+  private static Device createUsbEnabledDevice(String serialNumber, int sdkVersion, String locale) {
+    return FakeDevice.fromDeviceSpec(
+        serialNumber,
+        DeviceState.ONLINE,
+        mergeSpecs(sdkVersion(sdkVersion), abis("armeabi"), locales(locale), density(480)));
+  }
+
+  private static Device createDeviceWithNoProperties(
+      String serialNumber, int sdkVersion, String locale) {
+    return FakeDevice.fromDeviceSpecWithProperties(
+        serialNumber,
+        DeviceState.ONLINE,
+        mergeSpecs(sdkVersion(sdkVersion), abis("armeabi"), locales(locale), density(480)),
+        ImmutableMap.of());
+  }
+}

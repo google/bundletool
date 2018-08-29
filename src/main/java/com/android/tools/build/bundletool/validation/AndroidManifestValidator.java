@@ -37,6 +37,7 @@ public class AndroidManifestValidator extends SubValidator {
     validateOnDemand(module);
     validateFusingConfig(module);
     validateMinMaxSdk(module);
+    validateOnDemandIsInstantMutualExclusion(module);
   }
 
   private void validateInstant(BundleModule module) {
@@ -53,32 +54,78 @@ public class AndroidManifestValidator extends SubValidator {
   }
 
   private void validateOnDemand(BundleModule module) {
+    Optional<Boolean> isOnDemandModule =
+        module
+            .getAndroidManifest()
+            .isOnDemandModule(
+                BundleToolVersion.getVersionFromBundleConfig(module.getBundleConfig()));
+
+    boolean isConditionalModule = !module.getAndroidManifest().getModuleConditions().isEmpty();
+
+    if (module.isBaseModule()) {
+      // In the base module, onDemand must be either not set or false
+      if (isOnDemandModule.isPresent() && isOnDemandModule.get()) {
+        throw new ValidationException(
+            "The base module cannot be marked as onDemand='true' since it will always be served.");
+      }
+      if (isConditionalModule) {
+        throw new ValidationException(
+            "The base module cannot have conditions since it will always be served.");
+      }
+    } else {
+      // In feature modules, onDemand must be explicitly set to some value unless it's a conditional
+      // module.
+      if (isConditionalModule) {
+        if (isOnDemandModule.isPresent()) {
+          throw ValidationException.builder()
+              .withMessage(
+                  "The element <dist:module> in the AndroidManifest.xml must not have the "
+                      + "attribute 'onDemand' set if the module is conditional (module: '%s').",
+                  module.getName())
+              .build();
+        }
+      } else { // module is not conditional
+        if (!isOnDemandModule.isPresent()) {
+          throw ValidationException.builder()
+              .withMessage(
+                  "The element <dist:module> in the AndroidManifest.xml must have the attribute "
+                      + "'onDemand' explicitly set (module: '%s').",
+                  module.getName())
+              .build();
+        }
+      }
+    }
+  }
+
+  private void validateOnDemandIsInstantMutualExclusion(BundleModule module) {
     Optional<Boolean> isDynamicModule =
         module
             .getAndroidManifest()
             .isOnDemandModule(
                 BundleToolVersion.getVersionFromBundleConfig(module.getBundleConfig()));
 
-    if (module.isBaseModule()) {
-      // In the base module, onDemand must be either not set or false
-      if (isDynamicModule.isPresent() && isDynamicModule.get()) {
-        throw new ValidationException(
-            "The base module cannot be marked as onDemand='true' since it will always be served.");
-      }
-    } else {
-      // In feature modules, onDemand must be explicitly set to some value.
-      if (!isDynamicModule.isPresent()) {
-        throw ValidationException.builder()
-            .withMessage(
-                "The element <dist:module> in the AndroidManifest.xml must have the attribute "
-                    + "'onDemand' explicitly set (module: '%s').",
-                module.getName())
-            .build();
-      }
+    Optional<Boolean> isInstant = module.getAndroidManifest().isInstantModule();
+    if (isDynamicModule.isPresent()
+        && isDynamicModule.get()
+        && isInstant.isPresent()
+        && isInstant.get()) {
+      throw ValidationException.builder()
+          .withMessage(
+              "The attribute 'onDemand' and 'instant' cannot both be true at the same time"
+                  + " (module '%s').",
+              module.getName())
+          .build();
     }
   }
 
   private void validateFusingConfig(BundleModule module) {
+    Optional<Boolean> isInstant = module.getAndroidManifest().isInstantModule();
+    // Skip validations for instant modules. This is only relevant for Pre-L,
+    // where instant apps are not available
+    if (isInstant.isPresent() && isInstant.get()) {
+      return;
+    }
+
     Optional<Boolean> includedInFusingByManifest =
         module
             .getAndroidManifest()

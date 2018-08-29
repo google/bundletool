@@ -84,8 +84,12 @@ public final class OptimizationsMerger {
             mergeSplitDimensions(
                 defaultOptimizations.getSplitDimensions(),
                 requestedOptimizations.getSplitsConfig().getSplitDimensionList()))
+        .setUncompressNativeLibraries(
+            requestedOptimizations.getUncompressNativeLibraries().getEnabled()
+                && defaultOptimizations.getUncompressNativeLibraries())
         .build();
   }
+
 
   private ImmutableSet<OptimizationDimension> mergeSplitDimensions(
       ImmutableSet<OptimizationDimension> defaultSplitDimensions,
@@ -104,4 +108,5 @@ public final class OptimizationsMerger {
 
     return ImmutableSet.copyOf(mergedDimensions);
   }
+  
 }

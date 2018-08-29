@@ -48,9 +48,14 @@ public abstract class AlternativeVariantTargetingPopulator<T extends Message> {
     standaloneApks =
         new ScreenDensityAlternativesPopulator().addAlternativeVariantTargeting(standaloneApks);
 
-    return GeneratedApks.fromModuleSplits(
-        new SdkVersionAlternativesPopulator()
-            .addAlternativeVariantTargeting(generatedApks.getSplitApks(), standaloneApks));
+    ImmutableList<ModuleSplit> moduleSplits =
+        ImmutableList.<ModuleSplit>builder()
+            .addAll(
+                new SdkVersionAlternativesPopulator()
+                    .addAlternativeVariantTargeting(generatedApks.getSplitApks(), standaloneApks))
+            .addAll(generatedApks.getInstantApks())
+            .build();
+    return GeneratedApks.fromModuleSplits(moduleSplits);
   }
 
   /**

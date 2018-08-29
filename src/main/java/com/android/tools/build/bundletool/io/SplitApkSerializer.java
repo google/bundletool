@@ -25,17 +25,25 @@ import com.android.bundle.Config.Compression;
 import com.android.tools.build.bundletool.model.Aapt2Command;
 import com.android.tools.build.bundletool.model.BundleModuleName;
 import com.android.tools.build.bundletool.model.ModuleSplit;
+import com.android.tools.build.bundletool.model.ModuleSplit.SplitType;
 import com.android.tools.build.bundletool.model.SigningConfiguration;
 import com.android.tools.build.bundletool.model.ZipPath;
 import com.google.common.collect.Iterables;
 import java.nio.file.Path;
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.Optional;
+import java.util.Set;
+import java.util.function.BiFunction;
+import javax.annotation.concurrent.GuardedBy;
 
 /** Serializes split APKs on disk. */
 public class SplitApkSerializer {
 
-  public static final String SPLIT_APKS_SUB_DIR = "splits";
+  private static final ZipPath SPLIT_APKS_SUB_DIR = ZipPath.create("splits");
+  private static final ZipPath INSTANT_APKS_SUB_DIR = ZipPath.create("instant");
+
+  private final SuffixManager suffixManager = new SuffixManager();
 
   private final ApkSerializerHelper apkSerializerHelper;
 
@@ -46,29 +54,71 @@ public class SplitApkSerializer {
     this.apkSerializerHelper = new ApkSerializerHelper(aapt2Command, signingConfig, compression);
   }
 
+  /** Writes the installable split to disk. */
   public ApkDescription writeSplitToDisk(ModuleSplit split, Path outputDirectory) {
+    return writeToDisk(
+        split, outputDirectory, SPLIT_APKS_SUB_DIR, ApkDescription.Builder::setSplitApkMetadata);
+  }
+
+  /** Writes the instant split to disk. */
+  public ApkDescription writeInstantSplitToDisk(ModuleSplit split, Path outputDirectory) {
+    return writeToDisk(
+        split,
+        outputDirectory,
+        INSTANT_APKS_SUB_DIR,
+        ApkDescription.Builder::setInstantApkMetadata);
+  }
+
+  /** Writes the given split to the path subdirectory in the zip file. */
+  private ApkDescription writeToDisk(
+      ModuleSplit split,
+      Path outputDirectory,
+      ZipPath subDirectoryInApkSet,
+      BiFunction<ApkDescription.Builder, SplitApkMetadata, ApkDescription.Builder> setApkMetadata) {
     checkState(isDirectory(outputDirectory));
 
     String apkFileName = getApkFileName(split, split.getModuleName());
     // Using ZipPath to ensure '/' path delimiter in the ApkDescription proto.
-    String apkFileRelPath = ZipPath.create(SPLIT_APKS_SUB_DIR).resolve(apkFileName).toString();
+    String apkFileRelPath = subDirectoryInApkSet.resolve(apkFileName).toString();
 
     apkSerializerHelper.writeToZipFile(split, outputDirectory.resolve(apkFileRelPath));
-
-    return ApkDescription.newBuilder()
-        .setPath(apkFileRelPath)
-        .setTargeting(split.getApkTargeting())
-        .setSplitApkMetadata(
+    ApkDescription.Builder builder =
+        ApkDescription.newBuilder().setPath(apkFileRelPath).setTargeting(split.getApkTargeting());
+    return setApkMetadata
+        .apply(
+            builder,
             SplitApkMetadata.newBuilder()
                 .setSplitId(split.getAndroidManifest().getSplitId().orElse(""))
-                .setIsMasterSplit(split.isMasterSplit()))
+                .setIsMasterSplit(split.isMasterSplit())
+                .build())
         .build();
   }
 
-  private static String getApkFileName(ModuleSplit apk, BundleModuleName moduleName) {
+  private String getApkFileName(ModuleSplit apk, BundleModuleName moduleName) {
     String splitId = apk.getAndroidManifest().getSplitId().orElse("");
     String fileSuffix =
         apk.isMasterSplit() ? "master" : Iterables.getLast(Arrays.asList(splitId.split("\\.")));
-    return String.format("%s-%s.apk", moduleName.getName(), fileSuffix);
+
+    String prefix = apk.getSplitType() == SplitType.INSTANT ? "instant-" : "";
+    return String.format(
+        "%s%s.apk",
+        prefix,
+        suffixManager.resolveSuffix(String.format("%s-%s", moduleName.getName(), fileSuffix)));
+  }
+
+  private static class SuffixManager {
+    @GuardedBy("this")
+    private final Set<String> usedSuffixes = new HashSet<>();
+
+    synchronized String resolveSuffix(String proposedSuffix) {
+      String currentProposal = proposedSuffix;
+      int serialNumber = 1;
+      while (usedSuffixes.contains(currentProposal)) {
+        serialNumber++;
+        currentProposal = String.format("%s_%d", proposedSuffix, serialNumber);
+      }
+      usedSuffixes.add(currentProposal);
+      return currentProposal;
+    }
   }
 }

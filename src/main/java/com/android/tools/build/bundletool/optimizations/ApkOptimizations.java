@@ -45,18 +45,28 @@ public abstract class ApkOptimizations {
                   ApkOptimizations.builder()
                       .setSplitDimensions(ImmutableSet.of(ABI, SCREEN_DENSITY, LANGUAGE))
                       .build())
+              .put(
+                  Version.of("0.6.0"),
+                  ApkOptimizations.builder()
+                      .setSplitDimensions(ImmutableSet.of(ABI, SCREEN_DENSITY, LANGUAGE))
+                      .setUncompressNativeLibraries(true)
+                      .build())
               .build();
 
   public abstract ImmutableSet<OptimizationDimension> getSplitDimensions();
 
+  public abstract boolean getUncompressNativeLibraries();
+
   static Builder builder() {
-    return new AutoValue_ApkOptimizations.Builder();
+    return new AutoValue_ApkOptimizations.Builder().setUncompressNativeLibraries(false);
   }
 
   /** Builder for the {@link ApkOptimizations} class. */
   @AutoValue.Builder
   abstract static class Builder {
     abstract Builder setSplitDimensions(ImmutableSet<OptimizationDimension> splitDimensions);
+
+    abstract Builder setUncompressNativeLibraries(boolean enable);
 
     abstract ApkOptimizations build();
   }

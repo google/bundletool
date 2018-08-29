@@ -16,8 +16,8 @@
 
 package com.android.tools.build.bundletool.splitters;
 
-import static com.android.tools.build.bundletool.targeting.TargetingUtils.abiUniverse;
-import static com.android.tools.build.bundletool.targeting.TargetingUtils.densityUniverse;
+import static com.android.tools.build.bundletool.utils.TargetingProtoUtils.abiUniverse;
+import static com.android.tools.build.bundletool.utils.TargetingProtoUtils.densityUniverse;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.base.Predicates.not;
@@ -122,6 +122,10 @@ public class BundleSharder {
 
     // Merge splits with the same targeting and make a single master split.
     ImmutableList<ModuleSplit> mergedSplits = new SameTargetingMerger().merge(rawSplits.build());
+
+    // Remove the splitName from any standalone apks, as these are only used for instant apps (L+).
+    mergedSplits =
+        mergedSplits.stream().map(ModuleSplit::removeSplitName).collect(toImmutableList());
 
     // Check that we have only one master split.
     long masterSplitCount = mergedSplits.stream().filter(ModuleSplit::isMasterSplit).count();

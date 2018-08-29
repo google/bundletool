@@ -33,7 +33,7 @@ public final class EnumMapper {
    * Builds a correspondence map between {@code enum1Type} and {@code enum2Type} based on the name
    * of the enum values.
    *
-   * <p>If any value of {@code enum1Type} is not found in {@code enum2Type}, an {@link
+   * <p>If the values of {@code enum1Type} are not same as {@code enum2Type}, an {@link
    * IllegalArgumentException} is thrown.
    */
   public static <E1 extends Enum<E1>, E2 extends Enum<E2>> ImmutableBiMap<E1, E2> mapByName(

@@ -20,11 +20,8 @@ import static com.android.tools.build.bundletool.utils.FileNames.TABLE_OF_CONTEN
 import static com.android.tools.build.bundletool.utils.files.FilePreconditions.checkDirectoryExists;
 import static com.android.tools.build.bundletool.utils.files.FilePreconditions.checkFileExistsAndReadable;
 import static com.google.common.base.Preconditions.checkNotNull;
-import static com.google.common.collect.ImmutableSet.toImmutableSet;
 
-import com.android.bundle.Commands.ApkSet;
 import com.android.bundle.Commands.BuildApksResult;
-import com.android.bundle.Commands.ModuleMetadata;
 import com.android.bundle.Devices.DeviceSpec;
 import com.android.tools.build.bundletool.commands.CommandHelp.CommandDescription;
 import com.android.tools.build.bundletool.commands.CommandHelp.FlagDescription;
@@ -38,7 +35,6 @@ import com.android.tools.build.bundletool.utils.flags.ParsedFlags;
 import com.google.auto.value.AutoValue;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
-import com.google.common.collect.Sets;
 import com.google.common.io.ByteStreams;
 import java.io.IOException;
 import java.io.InputStream;
@@ -46,7 +42,6 @@ import java.io.OutputStream;
 import java.io.UncheckedIOException;
 import java.nio.file.Path;
 import java.util.Optional;
-import java.util.Set;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 
@@ -60,6 +55,7 @@ public abstract class ExtractApksCommand {
   private static final Flag<Path> DEVICE_SPEC_FLAG = Flag.path("device-spec");
   private static final Flag<Path> OUTPUT_DIRECTORY = Flag.path("output-dir");
   private static final Flag<ImmutableSet<String>> MODULES_FLAG = Flag.stringSet("modules");
+  private static final Flag<Boolean> INSTANT_FLAG = Flag.booleanFlag("instant");
 
   public abstract Path getApksArchivePath();
 
@@ -69,8 +65,11 @@ public abstract class ExtractApksCommand {
 
   public abstract Optional<ImmutableSet<String>> getModules();
 
+  /** Gets whether instant APKs should be extracted. */
+  public abstract boolean getInstant();
+
   public static Builder builder() {
-    return new AutoValue_ExtractApksCommand.Builder();
+    return new AutoValue_ExtractApksCommand.Builder().setInstant(false);
   }
 
   /** Builder for the {@link ExtractApksCommand}. */
@@ -84,6 +83,14 @@ public abstract class ExtractApksCommand {
 
     public abstract Builder setModules(ImmutableSet<String> modules);
 
+    /**
+     * Sets whether instant APKs should be extracted.
+     *
+     * <p>The default is {@code false}. If this is set to {@code true}, the instant APKs will be
+     * extracted instead of the installable APKs.
+     */
+    public abstract Builder setInstant(boolean instant);
+
     public abstract ExtractApksCommand build();
   }
 
@@ -92,6 +99,7 @@ public abstract class ExtractApksCommand {
     Path deviceSpecPath = DEVICE_SPEC_FLAG.getRequiredValue(flags);
     Path outputDirectory = OUTPUT_DIRECTORY.getRequiredValue(flags);
     Optional<ImmutableSet<String>> modules = MODULES_FLAG.getValue(flags);
+    Optional<Boolean> instant = INSTANT_FLAG.getValue(flags);
     flags.checkNoUnknownFlags();
 
     ExtractApksCommand.Builder command = builder();
@@ -107,44 +115,21 @@ public abstract class ExtractApksCommand {
 
     modules.ifPresent(command::setModules);
 
+    instant.ifPresent(command::setInstant);
+
     return command.build();
   }
 
   public ImmutableList<Path> execute() {
-    validateInput();
+    if (getModules().isPresent() && getModules().get().isEmpty()) {
+      throw new ValidationException("The set of modules cannot be empty.");
+    }
 
     ApkMatcher apkMatcher =
-        new ApkMatcher(getDeviceSpec(), /* allowedSplitModules= */ getModules());
+        new ApkMatcher(getDeviceSpec(), /* requestedModuleNames= */ getModules(), getInstant());
     ImmutableList<ZipPath> matchedApks = apkMatcher.getMatchingApks(readTableOfContents());
 
     return extractMatchedApks(matchedApks);
-  }
-
-  private void validateInput() {
-    if (getModules().isPresent()) {
-      ImmutableSet<String> modules = getModules().get();
-
-      if (modules.isEmpty()) {
-        throw new ValidationException("The set of modules cannot be empty.");
-      }
-
-      Set<String> unknownModules =
-          Sets.difference(
-              modules,
-              readTableOfContents()
-                  .getVariantList()
-                  .stream()
-                  .flatMap(variant -> variant.getApkSetList().stream())
-                  .map(ApkSet::getModuleMetadata)
-                  .map(ModuleMetadata::getName)
-                  .collect(toImmutableSet()));
-      if (!unknownModules.isEmpty()) {
-        throw ValidationException.builder()
-            .withMessage(
-                "The APK Set archive does not contain the following modules: %s", unknownModules)
-            .build();
-      }
-    }
   }
 
   private ImmutableList<Path> extractMatchedApks(ImmutableList<ZipPath> matchedApkPaths) {
@@ -221,9 +206,17 @@ public abstract class ExtractApksCommand {
                 .setExampleValue("base,module1,module2")
                 .setOptional(true)
                 .setDescription(
-                    "When specified and the device matches split APKs, then only APKs of the "
-                        + "specified modules will be extracted. Cannot be used if the device "
-                        + "matches a non-split APK.")
+                    "List of modules to be extracted (defaults to all of them). Note that the "
+                        + "dependent modules will also be extracted. Ignored if the device "
+                        + "receives a standalone APK.")
+                .build())
+        .addFlag(
+            FlagDescription.builder()
+                .setFlagName(INSTANT_FLAG.getName())
+                .setOptional(true)
+                .setDescription(
+                    "When set, APKs of the instant modules will be extracted instead of the "
+                        + "installable APKs.")
                 .build())
         .build();
   }

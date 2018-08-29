@@ -19,8 +19,10 @@ package com.android.tools.build.bundletool.utils;
 /** Various version constants and versions-related code used by the bundletool. */
 public final class Versions {
 
+  public static final int ANDROID_K_API_VERSION = 20;
   public static final int ANDROID_L_API_VERSION = 21;
   public static final int ANDROID_M_API_VERSION = 23;
+  public static final int ANDROID_P_API_VERSION = 28;
 
   // Not meant to be instantiated.
   private Versions() {}

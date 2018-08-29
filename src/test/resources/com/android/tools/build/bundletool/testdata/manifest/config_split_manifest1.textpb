@@ -1,0 +1,79 @@
+# proto-file: third_party/android/aapt2/proto/Resources.proto
+# proto-message: aapt.pb.XmlNode
+
+element: {
+  # (aapt.pb.XmlElement) size=2.3K
+  namespace_declaration: {
+    # (aapt.pb.XmlNamespace) size=57B
+    prefix: "android"  # size=7
+    uri: "http://schemas.android.com/apk/res/android"  # size=42
+    # element.namespace_declaration[0].source
+  }
+  # element.namespace_declaration[0]
+  name: "manifest"  # size=8
+  attribute: {
+    # (aapt.pb.XmlAttribute) size=33B
+    name: "package"  # size=7
+    value: "com.example.appproject"  # size=22
+    compiled_item {
+      str {
+        value: "com.example.appproject"
+      }
+    }
+  }
+  # element.attribute[0]
+  attribute: {
+    # (aapt.pb.XmlAttribute) size=77B
+    namespace_uri: "http://schemas.android.com/apk/res/android"  # size=42
+    name: "versionCode"  # size=11
+    value: "1"
+    # element.attribute[1].source
+    resource_id: 0x0101021b  # 16_843_291; as IP:27.2.1.1 (swapped=1.1.2.27)
+    compiled_item: {
+      # (aapt.pb.Item) size=6B
+      prim: {
+        # (aapt.pb.Primitive)
+        int_decimal_value: 1
+      }
+      # element.attribute[1].compiled_item.prim
+    }
+    # element.attribute[1].compiled_item
+  }
+  # element.attribute[1]
+  attribute: {
+    name: "split"
+    value: "testModule.config.hdpi"
+    compiled_item {
+      str {
+        value: "testModule.config.hdpi"
+      }
+    }
+  }
+  attribute: {
+    name: "configForSplit"
+    value: "testModule"
+    compiled_item {
+      str {
+        value: "testModule"
+      }
+    }
+  }
+  child: {
+    # (aapt.pb.XmlNode) size=1.8K
+    element: {
+      # (aapt.pb.XmlElement) size=1.8K
+      name: "application"  # size=11
+      attribute: {
+        namespace_uri: "http://schemas.android.com/apk/res/android"
+        name: "hasCode"
+        resource_id: 0x101000c
+        compiled_item: {
+          prim: {
+            boolean_value: false
+          }
+        }
+      }
+    }
+  }
+  # element.child[3]
+}

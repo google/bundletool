@@ -26,6 +26,12 @@ message Compression {
 
 message Optimizations {
   SplitsConfig splits_config = 1;
+  // This is for uncompressing native libraries on M+ devices.
+  UncompressNativeLibraries uncompress_native_libraries = 2;
+}
+
+message UncompressNativeLibraries {
+  bool enabled = 1;
 }
 
 message SplitsConfig {

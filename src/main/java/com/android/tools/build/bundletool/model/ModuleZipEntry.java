@@ -79,6 +79,14 @@ public abstract class ModuleZipEntry implements ModuleEntry {
     return getZipEntry().isDirectory();
   }
 
+  @Override
+  public ModuleZipEntry setCompression(boolean shouldCompress) {
+    if (shouldCompress == shouldCompress()) {
+      return this;
+    }
+    return create(getZipEntry(), getZipFile(), getPathNamesToSkip(), shouldCompress);
+  }
+
   /** Constructs a {@link ModuleEntry} for {@link ZipEntry} contained in a bundle zip file. */
   public static ModuleZipEntry fromBundleZipEntry(ZipEntry zipEntry, ZipFile zipFile) {
     return create(zipEntry, zipFile, /* pathNamesToSkip= */ 1, /* shouldCompress= */ true);

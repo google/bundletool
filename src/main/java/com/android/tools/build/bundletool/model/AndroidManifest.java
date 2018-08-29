@@ -28,6 +28,7 @@ import com.android.tools.build.bundletool.utils.xmlproto.XmlProtoAttribute;
 import com.android.tools.build.bundletool.utils.xmlproto.XmlProtoElement;
 import com.android.tools.build.bundletool.utils.xmlproto.XmlProtoElementBuilder;
 import com.android.tools.build.bundletool.utils.xmlproto.XmlProtoNode;
+import com.android.tools.build.bundletool.utils.xmlproto.XmlProtoNodeBuilder;
 import com.android.tools.build.bundletool.version.Version;
 import com.google.auto.value.AutoValue;
 import com.google.auto.value.extension.memoized.Memoized;
@@ -35,6 +36,7 @@ import com.google.common.base.Splitter;
 import com.google.common.collect.ImmutableList;
 import java.util.Optional;
 import java.util.stream.Stream;
+import javax.annotation.CheckReturnValue;
 
 /**
  * Represents Android manifest.
@@ -54,12 +56,20 @@ public abstract class AndroidManifest {
   public static final String SUPPORTS_GL_TEXTURE_ELEMENT_NAME = "supports-gl-texture";
   public static final String USES_FEATURE_ELEMENT_NAME = "uses-feature";
   public static final String USES_SDK_ELEMENT_NAME = "uses-sdk";
+  public static final String ACTIVITY_ELEMENT_NAME = "activity";
+  public static final String SERVICE_ELEMENT_NAME = "service";
+  public static final String PROVIDER_ELEMENT_NAME = "provider";
 
   public static final String DEBUGGABLE_ATTRIBUTE_NAME = "debuggable";
   public static final String EXTRACT_NATIVE_LIBS_ATTRIBUTE_NAME = "extractNativeLibs";
   public static final String GL_VERSION_ATTRIBUTE_NAME = "glEsVersion";
   public static final String MAX_SDK_VERSION_ATTRIBUTE_NAME = "maxSdkVersion";
   public static final String MIN_SDK_VERSION_ATTRIBUTE_NAME = "minSdkVersion";
+  public static final String NAME_ATTRIBUTE_NAME = "name";
+  public static final String VALUE_ATTRIBUTE_NAME = "value";
+  public static final String CONDITION_DEVICE_FEATURE_NAME = "device-feature";
+  public static final String CONDITION_MIN_SDK_VERSION_NAME = "min-sdk";
+  public static final String SPLIT_NAME_ATTRIBUTE_NAME = "splitName";
 
   public static final int DEBUGGABLE_RESOURCE_ID = 0x0101000f;
   public static final int EXTRACT_NATIVE_LIBS_RESOURCE_ID = 0x10104ea;
@@ -72,6 +82,8 @@ public abstract class AndroidManifest {
   public static final int VERSION_CODE_RESOURCE_ID = 0x0101021b;
   public static final int IS_FEATURE_SPLIT_RESOURCE_ID = 0x0101055b;
   public static final int GL_ES_VERSION_RESOURCE_ID = 0x01010281;
+  public static final int TARGET_SANDBOX_VERSION_RESOURCE_ID = 0x0101054c;
+  public static final int SPLIT_NAME_RESOURCE_ID = 0x01010549;
 
   public static final String META_DATA_KEY_FUSED_MODULE_NAMES =
       "com.android.dynamic.apk.fused.modules";
@@ -140,6 +152,14 @@ public abstract class AndroidManifest {
     return getApplicationDebuggable().orElse(false);
   }
 
+  @CheckReturnValue
+  public AndroidManifest applyMutators(ImmutableList<ManifestMutator> manifestMutators) {
+    XmlProtoNodeBuilder xmlProtoNode = getManifestRoot().toBuilder();
+    for (ManifestMutator manifestMutator : manifestMutators) {
+      manifestMutator.accept(xmlProtoNode.getElement());
+    }
+    return AndroidManifest.create(xmlProtoNode.build().getProto());
+  }
   /**
    * Extracts value of the {@code <application android:debuggable>} attribute.
    *
@@ -163,6 +183,12 @@ public abstract class AndroidManifest {
 
   public Optional<Integer> getMaxSdkVersion() {
     return getUsesSdkAttribute(MAX_SDK_VERSION_RESOURCE_ID);
+  }
+
+  public Optional<Integer> getTargetSandboxVersion() {
+    return getManifestElement()
+        .getAndroidAttribute(TARGET_SANDBOX_VERSION_RESOURCE_ID)
+        .map(XmlProtoAttribute::getValueAsDecimalInteger);
   }
 
   private Optional<Integer> getUsesSdkAttribute(int attributeResId) {
@@ -271,6 +297,69 @@ public abstract class AndroidManifest {
         .map(XmlProtoAttribute::getValueAsBoolean);
   }
 
+  public ImmutableList<DeviceFeatureCondition> getDeviceFeatureConditions() {
+    return getModuleConditions().getDeviceFeatureConditions();
+  }
+
+  /** Currently only <dist:device-feature> condition is supported. We reject all other values. */
+  public ModuleConditions getModuleConditions() {
+    ImmutableList<XmlProtoElement> conditionElements = getModuleConditionElements();
+
+    ModuleConditions.Builder moduleConditions = ModuleConditions.builder();
+    for (XmlProtoElement conditionElement : conditionElements) {
+      if (!conditionElement.getNamespaceUri().equals(DISTRIBUTION_NAMESPACE)) {
+        throw ValidationException.builder()
+            .withMessage(
+                "Invalid namespace found in the module condition element. "
+                    + "Expected '%s'; found '%s'.",
+                DISTRIBUTION_NAMESPACE, conditionElement.getNamespaceUri())
+            .build();
+      }
+      switch (conditionElement.getName()) {
+        case CONDITION_DEVICE_FEATURE_NAME:
+          moduleConditions.addDeviceFeatureCondition(parseDeviceFeatureCondition(conditionElement));
+          break;
+        case CONDITION_MIN_SDK_VERSION_NAME:
+          moduleConditions.setMinSdkVersion(parseMinSdkVersionCondition(conditionElement));
+          break;
+        default:
+          throw new ValidationException(
+              String.format("Unrecognized module condition: '%s'", conditionElement.getName()));
+      }
+    }
+    return moduleConditions.build();
+  }
+
+  private ImmutableList<XmlProtoElement> getModuleConditionElements() {
+    return getManifestElement()
+        .getOptionalChildElement(DISTRIBUTION_NAMESPACE, "module")
+        .flatMap(module -> module.getOptionalChildElement(DISTRIBUTION_NAMESPACE, "conditions"))
+        .map(conditions -> conditions.getChildrenElements().collect(toImmutableList()))
+        .orElse(ImmutableList.of());
+  }
+
+  private DeviceFeatureCondition parseDeviceFeatureCondition(XmlProtoElement conditionElement) {
+    return DeviceFeatureCondition.create(
+        conditionElement
+            .getAttribute(DISTRIBUTION_NAMESPACE, NAME_ATTRIBUTE_NAME)
+            .orElseThrow(
+                () ->
+                    new ValidationException(
+                        "Missing required 'name' attribute in the 'device-feature' condition "
+                            + "element."))
+            .getValueAsString());
+  }
+
+  private int parseMinSdkVersionCondition(XmlProtoElement conditionElement) {
+    return conditionElement
+        .getAttribute(DISTRIBUTION_NAMESPACE, VALUE_ATTRIBUTE_NAME)
+        .orElseThrow(
+            () ->
+                new ValidationException(
+                    "Missing required 'value' attribute in the 'min-sdk' condition element."))
+        .getValueAsDecimalInteger();
+  }
+
   /**
    * Extracts the 'android:extractNativeLibs' value from the {@code <application>} tag.
    *
@@ -298,6 +387,16 @@ public abstract class AndroidManifest {
 
   /** Returns the string value specified in the meta-data of the given name, if it exists. */
   public Optional<String> getMetadataValue(String metadataName) {
+    return getMetadataAttributeWithName(metadataName).map(XmlProtoAttribute::getValueAsString);
+  }
+
+  /** Returns the string value specified in the meta-data of the given name, if it exists. */
+  public Optional<Integer> getMetadataValueAsInteger(String metadataName) {
+    return getMetadataAttributeWithName(metadataName)
+        .map(XmlProtoAttribute::getValueAsDecimalInteger);
+  }
+
+  private Optional<XmlProtoAttribute> getMetadataAttributeWithName(String metadataName) {
     return getMetadataElement(metadataName)
         .map(
             metadataElement ->
@@ -310,8 +409,7 @@ public abstract class AndroidManifest {
                                     "Missing expected attribute 'android:value' for <meta-data> "
                                         + "element '%s'.",
                                     metadataName)
-                                .build()))
-        .map(XmlProtoAttribute::getValueAsString);
+                                .build()));
   }
 
   /** Returns the resource ID specified in the meta-data of the given name, if it exists. */

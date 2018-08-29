@@ -49,7 +49,7 @@ public interface Aapt2Command {
   class CommandExecutor {
     private static final int TIMEOUT_AAPT2_COMMANDS_SECONDS = 5 * 60; // 5 minutes.
 
-    void execute(String... command) {
+    public void execute(String... command) {
       try {
         Process process = new ProcessBuilder(command).redirectErrorStream(true).start();
         if (!process.waitFor(TIMEOUT_AAPT2_COMMANDS_SECONDS, TimeUnit.SECONDS)) {

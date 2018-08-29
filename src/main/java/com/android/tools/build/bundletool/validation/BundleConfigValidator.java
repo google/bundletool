@@ -15,22 +15,18 @@
  */
 package com.android.tools.build.bundletool.validation;
 
-import static com.google.common.collect.ImmutableList.toImmutableList;
-
 import com.android.bundle.Config.BundleConfig;
 import com.android.bundle.Config.Compression;
 import com.android.bundle.Config.Optimizations;
 import com.android.bundle.Config.SplitDimension;
+import com.android.bundle.Config.SplitDimension.Value;
 import com.android.tools.build.bundletool.exceptions.ValidationException;
 import com.android.tools.build.bundletool.model.AppBundle;
 import com.android.tools.build.bundletool.version.BundleToolVersion;
-import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import java.nio.file.FileSystem;
 import java.nio.file.FileSystems;
-import java.util.Map;
-import java.util.function.Function;
-import java.util.stream.Collectors;
+import java.util.List;
 
 /** Validator of the BundleConfig. */
 public final class BundleConfigValidator extends SubValidator {
@@ -72,24 +68,26 @@ public final class BundleConfigValidator extends SubValidator {
   }
 
   private void validateOptimizations(Optimizations optimizations) {
-    ImmutableList<SplitDimension.Value> duplicateSplitDimensions =
-        optimizations
-            // Construct Map<SplitDimension.Value, Long> that counts dimension occurrences.
-            .getSplitsConfig()
-            .getSplitDimensionList()
-            .stream()
-            .map(SplitDimension::getValue)
-            .collect(Collectors.groupingBy(Function.identity(), Collectors.counting()))
-            // Find dimension(s) occurring more than once.
-            .entrySet()
-            .stream()
-            .filter(mapEntry -> mapEntry.getValue() > 1)
-            .map(Map.Entry::getKey)
-            .collect(toImmutableList());
-    if (!duplicateSplitDimensions.isEmpty()) {
+    List<SplitDimension> splitDimensions = optimizations.getSplitsConfig().getSplitDimensionList();
+
+    // We only throw if an unrecognized dimension is enabled, since that would generate an
+    // unexpected output. However, we tolerate if the unknown dimension is negated since the output
+    // will be the same.
+    if (splitDimensions
+        .stream()
+        .anyMatch(
+            dimension ->
+                dimension.getValue().equals(Value.UNRECOGNIZED) && !dimension.getNegate())) {
       throw ValidationException.builder()
           .withMessage(
-              "BundleConfig.pb contains duplicate split dimensions: %s", duplicateSplitDimensions)
+              "BundleConfig.pb contains an unrecognized split dimension. Update bundletool?")
+          .build();
+    }
+
+    if (splitDimensions.stream().map(SplitDimension::getValueValue).distinct().count()
+        != splitDimensions.size()) {
+      throw ValidationException.builder()
+          .withMessage("BundleConfig.pb contains duplicate split dimensions: %s", splitDimensions)
           .build();
     }
   }

@@ -9,15 +9,15 @@ import "targeting.proto";
 
 // Describes the output of the "build-apks" command.
 message BuildApksResult {
-  // Variants.
-  // Variant is a group of APKs that covers a part of the device configuration
-  // space. APKs from multiple variants are never combined on one device.
+  // List of the created variants.
   repeated Variant variant = 1;
 
   // Metadata about BundleTool used to build the APKs.
   Bundletool bundletool = 2;
 }
 
+// Variant is a group of APKs that covers a part of the device configuration
+// space. APKs from multiple variants are never combined on one device.
 message Variant {
   // Variant-level targeting.
   // This targeting is fairly high-level and each APK has its own targeting as
@@ -26,6 +26,12 @@ message Variant {
 
   // Set of APKs, one set per module.
   repeated ApkSet apk_set = 2;
+
+  // Number of the variant, starting at 0 (unless overridden).
+  // A device will receive APKs from the first variant that matches the device
+  // configuration, with higher variant numbers having priority over lower
+  // variant numbers.
+  uint32 variant_number = 3;
 }
 
 // Represents a module.
@@ -44,6 +50,17 @@ message ModuleMetadata {
   // Indicates whether this module is marked "on demand".
   // Set only for Split APKs.
   bool on_demand = 2;
+
+  // Indicates whether this module is marked "instant".
+  bool is_instant = 3;
+
+  // Names of the modules that this module directly depends on.
+  // Each module implicitly depends on the base module.
+  repeated string dependencies = 4;
+
+  // The targeting that makes a conditional module installed.
+  // Relevant only for Split APKs.
+  ModuleTargeting targeting = 5;
 }
 
 message ApkDescription {
@@ -57,6 +74,8 @@ message ApkDescription {
     SplitApkMetadata split_apk_metadata = 3;
     // Set only for standalone APKs.
     StandaloneApkMetadata standalone_apk_metadata = 4;
+    // Set only for Instant split APKs.
+    SplitApkMetadata instant_apk_metadata = 5;
   }
 }
 

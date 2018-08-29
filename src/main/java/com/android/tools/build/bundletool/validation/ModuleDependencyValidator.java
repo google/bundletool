@@ -29,9 +29,12 @@ import com.google.common.collect.Multimaps;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
+import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 /**
  * Validates dependencies between bundle modules.
@@ -57,6 +60,7 @@ public class ModuleDependencyValidator extends SubValidator {
     checkModulesHaveUniqueDependencies(moduleDependenciesMap);
     checkReferencedModulesExist(moduleDependenciesMap);
     checkNoCycles(moduleDependenciesMap);
+    checkNoInstallTimeToOnDemandModulesDependencies(modules, moduleDependenciesMap);
   }
 
   /**
@@ -240,5 +244,27 @@ public class ModuleDependencyValidator extends SubValidator {
       }
     }
     processing.remove(moduleName);
+  }
+
+  /** Checks that an install-time module does not depend on an on-demand module. */
+  private static void checkNoInstallTimeToOnDemandModulesDependencies(
+      ImmutableList<BundleModule> modules, Multimap<String, String> moduleDependenciesMap) {
+    Map<String, BundleModule> modulesByName =
+        modules
+            .stream()
+            .collect(Collectors.toMap(module -> module.getName().getName(), Function.identity()));
+
+    for (Entry<String, String> dependencyEntry : moduleDependenciesMap.entries()) {
+      String moduleName = dependencyEntry.getKey();
+      String moduleDep = dependencyEntry.getValue();
+      if (!modulesByName.get(moduleName).isDynamicModule()
+          && modulesByName.get(moduleDep).isDynamicModule()) {
+        throw ValidationException.builder()
+            .withMessage(
+                "Install-time module '%s' declares dependency on on-demand module '%s'.",
+                moduleName, moduleDep)
+            .build();
+      }
+    }
   }
 }

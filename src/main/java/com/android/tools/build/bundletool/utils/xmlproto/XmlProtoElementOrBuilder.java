@@ -21,6 +21,7 @@ import static java.util.stream.Collectors.toList;
 import com.android.aapt.Resources.XmlAttributeOrBuilder;
 import com.android.aapt.Resources.XmlElementOrBuilder;
 import com.android.aapt.Resources.XmlNodeOrBuilder;
+import com.google.common.base.Predicate;
 import com.google.common.collect.Iterables;
 import java.util.List;
 import java.util.Optional;
@@ -95,6 +96,10 @@ abstract class XmlProtoElementOrBuilder<
     return getAttributes().filter(attr -> attr.getResourceId() == resourceId).findFirst();
   }
 
+  public final Stream<ElementWrapperT> getChildrenElements() {
+    return getChildren().filter(NodeWrapperT::isElement).map(NodeWrapperT::getElement);
+  }
+
   /** Finds XML elements among the direct children with the given name and empty namespace URI. */
   public final Stream<ElementWrapperT> getChildrenElements(String name) {
     return getChildrenElements(NO_NAMESPACE_URI, name);
@@ -102,10 +107,16 @@ abstract class XmlProtoElementOrBuilder<
 
   /** Finds XML elements among the direct children with the given name and namespace URI. */
   public final Stream<ElementWrapperT> getChildrenElements(String namespaceUri, String name) {
+    return getChildrenElements(
+        el -> el.getName().equals(name) && el.getNamespaceUri().equals(namespaceUri));
+  }
+
+  /** Finds XML elements among the direct children that satisfies the given predicate. */
+  public final Stream<ElementWrapperT> getChildrenElements(Predicate<ElementWrapperT> predicate) {
     return getChildren()
         .filter(node -> node.isElement())
         .map(node -> node.getElement())
-        .filter(el -> el.getName().equals(name) && el.getNamespaceUri().equals(namespaceUri));
+        .filter(predicate);
   }
 
   /**

@@ -22,9 +22,11 @@ import com.android.bundle.Commands.ModuleMetadata;
 import com.android.bundle.Config.BundleConfig;
 import com.android.bundle.Files.Assets;
 import com.android.bundle.Files.NativeLibraries;
+import com.android.bundle.Targeting.ModuleTargeting;
 import com.android.tools.build.bundletool.version.BundleToolVersion;
 import com.google.auto.value.AutoValue;
 import com.google.common.collect.ImmutableCollection;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
 import java.io.InputStream;
@@ -107,6 +109,19 @@ public abstract class BundleModule {
             .get();
   }
 
+  public boolean isInstantModule() {
+    Optional<Boolean> isInstantModule = getAndroidManifest().isInstantModule();
+    return isInstantModule.orElse(false);
+  }
+
+  public ImmutableList<String> getDependencies() {
+    return getAndroidManifest().getUsesSplits();
+  }
+
+  private ModuleTargeting getModuleTargeting() {
+    return getAndroidManifest().getModuleConditions().toTargeting();
+  }
+
   /**
    * Returns all {@link ModuleEntry} of the module that match the predicate on the relative path of
    * the entries in the module.
@@ -134,13 +149,15 @@ public abstract class BundleModule {
   }
 
   public ModuleMetadata getModuleMetadata() {
-    return ModuleMetadata.newBuilder()
-        .setName(getName().getName())
-        .setOnDemand(
-            getAndroidManifest()
-                .isOnDemandModule(BundleToolVersion.getVersionFromBundleConfig(getBundleConfig()))
-                .orElse(false))
-        .build();
+    ModuleMetadata.Builder metadata =
+        ModuleMetadata.newBuilder()
+            .setName(getName().getName())
+            .setOnDemand(isDynamicModule())
+            .setIsInstant(isInstantModule())
+            .addAllDependencies(getDependencies())
+            .setTargeting(getModuleTargeting());
+
+    return metadata.build();
   }
 
   public static Builder builder() {

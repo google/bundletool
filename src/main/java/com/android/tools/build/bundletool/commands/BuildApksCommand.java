@@ -16,77 +16,39 @@
 
 package com.android.tools.build.bundletool.commands;
 
-import static com.android.tools.build.bundletool.utils.files.FilePreconditions.checkFileDoesNotExist;
-import static com.android.tools.build.bundletool.utils.files.FilePreconditions.checkFileExistsAndExecutable;
-import static com.android.tools.build.bundletool.utils.files.FilePreconditions.checkFileExistsAndReadable;
 import static com.google.common.base.Preconditions.checkArgument;
-import static com.google.common.collect.ImmutableList.toImmutableList;
 
-import com.android.bundle.Commands.BuildApksResult;
-import com.android.bundle.Commands.Variant;
-import com.android.bundle.Config.BundleConfig;
-import com.android.bundle.Config.Bundletool;
-import com.android.bundle.Config.Compression;
-import com.android.bundle.Devices.DeviceSpec;
-import com.android.bundle.Targeting.ApkTargeting;
-import com.android.bundle.Targeting.SdkVersion;
-import com.android.bundle.Targeting.SdkVersionTargeting;
-import com.android.bundle.Targeting.VariantTargeting;
 import com.android.tools.build.bundletool.commands.CommandHelp.CommandDescription;
 import com.android.tools.build.bundletool.commands.CommandHelp.FlagDescription;
 import com.android.tools.build.bundletool.device.AdbServer;
-import com.android.tools.build.bundletool.device.DeviceAnalyzer;
-import com.android.tools.build.bundletool.device.DeviceSpecParser;
 import com.android.tools.build.bundletool.exceptions.CommandExecutionException;
 import com.android.tools.build.bundletool.exceptions.ValidationException;
-import com.android.tools.build.bundletool.io.ApkSerializerManager;
-import com.android.tools.build.bundletool.io.ApkSetBuilderFactory;
-import com.android.tools.build.bundletool.io.ApkSetBuilderFactory.ApkSetBuilder;
-import com.android.tools.build.bundletool.io.SplitApkSerializer;
-import com.android.tools.build.bundletool.io.StandaloneApkSerializer;
 import com.android.tools.build.bundletool.io.TempFiles;
 import com.android.tools.build.bundletool.model.Aapt2Command;
-import com.android.tools.build.bundletool.model.AppBundle;
-import com.android.tools.build.bundletool.model.BundleMetadata;
-import com.android.tools.build.bundletool.model.BundleModule;
-import com.android.tools.build.bundletool.model.GeneratedApks;
-import com.android.tools.build.bundletool.model.ModuleSplit;
+import com.android.tools.build.bundletool.model.ApkModifier;
 import com.android.tools.build.bundletool.model.OptimizationDimension;
 import com.android.tools.build.bundletool.model.SigningConfiguration;
-import com.android.tools.build.bundletool.optimizations.ApkOptimizations;
-import com.android.tools.build.bundletool.optimizations.OptimizationsMerger;
-import com.android.tools.build.bundletool.splitters.BundleSharder;
-import com.android.tools.build.bundletool.splitters.ModuleSplitter;
-import com.android.tools.build.bundletool.targeting.AlternativeVariantTargetingPopulator;
+import com.android.tools.build.bundletool.splitters.NativeLibrariesCompressionSplitter;
 import com.android.tools.build.bundletool.utils.EnvironmentVariableProvider;
 import com.android.tools.build.bundletool.utils.SdkToolsLocator;
 import com.android.tools.build.bundletool.utils.SystemEnvironmentVariableProvider;
-import com.android.tools.build.bundletool.utils.Versions;
 import com.android.tools.build.bundletool.utils.flags.Flag;
 import com.android.tools.build.bundletool.utils.flags.Flag.Password;
 import com.android.tools.build.bundletool.utils.flags.ParsedFlags;
-import com.android.tools.build.bundletool.validation.AppBundleValidator;
-import com.android.tools.build.bundletool.version.BundleToolVersion;
-import com.android.tools.build.bundletool.version.Version;
 import com.google.auto.value.AutoValue;
-import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.io.MoreFiles;
 import com.google.common.util.concurrent.ListeningExecutorService;
 import com.google.common.util.concurrent.MoreExecutors;
-import java.io.IOException;
 import java.io.PrintStream;
-import java.io.UncheckedIOException;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Arrays;
 import java.util.Optional;
 import java.util.concurrent.Executors;
 import java.util.stream.Collectors;
-import java.util.zip.ZipFile;
 
-/** Implementation of the command to generate module split APKs and bundle shard APKs. */
+/** Command to generate APKs from an Android App Bundle. */
 @AutoValue
 public abstract class BuildApksCommand {
 
@@ -147,16 +109,25 @@ public abstract class BuildApksCommand {
 
   public abstract Optional<SigningConfiguration> getSigningConfiguration();
 
-  public abstract ListeningExecutorService getExecutorService();
+  ListeningExecutorService getExecutorService() {
+    return getExecutorServiceInternal();
+  }
 
+  abstract ListeningExecutorService getExecutorServiceInternal();
+
+  abstract boolean isExecutorServiceCreatedByBundleTool();
+
+
+  public abstract Optional<ApkModifier> getApkModifier();
+
+  public abstract Optional<Integer> getFirstVariantNumber();
 
   public static Builder builder() {
     return new AutoValue_BuildApksCommand.Builder()
         .setOverwriteOutput(false)
         .setGenerateOnlyUniversalApk(false)
         .setGenerateOnlyForConnectedDevice(false)
-        .setOptimizationDimensions(ImmutableSet.of())
-        .setExecutorService(createInternalExecutorService(DEFAULT_THREAD_POOL_SIZE));
+        .setOptimizationDimensions(ImmutableSet.of());
   }
 
   /** Builder for the {@link BuildApksCommand}. */
@@ -224,12 +195,50 @@ public abstract class BuildApksCommand {
      * <p>Optional. The caller is responsible for providing a service that accepts new tasks, and
      * for shutting it down afterwards.
      */
-    public abstract Builder setExecutorService(ListeningExecutorService executorService);
+    public Builder setExecutorService(ListeningExecutorService executorService) {
+      setExecutorServiceInternal(executorService);
+      setExecutorServiceCreatedByBundleTool(false);
+      return this;
+    }
 
+    abstract Builder setExecutorServiceInternal(ListeningExecutorService executorService);
+
+    abstract Optional<ListeningExecutorService> getExecutorServiceInternal();
+
+    /**
+     * Sets whether the ExecutorService has been created by bundletool, otherwise provided by the
+     * client.
+     *
+     * <p>If true, the ExecutorService is shut down at the end of execution of this command.
+     */
+    abstract Builder setExecutorServiceCreatedByBundleTool(boolean value);
+
+
+    /**
+     * Provides an {@link ApkModifier} that will be invoked just before the APKs are finalized,
+     * serialized on disk and signed.
+     *
+     * <p>The {@link ApkModifier} must be thread-safe as it may in the future be invoked
+     * concurrently for the different APKs.
+     */
+    public abstract Builder setApkModifier(ApkModifier apkModifier);
+
+    /**
+     * Provides the lowest variant number to use.
+     *
+     * <p>By default, variants are numbered from 0 to {@code variantNum - 1}. By setting a value
+     * here, the variants will be numbered from {@code lowestVariantNumber} and up.
+     */
+    public abstract Builder setFirstVariantNumber(int firstVariantNumber);
 
     abstract BuildApksCommand autoBuild();
 
     public BuildApksCommand build() {
+      if (!getExecutorServiceInternal().isPresent()) {
+        setExecutorServiceInternal(createInternalExecutorService(DEFAULT_THREAD_POOL_SIZE));
+        setExecutorServiceCreatedByBundleTool(true);
+      }
+
       BuildApksCommand command = autoBuild();
       if (!command.getOptimizationDimensions().isEmpty() && command.getGenerateOnlyUniversalApk()) {
         throw new ValidationException(
@@ -297,7 +306,9 @@ public abstract class BuildApksCommand {
         .getValue(flags)
         .ifPresent(
             maxThreads ->
-                buildApksCommand.setExecutorService(createInternalExecutorService(maxThreads)));
+                buildApksCommand
+                    .setExecutorService(createInternalExecutorService(maxThreads))
+                    .setExecutorServiceCreatedByBundleTool(true));
     OPTIMIZE_FOR_FLAG.getValue(flags).ifPresent(buildApksCommand::setOptimizationDimensions);
 
     // Signing-related arguments.
@@ -354,248 +365,13 @@ public abstract class BuildApksCommand {
   }
 
   public Path execute() {
-    return TempFiles.withTempDirectoryReturning(this::executeWithTempDir);
-  }
-
-  private Path executeWithTempDir(Path tempDir) {
-    validateInput();
-
-    Aapt2Command aapt2Command = getAapt2Command().orElseGet(() -> extractAapt2FromJar(tempDir));
-
-    // Fail fast with ADB before generating any APKs.
-    Optional<DeviceSpec> deviceSpec = Optional.empty();
-    if (getGenerateOnlyForConnectedDevice()) {
-      deviceSpec = Optional.of(getDeviceSpec());
-    } else if (getDeviceSpecPath().isPresent()) {
-      deviceSpec = Optional.of(DeviceSpecParser.parseDeviceSpec(getDeviceSpecPath().get()));
-    }
-
-    try (ZipFile bundleZip = new ZipFile(getBundlePath().toFile())) {
-      AppBundleValidator bundleValidator = new AppBundleValidator();
-
-      bundleValidator.validateFile(bundleZip);
-      AppBundle appBundle = AppBundle.buildFromZip(bundleZip);
-      bundleValidator.validate(appBundle);
-
-      BundleConfig bundleConfig = appBundle.getBundleConfig();
-      Version bundleVersion = BundleToolVersion.getVersionFromBundleConfig(bundleConfig);
-
-      ImmutableList<BundleModule> allModules =
-          ImmutableList.copyOf(appBundle.getModules().values());
-
-      ApkSetBuilder apkSetBuilder =
-          createApkSetBuilder(
-              aapt2Command, getSigningConfiguration(), bundleConfig.getCompression(), tempDir);
-
-      ApkOptimizations apkOptimizations =
-          getGenerateOnlyUniversalApk()
-              ? ApkOptimizations.getOptimizationsForUniversalApk()
-              : new OptimizationsMerger()
-                  .mergeWithDefaults(bundleConfig, getOptimizationDimensions());
-
-      boolean generateSplitApks = !getGenerateOnlyUniversalApk() && !targetsOnlyPreL(appBundle);
-      boolean generateStandaloneApks = getGenerateOnlyUniversalApk() || targetsPreL(appBundle);
-
-      if (deviceSpec.isPresent()) {
-        if (deviceSpec.get().getSdkVersion() >= Versions.ANDROID_L_API_VERSION) {
-          generateStandaloneApks = false;
-          if (!generateSplitApks) {
-            throw new CommandExecutionException(
-                "App Bundle targets pre-L devices, but the device has SDK version higher "
-                    + "or equal to L.");
-          }
-        } else {
-          generateSplitApks = false;
-          if (!generateStandaloneApks) {
-            throw new CommandExecutionException(
-                "App Bundle targets L+ devices, but the device has SDK version lower than L.");
-          }
-        }
-      }
-
-      GeneratedApks.Builder generatedApksBuilder = GeneratedApks.builder();
-      if (generateSplitApks) {
-        generatedApksBuilder.setSplitApks(
-            generateSplitApks(allModules, apkOptimizations, bundleVersion));
-      }
-      if (generateStandaloneApks) {
-        // Note: Universal APK is a special type of standalone, with no optimization dimensions.
-        ImmutableList<BundleModule> modulesForFusing =
-            allModules.stream().filter(BundleModule::isIncludedInFusing).collect(toImmutableList());
-        generatedApksBuilder.setStandaloneApks(
-            generateStandaloneApks(
-                modulesForFusing,
-                appBundle.getBundleMetadata(),
-                getGenerateOnlyUniversalApk(),
-                tempDir,
-                apkOptimizations,
-                bundleVersion));
-      }
-      // Populate alternative targeting based on variant targeting of all APKs.
-      GeneratedApks generatedApks =
-          AlternativeVariantTargetingPopulator.populateAlternativeVariantTargeting(
-              generatedApksBuilder.build());
-
-      // Create variants and serialize APKs.
-      ApkSerializerManager apkSerializerManager = new ApkSerializerManager(getExecutorService());
-      ImmutableList<Variant> allVariantsWithTargeting;
-      if (deviceSpec.isPresent()) {
-        allVariantsWithTargeting =
-            ImmutableList.of(
-                apkSerializerManager.serializeApksForDevice(
-                    deviceSpec.get(), generatedApks, apkSetBuilder, appBundle));
-      } else {
-        allVariantsWithTargeting =
-            apkSerializerManager.serializeApks(
-                generatedApks, apkSetBuilder, appBundle, getGenerateOnlyUniversalApk());
-      }
-      // Finalize the output archive.
-      apkSetBuilder.setTableOfContentsFile(
-          BuildApksResult.newBuilder()
-              .addAllVariant(allVariantsWithTargeting)
-              .setBundletool(
-                  Bundletool.newBuilder()
-                      .setVersion(BundleToolVersion.getCurrentVersion().toString()))
-              .build());
-      if (getOverwriteOutput()) {
-        Files.deleteIfExists(getOutputFile());
-      }
-      apkSetBuilder.writeTo(getOutputFile());
-    } catch (IOException e) {
-      throw new UncheckedIOException(
-          String.format("An error occurred when processing the bundle '%s'.", getBundlePath()), e);
-    }
-
-
-    return getOutputFile();
-  }
-
-  private DeviceSpec getDeviceSpec() {
-    AdbServer adbServer = getAdbServer().get();
-    adbServer.init(getAdbPath().get());
-
-    return new DeviceAnalyzer(adbServer).getDeviceSpec(getDeviceId());
-  }
-
-  private ApkSetBuilder createApkSetBuilder(
-      Aapt2Command aapt2Command,
-      Optional<SigningConfiguration> signingConfiguration,
-      Compression compression,
-      Path tempDir) {
-    SplitApkSerializer splitApkSerializer =
-        new SplitApkSerializer(aapt2Command, signingConfiguration, compression);
-    StandaloneApkSerializer standaloneApkSerializer =
-        new StandaloneApkSerializer(aapt2Command, signingConfiguration, compression);
-
-    return ApkSetBuilderFactory.createApkSetBuilder(
-        splitApkSerializer, standaloneApkSerializer, tempDir);
-  }
-
-  private static Aapt2Command extractAapt2FromJar(Path tempDir) {
-    return new SdkToolsLocator()
-        .extractAapt2(tempDir)
-        .map(Aapt2Command::createFromExecutablePath)
-        .orElseThrow(
-            () ->
-                new CommandExecutionException(
-                    "Could not extract aapt2: consider updating bundletool to a more recent "
-                        + "version or providing the path to aapt2 using the flag --aapt2."));
-  }
-
-  private void validateInput() {
-    checkFileExistsAndReadable(getBundlePath());
-    if (!getOverwriteOutput()) {
-      checkFileDoesNotExist(getOutputFile());
-    }
-
-    if (getGenerateOnlyForConnectedDevice()) {
-      checkArgument(
-          getAdbServer().isPresent(),
-          "Property 'adbServer' is required when 'generateOnlyForConnectedDevice' is true.");
-      checkArgument(
-          getAdbPath().isPresent(),
-          "Property 'adbPath' is required when 'generateOnlyForConnectedDevice' is true.");
-      checkFileExistsAndExecutable(getAdbPath().get());
-    }
-  }
-
-  private ImmutableList<ModuleSplit> generateSplitApks(
-      ImmutableList<BundleModule> modules,
-      ApkOptimizations apkOptimizations,
-      Version bundleVersion) {
-    ImmutableList.Builder<ModuleSplit> builder = ImmutableList.builder();
-    for (BundleModule module : modules) {
-      ModuleSplitter moduleSplitter =
-          new ModuleSplitter(module, apkOptimizations.getSplitDimensions(), bundleVersion);
-      ImmutableList<ModuleSplit> splitApks = moduleSplitter.splitModule();
-      builder.addAll(splitApks);
-    }
-    return builder.build();
-  }
-
-  private ImmutableList<ModuleSplit> generateStandaloneApks(
-      ImmutableList<BundleModule> modules,
-      BundleMetadata bundleMetadata,
-      boolean isUniversalApk,
-      Path tempDir,
-      ApkOptimizations apkOptimizations,
-      Version bundleVersion) {
-
-    ImmutableList<ModuleSplit> standaloneApks =
-        new BundleSharder(tempDir, bundleVersion)
-            .shardBundle(modules, apkOptimizations.getSplitDimensions(), bundleMetadata);
-
-    return standaloneApks
-        .stream()
-        .map(
-            moduleSplit ->
-                moduleSplit
-                    .toBuilder()
-                    .setVariantTargeting(
-                        isUniversalApk
-                            ? VariantTargeting.getDefaultInstance()
-                            : standaloneApkVariantTargeting(moduleSplit))
-                    .setStandalone(true)
-                    .build())
-        .collect(toImmutableList());
-  }
-
-  private static boolean targetsOnlyPreL(AppBundle bundle) {
-    Optional<Integer> maxSdkVersion =
-        bundle.getBaseModule().getAndroidManifest().getMaxSdkVersion();
-    return maxSdkVersion.isPresent() && maxSdkVersion.get() < Versions.ANDROID_L_API_VERSION;
-  }
-
-  private static boolean targetsPreL(AppBundle bundle) {
-    int baseMinSdkVersion = bundle.getBaseModule().getAndroidManifest().getEffectiveMinSdkVersion();
-    return baseMinSdkVersion < Versions.ANDROID_L_API_VERSION;
-  }
-
-  private static VariantTargeting standaloneApkVariantTargeting(ModuleSplit standaloneApk) {
-    ApkTargeting apkTargeting = standaloneApk.getApkTargeting();
-
-    VariantTargeting.Builder variantTargeting = VariantTargeting.newBuilder();
-    if (apkTargeting.hasAbiTargeting()) {
-      variantTargeting.setAbiTargeting(apkTargeting.getAbiTargeting());
-    }
-    if (apkTargeting.hasScreenDensityTargeting()) {
-      variantTargeting.setScreenDensityTargeting(apkTargeting.getScreenDensityTargeting());
-    }
-    // If a standalone variant was generated, then we may have also generated a splits variant with
-    // some SDK targeting (splits run only on Android L+). When we later compute alternative
-    // targeting across all variants, we don't allow some variants to have, and some variants not to
-    // have targeting for a dimension (SDK in this case). That is why we need to set the default
-    // instance of SDK targeting for the standalone variants.
-    variantTargeting.setSdkVersionTargeting(
-        SdkVersionTargeting.newBuilder().addValue(SdkVersion.getDefaultInstance()));
-
-    return variantTargeting.build();
+    return TempFiles.withTempDirectoryReturning(new BuildApksManager(this)::execute);
   }
 
   /**
    * Creates an internal executor service that uses at most the given number of threads.
    *
-   * <p>The executor service will gracefully shutdown automatically.
+   * <p>The caller is responsible for shutting down the executor service.
    */
   private static ListeningExecutorService createInternalExecutorService(int maxThreads) {
     checkArgument(maxThreads >= 0, "The maxThreads must be positive, got %s.", maxThreads);

@@ -58,6 +58,14 @@ public abstract class FileSystemModuleEntry implements ModuleEntry {
     }
   }
 
+  @Override
+  public FileSystemModuleEntry setCompression(boolean shouldCompress) {
+    if (shouldCompress == shouldCompress()) {
+      return this;
+    }
+    return create(getPath(), isDirectory(), shouldCompress, getFileSystemPath());
+  }
+
   /**
    * Constructs a {@link ModuleEntry} representing the specified file on the filesystem.
    *
