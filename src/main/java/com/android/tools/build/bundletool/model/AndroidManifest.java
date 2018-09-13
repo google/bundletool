@@ -205,6 +205,10 @@ public abstract class AndroidManifest {
         .map(XmlProtoAttribute::getValueAsBoolean);
   }
 
+  public boolean getEffectiveHasCode() {
+    return getHasCode().orElse(true);
+  }
+
   public Optional<Boolean> getIsFeatureSplit() {
     return getManifestElement()
         .getAndroidAttribute(IS_FEATURE_SPLIT_RESOURCE_ID)

@@ -17,6 +17,7 @@
 package com.android.tools.build.bundletool.validation;
 
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifest;
+import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withMinSdkVersion;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withOnDemand;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withSplitId;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withUsesSplit;
@@ -241,5 +242,168 @@ public class ModuleDependencyValidatorTest {
                 androidManifest(PKG_NAME, withOnDemand(true), withUsesSplit("feature1"))));
 
     new ModuleDependencyValidator().validateAllModules(allModules);
+  }
+
+  @Test
+  public void validateAllModules_onDemandModuleMinSdkSmallerThanBase_succeeds() throws Exception {
+    ImmutableList<BundleModule> allModules =
+        ImmutableList.of(
+            module("base", androidManifest(PKG_NAME, withMinSdkVersion(20))),
+            module(
+                "feature1", androidManifest(PKG_NAME, withOnDemand(true), withMinSdkVersion(19))));
+
+    new ModuleDependencyValidator().validateAllModules(allModules);
+  }
+
+  @Test
+  public void validateAllModules_onDemandModuleEffectiveMinSdkSmallerThanBase_succeeds()
+      throws Exception {
+    ImmutableList<BundleModule> allModules =
+        ImmutableList.of(
+            module("base", androidManifest(PKG_NAME, withMinSdkVersion(20))),
+            module("feature1", androidManifest(PKG_NAME, withOnDemand(true))));
+
+    new ModuleDependencyValidator().validateAllModules(allModules);
+  }
+
+  @Test
+  public void validateAllModules_onDemandModuleMinSdkSmallerThanOnDemandModule_fails()
+      throws Exception {
+    ImmutableList<BundleModule> allModules =
+        ImmutableList.of(
+            module("base", androidManifest(PKG_NAME, withMinSdkVersion(20))),
+            module(
+                "feature1",
+                androidManifest(
+                    PKG_NAME,
+                    withOnDemand(true),
+                    withUsesSplit("feature2"),
+                    withMinSdkVersion(19))),
+            module(
+                "feature2", androidManifest(PKG_NAME, withOnDemand(true), withMinSdkVersion(20))));
+
+    ValidationException exception =
+        assertThrows(
+            ValidationException.class,
+            () -> new ModuleDependencyValidator().validateAllModules(allModules));
+
+    assertThat(exception)
+        .hasMessageThat()
+        .contains(
+            "On-demand module 'feature1' has a minSdkVersion(19), which is smaller than the"
+                + " minSdkVersion(20) of its dependency 'feature2'.");
+  }
+
+  @Test
+  public void validateAllModules_onDemandModuleEffectiveMinSdkSmallerThanOnDemandModule_fails()
+      throws Exception {
+    ImmutableList<BundleModule> allModules =
+        ImmutableList.of(
+            module("base", androidManifest(PKG_NAME, withMinSdkVersion(20))),
+            module(
+                "feature1",
+                androidManifest(PKG_NAME, withOnDemand(true), withUsesSplit("feature2"))),
+            module(
+                "feature2", androidManifest(PKG_NAME, withOnDemand(true), withMinSdkVersion(20))));
+
+    ValidationException exception =
+        assertThrows(
+            ValidationException.class,
+            () -> new ModuleDependencyValidator().validateAllModules(allModules));
+
+    assertThat(exception)
+        .hasMessageThat()
+        .contains(
+            "On-demand module 'feature1' has a minSdkVersion(1), which is smaller than the"
+                + " minSdkVersion(20) of its dependency 'feature2'.");
+  }
+
+  @Test
+  public void validateAllModules_onDemandModuleMinSdkGreaterThanBase_succeeds() throws Exception {
+    ImmutableList<BundleModule> allModules =
+        ImmutableList.of(
+            module("base", androidManifest(PKG_NAME, withMinSdkVersion(20))),
+            module(
+                "feature1", androidManifest(PKG_NAME, withOnDemand(true), withMinSdkVersion(21))));
+
+    new ModuleDependencyValidator().validateAllModules(allModules);
+  }
+
+  @Test
+  public void validateAllModules_onDemandModuleMinSdkEqualToBase_succeeds() throws Exception {
+    ImmutableList<BundleModule> allModules =
+        ImmutableList.of(
+            module("base", androidManifest(PKG_NAME, withMinSdkVersion(20))),
+            module(
+                "feature1", androidManifest(PKG_NAME, withOnDemand(true), withMinSdkVersion(20))));
+
+    new ModuleDependencyValidator().validateAllModules(allModules);
+  }
+
+  @Test
+  public void validateAllModules_installTimeModuleMinSdkGreaterThanBase_fails() throws Exception {
+    ImmutableList<BundleModule> allModules =
+        ImmutableList.of(
+            module("base", androidManifest(PKG_NAME, withMinSdkVersion(20))),
+            module("feature1", androidManifest(PKG_NAME, withMinSdkVersion(21))));
+
+    ValidationException exception =
+        assertThrows(
+            ValidationException.class,
+            () -> new ModuleDependencyValidator().validateAllModules(allModules));
+
+    assertThat(exception)
+        .hasMessageThat()
+        .contains(
+            "Install-time module 'feature1' has a minSdkVersion(21) different than the"
+                + " minSdkVersion(20) of its dependency 'base'.");
+  }
+
+  @Test
+  public void validateAllModules_installTimeModuleMinSdkSmallerThanBase_fails() throws Exception {
+    ImmutableList<BundleModule> allModules =
+        ImmutableList.of(
+            module("base", androidManifest(PKG_NAME, withMinSdkVersion(20))),
+            module("feature1", androidManifest(PKG_NAME, withMinSdkVersion(19))));
+
+    ValidationException exception =
+        assertThrows(
+            ValidationException.class,
+            () -> new ModuleDependencyValidator().validateAllModules(allModules));
+
+    assertThat(exception)
+        .hasMessageThat()
+        .contains(
+            "Install-time module 'feature1' has a minSdkVersion(19) different than the"
+                + " minSdkVersion(20) of its dependency 'base'.");
+  }
+
+  @Test
+  public void validateAllModules_installTimeModuleMinSdkEqualToBase_succeeds() throws Exception {
+    ImmutableList<BundleModule> allModules =
+        ImmutableList.of(
+            module("base", androidManifest(PKG_NAME, withMinSdkVersion(20))),
+            module("feature1", androidManifest(PKG_NAME, withMinSdkVersion(20))));
+
+    new ModuleDependencyValidator().validateAllModules(allModules);
+  }
+
+  @Test
+  public void validateAllModules_installTimeModuleEffectiveMinSdk_fails() throws Exception {
+    ImmutableList<BundleModule> allModules =
+        ImmutableList.of(
+            module("base", androidManifest(PKG_NAME, withMinSdkVersion(20))),
+            module("feature1", androidManifest(PKG_NAME)));
+
+    ValidationException exception =
+        assertThrows(
+            ValidationException.class,
+            () -> new ModuleDependencyValidator().validateAllModules(allModules));
+
+    assertThat(exception)
+        .hasMessageThat()
+        .contains(
+            "Install-time module 'feature1' has a minSdkVersion(1) different than the"
+                + " minSdkVersion(20) of its dependency 'base'.");
   }
 }

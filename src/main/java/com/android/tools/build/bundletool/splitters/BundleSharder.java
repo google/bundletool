@@ -117,7 +117,7 @@ public class BundleSharder {
 
     // Other files.
     rawSplits.add(ModuleSplit.forAssets(module));
-    rawSplits.add(ModuleSplit.forCode(module));
+    rawSplits.add(ModuleSplit.forDex(module));
     rawSplits.add(ModuleSplit.forRoot(module));
 
     // Merge splits with the same targeting and make a single master split.

@@ -24,17 +24,16 @@ import com.android.tools.build.bundletool.model.AndroidManifest;
 import com.android.tools.build.bundletool.model.BundleModule;
 import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.Maps;
 import com.google.common.collect.Multimap;
 import com.google.common.collect.Multimaps;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
-import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Optional;
 import java.util.Set;
-import java.util.function.Function;
-import java.util.stream.Collectors;
 
 /**
  * Validates dependencies between bundle modules.
@@ -55,12 +54,15 @@ public class ModuleDependencyValidator extends SubValidator {
     checkSplitIds(modules);
 
     Multimap<String, String> moduleDependenciesMap = buildAdjacencyMap(modules);
+    ImmutableMap<String, BundleModule> modulesByName =
+        Maps.uniqueIndex(modules, module -> module.getName().getName());
 
     checkNoReflexiveDependencies(moduleDependenciesMap);
     checkModulesHaveUniqueDependencies(moduleDependenciesMap);
     checkReferencedModulesExist(moduleDependenciesMap);
     checkNoCycles(moduleDependenciesMap);
-    checkNoInstallTimeToOnDemandModulesDependencies(modules, moduleDependenciesMap);
+    checkNoInstallTimeToOnDemandModulesDependencies(moduleDependenciesMap, modulesByName);
+    checkMinSdkIsCompatibleWithDependencies(moduleDependenciesMap, modulesByName);
   }
 
   /**
@@ -248,21 +250,48 @@ public class ModuleDependencyValidator extends SubValidator {
 
   /** Checks that an install-time module does not depend on an on-demand module. */
   private static void checkNoInstallTimeToOnDemandModulesDependencies(
-      ImmutableList<BundleModule> modules, Multimap<String, String> moduleDependenciesMap) {
-    Map<String, BundleModule> modulesByName =
-        modules
-            .stream()
-            .collect(Collectors.toMap(module -> module.getName().getName(), Function.identity()));
-
+      Multimap<String, String> moduleDependenciesMap,
+      ImmutableMap<String, BundleModule> modulesByName) {
     for (Entry<String, String> dependencyEntry : moduleDependenciesMap.entries()) {
       String moduleName = dependencyEntry.getKey();
       String moduleDep = dependencyEntry.getValue();
-      if (!modulesByName.get(moduleName).isDynamicModule()
-          && modulesByName.get(moduleDep).isDynamicModule()) {
+      if (!modulesByName.get(moduleName).isOnDemandModule()
+          && modulesByName.get(moduleDep).isOnDemandModule()) {
         throw ValidationException.builder()
             .withMessage(
                 "Install-time module '%s' declares dependency on on-demand module '%s'.",
                 moduleName, moduleDep)
+            .build();
+      }
+    }
+  }
+
+  /** Checks that the min sdk value for a module is compatible with its dependencies. */
+  private static void checkMinSdkIsCompatibleWithDependencies(
+      Multimap<String, String> moduleDependenciesMap,
+      ImmutableMap<String, BundleModule> modulesByName) {
+    for (Entry<String, String> dependencyEntry : moduleDependenciesMap.entries()) {
+      String moduleName = dependencyEntry.getKey();
+      String moduleDepName = dependencyEntry.getValue();
+      BundleModule module = modulesByName.get(moduleName);
+      BundleModule moduleDep = modulesByName.get(moduleDepName);
+      int minSdk = module.getAndroidManifest().getEffectiveMinSdkVersion();
+      int minSdkDep = moduleDep.getAndroidManifest().getEffectiveMinSdkVersion();
+      if (!module.isOnDemandModule() && minSdk != minSdkDep) {
+        throw ValidationException.builder()
+            .withMessage(
+                "Install-time module '%s' has a minSdkVersion(%d) different than the"
+                    + " minSdkVersion(%d) of its dependency '%s'.",
+                moduleName, minSdk, minSdkDep, moduleDepName)
+            .build();
+      } else if (minSdk < minSdkDep && !moduleDep.isBaseModule()) {
+        // Note that for dependencies on base module, having lower minSdk is harmless because the
+        // app will not be served to devices with lower minSdk than the base.
+        throw ValidationException.builder()
+            .withMessage(
+                "On-demand module '%s' has a minSdkVersion(%d), which is smaller than the"
+                    + " minSdkVersion(%d) of its dependency '%s'.",
+                moduleName, minSdk, minSdkDep, moduleDepName)
             .build();
       }
     }

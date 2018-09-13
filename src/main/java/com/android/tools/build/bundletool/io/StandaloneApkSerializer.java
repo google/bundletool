@@ -32,37 +32,35 @@ public class StandaloneApkSerializer {
 
   public static final String STANDALONE_APKS_SUB_DIR = "standalones";
 
+  private final ApkPathManager apkPathManager;
   private final ApkSerializerHelper apkSerializerHelper;
 
   public StandaloneApkSerializer(
+      ApkPathManager apkPathManager,
       Aapt2Command aapt2Command,
       Optional<SigningConfiguration> signingConfig,
       Compression compression) {
+    this.apkPathManager = apkPathManager;
     this.apkSerializerHelper = new ApkSerializerHelper(aapt2Command, signingConfig, compression);
   }
 
   public ApkDescription writeToDisk(ModuleSplit standaloneSplit, Path outputDirectory) {
-    String suffix =
-        (standaloneSplit.getSuffix().isEmpty() ? "" : "-") + standaloneSplit.getSuffix();
-    String apkFileName = String.format("standalone%s.apk", suffix);
-    // Using ZipPath to ensure '/' path delimiter in the ApkDescription proto.
-    String apkFileRelPath = ZipPath.create(STANDALONE_APKS_SUB_DIR).resolve(apkFileName).toString();
-
-    return writeToDiskInternal(standaloneSplit, outputDirectory, apkFileRelPath);
+    ZipPath apkPath = apkPathManager.getApkPath(standaloneSplit);
+    return writeToDiskInternal(standaloneSplit, outputDirectory, apkPath);
   }
 
   public ApkDescription writeToDiskAsUniversal(ModuleSplit standaloneSplit, Path outputDirectory) {
-    return writeToDiskInternal(
-        standaloneSplit, outputDirectory, /* apkFileRelPath= */ "universal.apk");
+    return writeToDiskInternal(standaloneSplit, outputDirectory, ZipPath.create("universal.apk"));
   }
 
   @VisibleForTesting
   ApkDescription writeToDiskInternal(
-      ModuleSplit standaloneSplit, Path outputDirectory, String apkFileRelPath) {
-    apkSerializerHelper.writeToZipFile(standaloneSplit, outputDirectory.resolve(apkFileRelPath));
+      ModuleSplit standaloneSplit, Path outputDirectory, ZipPath apkPath) {
+    apkSerializerHelper.writeToZipFile(
+        standaloneSplit, outputDirectory.resolve(apkPath.toString()));
 
     return ApkDescription.newBuilder()
-        .setPath(apkFileRelPath)
+        .setPath(apkPath.toString())
         .setStandaloneApkMetadata(
             StandaloneApkMetadata.newBuilder()
                 .addAllFusedModuleName(standaloneSplit.getAndroidManifest().getFusedModuleNames()))

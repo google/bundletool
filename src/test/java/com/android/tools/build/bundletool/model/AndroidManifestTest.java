@@ -222,6 +222,7 @@ public class AndroidManifestTest {
     AndroidManifest androidManifest =
         AndroidManifest.create(xmlNode(xmlElement("manifest", xmlNode(xmlElement("application")))));
     assertThat(androidManifest.getHasCode()).isEmpty();
+    assertThat(androidManifest.getEffectiveHasCode()).isTrue();
   }
 
   @Test
@@ -341,20 +342,20 @@ public class AndroidManifestTest {
   }
 
   @Test
-  public void isDynamicModule_notSet() {
+  public void isOnDemandModule_notSet() {
     // From Bundletool 0.3.4 onwards.
     AndroidManifest manifest = AndroidManifest.create(androidManifest("com.test.app"));
     assertThat(manifest.isOnDemandModule(BUNDLE_TOOL_0_3_4)).isEmpty();
   }
 
   @Test
-  public void isDynamicModule_false_byDefault_legacy() {
+  public void isOnDemandModule_false_byDefault_legacy() {
     AndroidManifest manifest = AndroidManifest.create(androidManifest("com.test.app"));
     assertThat(manifest.isOnDemandModule(BUNDLE_TOOL_0_3_3)).isEmpty();
   }
 
   @Test
-  public void isDynamicModule_true() {
+  public void isOnDemandModule_true() {
     // From Bundletool 0.3.4 onwards.
     AndroidManifest manifest =
         AndroidManifest.create(androidManifest("com.test.app", withOnDemand(true)));
@@ -362,7 +363,7 @@ public class AndroidManifestTest {
   }
 
   @Test
-  public void isDynamicModule_true_legacy() {
+  public void isOnDemandModule_true_legacy() {
     AndroidManifest manifest =
         AndroidManifest.create(androidManifest("com.test.app", withLegacyOnDemand(true)));
     assertThat(manifest.isOnDemandModule(BUNDLE_TOOL_0_3_3)).hasValue(true);
@@ -373,7 +374,7 @@ public class AndroidManifestTest {
   }
 
   @Test
-  public void isDynamicModule_false() {
+  public void isOnDemandModule_false() {
     // From Bundletool 0.3.4 onwards.
     AndroidManifest manifest =
         AndroidManifest.create(androidManifest("com.test.app", withOnDemand(false)));
@@ -381,7 +382,7 @@ public class AndroidManifestTest {
   }
 
   @Test
-  public void isDynamicModule_false_legacy() {
+  public void isOnDemandModule_false_legacy() {
     AndroidManifest manifest =
         AndroidManifest.create(androidManifest("com.test.app", withLegacyOnDemand(false)));
     assertThat(manifest.isOnDemandModule(BUNDLE_TOOL_0_3_3)).hasValue(false);
@@ -392,7 +393,7 @@ public class AndroidManifestTest {
   }
 
   @Test
-  public void isDynamicModule_old_namespace_returnsEmpty() {
+  public void isOnDemandModule_old_namespace_returnsEmpty() {
     // From Bundletool 0.3.4 onwards.
     AndroidManifest manifest =
         AndroidManifest.create(androidManifest("com.test.app", withLegacyOnDemand(false)));

@@ -26,6 +26,8 @@ import com.android.bundle.Files.NativeLibraries;
 import com.android.tools.build.bundletool.model.BundleModule;
 import com.android.tools.build.bundletool.model.BundleModuleName;
 import com.android.tools.build.bundletool.model.ModuleEntry;
+import com.android.tools.build.bundletool.utils.xmlproto.XmlProtoNode;
+import com.android.tools.build.bundletool.utils.xmlproto.XmlProtoNodeBuilder;
 import com.google.common.collect.ImmutableSet;
 import java.io.IOException;
 
@@ -37,6 +39,8 @@ public class BundleModuleBuilder {
   private final BundleModuleName moduleName;
 
   private BundleConfig bundleConfig = DEFAULT_BUNDLE_CONFIG;
+
+  private XmlNode androidManifest = null;
 
   public BundleModuleBuilder(String moduleName) {
     checkNotNull(moduleName);
@@ -78,11 +82,23 @@ public class BundleModuleBuilder {
   }
 
   public BundleModuleBuilder setManifest(XmlNode androidManifest) {
-    addFile("manifest/AndroidManifest.xml", androidManifest.toByteArray());
+    this.androidManifest = androidManifest;
     return this;
   }
 
   public BundleModule build() throws IOException {
+    if (androidManifest != null) {
+      boolean hasCode =
+          entries.build().stream().anyMatch(entry -> entry.getPath().toString().endsWith(".dex"));
+      if (hasCode) {
+        XmlProtoNodeBuilder manifestBuilder = new XmlProtoNode(androidManifest).toBuilder();
+        ManifestProtoUtils.clearHasCode().accept(manifestBuilder.getElement());
+        androidManifest = manifestBuilder.build().getProto();
+      }
+
+      addFile("manifest/AndroidManifest.xml", androidManifest.toByteArray());
+    }
+
     return BundleModule.builder()
         .setName(moduleName)
         .addEntries(entries.build())

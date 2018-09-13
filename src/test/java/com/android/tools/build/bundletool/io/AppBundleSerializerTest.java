@@ -17,6 +17,7 @@
 package com.android.tools.build.bundletool.io;
 
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifest;
+import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.clearHasCode;
 import static com.android.tools.build.bundletool.testing.ResourcesTableFactory.createResourceTable;
 import static com.android.tools.build.bundletool.testing.truth.zip.TruthZip.assertThat;
 import static com.google.common.truth.Truth.assertThat;
@@ -55,7 +56,7 @@ public class AppBundleSerializerTest {
 
   @Test
   public void allFilesPresent() throws Exception {
-    XmlNode manifest = androidManifest("com.app");
+    XmlNode manifest = androidManifest("com.app", clearHasCode());
     Assets assetsConfig = Assets.getDefaultInstance();
     NativeLibraries nativeConfig = NativeLibraries.getDefaultInstance();
     ResourceTable resourceTable = createResourceTable();

@@ -62,11 +62,6 @@ public final class OptimizationsMerger {
   @Deprecated // Optimization flags will go away soon!
   public ApkOptimizations mergeWithDefaults(
       BundleConfig bundleConfig, ImmutableSet<OptimizationDimension> optimizationsOverride) {
-    // Until we get rid of the flag, it takes precedence over anything else.
-    if (!optimizationsOverride.isEmpty()) {
-      return ApkOptimizations.builder().setSplitDimensions(optimizationsOverride).build();
-    }
-
     // Default optimizations performed on APKs if the developer doesn't specify any preferences.
     String buildVersionString = bundleConfig.getBundletool().getVersion();
     Version bundleToolBuildVersion =
@@ -79,14 +74,23 @@ public final class OptimizationsMerger {
     // Preferences specified by the developer.
     Optimizations requestedOptimizations = bundleConfig.getOptimizations();
 
-    return ApkOptimizations.builder()
-        .setSplitDimensions(
-            mergeSplitDimensions(
+    // Until we get rid of OptimizationsOverride flag, it takes precedence over anything else.
+    ImmutableSet<OptimizationDimension> splitDimensions =
+        !optimizationsOverride.isEmpty()
+            ? optimizationsOverride
+            : mergeSplitDimensions(
                 defaultOptimizations.getSplitDimensions(),
-                requestedOptimizations.getSplitsConfig().getSplitDimensionList()))
-        .setUncompressNativeLibraries(
-            requestedOptimizations.getUncompressNativeLibraries().getEnabled()
-                && defaultOptimizations.getUncompressNativeLibraries())
+                requestedOptimizations.getSplitsConfig().getSplitDimensionList());
+
+    // If developer sets UncompressNativeLibraries use that, otherwise use the default value.
+    boolean uncompressNativeLibraries =
+        requestedOptimizations.hasUncompressNativeLibraries()
+            ? requestedOptimizations.getUncompressNativeLibraries().getEnabled()
+            : defaultOptimizations.getUncompressNativeLibraries();
+
+    return ApkOptimizations.builder()
+        .setSplitDimensions(splitDimensions)
+        .setUncompressNativeLibraries(uncompressNativeLibraries)
         .build();
   }
 

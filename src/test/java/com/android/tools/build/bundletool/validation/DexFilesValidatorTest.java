@@ -17,6 +17,8 @@
 package com.android.tools.build.bundletool.validation;
 
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifest;
+import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.clearHasCode;
+import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withHasCode;
 import static com.google.common.truth.Truth.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
@@ -31,19 +33,92 @@ import org.junit.runners.JUnit4;
 public class DexFilesValidatorTest {
 
   @Test
-  public void noDexFiles_ok() throws Exception {
+  public void noDexFiles_hasCodeSetFalse_ok() throws Exception {
     BundleModule module =
-        new BundleModuleBuilder("base").setManifest(androidManifest("com.test.app")).build();
+        new BundleModuleBuilder("base")
+            .addFile(
+                "manifest/AndroidManifest.xml",
+                androidManifest("com.test.app", withHasCode(false)).toByteArray())
+            .build();
 
     new DexFilesValidator().validateModule(module);
   }
 
   @Test
-  public void singleDexFile_valid_ok() throws Exception {
+  public void noDexFiles_hasCodeNotSet_throws() throws Exception {
+    BundleModule module =
+        new BundleModuleBuilder("base")
+            .addFile(
+                "manifest/AndroidManifest.xml",
+                androidManifest("com.test.app", clearHasCode()).toByteArray())
+            .build();
+
+    ValidationException exception =
+        assertThrows(
+            ValidationException.class, () -> new DexFilesValidator().validateModule(module));
+
+    assertThat(exception)
+        .hasMessageThat()
+        .contains(
+            "Module 'base' has no dex files but the attribute 'hasCode' is not set to false "
+                + "in the AndroidManifest.xml.");
+  }
+
+  @Test
+  public void noDexFiles_hasCodeSetTrue_throws() throws Exception {
+    BundleModule module =
+        new BundleModuleBuilder("base")
+            .addFile(
+                "manifest/AndroidManifest.xml",
+                androidManifest("com.test.app", withHasCode(true)).toByteArray())
+            .build();
+
+    ValidationException exception =
+        assertThrows(
+            ValidationException.class, () -> new DexFilesValidator().validateModule(module));
+
+    assertThat(exception)
+        .hasMessageThat()
+        .contains(
+            "Module 'base' has no dex files but the attribute 'hasCode' is not set to false "
+                + "in the AndroidManifest.xml.");
+  }
+
+  @Test
+  public void singleDexFile_validHasCodeDefault_ok() throws Exception {
     BundleModule module =
         new BundleModuleBuilder("base")
             .addFile("dex/classes.dex")
-            .setManifest(androidManifest("com.test.app"))
+            .addFile(
+                "manifest/AndroidManifest.xml",
+                androidManifest("com.test.app", withHasCode(true)).toByteArray())
+            .build();
+
+    new DexFilesValidator().validateModule(module);
+  }
+
+  @Test
+  public void singleDexFile_validHasCodeTrue_ok() throws Exception {
+    BundleModule module =
+        new BundleModuleBuilder("base")
+            .addFile("dex/classes.dex")
+            .addFile(
+                "manifest/AndroidManifest.xml",
+                androidManifest("com.test.app", withHasCode(true)).toByteArray())
+            .build();
+
+    new DexFilesValidator().validateModule(module);
+  }
+
+  /* There is a use case where applications load dex files manually. */
+  @Test
+  public void singleDexFile_validHasCodeFalse_ok() throws Exception {
+    BundleModule module =
+        new BundleModuleBuilder("base")
+            .addFile("dex/classes.dex")
+            .addFile(
+                "manifest/AndroidManifest.xml",
+                androidManifest("com.test.app", withHasCode(false)).toByteArray())
             .build();
 
     new DexFilesValidator().validateModule(module);
@@ -74,7 +149,7 @@ public class DexFilesValidatorTest {
             .addFile("dex/classes2.dex")
             .addFile("dex/classes3.dex")
             .addFile("dex/classes4.dex")
-            .setManifest(androidManifest("com.test.app"))
+            .setManifest(androidManifest("com.test.app", withHasCode(true)))
             .build();
 
     new DexFilesValidator().validateModule(module);

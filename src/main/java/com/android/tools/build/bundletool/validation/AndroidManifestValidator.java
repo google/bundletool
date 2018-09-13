@@ -26,6 +26,7 @@ import com.android.tools.build.bundletool.exceptions.manifest.ManifestSdkTargeti
 import com.android.tools.build.bundletool.model.AndroidManifest;
 import com.android.tools.build.bundletool.model.BundleModule;
 import com.android.tools.build.bundletool.version.BundleToolVersion;
+import com.android.tools.build.bundletool.version.Version;
 import java.util.Optional;
 
 /** Validates {@code AndroidManifest.xml} file of each module. */
@@ -54,13 +55,12 @@ public class AndroidManifestValidator extends SubValidator {
   }
 
   private void validateOnDemand(BundleModule module) {
-    Optional<Boolean> isOnDemandModule =
-        module
-            .getAndroidManifest()
-            .isOnDemandModule(
-                BundleToolVersion.getVersionFromBundleConfig(module.getBundleConfig()));
 
-    boolean isConditionalModule = !module.getAndroidManifest().getModuleConditions().isEmpty();
+    Version bundleToolVersion =
+        BundleToolVersion.getVersionFromBundleConfig(module.getBundleConfig());
+    Optional<Boolean> isOnDemandModule =
+        module.getAndroidManifest().isOnDemandModule(bundleToolVersion);
+    boolean hasConditions = !module.getAndroidManifest().getModuleConditions().isEmpty();
 
     if (module.isBaseModule()) {
       // In the base module, onDemand must be either not set or false
@@ -68,14 +68,14 @@ public class AndroidManifestValidator extends SubValidator {
         throw new ValidationException(
             "The base module cannot be marked as onDemand='true' since it will always be served.");
       }
-      if (isConditionalModule) {
+      if (hasConditions) {
         throw new ValidationException(
             "The base module cannot have conditions since it will always be served.");
       }
     } else {
       // In feature modules, onDemand must be explicitly set to some value unless it's a conditional
       // module.
-      if (isConditionalModule) {
+      if (hasConditions) {
         if (isOnDemandModule.isPresent()) {
           throw ValidationException.builder()
               .withMessage(
@@ -98,21 +98,21 @@ public class AndroidManifestValidator extends SubValidator {
   }
 
   private void validateOnDemandIsInstantMutualExclusion(BundleModule module) {
-    Optional<Boolean> isDynamicModule =
-        module
-            .getAndroidManifest()
-            .isOnDemandModule(
-                BundleToolVersion.getVersionFromBundleConfig(module.getBundleConfig()));
+    boolean isInstant = module.getAndroidManifest().isInstantModule().orElse(false);
+    boolean hasConditions = !module.getAndroidManifest().getModuleConditions().isEmpty();
 
-    Optional<Boolean> isInstant = module.getAndroidManifest().isInstantModule();
-    if (isDynamicModule.isPresent()
-        && isDynamicModule.get()
-        && isInstant.isPresent()
-        && isInstant.get()) {
+    if (module.isOnDemandModule() && isInstant) {
       throw ValidationException.builder()
           .withMessage(
               "The attribute 'onDemand' and 'instant' cannot both be true at the same time"
                   + " (module '%s').",
+              module.getName())
+          .build();
+    }
+    if (hasConditions && isInstant) {
+      throw ValidationException.builder()
+          .withMessage(
+              "The attribute 'instant' cannot be true for conditional module (module '%s').",
               module.getName())
           .build();
     }

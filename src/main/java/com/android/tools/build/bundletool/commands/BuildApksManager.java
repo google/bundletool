@@ -15,6 +15,7 @@
  */
 package com.android.tools.build.bundletool.commands;
 
+import static com.android.tools.build.bundletool.utils.TargetingProtoUtils.sdkVersionFrom;
 import static com.android.tools.build.bundletool.utils.files.FilePreconditions.checkFileDoesNotExist;
 import static com.android.tools.build.bundletool.utils.files.FilePreconditions.checkFileExistsAndExecutable;
 import static com.android.tools.build.bundletool.utils.files.FilePreconditions.checkFileExistsAndReadable;
@@ -28,19 +29,20 @@ import com.android.bundle.Config.Bundletool;
 import com.android.bundle.Config.Compression;
 import com.android.bundle.Devices.DeviceSpec;
 import com.android.bundle.Targeting.ApkTargeting;
-import com.android.bundle.Targeting.SdkVersion;
 import com.android.bundle.Targeting.SdkVersionTargeting;
 import com.android.bundle.Targeting.VariantTargeting;
 import com.android.tools.build.bundletool.device.AdbServer;
 import com.android.tools.build.bundletool.device.DeviceAnalyzer;
 import com.android.tools.build.bundletool.device.DeviceSpecParser;
 import com.android.tools.build.bundletool.exceptions.CommandExecutionException;
+import com.android.tools.build.bundletool.io.ApkPathManager;
 import com.android.tools.build.bundletool.io.ApkSerializerManager;
 import com.android.tools.build.bundletool.io.ApkSetBuilderFactory;
 import com.android.tools.build.bundletool.io.ApkSetBuilderFactory.ApkSetBuilder;
 import com.android.tools.build.bundletool.io.SplitApkSerializer;
 import com.android.tools.build.bundletool.io.StandaloneApkSerializer;
 import com.android.tools.build.bundletool.model.Aapt2Command;
+import com.android.tools.build.bundletool.model.ApkListener;
 import com.android.tools.build.bundletool.model.ApkModifier;
 import com.android.tools.build.bundletool.model.AppBundle;
 import com.android.tools.build.bundletool.model.BundleMetadata;
@@ -165,7 +167,6 @@ final class BuildApksManager {
             generateStandaloneApks(
                 modulesForFusing,
                 appBundle.getBundleMetadata(),
-                command.getGenerateOnlyUniversalApk(),
                 tempDir,
                 apkOptimizations,
                 bundleVersion));
@@ -181,6 +182,7 @@ final class BuildApksManager {
               appBundle,
               apkSetBuilder,
               command.getExecutorService(),
+              command.getApkListener().orElse(ApkListener.NO_OP),
               command.getApkModifier().orElse(ApkModifier.NO_OP),
               command.getFirstVariantNumber().orElse(0));
       ImmutableList<Variant> allVariantsWithTargeting;
@@ -231,10 +233,12 @@ final class BuildApksManager {
       Optional<SigningConfiguration> signingConfiguration,
       Compression compression,
       Path tempDir) {
+    ApkPathManager apkPathmanager = new ApkPathManager();
     SplitApkSerializer splitApkSerializer =
-        new SplitApkSerializer(aapt2Command, signingConfiguration, compression);
+        new SplitApkSerializer(apkPathmanager, aapt2Command, signingConfiguration, compression);
     StandaloneApkSerializer standaloneApkSerializer =
-        new StandaloneApkSerializer(aapt2Command, signingConfiguration, compression);
+        new StandaloneApkSerializer(
+            apkPathmanager, aapt2Command, signingConfiguration, compression);
 
     return ApkSetBuilderFactory.createApkSetBuilder(
         splitApkSerializer, standaloneApkSerializer, tempDir);
@@ -290,7 +294,6 @@ final class BuildApksManager {
   private ImmutableList<ModuleSplit> generateStandaloneApks(
       ImmutableList<BundleModule> modules,
       BundleMetadata bundleMetadata,
-      boolean isUniversalApk,
       Path tempDir,
       ApkOptimizations apkOptimizations,
       Version bundleVersion) {
@@ -299,16 +302,12 @@ final class BuildApksManager {
         new BundleSharder(tempDir, bundleVersion)
             .shardBundle(modules, apkOptimizations.getSplitDimensions(), bundleMetadata);
 
-    return standaloneApks
-        .stream()
+    return standaloneApks.stream()
         .map(
             moduleSplit ->
                 moduleSplit
                     .toBuilder()
-                    .setVariantTargeting(
-                        isUniversalApk
-                            ? VariantTargeting.getDefaultInstance()
-                            : standaloneApkVariantTargeting(moduleSplit))
+                    .setVariantTargeting(standaloneApkVariantTargeting(moduleSplit))
                     .setSplitType(SplitType.STANDALONE)
                     .build())
         .collect(toImmutableList());
@@ -335,14 +334,14 @@ final class BuildApksManager {
     if (apkTargeting.hasScreenDensityTargeting()) {
       variantTargeting.setScreenDensityTargeting(apkTargeting.getScreenDensityTargeting());
     }
-    // If a standalone variant was generated, then we may have also generated a splits variant with
-    // some SDK targeting (splits run only on Android L+). When we later compute alternative
-    // targeting across all variants, we don't allow some variants to have, and some variants not to
-    // have targeting for a dimension (SDK in this case). That is why we need to set the default
-    // instance of SDK targeting for the standalone variants.
-    variantTargeting.setSdkVersionTargeting(
-        SdkVersionTargeting.newBuilder().addValue(SdkVersion.getDefaultInstance()));
+    variantTargeting.setSdkVersionTargeting(sdkVersionTargeting(standaloneApk));
 
     return variantTargeting.build();
+  }
+
+  private static SdkVersionTargeting sdkVersionTargeting(ModuleSplit moduleSplit) {
+    return SdkVersionTargeting.newBuilder()
+        .addValue(sdkVersionFrom(moduleSplit.getAndroidManifest().getEffectiveMinSdkVersion()))
+        .build();
   }
 }

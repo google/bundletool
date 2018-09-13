@@ -71,6 +71,22 @@ public class OptimizationsMergerTest {
   }
 
   @Test
+  public void mergeOptimizations_overridesTakePrecedence_withUncompressNativeLibs() {
+    ApkOptimizations apkOptimizations =
+        new OptimizationsMerger()
+            .mergeWithDefaults(
+                createBundleConfigBuilder()
+                    .clearOptimizations()
+                    .addSplitDimension(SplitDimension.Value.ABI)
+                    .setUncompressNativeLibraries(true)
+                    .build(),
+                /* optimizationsOverride= */ ImmutableSet.of(SCREEN_DENSITY));
+
+    assertThat(apkOptimizations.getSplitDimensions()).containsExactly(SCREEN_DENSITY);
+    assertThat(apkOptimizations.getUncompressNativeLibraries()).isTrue();
+  }
+
+  @Test
   public void mergeOptimizations_bundleConfigRemovesOneDimension() {
     ApkOptimizations apkOptimizations =
         new OptimizationsMerger()
@@ -97,6 +113,17 @@ public class OptimizationsMergerTest {
 
     assertThat(apkOptimizations.getSplitDimensions()).isEqualTo(DEFAULT_SPLIT_DIMENSIONS);
     assertThat(apkOptimizations.getUncompressNativeLibraries()).isFalse();
+  }
+
+  @Test
+  public void mergeOptimizations_afterVersion_0_6_0_uncompressNativeLibsNotSet() {
+    ApkOptimizations apkOptimizations =
+        new OptimizationsMerger()
+            .mergeWithDefaults(
+                createBundleConfigBuilder().setVersion("0.6.0").clearOptimizations().build());
+
+    assertThat(apkOptimizations.getSplitDimensions()).isEqualTo(DEFAULT_SPLIT_DIMENSIONS);
+    assertThat(apkOptimizations.getUncompressNativeLibraries()).isTrue();
   }
 
   @Test

@@ -63,7 +63,7 @@ public class ModuleTitleValidatorTest {
 
     assertThat(exception)
         .hasMessageThat()
-        .contains("Mandatory title is missing in manifest for dynamic module");
+        .contains("Mandatory title is missing in manifest for on-demand module");
   }
 
   @Test

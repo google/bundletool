@@ -34,6 +34,7 @@ import com.android.bundle.Devices.DeviceSpec;
 import com.android.bundle.Targeting.VariantTargeting;
 import com.android.tools.build.bundletool.device.ApkMatcher;
 import com.android.tools.build.bundletool.io.ApkSetBuilderFactory.ApkSetBuilder;
+import com.android.tools.build.bundletool.model.ApkListener;
 import com.android.tools.build.bundletool.model.ApkModifier;
 import com.android.tools.build.bundletool.model.ApkModifier.ApkDescription.ApkType;
 import com.android.tools.build.bundletool.model.AppBundle;
@@ -58,6 +59,7 @@ import java.util.stream.Collectors;
 public class ApkSerializerManager {
 
   private final ListeningExecutorService executorService;
+  private final ApkListener apkListener;
   private final ApkModifier apkModifier;
   private final int firstVariantNumber;
   private final AppBundle appBundle;
@@ -67,11 +69,13 @@ public class ApkSerializerManager {
       AppBundle appBundle,
       ApkSetBuilder apkSetBuilder,
       ListeningExecutorService executorService,
+      ApkListener apkListener,
       ApkModifier apkModifier,
       int firstVariantNumber) {
     this.appBundle = appBundle;
     this.apkSetBuilder = apkSetBuilder;
     this.executorService = executorService;
+    this.apkListener = apkListener;
     this.apkModifier = apkModifier;
     this.firstVariantNumber = firstVariantNumber;
   }
@@ -112,7 +116,7 @@ public class ApkSerializerManager {
     // 1. Remove APKs not matching the device spec.
     // 2. Modify the APKs based on the ApkModifier.
     // 3. Serialize all APKs in parallel.
-    ApkSerializer apkSerializer = new ApkSerializer(isUniversalApk);
+    ApkSerializer apkSerializer = new ApkSerializer(apkListener, isUniversalApk);
 
     // Modifies the APK using APK modifier, then returns a map by extracting the variant
     // of APK first and later clearing out its variant targeting.
@@ -228,24 +232,36 @@ public class ApkSerializerManager {
   }
 
   private final class ApkSerializer {
+    private final ApkListener apkListener;
     private final boolean isUniversalApk;
 
-    public ApkSerializer(boolean isUniversalApk) {
+    public ApkSerializer(ApkListener apkListener, boolean isUniversalApk) {
+      this.apkListener = apkListener;
       this.isUniversalApk = isUniversalApk;
     }
 
     public ApkDescription serialize(ModuleSplit split) {
+      ApkDescription apkDescription;
       switch (split.getSplitType()) {
         case INSTANT:
-          return apkSetBuilder.addInstantApk(split);
+          apkDescription = apkSetBuilder.addInstantApk(split);
+          break;
         case SPLIT:
-          return apkSetBuilder.addSplitApk(split);
+          apkDescription = apkSetBuilder.addSplitApk(split);
+          break;
         case STANDALONE:
-          return isUniversalApk
-              ? apkSetBuilder.addStandaloneUniversalApk(split)
-              : apkSetBuilder.addStandaloneApk(split);
+          apkDescription =
+              isUniversalApk
+                  ? apkSetBuilder.addStandaloneUniversalApk(split)
+                  : apkSetBuilder.addStandaloneApk(split);
+          break;
+        default:
+          throw new IllegalStateException("Unexpected splitType: " + split.getSplitType());
       }
-      throw new IllegalStateException("Unexpected splitType: " + split.getSplitType());
+
+      apkListener.onApkFinalized(apkDescription);
+
+      return apkDescription;
     }
   }
 }

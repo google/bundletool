@@ -68,7 +68,7 @@ public class DexCompressionSplitterTest {
   public void dexCompressionSplitter_withDexFiles() throws Exception {
     DexCompressionSplitter dexCompressionSplitter = new DexCompressionSplitter();
     ImmutableCollection<ModuleSplit> splits =
-        dexCompressionSplitter.split(ModuleSplit.forCode(createModuleWithDexFile()));
+        dexCompressionSplitter.split(ModuleSplit.forDex(createModuleWithDexFile()));
 
     assertThat(splits).hasSize(2);
 
@@ -98,7 +98,7 @@ public class DexCompressionSplitterTest {
     DexCompressionSplitter dexCompressionSplitter = new DexCompressionSplitter();
     ImmutableCollection<ModuleSplit> splits =
         dexCompressionSplitter.split(
-            ModuleSplit.forCode(createModuleWithDexFile(withMinSdkVersion(ANDROID_P_API_VERSION))));
+            ModuleSplit.forDex(createModuleWithDexFile(withMinSdkVersion(ANDROID_P_API_VERSION))));
 
     assertThat(splits).hasSize(1);
 

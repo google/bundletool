@@ -251,6 +251,29 @@ public class AndroidManifestValidatorTest {
   }
 
   @Test
+  public void moduleConditionsSetAndInstantAttributeTrue_throws() throws Exception {
+    BundleModule module =
+        new BundleModuleBuilder(FEATURE_MODULE_NAME)
+            .setManifest(
+                androidManifest(
+                    PKG_NAME,
+                    withFeatureCondition("com.android.feature"),
+                    withInstant(true),
+                    withFusingAttribute(true)))
+            .build();
+
+    ValidationException exception =
+        assertThrows(
+            ValidationException.class, () -> new AndroidManifestValidator().validateModule(module));
+    assertThat(exception)
+        .hasMessageThat()
+        .contains(
+            String.format(
+                "The attribute 'instant' cannot be true for conditional module" + " (module '%s').",
+                FEATURE_MODULE_NAME));
+  }
+
+  @Test
   public void conditionalModuleAndOnDemandAttribute_throws() throws Exception {
     BundleModule module =
         new BundleModuleBuilder(FEATURE_MODULE_NAME)

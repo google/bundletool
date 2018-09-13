@@ -289,7 +289,7 @@ public class ManifestEditorTest {
   }
 
   @Test
-  public void setFeatureSplit_isDynamicAttributeCopied() throws Exception {
+  public void setFeatureSplit_isOnDemandAttributeCopied() throws Exception {
     AndroidManifest manifest =
         AndroidManifest.create(androidManifest("com.test.app", withOnDemand(true)));
     assertThat(manifest.isOnDemandModule(CURRENT_VERSION)).hasValue(true);

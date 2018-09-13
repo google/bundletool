@@ -109,7 +109,6 @@ public class ModuleSplitter {
 
     ImmutableList.Builder<ModuleSplit> splits = ImmutableList.builder();
 
-
     // Resources splits.
     SplittingPipeline resourcesPipeline = createResourcesSplittingPipeline();
     splits.addAll(resourcesPipeline.split(ModuleSplit.forResources(module)));
@@ -122,8 +121,10 @@ public class ModuleSplitter {
     SplittingPipeline assetsPipeline = createAssetsSplittingPipeline();
     splits.addAll(assetsPipeline.split(ModuleSplit.forAssets(module)));
 
+    ImmutableList<ModuleSplit> dexSplits = ImmutableList.of(ModuleSplit.forDex(module));
+    splits.addAll(dexSplits);
+
     // Other files.
-    splits.add(ModuleSplit.forCode(module));
     splits.add(ModuleSplit.forRoot(module));
 
     ImmutableMultimap<VariantTargeting, ModuleSplit> variantModuleSplitMap =
@@ -222,6 +223,7 @@ public class ModuleSplitter {
     }
     return SplittingPipeline.create(assetsSplitters.build());
   }
+
 
   private static boolean targetsOnlyPreL(BundleModule module) {
     Optional<Integer> maxSdkVersion = module.getAndroidManifest().getMaxSdkVersion();

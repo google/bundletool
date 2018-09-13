@@ -19,6 +19,7 @@ package com.android.tools.build.bundletool.commands;
 import static com.android.bundle.Targeting.Abi.AbiAlias.X86;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifest;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withFusingAttribute;
+import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withHasCode;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withOnDemand;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withUsesSplit;
 import static com.android.tools.build.bundletool.testing.ResourcesTableFactory.createResourceTable;
@@ -172,7 +173,7 @@ public class BuildBundleCommandTest {
 
   @Test
   public void validModule() throws Exception {
-    XmlNode manifest = androidManifest(PKG_NAME);
+    XmlNode manifest = androidManifest(PKG_NAME, withHasCode(true));
     ResourceTable resourceTable =
         createResourceTable(
             "icon", fileReference("res/drawable/icon.png", Configuration.getDefaultInstance()));
@@ -208,7 +209,7 @@ public class BuildBundleCommandTest {
 
   @Test
   public void assetsTargeting_generated() throws Exception {
-    XmlNode manifest = androidManifest(PKG_NAME);
+    XmlNode manifest = androidManifest(PKG_NAME, withHasCode(true));
     Assets assetsConfig =
         Assets.newBuilder()
             .addDirectory(

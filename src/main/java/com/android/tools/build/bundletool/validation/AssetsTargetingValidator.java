@@ -23,8 +23,6 @@ import com.android.bundle.Files.TargetedAssetsDirectory;
 import com.android.tools.build.bundletool.exceptions.ValidationException;
 import com.android.tools.build.bundletool.model.BundleModule;
 import com.android.tools.build.bundletool.model.ZipPath;
-import java.util.ArrayList;
-import java.util.List;
 
 /** Validates targeting of assets. */
 public class AssetsTargetingValidator extends SubValidator {
@@ -35,8 +33,6 @@ public class AssetsTargetingValidator extends SubValidator {
   }
 
   private void validateTargeting(BundleModule module, Assets assets) {
-    List<String> targetedDirs = new ArrayList<>();
-
     for (TargetedAssetsDirectory targetedDirectory : assets.getDirectoryList()) {
       ZipPath path = ZipPath.create(targetedDirectory.getPath());
 
@@ -52,8 +48,6 @@ public class AssetsTargetingValidator extends SubValidator {
             .withMessage("Targeted directory '%s' is empty.", path)
             .build();
       }
-
-      targetedDirs.add(path.toString());
     }
   }
 }

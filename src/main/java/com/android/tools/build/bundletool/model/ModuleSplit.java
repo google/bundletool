@@ -111,6 +111,10 @@ public abstract class ModuleSplit {
    * replace them with underscores instead.
    */
   public String getSuffix() {
+    if (isMasterSplit()) {
+      return "";
+    }
+
     StringJoiner suffixJoiner = new StringJoiner("_");
 
     // The dimensions below should be ordered by their priority.
@@ -283,7 +287,7 @@ public abstract class ModuleSplit {
         /* setResourceTable= */ false);
   }
 
-  public static ModuleSplit forCode(BundleModule bundleModule) {
+  public static ModuleSplit forDex(BundleModule bundleModule) {
     return fromBundleModule(
         bundleModule,
         entry -> entry.getPath().startsWith(DEX_DIRECTORY),

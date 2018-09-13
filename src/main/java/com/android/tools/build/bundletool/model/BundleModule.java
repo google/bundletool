@@ -93,11 +93,11 @@ public abstract class BundleModule {
     return BundleModuleName.BASE_MODULE_NAME.equals(getName().getName());
   }
 
-  public boolean isDynamicModule() {
-    Optional<Boolean> isDynamicModule =
+  public boolean isOnDemandModule() {
+    Optional<Boolean> isOnDemandModule =
         getAndroidManifest()
             .isOnDemandModule(BundleToolVersion.getVersionFromBundleConfig(getBundleConfig()));
-    return isDynamicModule.orElse(false);
+    return isOnDemandModule.orElse(false);
   }
 
   public boolean isIncludedInFusing() {
@@ -149,15 +149,13 @@ public abstract class BundleModule {
   }
 
   public ModuleMetadata getModuleMetadata() {
-    ModuleMetadata.Builder metadata =
-        ModuleMetadata.newBuilder()
-            .setName(getName().getName())
-            .setOnDemand(isDynamicModule())
-            .setIsInstant(isInstantModule())
-            .addAllDependencies(getDependencies())
-            .setTargeting(getModuleTargeting());
-
-    return metadata.build();
+    return ModuleMetadata.newBuilder()
+        .setName(getName().getName())
+        .setOnDemand(isOnDemandModule())
+        .setIsInstant(isInstantModule())
+        .addAllDependencies(getDependencies())
+        .setTargeting(getModuleTargeting())
+        .build();
   }
 
   public static Builder builder() {

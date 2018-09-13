@@ -29,8 +29,15 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * Validates that dex files in a bundle module are named correctly, forming a sequence
- * "classes.dex", "classes2.dex", "classes3.dex" etc.
+ * Validates correct dex files usage in a bundle module.
+ *
+ * <p>Validated properties:
+ *
+ * <ul>
+ *   <li>Dex files in a bundle module are named correctly, forming a sequence * "classes.dex",
+ *       "classes2.dex", "classes3.dex" etc.
+ *   <li>'hasCode' value corresponds to whether there are dex files present in the bundle.
+ * </ul>
  */
 public class DexFilesValidator extends SubValidator {
 
@@ -47,6 +54,11 @@ public class DexFilesValidator extends SubValidator {
             .sorted(Comparator.comparingInt(DexFilesValidator::getClassesDexIndex))
             .collect(toImmutableList());
 
+    validateDexNames(orderedDexFiles);
+    validateHasCode(module, orderedDexFiles);
+  }
+
+  private static void validateDexNames(ImmutableList<String> orderedDexFiles) {
     int dexIndex = 1;
     for (String dexFileName : orderedDexFiles) {
       // This also catches the issue of duplicate files for index 1 (valid "classes.dex" and
@@ -60,6 +72,18 @@ public class DexFilesValidator extends SubValidator {
             .build();
       }
       dexIndex++;
+    }
+  }
+
+  private static void validateHasCode(BundleModule module, ImmutableList<String> orderedDexFiles) {
+    boolean hasCode = module.getAndroidManifest().getEffectiveHasCode();
+    if (orderedDexFiles.isEmpty() && hasCode) {
+      throw ValidationException.builder()
+          .withMessage(
+              "Module '%s' has no dex files but the attribute 'hasCode' is not set to false "
+                  + "in the AndroidManifest.xml.",
+              module.getName())
+          .build();
     }
   }
 

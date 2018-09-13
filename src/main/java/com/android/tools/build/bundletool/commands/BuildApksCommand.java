@@ -25,9 +25,11 @@ import com.android.tools.build.bundletool.exceptions.CommandExecutionException;
 import com.android.tools.build.bundletool.exceptions.ValidationException;
 import com.android.tools.build.bundletool.io.TempFiles;
 import com.android.tools.build.bundletool.model.Aapt2Command;
+import com.android.tools.build.bundletool.model.ApkListener;
 import com.android.tools.build.bundletool.model.ApkModifier;
 import com.android.tools.build.bundletool.model.OptimizationDimension;
 import com.android.tools.build.bundletool.model.SigningConfiguration;
+import com.android.tools.build.bundletool.splitters.DexCompressionSplitter;
 import com.android.tools.build.bundletool.splitters.NativeLibrariesCompressionSplitter;
 import com.android.tools.build.bundletool.utils.EnvironmentVariableProvider;
 import com.android.tools.build.bundletool.utils.SdkToolsLocator;
@@ -117,6 +119,8 @@ public abstract class BuildApksCommand {
 
   abstract boolean isExecutorServiceCreatedByBundleTool();
 
+
+  public abstract Optional<ApkListener> getApkListener();
 
   public abstract Optional<ApkModifier> getApkModifier();
 
@@ -213,6 +217,13 @@ public abstract class BuildApksCommand {
      */
     abstract Builder setExecutorServiceCreatedByBundleTool(boolean value);
 
+
+    /**
+     * Provides an {@link ApkListener} that will be notified at defined stages of APK creation.
+     *
+     * <p>The {@link ApkListener} must be thread-safe.
+     */
+    public abstract Builder setApkListener(ApkListener apkListener);
 
     /**
      * Provides an {@link ApkModifier} that will be invoked just before the APKs are finalized,

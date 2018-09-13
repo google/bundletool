@@ -24,6 +24,7 @@ import static com.android.tools.build.bundletool.model.AndroidManifest.DEBUGGABL
 import static com.android.tools.build.bundletool.model.AndroidManifest.DISTRIBUTION_NAMESPACE;
 import static com.android.tools.build.bundletool.model.AndroidManifest.EXTRACT_NATIVE_LIBS_ATTRIBUTE_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.EXTRACT_NATIVE_LIBS_RESOURCE_ID;
+import static com.android.tools.build.bundletool.model.AndroidManifest.HAS_CODE_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.MAX_SDK_VERSION_ATTRIBUTE_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.MAX_SDK_VERSION_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.META_DATA_ELEMENT_NAME;
@@ -259,6 +260,7 @@ public final class ManifestProtoUtils {
                                                     "android.intent.category.LAUNCHER")))))))))));
 
     XmlProtoNodeBuilder xmlProtoNode = new XmlProtoNode(manifestNode).toBuilder();
+    withHasCode(false).accept(xmlProtoNode.getElement());
     for (ManifestMutator manifestMutator : manifestMutators) {
       manifestMutator.accept(xmlProtoNode.getElement());
     }
@@ -292,6 +294,21 @@ public final class ManifestProtoUtils {
             .getOrCreateChildElement(DISTRIBUTION_NAMESPACE, "module")
             .getOrCreateAttribute(DISTRIBUTION_NAMESPACE, "title")
             .setValueAsRefId(refId);
+  }
+
+  public static ManifestMutator withHasCode(boolean hasCode) {
+    return manifestElement ->
+        manifestElement
+            .getOrCreateChildElement(APPLICATION_ELEMENT_NAME)
+            .getOrCreateAndroidAttribute("hasCode", HAS_CODE_RESOURCE_ID)
+            .setValueAsBoolean(hasCode);
+  }
+
+  public static ManifestMutator clearHasCode() {
+    return manifestElement ->
+        manifestElement
+            .getOptionalChildElement(APPLICATION_ELEMENT_NAME)
+            .ifPresent(application -> application.removeAttribute(ANDROID_NAMESPACE, "hasCode"));
   }
 
   public static ManifestMutator withSplitId(String splitId) {

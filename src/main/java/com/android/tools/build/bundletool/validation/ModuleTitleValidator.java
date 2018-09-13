@@ -50,20 +50,20 @@ public class ModuleTitleValidator extends SubValidator {
 
     for (BundleModule module : modules) {
 
-      if (module.isDynamicModule()) {
+      if (module.isOnDemandModule()) {
         Optional<Integer> titleRefId = module.getAndroidManifest().getTitleRefId();
 
         if (!titleRefId.isPresent()) {
           throw ValidationException.builder()
               .withMessage(
-                  "Mandatory title is missing in manifest for dynamic module '%s'.",
+                  "Mandatory title is missing in manifest for on-demand module '%s'.",
                   module.getName())
               .build();
         }
         if (!stringResourceIds.contains(titleRefId.get())) {
           throw ValidationException.builder()
               .withMessage(
-                  "Title for dynamic module '%s' is missing in the base resource table.",
+                  "Title for on-demand module '%s' is missing in the base resource table.",
                   module.getName())
               .build();
         }
