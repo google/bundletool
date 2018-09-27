@@ -1,3 +1,5 @@
+import com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar
+
 buildscript {
     repositories {
         jcenter()
@@ -7,7 +9,6 @@ buildscript {
     }
     dependencies {
         classpath "com.google.protobuf:protobuf-gradle-plugin:0.8.3"
-        classpath "net.ltgt.gradle:gradle-apt-plugin:0.14"
         classpath "com.github.jengelman.gradle.plugins:shadow:2.0.2"
     }
 }
@@ -16,7 +17,6 @@ apply plugin: "com.github.johnrengelman.shadow"
 apply plugin: "com.google.protobuf"
 apply plugin: "java"
 apply plugin: "maven"
-apply plugin: "net.ltgt.apt"
 
 repositories {
     mavenLocal()
@@ -33,24 +33,23 @@ configurations {
 // The repackaging rules are defined in the "shadowJar" task below.
 dependencies {
     compile "com.android.tools:r8:1.0.37"
-    compile "com.android.tools.build:apkzlib:3.2.0-alpha06"
-    compile "com.android.tools.ddms:ddmlib:26.2.0-alpha04"
-
+    compile "com.android.tools.build:apkzlib:3.2.0"
+    compile "com.android.tools.ddms:ddmlib:26.2.0"
     shadow "com.android.tools.build:aapt2-proto:0.3.1"
     shadow "com.google.auto.value:auto-value:1.5.2"
-    apt "com.google.auto.value:auto-value:1.5.2"
+    annotationProcessor "com.google.auto.value:auto-value:1.5.2"
     shadow "com.google.errorprone:error_prone_annotations:2.2.0"
     shadow "com.google.guava:guava:26.0-jre"
-    shadow "com.google.protobuf:protobuf-java:3.4.0"
-    shadow "com.google.protobuf:protobuf-java-util:3.4.0"
+    shadow "com.google.protobuf:protobuf-java:3.6.1"
+    shadow "com.google.protobuf:protobuf-java-util:3.6.1"
 
-    compileWindows "com.android.tools.build:aapt2:3.2.0-alpha14-4748712:windows"
-    compileMacOs "com.android.tools.build:aapt2:3.2.0-alpha14-4748712:osx"
-    compileLinux "com.android.tools.build:aapt2:3.2.0-alpha14-4748712:linux"
+    compileWindows "com.android.tools.build:aapt2:3.2.0:windows"
+    compileMacOs "com.android.tools.build:aapt2:3.2.0:osx"
+    compileLinux "com.android.tools.build:aapt2:3.2.0:linux"
 
     testCompile "com.android.tools.build:aapt2-proto:0.3.1"
     testCompile "com.google.auto.value:auto-value-annotations:1.5.2"
-    testApt "com.google.auto.value:auto-value:1.5.2"
+    testAnnotationProcessor "com.google.auto.value:auto-value:1.5.2"
     testCompile "com.google.errorprone:error_prone_annotations:2.2.0"
     testCompile "com.google.guava:guava:26.0-jre"
     testCompile "com.google.truth.extensions:truth-java8-extension:0.42"
@@ -79,7 +78,7 @@ test {
 
 protobuf {
     protoc {
-        artifact = "com.google.protobuf:protoc:3.4.0"
+        artifact = "com.google.protobuf:protoc:3.6.1"
     }
 }
 
@@ -130,7 +129,7 @@ shadowJar {
 }
 
 // Artifact to use as standalone command line tool.
-task executableJar(type: com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar) {
+task executableJar(type: ShadowJar) {
     baseName = 'bundletool'
     classifier = 'all'
     from sourceSets.main.output
