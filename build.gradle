@@ -46,7 +46,7 @@ dependencies {
 
     compileWindows "com.android.tools.build:aapt2:3.2.0:windows"
     compileMacOs "com.android.tools.build:aapt2:3.2.0:osx"
-    compileLinux "com.android.tools.build:aapt2:3.2.0-:linux"
+    compileLinux "com.android.tools.build:aapt2:3.2.0:linux"
 
     testCompile "com.android.tools.build:aapt2-proto:0.3.1"
     testCompile "com.google.auto.value:auto-value-annotations:1.5.2"
