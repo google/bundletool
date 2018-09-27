@@ -1,3 +1,5 @@
+import com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar
+
 buildscript {
     repositories {
         jcenter()
@@ -7,7 +9,6 @@ buildscript {
     }
     dependencies {
         classpath "com.google.protobuf:protobuf-gradle-plugin:0.8.3"
-        classpath "net.ltgt.gradle:gradle-apt-plugin:0.14"
         classpath "com.github.jengelman.gradle.plugins:shadow:2.0.2"
     }
 }
@@ -16,7 +17,6 @@ apply plugin: "com.github.johnrengelman.shadow"
 apply plugin: "com.google.protobuf"
 apply plugin: "java"
 apply plugin: "maven"
-apply plugin: "net.ltgt.apt"
 
 repositories {
     mavenLocal()
@@ -130,7 +130,7 @@ shadowJar {
 }
 
 // Artifact to use as standalone command line tool.
-task executableJar(type: com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar) {
+task executableJar(type: ShadowJar) {
     baseName = 'bundletool'
     classifier = 'all'
     from sourceSets.main.output
