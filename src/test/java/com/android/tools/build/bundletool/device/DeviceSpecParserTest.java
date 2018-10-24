@@ -42,6 +42,18 @@ public class DeviceSpecParserTest {
   }
 
   @Test
+  public void parsesCorrectDeviceSpecFile_parsePartialDeviceSpec_Succeeds() throws Exception {
+    DeviceSpec deviceSpec =
+        DeviceSpecParser.parsePartialDeviceSpec(
+            TestData.openReader("testdata/device/pixel2_spec.json"));
+    assertThat(deviceSpec.getSupportedAbisList())
+        .containsExactly("arm64-v8a", "armeabi-v7a", "armeabi");
+    assertThat(deviceSpec.getScreenDensity()).isEqualTo(560);
+    assertThat(deviceSpec.getSdkVersion()).isEqualTo(26);
+    assertThat(deviceSpec.getSupportedLocalesList()).containsExactly("en-GB");
+  }
+
+  @Test
   public void wrongFileExtension_throws() throws Exception {
     Throwable exception =
         assertThrows(
@@ -83,5 +95,60 @@ public class DeviceSpecParserTest {
                 DeviceSpecParser.parseDeviceSpec(
                     TestData.openReader("testdata/device/invalid_spec_locales_empty.json")));
     assertThat(exception).hasMessageThat().contains("Device spec supported locales list is empty");
+  }
+
+  @Test
+  public void parsePartialDeviceSpec_acceptEmptyAbi() throws Exception {
+    DeviceSpec deviceSpec =
+        DeviceSpecParser.parsePartialDeviceSpec(
+            TestData.openReader("testdata/device/invalid_spec_abi_empty.json"));
+    assertThat(deviceSpec.getSupportedAbisList()).isEmpty();
+    assertThat(deviceSpec.getScreenDensity()).isEqualTo(411);
+    assertThat(deviceSpec.getSdkVersion()).isEqualTo(1);
+    assertThat(deviceSpec.getSupportedLocalesList()).containsExactly("en-US", "es-US");
+  }
+
+  @Test
+  public void parsePartialDeviceSpec_acceptEmptyLocaleList() throws Exception {
+    DeviceSpec deviceSpec =
+        DeviceSpecParser.parsePartialDeviceSpec(
+            TestData.openReader("testdata/device/invalid_spec_locales_empty.json"));
+    assertThat(deviceSpec.getSupportedAbisList()).containsExactly("armeabi-v7a");
+    assertThat(deviceSpec.getScreenDensity()).isEqualTo(411);
+    assertThat(deviceSpec.getSdkVersion()).isEqualTo(24);
+    assertThat(deviceSpec.getSupportedLocalesList()).isEmpty();
+  }
+
+  @Test
+  public void parsePartialDeviceSpec_acceptZeroSdk() throws Exception {
+    DeviceSpec deviceSpec =
+        DeviceSpecParser.parsePartialDeviceSpec(
+            TestData.openReader("testdata/device/invalid_spec_sdk_zero.json"));
+    assertThat(deviceSpec.getSupportedAbisList()).containsExactly("armeabi-v7a");
+    assertThat(deviceSpec.getScreenDensity()).isEqualTo(411);
+    assertThat(deviceSpec.getSdkVersion()).isEqualTo(0);
+    assertThat(deviceSpec.getSupportedLocalesList()).containsExactly("en-US", "es-US");
+  }
+
+  @Test
+  public void parsePartialDeviceSpec_acceptZeroDensity() throws Exception {
+    DeviceSpec deviceSpec =
+        DeviceSpecParser.parsePartialDeviceSpec(
+            TestData.openReader("testdata/device/invalid_spec_density_zero.json"));
+    assertThat(deviceSpec.getSupportedAbisList()).containsExactly("armeabi-v7a");
+    assertThat(deviceSpec.getScreenDensity()).isEqualTo(0);
+    assertThat(deviceSpec.getSdkVersion()).isEqualTo(23);
+    assertThat(deviceSpec.getSupportedLocalesList()).containsExactly("en-US", "es-US");
+  }
+
+  @Test
+  public void parsePartialDeviceSpec_rejectsNegativeDensity() throws Exception {
+    Throwable exception =
+        assertThrows(
+            ValidationException.class,
+            () ->
+                DeviceSpecParser.parsePartialDeviceSpec(
+                    TestData.openReader("testdata/device/invalid_spec_density_negative.json")));
+    assertThat(exception).hasMessageThat().contains("Device spec screen density (-1)");
   }
 }

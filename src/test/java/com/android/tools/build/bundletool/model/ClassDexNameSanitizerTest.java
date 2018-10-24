@@ -20,7 +20,6 @@ import static com.google.common.truth.Truth.assertThat;
 
 import com.android.bundle.Config.BundleConfig;
 import com.android.tools.build.bundletool.testing.BundleConfigBuilder;
-import com.android.tools.build.bundletool.testing.InMemoryModuleEntry;
 import java.io.IOException;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -79,6 +78,6 @@ public final class ClassDexNameSanitizerTest {
         .setBundleConfig(DEFAULT_BUNDLE_CONFIG)
         .addEntry(InMemoryModuleEntry.ofFile("assets/hello", new byte[] {0xD, 0xE, 0xA, 0xD}))
         .addEntry(InMemoryModuleEntry.ofFile("assets/world", new byte[] {0xB, 0xE, 0xE, 0xF}))
-        .setAndroidManifest(AndroidManifest.create(androidManifest("com.test.app")));
+        .setAndroidManifestProto(androidManifest("com.test.app"));
   }
 }

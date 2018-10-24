@@ -16,22 +16,16 @@
 
 package com.android.tools.build.bundletool.model;
 
-import static com.android.tools.build.bundletool.model.AndroidManifest.APPLICATION_ELEMENT_NAME;
-import static com.android.tools.build.bundletool.model.AndroidManifest.EXTRACT_NATIVE_LIBS_ATTRIBUTE_NAME;
-import static com.android.tools.build.bundletool.model.AndroidManifest.EXTRACT_NATIVE_LIBS_RESOURCE_ID;
-
-import com.android.tools.build.bundletool.utils.xmlproto.XmlProtoElementBuilder;
 import java.util.function.Consumer;
 
 /** Represents a mutation to manifest, which can then be applied to manifest for editing it. */
-public interface ManifestMutator extends Consumer<XmlProtoElementBuilder> {
+public interface ManifestMutator extends Consumer<ManifestEditor> {
 
-  public static ManifestMutator withExtractNativeLibs(boolean value) {
-    return manifestElement ->
-        manifestElement
-            .getOrCreateChildElement(APPLICATION_ELEMENT_NAME)
-            .getOrCreateAndroidAttribute(
-                EXTRACT_NATIVE_LIBS_ATTRIBUTE_NAME, EXTRACT_NATIVE_LIBS_RESOURCE_ID)
-            .setValueAsBoolean(value);
+  static ManifestMutator withExtractNativeLibs(boolean value) {
+    return manifestEditor -> manifestEditor.setExtractNativeLibsValue(value);
+  }
+
+  static ManifestMutator withSplitsRequired(boolean value) {
+    return manifestEditor -> manifestEditor.setSplitsRequired(value);
   }
 }

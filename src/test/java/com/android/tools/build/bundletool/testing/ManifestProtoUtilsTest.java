@@ -16,7 +16,7 @@
 package com.android.tools.build.bundletool.testing;
 
 import static com.android.tools.build.bundletool.model.AndroidManifest.ACTIVITY_ELEMENT_NAME;
-import static com.android.tools.build.bundletool.model.AndroidManifest.ANDROID_NAMESPACE;
+import static com.android.tools.build.bundletool.model.AndroidManifest.ANDROID_NAMESPACE_URI;
 import static com.android.tools.build.bundletool.model.AndroidManifest.NAME_ATTRIBUTE_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.NAME_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.PROVIDER_ELEMENT_NAME;
@@ -61,9 +61,10 @@ public final class ManifestProtoUtilsTest {
     XmlElement activityElement = activities.get(1);
     assertThat(activityElement.getAttributeList())
         .containsExactly(
-            xmlAttribute(ANDROID_NAMESPACE, NAME_ATTRIBUTE_NAME, NAME_RESOURCE_ID, "FooActivity"),
             xmlAttribute(
-                ANDROID_NAMESPACE, SPLIT_NAME_ATTRIBUTE_NAME, SPLIT_NAME_RESOURCE_ID, "foo"));
+                ANDROID_NAMESPACE_URI, NAME_ATTRIBUTE_NAME, NAME_RESOURCE_ID, "FooActivity"),
+            xmlAttribute(
+                ANDROID_NAMESPACE_URI, SPLIT_NAME_ATTRIBUTE_NAME, SPLIT_NAME_RESOURCE_ID, "foo"));
   }
 
   @Test
@@ -84,9 +85,10 @@ public final class ManifestProtoUtilsTest {
     XmlElement serviceElement = Iterables.getOnlyElement(services);
     assertThat(serviceElement.getAttributeList())
         .containsExactly(
-            xmlAttribute(ANDROID_NAMESPACE, NAME_ATTRIBUTE_NAME, NAME_RESOURCE_ID, "FooService"),
             xmlAttribute(
-                ANDROID_NAMESPACE, SPLIT_NAME_ATTRIBUTE_NAME, SPLIT_NAME_RESOURCE_ID, "foo"));
+                ANDROID_NAMESPACE_URI, NAME_ATTRIBUTE_NAME, NAME_RESOURCE_ID, "FooService"),
+            xmlAttribute(
+                ANDROID_NAMESPACE_URI, SPLIT_NAME_ATTRIBUTE_NAME, SPLIT_NAME_RESOURCE_ID, "foo"));
   }
 
   @Test
@@ -107,8 +109,9 @@ public final class ManifestProtoUtilsTest {
     XmlElement providerElement = Iterables.getOnlyElement(providers);
     assertThat(providerElement.getAttributeList())
         .containsExactly(
-            xmlAttribute(ANDROID_NAMESPACE, NAME_ATTRIBUTE_NAME, NAME_RESOURCE_ID, "FooProvider"),
             xmlAttribute(
-                ANDROID_NAMESPACE, SPLIT_NAME_ATTRIBUTE_NAME, SPLIT_NAME_RESOURCE_ID, "foo"));
+                ANDROID_NAMESPACE_URI, NAME_ATTRIBUTE_NAME, NAME_RESOURCE_ID, "FooProvider"),
+            xmlAttribute(
+                ANDROID_NAMESPACE_URI, SPLIT_NAME_ATTRIBUTE_NAME, SPLIT_NAME_RESOURCE_ID, "foo"));
   }
 }

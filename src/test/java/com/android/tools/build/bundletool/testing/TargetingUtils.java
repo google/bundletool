@@ -548,6 +548,13 @@ public final class TargetingUtils {
         .build();
   }
 
+  public static ImmutableList<DeviceFeatureTargeting> deviceFeatureTargetingList(
+      String... featureNames) {
+    return Arrays.asList(featureNames).stream()
+        .map(TargetingUtils::deviceFeatureTargeting)
+        .collect(toImmutableList());
+  }
+
   // Helper methods for processing splits.
 
   public static ImmutableList<ModuleSplit> filterSplitsByTargeting(

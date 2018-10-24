@@ -17,11 +17,11 @@
 package com.android.tools.build.bundletool.device;
 
 import com.android.ddmlib.AdbCommandRejectedException;
-import com.android.ddmlib.IShellOutputReceiver;
+import com.android.ddmlib.MultiLineReceiver;
 import com.android.ddmlib.ShellCommandUnresponsiveException;
 import com.android.ddmlib.TimeoutException;
 import com.android.tools.build.bundletool.exceptions.CommandExecutionException;
-import java.io.ByteArrayOutputStream;
+import com.google.common.collect.ImmutableList;
 import java.io.IOException;
 import java.util.concurrent.TimeUnit;
 
@@ -36,33 +36,33 @@ public class AdbShellCommandTask {
     this.command = commandToExecute;
   }
 
-  public String execute() {
+  /** Executes a command and returns a list of strings containing the lines of the output. */
+  public ImmutableList<String> execute() {
     // Waits forever.
     return execute(0, TimeUnit.SECONDS);
   }
 
-  public String execute(long deadline, TimeUnit deadlineUnits) {
-    ByteArrayOutputStream commandOutput = new ByteArrayOutputStream();
+  /** Executes a command and returns a list of strings containing the lines of the output. */
+  public ImmutableList<String> execute(long deadline, TimeUnit deadlineUnits) {
+    ImmutableList.Builder<String> outputLines = ImmutableList.builder();
     try {
       device.executeShellCommand(
           command,
-          new IShellOutputReceiver() {
-            @Override
-            public void addOutput(byte[] bytes, int offset, int length) {
-              commandOutput.write(bytes, offset, length);
-            }
-
-            @Override
-            public void flush() {}
+          new MultiLineReceiver() {
 
             @Override
             public boolean isCancelled() {
               return false;
             }
+
+            @Override
+            public void processNewLines(String[] strings) {
+              outputLines.add(strings);
+            }
           },
           deadline,
           deadlineUnits);
-      return commandOutput.toString("UTF-8");
+      return outputLines.build();
     } catch (IOException e) {
       throw CommandExecutionException.builder()
           .withMessage(

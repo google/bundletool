@@ -42,7 +42,17 @@ public class AdbShellCommandTaskTest {
     fakeDevice.injectShellCommandOutput("getprop", () -> "test output");
 
     AdbShellCommandTask task = new AdbShellCommandTask(fakeDevice, "getprop");
-    assertThat(task.execute()).isEqualTo("test output");
+    assertThat(task.execute()).containsExactly("test output");
+  }
+
+  @Test
+  public void commandExecution_outputMultiLine() {
+    FakeDevice fakeDevice =
+        FakeDevice.fromDeviceSpec("id1", DeviceState.ONLINE, lDeviceWithLocales("en-US"));
+    fakeDevice.injectShellCommandOutput("getprop", () -> "test output\nnew line");
+
+    AdbShellCommandTask task = new AdbShellCommandTask(fakeDevice, "getprop");
+    assertThat(task.execute()).containsExactly("test output", "new line").inOrder();
   }
 
   @Test

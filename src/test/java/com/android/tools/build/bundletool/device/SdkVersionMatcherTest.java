@@ -54,7 +54,7 @@ public class SdkVersionMatcherTest {
         assertThrows(
             CommandExecutionException.class,
             () ->
-                sdkMatcher.matchesTargeting(
+                sdkMatcher.checkDeviceCompatible(
                     sdkVersionTargeting(sdkVersionFrom(22), ImmutableSet.of())));
     assertThat(exception)
         .hasMessageThat()
@@ -64,7 +64,7 @@ public class SdkVersionMatcherTest {
         assertThrows(
             CommandExecutionException.class,
             () ->
-                sdkMatcher.matchesTargeting(
+                sdkMatcher.checkDeviceCompatible(
                     sdkVersionTargeting(
                         sdkVersionFrom(25),
                         ImmutableSet.of(sdkVersionFrom(22), sdkVersionFrom(27)))));

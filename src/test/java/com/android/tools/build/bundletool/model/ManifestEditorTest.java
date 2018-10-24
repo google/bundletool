@@ -29,7 +29,7 @@ import static com.android.tools.build.bundletool.model.AndroidManifest.TARGET_SA
 import static com.android.tools.build.bundletool.model.AndroidManifest.VALUE_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.VERSION_CODE_RESOURCE_ID;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifest;
-import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withOnDemand;
+import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withOnDemandAttribute;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withSplitNameActivity;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withSplitNameProvider;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withSplitNameService;
@@ -43,12 +43,11 @@ import static com.google.common.truth.Truth.assertThat;
 import static com.google.common.truth.Truth8.assertThat;
 import static com.google.common.truth.extensions.proto.ProtoTruth.assertThat;
 
+import com.android.aapt.Resources.XmlAttribute;
 import com.android.aapt.Resources.XmlElement;
 import com.android.aapt.Resources.XmlNode;
 import com.android.tools.build.bundletool.TestData;
 import com.android.tools.build.bundletool.utils.xmlproto.XmlProtoElement;
-import com.android.tools.build.bundletool.version.BundleToolVersion;
-import com.android.tools.build.bundletool.version.Version;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
 import com.google.protobuf.TextFormat;
@@ -61,8 +60,6 @@ import org.junit.runners.JUnit4;
 public class ManifestEditorTest {
 
   private static final String ANDROID_NAMESPACE_URI = "http://schemas.android.com/apk/res/android";
-
-  private static final Version CURRENT_VERSION = BundleToolVersion.getCurrentVersion();
 
   @Test
   public void setMinSdkVersion_nonExistingElement_created() throws Exception {
@@ -291,12 +288,12 @@ public class ManifestEditorTest {
   @Test
   public void setFeatureSplit_isOnDemandAttributeCopied() throws Exception {
     AndroidManifest manifest =
-        AndroidManifest.create(androidManifest("com.test.app", withOnDemand(true)));
-    assertThat(manifest.isOnDemandModule(CURRENT_VERSION)).hasValue(true);
+        AndroidManifest.create(androidManifest("com.test.app", withOnDemandAttribute(true)));
+    assertThat(manifest.isOnDemandModule()).hasValue(true);
 
     AndroidManifest editedManifest =
         manifest.toEditor().setSplitIdForFeatureSplit("feature1").save();
-    assertThat(editedManifest.isOnDemandModule(CURRENT_VERSION)).hasValue(true);
+    assertThat(editedManifest.isOnDemandModule()).hasValue(true);
   }
 
   @Test
@@ -442,28 +439,51 @@ public class ManifestEditorTest {
     AndroidManifest editedManifest =
         androidManifest.toEditor().setFusedModuleNames(ImmutableList.of("base", "feature")).save();
 
-    XmlNode manifestRoot = editedManifest.getManifestRoot().getProto();
-    assertThat(manifestRoot.hasElement()).isTrue();
-    XmlElement manifestElement = manifestRoot.getElement();
-    assertThat(manifestElement.getName()).isEqualTo("manifest");
-    assertThat(manifestElement.getChildCount()).isEqualTo(1);
-    XmlNode applicationNode = manifestElement.getChild(0);
-    assertThat(applicationNode.hasElement()).isTrue();
-    XmlElement applicationElement = applicationNode.getElement();
-    assertThat(applicationElement.getName()).isEqualTo("application");
-    assertThat(applicationElement.getChildCount()).isEqualTo(1);
-    XmlNode metadataNode = applicationElement.getChild(0);
-    assertThat(metadataNode.hasElement()).isTrue();
-    XmlElement metadataElement = metadataNode.getElement();
-    assertThat(metadataElement.getName()).isEqualTo("meta-data");
-    assertThat(metadataElement.getAttributeList())
-        .containsExactly(
-            xmlAttribute(
-                ANDROID_NAMESPACE_URI,
-                "name",
-                NAME_RESOURCE_ID,
-                "com.android.dynamic.apk.fused.modules"),
-            xmlAttribute(ANDROID_NAMESPACE_URI, "value", VALUE_RESOURCE_ID, "base,feature"));
+    assertOnlyMetadataElement(
+        editedManifest,
+        "com.android.dynamic.apk.fused.modules",
+        xmlAttribute(ANDROID_NAMESPACE_URI, "value", VALUE_RESOURCE_ID, "base,feature"));
+  }
+
+  @Test
+  public void setSplitsRequired() throws Exception {
+    AndroidManifest androidManifest =
+        AndroidManifest.create(xmlNode(xmlElement("manifest", xmlNode(xmlElement("application")))));
+
+    AndroidManifest editedManifest = androidManifest.toEditor().setSplitsRequired(true).save();
+
+    assertOnlyMetadataElement(
+        editedManifest,
+        "com.android.vending.splits.required",
+        xmlBooleanAttribute(ANDROID_NAMESPACE_URI, "value", VALUE_RESOURCE_ID, true));
+  }
+
+  @Test
+  public void setSplitsRequired_idempotent() throws Exception {
+    AndroidManifest androidManifest =
+        AndroidManifest.create(xmlNode(xmlElement("manifest", xmlNode(xmlElement("application")))));
+
+    AndroidManifest editedManifest =
+        androidManifest.toEditor().setSplitsRequired(true).setSplitsRequired(true).save();
+
+    assertOnlyMetadataElement(
+        editedManifest,
+        "com.android.vending.splits.required",
+        xmlBooleanAttribute(ANDROID_NAMESPACE_URI, "value", VALUE_RESOURCE_ID, true));
+  }
+
+  @Test
+  public void setSplitsRequired_lastInvocationWins() throws Exception {
+    AndroidManifest androidManifest =
+        AndroidManifest.create(xmlNode(xmlElement("manifest", xmlNode(xmlElement("application")))));
+
+    AndroidManifest editedManifest =
+        androidManifest.toEditor().setSplitsRequired(true).setSplitsRequired(false).save();
+
+    assertOnlyMetadataElement(
+        editedManifest,
+        "com.android.vending.splits.required",
+        xmlBooleanAttribute(ANDROID_NAMESPACE_URI, "value", VALUE_RESOURCE_ID, false));
   }
 
   @Test
@@ -569,5 +589,33 @@ public class ManifestEditorTest {
         androidManifest.toEditor().addMetaDataInteger("hello", 123).save();
 
     assertThat(editedManifest.getMetadataValueAsInteger("hello")).hasValue(123);
+  }
+
+  @Test
+  public void addMetadataResourceReference() {
+    AndroidManifest androidManifest =
+        AndroidManifest.create(xmlNode(xmlElement("manifest", xmlNode(xmlElement("application")))));
+    AndroidManifest editedManifest =
+        androidManifest.toEditor().addMetaDataResourceId("hello", 123).save();
+
+    assertThat(editedManifest.getMetadataResourceId("hello")).hasValue(123);
+  }
+
+  private static void assertOnlyMetadataElement(
+      AndroidManifest manifest, String name, XmlAttribute valueAttr) {
+    XmlNode manifestRoot = manifest.getManifestRoot().getProto();
+    XmlElement manifestElement = manifestRoot.getElement();
+    assertThat(manifestElement.getName()).isEqualTo("manifest");
+    assertThat(manifestElement.getChildCount()).isEqualTo(1);
+    XmlNode applicationNode = manifestElement.getChild(0);
+    XmlElement applicationElement = applicationNode.getElement();
+    assertThat(applicationElement.getName()).isEqualTo("application");
+    assertThat(applicationElement.getChildCount()).isEqualTo(1);
+    XmlNode metadataNode = applicationElement.getChild(0);
+    XmlElement metadataElement = metadataNode.getElement();
+    assertThat(metadataElement.getName()).isEqualTo("meta-data");
+    assertThat(metadataElement.getAttributeList())
+        .containsExactly(
+            xmlAttribute(ANDROID_NAMESPACE_URI, "name", NAME_RESOURCE_ID, name), valueAttr);
   }
 }

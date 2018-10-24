@@ -16,15 +16,36 @@
 
 package com.android.tools.build.bundletool.utils;
 
+import static com.android.tools.build.bundletool.utils.FileNames.TABLE_OF_CONTENTS_FILE;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 
 import com.android.bundle.Commands.ApkDescription;
 import com.android.bundle.Commands.BuildApksResult;
 import com.android.bundle.Commands.Variant;
+import com.android.tools.build.bundletool.utils.files.BufferedIo;
 import com.google.common.collect.ImmutableList;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.UncheckedIOException;
+import java.nio.file.Path;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipFile;
 
 /** Utility class for result objects returned by bundletool commands. */
 public final class ResultUtils {
+
+  public static BuildApksResult readTableOfContents(Path apksArchivePath) {
+    try (ZipFile apksArchive = new ZipFile(apksArchivePath.toFile());
+        InputStream tocStream =
+            BufferedIo.inputStream(apksArchive, new ZipEntry(TABLE_OF_CONTENTS_FILE))) {
+      return BuildApksResult.parseFrom(tocStream);
+    } catch (IOException e) {
+      throw new UncheckedIOException(
+          String.format(
+              "Error while reading the table of contents file from '%s'.", apksArchivePath),
+          e);
+    }
+  }
 
   public static ImmutableList<Variant> splitApkVariants(BuildApksResult result) {
     return result

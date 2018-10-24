@@ -15,16 +15,11 @@
  */
 package com.android.tools.build.bundletool.io;
 
-import static com.android.tools.build.bundletool.model.ModuleSplit.SplitType.INSTANT;
-import static com.android.tools.build.bundletool.model.ModuleSplit.SplitType.SPLIT;
-import static com.android.tools.build.bundletool.model.ModuleSplit.SplitType.STANDALONE;
-import static com.android.tools.build.bundletool.targeting.TargetingComparators.VARIANT_TARGETING_COMPARATOR;
 import static com.android.tools.build.bundletool.utils.CollectorUtils.groupingBySortedKeys;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Predicates.alwaysTrue;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.ImmutableMap.toImmutableMap;
-import static java.util.Comparator.comparing;
 import static java.util.function.Function.identity;
 
 import com.android.bundle.Commands.ApkDescription;
@@ -42,14 +37,14 @@ import com.android.tools.build.bundletool.model.BundleModuleName;
 import com.android.tools.build.bundletool.model.GeneratedApks;
 import com.android.tools.build.bundletool.model.ModuleSplit;
 import com.android.tools.build.bundletool.model.ModuleSplit.SplitType;
+import com.android.tools.build.bundletool.model.VariantKey;
 import com.android.tools.build.bundletool.utils.ConcurrencyUtils;
-import com.google.auto.value.AutoValue;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableListMultimap;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Multimap;
-import com.google.common.collect.Ordering;
 import com.google.common.util.concurrent.ListeningExecutorService;
+import java.util.Map.Entry;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Predicate;
@@ -103,14 +98,13 @@ public class ApkSerializerManager {
             ? new ApkMatcher(deviceSpec.get())::matchesModuleSplitByTargeting
             : alwaysTrue();
 
+    ImmutableListMultimap<VariantKey, ModuleSplit> splitsByVariant =
+        generatedApks.getAllApksGroupedByOrderedVariants();
+
     // Assign the variant numbers to each variant present.
     AtomicInteger variantNumberCounter = new AtomicInteger(firstVariantNumber);
     ImmutableMap<VariantKey, Integer> variantNumberByVariantKey =
-        generatedApks
-            .getAllApksStream()
-            .map(VariantKey::create)
-            .sorted()
-            .distinct()
+        splitsByVariant.keySet().stream()
             .collect(toImmutableMap(identity(), unused -> variantNumberCounter.getAndIncrement()));
 
     // 1. Remove APKs not matching the device spec.
@@ -120,25 +114,22 @@ public class ApkSerializerManager {
 
     // Modifies the APK using APK modifier, then returns a map by extracting the variant
     // of APK first and later clearing out its variant targeting.
-    ImmutableListMultimap<VariantKey, ModuleSplit> splitByVariant =
-        generatedApks
-            .getAllApksStream()
-            .filter(deviceFilter)
-            .map(
-                split -> {
-                  int variantNumber = variantNumberByVariantKey.get(VariantKey.create(split));
-                  return modifyApk(split, variantNumber);
-                })
+
+    ImmutableListMultimap<VariantKey, ModuleSplit> finalSplitsByVariant =
+        splitsByVariant.entries().stream()
+            .filter(keyModuleSplitEntry -> deviceFilter.test(keyModuleSplitEntry.getValue()))
             .collect(
                 groupingBySortedKeys(
-                    VariantKey::create, ApkSerializerManager::clearVariantTargeting));
+                    Entry::getKey,
+                    entry ->
+                        clearVariantTargeting(
+                            modifyApk(
+                                entry.getValue(), variantNumberByVariantKey.get(entry.getKey())))));
 
     // After variant targeting of APKs are cleared, there might be duplicate APKs
     // which are removed and the distinct APKs are then serialized in parallel.
     ImmutableMap<ModuleSplit, ApkDescription> apkDescriptionBySplit =
-        splitByVariant
-            .values()
-            .stream()
+        finalSplitsByVariant.values().stream()
             .distinct()
             .collect(
                 Collectors.collectingAndThen(
@@ -149,16 +140,14 @@ public class ApkSerializerManager {
 
     // Build the result proto.
     ImmutableList.Builder<Variant> variants = ImmutableList.builder();
-    for (VariantKey variantKey : splitByVariant.keySet()) {
+    for (VariantKey variantKey : finalSplitsByVariant.keySet()) {
       Variant.Builder variant =
           Variant.newBuilder()
               .setVariantNumber(variantNumberByVariantKey.get(variantKey))
               .setTargeting(variantKey.getVariantTargeting());
 
       Multimap<BundleModuleName, ModuleSplit> splitsByModuleName =
-          splitByVariant
-              .get(variantKey)
-              .stream()
+          finalSplitsByVariant.get(variantKey).stream()
               .collect(groupingBySortedKeys(ModuleSplit::getModuleName));
 
       for (BundleModuleName moduleName : splitsByModuleName.keySet()) {
@@ -203,32 +192,6 @@ public class ApkSerializerManager {
         .toBuilder()
         .setVariantTargeting(VariantTargeting.getDefaultInstance())
         .build();
-  }
-
-  /**
-   * Key identifying a variant.
-   *
-   * <p>A variant is a set of APKs. One device is guaranteed to receive only APKs from the same
-   * variant.
-   */
-  @AutoValue
-  abstract static class VariantKey implements Comparable<VariantKey> {
-    static VariantKey create(ModuleSplit moduleSplit) {
-      return new AutoValue_ApkSerializerManager_VariantKey(
-          moduleSplit.getSplitType(), moduleSplit.getVariantTargeting());
-    }
-
-    abstract SplitType getSplitType();
-
-    abstract VariantTargeting getVariantTargeting();
-
-    @Override
-    public int compareTo(VariantKey o) {
-      // Instant APKs get the lowest variant numbers followed by standalone and then split APKs.
-      return comparing(VariantKey::getSplitType, Ordering.explicit(INSTANT, STANDALONE, SPLIT))
-          .thenComparing(VariantKey::getVariantTargeting, VARIANT_TARGETING_COMPARATOR)
-          .compare(this, o);
-    }
   }
 
   private final class ApkSerializer {

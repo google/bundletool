@@ -16,6 +16,7 @@
 
 package com.android.tools.build.bundletool.testing.truth.zip;
 
+import static com.android.tools.build.bundletool.testing.DateTimeConverter.fromLocalTimeToUtc;
 import static com.google.common.truth.Truth.assertWithMessage;
 
 import com.google.common.io.ByteStreams;
@@ -36,7 +37,7 @@ public class ZipEntrySubject extends Subject<ZipEntrySubject, ZipEntry> {
    *
    * <p>For reference see {@link java.util.zip.ZipUtils#extendedDosToJavaTime(long)}.
    */
-  private static final long EXTENDED_DOS_TIME_EPOCH_START_TIMESTAMP = 312796800000L;
+  private static final long EXTENDED_DOS_TIME_EPOCH_START_TIMESTAMP = 312768000000L;
 
   private InputStream zip;
 
@@ -86,7 +87,7 @@ public class ZipEntrySubject extends Subject<ZipEntrySubject, ZipEntry> {
         .isNull();
     // Zip files internally use extended DOS time.
     assertWithMessage("File \"%s\" in zip file does not have the expected time", actual())
-        .that(actual().getTime())
+        .that(fromLocalTimeToUtc(actual().getTime()))
         .isEqualTo(EXTENDED_DOS_TIME_EPOCH_START_TIMESTAMP);
     return this;
   }

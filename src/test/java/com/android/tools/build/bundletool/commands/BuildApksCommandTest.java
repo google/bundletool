@@ -34,6 +34,7 @@ import com.android.tools.build.bundletool.model.SigningConfiguration;
 import com.android.tools.build.bundletool.testing.Aapt2Helper;
 import com.android.tools.build.bundletool.testing.CertificateFactory;
 import com.android.tools.build.bundletool.testing.FakeAndroidHomeVariableProvider;
+import com.android.tools.build.bundletool.testing.FakeAndroidSerialVariableProvider;
 import com.android.tools.build.bundletool.utils.EnvironmentVariableProvider;
 import com.android.tools.build.bundletool.utils.flags.FlagParser;
 import com.android.tools.build.bundletool.utils.flags.FlagParser.FlagParseException;
@@ -65,6 +66,9 @@ public class BuildApksCommandTest {
   private static final String KEYSTORE_PASSWORD = "keystore-password";
   private static final String KEY_PASSWORD = "key-password";
   private static final String KEY_ALIAS = "key-alias";
+  private static final Path ADB_PATH =
+      Paths.get("third_party/java/android/android_sdk_linux/platform-tools/adb.static");
+  private static final String DEVICE_ID = "id1";
 
   @Rule public final TemporaryFolder tmp = new TemporaryFolder();
 
@@ -80,6 +84,8 @@ public class BuildApksCommandTest {
   private final AdbServer fakeAdbServer = mock(AdbServer.class);
   private final EnvironmentVariableProvider androidHomeProvider =
       new FakeAndroidHomeVariableProvider("/android/home");
+  private final EnvironmentVariableProvider androidSerialProvider =
+      new FakeAndroidSerialVariableProvider(DEVICE_ID);
 
   @BeforeClass
   public static void setUpClass() throws Exception {
@@ -240,6 +246,70 @@ public class BuildApksCommandTest {
             .setOutputFile(outputFilePath)
             // Optional values.
             .setOverwriteOutput(true)
+            // Must copy instance of the internal executor service.
+            .setAapt2Command(commandViaFlags.getAapt2Command().get())
+            .setExecutorServiceInternal(commandViaFlags.getExecutorService())
+            .setExecutorServiceCreatedByBundleTool(true)
+            .build();
+
+    assertThat(commandViaBuilder).isEqualTo(commandViaFlags);
+  }
+
+  @Test
+  public void buildingViaFlagsAndBuilderHasSameResult_deviceId() throws Exception {
+    BuildApksCommand commandViaFlags =
+        BuildApksCommand.fromFlags(
+            new FlagParser()
+                .parse(
+                    "--bundle=" + bundlePath,
+                    "--output=" + outputFilePath,
+                    "--device-id=" + DEVICE_ID,
+                    "--connected-device",
+                    "--adb=" + ADB_PATH,
+                    "--aapt2=" + AAPT2_PATH),
+            fakeAdbServer);
+
+    BuildApksCommand commandViaBuilder =
+        BuildApksCommand.builder()
+            .setBundlePath(bundlePath)
+            .setOutputFile(outputFilePath)
+            .setDeviceId(DEVICE_ID)
+            .setGenerateOnlyForConnectedDevice(true)
+            .setAdbPath(ADB_PATH)
+            .setAdbServer(fakeAdbServer)
+            // Must copy instance of the internal executor service.
+            .setAapt2Command(commandViaFlags.getAapt2Command().get())
+            .setExecutorServiceInternal(commandViaFlags.getExecutorService())
+            .setExecutorServiceCreatedByBundleTool(true)
+            .build();
+
+    assertThat(commandViaBuilder).isEqualTo(commandViaFlags);
+  }
+
+  @Test
+  public void buildingViaFlagsAndBuilderHasSameResult_androidSerialVariable() throws Exception {
+    ByteArrayOutputStream output = new ByteArrayOutputStream();
+    BuildApksCommand commandViaFlags =
+        BuildApksCommand.fromFlags(
+            new FlagParser()
+                .parse(
+                    "--bundle=" + bundlePath,
+                    "--output=" + outputFilePath,
+                    "--connected-device",
+                    "--adb=" + ADB_PATH,
+                    "--aapt2=" + AAPT2_PATH),
+            new PrintStream(output),
+            androidSerialProvider,
+            fakeAdbServer);
+
+    BuildApksCommand commandViaBuilder =
+        BuildApksCommand.builder()
+            .setBundlePath(bundlePath)
+            .setOutputFile(outputFilePath)
+            .setDeviceId(DEVICE_ID)
+            .setGenerateOnlyForConnectedDevice(true)
+            .setAdbPath(ADB_PATH)
+            .setAdbServer(fakeAdbServer)
             // Must copy instance of the internal executor service.
             .setAapt2Command(commandViaFlags.getAapt2Command().get())
             .setExecutorServiceInternal(commandViaFlags.getExecutorService())

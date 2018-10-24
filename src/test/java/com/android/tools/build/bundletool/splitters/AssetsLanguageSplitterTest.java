@@ -16,7 +16,9 @@
 
 package com.android.tools.build.bundletool.splitters;
 
+import static com.android.tools.build.bundletool.model.ManifestMutator.withSplitsRequired;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifest;
+import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.compareManifestMutators;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.alternativeLanguageTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.apkAlternativeLanguageTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.apkLanguageTargeting;
@@ -28,6 +30,7 @@ import static com.android.tools.build.bundletool.testing.TargetingUtils.lPlusVar
 import static com.android.tools.build.bundletool.testing.TargetingUtils.languageTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.targetedAssetsDirectory;
 import static com.android.tools.build.bundletool.testing.TestUtils.extractPaths;
+import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.ImmutableSet.toImmutableSet;
 import static com.google.common.truth.Truth.assertThat;
 import static com.google.common.truth.extensions.proto.ProtoTruth.assertThat;
@@ -37,6 +40,8 @@ import com.android.bundle.Targeting.AssetsDirectoryTargeting;
 import com.android.tools.build.bundletool.model.BundleModule;
 import com.android.tools.build.bundletool.model.ModuleSplit;
 import com.android.tools.build.bundletool.testing.BundleModuleBuilder;
+import com.google.common.collect.ImmutableCollection;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
 import java.util.Collection;
 import org.junit.Test;
@@ -189,6 +194,58 @@ public class AssetsLanguageSplitterTest {
         assetsSplits, apkLanguageTargeting("en"), "assets/different#lang_en/strings.pak");
     verifySplitFor(
         assetsSplits, apkAlternativeLanguageTargeting("en", "jp"), "assets/different/strings.pak");
+  }
+
+  @Test
+  public void manifestMutatorToRequireSplits_notRegistered_whenNoLanguageSpecificAssets()
+      throws Exception {
+    BundleModule testModule =
+        new BundleModuleBuilder("testModule")
+            .addFile("assets/other/strings.pak")
+            .setAssetsConfig(
+                assets(
+                    targetedAssetsDirectory(
+                        "assets/other", AssetsDirectoryTargeting.getDefaultInstance())))
+            .setManifest(androidManifest("com.test.app"))
+            .build();
+    ModuleSplit baseSplit = ModuleSplit.forAssets(testModule);
+
+    ImmutableCollection<ModuleSplit> assetsSplits =
+        LanguageAssetsSplitter.create().split(baseSplit);
+
+    assertThat(assetsSplits).hasSize(1);
+    assertThat(assetsSplits.asList().get(0).getMasterManifestMutators()).isEmpty();
+  }
+
+  @Test
+  public void manifestMutatorToRequireSplits_registered_whenLanguageSpecificAssetsPresent()
+      throws Exception {
+    BundleModule testModule =
+        new BundleModuleBuilder("testModule")
+            .addFile("assets/i18n#lang_jp/strings.pak")
+            .addFile("assets/other/strings.pak")
+            .setAssetsConfig(
+                assets(
+                    targetedAssetsDirectory(
+                        "assets/i18n#lang_jp", assetsDirectoryTargeting(languageTargeting("jp"))),
+                    targetedAssetsDirectory(
+                        "assets/other", AssetsDirectoryTargeting.getDefaultInstance())))
+            .setManifest(androidManifest("com.test.app"))
+            .build();
+    ModuleSplit baseSplit = ModuleSplit.forAssets(testModule);
+
+    Collection<ModuleSplit> assetsSplits = LanguageAssetsSplitter.create().split(baseSplit);
+
+    ImmutableList<ModuleSplit> configSplits =
+        assetsSplits.stream().filter(split -> !split.isMasterSplit()).collect(toImmutableList());
+
+    assertThat(configSplits).isNotEmpty();
+    for (ModuleSplit configSplit : configSplits) {
+      assertThat(
+              compareManifestMutators(
+                  configSplit.getMasterManifestMutators(), withSplitsRequired(true)))
+          .isTrue();
+    }
   }
 
   private void verifySplitFor(

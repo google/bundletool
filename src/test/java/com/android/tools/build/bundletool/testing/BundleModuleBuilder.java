@@ -25,6 +25,7 @@ import com.android.bundle.Files.Assets;
 import com.android.bundle.Files.NativeLibraries;
 import com.android.tools.build.bundletool.model.BundleModule;
 import com.android.tools.build.bundletool.model.BundleModuleName;
+import com.android.tools.build.bundletool.model.InMemoryModuleEntry;
 import com.android.tools.build.bundletool.model.ModuleEntry;
 import com.android.tools.build.bundletool.utils.xmlproto.XmlProtoNode;
 import com.android.tools.build.bundletool.utils.xmlproto.XmlProtoNodeBuilder;

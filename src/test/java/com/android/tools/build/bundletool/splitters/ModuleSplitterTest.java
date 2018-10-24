@@ -20,7 +20,7 @@ import static com.android.bundle.Targeting.TextureCompressionFormat.TextureCompr
 import static com.android.bundle.Targeting.TextureCompressionFormat.TextureCompressionFormatAlias.ETC1_RGB8;
 import static com.android.bundle.Targeting.TextureCompressionFormat.TextureCompressionFormatAlias.S3TC;
 import static com.android.tools.build.bundletool.model.AndroidManifest.ACTIVITY_ELEMENT_NAME;
-import static com.android.tools.build.bundletool.model.AndroidManifest.ANDROID_NAMESPACE;
+import static com.android.tools.build.bundletool.model.AndroidManifest.ANDROID_NAMESPACE_URI;
 import static com.android.tools.build.bundletool.model.AndroidManifest.NAME_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.SPLIT_NAME_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.ManifestMutator.withExtractNativeLibs;
@@ -30,6 +30,7 @@ import static com.android.tools.build.bundletool.model.OptimizationDimension.SCR
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifest;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withInstant;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withMaxSdkVersion;
+import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withMinSdkVersion;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withSplitNameActivity;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.xmlAttribute;
 import static com.android.tools.build.bundletool.testing.ModuleSplitUtils.applyManifestMutators;
@@ -64,14 +65,15 @@ import static com.android.tools.build.bundletool.testing.TargetingUtils.nativeDi
 import static com.android.tools.build.bundletool.testing.TargetingUtils.nativeLibraries;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.openGlVersionFrom;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.openGlVersionTargeting;
-import static com.android.tools.build.bundletool.testing.TargetingUtils.sdkVersionFrom;
-import static com.android.tools.build.bundletool.testing.TargetingUtils.sdkVersionTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.targetedAssetsDirectory;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.targetedNativeDirectory;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.textureCompressionTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.variantMinSdkTargeting;
 import static com.android.tools.build.bundletool.testing.TestUtils.extractPaths;
 import static com.android.tools.build.bundletool.testing.truth.resources.TruthResourceTable.assertThat;
+import static com.android.tools.build.bundletool.utils.Versions.ANDROID_L_API_VERSION;
+import static com.android.tools.build.bundletool.utils.Versions.ANDROID_M_API_VERSION;
+import static com.android.tools.build.bundletool.utils.Versions.ANDROID_P_API_VERSION;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.ImmutableSet.toImmutableSet;
 import static com.google.common.truth.Truth.assertThat;
@@ -91,7 +93,6 @@ import com.android.bundle.Targeting.Abi.AbiAlias;
 import com.android.bundle.Targeting.ApkTargeting;
 import com.android.bundle.Targeting.AssetsDirectoryTargeting;
 import com.android.bundle.Targeting.ScreenDensity.DensityAlias;
-import com.android.bundle.Targeting.SdkVersion;
 import com.android.bundle.Targeting.VariantTargeting;
 import com.android.tools.build.bundletool.exceptions.CommandExecutionException;
 import com.android.tools.build.bundletool.model.AndroidManifest;
@@ -103,13 +104,13 @@ import com.android.tools.build.bundletool.model.ModuleSplit.SplitType;
 import com.android.tools.build.bundletool.model.OptimizationDimension;
 import com.android.tools.build.bundletool.model.ZipPath;
 import com.android.tools.build.bundletool.testing.BundleModuleBuilder;
-import com.android.tools.build.bundletool.utils.Versions;
 import com.android.tools.build.bundletool.utils.xmlproto.XmlProtoElement;
 import com.android.tools.build.bundletool.version.BundleToolVersion;
 import com.android.tools.build.bundletool.version.Version;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.Iterables;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 import java.util.List;
@@ -135,7 +136,7 @@ public class ModuleSplitterTest {
         new BundleModuleBuilder("testModule").setManifest(androidManifest("com.test.app")).build();
 
     ImmutableList<ModuleSplit> moduleSplits =
-        new ModuleSplitter(bundleModule, ImmutableSet.of(), BUNDLETOOL_VERSION).splitModule();
+        new ModuleSplitter(bundleModule, BUNDLETOOL_VERSION).splitModule();
 
     assertThat(moduleSplits).hasSize(1);
     ModuleSplit masterSplit = moduleSplits.get(0);
@@ -723,7 +724,8 @@ public class ModuleSplitterTest {
   }
 
   @Test
-  public void nativeSplits_withAbiAndUncompressNativeLibsSplitter() throws Exception {
+  public void nativeSplits_lPlusTargeting_withAbiAndUncompressNativeLibsSplitter()
+      throws Exception {
     NativeLibraries nativeConfig =
         nativeLibraries(targetedNativeDirectory("lib/x86", nativeDirectoryTargeting("x86")));
     BundleModule testModule =
@@ -734,22 +736,65 @@ public class ModuleSplitterTest {
             .build();
 
     ModuleSplitter moduleSplitter =
-        new ModuleSplitter(testModule, ImmutableSet.of(ABI), BUNDLETOOL_VERSION);
+        new ModuleSplitter(
+            testModule,
+            BUNDLETOOL_VERSION,
+            ApkGenerationConfiguration.builder()
+                .setOptimizationDimensions(ImmutableSet.of(ABI))
+                .setEnableNativeLibraryCompressionSplitter(true)
+                .build(),
+            lPlusVariantTargeting());
 
-    moduleSplitter.setEnableNativeLibraryCompressionSplitter(true);
     List<ModuleSplit> splits = moduleSplitter.splitModule();
+    // Base + X86 Split
+    assertThat(splits).hasSize(2);
     assertThat(splits.stream().map(ModuleSplit::getSplitType).distinct().collect(toImmutableSet()))
         .containsExactly(SplitType.SPLIT);
-    SdkVersion lSdkVersion = sdkVersionFrom(Versions.ANDROID_L_API_VERSION);
-    SdkVersion mSdkVersion = sdkVersionFrom(Versions.ANDROID_M_API_VERSION);
-    assertThat(
-            splits.stream()
-                .map(split -> split.getVariantTargeting().getSdkVersionTargeting())
-                .distinct()
-                .collect(toImmutableSet()))
-        .containsExactly(
-            sdkVersionTargeting(lSdkVersion, ImmutableSet.of(mSdkVersion)),
-            sdkVersionTargeting(mSdkVersion, ImmutableSet.of(lSdkVersion)));
+    assertThat(splits.stream().map(split -> split.getVariantTargeting()).collect(toImmutableSet()))
+        .containsExactly(variantMinSdkTargeting(ANDROID_L_API_VERSION));
+    ModuleSplit x86Split =
+        splits.stream()
+            .filter(split -> split.getApkTargeting().hasAbiTargeting())
+            .findFirst()
+            .get();
+    assertThat(x86Split.findEntry("lib/x86/liba.so").get().shouldCompress()).isTrue();
+  }
+
+  @Test
+  public void nativeSplits_mPlusTargeting_withAbiAndUncompressNativeLibsSplitter()
+      throws Exception {
+    NativeLibraries nativeConfig =
+        nativeLibraries(targetedNativeDirectory("lib/x86", nativeDirectoryTargeting("x86")));
+    BundleModule testModule =
+        new BundleModuleBuilder("testModule")
+            .setManifest(androidManifest("com.test.app"))
+            .setNativeConfig(nativeConfig)
+            .addFile("lib/x86/liba.so")
+            .build();
+
+    ModuleSplitter moduleSplitter =
+        new ModuleSplitter(
+            testModule,
+            BUNDLETOOL_VERSION,
+            ApkGenerationConfiguration.builder()
+                .setOptimizationDimensions(ImmutableSet.of(ABI))
+                .setEnableNativeLibraryCompressionSplitter(true)
+                .build(),
+            variantMinSdkTargeting(ANDROID_M_API_VERSION));
+
+    List<ModuleSplit> splits = moduleSplitter.splitModule();
+    // Base + X86 Split
+    assertThat(splits).hasSize(2);
+    assertThat(splits.stream().map(ModuleSplit::getSplitType).distinct().collect(toImmutableSet()))
+        .containsExactly(SplitType.SPLIT);
+    assertThat(splits.stream().map(split -> split.getVariantTargeting()).collect(toImmutableSet()))
+        .containsExactly(variantMinSdkTargeting(ANDROID_M_API_VERSION));
+    ModuleSplit x86Split =
+        splits.stream()
+            .filter(split -> split.getApkTargeting().hasAbiTargeting())
+            .findFirst()
+            .get();
+    assertThat(x86Split.findEntry("lib/x86/liba.so").get().shouldCompress()).isFalse();
   }
 
   @Test
@@ -788,6 +833,54 @@ public class ModuleSplitterTest {
     ImmutableSet<String> expectedFiles =
         ImmutableSet.of("dex/classes.dex", "assets/some_asset.txt", "root/some_other_file.txt");
     assertThat(actualFiles).containsAllIn(expectedFiles);
+  }
+
+  @Test
+  public void nativeSplits_pPlusTargeting_withDexCompressionSplitter() throws Exception {
+    BundleModule testModule =
+        new BundleModuleBuilder("testModule")
+            .addFile("dex/classes.dex")
+            .setManifest(androidManifest("com.test.app"))
+            .build();
+
+    ModuleSplitter moduleSplitter =
+        new ModuleSplitter(
+            testModule,
+            BUNDLETOOL_VERSION,
+            ApkGenerationConfiguration.builder().setEnableDexCompressionSplitter(true).build(),
+            variantMinSdkTargeting(ANDROID_P_API_VERSION));
+
+    List<ModuleSplit> splits = moduleSplitter.splitModule();
+    assertThat(splits).hasSize(1);
+    ModuleSplit moduleSplit = Iterables.getOnlyElement(splits);
+    assertThat(moduleSplit.getSplitType()).isEqualTo(SplitType.SPLIT);
+    assertThat(moduleSplit.getVariantTargeting())
+        .isEqualTo(variantMinSdkTargeting(ANDROID_P_API_VERSION));
+    assertThat(moduleSplit.findEntry("dex/classes.dex").get().shouldCompress()).isFalse();
+  }
+
+  @Test
+  public void nativeSplits_lPlusTargeting_withDexCompressionSplitter() throws Exception {
+    BundleModule testModule =
+        new BundleModuleBuilder("testModule")
+            .addFile("dex/classes.dex")
+            .setManifest(androidManifest("com.test.app"))
+            .build();
+
+    ModuleSplitter moduleSplitter =
+        new ModuleSplitter(
+            testModule,
+            BUNDLETOOL_VERSION,
+            ApkGenerationConfiguration.builder().setEnableDexCompressionSplitter(true).build(),
+            lPlusVariantTargeting());
+
+    List<ModuleSplit> splits = moduleSplitter.splitModule();
+    assertThat(splits).hasSize(1);
+    ModuleSplit moduleSplit = Iterables.getOnlyElement(splits);
+    assertThat(moduleSplit.getSplitType()).isEqualTo(SplitType.SPLIT);
+    assertThat(moduleSplit.getVariantTargeting())
+        .isEqualTo(variantMinSdkTargeting(ANDROID_L_API_VERSION));
+    assertThat(moduleSplit.findEntry("dex/classes.dex").get().shouldCompress()).isTrue();
   }
 
   @Test
@@ -939,9 +1032,7 @@ public class ModuleSplitterTest {
     CommandExecutionException exception =
         assertThrows(
             CommandExecutionException.class,
-            () ->
-                new ModuleSplitter(bundleModule, ImmutableSet.of(), BUNDLETOOL_VERSION)
-                    .splitModule());
+            () -> new ModuleSplitter(bundleModule, BUNDLETOOL_VERSION).splitModule());
 
     assertThat(exception)
         .hasMessageThat()
@@ -978,8 +1069,7 @@ public class ModuleSplitterTest {
     BundleModule bundleModule =
         new BundleModuleBuilder("base").setManifest(androidManifest("com.test.app")).build();
 
-    ModuleSplitter moduleSplitter =
-        new ModuleSplitter(bundleModule, ImmutableSet.of(), BUNDLETOOL_VERSION);
+    ModuleSplitter moduleSplitter = new ModuleSplitter(bundleModule, BUNDLETOOL_VERSION);
     assetsSplit1 = moduleSplitter.writeSplitIdInManifest(assetsSplit1);
     assetsSplit2 = moduleSplitter.writeSplitIdInManifest(assetsSplit2);
 
@@ -1017,8 +1107,7 @@ public class ModuleSplitterTest {
     BundleModule bundleModule =
         new BundleModuleBuilder("base").setManifest(androidManifest("com.test.app")).build();
 
-    ModuleSplitter moduleSplitter =
-        new ModuleSplitter(bundleModule, ImmutableSet.of(), BUNDLETOOL_VERSION);
+    ModuleSplitter moduleSplitter = new ModuleSplitter(bundleModule, BUNDLETOOL_VERSION);
     assetsSplit1 = moduleSplitter.writeSplitIdInManifest(assetsSplit1);
     assetsSplit2 = moduleSplitter.writeSplitIdInManifest(assetsSplit2);
 
@@ -1032,33 +1121,7 @@ public class ModuleSplitterTest {
     BundleModule bundleModule = new BundleModuleBuilder("testModule").setManifest(manifest).build();
 
     ImmutableList<ModuleSplit> moduleSplits =
-        new ModuleSplitter(bundleModule, ImmutableSet.of(), BUNDLETOOL_VERSION).splitModule();
-
-    assertThat(moduleSplits).hasSize(1);
-    ModuleSplit masterSplit = moduleSplits.get(0);
-    ImmutableList<XmlElement> activities =
-        masterSplit
-            .getAndroidManifest()
-            .getManifestRoot()
-            .getElement()
-            .getChildElement("application")
-            .getChildrenElements(ACTIVITY_ELEMENT_NAME)
-            .map(XmlProtoElement::getProto)
-            .collect(toImmutableList());
-    assertThat(activities).hasSize(2);
-    XmlElement activityElement = activities.get(1);
-    assertThat(activityElement.getAttributeList())
-        .containsExactly(xmlAttribute(ANDROID_NAMESPACE, "name", NAME_RESOURCE_ID, "FooActivity"));
-  }
-
-  @Test
-  public void splitNameNotRemovedforInstantSplit() throws Exception {
-    XmlNode manifest = androidManifest("com.test.app", withSplitNameActivity("FooActivity", "foo"));
-    BundleModule bundleModule = new BundleModuleBuilder("testModule").setManifest(manifest).build();
-
-    ImmutableList<ModuleSplit> moduleSplits =
-        new ModuleSplitter(bundleModule, ImmutableSet.of(), BUNDLETOOL_VERSION)
-            .splitInstantModule();
+        new ModuleSplitter(bundleModule, BUNDLETOOL_VERSION).splitModule();
 
     assertThat(moduleSplits).hasSize(1);
     ModuleSplit masterSplit = moduleSplits.get(0);
@@ -1075,20 +1138,55 @@ public class ModuleSplitterTest {
     XmlElement activityElement = activities.get(1);
     assertThat(activityElement.getAttributeList())
         .containsExactly(
-            xmlAttribute(ANDROID_NAMESPACE, "name", NAME_RESOURCE_ID, "FooActivity"),
-            xmlAttribute(ANDROID_NAMESPACE, "splitName", SPLIT_NAME_RESOURCE_ID, "foo"));
+            xmlAttribute(ANDROID_NAMESPACE_URI, "name", NAME_RESOURCE_ID, "FooActivity"));
   }
 
   @Test
-  public void targetSandboxVersionInInstant_getsSetTo2() throws Exception {
+  public void splitNameNotRemovedforInstantSplit() throws Exception {
+    XmlNode manifest = androidManifest("com.test.app", withSplitNameActivity("FooActivity", "foo"));
+    BundleModule bundleModule = new BundleModuleBuilder("testModule").setManifest(manifest).build();
+
+    ImmutableList<ModuleSplit> moduleSplits =
+        new ModuleSplitter(
+                bundleModule,
+                BUNDLETOOL_VERSION,
+                ApkGenerationConfiguration.builder().setForInstantAppVariants(true).build(),
+                lPlusVariantTargeting())
+            .splitModule();
+
+    assertThat(moduleSplits).hasSize(1);
+    ModuleSplit masterSplit = moduleSplits.get(0);
+    ImmutableList<XmlElement> activities =
+        masterSplit
+            .getAndroidManifest()
+            .getManifestRoot()
+            .getElement()
+            .getChildElement("application")
+            .getChildrenElements(ACTIVITY_ELEMENT_NAME)
+            .map(XmlProtoElement::getProto)
+            .collect(toImmutableList());
+    assertThat(activities).hasSize(2);
+    XmlElement activityElement = activities.get(1);
+    assertThat(activityElement.getAttributeList())
+        .containsExactly(
+            xmlAttribute(ANDROID_NAMESPACE_URI, "name", NAME_RESOURCE_ID, "FooActivity"),
+            xmlAttribute(ANDROID_NAMESPACE_URI, "splitName", SPLIT_NAME_RESOURCE_ID, "foo"));
+  }
+
+  @Test
+  public void instantManifestChanges_addsMinSdkVersion() throws Exception {
     BundleModule bundleModule =
         new BundleModuleBuilder("testModule")
             .setManifest(androidManifest("com.test.app", withInstant(true)))
             .build();
 
     ImmutableList<ModuleSplit> moduleSplits =
-        new ModuleSplitter(bundleModule, ImmutableSet.of(), BUNDLETOOL_VERSION)
-            .splitInstantModule();
+        new ModuleSplitter(
+                bundleModule,
+                BUNDLETOOL_VERSION,
+                ApkGenerationConfiguration.builder().setForInstantAppVariants(true).build(),
+                lPlusVariantTargeting())
+            .splitModule();
 
     assertThat(moduleSplits).hasSize(1);
     ModuleSplit masterSplit = moduleSplits.get(0);
@@ -1097,6 +1195,57 @@ public class ModuleSplitterTest {
     assertThat(masterSplit.getApkTargeting()).isEqualTo(apkMinSdkTargeting(21));
     assertThat(masterSplit.getSplitType()).isEqualTo(SplitType.INSTANT);
     assertThat(masterSplit.getAndroidManifest().getTargetSandboxVersion()).hasValue(2);
+    assertThat(masterSplit.getAndroidManifest().getMinSdkVersion()).hasValue(21);
+  }
+
+  @Test
+  public void instantManifestChanges_keepsMinSdkVersion() throws Exception {
+    BundleModule bundleModule =
+        new BundleModuleBuilder("testModule")
+            .setManifest(androidManifest("com.test.app", withMinSdkVersion(22), withInstant(true)))
+            .build();
+
+    ImmutableList<ModuleSplit> moduleSplits =
+        new ModuleSplitter(
+                bundleModule,
+                BUNDLETOOL_VERSION,
+                ApkGenerationConfiguration.builder().setForInstantAppVariants(true).build(),
+                lPlusVariantTargeting())
+            .splitModule();
+
+    assertThat(moduleSplits).hasSize(1);
+    ModuleSplit masterSplit = moduleSplits.get(0);
+    assertThat(masterSplit.getVariantTargeting()).isEqualTo(lPlusVariantTargeting());
+    assertThat(masterSplit.isMasterSplit()).isTrue();
+    assertThat(masterSplit.getApkTargeting()).isEqualTo(apkMinSdkTargeting(21));
+    assertThat(masterSplit.getSplitType()).isEqualTo(SplitType.INSTANT);
+    assertThat(masterSplit.getAndroidManifest().getTargetSandboxVersion()).hasValue(2);
+    assertThat(masterSplit.getAndroidManifest().getMinSdkVersion()).hasValue(22);
+  }
+
+  @Test
+  public void instantManifestChanges_updatesMinSdkVersion() throws Exception {
+    BundleModule bundleModule =
+        new BundleModuleBuilder("testModule")
+            .setManifest(androidManifest("com.test.app", withMinSdkVersion(19), withInstant(true)))
+            .build();
+
+    ImmutableList<ModuleSplit> moduleSplits =
+        new ModuleSplitter(
+                bundleModule,
+                BUNDLETOOL_VERSION,
+                ApkGenerationConfiguration.builder().setForInstantAppVariants(true).build(),
+                lPlusVariantTargeting())
+            .splitModule();
+
+    assertThat(moduleSplits).hasSize(1);
+    ModuleSplit masterSplit = moduleSplits.get(0);
+    assertThat(masterSplit.getVariantTargeting()).isEqualTo(lPlusVariantTargeting());
+    assertThat(masterSplit.isMasterSplit()).isTrue();
+    assertThat(masterSplit.getApkTargeting()).isEqualTo(apkMinSdkTargeting(21));
+    assertThat(masterSplit.getSplitType()).isEqualTo(SplitType.INSTANT);
+    assertThat(masterSplit.getAndroidManifest().getTargetSandboxVersion()).hasValue(2);
+    assertThat(masterSplit.getAndroidManifest().getMinSdkVersion()).hasValue(21);
   }
 
   @Test
@@ -1109,7 +1258,7 @@ public class ModuleSplitterTest {
             .setMasterSplit(false)
             .setApkTargeting(apkAbiTargeting(AbiAlias.X86))
             .setVariantTargeting(lPlusVariantTargeting())
-            .setMasterManifestMutators(ImmutableList.of(withExtractNativeLibs(true)))
+            .addMasterManifestMutator(withExtractNativeLibs(true))
             .build();
 
     ImmutableList<ModuleSplit> moduleSplits =
@@ -1135,8 +1284,8 @@ public class ModuleSplitterTest {
         createModuleSplitBuilder()
             .setMasterSplit(false)
             .setApkTargeting(apkAbiTargeting(AbiAlias.X86))
-            .setVariantTargeting(variantMinSdkTargeting(Versions.ANDROID_M_API_VERSION))
-            .setMasterManifestMutators(ImmutableList.of(withExtractNativeLibs(true)))
+            .setVariantTargeting(variantMinSdkTargeting(ANDROID_M_API_VERSION))
+            .addMasterManifestMutator(withExtractNativeLibs(true))
             .build();
 
     Throwable exception =
@@ -1164,11 +1313,25 @@ public class ModuleSplitterTest {
   }
 
   private static ModuleSplitter createAbiAndDensitySplitter(BundleModule module) {
-    return new ModuleSplitter(module, ImmutableSet.of(ABI, SCREEN_DENSITY), BUNDLETOOL_VERSION);
+    return new ModuleSplitter(
+        module,
+        BUNDLETOOL_VERSION,
+        withOptimizationDimensions(ImmutableSet.of(ABI, SCREEN_DENSITY)),
+        lPlusVariantTargeting());
   }
 
   private static ModuleSplitter createAbiDensityAndLanguageSplitter(BundleModule module) {
     return new ModuleSplitter(
-        module, ImmutableSet.of(ABI, SCREEN_DENSITY, LANGUAGE), BUNDLETOOL_VERSION);
+        module,
+        BUNDLETOOL_VERSION,
+        withOptimizationDimensions(ImmutableSet.of(ABI, SCREEN_DENSITY, LANGUAGE)),
+        lPlusVariantTargeting());
+  }
+
+  private static ApkGenerationConfiguration withOptimizationDimensions(
+      ImmutableSet<OptimizationDimension> optimizationDimensions) {
+    return ApkGenerationConfiguration.builder()
+        .setOptimizationDimensions(optimizationDimensions)
+        .build();
   }
 }

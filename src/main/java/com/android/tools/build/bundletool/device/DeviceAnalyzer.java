@@ -20,6 +20,7 @@ import static com.google.common.base.Preconditions.checkState;
 
 import com.android.bundle.Devices.DeviceSpec;
 import com.android.ddmlib.IDevice.DeviceState;
+import com.android.tools.build.bundletool.device.activitymanager.ActivityManagerRunner;
 import com.android.tools.build.bundletool.exceptions.CommandExecutionException;
 import com.android.tools.build.bundletool.utils.Versions;
 import com.google.common.collect.ImmutableList;
@@ -56,14 +57,27 @@ public class DeviceAnalyzer {
       checkState(deviceSdkVersion > 1, "Error retrieving device SDK version. Please try again.");
       int deviceDensity = device.getDensity();
       checkState(deviceDensity > 0, "Error retrieving device density. Please try again.");
-      ImmutableList<String> supportedAbis = device.getAbis();
+      ImmutableList<String> deviceFeatures = device.getDeviceFeatures();
+
+      ActivityManagerRunner activityManagerRunner = new ActivityManagerRunner(device);
+      ImmutableList<String> deviceLocales = activityManagerRunner.getDeviceLocales();
+      if (deviceLocales.isEmpty()) {
+        // Fallback using properties.
+        deviceLocales = ImmutableList.of(getMainLocaleViaProperties(device));
+      }
+      ImmutableList<String> supportedAbis = activityManagerRunner.getDeviceAbis();
+      if (supportedAbis.isEmpty()) {
+        // Fallback using properties.
+        supportedAbis = device.getAbis();
+      }
       checkState(!supportedAbis.isEmpty(), "Error retrieving device ABIs. Please try again.");
 
       return DeviceSpec.newBuilder()
           .setSdkVersion(deviceSdkVersion)
           .addAllSupportedAbis(supportedAbis)
-          .addSupportedLocales(getMainLocale(device))
+          .addAllSupportedLocales(deviceLocales)
           .setScreenDensity(deviceDensity)
+          .addAllDeviceFeatures(deviceFeatures)
           .build();
     } catch (TimeoutException e) {
       throw CommandExecutionException.builder()
@@ -73,7 +87,7 @@ public class DeviceAnalyzer {
     }
   }
 
-  private String getMainLocale(Device device) {
+  private String getMainLocaleViaProperties(Device device) {
     Optional<String> locale = Optional.empty();
 
     int apiLevel = device.getVersion().getApiLevel();

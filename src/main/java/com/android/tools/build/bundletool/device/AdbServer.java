@@ -28,7 +28,7 @@ import java.util.concurrent.TimeoutException;
 /** Manages the BundleTool-Ddmlib interactions. Represents ADB bridge connection. */
 public abstract class AdbServer implements Closeable {
 
-  private static final int ADB_TIMEOUT_MS = 60000;
+  public static final int ADB_TIMEOUT_MS = 60000;
 
   public abstract void init(Path pathToAdb);
 

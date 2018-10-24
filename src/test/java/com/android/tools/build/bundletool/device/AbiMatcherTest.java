@@ -53,11 +53,11 @@ public class AbiMatcherTest {
     assertThrows(
         CommandExecutionException.class,
         () ->
-            abiMatcher.matchesTargeting(
+            abiMatcher.checkDeviceCompatible(
                 abiTargeting(AbiAlias.ARM64_V8A, ImmutableSet.of(AbiAlias.X86_64))));
     assertThrows(
         CommandExecutionException.class,
-        () -> abiMatcher.matchesTargeting(abiTargeting(AbiAlias.X86_64, ImmutableSet.of())));
+        () -> abiMatcher.checkDeviceCompatible(abiTargeting(AbiAlias.X86_64, ImmutableSet.of())));
   }
 
   /** Tests handling of fallback targeting, often used in assets (no values, some alternatives). */

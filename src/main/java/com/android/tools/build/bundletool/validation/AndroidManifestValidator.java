@@ -16,6 +16,8 @@
 
 package com.android.tools.build.bundletool.validation;
 
+import static com.android.tools.build.bundletool.model.AndroidManifest.NO_NAMESPACE_URI;
+
 import com.android.tools.build.bundletool.exceptions.ValidationException;
 import com.android.tools.build.bundletool.exceptions.manifest.ManifestFusingException.BaseModuleExcludedFromFusingException;
 import com.android.tools.build.bundletool.exceptions.manifest.ManifestFusingException.ModuleFusingConfigurationMissingException;
@@ -25,20 +27,44 @@ import com.android.tools.build.bundletool.exceptions.manifest.ManifestSdkTargeti
 import com.android.tools.build.bundletool.exceptions.manifest.ManifestSdkTargetingException.MinSdkInvalidException;
 import com.android.tools.build.bundletool.model.AndroidManifest;
 import com.android.tools.build.bundletool.model.BundleModule;
-import com.android.tools.build.bundletool.version.BundleToolVersion;
-import com.android.tools.build.bundletool.version.Version;
+import com.android.tools.build.bundletool.model.ManifestDeliveryElement;
+import com.google.common.collect.ImmutableList;
 import java.util.Optional;
 
 /** Validates {@code AndroidManifest.xml} file of each module. */
 public class AndroidManifestValidator extends SubValidator {
 
   @Override
+  public void validateAllModules(ImmutableList<BundleModule> modules) {
+    validateInstant(modules);
+  }
+
+  @Override
   public void validateModule(BundleModule module) {
     validateInstant(module);
-    validateOnDemand(module);
+    validateDeliverySettings(module);
     validateFusingConfig(module);
     validateMinMaxSdk(module);
+    validateNumberOfSplitIds(module);
     validateOnDemandIsInstantMutualExclusion(module);
+  }
+
+  private void validateInstant(ImmutableList<BundleModule> modules) {
+    // If any module is 'instant' validate that 'base' is instant too.
+    BundleModule baseModule =
+        modules.stream()
+            .filter(BundleModule::isBaseModule)
+            .findFirst()
+            .orElseThrow(
+                () ->
+                    new ValidationException(
+                        "App Bundle does not contain a mandatory 'base' module."));
+    if (modules.stream().anyMatch(BundleModule::isInstantModule) && !baseModule.isInstantModule()) {
+      throw ValidationException.builder()
+          .withMessage(
+              "App Bundle contains instant modules but the 'base' module is not marked 'instant'.")
+          .build();
+    }
   }
 
   private void validateInstant(BundleModule module) {
@@ -54,58 +80,60 @@ public class AndroidManifestValidator extends SubValidator {
     }
   }
 
-  private void validateOnDemand(BundleModule module) {
+  private void validateDeliverySettings(BundleModule module) {
 
-    Version bundleToolVersion =
-        BundleToolVersion.getVersionFromBundleConfig(module.getBundleConfig());
-    Optional<Boolean> isOnDemandModule =
-        module.getAndroidManifest().isOnDemandModule(bundleToolVersion);
-    boolean hasConditions = !module.getAndroidManifest().getModuleConditions().isEmpty();
+    Optional<Boolean> isOnDemandModule = module.getAndroidManifest().isOnDemandModule();
+    boolean deliveryTypeDeclared = module.getAndroidManifest().isDeliveryTypeDeclared();
+    boolean hasConditions =
+        module
+            .getAndroidManifest()
+            .getManifestDeliveryElement()
+            .map(ManifestDeliveryElement::hasModuleConditions)
+            .orElse(false);
+
+    if (module.getAndroidManifest().getOnDemandAttribute().isPresent()
+        && module.getAndroidManifest().getManifestDeliveryElement().isPresent()) {
+      throw ValidationException.builder()
+          .withMessage(
+              "Module '%s' cannot use <dist:delivery> settings and legacy dist:onDemand "
+                  + "attribute at the same time",
+              module.getName())
+          .build();
+    }
 
     if (module.isBaseModule()) {
       // In the base module, onDemand must be either not set or false
       if (isOnDemandModule.isPresent() && isOnDemandModule.get()) {
         throw new ValidationException(
-            "The base module cannot be marked as onDemand='true' since it will always be served.");
+            "The base module cannot be marked on-demand since it will always be served.");
       }
       if (hasConditions) {
         throw new ValidationException(
             "The base module cannot have conditions since it will always be served.");
       }
-    } else {
-      // In feature modules, onDemand must be explicitly set to some value unless it's a conditional
-      // module.
-      if (hasConditions) {
-        if (isOnDemandModule.isPresent()) {
-          throw ValidationException.builder()
-              .withMessage(
-                  "The element <dist:module> in the AndroidManifest.xml must not have the "
-                      + "attribute 'onDemand' set if the module is conditional (module: '%s').",
-                  module.getName())
-              .build();
+    } else if (!deliveryTypeDeclared) {
+      throw ValidationException.builder()
+          .withMessage(
+              "The module must explicitly set its delivery options using the "
+                  + "<dist:delivery> element (module: '%s').",
+              module.getName())
+          .build();
         }
-      } else { // module is not conditional
-        if (!isOnDemandModule.isPresent()) {
-          throw ValidationException.builder()
-              .withMessage(
-                  "The element <dist:module> in the AndroidManifest.xml must have the attribute "
-                      + "'onDemand' explicitly set (module: '%s').",
-                  module.getName())
-              .build();
-        }
-      }
     }
-  }
 
   private void validateOnDemandIsInstantMutualExclusion(BundleModule module) {
     boolean isInstant = module.getAndroidManifest().isInstantModule().orElse(false);
-    boolean hasConditions = !module.getAndroidManifest().getModuleConditions().isEmpty();
+    boolean hasConditions =
+        module
+            .getAndroidManifest()
+            .getManifestDeliveryElement()
+            .map(ManifestDeliveryElement::hasModuleConditions)
+            .orElse(false);
 
     if (module.isOnDemandModule() && isInstant) {
       throw ValidationException.builder()
           .withMessage(
-              "The attribute 'onDemand' and 'instant' cannot both be true at the same time"
-                  + " (module '%s').",
+              "Module cannot be on-demand and 'instant' at the same time (module '%s').",
               module.getName())
           .build();
     }
@@ -127,10 +155,7 @@ public class AndroidManifestValidator extends SubValidator {
     }
 
     Optional<Boolean> includedInFusingByManifest =
-        module
-            .getAndroidManifest()
-            .getIsModuleIncludedInFusing(
-                BundleToolVersion.getVersionFromBundleConfig(module.getBundleConfig()));
+        module.getAndroidManifest().getIsModuleIncludedInFusing();
 
     if (module.isBaseModule()) {
       if (includedInFusingByManifest.isPresent() && !includedInFusingByManifest.get()) {
@@ -164,6 +189,27 @@ public class AndroidManifestValidator extends SubValidator {
 
     if (maxSdk.isPresent() && minSdk.isPresent() && maxSdk.get() < minSdk.get()) {
       throw new MinSdkGreaterThanMaxSdkException(minSdk.get(), maxSdk.get());
+    }
+  }
+
+  private void validateNumberOfSplitIds(BundleModule module) {
+    long splitIdsCount =
+        module
+            .getAndroidManifest()
+            .getManifestRoot()
+            .getElement()
+            .getAttributes()
+            .filter(
+                attr ->
+                    attr.getName().equals("split")
+                        && attr.getNamespaceUri().equals(NO_NAMESPACE_URI))
+            .count();
+    if (splitIdsCount > 1) {
+      throw ValidationException.builder()
+          .withMessage(
+              "The attribute 'split' cannot be declared more than once (module '%s').",
+              module.getName())
+          .build();
     }
   }
 }

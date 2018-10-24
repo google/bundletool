@@ -60,6 +60,30 @@ public abstract class ParsedFlags {
    */
   public abstract List<String> getCommands();
 
+  /**
+   * Returns the first command provided on the command line if provided.
+   *
+   * <p>e.g. for "bundletool dump manifest --module=base", the command is 'dump' and the sub-command
+   * is 'manifest'.
+   */
+  public Optional<String> getMainCommand() {
+    return getSubCommand(0);
+  }
+
+  /**
+   * Returns the second command provided on the command line if provided.
+   *
+   * <p>e.g. for "bundletool dump manifest --module=base", the command is 'dump' and the sub-command
+   * is 'manifest'.
+   */
+  public Optional<String> getSubCommand() {
+    return getSubCommand(1);
+  }
+
+  private Optional<String> getSubCommand(int index) {
+    return getCommands().size() > index ? Optional.of(getCommands().get(index)) : Optional.empty();
+  }
+
   protected abstract ImmutableListMultimap<String, String> getFlags();
 
   /**

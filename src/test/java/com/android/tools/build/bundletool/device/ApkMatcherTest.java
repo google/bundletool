@@ -27,8 +27,15 @@ import static com.android.bundle.Targeting.ScreenDensity.DensityAlias.MDPI;
 import static com.android.bundle.Targeting.ScreenDensity.DensityAlias.XHDPI;
 import static com.android.bundle.Targeting.ScreenDensity.DensityAlias.XXHDPI;
 import static com.android.bundle.Targeting.ScreenDensity.DensityAlias.XXXHDPI;
+import static com.android.tools.build.bundletool.testing.ApkSetUtils.splitApkSet;
+import static com.android.tools.build.bundletool.testing.ApksArchiveHelpers.createConditionalApkSet;
+import static com.android.tools.build.bundletool.testing.ApksArchiveHelpers.createVariant;
+import static com.android.tools.build.bundletool.testing.ApksArchiveHelpers.instantApkDescription;
+import static com.android.tools.build.bundletool.testing.ApksArchiveHelpers.splitApkDescription;
+import static com.android.tools.build.bundletool.testing.ApksArchiveHelpers.standaloneVariant;
 import static com.android.tools.build.bundletool.testing.DeviceFactory.abis;
 import static com.android.tools.build.bundletool.testing.DeviceFactory.density;
+import static com.android.tools.build.bundletool.testing.DeviceFactory.deviceFeatures;
 import static com.android.tools.build.bundletool.testing.DeviceFactory.deviceWithSdk;
 import static com.android.tools.build.bundletool.testing.DeviceFactory.lDeviceWithAbis;
 import static com.android.tools.build.bundletool.testing.DeviceFactory.lDeviceWithDensity;
@@ -36,12 +43,16 @@ import static com.android.tools.build.bundletool.testing.DeviceFactory.lDeviceWi
 import static com.android.tools.build.bundletool.testing.DeviceFactory.locales;
 import static com.android.tools.build.bundletool.testing.DeviceFactory.mergeSpecs;
 import static com.android.tools.build.bundletool.testing.DeviceFactory.sdkVersion;
+import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifest;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.apkAbiTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.apkAlternativeLanguageTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.apkDensityTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.apkLanguageTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.mergeApkTargeting;
+import static com.android.tools.build.bundletool.testing.TargetingUtils.mergeModuleTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.mergeVariantTargeting;
+import static com.android.tools.build.bundletool.testing.TargetingUtils.moduleFeatureTargeting;
+import static com.android.tools.build.bundletool.testing.TargetingUtils.moduleMinSdkVersionTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.sdkVersionFrom;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.variantAbiTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.variantDensityTargeting;
@@ -49,20 +60,20 @@ import static com.android.tools.build.bundletool.testing.TargetingUtils.variantS
 import static com.google.common.truth.Truth.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
-import com.android.bundle.Commands.ApkDescription;
 import com.android.bundle.Commands.ApkSet;
 import com.android.bundle.Commands.BuildApksResult;
-import com.android.bundle.Commands.ModuleMetadata;
-import com.android.bundle.Commands.SplitApkMetadata;
-import com.android.bundle.Commands.StandaloneApkMetadata;
 import com.android.bundle.Commands.Variant;
 import com.android.bundle.Devices.DeviceSpec;
+import com.android.bundle.Targeting.Abi.AbiAlias;
 import com.android.bundle.Targeting.ApkTargeting;
 import com.android.bundle.Targeting.ScreenDensity.DensityAlias;
-import com.android.bundle.Targeting.SdkVersion;
 import com.android.bundle.Targeting.VariantTargeting;
 import com.android.tools.build.bundletool.exceptions.CommandExecutionException;
 import com.android.tools.build.bundletool.exceptions.ValidationException;
+import com.android.tools.build.bundletool.model.AndroidManifest;
+import com.android.tools.build.bundletool.model.BundleModuleName;
+import com.android.tools.build.bundletool.model.ModuleSplit;
+import com.android.tools.build.bundletool.model.ModuleSplit.SplitType;
 import com.android.tools.build.bundletool.model.ZipPath;
 import com.android.tools.build.bundletool.utils.Versions;
 import com.google.common.collect.ImmutableList;
@@ -98,8 +109,7 @@ public class ApkMatcherTest {
     BuildApksResult buildApksResult =
         buildApksResult(
             oneApkSplitApkVariant(
-                variantSdkTargeting(
-                    sdkVersionFrom(21), ImmutableSet.of(SdkVersion.getDefaultInstance())),
+                variantSdkTargeting(sdkVersionFrom(21), ImmutableSet.of(sdkVersionFrom(1))),
                 ApkTargeting.getDefaultInstance(),
                 apk));
 
@@ -158,7 +168,7 @@ public class ApkMatcherTest {
     BuildApksResult buildApksResult =
         buildApksResult(
             standaloneVariant(
-                variantSdkTargeting(SdkVersion.getDefaultInstance(), ImmutableSet.of()),
+                variantSdkTargeting(sdkVersionFrom(1), ImmutableSet.of()),
                 ApkTargeting.getDefaultInstance(),
                 apk));
 
@@ -172,8 +182,7 @@ public class ApkMatcherTest {
     BuildApksResult buildApksResult =
         buildApksResult(
             standaloneVariant(
-                variantSdkTargeting(
-                    SdkVersion.getDefaultInstance(), ImmutableSet.of(sdkVersionFrom(21))),
+                variantSdkTargeting(sdkVersionFrom(1), ImmutableSet.of(sdkVersionFrom(21))),
                 ApkTargeting.getDefaultInstance(),
                 apk));
 
@@ -204,8 +213,7 @@ public class ApkMatcherTest {
     BuildApksResult buildApksResult =
         buildApksResult(
             oneApkSplitApkVariant(
-                variantSdkTargeting(
-                    sdkVersionFrom(21), ImmutableSet.of(SdkVersion.getDefaultInstance())),
+                variantSdkTargeting(sdkVersionFrom(21), ImmutableSet.of(sdkVersionFrom(1))),
                 ApkTargeting.getDefaultInstance(),
                 apk));
 
@@ -239,8 +247,7 @@ public class ApkMatcherTest {
         buildApksResult(
             oneApkSplitApkVariant(
                 variantSdkTargeting(
-                    sdkVersionFrom(21),
-                    ImmutableSet.of(SdkVersion.getDefaultInstance(), sdkVersionFrom(23))),
+                    sdkVersionFrom(21), ImmutableSet.of(sdkVersionFrom(1), sdkVersionFrom(23))),
                 ApkTargeting.getDefaultInstance(),
                 apk));
 
@@ -256,8 +263,7 @@ public class ApkMatcherTest {
         buildApksResult(
             standaloneVariant(
                 mergeVariantTargeting(
-                    variantSdkTargeting(
-                        SdkVersion.getDefaultInstance(), ImmutableSet.of(sdkVersionFrom(21))),
+                    variantSdkTargeting(sdkVersionFrom(1), ImmutableSet.of(sdkVersionFrom(21))),
                     variantAbiTargeting(X86, ImmutableSet.of(ARMEABI_V7A, ARM64_V8A))),
                 ApkTargeting.getDefaultInstance(),
                 apk));
@@ -275,8 +281,7 @@ public class ApkMatcherTest {
         buildApksResult(
             standaloneVariant(
                 mergeVariantTargeting(
-                    variantSdkTargeting(
-                        SdkVersion.getDefaultInstance(), ImmutableSet.of(sdkVersionFrom(21))),
+                    variantSdkTargeting(sdkVersionFrom(1), ImmutableSet.of(sdkVersionFrom(21))),
                     variantAbiTargeting(X86, ImmutableSet.of(ARMEABI_V7A, ARM64_V8A))),
                 ApkTargeting.getDefaultInstance(),
                 apk));
@@ -294,8 +299,7 @@ public class ApkMatcherTest {
         buildApksResult(
             standaloneVariant(
                 mergeVariantTargeting(
-                    variantSdkTargeting(
-                        SdkVersion.getDefaultInstance(), ImmutableSet.of(sdkVersionFrom(21))),
+                    variantSdkTargeting(sdkVersionFrom(1), ImmutableSet.of(sdkVersionFrom(21))),
                     variantAbiTargeting(X86, ImmutableSet.of(ARMEABI_V7A, ARM64_V8A, X86_64))),
                 ApkTargeting.getDefaultInstance(),
                 apk));
@@ -313,8 +317,7 @@ public class ApkMatcherTest {
         buildApksResult(
             standaloneVariant(
                 mergeVariantTargeting(
-                    variantSdkTargeting(
-                        SdkVersion.getDefaultInstance(), ImmutableSet.of(sdkVersionFrom(21))),
+                    variantSdkTargeting(sdkVersionFrom(1), ImmutableSet.of(sdkVersionFrom(21))),
                     variantAbiTargeting(X86, ImmutableSet.of(ARMEABI_V7A, ARM64_V8A))),
                 ApkTargeting.getDefaultInstance(),
                 apk));
@@ -332,8 +335,7 @@ public class ApkMatcherTest {
         buildApksResult(
             standaloneVariant(
                 mergeVariantTargeting(
-                    variantSdkTargeting(
-                        SdkVersion.getDefaultInstance(), ImmutableSet.of(sdkVersionFrom(21))),
+                    variantSdkTargeting(sdkVersionFrom(1), ImmutableSet.of(sdkVersionFrom(21))),
                     variantDensityTargeting(MDPI)),
                 ApkTargeting.getDefaultInstance(),
                 apk));
@@ -351,8 +353,7 @@ public class ApkMatcherTest {
         buildApksResult(
             standaloneVariant(
                 mergeVariantTargeting(
-                    variantSdkTargeting(
-                        SdkVersion.getDefaultInstance(), ImmutableSet.of(sdkVersionFrom(21))),
+                    variantSdkTargeting(sdkVersionFrom(1), ImmutableSet.of(sdkVersionFrom(21))),
                     variantDensityTargeting(XHDPI, ImmutableSet.of(MDPI))),
                 ApkTargeting.getDefaultInstance(),
                 apk));
@@ -370,8 +371,7 @@ public class ApkMatcherTest {
         buildApksResult(
             standaloneVariant(
                 mergeVariantTargeting(
-                    variantSdkTargeting(
-                        SdkVersion.getDefaultInstance(), ImmutableSet.of(sdkVersionFrom(21))),
+                    variantSdkTargeting(sdkVersionFrom(1), ImmutableSet.of(sdkVersionFrom(21))),
                     variantDensityTargeting(XHDPI, ImmutableSet.of(MDPI, HDPI))),
                 ApkTargeting.getDefaultInstance(),
                 apk));
@@ -389,8 +389,7 @@ public class ApkMatcherTest {
         buildApksResult(
             standaloneVariant(
                 mergeVariantTargeting(
-                    variantSdkTargeting(
-                        SdkVersion.getDefaultInstance(), ImmutableSet.of(sdkVersionFrom(21))),
+                    variantSdkTargeting(sdkVersionFrom(1), ImmutableSet.of(sdkVersionFrom(21))),
                     variantDensityTargeting(XHDPI, ImmutableSet.of(LDPI, XXHDPI))),
                 ApkTargeting.getDefaultInstance(),
                 apk));
@@ -408,8 +407,7 @@ public class ApkMatcherTest {
         buildApksResult(
             standaloneVariant(
                 mergeVariantTargeting(
-                    variantSdkTargeting(
-                        SdkVersion.getDefaultInstance(), ImmutableSet.of(sdkVersionFrom(21))),
+                    variantSdkTargeting(sdkVersionFrom(1), ImmutableSet.of(sdkVersionFrom(21))),
                     variantAbiTargeting(X86, ImmutableSet.of(ARMEABI_V7A, ARM64_V8A)),
                     variantDensityTargeting(XHDPI, ImmutableSet.of(LDPI, XXHDPI))),
                 ApkTargeting.getDefaultInstance(),
@@ -428,8 +426,7 @@ public class ApkMatcherTest {
         buildApksResult(
             standaloneVariant(
                 mergeVariantTargeting(
-                    variantSdkTargeting(
-                        SdkVersion.getDefaultInstance(), ImmutableSet.of(sdkVersionFrom(21))),
+                    variantSdkTargeting(sdkVersionFrom(1), ImmutableSet.of(sdkVersionFrom(21))),
                     variantAbiTargeting(X86, ImmutableSet.of(ARMEABI_V7A, ARM64_V8A)),
                     variantDensityTargeting(XHDPI, ImmutableSet.of(LDPI, HDPI, XXHDPI))),
                 ApkTargeting.getDefaultInstance(),
@@ -448,8 +445,7 @@ public class ApkMatcherTest {
         buildApksResult(
             standaloneVariant(
                 mergeVariantTargeting(
-                    variantSdkTargeting(
-                        SdkVersion.getDefaultInstance(), ImmutableSet.of(sdkVersionFrom(21))),
+                    variantSdkTargeting(sdkVersionFrom(1), ImmutableSet.of(sdkVersionFrom(21))),
                     variantAbiTargeting(ARM64_V8A, ImmutableSet.of(ARMEABI_V7A, X86)),
                     variantDensityTargeting(XHDPI, ImmutableSet.of(LDPI, HDPI, XXHDPI))),
                 ApkTargeting.getDefaultInstance(),
@@ -614,7 +610,7 @@ public class ApkMatcherTest {
     ZipPath frApk = ZipPath.create("master-fr.apk");
     BuildApksResult buildApksResult =
         buildApksResult(
-            variant(
+            createVariant(
                 variantSdkTargeting(sdkVersionFrom(Versions.ANDROID_L_API_VERSION)),
                 splitApkSet("base", splitApkDescription(apkLanguageTargeting("en"), enApk)),
                 splitApkSet("base", splitApkDescription(apkLanguageTargeting("fr"), frApk))));
@@ -634,7 +630,7 @@ public class ApkMatcherTest {
     ZipPath deFallbackApk = ZipPath.create("master-not-de.apk");
     BuildApksResult buildApksResult =
         buildApksResult(
-            variant(
+            createVariant(
                 variantSdkTargeting(sdkVersionFrom(Versions.ANDROID_L_API_VERSION)),
                 splitApkSet(
                     "master",
@@ -682,7 +678,7 @@ public class ApkMatcherTest {
     ZipPath apk = ZipPath.create("master-de-fr.apk");
     BuildApksResult buildApksResult =
         buildApksResult(
-            variant(
+            createVariant(
                 VariantTargeting.getDefaultInstance(),
                 splitApkSet(
                     /* moduleName= */ "base",
@@ -719,7 +715,7 @@ public class ApkMatcherTest {
     ZipPath apk = ZipPath.create("master-de-fr.apk");
     BuildApksResult buildApksResult =
         buildApksResult(
-            variant(
+            createVariant(
                 VariantTargeting.getDefaultInstance(),
                 splitApkSet(
                     /* moduleName= */ "base",
@@ -748,7 +744,7 @@ public class ApkMatcherTest {
     ZipPath apk = ZipPath.create("master-de-fr.apk");
     BuildApksResult buildApksResult =
         buildApksResult(
-            variant(
+            createVariant(
                 VariantTargeting.getDefaultInstance(),
                 splitApkSet(
                     /* moduleName= */ "base",
@@ -807,7 +803,7 @@ public class ApkMatcherTest {
     ZipPath feature2Apk = ZipPath.create("master-feature2.apk");
     BuildApksResult buildApksResult =
         buildApksResult(
-            variant(
+            createVariant(
                 VariantTargeting.getDefaultInstance(),
                 splitApkSet(
                     /* moduleName= */ "base",
@@ -823,10 +819,11 @@ public class ApkMatcherTest {
                     /* moduleDependencies= */ ImmutableList.of("feature1"),
                     splitApkDescription(ApkTargeting.getDefaultInstance(), feature2Apk))));
 
+    // By default on-demand features are not installed.
     Optional<ImmutableSet<String>> allModules = Optional.empty();
     assertThat(
             new ApkMatcher(device, allModules, NOT_MATCH_INSTANT).getMatchingApks(buildApksResult))
-        .containsExactly(baseApk, feature1Apk, feature2Apk);
+        .containsExactly(baseApk);
 
     Optional<ImmutableSet<String>> baseModuleOnly = Optional.of(ImmutableSet.of("base"));
     assertThat(
@@ -857,7 +854,7 @@ public class ApkMatcherTest {
     ZipPath feature4Apk = ZipPath.create("master-feature4.apk");
     BuildApksResult buildApksResult =
         buildApksResult(
-            variant(
+            createVariant(
                 VariantTargeting.getDefaultInstance(),
                 splitApkSet(
                     /* moduleName= */ "base",
@@ -883,10 +880,11 @@ public class ApkMatcherTest {
                     /* moduleDependencies= */ ImmutableList.of("feature2", "feature3"),
                     splitApkDescription(ApkTargeting.getDefaultInstance(), feature4Apk))));
 
+    // By default on-demand features are not installed.
     Optional<ImmutableSet<String>> allModules = Optional.empty();
     assertThat(
             new ApkMatcher(device, allModules, NOT_MATCH_INSTANT).getMatchingApks(buildApksResult))
-        .containsExactly(baseApk, feature1Apk, feature2Apk, feature3Apk, feature4Apk);
+        .containsExactly(baseApk);
 
     Optional<ImmutableSet<String>> feature4ModuleOnly = Optional.of(ImmutableSet.of("feature4"));
     assertThat(
@@ -905,30 +903,31 @@ public class ApkMatcherTest {
   public void apkMatch_withModuleTypeFiltering_splitApks_installTimeModules() {
     DeviceSpec device = deviceWithSdk(21);
     ZipPath baseApk = ZipPath.create("master-base.apk");
-    ZipPath feature1Apk = ZipPath.create("master-feature1.apk");
+    ZipPath onDemandFeatureApk = ZipPath.create("master-feature1.apk");
     ZipPath feature2Apk = ZipPath.create("master-feature2.apk");
     BuildApksResult buildApksResult =
         buildApksResult(
-            variant(
+            createVariant(
                 VariantTargeting.getDefaultInstance(),
                 splitApkSet(
                     /* moduleName= */ "base",
                     splitApkDescription(ApkTargeting.getDefaultInstance(), baseApk)),
                 splitApkSet(
-                    /* moduleName= */ "feature1",
+                    /* moduleName= */ "onDemandFeature",
                     /* onDemand= */ true,
                     /* moduleDependencies= */ ImmutableList.of(),
-                    splitApkDescription(ApkTargeting.getDefaultInstance(), feature1Apk)),
+                    splitApkDescription(ApkTargeting.getDefaultInstance(), onDemandFeatureApk)),
                 splitApkSet(
                     /* moduleName= */ "feature2",
                     /* onDemand= */ false,
                     /* moduleDependencies= */ ImmutableList.of(),
                     splitApkDescription(ApkTargeting.getDefaultInstance(), feature2Apk))));
 
+    // By default only install-time module are matched.
     Optional<ImmutableSet<String>> allModules = Optional.empty();
     assertThat(
             new ApkMatcher(device, allModules, NOT_MATCH_INSTANT).getMatchingApks(buildApksResult))
-        .containsExactly(baseApk, feature1Apk, feature2Apk);
+        .containsExactly(baseApk, feature2Apk);
 
     Optional<ImmutableSet<String>> baseModuleOnly = Optional.of(ImmutableSet.of("base"));
     assertThat(
@@ -942,11 +941,57 @@ public class ApkMatcherTest {
                 .getMatchingApks(buildApksResult))
         .containsExactly(baseApk, feature2Apk);
 
-    Optional<ImmutableSet<String>> feature1ModuleOnly = Optional.of(ImmutableSet.of("feature1"));
+    Optional<ImmutableSet<String>> onDemandModuleOnly =
+        Optional.of(ImmutableSet.of("onDemandFeature"));
     assertThat(
-            new ApkMatcher(device, feature1ModuleOnly, NOT_MATCH_INSTANT)
+            new ApkMatcher(device, onDemandModuleOnly, NOT_MATCH_INSTANT)
                 .getMatchingApks(buildApksResult))
-        .containsExactly(baseApk, feature1Apk, feature2Apk);
+        .containsExactly(baseApk, onDemandFeatureApk, feature2Apk);
+  }
+
+  @Test
+  public void splitApk_conditionalModule_deviceEligible() {
+    DeviceSpec device = mergeSpecs(deviceWithSdk(24), deviceFeatures("android.hardware.camera.ar"));
+
+    ZipPath baseApk = ZipPath.create("base-master.apk");
+    ZipPath feature1Apk = ZipPath.create("ar-master.apk");
+    BuildApksResult buildApksResult =
+        buildApksResult(
+            createVariant(
+                variantSdkTargeting(21),
+                splitApkSet(
+                    /* moduleName= */ "base",
+                    splitApkDescription(ApkTargeting.getDefaultInstance(), baseApk)),
+                createConditionalApkSet(
+                    /* moduleName= */ "ar",
+                    mergeModuleTargeting(
+                        moduleFeatureTargeting("android.hardware.camera.ar"),
+                        moduleMinSdkVersionTargeting(24)),
+                    splitApkDescription(ApkTargeting.getDefaultInstance(), feature1Apk))));
+    assertThat(new ApkMatcher(device).getMatchingApks(buildApksResult))
+        .containsExactly(baseApk, feature1Apk);
+  }
+
+  @Test
+  public void splitApk_conditionalModule_deviceNotEligible() {
+    DeviceSpec device = mergeSpecs(deviceWithSdk(21));
+
+    ZipPath baseApk = ZipPath.create("base-master.apk");
+    ZipPath feature1Apk = ZipPath.create("ar-master.apk");
+    BuildApksResult buildApksResult =
+        buildApksResult(
+            createVariant(
+                variantSdkTargeting(21),
+                splitApkSet(
+                    /* moduleName= */ "base",
+                    splitApkDescription(ApkTargeting.getDefaultInstance(), baseApk)),
+                createConditionalApkSet(
+                    /* moduleName= */ "ar",
+                    mergeModuleTargeting(
+                        moduleFeatureTargeting("android.hardware.camera.ar"),
+                        moduleMinSdkVersionTargeting(24)),
+                    splitApkDescription(ApkTargeting.getDefaultInstance(), feature1Apk))));
+    assertThat(new ApkMatcher(device).getMatchingApks(buildApksResult)).containsExactly(baseApk);
   }
 
   // Real-world complex selections.
@@ -970,8 +1015,7 @@ public class ApkMatcherTest {
             // Standalone X86 MDPI
             standaloneVariant(
                 mergeVariantTargeting(
-                    variantSdkTargeting(
-                        SdkVersion.getDefaultInstance(), ImmutableSet.of(sdkVersionFrom(21))),
+                    variantSdkTargeting(sdkVersionFrom(1), ImmutableSet.of(sdkVersionFrom(21))),
                     variantAbiTargeting(X86, ImmutableSet.of(ARMEABI)),
                     variantDensityTargeting(MDPI, ImmutableSet.of(XXXHDPI))),
                 mergeApkTargeting(
@@ -981,8 +1025,7 @@ public class ApkMatcherTest {
             // Standalone X86 XXXHDI
             standaloneVariant(
                 mergeVariantTargeting(
-                    variantSdkTargeting(
-                        SdkVersion.getDefaultInstance(), ImmutableSet.of(sdkVersionFrom(21))),
+                    variantSdkTargeting(sdkVersionFrom(1), ImmutableSet.of(sdkVersionFrom(21))),
                     variantAbiTargeting(X86, ImmutableSet.of(ARMEABI)),
                     variantDensityTargeting(XXXHDPI, ImmutableSet.of(MDPI))),
                 mergeApkTargeting(
@@ -992,8 +1035,7 @@ public class ApkMatcherTest {
             // Standalone ARM MDPI
             standaloneVariant(
                 mergeVariantTargeting(
-                    variantSdkTargeting(
-                        SdkVersion.getDefaultInstance(), ImmutableSet.of(sdkVersionFrom(21))),
+                    variantSdkTargeting(sdkVersionFrom(1), ImmutableSet.of(sdkVersionFrom(21))),
                     variantAbiTargeting(ARMEABI, ImmutableSet.of(X86)),
                     variantDensityTargeting(MDPI, ImmutableSet.of(XXXHDPI))),
                 mergeApkTargeting(
@@ -1003,8 +1045,7 @@ public class ApkMatcherTest {
             // Standalone ARM XXXHDI
             standaloneVariant(
                 mergeVariantTargeting(
-                    variantSdkTargeting(
-                        SdkVersion.getDefaultInstance(), ImmutableSet.of(sdkVersionFrom(21))),
+                    variantSdkTargeting(sdkVersionFrom(1), ImmutableSet.of(sdkVersionFrom(21))),
                     variantAbiTargeting(ARMEABI, ImmutableSet.of(X86)),
                     variantDensityTargeting(XXXHDPI, ImmutableSet.of(MDPI))),
                 mergeApkTargeting(
@@ -1013,8 +1054,7 @@ public class ApkMatcherTest {
                 standaloneArmXxxhdpiApk),
             // Splits L+
             splitApkVariant(
-                variantSdkTargeting(
-                    sdkVersionFrom(21), ImmutableSet.of(SdkVersion.getDefaultInstance())),
+                variantSdkTargeting(sdkVersionFrom(21), ImmutableSet.of(sdkVersionFrom(1))),
                 splitApkSet(
                     /* moduleName= */ "base",
                     splitApkDescription(ApkTargeting.getDefaultInstance(), baseMasterSplitApk),
@@ -1062,86 +1102,45 @@ public class ApkMatcherTest {
                 + "app ABIs: [x86, armeabi]");
   }
 
+  @Test
+  public void matchesModuleSplit_incompatibleDeviceThrows() {
+    // MIPS ABI is not supported by the split.
+    DeviceSpec mipsDevice =
+        mergeSpecs(sdkVersion(21), abis("mips"), density(MDPI), locales("en"));
+
+    ModuleSplit moduleSplit =
+        ModuleSplit.builder()
+            .setAndroidManifest(AndroidManifest.create(androidManifest("com.test.app")))
+            .setEntries(ImmutableList.of())
+            .setMasterSplit(false)
+            .setSplitType(SplitType.SPLIT)
+            .setModuleName(BundleModuleName.create("base"))
+            .setApkTargeting(apkAbiTargeting(AbiAlias.ARM64_V8A, ImmutableSet.of(AbiAlias.X86)))
+            .setVariantTargeting(variantSdkTargeting(21))
+            .build();
+
+    Throwable exception = assertThrows(CommandExecutionException.class,
+        () -> new ApkMatcher(mipsDevice).matchesModuleSplitByTargeting(moduleSplit));
+    assertThat(exception)
+        .hasMessageThat()
+        .contains(
+            "The app doesn't support ABI architectures of the device. Device ABIs: [mips], "
+                + "app ABIs: [arm64-v8a, x86]");
+  }
+
   private static BuildApksResult buildApksResult(Variant... variants) {
     return BuildApksResult.newBuilder().addAllVariant(Arrays.asList(variants)).build();
   }
 
-  private static Variant variant(VariantTargeting targeting, ApkSet... apkSets) {
-    return Variant.newBuilder()
-        .setTargeting(targeting)
-        .addAllApkSet(Arrays.asList(apkSets))
-        .build();
-  }
-
-  private static Variant standaloneVariant(
-      VariantTargeting variantTargeting, ApkTargeting apkTargeting, ZipPath apkPath) {
-    // A standalone variant has only a single APK with module named "base".
-    return variant(
-        variantTargeting,
-        ApkSet.newBuilder()
-            .setModuleMetadata(ModuleMetadata.newBuilder().setName("base"))
-            .addApkDescription(
-                ApkDescription.newBuilder()
-                    .setTargeting(apkTargeting)
-                    .setPath(apkPath.toString())
-                    // Contents of the standalone APK metadata is not important for these tests
-                    // as long as the field is set.
-                    .setStandaloneApkMetadata(StandaloneApkMetadata.getDefaultInstance()))
-            .build());
-  }
-
   private static Variant splitApkVariant(
       VariantTargeting variantTargeting, ApkSet... splitApkSets) {
-    return variant(variantTargeting, splitApkSets);
+    return createVariant(variantTargeting, splitApkSets);
   }
 
   private static Variant oneApkSplitApkVariant(
       VariantTargeting variantTargeting, ApkTargeting apkTargeting, ZipPath apkPath) {
-    return variant(
+    return createVariant(
         variantTargeting,
         splitApkSet(/* moduleName= */ "base", splitApkDescription(apkTargeting, apkPath)));
-  }
-
-  private static ApkSet splitApkSet(String moduleName, ApkDescription... apkDescriptions) {
-    return splitApkSet(
-        moduleName,
-        /* onDemand= */ false,
-        /* moduleDependencies= */ ImmutableList.of(),
-        apkDescriptions);
-  }
-
-  private static ApkSet splitApkSet(
-      String moduleName,
-      boolean onDemand,
-      ImmutableList<String> moduleDependencies,
-      ApkDescription... apkDescriptions) {
-    return ApkSet.newBuilder()
-        .setModuleMetadata(
-            ModuleMetadata.newBuilder()
-                .setName(moduleName)
-                .setOnDemand(onDemand)
-                .addAllDependencies(moduleDependencies))
-        .addAllApkDescription(Arrays.asList(apkDescriptions))
-        .build();
-  }
-
-  private static ApkDescription splitApkDescription(ApkTargeting apkTargeting, ZipPath apkPath) {
-    return ApkDescription.newBuilder()
-        .setTargeting(apkTargeting)
-        .setPath(apkPath.toString())
-        // Contents of the split APK metadata is not important for these tests as long as
-        // the field is set.
-        .setSplitApkMetadata(SplitApkMetadata.getDefaultInstance())
-        .build();
-  }
-
-  private static ApkDescription instantApkDescription(ApkTargeting apkTargeting, ZipPath apkPath) {
-    return ApkDescription.newBuilder()
-        .setTargeting(apkTargeting)
-        .setPath(apkPath.toString())
-        // Contents of the instant APK metadata is not important for these tests as long as
-        // the field is set.
-        .setInstantApkMetadata(SplitApkMetadata.getDefaultInstance())
-        .build();
   }
 }

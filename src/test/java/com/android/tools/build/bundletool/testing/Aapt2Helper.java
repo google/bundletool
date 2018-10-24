@@ -24,7 +24,7 @@ import java.nio.file.Paths;
 public final class Aapt2Helper {
 
   public static final String AAPT2_PATH =
-      "third_party/java/android/android_sdk_linux/platform-tools/aapt2";
+      System.getenv("AAPT2_PATH");
 
   public static Aapt2Command getAapt2Command() {
     return Aapt2Command.createFromExecutablePath(Paths.get(AAPT2_PATH));

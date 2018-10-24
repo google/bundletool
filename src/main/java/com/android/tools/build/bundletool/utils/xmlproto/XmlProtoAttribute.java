@@ -15,8 +15,8 @@
  */
 package com.android.tools.build.bundletool.utils.xmlproto;
 
-import static com.android.tools.build.bundletool.utils.xmlproto.XmlProtoElement.ANDROID_NAMESPACE_URI;
-import static com.android.tools.build.bundletool.utils.xmlproto.XmlProtoElement.NO_NAMESPACE_URI;
+import static com.android.tools.build.bundletool.model.AndroidManifest.ANDROID_NAMESPACE_URI;
+import static com.android.tools.build.bundletool.model.AndroidManifest.NO_NAMESPACE_URI;
 import static com.google.common.base.Preconditions.checkNotNull;
 
 import com.android.aapt.Resources.XmlAttribute;

@@ -69,4 +69,11 @@ public final class ScreenDensityMatcher extends TargetingDimensionMatcher<Screen
     return variantTargeting.getScreenDensityTargeting();
   }
 
+  @Override
+  protected boolean isDeviceDimensionPresent() {
+    return getDeviceSpec().getScreenDensity() != 0;
+  }
+
+  @Override
+  protected void checkDeviceCompatibleInternal(ScreenDensityTargeting targetingValue) {}
 }

@@ -25,12 +25,10 @@ import com.android.bundle.Targeting.AssetsDirectoryTargeting;
 import com.android.bundle.Targeting.SdkVersion;
 import com.android.bundle.Targeting.SdkVersionTargeting;
 import com.android.bundle.Targeting.VariantTargeting;
-import com.android.tools.build.bundletool.model.ModuleSplit;
 import com.android.tools.build.bundletool.utils.TargetingProtoUtils;
-import com.google.common.collect.ImmutableCollection;
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableMultimap;
 import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.Iterables;
 import com.google.common.collect.Sets;
 
 /** Utility functions for Targeting proto. */
@@ -53,58 +51,6 @@ public final class TargetingUtils {
       dimensions.add(TargetingDimension.LANGUAGE);
     }
     return dimensions.build();
-  }
-
-  /**
-   * Checks if the sdk range supported by the variant is completely enclosed in the sdk range
-   * supported by the moduleSplit. Also ensures that variant does not partially cover a module split
-   * range.
-   */
-  private static boolean checkVariantMatchWithModuleSplit(
-      VariantTargeting variantTargeting, ModuleSplit moduleSplit) {
-
-    SdkVersionTargeting variantSdkTargeting = variantTargeting.getSdkVersionTargeting();
-    int variantTargetingMinSdk = getMinSdk(variantSdkTargeting);
-    int variantTargetingMaxSdk = getMaxSdk(variantSdkTargeting);
-
-    SdkVersionTargeting moduleSplitSdkTargeting =
-        moduleSplit.getVariantTargeting().getSdkVersionTargeting();
-    int moduleSplitMinSdk = getMinSdk(moduleSplitSdkTargeting);
-    int moduleSplitMaxSdk = getMaxSdk(moduleSplitSdkTargeting);
-
-    boolean encloses =
-        variantTargetingMinSdk >= moduleSplitMinSdk && variantTargetingMaxSdk <= moduleSplitMaxSdk;
-
-    if (!encloses) {
-      checkState(
-          variantTargetingMaxSdk <= moduleSplitMinSdk
-              || moduleSplitMaxSdk <= variantTargetingMinSdk,
-          "Partial overlap between the sdk ranges of "
-              + "variant [ %s, %s )  and module split [ %s, %s ).",
-          variantTargetingMinSdk,
-          variantTargetingMaxSdk,
-          moduleSplitMinSdk,
-          moduleSplitMaxSdk);
-      return false;
-    }
-    return true;
-  }
-
-  /** Returns a map of variants with a list of all the splits supported by each variant. */
-  public static ImmutableMultimap<VariantTargeting, ModuleSplit> matchModuleSplitWithVariants(
-      ImmutableCollection<VariantTargeting> variants,
-      ImmutableCollection<ModuleSplit> moduleSplits) {
-
-    ImmutableMultimap.Builder<VariantTargeting, ModuleSplit> mapping = ImmutableMultimap.builder();
-
-    for (VariantTargeting variant : variants) {
-      for (ModuleSplit moduleSplit : moduleSplits) {
-        if (checkVariantMatchWithModuleSplit(variant, moduleSplit)) {
-          mapping.put(variant, moduleSplit);
-        }
-      }
-    }
-    return mapping.build();
   }
 
   /**
@@ -169,15 +115,15 @@ public final class TargetingUtils {
   }
 
   /** Extracts the minimum sdk (inclusive) supported by the targeting. */
-  private static int getMinSdk(SdkVersionTargeting sdkVersionTargeting) {
+  public static int getMinSdk(SdkVersionTargeting sdkVersionTargeting) {
     if (sdkVersionTargeting.getValueList().isEmpty()) {
       return 1;
     }
-    return sdkVersionTargeting.getValue(0).getMin().getValue();
+    return Iterables.getOnlyElement(sdkVersionTargeting.getValueList()).getMin().getValue();
   }
 
   /** Extracts the maximum sdk (exclusive) supported by the targeting. */
-  private static int getMaxSdk(SdkVersionTargeting sdkVersionTargeting) {
+  public static int getMaxSdk(SdkVersionTargeting sdkVersionTargeting) {
     int minSdk = getMinSdk(sdkVersionTargeting);
     int alternativeMinSdk =
         sdkVersionTargeting

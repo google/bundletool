@@ -16,7 +16,9 @@
 
 package com.android.tools.build.bundletool.splitters;
 
+import static com.android.tools.build.bundletool.model.ManifestMutator.withSplitsRequired;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifest;
+import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.compareManifestMutators;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.apkAbiTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.apkGraphicsTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.assets;
@@ -46,6 +48,8 @@ import com.android.tools.build.bundletool.model.BundleModule;
 import com.android.tools.build.bundletool.model.ModuleSplit;
 import com.android.tools.build.bundletool.model.ModuleSplit.SplitType;
 import com.android.tools.build.bundletool.testing.BundleModuleBuilder;
+import com.google.common.collect.ImmutableCollection;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import java.util.Collection;
 import java.util.List;
@@ -652,5 +656,55 @@ public class GraphicsApiAssetsSplitterTest {
             IllegalArgumentException.class,
             () -> GraphicsApiAssetsSplitter.create().split(baseSplit));
     assertThat(t).hasMessageThat().contains("Split is already targeting the splitting dimension.");
+  }
+
+  @Test
+  public void manifestMutatorToRequireSplits_notRegistered_whenNoGraphicsApiSpecificAssets()
+      throws Exception {
+    BundleModule testModule =
+        new BundleModuleBuilder("testModule")
+            .addFile("assets/other/file.dat")
+            .setAssetsConfig(
+                assets(
+                    targetedAssetsDirectory(
+                        "assets/other", AssetsDirectoryTargeting.getDefaultInstance())))
+            .setManifest(androidManifest("com.test.app"))
+            .build();
+    ModuleSplit baseSplit = ModuleSplit.forAssets(testModule);
+
+    ImmutableCollection<ModuleSplit> assetsSplits =
+        GraphicsApiAssetsSplitter.create().split(baseSplit);
+
+    assertThat(assetsSplits).hasSize(1);
+    assertThat(assetsSplits.asList().get(0).getMasterManifestMutators()).isEmpty();
+  }
+
+  @Test
+  public void manifestMutatorToRequireSplits_registered_whenGraphicsApiSpecificAssetsPresent()
+      throws Exception {
+    BundleModule testModule =
+        new BundleModuleBuilder("testModule")
+            .addFile("assets/images#opengl_2.0/image.jpg")
+            .setAssetsConfig(
+                assets(
+                    targetedAssetsDirectory(
+                        "assets/images#opengl_2.0",
+                        assetsDirectoryTargeting(graphicsApiTargeting(openGlVersionFrom(2))))))
+            .setManifest(androidManifest("com.test.app"))
+            .build();
+    ModuleSplit baseSplit = ModuleSplit.forAssets(testModule);
+
+    Collection<ModuleSplit> assetsSplits = GraphicsApiAssetsSplitter.create().split(baseSplit);
+
+    ImmutableList<ModuleSplit> configSplits =
+        assetsSplits.stream().filter(split -> !split.isMasterSplit()).collect(toImmutableList());
+
+    assertThat(configSplits).isNotEmpty();
+    for (ModuleSplit configSplit : configSplits) {
+      assertThat(
+              compareManifestMutators(
+                  configSplit.getMasterManifestMutators(), withSplitsRequired(true)))
+          .isTrue();
+    }
   }
 }

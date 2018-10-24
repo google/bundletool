@@ -20,7 +20,7 @@ import static com.android.bundle.Targeting.Abi.AbiAlias.ARMEABI;
 import static com.android.bundle.Targeting.Abi.AbiAlias.X86;
 import static com.android.bundle.Targeting.Abi.AbiAlias.X86_64;
 import static com.android.tools.build.bundletool.model.AndroidManifest.ACTIVITY_ELEMENT_NAME;
-import static com.android.tools.build.bundletool.model.AndroidManifest.ANDROID_NAMESPACE;
+import static com.android.tools.build.bundletool.model.AndroidManifest.ANDROID_NAMESPACE_URI;
 import static com.android.tools.build.bundletool.model.AndroidManifest.NAME_RESOURCE_ID;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifest;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withSplitNameActivity;
@@ -209,7 +209,8 @@ public class BundleSharderTest {
     assertThat(activities).hasSize(2);
     XmlElement activityElement = activities.get(1);
     assertThat(activityElement.getAttributeList())
-        .containsExactly(xmlAttribute(ANDROID_NAMESPACE, "name", NAME_RESOURCE_ID, "FooActivity"));
+        .containsExactly(
+            xmlAttribute(ANDROID_NAMESPACE_URI, "name", NAME_RESOURCE_ID, "FooActivity"));
   }
 
   @Test

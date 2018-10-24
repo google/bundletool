@@ -30,6 +30,7 @@ import com.android.tools.build.bundletool.utils.flags.ParsedFlags;
 import com.android.tools.build.bundletool.version.BundleToolVersion;
 import com.google.common.collect.ImmutableList;
 import java.util.List;
+import java.util.Optional;
 
 /**
  * Main entry point of the bundle tool.
@@ -56,7 +57,8 @@ public class BundleToolMain {
     }
     List<String> commands = flags.getCommands();
 
-    if (commands.isEmpty()) {
+    Optional<String> command = flags.getMainCommand();
+    if (!command.isPresent()) {
       System.out.println("Error: You have to specify a command.");
       help();
       runtime.exit(1);
@@ -64,7 +66,7 @@ public class BundleToolMain {
     }
 
     try {
-      switch (commands.get(0)) {
+      switch (command.get()) {
         case BuildBundleCommand.COMMAND_NAME:
           BuildBundleCommand.fromFlags(flags).execute();
           break;
@@ -94,8 +96,8 @@ public class BundleToolMain {
           VersionCommand.fromFlags(flags, System.out).execute();
           break;
         case HELP_CMD:
-          if (commands.size() > 1) {
-            help(commands.get(1), runtime);
+          if (flags.getSubCommand().isPresent()) {
+            help(flags.getSubCommand().get(), runtime);
           } else {
             help();
           }

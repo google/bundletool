@@ -15,7 +15,7 @@
  */
 package com.android.tools.build.bundletool.utils.xmlproto;
 
-import static com.android.tools.build.bundletool.utils.xmlproto.XmlProtoElementOrBuilder.ANDROID_NAMESPACE_URI;
+import static com.android.tools.build.bundletool.model.AndroidManifest.ANDROID_NAMESPACE_URI;
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.truth.Truth.assertThat;
 import static com.google.common.truth.extensions.proto.ProtoTruth.assertThat;

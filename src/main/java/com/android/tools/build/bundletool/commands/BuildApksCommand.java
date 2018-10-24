@@ -71,6 +71,7 @@ public abstract class BuildApksCommand {
   private static final Flag<Boolean> CONNECTED_DEVICE_FLAG = Flag.booleanFlag("connected-device");
   private static final Flag<String> DEVICE_ID_FLAG = Flag.string("device-id");
   private static final String ANDROID_HOME_VARIABLE = "ANDROID_HOME";
+  private static final String ANDROID_SERIAL_VARIABLE = "ANDROID_SERIAL";
 
   private static final Flag<Path> DEVICE_SPEC_FLAG = Flag.path("device-spec");
 
@@ -146,8 +147,8 @@ public abstract class BuildApksCommand {
     /**
      * Sets whether to overwrite the contents of the output file.
      *
-     * <p>The default is {@code false}. If set to {@code false} and a file is present, exception is
-     * thrown.
+     * <p>The default is {@code false}. If set to {@code false} and the output file is present,
+     * exception is thrown.
      */
     public abstract Builder setOverwriteOutput(boolean overwriteOutput);
 
@@ -346,7 +347,12 @@ public abstract class BuildApksCommand {
     CONNECTED_DEVICE_FLAG
         .getValue(flags)
         .ifPresent(buildApksCommand::setGenerateOnlyForConnectedDevice);
-    DEVICE_ID_FLAG.getValue(flags).ifPresent(buildApksCommand::setDeviceId);
+
+    Optional<String> deviceSerialName = DEVICE_ID_FLAG.getValue(flags);
+    if (!deviceSerialName.isPresent()) {
+      deviceSerialName = environmentVariableProvider.getVariable(ANDROID_SERIAL_VARIABLE);
+    }
+    deviceSerialName.ifPresent(buildApksCommand::setDeviceId);
 
     // Applied only when --connected-device flag is set, because we don't want to fail command
     // if ADB cannot be found in a normal mode.
@@ -524,9 +530,10 @@ public abstract class BuildApksCommand {
                 .setExampleValue("device-serial-name")
                 .setOptional(true)
                 .setDescription(
-                    "Device serial name. Required when more than one device or emulator is "
-                        + "connected. Used only if %s flag is set.",
-                    CONNECTED_DEVICE_FLAG)
+                    "Device serial name. If absent, this uses the %s environment variable. Either "
+                        + "this flag or the environment variable is required when more than one "
+                        + "device or emulator is connected. Used only if %s flag is set.",
+                    ANDROID_SERIAL_VARIABLE, CONNECTED_DEVICE_FLAG)
                 .build())
         .addFlag(
             FlagDescription.builder()

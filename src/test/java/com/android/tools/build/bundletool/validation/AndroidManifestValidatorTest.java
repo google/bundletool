@@ -19,10 +19,14 @@ package com.android.tools.build.bundletool.validation;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifest;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withFeatureCondition;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withFusingAttribute;
+import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withInstallTimeDelivery;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withInstant;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withMaxSdkVersion;
+import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withMinSdkCondition;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withMinSdkVersion;
-import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withOnDemand;
+import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withOnDemandAttribute;
+import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withOnDemandDelivery;
+import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withSplitId;
 import static com.google.common.truth.Truth.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
@@ -34,6 +38,8 @@ import com.android.tools.build.bundletool.exceptions.manifest.ManifestSdkTargeti
 import com.android.tools.build.bundletool.model.BundleModule;
 import com.android.tools.build.bundletool.testing.BundleModuleBuilder;
 import com.android.tools.build.bundletool.testing.ManifestProtoUtils.ManifestMutator;
+import com.android.tools.build.bundletool.utils.xmlproto.XmlProtoAttributeBuilder;
+import com.google.common.collect.ImmutableList;
 import java.io.IOException;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -82,7 +88,10 @@ public class AndroidManifestValidatorTest {
         new BundleModuleBuilder(FEATURE_MODULE_NAME)
             .setManifest(
                 androidManifest(
-                    PKG_NAME, withInstant(true), withOnDemand(false), withFusingAttribute(false)))
+                    PKG_NAME,
+                    withInstant(true),
+                    withOnDemandAttribute(false),
+                    withFusingAttribute(false)))
             .build();
 
     new AndroidManifestValidator().validateModule(module);
@@ -92,7 +101,8 @@ public class AndroidManifestValidatorTest {
   public void nonBase_withFusingConfigFalse_ok() throws Exception {
     BundleModule module =
         new BundleModuleBuilder(FEATURE_MODULE_NAME)
-            .setManifest(androidManifest(PKG_NAME, withOnDemand(true), withFusingAttribute(false)))
+            .setManifest(
+                androidManifest(PKG_NAME, withOnDemandAttribute(true), withFusingAttribute(false)))
             .build();
 
     new AndroidManifestValidator().validateModule(module);
@@ -102,7 +112,8 @@ public class AndroidManifestValidatorTest {
   public void nonBase_withFusingConfigTrue_ok() throws Exception {
     BundleModule module =
         new BundleModuleBuilder(FEATURE_MODULE_NAME)
-            .setManifest(androidManifest(PKG_NAME, withOnDemand(true), withFusingAttribute(true)))
+            .setManifest(
+                androidManifest(PKG_NAME, withOnDemandAttribute(true), withFusingAttribute(true)))
             .build();
 
     new AndroidManifestValidator().validateModule(module);
@@ -112,7 +123,7 @@ public class AndroidManifestValidatorTest {
   public void nonBase_withoutFusingConfig_throws() throws Exception {
     BundleModule module =
         new BundleModuleBuilder(FEATURE_MODULE_NAME)
-            .setManifest(androidManifest(PKG_NAME, withOnDemand(true)))
+            .setManifest(androidManifest(PKG_NAME, withOnDemandAttribute(true)))
             .build();
 
     ValidationException exception =
@@ -128,7 +139,7 @@ public class AndroidManifestValidatorTest {
   public void nonBase_withoutFusingConfigAndIsInstant_ok() throws Exception {
     BundleModule module =
         new BundleModuleBuilder(FEATURE_MODULE_NAME)
-            .setManifest(androidManifest(PKG_NAME, withInstant(true), withOnDemand(false)))
+            .setManifest(androidManifest(PKG_NAME, withInstant(true), withOnDemandAttribute(false)))
             .build();
 
     new AndroidManifestValidator().validateModule(module);
@@ -146,7 +157,17 @@ public class AndroidManifestValidatorTest {
   public void base_withOnDemandAttributeSetToFalse_ok() throws Exception {
     BundleModule module =
         new BundleModuleBuilder(BASE_MODULE_NAME)
-            .setManifest(androidManifest(PKG_NAME, withOnDemand(false)))
+            .setManifest(androidManifest(PKG_NAME, withOnDemandAttribute(false)))
+            .build();
+
+    new AndroidManifestValidator().validateModule(module);
+  }
+
+  @Test
+  public void base_withInstallTimeDeliveryElement_ok() throws Exception {
+    BundleModule module =
+        new BundleModuleBuilder(BASE_MODULE_NAME)
+            .setManifest(androidManifest(PKG_NAME, withInstallTimeDelivery()))
             .build();
 
     new AndroidManifestValidator().validateModule(module);
@@ -156,7 +177,7 @@ public class AndroidManifestValidatorTest {
   public void base_withOnDemandAttributeSetToTrue_throws() throws Exception {
     BundleModule module =
         new BundleModuleBuilder(BASE_MODULE_NAME)
-            .setManifest(androidManifest(PKG_NAME, withOnDemand(true)))
+            .setManifest(androidManifest(PKG_NAME, withOnDemandAttribute(true)))
             .build();
 
     ValidationException exception =
@@ -164,7 +185,22 @@ public class AndroidManifestValidatorTest {
             ValidationException.class, () -> new AndroidManifestValidator().validateModule(module));
     assertThat(exception)
         .hasMessageThat()
-        .contains("The base module cannot be marked as onDemand='true'");
+        .contains("The base module cannot be marked on-demand since it will always be served.");
+  }
+
+  @Test
+  public void base_withOnDemandDeliveryElement_throws() throws Exception {
+    BundleModule module =
+        new BundleModuleBuilder(BASE_MODULE_NAME)
+            .setManifest(androidManifest(PKG_NAME, withOnDemandDelivery()))
+            .build();
+
+    ValidationException exception =
+        assertThrows(
+            ValidationException.class, () -> new AndroidManifestValidator().validateModule(module));
+    assertThat(exception)
+        .hasMessageThat()
+        .contains("The base module cannot be marked on-demand since it will always be served.");
   }
 
   @Test
@@ -181,7 +217,7 @@ public class AndroidManifestValidatorTest {
   }
 
   @Test
-  public void nonBase_withOnDemandAttributeNotSet_throws() throws Exception {
+  public void nonBase_withNoDeliverySettings_throws() throws Exception {
     BundleModule module =
         new BundleModuleBuilder(FEATURE_MODULE_NAME).setManifest(androidManifest(PKG_NAME)).build();
 
@@ -192,8 +228,8 @@ public class AndroidManifestValidatorTest {
         .hasMessageThat()
         .contains(
             String.format(
-                "The element <dist:module> in the AndroidManifest.xml must have the attribute "
-                    + "'onDemand' explicitly set (module: '%s')",
+                "The module must explicitly set its delivery options using the <dist:delivery> "
+                    + "element (module: '%s')",
                 FEATURE_MODULE_NAME));
   }
 
@@ -201,7 +237,8 @@ public class AndroidManifestValidatorTest {
   public void nonBase_withOnDemandAttributeSetToTrue_ok() throws Exception {
     BundleModule module =
         new BundleModuleBuilder(FEATURE_MODULE_NAME)
-            .setManifest(androidManifest(PKG_NAME, withOnDemand(true), withFusingAttribute(true)))
+            .setManifest(
+                androidManifest(PKG_NAME, withOnDemandAttribute(true), withFusingAttribute(true)))
             .build();
 
     new AndroidManifestValidator().validateModule(module);
@@ -211,19 +248,71 @@ public class AndroidManifestValidatorTest {
   public void nonBase_withOnDemandAttributeSetToFalse_ok() throws Exception {
     BundleModule module =
         new BundleModuleBuilder(FEATURE_MODULE_NAME)
-            .setManifest(androidManifest(PKG_NAME, withOnDemand(false), withFusingAttribute(false)))
+            .setManifest(
+                androidManifest(PKG_NAME, withOnDemandAttribute(false), withFusingAttribute(false)))
             .build();
 
     new AndroidManifestValidator().validateModule(module);
   }
 
   @Test
-  public void onDemandAndInstantAttributeSetToTrue_throws() throws Exception {
+  public void nonBase_withOnDemandDeliveryElement_ok() throws Exception {
+    BundleModule module =
+        new BundleModuleBuilder(FEATURE_MODULE_NAME)
+            .setManifest(
+                androidManifest(PKG_NAME, withOnDemandDelivery(), withFusingAttribute(true)))
+            .build();
+
+    new AndroidManifestValidator().validateModule(module);
+  }
+
+  @Test
+  public void nonBase_withInstallTimeDeliveryElement_ok() throws Exception {
+    BundleModule module =
+        new BundleModuleBuilder(FEATURE_MODULE_NAME)
+            .setManifest(
+                androidManifest(PKG_NAME, withInstallTimeDelivery(), withFusingAttribute(true)))
+            .build();
+
+    new AndroidManifestValidator().validateModule(module);
+  }
+
+  @Test
+  public void nonBase_withConditions_ok() throws Exception {
+    BundleModule module =
+        new BundleModuleBuilder(FEATURE_MODULE_NAME)
+            .setManifest(
+                androidManifest(PKG_NAME, withMinSdkCondition(25), withFusingAttribute(true)))
+            .build();
+
+    new AndroidManifestValidator().validateModule(module);
+  }
+
+  @Test
+  public void nonBase_withConditionsAndOnDemandDeliveryElement_ok() throws Exception {
     BundleModule module =
         new BundleModuleBuilder(FEATURE_MODULE_NAME)
             .setManifest(
                 androidManifest(
-                    PKG_NAME, withOnDemand(true), withInstant(true), withFusingAttribute(true)))
+                    PKG_NAME,
+                    withMinSdkCondition(25),
+                    withOnDemandDelivery(),
+                    withFusingAttribute(true)))
+            .build();
+
+    new AndroidManifestValidator().validateModule(module);
+  }
+
+  @Test
+  public void nonBase_withConditionsAndOnDemandAttribute_throws() throws Exception {
+    BundleModule module =
+        new BundleModuleBuilder(FEATURE_MODULE_NAME)
+            .setManifest(
+                androidManifest(
+                    PKG_NAME,
+                    withMinSdkCondition(25),
+                    withOnDemandAttribute(true),
+                    withFusingAttribute(true)))
             .build();
 
     ValidationException exception =
@@ -233,8 +322,51 @@ public class AndroidManifestValidatorTest {
         .hasMessageThat()
         .contains(
             String.format(
-                "The attribute 'onDemand' and 'instant' cannot both be true"
-                    + " at the same time (module '%s').",
+                "Module '%s' cannot use <dist:delivery> settings and legacy dist:onDemand "
+                    + "attribute at the same time",
+                FEATURE_MODULE_NAME));
+  }
+
+  @Test
+  public void onDemandAndInstantAttributeSetToTrue_throws() throws Exception {
+    BundleModule module =
+        new BundleModuleBuilder(FEATURE_MODULE_NAME)
+            .setManifest(
+                androidManifest(
+                    PKG_NAME,
+                    withOnDemandAttribute(true),
+                    withInstant(true),
+                    withFusingAttribute(true)))
+            .build();
+
+    ValidationException exception =
+        assertThrows(
+            ValidationException.class, () -> new AndroidManifestValidator().validateModule(module));
+    assertThat(exception)
+        .hasMessageThat()
+        .contains(
+            String.format(
+                "Module cannot be on-demand and 'instant' at the same time (module '%s').",
+                FEATURE_MODULE_NAME));
+  }
+
+  @Test
+  public void onDemandElementAndInstantAttributeSetToTrue_throws() throws Exception {
+    BundleModule module =
+        new BundleModuleBuilder(FEATURE_MODULE_NAME)
+            .setManifest(
+                androidManifest(
+                    PKG_NAME, withOnDemandDelivery(), withInstant(true), withFusingAttribute(true)))
+            .build();
+
+    ValidationException exception =
+        assertThrows(
+            ValidationException.class, () -> new AndroidManifestValidator().validateModule(module));
+    assertThat(exception)
+        .hasMessageThat()
+        .contains(
+            String.format(
+                "Module cannot be on-demand and 'instant' at the same time (module '%s').",
                 FEATURE_MODULE_NAME));
   }
 
@@ -244,7 +376,43 @@ public class AndroidManifestValidatorTest {
         new BundleModuleBuilder(FEATURE_MODULE_NAME)
             .setManifest(
                 androidManifest(
-                    PKG_NAME, withOnDemand(false), withInstant(true), withFusingAttribute(true)))
+                    PKG_NAME,
+                    withOnDemandAttribute(false),
+                    withInstant(true),
+                    withFusingAttribute(true)))
+            .build();
+
+    new AndroidManifestValidator().validateModule(module);
+  }
+
+  @Test
+  public void installTimeDeliveryAndInstantAttributeSetToTrue_ok() throws Exception {
+    BundleModule module =
+        new BundleModuleBuilder(FEATURE_MODULE_NAME)
+            .setManifest(
+                androidManifest(
+                    PKG_NAME,
+                    withInstallTimeDelivery(),
+                    withInstant(true),
+                    withFusingAttribute(true)))
+            .build();
+
+    new AndroidManifestValidator().validateModule(module);
+  }
+
+  @Test
+  public void installTimeAndOnDemandDeliveryAndInstantAttributeSetToTrue_ok() throws Exception {
+    // On-demand delivery element does not make a module on-demand if install-time element is
+    // present.
+    BundleModule module =
+        new BundleModuleBuilder(FEATURE_MODULE_NAME)
+            .setManifest(
+                androidManifest(
+                    PKG_NAME,
+                    withInstallTimeDelivery(),
+                    withOnDemandDelivery(),
+                    withInstant(true),
+                    withFusingAttribute(true)))
             .build();
 
     new AndroidManifestValidator().validateModule(module);
@@ -271,30 +439,6 @@ public class AndroidManifestValidatorTest {
             String.format(
                 "The attribute 'instant' cannot be true for conditional module" + " (module '%s').",
                 FEATURE_MODULE_NAME));
-  }
-
-  @Test
-  public void conditionalModuleAndOnDemandAttribute_throws() throws Exception {
-    BundleModule module =
-        new BundleModuleBuilder(FEATURE_MODULE_NAME)
-            .setManifest(
-                androidManifest(
-                    PKG_NAME,
-                    withOnDemand(true),
-                    withFusingAttribute(true),
-                    withFeatureCondition("com.hardware.camera.ar")))
-            .build();
-
-    ValidationException exception =
-        assertThrows(
-            ValidationException.class, () -> new AndroidManifestValidator().validateModule(module));
-    assertThat(exception)
-        .hasMessageThat()
-        .contains(
-            String.format(
-                "The element <dist:module> in the AndroidManifest.xml must not have the attribute "
-                    + "'onDemand' set if the module is conditional (module: '%s').",
-                module.getName()));
   }
 
   @Test
@@ -346,12 +490,13 @@ public class AndroidManifestValidatorTest {
   public void withMaxSdkLessThanInstantSdk_throws() throws Exception {
     BundleModule module =
         new BundleModuleBuilder(FEATURE_MODULE_NAME)
-            .setManifest(androidManifest(
-                PKG_NAME,
-                withInstant(true),
-                withOnDemand(false),
-                withFusingAttribute(false),
-                withMaxSdkVersion(18)))
+            .setManifest(
+                androidManifest(
+                    PKG_NAME,
+                    withInstant(true),
+                    withOnDemandAttribute(false),
+                    withFusingAttribute(false),
+                    withMaxSdkVersion(18)))
             .build();
 
     MaxSdkLessThanMinInstantSdk e =
@@ -368,12 +513,13 @@ public class AndroidManifestValidatorTest {
   public void withMaxSdkEqualToInstantSdk_ok() throws Exception {
     BundleModule module =
         new BundleModuleBuilder(FEATURE_MODULE_NAME)
-            .setManifest(androidManifest(
-                PKG_NAME,
-                withInstant(true),
-                withOnDemand(false),
-                withFusingAttribute(false),
-                withMaxSdkVersion(21)))
+            .setManifest(
+                androidManifest(
+                    PKG_NAME,
+                    withInstant(true),
+                    withOnDemandAttribute(false),
+                    withFusingAttribute(false),
+                    withMaxSdkVersion(21)))
             .build();
 
     new AndroidManifestValidator().validateModule(module);
@@ -383,19 +529,86 @@ public class AndroidManifestValidatorTest {
   public void instantFeature_noMaxSdk() throws Exception {
     BundleModule module =
         new BundleModuleBuilder(FEATURE_MODULE_NAME)
-            .setManifest(androidManifest(
-                PKG_NAME,
-                withInstant(true),
-                withOnDemand(false),
-                withFusingAttribute(false)))
+            .setManifest(
+                androidManifest(
+                    PKG_NAME,
+                    withInstant(true),
+                    withOnDemandAttribute(false),
+                    withFusingAttribute(false)))
             .build();
 
     new AndroidManifestValidator().validateModule(module);
+  }
+
+  @Test
+  public void withMultipleSplitIds_throws() throws Exception {
+    BundleModule module =
+        new BundleModuleBuilder(BASE_MODULE_NAME)
+            .setManifest(
+                androidManifest(
+                    PKG_NAME,
+                    withSplitId("module-split-name"),
+                    withSecondSplitId("module-split-name2")))
+            .build();
+
+    ValidationException e =
+        assertThrows(
+            ValidationException.class, () -> new AndroidManifestValidator().validateModule(module));
+
+    assertThat(e).hasMessageThat().contains("attribute 'split' cannot be declared more than once");
+  }
+
+  @Test
+  public void withoutSplitIds() throws Exception {
+    BundleModule module =
+        new BundleModuleBuilder(BASE_MODULE_NAME).setManifest(androidManifest(PKG_NAME)).build();
+
+    new AndroidManifestValidator().validateModule(module);
+  }
+
+  @Test
+  public void withOneSplitId() throws Exception {
+    BundleModule module =
+        new BundleModuleBuilder(BASE_MODULE_NAME)
+            .setManifest(androidManifest(PKG_NAME, withSplitId("module-split-name")))
+            .build();
+
+    new AndroidManifestValidator().validateModule(module);
+  }
+
+  private static ManifestMutator withSecondSplitId(String splitId) {
+    return manifestElement ->
+        manifestElement.addAttribute(
+            XmlProtoAttributeBuilder.create("split").setValueAsString(splitId));
   }
 
   private BundleModule baseModule(ManifestMutator... mutators) throws IOException {
     return new BundleModuleBuilder(BASE_MODULE_NAME)
         .setManifest(androidManifest(PKG_NAME, mutators))
         .build();
+  }
+
+  @Test
+  public void instantModule_withoutBase_throws() throws Exception {
+    BundleModule featureModule =
+        new BundleModuleBuilder(FEATURE_MODULE_NAME)
+            .setManifest(
+                androidManifest(
+                    PKG_NAME,
+                    withInstant(true),
+                    withOnDemandAttribute(false),
+                    withFusingAttribute(false)))
+            .build();
+
+    Throwable exception =
+        assertThrows(
+            ValidationException.class,
+            () ->
+                new AndroidManifestValidator()
+                    .validateAllModules(ImmutableList.of(baseModule(), featureModule)));
+    assertThat(exception)
+        .hasMessageThat()
+        .contains(
+            "App Bundle contains instant modules but the 'base' module is not marked 'instant'.");
   }
 }

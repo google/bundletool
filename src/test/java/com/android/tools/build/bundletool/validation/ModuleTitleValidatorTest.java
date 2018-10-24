@@ -17,7 +17,7 @@
 package com.android.tools.build.bundletool.validation;
 
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifest;
-import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withOnDemand;
+import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withOnDemandAttribute;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withTitle;
 import static com.android.tools.build.bundletool.testing.ResourcesTableFactory.TEST_LABEL_RESOURCE_ID;
 import static com.android.tools.build.bundletool.testing.ResourcesTableFactory.resourceTableWithTestLabel;
@@ -54,7 +54,7 @@ public class ModuleTitleValidatorTest {
     ImmutableList<BundleModule> allModules =
         ImmutableList.of(
             module("base", androidManifest(PKG_NAME)),
-            module("demand", androidManifest(PKG_NAME, withOnDemand(true))));
+            module("demand", androidManifest(PKG_NAME, withOnDemandAttribute(true))));
 
     ValidationException exception =
         assertThrows(
@@ -73,7 +73,7 @@ public class ModuleTitleValidatorTest {
     ImmutableList<BundleModule> allModules =
         ImmutableList.of(
             module("base", androidManifest(PKG_NAME), "0.4.2"),
-            module("demand", androidManifest(PKG_NAME, withOnDemand(true)), "0.4.2"));
+            module("demand", androidManifest(PKG_NAME, withOnDemandAttribute(true)), "0.4.2"));
 
     new ModuleTitleValidator().validateAllModules(allModules);
   }
@@ -98,7 +98,7 @@ public class ModuleTitleValidatorTest {
                 "demand",
                 androidManifest(
                     PKG_NAME,
-                    withOnDemand(true),
+                    withOnDemandAttribute(true),
                     withTitle("@string/test_label", TEST_LABEL_RESOURCE_ID))));
 
     ValidationException exception =
@@ -118,7 +118,7 @@ public class ModuleTitleValidatorTest {
                 "demand",
                 androidManifest(
                     PKG_NAME,
-                    withOnDemand(true),
+                    withOnDemandAttribute(true),
                     withTitle("@string/test_label", TEST_LABEL_RESOURCE_ID))));
 
     new ModuleTitleValidator().validateAllModules(allModules);

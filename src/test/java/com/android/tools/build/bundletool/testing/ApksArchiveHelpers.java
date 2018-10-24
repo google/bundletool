@@ -24,6 +24,7 @@ import com.android.bundle.Commands.SplitApkMetadata;
 import com.android.bundle.Commands.StandaloneApkMetadata;
 import com.android.bundle.Commands.Variant;
 import com.android.bundle.Targeting.ApkTargeting;
+import com.android.bundle.Targeting.ModuleTargeting;
 import com.android.bundle.Targeting.VariantTargeting;
 import com.android.tools.build.bundletool.io.ZipBuilder;
 import com.android.tools.build.bundletool.model.ZipPath;
@@ -66,6 +67,23 @@ public final class ApksArchiveHelpers {
         createSplitApkSet("base", createMasterApkDescription(apkTargeting, apkPath)));
   }
 
+  public static Variant standaloneVariant(
+      VariantTargeting variantTargeting, ApkTargeting apkTargeting, ZipPath apkPath) {
+    // A standalone variant has only a single APK with module named "base".
+    return createVariant(
+        variantTargeting,
+        ApkSet.newBuilder()
+            .setModuleMetadata(ModuleMetadata.newBuilder().setName("base"))
+            .addApkDescription(
+                ApkDescription.newBuilder()
+                    .setTargeting(apkTargeting)
+                    .setPath(apkPath.toString())
+                    // Contents of the standalone APK metadata is not important for these tests
+                    // as long as the field is set.
+                    .setStandaloneApkMetadata(StandaloneApkMetadata.getDefaultInstance()))
+            .build());
+  }
+
   public static ApkSet createSplitApkSet(String moduleName, ApkDescription... apkDescription) {
     return createSplitApkSet(
         moduleName,
@@ -89,6 +107,18 @@ public final class ApksArchiveHelpers {
         .build();
   }
 
+  public static ApkSet createConditionalApkSet(
+      String moduleName, ModuleTargeting moduleTargeting, ApkDescription... apkDescriptions) {
+    return ApkSet.newBuilder()
+        .setModuleMetadata(
+            ModuleMetadata.newBuilder()
+                .setName(moduleName)
+                .setTargeting(moduleTargeting)
+                .setOnDemand(false))
+        .addAllApkDescription(Arrays.asList(apkDescriptions))
+        .build();
+  }
+
   public static ApkDescription createMasterApkDescription(ApkTargeting apkTargeting, Path apkPath) {
     return createApkDescription(apkTargeting, apkPath, /* isMasterSplit= */ true);
   }
@@ -99,6 +129,26 @@ public final class ApksArchiveHelpers {
         .setPath(apkPath.toString())
         .setTargeting(apkTargeting)
         .setSplitApkMetadata(SplitApkMetadata.newBuilder().setIsMasterSplit(isMasterSplit))
+        .build();
+  }
+
+  public static ApkDescription splitApkDescription(ApkTargeting apkTargeting, ZipPath apkPath) {
+    return ApkDescription.newBuilder()
+        .setTargeting(apkTargeting)
+        .setPath(apkPath.toString())
+        // Contents of the split APK metadata is not important for these tests as long as
+        // the field is set.
+        .setSplitApkMetadata(SplitApkMetadata.getDefaultInstance())
+        .build();
+  }
+
+  public static ApkDescription instantApkDescription(ApkTargeting apkTargeting, ZipPath apkPath) {
+    return ApkDescription.newBuilder()
+        .setTargeting(apkTargeting)
+        .setPath(apkPath.toString())
+        // Contents of the instant APK metadata is not important for these tests as long as
+        // the field is set.
+        .setInstantApkMetadata(SplitApkMetadata.getDefaultInstance())
         .build();
   }
 

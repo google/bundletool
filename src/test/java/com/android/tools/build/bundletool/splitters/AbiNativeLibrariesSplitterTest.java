@@ -18,7 +18,9 @@ package com.android.tools.build.bundletool.splitters;
 
 import static com.android.bundle.Targeting.Abi.AbiAlias.X86;
 import static com.android.bundle.Targeting.Abi.AbiAlias.X86_64;
+import static com.android.tools.build.bundletool.model.ManifestMutator.withSplitsRequired;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifest;
+import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.compareManifestMutators;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.apkAbiTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.lPlusVariantTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.nativeDirectoryTargeting;
@@ -104,9 +106,7 @@ public class AbiNativeLibrariesSplitterTest {
   public void neverProducesMasterSplit() throws Exception {
     ModuleSplit inputSplit =
         ModuleSplit.forNativeLibraries(
-                createSingleLibraryModule("testModule", "x86", "lib/x86/libnoname.so"))
-            .toBuilder()
-            .build();
+            createSingleLibraryModule("testModule", "x86", "lib/x86/libnoname.so"));
     assertThat(inputSplit.isMasterSplit()).isTrue();
 
     ImmutableCollection<ModuleSplit> splits = new AbiNativeLibrariesSplitter().split(inputSplit);
@@ -116,7 +116,7 @@ public class AbiNativeLibrariesSplitterTest {
   }
 
   @Test
-  public void testNativeSplitIdEqualsToModuleName_base() throws Exception {
+  public void nativeSplitIdEqualsToModuleName_base() throws Exception {
     AbiNativeLibrariesSplitter abiNativeLibrariesSplitter = new AbiNativeLibrariesSplitter();
     ImmutableCollection<ModuleSplit> splits =
         abiNativeLibrariesSplitter.split(
@@ -134,7 +134,7 @@ public class AbiNativeLibrariesSplitterTest {
   }
 
   @Test
-  public void testMasterSplitIdEqualsToModuleName_nonBase() throws Exception {
+  public void masterSplitIdEqualsToModuleName_nonBase() throws Exception {
     AbiNativeLibrariesSplitter abiNativeLibrariesSplitter = new AbiNativeLibrariesSplitter();
     ImmutableCollection<ModuleSplit> splits =
         abiNativeLibrariesSplitter.split(
@@ -184,6 +184,35 @@ public class AbiNativeLibrariesSplitterTest {
     assertThat(leftOverSplit.isMasterSplit()).isTrue();
     assertThat(extractPaths(leftOverSplit.getEntries()))
         .containsExactly("dex/classes.dex", "assets/leftover.txt");
+  }
+
+  @Test
+  public void manifestMutatorToRequireSplits_registered_whenAbisPresent() throws Exception {
+    ModuleSplit inputSplit =
+        ModuleSplit.forNativeLibraries(
+            createSingleLibraryModule("testModule", "x86", "lib/x86/libnoname.so"));
+
+    ImmutableCollection<ModuleSplit> splits = new AbiNativeLibrariesSplitter().split(inputSplit);
+
+    assertThat(splits).hasSize(1);
+    assertThat(
+            compareManifestMutators(
+                splits.asList().get(0).getMasterManifestMutators(), withSplitsRequired(true)))
+        .isTrue();
+  }
+
+  @Test
+  public void manifestMutatorToRequireSplits_notRegistered_whenNoAbis() throws Exception {
+    ModuleSplit inputSplit =
+        ModuleSplit.forNativeLibraries(
+            new BundleModuleBuilder("testModule")
+                .setManifest(androidManifest("com.test.app"))
+                .build());
+
+    ImmutableCollection<ModuleSplit> splits = new AbiNativeLibrariesSplitter().split(inputSplit);
+
+    assertThat(splits).hasSize(1);
+    assertThat(splits.asList().get(0).getMasterManifestMutators()).isEmpty();
   }
 
   /** Creates a minimal module with one native library targeted at the given cpu architecture. */

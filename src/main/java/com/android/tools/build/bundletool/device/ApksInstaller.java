@@ -16,6 +16,7 @@
 
 package com.android.tools.build.bundletool.device;
 
+import static com.android.tools.build.bundletool.device.AdbServer.ADB_TIMEOUT_MS;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 
 import com.android.tools.build.bundletool.exceptions.CommandExecutionException;
@@ -32,7 +33,6 @@ import java.util.function.Predicate;
 public class ApksInstaller {
 
   private final AdbServer adbServer;
-  private static final int ADB_TIMEOUT_MS = 60000;
 
   /** Initializes the instance. Expects the {@link AdbServer} to be initialized. */
   public ApksInstaller(AdbServer adbServer) {

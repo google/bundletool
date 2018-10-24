@@ -20,7 +20,7 @@ import static com.android.bundle.Targeting.Abi.AbiAlias.X86;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifest;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withFusingAttribute;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withHasCode;
-import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withOnDemand;
+import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withOnDemandAttribute;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withUsesSplit;
 import static com.android.tools.build.bundletool.testing.ResourcesTableFactory.createResourceTable;
 import static com.android.tools.build.bundletool.testing.ResourcesTableFactory.fileReference;
@@ -694,7 +694,7 @@ public class BuildBundleCommandTest {
                 androidManifest(
                     PKG_NAME,
                     withUsesSplit("module2"),
-                    withOnDemand(false),
+                    withOnDemandAttribute(false),
                     withFusingAttribute(true)))
             .writeTo(tmpDir.resolve("module1.zip"));
     Path module2Path =
@@ -704,7 +704,7 @@ public class BuildBundleCommandTest {
                 androidManifest(
                     PKG_NAME,
                     withUsesSplit("module3"),
-                    withOnDemand(false),
+                    withOnDemandAttribute(false),
                     withFusingAttribute(true)))
             .writeTo(tmpDir.resolve("module2.zip"));
     Path module3Path =
@@ -714,7 +714,7 @@ public class BuildBundleCommandTest {
                 androidManifest(
                     PKG_NAME,
                     withUsesSplit("module1"),
-                    withOnDemand(false),
+                    withOnDemandAttribute(false),
                     withFusingAttribute(true)))
             .writeTo(tmpDir.resolve("module3.zip"));
     BuildBundleCommand command =

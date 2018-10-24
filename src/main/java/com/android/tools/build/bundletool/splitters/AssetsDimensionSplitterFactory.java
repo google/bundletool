@@ -16,6 +16,7 @@
 
 package com.android.tools.build.bundletool.splitters;
 
+import static com.android.tools.build.bundletool.model.ManifestMutator.withSplitsRequired;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 
@@ -93,18 +94,24 @@ public class AssetsDimensionSplitterFactory {
             Multimaps.index(
                 assets.getDirectoryList(),
                 targetedDirectory -> dimensionGetter.apply(targetedDirectory.getTargeting()));
-        return directoriesMap
-            .asMap()
-            .entrySet()
-            .stream()
+        return directoriesMap.asMap().entrySet().stream()
             .map(
-                entry ->
-                    split
-                        .toBuilder()
-                        .setEntries(findEntriesInDirectories(entry.getValue(), split))
-                        .setApkTargeting(generateTargeting(split.getApkTargeting(), entry.getKey()))
-                        .setMasterSplit(split.isMasterSplit() && isDefaultTargeting(entry.getKey()))
-                        .build())
+                entry -> {
+                  ModuleSplit.Builder modifiedSplit = split.toBuilder();
+
+                  boolean isMasterSplit =
+                      split.isMasterSplit() && isDefaultTargeting(entry.getKey());
+
+                  modifiedSplit
+                      .setEntries(findEntriesInDirectories(entry.getValue(), split))
+                      .setApkTargeting(generateTargeting(split.getApkTargeting(), entry.getKey()))
+                      .setMasterSplit(isMasterSplit);
+                  if (!isMasterSplit) {
+                    modifiedSplit.addMasterManifestMutator(withSplitsRequired(true));
+                  }
+
+                  return modifiedSplit.build();
+                })
             .filter(moduleSplit -> !moduleSplit.getEntries().isEmpty())
             .collect(toImmutableList());
       }

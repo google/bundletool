@@ -121,7 +121,7 @@ public abstract class SigningConfiguration {
           return readSigningConfigFromLoadedKeyStore(
               keystore, keyAlias, optionalKeyPassword.get().getValue().getPassword());
         } catch (UnrecoverableKeyException e) {
-          throw new CommandExecutionException("Incorrect key password.");
+          throw new CommandExecutionException("Incorrect key password.", e);
         }
       }
 
@@ -137,7 +137,7 @@ public abstract class SigningConfiguration {
                   System.console().readPassword("Enter password for key '%s': ", keyAlias));
           return readSigningConfigFromLoadedKeyStore(keystore, keyAlias, keyPassword.getPassword());
         } catch (UnrecoverableKeyException e) {
-          throw new CommandExecutionException("Incorrect key password.");
+          throw new CommandExecutionException("Incorrect key password.", e);
         }
       }
     } catch (IOException | NoSuchAlgorithmException | KeyStoreException | CertificateException e) {

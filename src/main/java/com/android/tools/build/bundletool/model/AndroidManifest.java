@@ -28,10 +28,11 @@ import com.android.tools.build.bundletool.utils.xmlproto.XmlProtoAttribute;
 import com.android.tools.build.bundletool.utils.xmlproto.XmlProtoElement;
 import com.android.tools.build.bundletool.utils.xmlproto.XmlProtoElementBuilder;
 import com.android.tools.build.bundletool.utils.xmlproto.XmlProtoNode;
-import com.android.tools.build.bundletool.utils.xmlproto.XmlProtoNodeBuilder;
+import com.android.tools.build.bundletool.version.BundleToolVersion;
 import com.android.tools.build.bundletool.version.Version;
 import com.google.auto.value.AutoValue;
 import com.google.auto.value.extension.memoized.Memoized;
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Splitter;
 import com.google.common.collect.ImmutableList;
 import java.util.Optional;
@@ -48,8 +49,10 @@ public abstract class AndroidManifest {
 
   private static final Splitter COMMA_SPLITTER = Splitter.on(',');
 
-  public static final String ANDROID_NAMESPACE = "http://schemas.android.com/apk/res/android";
-  public static final String DISTRIBUTION_NAMESPACE = "http://schemas.android.com/apk/distribution";
+  public static final String ANDROID_NAMESPACE_URI = "http://schemas.android.com/apk/res/android";
+  public static final String DISTRIBUTION_NAMESPACE_URI =
+      "http://schemas.android.com/apk/distribution";
+  public static final String NO_NAMESPACE_URI = "";
 
   public static final String APPLICATION_ELEMENT_NAME = "application";
   public static final String META_DATA_ELEMENT_NAME = "meta-data";
@@ -88,11 +91,26 @@ public abstract class AndroidManifest {
   public static final String META_DATA_KEY_FUSED_MODULE_NAMES =
       "com.android.dynamic.apk.fused.modules";
 
+  /**
+   * Boolean <meta-data> entry indicating whether the app is capable of running without any splits
+   * other than the base master split.
+   *
+   * <p>Written in master split of the base module.
+   */
+  public static final String META_DATA_KEY_SPLITS_REQUIRED = "com.android.vending.splits.required";
+
   public abstract XmlProtoNode getManifestRoot();
+
+  abstract Version getBundleToolVersion();
 
   @Memoized
   XmlProtoElement getManifestElement() {
     return getManifestRoot().getElement();
+  }
+
+  @Memoized
+  public Optional<ManifestDeliveryElement> getManifestDeliveryElement() {
+    return ManifestDeliveryElement.fromManifestElement(getManifestElement());
   }
 
   /**
@@ -100,12 +118,17 @@ public abstract class AndroidManifest {
    *
    * @param manifestRoot the parsed proto of the root of the manifest
    */
-  public static AndroidManifest create(XmlProtoNode manifestRoot) {
-    return new AutoValue_AndroidManifest(manifestRoot);
+  public static AndroidManifest create(XmlProtoNode manifestRoot, Version bundleToolVersion) {
+    return new AutoValue_AndroidManifest(manifestRoot, bundleToolVersion);
   }
 
+  public static AndroidManifest create(XmlNode manifestRoot, Version bundleToolVersion) {
+    return create(new XmlProtoNode(manifestRoot), bundleToolVersion);
+  }
+
+  @VisibleForTesting
   public static AndroidManifest create(XmlNode manifestRoot) {
-    return create(new XmlProtoNode(manifestRoot));
+    return create(manifestRoot, BundleToolVersion.getCurrentVersion());
   }
 
   /**
@@ -129,7 +152,7 @@ public abstract class AndroidManifest {
     checkNotNull(packageName);
 
     ManifestEditor editor =
-        new ManifestEditor(createMinimalManifestTag())
+        new ManifestEditor(createMinimalManifestTag(), BundleToolVersion.getCurrentVersion())
             .setPackage(packageName)
             .setVersionCode(versionCode)
             .setSplitId(splitId)
@@ -144,7 +167,7 @@ public abstract class AndroidManifest {
   private static XmlProtoNode createMinimalManifestTag() {
     return XmlProtoNode.createElementNode(
         XmlProtoElementBuilder.create("manifest")
-            .addNamespaceDeclaration("android", ANDROID_NAMESPACE)
+            .addNamespaceDeclaration("android", ANDROID_NAMESPACE_URI)
             .build());
   }
 
@@ -154,12 +177,13 @@ public abstract class AndroidManifest {
 
   @CheckReturnValue
   public AndroidManifest applyMutators(ImmutableList<ManifestMutator> manifestMutators) {
-    XmlProtoNodeBuilder xmlProtoNode = getManifestRoot().toBuilder();
+    ManifestEditor manifestEditor = toEditor();
     for (ManifestMutator manifestMutator : manifestMutators) {
-      manifestMutator.accept(xmlProtoNode.getElement());
+      manifestMutator.accept(manifestEditor);
     }
-    return AndroidManifest.create(xmlProtoNode.build().getProto());
+    return manifestEditor.save();
   }
+
   /**
    * Extracts value of the {@code <application android:debuggable>} attribute.
    *
@@ -215,19 +239,19 @@ public abstract class AndroidManifest {
         .map(XmlProtoAttribute::getValueAsBoolean);
   }
 
-  public Optional<Boolean> getIsModuleIncludedInFusing(Version bundleToolVersion) {
+  public Optional<Boolean> getIsModuleIncludedInFusing() {
     return getManifestElement()
-        .getOptionalChildElement(DISTRIBUTION_NAMESPACE, "module")
-        .flatMap(module -> module.getOptionalChildElement(DISTRIBUTION_NAMESPACE, "fusing"))
+        .getOptionalChildElement(DISTRIBUTION_NAMESPACE_URI, "module")
+        .flatMap(module -> module.getOptionalChildElement(DISTRIBUTION_NAMESPACE_URI, "fusing"))
         .map(
             fusing -> {
-              if (bundleToolVersion.isOlderThan(Version.of("0.3.4-dev"))) {
+              if (getBundleToolVersion().isOlderThan(Version.of("0.3.4-dev"))) {
                 return fusing
                     .getAttributeIgnoringNamespace("include")
                     .orElseThrow(() -> new FusingMissingIncludeAttribute(getSplitId()));
               } else {
                 return fusing
-                    .getAttribute(DISTRIBUTION_NAMESPACE, "include")
+                    .getAttribute(DISTRIBUTION_NAMESPACE_URI, "include")
                     .orElseThrow(() -> new FusingMissingIncludeAttribute(getSplitId()));
               }
             })
@@ -260,8 +284,8 @@ public abstract class AndroidManifest {
 
   public Optional<Integer> getTitleRefId() {
     return getManifestElement()
-        .getOptionalChildElement(DISTRIBUTION_NAMESPACE, "module")
-        .flatMap(module -> module.getAttribute(DISTRIBUTION_NAMESPACE, "title"))
+        .getOptionalChildElement(DISTRIBUTION_NAMESPACE_URI, "module")
+        .flatMap(module -> module.getAttribute(DISTRIBUTION_NAMESPACE_URI, "title"))
         .map(XmlProtoAttribute::getValueAsRefId);
   }
 
@@ -280,88 +304,54 @@ public abstract class AndroidManifest {
         .collect(toImmutableList());
   }
 
-  public Optional<Boolean> isOnDemandModule(Version bundleToolVersion) {
+  public Optional<XmlProtoAttribute> getOnDemandAttribute() {
     return getManifestElement()
-        .getOptionalChildElement(DISTRIBUTION_NAMESPACE, "module")
+        .getOptionalChildElement(DISTRIBUTION_NAMESPACE_URI, "module")
         .flatMap(
             module -> {
-              if (bundleToolVersion.isOlderThan(Version.of("0.3.4-dev"))) {
+              if (getBundleToolVersion().isOlderThan(Version.of("0.3.4-dev"))) {
                 return module.getAttributeIgnoringNamespace("onDemand");
               } else {
-                return module.getAttribute(DISTRIBUTION_NAMESPACE, "onDemand");
+                return module.getAttribute(DISTRIBUTION_NAMESPACE_URI, "onDemand");
               }
-            })
-        .map(XmlProtoAttribute::getValueAsBoolean);
+            });
+  }
+
+  /**
+   * Returns whether the module delivery settings are explicitly declared.
+   *
+   * <p>This can be done either in the old syntax by specifying dist:onDemand attribute value, or in
+   * the new syntax by populating the <dist:delivery> element.
+   */
+  public boolean isDeliveryTypeDeclared() {
+    if (getManifestDeliveryElement().isPresent()) {
+      return getManifestDeliveryElement().get().isWellFormed();
+    }
+
+    // Legacy syntax.
+    return getOnDemandAttribute().isPresent();
+  }
+
+  /**
+   * Returns whether the module is effectively on-demand.
+   *
+   * <p>On-demand here means the module will never be installed by Play, it can be only fetched
+   * using dynamic delivery.
+   */
+  public Optional<Boolean> isOnDemandModule() {
+    if (getManifestDeliveryElement().isPresent()) {
+      return Optional.of(!getManifestDeliveryElement().get().hasInstallTimeElement());
+    }
+
+    // Legacy syntax.
+    return getOnDemandAttribute().map(XmlProtoAttribute::getValueAsBoolean);
   }
 
   public Optional<Boolean> isInstantModule() {
     return getManifestElement()
-        .getOptionalChildElement(DISTRIBUTION_NAMESPACE, "module")
-        .flatMap(module -> module.getAttribute(DISTRIBUTION_NAMESPACE, "instant"))
+        .getOptionalChildElement(DISTRIBUTION_NAMESPACE_URI, "module")
+        .flatMap(module -> module.getAttribute(DISTRIBUTION_NAMESPACE_URI, "instant"))
         .map(XmlProtoAttribute::getValueAsBoolean);
-  }
-
-  public ImmutableList<DeviceFeatureCondition> getDeviceFeatureConditions() {
-    return getModuleConditions().getDeviceFeatureConditions();
-  }
-
-  /** Currently only <dist:device-feature> condition is supported. We reject all other values. */
-  public ModuleConditions getModuleConditions() {
-    ImmutableList<XmlProtoElement> conditionElements = getModuleConditionElements();
-
-    ModuleConditions.Builder moduleConditions = ModuleConditions.builder();
-    for (XmlProtoElement conditionElement : conditionElements) {
-      if (!conditionElement.getNamespaceUri().equals(DISTRIBUTION_NAMESPACE)) {
-        throw ValidationException.builder()
-            .withMessage(
-                "Invalid namespace found in the module condition element. "
-                    + "Expected '%s'; found '%s'.",
-                DISTRIBUTION_NAMESPACE, conditionElement.getNamespaceUri())
-            .build();
-      }
-      switch (conditionElement.getName()) {
-        case CONDITION_DEVICE_FEATURE_NAME:
-          moduleConditions.addDeviceFeatureCondition(parseDeviceFeatureCondition(conditionElement));
-          break;
-        case CONDITION_MIN_SDK_VERSION_NAME:
-          moduleConditions.setMinSdkVersion(parseMinSdkVersionCondition(conditionElement));
-          break;
-        default:
-          throw new ValidationException(
-              String.format("Unrecognized module condition: '%s'", conditionElement.getName()));
-      }
-    }
-    return moduleConditions.build();
-  }
-
-  private ImmutableList<XmlProtoElement> getModuleConditionElements() {
-    return getManifestElement()
-        .getOptionalChildElement(DISTRIBUTION_NAMESPACE, "module")
-        .flatMap(module -> module.getOptionalChildElement(DISTRIBUTION_NAMESPACE, "conditions"))
-        .map(conditions -> conditions.getChildrenElements().collect(toImmutableList()))
-        .orElse(ImmutableList.of());
-  }
-
-  private DeviceFeatureCondition parseDeviceFeatureCondition(XmlProtoElement conditionElement) {
-    return DeviceFeatureCondition.create(
-        conditionElement
-            .getAttribute(DISTRIBUTION_NAMESPACE, NAME_ATTRIBUTE_NAME)
-            .orElseThrow(
-                () ->
-                    new ValidationException(
-                        "Missing required 'name' attribute in the 'device-feature' condition "
-                            + "element."))
-            .getValueAsString());
-  }
-
-  private int parseMinSdkVersionCondition(XmlProtoElement conditionElement) {
-    return conditionElement
-        .getAttribute(DISTRIBUTION_NAMESPACE, VALUE_ATTRIBUTE_NAME)
-        .orElseThrow(
-            () ->
-                new ValidationException(
-                    "Missing required 'value' attribute in the 'min-sdk' condition element."))
-        .getValueAsDecimalInteger();
   }
 
   /**
@@ -394,7 +384,7 @@ public abstract class AndroidManifest {
     return getMetadataAttributeWithName(metadataName).map(XmlProtoAttribute::getValueAsString);
   }
 
-  /** Returns the string value specified in the meta-data of the given name, if it exists. */
+  /** Returns the integer value specified in the meta-data of the given name, if it exists. */
   public Optional<Integer> getMetadataValueAsInteger(String metadataName) {
     return getMetadataAttributeWithName(metadataName)
         .map(XmlProtoAttribute::getValueAsDecimalInteger);
@@ -474,6 +464,6 @@ public abstract class AndroidManifest {
   }
 
   public ManifestEditor toEditor() {
-    return new ManifestEditor(getManifestRoot());
+    return new ManifestEditor(getManifestRoot(), getBundleToolVersion());
   }
 }

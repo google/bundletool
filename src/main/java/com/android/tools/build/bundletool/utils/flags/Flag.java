@@ -44,6 +44,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
@@ -342,7 +343,10 @@ public abstract class Flag<T> {
     @Override
     protected Path parse(String value) {
       if (OsPlatform.getCurrentPlatform() != OsPlatform.WINDOWS) {
-        value = HOME_DIRECTORY_ALIAS.matcher(value).replaceFirst(System.getProperty("user.home"));
+        value =
+            HOME_DIRECTORY_ALIAS
+                .matcher(value)
+                .replaceFirst(Matcher.quoteReplacement(System.getProperty("user.home")));
       }
       return Paths.get(value);
     }

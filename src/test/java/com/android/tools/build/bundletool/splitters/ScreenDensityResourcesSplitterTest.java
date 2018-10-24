@@ -16,8 +16,10 @@
 
 package com.android.tools.build.bundletool.splitters;
 
+import static com.android.tools.build.bundletool.model.ManifestMutator.withSplitsRequired;
 import static com.android.tools.build.bundletool.splitters.ScreenDensityResourcesSplitter.DEFAULT_DENSITY_BUCKETS;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifest;
+import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.compareManifestMutators;
 import static com.android.tools.build.bundletool.testing.ResourcesTableFactory.HDPI;
 import static com.android.tools.build.bundletool.testing.ResourcesTableFactory.LDPI;
 import static com.android.tools.build.bundletool.testing.ResourcesTableFactory.MDPI;
@@ -41,6 +43,7 @@ import static com.android.tools.build.bundletool.utils.ResourcesUtils.DEFAULT_DE
 import static com.android.tools.build.bundletool.utils.ResourcesUtils.HDPI_VALUE;
 import static com.android.tools.build.bundletool.utils.ResourcesUtils.MDPI_VALUE;
 import static com.android.tools.build.bundletool.utils.ResourcesUtils.XXXHDPI_VALUE;
+import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.ImmutableSet.toImmutableSet;
 import static com.google.common.truth.Truth.assertThat;
 import static com.google.common.truth.Truth8.assertThat;
@@ -60,6 +63,7 @@ import com.android.tools.build.bundletool.testing.ResourcesTableFactory;
 import com.android.tools.build.bundletool.version.BundleToolVersion;
 import com.android.tools.build.bundletool.version.Version;
 import com.google.common.collect.ImmutableCollection;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.MoreCollectors;
 import com.google.common.collect.Sets;
@@ -783,6 +787,65 @@ public class ScreenDensityResourcesSplitterTest {
               .onlyWithConfigs(HDPI);
           assertThat(densitySplit.findEntry("res/drawable-hdpi/image.jpg")).isPresent();
         });
+  }
+
+  @Test
+  public void manifestMutatorToRequireSplits_notRegistered_whenNoDensityResources()
+      throws Exception {
+    BundleModule testModule =
+        new BundleModuleBuilder("testModule")
+            .addFile("res/drawable/test.jpg")
+            .setResourceTable(
+                resourceTable(
+                    pkg(
+                        USER_PACKAGE_OFFSET,
+                        "com.test.app",
+                        type(
+                            0x01,
+                            "drawable",
+                            entry(
+                                0x01,
+                                "test",
+                                fileReference(
+                                    "res/drawable/test.jpg",
+                                    Configuration.getDefaultInstance()))))))
+            .setManifest(androidManifest("com.test.app"))
+            .build();
+
+    ModuleSplit resourcesModule = ModuleSplit.forResources(testModule);
+
+    ImmutableCollection<ModuleSplit> splits = splitter.split(resourcesModule);
+    assertThat(splits).hasSize(1);
+    assertThat(splits.asList().get(0).getMasterManifestMutators()).isEmpty();
+  }
+
+  @Test
+  public void manifestMutatorToRequireSplits_registered_whenDensityResourcesPresent()
+      throws Exception {
+    BundleModule testModule =
+        new BundleModuleBuilder("testModule")
+            .addFile("res/drawable-mdpi/image.jpg")
+            .addFile("res/drawable-hdpi/image.jpg")
+            .setResourceTable(
+                ResourcesTableFactory.createResourceTable(
+                    "image",
+                    fileReference("res/drawable-mdpi/image.jpg", MDPI),
+                    fileReference("res/drawable-hdpi/image.jpg", HDPI)))
+            .setManifest(androidManifest("com.test.app"))
+            .build();
+
+    ImmutableCollection<ModuleSplit> densitySplits =
+        splitter.split(ModuleSplit.forResources(testModule));
+
+    ImmutableList<ModuleSplit> configSplits =
+        densitySplits.stream().filter(split -> !split.isMasterSplit()).collect(toImmutableList());
+    assertThat(configSplits).isNotEmpty();
+    for (ModuleSplit configSplit : configSplits) {
+      assertThat(
+              compareManifestMutators(
+                  configSplit.getMasterManifestMutators(), withSplitsRequired(true)))
+          .isTrue();
+    }
   }
 
   private static ModuleSplit findModuleSplitWithScreenDensityTargeting(

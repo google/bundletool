@@ -25,6 +25,7 @@ import com.android.bundle.Files.NativeLibraries;
 import com.android.bundle.Targeting.ModuleTargeting;
 import com.android.tools.build.bundletool.version.BundleToolVersion;
 import com.google.auto.value.AutoValue;
+import com.google.auto.value.extension.memoized.Memoized;
 import com.google.common.collect.ImmutableCollection;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
@@ -63,7 +64,13 @@ public abstract class BundleModule {
   /** The version of Bundletool that built this module, taken from BundleConfig. */
   public abstract BundleConfig getBundleConfig();
 
-  public abstract AndroidManifest getAndroidManifest();
+  abstract XmlNode getAndroidManifestProto();
+
+  @Memoized
+  public AndroidManifest getAndroidManifest() {
+    return AndroidManifest.create(
+        getAndroidManifestProto(), BundleToolVersion.getVersionFromBundleConfig(getBundleConfig()));
+  }
 
   public abstract Optional<ResourceTable> getResourceTable();
 
@@ -94,19 +101,13 @@ public abstract class BundleModule {
   }
 
   public boolean isOnDemandModule() {
-    Optional<Boolean> isOnDemandModule =
-        getAndroidManifest()
-            .isOnDemandModule(BundleToolVersion.getVersionFromBundleConfig(getBundleConfig()));
+    Optional<Boolean> isOnDemandModule = getAndroidManifest().isOnDemandModule();
     return isOnDemandModule.orElse(false);
   }
 
   public boolean isIncludedInFusing() {
     // The following should never throw if the module/bundle has been validated.
-    return isBaseModule()
-        || getAndroidManifest()
-            .getIsModuleIncludedInFusing(
-                BundleToolVersion.getVersionFromBundleConfig(getBundleConfig()))
-            .get();
+    return isBaseModule() || getAndroidManifest().getIsModuleIncludedInFusing().get();
   }
 
   public boolean isInstantModule() {
@@ -119,7 +120,11 @@ public abstract class BundleModule {
   }
 
   private ModuleTargeting getModuleTargeting() {
-    return getAndroidManifest().getModuleConditions().toTargeting();
+    return getAndroidManifest()
+        .getManifestDeliveryElement()
+        .map(ManifestDeliveryElement::getModuleConditions)
+        .map(ModuleConditions::toTargeting)
+        .orElse(ModuleTargeting.getDefaultInstance());
   }
 
   /**
@@ -171,11 +176,13 @@ public abstract class BundleModule {
 
     public abstract Builder setBundleConfig(BundleConfig value);
 
+    abstract BundleConfig getBundleConfig();
+
     abstract ImmutableMap.Builder<ZipPath, ModuleEntry> entryMapBuilder();
 
     abstract Builder setEntryMap(ImmutableMap<ZipPath, ModuleEntry> entryMap);
 
-    abstract Builder setAndroidManifest(AndroidManifest manifest);
+    abstract Builder setAndroidManifestProto(XmlNode manifestProto);
 
     abstract Builder setResourceTable(ResourceTable resourceTable);
 
@@ -202,7 +209,7 @@ public abstract class BundleModule {
     public Builder addEntry(ModuleEntry moduleEntry) throws IOException {
       if (moduleEntry.getPath().equals(MANIFEST_PATH)) {
         try (InputStream inputStream = moduleEntry.getContent()) {
-          setAndroidManifest(AndroidManifest.create(XmlNode.parseFrom(inputStream)));
+          setAndroidManifestProto(XmlNode.parseFrom(inputStream));
         }
       } else if (moduleEntry.getPath().equals(RESOURCES_PROTO_PATH)) {
         try (InputStream inputStream = moduleEntry.getContent()) {

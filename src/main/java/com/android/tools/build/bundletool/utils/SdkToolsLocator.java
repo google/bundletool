@@ -31,6 +31,7 @@ import java.nio.file.FileSystems;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.PathMatcher;
+import java.nio.file.Paths;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.NoSuchElementException;
 import java.util.Optional;
@@ -54,24 +55,45 @@ public final class SdkToolsLocator {
     this.adbPathMatcher = fileSystem.getPathMatcher(ADB_GLOB);
   }
 
-  /** Tries to extract aapt2 from the executable if found. */
+  /**
+   * Tries to extract aapt2 from the executable if found. The gradle tests extract aapt2 in a
+   * corresponding folder. In this case the folder is searched.
+   *
+   * <p>Returns an empty instance if no aapt2 binary is found inside the folder.
+   *
+   * @throws CommandExecutionException if aapt2 was not in or cannot be extracted from the
+   *     executable.
+   */
   public Optional<Path> extractAapt2(Path tempDir) {
     String osDir = getOsSpecificJarDirectory();
-
     // Attempt at locating the directory in question inside the jar.
     URL osDirUrl = SdkToolsLocator.class.getResource(osDir);
-
-    // If it's not found or we're not in a jar, fail.
-    if (osDirUrl == null || !"jar".equals(osDirUrl.getProtocol())) {
+    if (osDirUrl == null) {
       return Optional.empty();
     }
 
     Path aapt2;
     try {
       Path outputDir = tempDir.resolve("output");
-      extractFilesFromJar(outputDir, osDirUrl, osDir);
-      try (Stream<Path> aapt2Binaries = Files.find(outputDir, /* maxDepth= */ 3, AAPT2_MATCHER)) {
-        aapt2 = aapt2Binaries.collect(onlyElement());
+      // If we are in a jar, we are running from the executable.
+      // Extract aapt2 from the jar.
+      if ("jar".equals(osDirUrl.getProtocol())) {
+        extractFilesFromJar(outputDir, osDirUrl, osDir);
+        try (Stream<Path> aapt2Binaries = Files.find(outputDir, /* maxDepth= */ 3, AAPT2_MATCHER)) {
+          aapt2 = aapt2Binaries.collect(onlyElement());
+        }
+
+      } else {
+        // If we are not in a jar, this might be a test.
+        // Try to locate the aapt2 inside the directory.
+        try (Stream<Path> aapt2Binaries =
+            Files.find(Paths.get(osDirUrl.toURI()), /* maxDepth= */ 3, AAPT2_MATCHER)) {
+          Optional<Path> aapt2Path = aapt2Binaries.findFirst();
+          if (!aapt2Path.isPresent()) {
+            return Optional.empty();
+          }
+          aapt2 = aapt2Path.get();
+        }
       }
     } catch (NoSuchElementException e) {
       throw new CommandExecutionException("Unable to locate aapt2 inside jar.", e);

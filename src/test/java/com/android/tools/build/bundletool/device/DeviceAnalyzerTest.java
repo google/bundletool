@@ -18,6 +18,7 @@ package com.android.tools.build.bundletool.device;
 
 import static com.android.tools.build.bundletool.testing.DeviceFactory.abis;
 import static com.android.tools.build.bundletool.testing.DeviceFactory.density;
+import static com.android.tools.build.bundletool.testing.DeviceFactory.deviceFeatures;
 import static com.android.tools.build.bundletool.testing.DeviceFactory.locales;
 import static com.android.tools.build.bundletool.testing.DeviceFactory.mergeSpecs;
 import static com.android.tools.build.bundletool.testing.DeviceFactory.sdkVersion;
@@ -29,6 +30,7 @@ import com.android.ddmlib.IDevice.DeviceState;
 import com.android.tools.build.bundletool.exceptions.CommandExecutionException;
 import com.android.tools.build.bundletool.testing.FakeAdbServer;
 import com.android.tools.build.bundletool.testing.FakeDevice;
+import com.google.common.base.Joiner;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import java.nio.file.Paths;
@@ -86,19 +88,19 @@ public class DeviceAnalyzerTest {
   }
 
   @Test
-  public void noDeviceId_oneConnectedDevice_sdk21_fallBack() {
+  public void noDeviceId_oneConnectedDevice_sdk19_fallBack() {
     FakeAdbServer fakeAdbServer =
         new FakeAdbServer(
             /* hasInitialDeviceList= */ true,
             /* devices= */ ImmutableList.of(
-                createDeviceWithNoProperties("a", /* sdkVersion= */ 21, /* locale= */ "de-DE")));
+                createDeviceWithNoProperties("a", /* sdkVersion= */ 19, /* locale= */ "de-DE")));
     fakeAdbServer.init(Paths.get("path/to/adb"));
 
     DeviceSpec spec = new DeviceAnalyzer(fakeAdbServer).getDeviceSpec(Optional.empty());
 
     assertThat(spec.getScreenDensity()).isEqualTo(480);
     assertThat(spec.getSupportedAbisList()).containsExactly("armeabi");
-    assertThat(spec.getSdkVersion()).isEqualTo(21);
+    assertThat(spec.getSdkVersion()).isEqualTo(19);
 
     // We couldn't detect locale so we expect to fallback to en-US.
     assertThat(spec.getSupportedLocalesList()).containsExactly("en-US");
@@ -119,25 +121,6 @@ public class DeviceAnalyzerTest {
     assertThat(spec.getSupportedAbisList()).containsExactly("armeabi");
     assertThat(spec.getSdkVersion()).isEqualTo(26);
     assertThat(spec.getSupportedLocalesList()).containsExactly("pt-PT");
-  }
-
-  @Test
-  public void noDeviceId_oneConnectedDevice_sdk26_fallBack() {
-    FakeAdbServer fakeAdbServer =
-        new FakeAdbServer(
-            /* hasInitialDeviceList= */ true,
-            /* devices= */ ImmutableList.of(
-                createDeviceWithNoProperties("a", /* sdkVersion= */ 26, /* locale= */ "de-DE")));
-    fakeAdbServer.init(Paths.get("path/to/adb"));
-
-    DeviceSpec spec = new DeviceAnalyzer(fakeAdbServer).getDeviceSpec(Optional.empty());
-
-    assertThat(spec.getScreenDensity()).isEqualTo(480);
-    assertThat(spec.getSupportedAbisList()).containsExactly("armeabi");
-    assertThat(spec.getSdkVersion()).isEqualTo(26);
-
-    // We couldn't detect locale so we expect to fallback to en-US.
-    assertThat(spec.getSupportedLocalesList()).containsExactly("en-US");
   }
 
   @Test
@@ -297,6 +280,110 @@ public class DeviceAnalyzerTest {
         .contains("Error retrieving device ABIs. Please try again.");
   }
 
+  @Test
+  public void extractsDeviceFeatures() {
+    FakeDevice fakeDevice =
+        FakeDevice.fromDeviceSpec(
+            "id1",
+            DeviceState.ONLINE,
+            mergeSpecs(
+                density(240),
+                locales("en-US"),
+                abis("x86"),
+                sdkVersion(21),
+                deviceFeatures("com.feature1", "com.feature2")));
+
+    FakeAdbServer fakeAdbServer =
+        new FakeAdbServer(
+            /* hasInitialDeviceList= */ true, /* devices= */ ImmutableList.of(fakeDevice));
+    fakeAdbServer.init(Paths.get("path/to/adb"));
+
+    DeviceAnalyzer analyzer = new DeviceAnalyzer(fakeAdbServer);
+
+    DeviceSpec deviceSpec = analyzer.getDeviceSpec(Optional.empty());
+    assertThat(deviceSpec.getDeviceFeaturesList()).containsExactly("com.feature1", "com.feature2");
+  }
+
+  @Test
+  public void prefersAbisLocalesViaActivityManager() {
+    FakeDevice fakeDevice =
+        FakeDevice.fromDeviceSpec(
+            "id1",
+            DeviceState.ONLINE,
+            mergeSpecs(sdkVersion(27), locales("en-US"), density(560), abis("armv64-v8a")));
+
+    fakeDevice.injectShellCommandOutput(
+        "am get-config",
+        () ->
+            Joiner.on('\n')
+                .join(
+                    ImmutableList.of(
+                        "abi: arm64-v8a,armeabi-v7a,armeabi",
+                        "config: mcc234-mnc15-en-rGB,in-rID,pl-rPL-ldltr-sw411dp-w411dp-h746dp-"
+                            + "normal-long-notround-lowdr-widecg-port-notnight-560dpi-finger-"
+                            + "keysexposed-nokeys-navhidden-nonav-v27")));
+
+    FakeAdbServer fakeAdbServer =
+        new FakeAdbServer(
+            /* hasInitialDeviceList= */ true, /* devices= */ ImmutableList.of(fakeDevice));
+    fakeAdbServer.init(Paths.get("path/to/adb"));
+
+    DeviceAnalyzer analyzer = new DeviceAnalyzer(fakeAdbServer);
+
+    DeviceSpec deviceSpec = analyzer.getDeviceSpec(Optional.empty());
+
+    assertThat(deviceSpec.getSupportedAbisList())
+        .containsExactly("arm64-v8a", "armeabi-v7a", "armeabi")
+        .inOrder();
+    assertThat(deviceSpec.getSupportedLocalesList())
+        .containsExactly("en-GB", "in-ID", "pl-PL")
+        .inOrder();
+  }
+
+  @Test
+  public void activityManagerFails_propertiesFallback() {
+    FakeDevice fakeDevice =
+        FakeDevice.fromDeviceSpec(
+            "id1",
+            DeviceState.ONLINE,
+            mergeSpecs(sdkVersion(26), locales("de-DE"), density(480), abis("armeabi")));
+    fakeDevice.injectShellCommandOutput("am get-config", () -> "error");
+
+    FakeAdbServer fakeAdbServer =
+        new FakeAdbServer(
+            /* hasInitialDeviceList= */ true, /* devices= */ ImmutableList.of(fakeDevice));
+    fakeAdbServer.init(Paths.get("path/to/adb"));
+
+    DeviceSpec spec = new DeviceAnalyzer(fakeAdbServer).getDeviceSpec(Optional.empty());
+
+    assertThat(spec.getScreenDensity()).isEqualTo(480);
+    assertThat(spec.getSupportedAbisList()).containsExactly("armeabi");
+    assertThat(spec.getSdkVersion()).isEqualTo(26);
+    assertThat(spec.getSupportedLocalesList()).containsExactly("de-DE");
+  }
+
+  @Test
+  public void activityManagerFails_noProperties_defaultLocaleFallback() {
+    // It creates no properties, hence locale fetch via properties should also fall back.
+    FakeDevice fakeDevice =
+        createDeviceWithNoProperties("a", /* sdkVersion= */ 26, /* locale= */ "de-DE");
+    fakeDevice.injectShellCommandOutput("am get-config", () -> "error");
+
+    FakeAdbServer fakeAdbServer =
+        new FakeAdbServer(
+            /* hasInitialDeviceList= */ true, /* devices= */ ImmutableList.of(fakeDevice));
+    fakeAdbServer.init(Paths.get("path/to/adb"));
+
+    DeviceSpec spec = new DeviceAnalyzer(fakeAdbServer).getDeviceSpec(Optional.empty());
+
+    assertThat(spec.getScreenDensity()).isEqualTo(480);
+    assertThat(spec.getSupportedAbisList()).containsExactly("armeabi");
+    assertThat(spec.getSdkVersion()).isEqualTo(26);
+
+    // We couldn't detect locale so we expect to fallback to en-US.
+    assertThat(spec.getSupportedLocalesList()).containsExactly("en-US");
+  }
+
   private static Device createUsbEnabledDevice(String serialNumber) {
     return createUsbEnabledDevice(serialNumber, /* sdkVersion= */ 21, /* locale= */ "en-US");
   }
@@ -308,7 +395,7 @@ public class DeviceAnalyzerTest {
         mergeSpecs(sdkVersion(sdkVersion), abis("armeabi"), locales(locale), density(480)));
   }
 
-  private static Device createDeviceWithNoProperties(
+  private static FakeDevice createDeviceWithNoProperties(
       String serialNumber, int sdkVersion, String locale) {
     return FakeDevice.fromDeviceSpecWithProperties(
         serialNumber,

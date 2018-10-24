@@ -24,13 +24,17 @@ import com.android.tools.build.bundletool.model.AndroidManifest;
 import com.android.tools.build.bundletool.model.BundleModuleName;
 import com.android.tools.build.bundletool.model.ManifestMutator;
 import com.android.tools.build.bundletool.model.ModuleSplit;
+import com.android.tools.build.bundletool.version.BundleToolVersion;
+import com.android.tools.build.bundletool.version.Version;
 import com.google.common.collect.ImmutableList;
 
 /** Utility to create and manipulate the {@link ModuleSplit}. */
 public class ModuleSplitUtils {
 
+  private static final Version CURRENT_VERSION = BundleToolVersion.getCurrentVersion();
+
   private static final AndroidManifest DEFAULT_MANIFEST =
-      AndroidManifest.create(androidManifest("com.test.app"));
+      AndroidManifest.create(androidManifest("com.test.app"), CURRENT_VERSION);
 
   /** Creates {@link ModuleSplit.Builder} with fields pre-populated to default values. */
   public static ModuleSplit.Builder createModuleSplitBuilder() {

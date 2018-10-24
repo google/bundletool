@@ -17,6 +17,7 @@
 package com.android.tools.build.bundletool.model;
 
 import static com.android.tools.build.bundletool.model.AndroidManifest.ACTIVITY_ELEMENT_NAME;
+import static com.android.tools.build.bundletool.model.AndroidManifest.ANDROID_NAMESPACE_URI;
 import static com.android.tools.build.bundletool.model.AndroidManifest.APPLICATION_ELEMENT_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.EXTRACT_NATIVE_LIBS_ATTRIBUTE_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.EXTRACT_NATIVE_LIBS_RESOURCE_ID;
@@ -28,10 +29,13 @@ import static com.android.tools.build.bundletool.model.AndroidManifest.MAX_SDK_V
 import static com.android.tools.build.bundletool.model.AndroidManifest.MAX_SDK_VERSION_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.META_DATA_ELEMENT_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.META_DATA_KEY_FUSED_MODULE_NAMES;
+import static com.android.tools.build.bundletool.model.AndroidManifest.META_DATA_KEY_SPLITS_REQUIRED;
 import static com.android.tools.build.bundletool.model.AndroidManifest.MIN_SDK_VERSION_ATTRIBUTE_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.MIN_SDK_VERSION_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.NAME_RESOURCE_ID;
+import static com.android.tools.build.bundletool.model.AndroidManifest.NO_NAMESPACE_URI;
 import static com.android.tools.build.bundletool.model.AndroidManifest.PROVIDER_ELEMENT_NAME;
+import static com.android.tools.build.bundletool.model.AndroidManifest.RESOURCE_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.SERVICE_ELEMENT_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.SPLIT_NAME_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.SUPPORTS_GL_TEXTURE_ELEMENT_NAME;
@@ -41,14 +45,16 @@ import static com.android.tools.build.bundletool.model.AndroidManifest.USES_SDK_
 import static com.android.tools.build.bundletool.model.AndroidManifest.VALUE_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.VERSION_CODE_RESOURCE_ID;
 import static com.android.tools.build.bundletool.utils.xmlproto.XmlProtoAttributeBuilder.createAndroidAttribute;
-import static com.android.tools.build.bundletool.utils.xmlproto.XmlProtoElement.ANDROID_NAMESPACE_URI;
-import static com.android.tools.build.bundletool.utils.xmlproto.XmlProtoElement.NO_NAMESPACE_URI;
+import static com.google.common.collect.MoreCollectors.toOptional;
 import static java.util.stream.Collectors.joining;
 
+import com.android.tools.build.bundletool.utils.xmlproto.XmlProtoAttributeBuilder;
 import com.android.tools.build.bundletool.utils.xmlproto.XmlProtoElementBuilder;
 import com.android.tools.build.bundletool.utils.xmlproto.XmlProtoNode;
 import com.android.tools.build.bundletool.utils.xmlproto.XmlProtoNodeBuilder;
+import com.android.tools.build.bundletool.version.Version;
 import com.google.common.collect.ImmutableList;
+import java.util.Optional;
 import javax.annotation.CheckReturnValue;
 
 /** Modifies the manifest in the protocol buffer format. */
@@ -60,10 +66,12 @@ public class ManifestEditor {
 
   private final XmlProtoNodeBuilder rootNode;
   private final XmlProtoElementBuilder manifestElement;
+  private final Version bundleToolVersion;
 
-  public ManifestEditor(XmlProtoNode rootNode) {
+  public ManifestEditor(XmlProtoNode rootNode, Version bundleToolVersion) {
     this.rootNode = rootNode.toBuilder();
     this.manifestElement = this.rootNode.getElement();
+    this.bundleToolVersion = bundleToolVersion;
   }
 
   public XmlProtoElementBuilder getRawProto() {
@@ -137,27 +145,28 @@ public class ManifestEditor {
   }
 
   public ManifestEditor addMetaDataString(String key, String value) {
-    manifestElement
-        .getOrCreateChildElement(APPLICATION_ELEMENT_NAME)
-        .addChildElement(
-            XmlProtoElementBuilder.create("meta-data")
-                .addAttribute(
-                    createAndroidAttribute("name", NAME_RESOURCE_ID).setValueAsString(key))
-                .addAttribute(
-                    createAndroidAttribute("value", VALUE_RESOURCE_ID).setValueAsString(value)));
-    return this;
+    return addMetaDataValue(
+        key, createAndroidAttribute("value", VALUE_RESOURCE_ID).setValueAsString(value));
   }
 
   public ManifestEditor addMetaDataInteger(String key, int value) {
+    return addMetaDataValue(
+        key, createAndroidAttribute("value", VALUE_RESOURCE_ID).setValueAsDecimalInteger(value));
+  }
+
+  public ManifestEditor addMetaDataResourceId(String key, int resourceId) {
+    return addMetaDataValue(
+        key, createAndroidAttribute("value", RESOURCE_RESOURCE_ID).setValueAsRefId(resourceId));
+  }
+
+  private ManifestEditor addMetaDataValue(String key, XmlProtoAttributeBuilder valueAttribute) {
     manifestElement
         .getOrCreateChildElement(APPLICATION_ELEMENT_NAME)
         .addChildElement(
             XmlProtoElementBuilder.create("meta-data")
                 .addAttribute(
                     createAndroidAttribute("name", NAME_RESOURCE_ID).setValueAsString(key))
-                .addAttribute(
-                    createAndroidAttribute("value", VALUE_RESOURCE_ID)
-                        .setValueAsDecimalInteger(value)));
+                .addAttribute(valueAttribute));
     return this;
   }
 
@@ -184,16 +193,23 @@ public class ManifestEditor {
     // Make sure the names are unique and sort for deterministic behavior.
     String moduleNamesString = moduleNames.stream().sorted().distinct().collect(joining(","));
 
-    manifestElement
-        .getOrCreateChildElement(APPLICATION_ELEMENT_NAME)
-        .addChildElement(
-            XmlProtoElementBuilder.create(META_DATA_ELEMENT_NAME)
-                .addAttribute(
-                    createAndroidAttribute("name", NAME_RESOURCE_ID)
-                        .setValueAsString(META_DATA_KEY_FUSED_MODULE_NAMES))
-                .addAttribute(
-                    createAndroidAttribute("value", VALUE_RESOURCE_ID)
-                        .setValueAsString(moduleNamesString)));
+    setMetadataValue(
+        META_DATA_KEY_FUSED_MODULE_NAMES,
+        createAndroidAttribute("value", VALUE_RESOURCE_ID).setValueAsString(moduleNamesString));
+
+    return this;
+  }
+
+  /**
+   * Sets a flag whether the app is able to run without any config splits.
+   *
+   * <p>The information is stored as a {@code <meta-data android:name="..." android:value="..."/>}
+   * element inside the {@code <application>} element.
+   */
+  public ManifestEditor setSplitsRequired(boolean value) {
+    setMetadataValue(
+        META_DATA_KEY_SPLITS_REQUIRED,
+        createAndroidAttribute("value", VALUE_RESOURCE_ID).setValueAsBoolean(value));
     return this;
   }
 
@@ -214,7 +230,34 @@ public class ManifestEditor {
   /** Generates the modified manifest. */
   @CheckReturnValue
   public AndroidManifest save() {
-    return AndroidManifest.create(rootNode.build());
+    return AndroidManifest.create(rootNode.build(), bundleToolVersion);
+  }
+
+  private ManifestEditor setMetadataValue(String name, XmlProtoAttributeBuilder valueAttr) {
+    XmlProtoElementBuilder applicationEl =
+        manifestElement.getOrCreateChildElement(APPLICATION_ELEMENT_NAME);
+
+    Optional<XmlProtoElementBuilder> existingMetadataEl =
+        applicationEl
+            .getChildrenElements(META_DATA_ELEMENT_NAME)
+            .filter(
+                metadataEl ->
+                    metadataEl
+                        .getAndroidAttribute(NAME_RESOURCE_ID)
+                        .map(nameAttr -> name.equals(nameAttr.getValueAsString()))
+                        .orElse(false))
+            .collect(toOptional());
+
+    if (existingMetadataEl.isPresent()) {
+      existingMetadataEl.get().removeAndroidAttribute(VALUE_RESOURCE_ID).addAttribute(valueAttr);
+    } else {
+      applicationEl.addChildElement(
+          XmlProtoElementBuilder.create(META_DATA_ELEMENT_NAME)
+              .addAttribute(createAndroidAttribute("name", NAME_RESOURCE_ID).setValueAsString(name))
+              .addAttribute(valueAttr));
+    }
+
+    return this;
   }
 
   private ManifestEditor setUsesSdkAttribute(String attributeName, int attributeResId, int value) {

@@ -17,11 +17,11 @@
 package com.android.tools.build.bundletool.testing;
 
 import static com.android.tools.build.bundletool.model.AndroidManifest.ACTIVITY_ELEMENT_NAME;
-import static com.android.tools.build.bundletool.model.AndroidManifest.ANDROID_NAMESPACE;
+import static com.android.tools.build.bundletool.model.AndroidManifest.ANDROID_NAMESPACE_URI;
 import static com.android.tools.build.bundletool.model.AndroidManifest.APPLICATION_ELEMENT_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.DEBUGGABLE_ATTRIBUTE_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.DEBUGGABLE_RESOURCE_ID;
-import static com.android.tools.build.bundletool.model.AndroidManifest.DISTRIBUTION_NAMESPACE;
+import static com.android.tools.build.bundletool.model.AndroidManifest.DISTRIBUTION_NAMESPACE_URI;
 import static com.android.tools.build.bundletool.model.AndroidManifest.EXTRACT_NATIVE_LIBS_ATTRIBUTE_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.EXTRACT_NATIVE_LIBS_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.HAS_CODE_RESOURCE_ID;
@@ -33,6 +33,7 @@ import static com.android.tools.build.bundletool.model.AndroidManifest.MIN_SDK_V
 import static com.android.tools.build.bundletool.model.AndroidManifest.MIN_SDK_VERSION_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.NAME_ATTRIBUTE_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.NAME_RESOURCE_ID;
+import static com.android.tools.build.bundletool.model.AndroidManifest.NO_NAMESPACE_URI;
 import static com.android.tools.build.bundletool.model.AndroidManifest.PROVIDER_ELEMENT_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.RESOURCE_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.SERVICE_ELEMENT_NAME;
@@ -50,7 +51,7 @@ import com.android.aapt.Resources.XmlAttribute;
 import com.android.aapt.Resources.XmlElement;
 import com.android.aapt.Resources.XmlNamespace;
 import com.android.aapt.Resources.XmlNode;
-import com.android.tools.build.bundletool.model.ManifestMutator;
+import com.android.tools.build.bundletool.model.AndroidManifest;
 import com.android.tools.build.bundletool.utils.xmlproto.XmlProtoAttributeBuilder;
 import com.android.tools.build.bundletool.utils.xmlproto.XmlProtoElementBuilder;
 import com.android.tools.build.bundletool.utils.xmlproto.XmlProtoNode;
@@ -64,7 +65,6 @@ import javax.annotation.Nullable;
 /** Helper methods for proto based Android Manifest tests. */
 public final class ManifestProtoUtils {
 
-  private static final String NO_NAMESPACE_URI = "";
   private static final int NO_RESOURCE_ID = 0;
 
   public static XmlNode xmlNode(XmlElement element) {
@@ -227,18 +227,20 @@ public final class ManifestProtoUtils {
                 "manifest",
                 ImmutableList.of(
                     xmlAttribute("package", packageName),
-                    xmlDecimalIntegerAttribute(ANDROID_NAMESPACE, "versionCode", 0x0101021b, 1)),
+                    xmlDecimalIntegerAttribute(
+                        ANDROID_NAMESPACE_URI, "versionCode", 0x0101021b, 1)),
                 xmlNode(
                     xmlElement(
                         NO_NAMESPACE_URI,
                         APPLICATION_ELEMENT_NAME,
-                        xmlAttribute(ANDROID_NAMESPACE, "label", 0x01010001, "minimal"),
+                        xmlAttribute(ANDROID_NAMESPACE_URI, "label", 0x01010001, "minimal"),
                         xmlNamespace(
-                            ANDROID_NAMESPACE, "http://schemas.android.com/apk/res/android"),
+                            ANDROID_NAMESPACE_URI, "http://schemas.android.com/apk/res/android"),
                         xmlNode(
                             xmlElement(
                                 "activity",
-                                xmlAttribute(ANDROID_NAMESPACE, "name", 0x01010003, "MainActivity"),
+                                xmlAttribute(
+                                    ANDROID_NAMESPACE_URI, "name", 0x01010003, "MainActivity"),
                                 xmlNode(
                                     xmlElement(
                                         "intent-filter",
@@ -246,7 +248,7 @@ public final class ManifestProtoUtils {
                                             xmlElement(
                                                 "action",
                                                 xmlAttribute(
-                                                    ANDROID_NAMESPACE,
+                                                    ANDROID_NAMESPACE_URI,
                                                     "name",
                                                     0x01010003,
                                                     "android.intent.action.MAIN"))),
@@ -254,7 +256,7 @@ public final class ManifestProtoUtils {
                                             xmlElement(
                                                 "category",
                                                 xmlAttribute(
-                                                    ANDROID_NAMESPACE,
+                                                    ANDROID_NAMESPACE_URI,
                                                     "name",
                                                     0x01010003,
                                                     "android.intent.category.LAUNCHER")))))))))));
@@ -272,7 +274,7 @@ public final class ManifestProtoUtils {
     return androidManifest(
         packageName,
         ObjectArrays.concat(
-            new ManifestMutator[] {withOnDemand(true), withFusingAttribute(true)},
+            new ManifestMutator[] {withOnDemandAttribute(true), withFusingAttribute(true)},
             manifestMutators,
             ManifestMutator.class));
   }
@@ -291,8 +293,8 @@ public final class ManifestProtoUtils {
     }
     return manifestElement ->
         manifestElement
-            .getOrCreateChildElement(DISTRIBUTION_NAMESPACE, "module")
-            .getOrCreateAttribute(DISTRIBUTION_NAMESPACE, "title")
+            .getOrCreateChildElement(DISTRIBUTION_NAMESPACE_URI, "module")
+            .getOrCreateAttribute(DISTRIBUTION_NAMESPACE_URI, "title")
             .setValueAsRefId(refId);
   }
 
@@ -308,7 +310,8 @@ public final class ManifestProtoUtils {
     return manifestElement ->
         manifestElement
             .getOptionalChildElement(APPLICATION_ELEMENT_NAME)
-            .ifPresent(application -> application.removeAttribute(ANDROID_NAMESPACE, "hasCode"));
+            .ifPresent(
+                application -> application.removeAttribute(ANDROID_NAMESPACE_URI, "hasCode"));
   }
 
   public static ManifestMutator withSplitId(String splitId) {
@@ -326,29 +329,52 @@ public final class ManifestProtoUtils {
             .setValueAsDecimalInteger(version);
   }
 
-  public static ManifestMutator withOnDemand(boolean value) {
+  public static ManifestMutator withOnDemandAttribute(boolean value) {
     return manifestElement ->
         manifestElement
-            .getOrCreateChildElement(DISTRIBUTION_NAMESPACE, "module")
-            .getOrCreateAttribute(DISTRIBUTION_NAMESPACE, "onDemand")
+            .getOrCreateChildElement(DISTRIBUTION_NAMESPACE_URI, "module")
+            .getOrCreateAttribute(DISTRIBUTION_NAMESPACE_URI, "onDemand")
             .setValueAsBoolean(value);
   }
 
-  /** Same as {@link #withOnDemand(boolean)} but with the attribute not namespaced. */
+  /** Same as {@link #withOnDemandAttribute(boolean)} but with the attribute not namespaced. */
   public static ManifestMutator withLegacyOnDemand(boolean value) {
     return manifestElement ->
         manifestElement
-            .getOrCreateChildElement(DISTRIBUTION_NAMESPACE, "module")
+            .getOrCreateChildElement(DISTRIBUTION_NAMESPACE_URI, "module")
             .getOrCreateAttribute(NO_NAMESPACE_URI, "onDemand")
             .setValueAsBoolean(value);
+  }
+
+  public static ManifestMutator withEmptyDeliveryElement() {
+    return manifestElement ->
+        manifestElement
+            .getOrCreateChildElement(DISTRIBUTION_NAMESPACE_URI, "module")
+            .getOrCreateChildElement(DISTRIBUTION_NAMESPACE_URI, "delivery");
+  }
+
+  public static ManifestMutator withInstallTimeDelivery() {
+    return manifestElement ->
+        manifestElement
+            .getOrCreateChildElement(DISTRIBUTION_NAMESPACE_URI, "module")
+            .getOrCreateChildElement(DISTRIBUTION_NAMESPACE_URI, "delivery")
+            .getOrCreateChildElement(DISTRIBUTION_NAMESPACE_URI, "install-time");
+  }
+
+  public static ManifestMutator withOnDemandDelivery() {
+    return manifestElement ->
+        manifestElement
+            .getOrCreateChildElement(DISTRIBUTION_NAMESPACE_URI, "module")
+            .getOrCreateChildElement(DISTRIBUTION_NAMESPACE_URI, "delivery")
+            .getOrCreateChildElement(DISTRIBUTION_NAMESPACE_URI, "on-demand");
   }
 
   /** Adds the instant attribute under the dist:module tag. */
   public static ManifestMutator withInstant(boolean value) {
     return manifestElement ->
         manifestElement
-            .getOrCreateChildElement(DISTRIBUTION_NAMESPACE, "module")
-            .getOrCreateAttribute(DISTRIBUTION_NAMESPACE, "instant")
+            .getOrCreateChildElement(DISTRIBUTION_NAMESPACE_URI, "module")
+            .getOrCreateAttribute(DISTRIBUTION_NAMESPACE_URI, "instant")
             .setValueAsBoolean(value);
   }
 
@@ -360,8 +386,8 @@ public final class ManifestProtoUtils {
   public static ManifestMutator withLegacyFusingAttribute(boolean value) {
     return manifestElement ->
         manifestElement
-            .getOrCreateChildElement(DISTRIBUTION_NAMESPACE, "module")
-            .getOrCreateChildElement(DISTRIBUTION_NAMESPACE, "fusing")
+            .getOrCreateChildElement(DISTRIBUTION_NAMESPACE_URI, "module")
+            .getOrCreateChildElement(DISTRIBUTION_NAMESPACE_URI, "fusing")
             .getOrCreateAttribute(NO_NAMESPACE_URI, "include")
             .setValueAsBoolean(value);
   }
@@ -369,9 +395,9 @@ public final class ManifestProtoUtils {
   public static ManifestMutator withFusingAttribute(boolean value) {
     return manifestElement ->
         manifestElement
-            .getOrCreateChildElement(DISTRIBUTION_NAMESPACE, "module")
-            .getOrCreateChildElement(DISTRIBUTION_NAMESPACE, "fusing")
-            .getOrCreateAttribute(DISTRIBUTION_NAMESPACE, "include")
+            .getOrCreateChildElement(DISTRIBUTION_NAMESPACE_URI, "module")
+            .getOrCreateChildElement(DISTRIBUTION_NAMESPACE_URI, "fusing")
+            .getOrCreateAttribute(DISTRIBUTION_NAMESPACE_URI, "include")
             .setValueAsBoolean(value);
   }
 
@@ -396,7 +422,7 @@ public final class ManifestProtoUtils {
   }
 
   public static ManifestMutator withoutVersionCode() {
-    return manifestElement -> manifestElement.removeAttribute(ANDROID_NAMESPACE, "versionCode");
+    return manifestElement -> manifestElement.removeAttribute(ANDROID_NAMESPACE_URI, "versionCode");
   }
 
   public static ManifestMutator withUsesSplit(String... splitIds) {
@@ -453,34 +479,40 @@ public final class ManifestProtoUtils {
   public static ManifestMutator withFeatureCondition(String featureName) {
     return manifestElement ->
         manifestElement
-            .getOrCreateChildElement(DISTRIBUTION_NAMESPACE, "module")
-            .getOrCreateChildElement(DISTRIBUTION_NAMESPACE, "conditions")
+            .getOrCreateChildElement(DISTRIBUTION_NAMESPACE_URI, "module")
+            .getOrCreateChildElement(DISTRIBUTION_NAMESPACE_URI, "delivery")
+            .getOrCreateChildElement(DISTRIBUTION_NAMESPACE_URI, "install-time")
+            .getOrCreateChildElement(DISTRIBUTION_NAMESPACE_URI, "conditions")
             .addChildElement(
-                XmlProtoElementBuilder.create(DISTRIBUTION_NAMESPACE, "device-feature")
+                XmlProtoElementBuilder.create(DISTRIBUTION_NAMESPACE_URI, "device-feature")
                     .addAttribute(
-                        XmlProtoAttributeBuilder.create(DISTRIBUTION_NAMESPACE, "name")
+                        XmlProtoAttributeBuilder.create(DISTRIBUTION_NAMESPACE_URI, "name")
                             .setValueAsString(featureName)));
   }
 
   public static ManifestMutator withMinSdkCondition(int minSdkVersion) {
     return manifestElement ->
         manifestElement
-            .getOrCreateChildElement(DISTRIBUTION_NAMESPACE, "module")
-            .getOrCreateChildElement(DISTRIBUTION_NAMESPACE, "conditions")
+            .getOrCreateChildElement(DISTRIBUTION_NAMESPACE_URI, "module")
+            .getOrCreateChildElement(DISTRIBUTION_NAMESPACE_URI, "delivery")
+            .getOrCreateChildElement(DISTRIBUTION_NAMESPACE_URI, "install-time")
+            .getOrCreateChildElement(DISTRIBUTION_NAMESPACE_URI, "conditions")
             .addChildElement(
-                XmlProtoElementBuilder.create(DISTRIBUTION_NAMESPACE, "min-sdk")
+                XmlProtoElementBuilder.create(DISTRIBUTION_NAMESPACE_URI, "min-sdk")
                     .addAttribute(
-                        XmlProtoAttributeBuilder.create(DISTRIBUTION_NAMESPACE, "value")
+                        XmlProtoAttributeBuilder.create(DISTRIBUTION_NAMESPACE_URI, "value")
                             .setValueAsDecimalInteger(minSdkVersion)));
   }
 
   public static ManifestMutator withUnsupportedCondition() {
     return manifestElement ->
         manifestElement
-            .getOrCreateChildElement(DISTRIBUTION_NAMESPACE, "module")
-            .getOrCreateChildElement(DISTRIBUTION_NAMESPACE, "conditions")
+            .getOrCreateChildElement(DISTRIBUTION_NAMESPACE_URI, "module")
+            .getOrCreateChildElement(DISTRIBUTION_NAMESPACE_URI, "delivery")
+            .getOrCreateChildElement(DISTRIBUTION_NAMESPACE_URI, "install-time")
+            .getOrCreateChildElement(DISTRIBUTION_NAMESPACE_URI, "conditions")
             .addChildElement(
-                XmlProtoElementBuilder.create(DISTRIBUTION_NAMESPACE, "unsupportedCondition"));
+                XmlProtoElementBuilder.create(DISTRIBUTION_NAMESPACE_URI, "unsupportedCondition"));
   }
 
   /** Adds an activity with the {@code splitName} attribute. */
@@ -517,6 +549,21 @@ public final class ManifestProtoUtils {
 
   /** Defined solely for readability. */
   public interface ManifestMutator extends Consumer<XmlProtoElementBuilder> {}
+
+  /**
+   * Compares manifest mutators by applying the mutators against same manifests and comparing the
+   * edited manifest, as we can't compare two mutators (lambda expressions) directly.
+   */
+  public static boolean compareManifestMutators(
+      ImmutableList<com.android.tools.build.bundletool.model.ManifestMutator> manifestMutators,
+      com.android.tools.build.bundletool.model.ManifestMutator otherManifestMutator) {
+
+    AndroidManifest defaultManifest = AndroidManifest.create(androidManifest("com.test.app"));
+
+    return defaultManifest
+        .applyMutators(manifestMutators)
+        .equals(defaultManifest.applyMutators(ImmutableList.of(otherManifestMutator)));
+  }
 
   // Do not instantiate.
   private ManifestProtoUtils() {}

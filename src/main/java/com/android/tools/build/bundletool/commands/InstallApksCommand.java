@@ -51,6 +51,7 @@ public abstract class InstallApksCommand {
   private static final Flag<ImmutableSet<String>> MODULES_FLAG = Flag.stringSet("modules");
 
   private static final String ANDROID_HOME_VARIABLE = "ANDROID_HOME";
+  private static final String ANDROID_SERIAL_VARIABLE = "ANDROID_SERIAL";
 
   private static final EnvironmentVariableProvider DEFAULT_PROVIDER =
       new SystemEnvironmentVariableProvider();
@@ -108,7 +109,12 @@ public abstract class InstallApksCommand {
                                 new CommandExecutionException(
                                     "Unable to determine the location of ADB. Please set the --adb "
                                         + "flag or define ANDROID_HOME environment variable.")));
+
     Optional<String> deviceSerialName = DEVICE_ID_FLAG.getValue(flags);
+    if (!deviceSerialName.isPresent()) {
+      deviceSerialName = environmentVariableProvider.getVariable(ANDROID_SERIAL_VARIABLE);
+    }
+
     Optional<ImmutableSet<String>> modules = MODULES_FLAG.getValue(flags);
     flags.checkNoUnknownFlags();
 
@@ -185,8 +191,10 @@ public abstract class InstallApksCommand {
                 .setExampleValue("device-serial-name")
                 .setOptional(true)
                 .setDescription(
-                    "Device serial name. Required when more than one device or emulator is "
-                        + "connected.")
+                    "Device serial name. If absent, this uses the %s environment variable. Either "
+                        + "this flag or the environment variable is required when more than one "
+                        + "device or emulator is connected.",
+                    ANDROID_SERIAL_VARIABLE)
                 .build())
         .addFlag(
             FlagDescription.builder()

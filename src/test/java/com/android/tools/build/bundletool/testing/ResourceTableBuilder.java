@@ -32,8 +32,10 @@ import com.android.aapt.Resources.ResourceTable;
 import com.android.aapt.Resources.Type;
 import com.android.aapt.Resources.TypeId;
 import com.android.aapt.Resources.Value;
+import com.google.common.io.Files;
 import java.util.Arrays;
 import java.util.Map;
+import java.util.Optional;
 import java.util.function.Function;
 
 /** Helper to build resource tables for tests. */
@@ -138,9 +140,7 @@ public final class ResourceTableBuilder {
     return addFileResourceForMultipleConfigs(
         resourceType,
         resourceName,
-        filePathByDensity
-            .entrySet()
-            .stream()
+        filePathByDensity.entrySet().stream()
             .collect(
                 toMap(
                     entry ->
@@ -157,9 +157,7 @@ public final class ResourceTableBuilder {
       Function<K, Configuration> configMaker,
       Function<V, Value> valueMaker) {
     ConfigValue[] configValues =
-        sourceMap
-            .entrySet()
-            .stream()
+        sourceMap.entrySet().stream()
             .map(
                 entry ->
                     ConfigValue.newBuilder()
@@ -187,9 +185,7 @@ public final class ResourceTableBuilder {
   }
 
   private Type.Builder getResourceType(String resourceType) {
-    return currentPackage
-        .getTypeBuilderList()
-        .stream()
+    return currentPackage.getTypeBuilderList().stream()
         .filter(type -> type.getName().equals(resourceType))
         .findFirst()
         .orElseGet(
@@ -207,9 +203,21 @@ public final class ResourceTableBuilder {
   }
 
   private static Value newFileReferenceValue(String resFilePath) {
-    return Value.newBuilder()
-        .setItem(Item.newBuilder().setFile(FileReference.newBuilder().setPath(resFilePath)))
-        .build();
+    FileReference.Builder fileReference = FileReference.newBuilder().setPath(resFilePath);
+    getFileType(resFilePath).ifPresent(fileReference::setType);
+
+    return Value.newBuilder().setItem(Item.newBuilder().setFile(fileReference)).build();
+  }
+
+  private static Optional<FileReference.Type> getFileType(String resFilePath) {
+    switch (Files.getFileExtension(resFilePath).toLowerCase()) {
+      case "png":
+        return Optional.of(FileReference.Type.PNG);
+      case "xml":
+        return Optional.of(FileReference.Type.PROTO_XML);
+      default:
+        return Optional.empty();
+    }
   }
 
   public ResourceTable build() {

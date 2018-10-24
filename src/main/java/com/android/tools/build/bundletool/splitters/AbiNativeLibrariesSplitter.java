@@ -16,6 +16,7 @@
 
 package com.android.tools.build.bundletool.splitters;
 
+import static com.android.tools.build.bundletool.model.ManifestMutator.withSplitsRequired;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.ImmutableSet.toImmutableSet;
 
@@ -84,6 +85,7 @@ public class AbiNativeLibrariesSplitter implements ModuleSplitSplitter {
                                   Sets.difference(allAbis, ImmutableSet.of(targeting.getAbi()))))
                       .build())
               .setMasterSplit(false)
+              .addMasterManifestMutator(withSplitsRequired(true))
               .setEntries(entriesList);
       splits.add(splitBuilder.build());
       leftOverEntries.removeAll(entriesList);

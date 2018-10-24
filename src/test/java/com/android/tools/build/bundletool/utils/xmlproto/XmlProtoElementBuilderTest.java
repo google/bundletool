@@ -15,7 +15,7 @@
  */
 package com.android.tools.build.bundletool.utils.xmlproto;
 
-import static com.android.tools.build.bundletool.utils.xmlproto.XmlProtoElementOrBuilder.ANDROID_NAMESPACE_URI;
+import static com.android.tools.build.bundletool.model.AndroidManifest.ANDROID_NAMESPACE_URI;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.truth.Truth.assertThat;
 import static com.google.common.truth.extensions.proto.ProtoTruth.assertThat;
@@ -31,50 +31,6 @@ import org.junit.runners.JUnit4;
 
 @RunWith(JUnit4.class)
 public class XmlProtoElementBuilderTest {
-
-  @Test
-  public void getAttributeIgnoringNamespace_duplicate() {
-    XmlAttribute attribute = XmlAttribute.newBuilder().setName("attribute").build();
-    XmlElement protoElement =
-        XmlElement.newBuilder().addAttribute(attribute).addAttribute(attribute).build();
-    XmlProtoElementBuilder element = new XmlProtoElementBuilder(protoElement.toBuilder());
-
-    XmlProtoAttributeBuilder fetchedAttribute =
-        element.getAttributeIgnoringNamespace("attribute").get();
-    assertThat(fetchedAttribute.getProto().build()).isEqualTo(attribute);
-    assertThat(element.getProto().build()).isEqualTo(protoElement);
-  }
-
-  @Test
-  public void getAttribute_duplicate() {
-    XmlAttribute attribute =
-        XmlAttribute.newBuilder().setName("attribute").setNamespaceUri("namespace").build();
-    XmlElement protoElement =
-        XmlElement.newBuilder().addAttribute(attribute).addAttribute(attribute).build();
-    XmlProtoElementBuilder element = new XmlProtoElementBuilder(protoElement.toBuilder());
-
-    XmlProtoAttributeBuilder fetchedAttribute =
-        element.getAttribute("namespace", "attribute").get();
-    assertThat(fetchedAttribute.getProto().build()).isEqualTo(attribute);
-    assertThat(element.getProto().build()).isEqualTo(protoElement);
-  }
-
-  @Test
-  public void getAndroidAttribute_duplicate() {
-    XmlAttribute attribute =
-        XmlAttribute.newBuilder()
-            .setName("attribute")
-            .setNamespaceUri("namespace")
-            .setResourceId(42)
-            .build();
-    XmlElement protoElement =
-        XmlElement.newBuilder().addAttribute(attribute).addAttribute(attribute).build();
-    XmlProtoElementBuilder element = new XmlProtoElementBuilder(protoElement.toBuilder());
-
-    XmlProtoAttributeBuilder fetchedAttribute = element.getAndroidAttribute(42).get();
-    assertThat(fetchedAttribute.getProto().build()).isEqualTo(attribute);
-    assertThat(element.getProto().build()).isEqualTo(protoElement);
-  }
 
   @Test
   public void addAttribute() {

@@ -16,6 +16,7 @@
 
 package com.android.tools.build.bundletool.splitters;
 
+import static com.android.tools.build.bundletool.model.ManifestMutator.withSplitsRequired;
 import static com.android.tools.build.bundletool.utils.ResourcesUtils.DEFAULT_DENSITY_VALUE;
 import static com.android.tools.build.bundletool.utils.ResourcesUtils.MIPMAP_TYPE;
 import static com.google.common.base.Preconditions.checkArgument;
@@ -103,12 +104,12 @@ public class ScreenDensityResourcesSplitter extends SplitterForOneTargetingDimen
                           ScreenDensityTargeting.newBuilder()
                               .addValue(toScreenDensity(density))
                               .addAllAlternatives(
-                                  allBut(densityBuckets, density)
-                                      .stream()
+                                  allBut(densityBuckets, density).stream()
                                       .map(ScreenDensityResourcesSplitter::toScreenDensity)
                                       .collect(toImmutableList())))
                       .build())
               .setMasterSplit(false)
+              .addMasterManifestMutator(withSplitsRequired(true))
               .setEntries(ModuleSplit.filterResourceEntries(split.getEntries(), optimizedTable))
               .setResourceTable(optimizedTable);
       splitsBuilder.add(moduleSplitBuilder.build());

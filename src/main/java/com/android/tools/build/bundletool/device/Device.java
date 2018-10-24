@@ -29,22 +29,24 @@ import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 
 /** Interface for BundleTool - Ddmlib interactions. Represents a connected device. */
-public interface Device {
+public abstract class Device {
 
-  DeviceState getState();
+  public abstract DeviceState getState();
 
-  AndroidVersion getVersion();
+  public abstract AndroidVersion getVersion();
 
-  ImmutableList<String> getAbis();
+  public abstract ImmutableList<String> getAbis();
 
   /** Returns device density or -1 if error occurred. */
-  int getDensity();
+  public abstract int getDensity();
 
-  String getSerialNumber();
+  public abstract String getSerialNumber();
 
-  Optional<String> getProperty(String propertyName);
+  public abstract Optional<String> getProperty(String propertyName);
 
-  void executeShellCommand(
+  public abstract ImmutableList<String> getDeviceFeatures();
+
+  public abstract void executeShellCommand(
       String command,
       IShellOutputReceiver receiver,
       long maxTimeToOutputResponse,
@@ -52,5 +54,6 @@ public interface Device {
       throws TimeoutException, AdbCommandRejectedException, ShellCommandUnresponsiveException,
           IOException;
 
-  void installApks(ImmutableList<Path> apks, boolean reinstall, long timeout, TimeUnit timeoutUnit);
+  public abstract void installApks(
+      ImmutableList<Path> apks, boolean reinstall, long timeout, TimeUnit timeoutUnit);
 }

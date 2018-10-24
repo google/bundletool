@@ -15,6 +15,7 @@
  */
 package com.android.tools.build.bundletool.utils.xmlproto;
 
+import static com.android.tools.build.bundletool.model.AndroidManifest.NO_NAMESPACE_URI;
 import static com.google.common.collect.MoreCollectors.toOptional;
 import static java.util.stream.Collectors.toList;
 
@@ -39,9 +40,6 @@ abstract class XmlProtoElementOrBuilder<
         XmlProtoElementOrBuilder<NodeProtoT, ?, ElementProtoT, ElementWrapperT, ?, ?>,
     AttributeProtoT extends XmlAttributeOrBuilder,
     AttributeWrapperT extends XmlProtoAttributeOrBuilder<AttributeProtoT>> {
-
-  public static final String NO_NAMESPACE_URI = "";
-  public static final String ANDROID_NAMESPACE_URI = "http://schemas.android.com/apk/res/android";
 
   public abstract ElementProtoT getProto();
 
@@ -84,16 +82,16 @@ abstract class XmlProtoElementOrBuilder<
   public final Optional<AttributeWrapperT> getAttribute(String namespaceUri, String name) {
     return getAttributes()
         .filter(attr -> attr.getName().equals(name) && attr.getNamespaceUri().equals(namespaceUri))
-        .findFirst();
+        .collect(toOptional());
   }
 
   @Deprecated // Don't ignore the namespace!
   public final Optional<AttributeWrapperT> getAttributeIgnoringNamespace(String name) {
-    return getAttributes().filter(attr -> attr.getName().equals(name)).findFirst();
+    return getAttributes().filter(attr -> attr.getName().equals(name)).collect(toOptional());
   }
 
   public final Optional<AttributeWrapperT> getAndroidAttribute(int resourceId) {
-    return getAttributes().filter(attr -> attr.getResourceId() == resourceId).findFirst();
+    return getAttributes().filter(attr -> attr.getResourceId() == resourceId).collect(toOptional());
   }
 
   public final Stream<ElementWrapperT> getChildrenElements() {

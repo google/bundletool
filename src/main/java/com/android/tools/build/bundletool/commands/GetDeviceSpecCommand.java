@@ -50,8 +50,10 @@ public abstract class GetDeviceSpecCommand {
   private static final Flag<Path> ADB_PATH_FLAG = Flag.path("adb");
   private static final Flag<String> DEVICE_ID_FLAG = Flag.string("device-id");
   private static final Flag<Path> OUTPUT_FLAG = Flag.path("output");
+  private static final Flag<Boolean> OVERWRITE_OUTPUT_FLAG = Flag.booleanFlag("overwrite");
 
   private static final String ANDROID_HOME_VARIABLE = "ANDROID_HOME";
+  private static final String ANDROID_SERIAL_VARIABLE = "ANDROID_SERIAL";
 
   private static final EnvironmentVariableProvider DEFAULT_PROVIDER =
       new SystemEnvironmentVariableProvider();
@@ -64,16 +66,26 @@ public abstract class GetDeviceSpecCommand {
 
   public abstract Path getOutputPath();
 
+  public abstract boolean getOverwriteOutput();
+
   abstract AdbServer getAdbServer();
 
   public static Builder builder() {
-    return new AutoValue_GetDeviceSpecCommand.Builder();
+    return new AutoValue_GetDeviceSpecCommand.Builder().setOverwriteOutput(false);
   }
 
   /** Builder for the {@link GetDeviceSpecCommand}. */
   @AutoValue.Builder
   public abstract static class Builder {
     public abstract Builder setOutputPath(Path outputPath);
+
+    /**
+     * Sets whether to overwrite the contents of the output file.
+     *
+     * <p>The default is {@code false}. If set to {@code false} and the output file is present,
+     * exception is thrown.
+     */
+    public abstract Builder setOverwriteOutput(boolean overwriteOutput);
 
     public abstract Builder setAdbPath(Path adbPath);
 
@@ -111,9 +123,10 @@ public abstract class GetDeviceSpecCommand {
         builder().setAdbServer(adbServer).setOutputPath(OUTPUT_FLAG.getRequiredValue(flags));
 
     Optional<String> deviceSerialName = DEVICE_ID_FLAG.getValue(flags);
-    if (deviceSerialName.isPresent()) {
-      builder.setDeviceId(deviceSerialName.get());
+    if (!deviceSerialName.isPresent()) {
+      deviceSerialName = environmentVariableProvider.getVariable(ANDROID_SERIAL_VARIABLE);
     }
+    deviceSerialName.ifPresent(builder::setDeviceId);
 
     Path adbPath =
         ADB_PATH_FLAG
@@ -129,13 +142,17 @@ public abstract class GetDeviceSpecCommand {
                                     "Unable to determine the location of ADB. Please set the --adb "
                                         + "flag or define ANDROID_HOME environment variable.")));
     builder.setAdbPath(adbPath);
+
+    OVERWRITE_OUTPUT_FLAG.getValue(flags).ifPresent(builder::setOverwriteOutput);
     flags.checkNoUnknownFlags();
 
     return builder.build();
   }
 
   public DeviceSpec execute() {
-    FilePreconditions.checkFileDoesNotExist(getOutputPath());
+    if (!getOverwriteOutput()) {
+      FilePreconditions.checkFileDoesNotExist(getOutputPath());
+    }
 
     Path pathToAdb = getAdbPath();
     FilePreconditions.checkFileExistsAndExecutable(pathToAdb);
@@ -147,8 +164,11 @@ public abstract class GetDeviceSpecCommand {
     return deviceSpec;
   }
 
-  private static void writeDeviceSpecToFile(DeviceSpec deviceSpec, Path outputFile) {
+  private void writeDeviceSpecToFile(DeviceSpec deviceSpec, Path outputFile) {
     try {
+      if (getOverwriteOutput()) {
+        Files.deleteIfExists(getOutputPath());
+      }
       Files.write(outputFile, JsonFormat.printer().print(deviceSpec).getBytes(UTF_8));
     } catch (IOException e) {
       throw new UncheckedIOException(
@@ -188,8 +208,16 @@ public abstract class GetDeviceSpecCommand {
                 .setExampleValue("device-serial-name")
                 .setOptional(true)
                 .setDescription(
-                    "Device serial name. Required when more than one device or emulator is "
-                        + "connected.")
+                    "Device serial name. If absent, this uses the %s environment variable. Either "
+                        + "this flag or the environment variable is required when more than one "
+                        + "device or emulator is connected.",
+                    ANDROID_SERIAL_VARIABLE)
+                .build())
+        .addFlag(
+            FlagDescription.builder()
+                .setFlagName(OVERWRITE_OUTPUT_FLAG.getName())
+                .setOptional(true)
+                .setDescription("If set, any previous existing output will be overwritten.")
                 .build())
         .build();
   }

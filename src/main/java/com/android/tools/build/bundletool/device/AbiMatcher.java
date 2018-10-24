@@ -17,7 +17,6 @@
 package com.android.tools.build.bundletool.device;
 
 import static com.google.common.base.Preconditions.checkArgument;
-import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.ImmutableSet.toImmutableSet;
 
 import com.android.bundle.Devices.DeviceSpec;
@@ -29,11 +28,10 @@ import com.android.bundle.Targeting.VariantTargeting;
 import com.android.tools.build.bundletool.exceptions.CommandExecutionException;
 import com.android.tools.build.bundletool.exceptions.ValidationException;
 import com.android.tools.build.bundletool.model.AbiName;
-import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Sets;
 import com.google.common.collect.Sets.SetView;
-import java.util.stream.Stream;
+import com.google.common.collect.Streams;
 
 /** A {@link TargetingDimensionMatcher} that provides matching on ABI architecture. */
 public final class AbiMatcher extends TargetingDimensionMatcher<AbiTargeting> {
@@ -81,22 +79,42 @@ public final class AbiMatcher extends TargetingDimensionMatcher<AbiTargeting> {
     }
     // At this point we know that any device's abiAlias is not within values or alternatives.
     // The only viable scenario is when the split has no values and the semantic is to match
-    // "all but alternatives". Otherwise, neither value or alternative can satisfy the device spec
-    // therefore this module can't be supported by the device.
-    if (!valuesList.isEmpty()) {
-      ImmutableList<String> supportedAbis =
-          Stream.concat(valuesList.stream(), alternativesList.stream())
-              .map(AbiName::fromProto)
-              .map(AbiName::getPlatformName)
-              .collect(toImmutableList());
+    // "all but alternatives".
+
+    return valuesList.isEmpty();
+  }
+
+  @Override
+  protected void checkDeviceCompatibleInternal(AbiTargeting targeting) {
+    if (targeting.equals(AbiTargeting.getDefaultInstance())) {
+      return;
+    }
+
+    ImmutableSet<String> valuesAndAlternativesSet =
+        Streams.concat(
+                targeting.getValueList().stream()
+                    .map(Abi::getAlias)
+                    .map(AbiName::fromProto)
+                    .map(AbiName::getPlatformName),
+                targeting.getAlternativesList().stream()
+                    .map(Abi::getAlias)
+                    .map(AbiName::fromProto)
+                    .map(AbiName::getPlatformName))
+            .collect(toImmutableSet());
+
+    ImmutableSet<String> deviceAbis =
+        getDeviceSpec().getSupportedAbisList().stream().collect(toImmutableSet());
+
+    SetView<String> intersection = Sets.intersection(valuesAndAlternativesSet, deviceAbis);
+
+    if (intersection.isEmpty()) {
       throw CommandExecutionException.builder()
           .withMessage(
               "The app doesn't support ABI architectures of the device. "
                   + "Device ABIs: %s, app ABIs: %s.",
-              getDeviceSpec().getSupportedAbisList(), supportedAbis)
+              getDeviceSpec().getSupportedAbisList(), valuesAndAlternativesSet)
           .build();
     }
-    return true;
   }
 
   @Override
@@ -107,5 +125,10 @@ public final class AbiMatcher extends TargetingDimensionMatcher<AbiTargeting> {
   @Override
   protected AbiTargeting getTargetingValue(VariantTargeting variantTargeting) {
     return variantTargeting.getAbiTargeting();
+  }
+
+  @Override
+  protected boolean isDeviceDimensionPresent() {
+    return !getDeviceSpec().getSupportedAbisList().isEmpty();
   }
 }

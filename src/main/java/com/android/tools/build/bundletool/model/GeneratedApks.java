@@ -16,14 +16,17 @@
 
 package com.android.tools.build.bundletool.model;
 
+import static com.android.tools.build.bundletool.utils.CollectorUtils.groupingBySortedKeys;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static java.util.stream.Collectors.groupingBy;
 
 import com.android.tools.build.bundletool.model.ModuleSplit.SplitType;
 import com.google.auto.value.AutoValue;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableListMultimap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Function;
 import java.util.stream.Stream;
 
 /** Represents generated APKs and groups them into standalone, split, and instant ones. */
@@ -42,6 +45,12 @@ public abstract class GeneratedApks {
 
   public Stream<ModuleSplit> getAllApksStream() {
     return Stream.of(getStandaloneApks(), getInstantApks(), getSplitApks()).flatMap(List::stream);
+  }
+
+  /** Returns all apks grouped and ordered by {@link VariantKey}. */
+  public ImmutableListMultimap<VariantKey, ModuleSplit> getAllApksGroupedByOrderedVariants() {
+    return getAllApksStream()
+        .collect(groupingBySortedKeys(VariantKey::create, Function.identity()));
   }
 
   public static Builder builder() {

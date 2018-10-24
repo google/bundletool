@@ -13,10 +13,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License
  */
-package com.android.tools.build.bundletool.testing;
+package com.android.tools.build.bundletool.model;
 
-import com.android.tools.build.bundletool.model.ModuleEntry;
-import com.android.tools.build.bundletool.model.ZipPath;
 import com.google.auto.value.AutoValue;
 import com.google.protobuf.ByteString;
 import java.io.ByteArrayInputStream;
@@ -51,11 +49,12 @@ public abstract class InMemoryModuleEntry implements ModuleEntry {
   }
 
   public static InMemoryModuleEntry ofFile(String path, byte[] content) {
+    return ofFile(ZipPath.create(path), content);
+  }
+
+  public static InMemoryModuleEntry ofFile(ZipPath path, byte[] content) {
     return new AutoValue_InMemoryModuleEntry(
-        ZipPath.create(path),
-        ByteString.copyFrom(content),
-        /* isDirectory= */ false,
-        /* shouldCompress= */ true);
+        path, ByteString.copyFrom(content), /* isDirectory= */ false, /* shouldCompress= */ true);
   }
 
   public static InMemoryModuleEntry ofFile(String path, byte[] content, boolean shouldCompress) {

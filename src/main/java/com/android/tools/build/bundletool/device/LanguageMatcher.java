@@ -83,4 +83,12 @@ public class LanguageMatcher extends TargetingDimensionMatcher<LanguageTargeting
       return !alternativeLanguages.containsAll(deviceLanguages);
     }
   }
+
+  @Override
+  protected boolean isDeviceDimensionPresent() {
+    return !deviceLanguages.isEmpty();
+  }
+
+  @Override
+  protected void checkDeviceCompatibleInternal(LanguageTargeting targetingValue) {}
 }

@@ -18,6 +18,7 @@ package com.android.tools.build.bundletool.testing;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
+import static com.google.common.collect.ImmutableList.toImmutableList;
 import static java.nio.charset.StandardCharsets.UTF_8;
 
 import com.android.bundle.Devices.DeviceSpec;
@@ -29,6 +30,8 @@ import com.android.ddmlib.TimeoutException;
 import com.android.sdklib.AndroidVersion;
 import com.android.tools.build.bundletool.device.Device;
 import com.android.tools.build.bundletool.utils.Versions;
+import com.google.common.base.Joiner;
+import com.google.common.base.Splitter;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
@@ -40,16 +43,21 @@ import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 
 /** Fake implementation of {@link Device} for tests. */
-public class FakeDevice implements Device {
+public class FakeDevice extends Device {
 
   private final DeviceState state;
   private final AndroidVersion androidVersion;
   private final ImmutableList<String> abis;
   private final int density;
+  private final ImmutableList<String> features;
   private final String serialNumber;
   private final ImmutableMap<String, String> properties;
   private final Map<String, FakeShellCommandAction> commandInjections = new HashMap<>();
   private Optional<SideEffect> installApksSideEffect = Optional.empty();
+  private static final Joiner COMMA_JOINER = Joiner.on(',');
+  private static final Joiner DASH_JOINER = Joiner.on('-');
+  private static final Joiner LINE_JOINER = Joiner.on(System.getProperty("line.separator"));
+  private static final Splitter DASH_SPLITTER = Splitter.on('-');
 
   FakeDevice(
       String serialNumber,
@@ -57,6 +65,7 @@ public class FakeDevice implements Device {
       int sdkVersion,
       ImmutableList<String> abis,
       int density,
+      ImmutableList<String> features,
       ImmutableMap<String, String> properties) {
     this.state = state;
     this.androidVersion = new AndroidVersion(sdkVersion);
@@ -64,6 +73,7 @@ public class FakeDevice implements Device {
     this.density = density;
     this.serialNumber = serialNumber;
     this.properties = properties;
+    this.features = features;
   }
 
   public static FakeDevice fromDeviceSpecWithProperties(
@@ -71,13 +81,44 @@ public class FakeDevice implements Device {
       DeviceState deviceState,
       DeviceSpec deviceSpec,
       ImmutableMap<String, String> properties) {
-    return new FakeDevice(
-        deviceId,
-        deviceState,
-        deviceSpec.getSdkVersion(),
-        ImmutableList.copyOf(deviceSpec.getSupportedAbisList()),
-        deviceSpec.getScreenDensity(),
-        properties);
+    FakeDevice device =
+        new FakeDevice(
+            deviceId,
+            deviceState,
+            deviceSpec.getSdkVersion(),
+            ImmutableList.copyOf(deviceSpec.getSupportedAbisList()),
+            deviceSpec.getScreenDensity(),
+            ImmutableList.copyOf(deviceSpec.getDeviceFeaturesList()),
+            properties);
+    device.injectShellCommandOutput(
+        "pm list features",
+        () ->
+            LINE_JOINER.join(
+                deviceSpec.getDeviceFeaturesList().stream()
+                    .map(feature -> "feature:" + feature)
+                    .collect(toImmutableList())));
+    device.injectShellCommandOutput(
+        "am get-config",
+        () ->
+            LINE_JOINER.join(
+                ImmutableList.of(
+                    "abi: " + COMMA_JOINER.join(deviceSpec.getSupportedAbisList()),
+                    "config: mcc234-mnc15-"
+                        + DASH_JOINER.join(
+                            deviceSpec.getSupportedLocalesList().stream()
+                                .map(FakeDevice::convertLocaleToResourceString)
+                                .collect(toImmutableList())))));
+    return device;
+  }
+
+  private static String convertLocaleToResourceString(String s) {
+    ImmutableList<String> countryRegion = ImmutableList.copyOf(DASH_SPLITTER.split(s));
+    checkArgument(countryRegion.size() > 0 && countryRegion.size() <= 2);
+    if (countryRegion.size() > 1) {
+      return countryRegion.get(0) + "-r" + countryRegion.get(1);
+    } else {
+      return countryRegion.get(0);
+    }
   }
 
   public static FakeDevice fromDeviceSpec(
@@ -111,6 +152,7 @@ public class FakeDevice implements Device {
         Integer.MAX_VALUE,
         ImmutableList.of(),
         /* density= */ -1,
+        ImmutableList.of(),
         ImmutableMap.of());
   }
 
@@ -145,6 +187,11 @@ public class FakeDevice implements Device {
   }
 
   @Override
+  public ImmutableList<String> getDeviceFeatures() {
+    return features;
+  }
+
+  @Override
   public void executeShellCommand(
       String command,
       IShellOutputReceiver receiver,
@@ -152,6 +199,7 @@ public class FakeDevice implements Device {
       TimeUnit maxTimeUnits)
       throws TimeoutException, AdbCommandRejectedException, ShellCommandUnresponsiveException,
           IOException {
+
     checkState(commandInjections.containsKey(command));
     byte[] data = commandInjections.get(command).onExecute().getBytes(UTF_8);
     receiver.addOutput(data, 0, data.length);
@@ -173,7 +221,6 @@ public class FakeDevice implements Device {
   }
 
   public void injectShellCommandOutput(String command, FakeShellCommandAction action) {
-    checkState(!commandInjections.containsKey(command));
     commandInjections.put(command, action);
   }
 

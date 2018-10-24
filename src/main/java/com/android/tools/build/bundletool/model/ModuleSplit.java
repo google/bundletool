@@ -22,6 +22,7 @@ import static com.android.tools.build.bundletool.model.BundleModule.LIB_DIRECTOR
 import static com.android.tools.build.bundletool.model.BundleModule.RESOURCES_DIRECTORY;
 import static com.android.tools.build.bundletool.model.BundleModule.ROOT_DIRECTORY;
 import static com.android.tools.build.bundletool.utils.ResourcesUtils.SCREEN_DENSITY_TO_PROTO_VALUE_MAP;
+import static com.android.tools.build.bundletool.utils.TargetingProtoUtils.lPlusVariantTargeting;
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.MoreCollectors.toOptional;
@@ -35,19 +36,15 @@ import com.android.bundle.Targeting.GraphicsApi;
 import com.android.bundle.Targeting.GraphicsApiTargeting;
 import com.android.bundle.Targeting.LanguageTargeting;
 import com.android.bundle.Targeting.OpenGlVersion;
-import com.android.bundle.Targeting.SdkVersion;
-import com.android.bundle.Targeting.SdkVersionTargeting;
 import com.android.bundle.Targeting.TextureCompressionFormatTargeting;
 import com.android.bundle.Targeting.VariantTargeting;
 import com.android.bundle.Targeting.VulkanVersion;
 import com.android.tools.build.bundletool.utils.ResourcesUtils;
-import com.android.tools.build.bundletool.utils.Versions;
 import com.google.auto.value.AutoValue;
 import com.google.common.base.Predicate;
 import com.google.common.base.Predicates;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
-import com.google.protobuf.Int32Value;
 import java.util.List;
 import java.util.Optional;
 import java.util.StringJoiner;
@@ -252,71 +249,139 @@ public abstract class ModuleSplit {
   public static Builder builder() {
     return new AutoValue_ModuleSplit.Builder()
         .setEntries(ImmutableList.of())
-        .setMasterManifestMutators(ImmutableList.of())
         .setSplitType(SplitType.SPLIT);
   }
 
   /**
    * Creates a {@link ModuleSplit} with all entries from the {@link BundleModule} valid directories.
+   *
+   * <p>The generated ModuleSplit has empty APK targeting and default L+ variant targeting.
    */
   public static ModuleSplit forModule(BundleModule bundleModule) {
-    return fromBundleModule(bundleModule, Predicates.alwaysTrue(), /* setResourceTable= */ true);
-  }
-
-  /** Creates a {@link ModuleSplit} only with the resources entries with empty targeting. */
-  public static ModuleSplit forResources(BundleModule bundleModule) {
-    return fromBundleModule(
-        bundleModule,
-        entry -> entry.getPath().startsWith(RESOURCES_DIRECTORY),
-        /* setResourceTable= */ true);
-  }
-
-  /** Creates a {@link ModuleSplit} only with the assets entries with empty targeting. */
-  public static ModuleSplit forAssets(BundleModule bundleModule) {
-    return fromBundleModule(
-        bundleModule,
-        entry -> entry.getPath().startsWith(ASSETS_DIRECTORY),
-        /* setResourceTable= */ false);
-  }
-
-  /** Creates a {@link ModuleSplit} only with the native library entries with empty targeting. */
-  public static ModuleSplit forNativeLibraries(BundleModule bundleModule) {
-    return fromBundleModule(
-        bundleModule,
-        entry -> entry.getPath().startsWith(LIB_DIRECTORY),
-        /* setResourceTable= */ false);
-  }
-
-  public static ModuleSplit forDex(BundleModule bundleModule) {
-    return fromBundleModule(
-        bundleModule,
-        entry -> entry.getPath().startsWith(DEX_DIRECTORY),
-        /* setResourceTable= */ false);
-  }
-
-  public static ModuleSplit forRoot(BundleModule bundleModule) {
-    return fromBundleModule(
-        bundleModule,
-        entry -> entry.getPath().startsWith(ROOT_DIRECTORY),
-        /* setResourceTable= */ false);
+    return forModule(bundleModule, lPlusVariantTargeting());
   }
 
   /**
-   * Creates a {@link ModuleSplit} with entries from the Bundle Module satisfying the predicate.
+   * Creates a {@link ModuleSplit} with all entries from the {@link BundleModule} valid directories
+   * with empty APK targeting and given variant targeting.
+   */
+  public static ModuleSplit forModule(
+      BundleModule bundleModule, VariantTargeting variantTargeting) {
+    return fromBundleModule(
+        bundleModule, Predicates.alwaysTrue(), /* setResourceTable= */ true, variantTargeting);
+  }
+
+  /**
+   * Creates a {@link ModuleSplit} only with the resources entries with empty APK targeting and
+   * default L+ variant targeting.
+   */
+  public static ModuleSplit forResources(BundleModule bundleModule) {
+    return forResources(bundleModule, lPlusVariantTargeting());
+  }
+
+  /**
+   * Creates a {@link ModuleSplit} only with the resources entries with empty APK targeting and
+   * given variant targeting.
+   */
+  public static ModuleSplit forResources(
+      BundleModule bundleModule, VariantTargeting variantTargeting) {
+    return fromBundleModule(
+        bundleModule,
+        entry -> entry.getPath().startsWith(RESOURCES_DIRECTORY),
+        /* setResourceTable= */ true,
+        variantTargeting);
+  }
+
+  /**
+   * Creates a {@link ModuleSplit} only with the assets entries with empty APK targeting and default
+   * L+ variant targeting.
+   */
+  public static ModuleSplit forAssets(BundleModule bundleModule) {
+    return forAssets(bundleModule, lPlusVariantTargeting());
+  }
+
+  /**
+   * Creates a {@link ModuleSplit} only with the assets entries with empty APK targeting and given
+   * variant targeting.
+   */
+  public static ModuleSplit forAssets(
+      BundleModule bundleModule, VariantTargeting variantTargeting) {
+    return fromBundleModule(
+        bundleModule,
+        entry -> entry.getPath().startsWith(ASSETS_DIRECTORY),
+        /* setResourceTable= */ false,
+        variantTargeting);
+  }
+
+  /**
+   * Creates a {@link ModuleSplit} only with the native library entries with empty APK targeting and
+   * default L+ variant targeting.
+   */
+  public static ModuleSplit forNativeLibraries(BundleModule bundleModule) {
+    return forNativeLibraries(bundleModule, lPlusVariantTargeting());
+  }
+
+  /**
+   * Creates a {@link ModuleSplit} only with the native library entries with empty APK targeting and
+   * given variant targeting.
+   */
+  public static ModuleSplit forNativeLibraries(
+      BundleModule bundleModule, VariantTargeting variantTargeting) {
+    return fromBundleModule(
+        bundleModule,
+        entry -> entry.getPath().startsWith(LIB_DIRECTORY),
+        /* setResourceTable= */ false,
+        variantTargeting);
+  }
+
+  /**
+   * Creates a {@link ModuleSplit} only with the dex files with empty APK targeting and default L+
+   * variant targeting.
+   */
+  public static ModuleSplit forDex(BundleModule bundleModule) {
+    return forDex(bundleModule, lPlusVariantTargeting());
+  }
+
+  /**
+   * Creates a {@link ModuleSplit} only with the dex files with empty APK targeting and given
+   * variant targeting.
+   */
+  public static ModuleSplit forDex(BundleModule bundleModule, VariantTargeting variantTargeting) {
+    return fromBundleModule(
+        bundleModule,
+        entry -> entry.getPath().startsWith(DEX_DIRECTORY),
+        /* setResourceTable= */ false,
+        variantTargeting);
+  }
+
+  public static ModuleSplit forRoot(BundleModule bundleModule) {
+    return forRoot(bundleModule, lPlusVariantTargeting());
+  }
+
+  public static ModuleSplit forRoot(BundleModule bundleModule, VariantTargeting variantTargeting) {
+    return fromBundleModule(
+        bundleModule,
+        entry -> entry.getPath().startsWith(ROOT_DIRECTORY),
+        /* setResourceTable= */ false,
+        variantTargeting);
+  }
+
+  /**
+   * Creates a {@link ModuleSplit} with entries from the Bundle Module satisfying the predicate with
+   * a given variant targeting.
    *
    * <p>The created instance is not standalone thus its variant targets L+ devices initially.
    */
   private static ModuleSplit fromBundleModule(
       BundleModule bundleModule,
       Predicate<ModuleEntry> entriesPredicate,
-      boolean setResourceTable) {
+      boolean setResourceTable,
+      VariantTargeting variantTargeting) {
     ModuleSplit.Builder splitBuilder =
         builder()
             .setModuleName(bundleModule.getName())
             .setEntries(
-                bundleModule
-                    .getEntries()
-                    .stream()
+                bundleModule.getEntries().stream()
                     .filter(entriesPredicate)
                     .collect(toImmutableList()))
             .setAndroidManifest(bundleModule.getAndroidManifest())
@@ -324,7 +389,7 @@ public abstract class ModuleSplit {
             .setMasterSplit(true)
             .setSplitType(SplitType.SPLIT)
             .setApkTargeting(ApkTargeting.getDefaultInstance())
-            .setVariantTargeting(lPlusVariantTargeting());
+            .setVariantTargeting(variantTargeting);
 
     bundleModule.getNativeConfig().ifPresent(splitBuilder::setNativeConfig);
     bundleModule.getAssetsConfig().ifPresent(splitBuilder::setAssetsConfig);
@@ -363,16 +428,6 @@ public abstract class ModuleSplit {
     return findEntry(ZipPath.create(path));
   }
 
-  private static VariantTargeting lPlusVariantTargeting() {
-    return VariantTargeting.newBuilder()
-        .setSdkVersionTargeting(
-            SdkVersionTargeting.newBuilder()
-                .addValue(
-                    SdkVersion.newBuilder()
-                        .setMin(Int32Value.newBuilder().setValue(Versions.ANDROID_L_API_VERSION))))
-        .build();
-  }
-
   /** Builder for {@link ModuleSplit}. */
   @AutoValue.Builder
   public abstract static class Builder {
@@ -397,8 +452,12 @@ public abstract class ModuleSplit {
 
     public abstract Builder setAndroidManifest(AndroidManifest androidManifest);
 
-    public abstract Builder setMasterManifestMutators(
-        ImmutableList<ManifestMutator> manifestMutators);
+    abstract ImmutableList.Builder<ManifestMutator> masterManifestMutatorsBuilder();
+
+    public Builder addMasterManifestMutator(ManifestMutator manifestMutator) {
+      masterManifestMutatorsBuilder().add(manifestMutator);
+      return this;
+    }
 
     protected abstract ModuleSplit autoBuild();
 

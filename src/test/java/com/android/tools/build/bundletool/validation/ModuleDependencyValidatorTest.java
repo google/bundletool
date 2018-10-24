@@ -18,7 +18,7 @@ package com.android.tools.build.bundletool.validation;
 
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifest;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withMinSdkVersion;
-import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withOnDemand;
+import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withOnDemandAttribute;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withSplitId;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withUsesSplit;
 import static com.google.common.truth.Truth.assertThat;
@@ -191,7 +191,7 @@ public class ModuleDependencyValidatorTest {
     ImmutableList<BundleModule> allModules =
         ImmutableList.of(
             module("base", androidManifest(PKG_NAME)),
-            module("feature1", androidManifest(PKG_NAME, withOnDemand(true))),
+            module("feature1", androidManifest(PKG_NAME, withOnDemandAttribute(true))),
             module("feature2", androidManifest(PKG_NAME, withUsesSplit("feature1"))));
 
     ValidationException exception =
@@ -226,7 +226,7 @@ public class ModuleDependencyValidatorTest {
             module("feature1", androidManifest(PKG_NAME)),
             module(
                 "feature2",
-                androidManifest(PKG_NAME, withOnDemand(true), withUsesSplit("feature1"))));
+                androidManifest(PKG_NAME, withOnDemandAttribute(true), withUsesSplit("feature1"))));
 
     new ModuleDependencyValidator().validateAllModules(allModules);
   }
@@ -236,10 +236,10 @@ public class ModuleDependencyValidatorTest {
     ImmutableList<BundleModule> allModules =
         ImmutableList.of(
             module("base", androidManifest(PKG_NAME)),
-            module("feature1", androidManifest(PKG_NAME, withOnDemand(true))),
+            module("feature1", androidManifest(PKG_NAME, withOnDemandAttribute(true))),
             module(
                 "feature2",
-                androidManifest(PKG_NAME, withOnDemand(true), withUsesSplit("feature1"))));
+                androidManifest(PKG_NAME, withOnDemandAttribute(true), withUsesSplit("feature1"))));
 
     new ModuleDependencyValidator().validateAllModules(allModules);
   }
@@ -250,7 +250,8 @@ public class ModuleDependencyValidatorTest {
         ImmutableList.of(
             module("base", androidManifest(PKG_NAME, withMinSdkVersion(20))),
             module(
-                "feature1", androidManifest(PKG_NAME, withOnDemand(true), withMinSdkVersion(19))));
+                "feature1",
+                androidManifest(PKG_NAME, withOnDemandAttribute(true), withMinSdkVersion(19))));
 
     new ModuleDependencyValidator().validateAllModules(allModules);
   }
@@ -261,7 +262,7 @@ public class ModuleDependencyValidatorTest {
     ImmutableList<BundleModule> allModules =
         ImmutableList.of(
             module("base", androidManifest(PKG_NAME, withMinSdkVersion(20))),
-            module("feature1", androidManifest(PKG_NAME, withOnDemand(true))));
+            module("feature1", androidManifest(PKG_NAME, withOnDemandAttribute(true))));
 
     new ModuleDependencyValidator().validateAllModules(allModules);
   }
@@ -276,11 +277,12 @@ public class ModuleDependencyValidatorTest {
                 "feature1",
                 androidManifest(
                     PKG_NAME,
-                    withOnDemand(true),
+                    withOnDemandAttribute(true),
                     withUsesSplit("feature2"),
                     withMinSdkVersion(19))),
             module(
-                "feature2", androidManifest(PKG_NAME, withOnDemand(true), withMinSdkVersion(20))));
+                "feature2",
+                androidManifest(PKG_NAME, withOnDemandAttribute(true), withMinSdkVersion(20))));
 
     ValidationException exception =
         assertThrows(
@@ -302,9 +304,10 @@ public class ModuleDependencyValidatorTest {
             module("base", androidManifest(PKG_NAME, withMinSdkVersion(20))),
             module(
                 "feature1",
-                androidManifest(PKG_NAME, withOnDemand(true), withUsesSplit("feature2"))),
+                androidManifest(PKG_NAME, withOnDemandAttribute(true), withUsesSplit("feature2"))),
             module(
-                "feature2", androidManifest(PKG_NAME, withOnDemand(true), withMinSdkVersion(20))));
+                "feature2",
+                androidManifest(PKG_NAME, withOnDemandAttribute(true), withMinSdkVersion(20))));
 
     ValidationException exception =
         assertThrows(
@@ -324,7 +327,8 @@ public class ModuleDependencyValidatorTest {
         ImmutableList.of(
             module("base", androidManifest(PKG_NAME, withMinSdkVersion(20))),
             module(
-                "feature1", androidManifest(PKG_NAME, withOnDemand(true), withMinSdkVersion(21))));
+                "feature1",
+                androidManifest(PKG_NAME, withOnDemandAttribute(true), withMinSdkVersion(21))));
 
     new ModuleDependencyValidator().validateAllModules(allModules);
   }
@@ -335,7 +339,8 @@ public class ModuleDependencyValidatorTest {
         ImmutableList.of(
             module("base", androidManifest(PKG_NAME, withMinSdkVersion(20))),
             module(
-                "feature1", androidManifest(PKG_NAME, withOnDemand(true), withMinSdkVersion(20))));
+                "feature1",
+                androidManifest(PKG_NAME, withOnDemandAttribute(true), withMinSdkVersion(20))));
 
     new ModuleDependencyValidator().validateAllModules(allModules);
   }

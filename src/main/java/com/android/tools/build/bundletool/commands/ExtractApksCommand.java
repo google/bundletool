@@ -16,12 +16,10 @@
 
 package com.android.tools.build.bundletool.commands;
 
-import static com.android.tools.build.bundletool.utils.FileNames.TABLE_OF_CONTENTS_FILE;
 import static com.android.tools.build.bundletool.utils.files.FilePreconditions.checkDirectoryExists;
 import static com.android.tools.build.bundletool.utils.files.FilePreconditions.checkFileExistsAndReadable;
 import static com.google.common.base.Preconditions.checkNotNull;
 
-import com.android.bundle.Commands.BuildApksResult;
 import com.android.bundle.Devices.DeviceSpec;
 import com.android.tools.build.bundletool.commands.CommandHelp.CommandDescription;
 import com.android.tools.build.bundletool.commands.CommandHelp.FlagDescription;
@@ -29,17 +27,21 @@ import com.android.tools.build.bundletool.device.ApkMatcher;
 import com.android.tools.build.bundletool.device.DeviceSpecParser;
 import com.android.tools.build.bundletool.exceptions.ValidationException;
 import com.android.tools.build.bundletool.model.ZipPath;
+import com.android.tools.build.bundletool.utils.ResultUtils;
 import com.android.tools.build.bundletool.utils.files.BufferedIo;
 import com.android.tools.build.bundletool.utils.flags.Flag;
 import com.android.tools.build.bundletool.utils.flags.ParsedFlags;
 import com.google.auto.value.AutoValue;
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.io.ByteStreams;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.io.PrintStream;
 import java.io.UncheckedIOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Optional;
 import java.util.zip.ZipEntry;
@@ -61,15 +63,17 @@ public abstract class ExtractApksCommand {
 
   public abstract DeviceSpec getDeviceSpec();
 
-  public abstract Path getOutputDirectory();
+  public abstract Optional<Path> getOutputDirectory();
 
   public abstract Optional<ImmutableSet<String>> getModules();
 
   /** Gets whether instant APKs should be extracted. */
   public abstract boolean getInstant();
 
+
   public static Builder builder() {
-    return new AutoValue_ExtractApksCommand.Builder().setInstant(false);
+    return new AutoValue_ExtractApksCommand.Builder()
+        .setInstant(false);
   }
 
   /** Builder for the {@link ExtractApksCommand}. */
@@ -91,13 +95,14 @@ public abstract class ExtractApksCommand {
      */
     public abstract Builder setInstant(boolean instant);
 
+
     public abstract ExtractApksCommand build();
   }
 
   public static ExtractApksCommand fromFlags(ParsedFlags flags) {
     Path apksArchivePath = APKS_ARCHIVE_FILE_FLAG.getRequiredValue(flags);
     Path deviceSpecPath = DEVICE_SPEC_FLAG.getRequiredValue(flags);
-    Path outputDirectory = OUTPUT_DIRECTORY.getRequiredValue(flags);
+    Optional<Path> outputDirectory = OUTPUT_DIRECTORY.getValue(flags);
     Optional<ImmutableSet<String>> modules = MODULES_FLAG.getValue(flags);
     Optional<Boolean> instant = INSTANT_FLAG.getValue(flags);
     flags.checkNoUnknownFlags();
@@ -110,35 +115,45 @@ public abstract class ExtractApksCommand {
     checkFileExistsAndReadable(deviceSpecPath);
     command.setDeviceSpec(DeviceSpecParser.parseDeviceSpec(deviceSpecPath));
 
-    checkDirectoryExists(outputDirectory);
-    command.setOutputDirectory(outputDirectory);
+    outputDirectory.ifPresent(command::setOutputDirectory);
 
     modules.ifPresent(command::setModules);
 
     instant.ifPresent(command::setInstant);
 
+
     return command.build();
   }
 
   public ImmutableList<Path> execute() {
+    return execute(System.out);
+  }
+
+  @VisibleForTesting
+  ImmutableList<Path> execute(PrintStream output) {
     if (getModules().isPresent() && getModules().get().isEmpty()) {
       throw new ValidationException("The set of modules cannot be empty.");
     }
 
     ApkMatcher apkMatcher =
         new ApkMatcher(getDeviceSpec(), /* requestedModuleNames= */ getModules(), getInstant());
-    ImmutableList<ZipPath> matchedApks = apkMatcher.getMatchingApks(readTableOfContents());
+    ImmutableList<ZipPath> matchedApks =
+        apkMatcher.getMatchingApks(ResultUtils.readTableOfContents(getApksArchivePath()));
 
     return extractMatchedApks(matchedApks);
   }
 
   private ImmutableList<Path> extractMatchedApks(ImmutableList<ZipPath> matchedApkPaths) {
+    Path outputDirectoryPath =
+        getOutputDirectory().orElseGet(ExtractApksCommand::createTempDirectory);
+    checkDirectoryExists(outputDirectoryPath);
+
     ImmutableList.Builder<Path> builder = ImmutableList.builder();
     try (ZipFile apksArchive = new ZipFile(getApksArchivePath().toFile())) {
       for (ZipPath matchedApk : matchedApkPaths) {
         ZipEntry entry = apksArchive.getEntry(matchedApk.toString());
         checkNotNull(entry);
-        Path extractedApkPath = getOutputDirectory().resolve(matchedApk.getFileName().toString());
+        Path extractedApkPath = outputDirectoryPath.resolve(matchedApk.getFileName().toString());
         try (InputStream inputStream = BufferedIo.inputStream(apksArchive, entry);
             OutputStream outputApk = BufferedIo.outputStream(extractedApkPath)) {
           ByteStreams.copy(inputStream, outputApk);
@@ -153,19 +168,17 @@ public abstract class ExtractApksCommand {
           String.format("Error while processing the APK Set archive '%s'.", getApksArchivePath()),
           e);
     }
+    System.err.printf(
+        "The APKs have been extracted in the directory: %s\n", outputDirectoryPath.toString());
     return builder.build();
   }
 
-  private BuildApksResult readTableOfContents() {
-    try (ZipFile apksArchive = new ZipFile(getApksArchivePath().toFile());
-        InputStream tocStream =
-            BufferedIo.inputStream(apksArchive, new ZipEntry(TABLE_OF_CONTENTS_FILE))) {
-      return BuildApksResult.parseFrom(tocStream);
+  private static Path createTempDirectory() {
+    try {
+      return Files.createTempDirectory("bundletool-extracted-apks");
     } catch (IOException e) {
       throw new UncheckedIOException(
-          String.format(
-              "Error while reading the table of contents file from '%s'.", getApksArchivePath()),
-          e);
+          "Unable to create a temporary directory for extracted APKs.", e);
     }
   }
 
@@ -196,9 +209,11 @@ public abstract class ExtractApksCommand {
         .addFlag(
             FlagDescription.builder()
                 .setFlagName(OUTPUT_DIRECTORY.getName())
+                .setOptional(true)
                 .setExampleValue("output-dir")
                 .setDescription(
-                    "Path to where the matched APKs will be extracted from the archive file.")
+                    "Path to where the matched APKs will be extracted from the archive file. "
+                        + "If not set, the APK Set archive is created in a temporary directory.")
                 .build())
         .addFlag(
             FlagDescription.builder()

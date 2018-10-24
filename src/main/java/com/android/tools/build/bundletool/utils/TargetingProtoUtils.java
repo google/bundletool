@@ -16,12 +16,15 @@
 
 package com.android.tools.build.bundletool.utils;
 
+import static com.android.tools.build.bundletool.utils.Versions.ANDROID_L_API_VERSION;
+
 import com.android.bundle.Targeting.Abi;
 import com.android.bundle.Targeting.ApkTargeting;
 import com.android.bundle.Targeting.AssetsDirectoryTargeting;
 import com.android.bundle.Targeting.ScreenDensity;
 import com.android.bundle.Targeting.SdkVersion;
 import com.android.bundle.Targeting.SdkVersionTargeting;
+import com.android.bundle.Targeting.VariantTargeting;
 import com.google.common.collect.ImmutableSet;
 import com.google.protobuf.Int32Value;
 
@@ -105,4 +108,11 @@ public final class TargetingProtoUtils {
     return SdkVersionTargeting.newBuilder().addValue(sdkVersion).build();
   }
 
+  public static VariantTargeting variantTargeting(SdkVersionTargeting sdkVersionTargeting) {
+    return VariantTargeting.newBuilder().setSdkVersionTargeting(sdkVersionTargeting).build();
+  }
+
+  public static VariantTargeting lPlusVariantTargeting() {
+    return variantTargeting(sdkVersionTargeting(sdkVersionFrom(ANDROID_L_API_VERSION)));
+  }
 }

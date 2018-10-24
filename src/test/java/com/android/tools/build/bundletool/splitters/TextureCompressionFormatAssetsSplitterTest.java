@@ -16,7 +16,9 @@
 
 package com.android.tools.build.bundletool.splitters;
 
+import static com.android.tools.build.bundletool.model.ManifestMutator.withSplitsRequired;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifest;
+import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.compareManifestMutators;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.apkTextureTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.assets;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.assetsDirectoryTargeting;
@@ -25,6 +27,7 @@ import static com.android.tools.build.bundletool.testing.TargetingUtils.getSplit
 import static com.android.tools.build.bundletool.testing.TargetingUtils.targetedAssetsDirectory;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.textureCompressionTargeting;
 import static com.android.tools.build.bundletool.testing.TestUtils.extractPaths;
+import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.truth.Truth.assertThat;
 
 import com.android.bundle.Targeting.AssetsDirectoryTargeting;
@@ -32,6 +35,8 @@ import com.android.bundle.Targeting.TextureCompressionFormat.TextureCompressionF
 import com.android.tools.build.bundletool.model.BundleModule;
 import com.android.tools.build.bundletool.model.ModuleSplit;
 import com.android.tools.build.bundletool.testing.BundleModuleBuilder;
+import com.google.common.collect.ImmutableCollection;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import java.util.Collection;
 import java.util.List;
@@ -101,5 +106,59 @@ public class TextureCompressionFormatAssetsSplitterTest {
     assertThat(threeDcSplits).hasSize(1);
     assertThat(extractPaths(threeDcSplits.get(0).getEntries()))
         .containsExactly("assets/images#tcf_three_dc/image.jpg");
+  }
+
+  @Test
+  public void manifestMutatorToRequireSplits_notRegistered_whenNoTcfSpecificAssets()
+      throws Exception {
+    BundleModule testModule =
+        new BundleModuleBuilder("testModule")
+            .addFile("assets/other/file.dat")
+            .setAssetsConfig(
+                assets(
+                    targetedAssetsDirectory(
+                        "assets/other", AssetsDirectoryTargeting.getDefaultInstance())))
+            .setManifest(androidManifest("com.test.app"))
+            .build();
+    ModuleSplit baseSplit = ModuleSplit.forAssets(testModule);
+
+    ImmutableCollection<ModuleSplit> assetsSplits =
+        TextureCompressionFormatAssetsSplitter.create().split(baseSplit);
+
+    assertThat(assetsSplits).hasSize(1);
+    assertThat(assetsSplits.asList().get(0).getMasterManifestMutators()).isEmpty();
+  }
+
+  @Test
+  public void manifestMutatorToRequireSplits_registered_whenTcfSpecificAssetsPresent()
+      throws Exception {
+    BundleModule testModule =
+        new BundleModuleBuilder("testModule")
+            .addFile("assets/images#tcf_etc1/image.jpg")
+            .setAssetsConfig(
+                assets(
+                    targetedAssetsDirectory(
+                        "assets/images#tcf_etc1",
+                        assetsDirectoryTargeting(
+                            textureCompressionTargeting(
+                                TextureCompressionFormatAlias.ETC1_RGB8,
+                                ImmutableSet.of(TextureCompressionFormatAlias.THREE_DC))))))
+            .setManifest(androidManifest("com.test.app"))
+            .build();
+    ModuleSplit baseSplit = ModuleSplit.forAssets(testModule);
+
+    ImmutableCollection<ModuleSplit> assetsSplits =
+        TextureCompressionFormatAssetsSplitter.create().split(baseSplit);
+
+    ImmutableList<ModuleSplit> configSplits =
+        assetsSplits.stream().filter(split -> !split.isMasterSplit()).collect(toImmutableList());
+
+    assertThat(configSplits).isNotEmpty();
+    for (ModuleSplit configSplit : configSplits) {
+      assertThat(
+              compareManifestMutators(
+                  configSplit.getMasterManifestMutators(), withSplitsRequired(true)))
+          .isTrue();
+    }
   }
 }

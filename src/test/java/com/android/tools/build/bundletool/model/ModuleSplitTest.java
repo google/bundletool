@@ -17,7 +17,7 @@
 package com.android.tools.build.bundletool.model;
 
 import static com.android.tools.build.bundletool.model.AndroidManifest.ACTIVITY_ELEMENT_NAME;
-import static com.android.tools.build.bundletool.model.AndroidManifest.ANDROID_NAMESPACE;
+import static com.android.tools.build.bundletool.model.AndroidManifest.ANDROID_NAMESPACE_URI;
 import static com.android.tools.build.bundletool.model.AndroidManifest.IS_FEATURE_SPLIT_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.NAME_RESOURCE_ID;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifest;
@@ -54,7 +54,6 @@ import com.android.bundle.Targeting.ScreenDensity.DensityAlias;
 import com.android.bundle.Targeting.ScreenDensityTargeting;
 import com.android.bundle.Targeting.TextureCompressionFormat.TextureCompressionFormatAlias;
 import com.android.tools.build.bundletool.testing.BundleModuleBuilder;
-import com.android.tools.build.bundletool.testing.InMemoryModuleEntry;
 import com.android.tools.build.bundletool.utils.xmlproto.XmlProtoElement;
 import com.android.tools.build.bundletool.utils.xmlproto.XmlProtoNode;
 import com.google.common.collect.ImmutableList;
@@ -161,10 +160,10 @@ public class ModuleSplitTest {
         .containsExactly(
             xmlAttribute("package", "com.test.app"),
             xmlDecimalIntegerAttribute(
-                ANDROID_NAMESPACE, "versionCode", VERSION_CODE_RESOURCE_ID, 1),
+                ANDROID_NAMESPACE_URI, "versionCode", VERSION_CODE_RESOURCE_ID, 1),
             xmlAttribute("split", "testModule"),
             xmlBooleanAttribute(
-                ANDROID_NAMESPACE, "isFeatureSplit", IS_FEATURE_SPLIT_RESOURCE_ID, true));
+                ANDROID_NAMESPACE_URI, "isFeatureSplit", IS_FEATURE_SPLIT_RESOURCE_ID, true));
   }
 
   @Ignore("Graphics API is currently not being reflected in the manifest.")
@@ -382,12 +381,12 @@ public class ModuleSplitTest {
     assertThat(activities).hasSize(2);
     XmlElement activityElement = activities.get(1);
     assertThat(activityElement.getAttributeList())
-        .containsExactly(xmlAttribute(ANDROID_NAMESPACE, "name", NAME_RESOURCE_ID, "FooActivity"));
+        .containsExactly(
+            xmlAttribute(ANDROID_NAMESPACE_URI, "name", NAME_RESOURCE_ID, "FooActivity"));
   }
 
   private ImmutableList<ModuleEntry> fakeEntriesOf(String... entries) {
-    return Arrays.asList(entries)
-        .stream()
+    return Arrays.stream(entries)
         .map(entry -> InMemoryModuleEntry.ofFile(entry, DUMMY_CONTENT))
         .collect(toImmutableList());
   }
@@ -397,7 +396,7 @@ public class ModuleSplitTest {
     XmlElement glTexture = manifest.getElement().getChildElement("supports-gl-texture").getProto();
     assertThat(glTexture.getAttributeList()).hasSize(1);
     assertThat(glTexture.getAttribute(0))
-        .isEqualTo(xmlAttribute(ANDROID_NAMESPACE, "name", textureString));
+        .isEqualTo(xmlAttribute(ANDROID_NAMESPACE_URI, "name", textureString));
   }
 
   private static void assertManifestHasGlTargeting(XmlProtoNode manifest, int expectedValue) {
@@ -410,6 +409,6 @@ public class ModuleSplitTest {
     assertThat(features).hasSize(1);
     assertThat(features.get(0).getAttributeList()).hasSize(1);
     assertThat(features.get(0).getAttribute(0))
-        .isEqualTo(xmlDecimalIntegerAttribute(ANDROID_NAMESPACE, "glEsVersion", expectedValue));
+        .isEqualTo(xmlDecimalIntegerAttribute(ANDROID_NAMESPACE_URI, "glEsVersion", expectedValue));
   }
 }

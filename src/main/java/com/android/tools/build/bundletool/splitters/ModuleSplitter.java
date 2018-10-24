@@ -16,10 +16,13 @@
 
 package com.android.tools.build.bundletool.splitters;
 
+import static com.android.tools.build.bundletool.utils.TargetingProtoUtils.lPlusVariantTargeting;
 import static com.android.tools.build.bundletool.utils.Versions.ANDROID_L_API_VERSION;
+import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 
+import com.android.bundle.Targeting.ApkTargeting;
 import com.android.bundle.Targeting.SdkVersion;
 import com.android.bundle.Targeting.SdkVersionTargeting;
 import com.android.bundle.Targeting.VariantTargeting;
@@ -27,19 +30,18 @@ import com.android.tools.build.bundletool.exceptions.CommandExecutionException;
 import com.android.tools.build.bundletool.mergers.SameTargetingMerger;
 import com.android.tools.build.bundletool.model.AndroidManifest;
 import com.android.tools.build.bundletool.model.BundleModule;
+import com.android.tools.build.bundletool.model.ManifestEditor;
 import com.android.tools.build.bundletool.model.ManifestMutator;
 import com.android.tools.build.bundletool.model.ModuleSplit;
 import com.android.tools.build.bundletool.model.ModuleSplit.SplitType;
 import com.android.tools.build.bundletool.model.OptimizationDimension;
 import com.android.tools.build.bundletool.version.Version;
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.HashMultimap;
 import com.google.common.collect.ImmutableCollection;
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableMultimap;
-import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Multimap;
 import com.google.protobuf.Int32Value;
-import java.util.Collection;
 import java.util.Optional;
 import javax.annotation.concurrent.GuardedBy;
 
@@ -52,48 +54,46 @@ import javax.annotation.concurrent.GuardedBy;
 public class ModuleSplitter {
 
   private final BundleModule module;
-  private final ImmutableSet<OptimizationDimension> optimizationDimensions;
   private final SuffixManager suffixManager = new SuffixManager();
   private final Version bundleVersion;
+  private final ApkGenerationConfiguration apkGenerationConfiguration;
+  private final VariantTargeting variantTargeting;
 
-
-  private boolean enableNativeLibraryCompressionSplitter = false;
+  @VisibleForTesting
+  ModuleSplitter(BundleModule module, Version bundleVersion) {
+    this(
+        module,
+        bundleVersion,
+        ApkGenerationConfiguration.getDefaultInstance(),
+        lPlusVariantTargeting());
+  }
 
   public ModuleSplitter(
       BundleModule module,
-      ImmutableSet<OptimizationDimension> optimizationDimensions,
-      Version bundleVersion) {
-    this.optimizationDimensions = optimizationDimensions;
-    this.module = module;
-    this.bundleVersion = bundleVersion;
-  }
-
-
-  public void setEnableNativeLibraryCompressionSplitter(boolean value) {
-    this.enableNativeLibraryCompressionSplitter = value;
+      Version bundleVersion,
+      ApkGenerationConfiguration apkGenerationConfiguration,
+      VariantTargeting variantTargeting) {
+    this.module = checkNotNull(module);
+    this.bundleVersion = checkNotNull(bundleVersion);
+    this.apkGenerationConfiguration = checkNotNull(apkGenerationConfiguration);
+    this.variantTargeting = checkNotNull(variantTargeting);
   }
 
   public ImmutableList<ModuleSplit> splitModule() {
-    return splitModuleInternal()
-        .stream()
-        .map(this::removeSplitName)
-        .collect(toImmutableList());
+    if (apkGenerationConfiguration.isForInstantAppVariants()) {
+      // Returns the list of module splits, ready for use as an instant app.
+      return splitModuleInternal().stream()
+          .map(ModuleSplitter::makeInstantManifestChanges)
+          .map(moduleSplit -> moduleSplit.toBuilder().setSplitType(SplitType.INSTANT).build())
+          .collect(toImmutableList());
+    } else {
+      return splitModuleInternal().stream().map(this::removeSplitName).collect(toImmutableList());
+    }
   }
-
-  /** Returns the list of module splits, ready for use as an instant app. */
-  public ImmutableList<ModuleSplit> splitInstantModule() {
-    return splitModuleInternal()
-        .stream()
-        .map(ModuleSplitter::writeTargetSandboxVersion)
-        .map(moduleSplit -> moduleSplit.toBuilder().setSplitType(SplitType.INSTANT).build())
-        .collect(toImmutableList());
-  }
-
   /** Common modifications to both the instant and installed splits. */
   private ImmutableList<ModuleSplit> splitModuleInternal() {
-    return runSplitters()
-        .stream()
-        .map(this::addLPlusTargeting)
+    return runSplitters().stream()
+        .map(this::addLPlusApkTargeting)
         .map(this::writeSplitIdInManifest)
         .collect(toImmutableList());
   }
@@ -111,34 +111,35 @@ public class ModuleSplitter {
 
     // Resources splits.
     SplittingPipeline resourcesPipeline = createResourcesSplittingPipeline();
-    splits.addAll(resourcesPipeline.split(ModuleSplit.forResources(module)));
+    splits.addAll(resourcesPipeline.split(ModuleSplit.forResources(module, variantTargeting)));
 
     // Native libraries splits.
     SplittingPipeline nativePipeline = createNativeLibrariesSplittingPipeline();
-    splits.addAll(nativePipeline.split(ModuleSplit.forNativeLibraries(module)));
+    splits.addAll(nativePipeline.split(ModuleSplit.forNativeLibraries(module, variantTargeting)));
 
     // Assets splits.
     SplittingPipeline assetsPipeline = createAssetsSplittingPipeline();
-    splits.addAll(assetsPipeline.split(ModuleSplit.forAssets(module)));
+    splits.addAll(assetsPipeline.split(ModuleSplit.forAssets(module, variantTargeting)));
 
-    ImmutableList<ModuleSplit> dexSplits = ImmutableList.of(ModuleSplit.forDex(module));
-    splits.addAll(dexSplits);
+    // Dex Files.
+    SplittingPipeline dexPipeline = createDexSplittingPipeline();
+    splits.addAll(dexPipeline.split(ModuleSplit.forDex(module, variantTargeting)));
 
     // Other files.
-    splits.add(ModuleSplit.forRoot(module));
+    splits.add(ModuleSplit.forRoot(module, variantTargeting));
 
-    ImmutableMultimap<VariantTargeting, ModuleSplit> variantModuleSplitMap =
-        new VariantGrouper().groupByVariant(splits.build());
+    // Merging and making a master split.
+    ImmutableList<ModuleSplit> mergedSplits =
+        new SameTargetingMerger().merge(applyMasterManifestMutators(splits.build()));
 
-    ImmutableList.Builder<ModuleSplit> mergedSplits = ImmutableList.builder();
-    for (Collection<ModuleSplit> moduleSplits : variantModuleSplitMap.asMap().values()) {
-      // Merging and making a master split from single variant.
-      mergedSplits.addAll(
-          new SameTargetingMerger()
-              .merge(applyMasterManifestMutators(ImmutableList.copyOf(moduleSplits))));
-    }
+    // Check that we have only one split with default targeting - the master split.
+    ImmutableList<ModuleSplit> defaultTargetingSplits =
+        mergedSplits.stream()
+            .filter(split -> split.getApkTargeting().equals(ApkTargeting.getDefaultInstance()))
+            .collect(toImmutableList());
+    checkState(defaultTargetingSplits.size() == 1, "Expected one split with default targeting.");
 
-    return mergedSplits.build();
+    return mergedSplits;
   }
 
   /* Writes the final manifest that reflects the Split ID. */
@@ -150,25 +151,33 @@ public class ModuleSplitter {
 
   /* Removes the {@code splitName} attribute, if it exists in the manifest. */
   public ModuleSplit removeSplitName(ModuleSplit moduleSplit) {
-
     return moduleSplit.removeSplitName();
   }
 
   /**
-   * Updates the split to insert the targetSandboxVersion as 2, which is required for instant apps.
+   * Updates the split to insert instant app specific manifest changes. The targetSandboxVersion
+   * needs to be set to 2 and the minSdkVersion should be 21 or above.
    */
-  public static ModuleSplit writeTargetSandboxVersion(ModuleSplit moduleSplit) {
-    AndroidManifest apkManifest =
-        moduleSplit.getAndroidManifest().toEditor().setTargetSandboxVersion(2).save();
-    return moduleSplit.toBuilder().setAndroidManifest(apkManifest).build();
+  public static ModuleSplit makeInstantManifestChanges(ModuleSplit moduleSplit) {
+    AndroidManifest manifest = moduleSplit.getAndroidManifest();
+    ManifestEditor editor = manifest.toEditor();
+    editor.setTargetSandboxVersion(2);
+    if (manifest.getEffectiveMinSdkVersion() < 21) {
+      editor.setMinSdkVersion(21);
+    }
+    return moduleSplit.toBuilder().setAndroidManifest(editor.save()).build();
   }
 
   private SplittingPipeline createResourcesSplittingPipeline() {
     ImmutableList.Builder<ModuleSplitSplitter> resourceSplitters = ImmutableList.builder();
-    if (optimizationDimensions.contains(OptimizationDimension.SCREEN_DENSITY)) {
+    if (apkGenerationConfiguration
+        .getOptimizationDimensions()
+        .contains(OptimizationDimension.SCREEN_DENSITY)) {
       resourceSplitters.add(new ScreenDensityResourcesSplitter(bundleVersion));
     }
-    if (optimizationDimensions.contains(OptimizationDimension.LANGUAGE)) {
+    if (apkGenerationConfiguration
+        .getOptimizationDimensions()
+        .contains(OptimizationDimension.LANGUAGE)) {
       resourceSplitters.add(new LanguageResourcesSplitter());
     }
     return SplittingPipeline.create(resourceSplitters.build());
@@ -207,10 +216,12 @@ public class ModuleSplitter {
 
   private SplittingPipeline createNativeLibrariesSplittingPipeline() {
     ImmutableList.Builder<ModuleSplitSplitter> nativeSplitters = ImmutableList.builder();
-    if (enableNativeLibraryCompressionSplitter) {
-      nativeSplitters.add(new NativeLibrariesCompressionSplitter());
+    if (apkGenerationConfiguration.getEnableNativeLibraryCompressionSplitter()) {
+      nativeSplitters.add(new NativeLibrariesCompressionSplitter(apkGenerationConfiguration));
     }
-    if (optimizationDimensions.contains(OptimizationDimension.ABI)) {
+    if (apkGenerationConfiguration
+        .getOptimizationDimensions()
+        .contains(OptimizationDimension.ABI)) {
       nativeSplitters.add(new AbiNativeLibrariesSplitter());
     }
     return SplittingPipeline.create(nativeSplitters.build());
@@ -218,12 +229,22 @@ public class ModuleSplitter {
 
   private SplittingPipeline createAssetsSplittingPipeline() {
     ImmutableList.Builder<ModuleSplitSplitter> assetsSplitters = ImmutableList.builder();
-    if (optimizationDimensions.contains(OptimizationDimension.LANGUAGE)) {
+    if (apkGenerationConfiguration
+        .getOptimizationDimensions()
+        .contains(OptimizationDimension.LANGUAGE)) {
       assetsSplitters.add(LanguageAssetsSplitter.create());
     }
     return SplittingPipeline.create(assetsSplitters.build());
   }
 
+  private SplittingPipeline createDexSplittingPipeline() {
+    ImmutableList.Builder<ModuleSplitSplitter> dexSplitters = ImmutableList.builder();
+    if (apkGenerationConfiguration.getEnableDexCompressionSplitter()) {
+      dexSplitters.add(new DexCompressionSplitter());
+    }
+
+    return SplittingPipeline.create(dexSplitters.build());
+  }
 
   private static boolean targetsOnlyPreL(BundleModule module) {
     Optional<Integer> maxSdkVersion = module.getAndroidManifest().getMaxSdkVersion();
@@ -231,10 +252,10 @@ public class ModuleSplitter {
   }
 
   /**
-   * Adds L+ targeting to the module split. If SDK targeting already exists, it's not overridden but
-   * checked that it targets no L- devices.
+   * Adds L+ targeting to the Apk targeting of module split. If SDK targeting already exists, it's
+   * not overridden but checked that it targets no L- devices.
    */
-  private ModuleSplit addLPlusTargeting(ModuleSplit split) {
+  private ModuleSplit addLPlusApkTargeting(ModuleSplit split) {
     if (split.getApkTargeting().hasSdkVersionTargeting()) {
       checkState(
           split.getApkTargeting().getSdkVersionTargeting().getValue(0).getMin().getValue()

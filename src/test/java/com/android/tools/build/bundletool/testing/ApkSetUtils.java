@@ -15,13 +15,18 @@
  */
 package com.android.tools.build.bundletool.testing;
 
+import com.android.bundle.Commands.ApkDescription;
+import com.android.bundle.Commands.ApkSet;
 import com.android.bundle.Commands.BuildApksResult;
+import com.android.bundle.Commands.ModuleMetadata;
+import com.google.common.collect.ImmutableList;
 import com.google.common.io.ByteStreams;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Arrays;
 import java.util.zip.ZipFile;
 
 /** Utility methods to manipulate APK Sets. */
@@ -47,6 +52,29 @@ public final class ApkSetUtils {
       ByteStreams.copy(apkSetFile.getInputStream(apkSetFile.getEntry(path)), fileOutputStream);
     }
     return extractedFile;
+  }
+
+  public static ApkSet splitApkSet(String moduleName, ApkDescription... apkDescriptions) {
+    return splitApkSet(
+        moduleName,
+        /* onDemand= */ false,
+        /* moduleDependencies= */ ImmutableList.of(),
+        apkDescriptions);
+  }
+
+  public static ApkSet splitApkSet(
+      String moduleName,
+      boolean onDemand,
+      ImmutableList<String> moduleDependencies,
+      ApkDescription... apkDescriptions) {
+    return ApkSet.newBuilder()
+        .setModuleMetadata(
+            ModuleMetadata.newBuilder()
+                .setName(moduleName)
+                .setOnDemand(onDemand)
+                .addAllDependencies(moduleDependencies))
+        .addAllApkDescription(Arrays.asList(apkDescriptions))
+        .build();
   }
 
   private ApkSetUtils() {}

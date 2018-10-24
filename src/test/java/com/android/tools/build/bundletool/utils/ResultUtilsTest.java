@@ -17,6 +17,7 @@
 package com.android.tools.build.bundletool.utils;
 
 import static com.android.tools.build.bundletool.testing.ApksArchiveHelpers.createApkDescription;
+import static com.android.tools.build.bundletool.testing.ApksArchiveHelpers.createApksArchiveFile;
 import static com.android.tools.build.bundletool.testing.ApksArchiveHelpers.createInstantApkSet;
 import static com.android.tools.build.bundletool.testing.ApksArchiveHelpers.createMasterApkDescription;
 import static com.android.tools.build.bundletool.testing.ApksArchiveHelpers.createSplitApkSet;
@@ -25,6 +26,7 @@ import static com.android.tools.build.bundletool.testing.ApksArchiveHelpers.crea
 import static com.android.tools.build.bundletool.testing.TargetingUtils.apkAbiTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.sdkVersionFrom;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.variantSdkTargeting;
+import static com.android.tools.build.bundletool.utils.ResultUtils.readTableOfContents;
 import static com.google.common.truth.Truth.assertThat;
 
 import com.android.bundle.Commands.BuildApksResult;
@@ -32,15 +34,57 @@ import com.android.bundle.Commands.Variant;
 import com.android.bundle.Targeting.Abi.AbiAlias;
 import com.android.bundle.Targeting.ApkTargeting;
 import com.android.bundle.Targeting.SdkVersion;
+import com.android.bundle.Targeting.VariantTargeting;
 import com.google.common.collect.ImmutableSet;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import org.junit.Before;
+import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.TemporaryFolder;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 
 @RunWith(JUnit4.class)
 public class ResultUtilsTest {
+
+  @Rule public final TemporaryFolder tmp = new TemporaryFolder();
+  private Path tmpDir;
+
+  @Before
+  public void setUp() throws Exception {
+    tmpDir = tmp.getRoot().toPath();
+  }
+
+  @Test
+  public void emptyBuildApksResult_readTableOfContents() throws Exception {
+
+    Path apksArchiveFile =
+        createApksArchiveFile(BuildApksResult.getDefaultInstance(), tmpDir.resolve("bundle.apks"));
+
+    BuildApksResult buildApksResult = readTableOfContents(apksArchiveFile);
+    assertThat(buildApksResult).isEqualTo(BuildApksResult.getDefaultInstance());
+  }
+
+  @Test
+  public void buildApksResult_readTableOfContents() throws Exception {
+    Path apkLBase = Paths.get("apkL-base.apk");
+    BuildApksResult tableOfContentsProto =
+        BuildApksResult.newBuilder()
+            .addVariant(
+                createVariant(
+                    VariantTargeting.getDefaultInstance(),
+                    createSplitApkSet(
+                        "base",
+                        createMasterApkDescription(ApkTargeting.getDefaultInstance(), apkLBase))))
+            .build();
+
+    Path apksArchiveFile =
+        createApksArchiveFile(tableOfContentsProto, tmpDir.resolve("bundle.apks"));
+
+    BuildApksResult buildApksResult = readTableOfContents(apksArchiveFile);
+    assertThat(buildApksResult).isEqualTo(tableOfContentsProto);
+  }
 
   @Test
   public void filterInstantApkVariant() throws Exception {

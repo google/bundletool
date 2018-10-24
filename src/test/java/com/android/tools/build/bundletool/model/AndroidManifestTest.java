@@ -24,15 +24,15 @@ import static com.android.tools.build.bundletool.model.AndroidManifest.RESOURCE_
 import static com.android.tools.build.bundletool.model.AndroidManifest.VALUE_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.VERSION_CODE_RESOURCE_ID;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifest;
-import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withFeatureCondition;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withFusingAttribute;
+import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withInstallTimeDelivery;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withLegacyFusingAttribute;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withLegacyOnDemand;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withMinSdkCondition;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withMinSdkVersion;
-import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withOnDemand;
+import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withOnDemandAttribute;
+import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withOnDemandDelivery;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withTargetSandboxVersion;
-import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withUnsupportedCondition;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withUsesSplit;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.xmlAttribute;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.xmlBooleanAttribute;
@@ -51,11 +51,7 @@ import com.android.tools.build.bundletool.exceptions.ValidationException;
 import com.android.tools.build.bundletool.exceptions.manifest.ManifestFusingException.FusingMissingIncludeAttribute;
 import com.android.tools.build.bundletool.exceptions.manifest.ManifestVersionException.VersionCodeMissingException;
 import com.android.tools.build.bundletool.utils.xmlproto.UnexpectedAttributeTypeException;
-import com.android.tools.build.bundletool.utils.xmlproto.XmlProtoAttributeBuilder;
-import com.android.tools.build.bundletool.utils.xmlproto.XmlProtoElement;
-import com.android.tools.build.bundletool.utils.xmlproto.XmlProtoElementBuilder;
 import com.android.tools.build.bundletool.utils.xmlproto.XmlProtoNode;
-import com.android.tools.build.bundletool.version.BundleToolVersion;
 import com.android.tools.build.bundletool.version.Version;
 import com.google.common.collect.ImmutableList;
 import com.google.protobuf.TextFormat;
@@ -72,7 +68,6 @@ public class AndroidManifestTest {
   private static final String DISTRIBUTION_NAMESPACE_URI =
       "http://schemas.android.com/apk/distribution";
 
-  private static final Version CURRENT_VERSION = BundleToolVersion.getCurrentVersion();
   private static final Version BUNDLE_TOOL_0_3_4 = Version.of("0.3.4");
   private static final Version BUNDLE_TOOL_0_3_3 = Version.of("0.3.3");
 
@@ -344,121 +339,198 @@ public class AndroidManifestTest {
   @Test
   public void isOnDemandModule_notSet() {
     // From Bundletool 0.3.4 onwards.
-    AndroidManifest manifest = AndroidManifest.create(androidManifest("com.test.app"));
-    assertThat(manifest.isOnDemandModule(BUNDLE_TOOL_0_3_4)).isEmpty();
+    AndroidManifest manifest =
+        AndroidManifest.create(androidManifest("com.test.app"), BUNDLE_TOOL_0_3_4);
+    assertThat(manifest.getManifestDeliveryElement()).isEmpty();
+    assertThat(manifest.getOnDemandAttribute()).isEmpty();
+    assertThat(manifest.isDeliveryTypeDeclared()).isFalse();
+    assertThat(manifest.isOnDemandModule()).isEmpty();
   }
 
   @Test
-  public void isOnDemandModule_false_byDefault_legacy() {
-    AndroidManifest manifest = AndroidManifest.create(androidManifest("com.test.app"));
-    assertThat(manifest.isOnDemandModule(BUNDLE_TOOL_0_3_3)).isEmpty();
+  public void isOnDemandModule_notSet_legacy() {
+    AndroidManifest manifest =
+        AndroidManifest.create(androidManifest("com.test.app"), BUNDLE_TOOL_0_3_3);
+    assertThat(manifest.getManifestDeliveryElement()).isEmpty();
+    assertThat(manifest.getOnDemandAttribute()).isEmpty();
+    assertThat(manifest.isDeliveryTypeDeclared()).isFalse();
+    assertThat(manifest.isOnDemandModule()).isEmpty();
   }
 
   @Test
   public void isOnDemandModule_true() {
     // From Bundletool 0.3.4 onwards.
     AndroidManifest manifest =
-        AndroidManifest.create(androidManifest("com.test.app", withOnDemand(true)));
-    assertThat(manifest.isOnDemandModule(BUNDLE_TOOL_0_3_4)).hasValue(true);
+        AndroidManifest.create(
+            androidManifest("com.test.app", withOnDemandAttribute(true)), BUNDLE_TOOL_0_3_4);
+    assertThat(manifest.getManifestDeliveryElement()).isEmpty();
+    assertThat(manifest.getOnDemandAttribute()).isPresent();
+    assertThat(manifest.isDeliveryTypeDeclared()).isTrue();
+    assertThat(manifest.isOnDemandModule()).hasValue(true);
   }
 
   @Test
   public void isOnDemandModule_true_legacy() {
     AndroidManifest manifest =
-        AndroidManifest.create(androidManifest("com.test.app", withLegacyOnDemand(true)));
-    assertThat(manifest.isOnDemandModule(BUNDLE_TOOL_0_3_3)).hasValue(true);
+        AndroidManifest.create(
+            androidManifest("com.test.app", withLegacyOnDemand(true)), BUNDLE_TOOL_0_3_3);
+    assertThat(manifest.getManifestDeliveryElement()).isEmpty();
+    assertThat(manifest.getOnDemandAttribute()).isPresent();
+    assertThat(manifest.isDeliveryTypeDeclared()).isTrue();
+    assertThat(manifest.isOnDemandModule()).hasValue(true);
 
     AndroidManifest newManifest =
-        AndroidManifest.create(androidManifest("com.test.app", withOnDemand(true)));
-    assertThat(newManifest.isOnDemandModule(BUNDLE_TOOL_0_3_3)).hasValue(true);
+        AndroidManifest.create(
+            androidManifest("com.test.app", withOnDemandAttribute(true)), BUNDLE_TOOL_0_3_3);
+    assertThat(newManifest.getManifestDeliveryElement()).isEmpty();
+    assertThat(newManifest.getOnDemandAttribute()).isPresent();
+    assertThat(newManifest.isDeliveryTypeDeclared()).isTrue();
+    assertThat(newManifest.isOnDemandModule()).hasValue(true);
   }
 
   @Test
   public void isOnDemandModule_false() {
     // From Bundletool 0.3.4 onwards.
     AndroidManifest manifest =
-        AndroidManifest.create(androidManifest("com.test.app", withOnDemand(false)));
-    assertThat(manifest.isOnDemandModule(BUNDLE_TOOL_0_3_4)).hasValue(false);
+        AndroidManifest.create(
+            androidManifest("com.test.app", withOnDemandAttribute(false)), BUNDLE_TOOL_0_3_4);
+    assertThat(manifest.getManifestDeliveryElement()).isEmpty();
+    assertThat(manifest.getOnDemandAttribute()).isPresent();
+    assertThat(manifest.isDeliveryTypeDeclared()).isTrue();
+    assertThat(manifest.isOnDemandModule()).hasValue(false);
   }
 
   @Test
   public void isOnDemandModule_false_legacy() {
     AndroidManifest manifest =
-        AndroidManifest.create(androidManifest("com.test.app", withLegacyOnDemand(false)));
-    assertThat(manifest.isOnDemandModule(BUNDLE_TOOL_0_3_3)).hasValue(false);
+        AndroidManifest.create(
+            androidManifest("com.test.app", withLegacyOnDemand(false)), BUNDLE_TOOL_0_3_3);
+    assertThat(manifest.getManifestDeliveryElement()).isEmpty();
+    assertThat(manifest.getOnDemandAttribute()).isPresent();
+    assertThat(manifest.isDeliveryTypeDeclared()).isTrue();
+    assertThat(manifest.isOnDemandModule()).hasValue(false);
 
     AndroidManifest newManifest =
-        AndroidManifest.create(androidManifest("com.test.app", withOnDemand(false)));
-    assertThat(newManifest.isOnDemandModule(BUNDLE_TOOL_0_3_3)).hasValue(false);
+        AndroidManifest.create(
+            androidManifest("com.test.app", withOnDemandAttribute(false)), BUNDLE_TOOL_0_3_3);
+    assertThat(newManifest.getManifestDeliveryElement()).isEmpty();
+    assertThat(newManifest.getOnDemandAttribute()).isPresent();
+    assertThat(newManifest.isDeliveryTypeDeclared()).isTrue();
+    assertThat(newManifest.isOnDemandModule()).hasValue(false);
   }
 
   @Test
   public void isOnDemandModule_old_namespace_returnsEmpty() {
     // From Bundletool 0.3.4 onwards.
     AndroidManifest manifest =
-        AndroidManifest.create(androidManifest("com.test.app", withLegacyOnDemand(false)));
-    assertThat(manifest.isOnDemandModule(BUNDLE_TOOL_0_3_4)).isEmpty();
+        AndroidManifest.create(
+            androidManifest("com.test.app", withLegacyOnDemand(false)), BUNDLE_TOOL_0_3_4);
+    assertThat(manifest.getManifestDeliveryElement()).isEmpty();
+    assertThat(manifest.getOnDemandAttribute()).isEmpty();
+    assertThat(manifest.isDeliveryTypeDeclared()).isFalse();
+    assertThat(manifest.isOnDemandModule()).isEmpty();
+  }
+
+  @Test
+  public void isOnDemandModule_deliveryElement_installTime() {
+    AndroidManifest manifest =
+        AndroidManifest.create(androidManifest("com.test.app", withInstallTimeDelivery()));
+
+    assertThat(manifest.getManifestDeliveryElement()).isPresent();
+    assertThat(manifest.getOnDemandAttribute()).isEmpty();
+    assertThat(manifest.isDeliveryTypeDeclared()).isTrue();
+    assertThat(manifest.isOnDemandModule()).hasValue(false);
+  }
+
+  @Test
+  public void isOnDemandModule_deliveryElement_onDemand() {
+    AndroidManifest manifest =
+        AndroidManifest.create(androidManifest("com.test.app", withOnDemandDelivery()));
+
+    assertThat(manifest.getManifestDeliveryElement()).isPresent();
+    assertThat(manifest.getOnDemandAttribute()).isEmpty();
+    assertThat(manifest.isDeliveryTypeDeclared()).isTrue();
+    assertThat(manifest.isOnDemandModule()).hasValue(true);
+  }
+
+  @Test
+  public void isOnDemandModule_deliveryElement_conditions() {
+    AndroidManifest manifest =
+        AndroidManifest.create(androidManifest("com.test.app", withMinSdkCondition(21)));
+
+    assertThat(manifest.getManifestDeliveryElement()).isPresent();
+    assertThat(manifest.getOnDemandAttribute()).isEmpty();
+    assertThat(manifest.isDeliveryTypeDeclared()).isTrue();
+    assertThat(manifest.isOnDemandModule()).hasValue(false);
   }
 
   @Test
   public void getIsIncludedInFusing_true() {
     // From Bundletool 0.3.4 onwards.
     AndroidManifest manifest =
-        AndroidManifest.create(androidManifest("com.test.app", withFusingAttribute(true)));
-    assertThat(manifest.getIsModuleIncludedInFusing(BUNDLE_TOOL_0_3_4)).hasValue(true);
+        AndroidManifest.create(
+            androidManifest("com.test.app", withFusingAttribute(true)), BUNDLE_TOOL_0_3_4);
+    assertThat(manifest.getIsModuleIncludedInFusing()).hasValue(true);
   }
 
   @Test
   public void getIsIncludedInFusing_legacy_true() {
     AndroidManifest manifest =
-        AndroidManifest.create(androidManifest("com.test.app", withLegacyFusingAttribute(true)));
-    assertThat(manifest.getIsModuleIncludedInFusing(BUNDLE_TOOL_0_3_3)).hasValue(true);
+        AndroidManifest.create(
+            androidManifest("com.test.app", withLegacyFusingAttribute(true)), BUNDLE_TOOL_0_3_3);
+    assertThat(manifest.getIsModuleIncludedInFusing()).hasValue(true);
 
     AndroidManifest newManifest =
-        AndroidManifest.create(androidManifest("com.test.app", withFusingAttribute(true)));
-    assertThat(newManifest.getIsModuleIncludedInFusing(BUNDLE_TOOL_0_3_3)).hasValue(true);
+        AndroidManifest.create(
+            androidManifest("com.test.app", withFusingAttribute(true)), BUNDLE_TOOL_0_3_3);
+    assertThat(newManifest.getIsModuleIncludedInFusing()).hasValue(true);
   }
 
   @Test
   public void getIsIncludedInFusing_false() {
     // From Bundletool 0.3.4 onwards.
     AndroidManifest androidManifest =
-        AndroidManifest.create(androidManifest("com.test.app", withFusingAttribute(false)));
-    assertThat(androidManifest.getIsModuleIncludedInFusing(BUNDLE_TOOL_0_3_4)).hasValue(false);
+        AndroidManifest.create(
+            androidManifest("com.test.app", withFusingAttribute(false)), BUNDLE_TOOL_0_3_4);
+    assertThat(androidManifest.getIsModuleIncludedInFusing()).hasValue(false);
   }
 
   @Test
   public void getIsIncludedInFusing_no_namespace_throws() {
     // From Bundletool 0.3.4 onwards.
     AndroidManifest androidManifest =
-        AndroidManifest.create(androidManifest("com.test.app", withLegacyFusingAttribute(false)));
+        AndroidManifest.create(
+            androidManifest("com.test.app", withLegacyFusingAttribute(false)), BUNDLE_TOOL_0_3_4);
     assertThrows(
-        FusingMissingIncludeAttribute.class,
-        () -> androidManifest.getIsModuleIncludedInFusing(BUNDLE_TOOL_0_3_4));
+        FusingMissingIncludeAttribute.class, () -> androidManifest.getIsModuleIncludedInFusing());
   }
 
   @Test
   public void getIsIncludedInFusing_legacy_false() {
     AndroidManifest manifest =
-        AndroidManifest.create(androidManifest("com.test.app", withLegacyFusingAttribute(false)));
-    assertThat(manifest.getIsModuleIncludedInFusing(BUNDLE_TOOL_0_3_3)).hasValue(false);
+        AndroidManifest.create(
+            androidManifest("com.test.app", withLegacyFusingAttribute(false)), BUNDLE_TOOL_0_3_3);
+    assertThat(manifest.getIsModuleIncludedInFusing()).hasValue(false);
 
     AndroidManifest newManifest =
-        AndroidManifest.create(androidManifest("com.test.app", withFusingAttribute(false)));
-    assertThat(newManifest.getIsModuleIncludedInFusing(BUNDLE_TOOL_0_3_3)).hasValue(false);
+        AndroidManifest.create(
+            androidManifest("com.test.app", withFusingAttribute(false)), BUNDLE_TOOL_0_3_3);
+    assertThat(newManifest.getIsModuleIncludedInFusing()).hasValue(false);
   }
 
   @Test
   public void getIsIncludedInFusing_missingElements_emptyOptional() {
     // From Bundletool 0.3.4 onwards.
-    AndroidManifest androidManifest = AndroidManifest.create(androidManifest("com.test.app"));
-    assertThat(androidManifest.getIsModuleIncludedInFusing(BUNDLE_TOOL_0_3_4)).isEmpty();
+    AndroidManifest androidManifest =
+        AndroidManifest.create(androidManifest("com.test.app"), BUNDLE_TOOL_0_3_4);
+    assertThat(androidManifest.getIsModuleIncludedInFusing()).isEmpty();
   }
 
   @Test
   public void getIsIncludedInFusing_missingElements_legacy_emptyOptional() {
-    AndroidManifest androidManifest = AndroidManifest.create(androidManifest("com.test.app"));
-    assertThat(androidManifest.getIsModuleIncludedInFusing(BUNDLE_TOOL_0_3_3)).isEmpty();
+    AndroidManifest androidManifest =
+        AndroidManifest.create(androidManifest("com.test.app"), BUNDLE_TOOL_0_3_3);
+    assertThat(androidManifest.getIsModuleIncludedInFusing()).isEmpty();
   }
 
   @Test
@@ -473,11 +545,12 @@ public class AndroidManifestTest {
                         xmlElement(
                             DISTRIBUTION_NAMESPACE_URI,
                             "module",
-                            xmlNode(xmlElement(DISTRIBUTION_NAMESPACE_URI, "fusing")))))));
+                            xmlNode(xmlElement(DISTRIBUTION_NAMESPACE_URI, "fusing")))))),
+            BUNDLE_TOOL_0_3_4);
     FusingMissingIncludeAttribute exception =
         assertThrows(
             FusingMissingIncludeAttribute.class,
-            () -> androidManifest.getIsModuleIncludedInFusing(BUNDLE_TOOL_0_3_4));
+            () -> androidManifest.getIsModuleIncludedInFusing());
     assertThat(exception)
         .hasMessageThat()
         .contains("<fusing> element is missing the 'include' attribute");
@@ -494,11 +567,12 @@ public class AndroidManifestTest {
                         xmlElement(
                             DISTRIBUTION_NAMESPACE_URI,
                             "module",
-                            xmlNode(xmlElement(DISTRIBUTION_NAMESPACE_URI, "fusing")))))));
+                            xmlNode(xmlElement(DISTRIBUTION_NAMESPACE_URI, "fusing")))))),
+            BUNDLE_TOOL_0_3_3);
     FusingMissingIncludeAttribute exception =
         assertThrows(
             FusingMissingIncludeAttribute.class,
-            () -> androidManifest.getIsModuleIncludedInFusing(BUNDLE_TOOL_0_3_3));
+            () -> androidManifest.getIsModuleIncludedInFusing());
     assertThat(exception)
         .hasMessageThat()
         .contains("<fusing> element is missing the 'include' attribute");
@@ -517,11 +591,12 @@ public class AndroidManifestTest {
                         xmlElement(
                             DISTRIBUTION_NAMESPACE_URI,
                             "module",
-                            xmlNode(xmlElement(DISTRIBUTION_NAMESPACE_URI, "fusing")))))));
+                            xmlNode(xmlElement(DISTRIBUTION_NAMESPACE_URI, "fusing")))))),
+            BUNDLE_TOOL_0_3_4);
     FusingMissingIncludeAttribute exception =
         assertThrows(
             FusingMissingIncludeAttribute.class,
-            () -> androidManifest.getIsModuleIncludedInFusing(BUNDLE_TOOL_0_3_4));
+            () -> androidManifest.getIsModuleIncludedInFusing());
     assertThat(exception)
         .hasMessageThat()
         .isEqualTo("<fusing> element is missing the 'include' attribute (split: 'feature1').");
@@ -539,11 +614,12 @@ public class AndroidManifestTest {
                         xmlElement(
                             DISTRIBUTION_NAMESPACE_URI,
                             "module",
-                            xmlNode(xmlElement(DISTRIBUTION_NAMESPACE_URI, "fusing")))))));
+                            xmlNode(xmlElement(DISTRIBUTION_NAMESPACE_URI, "fusing")))))),
+            BUNDLE_TOOL_0_3_3);
     FusingMissingIncludeAttribute exception =
         assertThrows(
             FusingMissingIncludeAttribute.class,
-            () -> androidManifest.getIsModuleIncludedInFusing(BUNDLE_TOOL_0_3_3));
+            () -> androidManifest.getIsModuleIncludedInFusing());
     assertThat(exception)
         .hasMessageThat()
         .isEqualTo("<fusing> element is missing the 'include' attribute (split: 'feature1').");
@@ -676,7 +752,7 @@ public class AndroidManifestTest {
     assertThat(configManifest.getHasCode()).hasValue(false);
     assertThat(configManifest.getSplitId()).hasValue("x86");
     assertThat(configManifest.getConfigForSplit()).hasValue("feature1");
-    assertThat(configManifest.isOnDemandModule(CURRENT_VERSION)).isEmpty();
+    assertThat(configManifest.isOnDemandModule()).isEmpty();
     assertThat(configManifest.getIsFeatureSplit()).isEmpty();
     assertThat(configManifest.getExtractNativeLibsValue()).hasValue(false);
   }
@@ -757,106 +833,6 @@ public class AndroidManifestTest {
                         xmlElement(
                             "application", metadataWithValueAsInteger("metadata-key", 123))))));
     assertThat(androidManifest.getMetadataValueAsInteger("metadata-key")).hasValue(123);
-  }
-
-  @Test
-  public void getModuleConditions_returnsAllConditions() {
-    AndroidManifest androidManifest =
-        AndroidManifest.create(
-            androidManifest(
-                "com.test.app",
-                withFeatureCondition("android.hardware.camera.ar"),
-                withMinSdkCondition(24)));
-
-    assertThat(androidManifest.getModuleConditions())
-        .isEqualTo(
-            ModuleConditions.builder()
-                .addDeviceFeatureCondition(
-                    DeviceFeatureCondition.create("android.hardware.camera.ar"))
-                .setMinSdkVersion(24)
-                .build());
-  }
-
-  @Test
-  public void getDeviceFeatureConditions_returnsAllConditions() {
-    AndroidManifest androidManifest =
-        AndroidManifest.create(
-            androidManifest(
-                "com.test.app",
-                withFeatureCondition("android.hardware.camera.ar"),
-                withFeatureCondition("android.software.vr.mode"),
-                withMinSdkVersion(24)));
-
-    assertThat(androidManifest.getDeviceFeatureConditions())
-        .containsExactly(
-            DeviceFeatureCondition.create("android.hardware.camera.ar"),
-            DeviceFeatureCondition.create("android.software.vr.mode"));
-  }
-
-  @Test
-  public void moduleConditions_unsupportedCondition_throws() throws Exception {
-    AndroidManifest androidManifest =
-        AndroidManifest.create(
-            androidManifest(
-                "com.test.app", withFusingAttribute(false), withUnsupportedCondition()));
-
-    Throwable exception =
-        assertThrows(ValidationException.class, () -> androidManifest.getModuleConditions());
-    assertThat(exception)
-        .hasMessageThat()
-        .contains("Unrecognized module condition: 'unsupportedCondition'");
-  }
-
-  @Test
-  public void moduleConditions_missingNameOfFeature_throws() throws Exception {
-    // Name attribute doesn't use distribution namespace.
-    XmlProtoElement badCondition =
-        XmlProtoElementBuilder.create(DISTRIBUTION_NAMESPACE_URI, "device-feature")
-            .addAttribute(
-                XmlProtoAttributeBuilder.create("name")
-                    .setValueAsString("android.hardware.camera.ar"))
-            .build();
-
-    AndroidManifest androidManifest = createAndroidManifestWithConditions(badCondition);
-
-    Throwable exception =
-        assertThrows(ValidationException.class, () -> androidManifest.getModuleConditions());
-    assertThat(exception)
-        .hasMessageThat()
-        .contains("Missing required 'name' attribute in the 'device-feature' condition element.");
-  }
-
-  @Test
-  public void moduleConditions_missingMinSdkValue_throws() {
-    // Value attribute doesn't use distribution namespace.
-    XmlProtoElement badCondition =
-        XmlProtoElementBuilder.create(DISTRIBUTION_NAMESPACE_URI, "min-sdk")
-            .addAttribute(XmlProtoAttributeBuilder.create("value").setValueAsDecimalInteger(26))
-            .build();
-    AndroidManifest androidManifest = createAndroidManifestWithConditions(badCondition);
-
-    Throwable exception =
-        assertThrows(ValidationException.class, () -> androidManifest.getModuleConditions());
-    assertThat(exception)
-        .hasMessageThat()
-        .contains("Missing required 'value' attribute in the 'min-sdk' condition element.");
-  }
-
-  private static AndroidManifest createAndroidManifestWithConditions(
-      XmlProtoElement... conditions) {
-    XmlProtoElementBuilder conditionsBuilder =
-        XmlProtoElementBuilder.create(DISTRIBUTION_NAMESPACE_URI, "conditions");
-    for (XmlProtoElement condition : conditions) {
-      conditionsBuilder.addChildElement(condition.toBuilder());
-    }
-
-    return AndroidManifest.create(
-        XmlProtoNode.createElementNode(
-            XmlProtoElementBuilder.create("manifest")
-                .addChildElement(
-                    XmlProtoElementBuilder.create(DISTRIBUTION_NAMESPACE_URI, "module")
-                        .addChildElement(conditionsBuilder))
-                .build()));
   }
 
   private XmlNode metadataWithValue(String key, String value) {

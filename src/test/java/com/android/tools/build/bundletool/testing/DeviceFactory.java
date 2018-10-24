@@ -88,6 +88,10 @@ public final class DeviceFactory {
     return DeviceSpec.newBuilder().setSdkVersion(sdkVersion).build();
   }
 
+  public static DeviceSpec deviceFeatures(String... features) {
+    return DeviceSpec.newBuilder().addAllDeviceFeatures(Arrays.asList(features)).build();
+  }
+
   public static DeviceSpec mergeSpecs(DeviceSpec deviceSpec, DeviceSpec... specParts) {
     return mergeFromProtos(deviceSpec, specParts);
   }

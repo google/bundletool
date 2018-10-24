@@ -26,12 +26,32 @@ import java.io.Reader;
 import java.io.UncheckedIOException;
 import java.nio.file.Path;
 
-/** Parses the device spec JSON files. */
+/**
+ * Parses the device spec JSON files. This supports two types of parsings, either a full device spec
+ * (requires all the fields Ex: SDK, Screen Density, ABI, Language to be present) or partial device
+ * spec can be parsed. The methods parseDeviceSpec require the full device spec to be present.
+ */
 public class DeviceSpecParser {
 
   private static final String JSON_EXTENSION = "json";
 
   public static DeviceSpec parseDeviceSpec(Path deviceSpecFile) {
+    return parseDeviceSpecInternal(deviceSpecFile, /* canSkipFields= */ false);
+  }
+
+  public static DeviceSpec parseDeviceSpec(Reader deviceSpecReader) throws IOException {
+    return parseDeviceSpecInternal(deviceSpecReader, /* canSkipFields= */ false);
+  }
+
+  public static DeviceSpec parsePartialDeviceSpec(Path deviceSpecFile) {
+    return parseDeviceSpecInternal(deviceSpecFile, /* canSkipFields= */ true);
+  }
+
+  public static DeviceSpec parsePartialDeviceSpec(Reader deviceSpecReader) throws IOException {
+    return parseDeviceSpecInternal(deviceSpecReader, /* canSkipFields= */ true);
+  }
+
+  private static DeviceSpec parseDeviceSpecInternal(Path deviceSpecFile, boolean canSkipFields) {
     if (!JSON_EXTENSION.equals(MoreFiles.getFileExtension(deviceSpecFile))) {
       throw ValidationException.builder()
           .withMessage(
@@ -40,40 +60,46 @@ public class DeviceSpecParser {
           .build();
     }
     try (Reader deviceSpecReader = BufferedIo.reader(deviceSpecFile)) {
-      return parseDeviceSpec(deviceSpecReader);
+      return parseDeviceSpecInternal(deviceSpecReader, canSkipFields);
     } catch (IOException e) {
       throw new UncheckedIOException(
           String.format("Error while reading the device spec file '%s'.", deviceSpecFile), e);
     }
   }
 
-  public static DeviceSpec parseDeviceSpec(Reader deviceSpecReader) throws IOException {
+  private static DeviceSpec parseDeviceSpecInternal(Reader deviceSpecReader, boolean canSkipFields)
+      throws IOException {
     DeviceSpec.Builder builder = DeviceSpec.newBuilder();
     JsonFormat.parser().merge(deviceSpecReader, builder);
     DeviceSpec deviceSpec = builder.build();
-    validateDeviceSpec(deviceSpec);
+    validateDeviceSpec(deviceSpec, canSkipFields);
     return deviceSpec;
   }
 
-  public static void validateDeviceSpec(DeviceSpec deviceSpec) {
-    if (deviceSpec.getSdkVersion() <= 0) {
+  private static void validateDeviceSpec(DeviceSpec deviceSpec, boolean canSkipFields) {
+    if (deviceSpec.getSdkVersion() < 0 || (!canSkipFields && deviceSpec.getSdkVersion() == 0)) {
       throw ValidationException.builder()
           .withMessage(
-              "Device spec SDK version (%d) is not a positive number.", deviceSpec.getSdkVersion())
+              "Device spec SDK version (%d) should be set to a strictly positive number.",
+              deviceSpec.getSdkVersion())
           .build();
     }
-    if (deviceSpec.getScreenDensity() <= 0) {
+    if (deviceSpec.getScreenDensity() < 0
+        || (!canSkipFields && deviceSpec.getScreenDensity() == 0)) {
       throw ValidationException.builder()
           .withMessage(
-              "Device spec screen density (%d) is not a positive number.",
+              "Device spec screen density (%d) should be set to a strictly positive number.",
               deviceSpec.getScreenDensity())
           .build();
     }
-    if (deviceSpec.getSupportedAbisList().isEmpty()) {
-      throw new ValidationException("Device spec supported ABI list is empty.");
-    }
-    if (deviceSpec.getSupportedLocalesList().isEmpty()) {
-      throw new ValidationException("Device spec supported locales list is empty.");
+
+    if (!canSkipFields) {
+      if (deviceSpec.getSupportedAbisList().isEmpty()) {
+        throw new ValidationException("Device spec supported ABI list is empty.");
+      }
+      if (deviceSpec.getSupportedLocalesList().isEmpty()) {
+        throw new ValidationException("Device spec supported locales list is empty.");
+      }
     }
   }
 

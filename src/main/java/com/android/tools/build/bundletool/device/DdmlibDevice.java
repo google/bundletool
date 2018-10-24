@@ -36,9 +36,13 @@ import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 
 /** Ddmlib-backed implementation of the {@link Device}. */
-public class DdmlibDevice implements Device {
+public class DdmlibDevice extends Device {
 
   private final IDevice device;
+  private static final int ADB_TIMEOUT_MS = 60000;
+  private static final String DEVICE_FEATURES_COMMAND = "pm list features";
+
+  private final DeviceFeaturesParser deviceFeaturesParser = new DeviceFeaturesParser();
 
   public DdmlibDevice(IDevice device) {
     this.device = device;
@@ -72,6 +76,13 @@ public class DdmlibDevice implements Device {
   @Override
   public Optional<String> getProperty(String propertyName) {
     return Optional.ofNullable(device.getProperty(propertyName));
+  }
+
+  @Override
+  public ImmutableList<String> getDeviceFeatures() {
+    return deviceFeaturesParser.parse(
+        new AdbShellCommandTask(this, DEVICE_FEATURES_COMMAND)
+            .execute(ADB_TIMEOUT_MS, TimeUnit.MILLISECONDS));
   }
 
   @Override

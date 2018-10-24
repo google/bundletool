@@ -17,19 +17,16 @@
 package com.android.tools.build.bundletool.splitters;
 
 import static com.android.tools.build.bundletool.model.BundleModule.DEX_DIRECTORY;
-import static com.android.tools.build.bundletool.utils.TargetingProtoUtils.sdkVersionFrom;
-import static com.android.tools.build.bundletool.utils.TargetingProtoUtils.sdkVersionTargeting;
-import static com.android.tools.build.bundletool.utils.Versions.ANDROID_L_API_VERSION;
 import static com.android.tools.build.bundletool.utils.Versions.ANDROID_P_API_VERSION;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.ImmutableSet.toImmutableSet;
 
-import com.android.bundle.Targeting.SdkVersionTargeting;
 import com.android.tools.build.bundletool.model.ModuleEntry;
 import com.android.tools.build.bundletool.model.ModuleSplit;
 import com.google.common.collect.ImmutableCollection;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.Iterables;
 
 /** Splits the dex files in the module by their Compression. */
 public class DexCompressionSplitter implements ModuleSplitSplitter {
@@ -46,28 +43,11 @@ public class DexCompressionSplitter implements ModuleSplitSplitter {
       return ImmutableList.of(moduleSplit);
     }
 
-    ImmutableList.Builder<ModuleSplit> splits = new ImmutableList.Builder<>();
-    splits.add(
+    // Only APKs targeting devices below Android P should be compressed.
+    boolean shouldCompress = targetsPreP(moduleSplit);
+    return ImmutableList.of(
         createModuleSplit(
-            moduleSplit,
-            sdkVersionTargeting(
-                sdkVersionFrom(ANDROID_P_API_VERSION),
-                targetsPreP(moduleSplit)
-                    ? ImmutableSet.of(sdkVersionFrom(ANDROID_L_API_VERSION))
-                    : ImmutableSet.of()),
-            mergeAndSetCompression(dexEntries, moduleSplit, /* shouldCompress= */ false)));
-
-    if (targetsPreP(moduleSplit)) {
-      splits.add(
-          createModuleSplit(
-              moduleSplit,
-              sdkVersionTargeting(
-                  sdkVersionFrom(ANDROID_L_API_VERSION),
-                  ImmutableSet.of(sdkVersionFrom(ANDROID_P_API_VERSION))),
-              mergeAndSetCompression(dexEntries, moduleSplit, /* shouldCompress= */ true)));
-    }
-
-    return splits.build();
+            moduleSplit, mergeAndSetCompression(dexEntries, moduleSplit, shouldCompress)));
   }
 
   private static ImmutableList<ModuleEntry> mergeAndSetCompression(
@@ -88,22 +68,20 @@ public class DexCompressionSplitter implements ModuleSplitSplitter {
   }
 
   private static boolean targetsPreP(ModuleSplit moduleSplit) {
-    int minSdkVersion = moduleSplit.getAndroidManifest().getEffectiveMinSdkVersion();
-    return minSdkVersion < ANDROID_P_API_VERSION;
+    int sdkVersion =
+        Iterables.getOnlyElement(
+                moduleSplit.getVariantTargeting().getSdkVersionTargeting().getValueList())
+            .getMin()
+            .getValue();
+
+    return sdkVersion < ANDROID_P_API_VERSION;
   }
 
   private static ModuleSplit createModuleSplit(
       ModuleSplit moduleSplit,
-      SdkVersionTargeting variantSdkVersionTargeting,
       ImmutableList<ModuleEntry> moduleEntries) {
     return moduleSplit
         .toBuilder()
-        .setVariantTargeting(
-            moduleSplit
-                .getVariantTargeting()
-                .toBuilder()
-                .setSdkVersionTargeting(variantSdkVersionTargeting)
-                .build())
         .setEntries(moduleEntries)
         .build();
   }
