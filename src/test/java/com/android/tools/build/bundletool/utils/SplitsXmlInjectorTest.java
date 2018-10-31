@@ -29,6 +29,7 @@ import static com.google.common.truth.Truth8.assertThat;
 import static com.google.common.truth.extensions.proto.ProtoTruth.assertThat;
 import static java.nio.charset.StandardCharsets.UTF_8;
 
+import com.android.aapt.Resources.ResourceTable;
 import com.android.aapt.Resources.XmlNode;
 import com.android.bundle.Targeting.ApkTargeting;
 import com.android.bundle.Targeting.LanguageTargeting;
@@ -40,7 +41,9 @@ import com.android.tools.build.bundletool.model.InMemoryModuleEntry;
 import com.android.tools.build.bundletool.model.ModuleSplit;
 import com.android.tools.build.bundletool.model.ModuleSplit.SplitType;
 import com.android.tools.build.bundletool.model.SplitsProtoXmlBuilder;
+import com.android.tools.build.bundletool.testing.ResourceTableBuilder;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 import org.checkerframework.checker.nullness.qual.Nullable;
 import org.junit.Before;
 import org.junit.Test;
@@ -157,6 +160,47 @@ public class SplitsXmlInjectorTest {
             .addLanguageMapping(BundleModuleName.create(BASE_MODULE_NAME), "fr", "config.fr")
             .build();
     assertThat(XmlNode.parseFrom(processedBaseMasterSplit.getEntries().get(0).getContent()))
+        .ignoringRepeatedFieldOrder()
+        .isEqualTo(expectedSplitsProtoXml);
+  }
+
+  @Test
+  public void process_standalone() throws Exception {
+    ModuleSplit standalone =
+        createModuleSplit(
+            BASE_MODULE_NAME,
+            /* splitId= */ "",
+            /* masterSplit= */ true,
+            STANDALONE,
+            /* languageTargeting= */ null);
+    ResourceTable standaloneResourceTable =
+        new ResourceTableBuilder()
+            .addPackage("com.example.app")
+            .addStringResourceForMultipleLocales(
+                "title", ImmutableMap.of("ru-RU", "title ru-RU", "fr", "title fr"))
+            .build();
+    standalone = standalone.toBuilder().setResourceTable(standaloneResourceTable).build();
+
+    GeneratedApks result =
+        splitsXmlInjector.process(GeneratedApks.fromModuleSplits(ImmutableList.of(standalone)));
+
+    ModuleSplit processedStandalone = result.getAllApksStream().collect(onlyElement());
+
+    assertThat(
+            processedStandalone
+                .getAndroidManifest()
+                .getMetadataResourceId("com.android.vending.splits"))
+        .hasValue(0x7f010000);
+    assertThat(processedStandalone.getResourceTable().get())
+        .containsResource("com.example.app:xml/splits0")
+        .withFileReference("res/xml/splits0.xml");
+
+    XmlNode expectedSplitsProtoXml =
+        new SplitsProtoXmlBuilder()
+            .addLanguageMapping(BundleModuleName.create(BASE_MODULE_NAME), "ru", "")
+            .addLanguageMapping(BundleModuleName.create(BASE_MODULE_NAME), "fr", "")
+            .build();
+    assertThat(XmlNode.parseFrom(processedStandalone.getEntries().get(0).getContent()))
         .ignoringRepeatedFieldOrder()
         .isEqualTo(expectedSplitsProtoXml);
   }

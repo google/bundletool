@@ -60,7 +60,7 @@ public class SplitApkSerializer {
       ModuleSplit split,
       Path outputDirectory,
       BiFunction<ApkDescription.Builder, SplitApkMetadata, ApkDescription.Builder> setApkMetadata) {
-    checkState(isDirectory(outputDirectory));
+    checkState(isDirectory(outputDirectory), "Output directory does not exist.");
 
     ZipPath apkPath = apkPathManager.getApkPath(split);
 

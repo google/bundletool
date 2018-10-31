@@ -16,6 +16,7 @@
 
 package com.android.tools.build.bundletool.commands;
 
+import static com.android.tools.build.bundletool.commands.GetSizeCommand.SUPPORTED_DIMENSIONS;
 import static com.android.tools.build.bundletool.testing.ApksArchiveHelpers.createApksArchiveFile;
 import static com.android.tools.build.bundletool.testing.DeviceFactory.createDeviceSpecFile;
 import static com.android.tools.build.bundletool.testing.DeviceFactory.deviceWithSdk;
@@ -27,10 +28,13 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import com.android.bundle.Commands.BuildApksResult;
 import com.android.bundle.Devices.DeviceSpec;
 import com.android.tools.build.bundletool.TestData;
+import com.android.tools.build.bundletool.commands.GetSizeCommand.Dimension;
 import com.android.tools.build.bundletool.exceptions.CommandExecutionException;
 import com.android.tools.build.bundletool.utils.flags.FlagParser;
+import com.android.tools.build.bundletool.utils.flags.FlagParser.FlagParseException;
 import com.android.tools.build.bundletool.utils.flags.ParsedFlags;
 import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.Sets;
 import com.google.common.io.ByteStreams;
 import com.google.protobuf.util.JsonFormat;
 import java.io.FileOutputStream;
@@ -133,6 +137,62 @@ public final class GetSizeCommandTest {
   }
 
   @Test
+  public void testSupportedDimensions_onlySkipsAllDimension() {
+    assertThat(Sets.difference(SUPPORTED_DIMENSIONS, ImmutableSet.copyOf(Dimension.values())))
+        .isEmpty();
+    assertThat(Sets.difference(ImmutableSet.copyOf(Dimension.values()), SUPPORTED_DIMENSIONS))
+        .containsExactly(Dimension.ALL);
+  }
+
+  @Test
+  public void deviceSpecWrongDimensions_throws() throws Exception {
+    BuildApksResult tableOfContentsProto = BuildApksResult.getDefaultInstance();
+    Path apksArchiveFile =
+        createApksArchiveFile(tableOfContentsProto, tmpDir.resolve("bundle.apks"));
+
+    ParsedFlags flags =
+        new FlagParser().parse("--apks=" + apksArchiveFile, "--dimensions=" + "ABI,SCREEN");
+    Throwable exception =
+        assertThrows(FlagParseException.class, () -> GetSizeCommand.fromFlags(flags));
+
+    assertThat(exception).hasMessageThat().contains("Not a valid enum value");
+    assertThat(exception).hasMessageThat().contains("SCREEN");
+  }
+
+  @Test
+  public void deviceSpecAll_hasAllDimensions() throws Exception {
+    BuildApksResult tableOfContentsProto = BuildApksResult.getDefaultInstance();
+    Path apksArchiveFile =
+        createApksArchiveFile(tableOfContentsProto, tmpDir.resolve("bundle.apks"));
+
+    GetSizeCommand command =
+        GetSizeCommand.fromFlags(
+            new FlagParser().parse("--apks=" + apksArchiveFile, "--dimensions=" + "ALL"));
+
+    assertThat(command.getDimensions()).isSameAs(SUPPORTED_DIMENSIONS);
+  }
+
+  @Test
+  public void builderAndFlagsConstruction_optionalDimensions_equivalent() throws Exception {
+    BuildApksResult tableOfContentsProto = BuildApksResult.getDefaultInstance();
+    Path apksArchiveFile =
+        createApksArchiveFile(tableOfContentsProto, tmpDir.resolve("bundle.apks"));
+
+    GetSizeCommand fromFlags =
+        GetSizeCommand.fromFlags(
+            new FlagParser()
+                .parse("--apks=" + apksArchiveFile, "--dimensions=" + "ABI,SCREEN_DENSITY"));
+
+    GetSizeCommand fromBuilderApi =
+        GetSizeCommand.builder()
+            .setApksArchivePath(apksArchiveFile)
+            .setDimensions(ImmutableSet.of(Dimension.ABI, Dimension.SCREEN_DENSITY))
+            .build();
+
+    assertThat(fromFlags).isEqualTo(fromBuilderApi);
+  }
+
+  @Test
   public void builderAndFlagsConstruction_equivalent() throws Exception {
     BuildApksResult tableOfContentsProto = BuildApksResult.getDefaultInstance();
     Path apksArchiveFile =
@@ -192,7 +252,6 @@ public final class GetSizeCommandTest {
     GetSizeCommand fromBuilderApi =
         GetSizeCommand.builder()
             .setApksArchivePath(apksArchiveFile)
-            .setDeviceSpec(DeviceSpec.getDefaultInstance())
             .setModules(ImmutableSet.of("base"))
             .build();
 
@@ -216,7 +275,6 @@ public final class GetSizeCommandTest {
     GetSizeCommand fromBuilderApi =
         GetSizeCommand.builder()
             .setApksArchivePath(apksArchiveFile)
-            .setDeviceSpec(DeviceSpec.getDefaultInstance())
             .setInstant(true)
             .build();
 

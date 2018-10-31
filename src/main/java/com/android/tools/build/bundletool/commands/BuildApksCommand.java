@@ -120,6 +120,8 @@ public abstract class BuildApksCommand {
 
   abstract boolean isExecutorServiceCreatedByBundleTool();
 
+  public abstract boolean getCreateApkSetArchive();
+
 
   public abstract Optional<ApkListener> getApkListener();
 
@@ -132,6 +134,7 @@ public abstract class BuildApksCommand {
         .setOverwriteOutput(false)
         .setGenerateOnlyUniversalApk(false)
         .setGenerateOnlyForConnectedDevice(false)
+        .setCreateApkSetArchive(true)
         .setOptimizationDimensions(ImmutableSet.of());
   }
 
@@ -218,6 +221,14 @@ public abstract class BuildApksCommand {
      */
     abstract Builder setExecutorServiceCreatedByBundleTool(boolean value);
 
+    /**
+     * If false will extract the APK set to the output directory without creating the final archive.
+     * Important: if this mode is used, the caller should still provide a "apks file" as the output
+     * file parameter. This is because there is a lots of validation here that assumes that. The
+     * command will return the directory where the APK files were copied to.
+     */
+    public abstract Builder setCreateApkSetArchive(boolean value);
+
 
     /**
      * Provides an {@link ApkListener} that will be notified at defined stages of APK creation.
@@ -278,12 +289,15 @@ public abstract class BuildApksCommand {
             "Setting --device-id requires using the --connected-device flag.");
       }
 
-      if (!APK_SET_ARCHIVE_EXTENSION.equals(MoreFiles.getFileExtension(command.getOutputFile()))) {
-        throw ValidationException.builder()
-            .withMessage(
-                "Flag --output should be the path where to generate the APK Set. "
-                    + "Its extension must be '.apks'.")
-            .build();
+      if (command.getCreateApkSetArchive()) {
+        if (!APK_SET_ARCHIVE_EXTENSION.equals(
+            MoreFiles.getFileExtension(command.getOutputFile()))) {
+          throw ValidationException.builder()
+              .withMessage(
+                  "Flag --output should be the path where to generate the APK Set. "
+                      + "Its extension must be '.apks'.")
+              .build();
+        }
       }
 
       return command;

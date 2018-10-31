@@ -206,6 +206,42 @@ public class XmlProtoAttributeTest {
   }
 
   @Test
+  public void getValueAsInteger_decimalInteger() {
+    XmlProtoAttribute attribute =
+        new XmlProtoAttribute(
+            XmlAttribute.newBuilder()
+                .setCompiledItem(
+                    Item.newBuilder().setPrim(Primitive.newBuilder().setIntDecimalValue(123)))
+                .build());
+
+    assertThat(attribute.getValueAsInteger()).isEqualTo(123);
+  }
+
+  @Test
+  public void getValueAsInteger_hexInteger() {
+    XmlProtoAttribute attribute =
+        new XmlProtoAttribute(
+            XmlAttribute.newBuilder()
+                .setCompiledItem(
+                    Item.newBuilder().setPrim(Primitive.newBuilder().setIntHexadecimalValue(0x123)))
+                .build());
+
+    assertThat(attribute.getValueAsInteger()).isEqualTo(0x123);
+  }
+
+  @Test
+  public void getValueAsInteger_notInteger() {
+    XmlProtoAttribute attribute =
+        new XmlProtoAttribute(
+            XmlAttribute.newBuilder()
+                .setCompiledItem(
+                    Item.newBuilder().setStr(Resources.String.newBuilder().setValue("123")))
+                .build());
+
+    assertThrows(UnexpectedAttributeTypeException.class, () -> attribute.getValueAsInteger());
+  }
+
+  @Test
   public void testEquals_equal() {
     XmlProtoAttribute attribute1 =
         XmlProtoAttributeBuilder.create("namespace", "hello").setValueAsString("hello").build();

@@ -134,6 +134,22 @@ public class AndroidManifestTest {
   }
 
   @Test
+  public void getMinSdkVersion_asString() {
+    AndroidManifest androidManifest =
+        AndroidManifest.create(androidManifest("com.test.app", withMinSdkVersion("Q")));
+    assertThat(androidManifest.getMinSdkVersion()).hasValue(10_000);
+
+    AndroidManifest androidManifest2 =
+        AndroidManifest.create(androidManifest("com.test.app", withMinSdkVersion("R")));
+    assertThat(androidManifest2.getMinSdkVersion()).hasValue(10_000);
+
+    // Lowercase disallowed.
+    AndroidManifest androidManifest3 =
+        AndroidManifest.create(androidManifest("com.test.app", withMinSdkVersion("r")));
+    assertThrows(UnexpectedAttributeTypeException.class, () -> androidManifest3.getMinSdkVersion());
+  }
+
+  @Test
   public void getTargetSandboxVersion_empty() {
     AndroidManifest androidManifest = AndroidManifest.create(androidManifest("com.test.app"));
     assertThat(androidManifest.getTargetSandboxVersion()).isEmpty();
@@ -462,6 +478,64 @@ public class AndroidManifestTest {
     assertThat(manifest.getOnDemandAttribute()).isEmpty();
     assertThat(manifest.isDeliveryTypeDeclared()).isTrue();
     assertThat(manifest.isOnDemandModule()).hasValue(false);
+  }
+
+  @Test
+  public void isAlwaysInstalled_deliveryElement_installTime() {
+    AndroidManifest manifest =
+        AndroidManifest.create(androidManifest("com.test.app", withInstallTimeDelivery()));
+
+    assertThat(manifest.isModuleAlwaysInstalled()).isTrue();
+  }
+
+  @Test
+  public void isAlwaysInstalled_deliveryElement_installTime_onDemand() {
+    AndroidManifest manifest =
+        AndroidManifest.create(
+            androidManifest("com.test.app", withInstallTimeDelivery(), withOnDemandDelivery()));
+
+    assertThat(manifest.isModuleAlwaysInstalled()).isTrue();
+  }
+
+  @Test
+  public void isAlwaysInstalled_deliveryElement_conditions() {
+    AndroidManifest manifest =
+        AndroidManifest.create(androidManifest("com.test.app", withMinSdkCondition(21)));
+
+    assertThat(manifest.isModuleAlwaysInstalled()).isFalse();
+  }
+
+  @Test
+  public void isAlwaysInstalled_legacy_onDemandAttributeTrue() {
+    AndroidManifest manifest =
+        AndroidManifest.create(
+            androidManifest("com.test.app", withLegacyOnDemand(true)), BUNDLE_TOOL_0_3_3);
+
+    assertThat(manifest.isModuleAlwaysInstalled()).isFalse();
+  }
+
+  @Test
+  public void isAlwaysInstalled_onDemandAttributeTrue() {
+    AndroidManifest manifest =
+        AndroidManifest.create(androidManifest("com.test.app", withOnDemandAttribute(true)));
+
+    assertThat(manifest.isModuleAlwaysInstalled()).isFalse();
+  }
+
+  @Test
+  public void isAlwaysInstalled_legacy_onDemandAttributeFalse() {
+    AndroidManifest manifest =
+        AndroidManifest.create(androidManifest("com.test.app", withLegacyOnDemand(false)));
+
+    assertThat(manifest.isModuleAlwaysInstalled()).isTrue();
+  }
+
+  @Test
+  public void isAlwaysInstalled_deliveryElement_onlyOnDemand() {
+    AndroidManifest manifest =
+        AndroidManifest.create(androidManifest("com.test.app", withOnDemandDelivery()));
+
+    assertThat(manifest.isModuleAlwaysInstalled()).isFalse();
   }
 
   @Test

@@ -19,15 +19,18 @@ package com.android.tools.build.bundletool.utils;
 import static com.android.tools.build.bundletool.utils.files.FilePreconditions.checkFileExistsAndReadable;
 import static com.google.common.base.Predicates.not;
 
-import com.android.tools.build.bundletool.exceptions.ValidationException;
 import com.android.tools.build.bundletool.model.ZipPath;
+import com.google.common.io.ByteStreams;
+import com.google.common.io.CountingOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.UncheckedIOException;
 import java.nio.file.Path;
-import java.util.Collection;
 import java.util.stream.Stream;
+import java.util.zip.GZIPOutputStream;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
+import javax.annotation.WillNotClose;
 
 /** Misc utilities for working with zip files. */
 public final class ZipUtils {
@@ -47,8 +50,7 @@ public final class ZipUtils {
    */
   public static Stream<? extends ZipEntry> getFileEntriesWithPathPrefix(
       ZipFile zipFile, ZipPath prefix) {
-    return zipFile
-        .stream()
+    return zipFile.stream()
         .filter(not(ZipEntry::isDirectory))
         .filter(entry -> ZipPath.create(entry.getName()).startsWith(prefix));
   }
@@ -62,18 +64,15 @@ public final class ZipUtils {
     }
   }
 
-  public static void closeZipFiles(Collection<ZipFile> zipFiles) {
-    IOException thrown = null;
-    for (ZipFile zipFile : zipFiles) {
-      try {
-        zipFile.close();
-      } catch (IOException e) {
-        thrown = e;
-      }
+  /** Calculates the GZip compressed size in bytes of the target {@code stream}. */
+  public static long calculateGzipCompressedSize(@WillNotClose InputStream stream)
+      throws IOException {
+    CountingOutputStream countingOutputStream =
+        new CountingOutputStream(ByteStreams.nullOutputStream());
+    try (GZIPOutputStream compressedStream = new GZIPOutputStream(countingOutputStream)) {
+      ByteStreams.copy(stream, compressedStream);
     }
-    if (thrown != null) {
-      throw new ValidationException("Error closing zip files.", thrown);
-    }
+    return countingOutputStream.getCount();
   }
 
   // Not meant to be instantiated.

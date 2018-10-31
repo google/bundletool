@@ -11,7 +11,7 @@ message BundleToolError {
   // include server paths and configuration.
   string exception_message = 1;
 
-  // Next id: 25
+  // Next id: 26
   oneof custom_error {
     ManifestMissingVersionCodeError manifest_missing_version_code = 2;
     ManifestInvalidVersionCodeError manifest_invalid_version_code = 3;
@@ -25,6 +25,7 @@ message BundleToolError {
     ManifestMaxSdkLessThanMinInstantSdkError manifest_max_sdk_less_than_min_instant_sdk = 23;
     ManifestMinSdkInvalidError manifest_min_sdk_invalid = 19;
     ManifestMinSdkGreaterThanMaxSdkError manifest_min_sdk_greater_than_max = 20;
+    ManifestDuplicateAttributeError manifest_duplicate_attribute = 25;
 
     FileTypeInvalidFileExtensionError file_type_invalid_file_extension = 6;
     FileTypeInvalidFileNameInDirectoryError file_type_invalid_file_name = 7;
@@ -83,6 +84,11 @@ message ManifestModuleFusingConfigurationMissingError {
 
 message ManifestFusingMissingIncludeAttributeError {
   string module_name = 1;
+}
+
+message ManifestDuplicateAttributeError {
+  string attribute_name = 1;
+  string module_name = 2;
 }
 
 message FileTypeInvalidFileExtensionError {

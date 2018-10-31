@@ -31,6 +31,7 @@ import com.android.tools.build.bundletool.utils.ZipUtils;
 import com.android.tools.build.bundletool.version.BundleToolVersion;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
+import com.google.common.io.Closer;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Path;
@@ -83,26 +84,22 @@ public class BundleModulesValidator {
     checkFileNamesAreUnique("Modules", modulePaths);
 
     final Map<Path, ZipFile> zipFileByPath = new HashMap<>();
-    try {
+    try (Closer closer = Closer.create()) {
       for (Path modulePath : modulePaths) {
         checkFileHasExtension("Module", modulePath, ".zip");
-        ZipFile moduleZip = ZipUtils.openZipFile(modulePath);
+        ZipFile moduleZip = closer.register(ZipUtils.openZipFile(modulePath));
         zipFileByPath.put(modulePath, moduleZip);
         new ValidatorRunner(MODULE_FILE_SUB_VALIDATORS).validateModuleZipFile(moduleZip);
       }
 
       ImmutableList<BundleModule> modules =
-          zipFileByPath
-              .entrySet()
-              .stream()
+          zipFileByPath.entrySet().stream()
               .map(entry -> toBundleModule(entry.getKey(), entry.getValue()))
               .collect(toImmutableList());
 
       new ValidatorRunner(MODULES_SUB_VALIDATORS).validateBundleModules(modules);
-    } finally {
-      if (zipFileByPath != null) {
-        ZipUtils.closeZipFiles(zipFileByPath.values());
-      }
+    } catch (IOException e) {
+      throw new UncheckedIOException(e);
     }
   }
 
@@ -115,8 +112,7 @@ public class BundleModulesValidator {
           .setName(moduleName)
           .setBundleConfig(EMPTY_CONFIG_WITH_CURRENT_VERSION)
           .addEntries(
-              moduleZipFile
-                  .stream()
+              moduleZipFile.stream()
                   .filter(not(ZipEntry::isDirectory))
                   .map(zipEntry -> ModuleZipEntry.fromModuleZipEntry(zipEntry, moduleZipFile))
                   .collect(toImmutableList()))

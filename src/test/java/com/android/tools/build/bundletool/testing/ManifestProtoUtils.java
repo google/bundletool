@@ -406,6 +406,11 @@ public final class ManifestProtoUtils {
         MIN_SDK_VERSION_ATTRIBUTE_NAME, MIN_SDK_VERSION_RESOURCE_ID, version);
   }
 
+  public static ManifestMutator withMinSdkVersion(String version) {
+    return withUsesSdkAttribute(
+        MIN_SDK_VERSION_ATTRIBUTE_NAME, MIN_SDK_VERSION_RESOURCE_ID, version);
+  }
+
   public static ManifestMutator withMaxSdkVersion(int version) {
     return withUsesSdkAttribute(
         MAX_SDK_VERSION_ATTRIBUTE_NAME, MAX_SDK_VERSION_RESOURCE_ID, version);
@@ -419,6 +424,16 @@ public final class ManifestProtoUtils {
             .addAttribute(
                 XmlProtoAttributeBuilder.createAndroidAttribute(attributeName, resourceId)
                     .setValueAsDecimalInteger(value));
+  }
+
+  private static ManifestMutator withUsesSdkAttribute(
+      String attributeName, int resourceId, String value) {
+    return manifestElement ->
+        manifestElement
+            .getOrCreateChildElement(USES_SDK_ELEMENT_NAME)
+            .addAttribute(
+                XmlProtoAttributeBuilder.createAndroidAttribute(attributeName, resourceId)
+                    .setValueAsString(value));
   }
 
   public static ManifestMutator withoutVersionCode() {
@@ -488,6 +503,41 @@ public final class ManifestProtoUtils {
                     .addAttribute(
                         XmlProtoAttributeBuilder.create(DISTRIBUTION_NAMESPACE_URI, "name")
                             .setValueAsString(featureName)));
+  }
+
+  public static ManifestMutator withFeatureCondition(String featureName, int featureVersion) {
+    return manifestElement ->
+        manifestElement
+            .getOrCreateChildElement(DISTRIBUTION_NAMESPACE_URI, "module")
+            .getOrCreateChildElement(DISTRIBUTION_NAMESPACE_URI, "delivery")
+            .getOrCreateChildElement(DISTRIBUTION_NAMESPACE_URI, "install-time")
+            .getOrCreateChildElement(DISTRIBUTION_NAMESPACE_URI, "conditions")
+            .addChildElement(
+                XmlProtoElementBuilder.create(DISTRIBUTION_NAMESPACE_URI, "device-feature")
+                    .addAttribute(
+                        XmlProtoAttributeBuilder.create(DISTRIBUTION_NAMESPACE_URI, "name")
+                            .setValueAsString(featureName))
+                    .addAttribute(
+                        XmlProtoAttributeBuilder.create(DISTRIBUTION_NAMESPACE_URI, "version")
+                            .setValueAsDecimalInteger(featureVersion)));
+  }
+
+  public static ManifestMutator withFeatureConditionHexVersion(
+      String featureName, int featureVersion) {
+    return manifestElement ->
+        manifestElement
+            .getOrCreateChildElement(DISTRIBUTION_NAMESPACE_URI, "module")
+            .getOrCreateChildElement(DISTRIBUTION_NAMESPACE_URI, "delivery")
+            .getOrCreateChildElement(DISTRIBUTION_NAMESPACE_URI, "install-time")
+            .getOrCreateChildElement(DISTRIBUTION_NAMESPACE_URI, "conditions")
+            .addChildElement(
+                XmlProtoElementBuilder.create(DISTRIBUTION_NAMESPACE_URI, "device-feature")
+                    .addAttribute(
+                        XmlProtoAttributeBuilder.create(DISTRIBUTION_NAMESPACE_URI, "name")
+                            .setValueAsString(featureName))
+                    .addAttribute(
+                        XmlProtoAttributeBuilder.create(DISTRIBUTION_NAMESPACE_URI, "version")
+                            .setValueAsHexInteger(featureVersion)));
   }
 
   public static ManifestMutator withMinSdkCondition(int minSdkVersion) {

@@ -19,7 +19,6 @@ package com.android.tools.build.bundletool.splitters;
 import static com.android.tools.build.bundletool.model.BundleModule.RESOURCES_DIRECTORY;
 import static com.android.tools.build.bundletool.utils.ResourcesUtils.convertLocaleToLanguage;
 import static com.google.common.collect.ImmutableList.toImmutableList;
-import static com.google.common.collect.ImmutableSet.toImmutableSet;
 
 import com.android.aapt.Resources.ConfigValue;
 import com.android.aapt.Resources.Entry;
@@ -33,8 +32,8 @@ import com.google.common.collect.ImmutableCollection;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableList.Builder;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
-import java.util.Set;
 
 /**
  * Splits the module resources by languages.
@@ -123,11 +122,7 @@ public class LanguageResourcesSplitter extends SplitterForOneTargetingDimension 
 
   private static ImmutableMap<String, ResourceTable> groupByLanguage(
       ResourceTable table, boolean hasNonResourceEntries) {
-    Set<String> languages =
-        ResourcesUtils.configValues(table)
-            .map(configValue -> configValue.getConfig().getLocale())
-            .map(ResourcesUtils::convertLocaleToLanguage)
-            .collect(toImmutableSet());
+    ImmutableSet<String> languages = ResourcesUtils.getAllLanguages(table);
 
     ImmutableMap.Builder<String, ResourceTable> resourceTableByLanguage =
         new ImmutableMap.Builder<>();

@@ -63,6 +63,12 @@ public final class ApkSetBuilderFactory {
     return new ApkSetArchiveBuilder(splitApkSerializer, standaloneApkSerializer, tempDir);
   }
 
+  public static ApkSetBuilder createApkSetWithoutArchiveBuilder(
+      SplitApkSerializer splitApkSerializer,
+      StandaloneApkSerializer standaloneApkSerializer,
+      Path outputDir) {
+    return new ApkSetWithoutArchiveBuilder(splitApkSerializer, standaloneApkSerializer, outputDir);
+  }
 
   /** ApkSet builder that stores the generated APKs in the Apk Set archive. */
   public static class ApkSetArchiveBuilder implements ApkSetBuilder {
@@ -135,4 +141,62 @@ public final class ApkSetBuilderFactory {
     }
   }
 
+  /** ApkSet builder that stores the generated APKs directly in the output directory. */
+  public static class ApkSetWithoutArchiveBuilder implements ApkSetBuilder {
+
+    private final SplitApkSerializer splitApkSerializer;
+    private final StandaloneApkSerializer standaloneApkSerializer;
+    private final Path outputDirectory;
+
+    public ApkSetWithoutArchiveBuilder(
+        SplitApkSerializer splitApkSerializer,
+        StandaloneApkSerializer standaloneApkSerializer,
+        Path outputDirectory) {
+      this.outputDirectory = outputDirectory;
+      this.splitApkSerializer = splitApkSerializer;
+      this.standaloneApkSerializer = standaloneApkSerializer;
+    }
+
+    @Override
+    public ApkDescription addInstantApk(ModuleSplit split) {
+      return splitApkSerializer.writeInstantSplitToDisk(split, outputDirectory);
+    }
+
+    @Override
+    public ApkDescription addSplitApk(ModuleSplit split) {
+      return splitApkSerializer.writeSplitToDisk(split, outputDirectory);
+    }
+
+    @Override
+    public ApkDescription addStandaloneApk(ModuleSplit split) {
+      return standaloneApkSerializer.writeToDisk(split, outputDirectory);
+    }
+
+    @Override
+    public ApkDescription addStandaloneUniversalApk(ModuleSplit split) {
+      return standaloneApkSerializer.writeToDiskAsUniversal(split, outputDirectory);
+    }
+
+    @Override
+    public void setTableOfContentsFile(BuildApksResult tableOfContentsProto) {
+      writeProtoFile(tableOfContentsProto, outputDirectory.resolve("toc.pb"));
+    }
+
+    @Override
+    public void writeTo(Path destinationPath) {
+      // No-op.
+    }
+
+    private void writeProtoFile(Message proto, Path outputFile) {
+      try (OutputStream outputStream = BufferedIo.outputStream(outputFile)) {
+        proto.writeTo(outputStream);
+      } catch (FileNotFoundException e) {
+        throw new UncheckedIOException(
+            String.format("Can't create the output file '%s'.", outputFile), e);
+      } catch (IOException e) {
+        throw new UncheckedIOException(
+            String.format("Error while writing the output file '%s'.", outputFile), e);
+      }
+    }
+  }
 }

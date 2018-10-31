@@ -82,16 +82,16 @@ abstract class XmlProtoElementOrBuilder<
   public final Optional<AttributeWrapperT> getAttribute(String namespaceUri, String name) {
     return getAttributes()
         .filter(attr -> attr.getName().equals(name) && attr.getNamespaceUri().equals(namespaceUri))
-        .collect(toOptional());
+        .findFirst();
   }
 
   @Deprecated // Don't ignore the namespace!
   public final Optional<AttributeWrapperT> getAttributeIgnoringNamespace(String name) {
-    return getAttributes().filter(attr -> attr.getName().equals(name)).collect(toOptional());
+    return getAttributes().filter(attr -> attr.getName().equals(name)).findFirst();
   }
 
   public final Optional<AttributeWrapperT> getAndroidAttribute(int resourceId) {
-    return getAttributes().filter(attr -> attr.getResourceId() == resourceId).collect(toOptional());
+    return getAttributes().filter(attr -> attr.getResourceId() == resourceId).findFirst();
   }
 
   public final Stream<ElementWrapperT> getChildrenElements() {

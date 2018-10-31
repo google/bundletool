@@ -331,6 +331,12 @@ public final class TargetingUtils {
         .build();
   }
 
+  public static ModuleTargeting moduleFeatureTargeting(String featureName, int featureVersion) {
+    return ModuleTargeting.newBuilder()
+        .addDeviceFeatureTargeting(deviceFeatureTargeting(featureName, featureVersion))
+        .build();
+  }
+
   public static ModuleTargeting moduleMinSdkVersionTargeting(int minSdkVersion) {
     return ModuleTargeting.newBuilder()
         .setSdkVersionTargeting(sdkVersionTargeting(sdkVersionFrom(minSdkVersion)))
@@ -545,6 +551,16 @@ public final class TargetingUtils {
   public static DeviceFeatureTargeting deviceFeatureTargeting(String featureName) {
     return DeviceFeatureTargeting.newBuilder()
         .setRequiredFeature(DeviceFeature.newBuilder().setFeatureName(featureName))
+        .build();
+  }
+
+  public static DeviceFeatureTargeting deviceFeatureTargeting(
+      String featureName, int featureVersion) {
+    return DeviceFeatureTargeting.newBuilder()
+        .setRequiredFeature(
+            DeviceFeature.newBuilder()
+                .setFeatureName(featureName)
+                .setFeatureVersion(featureVersion))
         .build();
   }
 

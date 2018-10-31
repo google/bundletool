@@ -626,8 +626,10 @@ public class BuildApksManagerTest {
     try (ZipFile universalApkZipFile = new ZipFile(universalApkFile)) {
       assertThat(filesUnderPath(universalApkZipFile, ZipPath.create("lib")))
           .containsExactly("lib/x86/libsome.so", "lib/x86_64/libsome.so");
+      // "res/xml/splits0.xml" is created by bundletool with list of generated splits.
       assertThat(filesUnderPath(universalApkZipFile, ZipPath.create("res")))
-          .containsExactly("res/drawable-ldpi/image.jpg", "res/drawable-mdpi/image.jpg");
+          .containsExactly(
+              "res/drawable-ldpi/image.jpg", "res/drawable-mdpi/image.jpg", "res/xml/splits0.xml");
     }
   }
 
@@ -1440,6 +1442,8 @@ public class BuildApksManagerTest {
                 .addCopies("res/drawable-cz/image.jpg", 2)
                 .addCopies("res/drawable-fr/image.jpg", 2)
                 .addCopies("res/drawable-pl/image.jpg", 2)
+                .addCopies("res/xml/splits0.xml", 2)
+                // "res/xml/splits0.xml" is created by bundletool with list of generated splits.
                 .addCopies("resources.arsc", 2)
                 .addCopies(manifest, 2)
                 .addCopies(signature, 2)
@@ -1582,6 +1586,80 @@ public class BuildApksManagerTest {
     execute(command);
   }
 
+  @Test
+  public void extractApkSet_outputApksWithoutArchive() throws Exception {
+    AppBundle appBundle =
+        new AppBundleBuilder()
+            .addModule(
+                "base",
+                builder ->
+                    builder
+                        .addFile("assets/file.txt")
+                        .addFile("dex/classes.dex")
+                        .setManifest(androidManifest("com.test.app"))
+                        .setResourceTable(
+                            resourceTable(
+                                packageWithTestLabel("test_label", USER_PACKAGE_OFFSET - 1))))
+            .addModule(
+                "abi_feature",
+                builder ->
+                    builder
+                        .addFile("lib/x86/libsome.so")
+                        .addFile("lib/x86_64/libsome.so")
+                        .setNativeConfig(
+                            nativeLibraries(
+                                targetedNativeDirectory(
+                                    "lib/x86", nativeDirectoryTargeting(AbiAlias.X86)),
+                                targetedNativeDirectory(
+                                    "lib/x86_64", nativeDirectoryTargeting(AbiAlias.X86_64))))
+                        .setManifest(
+                            androidManifestForFeature(
+                                "com.test.app",
+                                withTitle(
+                                    "@string/test_label",
+                                    makeResourceIdentifier(USER_PACKAGE_OFFSET - 1, 0x01, 0x01)))))
+            .addModule(
+                "language_feature",
+                builder ->
+                    builder
+                        .addFile("res/drawable/image.jpg")
+                        .addFile("res/drawable-cz/image.jpg")
+                        .addFile("res/drawable-fr/image.jpg")
+                        .addFile("res/drawable-pl/image.jpg")
+                        .setResourceTable(
+                            createResourceTable(
+                                "image",
+                                fileReference(
+                                    "res/drawable/image.jpg", Configuration.getDefaultInstance()),
+                                fileReference("res/drawable-cz/image.jpg", locale("cz")),
+                                fileReference("res/drawable-fr/image.jpg", locale("fr")),
+                                fileReference("res/drawable-pl/image.jpg", locale("pl"))))
+                        .setManifest(
+                            androidManifestForFeature(
+                                "com.test.app",
+                                withTitle(
+                                    "@string/test_label",
+                                    makeResourceIdentifier(USER_PACKAGE_OFFSET - 1, 0x01, 0x01)))))
+            .build();
+    bundleSerializer.writeToDisk(appBundle, bundlePath);
+
+    BuildApksCommand command =
+        BuildApksCommand.builder()
+            .setBundlePath(bundlePath)
+            .setOptimizationDimensions(ImmutableSet.of(ABI, LANGUAGE))
+            .setOutputFile(outputDir)
+            .setAapt2Command(aapt2Command)
+            .setCreateApkSetArchive(false)
+            .build();
+
+    Path outputDirectory = execute(command);
+    assertThat(outputDirectory).isEqualTo(outputDir);
+
+    BuildApksResult result = parseTocFromFile(outputDirectory.resolve("toc.pb").toFile());
+
+    // Validate all APKs were created.
+    verifyApksExist(apkDescriptions(result.getVariantList()), outputDir);
+  }
 
   @Test
   public void bundleToolVersionSet() throws Exception {

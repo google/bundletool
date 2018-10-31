@@ -22,6 +22,7 @@ import static com.android.tools.build.bundletool.testing.TargetingUtils.moduleMi
 import static com.google.common.truth.extensions.proto.ProtoTruth.assertThat;
 
 import com.android.bundle.Targeting.ModuleTargeting;
+import java.util.Optional;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
@@ -58,6 +59,20 @@ public class ModuleConditionsTest {
         .isEqualTo(
             mergeModuleTargeting(
                 moduleFeatureTargeting("com.feature1"), moduleFeatureTargeting("com.feature2")));
+  }
+
+  @Test
+  public void toTargeting_deviceFeatureVersionedConditions() {
+    ModuleConditions moduleConditions =
+        ModuleConditions.builder()
+            .addDeviceFeatureCondition(
+                DeviceFeatureCondition.create("com.feature1", Optional.of(12)))
+            .build();
+
+    ModuleTargeting moduleTargeting = moduleConditions.toTargeting();
+    assertThat(moduleTargeting)
+        .ignoringRepeatedFieldOrder()
+        .isEqualTo(mergeModuleTargeting(moduleFeatureTargeting("com.feature1", 12)));
   }
 
   @Test

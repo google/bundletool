@@ -25,6 +25,7 @@ import static com.google.common.collect.ImmutableList.toImmutableList;
 
 import com.android.aapt.Resources.XmlNode;
 import com.android.tools.build.bundletool.exceptions.ValidationException;
+import com.android.tools.build.bundletool.utils.xmlproto.XmlProtoAttribute;
 import com.android.tools.build.bundletool.utils.xmlproto.XmlProtoElement;
 import com.android.tools.build.bundletool.utils.xmlproto.XmlProtoNode;
 import com.google.auto.value.AutoValue;
@@ -36,6 +37,8 @@ import java.util.Optional;
 /** Parses and provides business logic utilities for <dist:delivery> element. */
 @AutoValue
 public abstract class ManifestDeliveryElement {
+
+  private static final String VERSION_ATTRIBUTE_NAME = "version";
 
   abstract XmlProtoElement getDeliveryElement();
 
@@ -122,7 +125,10 @@ public abstract class ManifestDeliveryElement {
                     new ValidationException(
                         "Missing required 'name' attribute in the 'device-feature' condition "
                             + "element."))
-            .getValueAsString());
+            .getValueAsString(),
+        conditionElement
+            .getAttribute(DISTRIBUTION_NAMESPACE_URI, VERSION_ATTRIBUTE_NAME)
+            .map(XmlProtoAttribute::getValueAsInteger));
   }
 
   private int parseMinSdkVersionCondition(XmlProtoElement conditionElement) {

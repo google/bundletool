@@ -160,7 +160,7 @@ final class ApkSerializerHelper {
                     // Clear timestamps on zip entries to minimize diffs between APKs.
                     .setNoTimestamps(true),
                 signingConfig.map(config -> config.getPrivateKey()).orElse(null),
-                signingConfig.map(config -> config.getCertificates()).orElse(null),
+                signingConfig.map(config -> config.getCertificates()).orElse(ImmutableList.of()),
                 /* v1SigningEnabled= */ true,
                 /* v2SigningEnabled= */ true,
                 BUILT_BY,

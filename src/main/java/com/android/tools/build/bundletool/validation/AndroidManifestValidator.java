@@ -17,8 +17,10 @@
 package com.android.tools.build.bundletool.validation;
 
 import static com.android.tools.build.bundletool.model.AndroidManifest.NO_NAMESPACE_URI;
+import static com.google.common.collect.ImmutableSet.toImmutableSet;
 
 import com.android.tools.build.bundletool.exceptions.ValidationException;
+import com.android.tools.build.bundletool.exceptions.manifest.ManifestDuplicateAttributeException;
 import com.android.tools.build.bundletool.exceptions.manifest.ManifestFusingException.BaseModuleExcludedFromFusingException;
 import com.android.tools.build.bundletool.exceptions.manifest.ManifestFusingException.ModuleFusingConfigurationMissingException;
 import com.android.tools.build.bundletool.exceptions.manifest.ManifestSdkTargetingException.MaxSdkInvalidException;
@@ -28,7 +30,9 @@ import com.android.tools.build.bundletool.exceptions.manifest.ManifestSdkTargeti
 import com.android.tools.build.bundletool.model.AndroidManifest;
 import com.android.tools.build.bundletool.model.BundleModule;
 import com.android.tools.build.bundletool.model.ManifestDeliveryElement;
+import com.android.tools.build.bundletool.utils.xmlproto.XmlProtoAttribute;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableSet;
 import java.util.Optional;
 
 /** Validates {@code AndroidManifest.xml} file of each module. */
@@ -45,7 +49,7 @@ public class AndroidManifestValidator extends SubValidator {
     validateDeliverySettings(module);
     validateFusingConfig(module);
     validateMinMaxSdk(module);
-    validateNumberOfSplitIds(module);
+    validateNumberOfDistinctSplitIds(module);
     validateOnDemandIsInstantMutualExclusion(module);
   }
 
@@ -192,8 +196,8 @@ public class AndroidManifestValidator extends SubValidator {
     }
   }
 
-  private void validateNumberOfSplitIds(BundleModule module) {
-    long splitIdsCount =
+  private void validateNumberOfDistinctSplitIds(BundleModule module) {
+    ImmutableSet<XmlProtoAttribute> splitIds =
         module
             .getAndroidManifest()
             .getManifestRoot()
@@ -203,13 +207,9 @@ public class AndroidManifestValidator extends SubValidator {
                 attr ->
                     attr.getName().equals("split")
                         && attr.getNamespaceUri().equals(NO_NAMESPACE_URI))
-            .count();
-    if (splitIdsCount > 1) {
-      throw ValidationException.builder()
-          .withMessage(
-              "The attribute 'split' cannot be declared more than once (module '%s').",
-              module.getName())
-          .build();
+            .collect(toImmutableSet());
+    if (splitIds.size() > 1) {
+      throw new ManifestDuplicateAttributeException("split", splitIds, module.getName().toString());
     }
   }
 }

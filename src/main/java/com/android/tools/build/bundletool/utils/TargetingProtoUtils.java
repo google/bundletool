@@ -16,17 +16,22 @@
 
 package com.android.tools.build.bundletool.utils;
 
+import static com.android.bundle.Targeting.ScreenDensity.DensityOneofCase.DENSITY_ALIAS;
+import static com.android.tools.build.bundletool.utils.ResourcesUtils.DENSITY_ALIAS_TO_DPI_MAP;
 import static com.android.tools.build.bundletool.utils.Versions.ANDROID_L_API_VERSION;
 
 import com.android.bundle.Targeting.Abi;
 import com.android.bundle.Targeting.ApkTargeting;
 import com.android.bundle.Targeting.AssetsDirectoryTargeting;
 import com.android.bundle.Targeting.ScreenDensity;
+import com.android.bundle.Targeting.ScreenDensityTargeting;
 import com.android.bundle.Targeting.SdkVersion;
 import com.android.bundle.Targeting.SdkVersionTargeting;
 import com.android.bundle.Targeting.VariantTargeting;
 import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.MoreCollectors;
 import com.google.protobuf.Int32Value;
+import java.util.Optional;
 
 /** Utility functions for Targeting proto. */
 public final class TargetingProtoUtils {
@@ -114,5 +119,21 @@ public final class TargetingProtoUtils {
 
   public static VariantTargeting lPlusVariantTargeting() {
     return variantTargeting(sdkVersionTargeting(sdkVersionFrom(ANDROID_L_API_VERSION)));
+  }
+
+  public static Optional<Integer> getScreenDensityDpi(
+      ScreenDensityTargeting screenDensityTargeting) {
+    if (screenDensityTargeting.getValueList().isEmpty()) {
+      return Optional.empty();
+    }
+
+    ScreenDensity densityTargeting =
+        screenDensityTargeting.getValueList().stream()
+            // For now we only support one value in ScreenDensityTargeting.
+            .collect(MoreCollectors.onlyElement());
+    return Optional.of(
+        (densityTargeting.getDensityOneofCase() == DENSITY_ALIAS)
+            ? DENSITY_ALIAS_TO_DPI_MAP.get(densityTargeting.getDensityAlias())
+            : densityTargeting.getDensityDpi());
   }
 }

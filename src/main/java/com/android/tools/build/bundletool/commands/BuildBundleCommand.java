@@ -31,6 +31,7 @@ import com.android.tools.build.bundletool.commands.CommandHelp.FlagDescription;
 import com.android.tools.build.bundletool.exceptions.CommandExecutionException;
 import com.android.tools.build.bundletool.exceptions.ValidationException;
 import com.android.tools.build.bundletool.io.ZipBuilder;
+import com.android.tools.build.bundletool.io.ZipBuilder.EntryOption;
 import com.android.tools.build.bundletool.model.BundleMetadata;
 import com.android.tools.build.bundletool.model.BundleModule;
 import com.android.tools.build.bundletool.model.InputStreamSupplier;
@@ -45,14 +46,14 @@ import com.android.tools.build.bundletool.version.BundleToolVersion;
 import com.google.auto.value.AutoValue;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.io.Closer;
 import com.google.protobuf.InvalidProtocolBufferException;
 import com.google.protobuf.util.JsonFormat;
 import java.io.IOException;
 import java.io.Reader;
+import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.zip.ZipException;
@@ -69,6 +70,7 @@ public abstract class BuildBundleCommand {
   private static final Flag<ImmutableList<Path>> MODULES_FLAG = Flag.pathList("modules");
   private static final Flag<ImmutableMap<ZipPath, Path>> METADATA_FILES_FLAG =
       Flag.mapCollector("metadata-file", ZipPath.class, Path.class);
+  private static final Flag<Boolean> UNCOMPRESSED_FLAG = Flag.booleanFlag("uncompressed");
 
   public abstract Path getOutputPath();
 
@@ -80,8 +82,11 @@ public abstract class BuildBundleCommand {
   /** Returns the bundle metadata. */
   public abstract BundleMetadata getBundleMetadata();
 
+  abstract boolean getUncompressedBundle();
+
   public static Builder builder() {
-    return new AutoValue_BuildBundleCommand.Builder();
+    // By default, everything is compressed.
+    return new AutoValue_BuildBundleCommand.Builder().setUncompressedBundle(false);
   }
 
   /** Builder for the {@link BuildBundleCommand}. */
@@ -136,6 +141,13 @@ public abstract class BuildBundleCommand {
           BundleMetadata.BUNDLETOOL_NAMESPACE, BundleMetadata.MAIN_DEX_LIST_FILE_NAME, file);
     }
 
+    /**
+     * Sets whether the generated App Bundle should have its entries all uncompressed.
+     *
+     * <p>Defaults to {@code false}.
+     */
+    public abstract Builder setUncompressedBundle(boolean uncompressed);
+
     public abstract BuildBundleCommand build();
   }
 
@@ -152,6 +164,7 @@ public abstract class BuildBundleCommand {
     METADATA_FILES_FLAG
         .getValue(flags)
         .ifPresent(metadataFiles -> metadataFiles.forEach(builder::addMetadataFileInternal));
+    UNCOMPRESSED_FLAG.getValue(flags).ifPresent(builder::setUncompressedBundle);
 
     flags.checkNoUnknownFlags();
 
@@ -163,29 +176,29 @@ public abstract class BuildBundleCommand {
 
     ZipBuilder bundleBuilder = new ZipBuilder();
 
-    List<ZipFile> openedZipFiles = new ArrayList<>();
-    try {
+    try (Closer closer = Closer.create()) {
+    EntryOption[] compression =
+        getUncompressedBundle() ? new EntryOption[] {EntryOption.UNCOMPRESSED} : new EntryOption[0];
+
       // Merge in all the modules, each module into its own sub-directory.
       for (Path module : getModulesPaths()) {
         try {
-          ZipFile moduleZipFile = new ZipFile(module.toFile());
-          openedZipFiles.add(moduleZipFile);
-
+          ZipFile moduleZipFile = closer.register(new ZipFile(module.toFile()));
           ZipPath moduleDir = ZipPath.create(getNameWithoutExtension(module));
 
-          bundleBuilder.copyAllContentsFromZip(moduleDir, moduleZipFile);
+          bundleBuilder.copyAllContentsFromZip(moduleDir, moduleZipFile, compression);
 
           Optional<Assets> assetsTargeting = generateAssetsTargeting(moduleZipFile);
           if (assetsTargeting.isPresent()) {
             bundleBuilder.addFileWithProtoContent(
-                moduleDir.resolve("assets.pb"), assetsTargeting.get());
+                moduleDir.resolve("assets.pb"), assetsTargeting.get(), compression);
           }
 
           Optional<NativeLibraries> nativeLibrariesTargeting =
               generateNativeLibrariesTargeting(moduleZipFile);
           if (nativeLibrariesTargeting.isPresent()) {
             bundleBuilder.addFileWithProtoContent(
-                moduleDir.resolve("native.pb"), nativeLibrariesTargeting.get());
+                moduleDir.resolve("native.pb"), nativeLibrariesTargeting.get(), compression);
           }
         } catch (ZipException e) {
           throw CommandExecutionException.builder()
@@ -216,13 +229,15 @@ public abstract class BuildBundleCommand {
                       .setVersion(BundleToolVersion.getCurrentVersion().toString()))
               .build();
       bundleBuilder.addFileWithContent(
-          ZipPath.create(BUNDLE_CONFIG_FILE_NAME), bundleConfig.toByteArray());
+          ZipPath.create(BUNDLE_CONFIG_FILE_NAME), bundleConfig.toByteArray(), compression);
 
       // Add metadata files.
       for (Map.Entry<ZipPath, InputStreamSupplier> metadataEntry :
           getBundleMetadata().getFileDataMap().entrySet()) {
         bundleBuilder.addFile(
-            METADATA_DIRECTORY.resolve(metadataEntry.getKey()), metadataEntry.getValue());
+            METADATA_DIRECTORY.resolve(metadataEntry.getKey()),
+            metadataEntry.getValue(),
+            compression);
       }
 
       try {
@@ -233,8 +248,8 @@ public abstract class BuildBundleCommand {
             .withMessage("Unable to write file to location '%s'.")
             .build();
       }
-    } finally {
-      ZipUtils.closeZipFiles(openedZipFiles);
+    } catch (IOException e) {
+      throw new UncheckedIOException(e);
     }
   }
 

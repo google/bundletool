@@ -17,6 +17,7 @@
 package com.android.tools.build.bundletool.validation;
 
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifest;
+import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withFeatureCondition;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withMinSdkVersion;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withOnDemandAttribute;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withSplitId;
@@ -410,5 +411,31 @@ public class ModuleDependencyValidatorTest {
         .contains(
             "Install-time module 'feature1' has a minSdkVersion(1) different than the"
                 + " minSdkVersion(20) of its dependency 'base'.");
+  }
+
+  @Test
+  public void validateAllModules_conditionalModuleMinSdkHigherThanBase_succeeds() throws Exception {
+    ImmutableList<BundleModule> allModules =
+        ImmutableList.of(
+            module("base", androidManifest(PKG_NAME, withMinSdkVersion(20))),
+            module(
+                "feature1",
+                androidManifest(
+                    PKG_NAME, withMinSdkVersion(24), withFeatureCondition("android.feature"))));
+
+    new ModuleDependencyValidator().validateAllModules(allModules);
+  }
+
+  @Test
+  public void validateAllModules_conditionalModuleMinSdkLowerThanBase_succeeds() throws Exception {
+    ImmutableList<BundleModule> allModules =
+        ImmutableList.of(
+            module("base", androidManifest(PKG_NAME, withMinSdkVersion(20))),
+            module(
+                "feature1",
+                androidManifest(
+                    PKG_NAME, withMinSdkVersion(18), withFeatureCondition("android.feature"))));
+
+    new ModuleDependencyValidator().validateAllModules(allModules);
   }
 }

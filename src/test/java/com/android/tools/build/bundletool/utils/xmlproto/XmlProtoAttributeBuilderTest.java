@@ -132,6 +132,30 @@ public class XmlProtoAttributeBuilderTest {
   }
 
   @Test
+  public void setValueAsHexInteger() {
+    XmlProtoAttributeBuilder attribute = createAttribute().setValueAsHexInteger(0x123);
+    assertThat(attribute.getValueAsInteger()).isEqualTo(0x123);
+
+    attribute.setValueAsHexInteger(0x456);
+    assertThat(attribute.getValueAsHexInteger()).isEqualTo(0x456);
+  }
+
+  @Test
+  public void setValueAsHexInteger_overridesPreviousType() {
+    XmlProtoAttributeBuilder attribute = createAttribute().setValueAsString("hello");
+    attribute.setValueAsHexInteger(0x123);
+
+    assertThat(attribute.getValueAsHexInteger()).isEqualTo(0x123);
+  }
+
+  @Test
+  public void setValueAsHexInteger_alsoSetsRawValue() {
+    XmlProtoAttributeBuilder attribute = createAttribute().setValueAsString("hello");
+    attribute.setValueAsHexInteger(0x123);
+    assertThat(attribute.getProto().build().getValue()).isEqualTo("0x00000123");
+  }
+
+  @Test
   public void setValueAsString() {
     XmlProtoAttributeBuilder attribute = createAttribute().setValueAsString("hello");
     assertThat(attribute.getValueAsString()).isEqualTo("hello");

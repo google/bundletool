@@ -105,6 +105,8 @@ message Abi {
 
 message DeviceFeature {
   string feature_name = 1;
+  // Equivalent of android:glEsVersion or android:version in <uses-feature>.
+  int32 feature_version = 2;
 }
 
 // Targeting specific for directories under assets/.

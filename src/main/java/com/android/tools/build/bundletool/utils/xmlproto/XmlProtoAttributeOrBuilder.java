@@ -15,6 +15,7 @@
  */
 package com.android.tools.build.bundletool.utils.xmlproto;
 
+import com.android.aapt.Resources.Item;
 import com.android.aapt.Resources.Item.ValueCase;
 import com.android.aapt.Resources.Primitive;
 import com.android.aapt.Resources.Primitive.OneofValueCase;
@@ -67,6 +68,89 @@ abstract class XmlProtoAttributeOrBuilder<AttributeProtoT extends XmlAttributeOr
       throw new UnexpectedAttributeTypeException(getProto(), /* expectedType= */ "decimal int");
     }
     return primitive.getIntDecimalValue();
+  }
+
+  public final int getValueAsHexInteger() {
+    Primitive primitive = getProto().getCompiledItem().getPrim();
+    if (primitive.getOneofValueCase() != OneofValueCase.INT_HEXADECIMAL_VALUE) {
+      throw new UnexpectedAttributeTypeException(getProto(), /* expectedType= */ "hexadecimal int");
+    }
+    return primitive.getIntHexadecimalValue();
+  }
+
+  /** Returns integer value either from decimal or hexadecimal integer. */
+  public final int getValueAsInteger() {
+    Primitive primitive = getProto().getCompiledItem().getPrim();
+    switch (primitive.getOneofValueCase()) {
+      case INT_DECIMAL_VALUE:
+        return primitive.getIntDecimalValue();
+      case INT_HEXADECIMAL_VALUE:
+        return primitive.getIntHexadecimalValue();
+      default:
+        throw new UnexpectedAttributeTypeException(
+            getProto(), /* expectedType= */ "decimal|hexadecimal int");
+    }
+  }
+
+  /**
+   * Returns the value of the attribute as a string regardless of its type.
+   *
+   * <p>When not a string, the conversion is done on a best-effort basis, and may change in the
+   * future.
+   */
+  public final String getDebugString() {
+    if (!getProto().hasCompiledItem()) {
+      return getProto().getValue();
+    }
+
+    Item item = getProto().getCompiledItem();
+    switch (item.getValueCase()) {
+      case PRIM:
+        Primitive primitive = item.getPrim();
+        switch (primitive.getOneofValueCase()) {
+          case NULL_VALUE:
+            return "null";
+          case EMPTY_VALUE:
+            return "empty";
+          case FLOAT_VALUE:
+            return String.valueOf(primitive.getFloatValue());
+          case DIMENSION_VALUE:
+            return String.valueOf(primitive.getDimensionValue());
+          case FRACTION_VALUE:
+            return String.valueOf(primitive.getFractionValue());
+          case INT_DECIMAL_VALUE:
+            return String.valueOf(primitive.getIntDecimalValue());
+          case INT_HEXADECIMAL_VALUE:
+            return String.valueOf(primitive.getIntHexadecimalValue());
+          case BOOLEAN_VALUE:
+            return String.valueOf(primitive.getBooleanValue());
+          case COLOR_ARGB8_VALUE:
+            return String.valueOf(primitive.getColorArgb8Value());
+          case COLOR_RGB8_VALUE:
+            return String.valueOf(primitive.getColorRgb8Value());
+          case COLOR_ARGB4_VALUE:
+            return String.valueOf(primitive.getColorArgb4Value());
+          case COLOR_RGB4_VALUE:
+            return String.valueOf(primitive.getColorRgb4Value());
+          default:
+            // Not supported.
+            return primitive.toString();
+        }
+      case FILE:
+        return item.getFile().getPath();
+      case ID:
+        return "<ID>";
+      case RAW_STR:
+        return item.getRawStr().getValue();
+      case REF:
+        return String.valueOf(item.getRef().getId());
+      case STR:
+        return item.getStr().getValue();
+      case STYLED_STR:
+      default:
+        // Not supported.
+        return item.toString();
+    }
   }
 
   @Override

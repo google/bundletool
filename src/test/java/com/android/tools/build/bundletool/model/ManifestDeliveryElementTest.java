@@ -19,6 +19,7 @@ package com.android.tools.build.bundletool.model;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifest;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withEmptyDeliveryElement;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withFeatureCondition;
+import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withFeatureConditionHexVersion;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withFusingAttribute;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withInstallTimeDelivery;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withMinSdkCondition;
@@ -136,6 +137,24 @@ public class ManifestDeliveryElementTest {
         .containsExactly(
             DeviceFeatureCondition.create("android.hardware.camera.ar"),
             DeviceFeatureCondition.create("android.software.vr.mode"));
+  }
+
+  @Test
+  public void moduleConditions_deviceFeatureVersions() {
+    Optional<ManifestDeliveryElement> deliveryElement =
+        ManifestDeliveryElement.fromManifestRootNode(
+            androidManifest(
+                "com.test.app",
+                withFeatureConditionHexVersion("android.software.opengl", 0x30000),
+                withFeatureCondition("android.hardware.vr.headtracking", 1)));
+
+    assertThat(deliveryElement).isPresent();
+
+    assertThat(deliveryElement.get().hasModuleConditions()).isTrue();
+    assertThat(deliveryElement.get().getModuleConditions().getDeviceFeatureConditions())
+        .containsExactly(
+            DeviceFeatureCondition.create("android.software.opengl", Optional.of(0x30000)),
+            DeviceFeatureCondition.create("android.hardware.vr.headtracking", Optional.of(1)));
   }
 
   @Test

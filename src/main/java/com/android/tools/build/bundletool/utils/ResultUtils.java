@@ -48,27 +48,27 @@ public final class ResultUtils {
   }
 
   public static ImmutableList<Variant> splitApkVariants(BuildApksResult result) {
-    return result
-        .getVariantList()
-        .stream()
-        .filter(ResultUtils::isSplitApkVariant)
-        .collect(toImmutableList());
+    return splitApkVariants(ImmutableList.copyOf(result.getVariantList()));
+  }
+
+  public static ImmutableList<Variant> splitApkVariants(ImmutableList<Variant> variants) {
+    return variants.stream().filter(ResultUtils::isSplitApkVariant).collect(toImmutableList());
   }
 
   public static ImmutableList<Variant> instantApkVariants(BuildApksResult result) {
-    return result
-        .getVariantList()
-        .stream()
-        .filter(ResultUtils::isInstantApkVariant)
-        .collect(toImmutableList());
+    return instantApkVariants(ImmutableList.copyOf(result.getVariantList()));
+  }
+
+  public static ImmutableList<Variant> instantApkVariants(ImmutableList<Variant> variants) {
+    return variants.stream().filter(ResultUtils::isInstantApkVariant).collect(toImmutableList());
   }
 
   public static ImmutableList<Variant> standaloneApkVariants(BuildApksResult result) {
-    return result
-        .getVariantList()
-        .stream()
-        .filter(ResultUtils::isStandaloneApkVariant)
-        .collect(toImmutableList());
+    return standaloneApkVariants(ImmutableList.copyOf(result.getVariantList()));
+  }
+
+  public static ImmutableList<Variant> standaloneApkVariants(ImmutableList<Variant> variants) {
+    return variants.stream().filter(ResultUtils::isStandaloneApkVariant).collect(toImmutableList());
   }
 
   public static boolean isSplitApkVariant(Variant variant) {

@@ -33,6 +33,7 @@ import static com.android.tools.build.bundletool.testing.TestUtils.expectMissing
 import static com.android.tools.build.bundletool.testing.TestUtils.expectMissingRequiredFlagException;
 import static com.android.tools.build.bundletool.testing.truth.zip.TruthZip.assertThat;
 import static com.google.common.truth.Truth.assertThat;
+import static com.google.common.truth.Truth.assertWithMessage;
 import static com.google.common.truth.Truth8.assertThat;
 import static com.google.common.truth.extensions.proto.ProtoTruth.assertThat;
 import static java.nio.charset.StandardCharsets.UTF_8;
@@ -57,6 +58,7 @@ import com.android.tools.build.bundletool.io.ZipBuilder;
 import com.android.tools.build.bundletool.model.AppBundle;
 import com.android.tools.build.bundletool.model.ZipPath;
 import com.android.tools.build.bundletool.testing.BundleConfigBuilder;
+import com.android.tools.build.bundletool.testing.ResourceTableBuilder;
 import com.android.tools.build.bundletool.utils.flags.FlagParser;
 import com.android.tools.build.bundletool.version.BundleToolVersion;
 import com.google.common.collect.ImmutableList;
@@ -65,6 +67,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Collections;
+import java.util.Enumeration;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 import org.junit.Before;
@@ -79,9 +82,9 @@ public class BuildBundleCommandTest {
 
   private static final String PKG_NAME = "com.test.app";
 
-  @Rule public TemporaryFolder tmp = new TemporaryFolder();
-  private Path tmpDir;
+  @Rule public final TemporaryFolder tmp = new TemporaryFolder();
 
+  private Path tmpDir;
   private Path bundlePath;
 
   @Before
@@ -92,8 +95,8 @@ public class BuildBundleCommandTest {
 
   @Test
   public void buildingViaFlagsAndBuilderHasSameResult() throws Exception {
-    Path baseModulePath = buildSampleModule("base");
-    Path featureModulePath = buildSampleModule("feature");
+    Path baseModulePath = buildSimpleModule("base");
+    Path featureModulePath = buildSimpleModule("feature");
     BuildBundleCommand commandViaBuilder =
         BuildBundleCommand.builder()
             .setOutputPath(bundlePath)
@@ -143,8 +146,8 @@ public class BuildBundleCommandTest {
 
   @Test
   public void buildingViaFlagsAndBuilderHasSameResult_optionalMetadata() throws Exception {
-    Path baseModulePath = buildSampleModule("base");
-    Path featureModulePath = buildSampleModule("feature");
+    Path baseModulePath = buildSimpleModule("base");
+    Path featureModulePath = buildSimpleModule("feature");
     Path metadataFileAPath = Files.createFile(tmpDir.resolve("metadata-A.txt"));
     Path metadataFileBPath = Files.createFile(tmpDir.resolve("metadata-B.txt"));
     BuildBundleCommand commandViaBuilder =
@@ -169,6 +172,24 @@ public class BuildBundleCommandTest {
     // BundleMetadata would not compare equal.
     assertThat(commandViaBuilder.getBundleMetadata().getFileDataMap().keySet())
         .containsExactlyElementsIn(commandViaFlags.getBundleMetadata().getFileDataMap().keySet());
+  }
+
+  @Test
+  public void buildingViaFlagsAndBuilderHasSameResult_optionalUncompressed() throws Exception {
+    Path baseModulePath = buildSimpleModule("base");
+    BuildBundleCommand commandViaBuilder =
+        BuildBundleCommand.builder()
+            .setOutputPath(bundlePath)
+            .setModulesPaths(ImmutableList.of(baseModulePath))
+            .setUncompressedBundle(true)
+            .build();
+
+    BuildBundleCommand commandViaFlags =
+        BuildBundleCommand.fromFlags(
+            new FlagParser()
+                .parse("--output=" + bundlePath, "--modules=" + baseModulePath, "--uncompressed"));
+
+    assertThat(commandViaBuilder).isEqualTo(commandViaFlags);
   }
 
   @Test
@@ -366,7 +387,7 @@ public class BuildBundleCommandTest {
 
   @Test
   public void metadataFiles_areStored() throws Exception {
-    Path baseModulePath = buildSampleModule("base");
+    Path baseModulePath = buildSimpleModule("base");
     Path metadataFile1 = tmpDir.resolve("physical-name-ignored.1");
     Path metadataFile2 = tmpDir.resolve("physical-name-ignored.2");
     Path metadataFile3 = tmpDir.resolve("physical-name-ignored.3");
@@ -397,7 +418,7 @@ public class BuildBundleCommandTest {
 
   @Test
   public void mainDexListFile_isStored() throws Exception {
-    Path baseModulePath = buildSampleModule("base");
+    Path baseModulePath = buildSimpleModule("base");
     Path mainDexListFile = tmpDir.resolve("file.txt");
     Files.write(mainDexListFile, new byte[] {0x42});
 
@@ -416,7 +437,7 @@ public class BuildBundleCommandTest {
 
   @Test
   public void mainDexListFile_setTwice_throws() throws Exception {
-    Path baseModulePath = buildSampleModule("base");
+    Path baseModulePath = buildSimpleModule("base");
     Path mainDexListFile = tmpDir.resolve("file.txt");
     Files.write(mainDexListFile, new byte[] {0x42});
 
@@ -436,7 +457,7 @@ public class BuildBundleCommandTest {
 
   @Test
   public void directoryZipEntriesInModuleFiles_notIncludedInBundle() throws Exception {
-    Path tmpBaseModulePath = Files.move(buildSampleModule("base"), tmpDir.resolve("base.zip.tmp"));
+    Path tmpBaseModulePath = Files.move(buildSimpleModule("base"), tmpDir.resolve("base.zip.tmp"));
     Path baseModulePath;
     // Copy the valid bundle, only add a directory zip entry.
     try (ZipFile tmpBaseModuleZip = new ZipFile(tmpBaseModulePath.toFile())) {
@@ -471,7 +492,7 @@ public class BuildBundleCommandTest {
 
   @Test
   public void outputNotSet_throws() throws Exception {
-    Path baseModulePath = buildSampleModule("base");
+    Path baseModulePath = buildSimpleModule("base");
 
     expectMissingRequiredBuilderPropertyException(
         "outputPath",
@@ -485,7 +506,7 @@ public class BuildBundleCommandTest {
 
   @Test
   public void outputExists_throws() throws Exception {
-    Path baseModulePath = buildSampleModule("base");
+    Path baseModulePath = buildSimpleModule("base");
     bundlePath = tmp.newFile("existing-bundle.aab").toPath();
 
     IllegalArgumentException exception =
@@ -557,7 +578,7 @@ public class BuildBundleCommandTest {
 
   @Test
   public void metadataFileDoesNotExist_throws() throws Exception {
-    Path baseModulePath = buildSampleModule("base");
+    Path baseModulePath = buildSimpleModule("base");
     Path nonExistentFilePath = tmpDir.resolve("metadata.txt");
 
     ValidationException exceptionViaApi =
@@ -588,7 +609,7 @@ public class BuildBundleCommandTest {
 
   @Test
   public void metadataNamespaceInvalid_throws() throws Exception {
-    Path baseModulePath = buildSampleModule("base");
+    Path baseModulePath = buildSimpleModule("base");
     Path metadataFilePath = Files.createFile(tmpDir.resolve("metadata.txt"));
 
     IllegalArgumentException exceptionViaApi =
@@ -622,7 +643,7 @@ public class BuildBundleCommandTest {
 
   @Test
   public void duplicateMetadataFiles_throws() throws Exception {
-    Path baseModulePath = buildSampleModule("base");
+    Path baseModulePath = buildSimpleModule("base");
     Path metadataFile1 = Files.createFile(tmpDir.resolve("metadata1.txt"));
     Path metadataFile2 = Files.createFile(tmpDir.resolve("metadata2.txt"));
 
@@ -776,6 +797,42 @@ public class BuildBundleCommandTest {
     BuildBundleCommand.help();
   }
 
+  @Test
+  public void buildUncompressedBundle() throws Exception {
+    Path module =
+        new ZipBuilder()
+            .addFileWithProtoContent(
+                ZipPath.create("manifest/AndroidManifest.xml"), androidManifest(PKG_NAME))
+            .addFileWithContent(ZipPath.create("dex/classes.dex"), new byte[8])
+            .addFileWithContent(ZipPath.create("res/raw/hello.png"), new byte[8])
+            .addFileWithProtoContent(
+                ZipPath.create("resources.pb"),
+                new ResourceTableBuilder()
+                    .addPackage(PKG_NAME)
+                    .addDrawableResource("hello", "res/raw/hello.png")
+                    .build())
+            .writeTo(tmpDir.resolve("base.zip"));
+
+    Path mainDexList = Files.createFile(tmp.getRoot().toPath().resolve("mainDexList.txt"));
+    BuildBundleCommand.builder()
+        .setModulesPaths(ImmutableList.of(module))
+        .setOutputPath(bundlePath)
+        .setMainDexListFile(mainDexList)
+        .setUncompressedBundle(true)
+        .build()
+        .execute();
+
+    try (ZipFile bundle = new ZipFile(bundlePath.toFile())) {
+      Enumeration<? extends ZipEntry> entries = bundle.entries();
+      while (entries.hasMoreElements()) {
+        ZipEntry entry = entries.nextElement();
+        assertWithMessage("Entry %s is not uncompressed.", entry.getName())
+            .that(entry.getMethod())
+            .isEqualTo(ZipEntry.STORED);
+      }
+    }
+  }
+
   private Path createSimpleBaseModule() throws IOException {
     return new ZipBuilder()
         .addFileWithProtoContent(
@@ -783,7 +840,7 @@ public class BuildBundleCommandTest {
         .writeTo(tmpDir.resolve("base.zip"));
   }
 
-  private Path buildSampleModule(String moduleName) throws IOException {
+  private Path buildSimpleModule(String moduleName) throws IOException {
     return new ZipBuilder()
         .addFileWithProtoContent(
             ZipPath.create("manifest/AndroidManifest.xml"), androidManifest(PKG_NAME))

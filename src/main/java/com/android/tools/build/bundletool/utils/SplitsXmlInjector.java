@@ -28,11 +28,9 @@ import com.android.tools.build.bundletool.model.GeneratedApks;
 import com.android.tools.build.bundletool.model.InMemoryModuleEntry;
 import com.android.tools.build.bundletool.model.ModuleEntry;
 import com.android.tools.build.bundletool.model.ModuleSplit;
-import com.android.tools.build.bundletool.model.ModuleSplit.SplitType;
 import com.android.tools.build.bundletool.model.ResourceId;
 import com.android.tools.build.bundletool.model.ResourceInjector;
 import com.android.tools.build.bundletool.model.SplitsProtoXmlBuilder;
-import com.android.tools.build.bundletool.model.VariantKey;
 import com.android.tools.build.bundletool.model.ZipPath;
 import com.google.common.collect.ImmutableList;
 import java.util.Collection;
@@ -55,15 +53,40 @@ public class SplitsXmlInjector {
     return GeneratedApks.fromModuleSplits(
         generatedApks.getAllApksGroupedByOrderedVariants().asMap().entrySet().stream()
             .map(
-                keySplit ->
-                    isSplitApkVariant(keySplit.getKey())
-                        ? processVariantModuleList(keySplit.getValue())
-                        : keySplit.getValue())
+                keySplit -> {
+                  switch (keySplit.getKey().getSplitType()) {
+                    case SPLIT:
+                      return processSplitApkVariant(keySplit.getValue());
+                    case STANDALONE:
+                      return keySplit.getValue().stream()
+                          .map(this::processStandaloneVariant)
+                          .collect(toImmutableList());
+                    case INSTANT:
+                      return keySplit.getValue();
+                  }
+                  throw new IllegalStateException(
+                      String.format("Unknown split type %s", keySplit.getKey().getSplitType()));
+                })
             .flatMap(Collection::stream)
             .collect(toImmutableList()));
   }
 
-  private ImmutableList<ModuleSplit> processVariantModuleList(Collection<ModuleSplit> splits) {
+  private ModuleSplit processStandaloneVariant(ModuleSplit split) {
+    if (!split.getResourceTable().isPresent()) {
+      return split;
+    }
+
+    SplitsProtoXmlBuilder splitsProtoXmlBuilder = new SplitsProtoXmlBuilder();
+    ResourcesUtils.getAllLanguages(split.getResourceTable().get()).stream()
+        .filter(language -> !language.isEmpty())
+        .forEach(
+            language ->
+                splitsProtoXmlBuilder.addLanguageMapping(
+                    split.getModuleName(), language, /* splitId= */ ""));
+    return injectSplitsXml(split, splitsProtoXmlBuilder.build());
+  }
+
+  private ImmutableList<ModuleSplit> processSplitApkVariant(Collection<ModuleSplit> splits) {
     SplitsProtoXmlBuilder splitsProtoXmlBuilder = new SplitsProtoXmlBuilder();
     for (ModuleSplit split : splits) {
       String splitId = split.getAndroidManifest().getSplitId().orElse("");
@@ -132,9 +155,5 @@ public class SplitsXmlInjector {
         .filter(path -> !split.findEntry(path).isPresent())
         .findFirst()
         .get();
-  }
-
-  private static boolean isSplitApkVariant(VariantKey split) {
-    return split.getSplitType() == SplitType.SPLIT;
   }
 }

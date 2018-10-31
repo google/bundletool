@@ -179,6 +179,29 @@ public final class SplitsProtoXmlBuilderTest {
   }
 
   @Test
+  public void buildsMultipleModuleEntries_stableOrder() {
+    SplitsProtoXmlBuilder splitsProtoXmlBuilder = new SplitsProtoXmlBuilder();
+
+    splitsProtoXmlBuilder.addLanguageMapping(BundleModuleName.create("a"), "en", "a.en");
+    splitsProtoXmlBuilder.addLanguageMapping(BundleModuleName.create("a"), "fr", "a.fr");
+    splitsProtoXmlBuilder.addLanguageMapping(BundleModuleName.create("b"), "en", "a.en");
+    splitsProtoXmlBuilder.addLanguageMapping(BundleModuleName.create("b"), "fr", "a.fr");
+
+    SplitsProtoXmlBuilder splitsProtoXmlBuilderDifferentOrder = new SplitsProtoXmlBuilder();
+    splitsProtoXmlBuilderDifferentOrder.addLanguageMapping(
+        BundleModuleName.create("b"), "fr", "a.fr");
+    splitsProtoXmlBuilderDifferentOrder.addLanguageMapping(
+        BundleModuleName.create("b"), "en", "a.en");
+    splitsProtoXmlBuilderDifferentOrder.addLanguageMapping(
+        BundleModuleName.create("a"), "en", "a.en");
+    splitsProtoXmlBuilderDifferentOrder.addLanguageMapping(
+        BundleModuleName.create("a"), "fr", "a.fr");
+
+    assertThat(splitsProtoXmlBuilder.build())
+        .isEqualTo(splitsProtoXmlBuilderDifferentOrder.build());
+  }
+
+  @Test
   public void buildMultipleAssign_throws() {
     SplitsProtoXmlBuilder splitsProtoXmlBuilder = new SplitsProtoXmlBuilder();
     splitsProtoXmlBuilder.addLanguageMapping(

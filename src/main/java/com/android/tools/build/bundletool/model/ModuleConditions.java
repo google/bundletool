@@ -46,10 +46,11 @@ public abstract class ModuleConditions {
     ModuleTargeting.Builder moduleTargeting = ModuleTargeting.newBuilder();
 
     for (DeviceFeatureCondition condition : getDeviceFeatureConditions()) {
+      DeviceFeature.Builder feature =
+          DeviceFeature.newBuilder().setFeatureName(condition.getFeatureName());
+      condition.getFeatureVersion().ifPresent(feature::setFeatureVersion);
       moduleTargeting.addDeviceFeatureTargeting(
-          DeviceFeatureTargeting.newBuilder()
-              .setRequiredFeature(
-                  DeviceFeature.newBuilder().setFeatureName(condition.getFeatureName())));
+          DeviceFeatureTargeting.newBuilder().setRequiredFeature(feature));
     }
 
     if (getMinSdkVersion().isPresent()) {

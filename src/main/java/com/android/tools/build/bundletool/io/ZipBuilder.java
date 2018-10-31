@@ -193,12 +193,13 @@ public final class ZipBuilder {
    *
    * <p>Note that zip directory entries (including empty directories) are not copied.
    */
-  public ZipBuilder copyAllContentsFromZip(ZipPath toDirectory, ZipFile srcZipFile) {
+  public ZipBuilder copyAllContentsFromZip(
+      ZipPath toDirectory, ZipFile srcZipFile, EntryOption... entryOptions) {
     Enumeration<? extends ZipEntry> zipEntries = srcZipFile.entries();
     while (zipEntries.hasMoreElements()) {
       ZipEntry zipEntry = zipEntries.nextElement();
       if (!zipEntry.isDirectory()) {
-        addFileFromZip(toDirectory.resolve(zipEntry.getName()), srcZipFile, zipEntry);
+        addFileFromZip(toDirectory.resolve(zipEntry.getName()), srcZipFile, zipEntry, entryOptions);
       }
     }
 

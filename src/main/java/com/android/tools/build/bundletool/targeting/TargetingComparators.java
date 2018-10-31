@@ -16,13 +16,11 @@
 
 package com.android.tools.build.bundletool.targeting;
 
-import static com.android.bundle.Targeting.ScreenDensity.DensityOneofCase.DENSITY_ALIAS;
-import static com.android.tools.build.bundletool.utils.ResourcesUtils.DENSITY_ALIAS_TO_DPI_MAP;
+import static com.android.tools.build.bundletool.utils.TargetingProtoUtils.getScreenDensityDpi;
 import static com.google.common.collect.Comparators.emptiesFirst;
 import static java.util.Comparator.comparing;
 
 import com.android.bundle.Targeting.Abi.AbiAlias;
-import com.android.bundle.Targeting.ScreenDensity;
 import com.android.bundle.Targeting.VariantTargeting;
 import com.google.common.collect.MoreCollectors;
 import com.google.common.collect.Ordering;
@@ -99,21 +97,7 @@ public final class TargetingComparators {
   }
 
   private static Optional<Integer> getScreenDensity(VariantTargeting variantTargeting) {
-    if (variantTargeting.getScreenDensityTargeting().getValueList().isEmpty()) {
-      return Optional.empty();
-    }
-
-    ScreenDensity densityTargeting =
-        variantTargeting
-            .getScreenDensityTargeting()
-            .getValueList()
-            .stream()
-            // For now we only support one value in ScreenDensityTargeting.
-            .collect(MoreCollectors.onlyElement());
-    return Optional.of(
-        (densityTargeting.getDensityOneofCase() == DENSITY_ALIAS)
-            ? DENSITY_ALIAS_TO_DPI_MAP.get(densityTargeting.getDensityAlias())
-            : densityTargeting.getDensityDpi());
+    return getScreenDensityDpi(variantTargeting.getScreenDensityTargeting());
   }
 
   private TargetingComparators() {}

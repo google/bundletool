@@ -224,6 +224,14 @@ public final class ResourcesUtils {
         .collect(toOptional());
   }
 
+  /** Returns all languages present in given resource table. */
+  public static ImmutableSet<String> getAllLanguages(ResourceTable table) {
+    return configValues(table)
+        .map(configValue -> configValue.getConfig().getLocale())
+        .map(ResourcesUtils::convertLocaleToLanguage)
+        .collect(toImmutableSet());
+  }
+
   // Not meant to be instantiated.
   private ResourcesUtils() {}
 }

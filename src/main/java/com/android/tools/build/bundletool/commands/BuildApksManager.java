@@ -16,6 +16,7 @@
 package com.android.tools.build.bundletool.commands;
 
 import static com.android.tools.build.bundletool.utils.TargetingProtoUtils.sdkVersionFrom;
+import static com.android.tools.build.bundletool.utils.files.FilePreconditions.checkDirectoryExists;
 import static com.android.tools.build.bundletool.utils.files.FilePreconditions.checkFileDoesNotExist;
 import static com.android.tools.build.bundletool.utils.files.FilePreconditions.checkFileExistsAndExecutable;
 import static com.android.tools.build.bundletool.utils.files.FilePreconditions.checkFileExistsAndReadable;
@@ -234,7 +235,6 @@ final class BuildApksManager {
       }
     }
 
-
     return command.getOutputFile();
   }
 
@@ -257,6 +257,10 @@ final class BuildApksManager {
         new StandaloneApkSerializer(
             apkPathmanager, aapt2Command, signingConfiguration, compression);
 
+    if (!command.getCreateApkSetArchive()) {
+      return ApkSetBuilderFactory.createApkSetWithoutArchiveBuilder(
+          splitApkSerializer, standaloneApkSerializer, command.getOutputFile());
+    }
     return ApkSetBuilderFactory.createApkSetBuilder(
         splitApkSerializer, standaloneApkSerializer, tempDir);
   }
@@ -274,8 +278,12 @@ final class BuildApksManager {
 
   private void validateInput() {
     checkFileExistsAndReadable(command.getBundlePath());
-    if (!command.getOverwriteOutput()) {
-      checkFileDoesNotExist(command.getOutputFile());
+    if (command.getCreateApkSetArchive()) {
+      if (!command.getOverwriteOutput()) {
+        checkFileDoesNotExist(command.getOutputFile());
+      }
+    } else {
+      checkDirectoryExists(command.getOutputFile());
     }
 
     if (command.getGenerateOnlyForConnectedDevice()) {

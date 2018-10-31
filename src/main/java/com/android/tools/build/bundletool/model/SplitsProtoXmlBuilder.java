@@ -21,8 +21,7 @@ import com.android.tools.build.bundletool.exceptions.CommandExecutionException;
 import com.android.tools.build.bundletool.utils.xmlproto.XmlProtoAttributeBuilder;
 import com.android.tools.build.bundletool.utils.xmlproto.XmlProtoElementBuilder;
 import com.android.tools.build.bundletool.utils.xmlproto.XmlProtoNode;
-import com.google.common.collect.HashBasedTable;
-import com.google.common.collect.Table;
+import com.google.common.collect.TreeBasedTable;
 
 /**
  * Builder of the splits.xml file in proto format.
@@ -51,7 +50,8 @@ import com.google.common.collect.Table;
 public final class SplitsProtoXmlBuilder {
 
   // Stores mapping of <module, language, splitID>.
-  private final Table<String, String, String> splitsByModuleAndLanguage = HashBasedTable.create();
+  private final TreeBasedTable<String, String, String> splitsByModuleAndLanguage =
+      TreeBasedTable.create();
 
   public SplitsProtoXmlBuilder addLanguageMapping(
       BundleModuleName module, String language, String splitId) {

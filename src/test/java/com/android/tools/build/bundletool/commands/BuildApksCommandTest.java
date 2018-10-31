@@ -497,5 +497,4 @@ public class BuildApksCommandTest {
     assertThat(new String(output.toByteArray(), UTF_8))
         .doesNotContain("WARNING: The APKs won't be signed");
   }
-
 }

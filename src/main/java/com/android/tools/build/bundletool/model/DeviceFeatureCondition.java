@@ -17,6 +17,7 @@
 package com.android.tools.build.bundletool.model;
 
 import com.google.auto.value.AutoValue;
+import java.util.Optional;
 
 /** A {@link BundleModule} condition describing a certain device feature. */
 @AutoValue
@@ -24,7 +25,13 @@ public abstract class DeviceFeatureCondition {
 
   public abstract String getFeatureName();
 
+  public abstract Optional<Integer> getFeatureVersion();
+
   public static DeviceFeatureCondition create(String featureName) {
-    return new AutoValue_DeviceFeatureCondition(featureName);
+    return new AutoValue_DeviceFeatureCondition(featureName, Optional.empty());
+  }
+
+  public static DeviceFeatureCondition create(String featureName, Optional<Integer> version) {
+    return new AutoValue_DeviceFeatureCondition(featureName, version);
   }
 }

@@ -35,6 +35,7 @@ import com.google.auto.value.extension.memoized.Memoized;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Splitter;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.Range;
 import java.util.Optional;
 import java.util.stream.Stream;
 import javax.annotation.CheckReturnValue;
@@ -219,7 +220,17 @@ public abstract class AndroidManifest {
     return getManifestElement()
         .getOptionalChildElement(USES_SDK_ELEMENT_NAME)
         .flatMap(usesSdk -> usesSdk.getAndroidAttribute(attributeResId))
-        .map(attribute -> attribute.getValueAsDecimalInteger());
+        .map(
+            attribute -> {
+              // Hack for APKs that have a string for the SDK version.
+              String str = attribute.getValueAsString();
+              if (str.length() == 1 && Range.closed('A', 'Z').contains(str.charAt(0))) {
+                // The platform treats any codename as API level 10,000.
+                return 10_000;
+              }
+
+              return attribute.getValueAsDecimalInteger();
+            });
   }
 
   public Optional<Boolean> getHasCode() {
@@ -345,6 +356,20 @@ public abstract class AndroidManifest {
 
     // Legacy syntax.
     return getOnDemandAttribute().map(XmlProtoAttribute::getValueAsBoolean);
+  }
+
+  public boolean isModuleAlwaysInstalled() {
+    if (getManifestDeliveryElement().isPresent()) {
+      return !getManifestDeliveryElement().get().hasModuleConditions()
+          && getManifestDeliveryElement().get().hasInstallTimeElement();
+    }
+
+    // Legacy syntax.
+    return getOnDemandAttribute()
+        .map(XmlProtoAttribute::getValueAsBoolean)
+        .map(x -> !x)
+        // The only place where legacy onDemand can be absent is in base module.
+        .orElse(true);
   }
 
   public Optional<Boolean> isInstantModule() {

@@ -277,7 +277,7 @@ public class ModuleDependencyValidator extends SubValidator {
       BundleModule moduleDep = modulesByName.get(moduleDepName);
       int minSdk = module.getAndroidManifest().getEffectiveMinSdkVersion();
       int minSdkDep = moduleDep.getAndroidManifest().getEffectiveMinSdkVersion();
-      if (!module.isOnDemandModule() && minSdk != minSdkDep) {
+      if (module.getAndroidManifest().isModuleAlwaysInstalled() && minSdk != minSdkDep) {
         throw ValidationException.builder()
             .withMessage(
                 "Install-time module '%s' has a minSdkVersion(%d) different than the"

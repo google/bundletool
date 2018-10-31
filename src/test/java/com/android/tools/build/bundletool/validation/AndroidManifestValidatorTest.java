@@ -31,6 +31,7 @@ import static com.google.common.truth.Truth.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.android.tools.build.bundletool.exceptions.ValidationException;
+import com.android.tools.build.bundletool.exceptions.manifest.ManifestDuplicateAttributeException;
 import com.android.tools.build.bundletool.exceptions.manifest.ManifestSdkTargetingException.MaxSdkInvalidException;
 import com.android.tools.build.bundletool.exceptions.manifest.ManifestSdkTargetingException.MaxSdkLessThanMinInstantSdk;
 import com.android.tools.build.bundletool.exceptions.manifest.ManifestSdkTargetingException.MinSdkGreaterThanMaxSdkException;
@@ -541,7 +542,7 @@ public class AndroidManifestValidatorTest {
   }
 
   @Test
-  public void withMultipleSplitIds_throws() throws Exception {
+  public void withMultipleDistinctSplitIds_throws() throws Exception {
     BundleModule module =
         new BundleModuleBuilder(BASE_MODULE_NAME)
             .setManifest(
@@ -551,11 +552,28 @@ public class AndroidManifestValidatorTest {
                     withSecondSplitId("module-split-name2")))
             .build();
 
-    ValidationException e =
+    ManifestDuplicateAttributeException e =
         assertThrows(
-            ValidationException.class, () -> new AndroidManifestValidator().validateModule(module));
+            ManifestDuplicateAttributeException.class,
+            () -> new AndroidManifestValidator().validateModule(module));
 
     assertThat(e).hasMessageThat().contains("attribute 'split' cannot be declared more than once");
+  }
+
+
+  @Test
+  public void withMultipleEqualSplitIds() throws Exception {
+    BundleModule module =
+        new BundleModuleBuilder(BASE_MODULE_NAME)
+            .setManifest(
+                androidManifest(
+                    PKG_NAME,
+                    withSplitId("module-split-name"),
+                    withSecondSplitId("module-split-name")))
+            .build();
+
+    // We accept multiple identical split IDs, so this should not throw.
+    new AndroidManifestValidator().validateModule(module);
   }
 
   @Test
