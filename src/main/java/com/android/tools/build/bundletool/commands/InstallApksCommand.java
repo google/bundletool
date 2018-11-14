@@ -16,6 +16,7 @@
 
 package com.android.tools.build.bundletool.commands;
 
+import static com.android.tools.build.bundletool.utils.files.FilePreconditions.checkDirectoryExists;
 import static com.android.tools.build.bundletool.utils.files.FilePreconditions.checkFileExistsAndExecutable;
 import static com.android.tools.build.bundletool.utils.files.FilePreconditions.checkFileExistsAndReadable;
 
@@ -35,6 +36,7 @@ import com.android.tools.build.bundletool.utils.flags.ParsedFlags;
 import com.google.auto.value.AutoValue;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Optional;
@@ -126,8 +128,7 @@ public abstract class InstallApksCommand {
   }
 
   public void execute() {
-    checkFileExistsAndReadable(getApksArchivePath());
-    checkFileExistsAndExecutable(getAdbPath());
+    validateInput();
 
     AdbServer adbServer = getAdbServer();
     adbServer.init(getAdbPath());
@@ -139,8 +140,11 @@ public abstract class InstallApksCommand {
           ExtractApksCommand.Builder extractApksCommand =
               ExtractApksCommand.builder()
                   .setApksArchivePath(getApksArchivePath())
-                  .setDeviceSpec(deviceSpec)
-                  .setOutputDirectory(tempDir);
+                  .setDeviceSpec(deviceSpec);
+
+          if (!Files.isDirectory(getApksArchivePath())) {
+            extractApksCommand.setOutputDirectory(tempDir);
+          }
           getModules().ifPresent(extractApksCommand::setModules);
           ImmutableList<Path> extractedApks = extractApksCommand.build().execute();
 
@@ -151,6 +155,15 @@ public abstract class InstallApksCommand {
             installer.installApks(extractedApks);
           }
         });
+  }
+
+  private void validateInput() {
+    if (Files.isDirectory(getApksArchivePath())) {
+      checkDirectoryExists(getApksArchivePath());
+    } else {
+      checkFileExistsAndReadable(getApksArchivePath());
+    }
+    checkFileExistsAndExecutable(getAdbPath());
   }
 
   public static CommandHelp help() {

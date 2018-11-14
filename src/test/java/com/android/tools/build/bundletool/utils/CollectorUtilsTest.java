@@ -15,10 +15,12 @@
  */
 package com.android.tools.build.bundletool.utils;
 
+import static com.android.tools.build.bundletool.utils.CollectorUtils.combineMaps;
 import static com.google.common.truth.Truth.assertThat;
 import static com.google.common.util.concurrent.Futures.immediateFuture;
 
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Multimap;
 import java.util.stream.Stream;
 import org.junit.Test;
@@ -60,5 +62,15 @@ public final class CollectorUtilsTest {
                 immediateFuture("test"))
             .collect(CollectorUtils.waitForAll());
     assertThat(result).containsExactly("this", "is", "a", "test").inOrder();
+  }
+
+  @Test
+  public void testCombineMaps_withMinFunction() {
+    ImmutableMap<String, Integer> map1 = ImmutableMap.of("abc", 1, "bcd", 2, "cde", 3);
+    ImmutableMap<String, Integer> map2 = ImmutableMap.of("abc", 0, "bcd", 12, "efg", 4);
+
+    ImmutableMap<String, Integer> combinedMap = combineMaps(map1, map2, Math::min);
+    assertThat(combinedMap).hasSize(4);
+    assertThat(combinedMap).containsExactly("abc", 0, "bcd", 2, "cde", 3, "efg", 4);
   }
 }

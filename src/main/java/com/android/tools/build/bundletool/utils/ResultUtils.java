@@ -24,9 +24,11 @@ import com.android.bundle.Commands.BuildApksResult;
 import com.android.bundle.Commands.Variant;
 import com.android.tools.build.bundletool.utils.files.BufferedIo;
 import com.google.common.collect.ImmutableList;
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
@@ -34,16 +36,33 @@ import java.util.zip.ZipFile;
 /** Utility class for result objects returned by bundletool commands. */
 public final class ResultUtils {
 
-  public static BuildApksResult readTableOfContents(Path apksArchivePath) {
+  public static BuildApksResult readTableOfContents(Path apksPath) {
+    try {
+      if (Files.isDirectory(apksPath)) {
+        return readTableOfContentFromApksDirectory(apksPath);
+      } else {
+        return readTableOfContentFromApksArchive(apksPath);
+      }
+    } catch (IOException e) {
+      throw new UncheckedIOException(
+          String.format("Error while reading the table of contents file from '%s'.", apksPath), e);
+    }
+  }
+
+  private static BuildApksResult readTableOfContentFromApksArchive(Path apksArchivePath)
+      throws IOException {
     try (ZipFile apksArchive = new ZipFile(apksArchivePath.toFile());
         InputStream tocStream =
             BufferedIo.inputStream(apksArchive, new ZipEntry(TABLE_OF_CONTENTS_FILE))) {
       return BuildApksResult.parseFrom(tocStream);
-    } catch (IOException e) {
-      throw new UncheckedIOException(
-          String.format(
-              "Error while reading the table of contents file from '%s'.", apksArchivePath),
-          e);
+    }
+  }
+
+  private static BuildApksResult readTableOfContentFromApksDirectory(Path apksDirectoryPath)
+      throws IOException {
+    try (FileInputStream fileInputStream =
+        new FileInputStream(apksDirectoryPath.resolve(TABLE_OF_CONTENTS_FILE).toFile())) {
+      return BuildApksResult.parseFrom(fileInputStream);
     }
   }
 
@@ -69,6 +88,12 @@ public final class ResultUtils {
 
   public static ImmutableList<Variant> standaloneApkVariants(ImmutableList<Variant> variants) {
     return variants.stream().filter(ResultUtils::isStandaloneApkVariant).collect(toImmutableList());
+  }
+
+  public static ImmutableList<Variant> nonStandaloneApkVariants(ImmutableList<Variant> variants) {
+    return variants.stream()
+        .filter(variant -> !isStandaloneApkVariant(variant))
+        .collect(toImmutableList());
   }
 
   public static boolean isSplitApkVariant(Variant variant) {

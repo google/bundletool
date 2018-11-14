@@ -75,6 +75,10 @@ abstract class XmlProtoElementOrBuilder<
     return getChildrenText().collect(toOptional());
   }
 
+  public final Stream<XmlProtoNamespace> getNamespaceDeclarations() {
+    return getProto().getNamespaceDeclarationList().stream().map(XmlProtoNamespace::new);
+  }
+
   public final Optional<AttributeWrapperT> getAttribute(String name) {
     return getAttribute(NO_NAMESPACE_URI, name);
   }

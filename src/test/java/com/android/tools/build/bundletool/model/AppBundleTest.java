@@ -17,6 +17,10 @@
 package com.android.tools.build.bundletool.model;
 
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifest;
+import static com.android.tools.build.bundletool.testing.TargetingUtils.abi;
+import static com.android.tools.build.bundletool.testing.TargetingUtils.nativeDirectoryTargeting;
+import static com.android.tools.build.bundletool.testing.TargetingUtils.nativeLibraries;
+import static com.android.tools.build.bundletool.testing.TargetingUtils.targetedNativeDirectory;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.truth.Truth.assertThat;
 import static com.google.common.truth.Truth8.assertThat;
@@ -25,6 +29,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.android.aapt.Resources.XmlNode;
 import com.android.bundle.Config.BundleConfig;
+import com.android.bundle.Targeting.Abi.AbiAlias;
 import com.android.tools.build.bundletool.io.ZipBuilder;
 import com.android.tools.build.bundletool.testing.AppBundleBuilder;
 import com.android.tools.build.bundletool.testing.BundleConfigBuilder;
@@ -249,6 +254,88 @@ public class AppBundleTest {
     assertThrows(
         IllegalStateException.class,
         () -> AppBundle.buildFromZip(new ZipFile(bundleFile.toFile())));
+  }
+
+  @Test
+  public void targetedAbis_noNativeCode() throws Exception {
+    AppBundle appBundle =
+        new AppBundleBuilder()
+            .addModule(
+                "base",
+                baseModule ->
+                    baseModule.setManifest(MANIFEST).addFile("dex/classes.dex", DUMMY_CONTENT))
+            .addModule(
+                "detail",
+                module -> module.setManifest(MANIFEST).addFile("dex/classes.dex", DUMMY_CONTENT))
+            .build();
+
+    assertThat(appBundle.getTargetedAbis()).isEmpty();
+  }
+
+  @Test
+  public void targetedAbis_abiInAllModules() throws Exception {
+    AppBundle appBundle =
+        new AppBundleBuilder()
+            .addModule(
+                "base",
+                baseModule ->
+                    baseModule
+                        .setManifest(MANIFEST)
+                        .addFile("dex/classes.dex", DUMMY_CONTENT)
+                        .addFile("lib/x86_64/libfoo.so", DUMMY_CONTENT)
+                        .addFile("lib/armeabi/libfoo.so", DUMMY_CONTENT)
+                        .setNativeConfig(
+                            nativeLibraries(
+                                targetedNativeDirectory(
+                                    "lib/x86_64", nativeDirectoryTargeting(AbiAlias.X86_64)),
+                                targetedNativeDirectory(
+                                    "lib/armeabi", nativeDirectoryTargeting(AbiAlias.ARMEABI)))))
+            .addModule(
+                "detail",
+                module ->
+                    module
+                        .setManifest(MANIFEST)
+                        .addFile("dex/classes.dex", DUMMY_CONTENT)
+                        .addFile("lib/x86_64/libbar.so", DUMMY_CONTENT)
+                        .addFile("lib/armeabi/libbar.so", DUMMY_CONTENT)
+                        .setNativeConfig(
+                            nativeLibraries(
+                                targetedNativeDirectory(
+                                    "lib/x86_64", nativeDirectoryTargeting(AbiAlias.X86_64)),
+                                targetedNativeDirectory(
+                                    "lib/armeabi", nativeDirectoryTargeting(AbiAlias.ARMEABI)))))
+            .build();
+
+    assertThat(appBundle.getTargetedAbis())
+        .containsExactly(abi(AbiAlias.ARMEABI), abi(AbiAlias.X86_64));
+  }
+
+  @Test
+  public void targetedAbis_abiInSomeModules() throws Exception {
+    AppBundle appBundle =
+        new AppBundleBuilder()
+            .addModule(
+                "base",
+                baseModule ->
+                    baseModule.setManifest(MANIFEST).addFile("dex/classes.dex", DUMMY_CONTENT))
+            .addModule(
+                "detail",
+                module ->
+                    module
+                        .setManifest(MANIFEST)
+                        .addFile("dex/classes.dex", DUMMY_CONTENT)
+                        .addFile("lib/arm64-v8a/libbar.so", DUMMY_CONTENT)
+                        .addFile("lib/x86/libbar.so", DUMMY_CONTENT)
+                        .setNativeConfig(
+                            nativeLibraries(
+                                targetedNativeDirectory(
+                                    "lib/arm64-v8a", nativeDirectoryTargeting(AbiAlias.ARM64_V8A)),
+                                targetedNativeDirectory(
+                                    "lib/x86", nativeDirectoryTargeting(AbiAlias.X86)))))
+            .build();
+
+    assertThat(appBundle.getTargetedAbis())
+        .containsExactly(abi(AbiAlias.X86), abi(AbiAlias.ARM64_V8A));
   }
 
   private static ZipBuilder createBasicZipBuilder(BundleConfig config) {

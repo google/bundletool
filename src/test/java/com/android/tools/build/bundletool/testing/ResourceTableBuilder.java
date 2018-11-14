@@ -34,6 +34,7 @@ import com.android.aapt.Resources.TypeId;
 import com.android.aapt.Resources.Value;
 import com.google.common.io.Files;
 import java.util.Arrays;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
 import java.util.function.Function;
@@ -67,7 +68,8 @@ public final class ResourceTableBuilder {
             .setPackageName(packageName)
             .setPackageId(PackageId.newBuilder().setId(packageId));
 
-    highestTypeId = 0;
+    // Type IDs start at 1.
+    highestTypeId = 1;
 
     return this;
   }
@@ -147,7 +149,11 @@ public final class ResourceTableBuilder {
                         entry.getKey() == 0
                             ? Configuration.getDefaultInstance()
                             : Configuration.newBuilder().setDensity(entry.getKey()).build(),
-                    entry -> entry.getValue())));
+                    entry -> entry.getValue(),
+                    (u, v) -> {
+                      throw new IllegalStateException("Duplicate key: " + u);
+                    },
+                    LinkedHashMap::new)));
   }
 
   private <K, V> ResourceTableBuilder addResourceForMultipleConfigs(

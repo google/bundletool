@@ -30,6 +30,14 @@ public final class XmlProtoNodeBuilder
     this.node = checkNotNull(node);
   }
 
+  public static XmlProtoNodeBuilder createElementNode(XmlProtoElementBuilder element) {
+    return new XmlProtoNodeBuilder(XmlNode.newBuilder().setElement(element.getProto()));
+  }
+
+  public static XmlProtoNodeBuilder createTextNode(String text) {
+    return new XmlProtoNodeBuilder(XmlNode.newBuilder().setText(text));
+  }
+
   @Override
   public XmlNode.Builder getProto() {
     return node;

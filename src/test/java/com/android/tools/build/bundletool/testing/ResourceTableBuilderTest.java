@@ -149,13 +149,13 @@ public final class ResourceTableBuilderTest {
     List<Type> types = resourceTable.getPackage(0).getTypeList();
 
     assertThat(types.stream().map(type -> type.getTypeId().getId()).collect(toList()))
-        .containsExactly(0, 1);
+        .containsExactly(1, 2);
     assertThat(types.stream().map(type -> type.getName()).collect(toList()))
         .containsExactly("string", "drawable");
   }
 
   @Test
-  public void typeIdsStartAtZeroForAllPackages() {
+  public void typeIdsStartAtOneForAllPackages() {
     ResourceTable resourceTable =
         new ResourceTableBuilder()
             .addPackage("com.test.app")
@@ -164,8 +164,8 @@ public final class ResourceTableBuilderTest {
             .addDrawableResource("icon", "res/drawable/icon.png")
             .build();
 
-    assertThat(resourceTable.getPackage(0).getType(0).getTypeId().getId()).isEqualTo(0);
-    assertThat(resourceTable.getPackage(1).getType(0).getTypeId().getId()).isEqualTo(0);
+    assertThat(resourceTable.getPackage(0).getType(0).getTypeId().getId()).isEqualTo(1);
+    assertThat(resourceTable.getPackage(1).getType(0).getTypeId().getId()).isEqualTo(1);
   }
 
   @Test

@@ -376,6 +376,10 @@ public final class TargetingUtils {
         .build();
   }
 
+  public static Abi abi(AbiAlias abiAlias) {
+    return Abi.newBuilder().setAlias(abiAlias).build();
+  }
+
   // Graphics API Targeting
 
   public static GraphicsApi openGlVersionFrom(int fromMajor) {

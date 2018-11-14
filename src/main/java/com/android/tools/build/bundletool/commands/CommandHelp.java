@@ -36,7 +36,7 @@ import javax.annotation.CheckReturnValue;
 @AutoValue
 public abstract class CommandHelp {
 
-  private static final String LINE_SEPARATOR = System.getProperty("line.separator");
+  private static final String LINE_SEPARATOR = System.lineSeparator();
   private static final int MAX_WIDTH = 80;
   private static final int INDENT_SIZE = 4;
 
@@ -256,6 +256,18 @@ public abstract class CommandHelp {
   @VisibleForTesting
   @CheckReturnValue
   static String wrap(String text, int maxWidth, int firstLineIndent, int otherLinesIndent) {
+    int newLineIdx = text.indexOf(LINE_SEPARATOR);
+    if (newLineIdx != -1) {
+      // If a line break is found in the sentence, then we wrap the text recursively for each part.
+      return wrap(text.substring(0, newLineIdx), maxWidth, firstLineIndent, otherLinesIndent)
+          + LINE_SEPARATOR
+          + wrap(
+              text.substring(newLineIdx + LINE_SEPARATOR.length()),
+              maxWidth,
+              firstLineIndent,
+              otherLinesIndent);
+    }
+
     BreakIterator boundary = BreakIterator.getLineInstance(Locale.ENGLISH);
     boundary.setText(text);
 

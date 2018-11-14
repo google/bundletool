@@ -16,9 +16,13 @@
 
 package com.android.tools.build.bundletool.model;
 
+import static com.android.utils.ImmutableCollectors.toImmutableSet;
 import static com.google.common.base.Preconditions.checkState;
 
 import com.android.bundle.Config.BundleConfig;
+import com.android.bundle.Files.TargetedNativeDirectory;
+import com.android.bundle.Targeting.Abi;
+import com.android.bundle.Targeting.NativeDirectoryTargeting;
 import com.android.tools.build.bundletool.exceptions.CommandExecutionException;
 import com.android.tools.build.bundletool.exceptions.ValidationException;
 import com.android.tools.build.bundletool.utils.ZipUtils;
@@ -27,6 +31,7 @@ import com.android.tools.build.bundletool.version.BundleToolVersion;
 import com.android.tools.build.bundletool.version.Version;
 import com.google.common.collect.ImmutableCollection;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Maps;
 import com.google.protobuf.InvalidProtocolBufferException;
 import java.io.IOException;
@@ -34,6 +39,7 @@ import java.io.InputStream;
 import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.stream.Stream;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 import javax.annotation.CheckReturnValue;
@@ -104,6 +110,31 @@ public class AppBundle {
 
   public BundleMetadata getBundleMetadata() {
     return bundleMetadata;
+  }
+
+  /**
+   * Returns a set of ABIs that this App Bundle targets.
+   *
+   * <p>Note that the each module of the App Bundle must target the same set of ABIs or have no
+   * native code.
+   *
+   * <p>Returns empty set if the App Bundle has no native code at all.
+   */
+  public ImmutableSet<Abi> getTargetedAbis() {
+    return modules.values().stream()
+        .map(BundleModule::getNativeConfig)
+        .flatMap(
+            nativeConfig -> {
+              if (nativeConfig.isPresent()) {
+                return nativeConfig.get().getDirectoryList().stream()
+                    .map(TargetedNativeDirectory::getTargeting)
+                    .map(NativeDirectoryTargeting::getAbi);
+              } else {
+                return Stream.empty();
+              }
+            })
+        .distinct()
+        .collect(toImmutableSet());
   }
 
   private static Map<BundleModuleName, BundleModule> extractModules(

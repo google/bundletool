@@ -42,6 +42,7 @@ import static com.android.tools.build.bundletool.model.AndroidManifest.SPLIT_NAM
 import static com.android.tools.build.bundletool.model.AndroidManifest.TARGET_SANDBOX_VERSION_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.USES_SDK_ELEMENT_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.VALUE_RESOURCE_ID;
+import static com.android.tools.build.bundletool.model.AndroidManifest.VERSION_CODE_RESOURCE_ID;
 
 import com.android.aapt.Resources;
 import com.android.aapt.Resources.Item;
@@ -76,21 +77,32 @@ public final class ManifestProtoUtils {
   }
 
   public static XmlElement xmlElement(String name, XmlAttribute attribute, XmlNode... children) {
-    return xmlElement(NO_NAMESPACE_URI, name, ImmutableList.of(attribute), children);
+    return xmlElement(
+        NO_NAMESPACE_URI,
+        name,
+        /* namespaces= */ ImmutableList.of(),
+        ImmutableList.of(attribute),
+        children);
+  }
+
+  public static XmlElement xmlElement(
+      String name,
+      ImmutableList<XmlNamespace> namespaces,
+      ImmutableList<XmlAttribute> attributes,
+      XmlNode... children) {
+    return xmlElement(NO_NAMESPACE_URI, name, namespaces, attributes, children);
   }
 
   public static XmlElement xmlElement(
       String name, ImmutableList<XmlAttribute> attributes, XmlNode... children) {
-    return xmlElement(NO_NAMESPACE_URI, name, attributes, children);
-  }
-
-  public static XmlNamespace xmlNamespace(String prefix, String uri) {
-    return XmlNamespace.newBuilder().setPrefix(prefix).setUri(uri).build();
+    return xmlElement(
+        NO_NAMESPACE_URI, name, /* namespaces= */ ImmutableList.of(), attributes, children);
   }
 
   public static XmlElement xmlElement(
       String namespaceUri,
       String name,
+      ImmutableList<XmlNamespace> namespaces,
       ImmutableList<XmlAttribute> attributes,
       XmlNode... children) {
     return XmlElement.newBuilder()
@@ -98,19 +110,15 @@ public final class ManifestProtoUtils {
         .setName(name)
         .addAllAttribute(attributes)
         .addAllChild(Arrays.asList(children))
+        .addAllNamespaceDeclaration(namespaces)
         .build();
   }
 
   public static XmlElement xmlElement(
-      String namespaceUri,
-      String name,
-      XmlAttribute attribute,
-      XmlNamespace namespaceDeclaration,
-      XmlNode... children) {
+      String namespaceUri, String name, XmlAttribute attribute, XmlNode... children) {
     return XmlElement.newBuilder()
         .setNamespaceUri(namespaceUri)
         .setName(name)
-        .addNamespaceDeclaration(namespaceDeclaration)
         .addAttribute(attribute)
         .addAllChild(Arrays.asList(children))
         .build();
@@ -122,6 +130,10 @@ public final class ManifestProtoUtils {
         .setName(name)
         .addAllChild(Arrays.asList(children))
         .build();
+  }
+
+  public static XmlNamespace xmlNamespace(String prefix, String uri) {
+    return XmlNamespace.newBuilder().setPrefix(prefix).setUri(uri).build();
   }
 
   public static XmlAttribute xmlAttribute(String name) {
@@ -225,6 +237,7 @@ public final class ManifestProtoUtils {
         xmlNode(
             xmlElement(
                 "manifest",
+                ImmutableList.of(xmlNamespace("android", ANDROID_NAMESPACE_URI)),
                 ImmutableList.of(
                     xmlAttribute("package", packageName),
                     xmlDecimalIntegerAttribute(
@@ -234,8 +247,6 @@ public final class ManifestProtoUtils {
                         NO_NAMESPACE_URI,
                         APPLICATION_ELEMENT_NAME,
                         xmlAttribute(ANDROID_NAMESPACE_URI, "label", 0x01010001, "minimal"),
-                        xmlNamespace(
-                            ANDROID_NAMESPACE_URI, "http://schemas.android.com/apk/res/android"),
                         xmlNode(
                             xmlElement(
                                 "activity",
@@ -438,6 +449,13 @@ public final class ManifestProtoUtils {
 
   public static ManifestMutator withoutVersionCode() {
     return manifestElement -> manifestElement.removeAttribute(ANDROID_NAMESPACE_URI, "versionCode");
+  }
+
+  public static ManifestMutator withVersionCode(int versionCode) {
+    return manifestElement ->
+        manifestElement
+            .getOrCreateAndroidAttribute("versionCode", VERSION_CODE_RESOURCE_ID)
+            .setValueAsDecimalInteger(versionCode);
   }
 
   public static ManifestMutator withUsesSplit(String... splitIds) {

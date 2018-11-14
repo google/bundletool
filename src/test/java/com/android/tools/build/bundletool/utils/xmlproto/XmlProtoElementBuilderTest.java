@@ -18,6 +18,7 @@ package com.android.tools.build.bundletool.utils.xmlproto;
 import static com.android.tools.build.bundletool.model.AndroidManifest.ANDROID_NAMESPACE_URI;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.truth.Truth.assertThat;
+import static com.google.common.truth.Truth8.assertThat;
 import static com.google.common.truth.extensions.proto.ProtoTruth.assertThat;
 
 import com.android.aapt.Resources.XmlAttribute;
@@ -512,5 +513,19 @@ public class XmlProtoElementBuilderTest {
     protoElement.setName("world");
 
     assertThat(wrapperElement.getName()).isEqualTo("world");
+  }
+
+  @Test
+  public void getNamespaceDeclarations() {
+    XmlElement protoElement = XmlElement.getDefaultInstance();
+
+    XmlProtoElementBuilder element = new XmlProtoElementBuilder(protoElement.toBuilder());
+    element.addNamespaceDeclaration("ns", "http://namespace");
+    element.addNamespaceDeclaration("ns2", "http://namespace2");
+
+    assertThat(element.getNamespaceDeclarations())
+        .containsExactly(
+            XmlProtoNamespace.create("ns", "http://namespace"),
+            XmlProtoNamespace.create("ns2", "http://namespace2"));
   }
 }

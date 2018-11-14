@@ -91,6 +91,16 @@ public class XmlProtoAttributeBuilderTest {
   }
 
   @Test
+  public void setValueAsRefIdWithName() {
+    XmlProtoAttributeBuilder attribute = createAttribute().setValueAsRefId(0x123, "string/title");
+    assertThat(attribute.getValueAsRefId()).isEqualTo(0x123);
+    assertThat(attribute.getProto().getCompiledItem().getRef().getName()).isEqualTo("string/title");
+
+    attribute.setValueAsRefId(0x456);
+    assertThat(attribute.getProto().getCompiledItem().getRef().getName()).isEmpty();
+  }
+
+  @Test
   public void setValueAsRefId_overridesPreviousType() {
     XmlProtoAttributeBuilder attribute = createAttribute().setValueAsString("hello");
     attribute.setValueAsRefId(0x123);
@@ -181,6 +191,22 @@ public class XmlProtoAttributeBuilderTest {
     protoAttribute.setName("world");
 
     assertThat(wrapperAttribute.getName()).isEqualTo("world");
+  }
+
+  @Test
+  public void debugString_refIdWithName() {
+    XmlProtoAttribute attribute =
+        XmlProtoAttributeBuilder.create("title")
+            .setValueAsRefId(0x7f030000, "string/title")
+            .build();
+    assertThat(attribute.getDebugString()).isEqualTo("@string/title");
+  }
+
+  @Test
+  public void debugString_refIdWithoutName() {
+    XmlProtoAttribute attribute =
+        XmlProtoAttributeBuilder.create("title").setValueAsRefId(0x7f030000).build();
+    assertThat(attribute.getDebugString()).isEqualTo("0x7f030000");
   }
 
   private static XmlProtoAttributeBuilder createAttribute() {

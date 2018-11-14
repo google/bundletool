@@ -57,6 +57,7 @@ import java.nio.file.FileSystems;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.PathMatcher;
+import java.nio.file.Paths;
 import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
 import java.security.SignatureException;
@@ -118,14 +119,11 @@ final class ApkSerializerHelper {
     this.signingConfig = signingConfig;
 
     // Using the default filesystem will work on Windows because the "/" of the glob are swapped
-    // with "\" when the PathMatcher is constructed and the Path on Windows use this file separator.
-    // Note however that the "/" are not swapped for regexps, so we couldn't use PathMatcher if we
-    // wanted to add support for regexp.
+    // with "\" when the PathMatcher is constructed and we then use a FileSystem's Path when
+    // comparing which will thus also use the "\" separator.
     FileSystem fileSystem = FileSystems.getDefault();
     this.uncompressedPathMatchers =
-        compression
-            .getUncompressedGlobList()
-            .stream()
+        compression.getUncompressedGlobList().stream()
             .map(glob -> "glob:" + glob)
             .map(fileSystem::getPathMatcher)
             .collect(toImmutableList());
@@ -247,7 +245,9 @@ final class ApkSerializerHelper {
   private boolean shouldCompress(
       ZipPath path, boolean uncompressNativeLibs, boolean entryShouldCompress) {
     // Developer knows best: when they provide the uncompressed glob, we respect it.
-    if (uncompressedPathMatchers.stream().anyMatch(pathMatcher -> pathMatcher.matches(path))) {
+    // We convert the ZipPath to a FileSystem's path for the PathMatcher to work.
+    if (uncompressedPathMatchers.stream()
+        .anyMatch(pathMatcher -> pathMatcher.matches(Paths.get(path.toString())))) {
       return false;
     }
 

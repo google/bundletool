@@ -17,6 +17,7 @@
 package com.android.tools.build.bundletool.validation;
 
 import static com.android.tools.build.bundletool.model.AndroidManifest.NO_NAMESPACE_URI;
+import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.ImmutableSet.toImmutableSet;
 
 import com.android.tools.build.bundletool.exceptions.ValidationException;
@@ -31,6 +32,7 @@ import com.android.tools.build.bundletool.model.AndroidManifest;
 import com.android.tools.build.bundletool.model.BundleModule;
 import com.android.tools.build.bundletool.model.ManifestDeliveryElement;
 import com.android.tools.build.bundletool.utils.xmlproto.XmlProtoAttribute;
+import com.google.common.base.Joiner;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import java.util.Optional;
@@ -38,9 +40,30 @@ import java.util.Optional;
 /** Validates {@code AndroidManifest.xml} file of each module. */
 public class AndroidManifestValidator extends SubValidator {
 
+  private static final Joiner COMMA_JOINER = Joiner.on(',');
+
   @Override
   public void validateAllModules(ImmutableList<BundleModule> modules) {
+    validateSameVersionCode(modules);
     validateInstant(modules);
+  }
+
+  public void validateSameVersionCode(ImmutableList<BundleModule> modules) {
+    ImmutableList<Integer> versionCodes =
+        modules.stream()
+            .map(BundleModule::getAndroidManifest)
+            .map(AndroidManifest::getVersionCode)
+            .distinct()
+            .sorted()
+            .collect(toImmutableList());
+
+    if (versionCodes.size() > 1) {
+      throw ValidationException.builder()
+          .withMessage(
+              "App Bundle modules should have the same version code but found [%s].",
+              COMMA_JOINER.join(versionCodes))
+          .build();
+    }
   }
 
   @Override

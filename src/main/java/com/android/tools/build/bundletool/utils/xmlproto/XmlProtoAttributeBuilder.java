@@ -76,6 +76,13 @@ public final class XmlProtoAttributeBuilder
     return this;
   }
 
+  public XmlProtoAttributeBuilder setValueAsRefId(int refId, String name) {
+    attribute.clearValue();
+    attribute.setCompiledItem(
+        Item.newBuilder().setRef(Reference.newBuilder().setId(refId).setName(name)));
+    return this;
+  }
+
   public XmlProtoAttributeBuilder setValueAsDecimalInteger(int value) {
     attribute.setValue(String.valueOf(value));
     attribute.setCompiledItem(

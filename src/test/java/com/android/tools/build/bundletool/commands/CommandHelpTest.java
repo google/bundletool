@@ -308,6 +308,30 @@ public class CommandHelpTest {
                 "This sentence has exactly 40 characters."));
   }
 
+  @Test
+  public void wrap_withLineBreaks() {
+    assertThat(
+            asLines(
+                CommandHelp.wrap(
+                    String.format("This line is longer%nthan%n40 characters but has line breaks."),
+                    /* maxWidth= */ 40,
+                    /* firstLineIndent= */ 0,
+                    /* otherLinesIndent= */ 0)))
+        .isEqualTo(lineList("This line is longer", "than", "40 characters but has line breaks."));
+  }
+
+  @Test
+  public void wrap_withLineBreakAtEndOfText() {
+    assertThat(
+            asLines(
+                CommandHelp.wrap(
+                    String.format("This line ends with a line break.%n"),
+                    /* maxWidth= */ 40,
+                    /* firstLineIndent= */ 0,
+                    /* otherLinesIndent= */ 0)))
+        .isEqualTo(lineList("This line ends with a line break.", ""));
+  }
+
   /**
    * Split a string into lines in a platform-agnostic way.
    *

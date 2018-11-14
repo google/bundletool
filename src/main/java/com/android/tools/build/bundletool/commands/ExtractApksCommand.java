@@ -18,7 +18,9 @@ package com.android.tools.build.bundletool.commands;
 
 import static com.android.tools.build.bundletool.utils.files.FilePreconditions.checkDirectoryExists;
 import static com.android.tools.build.bundletool.utils.files.FilePreconditions.checkFileExistsAndReadable;
+import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
+import static com.google.common.collect.ImmutableList.toImmutableList;
 
 import com.android.bundle.Devices.DeviceSpec;
 import com.android.tools.build.bundletool.commands.CommandHelp.CommandDescription;
@@ -109,7 +111,8 @@ public abstract class ExtractApksCommand {
 
     ExtractApksCommand.Builder command = builder();
 
-    checkFileExistsAndReadable(apksArchivePath);
+    checkArgument(
+        !Files.isDirectory(apksArchivePath), "File '%s' is a directory.", apksArchivePath);
     command.setApksArchivePath(apksArchivePath);
 
     checkFileExistsAndReadable(deviceSpecPath);
@@ -131,19 +134,40 @@ public abstract class ExtractApksCommand {
 
   @VisibleForTesting
   ImmutableList<Path> execute(PrintStream output) {
-    if (getModules().isPresent() && getModules().get().isEmpty()) {
-      throw new ValidationException("The set of modules cannot be empty.");
-    }
+    validateInput();
 
     ApkMatcher apkMatcher =
         new ApkMatcher(getDeviceSpec(), /* requestedModuleNames= */ getModules(), getInstant());
     ImmutableList<ZipPath> matchedApks =
         apkMatcher.getMatchingApks(ResultUtils.readTableOfContents(getApksArchivePath()));
 
-    return extractMatchedApks(matchedApks);
+
+    if (Files.isDirectory(getApksArchivePath())) {
+      return matchedApks.stream()
+          .map(matchedApk -> getApksArchivePath().resolve(matchedApk.toString()))
+          .collect(toImmutableList());
+    } else {
+      return extractMatchedApksFromApksArchive(matchedApks);
+    }
   }
 
-  private ImmutableList<Path> extractMatchedApks(ImmutableList<ZipPath> matchedApkPaths) {
+  private void validateInput() {
+    if (getModules().isPresent() && getModules().get().isEmpty()) {
+      throw new ValidationException("The set of modules cannot be empty.");
+    }
+
+    if (Files.isDirectory(getApksArchivePath())) {
+      checkArgument(
+          !getOutputDirectory().isPresent(),
+          "Output directory should not be set when APKs are inside directory.");
+      checkDirectoryExists(getApksArchivePath());
+    } else {
+      checkFileExistsAndReadable(getApksArchivePath());
+    }
+  }
+
+  private ImmutableList<Path> extractMatchedApksFromApksArchive(
+      ImmutableList<ZipPath> matchedApkPaths) {
     Path outputDirectoryPath =
         getOutputDirectory().orElseGet(ExtractApksCommand::createTempDirectory);
     checkDirectoryExists(outputDirectoryPath);

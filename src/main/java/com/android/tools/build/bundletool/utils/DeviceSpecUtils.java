@@ -30,6 +30,22 @@ import com.google.common.collect.Iterables;
 /** Utils for {@link DeviceSpec}. */
 public final class DeviceSpecUtils {
 
+  public static boolean isAbiMissing(DeviceSpec deviceSpec) {
+    return deviceSpec.getSupportedAbisList().isEmpty();
+  }
+
+  public static boolean isScreenDensityMissing(DeviceSpec deviceSpec) {
+    return deviceSpec.getScreenDensity() == 0;
+  }
+
+  public static boolean isSdkVersionMissing(DeviceSpec deviceSpec) {
+    return deviceSpec.getSdkVersion() == 0;
+  }
+
+  public static boolean isLocalesMissing(DeviceSpec deviceSpec) {
+    return deviceSpec.getSupportedLocalesList().isEmpty();
+  }
+
   /** Utils for building {@link DeviceSpec} from targetings. */
   public static class DeviceSpecFromTargetingBuilder {
     private final DeviceSpec.Builder deviceSpec;

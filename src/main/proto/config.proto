@@ -29,9 +29,15 @@ message Optimizations {
   // This is for uncompressing native libraries on M+ devices (L+ devices on
   // instant apps).
   UncompressNativeLibraries uncompress_native_libraries = 2;
+  // This is for uncompressing dex files on P+ devices.
+  UncompressDexFiles uncompress_dex_files = 3;
 }
 
 message UncompressNativeLibraries {
+  bool enabled = 1;
+}
+
+message UncompressDexFiles {
   bool enabled = 1;
 }
 

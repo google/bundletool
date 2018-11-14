@@ -16,25 +16,20 @@
 
 package com.android.tools.build.bundletool.model;
 
-import static com.android.bundle.Targeting.Abi.AbiAlias.ARM64_V8A;
 import static com.android.bundle.Targeting.Abi.AbiAlias.ARMEABI_V7A;
 import static com.android.bundle.Targeting.Abi.AbiAlias.X86;
 import static com.android.bundle.Targeting.Abi.AbiAlias.X86_64;
 import static com.android.bundle.Targeting.ScreenDensity.DensityAlias.HDPI;
 import static com.android.bundle.Targeting.ScreenDensity.DensityAlias.LDPI;
-import static com.android.bundle.Targeting.ScreenDensity.DensityAlias.MDPI;
-import static com.android.bundle.Targeting.ScreenDensity.DensityAlias.XXHDPI;
-import static com.android.tools.build.bundletool.model.GetSizeConfiguration.getAbiName;
-import static com.android.tools.build.bundletool.model.GetSizeConfiguration.getLocaleName;
-import static com.android.tools.build.bundletool.model.GetSizeConfiguration.getScreenDensityName;
-import static com.android.tools.build.bundletool.model.GetSizeConfiguration.getSdkName;
-import static com.android.tools.build.bundletool.model.GetSizeConfiguration.getSizeConfiguration;
+import static com.android.tools.build.bundletool.model.SizeConfiguration.getAbiName;
+import static com.android.tools.build.bundletool.model.SizeConfiguration.getLocaleName;
+import static com.android.tools.build.bundletool.model.SizeConfiguration.getScreenDensityName;
+import static com.android.tools.build.bundletool.model.SizeConfiguration.getSdkName;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.abiTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.languageTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.screenDensityTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.sdkVersionFrom;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.sdkVersionTargeting;
-import static com.google.common.truth.Truth.assertThat;
 import static com.google.common.truth.Truth8.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
@@ -43,13 +38,12 @@ import com.android.bundle.Targeting.LanguageTargeting;
 import com.android.bundle.Targeting.ScreenDensityTargeting;
 import com.android.bundle.Targeting.SdkVersionTargeting;
 import com.google.common.collect.ImmutableSet;
-import java.util.Optional;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 
 @RunWith(JUnit4.class)
-public class GetSizeConfigurationTest {
+public class SizeConfigurationTest {
 
   @Test
   public void getSdk_noAlternatives() {
@@ -120,71 +114,5 @@ public class GetSizeConfigurationTest {
         () ->
             getScreenDensityName(
                 screenDensityTargeting(ImmutableSet.of(HDPI, LDPI), ImmutableSet.of())));
-  }
-
-  @Test
-  public void getSizeConfiguration_singleTargetings() {
-    assertThat(
-            getSizeConfiguration(
-                Optional.empty(),
-                Optional.of(abiTargeting(X86)),
-                Optional.empty(),
-                Optional.of(languageTargeting("en-UK"))))
-        .isEqualTo(
-            GetSizeConfiguration.builder()
-                .setAbi(Optional.of("x86"))
-                .setLocale(Optional.of("en-UK"))
-                .build());
-
-    assertThat(
-            getSizeConfiguration(
-                Optional.of(sdkVersionTargeting(sdkVersionFrom(25))),
-                Optional.empty(),
-                Optional.of(screenDensityTargeting(MDPI)),
-                Optional.empty()))
-        .isEqualTo(
-            GetSizeConfiguration.builder()
-                .setSdkVersion(Optional.of("25-"))
-                .setScreenDensity(Optional.of("MDPI"))
-                .build());
-
-    assertThat(
-            getSizeConfiguration(
-                Optional.of(
-                    sdkVersionTargeting(
-                        sdkVersionFrom(25),
-                        ImmutableSet.of(
-                            sdkVersionFrom(21), sdkVersionFrom(32), sdkVersionFrom(28)))),
-                Optional.of(abiTargeting(ARM64_V8A, ImmutableSet.of(ARMEABI_V7A))),
-                Optional.of(screenDensityTargeting(252, ImmutableSet.of(LDPI, XXHDPI))),
-                Optional.of(languageTargeting("jp"))))
-        .isEqualTo(
-            GetSizeConfiguration.builder()
-                .setSdkVersion(Optional.of("25-27"))
-                .setAbi(Optional.of("arm64-v8a"))
-                .setScreenDensity(Optional.of("252"))
-                .setLocale(Optional.of("jp"))
-                .build());
-  }
-
-  @Test
-  public void getSizeConfiguration_multipleTargetings_throws() {
-    assertThrows(
-        IllegalArgumentException.class,
-        () ->
-            getSizeConfiguration(
-                Optional.of(sdkVersionTargeting(sdkVersionFrom(25))),
-                Optional.of(abiTargeting(ImmutableSet.of(ARMEABI_V7A, X86_64), ImmutableSet.of())),
-                Optional.of(screenDensityTargeting(MDPI)),
-                Optional.of(languageTargeting("en-UK"))));
-
-    assertThrows(
-        IllegalArgumentException.class,
-        () ->
-            getSizeConfiguration(
-                Optional.of(sdkVersionTargeting(sdkVersionFrom(25))),
-                Optional.of(abiTargeting(X86_64)),
-                Optional.of(screenDensityTargeting(ImmutableSet.of(HDPI, LDPI), ImmutableSet.of())),
-                Optional.of(languageTargeting("en-UK"))));
   }
 }

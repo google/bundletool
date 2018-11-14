@@ -88,9 +88,12 @@ public final class OptimizationsMerger {
             ? requestedOptimizations.getUncompressNativeLibraries().getEnabled()
             : defaultOptimizations.getUncompressNativeLibraries();
 
+    boolean uncompressDexFiles = requestedOptimizations.getUncompressDexFiles().getEnabled();
+
     return ApkOptimizations.builder()
         .setSplitDimensions(splitDimensions)
         .setUncompressNativeLibraries(uncompressNativeLibraries)
+        .setUncompressDexFiles(uncompressDexFiles)
         .build();
   }
 

@@ -16,6 +16,7 @@
 
 package com.android.tools.build.bundletool.splitters;
 
+import com.android.bundle.Targeting.Abi;
 import com.android.tools.build.bundletool.model.OptimizationDimension;
 import com.google.auto.value.AutoValue;
 import com.google.common.collect.ImmutableSet;
@@ -32,11 +33,18 @@ public abstract class ApkGenerationConfiguration {
 
   public abstract boolean getEnableDexCompressionSplitter();
 
+  /**
+   * Returns a list of ABIs for placeholder libraries that should be populated for base modules
+   * without native code. See {@link AbiPlaceholderInjector} for details.
+   */
+  public abstract ImmutableSet<Abi> getAbisForPlaceholderLibs();
+
   public static ApkGenerationConfiguration.Builder builder() {
     return new AutoValue_ApkGenerationConfiguration.Builder()
         .setForInstantAppVariants(false)
         .setEnableNativeLibraryCompressionSplitter(false)
         .setEnableDexCompressionSplitter(false)
+        .setAbisForPlaceholderLibs(ImmutableSet.of())
         .setOptimizationDimensions(ImmutableSet.of());
   }
 
@@ -57,6 +65,8 @@ public abstract class ApkGenerationConfiguration {
         boolean enableNativeLibraryCompressionSplitter);
 
     public abstract Builder setEnableDexCompressionSplitter(boolean enableDexCompressionSplitter);
+
+    public abstract Builder setAbisForPlaceholderLibs(ImmutableSet<Abi> abis);
 
     public abstract ApkGenerationConfiguration build();
   }

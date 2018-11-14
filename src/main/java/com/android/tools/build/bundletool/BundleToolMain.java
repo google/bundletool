@@ -18,8 +18,10 @@ package com.android.tools.build.bundletool;
 import com.android.tools.build.bundletool.commands.BuildApksCommand;
 import com.android.tools.build.bundletool.commands.BuildBundleCommand;
 import com.android.tools.build.bundletool.commands.CommandHelp;
+import com.android.tools.build.bundletool.commands.DumpCommand;
 import com.android.tools.build.bundletool.commands.ExtractApksCommand;
 import com.android.tools.build.bundletool.commands.GetDeviceSpecCommand;
+import com.android.tools.build.bundletool.commands.GetSizeCommand;
 import com.android.tools.build.bundletool.commands.InstallApksCommand;
 import com.android.tools.build.bundletool.commands.ValidateBundleCommand;
 import com.android.tools.build.bundletool.commands.VersionCommand;
@@ -51,7 +53,7 @@ public class BundleToolMain {
     try {
       flags = new FlagParser().parse(args);
     } catch (FlagParser.FlagParseException e) {
-      System.out.println("Error while parsing the flags: " + e.getMessage());
+      System.err.println("Error while parsing the flags: " + e.getMessage());
       runtime.exit(1);
       return;
     }
@@ -59,7 +61,7 @@ public class BundleToolMain {
 
     Optional<String> command = flags.getMainCommand();
     if (!command.isPresent()) {
-      System.out.println("Error: You have to specify a command.");
+      System.err.println("Error: You have to specify a command.");
       help();
       runtime.exit(1);
       return;
@@ -92,6 +94,12 @@ public class BundleToolMain {
         case ValidateBundleCommand.COMMAND_NAME:
           ValidateBundleCommand.fromFlags(flags).execute();
           break;
+        case DumpCommand.COMMAND_NAME:
+          DumpCommand.fromFlags(flags).execute();
+          break;
+        case GetSizeCommand.COMMAND_NAME:
+          GetSizeCommand.fromFlags(flags).execute();
+          break;
         case VersionCommand.COMMAND_NAME:
           VersionCommand.fromFlags(flags, System.out).execute();
           break;
@@ -103,15 +111,15 @@ public class BundleToolMain {
           }
           break;
         default:
-          System.out.printf("Error: Unrecognized command '%s'.%n%n%n", commands.get(0));
+          System.err.printf("Error: Unrecognized command '%s'.%n%n%n", commands.get(0));
           help();
           runtime.exit(1);
           return;
       }
     } catch (Exception e) {
-      System.out.println(
+      System.err.println(
           "[BT:" + BundleToolVersion.getCurrentVersion() + "] Error: " + e.getMessage());
-      e.printStackTrace(System.out);
+      e.printStackTrace();
       runtime.exit(1);
       return;
     }
@@ -130,6 +138,8 @@ public class BundleToolMain {
             GetDeviceSpecCommand.help(),
             InstallApksCommand.help(),
             ValidateBundleCommand.help(),
+            DumpCommand.help(),
+            GetSizeCommand.help(),
             VersionCommand.help());
 
     System.out.println("Synopsis: bundletool <command> ...");
@@ -161,8 +171,14 @@ public class BundleToolMain {
       case ValidateBundleCommand.COMMAND_NAME:
         commandHelp = ValidateBundleCommand.help();
         break;
+      case DumpCommand.COMMAND_NAME:
+        commandHelp = DumpCommand.help();
+        break;
+      case GetSizeCommand.COMMAND_NAME:
+        commandHelp = GetSizeCommand.help();
+        break;
       default:
-        System.out.printf("Error: Unrecognized command '%s'.%n%n%n", commandName);
+        System.err.printf("Error: Unrecognized command '%s'.%n%n%n", commandName);
         help();
         runtime.exit(1);
         return;

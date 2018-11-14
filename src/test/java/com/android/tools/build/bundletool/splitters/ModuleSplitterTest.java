@@ -46,6 +46,7 @@ import static com.android.tools.build.bundletool.testing.ResourcesTableFactory.p
 import static com.android.tools.build.bundletool.testing.ResourcesTableFactory.resourceTable;
 import static com.android.tools.build.bundletool.testing.ResourcesTableFactory.type;
 import static com.android.tools.build.bundletool.testing.ResourcesTableFactory.value;
+import static com.android.tools.build.bundletool.testing.TargetingUtils.abi;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.alternativeLanguageTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.apkAbiTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.apkAlternativeLanguageTargeting;
@@ -1297,6 +1298,58 @@ public class ModuleSplitterTest {
     assertThat(exception)
         .hasMessageThat()
         .contains("Expected same variant targeting across all splits.");
+  }
+
+  @Test
+  public void addingLibraryPlaceholders_baseModule() throws Exception {
+    BundleModule baseModule =
+        new BundleModuleBuilder("base")
+            .addFile("dex/classes.dex")
+            .setManifest(androidManifest("com.test.app"))
+            .build();
+
+    ModuleSplitter moduleSplitter =
+        new ModuleSplitter(
+            baseModule,
+            BUNDLETOOL_VERSION,
+            ApkGenerationConfiguration.builder()
+                .setAbisForPlaceholderLibs(
+                    ImmutableSet.of(abi(AbiAlias.X86), abi(AbiAlias.ARM64_V8A)))
+                .build(),
+            lPlusVariantTargeting());
+
+    ImmutableList<ModuleSplit> splits = moduleSplitter.splitModule();
+    assertThat(splits).hasSize(1);
+    ModuleSplit masterSplit = splits.get(0);
+    assertThat(masterSplit.isMasterSplit()).isTrue();
+    assertThat(extractPaths(masterSplit.getEntries()))
+        .containsExactly(
+            "dex/classes.dex", "lib/x86/libplaceholder.so", "lib/arm64-v8a/libplaceholder.so");
+  }
+
+  @Test
+  public void addingLibraryPlaceholders_featureModule_noAction() throws Exception {
+    BundleModule baseModule =
+        new BundleModuleBuilder("feature")
+            .addFile("dex/classes.dex")
+            .setManifest(androidManifest("com.test.app"))
+            .build();
+
+    ModuleSplitter moduleSplitter =
+        new ModuleSplitter(
+            baseModule,
+            BUNDLETOOL_VERSION,
+            ApkGenerationConfiguration.builder()
+                .setAbisForPlaceholderLibs(
+                    ImmutableSet.of(abi(AbiAlias.X86), abi(AbiAlias.ARM64_V8A)))
+                .build(),
+            lPlusVariantTargeting());
+
+    ImmutableList<ModuleSplit> splits = moduleSplitter.splitModule();
+    assertThat(splits).hasSize(1);
+    ModuleSplit masterSplit = splits.get(0);
+    assertThat(masterSplit.isMasterSplit()).isTrue();
+    assertThat(extractPaths(masterSplit.getEntries())).containsExactly("dex/classes.dex");
   }
 
   private ModuleSplit checkAndReturnTheOnlyMasterSplit(List<ModuleSplit> splits) {

@@ -59,6 +59,8 @@ public class ModuleSplitter {
   private final ApkGenerationConfiguration apkGenerationConfiguration;
   private final VariantTargeting variantTargeting;
 
+  private final AbiPlaceholderInjector abiPlaceholderInjector;
+
   @VisibleForTesting
   ModuleSplitter(BundleModule module, Version bundleVersion) {
     this(
@@ -77,6 +79,8 @@ public class ModuleSplitter {
     this.bundleVersion = checkNotNull(bundleVersion);
     this.apkGenerationConfiguration = checkNotNull(apkGenerationConfiguration);
     this.variantTargeting = checkNotNull(variantTargeting);
+    this.abiPlaceholderInjector =
+        new AbiPlaceholderInjector(apkGenerationConfiguration.getAbisForPlaceholderLibs());
   }
 
   public ImmutableList<ModuleSplit> splitModule() {
@@ -87,9 +91,23 @@ public class ModuleSplitter {
           .map(moduleSplit -> moduleSplit.toBuilder().setSplitType(SplitType.INSTANT).build())
           .collect(toImmutableList());
     } else {
-      return splitModuleInternal().stream().map(this::removeSplitName).collect(toImmutableList());
+      return splitModuleInternal().stream()
+          .map(this::removeSplitName)
+          .map(this::addPlaceHolderNativeLibsToBaseModule)
+          .collect(toImmutableList());
     }
   }
+
+  private ModuleSplit addPlaceHolderNativeLibsToBaseModule(ModuleSplit moduleSplit) {
+    if (!apkGenerationConfiguration.getAbisForPlaceholderLibs().isEmpty()
+        && moduleSplit.isBaseModuleSplit()
+        && moduleSplit.isMasterSplit()) {
+      return abiPlaceholderInjector.addPlaceholderNativeEntries(moduleSplit);
+    } else {
+      return moduleSplit;
+    }
+  }
+
   /** Common modifications to both the instant and installed splits. */
   private ImmutableList<ModuleSplit> splitModuleInternal() {
     return runSplitters().stream()

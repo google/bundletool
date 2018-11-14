@@ -57,6 +57,11 @@ public class BundleConfigBuilder {
     return this;
   }
 
+  public BundleConfigBuilder setUncompressDexFiles(boolean enabled) {
+    builder.getOptimizationsBuilder().getUncompressDexFilesBuilder().setEnabled(enabled);
+    return this;
+  }
+
   public BundleConfigBuilder addUncompressedGlob(String uncompressedGlob) {
     builder.getCompressionBuilder().addUncompressedGlob(uncompressedGlob);
     return this;

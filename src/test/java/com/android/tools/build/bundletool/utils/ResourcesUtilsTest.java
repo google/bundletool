@@ -234,17 +234,17 @@ public class ResourcesUtilsTest {
             .build();
 
     Optional<Entry> layoutResource =
-        ResourcesUtils.lookupEntryByResourceId(resourceTable, 0x7F000000);
+        ResourcesUtils.lookupEntryByResourceId(resourceTable, 0x7F010000);
     assertThat(layoutResource).isPresent();
     assertThat(extractFilePathValues(layoutResource.get())).containsExactly("res/xml/layout.xml");
 
     Optional<Entry> helloResource =
-        ResourcesUtils.lookupEntryByResourceId(resourceTable, 0x7F010000);
+        ResourcesUtils.lookupEntryByResourceId(resourceTable, 0x7F020000);
     assertThat(helloResource).isPresent();
     assertThat(extractStringValues(helloResource.get())).containsExactly("res/string/hello.xml");
 
     Optional<Entry> worldResource =
-        ResourcesUtils.lookupEntryByResourceId(resourceTable, 0x7F010001);
+        ResourcesUtils.lookupEntryByResourceId(resourceTable, 0x7F020001);
     assertThat(worldResource).isPresent();
     assertThat(extractStringValues(worldResource.get())).containsExactly("res/string/world.xml");
   }
@@ -266,17 +266,17 @@ public class ResourcesUtilsTest {
             .build();
 
     Optional<Entry> layoutResource =
-        ResourcesUtils.lookupEntryByResourceId(resourceTable, 0x80000000);
+        ResourcesUtils.lookupEntryByResourceId(resourceTable, 0x80010000);
     assertThat(layoutResource).isPresent();
     assertThat(extractFilePathValues(layoutResource.get())).containsExactly("res/xml/layout.xml");
 
     Optional<Entry> helloResource =
-        ResourcesUtils.lookupEntryByResourceId(resourceTable, 0x80010000);
+        ResourcesUtils.lookupEntryByResourceId(resourceTable, 0x80020000);
     assertThat(helloResource).isPresent();
     assertThat(extractStringValues(helloResource.get())).containsExactly("res/string/hello.xml");
 
     Optional<Entry> worldResource =
-        ResourcesUtils.lookupEntryByResourceId(resourceTable, 0x80010001);
+        ResourcesUtils.lookupEntryByResourceId(resourceTable, 0x80020001);
     assertThat(worldResource).isPresent();
     assertThat(extractStringValues(worldResource.get())).containsExactly("res/string/world.xml");
   }

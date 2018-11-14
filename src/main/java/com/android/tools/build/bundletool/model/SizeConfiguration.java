@@ -27,7 +27,6 @@ import com.android.bundle.Targeting.ScreenDensityTargeting;
 import com.android.bundle.Targeting.SdkVersionTargeting;
 import com.android.tools.build.bundletool.commands.GetSizeCommand;
 import com.google.auto.value.AutoValue;
-import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.Iterables;
 import java.util.Optional;
 
@@ -38,7 +37,7 @@ import java.util.Optional;
  * <p>We set only the configuration fields based on the dimensions passed to {@link GetSizeCommand}.
  */
 @AutoValue
-public abstract class GetSizeConfiguration {
+public abstract class SizeConfiguration {
   public abstract Optional<String> getAbi();
 
   public abstract Optional<String> getLocale();
@@ -47,31 +46,17 @@ public abstract class GetSizeConfiguration {
 
   public abstract Optional<String> getSdkVersion();
 
-  public static GetSizeConfiguration.Builder builder() {
-    return new AutoValue_GetSizeConfiguration.Builder();
+  public abstract Builder toBuilder();
+
+  public static SizeConfiguration.Builder builder() {
+    return new AutoValue_SizeConfiguration.Builder();
   }
 
-  public static GetSizeConfiguration getDefaultInstance() {
-    return GetSizeConfiguration.builder().build();
+  public static SizeConfiguration getDefaultInstance() {
+    return SizeConfiguration.builder().build();
   }
 
-  public static GetSizeConfiguration getSizeConfiguration(
-      Optional<SdkVersionTargeting> sdkVersionTargeting,
-      Optional<AbiTargeting> abiTargeting,
-      Optional<ScreenDensityTargeting> screenDensityTargeting,
-      Optional<LanguageTargeting> languageTargeting) {
-
-    return GetSizeConfiguration.builder()
-        .setAbi(abiTargeting.flatMap(GetSizeConfiguration::getAbiName))
-        .setSdkVersion(sdkVersionTargeting.flatMap(GetSizeConfiguration::getSdkName))
-        .setLocale(languageTargeting.flatMap(GetSizeConfiguration::getLocaleName))
-        .setScreenDensity(
-            screenDensityTargeting.flatMap(GetSizeConfiguration::getScreenDensityName))
-        .build();
-  }
-
-  @VisibleForTesting
-  static Optional<String> getAbiName(AbiTargeting abiTargeting) {
+  public static Optional<String> getAbiName(AbiTargeting abiTargeting) {
     if (abiTargeting.getValueList().isEmpty()) {
       return Optional.empty();
     }
@@ -80,8 +65,7 @@ public abstract class GetSizeConfiguration {
             .getPlatformName());
   }
 
-  @VisibleForTesting
-  static Optional<String> getSdkName(SdkVersionTargeting sdkVersionTargeting) {
+  public static Optional<String> getSdkName(SdkVersionTargeting sdkVersionTargeting) {
     int maxSdk = getMaxSdk(sdkVersionTargeting);
     return Optional.of(
         String.format(
@@ -90,16 +74,15 @@ public abstract class GetSizeConfiguration {
             maxSdk != Integer.MAX_VALUE ? Integer.toString(maxSdk - 1) : ""));
   }
 
-  @VisibleForTesting
-  static Optional<String> getLocaleName(LanguageTargeting languageTargeting) {
+  public static Optional<String> getLocaleName(LanguageTargeting languageTargeting) {
     if (languageTargeting.getValueList().isEmpty()) {
       return Optional.empty();
     }
     return Optional.of(Iterables.getOnlyElement(languageTargeting.getValueList()));
   }
 
-  @VisibleForTesting
-  static Optional<String> getScreenDensityName(ScreenDensityTargeting screenDensityTargeting) {
+  public static Optional<String> getScreenDensityName(
+      ScreenDensityTargeting screenDensityTargeting) {
     if (screenDensityTargeting.getValueList().isEmpty()) {
       return Optional.empty();
     }
@@ -111,17 +94,17 @@ public abstract class GetSizeConfiguration {
             : Integer.toString(screenDensity.getDensityDpi()));
   }
 
-  /** Builder for the {@link GetSizeConfiguration}. */
+  /** Builder for the {@link SizeConfiguration}. */
   @AutoValue.Builder
   public abstract static class Builder {
-    public abstract Builder setAbi(Optional<String> abiName);
+    public abstract Builder setAbi(String abiName);
 
-    public abstract Builder setLocale(Optional<String> locale);
+    public abstract Builder setLocale(String locale);
 
-    public abstract Builder setScreenDensity(Optional<String> screenDensity);
+    public abstract Builder setScreenDensity(String screenDensity);
 
-    public abstract Builder setSdkVersion(Optional<String> sdkVersion);
+    public abstract Builder setSdkVersion(String sdkVersion);
 
-    public abstract GetSizeConfiguration build();
+    public abstract SizeConfiguration build();
   }
 }

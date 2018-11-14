@@ -39,7 +39,6 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
@@ -61,7 +60,7 @@ public class ApkSizeUtilsTest {
 
   @Test
   public void oneLVariant() throws Exception {
-    Path apkOne = Paths.get("apk_one.apk");
+    ZipPath apkOne = ZipPath.create("apk_one.apk");
     ImmutableList<Variant> variants =
         ImmutableList.of(
             createVariantForSingleSplitApk(
@@ -83,23 +82,22 @@ public class ApkSizeUtilsTest {
 
   @Test
   public void oneLVariant_multipleModules() throws Exception {
-    Path baseApk = Paths.get("base.apk");
-    Path baseX86Apk = Paths.get("base-x86.apk");
-    Path featureApk = Paths.get("feature.apk");
-    Path featureX86Apk = Paths.get("feature-x86.apk");
+    ZipPath baseApk = ZipPath.create("base.apk");
+    ZipPath baseX86Apk = ZipPath.create("base-x86.apk");
+    ZipPath featureApk = ZipPath.create("feature.apk");
+    ZipPath featureX86Apk = ZipPath.create("feature-x86.apk");
     ImmutableList<Variant> variants =
         ImmutableList.of(
             createVariant(
                 variantSdkTargeting(sdkVersionFrom(21)),
                 createSplitApkSet(
-                    "base", createMasterApkDescription(ApkTargeting.getDefaultInstance(), baseApk)),
-                createSplitApkSet(
-                    "base", createApkDescription(apkAbiTargeting(X86), baseX86Apk, false)),
+                    "base",
+                    createMasterApkDescription(ApkTargeting.getDefaultInstance(), baseApk),
+                    createApkDescription(apkAbiTargeting(X86), baseX86Apk, false)),
                 createSplitApkSet(
                     "feature",
-                    createMasterApkDescription(ApkTargeting.getDefaultInstance(), featureApk)),
-                createSplitApkSet(
-                    "feature", createApkDescription(apkAbiTargeting(X86), featureX86Apk, false))));
+                    createMasterApkDescription(ApkTargeting.getDefaultInstance(), featureApk),
+                    createApkDescription(apkAbiTargeting(X86), featureX86Apk, false))));
 
     Path apksArchiveFile =
         createApksArchiveFile(
@@ -119,8 +117,8 @@ public class ApkSizeUtilsTest {
 
   @Test
   public void multipleVariants() throws Exception {
-    Path apkOne = Paths.get("apk_one.apk");
-    Path apkTwo = Paths.get("apk_two.apk");
+    ZipPath apkOne = ZipPath.create("apk_one.apk");
+    ZipPath apkTwo = ZipPath.create("apk_two.apk");
     ImmutableList<Variant> variants =
         ImmutableList.of(
             createVariantForSingleSplitApk(
@@ -149,8 +147,8 @@ public class ApkSizeUtilsTest {
 
   @Test
   public void multipleVariants_withUncompressedEntries() throws Exception {
-    Path apkOne = Paths.get("apk_one.apk");
-    Path apkTwo = Paths.get("apk_two.apk");
+    ZipPath apkOne = ZipPath.create("apk_one.apk");
+    ZipPath apkTwo = ZipPath.create("apk_two.apk");
     ImmutableList<Variant> variants =
         ImmutableList.of(
             createVariantForSingleSplitApk(
@@ -187,8 +185,8 @@ public class ApkSizeUtilsTest {
 
   @Test
   public void multipleVariants_selectOneVariant() throws Exception {
-    Path apkOne = Paths.get("apk_one.apk");
-    Path apkTwo = Paths.get("apk_two.apk");
+    ZipPath apkOne = ZipPath.create("apk_one.apk");
+    ZipPath apkTwo = ZipPath.create("apk_two.apk");
     Variant lVariant =
         createVariantForSingleSplitApk(
             variantSdkTargeting(sdkVersionFrom(21), ImmutableSet.of(sdkVersionFrom(23))),

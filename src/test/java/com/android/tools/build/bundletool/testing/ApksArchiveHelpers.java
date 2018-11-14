@@ -16,6 +16,8 @@
 
 package com.android.tools.build.bundletool.testing;
 
+import static com.google.common.collect.ImmutableList.toImmutableList;
+
 import com.android.bundle.Commands.ApkDescription;
 import com.android.bundle.Commands.ApkSet;
 import com.android.bundle.Commands.BuildApksResult;
@@ -29,6 +31,7 @@ import com.android.bundle.Targeting.VariantTargeting;
 import com.android.tools.build.bundletool.io.ZipBuilder;
 import com.android.tools.build.bundletool.model.ZipPath;
 import com.google.common.collect.ImmutableList;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Arrays;
 
@@ -40,9 +43,7 @@ public final class ApksArchiveHelpers {
   public static Path createApksArchiveFile(BuildApksResult result, Path location) throws Exception {
     ZipBuilder archiveBuilder = new ZipBuilder();
 
-    result
-        .getVariantList()
-        .stream()
+    result.getVariantList().stream()
         .flatMap(variant -> variant.getApkSetList().stream())
         .flatMap(apkSet -> apkSet.getApkDescriptionList().stream())
         .forEach(
@@ -53,6 +54,23 @@ public final class ApksArchiveHelpers {
     return archiveBuilder.writeTo(location);
   }
 
+  public static Path createApksDirectory(BuildApksResult result, Path location) throws Exception {
+    ImmutableList<ApkDescription> apkDescriptions =
+        result.getVariantList().stream()
+            .flatMap(variant -> variant.getApkSetList().stream())
+            .flatMap(apkSet -> apkSet.getApkDescriptionList().stream())
+            .collect(toImmutableList());
+
+    for (ApkDescription apkDescription : apkDescriptions) {
+      Path apkPath = location.resolve(apkDescription.getPath());
+      Files.createDirectories(apkPath.getParent());
+      Files.write(apkPath, DUMMY_BYTES);
+    }
+    Files.write(location.resolve("toc.pb"), result.toByteArray());
+
+    return location;
+  }
+
   public static Variant createVariant(VariantTargeting variantTargeting, ApkSet... apkSets) {
     return Variant.newBuilder()
         .setTargeting(variantTargeting)
@@ -61,7 +79,7 @@ public final class ApksArchiveHelpers {
   }
 
   public static Variant createVariantForSingleSplitApk(
-      VariantTargeting variantTargeting, ApkTargeting apkTargeting, Path apkPath) {
+      VariantTargeting variantTargeting, ApkTargeting apkTargeting, ZipPath apkPath) {
     return createVariant(
         variantTargeting,
         createSplitApkSet("base", createMasterApkDescription(apkTargeting, apkPath)));
@@ -119,7 +137,8 @@ public final class ApksArchiveHelpers {
         .build();
   }
 
-  public static ApkDescription createMasterApkDescription(ApkTargeting apkTargeting, Path apkPath) {
+  public static ApkDescription createMasterApkDescription(
+      ApkTargeting apkTargeting, ZipPath apkPath) {
     return createApkDescription(apkTargeting, apkPath, /* isMasterSplit= */ true);
   }
 

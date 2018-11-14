@@ -18,6 +18,7 @@ package com.android.tools.build.bundletool.commands;
 
 import static com.android.tools.build.bundletool.testing.ApksArchiveHelpers.createApkDescription;
 import static com.android.tools.build.bundletool.testing.ApksArchiveHelpers.createApksArchiveFile;
+import static com.android.tools.build.bundletool.testing.ApksArchiveHelpers.createApksDirectory;
 import static com.android.tools.build.bundletool.testing.ApksArchiveHelpers.createMasterApkDescription;
 import static com.android.tools.build.bundletool.testing.ApksArchiveHelpers.createSplitApkSet;
 import static com.android.tools.build.bundletool.testing.ApksArchiveHelpers.createVariant;
@@ -46,6 +47,7 @@ import com.android.ddmlib.IDevice.DeviceState;
 import com.android.tools.build.bundletool.device.AdbServer;
 import com.android.tools.build.bundletool.exceptions.CommandExecutionException;
 import com.android.tools.build.bundletool.exceptions.InstallationException;
+import com.android.tools.build.bundletool.model.ZipPath;
 import com.android.tools.build.bundletool.testing.FakeAdbServer;
 import com.android.tools.build.bundletool.testing.FakeAndroidHomeVariableProvider;
 import com.android.tools.build.bundletool.testing.FakeAndroidSerialVariableProvider;
@@ -64,16 +66,21 @@ import java.util.List;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
+import org.junit.experimental.theories.DataPoints;
+import org.junit.experimental.theories.FromDataPoints;
+import org.junit.experimental.theories.Theories;
+import org.junit.experimental.theories.Theory;
 import org.junit.rules.TemporaryFolder;
 import org.junit.runner.RunWith;
-import org.junit.runners.JUnit4;
 
-@RunWith(JUnit4.class)
+@RunWith(Theories.class)
 public class InstallApksCommandTest {
 
-  @Rule public TemporaryFolder tmp = new TemporaryFolder();
-  private Path tmpDir;
   private static final String DEVICE_ID = "id1";
+
+  @Rule public TemporaryFolder tmp = new TemporaryFolder();
+
+  private Path tmpDir;
 
   private EnvironmentVariableProvider androidHomeProvider;
   private EnvironmentVariableProvider androidSerialProvider;
@@ -308,7 +315,7 @@ public class InstallApksCommandTest {
   public void adbInstallFails_throws() throws Exception {
     Path apksFile =
         createApksArchiveFile(
-            createSimpleTableOfContent(Paths.get("base-master.apk")),
+            createSimpleTableOfContent(ZipPath.create("base-master.apk")),
             tmpDir.resolve("bundle.apks"));
 
     FakeDevice fakeDevice =
@@ -335,7 +342,8 @@ public class InstallApksCommandTest {
   public void deviceSdkIncompatible_throws() throws Exception {
     Path apksFile =
         createApksArchiveFile(
-            createLPlusTableOfContent(Paths.get("base-master.apk")), tmpDir.resolve("bundle.apks"));
+            createLPlusTableOfContent(ZipPath.create("base-master.apk")),
+            tmpDir.resolve("bundle.apks"));
 
     FakeDevice fakeDevice =
         FakeDevice.fromDeviceSpec(
@@ -361,8 +369,8 @@ public class InstallApksCommandTest {
 
   @Test
   public void deviceAbiIncompatible_throws() throws Exception {
-    Path apkL = Paths.get("splits/apkL.apk");
-    Path apkLx86 = Paths.get("splits/apkL-x86.apk");
+    ZipPath apkL = ZipPath.create("splits/apkL.apk");
+    ZipPath apkLx86 = ZipPath.create("splits/apkL-x86.apk");
     BuildApksResult tableOfContentsProto =
         BuildApksResult.newBuilder()
             .addVariant(
@@ -405,7 +413,7 @@ public class InstallApksCommandTest {
   public void badSdkVersionDevice_throws() throws Exception {
     Path apksFile =
         createApksArchiveFile(
-            createSimpleTableOfContent(Paths.get("base-master.apk")),
+            createSimpleTableOfContent(ZipPath.create("base-master.apk")),
             tmpDir.resolve("bundle.apks"));
 
     DeviceSpec deviceSpec =
@@ -425,12 +433,15 @@ public class InstallApksCommandTest {
     assertThat(exception).hasMessageThat().contains("Error retrieving device SDK version");
   }
 
+  @DataPoints("apksInDirectory")
+  public static final ImmutableSet<Boolean> APKS_IN_DIRECTORY = ImmutableSet.of(true, false);
+
   @Test
-  public void badDensityDevice_throws() throws Exception {
+  @Theory
+  public void badDensityDevice_throws(@FromDataPoints("apksInDirectory") boolean apksInDirectory)
+      throws Exception {
     Path apksFile =
-        createApksArchiveFile(
-            createSimpleTableOfContent(Paths.get("base-master.apk")),
-            tmpDir.resolve("bundle.apks"));
+        createApks(createSimpleTableOfContent(ZipPath.create("base-master.apk")), apksInDirectory);
 
     DeviceSpec deviceSpec =
         mergeSpecs(sdkVersion(21), density(-1), abis("x86_64", "x86"), locales("en-US"));
@@ -450,11 +461,11 @@ public class InstallApksCommandTest {
   }
 
   @Test
-  public void badAbisDevice_throws() throws Exception {
+  @Theory
+  public void badAbisDevice_throws(@FromDataPoints("apksInDirectory") boolean apksInDirectory)
+      throws Exception {
     Path apksFile =
-        createApksArchiveFile(
-            createSimpleTableOfContent(Paths.get("base-master.apk")),
-            tmpDir.resolve("bundle.apks"));
+        createApks(createSimpleTableOfContent(ZipPath.create("base-master.apk")), apksInDirectory);
 
     DeviceSpec deviceSpec = mergeSpecs(sdkVersion(21), density(480), abis(), locales("en-US"));
     FakeDevice fakeDevice = FakeDevice.fromDeviceSpec(DEVICE_ID, DeviceState.ONLINE, deviceSpec);
@@ -473,7 +484,9 @@ public class InstallApksCommandTest {
   }
 
   @Test
-  public void installsOnlySpecifiedModules() throws Exception {
+  @Theory
+  public void installsOnlySpecifiedModules(
+      @FromDataPoints("apksInDirectory") boolean apksInDirectory) throws Exception {
     BuildApksResult tableOfContent =
         BuildApksResult.newBuilder()
             .addVariant(
@@ -482,17 +495,19 @@ public class InstallApksCommandTest {
                     createSplitApkSet(
                         "base",
                         createMasterApkDescription(
-                            ApkTargeting.getDefaultInstance(), Paths.get("base-master.apk"))),
+                            ApkTargeting.getDefaultInstance(), ZipPath.create("base-master.apk"))),
                     createSplitApkSet(
                         "feature1",
                         createMasterApkDescription(
-                            ApkTargeting.getDefaultInstance(), Paths.get("feature1-master.apk"))),
+                            ApkTargeting.getDefaultInstance(),
+                            ZipPath.create("feature1-master.apk"))),
                     createSplitApkSet(
                         "feature2",
                         createMasterApkDescription(
-                            ApkTargeting.getDefaultInstance(), Paths.get("feature2-master.apk")))))
+                            ApkTargeting.getDefaultInstance(),
+                            ZipPath.create("feature2-master.apk")))))
             .build();
-    Path apksFile = createApksArchiveFile(tableOfContent, tmpDir.resolve("bundle.apks"));
+    Path apksFile = createApks(tableOfContent, apksInDirectory);
 
     List<Path> installedApks = new ArrayList<>();
     FakeDevice fakeDevice =
@@ -514,7 +529,9 @@ public class InstallApksCommandTest {
   }
 
   @Test
-  public void moduleDependencies_installDependency() throws Exception {
+  @Theory
+  public void moduleDependencies_installDependency(
+      @FromDataPoints("apksInDirectory") boolean apksInDirectory) throws Exception {
     BuildApksResult tableOfContent =
         BuildApksResult.newBuilder()
             .addVariant(
@@ -523,27 +540,30 @@ public class InstallApksCommandTest {
                     createSplitApkSet(
                         /* moduleName= */ "base",
                         createMasterApkDescription(
-                            ApkTargeting.getDefaultInstance(), Paths.get("base-master.apk"))),
+                            ApkTargeting.getDefaultInstance(), ZipPath.create("base-master.apk"))),
                     createSplitApkSet(
                         /* moduleName= */ "feature1",
                         /* onDemand= */ true,
                         /* moduleDependencies= */ ImmutableList.of(),
                         createMasterApkDescription(
-                            ApkTargeting.getDefaultInstance(), Paths.get("feature1-master.apk"))),
+                            ApkTargeting.getDefaultInstance(),
+                            ZipPath.create("feature1-master.apk"))),
                     createSplitApkSet(
                         /* moduleName= */ "feature2",
                         /* onDemand= */ true,
                         /* moduleDependencies= */ ImmutableList.of("feature1"),
                         createMasterApkDescription(
-                            ApkTargeting.getDefaultInstance(), Paths.get("feature2-master.apk"))),
+                            ApkTargeting.getDefaultInstance(),
+                            ZipPath.create("feature2-master.apk"))),
                     createSplitApkSet(
                         /* moduleName= */ "feature3",
                         /* onDemand= */ true,
                         /* moduleDependencies= */ ImmutableList.of("feature2"),
                         createMasterApkDescription(
-                            ApkTargeting.getDefaultInstance(), Paths.get("feature3-master.apk")))))
+                            ApkTargeting.getDefaultInstance(),
+                            ZipPath.create("feature3-master.apk")))))
             .build();
-    Path apksFile = createApksArchiveFile(tableOfContent, tmpDir.resolve("bundle.apks"));
+    Path apksFile = createApks(tableOfContent, apksInDirectory);
 
     List<Path> installedApks = new ArrayList<>();
     FakeDevice fakeDevice =
@@ -565,7 +585,9 @@ public class InstallApksCommandTest {
   }
 
   @Test
-  public void moduleDependencies_diamondGraph() throws Exception {
+  @Theory
+  public void moduleDependencies_diamondGraph(
+      @FromDataPoints("apksInDirectory") boolean apksInDirectory) throws Exception {
     BuildApksResult tableOfContent =
         BuildApksResult.newBuilder()
             .addVariant(
@@ -574,33 +596,37 @@ public class InstallApksCommandTest {
                     createSplitApkSet(
                         /* moduleName= */ "base",
                         createMasterApkDescription(
-                            ApkTargeting.getDefaultInstance(), Paths.get("base-master.apk"))),
+                            ApkTargeting.getDefaultInstance(), ZipPath.create("base-master.apk"))),
                     createSplitApkSet(
                         /* moduleName= */ "feature1",
                         /* onDemand= */ true,
                         /* moduleDependencies= */ ImmutableList.of(),
                         createMasterApkDescription(
-                            ApkTargeting.getDefaultInstance(), Paths.get("feature1-master.apk"))),
+                            ApkTargeting.getDefaultInstance(),
+                            ZipPath.create("feature1-master.apk"))),
                     createSplitApkSet(
                         /* moduleName= */ "feature2",
                         /* onDemand= */ true,
                         /* moduleDependencies= */ ImmutableList.of("feature1"),
                         createMasterApkDescription(
-                            ApkTargeting.getDefaultInstance(), Paths.get("feature2-master.apk"))),
+                            ApkTargeting.getDefaultInstance(),
+                            ZipPath.create("feature2-master.apk"))),
                     createSplitApkSet(
                         /* moduleName= */ "feature3",
                         /* onDemand= */ true,
                         /* moduleDependencies= */ ImmutableList.of("feature1"),
                         createMasterApkDescription(
-                            ApkTargeting.getDefaultInstance(), Paths.get("feature3-master.apk"))),
+                            ApkTargeting.getDefaultInstance(),
+                            ZipPath.create("feature3-master.apk"))),
                     createSplitApkSet(
                         /* moduleName= */ "feature4",
                         /* onDemand= */ true,
                         /* moduleDependencies= */ ImmutableList.of("feature2", "feature3"),
                         createMasterApkDescription(
-                            ApkTargeting.getDefaultInstance(), Paths.get("feature4-master.apk")))))
+                            ApkTargeting.getDefaultInstance(),
+                            ZipPath.create("feature4-master.apk")))))
             .build();
-    Path apksFile = createApksArchiveFile(tableOfContent, tmpDir.resolve("bundle.apks"));
+    Path apksFile = createApks(tableOfContent, apksInDirectory);
 
     List<Path> installedApks = new ArrayList<>();
     FakeDevice fakeDevice =
@@ -638,7 +664,7 @@ public class InstallApksCommandTest {
   }
 
   /** Creates a table of content matching L+ devices. */
-  private static BuildApksResult createLPlusTableOfContent(Path apkPath) {
+  private static BuildApksResult createLPlusTableOfContent(ZipPath apkPath) {
     return BuildApksResult.newBuilder()
         .addVariant(
             createVariantForSingleSplitApk(
@@ -649,11 +675,20 @@ public class InstallApksCommandTest {
   }
 
   /** Creates a table of content matching all devices to a given apkPath. */
-  private static BuildApksResult createSimpleTableOfContent(Path apkPath) {
+  private static BuildApksResult createSimpleTableOfContent(ZipPath apkPath) {
     return BuildApksResult.newBuilder()
         .addVariant(
             createVariantForSingleSplitApk(
                 VariantTargeting.getDefaultInstance(), ApkTargeting.getDefaultInstance(), apkPath))
         .build();
+  }
+
+  private Path createApks(BuildApksResult buildApksResult, boolean apksInDirectory)
+      throws Exception {
+    if (apksInDirectory) {
+      return createApksDirectory(buildApksResult, tmpDir);
+    } else {
+      return createApksArchiveFile(buildApksResult, tmpDir.resolve("bundle.apks"));
+    }
   }
 }

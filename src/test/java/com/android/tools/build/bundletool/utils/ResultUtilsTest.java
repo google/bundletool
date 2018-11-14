@@ -18,16 +18,19 @@ package com.android.tools.build.bundletool.utils;
 
 import static com.android.tools.build.bundletool.testing.ApksArchiveHelpers.createApkDescription;
 import static com.android.tools.build.bundletool.testing.ApksArchiveHelpers.createApksArchiveFile;
+import static com.android.tools.build.bundletool.testing.ApksArchiveHelpers.createApksDirectory;
 import static com.android.tools.build.bundletool.testing.ApksArchiveHelpers.createInstantApkSet;
 import static com.android.tools.build.bundletool.testing.ApksArchiveHelpers.createMasterApkDescription;
 import static com.android.tools.build.bundletool.testing.ApksArchiveHelpers.createSplitApkSet;
 import static com.android.tools.build.bundletool.testing.ApksArchiveHelpers.createStandaloneApkSet;
 import static com.android.tools.build.bundletool.testing.ApksArchiveHelpers.createVariant;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.apkAbiTargeting;
+import static com.android.tools.build.bundletool.testing.TargetingUtils.lPlusVariantTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.sdkVersionFrom;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.variantSdkTargeting;
 import static com.android.tools.build.bundletool.utils.ResultUtils.readTableOfContents;
 import static com.google.common.truth.Truth.assertThat;
+import static com.google.common.truth.extensions.proto.ProtoTruth.assertThat;
 
 import com.android.bundle.Commands.BuildApksResult;
 import com.android.bundle.Commands.Variant;
@@ -35,9 +38,9 @@ import com.android.bundle.Targeting.Abi.AbiAlias;
 import com.android.bundle.Targeting.ApkTargeting;
 import com.android.bundle.Targeting.SdkVersion;
 import com.android.bundle.Targeting.VariantTargeting;
+import com.android.tools.build.bundletool.model.ZipPath;
 import com.google.common.collect.ImmutableSet;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
@@ -67,8 +70,17 @@ public class ResultUtilsTest {
   }
 
   @Test
+  public void emptyBuildApksResult_inDirectory_readTableOfContents() throws Exception {
+
+    Path apksDirectory = createApksDirectory(BuildApksResult.getDefaultInstance(), tmpDir);
+
+    BuildApksResult buildApksResult = readTableOfContents(apksDirectory);
+    assertThat(buildApksResult).isEqualToDefaultInstance();
+  }
+
+  @Test
   public void buildApksResult_readTableOfContents() throws Exception {
-    Path apkLBase = Paths.get("apkL-base.apk");
+    ZipPath apkLBase = ZipPath.create("apkL-base.apk");
     BuildApksResult tableOfContentsProto =
         BuildApksResult.newBuilder()
             .addVariant(
@@ -83,6 +95,25 @@ public class ResultUtilsTest {
         createApksArchiveFile(tableOfContentsProto, tmpDir.resolve("bundle.apks"));
 
     BuildApksResult buildApksResult = readTableOfContents(apksArchiveFile);
+    assertThat(buildApksResult).isEqualTo(tableOfContentsProto);
+  }
+
+  @Test
+  public void buildApksResult_inDirectory_readTableOfContents() throws Exception {
+    ZipPath apkLBase = ZipPath.create("apkL-base.apk");
+    BuildApksResult tableOfContentsProto =
+        BuildApksResult.newBuilder()
+            .addVariant(
+                createVariant(
+                    lPlusVariantTargeting(),
+                    createSplitApkSet(
+                        "base",
+                        createMasterApkDescription(ApkTargeting.getDefaultInstance(), apkLBase))))
+            .build();
+
+    Path apksDirectory = createApksDirectory(tableOfContentsProto, tmpDir);
+
+    BuildApksResult buildApksResult = readTableOfContents(apksDirectory);
     assertThat(buildApksResult).isEqualTo(tableOfContentsProto);
   }
 
@@ -159,9 +190,9 @@ public class ResultUtilsTest {
   }
 
   private Variant createInstantVariant() {
-    Path apkLBase = Paths.get("instant", "apkL-base.apk");
-    Path apkLFeature = Paths.get("instant", "apkL-feature.apk");
-    Path apkLOther = Paths.get("instant", "apkL-other.apk");
+    Path apkLBase = ZipPath.create("instant/apkL-base.apk");
+    Path apkLFeature = ZipPath.create("instant/apkL-feature.apk");
+    Path apkLOther = ZipPath.create("instant/apkL-other.apk");
     return createVariant(
         variantSdkTargeting(sdkVersionFrom(21), ImmutableSet.of(SdkVersion.getDefaultInstance())),
         createInstantApkSet("base", ApkTargeting.getDefaultInstance(), apkLBase),
@@ -170,8 +201,8 @@ public class ResultUtilsTest {
   }
 
   private Variant createSplitVariant() {
-    Path apkL = Paths.get("splits", "apkL.apk");
-    Path apkLx86 = Paths.get("splits", "apkL-x86.apk");
+    ZipPath apkL = ZipPath.create("splits/apkL.apk");
+    ZipPath apkLx86 = ZipPath.create("splits/apkL-x86.apk");
     return createVariant(
         variantSdkTargeting(sdkVersionFrom(21)),
         createSplitApkSet(
@@ -184,7 +215,7 @@ public class ResultUtilsTest {
   }
 
   private Variant createStandaloneVariant() {
-    Path apkPreL = Paths.get("apkPreL.apk");
+    Path apkPreL = ZipPath.create("apkPreL.apk");
     return createVariant(
         variantSdkTargeting(sdkVersionFrom(21), ImmutableSet.of(SdkVersion.getDefaultInstance())),
         createStandaloneApkSet(ApkTargeting.getDefaultInstance(), apkPreL));

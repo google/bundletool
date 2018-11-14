@@ -95,7 +95,7 @@ public class ApkMatcher {
         : ImmutableList.of();
   }
 
-  private ImmutableList<ZipPath> getMatchingApksFromVariant(Variant variant) {
+  public ImmutableList<ZipPath> getMatchingApksFromVariant(Variant variant) {
     ImmutableList.Builder<ZipPath> matchedApksBuilder = ImmutableList.builder();
 
     Predicate<String> moduleNameMatcher = getModuleNameMatcher(variant);

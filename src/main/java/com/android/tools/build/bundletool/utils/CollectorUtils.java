@@ -16,15 +16,21 @@
 package com.android.tools.build.bundletool.utils;
 
 import static com.android.tools.build.bundletool.utils.ConcurrencyUtils.waitFor;
+import static com.google.common.collect.ImmutableMap.toImmutableMap;
 import static java.util.function.Function.identity;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableListMultimap;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.MultimapBuilder;
 import com.google.common.collect.Multimaps;
+import com.google.common.collect.Streams;
 import com.google.common.util.concurrent.ListenableFuture;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
+import java.util.function.BinaryOperator;
 import java.util.function.Function;
 import java.util.stream.Collector;
 import java.util.stream.Collectors;
@@ -75,6 +81,16 @@ public final class CollectorUtils {
           return list1;
         },
         ImmutableList::copyOf);
+  }
+
+  /**
+   * Returns a single immutable copy of the mappings in {@code map1} and {@code map2}. Conflicts are
+   * resolved using the given {@code mergeFunction}.
+   */
+  public static <K, V> ImmutableMap<K, V> combineMaps(
+      Map<K, V> map1, Map<K, V> map2, BinaryOperator<V> mergeFunction) {
+    return Streams.concat(map1.entrySet().stream(), map2.entrySet().stream())
+        .collect(toImmutableMap(Entry::getKey, Entry::getValue, mergeFunction));
   }
 
   private CollectorUtils() {}

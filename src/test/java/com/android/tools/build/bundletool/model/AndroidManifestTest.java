@@ -38,6 +38,7 @@ import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.xmlA
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.xmlBooleanAttribute;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.xmlDecimalIntegerAttribute;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.xmlElement;
+import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.xmlNamespace;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.xmlNode;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.xmlResourceReferenceAttribute;
 import static com.google.common.truth.Truth.assertThat;
@@ -712,6 +713,8 @@ public class AndroidManifestTest {
                             xmlNode(
                                 xmlElement(
                                     "meta-data",
+                                    ImmutableList.of(
+                                        xmlNamespace("android", ANDROID_NAMESPACE_URI)),
                                     ImmutableList.of(
                                         xmlAttribute(ANDROID_NAMESPACE_URI, "name", "plain"),
                                         xmlAttribute(ANDROID_NAMESPACE_URI, "value", "v1")))),

@@ -190,7 +190,7 @@ public class SplitsXmlInjectorTest {
             processedStandalone
                 .getAndroidManifest()
                 .getMetadataResourceId("com.android.vending.splits"))
-        .hasValue(0x7f010000);
+        .hasValue(0x7f020000);
     assertThat(processedStandalone.getResourceTable().get())
         .containsResource("com.example.app:xml/splits0")
         .withFileReference("res/xml/splits0.xml");

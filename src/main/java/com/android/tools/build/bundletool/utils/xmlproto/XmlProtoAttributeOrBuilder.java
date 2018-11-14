@@ -143,7 +143,11 @@ abstract class XmlProtoAttributeOrBuilder<AttributeProtoT extends XmlAttributeOr
       case RAW_STR:
         return item.getRawStr().getValue();
       case REF:
-        return String.valueOf(item.getRef().getId());
+        // Return the name of the resource if available, else the ID.
+        if (!item.getRef().getName().isEmpty()) {
+          return "@" + item.getRef().getName();
+        }
+        return String.format("0x%08x", item.getRef().getId());
       case STR:
         return item.getStr().getValue();
       case STYLED_STR:

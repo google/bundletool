@@ -57,8 +57,12 @@ public abstract class ApkOptimizations {
 
   public abstract boolean getUncompressNativeLibraries();
 
+  public abstract boolean getUncompressDexFiles();
+
   static Builder builder() {
-    return new AutoValue_ApkOptimizations.Builder().setUncompressNativeLibraries(false);
+    return new AutoValue_ApkOptimizations.Builder()
+        .setUncompressNativeLibraries(false)
+        .setUncompressDexFiles(false);
   }
 
   /** Builder for the {@link ApkOptimizations} class. */
@@ -67,6 +71,8 @@ public abstract class ApkOptimizations {
     abstract Builder setSplitDimensions(ImmutableSet<OptimizationDimension> splitDimensions);
 
     abstract Builder setUncompressNativeLibraries(boolean enable);
+
+    abstract Builder setUncompressDexFiles(boolean enable);
 
     abstract ApkOptimizations build();
   }

@@ -27,6 +27,7 @@ import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.with
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withOnDemandAttribute;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withOnDemandDelivery;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withSplitId;
+import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withVersionCode;
 import static com.google.common.truth.Truth.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
@@ -628,5 +629,39 @@ public class AndroidManifestValidatorTest {
         .hasMessageThat()
         .contains(
             "App Bundle contains instant modules but the 'base' module is not marked 'instant'.");
+  }
+
+  @Test
+  public void bundleModules_sameVersionCode_ok() throws Exception {
+    ImmutableList<BundleModule> bundleModules =
+        ImmutableList.of(
+            new BundleModuleBuilder(BASE_MODULE_NAME)
+                .setManifest(androidManifest("com.test", withVersionCode(2)))
+                .build(),
+            new BundleModuleBuilder(FEATURE_MODULE_NAME)
+                .setManifest(androidManifest("com.test", withVersionCode(2)))
+                .build());
+
+    new AndroidManifestValidator().validateAllModules(bundleModules);
+  }
+
+  @Test
+  public void bundleModules_differentVersionCode_throws() throws Exception {
+    ImmutableList<BundleModule> bundleModules =
+        ImmutableList.of(
+            new BundleModuleBuilder(BASE_MODULE_NAME)
+                .setManifest(androidManifest("com.test", withVersionCode(2)))
+                .build(),
+            new BundleModuleBuilder(FEATURE_MODULE_NAME)
+                .setManifest(androidManifest("com.test", withVersionCode(3)))
+                .build());
+
+    Throwable exception =
+        assertThrows(
+            ValidationException.class,
+            () -> new AndroidManifestValidator().validateAllModules(bundleModules));
+    assertThat(exception)
+        .hasMessageThat()
+        .contains("App Bundle modules should have the same version code but found [2,3]");
   }
 }

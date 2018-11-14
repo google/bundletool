@@ -363,7 +363,7 @@ public abstract class BuildApksCommand {
         .ifPresent(buildApksCommand::setGenerateOnlyForConnectedDevice);
 
     Optional<String> deviceSerialName = DEVICE_ID_FLAG.getValue(flags);
-    if (!deviceSerialName.isPresent()) {
+    if (connectedDeviceMode && !deviceSerialName.isPresent()) {
       deviceSerialName = environmentVariableProvider.getVariable(ANDROID_SERIAL_VARIABLE);
     }
     deviceSerialName.ifPresent(buildApksCommand::setDeviceId);

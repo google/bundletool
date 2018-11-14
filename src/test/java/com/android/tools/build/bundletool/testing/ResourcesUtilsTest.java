@@ -48,28 +48,28 @@ public final class ResourcesUtilsTest {
                 /* packageName= */ "com.test.app",
                 /* typeName= */ "xml",
                 /* resourceName= */ "layout"))
-        .hasValue(0x7F000000);
+        .hasValue(0x7F010000);
     assertThat(
             ResourcesUtils.resolveResourceId(
                 resourceTable,
                 /* packageName= */ "com.test.app.split",
                 /* typeName= */ "xml",
                 /* resourceName= */ "layout"))
-        .hasValue(0x80000000);
-    assertThat(
-            ResourcesUtils.resolveResourceId(
-                resourceTable,
-                /* packageName= */ "com.test.app.split",
-                /* typeName= */ "string",
-                /* resourceName= */ "hello"))
         .hasValue(0x80010000);
     assertThat(
             ResourcesUtils.resolveResourceId(
                 resourceTable,
                 /* packageName= */ "com.test.app.split",
                 /* typeName= */ "string",
+                /* resourceName= */ "hello"))
+        .hasValue(0x80020000);
+    assertThat(
+            ResourcesUtils.resolveResourceId(
+                resourceTable,
+                /* packageName= */ "com.test.app.split",
+                /* typeName= */ "string",
                 /* resourceName= */ "world"))
-        .hasValue(0x80010001);
+        .hasValue(0x80020001);
   }
 
   @Test
