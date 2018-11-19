@@ -24,13 +24,17 @@ import static com.android.tools.build.bundletool.testing.TargetingUtils.mergeAss
 import static com.android.tools.build.bundletool.testing.TargetingUtils.openGlVersionFrom;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.openGlVersionTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.textureCompressionTargeting;
+import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.collect.ImmutableList.toImmutableList;
+import static com.google.common.collect.ImmutableSet.toImmutableSet;
 import static com.google.common.truth.Truth.assertThat;
 import static com.google.common.truth.extensions.proto.ProtoTruth.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
+import com.android.bundle.Files.ApexImages;
 import com.android.bundle.Files.Assets;
 import com.android.bundle.Files.NativeLibraries;
+import com.android.bundle.Files.TargetedApexImage;
 import com.android.bundle.Files.TargetedAssetsDirectory;
 import com.android.bundle.Files.TargetedNativeDirectory;
 import com.android.bundle.Targeting.AssetsDirectoryTargeting;
@@ -38,11 +42,14 @@ import com.android.bundle.Targeting.TextureCompressionFormat.TextureCompressionF
 import com.android.tools.build.bundletool.exceptions.ValidationException;
 import com.android.tools.build.bundletool.model.AbiName;
 import com.android.tools.build.bundletool.model.ZipPath;
+import com.google.common.base.Joiner;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.Sets;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
-import java.util.stream.Stream;
+import java.util.Set;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
@@ -80,11 +87,11 @@ public class TargetingGeneratorTest {
   @Test
   public void generateTargetingForNativeLibraries_createsSingleDirectoryGroup() throws Exception {
     Collection<String> manyDirectories =
-        Stream.of(AbiName.values())
+        Arrays.stream(AbiName.values())
             .map(AbiName::getPlatformName)
             .map(abi -> "lib/" + abi)
             .collect(toImmutableList());
-    assertThat(manyDirectories.size()).isGreaterThan(1); // Otherwise this test is useless.
+    checkState(manyDirectories.size() > 1); // Otherwise this test is useless.
 
     NativeLibraries nativeTargeting =
         generator.generateTargetingForNativeLibraries(manyDirectories);
@@ -104,8 +111,8 @@ public class TargetingGeneratorTest {
     assertThat(exception)
         .hasMessageThat()
         .containsMatch(
-            "Expecting ABI name in directory 'lib/ARM64-v8a', but found 'ARM64-v8a' which is not "
-                + "recognized. Did you mean 'arm64-v8a'?");
+            "Expecting ABI name in file or directory 'lib/ARM64-v8a', but found 'ARM64-v8a' "
+                + "which is not recognized. Did you mean 'arm64-v8a'?");
   }
 
   @Test
@@ -120,8 +127,60 @@ public class TargetingGeneratorTest {
     assertThat(exception)
         .hasMessageThat()
         .contains(
-            "Expecting ABI name in directory 'lib/non_abi_name', but found 'non_abi_name' which is "
-                + "not recognized.");
+            "Expecting ABI name in file or directory 'lib/non_abi_name', but found 'non_abi_name' "
+                + "which is not recognized.");
+  }
+
+  @Test
+  public void generateTargetingForApexImages_createsAllTargeting() throws Exception {
+    ImmutableSet<String> abis =
+        Arrays.stream(AbiName.values()).map(AbiName::getPlatformName).collect(toImmutableSet());
+    Set<String> abiPairs =
+        Sets.cartesianProduct(abis, abis).stream()
+            .map(pair -> Joiner.on('.').join(pair))
+            .collect(toImmutableSet());
+    Collection<ZipPath> allAbiFiles =
+        Sets.union(abis, abiPairs).stream()
+            .map(abi -> ZipPath.create(abi + ".img"))
+            .collect(toImmutableList());
+    checkState(allAbiFiles.size() > 1); // Otherwise this test is useless.
+
+    ApexImages apexImages = generator.generateTargetingForApexImages(allAbiFiles);
+
+    List<TargetedApexImage> images = apexImages.getImageList();
+    assertThat(images).hasSize(allAbiFiles.size());
+  }
+
+  @Test
+  public void generateTargetingForApexImages_abiBaseNamesDisallowed() throws Exception {
+    ValidationException exception =
+        assertThrows(
+            ValidationException.class,
+            () ->
+                generator.generateTargetingForApexImages(
+                    ImmutableList.of(ZipPath.create("x86.ARM64-v8a.img"))));
+
+    assertThat(exception)
+        .hasMessageThat()
+        .containsMatch(
+            "Expecting ABI name in file or directory 'x86.ARM64-v8a.img', but found 'ARM64-v8a' "
+                + "which is not recognized. Did you mean 'arm64-v8a'?");
+  }
+
+  @Test
+  public void generateTargetingForApexImages_baseNameNotAnAbi_throws() throws Exception {
+    ValidationException exception =
+        assertThrows(
+            ValidationException.class,
+            () ->
+                generator.generateTargetingForApexImages(
+                    ImmutableList.of(ZipPath.create("non_abi_name.img"))));
+
+    assertThat(exception)
+        .hasMessageThat()
+        .contains(
+            "Expecting ABI name in file or directory 'non_abi_name.img', but found 'non_abi_name' "
+                + "which is not recognized.");
   }
 
   @Test

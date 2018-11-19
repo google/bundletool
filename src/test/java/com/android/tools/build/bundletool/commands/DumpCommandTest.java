@@ -16,22 +16,17 @@
 package com.android.tools.build.bundletool.commands;
 
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifest;
-import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withMetadataValue;
 import static com.google.common.truth.Truth.assertThat;
-import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
-import com.android.aapt.Resources.XmlAttribute;
-import com.android.aapt.Resources.XmlElement;
-import com.android.aapt.Resources.XmlNode;
+import com.android.aapt.Resources.ResourceTable;
 import com.android.tools.build.bundletool.commands.DumpCommand.DumpTarget;
 import com.android.tools.build.bundletool.exceptions.ValidationException;
 import com.android.tools.build.bundletool.io.AppBundleSerializer;
 import com.android.tools.build.bundletool.model.AppBundle;
 import com.android.tools.build.bundletool.testing.AppBundleBuilder;
 import com.android.tools.build.bundletool.utils.flags.FlagParser;
-import java.io.ByteArrayOutputStream;
-import java.io.PrintStream;
+import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import org.junit.Before;
@@ -43,8 +38,6 @@ import org.junit.runners.JUnit4;
 
 @RunWith(JUnit4.class)
 public final class DumpCommandTest {
-
-  private static final String LINE_BREAK = System.lineSeparator();
 
   @Rule public final TemporaryFolder temporaryFolder = new TemporaryFolder();
 
@@ -78,6 +71,56 @@ public final class DumpCommandTest {
             .setDumpTarget(DumpTarget.MANIFEST)
             .setBundlePath(bundlePath)
             .setModuleName("feature")
+            .build();
+
+    assertThat(commandViaBuilder).isEqualTo(commandViaFlags);
+  }
+
+  @Test
+  public void buildingViaFlagsAndBuilderHasSameResult_withPrintValues() {
+    DumpCommand commandViaFlags =
+        DumpCommand.fromFlags(
+            new FlagParser().parse("dump", "manifest", "--bundle=" + bundlePath, "--values"));
+
+    DumpCommand commandViaBuilder =
+        DumpCommand.builder()
+            .setDumpTarget(DumpTarget.MANIFEST)
+            .setBundlePath(bundlePath)
+            .setPrintValues(true)
+            .build();
+
+    assertThat(commandViaBuilder).isEqualTo(commandViaFlags);
+  }
+
+  @Test
+  public void buildingViaFlagsAndBuilderHasSameResult_resourceId() {
+    DumpCommand commandViaFlags =
+        DumpCommand.fromFlags(
+            new FlagParser()
+                .parse("dump", "manifest", "--bundle=" + bundlePath, "--resource=0x12345678"));
+
+    DumpCommand commandViaBuilder =
+        DumpCommand.builder()
+            .setDumpTarget(DumpTarget.MANIFEST)
+            .setBundlePath(bundlePath)
+            .setResourceId(0x12345678)
+            .build();
+
+    assertThat(commandViaBuilder).isEqualTo(commandViaFlags);
+  }
+
+  @Test
+  public void buildingViaFlagsAndBuilderHasSameResult_resourceName() {
+    DumpCommand commandViaFlags =
+        DumpCommand.fromFlags(
+            new FlagParser()
+                .parse("dump", "manifest", "--bundle=" + bundlePath, "--resource=drawable/icon"));
+
+    DumpCommand commandViaBuilder =
+        DumpCommand.builder()
+            .setDumpTarget(DumpTarget.MANIFEST)
+            .setBundlePath(bundlePath)
+            .setResourceName("drawable/icon")
             .build();
 
     assertThat(commandViaBuilder).isEqualTo(commandViaFlags);
@@ -130,190 +173,102 @@ public final class DumpCommandTest {
   }
 
   @Test
-  public void dumpManifest() throws Exception {
-    XmlNode manifest =
-        XmlNode.newBuilder()
-            .setElement(XmlElement.newBuilder().setName("manifest").build())
+  public void dumpResources_withXPath_throws() throws Exception {
+    createBundle(bundlePath);
+
+    DumpCommand dumpCommand =
+        DumpCommand.builder()
+            .setBundlePath(bundlePath)
+            .setDumpTarget(DumpTarget.RESOURCES)
+            .setXPathExpression("/manifest/@nothing-that-exists")
             .build();
-    AppBundle appBundle =
-        new AppBundleBuilder().addModule("base", module -> module.setManifest(manifest)).build();
-    new AppBundleSerializer().writeToDisk(appBundle, bundlePath);
-
-    ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
-
-    DumpCommand.builder()
-        .setBundlePath(bundlePath)
-        .setDumpTarget(DumpTarget.MANIFEST)
-        .setModuleName("base")
-        .setOutputStream(new PrintStream(outputStream))
-        .build()
-        .execute();
-
-    assertThat(new String(outputStream.toByteArray(), UTF_8)).isEqualTo("<manifest/>" + LINE_BREAK);
+    ValidationException exception =
+        assertThrows(ValidationException.class, () -> dumpCommand.execute());
+    assertThat(exception)
+        .hasMessageThat()
+        .contains("Cannot pass an XPath expression when dumping resources.");
   }
 
   @Test
-  public void dumpManifest_moduleNotBase() throws Exception {
-    XmlNode manifestBase =
-        XmlNode.newBuilder()
-            .setElement(
-                XmlElement.newBuilder()
-                    .setName("manifest")
-                    .addAttribute(XmlAttribute.newBuilder().setName("package").setValue("base")))
-            .build();
-    XmlNode manifestModule =
-        XmlNode.newBuilder()
-            .setElement(
-                XmlElement.newBuilder()
-                    .setName("manifest")
-                    .addAttribute(XmlAttribute.newBuilder().setName("package").setValue("module")))
-            .build();
-    AppBundle appBundle =
-        new AppBundleBuilder()
-            .addModule("base", module -> module.setManifest(manifestBase))
-            .addModule("module", module -> module.setManifest(manifestModule))
-            .build();
-    new AppBundleSerializer().writeToDisk(appBundle, bundlePath);
+  public void dumpResources_resourceIdAndResourceNameSet_throws() throws Exception {
+    createBundle(bundlePath);
 
-    ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
-
-    DumpCommand.builder()
-        .setBundlePath(bundlePath)
-        .setDumpTarget(DumpTarget.MANIFEST)
-        .setModuleName("module")
-        .setOutputStream(new PrintStream(outputStream))
-        .build()
-        .execute();
-
-    assertThat(new String(outputStream.toByteArray(), UTF_8))
-        .isEqualTo("<manifest package=\"module\"/>" + LINE_BREAK);
+    DumpCommand dumpCommand =
+        DumpCommand.builder()
+            .setBundlePath(bundlePath)
+            .setDumpTarget(DumpTarget.RESOURCES)
+            .setResourceId(0x12345678)
+            .setResourceName("drawable/icon")
+            .build();
+    ValidationException exception =
+        assertThrows(ValidationException.class, () -> dumpCommand.execute());
+    assertThat(exception)
+        .hasMessageThat()
+        .contains("Cannot pass both resource ID and resource name.");
   }
 
   @Test
-  public void dumpManifest_withXPath_singleValue() throws Exception {
-    AppBundle appBundle =
-        new AppBundleBuilder()
-            .addModule("base", module -> module.setManifest(androidManifest("com.app")))
-            .build();
-    new AppBundleSerializer().writeToDisk(appBundle, bundlePath);
-
-    ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
-
-    DumpCommand.builder()
-        .setBundlePath(bundlePath)
-        .setDumpTarget(DumpTarget.MANIFEST)
-        .setXPathExpression("/manifest/@package")
-        .setOutputStream(new PrintStream(outputStream))
-        .build()
-        .execute();
-
-    assertThat(new String(outputStream.toByteArray(), UTF_8)).isEqualTo("com.app" + LINE_BREAK);
-  }
-
-  @Test
-  public void dumpManifest_withXPath_multipleValues() throws Exception {
-    AppBundle appBundle =
-        new AppBundleBuilder()
-            .addModule(
-                "base",
-                module ->
-                    module.setManifest(
-                        androidManifest(
-                            "com.app",
-                            withMetadataValue("key1", "value1"),
-                            withMetadataValue("key2", "value2"))))
-            .build();
-    new AppBundleSerializer().writeToDisk(appBundle, bundlePath);
-
-    ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
-
-    DumpCommand.builder()
-        .setBundlePath(bundlePath)
-        .setDumpTarget(DumpTarget.MANIFEST)
-        .setXPathExpression("/manifest/application/meta-data/@android:value")
-        .setOutputStream(new PrintStream(outputStream))
-        .build()
-        .execute();
-
-    assertThat(new String(outputStream.toByteArray(), UTF_8))
-        .isEqualTo("value1" + LINE_BREAK + "value2" + LINE_BREAK);
-  }
-
-  @Test
-  public void dumpManifest_withXPath_nodeResult() throws Exception {
-    AppBundle appBundle =
-        new AppBundleBuilder()
-            .addModule(
-                "base",
-                module ->
-                    module.setManifest(
-                        androidManifest(
-                            "com.app",
-                            withMetadataValue("key1", "value1"),
-                            withMetadataValue("key2", "value2"))))
-            .build();
-    new AppBundleSerializer().writeToDisk(appBundle, bundlePath);
-
-    ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+  public void dumpManifest_resourceIdSet_throws() throws Exception {
+    createBundle(bundlePath);
 
     DumpCommand dumpCommand =
         DumpCommand.builder()
             .setBundlePath(bundlePath)
             .setDumpTarget(DumpTarget.MANIFEST)
-            .setXPathExpression("/manifest/application/meta-data")
-            .setOutputStream(new PrintStream(outputStream))
+            .setResourceId(0x12345678)
             .build();
-
-    assertThrows(UnsupportedOperationException.class, () -> dumpCommand.execute());
+    ValidationException exception =
+        assertThrows(ValidationException.class, () -> dumpCommand.execute());
+    assertThat(exception)
+        .hasMessageThat()
+        .contains("The --resource flag can only be passed when dumping resources.");
   }
 
   @Test
-  public void dumpManifest_withXPath_predicate() throws Exception {
+  public void dumpResources_moduleSet_throws() throws Exception {
+    createBundle(bundlePath);
+
+    DumpCommand dumpCommand =
+        DumpCommand.builder()
+            .setBundlePath(bundlePath)
+            .setDumpTarget(DumpTarget.RESOURCES)
+            .setModuleName("base")
+            .build();
+    ValidationException exception =
+        assertThrows(ValidationException.class, () -> dumpCommand.execute());
+    assertThat(exception).hasMessageThat().contains("The --module flag is unnecessary");
+  }
+
+  @Test
+  public void dumpManifest_printValues_throws() throws Exception {
+    createBundle(bundlePath);
+
+    DumpCommand dumpCommand =
+        DumpCommand.builder()
+            .setBundlePath(bundlePath)
+            .setDumpTarget(DumpTarget.MANIFEST)
+            .setPrintValues(true)
+            .build();
+    ValidationException exception =
+        assertThrows(ValidationException.class, () -> dumpCommand.execute());
+    assertThat(exception)
+        .hasMessageThat()
+        .contains("The --values flag can only be passed when dumping resources.");
+  }
+
+  private static void createBundle(Path bundlePath) throws IOException {
+    createBundleWithResourceTable(bundlePath, ResourceTable.getDefaultInstance());
+  }
+
+  private static void createBundleWithResourceTable(Path bundlePath, ResourceTable resourceTable)
+      throws IOException {
     AppBundle appBundle =
         new AppBundleBuilder()
             .addModule(
                 "base",
                 module ->
-                    module.setManifest(
-                        androidManifest(
-                            "com.app",
-                            withMetadataValue("key1", "value1"),
-                            withMetadataValue("key2", "value2"))))
+                    module.setManifest(androidManifest("com.app")).setResourceTable(resourceTable))
             .build();
     new AppBundleSerializer().writeToDisk(appBundle, bundlePath);
-
-    ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
-
-    DumpCommand.builder()
-        .setBundlePath(bundlePath)
-        .setDumpTarget(DumpTarget.MANIFEST)
-        .setXPathExpression(
-            "/manifest/application/meta-data[@android:name = \"key2\"]/@android:value")
-        .setOutputStream(new PrintStream(outputStream))
-        .build()
-        .execute();
-
-    assertThat(new String(outputStream.toByteArray(), UTF_8)).isEqualTo("value2" + LINE_BREAK);
-  }
-
-  @Test
-  public void dumpManifest_withXPath_noMatch() throws Exception {
-    AppBundle appBundle =
-        new AppBundleBuilder()
-            .addModule("base", module -> module.setManifest(androidManifest("com.app")))
-            .build();
-    new AppBundleSerializer().writeToDisk(appBundle, bundlePath);
-
-    ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
-
-    DumpCommand.builder()
-        .setBundlePath(bundlePath)
-        .setDumpTarget(DumpTarget.MANIFEST)
-        .setXPathExpression("/manifest/@nothing-that-exists")
-        .setOutputStream(new PrintStream(outputStream))
-        .build()
-        .execute();
-
-    assertThat(new String(outputStream.toByteArray(), UTF_8)).isEqualTo(LINE_BREAK);
   }
 }

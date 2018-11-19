@@ -25,6 +25,7 @@ import com.android.tools.build.bundletool.commands.CommandHelp.CommandDescriptio
 import com.android.tools.build.bundletool.commands.CommandHelp.FlagDescription;
 import com.android.tools.build.bundletool.device.AdbServer;
 import com.android.tools.build.bundletool.device.ApksInstaller;
+import com.android.tools.build.bundletool.device.Device.InstallOptions;
 import com.android.tools.build.bundletool.device.DeviceAnalyzer;
 import com.android.tools.build.bundletool.exceptions.CommandExecutionException;
 import com.android.tools.build.bundletool.io.TempFiles;
@@ -51,6 +52,7 @@ public abstract class InstallApksCommand {
   private static final Flag<Path> APKS_ARCHIVE_FILE_FLAG = Flag.path("apks");
   private static final Flag<String> DEVICE_ID_FLAG = Flag.string("device-id");
   private static final Flag<ImmutableSet<String>> MODULES_FLAG = Flag.stringSet("modules");
+  private static final Flag<Boolean> ALLOW_DOWNGRADE_FLAG = Flag.booleanFlag("allow-downgrade");
 
   private static final String ANDROID_HOME_VARIABLE = "ANDROID_HOME";
   private static final String ANDROID_SERIAL_VARIABLE = "ANDROID_SERIAL";
@@ -66,10 +68,12 @@ public abstract class InstallApksCommand {
 
   public abstract Optional<ImmutableSet<String>> getModules();
 
+  public abstract boolean getAllowDowngrade();
+
   abstract AdbServer getAdbServer();
 
   public static Builder builder() {
-    return new AutoValue_InstallApksCommand.Builder();
+    return new AutoValue_InstallApksCommand.Builder().setAllowDowngrade(false);
   }
 
   /** Builder for the {@link InstallApksCommand}. */
@@ -82,6 +86,8 @@ public abstract class InstallApksCommand {
     public abstract Builder setDeviceId(String deviceId);
 
     public abstract Builder setModules(ImmutableSet<String> modules);
+
+    public abstract Builder setAllowDowngrade(boolean allowDowngrade);
 
     /** The caller is responsible for the lifecycle of the {@link AdbServer}. */
     public abstract Builder setAdbServer(AdbServer adbServer);
@@ -118,12 +124,16 @@ public abstract class InstallApksCommand {
     }
 
     Optional<ImmutableSet<String>> modules = MODULES_FLAG.getValue(flags);
+    Optional<Boolean> allowDowngrade = ALLOW_DOWNGRADE_FLAG.getValue(flags);
+
     flags.checkNoUnknownFlags();
 
     InstallApksCommand.Builder command =
         builder().setAdbPath(adbPath).setAdbServer(adbServer).setApksArchivePath(apksArchivePath);
     deviceSerialName.ifPresent(command::setDeviceId);
     modules.ifPresent(command::setModules);
+    allowDowngrade.ifPresent(command::setAllowDowngrade);
+
     return command.build();
   }
 
@@ -149,10 +159,13 @@ public abstract class InstallApksCommand {
           ImmutableList<Path> extractedApks = extractApksCommand.build().execute();
 
           ApksInstaller installer = new ApksInstaller(adbServer);
+          InstallOptions installOptions =
+              InstallOptions.builder().setAllowDowngrade(getAllowDowngrade()).build();
+
           if (getDeviceId().isPresent()) {
-            installer.installApks(extractedApks, getDeviceId().get());
+            installer.installApks(extractedApks, installOptions, getDeviceId().get());
           } else {
-            installer.installApks(extractedApks);
+            installer.installApks(extractedApks, installOptions);
           }
         });
   }
@@ -208,6 +221,15 @@ public abstract class InstallApksCommand {
                         + "this flag or the environment variable is required when more than one "
                         + "device or emulator is connected.",
                     ANDROID_SERIAL_VARIABLE)
+                .build())
+        .addFlag(
+            FlagDescription.builder()
+                .setFlagName(DEVICE_ID_FLAG.getName())
+                .setExampleValue("allow-downgrade")
+                .setOptional(true)
+                .setDescription(
+                    "If set, allows APKs to be installed on the device even if the app is already "
+                        + "installed with a lower version code.")
                 .build())
         .addFlag(
             FlagDescription.builder()

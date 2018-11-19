@@ -105,12 +105,13 @@ public final class XmlProtoToXmlConverter {
       for (XmlProtoAttribute protoAttribute : protoElement.getAttributes().collect(toList())) {
         String attrNamespaceUri = protoAttribute.getNamespaceUri();
         if (attrNamespaceUri.isEmpty()) {
-          xmlElement.setAttribute(protoAttribute.getName(), protoAttribute.getDebugString());
+          xmlElement.setAttribute(
+              getAttributeTagName(protoAttribute), protoAttribute.getDebugString());
         } else {
           String prefix = getPrefixForNamespace(attrNamespaceUri);
           xmlElement.setAttributeNS(
               attrNamespaceUri,
-              prefix + ":" + protoAttribute.getName(),
+              prefix + ":" + getAttributeTagName(protoAttribute),
               protoAttribute.getDebugString());
         }
       }
@@ -127,6 +128,28 @@ public final class XmlProtoToXmlConverter {
     } else {
       return xmlFactory.createTextNode(protoNode.getText());
     }
+  }
+
+  /**
+   * Extract the XML tag name from the attribute we want to print.
+   *
+   * <p>Because the XML spec doesn't allow empty tags, if the tag is not set in the proto, we return
+   * the resource ID if set, else "_unknown_".
+   */
+  private static String getAttributeTagName(XmlProtoAttribute protoAttribute) {
+    if (!protoAttribute.getName().isEmpty()) {
+      return protoAttribute.getName();
+    }
+
+    if (protoAttribute.getResourceId() == 0) {
+      // Something is wrong, but at least we won't crash by passing an empty tag.
+      return "_unknown_";
+    }
+
+    // Some optimization tools clear the name because the Android platform doesn't need it
+    // if it's an Android attribute because the resoure ID is used instead.
+    // Surrounding with underscores because a tag name cannot start with a digit.
+    return String.format("_0x%08x_", protoAttribute.getResourceId());
   }
 
   private String getPrefixForNamespace(String attrNamespaceUri) {

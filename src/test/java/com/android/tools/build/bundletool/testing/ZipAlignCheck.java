@@ -44,7 +44,7 @@ public final class ZipAlignCheck {
         CentralDirectoryHeader header = entry.getCentralDirectoryHeader();
 
         // Alignment only applies to uncompressed files.
-        if (header.getCompressionInfoWithWait().getMethod() == CompressionMethod.STORE) {
+        if (header.getCompressionInfoWithWait().getMethod().equals(CompressionMethod.STORE)) {
           int expectedAligment =
               NATIVE_LIB_PATTERN.matcher(header.getName()).matches()
                   ? PAGE_ALIGNMENT

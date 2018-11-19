@@ -21,6 +21,7 @@ import static com.google.common.base.Preconditions.checkNotNull;
 import com.android.aapt.Resources.ResourceTable;
 import com.android.aapt.Resources.XmlNode;
 import com.android.bundle.Config.BundleConfig;
+import com.android.bundle.Files.ApexImages;
 import com.android.bundle.Files.Assets;
 import com.android.bundle.Files.NativeLibraries;
 import com.android.tools.build.bundletool.model.BundleModule;
@@ -79,6 +80,11 @@ public class BundleModuleBuilder {
 
   public BundleModuleBuilder setResourceTable(ResourceTable resourceTable) {
     addFile("resources.pb", resourceTable.toByteArray());
+    return this;
+  }
+
+  public BundleModuleBuilder setApexConfig(ApexImages apexConfig) {
+    addFile("apex.pb", apexConfig.toByteArray());
     return this;
   }
 

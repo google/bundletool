@@ -16,6 +16,8 @@
 
 package com.android.tools.build.bundletool.validation;
 
+import static com.android.tools.build.bundletool.model.BundleModule.ABI_SPLITTER;
+import static com.android.tools.build.bundletool.model.BundleModule.APEX_DIRECTORY;
 import static com.android.tools.build.bundletool.model.BundleModule.ASSETS_DIRECTORY;
 import static com.android.tools.build.bundletool.model.BundleModule.DEX_DIRECTORY;
 import static com.android.tools.build.bundletool.model.BundleModule.LIB_DIRECTORY;
@@ -24,17 +26,20 @@ import static com.android.tools.build.bundletool.model.BundleModule.MANIFEST_FIL
 import static com.android.tools.build.bundletool.model.BundleModule.RESOURCES_DIRECTORY;
 import static com.android.tools.build.bundletool.model.BundleModule.RESOURCES_PROTO_PATH;
 import static com.android.tools.build.bundletool.model.BundleModule.ROOT_DIRECTORY;
+import static com.google.common.base.Preconditions.checkState;
 
 import com.android.tools.build.bundletool.exceptions.BundleFileTypesException.FileUsesReservedNameException;
 import com.android.tools.build.bundletool.exceptions.BundleFileTypesException.FilesInResourceDirectoryRootException;
+import com.android.tools.build.bundletool.exceptions.BundleFileTypesException.InvalidApexImagePathException;
 import com.android.tools.build.bundletool.exceptions.BundleFileTypesException.InvalidFileExtensionInDirectoryException;
 import com.android.tools.build.bundletool.exceptions.BundleFileTypesException.InvalidFileNameInDirectoryException;
-import com.android.tools.build.bundletool.exceptions.BundleFileTypesException.InvalidNativeArchitectureException;
+import com.android.tools.build.bundletool.exceptions.BundleFileTypesException.InvalidNativeArchitectureNameException;
 import com.android.tools.build.bundletool.exceptions.BundleFileTypesException.InvalidNativeLibraryPathException;
 import com.android.tools.build.bundletool.exceptions.BundleFileTypesException.UnknownFileOrDirectoryFoundInModuleException;
 import com.android.tools.build.bundletool.exceptions.ValidationException;
 import com.android.tools.build.bundletool.model.AbiName;
 import com.android.tools.build.bundletool.model.ZipPath;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import java.util.regex.Pattern;
 
@@ -93,7 +98,7 @@ public class BundleFilesValidator extends SubValidator {
 
       String subDirName = file.getName(1).toString();
       if (!AbiName.fromPlatformName(subDirName).isPresent()) {
-        throw new InvalidNativeArchitectureException(file.subpath(0, 2));
+        throw InvalidNativeArchitectureNameException.createForDirectory(file.subpath(0, 2));
       }
 
     } else if (file.startsWith(MANIFEST_DIRECTORY)) {
@@ -112,6 +117,19 @@ public class BundleFilesValidator extends SubValidator {
         throw new FileUsesReservedNameException(file, nameUnderRoot);
       }
 
+    } else if (file.startsWith(APEX_DIRECTORY)) {
+      if (file.getNameCount() != 2) {
+        throw new InvalidApexImagePathException(APEX_DIRECTORY, file);
+      }
+
+      if (!fileName.endsWith(".img")) {
+        throw new InvalidFileExtensionInDirectoryException(APEX_DIRECTORY, ".img", file);
+      }
+
+      if (!isMultiAbiFileName(fileName)) {
+        throw InvalidNativeArchitectureNameException.createForFile(file);
+      }
+
     } else {
       throw new UnknownFileOrDirectoryFoundInModuleException(file);
     }
@@ -120,5 +138,14 @@ public class BundleFilesValidator extends SubValidator {
   private static boolean isReservedRootApkEntry(ZipPath name) {
     return RESERVED_ROOT_APK_ENTRIES.contains(name)
         || CLASSES_DEX_PATTERN.matcher(name.toString()).matches();
+  }
+
+  private static boolean isMultiAbiFileName(String fileName) {
+    ImmutableList<String> tokens = ImmutableList.copyOf(ABI_SPLITTER.splitToList(fileName));
+    int nAbis = tokens.size() - 1;
+    checkState(tokens.get(nAbis).equals("img"), "File under 'apex/' does not have suffix 'img'");
+    return tokens.stream()
+        .limit(nAbis)
+        .allMatch(token -> AbiName.fromPlatformName(token).isPresent());
   }
 }

@@ -22,6 +22,7 @@ import static com.google.common.base.Preconditions.checkArgument;
 import com.android.tools.build.bundletool.exceptions.ValidationException;
 import com.android.tools.build.bundletool.model.AndroidManifest;
 import com.android.tools.build.bundletool.model.BundleModule;
+import com.android.tools.build.bundletool.model.BundleModule.ModuleDeliveryType;
 import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
@@ -255,11 +256,34 @@ public class ModuleDependencyValidator extends SubValidator {
     for (Entry<String, String> dependencyEntry : moduleDependenciesMap.entries()) {
       String moduleName = dependencyEntry.getKey();
       String moduleDep = dependencyEntry.getValue();
-      if (!modulesByName.get(moduleName).isOnDemandModule()
-          && modulesByName.get(moduleDep).isOnDemandModule()) {
+      ModuleDeliveryType moduleDeliveryType = modulesByName.get(moduleName).getDeliveryType();
+      ModuleDeliveryType depDeliveryType = modulesByName.get(moduleDep).getDeliveryType();
+
+      // Conditional modules can't have dependencies.
+      if (moduleDeliveryType.equals(ModuleDeliveryType.CONDITIONAL_INITIAL_INSTALL)
+          && !moduleDep.equals(BASE_MODULE_NAME)) {
         throw ValidationException.builder()
             .withMessage(
-                "Install-time module '%s' declares dependency on on-demand module '%s'.",
+                "Conditional module '%s' cannot have dependencies but uses module '%s'.",
+                moduleName, moduleDep)
+            .build();
+      }
+
+      if (moduleDeliveryType.equals(ModuleDeliveryType.NO_INITIAL_INSTALL)
+          && depDeliveryType.equals(ModuleDeliveryType.CONDITIONAL_INITIAL_INSTALL)) {
+        throw ValidationException.builder()
+            .withMessage(
+                "An on-demand module '%s' cannot depend on a conditional module '%s'.",
+                moduleName, moduleDep)
+            .build();
+      }
+
+      if (moduleDeliveryType.equals(ModuleDeliveryType.ALWAYS_INITIAL_INSTALL)
+          && !depDeliveryType.equals(ModuleDeliveryType.ALWAYS_INITIAL_INSTALL)) {
+        throw ValidationException.builder()
+            .withMessage(
+                "Install-time module '%s' cannot depend on a module '%s' that is not "
+                    + "install-time.",
                 moduleName, moduleDep)
             .build();
       }
@@ -277,7 +301,8 @@ public class ModuleDependencyValidator extends SubValidator {
       BundleModule moduleDep = modulesByName.get(moduleDepName);
       int minSdk = module.getAndroidManifest().getEffectiveMinSdkVersion();
       int minSdkDep = moduleDep.getAndroidManifest().getEffectiveMinSdkVersion();
-      if (module.getAndroidManifest().isModuleAlwaysInstalled() && minSdk != minSdkDep) {
+      if (module.getDeliveryType().equals(ModuleDeliveryType.ALWAYS_INITIAL_INSTALL)
+          && minSdk != minSdkDep) {
         throw ValidationException.builder()
             .withMessage(
                 "Install-time module '%s' has a minSdkVersion(%d) different than the"
@@ -289,8 +314,8 @@ public class ModuleDependencyValidator extends SubValidator {
         // app will not be served to devices with lower minSdk than the base.
         throw ValidationException.builder()
             .withMessage(
-                "On-demand module '%s' has a minSdkVersion(%d), which is smaller than the"
-                    + " minSdkVersion(%d) of its dependency '%s'.",
+                "Conditional or on-demand module '%s' has a minSdkVersion(%d), which is"
+                    + " smaller than the minSdkVersion(%d) of its dependency '%s'.",
                 moduleName, minSdk, minSdkDep, moduleDepName)
             .build();
       }

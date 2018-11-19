@@ -22,9 +22,10 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.android.tools.build.bundletool.exceptions.BundleFileTypesException.FileUsesReservedNameException;
 import com.android.tools.build.bundletool.exceptions.BundleFileTypesException.FilesInResourceDirectoryRootException;
+import com.android.tools.build.bundletool.exceptions.BundleFileTypesException.InvalidApexImagePathException;
 import com.android.tools.build.bundletool.exceptions.BundleFileTypesException.InvalidFileExtensionInDirectoryException;
 import com.android.tools.build.bundletool.exceptions.BundleFileTypesException.InvalidFileNameInDirectoryException;
-import com.android.tools.build.bundletool.exceptions.BundleFileTypesException.InvalidNativeArchitectureException;
+import com.android.tools.build.bundletool.exceptions.BundleFileTypesException.InvalidNativeArchitectureNameException;
 import com.android.tools.build.bundletool.exceptions.BundleFileTypesException.InvalidNativeLibraryPathException;
 import com.android.tools.build.bundletool.exceptions.BundleFileTypesException.UnknownFileOrDirectoryFoundInModuleException;
 import com.android.tools.build.bundletool.exceptions.ValidationException;
@@ -137,9 +138,9 @@ public class BundleFilesValidatorTest {
   public void validateLibFile_unknownAbi_throws() throws Exception {
     ZipPath unknownAbiPath = ZipPath.create("lib/sparc/libX.so");
 
-    InvalidNativeArchitectureException e =
+    InvalidNativeArchitectureNameException e =
         assertThrows(
-            InvalidNativeArchitectureException.class,
+            InvalidNativeArchitectureNameException.class,
             () -> new BundleFilesValidator().validateModuleFile(unknownAbiPath));
 
     assertThat(e).hasMessageThat().contains("Unrecognized native architecture for directory");
@@ -249,6 +250,68 @@ public class BundleFilesValidatorTest {
           .hasMessageThat()
           .contains("uses reserved file or directory name");
     }
+  }
+
+  @Test
+  public void validateApexFile_valid_success() throws Exception {
+    ZipPath apexFile = ZipPath.create("apex/x86.img");
+
+    new BundleFilesValidator().validateModuleFile(apexFile);
+  }
+
+  @Test
+  public void validateApexFile_validMultipleAbi_success() throws Exception {
+    ZipPath apexFile = ZipPath.create("apex/x86.arm64-v8a.img");
+
+    new BundleFilesValidator().validateModuleFile(apexFile);
+  }
+
+  @Test
+  public void validateApexFile_directoryStructureTooDeep_throws() throws Exception {
+    ZipPath apexFileTooDeep = ZipPath.create("apex/some-dir/x86.img");
+
+    InvalidApexImagePathException e =
+        assertThrows(
+            InvalidApexImagePathException.class,
+            () -> new BundleFilesValidator().validateModuleFile(apexFileTooDeep));
+
+    assertThat(e).hasMessageThat().contains("paths in form 'apex/<file>.img'");
+  }
+
+  @Test
+  public void validateApexFile_nonImgExtension_throws() throws Exception {
+    ZipPath nonImgFile = ZipPath.create("apex/x86.dat");
+
+    InvalidFileExtensionInDirectoryException e =
+        assertThrows(
+            InvalidFileExtensionInDirectoryException.class,
+            () -> new BundleFilesValidator().validateModuleFile(nonImgFile));
+
+    assertThat(e).hasMessageThat().contains("Files under apex/ must have .img extension");
+  }
+
+  @Test
+  public void validateApexFile_unknownAbi_throws() throws Exception {
+    ZipPath nonImgFile = ZipPath.create("apex/sparc.img");
+
+    InvalidNativeArchitectureNameException e =
+        assertThrows(
+            InvalidNativeArchitectureNameException.class,
+            () -> new BundleFilesValidator().validateModuleFile(nonImgFile));
+
+    assertThat(e).hasMessageThat().contains("Unrecognized native architecture for file");
+  }
+
+  @Test
+  public void validateApexFile_unknownMultipleAbi_throws() throws Exception {
+    ZipPath nonImgFile = ZipPath.create("apex/x86.sparc.img");
+
+    InvalidNativeArchitectureNameException e =
+        assertThrows(
+            InvalidNativeArchitectureNameException.class,
+            () -> new BundleFilesValidator().validateModuleFile(nonImgFile));
+
+    assertThat(e).hasMessageThat().contains("Unrecognized native architecture for file");
   }
 
   @Test

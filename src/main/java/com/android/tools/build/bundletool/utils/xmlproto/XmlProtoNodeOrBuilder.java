@@ -36,11 +36,11 @@ abstract class XmlProtoNodeOrBuilder<
   protected abstract ElementWrapperT newElement(ElementProtoT element);
 
   public final boolean isElement() {
-    return getProto().getNodeCase() == NodeCase.ELEMENT;
+    return getProto().getNodeCase().equals(NodeCase.ELEMENT);
   }
 
   public final boolean isText() {
-    return getProto().getNodeCase() == NodeCase.TEXT;
+    return getProto().getNodeCase().equals(NodeCase.TEXT);
   }
 
   public final ElementWrapperT getElement() {

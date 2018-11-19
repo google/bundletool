@@ -154,6 +154,75 @@ public final class XmlProtoToXmlConverterTest {
                 "</root>" + LINE_BREAK));
   }
 
+  @Test
+  public void testNameOfAndroidAttributeRemoved() {
+    XmlProtoNode proto =
+        XmlProtoNode.createElementNode(
+            XmlProtoElementBuilder.create("manifest")
+                .addNamespaceDeclaration("android", "http://schemas.android.com/apk/res/android")
+                .addAttribute(
+                    XmlProtoAttributeBuilder.createAndroidAttribute("", 0x0101021b)
+                        .setValueAsDecimalInteger(123))
+                .build());
+
+    Document document = XmlProtoToXmlConverter.convert(proto);
+    String xmlString = XmlUtils.documentToString(document);
+
+    assertThat(xmlString)
+        .isEqualTo(
+            String.format(
+                "<manifest xmlns:android=\"http://schemas.android.com/apk/res/android\" "
+                    + "android:_0x0101021b_=\"123\"/>%n"));
+  }
+
+  @Test
+  public void testNameAndNamespaceOfAndroidAttributeRemoved() {
+    XmlProtoNode proto =
+        XmlProtoNode.createElementNode(
+            XmlProtoElementBuilder.create("manifest")
+                .addAttribute(
+                    XmlProtoAttributeBuilder.create("")
+                        .setResourceId(0x0101021b)
+                        .setValueAsDecimalInteger(123))
+                .build());
+
+    Document document = XmlProtoToXmlConverter.convert(proto);
+    String xmlString = XmlUtils.documentToString(document);
+
+    assertThat(xmlString).isEqualTo(String.format("<manifest _0x0101021b_=\"123\"/>%n"));
+  }
+
+  @Test
+  public void testNameOfAttributeRemoved_doesNotCrash() {
+    XmlProtoNode proto =
+        XmlProtoNode.createElementNode(
+            XmlProtoElementBuilder.create("manifest")
+                .addAttribute(XmlProtoAttributeBuilder.create("").setValueAsString("hello"))
+                .build());
+
+    Document document = XmlProtoToXmlConverter.convert(proto);
+    String xmlString = XmlUtils.documentToString(document);
+
+    assertThat(xmlString).isEqualTo(String.format("<manifest _unknown_=\"hello\"/>%n"));
+  }
+
+  @Test
+  public void testNameOfNamespacedAttributeRemoved_doesNotCrash() {
+    XmlProtoNode proto =
+        XmlProtoNode.createElementNode(
+            XmlProtoElementBuilder.create("root")
+                .addNamespaceDeclaration("a", "http://uri")
+                .addAttribute(
+                    XmlProtoAttributeBuilder.create("http://uri", "").setValueAsString("hello"))
+                .build());
+
+    Document document = XmlProtoToXmlConverter.convert(proto);
+    String xmlString = XmlUtils.documentToString(document);
+
+    assertThat(xmlString)
+        .isEqualTo(String.format("<root xmlns:a=\"http://uri\" a:_unknown_=\"hello\"/>%n"));
+  }
+
   private static XmlProtoAttributeBuilder newAttribute(String attrName) {
     return XmlProtoAttributeBuilder.create(attrName);
   }

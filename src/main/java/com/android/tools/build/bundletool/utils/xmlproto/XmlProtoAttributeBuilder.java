@@ -103,4 +103,9 @@ public final class XmlProtoAttributeBuilder
         Item.newBuilder().setStr(Resources.String.newBuilder().setValue(value)));
     return this;
   }
+
+  public XmlProtoAttributeBuilder setResourceId(int resourceId) {
+    attribute.setResourceId(resourceId);
+    return this;
+  }
 }

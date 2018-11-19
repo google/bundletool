@@ -34,7 +34,7 @@ import com.android.bundle.Targeting.ScreenDensity;
 import com.android.bundle.Targeting.ScreenDensity.DensityAlias;
 import com.android.bundle.Targeting.ScreenDensityTargeting;
 import com.android.tools.build.bundletool.model.ModuleSplit;
-import com.android.tools.build.bundletool.model.PackageTypeEntry;
+import com.android.tools.build.bundletool.model.ResourceId;
 import com.android.tools.build.bundletool.targeting.ScreenDensitySelector;
 import com.android.tools.build.bundletool.utils.ResourcesUtils;
 import com.android.tools.build.bundletool.version.Version;
@@ -135,10 +135,9 @@ public class ScreenDensityResourcesSplitter extends SplitterForOneTargetingDimen
         .build();
   }
 
-  private ImmutableMultimap<PackageTypeEntry, ConfigValue> getClaimedConfigs(
+  private ImmutableMultimap<ResourceId, ConfigValue> getClaimedConfigs(
       Iterable<ModuleSplit> moduleSplits) {
-    ImmutableMultimap.Builder<PackageTypeEntry, ConfigValue> result =
-        new ImmutableMultimap.Builder<>();
+    ImmutableMultimap.Builder<ResourceId, ConfigValue> result = new ImmutableMultimap.Builder<>();
     for (ModuleSplit moduleSplit : moduleSplits) {
       checkState(
           moduleSplit.getResourceTable().isPresent(),
@@ -147,7 +146,7 @@ public class ScreenDensityResourcesSplitter extends SplitterForOneTargetingDimen
         for (Type type : pkg.getTypeList()) {
           for (Entry entry : type.getEntryList()) {
             for (ConfigValue configValue : entry.getConfigValueList()) {
-              result.put(PackageTypeEntry.create(pkg, type, entry), configValue);
+              result.put(ResourceId.create(pkg, type, entry), configValue);
             }
           }
         }
@@ -162,7 +161,7 @@ public class ScreenDensityResourcesSplitter extends SplitterForOneTargetingDimen
    * <p>It will be stripped of any entries claimed by the config splits.
    */
   private ResourceTable getResourceTableForDefaultSplit(
-      ModuleSplit split, ImmutableMultimap<PackageTypeEntry, ConfigValue> claimedConfigs) {
+      ModuleSplit split, ImmutableMultimap<ResourceId, ConfigValue> claimedConfigs) {
     checkArgument(
         split.getResourceTable().isPresent(), "Expected the split to contain Resource Table.");
     ResourceTable.Builder prunedTable = split.getResourceTable().get().toBuilder();
@@ -170,15 +169,10 @@ public class ScreenDensityResourcesSplitter extends SplitterForOneTargetingDimen
       for (Type.Builder typeBuilder : packageBuilder.getTypeBuilderList()) {
         List<Entry> newEntries = new ArrayList<>();
         for (Entry entry : typeBuilder.getEntryList()) {
+          ResourceId resourceId = ResourceId.create(packageBuilder, typeBuilder, entry);
           ImmutableList<ConfigValue> allConfigsExceptClaimed =
-              entry
-                  .getConfigValueList()
-                  .stream()
-                  .filter(
-                      configValue ->
-                          !claimedConfigs.containsEntry(
-                              PackageTypeEntry.create(packageBuilder, typeBuilder, entry),
-                              configValue))
+              entry.getConfigValueList().stream()
+                  .filter(configValue -> !claimedConfigs.containsEntry(resourceId, configValue))
                   .collect(toImmutableList());
           Entry.Builder newEntry =
               entry.toBuilder().clearConfigValue().addAllConfigValue(allConfigsExceptClaimed);
@@ -213,9 +207,7 @@ public class ScreenDensityResourcesSplitter extends SplitterForOneTargetingDimen
   private Entry filterEntryForDensity(Entry initialEntry, DensityAlias targetDensity) {
     // Groups together configs that only differ on density.
     Map<Configuration, List<ConfigValue>> configValuesByConfiguration =
-        initialEntry
-            .getConfigValueList()
-            .stream()
+        initialEntry.getConfigValueList().stream()
             // Remove this filter entirely once 0.4.0 is no longer being actively used.
             .filter(
                 configValue ->
@@ -240,16 +232,15 @@ public class ScreenDensityResourcesSplitter extends SplitterForOneTargetingDimen
   /** For each density group, it picks the best match for a given desired densityAlias. */
   private ImmutableList<ConfigValue> pickBestDensityForEachGroup(
       ImmutableList<List<ConfigValue>> densityGroups, DensityAlias densityAlias) {
-    return densityGroups
-        .stream()
+    return densityGroups.stream()
         .flatMap(
             group ->
                 new ScreenDensitySelector()
-                    .selectAllMatchingConfigValues(
-                        ImmutableList.copyOf(group),
-                        densityAlias,
-                        allBut(densityBuckets, densityAlias))
-                    .stream())
+                        .selectAllMatchingConfigValues(
+                            ImmutableList.copyOf(group),
+                            densityAlias,
+                            allBut(densityBuckets, densityAlias))
+                        .stream())
         .collect(toImmutableList());
   }
 

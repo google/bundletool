@@ -35,24 +35,12 @@ import javax.annotation.WillNotClose;
 /** Misc utilities for working with zip files. */
 public final class ZipUtils {
 
-  /**
-   * From the specified zip file extracts paths to all file entries that are under the given path.
-   */
-  public static Stream<ZipPath> getFilesWithPathPrefix(ZipFile zipFile, ZipPath prefix) {
-    return getFileEntriesWithPathPrefix(zipFile, prefix)
-        .map(ZipEntry::getName)
-        .map(ZipPath::create);
+  public static Stream<ZipPath> allFileEntriesPaths(ZipFile zipFile) {
+    return allFileEntries(zipFile).map(zipEntry -> ZipPath.create(zipEntry.getName()));
   }
 
-  /**
-   * From the specified zip file returns all non-directory {@link ZipEntry} matching the given path
-   * prefix.
-   */
-  public static Stream<? extends ZipEntry> getFileEntriesWithPathPrefix(
-      ZipFile zipFile, ZipPath prefix) {
-    return zipFile.stream()
-        .filter(not(ZipEntry::isDirectory))
-        .filter(entry -> ZipPath.create(entry.getName()).startsWith(prefix));
+  public static Stream<? extends ZipEntry> allFileEntries(ZipFile zipFile) {
+    return zipFile.stream().filter(not(ZipEntry::isDirectory));
   }
 
   public static ZipFile openZipFile(Path path) {

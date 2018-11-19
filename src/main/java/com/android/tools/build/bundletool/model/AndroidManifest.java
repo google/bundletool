@@ -343,35 +343,6 @@ public abstract class AndroidManifest {
     return getOnDemandAttribute().isPresent();
   }
 
-  /**
-   * Returns whether the module is effectively on-demand.
-   *
-   * <p>On-demand here means the module will never be installed by Play, it can be only fetched
-   * using dynamic delivery.
-   */
-  public Optional<Boolean> isOnDemandModule() {
-    if (getManifestDeliveryElement().isPresent()) {
-      return Optional.of(!getManifestDeliveryElement().get().hasInstallTimeElement());
-    }
-
-    // Legacy syntax.
-    return getOnDemandAttribute().map(XmlProtoAttribute::getValueAsBoolean);
-  }
-
-  public boolean isModuleAlwaysInstalled() {
-    if (getManifestDeliveryElement().isPresent()) {
-      return !getManifestDeliveryElement().get().hasModuleConditions()
-          && getManifestDeliveryElement().get().hasInstallTimeElement();
-    }
-
-    // Legacy syntax.
-    return getOnDemandAttribute()
-        .map(XmlProtoAttribute::getValueAsBoolean)
-        .map(x -> !x)
-        // The only place where legacy onDemand can be absent is in base module.
-        .orElse(true);
-  }
-
   public Optional<Boolean> isInstantModule() {
     return getManifestElement()
         .getOptionalChildElement(DISTRIBUTION_NAMESPACE_URI, "module")

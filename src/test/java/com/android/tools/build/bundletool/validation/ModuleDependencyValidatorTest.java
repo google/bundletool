@@ -18,8 +18,10 @@ package com.android.tools.build.bundletool.validation;
 
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifest;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withFeatureCondition;
+import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withInstallTimeDelivery;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withMinSdkVersion;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withOnDemandAttribute;
+import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withOnDemandDelivery;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withSplitId;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withUsesSplit;
 import static com.google.common.truth.Truth.assertThat;
@@ -203,7 +205,8 @@ public class ModuleDependencyValidatorTest {
     assertThat(exception)
         .hasMessageThat()
         .contains(
-            "Install-time module 'feature2' declares dependency on on-demand module 'feature1'");
+            "Install-time module 'feature2' cannot depend on a module 'feature1' that is not "
+                + "install-time");
   }
 
   @Test
@@ -293,8 +296,8 @@ public class ModuleDependencyValidatorTest {
     assertThat(exception)
         .hasMessageThat()
         .contains(
-            "On-demand module 'feature1' has a minSdkVersion(19), which is smaller than the"
-                + " minSdkVersion(20) of its dependency 'feature2'.");
+            "Conditional or on-demand module 'feature1' has a minSdkVersion(19), which is smaller "
+                + "than the minSdkVersion(20) of its dependency 'feature2'.");
   }
 
   @Test
@@ -318,8 +321,8 @@ public class ModuleDependencyValidatorTest {
     assertThat(exception)
         .hasMessageThat()
         .contains(
-            "On-demand module 'feature1' has a minSdkVersion(1), which is smaller than the"
-                + " minSdkVersion(20) of its dependency 'feature2'.");
+            "Conditional or on-demand module 'feature1' has a minSdkVersion(1), which is smaller "
+                + "than the minSdkVersion(20) of its dependency 'feature2'.");
   }
 
   @Test
@@ -437,5 +440,74 @@ public class ModuleDependencyValidatorTest {
                     PKG_NAME, withMinSdkVersion(18), withFeatureCondition("android.feature"))));
 
     new ModuleDependencyValidator().validateAllModules(allModules);
+  }
+
+  @Test
+  public void validateAllModules_conditionalModule_dependsOnSomething_throws() throws Exception {
+    ImmutableList<BundleModule> allModules =
+        ImmutableList.of(
+            module("base", androidManifest(PKG_NAME)),
+            module(
+                "conditional",
+                androidManifest(
+                    PKG_NAME,
+                    withFeatureCondition("android.feature"),
+                    withUsesSplit("conditional2"))),
+            module(
+                "conditional2",
+                androidManifest(PKG_NAME, withFeatureCondition("android.feature2"))));
+
+    ValidationException exception =
+        assertThrows(
+            ValidationException.class,
+            () -> new ModuleDependencyValidator().validateAllModules(allModules));
+    assertThat(exception)
+        .hasMessageThat()
+        .contains(
+            "Conditional module 'conditional' cannot have dependencies but uses module "
+                + "'conditional2'");
+  }
+
+  @Test
+  public void validateAllModules_installTime_dependsOnConditional_throws() throws Exception {
+    ImmutableList<BundleModule> allModules =
+        ImmutableList.of(
+            module("base", androidManifest(PKG_NAME)),
+            module(
+                "installtime",
+                androidManifest(PKG_NAME, withInstallTimeDelivery(), withUsesSplit("conditional"))),
+            module(
+                "conditional", androidManifest(PKG_NAME, withFeatureCondition("android.feature"))));
+
+    ValidationException exception =
+        assertThrows(
+            ValidationException.class,
+            () -> new ModuleDependencyValidator().validateAllModules(allModules));
+    assertThat(exception)
+        .hasMessageThat()
+        .contains(
+            "Install-time module 'installtime' cannot depend on a module 'conditional' that is "
+                + "not install-time");
+  }
+
+  @Test
+  public void validateAllModules_onDemandOnly_dependsOnConditional_throws() throws Exception {
+    ImmutableList<BundleModule> allModules =
+        ImmutableList.of(
+            module("base", androidManifest(PKG_NAME)),
+            module(
+                "ondemand",
+                androidManifest(PKG_NAME, withOnDemandDelivery(), withUsesSplit("conditional"))),
+            module(
+                "conditional", androidManifest(PKG_NAME, withFeatureCondition("android.feature"))));
+
+    ValidationException exception =
+        assertThrows(
+            ValidationException.class,
+            () -> new ModuleDependencyValidator().validateAllModules(allModules));
+    assertThat(exception)
+        .hasMessageThat()
+        .contains(
+            "An on-demand module 'ondemand' cannot depend on a conditional module 'conditional'");
   }
 }

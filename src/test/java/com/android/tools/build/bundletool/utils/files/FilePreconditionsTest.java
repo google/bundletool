@@ -73,7 +73,7 @@ public class FilePreconditionsTest {
   @Test
   public void checkFileExistsAndReadable_nonReadable_fail() throws Exception {
     // "File.setReadable(false)" does not work on Windows.
-    if (OsPlatform.getCurrentPlatform() == OsPlatform.WINDOWS) {
+    if (OsPlatform.getCurrentPlatform().equals(OsPlatform.WINDOWS)) {
       return;
     }
 

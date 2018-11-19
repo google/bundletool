@@ -67,6 +67,7 @@ public class BundleModulesValidator {
           new EntryClashValidator(),
           new AbiParityValidator(),
           new DexFilesValidator(),
+          new ApexBundleValidator(),
           // Other.
           new ModuleDependencyValidator(),
           new ModuleTitleValidator(),

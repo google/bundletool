@@ -165,6 +165,28 @@ public class InstallApksCommandTest {
   }
 
   @Test
+  public void fromFlagsEquivalentToBuilder_allowDowngrade() throws Exception {
+    Path apksFile = tmpDir.resolve("appbundle.apks");
+    Files.createFile(apksFile);
+
+    InstallApksCommand fromFlags =
+        InstallApksCommand.fromFlags(
+            new FlagParser().parse("--apks=" + apksFile, "--allow-downgrade"),
+            androidHomeProvider,
+            fakeServerOneDevice(lDeviceWithLocales("en-US")));
+
+    InstallApksCommand fromBuilder =
+        InstallApksCommand.builder()
+            .setApksArchivePath(apksFile)
+            .setAdbPath(adbPath)
+            .setAdbServer(fromFlags.getAdbServer())
+            .setAllowDowngrade(true)
+            .build();
+
+    assertThat(fromBuilder).isEqualTo(fromFlags);
+  }
+
+  @Test
   public void fromFlagsEquivalentToBuilder_androidSerialVariable() throws Exception {
     Path apksFile = tmpDir.resolve("appbundle.apks");
     Files.createFile(apksFile);
@@ -323,7 +345,7 @@ public class InstallApksCommandTest {
     AdbServer adbServer =
         new FakeAdbServer(/* hasInitialDeviceList= */ true, ImmutableList.of(fakeDevice));
     fakeDevice.setInstallApksSideEffect(
-        (apks, reinstall) -> {
+        (apks, installOptions) -> {
           throw InstallationException.builder().withMessage("Sample error message").build();
         });
 
@@ -514,7 +536,7 @@ public class InstallApksCommandTest {
         FakeDevice.fromDeviceSpec(DEVICE_ID, DeviceState.ONLINE, lDeviceWithLocales("en-US"));
     AdbServer adbServer =
         new FakeAdbServer(/* hasInitialDeviceList= */ true, ImmutableList.of(fakeDevice));
-    fakeDevice.setInstallApksSideEffect((apks, reinstall) -> installedApks.addAll(apks));
+    fakeDevice.setInstallApksSideEffect((apks, installOptions) -> installedApks.addAll(apks));
 
     InstallApksCommand.builder()
         .setApksArchivePath(apksFile)
@@ -570,7 +592,7 @@ public class InstallApksCommandTest {
         FakeDevice.fromDeviceSpec(DEVICE_ID, DeviceState.ONLINE, lDeviceWithLocales("en-US"));
     AdbServer adbServer =
         new FakeAdbServer(/* hasInitialDeviceList= */ true, ImmutableList.of(fakeDevice));
-    fakeDevice.setInstallApksSideEffect((apks, reinstall) -> installedApks.addAll(apks));
+    fakeDevice.setInstallApksSideEffect((apks, installOptions) -> installedApks.addAll(apks));
 
     InstallApksCommand.builder()
         .setApksArchivePath(apksFile)
@@ -633,7 +655,7 @@ public class InstallApksCommandTest {
         FakeDevice.fromDeviceSpec(DEVICE_ID, DeviceState.ONLINE, lDeviceWithLocales("en-US"));
     AdbServer adbServer =
         new FakeAdbServer(/* hasInitialDeviceList= */ true, ImmutableList.of(fakeDevice));
-    fakeDevice.setInstallApksSideEffect((apks, reinstall) -> installedApks.addAll(apks));
+    fakeDevice.setInstallApksSideEffect((apks, installOptions) -> installedApks.addAll(apks));
 
     InstallApksCommand.builder()
         .setApksArchivePath(apksFile)

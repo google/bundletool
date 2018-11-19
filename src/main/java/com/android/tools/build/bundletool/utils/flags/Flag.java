@@ -342,7 +342,7 @@ public abstract class Flag<T> {
 
     @Override
     protected Path parse(String value) {
-      if (OsPlatform.getCurrentPlatform() != OsPlatform.WINDOWS) {
+      if (!OsPlatform.getCurrentPlatform().equals(OsPlatform.WINDOWS)) {
         value =
             HOME_DIRECTORY_ALIAS
                 .matcher(value)

@@ -24,6 +24,7 @@ import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.with
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withUsesSplit;
 import static com.android.tools.build.bundletool.testing.ResourcesTableFactory.createResourceTable;
 import static com.android.tools.build.bundletool.testing.ResourcesTableFactory.fileReference;
+import static com.android.tools.build.bundletool.testing.TargetingUtils.apexImageSingleAbiTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.assetsDirectoryTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.graphicsApiTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.mergeAssetsTargeting;
@@ -44,8 +45,10 @@ import com.android.aapt.Resources.ResourceTable;
 import com.android.aapt.Resources.XmlNode;
 import com.android.bundle.Config.BundleConfig;
 import com.android.bundle.Config.Compression;
+import com.android.bundle.Files.ApexImages;
 import com.android.bundle.Files.Assets;
 import com.android.bundle.Files.NativeLibraries;
+import com.android.bundle.Files.TargetedApexImage;
 import com.android.bundle.Files.TargetedAssetsDirectory;
 import com.android.bundle.Files.TargetedNativeDirectory;
 import com.android.bundle.Targeting.Abi;
@@ -229,6 +232,38 @@ public class BuildBundleCommandTest {
   }
 
   @Test
+  public void validApexModule() throws Exception {
+    XmlNode manifest = androidManifest(PKG_NAME, withHasCode(false));
+    ApexImages apexConfig =
+        ApexImages.newBuilder()
+            .addImage(
+                TargetedApexImage.newBuilder()
+                    .setPath("apex/x86.img")
+                    .setTargeting(apexImageSingleAbiTargeting(X86)))
+            .build();
+    Path module =
+        new ZipBuilder()
+            .addFileWithContent(ZipPath.create("apex/x86.img"), "apex".getBytes(UTF_8))
+            .addFileWithProtoContent(ZipPath.create("manifest/AndroidManifest.xml"), manifest)
+            .addFileWithContent(ZipPath.create("root/manifest.json"), "manifest".getBytes(UTF_8))
+            .writeTo(tmpDir.resolve("base.zip"));
+
+    BuildBundleCommand.builder()
+        .setOutputPath(bundlePath)
+        .setModulesPaths(ImmutableList.of(module))
+        .build()
+        .execute();
+
+    ZipFile bundle = new ZipFile(bundlePath.toFile());
+    assertThat(bundle)
+        .hasFile("base/manifest/AndroidManifest.xml")
+        .withContent(manifest.toByteArray());
+    assertThat(bundle).hasFile("base/apex/x86.img").withContent("apex".getBytes(UTF_8));
+    assertThat(bundle).hasFile("base/root/manifest.json").withContent("manifest".getBytes(UTF_8));
+    assertThat(bundle).hasFile("base/apex.pb").withContent(apexConfig.toByteArray());
+  }
+
+  @Test
   public void assetsTargeting_generated() throws Exception {
     XmlNode manifest = androidManifest(PKG_NAME, withHasCode(true));
     Assets assetsConfig =
@@ -301,6 +336,20 @@ public class BuildBundleCommandTest {
 
     ZipFile bundleZip = new ZipFile(bundlePath.toFile());
     assertThat(bundleZip).doesNotHaveFile("base/native.pb");
+  }
+
+  @Test
+  public void apexImagesAbsent_apexTargetingIsAbsent() throws Exception {
+    Path moduleWithoutApexImages = createSimpleBaseModule();
+
+    BuildBundleCommand.builder()
+        .setOutputPath(bundlePath)
+        .setModulesPaths(ImmutableList.of(moduleWithoutApexImages))
+        .build()
+        .execute();
+
+    ZipFile bundleZip = new ZipFile(bundlePath.toFile());
+    assertThat(bundleZip).doesNotHaveFile("base/apex.pb");
   }
 
   @Test

@@ -20,6 +20,7 @@ import com.android.bundle.Errors.BundleToolError;
 import com.android.bundle.Errors.FileTypeDirectoryInBundleError;
 import com.android.bundle.Errors.FileTypeFileUsesReservedNameError;
 import com.android.bundle.Errors.FileTypeFilesInResourceDirectoryRootError;
+import com.android.bundle.Errors.FileTypeInvalidApexImagePathError;
 import com.android.bundle.Errors.FileTypeInvalidFileExtensionError;
 import com.android.bundle.Errors.FileTypeInvalidFileNameInDirectoryError;
 import com.android.bundle.Errors.FileTypeInvalidNativeArchitectureError;
@@ -118,21 +119,72 @@ public class BundleFileTypesException extends ValidationException {
     }
   }
 
-  /** self describing */
-  public static class InvalidNativeArchitectureException extends BundleFileTypesException {
+  /**
+   * Exception indicating that a file name in the APEX directory, within the input zip file, has the
+   * wrong form. All files in this directory should have depth one and the suffix 'img'.
+   */
+  public static class InvalidApexImagePathException extends BundleFileTypesException {
 
-    private final ZipPath directory;
+    private final ZipPath apexDirectory;
+    private final ZipPath file;
 
-    public InvalidNativeArchitectureException(ZipPath directory) {
-      super("Unrecognized native architecture for directory '%s'.", directory);
-      this.directory = directory;
+    /**
+     * @param apexDirectory the parent directory, as a {@code ZipPath}
+     * @param file the file that caused the exception, as a {@code ZipPath}
+     */
+    public InvalidApexImagePathException(ZipPath apexDirectory, ZipPath file) {
+      super(
+          "APEX image files need to have paths in form '%s/<file>.img' but found '%s'.",
+          apexDirectory, file);
+      this.apexDirectory = apexDirectory;
+      this.file = file;
+    }
+
+    @Override
+    protected void customizeProto(BundleToolError.Builder builder) {
+      builder.setFileTypeInvalidApexImagePath(
+          FileTypeInvalidApexImagePathError.newBuilder()
+              .setInvalidFile(file.toString())
+              .setBundleDirectory(apexDirectory.toString()));
+    }
+  }
+
+  /**
+   * Exception indicating that a file or directory name is not made of native architectures as
+   * expected.
+   */
+  public static class InvalidNativeArchitectureNameException extends BundleFileTypesException {
+
+    private final ZipPath fileOrDirectory;
+
+    /**
+     * Creates an InvalidNativeArchitectureNameException instance for a file.
+     *
+     * @param file the file that caused the exception, as a {@code ZipPath}
+     */
+    public static InvalidNativeArchitectureNameException createForFile(ZipPath file) {
+      return new InvalidNativeArchitectureNameException(file, "file");
+    }
+
+    /**
+     * Creates an InvalidNativeArchitectureNameException instance for a directory.
+     *
+     * @param directory the directory that caused the exception, as a {@code ZipPath}
+     */
+    public static InvalidNativeArchitectureNameException createForDirectory(ZipPath directory) {
+      return new InvalidNativeArchitectureNameException(directory, "directory");
+    }
+
+    private InvalidNativeArchitectureNameException(ZipPath fileOrDirectory, String type) {
+      super("Unrecognized native architecture for %s '%s'.", type, fileOrDirectory);
+      this.fileOrDirectory = fileOrDirectory;
     }
 
     @Override
     protected void customizeProto(BundleToolError.Builder builder) {
       builder.setFileTypeInvalidNativeArchitecture(
           FileTypeInvalidNativeArchitectureError.newBuilder()
-              .setInvalidArchitectureDirectory(directory.toString()));
+              .setInvalidArchitectureDirectory(fileOrDirectory.toString()));
     }
   }
 

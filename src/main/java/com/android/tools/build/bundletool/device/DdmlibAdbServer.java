@@ -66,7 +66,7 @@ public class DdmlibAdbServer extends AdbServer {
   @Override
   public synchronized void init(Path pathToAdb) {
     checkState(state != State.CLOSED, "Android Debug Bridge has been closed.");
-    if (state == State.INITIALIZED) {
+    if (state.equals(State.INITIALIZED)) {
       checkState(
           pathToAdb.equals(this.pathToAdb),
           "Re-initializing DdmlibAdbServer with a different ADB path. Expected: '%s', got '%s'.",
@@ -87,19 +87,19 @@ public class DdmlibAdbServer extends AdbServer {
 
   @Override
   public synchronized ImmutableList<Device> getDevicesInternal() {
-    checkState(state == State.INITIALIZED, "Android Debug Bridge is not initialized.");
+    checkState(state.equals(State.INITIALIZED), "Android Debug Bridge is not initialized.");
     return Arrays.stream(adb.getDevices()).map(DdmlibDevice::new).collect(toImmutableList());
   }
 
   @Override
   public synchronized boolean hasInitialDeviceList() {
-    checkState(state == State.INITIALIZED, "Android Debug Bridge is not initialized.");
+    checkState(state.equals(State.INITIALIZED), "Android Debug Bridge is not initialized.");
     return adb.hasInitialDeviceList();
   }
 
   @Override
   public synchronized void close() {
-    if (state == State.INITIALIZED) {
+    if (state.equals(State.INITIALIZED)) {
       AndroidDebugBridge.terminate();
     }
     state = State.CLOSED;

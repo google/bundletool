@@ -28,6 +28,7 @@ import com.android.bundle.Files.TargetedNativeDirectory;
 import com.android.bundle.Targeting.Abi;
 import com.android.bundle.Targeting.Abi.AbiAlias;
 import com.android.bundle.Targeting.AbiTargeting;
+import com.android.bundle.Targeting.ApexImageTargeting;
 import com.android.bundle.Targeting.ApkTargeting;
 import com.android.bundle.Targeting.AssetsDirectoryTargeting;
 import com.android.bundle.Targeting.DeviceFeature;
@@ -36,6 +37,8 @@ import com.android.bundle.Targeting.GraphicsApi;
 import com.android.bundle.Targeting.GraphicsApiTargeting;
 import com.android.bundle.Targeting.LanguageTargeting;
 import com.android.bundle.Targeting.ModuleTargeting;
+import com.android.bundle.Targeting.MultiAbi;
+import com.android.bundle.Targeting.MultiAbiTargeting;
 import com.android.bundle.Targeting.NativeDirectoryTargeting;
 import com.android.bundle.Targeting.OpenGlVersion;
 import com.android.bundle.Targeting.ScreenDensity;
@@ -147,6 +150,16 @@ public final class TargetingUtils {
       TextureCompressionFormatAlias tcf) {
     return NativeDirectoryTargeting.newBuilder()
         .setTextureCompressionFormat(TextureCompressionFormat.newBuilder().setAlias(tcf))
+        .build();
+  }
+
+  // Apex image file targeting helpers.
+
+  public static ApexImageTargeting apexImageSingleAbiTargeting(AbiAlias abi) {
+    return ApexImageTargeting.newBuilder()
+        .setMultiAbi(
+            MultiAbiTargeting.newBuilder()
+                .addValue(MultiAbi.newBuilder().addAbi(Abi.newBuilder().setAlias(abi))))
         .build();
   }
 

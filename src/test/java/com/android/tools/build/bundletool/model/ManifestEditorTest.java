@@ -47,6 +47,7 @@ import com.android.aapt.Resources.XmlAttribute;
 import com.android.aapt.Resources.XmlElement;
 import com.android.aapt.Resources.XmlNode;
 import com.android.tools.build.bundletool.TestData;
+import com.android.tools.build.bundletool.utils.xmlproto.XmlProtoAttribute;
 import com.android.tools.build.bundletool.utils.xmlproto.XmlProtoElement;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
@@ -289,11 +290,13 @@ public class ManifestEditorTest {
   public void setFeatureSplit_isOnDemandAttributeCopied() throws Exception {
     AndroidManifest manifest =
         AndroidManifest.create(androidManifest("com.test.app", withOnDemandAttribute(true)));
-    assertThat(manifest.isOnDemandModule()).hasValue(true);
+    assertThat(manifest.getOnDemandAttribute().map(XmlProtoAttribute::getValueAsBoolean))
+        .hasValue(true);
 
     AndroidManifest editedManifest =
         manifest.toEditor().setSplitIdForFeatureSplit("feature1").save();
-    assertThat(editedManifest.isOnDemandModule()).hasValue(true);
+    assertThat(editedManifest.getOnDemandAttribute().map(XmlProtoAttribute::getValueAsBoolean))
+        .hasValue(true);
   }
 
   @Test

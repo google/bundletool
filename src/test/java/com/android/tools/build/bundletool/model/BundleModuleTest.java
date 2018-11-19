@@ -19,7 +19,10 @@ package com.android.tools.build.bundletool.model;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifest;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withFeatureCondition;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withFusingAttribute;
+import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withInstallTimeDelivery;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withMinSdkCondition;
+import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withOnDemandAttribute;
+import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withOnDemandDelivery;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withUsesSplit;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.mergeModuleTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.moduleFeatureTargeting;
@@ -34,10 +37,13 @@ import com.android.aapt.Resources.Package;
 import com.android.aapt.Resources.ResourceTable;
 import com.android.aapt.Resources.XmlNode;
 import com.android.bundle.Config.BundleConfig;
+import com.android.bundle.Files.ApexImages;
 import com.android.bundle.Files.Assets;
 import com.android.bundle.Files.NativeLibraries;
+import com.android.bundle.Files.TargetedApexImage;
 import com.android.bundle.Files.TargetedAssetsDirectory;
 import com.android.bundle.Files.TargetedNativeDirectory;
+import com.android.tools.build.bundletool.model.BundleModule.ModuleDeliveryType;
 import com.android.tools.build.bundletool.testing.BundleConfigBuilder;
 import java.io.IOException;
 import java.util.Arrays;
@@ -199,6 +205,39 @@ public class BundleModuleTest {
   }
 
   @Test
+  public void missingApexProtoFile_returnsEmptyProto() {
+    BundleModule bundleModule = createMinimalModuleBuilder().build();
+
+    assertThat(bundleModule.getApexConfig()).isEmpty();
+  }
+
+  @Test
+  public void correctApexProtoFile_parsedAndReturned() throws Exception {
+    ApexImages apexConfig =
+        ApexImages.newBuilder()
+            .addImage(TargetedApexImage.newBuilder().setPath("apex/x86.img"))
+            .build();
+
+    BundleModule bundleModule =
+        createMinimalModuleBuilder()
+            .addEntry(InMemoryModuleEntry.ofFile("apex.pb", apexConfig.toByteArray()))
+            .build();
+
+    assertThat(bundleModule.getApexConfig()).hasValue(apexConfig);
+  }
+
+  @Test
+  public void incorrectApexProtoFile_throws() throws Exception {
+    byte[] badApexFile = new byte[] {'b', 'a', 'd'};
+
+    assertThrows(
+        IOException.class,
+        () ->
+            createMinimalModuleBuilder()
+                .addEntry(InMemoryModuleEntry.ofFile("apex.pb", badApexFile)));
+  }
+
+  @Test
   public void specialFiles_areNotStoredAsEntries() throws Exception {
     BundleModule bundleModule =
         BundleModule.builder()
@@ -313,6 +352,69 @@ public class BundleModuleTest {
             mergeModuleTargeting(
                 moduleFeatureTargeting("com.android.hardware.feature"),
                 moduleMinSdkVersionTargeting(/* minSdkVersion= */ 24)));
+  }
+
+  @Test
+  public void getDeliveryType_noConfig() throws Exception {
+    BundleModule bundleModule =
+        createMinimalModuleBuilder()
+            .setAndroidManifestProto(androidManifest("com.test.app"))
+            .build();
+
+    assertThat(bundleModule.getDeliveryType()).isEqualTo(ModuleDeliveryType.ALWAYS_INITIAL_INSTALL);
+  }
+
+  @Test
+  public void getDeliveryType_legacy_onDemandTrue() throws Exception {
+    BundleModule bundleModule =
+        createMinimalModuleBuilder()
+            .setAndroidManifestProto(androidManifest("com.test.app", withOnDemandAttribute(true)))
+            .build();
+
+    assertThat(bundleModule.getDeliveryType()).isEqualTo(ModuleDeliveryType.NO_INITIAL_INSTALL);
+  }
+
+  @Test
+  public void getdeliveryType_legacy_onDemandFalse() throws Exception {
+    BundleModule bundleModule =
+        createMinimalModuleBuilder()
+            .setAndroidManifestProto(androidManifest("com.test.app", withOnDemandAttribute(false)))
+            .build();
+
+    assertThat(bundleModule.getDeliveryType()).isEqualTo(ModuleDeliveryType.ALWAYS_INITIAL_INSTALL);
+  }
+
+  @Test
+  public void getdeliveryType_onDemandElement_only() throws Exception {
+    BundleModule bundleModule =
+        createMinimalModuleBuilder()
+            .setAndroidManifestProto(androidManifest("com.test.app", withOnDemandDelivery()))
+            .build();
+
+    assertThat(bundleModule.getDeliveryType()).isEqualTo(ModuleDeliveryType.NO_INITIAL_INSTALL);
+  }
+
+  @Test
+  public void getdeliveryType_onDemandElement_andConditions() throws Exception {
+    BundleModule bundleModule =
+        createMinimalModuleBuilder()
+            .setAndroidManifestProto(
+                androidManifest("com.test.app", withOnDemandDelivery(), withMinSdkCondition(21)))
+            .build();
+
+    assertThat(bundleModule.getDeliveryType())
+        .isEqualTo(ModuleDeliveryType.CONDITIONAL_INITIAL_INSTALL);
+  }
+
+  @Test
+  public void getdeliveryType_installTimeElement_noConditions() throws Exception {
+    BundleModule bundleModule =
+        createMinimalModuleBuilder()
+            .setAndroidManifestProto(
+                androidManifest("com.test.app", withInstallTimeDelivery(), withOnDemandDelivery()))
+            .build();
+
+    assertThat(bundleModule.getDeliveryType()).isEqualTo(ModuleDeliveryType.ALWAYS_INITIAL_INSTALL);
   }
 
   private static BundleModule.Builder createMinimalModuleBuilder() {

@@ -97,17 +97,23 @@ public class DdmlibDevice extends Device {
   }
 
   @Override
-  public void installApks(
-      ImmutableList<Path> apks, boolean reinstall, long timeout, TimeUnit timeoutUnit) {
+  public void installApks(ImmutableList<Path> apks, InstallOptions installOptions) {
     ImmutableList<File> apkFiles = apks.stream().map(Path::toFile).collect(toImmutableList());
 
     try {
       if (getVersion()
           .isGreaterOrEqualThan(AndroidVersion.ALLOW_SPLIT_APK_INSTALLATION.getApiLevel())) {
         device.installPackages(
-            apkFiles, reinstall, /* installOptions= */ ImmutableList.of(), timeout, timeoutUnit);
+            apkFiles,
+            installOptions.getAllowReinstall(),
+            installOptions.getAllowDowngrade() ? ImmutableList.of("-d") : ImmutableList.of(),
+            installOptions.getTimeout().toMillis(),
+            TimeUnit.MILLISECONDS);
       } else {
-        device.installPackage(Iterables.getOnlyElement(apkFiles).toString(), reinstall);
+        device.installPackage(
+            Iterables.getOnlyElement(apkFiles).toString(),
+            installOptions.getAllowReinstall(),
+            installOptions.getAllowDowngrade() ? "-d" : null);
       }
     } catch (InstallException e) {
       throw InstallationException.builder()

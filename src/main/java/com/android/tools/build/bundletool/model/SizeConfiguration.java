@@ -89,7 +89,7 @@ public abstract class SizeConfiguration {
 
     ScreenDensity screenDensity = Iterables.getOnlyElement(screenDensityTargeting.getValueList());
     return Optional.of(
-        screenDensity.getDensityOneofCase() == DENSITY_ALIAS
+        screenDensity.getDensityOneofCase().equals(DENSITY_ALIAS)
             ? screenDensity.getDensityAlias().name()
             : Integer.toString(screenDensity.getDensityDpi()));
   }

@@ -16,16 +16,15 @@
 
 package com.android.tools.build.bundletool.device;
 
-import static com.android.tools.build.bundletool.device.AdbServer.ADB_TIMEOUT_MS;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 
+import com.android.tools.build.bundletool.device.Device.InstallOptions;
 import com.android.tools.build.bundletool.exceptions.CommandExecutionException;
 import com.android.tools.build.bundletool.exceptions.DeviceNotFoundException;
 import com.android.tools.build.bundletool.exceptions.DeviceNotFoundException.TooManyDevicesMatchedException;
 import com.google.common.base.Predicates;
 import com.google.common.collect.ImmutableList;
 import java.nio.file.Path;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.function.Predicate;
 
@@ -40,32 +39,37 @@ public class ApksInstaller {
   }
 
   /** Attempts to install the given APKs to the only connected device. */
-  public void installApks(ImmutableList<Path> apkPaths) {
+  public void installApks(ImmutableList<Path> apkPaths, InstallOptions installOptions) {
     try {
-      installApks(apkPaths, Predicates.alwaysTrue());
+      installApks(apkPaths, installOptions, Predicates.alwaysTrue());
     } catch (TooManyDevicesMatchedException e) {
       throw CommandExecutionException.builder()
           .withMessage("Expected to find one connected device, but found %d.", e.getMatchedNumber())
+          .withCause(e)
           .build();
     } catch (DeviceNotFoundException e) {
       throw CommandExecutionException.builder()
           .withMessage("Expected to find one connected device, but found none.")
+          .withCause(e)
           .build();
     }
   }
 
   /** Attempts to install the given APKs to a device with a given serial number. */
-  public void installApks(ImmutableList<Path> apkPaths, String deviceId) {
+  public void installApks(
+      ImmutableList<Path> apkPaths, InstallOptions installOptions, String deviceId) {
     try {
-      installApks(apkPaths, device -> device.getSerialNumber().equals(deviceId));
+      installApks(apkPaths, installOptions, device -> device.getSerialNumber().equals(deviceId));
     } catch (DeviceNotFoundException e) {
       throw CommandExecutionException.builder()
           .withMessage("Expected to find one connected device with serial number '%s'.", deviceId)
+          .withCause(e)
           .build();
     }
   }
 
-  private void installApks(ImmutableList<Path> apkPaths, Predicate<Device> deviceFilter) {
+  private void installApks(
+      ImmutableList<Path> apkPaths, InstallOptions installOptions, Predicate<Device> deviceFilter) {
     try {
       ImmutableList<Device> matchedDevices =
           adbServer.getDevices().stream().filter(deviceFilter).collect(toImmutableList());
@@ -75,7 +79,7 @@ public class ApksInstaller {
         throw new TooManyDevicesMatchedException(matchedDevices.size());
       }
 
-      installOnDevice(apkPaths, matchedDevices.get(0));
+      installOnDevice(apkPaths, installOptions, matchedDevices.get(0));
 
     } catch (TimeoutException e) {
       throw CommandExecutionException.builder()
@@ -85,7 +89,8 @@ public class ApksInstaller {
     }
   }
 
-  private void installOnDevice(ImmutableList<Path> apkPaths, Device device) {
-    device.installApks(apkPaths, /* reinstall= */ true, ADB_TIMEOUT_MS, TimeUnit.MILLISECONDS);
+  private void installOnDevice(
+      ImmutableList<Path> apkPaths, InstallOptions installOptions, Device device) {
+    device.installApks(apkPaths, installOptions);
   }
 }

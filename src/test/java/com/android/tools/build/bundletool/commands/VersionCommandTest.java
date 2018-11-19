@@ -37,7 +37,7 @@ public class VersionCommandTest {
     VersionCommand.fromFlags(new FlagParser().parse(), new PrintStream(out)).execute();
 
     assertThat(asLines(out.toString()))
-        .containsExactly("BundleTool " + BundleToolVersion.getCurrentVersion(), "")
+        .containsExactly(BundleToolVersion.getCurrentVersion().toString(), "")
         .inOrder();
   }
 

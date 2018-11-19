@@ -195,7 +195,8 @@ public class ManifestDeliveryElementTest {
             ValidationException.class, () -> manifestDeliveryElement.get().getModuleConditions());
     assertThat(exception)
         .hasMessageThat()
-        .contains("Missing required 'name' attribute in the 'device-feature' condition element.");
+        .contains(
+            "Missing required 'dist:name' attribute in the 'device-feature' condition element.");
   }
 
   @Test
@@ -217,7 +218,206 @@ public class ManifestDeliveryElementTest {
             ValidationException.class, () -> manifestDeliveryElement.get().getModuleConditions());
     assertThat(exception)
         .hasMessageThat()
-        .contains("Missing required 'value' attribute in the 'min-sdk' condition element.");
+        .contains("Missing required 'dist:value' attribute in the 'min-sdk' condition element.");
+  }
+
+  @Test
+  public void moduleConditions_typoInElement_throws() {
+    XmlNode nodeWithTypo =
+        createAndroidManifestWithDeliveryElement(
+            XmlProtoElementBuilder.create(DISTRIBUTION_NAMESPACE_URI, "delivery")
+                .addChildElement(
+                    XmlProtoElementBuilder.create(DISTRIBUTION_NAMESPACE_URI, "install-time")
+                        .addChildElement(
+                            XmlProtoElementBuilder.create(
+                                DISTRIBUTION_NAMESPACE_URI, "condtions"))));
+
+    ValidationException exception =
+        assertThrows(
+            ValidationException.class,
+            () -> ManifestDeliveryElement.fromManifestRootNode(nodeWithTypo));
+
+    assertThat(exception)
+        .hasMessageThat()
+        .contains(
+            "Expected <dist:install-time> element to contain only <dist:conditions> "
+                + "element but found: 'condtions' with namespace URI: "
+                + "'http://schemas.android.com/apk/distribution'");
+  }
+
+  @Test
+  public void deliveryElement_typoInChildElement_throws() {
+    XmlNode nodeWithTypo =
+        createAndroidManifestWithDeliveryElement(
+            XmlProtoElementBuilder.create(DISTRIBUTION_NAMESPACE_URI, "delivery")
+                .addChildElement(
+                    XmlProtoElementBuilder.create(DISTRIBUTION_NAMESPACE_URI, "instal-time")));
+
+    ValidationException exception =
+        assertThrows(
+            ValidationException.class,
+            () -> ManifestDeliveryElement.fromManifestRootNode(nodeWithTypo));
+
+    assertThat(exception)
+        .hasMessageThat()
+        .contains(
+            "Expected <dist:delivery> element to contain only <dist:install-time> or "
+                + "<dist:on-demand> elements but found: 'instal-time' with namespace URI: "
+                + "'http://schemas.android.com/apk/distribution'");
+  }
+
+  @Test
+  public void onDemandElement_childElement_throws() {
+    XmlNode nodeWithTypo =
+        createAndroidManifestWithDeliveryElement(
+            XmlProtoElementBuilder.create(DISTRIBUTION_NAMESPACE_URI, "delivery")
+                .addChildElement(
+                    XmlProtoElementBuilder.create(DISTRIBUTION_NAMESPACE_URI, "on-demand")
+                        .addChildElement(
+                            XmlProtoElementBuilder.create(
+                                DISTRIBUTION_NAMESPACE_URI, "conditions"))));
+
+    ValidationException exception =
+        assertThrows(
+            ValidationException.class,
+            () -> ManifestDeliveryElement.fromManifestRootNode(nodeWithTypo));
+
+    assertThat(exception)
+        .hasMessageThat()
+        .contains(
+            "Expected <dist:on-demand> element to have no child elements but found: "
+                + "'conditions' with namespace URI: "
+                + "'http://schemas.android.com/apk/distribution'");
+  }
+
+  @Test
+  public void onDemandElement_missingNamespace_throws() {
+    XmlNode nodeWithTypo =
+        createAndroidManifestWithDeliveryElement(
+            XmlProtoElementBuilder.create(DISTRIBUTION_NAMESPACE_URI, "delivery")
+                .addChildElement(XmlProtoElementBuilder.create("on-demand")));
+
+    ValidationException exception =
+        assertThrows(
+            ValidationException.class,
+            () -> ManifestDeliveryElement.fromManifestRootNode(nodeWithTypo));
+
+    assertThat(exception)
+        .hasMessageThat()
+        .contains(
+            "Expected <dist:delivery> element to contain only <dist:install-time> or "
+                + "<dist:on-demand> elements but found: 'on-demand' with namespace not provided");
+  }
+
+  @Test
+  public void installTimeElement_missingNamespace_throws() {
+    XmlNode nodeWithTypo =
+        createAndroidManifestWithDeliveryElement(
+            XmlProtoElementBuilder.create(DISTRIBUTION_NAMESPACE_URI, "delivery")
+                .addChildElement(XmlProtoElementBuilder.create("install-time")));
+
+    ValidationException exception =
+        assertThrows(
+            ValidationException.class,
+            () -> ManifestDeliveryElement.fromManifestRootNode(nodeWithTypo));
+
+    assertThat(exception)
+        .hasMessageThat()
+        .contains(
+            "Expected <dist:delivery> element to contain only <dist:install-time> or "
+                + "<dist:on-demand> elements but found: 'install-time' with namespace not "
+                + "provided");
+  }
+
+  @Test
+  public void conditionsElement_missingNamespace_throws() {
+    XmlNode nodeWithTypo =
+        createAndroidManifestWithDeliveryElement(
+            XmlProtoElementBuilder.create(DISTRIBUTION_NAMESPACE_URI, "delivery")
+                .addChildElement(
+                    XmlProtoElementBuilder.create(DISTRIBUTION_NAMESPACE_URI, "install-time")
+                        .addChildElement(XmlProtoElementBuilder.create("conditions"))));
+
+    ValidationException exception =
+        assertThrows(
+            ValidationException.class,
+            () -> ManifestDeliveryElement.fromManifestRootNode(nodeWithTypo));
+
+    assertThat(exception)
+        .hasMessageThat()
+        .contains(
+            "Expected <dist:install-time> element to contain only <dist:conditions> element but "
+                + "found: 'conditions' with namespace not provided.");
+  }
+
+  @Test
+  public void minSdkCondition_missingNamespace_throws() {
+    XmlNode nodeWithTypo =
+        createAndroidManifestWithDeliveryElement(
+            XmlProtoElementBuilder.create(DISTRIBUTION_NAMESPACE_URI, "delivery")
+                .addChildElement(
+                    XmlProtoElementBuilder.create(DISTRIBUTION_NAMESPACE_URI, "install-time")
+                        .addChildElement(
+                            XmlProtoElementBuilder.create(DISTRIBUTION_NAMESPACE_URI, "conditions")
+                                .addChildElement(
+                                    XmlProtoElementBuilder.create(
+                                            DISTRIBUTION_NAMESPACE_URI, "min-sdk")
+                                        .addAttribute(
+                                            XmlProtoAttributeBuilder.create("value")
+                                                .setValueAsDecimalInteger(21))))));
+
+    ValidationException exception =
+        assertThrows(
+            ValidationException.class,
+            () ->
+                ManifestDeliveryElement.fromManifestRootNode(nodeWithTypo)
+                    .get()
+                    .getModuleConditions());
+
+    assertThat(exception)
+        .hasMessageThat()
+        .contains("Missing required 'dist:value' attribute in the 'min-sdk' condition element.");
+  }
+
+  @Test
+  public void deviceFeatureCondition_missingNamespace_throws() {
+    XmlNode nodeWithTypo =
+        createAndroidManifestWithDeliveryElement(
+            XmlProtoElementBuilder.create(DISTRIBUTION_NAMESPACE_URI, "delivery")
+                .addChildElement(
+                    XmlProtoElementBuilder.create(DISTRIBUTION_NAMESPACE_URI, "install-time")
+                        .addChildElement(
+                            XmlProtoElementBuilder.create(DISTRIBUTION_NAMESPACE_URI, "conditions")
+                                .addChildElement(
+                                    XmlProtoElementBuilder.create(
+                                            DISTRIBUTION_NAMESPACE_URI, "device-feature")
+                                        .addAttribute(
+                                            XmlProtoAttributeBuilder.create("name")
+                                                .setValueAsString("android.hardware.feature"))))));
+
+    ValidationException exception =
+        assertThrows(
+            ValidationException.class,
+            () ->
+                ManifestDeliveryElement.fromManifestRootNode(nodeWithTypo)
+                    .get()
+                    .getModuleConditions());
+
+    assertThat(exception)
+        .hasMessageThat()
+        .contains(
+            "Missing required 'dist:name' attribute in the 'device-feature' condition element.");
+  }
+
+  private static XmlNode createAndroidManifestWithDeliveryElement(
+      XmlProtoElementBuilder deliveryElement) {
+    return XmlProtoNode.createElementNode(
+            XmlProtoElementBuilder.create("manifest")
+                .addChildElement(
+                    XmlProtoElementBuilder.create(DISTRIBUTION_NAMESPACE_URI, "module")
+                        .addChildElement(deliveryElement))
+                .build())
+        .getProto();
   }
 
   private static XmlNode createAndroidManifestWithConditions(XmlProtoElement... conditions) {

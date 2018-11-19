@@ -44,6 +44,7 @@ public class AppBundleValidator {
           new EntryClashValidator(),
           new AbiParityValidator(),
           new DexFilesValidator(),
+          new ApexBundleValidator(),
           // Targeting validations.
           new AssetsTargetingValidator(),
           new NativeTargetingValidator(),

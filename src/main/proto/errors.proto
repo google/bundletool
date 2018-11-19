@@ -11,7 +11,7 @@ message BundleToolError {
   // include server paths and configuration.
   string exception_message = 1;
 
-  // Next id: 26
+  // Next id: 27
   oneof custom_error {
     ManifestMissingVersionCodeError manifest_missing_version_code = 2;
     ManifestInvalidVersionCodeError manifest_invalid_version_code = 3;
@@ -39,6 +39,7 @@ message BundleToolError {
         file_type_unknown_file_or_directory_in_module = 11;
     FileTypeFileUsesReservedNameError file_type_file_uses_reserved_name = 12;
     FileTypeDirectoryInBundleError file_type_directory_in_bundle = 18;
+    FileTypeInvalidApexImagePathError file_type_invalid_apex_image_path = 26;
 
     MandatoryBundleFileMissingError mandatory_bundle_file_missing = 14;
     MandatoryModuleFileMissingError mandatory_module_file_missing = 13;
@@ -104,6 +105,11 @@ message FileTypeInvalidFileNameInDirectoryError {
 }
 
 message FileTypeInvalidNativeLibraryPathError {
+  string bundle_directory = 1;
+  string invalid_file = 2;
+}
+
+message FileTypeInvalidApexImagePathError {
   string bundle_directory = 1;
   string invalid_file = 2;
 }

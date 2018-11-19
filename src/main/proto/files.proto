@@ -20,6 +20,12 @@ message NativeLibraries {
   repeated TargetedNativeDirectory directory = 1;
 }
 
+// Describes the APEX images in the App Bundle.
+message ApexImages {
+  // List of all the image files under "apex/".
+  repeated TargetedApexImage image = 1;
+}
+
 // An assets directory in the module that contains targeting information.
 // This information will be used when generating the APKs to determine how to
 // best split them.
@@ -44,4 +50,13 @@ message TargetedNativeDirectory {
   // Targeting of the directory.
   // Required.
   NativeDirectoryTargeting targeting = 2;
+}
+
+// An APEX image file in the module that contains targeting information.
+// This information will be used when generating the APK to determine which
+// image it contains.
+message TargetedApexImage {
+  string path = 1;
+
+  ApexImageTargeting targeting = 2;
 }

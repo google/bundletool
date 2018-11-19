@@ -275,8 +275,8 @@ public abstract class GetSizeCommand implements GetSizeRequest {
                 .setDescription(
                     "List of modules to run this report on (defaults to all the modules installed "
                         + "during the first download). Note that the dependent modules will also "
-                        + "be considered. We than ignore standalone APKs for size calculation when "
-                        + "this flag is set.")
+                        + "be considered. We ignore standalone APKs for size calculation when this "
+                        + "flag is set.")
                 .build())
         .addFlag(
             FlagDescription.builder()

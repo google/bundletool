@@ -184,6 +184,15 @@ public class XmlProtoAttributeBuilderTest {
   }
 
   @Test
+  public void setResourceId() {
+    XmlProtoAttributeBuilder attribute = createAttribute().setResourceId(123);
+    assertThat(attribute.getProto().build().getResourceId()).isEqualTo(123);
+
+    attribute.setResourceId(456);
+    assertThat(attribute.getProto().build().getResourceId()).isEqualTo(456);
+  }
+
+  @Test
   public void modifyingProtoModifiesAlsoWrapper() {
     XmlAttribute.Builder protoAttribute = XmlAttribute.newBuilder().setName("hello");
     XmlProtoAttributeBuilder wrapperAttribute = new XmlProtoAttributeBuilder(protoAttribute);

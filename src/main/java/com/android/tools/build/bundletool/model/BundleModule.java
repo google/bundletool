@@ -16,16 +16,23 @@
 
 package com.android.tools.build.bundletool.model;
 
+import static com.android.tools.build.bundletool.model.BundleModule.ModuleDeliveryType.ALWAYS_INITIAL_INSTALL;
+import static com.android.tools.build.bundletool.model.BundleModule.ModuleDeliveryType.CONDITIONAL_INITIAL_INSTALL;
+import static com.android.tools.build.bundletool.model.BundleModule.ModuleDeliveryType.NO_INITIAL_INSTALL;
+
 import com.android.aapt.Resources.ResourceTable;
 import com.android.aapt.Resources.XmlNode;
 import com.android.bundle.Commands.ModuleMetadata;
 import com.android.bundle.Config.BundleConfig;
+import com.android.bundle.Files.ApexImages;
 import com.android.bundle.Files.Assets;
 import com.android.bundle.Files.NativeLibraries;
 import com.android.bundle.Targeting.ModuleTargeting;
+import com.android.tools.build.bundletool.utils.xmlproto.XmlProtoAttribute;
 import com.android.tools.build.bundletool.version.BundleToolVersion;
 import com.google.auto.value.AutoValue;
 import com.google.auto.value.extension.memoized.Memoized;
+import com.google.common.base.Splitter;
 import com.google.common.collect.ImmutableCollection;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
@@ -54,12 +61,28 @@ public abstract class BundleModule {
   public static final ZipPath RESOURCES_DIRECTORY = ZipPath.create("res");
   public static final ZipPath ROOT_DIRECTORY = ZipPath.create("root");
 
+  /** The top-level directory of an App Bundle module that contains APEX image files. */
+  public static final ZipPath APEX_DIRECTORY = ZipPath.create("apex");
+
   public static final ZipPath ASSETS_PROTO_PATH = ZipPath.create("assets.pb");
   public static final ZipPath MANIFEST_PATH = MANIFEST_DIRECTORY.resolve(MANIFEST_FILENAME);
   public static final ZipPath NATIVE_PROTO_PATH = ZipPath.create("native.pb");
   public static final ZipPath RESOURCES_PROTO_PATH = ZipPath.create("resources.pb");
 
+  /** The top-level file of an App Bundle module that contains APEX targeting configuration. */
+  public static final ZipPath APEX_PROTO_PATH = ZipPath.create("apex.pb");
+
+  /** Used to parse file names in the apex/ directory, for multi-Abi targeting. */
+  public static final Splitter ABI_SPLITTER = Splitter.on(".").omitEmptyStrings();
+
   public abstract BundleModuleName getName();
+
+  /** Describes how the module is delivered at install-time. */
+  public enum ModuleDeliveryType {
+    ALWAYS_INITIAL_INSTALL,
+    CONDITIONAL_INITIAL_INSTALL,
+    NO_INITIAL_INSTALL
+  };
 
   /** The version of Bundletool that built this module, taken from BundleConfig. */
   public abstract BundleConfig getBundleConfig();
@@ -77,6 +100,8 @@ public abstract class BundleModule {
   public abstract Optional<Assets> getAssetsConfig();
 
   public abstract Optional<NativeLibraries> getNativeConfig();
+
+  public abstract Optional<ApexImages> getApexConfig();
 
   /**
    * Returns entries of the module, indexed by their module path.
@@ -100,9 +125,29 @@ public abstract class BundleModule {
     return BundleModuleName.BASE_MODULE_NAME.equals(getName().getName());
   }
 
-  public boolean isOnDemandModule() {
-    Optional<Boolean> isOnDemandModule = getAndroidManifest().isOnDemandModule();
-    return isOnDemandModule.orElse(false);
+  public ModuleDeliveryType getDeliveryType() {
+    if (getAndroidManifest().getManifestDeliveryElement().isPresent()) {
+      ManifestDeliveryElement manifestDeliveryElement =
+          getAndroidManifest().getManifestDeliveryElement().get();
+      if (manifestDeliveryElement.hasInstallTimeElement()) {
+        return manifestDeliveryElement.hasModuleConditions()
+            ? CONDITIONAL_INITIAL_INSTALL
+            : ALWAYS_INITIAL_INSTALL;
+      } else {
+        return NO_INITIAL_INSTALL;
+      }
+    }
+
+    // Handling legacy on-demand attribute value.
+    if (getAndroidManifest()
+        .getOnDemandAttribute()
+        .map(XmlProtoAttribute::getValueAsBoolean)
+        .orElse(false)) {
+      return NO_INITIAL_INSTALL;
+    }
+
+    // Legacy onDemand attribute is equal to false or for base module: no delivery information.
+    return ALWAYS_INITIAL_INSTALL;
   }
 
   public boolean isIncludedInFusing() {
@@ -156,7 +201,7 @@ public abstract class BundleModule {
   public ModuleMetadata getModuleMetadata() {
     return ModuleMetadata.newBuilder()
         .setName(getName().getName())
-        .setOnDemand(isOnDemandModule())
+        .setOnDemand(getDeliveryType().equals(NO_INITIAL_INSTALL))
         .setIsInstant(isInstantModule())
         .addAllDependencies(getDependencies())
         .setTargeting(getModuleTargeting())
@@ -190,6 +235,8 @@ public abstract class BundleModule {
 
     abstract Builder setNativeConfig(NativeLibraries nativeConfig);
 
+    abstract Builder setApexConfig(ApexImages apexConfig);
+
     /** @see #addEntry(ModuleEntry) */
     public Builder addEntries(Collection<ModuleEntry> entries) throws IOException {
       for (ModuleEntry entry : entries) {
@@ -222,6 +269,10 @@ public abstract class BundleModule {
       } else if (moduleEntry.getPath().equals(NATIVE_PROTO_PATH)) {
         try (InputStream inputStream = moduleEntry.getContent()) {
           setNativeConfig(NativeLibraries.parseFrom(inputStream));
+        }
+      } else if (moduleEntry.getPath().equals(APEX_PROTO_PATH)) {
+        try (InputStream inputStream = moduleEntry.getContent()) {
+          setApexConfig(ApexImages.parseFrom(inputStream));
         }
       } else if (!moduleEntry.isDirectory()) {
         entryMapBuilder().put(moduleEntry.getPath(), moduleEntry);

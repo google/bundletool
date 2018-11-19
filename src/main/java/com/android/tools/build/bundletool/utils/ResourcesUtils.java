@@ -26,15 +26,14 @@ import com.android.aapt.Resources.ResourceTable;
 import com.android.aapt.Resources.Type;
 import com.android.bundle.Targeting.ScreenDensity;
 import com.android.bundle.Targeting.ScreenDensity.DensityAlias;
+import com.android.tools.build.bundletool.model.ResourceTableEntry;
 import com.android.tools.build.bundletool.model.ZipPath;
 import com.google.common.collect.ImmutableBiMap;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import java.util.Collection;
-import java.util.HashSet;
 import java.util.Locale;
 import java.util.Optional;
-import java.util.Set;
 import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.stream.Stream;
@@ -136,42 +135,23 @@ public final class ResourcesUtils {
     return filteredTable.build();
   }
 
-  public static Set<Integer> resourceIds(
-      ResourceTable table, Function<Type, Boolean> typeFilterFn) {
-    Set<Integer> resourceIds = new HashSet<>();
-    for (Package pkg : table.getPackageList()) {
+  public static Stream<ResourceTableEntry> entries(ResourceTable resourceTable) {
+    Stream.Builder<ResourceTableEntry> stream = Stream.builder();
+    for (Package pkg : resourceTable.getPackageList()) {
       for (Type type : pkg.getTypeList()) {
-        if (typeFilterFn.apply(type)) {
-          for (Entry entry : type.getEntryList()) {
-            resourceIds.add(
-                makeResourceIdentifier(
-                    pkg.getPackageId().getId(),
-                    type.getTypeId().getId(),
-                    entry.getEntryId().getId()));
-          }
+        for (Entry entry : type.getEntryList()) {
+          stream.add(ResourceTableEntry.create(pkg, type, entry));
         }
       }
     }
-    return resourceIds;
-  }
-
-  public static int makeResourceIdentifier(
-      int packageIdentifier, int typeIdentifier, int entryIdentifier) {
-    return packageIdentifier << 24 | typeIdentifier << 16 | entryIdentifier;
-  }
-
-  public static Stream<Entry> entries(ResourceTable resourceTable) {
-    return resourceTable
-        .getPackageList()
-        .stream()
-        .map(Package::getTypeList)
-        .flatMap(Collection::stream)
-        .map(Type::getEntryList)
-        .flatMap(Collection::stream);
+    return stream.build();
   }
 
   public static Stream<ConfigValue> configValues(ResourceTable resourceTable) {
-    return entries(resourceTable).map(Entry::getConfigValueList).flatMap(Collection::stream);
+    return entries(resourceTable)
+        .map(ResourceTableEntry::getEntry)
+        .map(Entry::getConfigValueList)
+        .flatMap(Collection::stream);
   }
 
   public static ImmutableSet<ZipPath> getAllFileReferences(ResourceTable resourceTable) {
@@ -210,17 +190,9 @@ public final class ResourcesUtils {
 
   public static Optional<Entry> lookupEntryByResourceId(
       ResourceTable resourceTable, int resourceId) {
-    int packageId = (resourceId >> 24) & 0xFF;
-    int typeId = (resourceId >> 16) & 0xFF;
-    int entryId = (resourceId >> 0) & 0xFFFF;
-    return resourceTable
-        .getPackageList()
-        .stream()
-        .filter(pkg -> pkg.getPackageId().getId() == packageId)
-        .flatMap(pkg -> pkg.getTypeList().stream())
-        .filter(type -> type.getTypeId().getId() == typeId)
-        .flatMap(type -> type.getEntryList().stream())
-        .filter(entry -> entry.getEntryId().getId() == entryId)
+    return entries(resourceTable)
+        .filter(entry -> entry.getResourceId().getFullResourceId() == resourceId)
+        .map(ResourceTableEntry::getEntry)
         .collect(toOptional());
   }
 

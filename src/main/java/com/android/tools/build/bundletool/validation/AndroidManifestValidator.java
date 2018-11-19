@@ -17,6 +17,8 @@
 package com.android.tools.build.bundletool.validation;
 
 import static com.android.tools.build.bundletool.model.AndroidManifest.NO_NAMESPACE_URI;
+import static com.android.tools.build.bundletool.model.BundleModule.ModuleDeliveryType.CONDITIONAL_INITIAL_INSTALL;
+import static com.android.tools.build.bundletool.model.BundleModule.ModuleDeliveryType.NO_INITIAL_INSTALL;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.ImmutableSet.toImmutableSet;
 
@@ -30,7 +32,7 @@ import com.android.tools.build.bundletool.exceptions.manifest.ManifestSdkTargeti
 import com.android.tools.build.bundletool.exceptions.manifest.ManifestSdkTargetingException.MinSdkInvalidException;
 import com.android.tools.build.bundletool.model.AndroidManifest;
 import com.android.tools.build.bundletool.model.BundleModule;
-import com.android.tools.build.bundletool.model.ManifestDeliveryElement;
+import com.android.tools.build.bundletool.model.BundleModule.ModuleDeliveryType;
 import com.android.tools.build.bundletool.utils.xmlproto.XmlProtoAttribute;
 import com.google.common.base.Joiner;
 import com.google.common.collect.ImmutableList;
@@ -109,14 +111,8 @@ public class AndroidManifestValidator extends SubValidator {
 
   private void validateDeliverySettings(BundleModule module) {
 
-    Optional<Boolean> isOnDemandModule = module.getAndroidManifest().isOnDemandModule();
     boolean deliveryTypeDeclared = module.getAndroidManifest().isDeliveryTypeDeclared();
-    boolean hasConditions =
-        module
-            .getAndroidManifest()
-            .getManifestDeliveryElement()
-            .map(ManifestDeliveryElement::hasModuleConditions)
-            .orElse(false);
+    ModuleDeliveryType deliveryType = module.getDeliveryType();
 
     if (module.getAndroidManifest().getOnDemandAttribute().isPresent()
         && module.getAndroidManifest().getManifestDeliveryElement().isPresent()) {
@@ -130,11 +126,11 @@ public class AndroidManifestValidator extends SubValidator {
 
     if (module.isBaseModule()) {
       // In the base module, onDemand must be either not set or false
-      if (isOnDemandModule.isPresent() && isOnDemandModule.get()) {
+      if (deliveryType.equals(ModuleDeliveryType.NO_INITIAL_INSTALL)) {
         throw new ValidationException(
             "The base module cannot be marked on-demand since it will always be served.");
       }
-      if (hasConditions) {
+      if (deliveryType.equals(ModuleDeliveryType.CONDITIONAL_INITIAL_INSTALL)) {
         throw new ValidationException(
             "The base module cannot have conditions since it will always be served.");
       }
@@ -150,21 +146,15 @@ public class AndroidManifestValidator extends SubValidator {
 
   private void validateOnDemandIsInstantMutualExclusion(BundleModule module) {
     boolean isInstant = module.getAndroidManifest().isInstantModule().orElse(false);
-    boolean hasConditions =
-        module
-            .getAndroidManifest()
-            .getManifestDeliveryElement()
-            .map(ManifestDeliveryElement::hasModuleConditions)
-            .orElse(false);
 
-    if (module.isOnDemandModule() && isInstant) {
+    if (module.getDeliveryType().equals(NO_INITIAL_INSTALL) && isInstant) {
       throw ValidationException.builder()
           .withMessage(
               "Module cannot be on-demand and 'instant' at the same time (module '%s').",
               module.getName())
           .build();
     }
-    if (hasConditions && isInstant) {
+    if (module.getDeliveryType().equals(CONDITIONAL_INITIAL_INSTALL) && isInstant) {
       throw ValidationException.builder()
           .withMessage(
               "The attribute 'instant' cannot be true for conditional module (module '%s').",

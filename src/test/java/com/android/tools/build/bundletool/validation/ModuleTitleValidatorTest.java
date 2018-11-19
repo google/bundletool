@@ -17,6 +17,7 @@
 package com.android.tools.build.bundletool.validation;
 
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifest;
+import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withMinSdkCondition;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withOnDemandAttribute;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withTitle;
 import static com.android.tools.build.bundletool.testing.ResourcesTableFactory.TEST_LABEL_RESOURCE_ID;
@@ -63,7 +64,7 @@ public class ModuleTitleValidatorTest {
 
     assertThat(exception)
         .hasMessageThat()
-        .contains("Mandatory title is missing in manifest for on-demand module");
+        .contains("Mandatory title is missing in manifest for module 'demand'");
   }
 
   @Test
@@ -107,6 +108,22 @@ public class ModuleTitleValidatorTest {
             () -> new ModuleTitleValidator().validateAllModules(allModules));
 
     assertThat(exception).hasMessageThat().contains("is missing in the base resource table");
+  }
+
+  @Test
+  public void validateAllModules_conditionalModuleTitleMissing_throws() throws Exception {
+    ImmutableList<BundleModule> allModules =
+        ImmutableList.of(
+            module("base", androidManifest(PKG_NAME)),
+            module("conditional", androidManifest(PKG_NAME, withMinSdkCondition(21))));
+    ValidationException exception =
+        assertThrows(
+            ValidationException.class,
+            () -> new ModuleTitleValidator().validateAllModules(allModules));
+
+    assertThat(exception)
+        .hasMessageThat()
+        .contains("Mandatory title is missing in manifest for " + "module 'conditional'");
   }
 
   @Test

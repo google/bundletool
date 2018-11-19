@@ -38,7 +38,7 @@ public final class VersionCommand {
   }
 
   public void execute() {
-    out.println("BundleTool " + BundleToolVersion.getCurrentVersion());
+    out.println(BundleToolVersion.getCurrentVersion());
   }
 
   public static CommandHelp help() {

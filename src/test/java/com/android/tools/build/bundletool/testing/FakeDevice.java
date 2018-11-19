@@ -144,7 +144,7 @@ public class FakeDevice extends Device {
   }
 
   public static FakeDevice inDisconnectedState(String deviceId, DeviceState deviceState) {
-    checkArgument(deviceState != DeviceState.ONLINE);
+    checkArgument(!deviceState.equals(DeviceState.ONLINE));
     // In this state, querying device doesn't work.
     return new FakeDevice(
         deviceId,
@@ -207,9 +207,8 @@ public class FakeDevice extends Device {
   }
 
   @Override
-  public void installApks(
-      ImmutableList<Path> apks, boolean reinstall, long timeout, TimeUnit timeoutUnit) {
-    installApksSideEffect.ifPresent(val -> val.apply(apks, reinstall));
+  public void installApks(ImmutableList<Path> apks, InstallOptions installOptions) {
+    installApksSideEffect.ifPresent(val -> val.apply(apks, installOptions));
   }
 
   public void setInstallApksSideEffect(SideEffect sideEffect) {
@@ -234,6 +233,6 @@ public class FakeDevice extends Device {
 
   /** Side effect. */
   public interface SideEffect {
-    void apply(ImmutableList<Path> apks, boolean reinstall);
+    void apply(ImmutableList<Path> apks, InstallOptions installOptions);
   }
 }

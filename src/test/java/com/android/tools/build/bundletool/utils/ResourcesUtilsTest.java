@@ -225,11 +225,11 @@ public class ResourcesUtilsTest {
     ResourceTable resourceTable =
         new ResourceTableBuilder()
             .addPackage("com.test.app", 0x7F)
-            // 0x7F000000
-            .addXmlResource("layout", "res/xml/layout.xml")
             // 0x7F010000
+            .addXmlResource("layout", "res/xml/layout.xml")
+            // 0x7F020000
             .addStringResource("hello", "res/string/hello.xml")
-            // 0x7F010001
+            // 0x7F020001
             .addStringResource("world", "res/string/world.xml")
             .build();
 
@@ -254,14 +254,14 @@ public class ResourcesUtilsTest {
     ResourceTable resourceTable =
         new ResourceTableBuilder()
             .addPackage("com.test.app", 0x7F)
-            // 0x7F000000
+            // 0x7F010000
             .addXmlResource("layout", "res/xml/not-the-layout-we-want.xml")
             .addPackage("com.test.app.split", 0x80)
-            // 0x80000000
-            .addXmlResource("layout", "res/xml/layout.xml")
             // 0x80010000
+            .addXmlResource("layout", "res/xml/layout.xml")
+            // 0x80020000
             .addStringResource("hello", "res/string/hello.xml")
-            // 0x80010001
+            // 0x80020001
             .addStringResource("world", "res/string/world.xml")
             .build();
 

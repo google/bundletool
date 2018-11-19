@@ -16,28 +16,39 @@
 
 package com.android.tools.build.bundletool.targeting;
 
+import static com.android.tools.build.bundletool.model.BundleModule.ABI_SPLITTER;
 import static com.google.common.base.Preconditions.checkArgument;
+import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 
+import com.android.bundle.Files.ApexImages;
 import com.android.bundle.Files.Assets;
 import com.android.bundle.Files.NativeLibraries;
+import com.android.bundle.Files.TargetedApexImage;
 import com.android.bundle.Files.TargetedAssetsDirectory;
 import com.android.bundle.Files.TargetedNativeDirectory;
 import com.android.bundle.Targeting.Abi;
+import com.android.bundle.Targeting.ApexImageTargeting;
 import com.android.bundle.Targeting.AssetsDirectoryTargeting;
+import com.android.bundle.Targeting.MultiAbi;
+import com.android.bundle.Targeting.MultiAbiTargeting;
 import com.android.bundle.Targeting.NativeDirectoryTargeting;
 import com.android.tools.build.bundletool.exceptions.ValidationException;
 import com.android.tools.build.bundletool.model.AbiName;
 import com.android.tools.build.bundletool.model.ZipPath;
 import com.android.tools.build.bundletool.utils.TargetingProtoUtils;
 import com.android.tools.build.bundletool.utils.files.FileUtils;
+import com.google.common.base.Ascii;
 import com.google.common.collect.HashMultimap;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.Maps;
 import com.google.common.collect.Multimap;
 import com.google.common.collect.Sets;
 import java.util.Collection;
 import java.util.Optional;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
@@ -181,6 +192,51 @@ public class TargetingGenerator {
     return nativeLibraries.build();
   }
 
+  /**
+   * Generates APEX targeting based on the names of the APEX image files.
+   *
+   * @param apexImageFiles names of all files under apex/, including the "apex/" prefix.
+   * @return Targeting for all APEX image files.
+   */
+  public ApexImages generateTargetingForApexImages(Collection<ZipPath> apexImageFiles) {
+    ImmutableMap<ZipPath, MultiAbi> targetingByPath =
+        Maps.toMap(apexImageFiles, path -> buildMultiAbi(path.getFileName().toString()));
+
+    ApexImages.Builder apexImages = ApexImages.newBuilder();
+    ImmutableSet<MultiAbi> allTargeting = ImmutableSet.copyOf(targetingByPath.values());
+    targetingByPath.forEach(
+        (imagePath, targeting) ->
+            apexImages.addImage(
+                TargetedApexImage.newBuilder()
+                    .setPath(imagePath.toString())
+                    .setTargeting(buildApexTargetingWithAlternatives(targeting, allTargeting))));
+    return apexImages.build();
+  }
+
+  private static MultiAbi buildMultiAbi(String fileName) {
+    ImmutableList<String> tokens = ImmutableList.copyOf(ABI_SPLITTER.splitToList(fileName));
+    int nAbis = tokens.size() - 1;
+    checkState(tokens.get(nAbis).equals("img"), "File under 'apex/' does not have suffix 'img'");
+    return MultiAbi.newBuilder()
+        .addAllAbi(
+            tokens.stream()
+                .limit(nAbis)
+                .map(token -> checkAbiName(token, fileName))
+                .collect(toImmutableList()))
+        .build();
+  }
+
+  private static ApexImageTargeting buildApexTargetingWithAlternatives(
+      MultiAbi targeting, Set<MultiAbi> allTargeting) {
+    return ApexImageTargeting.newBuilder()
+        .setMultiAbi(
+            MultiAbiTargeting.newBuilder()
+                .addValue(targeting)
+                .addAllAlternatives(
+                    Sets.difference(allTargeting, ImmutableSet.of(targeting)).immutableCopy()))
+        .build();
+  }
+
   private static String checkRootDirectoryName(String rootName, String forDirectory) {
     checkArgument(rootName.endsWith("/"), "'%s' does not end with '/'.", rootName);
     checkArgument(
@@ -191,22 +247,23 @@ public class TargetingGenerator {
     return rootName;
   }
 
-  private static Abi checkAbiName(String token, String forDirectory) {
+  private static Abi checkAbiName(String token, String forFileOrDirectory) {
     Optional<AbiName> abiName = AbiName.fromPlatformName(token);
     if (!abiName.isPresent()) {
       Optional<AbiName> abiNameLowerCase = AbiName.fromPlatformName(token.toLowerCase());
       if (abiNameLowerCase.isPresent()) {
         throw ValidationException.builder()
             .withMessage(
-                "Expecting ABI name in directory '%s', but found '%s' which is not recognized. "
-                    + "Did you mean '%s'?",
-                forDirectory, token, token.toLowerCase())
+                "Expecting ABI name in file or directory '%s', but found '%s' "
+                    + "which is not recognized. Did you mean '%s'?",
+                forFileOrDirectory, token, Ascii.toLowerCase(token))
             .build();
       }
       throw ValidationException.builder()
           .withMessage(
-              "Expecting ABI name in directory '%s', but found '%s' which is not recognized.",
-              forDirectory, token)
+              "Expecting ABI name in file or directory '%s', but found '%s' "
+                  + "which is not recognized.",
+              forFileOrDirectory, token)
           .build();
     }
 

@@ -22,14 +22,18 @@ import com.android.ddmlib.IShellOutputReceiver;
 import com.android.ddmlib.ShellCommandUnresponsiveException;
 import com.android.ddmlib.TimeoutException;
 import com.android.sdklib.AndroidVersion;
+import com.google.auto.value.AutoValue;
 import com.google.common.collect.ImmutableList;
 import java.io.IOException;
 import java.nio.file.Path;
+import java.time.Duration;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 
 /** Interface for BundleTool - Ddmlib interactions. Represents a connected device. */
 public abstract class Device {
+
+  private static final Duration DEFAULT_ADB_TIMEOUT = Duration.ofMinutes(1);
 
   public abstract DeviceState getState();
 
@@ -54,6 +58,34 @@ public abstract class Device {
       throws TimeoutException, AdbCommandRejectedException, ShellCommandUnresponsiveException,
           IOException;
 
-  public abstract void installApks(
-      ImmutableList<Path> apks, boolean reinstall, long timeout, TimeUnit timeoutUnit);
+  public abstract void installApks(ImmutableList<Path> apks, InstallOptions installOptions);
+
+  /** Options related to APK installation. */
+  @AutoValue
+  public abstract static class InstallOptions {
+
+    public abstract boolean getAllowDowngrade();
+
+    public abstract boolean getAllowReinstall();
+
+    public abstract Duration getTimeout();
+
+    public static Builder builder() {
+      return new AutoValue_Device_InstallOptions.Builder()
+          .setTimeout(DEFAULT_ADB_TIMEOUT)
+          .setAllowReinstall(true);
+    }
+
+    /** Builder for {@link InstallOptions}. */
+    @AutoValue.Builder
+    public abstract static class Builder {
+      public abstract Builder setAllowDowngrade(boolean allowDowngrade);
+
+      public abstract Builder setAllowReinstall(boolean allowReinstall);
+
+      public abstract Builder setTimeout(Duration timeout);
+
+      public abstract InstallOptions build();
+    }
+  }
 }

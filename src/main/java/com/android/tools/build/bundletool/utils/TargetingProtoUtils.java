@@ -132,7 +132,7 @@ public final class TargetingProtoUtils {
             // For now we only support one value in ScreenDensityTargeting.
             .collect(MoreCollectors.onlyElement());
     return Optional.of(
-        (densityTargeting.getDensityOneofCase() == DENSITY_ALIAS)
+        densityTargeting.getDensityOneofCase().equals(DENSITY_ALIAS)
             ? DENSITY_ALIAS_TO_DPI_MAP.get(densityTargeting.getDensityAlias())
             : densityTargeting.getDensityDpi());
   }

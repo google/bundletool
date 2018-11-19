@@ -39,6 +39,8 @@ import java.util.Optional;
 public abstract class ManifestDeliveryElement {
 
   private static final String VERSION_ATTRIBUTE_NAME = "version";
+  private static final ImmutableList<String> ALLOWED_DELIVERY_MODES =
+      ImmutableList.of("install-time", "on-demand");
 
   abstract XmlProtoElement getDeliveryElement();
 
@@ -105,6 +107,66 @@ public abstract class ManifestDeliveryElement {
     return moduleConditions.build();
   }
 
+  private static void validateDeliveryElement(XmlProtoElement deliveryElement) {
+    validateDeliveryElementChildren(deliveryElement);
+    validateInstallTimeElement(
+        deliveryElement.getOptionalChildElement(DISTRIBUTION_NAMESPACE_URI, "install-time"));
+    validateOnDemandElement(
+        deliveryElement.getOptionalChildElement(DISTRIBUTION_NAMESPACE_URI, "on-demand"));
+  }
+
+  private static void validateDeliveryElementChildren(XmlProtoElement deliveryElement) {
+    Optional<XmlProtoElement> offendingElement =
+        deliveryElement
+            .getChildrenElements(
+                child ->
+                    !(child.getNamespaceUri().equals(DISTRIBUTION_NAMESPACE_URI)
+                        && ALLOWED_DELIVERY_MODES.contains(child.getName())))
+            .findAny();
+
+    if (offendingElement.isPresent()) {
+      throw ValidationException.builder()
+          .withMessage(
+              "Expected <dist:delivery> element to contain only <dist:install-time> or "
+                  + "<dist:on-demand> elements but found: %s",
+              printElement(offendingElement.get()))
+          .build();
+    }
+  }
+
+  private static void validateInstallTimeElement(Optional<XmlProtoElement> installTimeElement) {
+    Optional<XmlProtoElement> offendingElement =
+        installTimeElement.flatMap(
+            installTime ->
+                installTime
+                    .getChildrenElements(
+                        child ->
+                            !(child.getNamespaceUri().equals(DISTRIBUTION_NAMESPACE_URI)
+                                && child.getName().equals("conditions")))
+                    .findAny());
+
+    if (offendingElement.isPresent()) {
+      throw ValidationException.builder()
+          .withMessage(
+              "Expected <dist:install-time> element to contain only <dist:conditions> "
+                  + "element but found: %s.",
+              printElement(offendingElement.get()))
+          .build();
+    }
+  }
+
+  private static void validateOnDemandElement(Optional<XmlProtoElement> onDemandElement) {
+    Optional<XmlProtoElement> offendingChild =
+        onDemandElement.flatMap(element -> element.getChildrenElements().findAny());
+    if (offendingChild.isPresent()) {
+      throw ValidationException.builder()
+          .withMessage(
+              "Expected <dist:on-demand> element to have no child elements but found: %s.",
+              printElement(offendingChild.get()))
+          .build();
+    }
+  }
+
   private ImmutableList<XmlProtoElement> getModuleConditionElements() {
     Optional<XmlProtoElement> installTimeElement =
         getDeliveryElement().getOptionalChildElement(DISTRIBUTION_NAMESPACE_URI, "install-time");
@@ -123,7 +185,7 @@ public abstract class ManifestDeliveryElement {
             .orElseThrow(
                 () ->
                     new ValidationException(
-                        "Missing required 'name' attribute in the 'device-feature' condition "
+                        "Missing required 'dist:name' attribute in the 'device-feature' condition "
                             + "element."))
             .getValueAsString(),
         conditionElement
@@ -137,8 +199,16 @@ public abstract class ManifestDeliveryElement {
         .orElseThrow(
             () ->
                 new ValidationException(
-                    "Missing required 'value' attribute in the 'min-sdk' condition element."))
+                    "Missing required 'dist:value' attribute in the 'min-sdk' condition element."))
         .getValueAsDecimalInteger();
+  }
+
+  private static String printElement(XmlProtoElement element) {
+    if (element.getNamespaceUri().isEmpty()) {
+      return String.format("'%s' with namespace not provided", element.getName());
+    }
+    return String.format(
+        "'%s' with namespace URI: '%s'", element.getName(), element.getNamespaceUri());
   }
 
   /** Returns the instance if Android Manifest contains the <dist:delivery> element. */
@@ -147,7 +217,11 @@ public abstract class ManifestDeliveryElement {
     return manifestElement
         .getOptionalChildElement(DISTRIBUTION_NAMESPACE_URI, "module")
         .flatMap(elem -> elem.getOptionalChildElement(DISTRIBUTION_NAMESPACE_URI, "delivery"))
-        .map((XmlProtoElement elem) -> new AutoValue_ManifestDeliveryElement(elem));
+        .map(
+            (XmlProtoElement elem) -> {
+              validateDeliveryElement(elem);
+              return new AutoValue_ManifestDeliveryElement(elem);
+            });
   }
 
   @VisibleForTesting

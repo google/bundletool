@@ -205,7 +205,8 @@ public class AppBundle {
 
   private static BundleMetadata readBundleMetadata(ZipFile bundleFile) {
     BundleMetadata.Builder metadata = BundleMetadata.builder();
-    ZipUtils.getFileEntriesWithPathPrefix(bundleFile, METADATA_DIRECTORY)
+    ZipUtils.allFileEntries(bundleFile)
+        .filter(entry -> ZipPath.create(entry.getName()).startsWith(METADATA_DIRECTORY))
         .forEach(
             zipEntry -> {
               ZipPath bundlePath = ZipPath.create(zipEntry.getName());

@@ -62,7 +62,6 @@ import static com.android.tools.build.bundletool.testing.TargetingUtils.variantA
 import static com.android.tools.build.bundletool.testing.TargetingUtils.variantSdkTargeting;
 import static com.android.tools.build.bundletool.testing.TestUtils.filesUnderPath;
 import static com.android.tools.build.bundletool.testing.truth.zip.TruthZip.assertThat;
-import static com.android.tools.build.bundletool.utils.ResourcesUtils.makeResourceIdentifier;
 import static com.android.tools.build.bundletool.utils.ResultUtils.instantApkVariants;
 import static com.android.tools.build.bundletool.utils.ResultUtils.splitApkVariants;
 import static com.android.tools.build.bundletool.utils.ResultUtils.standaloneApkVariants;
@@ -101,6 +100,7 @@ import com.android.tools.build.bundletool.model.Aapt2Command;
 import com.android.tools.build.bundletool.model.AndroidManifest;
 import com.android.tools.build.bundletool.model.ApkModifier;
 import com.android.tools.build.bundletool.model.AppBundle;
+import com.android.tools.build.bundletool.model.ResourceId;
 import com.android.tools.build.bundletool.model.SigningConfiguration;
 import com.android.tools.build.bundletool.model.ZipPath;
 import com.android.tools.build.bundletool.testing.Aapt2Helper;
@@ -297,8 +297,7 @@ public class BuildApksManagerTest {
 
     // Split APKs: All modules must be used.
     ImmutableSet<String> modulesInSplitApks =
-        splitApkVariants(result)
-            .stream()
+        splitApkVariants(result).stream()
             .flatMap(variant -> variant.getApkSetList().stream())
             .map(ApkSet::getModuleMetadata)
             .map(ModuleMetadata::getName)
@@ -1377,10 +1376,7 @@ public class BuildApksManagerTest {
     ImmutableList<Variant> splitApkVariants = splitApkVariants(result);
     assertThat(splitApkVariants).hasSize(1);
     ImmutableMap<String, List<ApkDescription>> splitApksByModule =
-        splitApkVariants
-            .get(0)
-            .getApkSetList()
-            .stream()
+        splitApkVariants.get(0).getApkSetList().stream()
             .collect(
                 toImmutableMap(
                     apkSet -> apkSet.getModuleMetadata().getName(),
@@ -2001,24 +1997,19 @@ public class BuildApksManagerTest {
   }
 
   private static ImmutableList<ApkDescription> apkDescriptions(List<Variant> variants) {
-    return variants
-        .stream()
+    return variants.stream()
         .flatMap(variant -> apkDescriptions(variant).stream())
         .collect(toImmutableList());
   }
 
   private static ImmutableList<ApkDescription> apkDescriptions(Variant variant) {
-    return variant
-        .getApkSetList()
-        .stream()
+    return variant.getApkSetList().stream()
         .flatMap(apkSet -> apkSet.getApkDescriptionList().stream())
         .collect(toImmutableList());
   }
 
   private static ImmutableList<String> apkNamesInVariant(Variant variant) {
-    return variant
-        .getApkSetList()
-        .stream()
+    return variant.getApkSetList().stream()
         .flatMap(apkSet -> apkSet.getApkDescriptionList().stream())
         // Get just the filename.
         .map(ApkDescription::getPath)
@@ -2035,16 +2026,14 @@ public class BuildApksManagerTest {
    */
   private ImmutableMultiset<String> filesInApks(
       Collection<ApkDescription> apkDescs, ZipFile apkSetFile) {
-    return apkDescs
-        .stream()
+    return apkDescs.stream()
         .flatMap(apkDesc -> filesInApk(apkDesc, apkSetFile).stream())
         .collect(toImmutableMultiset());
   }
 
   /** Verifies that all given ApkDescriptions point to the APK files in the output directory. */
   private void verifyApksExist(Collection<ApkDescription> apkDescs, Path outputDirectory) {
-    apkDescs
-        .stream()
+    apkDescs.stream()
         .map(apkDesc -> outputDirectory.resolve(apkDesc.getPath()))
         .forEach(FilePreconditions::checkFileExistsAndReadable);
   }
@@ -2060,8 +2049,7 @@ public class BuildApksManagerTest {
 
   private ImmutableSet<String> filesInApk(File apkFile) throws Exception {
     try (ZipFile apkZip = new ZipFile(apkFile)) {
-      return Collections.list(apkZip.entries())
-          .stream()
+      return Collections.list(apkZip.entries()).stream()
           .map(ZipEntry::getName)
           .collect(toImmutableSet());
     }
@@ -2095,5 +2083,14 @@ public class BuildApksManagerTest {
 
   private Path execute(BuildApksCommand command) {
     return new BuildApksManager(command).execute(tmpDir);
+  }
+
+  private static int makeResourceIdentifier(int pkgId, int typeId, int entryId) {
+    return ResourceId.builder()
+        .setPackageId(pkgId)
+        .setTypeId(typeId)
+        .setEntryId(entryId)
+        .build()
+        .getFullResourceId();
   }
 }

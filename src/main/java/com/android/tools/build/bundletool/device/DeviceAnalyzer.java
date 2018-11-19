@@ -119,13 +119,13 @@ public class DeviceAnalyzer {
                         .withMessage("Unable to find the requested device.")
                         .build());
 
-    if (device.getState() == DeviceState.UNAUTHORIZED) {
+    if (device.getState().equals(DeviceState.UNAUTHORIZED)) {
       throw CommandExecutionException.builder()
           .withMessage(
               "Device found but not authorized for connecting. "
                   + "Please allow USB debugging on the device.")
           .build();
-    } else if (device.getState() != DeviceState.ONLINE) {
+    } else if (!device.getState().equals(DeviceState.ONLINE)) {
       throw CommandExecutionException.builder()
           .withMessage(
               "Unable to connect to the device (device state: '%s').", device.getState().name())

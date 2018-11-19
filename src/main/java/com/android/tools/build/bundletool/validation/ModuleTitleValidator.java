@@ -16,16 +16,18 @@
 
 package com.android.tools.build.bundletool.validation;
 
-import static com.android.tools.build.bundletool.utils.ResourcesUtils.resourceIds;
+import static com.android.tools.build.bundletool.utils.ResourcesUtils.entries;
+import static com.google.common.collect.ImmutableSet.toImmutableSet;
 
 import com.android.aapt.Resources.ResourceTable;
 import com.android.tools.build.bundletool.exceptions.ValidationException;
 import com.android.tools.build.bundletool.model.BundleModule;
+import com.android.tools.build.bundletool.model.BundleModule.ModuleDeliveryType;
 import com.android.tools.build.bundletool.version.BundleToolVersion;
 import com.android.tools.build.bundletool.version.Version;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableSet;
 import java.util.Optional;
-import java.util.Set;
 
 /** Validates module Titles for On Demand Modules */
 public class ModuleTitleValidator extends SubValidator {
@@ -46,25 +48,27 @@ public class ModuleTitleValidator extends SubValidator {
     }
     ResourceTable table = baseModule.getResourceTable().orElse(ResourceTable.getDefaultInstance());
 
-    Set<Integer> stringResourceIds = resourceIds(table, type -> type.getName().equals("string"));
+    ImmutableSet<Integer> stringResourceIds =
+        entries(table)
+            .filter(entry -> entry.getType().getName().equals("string"))
+            .map(entry -> entry.getResourceId().getFullResourceId())
+            .collect(toImmutableSet());
 
     for (BundleModule module : modules) {
 
-      if (module.isOnDemandModule()) {
+      if (!module.getDeliveryType().equals(ModuleDeliveryType.ALWAYS_INITIAL_INSTALL)) {
         Optional<Integer> titleRefId = module.getAndroidManifest().getTitleRefId();
 
         if (!titleRefId.isPresent()) {
           throw ValidationException.builder()
               .withMessage(
-                  "Mandatory title is missing in manifest for on-demand module '%s'.",
-                  module.getName())
+                  "Mandatory title is missing in manifest for module '%s'.", module.getName())
               .build();
         }
         if (!stringResourceIds.contains(titleRefId.get())) {
           throw ValidationException.builder()
               .withMessage(
-                  "Title for on-demand module '%s' is missing in the base resource table.",
-                  module.getName())
+                  "Title for module '%s' is missing in the base resource table.", module.getName())
               .build();
         }
       }

@@ -24,6 +24,7 @@ import static com.google.common.io.MoreFiles.getNameWithoutExtension;
 
 import com.android.bundle.Config.BundleConfig;
 import com.android.bundle.Config.Bundletool;
+import com.android.bundle.Files.ApexImages;
 import com.android.bundle.Files.Assets;
 import com.android.bundle.Files.NativeLibraries;
 import com.android.tools.build.bundletool.commands.CommandHelp.CommandDescription;
@@ -177,8 +178,10 @@ public abstract class BuildBundleCommand {
     ZipBuilder bundleBuilder = new ZipBuilder();
 
     try (Closer closer = Closer.create()) {
-    EntryOption[] compression =
-        getUncompressedBundle() ? new EntryOption[] {EntryOption.UNCOMPRESSED} : new EntryOption[0];
+      EntryOption[] compression =
+          getUncompressedBundle()
+              ? new EntryOption[] {EntryOption.UNCOMPRESSED}
+              : new EntryOption[0];
 
       // Merge in all the modules, each module into its own sub-directory.
       for (Path module : getModulesPaths()) {
@@ -189,17 +192,23 @@ public abstract class BuildBundleCommand {
           bundleBuilder.copyAllContentsFromZip(moduleDir, moduleZipFile, compression);
 
           Optional<Assets> assetsTargeting = generateAssetsTargeting(moduleZipFile);
-          if (assetsTargeting.isPresent()) {
-            bundleBuilder.addFileWithProtoContent(
-                moduleDir.resolve("assets.pb"), assetsTargeting.get(), compression);
-          }
+          assetsTargeting.ifPresent(
+              targeting ->
+                  bundleBuilder.addFileWithProtoContent(
+                      moduleDir.resolve("assets.pb"), targeting, compression));
 
           Optional<NativeLibraries> nativeLibrariesTargeting =
               generateNativeLibrariesTargeting(moduleZipFile);
-          if (nativeLibrariesTargeting.isPresent()) {
-            bundleBuilder.addFileWithProtoContent(
-                moduleDir.resolve("native.pb"), nativeLibrariesTargeting.get(), compression);
-          }
+          nativeLibrariesTargeting.ifPresent(
+              targeting ->
+                  bundleBuilder.addFileWithProtoContent(
+                      moduleDir.resolve("native.pb"), targeting, compression));
+
+          Optional<ApexImages> apexImagesTargeting = generateApexImagesTargeting(moduleZipFile);
+          apexImagesTargeting.ifPresent(
+              targeting ->
+                  bundleBuilder.addFileWithProtoContent(
+                      moduleDir.resolve("apex.pb"), targeting, compression));
         } catch (ZipException e) {
           throw CommandExecutionException.builder()
               .withCause(e)
@@ -261,7 +270,8 @@ public abstract class BuildBundleCommand {
 
   private Optional<Assets> generateAssetsTargeting(ZipFile module) {
     ImmutableList<ZipPath> assetDirectories =
-        ZipUtils.getFilesWithPathPrefix(module, BundleModule.ASSETS_DIRECTORY)
+        ZipUtils.allFileEntriesPaths(module)
+            .filter(path -> path.startsWith(BundleModule.ASSETS_DIRECTORY))
             .filter(path -> path.getNameCount() > 1)
             .map(ZipPath::getParent)
             .distinct()
@@ -278,7 +288,8 @@ public abstract class BuildBundleCommand {
     // Validation ensures that files under "lib/" conform to pattern "lib/<abi-dir>/file.so".
     // We extract the distinct "lib/<abi-dir>" directories.
     ImmutableList<String> libAbiDirs =
-        ZipUtils.getFilesWithPathPrefix(module, BundleModule.LIB_DIRECTORY)
+        ZipUtils.allFileEntriesPaths(module)
+            .filter(path -> path.startsWith(BundleModule.LIB_DIRECTORY))
             .filter(path -> path.getNameCount() > 2)
             .map(path -> path.subpath(0, 2))
             .map(ZipPath::toString)
@@ -290,6 +301,21 @@ public abstract class BuildBundleCommand {
     }
 
     return Optional.of(new TargetingGenerator().generateTargetingForNativeLibraries(libAbiDirs));
+  }
+
+  private Optional<ApexImages> generateApexImagesTargeting(ZipFile module) {
+    // Validation ensures that files under "apex/" conform to the pattern
+    // "apex/<abi1>.<abi2>...<abiN>.img".
+    ImmutableList<ZipPath> apexImageFiles =
+        ZipUtils.allFileEntriesPaths(module)
+            .filter(path -> path.startsWith(BundleModule.APEX_DIRECTORY))
+            .collect(toImmutableList());
+
+    if (apexImageFiles.isEmpty()) {
+      return Optional.empty();
+    }
+
+    return Optional.of(new TargetingGenerator().generateTargetingForApexImages(apexImageFiles));
   }
 
   private static BundleConfig parseBundleConfigJson(Path bundleConfigJsonPath) {

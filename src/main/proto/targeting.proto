@@ -103,6 +103,10 @@ message Abi {
   AbiAlias alias = 1;
 }
 
+message MultiAbi {
+  repeated Abi abi = 1;
+}
+
 message DeviceFeature {
   string feature_name = 1;
   // Equivalent of android:glEsVersion or android:version in <uses-feature>.
@@ -124,11 +128,23 @@ message NativeDirectoryTargeting {
   TextureCompressionFormat texture_compression_format = 3;
 }
 
+// Targeting specific for image files under apex/.
+message ApexImageTargeting {
+  MultiAbiTargeting multi_abi = 1;
+}
+
 message AbiTargeting {
   repeated Abi value = 1;
   // Targeting of other sibling directories that were in the Bundle.
   // For master splits this is targeting of other master splits.
   repeated Abi alternatives = 2;
+}
+
+message MultiAbiTargeting {
+  repeated MultiAbi value = 1;
+  // Targeting of other sibling directories that were in the Bundle.
+  // For master splits this is targeting of other master splits.
+  repeated MultiAbi alternatives = 2;
 }
 
 message ScreenDensityTargeting {

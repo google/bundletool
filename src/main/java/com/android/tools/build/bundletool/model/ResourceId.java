@@ -16,7 +16,11 @@
 
 package com.android.tools.build.bundletool.model;
 
+import com.android.aapt.Resources.EntryOrBuilder;
+import com.android.aapt.Resources.PackageOrBuilder;
+import com.android.aapt.Resources.TypeOrBuilder;
 import com.google.auto.value.AutoValue;
+import com.google.auto.value.extension.memoized.Memoized;
 import com.google.common.base.Preconditions;
 
 /** Represents a resource id in an APK's resource table. */
@@ -35,6 +39,14 @@ public abstract class ResourceId {
   public abstract int getTypeId();
 
   public abstract int getEntryId();
+
+  public static ResourceId create(PackageOrBuilder pkg, TypeOrBuilder type, EntryOrBuilder entry) {
+    return builder()
+        .setPackageId(pkg.getPackageId().getId())
+        .setTypeId(type.getTypeId().getId())
+        .setEntryId(entry.getEntryId().getId())
+        .build();
+  }
 
   public static Builder builder() {
     return new AutoValue_ResourceId.Builder();
@@ -87,6 +99,7 @@ public abstract class ResourceId {
    *
    * The full id of this entry will be 0x7f0a1234
    */
+  @Memoized
   public int getFullResourceId() {
     return (getPackageId() << PACKAGE_SHIFT) + (getTypeId() << TYPE_SHIFT) + getEntryId();
   }

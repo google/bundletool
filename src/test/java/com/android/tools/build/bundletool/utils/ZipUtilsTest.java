@@ -16,14 +16,15 @@
 
 package com.android.tools.build.bundletool.utils;
 
+import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.truth.Truth.assertThat;
-import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.util.stream.Collectors.toList;
 
 import com.android.tools.build.bundletool.io.ZipBuilder;
 import com.android.tools.build.bundletool.model.ZipPath;
+import com.google.common.collect.ImmutableList;
+import java.io.IOException;
 import java.nio.file.Path;
-import java.util.List;
 import java.util.zip.ZipFile;
 import org.junit.Rule;
 import org.junit.Test;
@@ -38,68 +39,25 @@ public class ZipUtilsTest {
   @Rule public TemporaryFolder tmp = new TemporaryFolder();
 
   @Test
-  public void getFilesWithPathPrefix_fileIsFound() throws Exception {
-    Path zipPath =
-        new ZipBuilder()
-            .addFileWithContent(ZipPath.create("META-INF/MANIFEST.MF"), "".getBytes(UTF_8))
-            .writeTo(tmp.getRoot().toPath().resolve("output.jar"));
-    ZipFile zipFile = new ZipFile(zipPath.toFile());
-
-    List<ZipPath> files =
-        ZipUtils.getFilesWithPathPrefix(zipFile, ZipPath.create("META-INF")).collect(toList());
-
-    assertThat(files).containsExactly(ZipPath.create("META-INF/MANIFEST.MF"));
-  }
-
-  @Test
-  public void getFilesWithPathPrefix_directoryDoesNotExists_emptyResult() throws Exception {
-    Path zipPath =
-        new ZipBuilder()
-            .addFileWithContent(ZipPath.create("META-INF/MANIFEST.MF"), "".getBytes(UTF_8))
-            .writeTo(tmp.getRoot().toPath().resolve("output.jar"));
-    ZipFile zipFile = new ZipFile(zipPath.toFile());
-
-    List<ZipPath> files =
-        ZipUtils.getFilesWithPathPrefix(zipFile, ZipPath.create("non-existent-dir"))
-            .collect(toList());
-
+  public void allFileEntriesPaths_emptyZip() throws Exception {
+    ZipFile zipFile = createZipFileWithFiles();
+    ImmutableList<ZipPath> files = ZipUtils.allFileEntriesPaths(zipFile).collect(toImmutableList());
     assertThat(files).isEmpty();
   }
 
   @Test
-  public void getFilesWithPathPrefix_prefixPointsToFile_fileReturned() throws Exception {
-    Path zipPath =
-        new ZipBuilder()
-            .addFileWithContent(ZipPath.create("META-INF/MANIFEST.MF"), "".getBytes(UTF_8))
-            .writeTo(tmp.getRoot().toPath().resolve("output.jar"));
-    ZipFile zipFile = new ZipFile(zipPath.toFile());
-
-    List<ZipPath> files =
-        ZipUtils.getFilesWithPathPrefix(zipFile, ZipPath.create("META-INF/MANIFEST.MF"))
-            .collect(toList());
-
-    assertThat(files).containsExactly(ZipPath.create("META-INF/MANIFEST.MF"));
+  public void allFileEntries_multipleFiles() throws Exception {
+    ZipFile zipFile = createZipFileWithFiles("a", "b", "c");
+    ImmutableList<ZipPath> files = ZipUtils.allFileEntriesPaths(zipFile).collect(toImmutableList());
+    assertThat(files.stream().map(Path::toString).collect(toList())).containsExactly("a", "b", "c");
   }
 
-  @Test
-  public void getFilesWithPathPrefix_multipleFilesFound() throws Exception {
-    Path zipPath =
-        new ZipBuilder()
-            .addFileWithContent(ZipPath.create("META-INF/MANIFEST.MF"), "".getBytes(UTF_8))
-            .addFileWithContent(ZipPath.create("META-INF/LICENSE.txt"), "".getBytes(UTF_8))
-            .addFileWithContent(
-                ZipPath.create("META-INF/services/org.xmlpull.v1.XmlPullParserFactory"),
-                "".getBytes(UTF_8))
-            .writeTo(tmp.getRoot().toPath().resolve("output.jar"));
-    ZipFile zipFile = new ZipFile(zipPath.toFile());
-
-    List<ZipPath> files =
-        ZipUtils.getFilesWithPathPrefix(zipFile, ZipPath.create("META-INF")).collect(toList());
-
-    assertThat(files)
-        .containsExactly(
-            ZipPath.create("META-INF/MANIFEST.MF"),
-            ZipPath.create("META-INF/LICENSE.txt"),
-            ZipPath.create("META-INF/services/org.xmlpull.v1.XmlPullParserFactory"));
+  private ZipFile createZipFileWithFiles(String... fileNames) throws IOException {
+    ZipBuilder zipBuilder = new ZipBuilder();
+    for (String fileName : fileNames) {
+      zipBuilder.addFileWithContent(ZipPath.create(fileName), new byte[1]);
+    }
+    Path zipPath = zipBuilder.writeTo(tmp.getRoot().toPath().resolve("output.jar"));
+    return new ZipFile(zipPath.toFile());
   }
 }

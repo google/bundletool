@@ -354,28 +354,26 @@ public class AndroidManifestTest {
   }
 
   @Test
-  public void isOnDemandModule_notSet() {
+  public void deliveryTypeAndOnDemandAttribute_notSet() {
     // From Bundletool 0.3.4 onwards.
     AndroidManifest manifest =
         AndroidManifest.create(androidManifest("com.test.app"), BUNDLE_TOOL_0_3_4);
     assertThat(manifest.getManifestDeliveryElement()).isEmpty();
     assertThat(manifest.getOnDemandAttribute()).isEmpty();
     assertThat(manifest.isDeliveryTypeDeclared()).isFalse();
-    assertThat(manifest.isOnDemandModule()).isEmpty();
   }
 
   @Test
-  public void isOnDemandModule_notSet_legacy() {
+  public void deliveryTypeAndOnDemandAttribute_notSet_legacy() {
     AndroidManifest manifest =
         AndroidManifest.create(androidManifest("com.test.app"), BUNDLE_TOOL_0_3_3);
     assertThat(manifest.getManifestDeliveryElement()).isEmpty();
     assertThat(manifest.getOnDemandAttribute()).isEmpty();
     assertThat(manifest.isDeliveryTypeDeclared()).isFalse();
-    assertThat(manifest.isOnDemandModule()).isEmpty();
   }
 
   @Test
-  public void isOnDemandModule_true() {
+  public void deliveryTypeAndOnDemandAttribute_true() {
     // From Bundletool 0.3.4 onwards.
     AndroidManifest manifest =
         AndroidManifest.create(
@@ -383,18 +381,16 @@ public class AndroidManifestTest {
     assertThat(manifest.getManifestDeliveryElement()).isEmpty();
     assertThat(manifest.getOnDemandAttribute()).isPresent();
     assertThat(manifest.isDeliveryTypeDeclared()).isTrue();
-    assertThat(manifest.isOnDemandModule()).hasValue(true);
   }
 
   @Test
-  public void isOnDemandModule_true_legacy() {
+  public void deliveryTypeAndOnDemandAttribute_true_legacy() {
     AndroidManifest manifest =
         AndroidManifest.create(
             androidManifest("com.test.app", withLegacyOnDemand(true)), BUNDLE_TOOL_0_3_3);
     assertThat(manifest.getManifestDeliveryElement()).isEmpty();
     assertThat(manifest.getOnDemandAttribute()).isPresent();
     assertThat(manifest.isDeliveryTypeDeclared()).isTrue();
-    assertThat(manifest.isOnDemandModule()).hasValue(true);
 
     AndroidManifest newManifest =
         AndroidManifest.create(
@@ -402,11 +398,10 @@ public class AndroidManifestTest {
     assertThat(newManifest.getManifestDeliveryElement()).isEmpty();
     assertThat(newManifest.getOnDemandAttribute()).isPresent();
     assertThat(newManifest.isDeliveryTypeDeclared()).isTrue();
-    assertThat(newManifest.isOnDemandModule()).hasValue(true);
   }
 
   @Test
-  public void isOnDemandModule_false() {
+  public void deliveryTypeAndOnDemandAttribute_false() {
     // From Bundletool 0.3.4 onwards.
     AndroidManifest manifest =
         AndroidManifest.create(
@@ -414,18 +409,16 @@ public class AndroidManifestTest {
     assertThat(manifest.getManifestDeliveryElement()).isEmpty();
     assertThat(manifest.getOnDemandAttribute()).isPresent();
     assertThat(manifest.isDeliveryTypeDeclared()).isTrue();
-    assertThat(manifest.isOnDemandModule()).hasValue(false);
   }
 
   @Test
-  public void isOnDemandModule_false_legacy() {
+  public void deliveryTypeAndOnDemandAttribute_false_legacy() {
     AndroidManifest manifest =
         AndroidManifest.create(
             androidManifest("com.test.app", withLegacyOnDemand(false)), BUNDLE_TOOL_0_3_3);
     assertThat(manifest.getManifestDeliveryElement()).isEmpty();
     assertThat(manifest.getOnDemandAttribute()).isPresent();
     assertThat(manifest.isDeliveryTypeDeclared()).isTrue();
-    assertThat(manifest.isOnDemandModule()).hasValue(false);
 
     AndroidManifest newManifest =
         AndroidManifest.create(
@@ -433,11 +426,10 @@ public class AndroidManifestTest {
     assertThat(newManifest.getManifestDeliveryElement()).isEmpty();
     assertThat(newManifest.getOnDemandAttribute()).isPresent();
     assertThat(newManifest.isDeliveryTypeDeclared()).isTrue();
-    assertThat(newManifest.isOnDemandModule()).hasValue(false);
   }
 
   @Test
-  public void isOnDemandModule_old_namespace_returnsEmpty() {
+  public void deliveryTypeAndOnDemandAttribute_old_namespace_returnsEmpty() {
     // From Bundletool 0.3.4 onwards.
     AndroidManifest manifest =
         AndroidManifest.create(
@@ -445,98 +437,36 @@ public class AndroidManifestTest {
     assertThat(manifest.getManifestDeliveryElement()).isEmpty();
     assertThat(manifest.getOnDemandAttribute()).isEmpty();
     assertThat(manifest.isDeliveryTypeDeclared()).isFalse();
-    assertThat(manifest.isOnDemandModule()).isEmpty();
   }
 
   @Test
-  public void isOnDemandModule_deliveryElement_installTime() {
+  public void deliveryTypeAndOnDemandAttribute_deliveryElement_installTime() {
     AndroidManifest manifest =
         AndroidManifest.create(androidManifest("com.test.app", withInstallTimeDelivery()));
 
     assertThat(manifest.getManifestDeliveryElement()).isPresent();
     assertThat(manifest.getOnDemandAttribute()).isEmpty();
     assertThat(manifest.isDeliveryTypeDeclared()).isTrue();
-    assertThat(manifest.isOnDemandModule()).hasValue(false);
   }
 
   @Test
-  public void isOnDemandModule_deliveryElement_onDemand() {
+  public void deliveryTypeAndOnDemandAttribute_deliveryElement_onDemand() {
     AndroidManifest manifest =
         AndroidManifest.create(androidManifest("com.test.app", withOnDemandDelivery()));
 
     assertThat(manifest.getManifestDeliveryElement()).isPresent();
     assertThat(manifest.getOnDemandAttribute()).isEmpty();
     assertThat(manifest.isDeliveryTypeDeclared()).isTrue();
-    assertThat(manifest.isOnDemandModule()).hasValue(true);
   }
 
   @Test
-  public void isOnDemandModule_deliveryElement_conditions() {
+  public void deliveryTypeAndOnDemandAttribute_deliveryElement_conditions() {
     AndroidManifest manifest =
         AndroidManifest.create(androidManifest("com.test.app", withMinSdkCondition(21)));
 
     assertThat(manifest.getManifestDeliveryElement()).isPresent();
     assertThat(manifest.getOnDemandAttribute()).isEmpty();
     assertThat(manifest.isDeliveryTypeDeclared()).isTrue();
-    assertThat(manifest.isOnDemandModule()).hasValue(false);
-  }
-
-  @Test
-  public void isAlwaysInstalled_deliveryElement_installTime() {
-    AndroidManifest manifest =
-        AndroidManifest.create(androidManifest("com.test.app", withInstallTimeDelivery()));
-
-    assertThat(manifest.isModuleAlwaysInstalled()).isTrue();
-  }
-
-  @Test
-  public void isAlwaysInstalled_deliveryElement_installTime_onDemand() {
-    AndroidManifest manifest =
-        AndroidManifest.create(
-            androidManifest("com.test.app", withInstallTimeDelivery(), withOnDemandDelivery()));
-
-    assertThat(manifest.isModuleAlwaysInstalled()).isTrue();
-  }
-
-  @Test
-  public void isAlwaysInstalled_deliveryElement_conditions() {
-    AndroidManifest manifest =
-        AndroidManifest.create(androidManifest("com.test.app", withMinSdkCondition(21)));
-
-    assertThat(manifest.isModuleAlwaysInstalled()).isFalse();
-  }
-
-  @Test
-  public void isAlwaysInstalled_legacy_onDemandAttributeTrue() {
-    AndroidManifest manifest =
-        AndroidManifest.create(
-            androidManifest("com.test.app", withLegacyOnDemand(true)), BUNDLE_TOOL_0_3_3);
-
-    assertThat(manifest.isModuleAlwaysInstalled()).isFalse();
-  }
-
-  @Test
-  public void isAlwaysInstalled_onDemandAttributeTrue() {
-    AndroidManifest manifest =
-        AndroidManifest.create(androidManifest("com.test.app", withOnDemandAttribute(true)));
-
-    assertThat(manifest.isModuleAlwaysInstalled()).isFalse();
-  }
-
-  @Test
-  public void isAlwaysInstalled_legacy_onDemandAttributeFalse() {
-    AndroidManifest manifest =
-        AndroidManifest.create(androidManifest("com.test.app", withLegacyOnDemand(false)));
-
-    assertThat(manifest.isModuleAlwaysInstalled()).isTrue();
-  }
-
-  @Test
-  public void isAlwaysInstalled_deliveryElement_onlyOnDemand() {
-    AndroidManifest manifest =
-        AndroidManifest.create(androidManifest("com.test.app", withOnDemandDelivery()));
-
-    assertThat(manifest.isModuleAlwaysInstalled()).isFalse();
   }
 
   @Test
@@ -829,7 +759,7 @@ public class AndroidManifestTest {
     assertThat(configManifest.getHasCode()).hasValue(false);
     assertThat(configManifest.getSplitId()).hasValue("x86");
     assertThat(configManifest.getConfigForSplit()).hasValue("feature1");
-    assertThat(configManifest.isOnDemandModule()).isEmpty();
+    assertThat(configManifest.isDeliveryTypeDeclared()).isFalse();
     assertThat(configManifest.getIsFeatureSplit()).isEmpty();
     assertThat(configManifest.getExtractNativeLibsValue()).hasValue(false);
   }
