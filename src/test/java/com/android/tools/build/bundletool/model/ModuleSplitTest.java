@@ -31,10 +31,12 @@ import static com.android.tools.build.bundletool.testing.TargetingUtils.apkAbiTa
 import static com.android.tools.build.bundletool.testing.TargetingUtils.apkDensityTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.apkGraphicsTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.apkLanguageTargeting;
+import static com.android.tools.build.bundletool.testing.TargetingUtils.apkMultiAbiTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.apkTextureTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.graphicsApiTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.lPlusVariantTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.languageTargeting;
+import static com.android.tools.build.bundletool.testing.TargetingUtils.multiAbiTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.openGlVersionFrom;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.textureCompressionTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.vulkanVersionFrom;
@@ -53,6 +55,7 @@ import com.android.bundle.Targeting.ScreenDensity;
 import com.android.bundle.Targeting.ScreenDensity.DensityAlias;
 import com.android.bundle.Targeting.ScreenDensityTargeting;
 import com.android.bundle.Targeting.TextureCompressionFormat.TextureCompressionFormatAlias;
+import com.android.bundle.Targeting.VariantTargeting;
 import com.android.tools.build.bundletool.testing.BundleModuleBuilder;
 import com.android.tools.build.bundletool.utils.xmlproto.XmlProtoElement;
 import com.android.tools.build.bundletool.utils.xmlproto.XmlProtoNode;
@@ -317,6 +320,28 @@ public class ModuleSplitTest {
             .build();
     resSplit = resSplit.writeSplitIdInManifest(resSplit.getSuffix());
     assertThat(resSplit.getAndroidManifest().getSplitId()).hasValue("config.other_abis");
+  }
+
+  @Test
+  public void apexModuleMultiAbiSplitSuffixAndName() {
+    ModuleSplit resSplit =
+        ModuleSplit.builder()
+            .setModuleName(BundleModuleName.create("base"))
+            .setEntries(ImmutableList.of())
+            .setVariantTargeting(VariantTargeting.getDefaultInstance())
+            .setApkTargeting(
+                apkMultiAbiTargeting(
+                    multiAbiTargeting(
+                        ImmutableSet.of(
+                            ImmutableSet.of(AbiAlias.X86_64, AbiAlias.X86),
+                            ImmutableSet.of(AbiAlias.ARM64_V8A, AbiAlias.ARMEABI_V7A)),
+                        ImmutableSet.of())))
+            .setMasterSplit(false)
+            .setAndroidManifest(AndroidManifest.create(androidManifest("com.test.app")))
+            .build();
+    resSplit = resSplit.writeSplitIdInManifest(resSplit.getSuffix());
+    assertThat(resSplit.getAndroidManifest().getSplitId())
+        .hasValue("config.x86_64.x86_arm64_v8a.armeabi_v7a");
   }
 
   @Test

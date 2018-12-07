@@ -233,7 +233,7 @@ public abstract class GetSizeCommand implements GetSizeRequest {
         .setCommandDescription(
             CommandDescription.builder()
                 .setShortDescription(
-                    "Computes the over-the-wire min and max sizes of APKs served to different "
+                    "Computes the min and max download sizes of APKs served to different "
                         + "devices configurations from an APK Set.")
                 .addAdditionalParagraph("The output is in CSV format.")
                 .build())

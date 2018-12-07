@@ -16,11 +16,19 @@
 
 package com.android.tools.build.bundletool.testing;
 
+import static com.google.common.collect.ImmutableSet.toImmutableSet;
+
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableSet;
+import com.google.common.io.ByteStreams;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.security.SecureRandom;
+import java.util.stream.Stream;
+import java.util.zip.GZIPInputStream;
 import org.junit.rules.TemporaryFolder;
 
 /** File utility functions specific to unit tests. */
@@ -49,6 +57,21 @@ public final class FileUtils {
    */
   public static Path getRandomFilePath(TemporaryFolder tmp, String prefix, String suffix) {
     return tmp.getRoot().toPath().resolve(getRandomFileName(prefix, suffix));
+  }
+
+  public static ImmutableSet<Path> getAllFilesInDirectory(Path directory) throws Exception {
+    try (Stream<Path> paths = Files.walk(directory)) {
+      return paths.filter(Files::isRegularFile).map(Path::getFileName).collect(toImmutableSet());
+    }
+  }
+
+  public static Path uncompressGzipFile(Path gzipPath, Path outputPath) throws Exception {
+    try (GZIPInputStream gzipInputStream =
+            new GZIPInputStream(new FileInputStream(gzipPath.toFile()));
+        FileOutputStream fileOutputStream = new FileOutputStream(outputPath.toFile())) {
+      ByteStreams.copy(gzipInputStream, fileOutputStream);
+    }
+    return outputPath;
   }
 
   // Do not instantiate.

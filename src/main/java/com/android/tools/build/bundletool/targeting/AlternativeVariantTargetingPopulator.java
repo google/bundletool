@@ -54,6 +54,7 @@ public abstract class AlternativeVariantTargetingPopulator<T extends Message> {
                 new SdkVersionAlternativesPopulator()
                     .addAlternativeVariantTargeting(generatedApks.getSplitApks(), standaloneApks))
             .addAll(generatedApks.getInstantApks())
+            .addAll(generatedApks.getSystemApks())
             .build();
     return GeneratedApks.fromModuleSplits(moduleSplits);
   }

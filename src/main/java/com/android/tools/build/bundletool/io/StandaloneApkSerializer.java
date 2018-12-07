@@ -16,21 +16,24 @@
 
 package com.android.tools.build.bundletool.io;
 
+import static com.google.common.base.Preconditions.checkArgument;
+
 import com.android.bundle.Commands.ApkDescription;
 import com.android.bundle.Commands.StandaloneApkMetadata;
+import com.android.bundle.Commands.SystemApkMetadata;
+import com.android.bundle.Commands.SystemApkMetadata.SystemApkType;
 import com.android.bundle.Config.Compression;
 import com.android.tools.build.bundletool.model.Aapt2Command;
 import com.android.tools.build.bundletool.model.ModuleSplit;
 import com.android.tools.build.bundletool.model.SigningConfiguration;
 import com.android.tools.build.bundletool.model.ZipPath;
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.collect.ImmutableList;
 import java.nio.file.Path;
 import java.util.Optional;
 
 /** Serializes standalone APKs to disk. */
 public class StandaloneApkSerializer {
-
-  public static final String STANDALONE_APKS_SUB_DIR = "standalones";
 
   private final ApkPathManager apkPathManager;
   private final ApkSerializerHelper apkSerializerHelper;
@@ -53,6 +56,27 @@ public class StandaloneApkSerializer {
     return writeToDiskInternal(standaloneSplit, outputDirectory, ZipPath.create("universal.apk"));
   }
 
+  public ApkDescription writeSystemApkToDisk(ModuleSplit systemSplit, Path outputDirectory) {
+    return writeSystemApkToDiskInternal(systemSplit, outputDirectory, SystemApkType.SYSTEM);
+  }
+  /**
+   * Writes an compressed system APK and stub system APK containing just android manifest to disk.
+   */
+  public ImmutableList<ApkDescription> writeCompressedSystemApksToDisk(
+      ModuleSplit systemSplit, Path outputDirectory) {
+    ApkDescription stubApkDescription =
+        writeSystemApkToDiskInternal(
+            splitWithOnlyManifest(systemSplit), outputDirectory, SystemApkType.SYSTEM_STUB);
+    ZipPath compressedApkPath =
+        ZipPath.create(getCompressedApkPathFromStubApkPath(stubApkDescription.getPath()));
+    apkSerializerHelper.writeCompressedApkToZipFile(
+        systemSplit, outputDirectory.resolve(compressedApkPath.toString()));
+    return ImmutableList.of(
+        stubApkDescription,
+        createSystemApkDescription(
+            systemSplit, compressedApkPath, SystemApkType.SYSTEM_COMPRESSED));
+  }
+
   @VisibleForTesting
   ApkDescription writeToDiskInternal(
       ModuleSplit standaloneSplit, Path outputDirectory, ZipPath apkPath) {
@@ -65,6 +89,45 @@ public class StandaloneApkSerializer {
             StandaloneApkMetadata.newBuilder()
                 .addAllFusedModuleName(standaloneSplit.getAndroidManifest().getFusedModuleNames()))
         .setTargeting(standaloneSplit.getApkTargeting())
+        .build();
+  }
+
+  private ApkDescription writeSystemApkToDiskInternal(
+      ModuleSplit systemSplit, Path outputDirectory, SystemApkMetadata.SystemApkType apkType) {
+    ZipPath apkPath = apkPathManager.getApkPath(systemSplit);
+    apkSerializerHelper.writeToZipFile(systemSplit, outputDirectory.resolve(apkPath.toString()));
+    return createSystemApkDescription(systemSplit, apkPath, apkType);
+  }
+
+  /**
+   * The compressed system APK should have the same file name as stub system APK (".apk" file
+   * extension) but end with ".apk.gz" file extension.
+   */
+  private static String getCompressedApkPathFromStubApkPath(String stubApkPath) {
+    checkArgument(stubApkPath.endsWith(".apk"));
+    return stubApkPath + ".gz";
+  }
+
+  private static ApkDescription createSystemApkDescription(
+      ModuleSplit systemSplit, ZipPath apkPath, SystemApkMetadata.SystemApkType apkType) {
+    return ApkDescription.newBuilder()
+        .setPath(apkPath.toString())
+        .setSystemApkMetadata(
+            SystemApkMetadata.newBuilder()
+                .addAllFusedModuleName(systemSplit.getAndroidManifest().getFusedModuleNames())
+                .setSystemApkType(apkType))
+        .setTargeting(systemSplit.getApkTargeting())
+        .build();
+  }
+
+  private static ModuleSplit splitWithOnlyManifest(ModuleSplit split) {
+    return ModuleSplit.builder()
+        .setModuleName(split.getModuleName())
+        .setSplitType(split.getSplitType())
+        .setVariantTargeting(split.getVariantTargeting())
+        .setApkTargeting(split.getApkTargeting())
+        .setAndroidManifest(split.getAndroidManifest())
+        .setMasterSplit(split.isMasterSplit())
         .build();
   }
 }

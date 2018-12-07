@@ -23,6 +23,7 @@ import static com.android.tools.build.bundletool.testing.ApksArchiveHelpers.crea
 import static com.android.tools.build.bundletool.testing.ApksArchiveHelpers.createMasterApkDescription;
 import static com.android.tools.build.bundletool.testing.ApksArchiveHelpers.createSplitApkSet;
 import static com.android.tools.build.bundletool.testing.ApksArchiveHelpers.createStandaloneApkSet;
+import static com.android.tools.build.bundletool.testing.ApksArchiveHelpers.createSystemApkSet;
 import static com.android.tools.build.bundletool.testing.ApksArchiveHelpers.createVariant;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.apkAbiTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.lPlusVariantTargeting;
@@ -163,12 +164,21 @@ public class ResultUtilsTest {
   }
 
   @Test
+  public void filterSystemApkVariant() throws Exception {
+    Variant systemVariant = createSystemVariant();
+    BuildApksResult apksResult = BuildApksResult.newBuilder().addVariant(systemVariant).build();
+
+    assertThat(ResultUtils.systemApkVariants(apksResult)).containsExactly(systemVariant);
+  }
+
+  @Test
   public void isInstantApkVariantTrue() throws Exception {
     Variant variant = createInstantVariant();
 
     assertThat(ResultUtils.isInstantApkVariant(variant)).isTrue();
     assertThat(ResultUtils.isSplitApkVariant(variant)).isFalse();
     assertThat(ResultUtils.isStandaloneApkVariant(variant)).isFalse();
+    assertThat(ResultUtils.isSystemApkVariant(variant)).isFalse();
   }
 
   @Test
@@ -178,6 +188,7 @@ public class ResultUtilsTest {
     assertThat(ResultUtils.isStandaloneApkVariant(variant)).isTrue();
     assertThat(ResultUtils.isSplitApkVariant(variant)).isFalse();
     assertThat(ResultUtils.isInstantApkVariant(variant)).isFalse();
+    assertThat(ResultUtils.isSystemApkVariant(variant)).isFalse();
   }
 
   @Test
@@ -187,6 +198,17 @@ public class ResultUtilsTest {
     assertThat(ResultUtils.isSplitApkVariant(variant)).isTrue();
     assertThat(ResultUtils.isStandaloneApkVariant(variant)).isFalse();
     assertThat(ResultUtils.isInstantApkVariant(variant)).isFalse();
+    assertThat(ResultUtils.isSystemApkVariant(variant)).isFalse();
+  }
+
+  @Test
+  public void isSystemApkVariantTrue() throws Exception {
+    Variant variant = createSystemVariant();
+
+    assertThat(ResultUtils.isSplitApkVariant(variant)).isFalse();
+    assertThat(ResultUtils.isStandaloneApkVariant(variant)).isFalse();
+    assertThat(ResultUtils.isInstantApkVariant(variant)).isFalse();
+    assertThat(ResultUtils.isSystemApkVariant(variant)).isTrue();
   }
 
   private Variant createInstantVariant() {
@@ -217,7 +239,14 @@ public class ResultUtilsTest {
   private Variant createStandaloneVariant() {
     Path apkPreL = ZipPath.create("apkPreL.apk");
     return createVariant(
-        variantSdkTargeting(sdkVersionFrom(21), ImmutableSet.of(SdkVersion.getDefaultInstance())),
+        variantSdkTargeting(sdkVersionFrom(15), ImmutableSet.of(SdkVersion.getDefaultInstance())),
         createStandaloneApkSet(ApkTargeting.getDefaultInstance(), apkPreL));
+  }
+
+  private Variant createSystemVariant() {
+    Path systemApk = ZipPath.create("system.apk");
+    return createVariant(
+        variantSdkTargeting(sdkVersionFrom(15), ImmutableSet.of(SdkVersion.getDefaultInstance())),
+        createSystemApkSet(ApkTargeting.getDefaultInstance(), systemApk));
   }
 }

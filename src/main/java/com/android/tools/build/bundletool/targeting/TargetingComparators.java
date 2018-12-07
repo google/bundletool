@@ -18,10 +18,16 @@ package com.android.tools.build.bundletool.targeting;
 
 import static com.android.tools.build.bundletool.utils.TargetingProtoUtils.getScreenDensityDpi;
 import static com.google.common.collect.Comparators.emptiesFirst;
+import static com.google.common.collect.ImmutableSet.toImmutableSet;
 import static java.util.Comparator.comparing;
 
+import com.android.bundle.Targeting.Abi;
 import com.android.bundle.Targeting.Abi.AbiAlias;
 import com.android.bundle.Targeting.VariantTargeting;
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.collect.Comparators;
+import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.ImmutableSortedSet;
 import com.google.common.collect.MoreCollectors;
 import com.google.common.collect.Ordering;
 import java.util.Comparator;
@@ -43,7 +49,7 @@ public final class TargetingComparators {
    *   <li>32 bits < 64 bits
    *   <li>less recent version of CPU < more recent version of CPU
    */
-  private static final Ordering<AbiAlias> ARCHITECTURE_ORDERING =
+  public static final Ordering<AbiAlias> ARCHITECTURE_ORDERING =
       Ordering.explicit(
           AbiAlias.ARMEABI,
           AbiAlias.ARMEABI_V7A,
@@ -57,13 +63,35 @@ public final class TargetingComparators {
       comparing(TargetingComparators::getAbi, emptiesFirst(ARCHITECTURE_ORDERING));
 
   private static final Comparator<VariantTargeting> SDK_COMPARATOR =
-      comparing(TargetingComparators::getMinSdk, emptiesFirst(Integer::compare));
+      comparing(TargetingComparators::getMinSdk, emptiesFirst(Ordering.natural()));
 
   private static final Comparator<VariantTargeting> SCREEN_DENSITY_COMPARATOR =
-      comparing(TargetingComparators::getScreenDensity, emptiesFirst(Integer::compare));
+      comparing(TargetingComparators::getScreenDensity, emptiesFirst(Ordering.natural()));
+
+  /**
+   * Comparator for sets of AbiAliases, according to ARCHITECTURE_ORDERING.
+   *
+   * <p>The ABIs in a MultiAbi are not ordered, but we sort them when comparing MultiAbis, from most
+   * to least preferable ABI. The sorted sets are then compared lexicographically. This means that:
+   *
+   * - MultiAbis are ordered by the most preferable ABI that is different between the two (e.g.
+   * [x86_64] > [x86]; [x86, arm64-v8a] > [x86, armeabi-v7a]).
+   *
+   * - A set of ABIs that contains another is always larger (e.g. [x86_64, X86] > [x86_64]).
+   */
+  public static final Comparator<ImmutableSet<AbiAlias>> MULTI_ABI_ALIAS_COMPARATOR =
+      comparing(
+          TargetingComparators::sortMultiAbi, Comparators.lexicographical(ARCHITECTURE_ORDERING));
+
+  @VisibleForTesting
+  static final Comparator<VariantTargeting> MULTI_ABI_COMPARATOR =
+      comparing(TargetingComparators::getMultiAbi, MULTI_ABI_ALIAS_COMPARATOR);
 
   public static final Comparator<VariantTargeting> VARIANT_TARGETING_COMPARATOR =
-      SDK_COMPARATOR.thenComparing(ABI_COMPARATOR).thenComparing(SCREEN_DENSITY_COMPARATOR);
+      SDK_COMPARATOR
+          .thenComparing(ABI_COMPARATOR)
+          .thenComparing(MULTI_ABI_COMPARATOR)
+          .thenComparing(SCREEN_DENSITY_COMPARATOR);
 
   private static Optional<Integer> getMinSdk(VariantTargeting variantTargeting) {
     // If the variant does not have an SDK targeting, it is suitable for all SDK values.
@@ -94,6 +122,25 @@ public final class TargetingComparators {
             // For now we only support one value in AbiTargeting.
             .collect(MoreCollectors.onlyElement())
             .getAlias());
+  }
+
+  private static ImmutableSet<AbiAlias> getMultiAbi(VariantTargeting variantTargeting) {
+    if (variantTargeting.getMultiAbiTargeting().getValueList().isEmpty()) {
+      return ImmutableSet.of();
+    }
+
+    return variantTargeting.getMultiAbiTargeting().getValueList().stream()
+        // For now we only support one value in MultiAbiTargeting.
+        .collect(MoreCollectors.onlyElement())
+        .getAbiList()
+        .stream()
+        .map(Abi::getAlias)
+        .collect(toImmutableSet());
+  }
+
+  /** Sort a set of ABIs from most preferable (e.g. X86_64) to least (e.g. ARMEABI_V7A). */
+  private static ImmutableSortedSet<AbiAlias> sortMultiAbi(ImmutableSet<AbiAlias> abis) {
+    return ImmutableSortedSet.copyOf(ARCHITECTURE_ORDERING.reverse(), abis);
   }
 
   private static Optional<Integer> getScreenDensity(VariantTargeting variantTargeting) {

@@ -44,13 +44,17 @@ import com.android.tools.build.bundletool.model.SplitsProtoXmlBuilder;
 import com.android.tools.build.bundletool.testing.ResourceTableBuilder;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableSet;
 import org.checkerframework.checker.nullness.qual.Nullable;
 import org.junit.Before;
 import org.junit.Test;
+import org.junit.experimental.theories.DataPoints;
+import org.junit.experimental.theories.FromDataPoints;
+import org.junit.experimental.theories.Theories;
+import org.junit.experimental.theories.Theory;
 import org.junit.runner.RunWith;
-import org.junit.runners.JUnit4;
 
-@RunWith(JUnit4.class)
+@RunWith(Theories.class)
 public class SplitsXmlInjectorTest {
 
   private static final String PACKAGE_NAME = "com.example.app";
@@ -164,14 +168,20 @@ public class SplitsXmlInjectorTest {
         .isEqualTo(expectedSplitsProtoXml);
   }
 
+  @DataPoints("standaloneSplitTypes")
+  public static final ImmutableSet<SplitType> STANDALONE_SPLIT_TYPES =
+      ImmutableSet.of(SplitType.STANDALONE, SplitType.SYSTEM);
+
   @Test
-  public void process_standalone() throws Exception {
+  @Theory
+  public void process_standaloneSplitTypes(
+      @FromDataPoints("standaloneSplitTypes") SplitType standaloneSplitType) throws Exception {
     ModuleSplit standalone =
         createModuleSplit(
             BASE_MODULE_NAME,
             /* splitId= */ "",
             /* masterSplit= */ true,
-            STANDALONE,
+            standaloneSplitType,
             /* languageTargeting= */ null);
     ResourceTable standaloneResourceTable =
         new ResourceTableBuilder()

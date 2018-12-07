@@ -69,7 +69,6 @@ public class ModuleSplitsToShardMerger {
 
   private static final BundleModuleName BASE_MODULE_NAME =
       BundleModuleName.create(BundleModuleName.BASE_MODULE_NAME);
-  private static final BundleModuleName SHARD_MODULE_NAME = BundleModuleName.create("base");
 
   private final DexMerger dexMerger;
   private final Path globalTempDir;
@@ -79,7 +78,14 @@ public class ModuleSplitsToShardMerger {
     this.globalTempDir = globalTempDir;
   }
 
-  /** Merges each collection of splits into a single standalone APK (aka shard). */
+  /**
+   * Gets a list of collections of splits, and merges each collection into a single standalone APK
+   * (aka shard).
+   *
+   * @param unfusedShards a list of lists - each inner list is a collection of splits
+   * @param bundleMetadata the App Bundle metadata
+   * @return a list of shards, each one made of the corresponding collection of splits
+   */
   public ImmutableList<ModuleSplit> merge(
       ImmutableList<ImmutableList<ModuleSplit>> unfusedShards, BundleMetadata bundleMetadata) {
     // Results of the dex merging are cached. Due to the nature of the cache keys and values, the
@@ -144,21 +150,72 @@ public class ModuleSplitsToShardMerger {
         mergedAndroidManifest.toEditor().setFusedModuleNames(fusedModuleNames).save();
 
     // Construct the final shard.
+    return buildShard(
+        mergedEntriesByPath.values(),
+        mergedDexFiles,
+        mergedSplitTargeting,
+        finalAndroidManifest,
+        mergedResourceTable);
+  }
+
+  /**
+   * Gets a list of collections of splits, and merges each collection into a single standalone APK
+   * (aka shard).
+   *
+   * @param unfusedShards a list of lists - each inner list is a collection of splits
+   * @return a list of shards, each one made of the corresponding collection of splits
+   */
+  public ImmutableList<ModuleSplit> mergeApex(
+      ImmutableList<ImmutableList<ModuleSplit>> unfusedShards) {
+    return unfusedShards.stream().map(this::mergeSingleApexShard).collect(toImmutableList());
+  }
+
+  @VisibleForTesting
+  ModuleSplit mergeSingleApexShard(ImmutableList<ModuleSplit> splitsOfShard) {
+    checkState(!splitsOfShard.isEmpty(), "A shard is made of at least one split.");
+
+    Map<ZipPath, ModuleEntry> mergedEntriesByPath = new HashMap<>();
+    ApkTargeting splitTargeting = ApkTargeting.getDefaultInstance();
+
+    for (ModuleSplit split : splitsOfShard) {
+      // An APEX shard is made of one master split and one multi-Abi split, so we use the latter.
+      splitTargeting =
+          splitTargeting.hasMultiAbiTargeting() ? splitTargeting : split.getApkTargeting();
+
+      for (ModuleEntry entry : split.getEntries()) {
+        mergeEntries(mergedEntriesByPath, split, entry);
+      }
+    }
+
+    // Construct the final shard.
+    return buildShard(
+        mergedEntriesByPath.values(),
+        ImmutableList.of(),
+        splitTargeting,
+        // An APEX module is made of one module, so any manifest works.
+        splitsOfShard.get(0).getAndroidManifest(),
+        Optional.empty());
+  }
+
+  private ModuleSplit buildShard(
+      Collection<ModuleEntry> entriesByPath,
+      Collection<ModuleEntry> mergedDexFiles,
+      ApkTargeting splitTargeting,
+      AndroidManifest androidManifest,
+      Optional<ResourceTable> mergedResourceTable) {
+    ImmutableList<ModuleEntry> entries =
+        ImmutableList.<ModuleEntry>builder().addAll(entriesByPath).addAll(mergedDexFiles).build();
     ModuleSplit.Builder shard =
         ModuleSplit.builder()
-            .setAndroidManifest(finalAndroidManifest)
-            .setEntries(
-                ImmutableList.<ModuleEntry>builder()
-                    .addAll(mergedEntriesByPath.values())
-                    .addAll(mergedDexFiles)
-                    .build())
-            .setApkTargeting(mergedSplitTargeting)
+            .setAndroidManifest(androidManifest)
+            .setEntries(entries)
+            .setApkTargeting(splitTargeting)
             .setSplitType(SplitType.STANDALONE)
             // We don't care about the following properties for shards. The values are set just to
             // satisfy contract of @AutoValue.Builder.
             // `nativeConfig` is optional and therefore not being set.
             .setMasterSplit(false)
-            .setModuleName(SHARD_MODULE_NAME)
+            .setModuleName(BASE_MODULE_NAME)
             .setVariantTargeting(VariantTargeting.getDefaultInstance());
     mergedResourceTable.ifPresent(shard::setResourceTable);
     return shard.build();

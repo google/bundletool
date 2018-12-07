@@ -39,12 +39,18 @@ public abstract class GeneratedApks {
 
   public abstract ImmutableList<ModuleSplit> getStandaloneApks();
 
+  public abstract ImmutableList<ModuleSplit> getSystemApks();
+
   public int size() {
-    return getInstantApks().size() + getSplitApks().size() + getStandaloneApks().size();
+    return getInstantApks().size()
+        + getSplitApks().size()
+        + getStandaloneApks().size()
+        + getSystemApks().size();
   }
 
   public Stream<ModuleSplit> getAllApksStream() {
-    return Stream.of(getStandaloneApks(), getInstantApks(), getSplitApks()).flatMap(List::stream);
+    return Stream.of(getStandaloneApks(), getInstantApks(), getSplitApks(), getSystemApks())
+        .flatMap(List::stream);
   }
 
   /** Returns all apks grouped and ordered by {@link VariantKey}. */
@@ -57,7 +63,8 @@ public abstract class GeneratedApks {
     return new AutoValue_GeneratedApks.Builder()
         .setInstantApks(ImmutableList.of())
         .setSplitApks(ImmutableList.of())
-        .setStandaloneApks(ImmutableList.of());
+        .setStandaloneApks(ImmutableList.of())
+        .setSystemApks(ImmutableList.of());
   }
 
   /** Creates a GeneratedApk instance from a list of module splits. */
@@ -68,18 +75,20 @@ public abstract class GeneratedApks {
         .setInstantApks(groups.getOrDefault(SplitType.INSTANT, ImmutableList.of()))
         .setSplitApks(groups.getOrDefault(SplitType.SPLIT, ImmutableList.of()))
         .setStandaloneApks(groups.getOrDefault(SplitType.STANDALONE, ImmutableList.of()))
+        .setSystemApks(groups.getOrDefault(SplitType.SYSTEM, ImmutableList.of()))
         .build();
   }
   /** Builder for {@link GeneratedApks}. */
   @AutoValue.Builder
   public abstract static class Builder {
 
-    public abstract GeneratedApks.Builder setInstantApks(ImmutableList<ModuleSplit> instantApks);
+    public abstract Builder setInstantApks(ImmutableList<ModuleSplit> instantApks);
 
-    public abstract GeneratedApks.Builder setSplitApks(ImmutableList<ModuleSplit> splitApks);
+    public abstract Builder setSplitApks(ImmutableList<ModuleSplit> splitApks);
 
-    public abstract GeneratedApks.Builder setStandaloneApks(
-        ImmutableList<ModuleSplit> standaloneApks);
+    public abstract Builder setStandaloneApks(ImmutableList<ModuleSplit> standaloneApks);
+
+    public abstract Builder setSystemApks(ImmutableList<ModuleSplit> systemApks);
 
     public abstract GeneratedApks build();
   }

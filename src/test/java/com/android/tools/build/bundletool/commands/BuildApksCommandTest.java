@@ -16,6 +16,7 @@
 
 package com.android.tools.build.bundletool.commands;
 
+import static com.android.tools.build.bundletool.commands.BuildApksCommand.ApkBuildMode.UNIVERSAL;
 import static com.android.tools.build.bundletool.model.OptimizationDimension.ABI;
 import static com.android.tools.build.bundletool.model.OptimizationDimension.SCREEN_DENSITY;
 import static com.android.tools.build.bundletool.testing.Aapt2Helper.AAPT2_PATH;
@@ -132,6 +133,35 @@ public class BuildApksCommandTest {
             .setAapt2Command(commandViaFlags.getAapt2Command().get())
             .setExecutorServiceInternal(commandViaFlags.getExecutorService())
             .setExecutorServiceCreatedByBundleTool(true)
+            .setOutputPrintStream(commandViaFlags.getOutputPrintStream().get())
+            .build();
+
+    assertThat(commandViaBuilder).isEqualTo(commandViaFlags);
+  }
+
+  // Remove this test when universal flag is deleted.
+  @Test
+  public void buildingViaFlagsWithUniversal_setsUniversalModeOnBuilder() throws Exception {
+    BuildApksCommand commandViaFlags =
+        BuildApksCommand.fromFlags(
+            new FlagParser()
+                .parse(
+                    "--bundle=" + bundlePath,
+                    "--output=" + outputFilePath,
+                    "--aapt2=" + AAPT2_PATH,
+                    "--universal"),
+            fakeAdbServer);
+
+    BuildApksCommand commandViaBuilder =
+        BuildApksCommand.builder()
+            .setBundlePath(bundlePath)
+            .setOutputFile(outputFilePath)
+            // Must copy instance of the internal executor service.
+            .setAapt2Command(commandViaFlags.getAapt2Command().get())
+            .setExecutorServiceInternal(commandViaFlags.getExecutorService())
+            .setExecutorServiceCreatedByBundleTool(true)
+            .setOutputPrintStream(commandViaFlags.getOutputPrintStream().get())
+            .setApkBuildMode(UNIVERSAL)
             .build();
 
     assertThat(commandViaBuilder).isEqualTo(commandViaFlags);
@@ -160,6 +190,7 @@ public class BuildApksCommandTest {
             .setAapt2Command(commandViaFlags.getAapt2Command().get())
             .setExecutorServiceInternal(commandViaFlags.getExecutorService())
             .setExecutorServiceCreatedByBundleTool(true)
+            .setOutputPrintStream(commandViaFlags.getOutputPrintStream().get())
             .build();
 
     assertThat(commandViaBuilder).isEqualTo(commandViaFlags);
@@ -195,6 +226,7 @@ public class BuildApksCommandTest {
             .setAapt2Command(commandViaFlags.getAapt2Command().get())
             .setExecutorServiceInternal(commandViaFlags.getExecutorService())
             .setExecutorServiceCreatedByBundleTool(true)
+            .setOutputPrintStream(commandViaFlags.getOutputPrintStream().get())
             .build();
 
     assertThat(commandViaBuilder).isEqualTo(commandViaFlags);
@@ -210,7 +242,7 @@ public class BuildApksCommandTest {
                     "--output=" + outputFilePath,
                     "--aapt2=" + AAPT2_PATH,
                     // Optional values.
-                    "--universal"),
+                    "--mode=UNIVERSAL"),
             fakeAdbServer);
 
     BuildApksCommand commandViaBuilder =
@@ -218,11 +250,12 @@ public class BuildApksCommandTest {
             .setBundlePath(bundlePath)
             .setOutputFile(outputFilePath)
             // Optional values.
-            .setGenerateOnlyUniversalApk(true)
+            .setApkBuildMode(UNIVERSAL)
             // Must copy instance of the internal executor service.
             .setAapt2Command(commandViaFlags.getAapt2Command().get())
             .setExecutorServiceInternal(commandViaFlags.getExecutorService())
             .setExecutorServiceCreatedByBundleTool(true)
+            .setOutputPrintStream(commandViaFlags.getOutputPrintStream().get())
             .build();
 
     assertThat(commandViaBuilder).isEqualTo(commandViaFlags);
@@ -250,6 +283,7 @@ public class BuildApksCommandTest {
             .setAapt2Command(commandViaFlags.getAapt2Command().get())
             .setExecutorServiceInternal(commandViaFlags.getExecutorService())
             .setExecutorServiceCreatedByBundleTool(true)
+            .setOutputPrintStream(commandViaFlags.getOutputPrintStream().get())
             .build();
 
     assertThat(commandViaBuilder).isEqualTo(commandViaFlags);
@@ -281,6 +315,7 @@ public class BuildApksCommandTest {
             .setAapt2Command(commandViaFlags.getAapt2Command().get())
             .setExecutorServiceInternal(commandViaFlags.getExecutorService())
             .setExecutorServiceCreatedByBundleTool(true)
+            .setOutputPrintStream(commandViaFlags.getOutputPrintStream().get())
             .build();
 
     assertThat(commandViaBuilder).isEqualTo(commandViaFlags);
@@ -314,6 +349,7 @@ public class BuildApksCommandTest {
             .setAapt2Command(commandViaFlags.getAapt2Command().get())
             .setExecutorServiceInternal(commandViaFlags.getExecutorService())
             .setExecutorServiceCreatedByBundleTool(true)
+            .setOutputPrintStream(commandViaFlags.getOutputPrintStream().get())
             .build();
 
     assertThat(commandViaBuilder).isEqualTo(commandViaFlags);
@@ -363,12 +399,12 @@ public class BuildApksCommandTest {
                     .setBundlePath(bundlePath)
                     .setOutputFile(outputFilePath)
                     .setAapt2Command(aapt2Command)
-                    .setGenerateOnlyUniversalApk(true)
+                    .setApkBuildMode(UNIVERSAL)
                     .setOptimizationDimensions(ImmutableSet.of(ABI))
                     .build());
     assertThat(builderException)
         .hasMessageThat()
-        .contains("Cannot generate universal APK and specify optimization dimensions");
+        .contains("Optimization dimension can be only set when running with 'default' mode flag.");
 
     ValidationException flagsException =
         assertThrows(
@@ -380,11 +416,11 @@ public class BuildApksCommandTest {
                             "--bundle=" + bundlePath,
                             "--output=" + outputFilePath,
                             "--optimize-for=abi",
-                            "--universal"),
+                            "--mode=UNIVERSAL"),
                     fakeAdbServer));
     assertThat(flagsException)
         .hasMessageThat()
-        .contains("Cannot generate universal APK and specify optimization dimensions");
+        .contains("Optimization dimension can be only set when running with 'default' mode flag.");
   }
 
   @Test

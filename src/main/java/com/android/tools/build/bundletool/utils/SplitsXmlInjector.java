@@ -57,6 +57,7 @@ public class SplitsXmlInjector {
                   switch (keySplit.getKey().getSplitType()) {
                     case SPLIT:
                       return processSplitApkVariant(keySplit.getValue());
+                    case SYSTEM:
                     case STANDALONE:
                       return keySplit.getValue().stream()
                           .map(this::processStandaloneVariant)

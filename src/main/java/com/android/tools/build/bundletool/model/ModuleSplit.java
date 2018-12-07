@@ -16,6 +16,7 @@
 
 package com.android.tools.build.bundletool.model;
 
+import static com.android.tools.build.bundletool.model.BundleModule.APEX_DIRECTORY;
 import static com.android.tools.build.bundletool.model.BundleModule.ASSETS_DIRECTORY;
 import static com.android.tools.build.bundletool.model.BundleModule.DEX_DIRECTORY;
 import static com.android.tools.build.bundletool.model.BundleModule.LIB_DIRECTORY;
@@ -28,19 +29,24 @@ import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.MoreCollectors.toOptional;
 
 import com.android.aapt.Resources.ResourceTable;
+import com.android.bundle.Files.ApexImages;
 import com.android.bundle.Files.Assets;
 import com.android.bundle.Files.NativeLibraries;
+import com.android.bundle.Targeting.Abi;
 import com.android.bundle.Targeting.AbiTargeting;
 import com.android.bundle.Targeting.ApkTargeting;
 import com.android.bundle.Targeting.GraphicsApi;
 import com.android.bundle.Targeting.GraphicsApiTargeting;
 import com.android.bundle.Targeting.LanguageTargeting;
+import com.android.bundle.Targeting.MultiAbi;
+import com.android.bundle.Targeting.MultiAbiTargeting;
 import com.android.bundle.Targeting.OpenGlVersion;
 import com.android.bundle.Targeting.TextureCompressionFormatTargeting;
 import com.android.bundle.Targeting.VariantTargeting;
 import com.android.bundle.Targeting.VulkanVersion;
 import com.android.tools.build.bundletool.utils.ResourcesUtils;
 import com.google.auto.value.AutoValue;
+import com.google.common.base.Joiner;
 import com.google.common.base.Predicate;
 import com.google.common.base.Predicates;
 import com.google.common.collect.ImmutableList;
@@ -55,9 +61,12 @@ import javax.annotation.CheckReturnValue;
 @AutoValue
 public abstract class ModuleSplit {
 
-  /** The split type being represented by this split. It can be a standalone, split, or instant. */
+  private static final Joiner MULTI_ABI_SUFFIX_JOINER = Joiner.on('.');
+
+  /** The split type being represented by this split. */
   public enum SplitType {
     STANDALONE,
+    SYSTEM,
     SPLIT,
     INSTANT
   }
@@ -68,7 +77,7 @@ public abstract class ModuleSplit {
   /** Returns the targeting of the Variant this instance belongs to. */
   public abstract VariantTargeting getVariantTargeting();
 
-  /** Whether this ModuleSplit instance represents a standalone, split or instant apk. */
+  /** Whether this ModuleSplit instance represents a standalone, split, instant or system apk. */
   public abstract SplitType getSplitType();
 
   /**
@@ -94,6 +103,9 @@ public abstract class ModuleSplit {
 
   public abstract Optional<Assets> getAssetsConfig();
 
+  /** The module APEX configuration - what system images it contains and with what targeting. */
+  public abstract Optional<ApexImages> getApexConfig();
+
   public abstract Builder toBuilder();
 
   /** Returns true iff this is split of the base module. */
@@ -118,15 +130,18 @@ public abstract class ModuleSplit {
 
     AbiTargeting abiTargeting = getApkTargeting().getAbiTargeting();
     if (!abiTargeting.getValueList().isEmpty()) {
-      abiTargeting
-          .getValueList()
-          .forEach(
-              value ->
-                  suffixJoiner.add(
-                      AbiName.fromProto(value.getAlias()).getPlatformName().replace('-', '_')));
+      abiTargeting.getValueList().forEach(value -> suffixJoiner.add(formatAbi(value)));
     } else if (!abiTargeting.getAlternativesList().isEmpty()) {
       suffixJoiner.add("other_abis");
     }
+
+    MultiAbiTargeting multiAbiTargeting = getApkTargeting().getMultiAbiTargeting();
+    for (MultiAbi value : multiAbiTargeting.getValueList()) {
+      suffixJoiner.add(
+          MULTI_ABI_SUFFIX_JOINER.join(
+              value.getAbiList().stream().map(ModuleSplit::formatAbi).collect(toImmutableList())));
+    }
+    // Alternatives without values are not supported for MultiAbiTargeting.
 
     LanguageTargeting languageTargeting = getApkTargeting().getLanguageTargeting();
     if (!languageTargeting.getValueList().isEmpty()) {
@@ -166,6 +181,10 @@ public abstract class ModuleSplit {
     }
 
     return suffixJoiner.toString();
+  }
+
+  private static String formatAbi(Abi abi) {
+    return AbiName.fromProto(abi.getAlias()).getPlatformName().replace('-', '_');
   }
 
   private static String formatGraphicsApi(GraphicsApi graphicsTargeting) {
@@ -367,6 +386,18 @@ public abstract class ModuleSplit {
   }
 
   /**
+   * Creates a {@link ModuleSplit} only with the apex image entries with empty APK targeting and
+   * default L+ variant targeting.
+   */
+  public static ModuleSplit forApex(BundleModule bundleModule) {
+    return fromBundleModule(
+        bundleModule,
+        entry -> entry.getPath().startsWith(APEX_DIRECTORY),
+        /* setResourceTable= */ false,
+        lPlusVariantTargeting());
+  }
+
+  /**
    * Creates a {@link ModuleSplit} with entries from the Bundle Module satisfying the predicate with
    * a given variant targeting.
    *
@@ -393,6 +424,7 @@ public abstract class ModuleSplit {
 
     bundleModule.getNativeConfig().ifPresent(splitBuilder::setNativeConfig);
     bundleModule.getAssetsConfig().ifPresent(splitBuilder::setAssetsConfig);
+    bundleModule.getApexConfig().ifPresent(splitBuilder::setApexConfig);
     if (setResourceTable) {
       bundleModule.getResourceTable().ifPresent(splitBuilder::setResourceTable);
     }
@@ -439,6 +471,11 @@ public abstract class ModuleSplit {
     public abstract Builder setNativeConfig(NativeLibraries nativeConfig);
 
     public abstract Builder setAssetsConfig(Assets assetsConfig);
+
+    /**
+     * Sets the module APEX configuration - what system images it contains and with what targeting.
+     */
+    public abstract Builder setApexConfig(ApexImages apexConfig);
 
     public abstract Builder setApkTargeting(ApkTargeting targeting);
 

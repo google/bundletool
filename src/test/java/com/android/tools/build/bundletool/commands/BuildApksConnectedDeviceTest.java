@@ -15,6 +15,7 @@
  */
 package com.android.tools.build.bundletool.commands;
 
+import static com.android.tools.build.bundletool.commands.BuildApksCommand.ApkBuildMode.UNIVERSAL;
 import static com.android.tools.build.bundletool.testing.ApkSetUtils.extractTocFromApkSetFile;
 import static com.android.tools.build.bundletool.testing.AppBundleFactory.createLdpiHdpiAppBundle;
 import static com.android.tools.build.bundletool.testing.AppBundleFactory.createMaxSdkBundle;
@@ -124,6 +125,7 @@ public class BuildApksConnectedDeviceTest {
             // Must copy instance of the internal executor service.
             .setExecutorServiceInternal(commandViaFlags.getExecutorService())
             .setExecutorServiceCreatedByBundleTool(true)
+            .setOutputPrintStream(commandViaFlags.getOutputPrintStream().get())
             .build();
 
     assertThat(commandViaBuilder).isEqualTo(commandViaFlags);
@@ -157,6 +159,7 @@ public class BuildApksConnectedDeviceTest {
             // Must copy instance of the internal executor service.
             .setExecutorServiceInternal(commandViaFlags.getExecutorService())
             .setExecutorServiceCreatedByBundleTool(true)
+            .setOutputPrintStream(commandViaFlags.getOutputPrintStream().get())
             .build();
 
     assertThat(commandViaBuilder).isEqualTo(commandViaFlags);
@@ -189,6 +192,7 @@ public class BuildApksConnectedDeviceTest {
             // Must copy instance of the internal executor service.
             .setExecutorServiceInternal(commandViaFlags.getExecutorService())
             .setExecutorServiceCreatedByBundleTool(true)
+            .setOutputPrintStream(commandViaFlags.getOutputPrintStream().get())
             .build();
 
     assertThat(commandViaBuilder).isEqualTo(commandViaFlags);
@@ -207,7 +211,7 @@ public class BuildApksConnectedDeviceTest {
             .setBundlePath(bundlePath)
             .setOutputFile(outputFilePath)
             .setGenerateOnlyForConnectedDevice(true)
-            .setGenerateOnlyUniversalApk(true)
+            .setApkBuildMode(UNIVERSAL)
             .setAdbPath(sdkDirPath.resolve("platform-tools").resolve("adb"))
             .setAdbServer(fakeAdbServer);
 
@@ -215,8 +219,7 @@ public class BuildApksConnectedDeviceTest {
     assertThat(exception)
         .hasMessageThat()
         .contains(
-            "Cannot generate universal APK and optimize for the connected "
-                + "device at the same time.");
+            "Optimizing for connected device only possible when running with 'default' mode flag.");
   }
 
   @Test

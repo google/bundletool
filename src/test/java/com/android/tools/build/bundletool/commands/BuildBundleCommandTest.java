@@ -24,7 +24,7 @@ import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.with
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withUsesSplit;
 import static com.android.tools.build.bundletool.testing.ResourcesTableFactory.createResourceTable;
 import static com.android.tools.build.bundletool.testing.ResourcesTableFactory.fileReference;
-import static com.android.tools.build.bundletool.testing.TargetingUtils.apexImageSingleAbiTargeting;
+import static com.android.tools.build.bundletool.testing.TargetingUtils.apexImageTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.assetsDirectoryTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.graphicsApiTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.mergeAssetsTargeting;
@@ -239,13 +239,14 @@ public class BuildBundleCommandTest {
             .addImage(
                 TargetedApexImage.newBuilder()
                     .setPath("apex/x86.img")
-                    .setTargeting(apexImageSingleAbiTargeting(X86)))
+                    .setTargeting(apexImageTargeting("x86")))
             .build();
     Path module =
         new ZipBuilder()
             .addFileWithContent(ZipPath.create("apex/x86.img"), "apex".getBytes(UTF_8))
             .addFileWithProtoContent(ZipPath.create("manifest/AndroidManifest.xml"), manifest)
-            .addFileWithContent(ZipPath.create("root/manifest.json"), "manifest".getBytes(UTF_8))
+            .addFileWithContent(
+                ZipPath.create("root/apex_manifest.json"), "manifest".getBytes(UTF_8))
             .writeTo(tmpDir.resolve("base.zip"));
 
     BuildBundleCommand.builder()
@@ -259,7 +260,9 @@ public class BuildBundleCommandTest {
         .hasFile("base/manifest/AndroidManifest.xml")
         .withContent(manifest.toByteArray());
     assertThat(bundle).hasFile("base/apex/x86.img").withContent("apex".getBytes(UTF_8));
-    assertThat(bundle).hasFile("base/root/manifest.json").withContent("manifest".getBytes(UTF_8));
+    assertThat(bundle)
+        .hasFile("base/root/apex_manifest.json")
+        .withContent("manifest".getBytes(UTF_8));
     assertThat(bundle).hasFile("base/apex.pb").withContent(apexConfig.toByteArray());
   }
 

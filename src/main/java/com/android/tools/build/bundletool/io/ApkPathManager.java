@@ -21,6 +21,7 @@ import com.android.tools.build.bundletool.model.ModuleSplit;
 import com.android.tools.build.bundletool.model.ModuleSplit.SplitType;
 import com.android.tools.build.bundletool.model.ZipPath;
 import com.google.common.base.Joiner;
+import com.google.common.collect.ImmutableSet;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Set;
@@ -76,6 +77,10 @@ public class ApkPathManager {
         directory = ZipPath.create("standalones");
         apkFileName = buildName("standalone", targetingSuffix);
         break;
+      case SYSTEM:
+        directory = ZipPath.create("system");
+        apkFileName = buildName("system", targetingSuffix);
+        break;
       default:
         throw new IllegalStateException("Unrecognized split type: " + moduleSplit.getSplitType());
     }
@@ -103,7 +108,9 @@ public class ApkPathManager {
   }
 
   private static String getTargetingSuffix(ModuleSplit moduleSplit) {
-    return moduleSplit.isMasterSplit() && !moduleSplit.getSplitType().equals(SplitType.STANDALONE)
+    return moduleSplit.isMasterSplit()
+            && !ImmutableSet.of(SplitType.STANDALONE, SplitType.SYSTEM)
+                .contains(moduleSplit.getSplitType())
         ? "master"
         : moduleSplit.getSuffix();
   }

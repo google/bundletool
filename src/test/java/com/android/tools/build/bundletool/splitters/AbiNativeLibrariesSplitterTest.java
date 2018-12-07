@@ -16,6 +16,8 @@
 
 package com.android.tools.build.bundletool.splitters;
 
+import static com.android.bundle.Targeting.Abi.AbiAlias.ARM64_V8A;
+import static com.android.bundle.Targeting.Abi.AbiAlias.ARMEABI_V7A;
 import static com.android.bundle.Targeting.Abi.AbiAlias.X86;
 import static com.android.bundle.Targeting.Abi.AbiAlias.X86_64;
 import static com.android.tools.build.bundletool.model.ManifestMutator.withSplitsRequired;
@@ -30,10 +32,12 @@ import static com.android.tools.build.bundletool.testing.TestUtils.extractPaths;
 import static com.google.common.truth.Truth.assertThat;
 import static com.google.common.truth.extensions.proto.ProtoTruth.assertThat;
 import static java.util.stream.Collectors.toList;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.android.bundle.Files.NativeLibraries;
 import com.android.bundle.Targeting.Abi.AbiAlias;
 import com.android.bundle.Targeting.ApkTargeting;
+import com.android.tools.build.bundletool.exceptions.CommandExecutionException;
 import com.android.tools.build.bundletool.model.BundleModule;
 import com.android.tools.build.bundletool.model.ModuleSplit;
 import com.android.tools.build.bundletool.testing.BundleModuleBuilder;
@@ -61,6 +65,64 @@ public class AbiNativeLibrariesSplitterTest {
     assertThat(x86Split.getApkTargeting()).isEqualTo(apkAbiTargeting(X86));
     assertThat(x86Split.getVariantTargeting()).isEqualTo(lPlusVariantTargeting());
     assertThat(extractPaths(x86Split.getEntries())).containsExactly("lib/x86/libnoname.so");
+  }
+
+  @Test
+  public void splittingByMultipleAbis_64BitDisabled() throws Exception {
+    NativeLibraries nativeConfig =
+        nativeLibraries(
+            targetedNativeDirectory("lib/armeabi-v7a", nativeDirectoryTargeting(ARMEABI_V7A)),
+            targetedNativeDirectory("lib/arm64-v8a", nativeDirectoryTargeting(ARM64_V8A)),
+            targetedNativeDirectory("lib/x86_64", nativeDirectoryTargeting(X86_64)));
+    BundleModule bundleModule =
+        new BundleModuleBuilder("testModule")
+            .setNativeConfig(nativeConfig)
+            .addFile("lib/armeabi-v7a/libtest.so")
+            .addFile("lib/arm64-v8a/libtest.so")
+            .addFile("lib/x86_64/libtest.so")
+            .setManifest(androidManifest("com.test.app"))
+            .build();
+
+    AbiNativeLibrariesSplitter abiNativeLibrariesSplitter =
+        new AbiNativeLibrariesSplitter(/* include64BitLibs= */ false);
+
+    ImmutableCollection<ModuleSplit> splits =
+        abiNativeLibrariesSplitter.split(ModuleSplit.forNativeLibraries(bundleModule));
+
+    assertThat(splits).hasSize(1);
+    ModuleSplit abiSplit = splits.asList().get(0);
+    assertThat(abiSplit.getApkTargeting())
+        .isEqualTo(apkAbiTargeting(ARMEABI_V7A, ImmutableSet.of()));
+    assertThat(extractPaths(abiSplit.getEntries())).containsExactly("lib/armeabi-v7a/libtest.so");
+  }
+
+  @Test
+  public void splittingByMultipleAbis_64BitDisabled_no32BitLibs_throws() throws Exception {
+    NativeLibraries nativeConfig =
+        nativeLibraries(
+            targetedNativeDirectory("lib/arm64-v8a", nativeDirectoryTargeting(ARM64_V8A)),
+            targetedNativeDirectory("lib/x86_64", nativeDirectoryTargeting(X86_64)));
+    BundleModule bundleModule =
+        new BundleModuleBuilder("testModule")
+            .setNativeConfig(nativeConfig)
+            .addFile("lib/arm64-v8a/libtest.so")
+            .addFile("lib/x86_64/libtest.so")
+            .setManifest(androidManifest("com.test.app"))
+            .build();
+
+    AbiNativeLibrariesSplitter abiNativeLibrariesSplitter =
+        new AbiNativeLibrariesSplitter(/* include64BitLibs= */ false);
+
+    CommandExecutionException exception =
+        assertThrows(
+            CommandExecutionException.class,
+            () -> abiNativeLibrariesSplitter.split(ModuleSplit.forNativeLibraries(bundleModule)));
+
+    assertThat(exception)
+        .hasMessageThat()
+        .contains(
+            "Generation of 64-bit native libraries is "
+                + "disabled, but App Bundle contains only 64-bit native libraries.");
   }
 
   @Test

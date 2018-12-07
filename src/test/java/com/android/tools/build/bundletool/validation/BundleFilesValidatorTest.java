@@ -315,6 +315,18 @@ public class BundleFilesValidatorTest {
   }
 
   @Test
+  public void validateApexFile_repeatingAbis_throws() throws Exception {
+    ZipPath repeatingAbisFile = ZipPath.create("apex/x86.x86_64.x86.img");
+
+    ValidationException e =
+        assertThrows(
+            ValidationException.class,
+            () -> new BundleFilesValidator().validateModuleFile(repeatingAbisFile));
+
+    assertThat(e).hasMessageThat().contains("Repeating architectures in APEX system image file");
+  }
+
+  @Test
   public void validateOtherFile_inModuleRoot_throws() throws Exception {
     ZipPath otherFile = ZipPath.create("in-root.txt");
 

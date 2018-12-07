@@ -28,12 +28,14 @@ import static com.android.tools.build.bundletool.testing.ResourcesTableFactory.t
 import static com.android.tools.build.bundletool.testing.ResourcesTableFactory.value;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.apkAbiTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.apkDensityTargeting;
+import static com.android.tools.build.bundletool.testing.TargetingUtils.apkMultiAbiTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.lPlusVariantTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.mergeApkTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.nativeDirectoryTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.nativeLibraries;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.targetedNativeDirectory;
 import static com.android.tools.build.bundletool.testing.TestUtils.extractPaths;
+import static com.google.common.collect.Iterables.getOnlyElement;
 import static com.google.common.truth.Truth.assertThat;
 import static com.google.common.truth.Truth8.assertThat;
 import static com.google.common.truth.extensions.proto.ProtoTruth.assertThat;
@@ -63,7 +65,6 @@ import com.android.tools.build.bundletool.model.ModuleSplit.SplitType;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
-import com.google.common.collect.Iterables;
 import com.google.common.collect.Maps;
 import com.google.common.io.ByteStreams;
 import java.nio.file.Path;
@@ -111,12 +112,9 @@ public class ModuleSplitsToShardMergerTest {
         new ModuleSplitsToShardMerger(d8DexMerger, tmpDir)
             .merge(ImmutableList.of(ImmutableList.of(masterSplit, x86Split)), NO_MAIN_DEX_LIST);
 
-    assertThat(shards).hasSize(1);
-    ModuleSplit shard = shards.get(0);
+    ModuleSplit shard = getOnlyElement(shards);
     assertThat(shard.getApkTargeting()).isEqualTo(apkAbiTargeting(AbiAlias.X86));
-    assertThat(shard.getVariantTargeting()).isEqualToDefaultInstance();
-    assertThat(shard.getSplitType()).isEqualTo(SplitType.STANDALONE);
-    assertThat(extractPaths(shard.getEntries())).containsExactly("lib/x86/libtest.so");
+    assertSingleEntryStandaloneShard(shard, "lib/x86/libtest.so");
   }
 
   @Test
@@ -148,14 +146,10 @@ public class ModuleSplitsToShardMergerTest {
     assertThat(shards).hasSize(2);
     ImmutableMap<ApkTargeting, ModuleSplit> shardsByTargeting =
         Maps.uniqueIndex(shards, ModuleSplit::getApkTargeting);
-    ModuleSplit x86Shard = shardsByTargeting.get(apkAbiTargeting(AbiAlias.X86));
-    assertThat(x86Shard.getVariantTargeting()).isEqualToDefaultInstance();
-    assertThat(x86Shard.getSplitType()).isEqualTo(SplitType.STANDALONE);
-    assertThat(extractPaths(x86Shard.getEntries())).containsExactly("lib/x86/libtest.so");
-    ModuleSplit mipsShard = shardsByTargeting.get(apkAbiTargeting(AbiAlias.MIPS));
-    assertThat(mipsShard.getVariantTargeting()).isEqualToDefaultInstance();
-    assertThat(mipsShard.getSplitType()).isEqualTo(SplitType.STANDALONE);
-    assertThat(extractPaths(mipsShard.getEntries())).containsExactly("lib/mips/libtest.so");
+    assertSingleEntryStandaloneShard(
+        shardsByTargeting.get(apkAbiTargeting(AbiAlias.X86)), "lib/x86/libtest.so");
+    assertSingleEntryStandaloneShard(
+        shardsByTargeting.get(apkAbiTargeting(AbiAlias.MIPS)), "lib/mips/libtest.so");
   }
 
   @Test
@@ -254,9 +248,9 @@ public class ModuleSplitsToShardMergerTest {
     assertThat(mergedDexData).isNotEqualTo(TestData.readBytes("testdata/dex/classes-other.dex"));
     // The merged result should be cached.
     assertThat(dexMergingCache).hasSize(1);
-    ImmutableSet<ModuleEntry> cacheKey = Iterables.getOnlyElement(dexMergingCache.keySet());
+    ImmutableSet<ModuleEntry> cacheKey = getOnlyElement(dexMergingCache.keySet());
     assertThat(cacheKey).containsExactly(dexEntry1, dexEntry2);
-    ImmutableList<Path> cacheValue = Iterables.getOnlyElement(dexMergingCache.values());
+    ImmutableList<Path> cacheValue = getOnlyElement(dexMergingCache.values());
     assertThat(cacheValue.stream().allMatch(cachedFile -> cachedFile.startsWith(tmpDir))).isTrue();
   }
 
@@ -551,6 +545,100 @@ public class ModuleSplitsToShardMergerTest {
     verifyNoMoreInteractions(spyDexMerger);
   }
 
+  @Test
+  public void mergeApex_oneSetOfSplits_producesOneShard() throws Exception {
+    ModuleSplit masterSplit = createModuleSplitBuilder().setMasterSplit(true).build();
+    ModuleSplit x86Split =
+        createModuleSplitBuilder()
+            .setEntries(ImmutableList.of(InMemoryModuleEntry.ofFile("apex/x86.img", DUMMY_CONTENT)))
+            .setMasterSplit(false)
+            .setApkTargeting(apkMultiAbiTargeting(AbiAlias.X86))
+            .build();
+
+    ImmutableList<ModuleSplit> shards =
+        new ModuleSplitsToShardMerger(d8DexMerger, tmpDir)
+            .mergeApex(ImmutableList.of(ImmutableList.of(masterSplit, x86Split)));
+
+    ModuleSplit x86Shard = getOnlyElement(shards);
+    assertThat(x86Shard.getApkTargeting()).isEqualTo(apkMultiAbiTargeting(AbiAlias.X86));
+    assertSingleEntryStandaloneShard(x86Shard, "apex/x86.img");
+  }
+
+  @Test
+  public void mergeApex_twoSetsOfSplits_producesTwoShards() throws Exception {
+    ModuleSplit masterSplit = createModuleSplitBuilder().setMasterSplit(true).build();
+    ModuleSplit x86Split =
+        createModuleSplitBuilder()
+            .setEntries(ImmutableList.of(InMemoryModuleEntry.ofFile("apex/x86.img", DUMMY_CONTENT)))
+            .setMasterSplit(false)
+            .setApkTargeting(apkMultiAbiTargeting(AbiAlias.X86))
+            .build();
+    ModuleSplit mipsSplit =
+        createModuleSplitBuilder()
+            .setEntries(
+                ImmutableList.of(InMemoryModuleEntry.ofFile("apex/mips.img", DUMMY_CONTENT)))
+            .setMasterSplit(false)
+            .setApkTargeting(apkMultiAbiTargeting(AbiAlias.MIPS))
+            .build();
+
+    ImmutableList<ModuleSplit> shards =
+        new ModuleSplitsToShardMerger(d8DexMerger, tmpDir)
+            .mergeApex(
+                ImmutableList.of(
+                    ImmutableList.of(masterSplit, x86Split),
+                    ImmutableList.of(masterSplit, mipsSplit)));
+
+    assertThat(shards).hasSize(2);
+    ImmutableMap<ApkTargeting, ModuleSplit> shardsByTargeting =
+        Maps.uniqueIndex(shards, ModuleSplit::getApkTargeting);
+
+    assertSingleEntryStandaloneShard(
+        shardsByTargeting.get(apkMultiAbiTargeting(AbiAlias.X86)), "apex/x86.img");
+    assertSingleEntryStandaloneShard(
+        shardsByTargeting.get(apkMultiAbiTargeting(AbiAlias.MIPS)), "apex/mips.img");
+  }
+
+  @Test
+  public void mergeApex_twoSetsOfSplits_multipleAbi_producesTwoShards() throws Exception {
+    ApkTargeting singleAbiTargeting =
+        apkMultiAbiTargeting(
+            ImmutableSet.of(ImmutableSet.of(AbiAlias.X86_64)),
+            ImmutableSet.of(ImmutableSet.of(AbiAlias.X86_64, AbiAlias.X86)));
+    ApkTargeting doubleAbiTargeting =
+        apkMultiAbiTargeting(
+            ImmutableSet.of(ImmutableSet.of(AbiAlias.X86_64, AbiAlias.X86)),
+            ImmutableSet.of(ImmutableSet.of(AbiAlias.X86_64)));
+    ModuleSplit masterSplit = createModuleSplitBuilder().setMasterSplit(true).build();
+    ModuleSplit singleAbiSplit =
+        createModuleSplitBuilder()
+            .setEntries(
+                ImmutableList.of(InMemoryModuleEntry.ofFile("apex/x86_64.img", DUMMY_CONTENT)))
+            .setMasterSplit(false)
+            .setApkTargeting(singleAbiTargeting)
+            .build();
+    ModuleSplit doubleAbiSplit =
+        createModuleSplitBuilder()
+            .setEntries(
+                ImmutableList.of(InMemoryModuleEntry.ofFile("apex/x86_64.x86.img", DUMMY_CONTENT)))
+            .setMasterSplit(false)
+            .setApkTargeting(doubleAbiTargeting)
+            .build();
+
+    ImmutableList<ModuleSplit> shards =
+        new ModuleSplitsToShardMerger(d8DexMerger, tmpDir)
+            .mergeApex(
+                ImmutableList.of(
+                    ImmutableList.of(masterSplit, doubleAbiSplit),
+                    ImmutableList.of(masterSplit, singleAbiSplit)));
+
+    assertThat(shards).hasSize(2);
+    ImmutableMap<ApkTargeting, ModuleSplit> shardsByTargeting =
+        Maps.uniqueIndex(shards, ModuleSplit::getApkTargeting);
+    assertSingleEntryStandaloneShard(shardsByTargeting.get(singleAbiTargeting), "apex/x86_64.img");
+    assertSingleEntryStandaloneShard(
+        shardsByTargeting.get(doubleAbiTargeting), "apex/x86_64.x86.img");
+  }
+
   /** Creates {@link ModuleSplit.Builder} with fields pre-populated to default values. */
   private ModuleSplit.Builder createModuleSplitBuilder() {
     return ModuleSplit.builder()
@@ -564,5 +652,11 @@ public class ModuleSplitsToShardMergerTest {
 
   private static Map<ImmutableSet<ModuleEntry>, ImmutableList<Path>> createCache() {
     return new HashMap<>();
+  }
+
+  private static void assertSingleEntryStandaloneShard(ModuleSplit shard, String entry) {
+    assertThat(shard.getVariantTargeting()).isEqualToDefaultInstance();
+    assertThat(shard.getSplitType()).isEqualTo(SplitType.STANDALONE);
+    assertThat(extractPaths(shard.getEntries())).containsExactly(entry);
   }
 }

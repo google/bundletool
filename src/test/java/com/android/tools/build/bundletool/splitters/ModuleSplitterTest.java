@@ -46,7 +46,6 @@ import static com.android.tools.build.bundletool.testing.ResourcesTableFactory.p
 import static com.android.tools.build.bundletool.testing.ResourcesTableFactory.resourceTable;
 import static com.android.tools.build.bundletool.testing.ResourcesTableFactory.type;
 import static com.android.tools.build.bundletool.testing.ResourcesTableFactory.value;
-import static com.android.tools.build.bundletool.testing.TargetingUtils.abi;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.alternativeLanguageTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.apkAbiTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.apkAlternativeLanguageTargeting;
@@ -69,6 +68,7 @@ import static com.android.tools.build.bundletool.testing.TargetingUtils.openGlVe
 import static com.android.tools.build.bundletool.testing.TargetingUtils.targetedAssetsDirectory;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.targetedNativeDirectory;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.textureCompressionTargeting;
+import static com.android.tools.build.bundletool.testing.TargetingUtils.toAbi;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.variantMinSdkTargeting;
 import static com.android.tools.build.bundletool.testing.TestUtils.extractPaths;
 import static com.android.tools.build.bundletool.testing.truth.resources.TruthResourceTable.assertThat;
@@ -693,7 +693,7 @@ public class ModuleSplitterTest {
             .addFile("lib/x86/liba.so")
             .build();
 
-    List<ModuleSplit> splits = createAbiAndDensitySplitter(testModule).splitModule();
+    ImmutableList<ModuleSplit> splits = createAbiAndDensitySplitter(testModule).splitModule();
     assertThat(splits.stream().map(ModuleSplit::getSplitType).distinct().collect(toImmutableSet()))
         .containsExactly(SplitType.SPLIT);
     assertThat(
@@ -722,6 +722,35 @@ public class ModuleSplitterTest {
     }
     assertThat(hasMasterSplit).isTrue();
     assertThat(hasX86Split).isTrue();
+  }
+
+  @Test
+  public void nativeSplits_64BitLibsDisabled() throws Exception {
+    NativeLibraries nativeConfig =
+        nativeLibraries(
+            targetedNativeDirectory("lib/x86", nativeDirectoryTargeting("x86")),
+            targetedNativeDirectory("lib/arm64-v8a", nativeDirectoryTargeting("arm64-v8a")));
+    BundleModule testModule =
+        new BundleModuleBuilder("testModule")
+            .setManifest(androidManifest("com.test.app"))
+            .setNativeConfig(nativeConfig)
+            .addFile("lib/x86/liba.so")
+            .addFile("lib/arm64-v8a/liba.so")
+            .build();
+
+    ModuleSplitter moduleSplitter =
+        new ModuleSplitter(
+            testModule, BUNDLETOOL_VERSION, withDisabled64BitLibs(), lPlusVariantTargeting());
+
+    ImmutableList<ModuleSplit> splits = moduleSplitter.splitModule();
+    ImmutableMap<ApkTargeting, ModuleSplit> toTargetingMap =
+        Maps.uniqueIndex(splits, ModuleSplit::getApkTargeting);
+    ApkTargeting x86SplitTargeting =
+        mergeApkTargeting(DEFAULT_MASTER_SPLIT_SDK_TARGETING, apkAbiTargeting(AbiAlias.X86));
+    assertThat(toTargetingMap.keySet())
+        .containsExactly(DEFAULT_MASTER_SPLIT_SDK_TARGETING, x86SplitTargeting);
+    assertThat(toTargetingMap.get(DEFAULT_MASTER_SPLIT_SDK_TARGETING).isMasterSplit()).isTrue();
+    assertThat(toTargetingMap.get(x86SplitTargeting).isMasterSplit()).isFalse();
   }
 
   @Test
@@ -1314,7 +1343,7 @@ public class ModuleSplitterTest {
             BUNDLETOOL_VERSION,
             ApkGenerationConfiguration.builder()
                 .setAbisForPlaceholderLibs(
-                    ImmutableSet.of(abi(AbiAlias.X86), abi(AbiAlias.ARM64_V8A)))
+                    ImmutableSet.of(toAbi(AbiAlias.X86), toAbi(AbiAlias.ARM64_V8A)))
                 .build(),
             lPlusVariantTargeting());
 
@@ -1341,7 +1370,7 @@ public class ModuleSplitterTest {
             BUNDLETOOL_VERSION,
             ApkGenerationConfiguration.builder()
                 .setAbisForPlaceholderLibs(
-                    ImmutableSet.of(abi(AbiAlias.X86), abi(AbiAlias.ARM64_V8A)))
+                    ImmutableSet.of(toAbi(AbiAlias.X86), toAbi(AbiAlias.ARM64_V8A)))
                 .build(),
             lPlusVariantTargeting());
 
@@ -1385,6 +1414,13 @@ public class ModuleSplitterTest {
       ImmutableSet<OptimizationDimension> optimizationDimensions) {
     return ApkGenerationConfiguration.builder()
         .setOptimizationDimensions(optimizationDimensions)
+        .build();
+  }
+
+  private static ApkGenerationConfiguration withDisabled64BitLibs() {
+    return ApkGenerationConfiguration.builder()
+        .setInclude64BitLibs(false)
+        .setOptimizationDimensions(ImmutableSet.of(ABI))
         .build();
   }
 }

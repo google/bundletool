@@ -33,6 +33,9 @@ public abstract class ApkGenerationConfiguration {
 
   public abstract boolean getEnableDexCompressionSplitter();
 
+  /** Whether to include 64-bit native library config splits. */
+  public abstract boolean getInclude64BitLibs();
+
   /**
    * Returns a list of ABIs for placeholder libraries that should be populated for base modules
    * without native code. See {@link AbiPlaceholderInjector} for details.
@@ -44,6 +47,7 @@ public abstract class ApkGenerationConfiguration {
         .setForInstantAppVariants(false)
         .setEnableNativeLibraryCompressionSplitter(false)
         .setEnableDexCompressionSplitter(false)
+        .setInclude64BitLibs(true)
         .setAbisForPlaceholderLibs(ImmutableSet.of())
         .setOptimizationDimensions(ImmutableSet.of());
   }
@@ -67,6 +71,8 @@ public abstract class ApkGenerationConfiguration {
     public abstract Builder setEnableDexCompressionSplitter(boolean enableDexCompressionSplitter);
 
     public abstract Builder setAbisForPlaceholderLibs(ImmutableSet<Abi> abis);
+
+    public abstract Builder setInclude64BitLibs(boolean shouldGenerate);
 
     public abstract ApkGenerationConfiguration build();
   }

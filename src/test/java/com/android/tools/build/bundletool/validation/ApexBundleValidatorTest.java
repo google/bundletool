@@ -36,7 +36,10 @@ public class ApexBundleValidatorTest {
   private static final String PKG_NAME = "com.test.app";
   private static final ApexImages APEX_CONFIG =
       ApexImages.newBuilder()
+          .addImage(TargetedApexImage.newBuilder().setPath("apex/x86_64.img"))
           .addImage(TargetedApexImage.newBuilder().setPath("apex/x86.img"))
+          .addImage(TargetedApexImage.newBuilder().setPath("apex/armeabi-v7a.img"))
+          .addImage(TargetedApexImage.newBuilder().setPath("apex/arm64-v8a.img"))
           .build();
 
   @Test
@@ -52,7 +55,7 @@ public class ApexBundleValidatorTest {
         new BundleModuleBuilder("apexTestModule")
             .setManifest(androidManifest(PKG_NAME))
             .setApexConfig(APEX_CONFIG)
-            .addFile("root/manifest.json")
+            .addFile("root/apex_manifest.json")
             .addFile("apex/x86.img")
             .addFile("root/unexpected.txt")
             .build();
@@ -86,9 +89,9 @@ public class ApexBundleValidatorTest {
         new BundleModuleBuilder("apexTestModule")
             .setManifest(androidManifest(PKG_NAME))
             .setApexConfig(APEX_CONFIG)
-            .addFile("root/manifest.json")
+            .addFile("root/apex_manifest.json")
             .addFile("apex/x86.img")
-            .addFile("apex/x86_64.img")
+            .addFile("apex/x86_64.x86.img")
             .build();
 
     ValidationException exception =
@@ -104,7 +107,7 @@ public class ApexBundleValidatorTest {
         new BundleModuleBuilder("apexTestModule")
             .setManifest(androidManifest(PKG_NAME))
             .setApexConfig(APEX_CONFIG)
-            .addFile("root/manifest.json")
+            .addFile("root/apex_manifest.json")
             // No image files under apex/.
             .build();
 
@@ -113,6 +116,65 @@ public class ApexBundleValidatorTest {
             ValidationException.class, () -> new ApexBundleValidator().validateModule(apexModule));
 
     assertThat(exception).hasMessageThat().contains("Targeted APEX image files are missing");
+  }
+
+  @Test
+  public void validateModule_imageFilesTargetSameSetOfAbis_throws() throws Exception {
+    ApexImages apexConfig =
+        ApexImages.newBuilder()
+            .addImage(TargetedApexImage.newBuilder().setPath("apex/x86_64.x86.img"))
+            .addImage(TargetedApexImage.newBuilder().setPath("apex/x86.armeabi-v7a.x86_64.img"))
+            .addImage(TargetedApexImage.newBuilder().setPath("apex/x86_64.x86.armeabi-v7a.img"))
+            .build();
+    BundleModule apexModule =
+        new BundleModuleBuilder("apexTestModule")
+            .setManifest(androidManifest(PKG_NAME))
+            .setApexConfig(apexConfig)
+            .addFile("root/apex_manifest.json")
+            .addFile("apex/x86_64.x86.img")
+            .addFile("apex/x86.armeabi-v7a.x86_64.img")
+            .addFile("apex/x86_64.x86.armeabi-v7a.img")
+            .build();
+
+    ValidationException exception =
+        assertThrows(
+            ValidationException.class, () -> new ApexBundleValidator().validateModule(apexModule));
+
+    assertThat(exception)
+        .hasMessageThat()
+        .contains("Every APEX image file must target a unique set of architectures");
+  }
+
+  @Test
+  public void validateModule_singletonAbiMissing_throws() throws Exception {
+    ApexImages apexConfig =
+        ApexImages.newBuilder()
+            .addImage(TargetedApexImage.newBuilder().setPath("apex/x86_64.img"))
+            .addImage(TargetedApexImage.newBuilder().setPath("apex/x86.img"))
+            .addImage(TargetedApexImage.newBuilder().setPath("apex/armeabi-v7a.img"))
+            .addImage(TargetedApexImage.newBuilder().setPath("apex/x86_64.x86.img"))
+            .addImage(TargetedApexImage.newBuilder().setPath("apex/x86_64.armeabi-v7a.img"))
+            .build();
+    BundleModule apexModule =
+        new BundleModuleBuilder("apexTestModule")
+            .setManifest(androidManifest(PKG_NAME))
+            .setApexConfig(apexConfig)
+            .addFile("root/apex_manifest.json")
+            .addFile("apex/x86_64.img")
+            .addFile("apex/x86.img")
+            .addFile("apex/armeabi-v7a.img")
+            // arm64-v8a.img missing.
+            .addFile("apex/x86_64.x86.img")
+            .addFile("apex/x86_64.armeabi-v7a.img")
+            .build();
+
+    ValidationException exception =
+        assertThrows(
+            ValidationException.class, () -> new ApexBundleValidator().validateModule(apexModule));
+
+    assertThat(exception)
+        .hasMessageThat()
+        .contains("APEX bundle must contain all these singleton architectures");
   }
 
   @Test
@@ -156,8 +218,11 @@ public class ApexBundleValidatorTest {
     return new BundleModuleBuilder("apexTestModule")
         .setManifest(androidManifest(PKG_NAME))
         .setApexConfig(APEX_CONFIG)
-        .addFile("root/manifest.json")
+        .addFile("root/apex_manifest.json")
+        .addFile("apex/x86_64.img")
         .addFile("apex/x86.img")
+        .addFile("apex/armeabi-v7a.img")
+        .addFile("apex/arm64-v8a.img")
         .build();
   }
 }

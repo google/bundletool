@@ -37,6 +37,7 @@ public class GeneratedApksTest {
     assertThat(generatedApks.getSplitApks()).isEmpty();
     assertThat(generatedApks.getStandaloneApks()).isEmpty();
     assertThat(generatedApks.getInstantApks()).isEmpty();
+    assertThat(generatedApks.getSystemApks()).isEmpty();
   }
 
   @Test
@@ -46,6 +47,7 @@ public class GeneratedApksTest {
     assertThat(generatedApks.getSplitApks()).isEmpty();
     assertThat(generatedApks.getStandaloneApks()).isEmpty();
     assertThat(generatedApks.getInstantApks()).isEmpty();
+    assertThat(generatedApks.getSystemApks()).isEmpty();
   }
 
   @Test
@@ -60,6 +62,19 @@ public class GeneratedApksTest {
     assertThat(generatedApks.getSplitApks()).containsExactly(splitApk);
     assertThat(generatedApks.getStandaloneApks()).containsExactly(standaloneApk);
     assertThat(generatedApks.getInstantApks()).containsExactly(instantApk);
+    assertThat(generatedApks.getSystemApks()).isEmpty();
+  }
+
+  @Test
+  public void fromModuleSplits_withSystemSplits_correctSizes() {
+    ModuleSplit systemApk = createModuleSplit(SplitType.SYSTEM);
+
+    GeneratedApks generatedApks = GeneratedApks.fromModuleSplits(ImmutableList.of(systemApk));
+    assertThat(generatedApks.size()).isEqualTo(1);
+    assertThat(generatedApks.getSplitApks()).isEmpty();
+    assertThat(generatedApks.getStandaloneApks()).isEmpty();
+    assertThat(generatedApks.getInstantApks()).isEmpty();
+    assertThat(generatedApks.getSystemApks()).containsExactly(systemApk);
   }
 
   private static ModuleSplit createModuleSplit(SplitType splitType) {

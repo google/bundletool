@@ -37,6 +37,7 @@ import com.android.tools.build.bundletool.exceptions.manifest.ManifestSdkTargeti
 import com.android.tools.build.bundletool.exceptions.manifest.ManifestSdkTargetingException.MaxSdkLessThanMinInstantSdk;
 import com.android.tools.build.bundletool.exceptions.manifest.ManifestSdkTargetingException.MinSdkGreaterThanMaxSdkException;
 import com.android.tools.build.bundletool.exceptions.manifest.ManifestSdkTargetingException.MinSdkInvalidException;
+import com.android.tools.build.bundletool.exceptions.manifest.ManifestVersionCodeConflictException;
 import com.android.tools.build.bundletool.model.BundleModule;
 import com.android.tools.build.bundletool.testing.BundleModuleBuilder;
 import com.android.tools.build.bundletool.testing.ManifestProtoUtils.ManifestMutator;
@@ -656,9 +657,9 @@ public class AndroidManifestValidatorTest {
                 .setManifest(androidManifest("com.test", withVersionCode(3)))
                 .build());
 
-    Throwable exception =
+    ManifestVersionCodeConflictException exception =
         assertThrows(
-            ValidationException.class,
+            ManifestVersionCodeConflictException.class,
             () -> new AndroidManifestValidator().validateAllModules(bundleModules));
     assertThat(exception)
         .hasMessageThat()

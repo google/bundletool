@@ -47,6 +47,7 @@ public class VariantMatcher {
     this(
         new SdkVersionMatcher(deviceSpec),
         new AbiMatcher(deviceSpec),
+        new MultiAbiMatcher(deviceSpec),
         new ScreenDensityMatcher(deviceSpec),
         matchInstant);
   }
@@ -54,9 +55,11 @@ public class VariantMatcher {
   VariantMatcher(
       SdkVersionMatcher sdkVersionMatcher,
       AbiMatcher abiMatcher,
+      MultiAbiMatcher multiAbiMatcher,
       ScreenDensityMatcher screenDensityMatcher,
       boolean matchInstant) {
-    this.variantMatchers = ImmutableList.of(sdkVersionMatcher, abiMatcher, screenDensityMatcher);
+    this.variantMatchers =
+        ImmutableList.of(sdkVersionMatcher, abiMatcher, multiAbiMatcher, screenDensityMatcher);
     this.matchInstant = matchInstant;
   }
 

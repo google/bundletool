@@ -31,6 +31,7 @@ import static com.android.tools.build.bundletool.testing.ApkSetUtils.splitApkSet
 import static com.android.tools.build.bundletool.testing.ApksArchiveHelpers.createConditionalApkSet;
 import static com.android.tools.build.bundletool.testing.ApksArchiveHelpers.createVariant;
 import static com.android.tools.build.bundletool.testing.ApksArchiveHelpers.instantApkDescription;
+import static com.android.tools.build.bundletool.testing.ApksArchiveHelpers.multiAbiTargetingStandaloneVariant;
 import static com.android.tools.build.bundletool.testing.ApksArchiveHelpers.splitApkDescription;
 import static com.android.tools.build.bundletool.testing.ApksArchiveHelpers.standaloneVariant;
 import static com.android.tools.build.bundletool.testing.DeviceFactory.abis;
@@ -53,6 +54,7 @@ import static com.android.tools.build.bundletool.testing.TargetingUtils.mergeMod
 import static com.android.tools.build.bundletool.testing.TargetingUtils.mergeVariantTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.moduleFeatureTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.moduleMinSdkVersionTargeting;
+import static com.android.tools.build.bundletool.testing.TargetingUtils.multiAbiTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.sdkVersionFrom;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.variantAbiTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.variantDensityTargeting;
@@ -66,6 +68,7 @@ import com.android.bundle.Commands.Variant;
 import com.android.bundle.Devices.DeviceSpec;
 import com.android.bundle.Targeting.Abi.AbiAlias;
 import com.android.bundle.Targeting.ApkTargeting;
+import com.android.bundle.Targeting.MultiAbiTargeting;
 import com.android.bundle.Targeting.ScreenDensity.DensityAlias;
 import com.android.bundle.Targeting.VariantTargeting;
 import com.android.tools.build.bundletool.exceptions.CommandExecutionException;
@@ -455,6 +458,67 @@ public class ApkMatcherTest {
             new ApkMatcher(deviceWith(19, ImmutableList.of("x86_64", "x86", "arm64-v8a"), HDPI))
                 .getMatchingApks(buildApksResult))
         .isEmpty();
+  }
+
+  // APEX variants tests.
+
+  @Test
+  public void apexVariantMatch_noMatch_throws() {
+    ZipPath x86Apk = ZipPath.create("standalone-x86.apk");
+    ZipPath x64X86Apk = ZipPath.create("standalone-x86_64.x86.apk");
+
+    ImmutableSet<ImmutableSet<AbiAlias>> x86Set = ImmutableSet.of(ImmutableSet.of(X86));
+    ImmutableSet<ImmutableSet<AbiAlias>> x64X86Set = ImmutableSet.of(ImmutableSet.of(X86_64, X86));
+
+    MultiAbiTargeting x86Targeting = multiAbiTargeting(x86Set, x64X86Set);
+    MultiAbiTargeting x64X86Targeting = multiAbiTargeting(x64X86Set, x86Set);
+
+    BuildApksResult buildApksResult =
+        BuildApksResult.newBuilder()
+            .addVariant(multiAbiTargetingStandaloneVariant(x86Targeting, x86Apk))
+            .addVariant(multiAbiTargetingStandaloneVariant(x64X86Targeting, x64X86Apk))
+            .build();
+
+    CommandExecutionException e =
+        assertThrows(
+            CommandExecutionException.class,
+            () -> new ApkMatcher(abis("x86_64", "armeabi-v7a")).getMatchingApks(buildApksResult));
+    assertThat(e)
+        .hasMessageThat()
+        .contains(
+            "No set of ABI architectures that the app supports is contained in the ABI "
+                + "architecture set of the device");
+  }
+
+  @Test
+  public void apexVariantMatch_matchesRightVariant() {
+    ZipPath x86Apk = ZipPath.create("standalone-x86.apk");
+    ZipPath x64X86Apk = ZipPath.create("standalone-x86_64.x86.apk");
+
+    ImmutableSet<ImmutableSet<AbiAlias>> x86Set = ImmutableSet.of(ImmutableSet.of(X86));
+    ImmutableSet<ImmutableSet<AbiAlias>> x64X86Set = ImmutableSet.of(ImmutableSet.of(X86_64, X86));
+
+    MultiAbiTargeting x86Targeting = multiAbiTargeting(x86Set, x64X86Set);
+    MultiAbiTargeting x64X86Targeting = multiAbiTargeting(x64X86Set, x86Set);
+
+    BuildApksResult buildApksResult =
+        BuildApksResult.newBuilder()
+            .addVariant(multiAbiTargetingStandaloneVariant(x86Targeting, x86Apk))
+            .addVariant(multiAbiTargetingStandaloneVariant(x64X86Targeting, x64X86Apk))
+            .build();
+
+    assertThat(new ApkMatcher(abis("x86")).getMatchingApks(buildApksResult))
+        .containsExactly(x86Apk);
+    assertThat(new ApkMatcher(abis("x86_64", "x86")).getMatchingApks(buildApksResult))
+        .containsExactly(x64X86Apk);
+    assertThat(
+            new ApkMatcher(abis("x86_64", "x86", "armeabi-v7a")).getMatchingApks(buildApksResult))
+        .containsExactly(x64X86Apk);
+    // Other device specs don't affect the matching variant.
+    assertThat(
+            new ApkMatcher(deviceWith(26, ImmutableList.of("x86"), HDPI))
+                .getMatchingApks(buildApksResult))
+        .containsExactly(x86Apk);
   }
 
   private static DeviceSpec deviceWith(

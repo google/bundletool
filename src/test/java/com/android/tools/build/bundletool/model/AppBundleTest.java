@@ -17,10 +17,10 @@
 package com.android.tools.build.bundletool.model;
 
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifest;
-import static com.android.tools.build.bundletool.testing.TargetingUtils.abi;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.nativeDirectoryTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.nativeLibraries;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.targetedNativeDirectory;
+import static com.android.tools.build.bundletool.testing.TargetingUtils.toAbi;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.truth.Truth.assertThat;
 import static com.google.common.truth.Truth8.assertThat;
@@ -307,7 +307,7 @@ public class AppBundleTest {
             .build();
 
     assertThat(appBundle.getTargetedAbis())
-        .containsExactly(abi(AbiAlias.ARMEABI), abi(AbiAlias.X86_64));
+        .containsExactly(toAbi(AbiAlias.ARMEABI), toAbi(AbiAlias.X86_64));
   }
 
   @Test
@@ -335,7 +335,40 @@ public class AppBundleTest {
             .build();
 
     assertThat(appBundle.getTargetedAbis())
-        .containsExactly(abi(AbiAlias.X86), abi(AbiAlias.ARM64_V8A));
+        .containsExactly(toAbi(AbiAlias.X86), toAbi(AbiAlias.ARM64_V8A));
+  }
+
+  @Test
+  public void renderscript_bcFilesPresent() throws Exception {
+    AppBundle appBundle =
+        new AppBundleBuilder()
+            .addModule(
+                "base",
+                baseModule ->
+                    baseModule.setManifest(MANIFEST).addFile("dex/classes.dex", DUMMY_CONTENT))
+            .addModule(
+                "detail",
+                module -> module.setManifest(MANIFEST).addFile("res/raw/script.bc", DUMMY_CONTENT))
+            .build();
+
+    assertThat(appBundle.has32BitRenderscriptCode()).isTrue();
+  }
+
+  @Test
+  public void renderscript_bcFilesAbsent() throws Exception {
+    AppBundle appBundle =
+        new AppBundleBuilder()
+            .addModule(
+                "base",
+                baseModule ->
+                    baseModule.setManifest(MANIFEST).addFile("dex/classes.dex", DUMMY_CONTENT))
+            .addModule(
+                "detail",
+                module ->
+                    module.setManifest(MANIFEST).addFile("assets/language.pak", DUMMY_CONTENT))
+            .build();
+
+    assertThat(appBundle.has32BitRenderscriptCode()).isFalse();
   }
 
   private static ZipBuilder createBasicZipBuilder(BundleConfig config) {

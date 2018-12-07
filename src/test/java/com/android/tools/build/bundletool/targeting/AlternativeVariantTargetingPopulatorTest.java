@@ -146,6 +146,28 @@ public class AlternativeVariantTargetingPopulatorTest {
   }
 
   @Test
+  public void systemApksPassThrough() {
+    VariantTargeting emptySdkTargeting = variantSdkTargeting(SdkVersion.getDefaultInstance());
+    ImmutableList<ModuleSplit> systemSplits =
+        ImmutableList.of(
+            createModuleSplit(
+                mergeVariantTargeting(
+                    emptySdkTargeting, variantDensityTargeting(DensityAlias.LDPI)),
+                SplitType.SYSTEM));
+
+    GeneratedApks generatedApks = GeneratedApks.builder().setSystemApks(systemSplits).build();
+
+    GeneratedApks processedApks =
+        AlternativeVariantTargetingPopulator.populateAlternativeVariantTargeting(generatedApks);
+
+    assertThat(processedApks.size()).isEqualTo(1);
+    assertThat(processedApks.getInstantApks()).isEmpty();
+    assertThat(processedApks.getStandaloneApks()).isEmpty();
+    assertThat(processedApks.getSplitApks()).isEmpty();
+    assertThat(processedApks.getSystemApks()).isEqualTo(systemSplits);
+  }
+
+  @Test
   public void abi_allVariantsAbiAgnostic_passThrough() throws Exception {
     ModuleSplit densityVariant = createModuleSplit(variantDensityTargeting(DensityAlias.LDPI));
     ModuleSplit sdkVariant = createModuleSplit(variantSdkTargeting(sdkVersionFrom(1)));

@@ -15,6 +15,7 @@
  */
 package com.android.tools.build.bundletool.io;
 
+import static com.android.tools.build.bundletool.model.BundleModule.APEX_DIRECTORY;
 import static com.android.tools.build.bundletool.model.BundleModule.DEX_DIRECTORY;
 import static com.android.tools.build.bundletool.model.BundleModule.MANIFEST_FILENAME;
 import static com.android.tools.build.bundletool.model.BundleModule.RESOURCES_PROTO_PATH;
@@ -49,6 +50,9 @@ import com.google.common.base.Predicate;
 import com.google.common.base.Predicates;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
+import com.google.common.io.ByteStreams;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
@@ -63,6 +67,7 @@ import java.security.NoSuchAlgorithmException;
 import java.security.SignatureException;
 import java.util.Optional;
 import java.util.regex.Pattern;
+import java.util.zip.GZIPOutputStream;
 
 /** Serializes APKs to Proto or Binary format. */
 final class ApkSerializerHelper {
@@ -134,7 +139,7 @@ final class ApkSerializerHelper {
     return outputPath;
   }
 
-  void writeToZipFile(ModuleSplit split, Path outputPath, Path tempDir) {
+  private void writeToZipFile(ModuleSplit split, Path outputPath, Path tempDir) {
     checkFileDoesNotExist(outputPath);
     createParentDirectories(outputPath);
 
@@ -176,6 +181,33 @@ final class ApkSerializerHelper {
     } catch (IOException e) {
       throw new UncheckedIOException(
           String.format("Failed to write APK file '%s'.", outputPath), e);
+    }
+  }
+
+  Path writeCompressedApkToZipFile(ModuleSplit split, Path outputPath) {
+    TempFiles.withTempDirectory(
+        tempDir -> {
+          Path tempApkOutputPath = tempDir.resolve("output.apk");
+          writeToZipFile(split, tempApkOutputPath, tempDir);
+          writeCompressedApkToZipFile(tempApkOutputPath, outputPath);
+        });
+    return outputPath;
+  }
+
+  private void writeCompressedApkToZipFile(Path apkPath, Path outputApkGzipPath) {
+    checkFileDoesNotExist(outputApkGzipPath);
+    createParentDirectories(outputApkGzipPath);
+
+    try (FileInputStream fileInputStream = new FileInputStream(apkPath.toFile());
+        GZIPOutputStream gzipOutputStream =
+            new GZIPOutputStream(new FileOutputStream(outputApkGzipPath.toFile()))) {
+      ByteStreams.copy(fileInputStream, gzipOutputStream);
+    } catch (IOException e) {
+      throw new UncheckedIOException(
+          String.format(
+              "Failed to write APK file '%s' to compressed APK file '%s'.",
+              apkPath, outputApkGzipPath),
+          e);
     }
   }
 
@@ -292,7 +324,8 @@ final class ApkSerializerHelper {
    * Transforms the entry path in the module to the final path in the module split.
    *
    * <p>The entries from root/, dex/, manifest/ directories will be moved to the top level of the
-   * split.
+   * split. Entries from apex/ will be moved to the top level and named "apex_payload.img". There
+   * should only be one such entry.
    */
   private ZipPath toApkEntryPath(ZipPath pathInModule) {
     if (pathInModule.startsWith(DEX_DIRECTORY)) {
@@ -309,6 +342,13 @@ final class ApkSerializerHelper {
           "Only files inside the root directory are supported but found: %s",
           pathInModule);
       return pathInModule.subpath(1, pathInModule.getNameCount());
+    }
+    if (pathInModule.startsWith(APEX_DIRECTORY)) {
+      checkArgument(
+          pathInModule.getNameCount() >= 2,
+          "Only files inside the apex directory are supported but found: %s",
+          pathInModule);
+      return ZipPath.create("apex_payload.img");
     }
     return pathInModule;
   }

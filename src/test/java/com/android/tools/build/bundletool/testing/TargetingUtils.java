@@ -21,8 +21,10 @@ import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.ImmutableSet.toImmutableSet;
 import static com.google.common.truth.Truth.assertThat;
 
+import com.android.bundle.Files.ApexImages;
 import com.android.bundle.Files.Assets;
 import com.android.bundle.Files.NativeLibraries;
+import com.android.bundle.Files.TargetedApexImage;
 import com.android.bundle.Files.TargetedAssetsDirectory;
 import com.android.bundle.Files.TargetedNativeDirectory;
 import com.android.bundle.Targeting.Abi;
@@ -58,6 +60,7 @@ import com.google.common.base.Predicates;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Lists;
+import com.google.common.collect.Sets;
 import com.google.protobuf.Int32Value;
 import java.util.Arrays;
 import java.util.Collection;
@@ -93,10 +96,7 @@ public final class TargetingUtils {
   }
 
   public static AssetsDirectoryTargeting assetsDirectoryTargeting(String architecture) {
-    AbiAlias alias =
-        AbiName.fromPlatformName(architecture)
-            .orElseThrow(() -> new IllegalArgumentException("Unrecognized ABI: " + architecture))
-            .toProto();
+    AbiAlias alias = toAbiAlias(architecture);
     return assetsDirectoryTargeting(abiTargeting(alias));
   }
 
@@ -135,14 +135,11 @@ public final class TargetingUtils {
   // See below, for the targeting dimension helper methods.
 
   public static NativeDirectoryTargeting nativeDirectoryTargeting(AbiAlias abi) {
-    return NativeDirectoryTargeting.newBuilder().setAbi(Abi.newBuilder().setAlias(abi)).build();
+    return NativeDirectoryTargeting.newBuilder().setAbi(toAbi(abi)).build();
   }
 
   public static NativeDirectoryTargeting nativeDirectoryTargeting(String architecture) {
-    AbiAlias alias =
-        AbiName.fromPlatformName(architecture)
-            .orElseThrow(() -> new IllegalArgumentException("Unrecognized ABI: " + architecture))
-            .toProto();
+    AbiAlias alias = toAbiAlias(architecture);
     return nativeDirectoryTargeting(alias);
   }
 
@@ -155,11 +152,22 @@ public final class TargetingUtils {
 
   // Apex image file targeting helpers.
 
-  public static ApexImageTargeting apexImageSingleAbiTargeting(AbiAlias abi) {
+  /** Builds APEX images proto from a collection of targeted images. */
+  public static ApexImages apexImages(TargetedApexImage... targetedApexImages) {
+    return ApexImages.newBuilder().addAllImage(Lists.newArrayList(targetedApexImages)).build();
+  }
+
+  /** Builds APEX targeted image from the image file path and its targeting. */
+  public static TargetedApexImage targetedApexImage(String path, ApexImageTargeting targeting) {
+    return TargetedApexImage.newBuilder().setPath(path).setTargeting(targeting).build();
+  }
+
+  /** Builds APEX image targeting (no alternatives) according to the Abi names. */
+  public static ApexImageTargeting apexImageTargeting(String... architectures) {
+    MultiAbi.Builder multiAbi = MultiAbi.newBuilder();
+    Arrays.stream(architectures).forEach(abi -> multiAbi.addAbi(toAbi(abi)));
     return ApexImageTargeting.newBuilder()
-        .setMultiAbi(
-            MultiAbiTargeting.newBuilder()
-                .addValue(MultiAbi.newBuilder().addAbi(Abi.newBuilder().setAlias(abi))))
+        .setMultiAbi(MultiAbiTargeting.newBuilder().addValue(multiAbi))
         .build();
   }
 
@@ -186,6 +194,58 @@ public final class TargetingUtils {
 
   public static ApkTargeting apkAbiTargeting(AbiAlias abiAlias) {
     return apkAbiTargeting(abiTargeting(abiAlias));
+  }
+
+  /** Builds APK targeting, of multi-Abi targeting only. */
+  public static ApkTargeting apkMultiAbiTargeting(MultiAbiTargeting multiAbiTargeting) {
+    return ApkTargeting.newBuilder().setMultiAbiTargeting(multiAbiTargeting).build();
+  }
+
+  /** Builds APK targeting, of multi-Abi targeting of a single architecture. */
+  public static ApkTargeting apkMultiAbiTargeting(AbiAlias abiAlias) {
+    return apkMultiAbiTargeting(multiAbiTargeting(abiAlias));
+  }
+
+  /**
+   * Builds APK targeting of a single architecture, with multi-Abi alternatives of single
+   * architecture each.
+   *
+   * @param abiAlias single Abi to target by.
+   * @param alternativeAbis a set of Abis, each one mapped to a single-Abi alternative (rather than
+   *     one targeting of multiple Abis).
+   */
+  public static ApkTargeting apkMultiAbiTargeting(
+      AbiAlias abiAlias, ImmutableSet<AbiAlias> alternativeAbis) {
+    return apkMultiAbiTargeting(multiAbiTargeting(abiAlias, alternativeAbis));
+  }
+
+  /**
+   * Builds APK multi-Abi targeting of arbitrary values and alternatives.
+   *
+   * @param abiAliases a set of sets of Abi aliases. Each inner set is converted to the repeated
+   *     MultiAbi.abi, and the outer set is converted to the repeated MultiAbiTargeting.value.
+   * @param alternatives a set of sets of Abi aliases. Each inner set is converted to the repeated
+   *     MultiAbi.abi, and the outer set is converted to the repeated
+   *     MultiAbiTargeting.alternatives.
+   */
+  public static ApkTargeting apkMultiAbiTargeting(
+      ImmutableSet<ImmutableSet<AbiAlias>> abiAliases,
+      ImmutableSet<ImmutableSet<AbiAlias>> alternatives) {
+    return apkMultiAbiTargeting(multiAbiTargeting(abiAliases, alternatives));
+  }
+
+  /**
+   * Builds APK multi-Abi targeting of single (multi Abi) values and arbitrary alternatives.
+   *
+   * @param targeting a set of Abi aliases, corresponding to a single value of MultiAbiTargeting.
+   * @param allTargeting a set of all expected 'targeting' sets. The alternatives are built from
+   *     this set minus the 'targeting' set.
+   */
+  public static ApkTargeting apkMultiAbiTargetingFromAllTargeting(
+      ImmutableSet<AbiAlias> targeting, ImmutableSet<ImmutableSet<AbiAlias>> allTargeting) {
+    return apkMultiAbiTargeting(
+        ImmutableSet.of(targeting),
+        Sets.difference(allTargeting, ImmutableSet.of(targeting)).immutableCopy());
   }
 
   public static ApkTargeting apkDensityTargeting(ScreenDensityTargeting screenDensityTargeting) {
@@ -261,8 +321,68 @@ public final class TargetingUtils {
         .build();
   }
 
+  /** Builds variant targeting, of multi-Abi targeting only. */
+  public static VariantTargeting variantMultiAbiTargeting(MultiAbiTargeting multiAbiTargeting) {
+    return VariantTargeting.newBuilder().setMultiAbiTargeting(multiAbiTargeting).build();
+  }
+
+  /**
+   * Builds variant multi-Abi targeting of a single architecture, with multi-Abi alternatives of
+   * single architecture each.
+   *
+   * @param value single Abi to target by.
+   * @param alternatives a set of Abis, each one mapped to a single-Abi alternative (rather than one
+   *     targeting of multiple Abis).
+   */
+  public static VariantTargeting variantMultiAbiTargeting(
+      AbiAlias value, ImmutableSet<AbiAlias> alternatives) {
+    return variantMultiAbiTargeting(multiAbiTargeting(value, alternatives));
+  }
+
+  /**
+   * Builds variant multi-Abi targeting of arbitrary values and alternatives.
+   *
+   * @param abiAliases a set of sets of Abi aliases. Each inner set is converted to the repeated
+   *     MultiAbi.abi, and the outer set is converted to the repeated MultiAbiTargeting.value.
+   * @param alternatives a set of sets of Abi aliases. Each inner set is converted to the repeated
+   *     MultiAbi.abi, and the outer set is converted to the repeated
+   *     MultiAbiTargeting.alternatives.
+   */
+  public static VariantTargeting variantMultiAbiTargeting(
+      ImmutableSet<ImmutableSet<AbiAlias>> abiAliases,
+      ImmutableSet<ImmutableSet<AbiAlias>> alternatives) {
+    return variantMultiAbiTargeting(multiAbiTargeting(abiAliases, alternatives));
+  }
+
+  /**
+   * Builds variant multi-Abi targeting of single (multi Abi) values and arbitrary alternatives.
+   *
+   * @param targeting a set of Abi aliases, corresponding to a single value of MultiAbiTargeting.
+   * @param allTargeting a set of all expected 'targeting' sets. The alternatives are built from
+   *     this set minus the 'targeting' set.
+   */
+  public static VariantTargeting variantMultiAbiTargetingFromAllTargeting(
+      ImmutableSet<AbiAlias> targeting, ImmutableSet<ImmutableSet<AbiAlias>> allTargeting) {
+    return variantMultiAbiTargeting(
+        ImmutableSet.of(targeting),
+        Sets.difference(allTargeting, ImmutableSet.of(targeting)).immutableCopy());
+  }
+
+  /** Builds Abi proto from its alias. */
   public static Abi toAbi(AbiAlias alias) {
     return Abi.newBuilder().setAlias(alias).build();
+  }
+
+  /** Builds Abi proto from the alias's name, given as a String. */
+  public static Abi toAbi(String abi) {
+    return toAbi(toAbiAlias(abi));
+  }
+
+  /** Builds AbiAlias proto from the alias's name, given as a String. */
+  static AbiAlias toAbiAlias(String abi) {
+    return AbiName.fromPlatformName(abi)
+        .orElseThrow(() -> new IllegalArgumentException("Unrecognized ABI: " + abi))
+        .toProto();
   }
 
   public static VariantTargeting variantMinSdkTargeting(
@@ -376,21 +496,74 @@ public final class TargetingUtils {
   public static AbiTargeting abiTargeting(
       ImmutableSet<AbiAlias> abiAliases, ImmutableSet<AbiAlias> alternatives) {
     return AbiTargeting.newBuilder()
-        .addAllValue(
-            abiAliases
-                .stream()
-                .map(alias -> Abi.newBuilder().setAlias(alias).build())
-                .collect(toImmutableList()))
+        .addAllValue(abiAliases.stream().map(TargetingUtils::toAbi).collect(toImmutableList()))
         .addAllAlternatives(
-            alternatives
-                .stream()
-                .map(alias -> Abi.newBuilder().setAlias(alias).build())
-                .collect(toImmutableList()))
+            alternatives.stream().map(TargetingUtils::toAbi).collect(toImmutableList()))
         .build();
   }
 
-  public static Abi abi(AbiAlias abiAlias) {
-    return Abi.newBuilder().setAlias(abiAlias).build();
+  // Multi ABI targeting
+
+  /** Builds multi-Abi targeting of a single value, of one architecture (no alternatives). */
+  public static MultiAbiTargeting multiAbiTargeting(AbiAlias abi) {
+    return multiAbiTargeting(ImmutableSet.of(ImmutableSet.of(abi)), ImmutableSet.of());
+  }
+
+  /**
+   * Builds multi-Abi targeting of arbitrary values with no alternatives.
+   *
+   * @param abiAliases a set of sets of Abi aliases. Each inner set is converted to the repeated
+   *     MultiAbi.abi, and the outer set is converted to the repeated MultiAbiTargeting.value.
+   */
+  public static MultiAbiTargeting multiAbiTargeting(
+      ImmutableSet<ImmutableSet<AbiAlias>> abiAliases) {
+    return MultiAbiTargeting.newBuilder().addAllValue(buildMultiAbis(abiAliases)).build();
+  }
+
+  /**
+   * Builds multi-Abi targeting of a single architecture, with multi-Abi alternatives of single
+   * architecture each.
+   *
+   * @param abi single Abi to target by.
+   * @param alternatives a set of Abis, each one mapped to a single-Abi alternative (rather than one
+   *     targeting of multiple Abis).
+   */
+  public static MultiAbiTargeting multiAbiTargeting(
+      AbiAlias abi, ImmutableSet<AbiAlias> alternatives) {
+    // Each element in 'alternatives' represent an alternative, not a MultiAbi.
+    ImmutableSet<ImmutableSet<AbiAlias>> alternativeSet =
+        alternatives.stream().map(ImmutableSet::of).collect(toImmutableSet());
+    return multiAbiTargeting(ImmutableSet.of(ImmutableSet.of(abi)), alternativeSet);
+  }
+
+  /**
+   * Builds multi-Abi targeting of arbitrary values and alternatives.
+   *
+   * @param abiAliases a set of sets of Abi aliases. Each inner set is converted to the repeated
+   *     MultiAbi.abi, and the outer set is converted to the repeated MultiAbiTargeting.value.
+   * @param alternatives a set of sets of Abi aliases. Each inner set is converted to the repeated
+   *     MultiAbi.abi, and the outer set is converted to the repeated
+   *     MultiAbiTargeting.alternatives.
+   */
+  public static MultiAbiTargeting multiAbiTargeting(
+      ImmutableSet<ImmutableSet<AbiAlias>> abiAliases,
+      ImmutableSet<ImmutableSet<AbiAlias>> alternatives) {
+    return MultiAbiTargeting.newBuilder()
+        .addAllValue(buildMultiAbis(abiAliases))
+        .addAllAlternatives(buildMultiAbis(alternatives))
+        .build();
+  }
+
+  private static ImmutableList<MultiAbi> buildMultiAbis(
+      ImmutableSet<ImmutableSet<AbiAlias>> abiAliases) {
+    return abiAliases.stream()
+        .map(
+            aliases ->
+                MultiAbi.newBuilder()
+                    .addAllAbi(
+                        aliases.stream().map(TargetingUtils::toAbi).collect(toImmutableList()))
+                    .build())
+        .collect(toImmutableList());
   }
 
   // Graphics API Targeting

@@ -11,6 +11,7 @@ message VariantTargeting {
   SdkVersionTargeting sdk_version_targeting = 1;
   AbiTargeting abi_targeting = 2;
   ScreenDensityTargeting screen_density_targeting = 3;
+  MultiAbiTargeting multi_abi_targeting = 4;
 }
 
 // Targeting on the level of individual APKs.
@@ -21,6 +22,7 @@ message ApkTargeting {
   ScreenDensityTargeting screen_density_targeting = 4;
   SdkVersionTargeting sdk_version_targeting = 5;
   TextureCompressionFormatTargeting texture_compression_format_targeting = 6;
+  MultiAbiTargeting multi_abi_targeting = 7;
 }
 
 // Targeting on the module level.

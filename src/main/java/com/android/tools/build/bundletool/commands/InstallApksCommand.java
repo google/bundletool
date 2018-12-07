@@ -224,8 +224,7 @@ public abstract class InstallApksCommand {
                 .build())
         .addFlag(
             FlagDescription.builder()
-                .setFlagName(DEVICE_ID_FLAG.getName())
-                .setExampleValue("allow-downgrade")
+                .setFlagName(ALLOW_DOWNGRADE_FLAG.getName())
                 .setOptional(true)
                 .setDescription(
                     "If set, allows APKs to be installed on the device even if the app is already "

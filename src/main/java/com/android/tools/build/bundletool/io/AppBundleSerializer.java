@@ -38,10 +38,13 @@ public class AppBundleSerializer {
     zipBuilder.addFileWithProtoContent(
         ZipPath.create(BUNDLE_CONFIG_FILE_NAME), bundle.getBundleConfig());
 
-    for (Entry<ZipPath, InputStreamSupplier> metadataEntry :
-        bundle.getBundleMetadata().getFileDataMap().entrySet()) {
-      zipBuilder.addFile(
-          METADATA_DIRECTORY.resolve(metadataEntry.getKey()), metadataEntry.getValue());
+    // APEX bundles do not have metadata files.
+    if (bundle.getModules().isEmpty() || !bundle.getBaseModule().getApexConfig().isPresent()) {
+      for (Entry<ZipPath, InputStreamSupplier> metadataEntry :
+          bundle.getBundleMetadata().getFileDataMap().entrySet()) {
+        zipBuilder.addFile(
+            METADATA_DIRECTORY.resolve(metadataEntry.getKey()), metadataEntry.getValue());
+      }
     }
 
     for (BundleModule module : bundle.getModules().values()) {
@@ -78,6 +81,12 @@ public class AppBundleSerializer {
               resourceTable ->
                   zipBuilder.addFileWithProtoContent(
                       moduleDir.resolve(BundleModule.RESOURCES_PROTO_PATH), resourceTable));
+      module
+          .getApexConfig()
+          .ifPresent(
+              apexConfig ->
+                  zipBuilder.addFileWithProtoContent(
+                      moduleDir.resolve(BundleModule.APEX_PROTO_PATH), apexConfig));
     }
 
     zipBuilder.writeTo(pathOnDisk);

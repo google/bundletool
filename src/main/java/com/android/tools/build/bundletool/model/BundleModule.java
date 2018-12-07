@@ -72,6 +72,9 @@ public abstract class BundleModule {
   /** The top-level file of an App Bundle module that contains APEX targeting configuration. */
   public static final ZipPath APEX_PROTO_PATH = ZipPath.create("apex.pb");
 
+  /** The file of an App Bundle module that contains the APEX manifest. */
+  public static final ZipPath APEX_MANIFEST_PATH = ZipPath.create("root/apex_manifest.json");
+
   /** Used to parse file names in the apex/ directory, for multi-Abi targeting. */
   public static final Splitter ABI_SPLITTER = Splitter.on(".").omitEmptyStrings();
 
@@ -158,6 +161,11 @@ public abstract class BundleModule {
   public boolean isInstantModule() {
     Optional<Boolean> isInstantModule = getAndroidManifest().isInstantModule();
     return isInstantModule.orElse(false);
+  }
+
+  @Memoized
+  public boolean hasRenderscript32Bitcode() {
+    return findEntries(zipPath -> zipPath.toString().endsWith(".bc")).findFirst().isPresent();
   }
 
   public ImmutableList<String> getDependencies() {

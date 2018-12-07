@@ -16,6 +16,10 @@
 
 package com.android.tools.build.bundletool.commands;
 
+import static com.android.tools.build.bundletool.commands.BuildApksCommand.ApkBuildMode.DEFAULT;
+import static com.android.tools.build.bundletool.commands.BuildApksCommand.ApkBuildMode.SYSTEM;
+import static com.android.tools.build.bundletool.commands.BuildApksCommand.ApkBuildMode.SYSTEM_COMPRESSED;
+import static com.android.tools.build.bundletool.commands.BuildApksCommand.ApkBuildMode.UNIVERSAL;
 import static com.google.common.base.Preconditions.checkArgument;
 
 import com.android.tools.build.bundletool.commands.CommandHelp.CommandDescription;
@@ -38,6 +42,7 @@ import com.android.tools.build.bundletool.utils.flags.Flag;
 import com.android.tools.build.bundletool.utils.flags.Flag.Password;
 import com.android.tools.build.bundletool.utils.flags.ParsedFlags;
 import com.google.auto.value.AutoValue;
+import com.google.common.base.Ascii;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.io.MoreFiles;
 import com.google.common.util.concurrent.ListeningExecutorService;
@@ -58,14 +63,30 @@ public abstract class BuildApksCommand {
 
   public static final String COMMAND_NAME = "build-apks";
 
+  /** Modes to run {@link BuildApksCommand} against to generate APKs. */
+  public enum ApkBuildMode {
+    /** DEFAULT mode generates split, standalone and instant APKs. */
+    DEFAULT,
+    /** UNIVERSAL mode generates universal APK. */
+    UNIVERSAL,
+    /** SYSTEM mode generates APKs for the system image. */
+    SYSTEM,
+    /**
+     * SYSTEM_COMPRESSED mode generates compressed APK and an additional uncompressed stub APK
+     * (containing only android manifest) for the system image.
+     */
+    SYSTEM_COMPRESSED
+  }
+
   private static final Flag<Path> BUNDLE_LOCATION_FLAG = Flag.path("bundle");
   private static final Flag<Path> OUTPUT_FILE_FLAG = Flag.path("output");
   private static final Flag<Boolean> OVERWRITE_OUTPUT_FLAG = Flag.booleanFlag("overwrite");
   private static final Flag<ImmutableSet<OptimizationDimension>> OPTIMIZE_FOR_FLAG =
       Flag.enumSet("optimize-for", OptimizationDimension.class);
   private static final Flag<Path> AAPT2_PATH_FLAG = Flag.path("aapt2");
-  private static final Flag<Boolean> GENERATE_UNIVERSAL_APK_FLAG = Flag.booleanFlag("universal");
   private static final Flag<Integer> MAX_THREADS_FLAG = Flag.positiveInteger("max-threads");
+  private static final Flag<ApkBuildMode> MODE_FLAG = Flag.enumFlag("mode", ApkBuildMode.class);
+  private static final Flag<Boolean> GENERATE_UNIVERSAL_APK_FLAG = Flag.booleanFlag("universal");
 
   private static final Flag<Path> ADB_PATH_FLAG = Flag.path("adb");
   private static final Flag<Boolean> CONNECTED_DEVICE_FLAG = Flag.booleanFlag("connected-device");
@@ -106,7 +127,7 @@ public abstract class BuildApksCommand {
   /** Required when getGenerateOnlyForConnectedDevice is true. */
   public abstract Optional<Path> getAdbPath();
 
-  public abstract boolean getGenerateOnlyUniversalApk();
+  public abstract ApkBuildMode getApkBuildMode();
 
   public abstract Optional<Aapt2Command> getAapt2Command();
 
@@ -129,10 +150,12 @@ public abstract class BuildApksCommand {
 
   public abstract Optional<Integer> getFirstVariantNumber();
 
+  public abstract Optional<PrintStream> getOutputPrintStream();
+
   public static Builder builder() {
     return new AutoValue_BuildApksCommand.Builder()
         .setOverwriteOutput(false)
-        .setGenerateOnlyUniversalApk(false)
+        .setApkBuildMode(DEFAULT)
         .setGenerateOnlyForConnectedDevice(false)
         .setCreateApkSetArchive(true)
         .setOptimizationDimensions(ImmutableSet.of());
@@ -161,11 +184,11 @@ public abstract class BuildApksCommand {
         ImmutableSet<OptimizationDimension> optimizationDimensions);
 
     /**
-     * Sets whether a universal APK should be generated.
+     * Sets against which mode APK should be generated.
      *
-     * <p>The default is false. If this is set to {@code true}, no other APKs will be generated.
+     * <p>By default we generate split, standalone ans instant APKs.
      */
-    public abstract Builder setGenerateOnlyUniversalApk(boolean universalOnly);
+    public abstract Builder setApkBuildMode(ApkBuildMode mode);
 
     /**
      * Sets if the generated APK Set will contain APKs compatible only with the connected device.
@@ -254,6 +277,9 @@ public abstract class BuildApksCommand {
      */
     public abstract Builder setFirstVariantNumber(int firstVariantNumber);
 
+    /** For command line, sets the {@link PrintStream} to use for outputting the warnings. */
+    public abstract Builder setOutputPrintStream(PrintStream outputPrintStream);
+
     abstract BuildApksCommand autoBuild();
 
     public BuildApksCommand build() {
@@ -263,20 +289,27 @@ public abstract class BuildApksCommand {
       }
 
       BuildApksCommand command = autoBuild();
-      if (!command.getOptimizationDimensions().isEmpty() && command.getGenerateOnlyUniversalApk()) {
+      if (!command.getOptimizationDimensions().isEmpty()
+          && !command.getApkBuildMode().equals(DEFAULT)) {
         throw new ValidationException(
-            "Cannot generate universal APK and specify optimization dimensions at the same time.");
+            String.format(
+                "Optimization dimension can be only set when running with '%s' mode flag.",
+                Ascii.toLowerCase(DEFAULT.name())));
       }
 
-      if (command.getGenerateOnlyForConnectedDevice() && command.getGenerateOnlyUniversalApk()) {
+      if (command.getGenerateOnlyForConnectedDevice()
+          && !command.getApkBuildMode().equals(DEFAULT)) {
         throw new ValidationException(
-            "Cannot generate universal APK and optimize for the connected device "
-                + "at the same time.");
+            String.format(
+                "Optimizing for connected device only possible when running with '%s' mode flag.",
+                Ascii.toLowerCase(DEFAULT.name())));
       }
 
-      if (command.getDeviceSpecPath().isPresent() && command.getGenerateOnlyUniversalApk()) {
+      if (command.getDeviceSpecPath().isPresent() && !command.getApkBuildMode().equals(DEFAULT)) {
         throw new ValidationException(
-            "Cannot generate universal APK and optimize for the device spec at the same time.");
+            String.format(
+                "Optimizing for device spec only possible when running with '%s' mode flag.",
+                Ascii.toLowerCase(DEFAULT.name())));
       }
 
       if (command.getGenerateOnlyForConnectedDevice() && command.getDeviceSpecPath().isPresent()) {
@@ -316,7 +349,8 @@ public abstract class BuildApksCommand {
     BuildApksCommand.Builder buildApksCommand =
         BuildApksCommand.builder()
             .setBundlePath(BUNDLE_LOCATION_FLAG.getRequiredValue(flags))
-            .setOutputFile(OUTPUT_FILE_FLAG.getRequiredValue(flags));
+            .setOutputFile(OUTPUT_FILE_FLAG.getRequiredValue(flags))
+            .setOutputPrintStream(out);
 
     // Optional arguments.
     OVERWRITE_OUTPUT_FLAG.getValue(flags).ifPresent(buildApksCommand::setOverwriteOutput);
@@ -325,9 +359,16 @@ public abstract class BuildApksCommand {
         .ifPresent(
             aapt2Path ->
                 buildApksCommand.setAapt2Command(Aapt2Command.createFromExecutablePath(aapt2Path)));
-    GENERATE_UNIVERSAL_APK_FLAG
-        .getValue(flags)
-        .ifPresent(buildApksCommand::setGenerateOnlyUniversalApk);
+
+    if (GENERATE_UNIVERSAL_APK_FLAG.getValue(flags).orElse(false)) {
+      out.printf(
+          "WARNING: The '%s' flag is now replaced with --mode=universal and is going to be removed "
+              + "in the next BundleTool version.",
+          GENERATE_UNIVERSAL_APK_FLAG.getName());
+      buildApksCommand.setApkBuildMode(UNIVERSAL);
+    }
+
+    MODE_FLAG.getValue(flags).ifPresent(buildApksCommand::setApkBuildMode);
     MAX_THREADS_FLAG
         .getValue(flags)
         .ifPresent(
@@ -370,21 +411,20 @@ public abstract class BuildApksCommand {
 
     // Applied only when --connected-device flag is set, because we don't want to fail command
     // if ADB cannot be found in a normal mode.
+    Optional<Path> adbPathFromFlag = ADB_PATH_FLAG.getValue(flags);
     if (connectedDeviceMode) {
       Path adbPath =
-          ADB_PATH_FLAG
-              .getValue(flags)
-              .orElseGet(
-                  () ->
-                      environmentVariableProvider
-                          .getVariable(ANDROID_HOME_VARIABLE)
-                          .flatMap(path -> new SdkToolsLocator().locateAdb(Paths.get(path)))
-                          .orElseThrow(
-                              () ->
-                                  new CommandExecutionException(
-                                      "Unable to determine the location of ADB. Please set the "
-                                          + "--adb flag or define ANDROID_HOME environment "
-                                          + "variable.")));
+          adbPathFromFlag.orElseGet(
+              () ->
+                  environmentVariableProvider
+                      .getVariable(ANDROID_HOME_VARIABLE)
+                      .flatMap(path -> new SdkToolsLocator().locateAdb(Paths.get(path)))
+                      .orElseThrow(
+                          () ->
+                              new CommandExecutionException(
+                                  "Unable to determine the location of ADB. Please set the "
+                                      + "--adb flag or define ANDROID_HOME environment "
+                                      + "variable.")));
       buildApksCommand.setAdbPath(adbPath).setAdbServer(adbServer);
     }
 
@@ -447,12 +487,22 @@ public abstract class BuildApksCommand {
                 .build())
         .addFlag(
             FlagDescription.builder()
-                .setFlagName(GENERATE_UNIVERSAL_APK_FLAG.getName())
+                .setFlagName(MODE_FLAG.getName())
+                .setExampleValue(joinFlagOptions(ApkBuildMode.values()))
                 .setOptional(true)
                 .setDescription(
-                    "If set, will generate only a single universal APK. This flag is mutually "
-                        + "exclusive with flag --%s.",
-                    OPTIMIZE_FOR_FLAG.getName())
+                    "Specifies which mode to run '%s' command against. Acceptable values are '%s'. "
+                        + "If not set or set to '%s' we generate split, standalone and instant "
+                        + "APKs. If set to '%s' we generate universal APK. If set to '%s' we "
+                        + "generate APKs for system image. If set to '%s' we generate compressed "
+                        + "APK and an additional uncompressed stub APK (containing only Android "
+                        + "manifest) for the system image.",
+                    BuildApksCommand.COMMAND_NAME,
+                    joinFlagOptions(ApkBuildMode.values()),
+                    Ascii.toLowerCase(DEFAULT.name()),
+                    Ascii.toLowerCase(UNIVERSAL.name()),
+                    Ascii.toLowerCase(SYSTEM.name()),
+                    Ascii.toLowerCase(SYSTEM_COMPRESSED.name()))
                 .build())
         .addFlag(
             FlagDescription.builder()
@@ -470,10 +520,11 @@ public abstract class BuildApksCommand {
                 .setOptional(true)
                 .setDescription(
                     "If set, will generate APKs with optimizations for the given dimensions. "
-                        + "Acceptable values are '%s'. This flag is mutually exclusive with flag "
-                        + "--%s.",
+                        + "Acceptable values are '%s'. This flag should be only be set with "
+                        + "--%s=%s flag.",
                     joinFlagOptions(OptimizationDimension.values()),
-                    GENERATE_UNIVERSAL_APK_FLAG.getName())
+                    MODE_FLAG.getName(),
+                    Ascii.toLowerCase(DEFAULT.name()))
                 .build())
         .addFlag(
             FlagDescription.builder()
@@ -526,7 +577,8 @@ public abstract class BuildApksCommand {
                 .setDescription(
                     "If set, will generate APK Set optimized for the connected device. The "
                         + "generated APK Set will only be installable on that specific class of "
-                        + "devices.")
+                        + "devices. This flag should be only be set with --%s=%s flag.",
+                    MODE_FLAG.getName(), Ascii.toLowerCase(DEFAULT.name()))
                 .build())
         .addFlag(
             FlagDescription.builder()
@@ -556,8 +608,11 @@ public abstract class BuildApksCommand {
                 .setOptional(true)
                 .setDescription(
                     "Path to the device spec file generated by the '%s' command. If present, "
-                        + "it will generate an APK Set optimized for the specified device spec.",
-                    GetDeviceSpecCommand.COMMAND_NAME)
+                        + "it will generate an APK Set optimized for the specified device spec. "
+                        + "This flag should be only be set with --%s=%s flag.",
+                    GetDeviceSpecCommand.COMMAND_NAME,
+                    MODE_FLAG.getName(),
+                    Ascii.toLowerCase(DEFAULT.name()))
                 .build())
         .build();
   }

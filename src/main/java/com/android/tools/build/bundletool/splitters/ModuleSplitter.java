@@ -240,7 +240,8 @@ public class ModuleSplitter {
     if (apkGenerationConfiguration
         .getOptimizationDimensions()
         .contains(OptimizationDimension.ABI)) {
-      nativeSplitters.add(new AbiNativeLibrariesSplitter());
+      nativeSplitters.add(
+          new AbiNativeLibrariesSplitter(apkGenerationConfiguration.getInclude64BitLibs()));
     }
     return SplittingPipeline.create(nativeSplitters.build());
   }

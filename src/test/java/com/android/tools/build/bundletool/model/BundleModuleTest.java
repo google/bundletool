@@ -62,6 +62,7 @@ public class BundleModuleTest {
   }
 
   private static final BundleConfig DEFAULT_BUNDLE_CONFIG = BundleConfigBuilder.create().build();
+  private static final byte[] DUMMY_CONTENT = new byte[0];
 
   @Test
   public void missingAssetsProtoFile_returnsEmptyProto() {
@@ -288,9 +289,9 @@ public class BundleModuleTest {
   /** Tests that we skip directories that contain a directory that we want to find entries under. */
   @Test
   public void entriesUnderPath_withPrefixDirectory() throws Exception {
-    ModuleEntry entry1 = InMemoryModuleEntry.ofFile("dir1/entry1", new byte[0]);
-    ModuleEntry entry2 = InMemoryModuleEntry.ofFile("dir1/entry2", new byte[0]);
-    ModuleEntry entry3 = InMemoryModuleEntry.ofFile("dir1longer/entry3", new byte[0]);
+    ModuleEntry entry1 = InMemoryModuleEntry.ofFile("dir1/entry1", DUMMY_CONTENT);
+    ModuleEntry entry2 = InMemoryModuleEntry.ofFile("dir1/entry2", DUMMY_CONTENT);
+    ModuleEntry entry3 = InMemoryModuleEntry.ofFile("dir1longer/entry3", DUMMY_CONTENT);
 
     BundleModule bundleModule =
         createMinimalModuleBuilder().addEntries(Arrays.asList(entry1, entry2, entry3)).build();
@@ -301,7 +302,7 @@ public class BundleModuleTest {
 
   @Test
   public void getEntry_existing_found() throws Exception {
-    ModuleEntry entry = InMemoryModuleEntry.ofFile("dir/entry", new byte[0]);
+    ModuleEntry entry = InMemoryModuleEntry.ofFile("dir/entry", DUMMY_CONTENT);
 
     BundleModule bundleModule =
         createMinimalModuleBuilder().addEntries(Arrays.asList(entry)).build();
@@ -415,6 +416,29 @@ public class BundleModuleTest {
             .build();
 
     assertThat(bundleModule.getDeliveryType()).isEqualTo(ModuleDeliveryType.ALWAYS_INITIAL_INSTALL);
+  }
+
+  @Test
+  public void renderscriptFiles_present() throws Exception {
+    BundleModule bundleModule =
+        createMinimalModuleBuilder()
+            .setAndroidManifestProto(androidManifest("com.test.app"))
+            .addEntry(InMemoryModuleEntry.ofFile("dex/classes.dex", DUMMY_CONTENT))
+            .addEntry(InMemoryModuleEntry.ofFile("res/raw/yuv2rgb.bc", DUMMY_CONTENT))
+            .build();
+
+    assertThat(bundleModule.hasRenderscript32Bitcode()).isTrue();
+  }
+
+  @Test
+  public void renderscriptFiles_absent() throws Exception {
+    BundleModule bundleModule =
+        createMinimalModuleBuilder()
+            .setAndroidManifestProto(androidManifest("com.test.app"))
+            .addEntry(InMemoryModuleEntry.ofFile("dex/classes.dex", DUMMY_CONTENT))
+            .build();
+
+    assertThat(bundleModule.hasRenderscript32Bitcode()).isFalse();
   }
 
   private static BundleModule.Builder createMinimalModuleBuilder() {

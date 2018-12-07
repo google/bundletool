@@ -15,6 +15,7 @@
  */
 package com.android.tools.build.bundletool.commands;
 
+import static com.android.tools.build.bundletool.commands.BuildApksCommand.ApkBuildMode.UNIVERSAL;
 import static com.android.tools.build.bundletool.testing.ApkSetUtils.extractTocFromApkSetFile;
 import static com.android.tools.build.bundletool.testing.AppBundleFactory.createInstantBundle;
 import static com.android.tools.build.bundletool.testing.AppBundleFactory.createLdpiHdpiAppBundle;
@@ -107,6 +108,7 @@ public class BuildApksDeviceSpecTest {
             // Must copy instance of the internal executor service.
             .setExecutorServiceInternal(commandViaFlags.getExecutorService())
             .setExecutorServiceCreatedByBundleTool(true)
+            .setOutputPrintStream(commandViaFlags.getOutputPrintStream().get())
             .build();
 
     assertThat(commandViaBuilder).isEqualTo(commandViaFlags);
@@ -127,13 +129,13 @@ public class BuildApksDeviceSpecTest {
             .setBundlePath(bundlePath)
             .setOutputFile(outputFilePath)
             .setDeviceSpecPath(deviceSpecPath)
-            .setGenerateOnlyUniversalApk(true);
+            .setApkBuildMode(UNIVERSAL);
 
     Throwable exception = assertThrows(ValidationException.class, () -> command.build());
     assertThat(exception)
         .hasMessageThat()
         .contains(
-            "Cannot generate universal APK and optimize for the device spec at the same time.");
+            "Optimizing for device spec only possible when running with 'default' mode flag.");
   }
 
   @Test

@@ -27,6 +27,7 @@ import com.android.bundle.Commands.ApkSet;
 import com.android.bundle.Commands.Variant;
 import com.android.bundle.Devices.DeviceSpec;
 import com.android.bundle.Targeting.VariantTargeting;
+import com.android.tools.build.bundletool.commands.BuildApksCommand.ApkBuildMode;
 import com.android.tools.build.bundletool.device.ApkMatcher;
 import com.android.tools.build.bundletool.io.ApkSetBuilderFactory.ApkSetBuilder;
 import com.android.tools.build.bundletool.model.ApkListener;
@@ -39,6 +40,7 @@ import com.android.tools.build.bundletool.model.ModuleSplit;
 import com.android.tools.build.bundletool.model.ModuleSplit.SplitType;
 import com.android.tools.build.bundletool.model.VariantKey;
 import com.android.tools.build.bundletool.utils.ConcurrencyUtils;
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableListMultimap;
 import com.google.common.collect.ImmutableMap;
@@ -75,24 +77,25 @@ public class ApkSerializerManager {
     this.firstVariantNumber = firstVariantNumber;
   }
 
-  public ImmutableList<Variant> serializeUniversalApk(GeneratedApks generatedApks) {
-    checkArgument(
-        generatedApks.getSplitApks().isEmpty() && generatedApks.getInstantApks().isEmpty(),
-        "Internal error: For universal APK expecting only standalone APKs.");
-    return serializeApks(generatedApks, /* isUniversalApk= */ true, Optional.empty());
-  }
-
   public ImmutableList<Variant> serializeApksForDevice(
       GeneratedApks generatedApks, DeviceSpec deviceSpec) {
-    return serializeApks(generatedApks, /* isUniversalApk= */ false, Optional.of(deviceSpec));
+    return serializeApks(generatedApks, ApkBuildMode.DEFAULT, Optional.of(deviceSpec));
   }
 
-  public ImmutableList<Variant> serializeApks(GeneratedApks generatedApks) {
-    return serializeApks(generatedApks, /* isUniversalApk= */ false, Optional.empty());
+  @VisibleForTesting
+  ImmutableList<Variant> serializeApks(GeneratedApks generatedApks) {
+    return serializeApks(generatedApks, ApkBuildMode.DEFAULT);
+  }
+
+  public ImmutableList<Variant> serializeApks(
+      GeneratedApks generatedApks, ApkBuildMode apkBuildMode) {
+    return serializeApks(generatedApks, apkBuildMode, Optional.empty());
   }
 
   private ImmutableList<Variant> serializeApks(
-      GeneratedApks generatedApks, boolean isUniversalApk, Optional<DeviceSpec> deviceSpec) {
+      GeneratedApks generatedApks, ApkBuildMode apkBuildMode, Optional<DeviceSpec> deviceSpec) {
+    validateInput(generatedApks, apkBuildMode);
+
     Predicate<ModuleSplit> deviceFilter =
         deviceSpec.isPresent()
             ? new ApkMatcher(deviceSpec.get())::matchesModuleSplitByTargeting
@@ -110,7 +113,7 @@ public class ApkSerializerManager {
     // 1. Remove APKs not matching the device spec.
     // 2. Modify the APKs based on the ApkModifier.
     // 3. Serialize all APKs in parallel.
-    ApkSerializer apkSerializer = new ApkSerializer(apkListener, isUniversalApk);
+    ApkSerializer apkSerializer = new ApkSerializer(apkListener, apkBuildMode);
 
     // Modifies the APK using APK modifier, then returns a map by extracting the variant
     // of APK first and later clearing out its variant targeting.
@@ -128,7 +131,9 @@ public class ApkSerializerManager {
 
     // After variant targeting of APKs are cleared, there might be duplicate APKs
     // which are removed and the distinct APKs are then serialized in parallel.
-    ImmutableMap<ModuleSplit, ApkDescription> apkDescriptionBySplit =
+    // Note: Only serializing compressed system APK produces multiple ApkDescriptions,
+    // i.e compressed and stub APK descriptions.
+    ImmutableMap<ModuleSplit, ImmutableList<ApkDescription>> apkDescriptionBySplit =
         finalSplitsByVariant.values().stream()
             .distinct()
             .collect(
@@ -155,16 +160,39 @@ public class ApkSerializerManager {
             ApkSet.newBuilder()
                 .setModuleMetadata(appBundle.getModule(moduleName).getModuleMetadata())
                 .addAllApkDescription(
-                    splitsByModuleName
-                        .get(moduleName)
-                        .stream()
-                        .map(apkDescriptionBySplit::get)
+                    splitsByModuleName.get(moduleName).stream()
+                        .flatMap(split -> apkDescriptionBySplit.get(split).stream())
                         .collect(toImmutableList())));
       }
       variants.add(variant.build());
     }
 
     return variants.build();
+  }
+
+  private void validateInput(GeneratedApks generatedApks, ApkBuildMode apkBuildMode) {
+    switch (apkBuildMode) {
+      case DEFAULT:
+        checkArgument(
+            generatedApks.getSystemApks().isEmpty(),
+            "Internal error: System APKs can only be set in system mode.");
+        break;
+      case UNIVERSAL:
+        checkArgument(
+            generatedApks.getSplitApks().isEmpty()
+                && generatedApks.getInstantApks().isEmpty()
+                && generatedApks.getSystemApks().isEmpty(),
+            "Internal error: For universal APK expecting only standalone APKs.");
+        break;
+      case SYSTEM_COMPRESSED:
+      case SYSTEM:
+        checkArgument(
+            generatedApks.getSplitApks().isEmpty()
+                && generatedApks.getInstantApks().isEmpty()
+                && generatedApks.getStandaloneApks().isEmpty(),
+            "Internal error: For system mode expecting only system APKs.");
+        break;
+    }
   }
 
   private ModuleSplit modifyApk(ModuleSplit moduleSplit, int variantNumber) {
@@ -196,35 +224,41 @@ public class ApkSerializerManager {
 
   private final class ApkSerializer {
     private final ApkListener apkListener;
-    private final boolean isUniversalApk;
+    private final ApkBuildMode apkBuildMode;
 
-    public ApkSerializer(ApkListener apkListener, boolean isUniversalApk) {
+    public ApkSerializer(ApkListener apkListener, ApkBuildMode apkBuildMode) {
       this.apkListener = apkListener;
-      this.isUniversalApk = isUniversalApk;
+      this.apkBuildMode = apkBuildMode;
     }
 
-    public ApkDescription serialize(ModuleSplit split) {
-      ApkDescription apkDescription;
+    public ImmutableList<ApkDescription> serialize(ModuleSplit split) {
+      ImmutableList<ApkDescription> apkDescriptions;
       switch (split.getSplitType()) {
         case INSTANT:
-          apkDescription = apkSetBuilder.addInstantApk(split);
+          apkDescriptions = ImmutableList.of(apkSetBuilder.addInstantApk(split));
           break;
         case SPLIT:
-          apkDescription = apkSetBuilder.addSplitApk(split);
+          apkDescriptions = ImmutableList.of(apkSetBuilder.addSplitApk(split));
+          break;
+        case SYSTEM:
+          apkDescriptions =
+              apkBuildMode.equals(ApkBuildMode.SYSTEM_COMPRESSED)
+                  ? apkSetBuilder.addCompressedSystemApks(split)
+                  : ImmutableList.of(apkSetBuilder.addSystemApk(split));
           break;
         case STANDALONE:
-          apkDescription =
-              isUniversalApk
-                  ? apkSetBuilder.addStandaloneUniversalApk(split)
-                  : apkSetBuilder.addStandaloneApk(split);
+          apkDescriptions =
+              apkBuildMode.equals(ApkBuildMode.UNIVERSAL)
+                  ? ImmutableList.of(apkSetBuilder.addStandaloneUniversalApk(split))
+                  : ImmutableList.of(apkSetBuilder.addStandaloneApk(split));
           break;
         default:
           throw new IllegalStateException("Unexpected splitType: " + split.getSplitType());
       }
 
-      apkListener.onApkFinalized(apkDescription);
-
-      return apkDescription;
+      // Notify apk listener.
+      apkDescriptions.forEach(apkListener::onApkFinalized);
+      return apkDescriptions;
     }
   }
 }

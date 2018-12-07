@@ -17,6 +17,7 @@ package com.android.tools.build.bundletool.integration;
 
 import static com.android.bundle.Targeting.ScreenDensity.DensityAlias.HDPI;
 import static com.android.bundle.Targeting.ScreenDensity.DensityAlias.XHDPI;
+import static com.android.tools.build.bundletool.commands.BuildApksCommand.ApkBuildMode.UNIVERSAL;
 import static com.android.tools.build.bundletool.testing.DeviceFactory.abis;
 import static com.android.tools.build.bundletool.testing.DeviceFactory.density;
 import static com.android.tools.build.bundletool.testing.DeviceFactory.locales;
@@ -151,7 +152,7 @@ public class BuildExtractApksTest {
             .setBundlePath(bundlePath)
             .setOutputFile(outputFilePath)
             .setAapt2Command(aapt2Command)
-            .setGenerateOnlyUniversalApk(true)
+            .setApkBuildMode(UNIVERSAL)
             .build();
 
     Path apkSetFilePath = command.execute();
@@ -183,7 +184,7 @@ public class BuildExtractApksTest {
             .setBundlePath(bundlePath)
             .setOutputFile(outputFilePath)
             .setAapt2Command(aapt2Command)
-            .setGenerateOnlyUniversalApk(true)
+            .setApkBuildMode(UNIVERSAL)
             .build();
 
     Path apkSetFilePath = command.execute();

@@ -27,6 +27,8 @@ import static com.android.tools.build.bundletool.model.BundleModule.RESOURCES_DI
 import static com.android.tools.build.bundletool.model.BundleModule.RESOURCES_PROTO_PATH;
 import static com.android.tools.build.bundletool.model.BundleModule.ROOT_DIRECTORY;
 import static com.google.common.base.Preconditions.checkState;
+import static com.google.common.collect.ImmutableList.toImmutableList;
+import static com.google.common.collect.ImmutableSet.toImmutableSet;
 
 import com.android.tools.build.bundletool.exceptions.BundleFileTypesException.FileUsesReservedNameException;
 import com.android.tools.build.bundletool.exceptions.BundleFileTypesException.FilesInResourceDirectoryRootException;
@@ -41,6 +43,7 @@ import com.android.tools.build.bundletool.model.AbiName;
 import com.android.tools.build.bundletool.model.ZipPath;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
+import java.util.Optional;
 import java.util.regex.Pattern;
 
 /** Validates files inside a bundle. */
@@ -126,9 +129,7 @@ public class BundleFilesValidator extends SubValidator {
         throw new InvalidFileExtensionInDirectoryException(APEX_DIRECTORY, ".img", file);
       }
 
-      if (!isMultiAbiFileName(fileName)) {
-        throw InvalidNativeArchitectureNameException.createForFile(file);
-      }
+      validateMultiAbiFileName(file);
 
     } else {
       throw new UnknownFileOrDirectoryFoundInModuleException(file);
@@ -140,12 +141,25 @@ public class BundleFilesValidator extends SubValidator {
         || CLASSES_DEX_PATTERN.matcher(name.toString()).matches();
   }
 
-  private static boolean isMultiAbiFileName(String fileName) {
-    ImmutableList<String> tokens = ImmutableList.copyOf(ABI_SPLITTER.splitToList(fileName));
+  private static void validateMultiAbiFileName(ZipPath file) {
+    ImmutableList<String> tokens =
+        ImmutableList.copyOf(ABI_SPLITTER.splitToList(file.getFileName().toString()));
     int nAbis = tokens.size() - 1;
+    // This was validated above.
     checkState(tokens.get(nAbis).equals("img"), "File under 'apex/' does not have suffix 'img'");
-    return tokens.stream()
-        .limit(nAbis)
-        .allMatch(token -> AbiName.fromPlatformName(token).isPresent());
+
+    ImmutableList<Optional<AbiName>> abis =
+        // Do not include the suffix "img".
+        tokens.stream().limit(nAbis).map(AbiName::fromPlatformName).collect(toImmutableList());
+    if (!abis.stream().allMatch(Optional::isPresent)) {
+      throw InvalidNativeArchitectureNameException.createForFile(file);
+    }
+
+    ImmutableSet<AbiName> uniqueAbis = abis.stream().map(Optional::get).collect(toImmutableSet());
+    if (uniqueAbis.size() != nAbis) {
+      throw ValidationException.builder()
+          .withMessage("Repeating architectures in APEX system image file '%s'.", file)
+          .build();
+    }
   }
 }

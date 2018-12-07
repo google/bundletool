@@ -16,6 +16,11 @@
 
 package com.android.tools.build.bundletool.testing;
 
+import static com.android.tools.build.bundletool.testing.TargetingUtils.apkMultiAbiTargeting;
+import static com.android.tools.build.bundletool.testing.TargetingUtils.mergeVariantTargeting;
+import static com.android.tools.build.bundletool.testing.TargetingUtils.sdkVersionFrom;
+import static com.android.tools.build.bundletool.testing.TargetingUtils.variantMultiAbiTargeting;
+import static com.android.tools.build.bundletool.testing.TargetingUtils.variantSdkTargeting;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 
 import com.android.bundle.Commands.ApkDescription;
@@ -24,9 +29,12 @@ import com.android.bundle.Commands.BuildApksResult;
 import com.android.bundle.Commands.ModuleMetadata;
 import com.android.bundle.Commands.SplitApkMetadata;
 import com.android.bundle.Commands.StandaloneApkMetadata;
+import com.android.bundle.Commands.SystemApkMetadata;
+import com.android.bundle.Commands.SystemApkMetadata.SystemApkType;
 import com.android.bundle.Commands.Variant;
 import com.android.bundle.Targeting.ApkTargeting;
 import com.android.bundle.Targeting.ModuleTargeting;
+import com.android.bundle.Targeting.MultiAbiTargeting;
 import com.android.bundle.Targeting.VariantTargeting;
 import com.android.tools.build.bundletool.io.ZipBuilder;
 import com.android.tools.build.bundletool.model.ZipPath;
@@ -100,6 +108,16 @@ public final class ApksArchiveHelpers {
                     // as long as the field is set.
                     .setStandaloneApkMetadata(StandaloneApkMetadata.getDefaultInstance()))
             .build());
+  }
+
+  /** Create standalone variant with multi ABI targeting only. */
+  public static Variant multiAbiTargetingStandaloneVariant(
+      MultiAbiTargeting targeting, ZipPath apkPath) {
+    return standaloneVariant(
+        mergeVariantTargeting(
+            variantSdkTargeting(sdkVersionFrom(1)), variantMultiAbiTargeting(targeting)),
+        apkMultiAbiTargeting(targeting),
+        apkPath);
   }
 
   public static ApkSet createSplitApkSet(String moduleName, ApkDescription... apkDescription) {
@@ -194,6 +212,21 @@ public final class ApksArchiveHelpers {
                 .setTargeting(apkTargeting)
                 .setStandaloneApkMetadata(
                     StandaloneApkMetadata.newBuilder().addFusedModuleName("base")))
+        .build();
+  }
+
+  public static ApkSet createSystemApkSet(ApkTargeting apkTargeting, Path apkPath) {
+    // Note: System APK is represented as a module named "base".
+    return ApkSet.newBuilder()
+        .setModuleMetadata(ModuleMetadata.newBuilder().setName("base"))
+        .addApkDescription(
+            ApkDescription.newBuilder()
+                .setPath(apkPath.toString())
+                .setTargeting(apkTargeting)
+                .setSystemApkMetadata(
+                    SystemApkMetadata.newBuilder()
+                        .addFusedModuleName("base")
+                        .setSystemApkType(SystemApkType.SYSTEM)))
         .build();
   }
 }

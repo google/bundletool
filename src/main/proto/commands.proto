@@ -76,6 +76,8 @@ message ApkDescription {
     StandaloneApkMetadata standalone_apk_metadata = 4;
     // Set only for Instant split APKs.
     SplitApkMetadata instant_apk_metadata = 5;
+    // Set only for system APKs.
+    SystemApkMetadata system_apk_metadata = 6;
   }
 }
 
@@ -91,4 +93,23 @@ message SplitApkMetadata {
 message StandaloneApkMetadata {
   // Names of the modules fused in this standalone APK.
   repeated string fused_module_name = 1;
+}
+
+// Holds data specific to system APKs.
+message SystemApkMetadata {
+  // Names of the modules fused in this system APK.
+  repeated string fused_module_name = 1;
+  enum SystemApkType {
+    UNSPECIFIED_VALUE = 0;
+    // Uncompressed APK for system image.
+    SYSTEM = 1;
+    // Stub APK for compressed APK in the system image
+    // (contains only android manifest).
+    SYSTEM_STUB = 2;
+    // Compressed APK for system image.
+    SYSTEM_COMPRESSED = 3;
+  }
+  // Indicates whether the APK is uncompressed system APK, stub APK or
+  // compressed system APK.
+  SystemApkType system_apk_type = 2;
 }

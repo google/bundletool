@@ -30,19 +30,17 @@ import com.android.tools.build.bundletool.exceptions.manifest.ManifestSdkTargeti
 import com.android.tools.build.bundletool.exceptions.manifest.ManifestSdkTargetingException.MaxSdkLessThanMinInstantSdk;
 import com.android.tools.build.bundletool.exceptions.manifest.ManifestSdkTargetingException.MinSdkGreaterThanMaxSdkException;
 import com.android.tools.build.bundletool.exceptions.manifest.ManifestSdkTargetingException.MinSdkInvalidException;
+import com.android.tools.build.bundletool.exceptions.manifest.ManifestVersionCodeConflictException;
 import com.android.tools.build.bundletool.model.AndroidManifest;
 import com.android.tools.build.bundletool.model.BundleModule;
 import com.android.tools.build.bundletool.model.BundleModule.ModuleDeliveryType;
 import com.android.tools.build.bundletool.utils.xmlproto.XmlProtoAttribute;
-import com.google.common.base.Joiner;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import java.util.Optional;
 
 /** Validates {@code AndroidManifest.xml} file of each module. */
 public class AndroidManifestValidator extends SubValidator {
-
-  private static final Joiner COMMA_JOINER = Joiner.on(',');
 
   @Override
   public void validateAllModules(ImmutableList<BundleModule> modules) {
@@ -60,11 +58,7 @@ public class AndroidManifestValidator extends SubValidator {
             .collect(toImmutableList());
 
     if (versionCodes.size() > 1) {
-      throw ValidationException.builder()
-          .withMessage(
-              "App Bundle modules should have the same version code but found [%s].",
-              COMMA_JOINER.join(versionCodes))
-          .build();
+      throw new ManifestVersionCodeConflictException(versionCodes.toArray(new Integer[0]));
     }
   }
 

@@ -17,7 +17,7 @@
 package com.android.tools.build.bundletool.splitters;
 
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifest;
-import static com.android.tools.build.bundletool.testing.TargetingUtils.abi;
+import static com.android.tools.build.bundletool.testing.TargetingUtils.toAbi;
 import static com.android.tools.build.bundletool.testing.TestUtils.extractPaths;
 import static com.google.common.truth.Truth.assertThat;
 
@@ -39,7 +39,7 @@ public class AbiPlaceholderInjectorTest {
             new BundleModuleBuilder("base").setManifest(androidManifest("com.test")).build());
 
     AbiPlaceholderInjector abiPlaceholderInjector =
-        new AbiPlaceholderInjector(ImmutableSet.of(abi(AbiAlias.ARMEABI_V7A)));
+        new AbiPlaceholderInjector(ImmutableSet.of(toAbi(AbiAlias.ARMEABI_V7A)));
 
     ModuleSplit actualModuleSplit = abiPlaceholderInjector.addPlaceholderNativeEntries(moduleSplit);
 

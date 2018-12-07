@@ -48,6 +48,7 @@ import java.util.zip.ZipOutputStream;
  * invoked.
  */
 public final class ZipBuilder {
+  private static final Long EPOCH = 0L;
 
   /** Entries to be output. */
   private final Map<ZipPath, Entry> entries = new LinkedHashMap<>();
@@ -73,11 +74,13 @@ public final class ZipBuilder {
             // For directories, we append "/" at the end of the file path since that's what the
             // ZipEntry class relies on.
             ZipEntry zipEntry = new ZipEntry(path + "/");
+            zipEntry.setTime(EPOCH);
             outZip.putNextEntry(zipEntry);
             // Directories are represented as having empty content in a zip file, so we don't write
             // any bytes to the outZip for this entry.
           } else {
             ZipEntry zipEntry = new ZipEntry(path.toString());
+            zipEntry.setTime(EPOCH);
             if (entry.hasOption(EntryOption.UNCOMPRESSED)) {
               zipEntry.setMethod(ZipEntry.STORED);
               // ZipFile API requires us to set the following properties manually for uncompressed

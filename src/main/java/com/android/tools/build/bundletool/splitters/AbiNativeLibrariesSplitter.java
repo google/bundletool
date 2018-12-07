@@ -22,8 +22,10 @@ import static com.google.common.collect.ImmutableSet.toImmutableSet;
 
 import com.android.bundle.Files.TargetedNativeDirectory;
 import com.android.bundle.Targeting.Abi;
+import com.android.bundle.Targeting.Abi.AbiAlias;
 import com.android.bundle.Targeting.AbiTargeting;
 import com.android.bundle.Targeting.NativeDirectoryTargeting;
+import com.android.tools.build.bundletool.exceptions.CommandExecutionException;
 import com.android.tools.build.bundletool.model.ModuleEntry;
 import com.android.tools.build.bundletool.model.ModuleSplit;
 import com.google.common.collect.ImmutableCollection;
@@ -37,6 +39,16 @@ import java.util.List;
 
 /** Splits the native libraries in the module by ABI. */
 public class AbiNativeLibrariesSplitter implements ModuleSplitSplitter {
+
+  private final boolean include64BitLibs;
+
+  public AbiNativeLibrariesSplitter(boolean include64BitLibs) {
+    this.include64BitLibs = include64BitLibs;
+  }
+
+  public AbiNativeLibrariesSplitter() {
+    this(/* include64BitLibs= */ true);
+  }
 
   /** Generates {@link ModuleSplit} objects dividing the native libraries by ABI. */
   @Override
@@ -60,6 +72,18 @@ public class AbiNativeLibrariesSplitter implements ModuleSplitSplitter {
             .map(NativeDirectoryTargeting::getAbi)
             .collect(toImmutableSet());
 
+    // We need to know the exact set of ABIs that we will generate, to set alternatives correctly.
+    ImmutableSet<Abi> abisToGenerate =
+        allAbis.stream().filter(abi -> include64BitLibs || !is64Bit(abi)).collect(toImmutableSet());
+
+    if (abisToGenerate.isEmpty() && !include64BitLibs) {
+      throw CommandExecutionException.builder()
+          .withMessage(
+              "Generation of 64-bit native libraries is disabled, but App Bundle contains "
+                  + "only 64-bit native libraries.")
+          .build();
+    }
+
     // Any entries not claimed by the ABI splits will be returned in a separate split using the
     // original targeting.
     HashSet<ModuleEntry> leftOverEntries = new HashSet<>(moduleSplit.getEntries());
@@ -71,28 +95,37 @@ public class AbiNativeLibrariesSplitter implements ModuleSplitSplitter {
               .flatMap(directory -> moduleSplit.findEntriesUnderPath(directory.getPath()))
               .collect(toImmutableList());
 
-      ModuleSplit.Builder splitBuilder =
-          moduleSplit
-              .toBuilder()
-              .setApkTargeting(
-                  moduleSplit
-                      .getApkTargeting()
-                      .toBuilder()
-                      .setAbiTargeting(
-                          AbiTargeting.newBuilder()
-                              .addValue(targeting.getAbi())
-                              .addAllAlternatives(
-                                  Sets.difference(allAbis, ImmutableSet.of(targeting.getAbi()))))
-                      .build())
-              .setMasterSplit(false)
-              .addMasterManifestMutator(withSplitsRequired(true))
-              .setEntries(entriesList);
-      splits.add(splitBuilder.build());
+      if (!is64Bit(targeting.getAbi()) || include64BitLibs) {
+        ModuleSplit.Builder splitBuilder =
+            moduleSplit
+                .toBuilder()
+                .setApkTargeting(
+                    moduleSplit
+                        .getApkTargeting()
+                        .toBuilder()
+                        .setAbiTargeting(
+                            AbiTargeting.newBuilder()
+                                .addValue(targeting.getAbi())
+                                .addAllAlternatives(
+                                    Sets.difference(
+                                        abisToGenerate, ImmutableSet.of(targeting.getAbi()))))
+                        .build())
+                .setMasterSplit(false)
+                .addMasterManifestMutator(withSplitsRequired(true))
+                .setEntries(entriesList);
+        splits.add(splitBuilder.build());
+      }
       leftOverEntries.removeAll(entriesList);
     }
     if (!leftOverEntries.isEmpty()) {
       splits.add(moduleSplit.toBuilder().setEntries(ImmutableList.copyOf(leftOverEntries)).build());
     }
     return splits.build();
+  }
+
+  private static boolean is64Bit(Abi abi) {
+    return abi.getAlias().equals(AbiAlias.ARM64_V8A)
+        || abi.getAlias().equals(AbiAlias.X86_64)
+        || abi.getAlias().equals(AbiAlias.MIPS64);
   }
 }

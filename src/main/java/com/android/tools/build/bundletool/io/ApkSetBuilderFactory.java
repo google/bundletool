@@ -25,6 +25,7 @@ import com.android.tools.build.bundletool.io.ZipBuilder.EntryOption;
 import com.android.tools.build.bundletool.model.ModuleSplit;
 import com.android.tools.build.bundletool.model.ZipPath;
 import com.android.tools.build.bundletool.utils.files.BufferedIo;
+import com.google.common.collect.ImmutableList;
 import com.google.protobuf.Message;
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -48,6 +49,15 @@ public final class ApkSetBuilderFactory {
 
     /** Adds an instant split APK to the APK Set archive. */
     ApkDescription addInstantApk(ModuleSplit split);
+
+    /** Adds an system APK to the APK Set archive. */
+    ApkDescription addSystemApk(ModuleSplit split);
+
+    /**
+     * Adds an compressed system APK and an and an additional uncompressed stub APK containing just
+     * the android manifest to the APK Set archive.
+     */
+    ImmutableList<ApkDescription> addCompressedSystemApks(ModuleSplit split);
 
     /** Sets the TOC file in the APK Set archive. */
     void setTableOfContentsFile(BuildApksResult tableOfContentsProto);
@@ -90,7 +100,7 @@ public final class ApkSetBuilderFactory {
     @Override
     public ApkDescription addSplitApk(ModuleSplit split) {
       ApkDescription apkDescription = splitApkSerializer.writeSplitToDisk(split, tempDirectory);
-      addToApkSetArchive(apkDescription);
+      addToApkSetArchive(apkDescription.getPath());
       return apkDescription;
     }
 
@@ -98,14 +108,14 @@ public final class ApkSetBuilderFactory {
     public ApkDescription addInstantApk(ModuleSplit split) {
       ApkDescription apkDescription =
           splitApkSerializer.writeInstantSplitToDisk(split, tempDirectory);
-      addToApkSetArchive(apkDescription);
+      addToApkSetArchive(apkDescription.getPath());
       return apkDescription;
     }
 
     @Override
     public ApkDescription addStandaloneApk(ModuleSplit split) {
       ApkDescription apkDescription = standaloneApkSerializer.writeToDisk(split, tempDirectory);
-      addToApkSetArchive(apkDescription);
+      addToApkSetArchive(apkDescription.getPath());
       return apkDescription;
     }
 
@@ -113,15 +123,31 @@ public final class ApkSetBuilderFactory {
     public ApkDescription addStandaloneUniversalApk(ModuleSplit split) {
       ApkDescription apkDescription =
           standaloneApkSerializer.writeToDiskAsUniversal(split, tempDirectory);
-      addToApkSetArchive(apkDescription);
+      addToApkSetArchive(apkDescription.getPath());
       return apkDescription;
     }
 
-    private void addToApkSetArchive(ApkDescription apkDescription) {
-      Path apkPath = tempDirectory.resolve(apkDescription.getPath());
-      checkFileExistsAndReadable(apkPath);
+    @Override
+    public ApkDescription addSystemApk(ModuleSplit split) {
+      ApkDescription apkDescription =
+          standaloneApkSerializer.writeSystemApkToDisk(split, tempDirectory);
+      addToApkSetArchive(apkDescription.getPath());
+      return apkDescription;
+    }
+
+    @Override
+    public ImmutableList<ApkDescription> addCompressedSystemApks(ModuleSplit split) {
+      ImmutableList<ApkDescription> apkDescriptions =
+          standaloneApkSerializer.writeCompressedSystemApksToDisk(split, tempDirectory);
+      apkDescriptions.forEach(apkDescription -> addToApkSetArchive(apkDescription.getPath()));
+      return apkDescriptions;
+    }
+
+    private void addToApkSetArchive(String relativeApkPath) {
+      Path fullApkPath = tempDirectory.resolve(relativeApkPath);
+      checkFileExistsAndReadable(fullApkPath);
       apkSetZipBuilder.addFileFromDisk(
-          ZipPath.create(apkDescription.getPath()), apkPath.toFile(), EntryOption.UNCOMPRESSED);
+          ZipPath.create(relativeApkPath), fullApkPath.toFile(), EntryOption.UNCOMPRESSED);
     }
 
     @Override
@@ -175,6 +201,16 @@ public final class ApkSetBuilderFactory {
     @Override
     public ApkDescription addStandaloneUniversalApk(ModuleSplit split) {
       return standaloneApkSerializer.writeToDiskAsUniversal(split, outputDirectory);
+    }
+
+    @Override
+    public ApkDescription addSystemApk(ModuleSplit split) {
+      return standaloneApkSerializer.writeSystemApkToDisk(split, outputDirectory);
+    }
+
+    @Override
+    public ImmutableList<ApkDescription> addCompressedSystemApks(ModuleSplit split) {
+      return standaloneApkSerializer.writeCompressedSystemApksToDisk(split, outputDirectory);
     }
 
     @Override

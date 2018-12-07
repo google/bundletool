@@ -104,6 +104,10 @@ public class AppBundle {
     return module;
   }
 
+  public boolean has32BitRenderscriptCode() {
+    return getModules().values().stream().anyMatch(BundleModule::hasRenderscript32Bitcode);
+  }
+
   public BundleConfig getBundleConfig() {
     return bundleConfig;
   }

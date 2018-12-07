@@ -18,11 +18,13 @@ package com.android.tools.build.bundletool.device;
 
 import static com.android.bundle.Targeting.Abi.AbiAlias.ARMEABI;
 import static com.android.bundle.Targeting.Abi.AbiAlias.X86;
+import static com.android.bundle.Targeting.Abi.AbiAlias.X86_64;
 import static com.android.bundle.Targeting.ScreenDensity.DensityAlias.HDPI;
 import static com.android.bundle.Targeting.ScreenDensity.DensityAlias.MDPI;
 import static com.android.bundle.Targeting.ScreenDensity.DensityAlias.XXXHDPI;
 import static com.android.tools.build.bundletool.testing.ApkSetUtils.splitApkSet;
 import static com.android.tools.build.bundletool.testing.ApksArchiveHelpers.createVariant;
+import static com.android.tools.build.bundletool.testing.ApksArchiveHelpers.multiAbiTargetingStandaloneVariant;
 import static com.android.tools.build.bundletool.testing.ApksArchiveHelpers.splitApkDescription;
 import static com.android.tools.build.bundletool.testing.ApksArchiveHelpers.standaloneVariant;
 import static com.android.tools.build.bundletool.testing.DeviceFactory.abis;
@@ -34,16 +36,21 @@ import static com.android.tools.build.bundletool.testing.TargetingUtils.apkAbiTa
 import static com.android.tools.build.bundletool.testing.TargetingUtils.apkDensityTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.mergeApkTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.mergeVariantTargeting;
+import static com.android.tools.build.bundletool.testing.TargetingUtils.multiAbiTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.sdkVersionFrom;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.variantAbiTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.variantDensityTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.variantSdkTargeting;
 import static com.google.common.truth.Truth.assertThat;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.android.bundle.Commands.BuildApksResult;
 import com.android.bundle.Commands.Variant;
 import com.android.bundle.Devices.DeviceSpec;
+import com.android.bundle.Targeting.Abi.AbiAlias;
 import com.android.bundle.Targeting.ApkTargeting;
+import com.android.bundle.Targeting.MultiAbiTargeting;
+import com.android.tools.build.bundletool.exceptions.CommandExecutionException;
 import com.android.tools.build.bundletool.model.ZipPath;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
@@ -147,7 +154,6 @@ public class VariantMatcherTest {
   @Test
   public void getAllMatchingVariants_fullDeviceSpec() {
     ZipPath standaloneX86MdpiApk = ZipPath.create("standalone-x86.mdpi.apk");
-    ZipPath.create("standalone-x86.xxxhdpi.apk");
     ZipPath baseMasterSplitApk = ZipPath.create("base-master.apk");
     ZipPath baseArmSplitApk = ZipPath.create("base-arm.apk");
     ZipPath screenXxxhdpiApk = ZipPath.create("screen-xxxhdpi.apk");
@@ -192,5 +198,69 @@ public class VariantMatcherTest {
     DeviceSpec postLDevice = mergeSpecs(sdkVersion(21), abis("x86"), density(MDPI), locales("en"));
     assertThat(new VariantMatcher(postLDevice).getAllMatchingVariants(buildApksResult))
         .containsExactly(splitVariant);
+  }
+
+  @Test
+  public void getAllMatchingVariants_apexVariants_noMatch_throws() {
+    ZipPath x86Apk = ZipPath.create("standalone-x86.apk");
+    ZipPath x64X86Apk = ZipPath.create("standalone-x86_64.x86.apk");
+
+    ImmutableSet<ImmutableSet<AbiAlias>> x86Set = ImmutableSet.of(ImmutableSet.of(X86));
+    ImmutableSet<ImmutableSet<AbiAlias>> x64X86Set = ImmutableSet.of(ImmutableSet.of(X86_64, X86));
+
+    MultiAbiTargeting x86Targeting = multiAbiTargeting(x86Set, x64X86Set);
+    MultiAbiTargeting x64X86Targeting = multiAbiTargeting(x64X86Set, x86Set);
+
+    Variant x86Variant = multiAbiTargetingStandaloneVariant(x86Targeting, x86Apk);
+    Variant x64X86Variant = multiAbiTargetingStandaloneVariant(x64X86Targeting, x64X86Apk);
+    BuildApksResult buildApksResult =
+        BuildApksResult.newBuilder()
+            .addAllVariant(ImmutableList.of(x86Variant, x64X86Variant))
+            .build();
+
+    CommandExecutionException e =
+        assertThrows(
+            CommandExecutionException.class,
+            () ->
+                new VariantMatcher(abis("x86_64", "armeabi-v7a"))
+                    .getAllMatchingVariants(buildApksResult));
+    assertThat(e)
+        .hasMessageThat()
+        .contains(
+            "No set of ABI architectures that the app supports is contained in the ABI "
+                + "architecture set of the device");
+  }
+
+  @Test
+  public void getAllMatchingVariants_apexVariants_fullDeviceSpec() {
+    ZipPath x86Apk = ZipPath.create("standalone-x86.apk");
+    ZipPath x64X86Apk = ZipPath.create("standalone-x86_64.x86.apk");
+
+    ImmutableSet<ImmutableSet<AbiAlias>> x86Set = ImmutableSet.of(ImmutableSet.of(X86));
+    ImmutableSet<ImmutableSet<AbiAlias>> x64X86Set = ImmutableSet.of(ImmutableSet.of(X86_64, X86));
+
+    MultiAbiTargeting x86Targeting = multiAbiTargeting(x86Set, x64X86Set);
+    MultiAbiTargeting x64X86Targeting = multiAbiTargeting(x64X86Set, x86Set);
+
+    Variant x86Variant = multiAbiTargetingStandaloneVariant(x86Targeting, x86Apk);
+    Variant x64X86Variant = multiAbiTargetingStandaloneVariant(x64X86Targeting, x64X86Apk);
+    BuildApksResult buildApksResult =
+        BuildApksResult.newBuilder()
+            .addAllVariant(ImmutableList.of(x86Variant, x64X86Variant))
+            .build();
+
+    assertThat(new VariantMatcher(abis("x86")).getAllMatchingVariants(buildApksResult))
+        .containsExactly(x86Variant);
+    assertThat(new VariantMatcher(abis("x86_64", "x86")).getAllMatchingVariants(buildApksResult))
+        .containsExactly(x64X86Variant);
+    assertThat(
+            new VariantMatcher(abis("x86_64", "x86", "armeabi-v7a"))
+                .getAllMatchingVariants(buildApksResult))
+        .containsExactly(x64X86Variant);
+    // Other device specs don't affect the matching variant.
+    assertThat(
+            new VariantMatcher(mergeSpecs(abis("x86"), density(HDPI)))
+                .getAllMatchingVariants(buildApksResult))
+        .containsExactly(x86Variant);
   }
 }

@@ -15,7 +15,6 @@
  */
 package com.android.tools.build.bundletool.commands;
 
-import static com.android.tools.build.bundletool.utils.TargetingProtoUtils.sdkVersionFrom;
 import static com.android.tools.build.bundletool.utils.files.FilePreconditions.checkDirectoryExists;
 import static com.android.tools.build.bundletool.utils.files.FilePreconditions.checkFileDoesNotExist;
 import static com.android.tools.build.bundletool.utils.files.FilePreconditions.checkFileExistsAndExecutable;
@@ -29,9 +28,6 @@ import com.android.bundle.Config.BundleConfig;
 import com.android.bundle.Config.Bundletool;
 import com.android.bundle.Config.Compression;
 import com.android.bundle.Devices.DeviceSpec;
-import com.android.bundle.Targeting.ApkTargeting;
-import com.android.bundle.Targeting.SdkVersionTargeting;
-import com.android.bundle.Targeting.VariantTargeting;
 import com.android.tools.build.bundletool.device.AdbServer;
 import com.android.tools.build.bundletool.device.DeviceAnalyzer;
 import com.android.tools.build.bundletool.device.DeviceSpecParser;
@@ -46,16 +42,14 @@ import com.android.tools.build.bundletool.model.Aapt2Command;
 import com.android.tools.build.bundletool.model.ApkListener;
 import com.android.tools.build.bundletool.model.ApkModifier;
 import com.android.tools.build.bundletool.model.AppBundle;
-import com.android.tools.build.bundletool.model.BundleMetadata;
 import com.android.tools.build.bundletool.model.BundleModule;
 import com.android.tools.build.bundletool.model.GeneratedApks;
-import com.android.tools.build.bundletool.model.ModuleSplit;
 import com.android.tools.build.bundletool.model.ModuleSplit.SplitType;
 import com.android.tools.build.bundletool.model.SigningConfiguration;
 import com.android.tools.build.bundletool.optimizations.ApkOptimizations;
 import com.android.tools.build.bundletool.optimizations.OptimizationsMerger;
 import com.android.tools.build.bundletool.splitters.ApkGenerationConfiguration;
-import com.android.tools.build.bundletool.splitters.BundleSharder;
+import com.android.tools.build.bundletool.splitters.ShardedApksGenerator;
 import com.android.tools.build.bundletool.splitters.SplitApksGenerator;
 import com.android.tools.build.bundletool.targeting.AlternativeVariantTargetingPopulator;
 import com.android.tools.build.bundletool.utils.SdkToolsLocator;
@@ -102,90 +96,113 @@ final class BuildApksManager {
       AppBundle appBundle = AppBundle.buildFromZip(bundleZip);
       bundleValidator.validate(appBundle);
 
+      if (appBundle.has32BitRenderscriptCode()) {
+        printWarning(
+            "App Bundle contains 32-bit RenderScript bitcode file (.bc) which disables 64-bit "
+                + "support in Android. 64-bit native libraries won't be included in generated "
+                + "APKs.");
+      }
+
       BundleConfig bundleConfig = appBundle.getBundleConfig();
       Version bundleVersion = BundleToolVersion.getVersionFromBundleConfig(bundleConfig);
 
       ImmutableList<BundleModule> allModules =
           ImmutableList.copyOf(appBundle.getModules().values());
 
-      ApkSetBuilder apkSetBuilder =
-          createApkSetBuilder(
-              aapt2Command,
-              command.getSigningConfiguration(),
-              bundleConfig.getCompression(),
-              tempDir);
-
-      ApkOptimizations apkOptimizations =
-          command.getGenerateOnlyUniversalApk()
-              ? ApkOptimizations.getOptimizationsForUniversalApk()
-              : new OptimizationsMerger()
-                  .mergeWithDefaults(bundleConfig, command.getOptimizationDimensions());
-
-      boolean generateSplitApks =
-          !command.getGenerateOnlyUniversalApk() && !targetsOnlyPreL(appBundle);
-      boolean generateStandaloneApks =
-          command.getGenerateOnlyUniversalApk() || targetsPreL(appBundle);
-
-      if (deviceSpec.isPresent()) {
-        if (deviceSpec.get().getSdkVersion() >= Versions.ANDROID_L_API_VERSION) {
-          generateStandaloneApks = false;
-          if (!generateSplitApks) {
-            throw new CommandExecutionException(
-                "App Bundle targets pre-L devices, but the device has SDK version higher "
-                    + "or equal to L.");
-          }
-        } else {
-          generateSplitApks = false;
-          if (!generateStandaloneApks) {
-            throw new CommandExecutionException(
-                "App Bundle targets L+ devices, but the device has SDK version lower than L.");
-          }
-        }
-      }
-
       GeneratedApks.Builder generatedApksBuilder = GeneratedApks.builder();
-      if (generateSplitApks) {
-        ApkGenerationConfiguration.Builder apkGenerationConfiguration =
-            ApkGenerationConfiguration.builder()
-                .setOptimizationDimensions(apkOptimizations.getSplitDimensions());
-        boolean enableNativeLibraryCompressionSplitter =
-            apkOptimizations.getUncompressNativeLibraries();
-        apkGenerationConfiguration.setEnableNativeLibraryCompressionSplitter(
-            enableNativeLibraryCompressionSplitter);
-        generatedApksBuilder.setSplitApks(
-            new SplitApksGenerator(
-                    allModules,
-                    bundleVersion,
-                    apkGenerationConfiguration.setForInstantAppVariants(false).build())
-                .generateSplits());
+      switch (command.getApkBuildMode()) {
+        case DEFAULT:
+          boolean isApexBundle = appBundle.getBaseModule().getApexConfig().isPresent();
+          boolean generateSplitApks = !targetsOnlyPreL(appBundle) && !isApexBundle;
+          boolean generateStandaloneApks = targetsPreL(appBundle) || isApexBundle;
 
-        // Generate instant splits for any instant compatible modules.
-        ImmutableList<BundleModule> instantModules =
-            allModules.stream().filter(BundleModule::isInstantModule).collect(toImmutableList());
-        generatedApksBuilder.setInstantApks(
-            new SplitApksGenerator(
-                    instantModules,
+          if (deviceSpec.isPresent()) {
+            if (deviceSpec.get().getSdkVersion() >= Versions.ANDROID_L_API_VERSION) {
+              generateStandaloneApks = false;
+              if (!generateSplitApks) {
+                throw new CommandExecutionException(
+                    "App Bundle targets pre-L devices, but the device has SDK version higher "
+                        + "or equal to L.");
+              }
+            } else {
+              generateSplitApks = false;
+              if (!generateStandaloneApks) {
+                throw new CommandExecutionException(
+                    "App Bundle targets L+ devices, but the device has SDK version lower than L.");
+              }
+            }
+          }
+
+          if (generateSplitApks) {
+            ApkGenerationConfiguration.Builder apkGenerationConfiguration =
+                getApkGenerationConfigurationBuilder(appBundle, bundleConfig, bundleVersion);
+
+            generatedApksBuilder.setSplitApks(
+                new SplitApksGenerator(
+                        allModules,
+                        bundleVersion,
+                        apkGenerationConfiguration.setForInstantAppVariants(false).build())
+                    .generateSplits());
+
+            // Generate instant splits for any instant compatible modules.
+            ImmutableList<BundleModule> instantModules =
+                allModules.stream()
+                    .filter(BundleModule::isInstantModule)
+                    .collect(toImmutableList());
+
+            generatedApksBuilder.setInstantApks(
+                new SplitApksGenerator(
+                        instantModules,
+                        bundleVersion,
+                        apkGenerationConfiguration
+                            .setForInstantAppVariants(true)
+                            // We can't enable this splitter for instant APKs, as currently they
+                            // only support one variant.
+                            .setEnableDexCompressionSplitter(false)
+                            .build())
+                    .generateSplits());
+          }
+          if (generateStandaloneApks) {
+            ShardedApksGenerator shardedApksGenerator =
+                new ShardedApksGenerator(
+                    tempDir,
                     bundleVersion,
-                    apkGenerationConfiguration
-                        .setForInstantAppVariants(true)
-                        // We can't enable this splitter for instant APKs, as currently they only
-                        // support one variant.
-                        .setEnableDexCompressionSplitter(false)
-                        .build())
-                .generateSplits());
+                    SplitType.STANDALONE,
+                    /* generate64BitShards= */ !appBundle.has32BitRenderscriptCode());
+            generatedApksBuilder.setStandaloneApks(
+                isApexBundle
+                    ? shardedApksGenerator.generateApexSplits(modulesToFuse(allModules))
+                    : shardedApksGenerator.generateSplits(
+                        modulesToFuse(allModules),
+                        appBundle.getBundleMetadata(),
+                        getApkOptimizations(bundleConfig)));
+          }
+          break;
+        case UNIVERSAL:
+          // Note: Universal APK is a special type of standalone, with no optimization dimensions.
+          generatedApksBuilder.setStandaloneApks(
+              new ShardedApksGenerator(tempDir, bundleVersion)
+                  .generateSplits(
+                      modulesToFuse(allModules),
+                      appBundle.getBundleMetadata(),
+                      ApkOptimizations.getOptimizationsForUniversalApk()));
+          break;
+        case SYSTEM_COMPRESSED:
+        case SYSTEM:
+          // Generate system APKs.
+          generatedApksBuilder.setSystemApks(
+              new ShardedApksGenerator(
+                      tempDir,
+                      bundleVersion,
+                      SplitType.SYSTEM,
+                      /* generate64BitShards= */ !appBundle.has32BitRenderscriptCode())
+                  .generateSplits(
+                      modulesToFuse(allModules),
+                      appBundle.getBundleMetadata(),
+                      getApkOptimizations(bundleConfig)));
+          break;
       }
-      if (generateStandaloneApks) {
-        // Note: Universal APK is a special type of standalone, with no optimization dimensions.
-        ImmutableList<BundleModule> modulesForFusing =
-            allModules.stream().filter(BundleModule::isIncludedInFusing).collect(toImmutableList());
-        generatedApksBuilder.setStandaloneApks(
-            generateStandaloneApks(
-                modulesForFusing,
-                appBundle.getBundleMetadata(),
-                tempDir,
-                apkOptimizations,
-                bundleVersion));
-      }
+
       // Populate alternative targeting based on variant targeting of all APKs.
       GeneratedApks generatedApks =
           AlternativeVariantTargetingPopulator.populateAlternativeVariantTargeting(
@@ -193,6 +210,13 @@ final class BuildApksManager {
 
       SplitsXmlInjector splitsXmlInjector = new SplitsXmlInjector();
       generatedApks = splitsXmlInjector.process(generatedApks);
+
+      ApkSetBuilder apkSetBuilder =
+          createApkSetBuilder(
+              aapt2Command,
+              command.getSigningConfiguration(),
+              bundleConfig.getCompression(),
+              tempDir);
 
       // Create variants and serialize APKs.
       ApkSerializerManager apkSerializerManager =
@@ -207,10 +231,9 @@ final class BuildApksManager {
       if (deviceSpec.isPresent()) {
         allVariantsWithTargeting =
             apkSerializerManager.serializeApksForDevice(generatedApks, deviceSpec.get());
-      } else if (command.getGenerateOnlyUniversalApk()) {
-        allVariantsWithTargeting = apkSerializerManager.serializeUniversalApk(generatedApks);
       } else {
-        allVariantsWithTargeting = apkSerializerManager.serializeApks(generatedApks);
+        allVariantsWithTargeting =
+            apkSerializerManager.serializeApks(generatedApks, command.getApkBuildMode());
       }
       // Finalize the output archive.
       apkSetBuilder.setTableOfContentsFile(
@@ -238,6 +261,10 @@ final class BuildApksManager {
     return command.getOutputFile();
   }
 
+  private void printWarning(String message) {
+    command.getOutputPrintStream().ifPresent(out -> out.println("WARNING: " + message));
+  }
+
   private DeviceSpec getDeviceSpec() {
     AdbServer adbServer = command.getAdbServer().get();
     adbServer.init(command.getAdbPath().get());
@@ -263,6 +290,33 @@ final class BuildApksManager {
     }
     return ApkSetBuilderFactory.createApkSetBuilder(
         splitApkSerializer, standaloneApkSerializer, tempDir);
+  }
+
+  private ApkGenerationConfiguration.Builder getApkGenerationConfigurationBuilder(
+      AppBundle appBundle, BundleConfig bundleConfig, Version bundleToolVersion) {
+
+    ApkOptimizations apkOptimizations = getApkOptimizations(bundleConfig);
+
+    ApkGenerationConfiguration.Builder apkGenerationConfiguration =
+        ApkGenerationConfiguration.builder()
+            .setOptimizationDimensions(apkOptimizations.getSplitDimensions());
+    boolean enableNativeLibraryCompressionSplitter =
+        apkOptimizations.getUncompressNativeLibraries();
+    apkGenerationConfiguration.setEnableNativeLibraryCompressionSplitter(
+        enableNativeLibraryCompressionSplitter);
+    if (appBundle.has32BitRenderscriptCode()) {
+      apkGenerationConfiguration.setInclude64BitLibs(false);
+    }
+    return apkGenerationConfiguration;
+  }
+
+  private ImmutableList<BundleModule> modulesToFuse(ImmutableList<BundleModule> modules) {
+    return modules.stream().filter(BundleModule::isIncludedInFusing).collect(toImmutableList());
+  }
+
+  private ApkOptimizations getApkOptimizations(BundleConfig bundleConfig) {
+    return new OptimizationsMerger()
+        .mergeWithDefaults(bundleConfig, command.getOptimizationDimensions());
   }
 
   private static Aapt2Command extractAapt2FromJar(Path tempDir) {
@@ -297,28 +351,6 @@ final class BuildApksManager {
     }
   }
 
-  private ImmutableList<ModuleSplit> generateStandaloneApks(
-      ImmutableList<BundleModule> modules,
-      BundleMetadata bundleMetadata,
-      Path tempDir,
-      ApkOptimizations apkOptimizations,
-      Version bundleVersion) {
-
-    ImmutableList<ModuleSplit> standaloneApks =
-        new BundleSharder(tempDir, bundleVersion)
-            .shardBundle(modules, apkOptimizations.getSplitDimensions(), bundleMetadata);
-
-    return standaloneApks.stream()
-        .map(
-            moduleSplit ->
-                moduleSplit
-                    .toBuilder()
-                    .setVariantTargeting(standaloneApkVariantTargeting(moduleSplit))
-                    .setSplitType(SplitType.STANDALONE)
-                    .build())
-        .collect(toImmutableList());
-  }
-
   private static boolean targetsOnlyPreL(AppBundle bundle) {
     Optional<Integer> maxSdkVersion =
         bundle.getBaseModule().getAndroidManifest().getMaxSdkVersion();
@@ -328,26 +360,5 @@ final class BuildApksManager {
   private static boolean targetsPreL(AppBundle bundle) {
     int baseMinSdkVersion = bundle.getBaseModule().getAndroidManifest().getEffectiveMinSdkVersion();
     return baseMinSdkVersion < Versions.ANDROID_L_API_VERSION;
-  }
-
-  private static VariantTargeting standaloneApkVariantTargeting(ModuleSplit standaloneApk) {
-    ApkTargeting apkTargeting = standaloneApk.getApkTargeting();
-
-    VariantTargeting.Builder variantTargeting = VariantTargeting.newBuilder();
-    if (apkTargeting.hasAbiTargeting()) {
-      variantTargeting.setAbiTargeting(apkTargeting.getAbiTargeting());
-    }
-    if (apkTargeting.hasScreenDensityTargeting()) {
-      variantTargeting.setScreenDensityTargeting(apkTargeting.getScreenDensityTargeting());
-    }
-    variantTargeting.setSdkVersionTargeting(sdkVersionTargeting(standaloneApk));
-
-    return variantTargeting.build();
-  }
-
-  private static SdkVersionTargeting sdkVersionTargeting(ModuleSplit moduleSplit) {
-    return SdkVersionTargeting.newBuilder()
-        .addValue(sdkVersionFrom(moduleSplit.getAndroidManifest().getEffectiveMinSdkVersion()))
-        .build();
   }
 }

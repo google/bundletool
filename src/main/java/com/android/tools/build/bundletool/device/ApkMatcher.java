@@ -68,17 +68,20 @@ public class ApkMatcher {
         "Set of requested split modules cannot be empty.");
     SdkVersionMatcher sdkVersionMatcher = new SdkVersionMatcher(deviceSpec);
     AbiMatcher abiMatcher = new AbiMatcher(deviceSpec);
+    MultiAbiMatcher multiAbiMatcher = new MultiAbiMatcher(deviceSpec);
     ScreenDensityMatcher screenDensityMatcher = new ScreenDensityMatcher(deviceSpec);
     LanguageMatcher languageMatcher = new LanguageMatcher(deviceSpec);
     DeviceFeatureMatcher deviceFeatureMatcher = new DeviceFeatureMatcher(deviceSpec);
 
     this.apkMatchers =
-        ImmutableList.of(sdkVersionMatcher, abiMatcher, screenDensityMatcher, languageMatcher);
+        ImmutableList.of(
+            sdkVersionMatcher, abiMatcher, multiAbiMatcher, screenDensityMatcher, languageMatcher);
     this.requestedModuleNames = requestedModuleNames;
     this.matchInstant = matchInstant;
     this.moduleMatcher = new ModuleMatcher(sdkVersionMatcher, deviceFeatureMatcher);
     this.variantMatcher =
-        new VariantMatcher(sdkVersionMatcher, abiMatcher, screenDensityMatcher, matchInstant);
+        new VariantMatcher(
+            sdkVersionMatcher, abiMatcher, multiAbiMatcher, screenDensityMatcher, matchInstant);
   }
 
   /**

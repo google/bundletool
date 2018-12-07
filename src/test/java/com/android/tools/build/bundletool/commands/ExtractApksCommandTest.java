@@ -16,6 +16,9 @@
 
 package com.android.tools.build.bundletool.commands;
 
+import static com.android.bundle.Targeting.Abi.AbiAlias.ARM64_V8A;
+import static com.android.bundle.Targeting.Abi.AbiAlias.X86;
+import static com.android.bundle.Targeting.Abi.AbiAlias.X86_64;
 import static com.android.tools.build.bundletool.testing.ApksArchiveHelpers.createApkDescription;
 import static com.android.tools.build.bundletool.testing.ApksArchiveHelpers.createApksArchiveFile;
 import static com.android.tools.build.bundletool.testing.ApksArchiveHelpers.createApksDirectory;
@@ -26,6 +29,7 @@ import static com.android.tools.build.bundletool.testing.ApksArchiveHelpers.crea
 import static com.android.tools.build.bundletool.testing.ApksArchiveHelpers.createStandaloneApkSet;
 import static com.android.tools.build.bundletool.testing.ApksArchiveHelpers.createVariant;
 import static com.android.tools.build.bundletool.testing.ApksArchiveHelpers.createVariantForSingleSplitApk;
+import static com.android.tools.build.bundletool.testing.ApksArchiveHelpers.multiAbiTargetingStandaloneVariant;
 import static com.android.tools.build.bundletool.testing.DeviceFactory.abis;
 import static com.android.tools.build.bundletool.testing.DeviceFactory.createDeviceSpecFile;
 import static com.android.tools.build.bundletool.testing.DeviceFactory.density;
@@ -38,6 +42,7 @@ import static com.android.tools.build.bundletool.testing.TargetingUtils.apkAbiTa
 import static com.android.tools.build.bundletool.testing.TargetingUtils.mergeModuleTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.moduleFeatureTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.moduleMinSdkVersionTargeting;
+import static com.android.tools.build.bundletool.testing.TargetingUtils.multiAbiTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.sdkVersionFrom;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.variantSdkTargeting;
 import static com.android.tools.build.bundletool.testing.TestUtils.expectMissingRequiredFlagException;
@@ -50,6 +55,7 @@ import com.android.bundle.Commands.BuildApksResult;
 import com.android.bundle.Devices.DeviceSpec;
 import com.android.bundle.Targeting.Abi.AbiAlias;
 import com.android.bundle.Targeting.ApkTargeting;
+import com.android.bundle.Targeting.MultiAbiTargeting;
 import com.android.bundle.Targeting.ScreenDensity.DensityAlias;
 import com.android.bundle.Targeting.SdkVersion;
 import com.android.bundle.Targeting.VariantTargeting;
@@ -586,6 +592,77 @@ public class ExtractApksCommandTest {
       assertThat(matchedApks).containsExactly(inTempDirectory(apkL.toString()));
     } else {
       assertThat(matchedApks).containsExactly(inOutputDirectory(apkL.getFileName()));
+    }
+    for (Path matchedApk : matchedApks) {
+      checkFileExistsAndReadable(tmpDir.resolve(matchedApk));
+    }
+  }
+
+  @Test
+  public void apexModule_noMatch() throws Exception {
+    BuildApksResult buildApksResult =
+        BuildApksResult.newBuilder()
+            .addVariant(
+                multiAbiTargetingStandaloneVariant(
+                    multiAbiTargeting(X86_64), ZipPath.create("standalones/standalone-x86_64.apk")))
+            .build();
+
+    Path apksPath = createApksArchiveFile(buildApksResult, tmpDir.resolve("bundle.apks"));
+    ExtractApksCommand.Builder extractedApksCommand =
+        ExtractApksCommand.builder().setApksArchivePath(apksPath).setDeviceSpec(abis("x86"));
+
+    Throwable exception =
+        assertThrows(CommandExecutionException.class, () -> extractedApksCommand.build().execute());
+    assertThat(exception)
+        .hasMessageThat()
+        .contains(
+            "No set of ABI architectures that the app supports is contained in the ABI "
+                + "architecture set of the device.");
+  }
+
+  @Test
+  @Theory
+  public void apexModule_getsBestPossibleApk(
+      @FromDataPoints("apksInDirectory") boolean apksInDirectory) throws Exception {
+    ZipPath x64Apk = ZipPath.create("standalones/standalone-x86_64.apk");
+    ZipPath x64X86Apk = ZipPath.create("standalones/standalone-x86_64.x86.apk");
+    ZipPath x64ArmApk = ZipPath.create("standalones/standalone-x86_64.arm64_v8a.apk");
+
+    MultiAbiTargeting x64Targeting =
+        multiAbiTargeting(
+            ImmutableSet.of(ImmutableSet.of(X86_64)),
+            ImmutableSet.of(ImmutableSet.of(X86_64, X86), ImmutableSet.of(X86_64, ARM64_V8A)));
+    MultiAbiTargeting x64X86Targeting =
+        multiAbiTargeting(
+            ImmutableSet.of(ImmutableSet.of(X86_64, X86)),
+            ImmutableSet.of(ImmutableSet.of(X86_64), ImmutableSet.of(X86_64, ARM64_V8A)));
+    MultiAbiTargeting x64ArmTargeting =
+        multiAbiTargeting(
+            ImmutableSet.of(ImmutableSet.of(X86_64, ARM64_V8A)),
+            ImmutableSet.of(ImmutableSet.of(X86_64), ImmutableSet.of(X86_64, X86)));
+
+    BuildApksResult buildApksResult =
+        BuildApksResult.newBuilder()
+            .addVariant(multiAbiTargetingStandaloneVariant(x64Targeting, x64Apk))
+            .addVariant(multiAbiTargetingStandaloneVariant(x64X86Targeting, x64X86Apk))
+            .addVariant(multiAbiTargetingStandaloneVariant(x64ArmTargeting, x64ArmApk))
+            .build();
+
+    Path apksPath = createApks(buildApksResult, apksInDirectory);
+    ExtractApksCommand.Builder extractedApksCommand =
+        ExtractApksCommand.builder()
+            .setApksArchivePath(apksPath)
+            .setDeviceSpec(abis("x86_64", "x86"));
+    if (!apksInDirectory) {
+      extractedApksCommand.setOutputDirectory(tmpDir);
+    }
+
+    ImmutableList<Path> matchedApks = extractedApksCommand.build().execute();
+
+    if (apksInDirectory) {
+      assertThat(matchedApks).containsExactly(inTempDirectory(x64X86Apk.toString()));
+    } else {
+      assertThat(matchedApks).containsExactly(inOutputDirectory(x64X86Apk.getFileName()));
     }
     for (Path matchedApk : matchedApks) {
       checkFileExistsAndReadable(tmpDir.resolve(matchedApk));

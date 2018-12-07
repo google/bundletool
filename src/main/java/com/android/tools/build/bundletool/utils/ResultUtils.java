@@ -90,7 +90,11 @@ public final class ResultUtils {
     return variants.stream().filter(ResultUtils::isStandaloneApkVariant).collect(toImmutableList());
   }
 
-  public static ImmutableList<Variant> nonStandaloneApkVariants(ImmutableList<Variant> variants) {
+  public static ImmutableList<Variant> systemApkVariants(BuildApksResult result) {
+    return systemApkVariants(ImmutableList.copyOf(result.getVariantList()));
+  }
+
+  public static ImmutableList<Variant> systemApkVariants(ImmutableList<Variant> variants) {
     return variants.stream()
         .filter(variant -> !isStandaloneApkVariant(variant))
         .collect(toImmutableList());
@@ -118,6 +122,12 @@ public final class ResultUtils {
         .stream()
         .flatMap(apkSet -> apkSet.getApkDescriptionList().stream())
         .allMatch(ApkDescription::hasInstantApkMetadata);
+  }
+
+  public static boolean isSystemApkVariant(Variant variant) {
+    return variant.getApkSetList().stream()
+        .flatMap(apkSet -> apkSet.getApkDescriptionList().stream())
+        .allMatch(ApkDescription::hasSystemApkMetadata);
   }
 
   private ResultUtils() {}
