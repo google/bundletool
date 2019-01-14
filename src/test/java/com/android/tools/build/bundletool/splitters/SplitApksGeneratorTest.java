@@ -16,15 +16,16 @@
 
 package com.android.tools.build.bundletool.splitters;
 
+import static com.android.tools.build.bundletool.model.utils.Versions.ANDROID_L_API_VERSION;
+import static com.android.tools.build.bundletool.model.utils.Versions.ANDROID_M_API_VERSION;
+import static com.android.tools.build.bundletool.model.utils.Versions.ANDROID_P_API_VERSION;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifest;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.lPlusVariantTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.nativeDirectoryTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.nativeLibraries;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.targetedNativeDirectory;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.variantMinSdkTargeting;
-import static com.android.tools.build.bundletool.utils.Versions.ANDROID_L_API_VERSION;
-import static com.android.tools.build.bundletool.utils.Versions.ANDROID_M_API_VERSION;
-import static com.android.tools.build.bundletool.utils.Versions.ANDROID_P_API_VERSION;
+import static com.android.tools.build.bundletool.testing.TestUtils.extractPaths;
 import static com.google.common.collect.ImmutableSet.toImmutableSet;
 import static com.google.common.truth.Truth.assertThat;
 import static com.google.common.truth.extensions.proto.ProtoTruth.assertThat;
@@ -34,13 +35,15 @@ import com.android.bundle.Targeting.VariantTargeting;
 import com.android.tools.build.bundletool.model.BundleModule;
 import com.android.tools.build.bundletool.model.ModuleSplit;
 import com.android.tools.build.bundletool.model.ModuleSplit.SplitType;
+import com.android.tools.build.bundletool.model.ResourceTableEntry;
+import com.android.tools.build.bundletool.model.version.BundleToolVersion;
+import com.android.tools.build.bundletool.model.version.Version;
 import com.android.tools.build.bundletool.testing.BundleModuleBuilder;
-import com.android.tools.build.bundletool.version.BundleToolVersion;
-import com.android.tools.build.bundletool.version.Version;
+import com.google.common.base.Predicates;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
-import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Maps;
+import java.util.function.Predicate;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
@@ -49,6 +52,9 @@ import org.junit.runners.JUnit4;
 public class SplitApksGeneratorTest {
 
   private static final Version BUNDLETOOL_VERSION = BundleToolVersion.getCurrentVersion();
+
+  private static final Predicate<ResourceTableEntry> NO_RESOURCES_PINNED_TO_MASTER =
+      Predicates.alwaysFalse();
 
   @Test
   public void simpleMultipleModules() throws Exception {
@@ -66,7 +72,10 @@ public class SplitApksGeneratorTest {
 
     ImmutableList<ModuleSplit> moduleSplits =
         new SplitApksGenerator(
-                bundleModule, BUNDLETOOL_VERSION, ApkGenerationConfiguration.getDefaultInstance())
+                bundleModule,
+                BUNDLETOOL_VERSION,
+                ApkGenerationConfiguration.getDefaultInstance(),
+                NO_RESOURCES_PINNED_TO_MASTER)
             .generateSplits();
 
     assertThat(moduleSplits).hasSize(2);
@@ -75,12 +84,12 @@ public class SplitApksGeneratorTest {
 
     ModuleSplit baseModule = moduleSplitMap.get("base");
     assertThat(baseModule.getSplitType()).isEqualTo(SplitType.SPLIT);
-    assertThat(getEntriesPaths(baseModule)).containsExactly("assets/leftover.txt");
+    assertThat(extractPaths(baseModule.getEntries())).containsExactly("assets/leftover.txt");
     assertThat(baseModule.getVariantTargeting()).isEqualTo(lPlusVariantTargeting());
 
     ModuleSplit testModule = moduleSplitMap.get("test");
     assertThat(testModule.getSplitType()).isEqualTo(SplitType.SPLIT);
-    assertThat(getEntriesPaths(testModule)).containsExactly("assets/test.txt");
+    assertThat(extractPaths(testModule.getEntries())).containsExactly("assets/test.txt");
     assertThat(testModule.getVariantTargeting()).isEqualTo(lPlusVariantTargeting());
   }
 
@@ -109,7 +118,8 @@ public class SplitApksGeneratorTest {
                 BUNDLETOOL_VERSION,
                 ApkGenerationConfiguration.builder()
                     .setEnableNativeLibraryCompressionSplitter(true)
-                    .build())
+                    .build(),
+                NO_RESOURCES_PINNED_TO_MASTER)
             .generateSplits();
 
     VariantTargeting lVariantTargeting =
@@ -129,23 +139,23 @@ public class SplitApksGeneratorTest {
 
     ModuleSplit baseLModule = getModuleSplit(moduleSplits, lVariantTargeting, "base");
     assertThat(baseLModule.getSplitType()).isEqualTo(SplitType.SPLIT);
-    assertThat(getEntriesPaths(baseLModule))
+    assertThat(extractPaths(baseLModule.getEntries()))
         .containsExactly("assets/leftover.txt", "lib/x86_64/libsome.so");
     assertThat(isCompressed(baseLModule, "lib/x86_64/libsome.so")).isTrue();
 
     ModuleSplit testLModule = getModuleSplit(moduleSplits, lVariantTargeting, "test");
     assertThat(testLModule.getSplitType()).isEqualTo(SplitType.SPLIT);
-    assertThat(getEntriesPaths(testLModule)).containsExactly("assets/test.txt");
+    assertThat(extractPaths(testLModule.getEntries())).containsExactly("assets/test.txt");
 
     ModuleSplit baseMModule = getModuleSplit(moduleSplits, mVariantTargeting, "base");
     assertThat(baseMModule.getSplitType()).isEqualTo(SplitType.SPLIT);
-    assertThat(getEntriesPaths(baseMModule))
+    assertThat(extractPaths(baseMModule.getEntries()))
         .containsExactly("assets/leftover.txt", "lib/x86_64/libsome.so");
     assertThat(isCompressed(baseMModule, "lib/x86_64/libsome.so")).isFalse();
 
     ModuleSplit testMModule = getModuleSplit(moduleSplits, mVariantTargeting, "test");
     assertThat(testMModule.getSplitType()).isEqualTo(SplitType.SPLIT);
-    assertThat(getEntriesPaths(testMModule)).containsExactly("assets/test.txt");
+    assertThat(extractPaths(testMModule.getEntries())).containsExactly("assets/test.txt");
   }
 
   @Test
@@ -176,7 +186,8 @@ public class SplitApksGeneratorTest {
                 ApkGenerationConfiguration.builder()
                     .setEnableNativeLibraryCompressionSplitter(true)
                     .setEnableDexCompressionSplitter(true)
-                    .build())
+                    .build(),
+                NO_RESOURCES_PINNED_TO_MASTER)
             .generateSplits();
 
     VariantTargeting lVariantTargeting =
@@ -203,35 +214,38 @@ public class SplitApksGeneratorTest {
 
     ModuleSplit baseLModule = getModuleSplit(moduleSplits, lVariantTargeting, "base");
     assertThat(baseLModule.getSplitType()).isEqualTo(SplitType.SPLIT);
-    assertThat(getEntriesPaths(baseLModule))
+    assertThat(extractPaths(baseLModule.getEntries()))
         .containsExactly("assets/leftover.txt", "lib/x86_64/libsome.so");
     assertThat(isCompressed(baseLModule, "lib/x86_64/libsome.so")).isTrue();
 
     ModuleSplit testLModule = getModuleSplit(moduleSplits, lVariantTargeting, "test");
     assertThat(testLModule.getSplitType()).isEqualTo(SplitType.SPLIT);
-    assertThat(getEntriesPaths(testLModule)).containsExactly("assets/test.txt", "dex/classes.dex");
+    assertThat(extractPaths(testLModule.getEntries()))
+        .containsExactly("assets/test.txt", "dex/classes.dex");
     assertThat(isCompressed(testLModule, "dex/classes.dex")).isTrue();
 
     ModuleSplit baseMModule = getModuleSplit(moduleSplits, mVariantTargeting, "base");
     assertThat(baseMModule.getSplitType()).isEqualTo(SplitType.SPLIT);
-    assertThat(getEntriesPaths(baseMModule))
+    assertThat(extractPaths(baseMModule.getEntries()))
         .containsExactly("assets/leftover.txt", "lib/x86_64/libsome.so");
     assertThat(isCompressed(baseMModule, "lib/x86_64/libsome.so")).isFalse();
 
     ModuleSplit testMModule = getModuleSplit(moduleSplits, mVariantTargeting, "test");
     assertThat(testMModule.getSplitType()).isEqualTo(SplitType.SPLIT);
-    assertThat(getEntriesPaths(testMModule)).containsExactly("assets/test.txt", "dex/classes.dex");
+    assertThat(extractPaths(testMModule.getEntries()))
+        .containsExactly("assets/test.txt", "dex/classes.dex");
     assertThat(isCompressed(testMModule, "dex/classes.dex")).isTrue();
 
     ModuleSplit basePModule = getModuleSplit(moduleSplits, pVariantTargeting, "base");
     assertThat(basePModule.getSplitType()).isEqualTo(SplitType.SPLIT);
-    assertThat(getEntriesPaths(basePModule))
+    assertThat(extractPaths(basePModule.getEntries()))
         .containsExactly("assets/leftover.txt", "lib/x86_64/libsome.so");
     assertThat(isCompressed(basePModule, "lib/x86_64/libsome.so")).isFalse();
 
     ModuleSplit testPModule = getModuleSplit(moduleSplits, pVariantTargeting, "test");
     assertThat(testPModule.getSplitType()).isEqualTo(SplitType.SPLIT);
-    assertThat(getEntriesPaths(testPModule)).containsExactly("assets/test.txt", "dex/classes.dex");
+    assertThat(extractPaths(testPModule.getEntries()))
+        .containsExactly("assets/test.txt", "dex/classes.dex");
     assertThat(isCompressed(testPModule, "dex/classes.dex")).isFalse();
   }
 
@@ -265,7 +279,8 @@ public class SplitApksGeneratorTest {
                     .setEnableNativeLibraryCompressionSplitter(true)
                     .setEnableDexCompressionSplitter(true)
                     .setForInstantAppVariants(true)
-                    .build())
+                    .build(),
+                NO_RESOURCES_PINNED_TO_MASTER)
             .generateSplits();
 
     // 2 splits for L variant
@@ -275,14 +290,15 @@ public class SplitApksGeneratorTest {
 
     ModuleSplit baseModule = moduleSplitMap.get("base");
     assertThat(baseModule.getSplitType()).isEqualTo(SplitType.INSTANT);
-    assertThat(getEntriesPaths(baseModule))
+    assertThat(extractPaths(baseModule.getEntries()))
         .containsExactly("assets/leftover.txt", "lib/x86_64/libsome.so");
     assertThat(baseModule.getVariantTargeting()).isEqualTo(lPlusVariantTargeting());
     assertThat(isCompressed(baseModule, "lib/x86_64/libsome.so")).isFalse();
 
     ModuleSplit testModule = moduleSplitMap.get("test");
     assertThat(testModule.getSplitType()).isEqualTo(SplitType.INSTANT);
-    assertThat(getEntriesPaths(testModule)).containsExactly("assets/test.txt", "dex/classes.dex");
+    assertThat(extractPaths(testModule.getEntries()))
+        .containsExactly("assets/test.txt", "dex/classes.dex");
     assertThat(testModule.getVariantTargeting()).isEqualTo(lPlusVariantTargeting());
     assertThat(isCompressed(testModule, "dex/classes.dex")).isTrue();
   }
@@ -296,12 +312,6 @@ public class SplitApksGeneratorTest {
         .filter(moduleSplit -> moduleSplit.getModuleName().getName().equals(moduleName))
         .findFirst()
         .get();
-  }
-
-  private static ImmutableSet<String> getEntriesPaths(ModuleSplit moduleSplit) {
-    return moduleSplit.getEntries().stream()
-        .map(moduleEntry -> moduleEntry.getPath().toString())
-        .collect(toImmutableSet());
   }
 
   private static boolean isCompressed(ModuleSplit moduleSplit, String path) {

@@ -17,7 +17,8 @@
 package com.android.tools.build.bundletool.splitters;
 
 import static com.android.tools.build.bundletool.model.BundleModule.RESOURCES_DIRECTORY;
-import static com.android.tools.build.bundletool.utils.ResourcesUtils.convertLocaleToLanguage;
+import static com.android.tools.build.bundletool.model.utils.ResourcesUtils.convertLocaleToLanguage;
+import static com.android.tools.build.bundletool.model.utils.ResourcesUtils.entries;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 
 import com.android.aapt.Resources.ConfigValue;
@@ -26,14 +27,15 @@ import com.android.aapt.Resources.ResourceTable;
 import com.android.bundle.Targeting.LanguageTargeting;
 import com.android.tools.build.bundletool.model.ModuleEntry;
 import com.android.tools.build.bundletool.model.ModuleSplit;
-import com.android.tools.build.bundletool.utils.ResourcesUtils;
+import com.android.tools.build.bundletool.model.ResourceTableEntry;
+import com.android.tools.build.bundletool.model.utils.ResourcesUtils;
 import com.google.common.base.Predicates;
 import com.google.common.collect.ImmutableCollection;
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableList.Builder;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
+import java.util.function.Predicate;
 
 /**
  * Splits the module resources by languages.
@@ -51,6 +53,12 @@ import com.google.common.collect.Iterables;
  * languages are using the same value 'tl'.
  */
 public class LanguageResourcesSplitter extends SplitterForOneTargetingDimension {
+
+  private final Predicate<ResourceTableEntry> pinResourceToMaster;
+
+  public LanguageResourcesSplitter(Predicate<ResourceTableEntry> pinResourceToMaster) {
+    this.pinResourceToMaster = pinResourceToMaster;
+  }
 
   @Override
   public ImmutableCollection<ModuleSplit> splitInternal(ModuleSplit split) {
@@ -95,9 +103,7 @@ public class LanguageResourcesSplitter extends SplitterForOneTargetingDimension 
   }
 
   private static boolean hasNonResourceEntries(ModuleSplit split) {
-    return split
-        .getEntries()
-        .stream()
+    return split.getEntries().stream()
         .anyMatch(entry -> !entry.getPath().startsWith(RESOURCES_DIRECTORY));
   }
 
@@ -106,21 +112,20 @@ public class LanguageResourcesSplitter extends SplitterForOneTargetingDimension 
     ImmutableList<ModuleEntry> entriesFromResourceTable =
         ModuleSplit.filterResourceEntries(inputEntries, resourceTable);
     if (language.isEmpty()) { // The split with no specific language targeting.
-      ImmutableList.Builder<ModuleEntry> result = new Builder<>();
-      result.addAll(entriesFromResourceTable);
-      // Add non-resource entries.
-      result.addAll(
-          inputEntries
-              .stream()
-              .filter(entry -> !entry.getPath().startsWith(RESOURCES_DIRECTORY))
-              .collect(toImmutableList()));
-      return result.build();
+      return ImmutableList.<ModuleEntry>builder()
+          .addAll(entriesFromResourceTable)
+          // Add non-resource entries.
+          .addAll(
+              inputEntries.stream()
+                  .filter(entry -> !entry.getPath().startsWith(RESOURCES_DIRECTORY))
+                  .collect(toImmutableList()))
+          .build();
     } else {
       return entriesFromResourceTable;
     }
   }
 
-  private static ImmutableMap<String, ResourceTable> groupByLanguage(
+  private ImmutableMap<String, ResourceTable> groupByLanguage(
       ResourceTable table, boolean hasNonResourceEntries) {
     ImmutableSet<String> languages = ResourcesUtils.getAllLanguages(table);
 
@@ -130,39 +135,54 @@ public class LanguageResourcesSplitter extends SplitterForOneTargetingDimension 
       resourceTableByLanguage.put(language, filterByLanguage(table, language));
     }
 
-    // If there are no resources with the default language (rare and not recommended) create an
-    // empty resource table.
-    // This semantic is desired here because we need a default language split to contain all non
-    // resource related entries.
-    if (!languages.contains("") && hasNonResourceEntries) {
-      resourceTableByLanguage.put("", ResourceTable.getDefaultInstance());
+    // If there are no resources with the default language (rare and not recommended) create a
+    // resource table with pinned entries for master split or empty resource table if there are
+    // non resource related entries and no pinned entries.
+    if (!languages.contains("")) {
+      ResourceTable pinnedResources =
+          ResourcesUtils.filterResourceTable(
+              table,
+              /* removeEntryPredicate= */ pinResourceToMaster.negate(),
+              /* configValuesFilterFn= */ ResourceTableEntry::getEntry);
+      if (hasNonResourceEntries || entries(pinnedResources).count() > 0) {
+        resourceTableByLanguage.put("", pinnedResources);
+      }
     }
 
     return resourceTableByLanguage.build();
   }
 
-  private static ResourceTable filterByLanguage(ResourceTable input, String language) {
+  private ResourceTable filterByLanguage(ResourceTable input, String language) {
     return ResourcesUtils.filterResourceTable(
         input,
-        /* removeTypePredicate= */ Predicates.alwaysFalse(),
+        /* removeEntryPredicate= */ language.isEmpty()
+            ? Predicates.alwaysFalse()
+            : pinResourceToMaster,
         /* configValuesFilterFn= */ entry -> filterEntryForLanguage(entry, language));
   }
 
   /**
-   * Only leaves the language specific config values relevant for the given language.
+   * Only leaves the language specific config values relevant for the given language. For pinned
+   * resource to master splits, retains them fully if the target language is empty (default value).
    *
    * @param initialEntry the entry to be updated
    * @param targetLanguage the desired language to match
-   * @return the entry containing only config values specific to the given language
+   * @return the entry containing only config values specific to the given language or pinned
+   *     resources to master splits if applicable.
    */
-  private static Entry filterEntryForLanguage(Entry initialEntry, String targetLanguage) {
+  private Entry filterEntryForLanguage(ResourceTableEntry initialEntry, String targetLanguage) {
+    if (targetLanguage.isEmpty() && pinResourceToMaster.test(initialEntry)) {
+      return initialEntry.getEntry();
+    }
+
     Iterable<ConfigValue> filteredConfigValues =
         Iterables.filter(
-            initialEntry.getConfigValueList(),
+            initialEntry.getEntry().getConfigValueList(),
             configValue ->
                 convertLocaleToLanguage(configValue.getConfig().getLocale())
                     .equals(targetLanguage));
     return initialEntry
+        .getEntry()
         .toBuilder()
         .clearConfigValue()
         .addAllConfigValue(filteredConfigValues)

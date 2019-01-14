@@ -19,10 +19,10 @@ package com.android.tools.build.bundletool.validation;
 import static com.google.common.collect.ImmutableSet.toImmutableSet;
 
 import com.android.bundle.Targeting.Abi.AbiAlias;
-import com.android.tools.build.bundletool.exceptions.ValidationException;
 import com.android.tools.build.bundletool.model.AbiName;
 import com.android.tools.build.bundletool.model.BundleModule;
-import com.android.tools.build.bundletool.targeting.TargetedDirectorySegment;
+import com.android.tools.build.bundletool.model.exceptions.ValidationException;
+import com.android.tools.build.bundletool.model.targeting.TargetedDirectorySegment;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import java.util.Set;

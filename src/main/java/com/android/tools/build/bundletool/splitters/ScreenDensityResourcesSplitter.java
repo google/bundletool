@@ -17,8 +17,8 @@
 package com.android.tools.build.bundletool.splitters;
 
 import static com.android.tools.build.bundletool.model.ManifestMutator.withSplitsRequired;
-import static com.android.tools.build.bundletool.utils.ResourcesUtils.DEFAULT_DENSITY_VALUE;
-import static com.android.tools.build.bundletool.utils.ResourcesUtils.MIPMAP_TYPE;
+import static com.android.tools.build.bundletool.model.utils.ResourcesUtils.DEFAULT_DENSITY_VALUE;
+import static com.android.tools.build.bundletool.model.utils.ResourcesUtils.MIPMAP_TYPE;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.collect.ImmutableList.toImmutableList;
@@ -35,9 +35,10 @@ import com.android.bundle.Targeting.ScreenDensity.DensityAlias;
 import com.android.bundle.Targeting.ScreenDensityTargeting;
 import com.android.tools.build.bundletool.model.ModuleSplit;
 import com.android.tools.build.bundletool.model.ResourceId;
-import com.android.tools.build.bundletool.targeting.ScreenDensitySelector;
-import com.android.tools.build.bundletool.utils.ResourcesUtils;
-import com.android.tools.build.bundletool.version.Version;
+import com.android.tools.build.bundletool.model.ResourceTableEntry;
+import com.android.tools.build.bundletool.model.targeting.ScreenDensitySelector;
+import com.android.tools.build.bundletool.model.utils.ResourcesUtils;
+import com.android.tools.build.bundletool.model.version.Version;
 import com.google.common.collect.ImmutableCollection;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMultimap;
@@ -49,6 +50,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.Predicate;
 
 /** Splits module resources by screen density. */
 public class ScreenDensityResourcesSplitter extends SplitterForOneTargetingDimension {
@@ -65,15 +67,20 @@ public class ScreenDensityResourcesSplitter extends SplitterForOneTargetingDimen
 
   private final ImmutableSet<DensityAlias> densityBuckets;
   private final Version bundleVersion;
+  private final Predicate<ResourceTableEntry> pinResourceToMaster;
 
-  public ScreenDensityResourcesSplitter(Version bundleVersion) {
-    this(DEFAULT_DENSITY_BUCKETS, bundleVersion);
+  public ScreenDensityResourcesSplitter(
+      Version bundleVersion, Predicate<ResourceTableEntry> pinResourceToMaster) {
+    this(DEFAULT_DENSITY_BUCKETS, bundleVersion, pinResourceToMaster);
   }
 
   public ScreenDensityResourcesSplitter(
-      ImmutableSet<DensityAlias> densityBuckets, Version bundleVersion) {
+      ImmutableSet<DensityAlias> densityBuckets,
+      Version bundleVersion,
+      Predicate<ResourceTableEntry> pinResourceToMaster) {
     this.densityBuckets = densityBuckets;
     this.bundleVersion = bundleVersion;
+    this.pinResourceToMaster = pinResourceToMaster;
   }
 
   @Override
@@ -190,7 +197,8 @@ public class ScreenDensityResourcesSplitter extends SplitterForOneTargetingDimen
     return ResourcesUtils.filterResourceTable(
         input,
         // Put mipmaps into the master split.
-        /* removeTypePredicate= */ type -> type.getName().equals(MIPMAP_TYPE),
+        /* removeEntryPredicate= */ pinResourceToMaster.or(
+            resourceTableEntry -> resourceTableEntry.getType().getName().equals(MIPMAP_TYPE)),
         /* configValuesFilterFn= */ entry -> filterEntryForDensity(entry, density));
   }
 
@@ -200,11 +208,12 @@ public class ScreenDensityResourcesSplitter extends SplitterForOneTargetingDimen
    * <p>As any other resource qualifiers can be requested when delivering resources, the algorithm
    * chooses the best match only within group of resources differing by density only.
    *
-   * @param initialEntry the entry to be updated
+   * @param tableEntry the entry to be updated
    * @param targetDensity the desired density to match
    * @return the entry with the best matching density config values.
    */
-  private Entry filterEntryForDensity(Entry initialEntry, DensityAlias targetDensity) {
+  private Entry filterEntryForDensity(ResourceTableEntry tableEntry, DensityAlias targetDensity) {
+    Entry initialEntry = tableEntry.getEntry();
     // Groups together configs that only differ on density.
     Map<Configuration, List<ConfigValue>> configValuesByConfiguration =
         initialEntry.getConfigValueList().stream()

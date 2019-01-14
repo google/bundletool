@@ -25,12 +25,14 @@ import static com.android.tools.build.bundletool.model.BundleModule.APEX_DIRECTO
 import static com.android.tools.build.bundletool.model.BundleModule.APEX_MANIFEST_PATH;
 import static com.google.common.collect.ImmutableSet.toImmutableSet;
 
+import com.android.bundle.Files.ApexImages;
 import com.android.bundle.Files.TargetedApexImage;
-import com.android.tools.build.bundletool.exceptions.ValidationException;
 import com.android.tools.build.bundletool.model.AbiName;
 import com.android.tools.build.bundletool.model.BundleModule;
 import com.android.tools.build.bundletool.model.ModuleEntry;
 import com.android.tools.build.bundletool.model.ZipPath;
+import com.android.tools.build.bundletool.model.exceptions.ValidationException;
+import com.google.common.base.Joiner;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Sets;
@@ -39,10 +41,15 @@ import java.util.Optional;
 /** Validates an APEX bundle. */
 public class ApexBundleValidator extends SubValidator {
 
-  private static final ImmutableSet<ImmutableSet<AbiName>> REQUIRED_SINGLETON_ABIS =
-      ImmutableList.of(X86_64, X86, ARMEABI_V7A, ARM64_V8A).stream()
-          .map(ImmutableSet::of)
-          .collect(toImmutableSet());
+  // The bundle must contain a system image for at least one of each of these sets.
+  private static final ImmutableSet<ImmutableSet<ImmutableSet<AbiName>>> REQUIRED_ONE_OF_ABI_SETS =
+      ImmutableSet.of(
+          // These 32-bit ABIs must be present.
+          ImmutableSet.of(ImmutableSet.of(X86)),
+          ImmutableSet.of(ImmutableSet.of(ARMEABI_V7A)),
+          // These 64-bit ABIs must be present on their own or with the corresponding 32-bit ABI.
+          ImmutableSet.of(ImmutableSet.of(X86_64), ImmutableSet.of(X86_64, X86)),
+          ImmutableSet.of(ImmutableSet.of(ARM64_V8A), ImmutableSet.of(ARM64_V8A, ARMEABI_V7A)));
 
   @Override
   public void validateAllModules(ImmutableList<BundleModule> modules) {
@@ -67,7 +74,7 @@ public class ApexBundleValidator extends SubValidator {
 
   @Override
   public void validateModule(BundleModule module) {
-    if (!module.getApexConfig().isPresent()) {
+    if (module.findEntriesUnderPath(APEX_DIRECTORY).count() == 0) {
       return;
     }
 
@@ -92,25 +99,6 @@ public class ApexBundleValidator extends SubValidator {
     }
 
     ImmutableSet<String> apexImages = apexImagesBuilder.build();
-    ImmutableSet<String> targetedImages =
-        module.getApexConfig().get().getImageList().stream()
-            .map(TargetedApexImage::getPath)
-            .collect(toImmutableSet());
-    ImmutableSet<String> untargetedImages =
-        Sets.difference(apexImages, targetedImages).immutableCopy();
-    if (!untargetedImages.isEmpty()) {
-      throw ValidationException.builder()
-          .withMessage("Found APEX image files that are not targeted: %s", untargetedImages)
-          .build();
-    }
-    ImmutableSet<String> missingTargetedImages =
-        Sets.difference(targetedImages, apexImages).immutableCopy();
-    if (!missingTargetedImages.isEmpty()) {
-      throw ValidationException.builder()
-          .withMessage("Targeted APEX image files are missing: %s", missingTargetedImages)
-          .build();
-    }
-
     ImmutableSet<ImmutableSet<AbiName>> allAbiNameSets =
         apexFileNamesBuilder.build().stream()
             .map(ApexBundleValidator::abiNamesFromFile)
@@ -123,13 +111,16 @@ public class ApexBundleValidator extends SubValidator {
           .build();
     }
 
-    if (!allAbiNameSets.containsAll(REQUIRED_SINGLETON_ABIS)) {
+    if (REQUIRED_ONE_OF_ABI_SETS.stream()
+        .anyMatch(one_of -> one_of.stream().noneMatch(allAbiNameSets::contains))) {
       throw ValidationException.builder()
           .withMessage(
-              "APEX bundle must contain all these singleton architectures: ."
-                  + REQUIRED_SINGLETON_ABIS)
+              "APEX bundle must contain one of %s.",
+              Joiner.on(" and one of ").join(REQUIRED_ONE_OF_ABI_SETS))
           .build();
     }
+
+    module.getApexConfig().ifPresent(targeting -> validateTargeting(apexImages, targeting));
   }
 
   private static ImmutableSet<AbiName> abiNamesFromFile(String fileName) {
@@ -142,5 +133,26 @@ public class ApexBundleValidator extends SubValidator {
         .map(AbiName::fromPlatformName)
         .map(Optional::get)
         .collect(toImmutableSet());
+  }
+
+  private static void validateTargeting(ImmutableSet<String> allImages, ApexImages targeting) {
+    ImmutableSet<String> targetedImages =
+        targeting.getImageList().stream().map(TargetedApexImage::getPath).collect(toImmutableSet());
+
+    ImmutableSet<String> untargetedImages =
+        Sets.difference(allImages, targetedImages).immutableCopy();
+    if (!untargetedImages.isEmpty()) {
+      throw ValidationException.builder()
+          .withMessage("Found APEX image files that are not targeted: %s", untargetedImages)
+          .build();
+    }
+
+    ImmutableSet<String> missingTargetedImages =
+        Sets.difference(targetedImages, allImages).immutableCopy();
+    if (!missingTargetedImages.isEmpty()) {
+      throw ValidationException.builder()
+          .withMessage("Targeted APEX image files are missing: %s", missingTargetedImages)
+          .build();
+    }
   }
 }

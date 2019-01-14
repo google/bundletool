@@ -19,10 +19,10 @@ package com.android.tools.build.bundletool.validation;
 import static com.android.tools.build.bundletool.model.BundleModuleName.BASE_MODULE_NAME;
 import static com.google.common.base.Preconditions.checkArgument;
 
-import com.android.tools.build.bundletool.exceptions.ValidationException;
 import com.android.tools.build.bundletool.model.AndroidManifest;
 import com.android.tools.build.bundletool.model.BundleModule;
 import com.android.tools.build.bundletool.model.BundleModule.ModuleDeliveryType;
+import com.android.tools.build.bundletool.model.exceptions.ValidationException;
 import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
@@ -33,7 +33,6 @@ import java.util.Collection;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.Map.Entry;
-import java.util.Optional;
 import java.util.Set;
 
 /**
@@ -52,7 +51,6 @@ public class ModuleDependencyValidator extends SubValidator {
   @Override
   public void validateAllModules(ImmutableList<BundleModule> modules) {
     checkHasBaseModule(modules);
-    checkSplitIds(modules);
 
     Multimap<String, String> moduleDependenciesMap = buildAdjacencyMap(modules);
     ImmutableMap<String, BundleModule> modulesByName =
@@ -111,37 +109,6 @@ public class ModuleDependencyValidator extends SubValidator {
       throw ValidationException.builder()
           .withMessage("Mandatory '%s' module is missing.", BASE_MODULE_NAME)
           .build();
-    }
-  }
-
-  private static void checkSplitIds(ImmutableList<BundleModule> modules) {
-    // This is rather a sanity check. Currently the bundletool ignores and/or rewrites the
-    // <manifest split="..."> attribute, but mismatch should not happen.
-
-    for (BundleModule module : modules) {
-      String moduleName = module.getName().getName();
-      Optional<String> splitIdFromManifest = module.getAndroidManifest().getSplitId();
-
-      if (module.isBaseModule()) {
-        // Follows the Split APK conventions - the base split has empty split ID.
-        if (splitIdFromManifest.isPresent()) {
-          throw ValidationException.builder()
-              .withMessage(
-                  "The base module should not declare split ID in the manifest, but it is set to "
-                      + "'%s'.",
-                  splitIdFromManifest.get())
-              .build();
-        }
-      } else {
-        if (splitIdFromManifest.isPresent() && !moduleName.equals(splitIdFromManifest.get())) {
-          throw ValidationException.builder()
-              .withMessage(
-                  "Module '%s' declares in its manifest that the split ID is '%s'. It needs to be"
-                      + " either absent or equal to the module name.",
-                  moduleName, splitIdFromManifest.get())
-              .build();
-        }
-      }
     }
   }
 

@@ -17,12 +17,20 @@
 package com.android.tools.build.bundletool.model;
 
 import com.android.bundle.Devices.DeviceSpec;
-import com.android.tools.build.bundletool.commands.GetSizeCommand.Dimension;
 import com.google.common.collect.ImmutableSet;
 import java.util.Optional;
 
 /** Request to compute the size of APKs for a given device spec. */
 public interface GetSizeRequest {
+
+  /** Dimensions to expand the sizes against. */
+  public enum Dimension {
+    SDK,
+    ABI,
+    SCREEN_DENSITY,
+    LANGUAGE,
+    ALL
+  }
 
   DeviceSpec getDeviceSpec();
 

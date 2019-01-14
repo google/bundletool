@@ -16,19 +16,23 @@
 
 package com.android.tools.build.bundletool.commands;
 
+import static com.android.bundle.Targeting.Abi.AbiAlias.ARM64_V8A;
+import static com.android.bundle.Targeting.Abi.AbiAlias.ARMEABI_V7A;
 import static com.android.bundle.Targeting.Abi.AbiAlias.X86;
+import static com.android.bundle.Targeting.Abi.AbiAlias.X86_64;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifest;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withFusingAttribute;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withHasCode;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withOnDemandAttribute;
+import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withSplitId;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withUsesSplit;
-import static com.android.tools.build.bundletool.testing.ResourcesTableFactory.createResourceTable;
-import static com.android.tools.build.bundletool.testing.ResourcesTableFactory.fileReference;
-import static com.android.tools.build.bundletool.testing.TargetingUtils.apexImageTargeting;
+import static com.android.tools.build.bundletool.testing.TargetingUtils.apexImages;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.assetsDirectoryTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.graphicsApiTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.mergeAssetsTargeting;
+import static com.android.tools.build.bundletool.testing.TargetingUtils.multiAbiTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.openGlVersionFrom;
+import static com.android.tools.build.bundletool.testing.TargetingUtils.targetedApexImage;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.textureCompressionTargeting;
 import static com.android.tools.build.bundletool.testing.TestUtils.expectMissingRequiredBuilderPropertyException;
 import static com.android.tools.build.bundletool.testing.TestUtils.expectMissingRequiredFlagException;
@@ -40,7 +44,6 @@ import static com.google.common.truth.extensions.proto.ProtoTruth.assertThat;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
-import com.android.aapt.ConfigurationOuterClass.Configuration;
 import com.android.aapt.Resources.ResourceTable;
 import com.android.aapt.Resources.XmlNode;
 import com.android.bundle.Config.BundleConfig;
@@ -52,19 +55,24 @@ import com.android.bundle.Files.TargetedApexImage;
 import com.android.bundle.Files.TargetedAssetsDirectory;
 import com.android.bundle.Files.TargetedNativeDirectory;
 import com.android.bundle.Targeting.Abi;
+import com.android.bundle.Targeting.Abi.AbiAlias;
 import com.android.bundle.Targeting.AssetsDirectoryTargeting;
 import com.android.bundle.Targeting.NativeDirectoryTargeting;
 import com.android.bundle.Targeting.TextureCompressionFormat.TextureCompressionFormatAlias;
-import com.android.tools.build.bundletool.exceptions.CommandExecutionException;
-import com.android.tools.build.bundletool.exceptions.ValidationException;
+import com.android.tools.build.bundletool.flags.FlagParser;
 import com.android.tools.build.bundletool.io.ZipBuilder;
 import com.android.tools.build.bundletool.model.AppBundle;
 import com.android.tools.build.bundletool.model.ZipPath;
+import com.android.tools.build.bundletool.model.exceptions.CommandExecutionException;
+import com.android.tools.build.bundletool.model.exceptions.ValidationException;
+import com.android.tools.build.bundletool.model.version.BundleToolVersion;
 import com.android.tools.build.bundletool.testing.BundleConfigBuilder;
+import com.android.tools.build.bundletool.testing.FileUtils;
+import com.android.tools.build.bundletool.testing.ManifestProtoUtils.ManifestMutator;
 import com.android.tools.build.bundletool.testing.ResourceTableBuilder;
-import com.android.tools.build.bundletool.utils.flags.FlagParser;
-import com.android.tools.build.bundletool.version.BundleToolVersion;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.Sets;
 import com.google.common.truth.Truth;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -199,8 +207,10 @@ public class BuildBundleCommandTest {
   public void validModule() throws Exception {
     XmlNode manifest = androidManifest(PKG_NAME, withHasCode(true));
     ResourceTable resourceTable =
-        createResourceTable(
-            "icon", fileReference("res/drawable/icon.png", Configuration.getDefaultInstance()));
+        new ResourceTableBuilder()
+            .addPackage(PKG_NAME)
+            .addDrawableResource("icon", "res/drawable/icon.png")
+            .build();
     Path module =
         new ZipBuilder()
             .addFileWithContent(ZipPath.create("assets/anything.dat"), "any".getBytes(UTF_8))
@@ -234,16 +244,20 @@ public class BuildBundleCommandTest {
   @Test
   public void validApexModule() throws Exception {
     XmlNode manifest = androidManifest(PKG_NAME, withHasCode(false));
+    ImmutableSet<AbiAlias> targetedAbis = ImmutableSet.of(X86_64, X86, ARM64_V8A, ARMEABI_V7A);
     ApexImages apexConfig =
-        ApexImages.newBuilder()
-            .addImage(
-                TargetedApexImage.newBuilder()
-                    .setPath("apex/x86.img")
-                    .setTargeting(apexImageTargeting("x86")))
-            .build();
+        apexImages(
+            targetedImageWithAlternatives("apex/x86_64.img", X86_64, targetedAbis),
+            targetedImageWithAlternatives("apex/x86.img", X86, targetedAbis),
+            targetedImageWithAlternatives("apex/arm64-v8a.img", ARM64_V8A, targetedAbis),
+            targetedImageWithAlternatives("apex/armeabi-v7a.img", ARMEABI_V7A, targetedAbis));
     Path module =
         new ZipBuilder()
-            .addFileWithContent(ZipPath.create("apex/x86.img"), "apex".getBytes(UTF_8))
+            .addFileWithContent(ZipPath.create("apex/x86_64.img"), "x86_64".getBytes(UTF_8))
+            .addFileWithContent(ZipPath.create("apex/x86.img"), "x86".getBytes(UTF_8))
+            .addFileWithContent(ZipPath.create("apex/arm64-v8a.img"), "arm64-v8a".getBytes(UTF_8))
+            .addFileWithContent(
+                ZipPath.create("apex/armeabi-v7a.img"), "armeabi-v7a".getBytes(UTF_8))
             .addFileWithProtoContent(ZipPath.create("manifest/AndroidManifest.xml"), manifest)
             .addFileWithContent(
                 ZipPath.create("root/apex_manifest.json"), "manifest".getBytes(UTF_8))
@@ -259,7 +273,12 @@ public class BuildBundleCommandTest {
     assertThat(bundle)
         .hasFile("base/manifest/AndroidManifest.xml")
         .withContent(manifest.toByteArray());
-    assertThat(bundle).hasFile("base/apex/x86.img").withContent("apex".getBytes(UTF_8));
+    assertThat(bundle).hasFile("base/apex/x86_64.img").withContent("x86_64".getBytes(UTF_8));
+    assertThat(bundle).hasFile("base/apex/x86.img").withContent("x86".getBytes(UTF_8));
+    assertThat(bundle).hasFile("base/apex/arm64-v8a.img").withContent("arm64-v8a".getBytes(UTF_8));
+    assertThat(bundle)
+        .hasFile("base/apex/armeabi-v7a.img")
+        .withContent("armeabi-v7a".getBytes(UTF_8));
     assertThat(bundle)
         .hasFile("base/root/apex_manifest.json")
         .withContent("manifest".getBytes(UTF_8));
@@ -610,22 +629,23 @@ public class BuildBundleCommandTest {
 
   @Test
   public void duplicateModules_throws() throws Exception {
-    Path moduleInDirA = tmp.newFolder("a").toPath().resolve("module.zip");
-    new ZipBuilder().writeTo(moduleInDirA);
-    Path moduleInDirB = tmp.newFolder("b").toPath().resolve("module.zip");
-    new ZipBuilder().writeTo(moduleInDirB);
+    Path moduleBase = buildSimpleModule("base");
+    Path moduleFeature1 = buildSimpleModule("feature");
+    Path moduleFeature2 = buildSimpleModule("feature");
 
-    IllegalArgumentException exception =
+    ValidationException exception =
         assertThrows(
-            IllegalArgumentException.class,
+            ValidationException.class,
             () ->
                 BuildBundleCommand.builder()
                     .setOutputPath(bundlePath)
-                    .setModulesPaths(ImmutableList.of(moduleInDirA, moduleInDirB))
+                    .setModulesPaths(ImmutableList.of(moduleBase, moduleFeature1, moduleFeature2))
                     .build()
                     .execute());
 
-    assertThat(exception).hasMessageThat().contains("must have unique filenames");
+    assertThat(exception)
+        .hasMessageThat()
+        .contains("More than one module have the 'split' attribute set to 'feature'");
   }
 
   @Test
@@ -766,6 +786,7 @@ public class BuildBundleCommandTest {
                 ZipPath.create("manifest/AndroidManifest.xml"),
                 androidManifest(
                     PKG_NAME,
+                    withSplitId("module1"),
                     withUsesSplit("module2"),
                     withOnDemandAttribute(false),
                     withFusingAttribute(true)))
@@ -776,6 +797,7 @@ public class BuildBundleCommandTest {
                 ZipPath.create("manifest/AndroidManifest.xml"),
                 androidManifest(
                     PKG_NAME,
+                    withSplitId("module2"),
                     withUsesSplit("module3"),
                     withOnDemandAttribute(false),
                     withFusingAttribute(true)))
@@ -786,6 +808,7 @@ public class BuildBundleCommandTest {
                 ZipPath.create("manifest/AndroidManifest.xml"),
                 androidManifest(
                     PKG_NAME,
+                    withSplitId("module3"),
                     withUsesSplit("module1"),
                     withOnDemandAttribute(false),
                     withFusingAttribute(true)))
@@ -808,8 +831,10 @@ public class BuildBundleCommandTest {
       throws Exception {
 
     ResourceTable resourceTable =
-        createResourceTable(
-            "icon", fileReference("res/drawable/icon.png", Configuration.getDefaultInstance()));
+        new ResourceTableBuilder()
+            .addPackage(PKG_NAME)
+            .addDrawableResource("icon", "res/drawable/icon.png")
+            .build();
     Path module =
         new ZipBuilder()
             .addFileWithProtoContent(ZipPath.create("resources.pb"), resourceTable)
@@ -893,9 +918,23 @@ public class BuildBundleCommandTest {
   }
 
   private Path buildSimpleModule(String moduleName) throws IOException {
+    ManifestMutator[] manifestMutators =
+        moduleName.equals("base")
+            ? new ManifestMutator[0]
+            : new ManifestMutator[] {withSplitId(moduleName)};
+
     return new ZipBuilder()
         .addFileWithProtoContent(
-            ZipPath.create("manifest/AndroidManifest.xml"), androidManifest(PKG_NAME))
-        .writeTo(tmpDir.resolve(moduleName + ".zip"));
+            ZipPath.create("manifest/AndroidManifest.xml"),
+            androidManifest(PKG_NAME, manifestMutators))
+        .writeTo(FileUtils.getRandomFilePath(tmp, moduleName, ".zip"));
+  }
+
+  private TargetedApexImage targetedImageWithAlternatives(
+      String path, AbiAlias abi, ImmutableSet<AbiAlias> targetedAbis) {
+    return targetedApexImage(
+        path,
+        multiAbiTargeting(
+            abi, Sets.difference(targetedAbis, ImmutableSet.of(abi)).immutableCopy()));
   }
 }

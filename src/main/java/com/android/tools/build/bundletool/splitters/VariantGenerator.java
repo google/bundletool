@@ -16,12 +16,12 @@
 
 package com.android.tools.build.bundletool.splitters;
 
-import static com.android.tools.build.bundletool.utils.TargetingProtoUtils.lPlusVariantTargeting;
-import static com.android.tools.build.bundletool.utils.Versions.ANDROID_L_API_VERSION;
+import static com.android.tools.build.bundletool.model.utils.TargetingProtoUtils.lPlusVariantTargeting;
+import static com.android.tools.build.bundletool.model.utils.Versions.ANDROID_L_API_VERSION;
 
 import com.android.bundle.Targeting.VariantTargeting;
-import com.android.tools.build.bundletool.exceptions.CommandExecutionException;
 import com.android.tools.build.bundletool.model.BundleModule;
+import com.android.tools.build.bundletool.model.exceptions.CommandExecutionException;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;

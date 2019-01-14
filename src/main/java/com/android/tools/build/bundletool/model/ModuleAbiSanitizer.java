@@ -23,7 +23,6 @@ import static com.google.common.collect.ImmutableSet.toImmutableSet;
 import static com.google.common.collect.ImmutableSetMultimap.toImmutableSetMultimap;
 
 import com.android.bundle.Files.NativeLibraries;
-import com.android.tools.build.bundletool.model.BundleModule.Builder;
 import com.google.common.collect.ImmutableMultimap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.ImmutableSetMultimap;
@@ -84,9 +83,7 @@ class ModuleAbiSanitizer {
    */
   private static ImmutableMultimap<ZipPath, ModuleEntry> indexLibFilesByAbiDir(
       BundleModule module) {
-    return module
-        .getEntries()
-        .stream()
+    return module.getEntries().stream()
         .filter(entry -> entry.getPath().startsWith(LIB_DIRECTORY))
         .collect(
             toImmutableSetMultimap(entry -> entry.getPath().subpath(0, 2), Function.identity()));
@@ -107,7 +104,7 @@ class ModuleAbiSanitizer {
       BundleModule module, ImmutableMultimap<ZipPath, ModuleEntry> libFilesByAbiDirToKeep) {
 
     // Construct new module by making minimal modifications to the existing module.
-    Builder newModule = module.toBuilder();
+    BundleModule.Builder newModule = module.toBuilder();
 
     if (module.getNativeConfig().isPresent()) {
       NativeLibraries newNativeConfig =
@@ -116,9 +113,7 @@ class ModuleAbiSanitizer {
     }
 
     newModule.setEntryMap(
-        module
-            .getEntries()
-            .stream()
+        module.getEntries().stream()
             .filter(
                 entry ->
                     !entry.getPath().startsWith(LIB_DIRECTORY)
@@ -139,9 +134,7 @@ class ModuleAbiSanitizer {
         .toBuilder()
         .clearDirectory()
         .addAllDirectory(
-            nativeLibraries
-                .getDirectoryList()
-                .stream()
+            nativeLibraries.getDirectoryList().stream()
                 .filter(targetedDirectory -> preservedAbiDirs.contains(targetedDirectory.getPath()))
                 .collect(toImmutableList()))
         .build();

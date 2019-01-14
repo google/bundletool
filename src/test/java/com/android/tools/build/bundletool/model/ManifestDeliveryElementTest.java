@@ -31,11 +31,11 @@ import static com.google.common.truth.Truth8.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.android.aapt.Resources.XmlNode;
-import com.android.tools.build.bundletool.exceptions.ValidationException;
-import com.android.tools.build.bundletool.utils.xmlproto.XmlProtoAttributeBuilder;
-import com.android.tools.build.bundletool.utils.xmlproto.XmlProtoElement;
-import com.android.tools.build.bundletool.utils.xmlproto.XmlProtoElementBuilder;
-import com.android.tools.build.bundletool.utils.xmlproto.XmlProtoNode;
+import com.android.tools.build.bundletool.model.exceptions.ValidationException;
+import com.android.tools.build.bundletool.model.utils.xmlproto.XmlProtoAttributeBuilder;
+import com.android.tools.build.bundletool.model.utils.xmlproto.XmlProtoElement;
+import com.android.tools.build.bundletool.model.utils.xmlproto.XmlProtoElementBuilder;
+import com.android.tools.build.bundletool.model.utils.xmlproto.XmlProtoNode;
 import java.util.Optional;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -409,6 +409,99 @@ public class ManifestDeliveryElementTest {
             "Missing required 'dist:name' attribute in the 'device-feature' condition element.");
   }
 
+  @Test
+  public void userCountriesCondition_parsesOk() {
+    XmlNode manifest =
+        createAndroidManifestWithConditions(
+            XmlProtoElementBuilder.create(DISTRIBUTION_NAMESPACE_URI, "user-countries")
+                .addChildElement(createCountryCodeEntry("pl"))
+                .addChildElement(createCountryCodeEntry("GB"))
+                .build());
+    Optional<ManifestDeliveryElement> deliveryElement =
+        ManifestDeliveryElement.fromManifestRootNode(manifest);
+    assertThat(deliveryElement).isPresent();
+
+    Optional<UserCountriesCondition> userCountriesCondition =
+        deliveryElement.get().getModuleConditions().getUserCountriesCondition();
+    assertThat(userCountriesCondition).isPresent();
+
+    assertThat(userCountriesCondition.get().getCountries()).containsExactly("PL", "GB");
+    assertThat(userCountriesCondition.get().getExclude()).isFalse();
+  }
+
+  @Test
+  public void userCountriesCondition_parsesExclusionOk() {
+    XmlNode manifest =
+        createAndroidManifestWithConditions(
+            XmlProtoElementBuilder.create(DISTRIBUTION_NAMESPACE_URI, "user-countries")
+                .addAttribute(
+                    XmlProtoAttributeBuilder.create(DISTRIBUTION_NAMESPACE_URI, "exclude")
+                        .setValueAsBoolean(true))
+                .addChildElement(createCountryCodeEntry("FR"))
+                .addChildElement(createCountryCodeEntry("SN"))
+                .build());
+    Optional<ManifestDeliveryElement> deliveryElement =
+        ManifestDeliveryElement.fromManifestRootNode(manifest);
+    assertThat(deliveryElement).isPresent();
+
+    Optional<UserCountriesCondition> userCountriesCondition =
+        deliveryElement.get().getModuleConditions().getUserCountriesCondition();
+    assertThat(userCountriesCondition).isPresent();
+
+    assertThat(userCountriesCondition.get().getCountries()).containsExactly("FR", "SN");
+    assertThat(userCountriesCondition.get().getExclude()).isTrue();
+  }
+
+  @Test
+  public void userCountriesCondition_badCountryElementName_throws() {
+    XmlNode manifest =
+        createAndroidManifestWithConditions(
+            XmlProtoElementBuilder.create(DISTRIBUTION_NAMESPACE_URI, "user-countries")
+                .addChildElement(
+                    XmlProtoElementBuilder.create(DISTRIBUTION_NAMESPACE_URI, "country-typo")
+                        .addAttribute(
+                            XmlProtoAttributeBuilder.create(DISTRIBUTION_NAMESPACE_URI, "code")
+                                .setValueAsString("DE")))
+                .build());
+    Optional<ManifestDeliveryElement> deliveryElement =
+        ManifestDeliveryElement.fromManifestRootNode(manifest);
+    assertThat(deliveryElement).isPresent();
+
+    ValidationException exception =
+        assertThrows(
+            ValidationException.class,
+            () -> deliveryElement.get().getModuleConditions().getUserCountriesCondition());
+
+    assertThat(exception)
+        .hasMessageThat()
+        .contains("Expected only <dist:country> elements inside <dist:user-countries>");
+  }
+
+  @Test
+  public void userCountriesCondition_missingCodeAttribute_throws() {
+    XmlNode manifest =
+        createAndroidManifestWithConditions(
+            XmlProtoElementBuilder.create(DISTRIBUTION_NAMESPACE_URI, "user-countries")
+                .addChildElement(
+                    XmlProtoElementBuilder.create(DISTRIBUTION_NAMESPACE_URI, "country")
+                        .addAttribute(
+                            XmlProtoAttributeBuilder.create(DISTRIBUTION_NAMESPACE_URI, "code-typo")
+                                .setValueAsString("DE")))
+                .build());
+    Optional<ManifestDeliveryElement> deliveryElement =
+        ManifestDeliveryElement.fromManifestRootNode(manifest);
+    assertThat(deliveryElement).isPresent();
+
+    ValidationException exception =
+        assertThrows(
+            ValidationException.class,
+            () -> deliveryElement.get().getModuleConditions().getUserCountriesCondition());
+
+    assertThat(exception)
+        .hasMessageThat()
+        .contains("<dist:country> element is expected to have 'dist:code' attribute");
+  }
+
   private static XmlNode createAndroidManifestWithDeliveryElement(
       XmlProtoElementBuilder deliveryElement) {
     return XmlProtoNode.createElementNode(
@@ -439,5 +532,12 @@ public class ManifestDeliveryElementTest {
                                         .addChildElement(conditionsBuilder))))
                 .build())
         .getProto();
+  }
+
+  private static XmlProtoElementBuilder createCountryCodeEntry(String countryCode) {
+    return XmlProtoElementBuilder.create(DISTRIBUTION_NAMESPACE_URI, "country")
+        .addAttribute(
+            XmlProtoAttributeBuilder.create(DISTRIBUTION_NAMESPACE_URI, "code")
+                .setValueAsString(countryCode));
   }
 }

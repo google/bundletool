@@ -15,22 +15,22 @@
  */
 package com.android.tools.build.bundletool.commands;
 
-import static com.android.tools.build.bundletool.utils.CollectorUtils.groupingBySortedKeys;
+import static com.android.tools.build.bundletool.model.utils.CollectorUtils.groupingBySortedKeys;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 
 import com.android.aapt.ConfigurationOuterClass.Configuration;
 import com.android.aapt.Resources.ConfigValue;
 import com.android.aapt.Resources.ResourceTable;
 import com.android.aapt.Resources.XmlNode;
-import com.android.tools.build.bundletool.exceptions.ValidationException;
-import com.android.tools.build.bundletool.model.BundleModule;
+import com.android.tools.build.bundletool.model.BundleModule.SpecialModuleEntry;
 import com.android.tools.build.bundletool.model.BundleModuleName;
 import com.android.tools.build.bundletool.model.ResourceTableEntry;
 import com.android.tools.build.bundletool.model.ZipPath;
-import com.android.tools.build.bundletool.utils.ResourcesUtils;
-import com.android.tools.build.bundletool.utils.ZipUtils;
-import com.android.tools.build.bundletool.utils.xmlproto.XmlProtoNode;
-import com.android.tools.build.bundletool.utils.xmlproto.XmlProtoPrintUtils;
+import com.android.tools.build.bundletool.model.exceptions.ValidationException;
+import com.android.tools.build.bundletool.model.utils.ResourcesUtils;
+import com.android.tools.build.bundletool.model.utils.ZipUtils;
+import com.android.tools.build.bundletool.model.utils.xmlproto.XmlProtoNode;
+import com.android.tools.build.bundletool.model.utils.xmlproto.XmlProtoPrintUtils;
 import com.android.tools.build.bundletool.xml.XPathResolver;
 import com.android.tools.build.bundletool.xml.XPathResolver.XPathResult;
 import com.android.tools.build.bundletool.xml.XmlNamespaceContext;
@@ -66,7 +66,8 @@ final class DumpManager {
 
   void printManifest(BundleModuleName moduleName, Optional<String> xPathExpression) {
     // Extract the manifest from the bundle.
-    ZipPath manifestPath = ZipPath.create(moduleName.getName()).resolve(BundleModule.MANIFEST_PATH);
+    ZipPath manifestPath =
+        ZipPath.create(moduleName.getName()).resolve(SpecialModuleEntry.ANDROID_MANIFEST.getPath());
     XmlProtoNode manifestProto =
         new XmlProtoNode(extractAndParse(bundlePath, manifestPath, XmlNode::parseFrom));
 
@@ -98,7 +99,7 @@ final class DumpManager {
     try (ZipFile zipFile = new ZipFile(bundlePath.toFile())) {
       resourceTables =
           ZipUtils.allFileEntriesPaths(zipFile)
-              .filter(path -> path.endsWith(BundleModule.RESOURCES_PROTO_PATH))
+              .filter(path -> path.endsWith(SpecialModuleEntry.RESOURCE_TABLE.getPath()))
               .map(path -> extractAndParse(zipFile, path, ResourceTable::parseFrom))
               .collect(toImmutableList());
     } catch (IOException e) {
@@ -134,9 +135,9 @@ final class DumpManager {
       }
       if (printValues) {
         printStream.printf(
-            " - %s [%s]",
-            XmlProtoPrintUtils.getValueAsString(configValue.getValue()),
-            XmlProtoPrintUtils.getValueTypeAsString(configValue.getValue()));
+            " - [%s] %s",
+            XmlProtoPrintUtils.getValueTypeAsString(configValue.getValue()),
+            XmlProtoPrintUtils.getValueAsString(configValue.getValue()));
       }
       printStream.println();
     }

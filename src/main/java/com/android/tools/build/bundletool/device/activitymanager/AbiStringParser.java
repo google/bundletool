@@ -19,8 +19,8 @@ package com.android.tools.build.bundletool.device.activitymanager;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 
-import com.android.tools.build.bundletool.exceptions.CommandExecutionException;
 import com.android.tools.build.bundletool.model.AbiName;
+import com.android.tools.build.bundletool.model.exceptions.CommandExecutionException;
 import com.google.common.collect.ImmutableList;
 import java.util.Arrays;
 import java.util.Optional;

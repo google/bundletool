@@ -17,8 +17,10 @@ package com.android.tools.build.bundletool.model;
 
 import static com.google.common.base.Preconditions.checkArgument;
 
-import com.android.tools.build.bundletool.utils.files.BufferedIo;
+import com.android.tools.build.bundletool.model.utils.files.BufferedIo;
 import com.google.auto.value.AutoValue;
+import com.google.errorprone.annotations.Immutable;
+import com.google.errorprone.annotations.MustBeClosed;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
@@ -31,7 +33,12 @@ import java.util.zip.ZipFile;
  * <p>It is the responsibility of the caller to ensure that the referenced {@link ZipFile} stays
  * opened for the lifetime of the {@link ModuleZipEntry} instance.
  */
+// This class is only immutable as long as the underlying zip file doesn't change, but if the zip
+// file changes, nothing we're doing in bundletool makes sense.
+@SuppressWarnings("Immutable")
+@Immutable
 @AutoValue
+@AutoValue.CopyAnnotations
 public abstract class ModuleZipEntry implements ModuleEntry {
 
   abstract ZipEntry getZipEntry();
@@ -58,6 +65,7 @@ public abstract class ModuleZipEntry implements ModuleEntry {
   @Override
   public abstract boolean shouldCompress();
 
+  @MustBeClosed
   @Override
   public InputStream getContent() {
     try {

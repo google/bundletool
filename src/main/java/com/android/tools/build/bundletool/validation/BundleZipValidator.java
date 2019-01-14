@@ -16,7 +16,7 @@
 
 package com.android.tools.build.bundletool.validation;
 
-import com.android.tools.build.bundletool.exceptions.BundleFileTypesException.DirectoryInBundleException;
+import com.android.tools.build.bundletool.model.exceptions.BundleFileTypesException.DirectoryInBundleException;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 

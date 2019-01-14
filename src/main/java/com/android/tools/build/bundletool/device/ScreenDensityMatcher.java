@@ -23,8 +23,8 @@ import com.android.bundle.Targeting.ApkTargeting;
 import com.android.bundle.Targeting.ScreenDensity;
 import com.android.bundle.Targeting.ScreenDensityTargeting;
 import com.android.bundle.Targeting.VariantTargeting;
-import com.android.tools.build.bundletool.targeting.ScreenDensitySelector;
-import com.android.tools.build.bundletool.utils.ResourcesUtils;
+import com.android.tools.build.bundletool.model.targeting.ScreenDensitySelector;
+import com.android.tools.build.bundletool.model.utils.ResourcesUtils;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
 

@@ -20,10 +20,15 @@ import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.truth.Truth.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
+import com.android.tools.build.bundletool.flags.Flag.RequiredFlagNotSetException;
+import com.android.tools.build.bundletool.model.InputStreamSupplier;
 import com.android.tools.build.bundletool.model.ModuleEntry;
 import com.android.tools.build.bundletool.model.ZipPath;
-import com.android.tools.build.bundletool.utils.flags.Flag.RequiredFlagNotSetException;
 import com.google.common.collect.ImmutableList;
+import com.google.common.io.ByteStreams;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.UncheckedIOException;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 import org.junit.jupiter.api.function.Executable;
@@ -56,8 +61,7 @@ public final class TestUtils {
    * instances, preserving the order.
    */
   public static ImmutableList<String> extractPaths(ImmutableList<ModuleEntry> entries) {
-    return entries
-        .stream()
+    return entries.stream()
         .map(ModuleEntry::getPath)
         .map(ZipPath::toString)
         .collect(toImmutableList());
@@ -65,10 +69,21 @@ public final class TestUtils {
 
   /** Extracts paths of all files having the given path prefix. */
   public static ImmutableList<String> filesUnderPath(ZipFile zipFile, ZipPath pathPrefix) {
-    return zipFile
-        .stream()
+    return zipFile.stream()
         .map(ZipEntry::getName)
         .filter(entryName -> ZipPath.create(entryName).startsWith(pathPrefix))
         .collect(toImmutableList());
+  }
+
+  public static byte[] getEntryContent(ModuleEntry entry) {
+    return toByteArray(entry.getContentSupplier());
+  }
+
+  public static byte[] toByteArray(InputStreamSupplier inputStreamSupplier) {
+    try (InputStream entryContent = inputStreamSupplier.get()) {
+      return ByteStreams.toByteArray(entryContent);
+    } catch (IOException e) {
+      throw new UncheckedIOException(e);
+    }
   }
 }

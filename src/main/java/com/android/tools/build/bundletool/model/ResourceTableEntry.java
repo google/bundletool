@@ -20,9 +20,12 @@ import com.android.aapt.Resources.Entry;
 import com.android.aapt.Resources.Type;
 import com.google.auto.value.AutoValue;
 import com.google.auto.value.extension.memoized.Memoized;
+import com.google.errorprone.annotations.Immutable;
 
 /** Represents an entry in a resource table. */
+@Immutable
 @AutoValue
+@AutoValue.CopyAnnotations
 public abstract class ResourceTableEntry {
 
   public static ResourceTableEntry create(Resources.Package pkg, Type type, Entry entry) {

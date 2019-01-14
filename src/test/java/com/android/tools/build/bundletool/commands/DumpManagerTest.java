@@ -112,7 +112,7 @@ public final class DumpManagerTest {
         .execute();
 
     assertThat(new String(outputStream.toByteArray(), UTF_8))
-        .isEqualTo(String.format("<manifest package=\"module\"/>%n"));
+        .isEqualTo(String.format("<manifest package=\"module\" split=\"module\"/>%n"));
   }
 
   @Test
@@ -417,9 +417,50 @@ public final class DumpManagerTest {
             String.format(
                 "Package 'com.app':%n"
                     + "0x7F010000 - string/title%n"
-                    + "\t(default) - Title [STR]%n"
+                    + "\t(default) - [STR] \"Title\"%n"
                     + "0x7F020000 - drawable/icon%n"
-                    + "\t(default) - res/drawable/icon.png [FILE]%n"
+                    + "\t(default) - [FILE] res/drawable/icon.png%n"
+                    + "%n"));
+  }
+
+  @Test
+  public void printResources_valuesEscaped() throws Exception {
+    createBundleWithResourceTable(
+        bundlePath,
+        new ResourceTableBuilder()
+            .addPackage("com.app")
+            .addStringResource("text", "First line\nSecond line\nThird line")
+            .addStringResource("text2", "First line\r\nSecond line\r\nThird line")
+            .addStringResource("text3", "First line\u2028Second line\u2028Third line")
+            .addStringResource("text4", "First line\\nSame line!")
+            .addStringResource("text5", "Text \"with\" quotes!")
+            .build());
+
+    ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+
+    DumpCommand.builder()
+        .setBundlePath(bundlePath)
+        .setDumpTarget(DumpTarget.RESOURCES)
+        .setOutputStream(new PrintStream(outputStream))
+        .setPrintValues(true)
+        .build()
+        .execute();
+
+    String output = new String(outputStream.toByteArray(), UTF_8);
+    assertThat(output)
+        .isEqualTo(
+            String.format(
+                "Package 'com.app':%n"
+                    + "0x7F010000 - string/text%n"
+                    + "\t(default) - [STR] \"First line\\nSecond line\\nThird line\"%n"
+                    + "0x7F010001 - string/text2%n"
+                    + "\t(default) - [STR] \"First line\\r\\nSecond line\\r\\nThird line\"%n"
+                    + "0x7F010002 - string/text3%n"
+                    + "\t(default) - [STR] \"First line\\u2028Second line\\u2028Third line\"%n"
+                    + "0x7F010003 - string/text4%n"
+                    + "\t(default) - [STR] \"First line\\\\nSame line!\"%n"
+                    + "0x7F010004 - string/text5%n"
+                    + "\t(default) - [STR] \"Text \\\"with\\\" quotes!\"%n"
                     + "%n"));
   }
 

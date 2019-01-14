@@ -19,8 +19,7 @@ import static com.android.tools.build.bundletool.testing.CertificateFactory.buil
 import static com.google.common.truth.Truth.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
-import com.android.tools.build.bundletool.exceptions.CommandExecutionException;
-import com.android.tools.build.bundletool.utils.flags.Flag.Password;
+import com.android.tools.build.bundletool.model.exceptions.CommandExecutionException;
 import java.io.FileOutputStream;
 import java.nio.file.Path;
 import java.security.KeyPair;
@@ -64,8 +63,8 @@ public class SigningConfigurationTest {
         SigningConfiguration.extractFromKeystore(
             keystorePath,
             KEY_ALIAS,
-            Optional.of(Password.createFromFlagValue("pass:" + KEYSTORE_PASSWORD)),
-            Optional.of(Password.createFromFlagValue("pass:" + KEY_PASSWORD)));
+            Optional.of(Password.createForTest(KEYSTORE_PASSWORD)),
+            Optional.of(Password.createForTest(KEY_PASSWORD)));
 
     assertThat(signingConfiguration.getPrivateKey()).isEqualTo(privateKey);
     assertThat(signingConfiguration.getCertificates()).containsExactly(certificate);
@@ -79,8 +78,8 @@ public class SigningConfigurationTest {
         SigningConfiguration.extractFromKeystore(
             keystorePath,
             KEY_ALIAS,
-            Optional.of(Password.createFromFlagValue("pass:" + KEYSTORE_PASSWORD)),
-            Optional.of(Password.createFromFlagValue("pass:" + KEY_PASSWORD)));
+            Optional.of(Password.createForTest(KEYSTORE_PASSWORD)),
+            Optional.of(Password.createForTest(KEY_PASSWORD)));
 
     assertThat(signingConfiguration.getPrivateKey()).isEqualTo(privateKey);
     assertThat(signingConfiguration.getCertificates()).containsExactly(certificate);
@@ -97,8 +96,8 @@ public class SigningConfigurationTest {
                 SigningConfiguration.extractFromKeystore(
                     keystorePath,
                     KEY_ALIAS,
-                    Optional.of(Password.createFromFlagValue("pass:WrongPassword")),
-                    Optional.of(Password.createFromFlagValue("pass:" + KEY_PASSWORD))));
+                    Optional.of(Password.createForTest("WrongPassword")),
+                    Optional.of(Password.createForTest(KEY_PASSWORD))));
     assertThat(e).hasMessageThat().contains("Incorrect keystore password");
   }
 
@@ -113,8 +112,8 @@ public class SigningConfigurationTest {
                 SigningConfiguration.extractFromKeystore(
                     keystorePath,
                     KEY_ALIAS,
-                    Optional.of(Password.createFromFlagValue("pass:" + KEYSTORE_PASSWORD)),
-                    Optional.of(Password.createFromFlagValue("pass:WrongPassword"))));
+                    Optional.of(Password.createForTest(KEYSTORE_PASSWORD)),
+                    Optional.of(Password.createForTest("WrongPassword"))));
     assertThat(e).hasMessageThat().contains("Incorrect key password");
   }
 
@@ -131,7 +130,7 @@ public class SigningConfigurationTest {
         SigningConfiguration.extractFromKeystore(
             keystorePath,
             KEY_ALIAS,
-            Optional.of(Password.createFromFlagValue("pass:" + KEYSTORE_PASSWORD)),
+            Optional.of(Password.createForTest(KEYSTORE_PASSWORD)),
             Optional.empty());
 
     assertThat(signingConfiguration.getPrivateKey()).isEqualTo(privateKey);
@@ -149,8 +148,8 @@ public class SigningConfigurationTest {
                 SigningConfiguration.extractFromKeystore(
                     keystorePath,
                     "BadKeyAlias",
-                    Optional.of(Password.createFromFlagValue("pass:" + KEYSTORE_PASSWORD)),
-                    Optional.of(Password.createFromFlagValue("pass:" + KEY_PASSWORD))));
+                    Optional.of(Password.createForTest(KEYSTORE_PASSWORD)),
+                    Optional.of(Password.createForTest(KEY_PASSWORD))));
     assertThat(e).hasMessageThat().contains("No key found with alias 'BadKeyAlias'");
   }
 

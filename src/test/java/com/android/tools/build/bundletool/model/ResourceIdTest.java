@@ -47,6 +47,16 @@ public class ResourceIdTest {
   }
 
   @Test
+  public void createFromFullResourceId() {
+    assertThat(ResourceId.create(0xffffffff))
+        .isEqualTo(
+            ResourceId.builder().setPackageId(0xff).setTypeId(0xff).setEntryId(0xffff).build());
+    assertThat(ResourceId.create(0x12345678))
+        .isEqualTo(
+            ResourceId.builder().setPackageId(0x12).setTypeId(0x34).setEntryId(0x5678).build());
+  }
+
+  @Test
   public void badPackageId_throws() {
     IllegalStateException exception =
         assertThrows(

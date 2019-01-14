@@ -18,11 +18,10 @@ package com.android.tools.build.bundletool.io;
 import static com.android.tools.build.bundletool.model.BundleModule.APEX_DIRECTORY;
 import static com.android.tools.build.bundletool.model.BundleModule.DEX_DIRECTORY;
 import static com.android.tools.build.bundletool.model.BundleModule.MANIFEST_FILENAME;
-import static com.android.tools.build.bundletool.model.BundleModule.RESOURCES_PROTO_PATH;
 import static com.android.tools.build.bundletool.model.BundleModule.ROOT_DIRECTORY;
-import static com.android.tools.build.bundletool.utils.files.FilePreconditions.checkFileDoesNotExist;
-import static com.android.tools.build.bundletool.utils.files.FilePreconditions.checkFileHasExtension;
-import static com.android.tools.build.bundletool.utils.files.FileUtils.createParentDirectories;
+import static com.android.tools.build.bundletool.model.utils.files.FilePreconditions.checkFileDoesNotExist;
+import static com.android.tools.build.bundletool.model.utils.files.FilePreconditions.checkFileHasExtension;
+import static com.android.tools.build.bundletool.model.utils.files.FileUtils.createParentDirectories;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.collect.ImmutableList.toImmutableList;
@@ -36,15 +35,17 @@ import com.android.tools.build.apkzlib.zip.AlignmentRule;
 import com.android.tools.build.apkzlib.zip.AlignmentRules;
 import com.android.tools.build.apkzlib.zip.ZFile;
 import com.android.tools.build.apkzlib.zip.ZFileOptions;
-import com.android.tools.build.bundletool.exceptions.ValidationException;
 import com.android.tools.build.bundletool.io.ZipBuilder.EntryOption;
 import com.android.tools.build.bundletool.model.Aapt2Command;
+import com.android.tools.build.bundletool.model.BundleModule.SpecialModuleEntry;
 import com.android.tools.build.bundletool.model.ModuleEntry;
 import com.android.tools.build.bundletool.model.ModuleSplit;
 import com.android.tools.build.bundletool.model.SigningConfiguration;
 import com.android.tools.build.bundletool.model.WearApkLocator;
 import com.android.tools.build.bundletool.model.ZipPath;
-import com.android.tools.build.bundletool.utils.files.FileUtils;
+import com.android.tools.build.bundletool.model.exceptions.ValidationException;
+import com.android.tools.build.bundletool.model.utils.files.FileUtils;
+import com.android.tools.build.bundletool.model.version.Version;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Predicate;
 import com.google.common.base.Predicates;
@@ -101,7 +102,7 @@ final class ApkSerializerHelper {
   private static final Predicate<ZipPath> FILES_FOR_AAPT2 =
       path ->
           path.startsWith("res")
-              || path.equals(RESOURCES_PROTO_PATH)
+              || path.equals(SpecialModuleEntry.RESOURCE_TABLE.getPath())
               || path.equals(ZipPath.create(MANIFEST_FILENAME));
 
   private static final String BUILT_BY = "BundleTool";
@@ -113,14 +114,17 @@ final class ApkSerializerHelper {
           "rtttl", "smf", "wav", "webm", "wma", "wmv", "xmf");
 
   private final Aapt2Command aapt2Command;
+  private final Version bundleVersion;
   private final Optional<SigningConfiguration> signingConfig;
   private final ImmutableList<PathMatcher> uncompressedPathMatchers;
 
   ApkSerializerHelper(
       Aapt2Command aapt2Command,
       Optional<SigningConfiguration> signingConfig,
+      Version bundleVersion,
       Compression compression) {
     this.aapt2Command = aapt2Command;
+    this.bundleVersion = bundleVersion;
     this.signingConfig = signingConfig;
 
     // Using the default filesystem will work on Windows because the "/" of the glob are swapped
@@ -243,7 +247,7 @@ final class ApkSerializerHelper {
         Path signedWearApk = signWearApk(entry, signingConfig.get(), tempDir);
         zipBuilder.addFileFromDisk(pathInApk, signedWearApk.toFile(), entryOptions);
       } else {
-        zipBuilder.addFile(pathInApk, () -> entry.getContent(), entryOptions);
+        zipBuilder.addFile(pathInApk, entry.getContentSupplier(), entryOptions);
       }
     }
 
@@ -251,7 +255,8 @@ final class ApkSerializerHelper {
         .getResourceTable()
         .ifPresent(
             resourceTable ->
-                zipBuilder.addFileWithProtoContent(RESOURCES_PROTO_PATH, resourceTable));
+                zipBuilder.addFileWithProtoContent(
+                    SpecialModuleEntry.RESOURCE_TABLE.getPath(), resourceTable));
     zipBuilder.addFileWithProtoContent(
         ZipPath.create(MANIFEST_FILENAME), split.getAndroidManifest().getManifestRoot().getProto());
 
@@ -288,8 +293,12 @@ final class ApkSerializerHelper {
       return false;
     }
 
-    // Common extensions that should remain uncompressed because don't provide any gains.
-    if (NO_COMPRESSION_EXTENSIONS.contains(FileUtils.getFileExtension(path))) {
+    // Common extensions that should remain uncompressed because compression doesn't provide any
+    // gains.
+    // For bundle versions starting by 0.7.3 the no-compression is fully configured through the
+    // bundle config file.
+    if (bundleVersion.isOlderThan(Version.of("0.7.3"))
+        && NO_COMPRESSION_EXTENSIONS.contains(FileUtils.getFileExtension(path))) {
       return false;
     }
 
@@ -370,7 +379,9 @@ final class ApkSerializerHelper {
 
       // Input
       Path unsignedApk = tempDir.resolve("wear-unsigned.apk");
-      Files.copy(wearApkEntry.getContent(), unsignedApk);
+      try (InputStream entryContent = wearApkEntry.getContent()) {
+        Files.copy(entryContent, unsignedApk);
+      }
 
       // Output
       Path signedApk = tempDir.resolve("wear-signed.apk");

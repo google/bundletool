@@ -30,7 +30,6 @@ import com.android.tools.build.bundletool.model.ModuleSplit;
 import com.google.common.base.Function;
 import com.google.common.collect.ImmutableCollection;
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableList.Builder;
 import com.google.common.collect.Multimap;
 import com.google.common.collect.Multimaps;
 import com.google.protobuf.Message;
@@ -79,14 +78,11 @@ public class AssetsDimensionSplitterFactory {
         checkArgument(
             !hasTargeting.test(split.getApkTargeting()),
             "Split is already targeting the splitting dimension.");
-        if (!split.getAssetsConfig().isPresent()) {
-          return ImmutableList.of(split);
-        }
-        ImmutableList.Builder<ModuleSplit> result = new Builder<>();
-        Assets assetsConfig = split.getAssetsConfig().get();
-        result.addAll(splitAssetsDirectories(assetsConfig, split));
 
-        return result.build();
+        return split
+            .getAssetsConfig()
+            .map(assetsConfig -> splitAssetsDirectories(assetsConfig, split))
+            .orElse(ImmutableList.of(split));
       }
 
       private ImmutableList<ModuleSplit> splitAssetsDirectories(Assets assets, ModuleSplit split) {
@@ -130,8 +126,7 @@ public class AssetsDimensionSplitterFactory {
 
       private ImmutableList<ModuleEntry> findEntriesInDirectories(
           Collection<TargetedAssetsDirectory> directories, ModuleSplit moduleSplit) {
-        return directories
-            .stream()
+        return directories.stream()
             .flatMap(directory -> moduleSplit.findEntriesInsideDirectory(directory.getPath()))
             .collect(toImmutableList());
       }

@@ -28,8 +28,8 @@ import static com.google.common.truth.Truth.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.android.aapt.Resources.XmlNode;
-import com.android.tools.build.bundletool.exceptions.ValidationException;
 import com.android.tools.build.bundletool.model.BundleModule;
+import com.android.tools.build.bundletool.model.exceptions.ValidationException;
 import com.android.tools.build.bundletool.testing.BundleModuleBuilder;
 import com.google.common.collect.ImmutableList;
 import java.io.IOException;
@@ -153,36 +153,6 @@ public class ModuleDependencyValidatorTest {
             () -> new ModuleDependencyValidator().validateAllModules(allModules));
 
     assertThat(exception).hasMessageThat().contains("Found cyclic dependency between modules");
-  }
-
-  @Test
-  public void validateAllModules_baseDeclaresSplitId_throws() throws Exception {
-    ImmutableList<BundleModule> allModules =
-        ImmutableList.of(module("base", androidManifest(PKG_NAME, withSplitId("base"))));
-
-    ValidationException exception =
-        assertThrows(
-            ValidationException.class,
-            () -> new ModuleDependencyValidator().validateAllModules(allModules));
-
-    assertThat(exception).hasMessageThat().contains("should not declare split ID");
-  }
-
-  @Test
-  public void validateAllModules_splitIdDifferentFromModuleName_throws() throws Exception {
-    ImmutableList<BundleModule> allModules =
-        ImmutableList.of(
-            module("base", androidManifest(PKG_NAME)),
-            module("feature", androidManifest(PKG_NAME, withSplitId("not_feature"))));
-
-    ValidationException exception =
-        assertThrows(
-            ValidationException.class,
-            () -> new ModuleDependencyValidator().validateAllModules(allModules));
-
-    assertThat(exception)
-        .hasMessageThat()
-        .contains("Module 'feature' declares in its manifest that the split ID is 'not_feature'");
   }
 
   private BundleModule module(String moduleName, XmlNode manifest) throws IOException {

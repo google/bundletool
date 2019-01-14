@@ -22,9 +22,10 @@ import static java.util.function.Function.identity;
 import static java.util.stream.Collectors.partitioningBy;
 
 import com.google.common.collect.ImmutableList;
+import com.google.errorprone.annotations.Immutable;
+import com.google.errorprone.annotations.MustBeClosed;
 import java.io.InputStream;
 import java.util.Map;
-import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -62,9 +63,8 @@ public class ClassesDexNameSanitizer {
         ImmutableList.<ModuleEntry>builder()
             .addAll(nonDexEntries)
             .addAll(
-                dexEntries
-                    .stream()
-                    .map(entry -> new RenamedModuleEntry(entry, this::incrementClassesDexNumber))
+                dexEntries.stream()
+                    .map(entry -> new RenamedDexEntry(entry))
                     .collect(toImmutableList()))
             .build();
 
@@ -74,39 +74,17 @@ public class ClassesDexNameSanitizer {
         .build();
   }
 
-  /**
-   * Increment the suffix of multidex files.
-   *
-   * <pre>
-   * dex/classes.dex -> dex/classes.dex
-   * dex/classes1.dex -> dex/classes2.dex
-   * dex/classes2.dex -> dex/classes3.dex
-   * </pre>
-   */
-  private ZipPath incrementClassesDexNumber(ZipPath entryPath) {
-    String fileName = entryPath.toString();
-
-    Matcher matcher = CLASSES_DEX_REGEX_PATTERN.matcher(fileName);
-    checkState(matcher.matches());
-
-    String num = matcher.group(1);
-    if (num.isEmpty()) {
-      return entryPath; // dex/classes.dex
-    }
-    return ZipPath.create("dex/classes" + (Integer.parseInt(num) + 1) + ".dex");
-  }
-
   /** A ModuleEntry that has the same content as an other ModuleEntry but uses a different name. */
-  private static class RenamedModuleEntry implements ModuleEntry {
+  @Immutable
+  private static class RenamedDexEntry implements ModuleEntry {
 
     private final ModuleEntry moduleEntry;
-    private final Function<ZipPath, ZipPath> renameFunction;
 
-    RenamedModuleEntry(ModuleEntry moduleEntry, Function<ZipPath, ZipPath> renameFunction) {
+    RenamedDexEntry(ModuleEntry moduleEntry) {
       this.moduleEntry = moduleEntry;
-      this.renameFunction = renameFunction;
     }
 
+    @MustBeClosed
     @Override
     public InputStream getContent() {
       return moduleEntry.getContent();
@@ -114,7 +92,7 @@ public class ClassesDexNameSanitizer {
 
     @Override
     public ZipPath getPath() {
-      return renameFunction.apply(moduleEntry.getPath());
+      return incrementClassesDexNumber(moduleEntry.getPath());
     }
 
     @Override
@@ -143,6 +121,28 @@ public class ClassesDexNameSanitizer {
     @Override
     public int hashCode() {
       return moduleEntry.hashCode();
+    }
+
+    /**
+     * Increment the suffix of multidex files.
+     *
+     * <pre>
+     * dex/classes.dex -- dex/classes.dex
+     * dex/classes1.dex -- dex/classes2.dex
+     * dex/classes2.dex -- dex/classes3.dex
+     * </pre>
+     */
+    private ZipPath incrementClassesDexNumber(ZipPath entryPath) {
+      String fileName = entryPath.toString();
+
+      Matcher matcher = CLASSES_DEX_REGEX_PATTERN.matcher(fileName);
+      checkState(matcher.matches());
+
+      String num = matcher.group(1);
+      if (num.isEmpty()) {
+        return entryPath; // dex/classes.dex
+      }
+      return ZipPath.create("dex/classes" + (Integer.parseInt(num) + 1) + ".dex");
     }
   }
 }

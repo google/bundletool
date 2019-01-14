@@ -19,9 +19,9 @@ package com.android.tools.build.bundletool.device;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 
 import com.android.tools.build.bundletool.device.Device.InstallOptions;
-import com.android.tools.build.bundletool.exceptions.CommandExecutionException;
-import com.android.tools.build.bundletool.exceptions.DeviceNotFoundException;
-import com.android.tools.build.bundletool.exceptions.DeviceNotFoundException.TooManyDevicesMatchedException;
+import com.android.tools.build.bundletool.model.exceptions.CommandExecutionException;
+import com.android.tools.build.bundletool.model.exceptions.DeviceNotFoundException;
+import com.android.tools.build.bundletool.model.exceptions.DeviceNotFoundException.TooManyDevicesMatchedException;
 import com.google.common.base.Predicates;
 import com.google.common.collect.ImmutableList;
 import java.nio.file.Path;

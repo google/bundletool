@@ -32,6 +32,8 @@ import com.android.aapt.Resources.ResourceTable;
 import com.android.aapt.Resources.Type;
 import com.android.aapt.Resources.TypeId;
 import com.android.aapt.Resources.Value;
+import com.android.aapt.Resources.Visibility;
+import com.android.aapt.Resources.Visibility.Level;
 import com.google.common.io.Files;
 import java.util.Arrays;
 import java.util.LinkedHashMap;
@@ -184,6 +186,7 @@ public final class ResourceTableBuilder {
     type.addEntry(
         Entry.newBuilder()
             .setEntryId(EntryId.newBuilder().setId(entryId))
+            .setVisibility(Visibility.newBuilder().setLevel(Level.PUBLIC))
             .setName(resourceName)
             .addAllConfigValue(Arrays.asList(configValues)));
 

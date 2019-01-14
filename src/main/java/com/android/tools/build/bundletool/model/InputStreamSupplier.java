@@ -16,6 +16,8 @@
 
 package com.android.tools.build.bundletool.model;
 
+import com.google.errorprone.annotations.Immutable;
+import com.google.errorprone.annotations.MustBeClosed;
 import java.io.IOException;
 import java.io.InputStream;
 
@@ -24,7 +26,11 @@ import java.io.InputStream;
  *
  * <p>To be used to access various types of data, such as files on disk, zip file entries or raw
  * byte data.
+ *
+ * <p>All subclasses must be immutable, and return the same {@link InputStream} at each invocation.
  */
+@Immutable
 public interface InputStreamSupplier {
+  @MustBeClosed
   InputStream get() throws IOException;
 }

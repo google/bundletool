@@ -16,8 +16,8 @@
 
 package com.android.tools.build.bundletool.mergers;
 
-import static com.android.tools.build.bundletool.utils.Versions.ANDROID_K_API_VERSION;
-import static com.android.tools.build.bundletool.utils.Versions.ANDROID_L_API_VERSION;
+import static com.android.tools.build.bundletool.model.utils.Versions.ANDROID_K_API_VERSION;
+import static com.android.tools.build.bundletool.model.utils.Versions.ANDROID_L_API_VERSION;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.collect.ImmutableList.toImmutableList;
@@ -26,7 +26,7 @@ import static com.google.common.truth.Truth.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.android.tools.build.bundletool.TestData;
-import com.android.tools.build.bundletool.exceptions.CommandExecutionException;
+import com.android.tools.build.bundletool.model.exceptions.CommandExecutionException;
 import com.android.tools.build.bundletool.testing.FileUtils;
 import com.android.tools.r8.dex.ApplicationReader;
 import com.android.tools.r8.graph.DexApplication;

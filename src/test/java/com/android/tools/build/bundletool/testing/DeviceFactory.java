@@ -16,13 +16,13 @@
 
 package com.android.tools.build.bundletool.testing;
 
-import static com.android.tools.build.bundletool.utils.ProtoUtils.mergeFromProtos;
-import static com.android.tools.build.bundletool.utils.ResourcesUtils.DENSITY_ALIAS_TO_DPI_MAP;
+import static com.android.tools.build.bundletool.model.utils.ProtoUtils.mergeFromProtos;
+import static com.android.tools.build.bundletool.model.utils.ResourcesUtils.DENSITY_ALIAS_TO_DPI_MAP;
 import static java.nio.charset.StandardCharsets.UTF_8;
 
 import com.android.bundle.Devices.DeviceSpec;
 import com.android.bundle.Targeting.ScreenDensity.DensityAlias;
-import com.android.tools.build.bundletool.utils.Versions;
+import com.android.tools.build.bundletool.model.utils.Versions;
 import com.google.protobuf.util.JsonFormat;
 import java.nio.file.Files;
 import java.nio.file.Path;

@@ -23,6 +23,8 @@ import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.with
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withMinSdkCondition;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withOnDemandAttribute;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withOnDemandDelivery;
+import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withSplitId;
+import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withTypeAttribute;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withUsesSplit;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.mergeModuleTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.moduleFeatureTargeting;
@@ -44,6 +46,7 @@ import com.android.bundle.Files.TargetedApexImage;
 import com.android.bundle.Files.TargetedAssetsDirectory;
 import com.android.bundle.Files.TargetedNativeDirectory;
 import com.android.tools.build.bundletool.model.BundleModule.ModuleDeliveryType;
+import com.android.tools.build.bundletool.model.BundleModule.ModuleType;
 import com.android.tools.build.bundletool.testing.BundleConfigBuilder;
 import java.io.IOException;
 import java.util.Arrays;
@@ -419,6 +422,37 @@ public class BundleModuleTest {
   }
 
   @Test
+  public void getModuleType_notSpecified_defaultsToFeature() {
+    BundleModule bundleModule =
+        createMinimalModuleBuilder()
+            .setAndroidManifestProto(androidManifest("com.test.app"))
+            .build();
+
+    assertThat(bundleModule.getModuleType()).isEqualTo(ModuleType.FEATURE_MODULE);
+  }
+
+  @Test
+  public void getModuleType_feature() {
+    BundleModule bundleModule =
+        createMinimalModuleBuilder()
+            .setAndroidManifestProto(androidManifest("com.test.app", withTypeAttribute("feature")))
+            .build();
+
+    assertThat(bundleModule.getModuleType()).isEqualTo(ModuleType.FEATURE_MODULE);
+  }
+
+  @Test
+  public void getModuleType_remoteAsset() {
+    BundleModule bundleModule =
+        createMinimalModuleBuilder()
+            .setAndroidManifestProto(
+                androidManifest("com.test.app", withTypeAttribute("remote-asset")))
+            .build();
+
+    assertThat(bundleModule.getModuleType()).isEqualTo(ModuleType.ASSET_MODULE);
+  }
+
+  @Test
   public void renderscriptFiles_present() throws Exception {
     BundleModule bundleModule =
         createMinimalModuleBuilder()
@@ -444,7 +478,7 @@ public class BundleModuleTest {
   private static BundleModule.Builder createMinimalModuleBuilder() {
     return BundleModule.builder()
         .setName(BundleModuleName.create("testModule"))
-        .setAndroidManifestProto(androidManifest("com.test.app"))
+        .setAndroidManifestProto(androidManifest("com.test.app", withSplitId("testModule")))
         .setBundleConfig(DEFAULT_BUNDLE_CONFIG);
   }
 }

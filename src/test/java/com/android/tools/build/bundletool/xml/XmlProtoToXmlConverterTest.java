@@ -17,10 +17,10 @@ package com.android.tools.build.bundletool.xml;
 
 import static com.google.common.truth.Truth.assertThat;
 
-import com.android.tools.build.bundletool.utils.xmlproto.XmlProtoAttributeBuilder;
-import com.android.tools.build.bundletool.utils.xmlproto.XmlProtoElement;
-import com.android.tools.build.bundletool.utils.xmlproto.XmlProtoElementBuilder;
-import com.android.tools.build.bundletool.utils.xmlproto.XmlProtoNode;
+import com.android.tools.build.bundletool.model.utils.xmlproto.XmlProtoAttributeBuilder;
+import com.android.tools.build.bundletool.model.utils.xmlproto.XmlProtoElement;
+import com.android.tools.build.bundletool.model.utils.xmlproto.XmlProtoElementBuilder;
+import com.android.tools.build.bundletool.model.utils.xmlproto.XmlProtoNode;
 import com.google.common.base.Joiner;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -221,6 +221,121 @@ public final class XmlProtoToXmlConverterTest {
 
     assertThat(xmlString)
         .isEqualTo(String.format("<root xmlns:a=\"http://uri\" a:_unknown_=\"hello\"/>%n"));
+  }
+
+  @Test
+  public void testNoNamespaceDeclaration_doesNotCrash() {
+    XmlProtoNode proto =
+        XmlProtoNode.createElementNode(
+            XmlProtoElementBuilder.create("root")
+                .addAttribute(
+                    XmlProtoAttributeBuilder.create("http://uri", "key").setValueAsString("value"))
+                .addAttribute(
+                    XmlProtoAttributeBuilder.create("http://uri", "key2")
+                        .setValueAsString("value2"))
+                .addAttribute(
+                    XmlProtoAttributeBuilder.create("http://other-uri", "other-key")
+                        .setValueAsString("other-value"))
+                .build());
+
+    Document document = XmlProtoToXmlConverter.convert(proto);
+    String xmlString = XmlUtils.documentToString(document);
+
+    assertThat(xmlString)
+        .isEqualTo(
+            String.format(
+                "<root xmlns:_unknown0_=\"http://uri\" "
+                    + "_unknown0_:key=\"value\" "
+                    + "_unknown0_:key2=\"value2\" "
+                    + "xmlns:_unknown1_=\"http://other-uri\" "
+                    + "_unknown1_:other-key=\"other-value\"/>%n"));
+  }
+
+  @Test
+  public void testNoNamespaceDeclarationWithCommonUris() {
+    XmlProtoNode proto =
+        XmlProtoNode.createElementNode(
+            XmlProtoElementBuilder.create("root")
+                .addAttribute(
+                    XmlProtoAttributeBuilder.create(
+                            "http://schemas.android.com/apk/res/android", "android-key")
+                        .setValueAsString("android-value"))
+                .addAttribute(
+                    XmlProtoAttributeBuilder.create(
+                            "http://schemas.android.com/apk/res/android", "android-key2")
+                        .setValueAsString("android-value2"))
+                .addAttribute(
+                    XmlProtoAttributeBuilder.create(
+                            "http://schemas.android.com/apk/distribution", "dist-key")
+                        .setValueAsString("dist-value"))
+                .addAttribute(
+                    XmlProtoAttributeBuilder.create("http://schemas.android.com/tools", "tools-key")
+                        .setValueAsString("tools-value"))
+                .build());
+
+    Document document = XmlProtoToXmlConverter.convert(proto);
+    String xmlString = XmlUtils.documentToString(document);
+
+    assertThat(xmlString)
+        .isEqualTo(
+            String.format(
+                "<root xmlns:android=\"http://schemas.android.com/apk/res/android\" "
+                    + "android:android-key=\"android-value\" "
+                    + "android:android-key2=\"android-value2\" "
+                    + "xmlns:dist=\"http://schemas.android.com/apk/distribution\" "
+                    + "dist:dist-key=\"dist-value\" "
+                    + "xmlns:tools=\"http://schemas.android.com/tools\" "
+                    + "tools:tools-key=\"tools-value\"/>%n"));
+  }
+
+  @Test
+  public void testNoNamespaceDeclarationWithNestedElementsWithCommonUris() {
+    XmlProtoNode proto =
+        XmlProtoNode.createElementNode(
+            XmlProtoElementBuilder.create("root")
+                .addChildElement(
+                    XmlProtoElementBuilder.create(
+                            "http://schemas.android.com/apk/res/android", "android-element")
+                        .addChildElement(
+                            XmlProtoElementBuilder.create(
+                                "http://schemas.android.com/apk/res/android", "android-element2")))
+                .build());
+
+    Document document = XmlProtoToXmlConverter.convert(proto);
+    String xmlString = XmlUtils.documentToString(document);
+
+    assertThat(xmlString)
+        .isEqualTo(
+            String.format(
+                "<root>%n"
+                    + "  <android:android-element "
+                    + "xmlns:android=\"http://schemas.android.com/apk/res/android\">%n"
+                    + "    <android:android-element2/>%n"
+                    + "  </android:android-element>%n"
+                    + "</root>%n"));
+  }
+
+  @Test
+  public void testCommonUriPrefixAlreadyInUse() {
+    XmlProtoNode proto =
+        XmlProtoNode.createElementNode(
+            XmlProtoElementBuilder.create("root")
+                .addNamespaceDeclaration("android", "http://uri")
+                .addAttribute(
+                    XmlProtoAttributeBuilder.create(
+                            "http://schemas.android.com/apk/res/android", "key")
+                        .setValueAsString("value"))
+                .build());
+
+    Document document = XmlProtoToXmlConverter.convert(proto);
+    String xmlString = XmlUtils.documentToString(document);
+
+    assertThat(xmlString)
+        .isEqualTo(
+            String.format(
+                "<root xmlns:android=\"http://uri\" "
+                    + "xmlns:_unknown0_=\"http://schemas.android.com/apk/res/android\" "
+                    + "_unknown0_:key=\"value\"/>%n"));
   }
 
   private static XmlProtoAttributeBuilder newAttribute(String attrName) {

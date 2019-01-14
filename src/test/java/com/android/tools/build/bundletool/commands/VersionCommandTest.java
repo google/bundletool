@@ -18,8 +18,8 @@ package com.android.tools.build.bundletool.commands;
 
 import static com.google.common.truth.Truth.assertThat;
 
-import com.android.tools.build.bundletool.utils.flags.FlagParser;
-import com.android.tools.build.bundletool.version.BundleToolVersion;
+import com.android.tools.build.bundletool.flags.FlagParser;
+import com.android.tools.build.bundletool.model.version.BundleToolVersion;
 import com.google.common.base.Splitter;
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;

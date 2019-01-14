@@ -24,23 +24,23 @@ import static com.android.tools.build.bundletool.model.BundleModule.LIB_DIRECTOR
 import static com.android.tools.build.bundletool.model.BundleModule.MANIFEST_DIRECTORY;
 import static com.android.tools.build.bundletool.model.BundleModule.MANIFEST_FILENAME;
 import static com.android.tools.build.bundletool.model.BundleModule.RESOURCES_DIRECTORY;
-import static com.android.tools.build.bundletool.model.BundleModule.RESOURCES_PROTO_PATH;
 import static com.android.tools.build.bundletool.model.BundleModule.ROOT_DIRECTORY;
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.ImmutableSet.toImmutableSet;
 
-import com.android.tools.build.bundletool.exceptions.BundleFileTypesException.FileUsesReservedNameException;
-import com.android.tools.build.bundletool.exceptions.BundleFileTypesException.FilesInResourceDirectoryRootException;
-import com.android.tools.build.bundletool.exceptions.BundleFileTypesException.InvalidApexImagePathException;
-import com.android.tools.build.bundletool.exceptions.BundleFileTypesException.InvalidFileExtensionInDirectoryException;
-import com.android.tools.build.bundletool.exceptions.BundleFileTypesException.InvalidFileNameInDirectoryException;
-import com.android.tools.build.bundletool.exceptions.BundleFileTypesException.InvalidNativeArchitectureNameException;
-import com.android.tools.build.bundletool.exceptions.BundleFileTypesException.InvalidNativeLibraryPathException;
-import com.android.tools.build.bundletool.exceptions.BundleFileTypesException.UnknownFileOrDirectoryFoundInModuleException;
-import com.android.tools.build.bundletool.exceptions.ValidationException;
 import com.android.tools.build.bundletool.model.AbiName;
+import com.android.tools.build.bundletool.model.BundleModule.SpecialModuleEntry;
 import com.android.tools.build.bundletool.model.ZipPath;
+import com.android.tools.build.bundletool.model.exceptions.BundleFileTypesException.FileUsesReservedNameException;
+import com.android.tools.build.bundletool.model.exceptions.BundleFileTypesException.FilesInResourceDirectoryRootException;
+import com.android.tools.build.bundletool.model.exceptions.BundleFileTypesException.InvalidApexImagePathException;
+import com.android.tools.build.bundletool.model.exceptions.BundleFileTypesException.InvalidFileExtensionInDirectoryException;
+import com.android.tools.build.bundletool.model.exceptions.BundleFileTypesException.InvalidFileNameInDirectoryException;
+import com.android.tools.build.bundletool.model.exceptions.BundleFileTypesException.InvalidNativeArchitectureNameException;
+import com.android.tools.build.bundletool.model.exceptions.BundleFileTypesException.InvalidNativeLibraryPathException;
+import com.android.tools.build.bundletool.model.exceptions.BundleFileTypesException.UnknownFileOrDirectoryFoundInModuleException;
+import com.android.tools.build.bundletool.model.exceptions.ValidationException;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import java.util.Optional;
@@ -64,7 +64,7 @@ public class BundleFilesValidator extends SubValidator {
           ZipPath.create("resources.arsc"),
           // Special files in the proto APKs (created by the 'split-module' command).
           ZipPath.create(MANIFEST_FILENAME),
-          RESOURCES_PROTO_PATH);
+          SpecialModuleEntry.RESOURCE_TABLE.getPath());
 
   @Override
   public void validateModuleFile(ZipPath file) {

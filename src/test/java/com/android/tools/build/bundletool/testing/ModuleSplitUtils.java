@@ -24,8 +24,8 @@ import com.android.tools.build.bundletool.model.AndroidManifest;
 import com.android.tools.build.bundletool.model.BundleModuleName;
 import com.android.tools.build.bundletool.model.ManifestMutator;
 import com.android.tools.build.bundletool.model.ModuleSplit;
-import com.android.tools.build.bundletool.version.BundleToolVersion;
-import com.android.tools.build.bundletool.version.Version;
+import com.android.tools.build.bundletool.model.version.BundleToolVersion;
+import com.android.tools.build.bundletool.model.version.Version;
 import com.google.common.collect.ImmutableList;
 
 /** Utility to create and manipulate the {@link ModuleSplit}. */

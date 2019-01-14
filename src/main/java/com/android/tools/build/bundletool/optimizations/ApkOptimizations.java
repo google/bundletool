@@ -21,13 +21,16 @@ import static com.android.tools.build.bundletool.model.OptimizationDimension.SCR
 import static com.google.common.base.Preconditions.checkNotNull;
 
 import com.android.tools.build.bundletool.model.OptimizationDimension;
-import com.android.tools.build.bundletool.version.Version;
+import com.android.tools.build.bundletool.model.version.Version;
 import com.google.auto.value.AutoValue;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.ImmutableSortedMap;
+import com.google.errorprone.annotations.Immutable;
 
 /** Optimizations that should be performed on the generated APKs. */
+@Immutable
 @AutoValue
+@AutoValue.CopyAnnotations
 public abstract class ApkOptimizations {
 
   /**

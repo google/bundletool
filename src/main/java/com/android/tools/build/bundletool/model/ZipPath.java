@@ -19,12 +19,13 @@ import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Preconditions.checkState;
 
+import com.google.auto.value.AutoValue;
 import com.google.common.base.Joiner;
 import com.google.common.base.Splitter;
-import com.google.common.collect.ComparisonChain;
+import com.google.common.collect.Comparators;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
-import com.google.common.collect.ObjectArrays;
-import com.google.common.collect.Ordering;
+import com.google.errorprone.annotations.Immutable;
 import java.io.File;
 import java.io.IOException;
 import java.net.URI;
@@ -34,9 +35,8 @@ import java.nio.file.Path;
 import java.nio.file.WatchEvent;
 import java.nio.file.WatchKey;
 import java.nio.file.WatchService;
-import java.util.Arrays;
+import java.util.Comparator;
 import java.util.Iterator;
-import java.util.List;
 import javax.annotation.CheckReturnValue;
 import javax.annotation.Nullable;
 
@@ -45,7 +45,10 @@ import javax.annotation.Nullable;
  *
  * <p>The separator will always be a forward slash ("/") regardless of the platform being used.
  */
-public final class ZipPath implements Path {
+@Immutable
+@AutoValue
+@AutoValue.CopyAnnotations
+public abstract class ZipPath implements Path {
 
   private static final String SEPARATOR = "/";
   private static final Splitter SPLITTER = Splitter.on(SEPARATOR).omitEmptyStrings();
@@ -54,34 +57,27 @@ public final class ZipPath implements Path {
 
   public static final ZipPath ROOT = ZipPath.create("");
 
+  // Constructor with restricted visibility to avoid subclassing and ensure immutability.
+  ZipPath() {}
+
   /**
    * List of parts of the path separated by the separator.
    *
    * <p>Note that this list can be empty when denoting the root of the zip.
    */
-  protected final String[] names;
-
-  // Cached hash code.
-  private transient int hashCode;
-
-  private ZipPath(List<String> names) {
-    this(names.toArray(new String[0]));
-  }
-
-  private ZipPath(String[] names) {
-    Arrays.stream(names)
-        .forEach(
-            name ->
-                checkArgument(
-                    !FORBIDDEN_NAMES.contains(name),
-                    "Name '%s' is not supported inside path.",
-                    name));
-    this.names = names;
-  }
+  abstract ImmutableList<String> getNames();
 
   public static ZipPath create(String path) {
     checkNotNull(path, "Path cannot be null.");
-    return new ZipPath(SPLITTER.splitToList(path));
+    return create(ImmutableList.copyOf(SPLITTER.splitToList(path)));
+  }
+
+  private static ZipPath create(ImmutableList<String> names) {
+    names.forEach(
+        name ->
+            checkArgument(
+                !FORBIDDEN_NAMES.contains(name), "Name '%s' is not supported inside path.", name));
+    return new AutoValue_ZipPath(names);
   }
 
   @Override
@@ -89,7 +85,8 @@ public final class ZipPath implements Path {
   public ZipPath resolve(Path p) {
     checkNotNull(p, "Path cannot be null.");
     ZipPath path = (ZipPath) p;
-    return new ZipPath(ObjectArrays.concat(names, path.names, String.class));
+    return create(
+        ImmutableList.<String>builder().addAll(getNames()).addAll(path.getNames()).build());
   }
 
   @Override
@@ -102,7 +99,7 @@ public final class ZipPath implements Path {
   @CheckReturnValue
   public ZipPath resolveSibling(Path path) {
     checkNotNull(path, "Path cannot be null.");
-    checkState(names.length > 0, "Root has not sibling.");
+    checkState(!getNames().isEmpty(), "Root has not sibling.");
     return getParent().resolve(path);
   }
 
@@ -115,25 +112,25 @@ public final class ZipPath implements Path {
   @Override
   @CheckReturnValue
   public ZipPath subpath(int from, int to) {
-    checkArgument(from >= 0 && from < names.length);
-    checkArgument(to >= 0 && to <= names.length);
+    checkArgument(from >= 0 && from < getNames().size());
+    checkArgument(to >= 0 && to <= getNames().size());
     checkArgument(from < to);
-    return new ZipPath(Arrays.copyOfRange(names, from, to));
+    return create(getNames().subList(from, to));
   }
 
   @Override
   @Nullable
   @CheckReturnValue
   public ZipPath getParent() {
-    if (names.length == 0) {
+    if (getNames().isEmpty()) {
       return null;
     }
-    return new ZipPath(Arrays.copyOf(names, names.length - 1));
+    return create(getNames().subList(0, getNames().size() - 1));
   }
 
   @Override
   public int getNameCount() {
-    return names.length;
+    return getNames().size();
   }
 
   @Override
@@ -143,8 +140,8 @@ public final class ZipPath implements Path {
 
   @Override
   public ZipPath getName(int index) {
-    checkArgument(index >= 0 && index < names.length);
-    return ZipPath.create(names[index]);
+    checkArgument(index >= 0 && index < getNames().size());
+    return ZipPath.create(getNames().get(index));
   }
 
   @Override
@@ -154,8 +151,10 @@ public final class ZipPath implements Path {
       return false;
     }
 
+    ImmutableList<String> names = getNames();
+    ImmutableList<String> otherNames = path.getNames();
     for (int i = 0; i < path.getNameCount(); i++) {
-      if (!path.names[i].equals(names[i])) {
+      if (!otherNames.get(i).equals(names.get(i))) {
         return false;
       }
     }
@@ -175,8 +174,10 @@ public final class ZipPath implements Path {
       return false;
     }
 
+    ImmutableList<String> names = getNames();
+    ImmutableList<String> otherNames = path.getNames();
     for (int i = 0; i < path.getNameCount(); i++) {
-      if (!path.names[path.names.length - i - 1].equals(names[names.length - i - 1])) {
+      if (!otherNames.get(otherNames.size() - i - 1).equals(names.get(names.size() - i - 1))) {
         return false;
       }
     }
@@ -190,38 +191,15 @@ public final class ZipPath implements Path {
   }
 
   @Override
-  public int hashCode() {
-    if (hashCode == 0) {
-      hashCode = Arrays.hashCode(names);
-    }
-    return hashCode;
+  public final int compareTo(Path other) {
+    return Comparators.lexicographical(Comparator.<String>naturalOrder())
+        .compare(getNames(), ((ZipPath) other).getNames());
   }
 
+  /** Returns the path as used in the zip file. */
   @Override
-  public boolean equals(Object path) {
-    if (!(path instanceof ZipPath)) {
-      return false;
-    }
-    return Arrays.equals(names, ((ZipPath) path).names);
-  }
-
-  @Override
-  public int compareTo(Path other) {
-    ZipPath path = (ZipPath) other;
-    ComparisonChain chain = ComparisonChain.start();
-    for (int i = 0; i < Math.max(getNameCount(), path.getNameCount()); i++) {
-      chain =
-          chain.compare(
-              i < names.length ? names[i] : null,
-              i < path.names.length ? path.names[i] : null,
-              Ordering.natural().nullsFirst());
-    }
-    return chain.result();
-  }
-
-  @Override
-  public String toString() {
-    return JOINER.join(names);
+  public final String toString() {
+    return JOINER.join(getNames());
   }
 
   @Override
@@ -232,7 +210,7 @@ public final class ZipPath implements Path {
 
   @Override
   public Iterator<Path> iterator() {
-    return Arrays.stream(names).map(name -> (Path) ZipPath.create(name)).iterator();
+    return getNames().stream().map(name -> (Path) ZipPath.create(name)).iterator();
   }
 
   @Override

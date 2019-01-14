@@ -27,10 +27,21 @@ import static com.android.tools.build.bundletool.commands.BuildApksCommand.ApkBu
 import static com.android.tools.build.bundletool.commands.BuildApksCommand.ApkBuildMode.UNIVERSAL;
 import static com.android.tools.build.bundletool.model.OptimizationDimension.ABI;
 import static com.android.tools.build.bundletool.model.OptimizationDimension.LANGUAGE;
+import static com.android.tools.build.bundletool.model.utils.ResultUtils.instantApkVariants;
+import static com.android.tools.build.bundletool.model.utils.ResultUtils.splitApkVariants;
+import static com.android.tools.build.bundletool.model.utils.ResultUtils.standaloneApkVariants;
+import static com.android.tools.build.bundletool.model.utils.ResultUtils.systemApkVariants;
+import static com.android.tools.build.bundletool.model.utils.Versions.ANDROID_M_API_VERSION;
+import static com.android.tools.build.bundletool.model.utils.Versions.ANDROID_P_API_VERSION;
 import static com.android.tools.build.bundletool.testing.Aapt2Helper.AAPT2_PATH;
 import static com.android.tools.build.bundletool.testing.ApkSetUtils.extractFromApkSetFile;
 import static com.android.tools.build.bundletool.testing.ApkSetUtils.extractTocFromApkSetFile;
 import static com.android.tools.build.bundletool.testing.ApkSetUtils.parseTocFromFile;
+import static com.android.tools.build.bundletool.testing.DeviceFactory.abis;
+import static com.android.tools.build.bundletool.testing.DeviceFactory.density;
+import static com.android.tools.build.bundletool.testing.DeviceFactory.locales;
+import static com.android.tools.build.bundletool.testing.DeviceFactory.mergeSpecs;
+import static com.android.tools.build.bundletool.testing.DeviceFactory.sdkVersion;
 import static com.android.tools.build.bundletool.testing.FileUtils.uncompressGzipFile;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifest;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifestForFeature;
@@ -46,11 +57,7 @@ import static com.android.tools.build.bundletool.testing.ResourcesTableFactory.L
 import static com.android.tools.build.bundletool.testing.ResourcesTableFactory.MDPI;
 import static com.android.tools.build.bundletool.testing.ResourcesTableFactory.TEST_LABEL_RESOURCE_ID;
 import static com.android.tools.build.bundletool.testing.ResourcesTableFactory.USER_PACKAGE_OFFSET;
-import static com.android.tools.build.bundletool.testing.ResourcesTableFactory.createResourceTable;
-import static com.android.tools.build.bundletool.testing.ResourcesTableFactory.fileReference;
 import static com.android.tools.build.bundletool.testing.ResourcesTableFactory.locale;
-import static com.android.tools.build.bundletool.testing.ResourcesTableFactory.packageWithTestLabel;
-import static com.android.tools.build.bundletool.testing.ResourcesTableFactory.resourceTable;
 import static com.android.tools.build.bundletool.testing.ResourcesTableFactory.resourceTableWithTestLabel;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.abiTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.alternativeLanguageTargeting;
@@ -75,12 +82,6 @@ import static com.android.tools.build.bundletool.testing.TargetingUtils.variantM
 import static com.android.tools.build.bundletool.testing.TargetingUtils.variantSdkTargeting;
 import static com.android.tools.build.bundletool.testing.TestUtils.filesUnderPath;
 import static com.android.tools.build.bundletool.testing.truth.zip.TruthZip.assertThat;
-import static com.android.tools.build.bundletool.utils.ResultUtils.instantApkVariants;
-import static com.android.tools.build.bundletool.utils.ResultUtils.splitApkVariants;
-import static com.android.tools.build.bundletool.utils.ResultUtils.standaloneApkVariants;
-import static com.android.tools.build.bundletool.utils.ResultUtils.systemApkVariants;
-import static com.android.tools.build.bundletool.utils.Versions.ANDROID_M_API_VERSION;
-import static com.android.tools.build.bundletool.utils.Versions.ANDROID_P_API_VERSION;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.ImmutableMap.toImmutableMap;
 import static com.google.common.collect.ImmutableMultiset.toImmutableMultiset;
@@ -109,22 +110,26 @@ import com.android.bundle.Targeting.Abi;
 import com.android.bundle.Targeting.Abi.AbiAlias;
 import com.android.bundle.Targeting.AbiTargeting;
 import com.android.bundle.Targeting.ApkTargeting;
+import com.android.bundle.Targeting.ScreenDensity.DensityAlias;
 import com.android.bundle.Targeting.SdkVersion;
 import com.android.bundle.Targeting.VariantTargeting;
 import com.android.tools.build.bundletool.TestData;
 import com.android.tools.build.bundletool.commands.BuildApksCommand.ApkBuildMode;
 import com.android.tools.build.bundletool.device.AdbServer;
-import com.android.tools.build.bundletool.exceptions.CommandExecutionException;
-import com.android.tools.build.bundletool.exceptions.ValidationException;
+import com.android.tools.build.bundletool.flags.FlagParser;
+import com.android.tools.build.bundletool.flags.ParsedFlags;
 import com.android.tools.build.bundletool.io.AppBundleSerializer;
 import com.android.tools.build.bundletool.io.ZipBuilder;
 import com.android.tools.build.bundletool.model.Aapt2Command;
 import com.android.tools.build.bundletool.model.AndroidManifest;
 import com.android.tools.build.bundletool.model.ApkModifier;
 import com.android.tools.build.bundletool.model.AppBundle;
-import com.android.tools.build.bundletool.model.ResourceId;
 import com.android.tools.build.bundletool.model.SigningConfiguration;
 import com.android.tools.build.bundletool.model.ZipPath;
+import com.android.tools.build.bundletool.model.exceptions.CommandExecutionException;
+import com.android.tools.build.bundletool.model.exceptions.ValidationException;
+import com.android.tools.build.bundletool.model.utils.files.FilePreconditions;
+import com.android.tools.build.bundletool.model.version.BundleToolVersion;
 import com.android.tools.build.bundletool.testing.Aapt2Helper;
 import com.android.tools.build.bundletool.testing.ApkSetUtils;
 import com.android.tools.build.bundletool.testing.AppBundleBuilder;
@@ -132,11 +137,8 @@ import com.android.tools.build.bundletool.testing.BundleConfigBuilder;
 import com.android.tools.build.bundletool.testing.CertificateFactory;
 import com.android.tools.build.bundletool.testing.FakeAdbServer;
 import com.android.tools.build.bundletool.testing.FileUtils;
+import com.android.tools.build.bundletool.testing.ResourceTableBuilder;
 import com.android.tools.build.bundletool.testing.truth.zip.TruthZip;
-import com.android.tools.build.bundletool.utils.files.FilePreconditions;
-import com.android.tools.build.bundletool.utils.flags.FlagParser;
-import com.android.tools.build.bundletool.utils.flags.ParsedFlags;
-import com.android.tools.build.bundletool.version.BundleToolVersion;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableMultiset;
@@ -719,10 +721,17 @@ public class BuildApksManagerTest {
                         .addFile("res/drawable-ldpi/image.jpg")
                         .addFile("res/drawable-mdpi/image.jpg")
                         .setResourceTable(
-                            createResourceTable(
-                                "image",
-                                fileReference("res/drawable-ldpi/image.jpg", LDPI),
-                                fileReference("res/drawable-mdpi/image.jpg", MDPI)))
+                            new ResourceTableBuilder()
+                                .addPackage("com.test.app")
+                                .addFileResourceForMultipleConfigs(
+                                    "drawable",
+                                    "image",
+                                    ImmutableMap.of(
+                                        LDPI,
+                                        "res/drawable-ldpi/image.jpg",
+                                        MDPI,
+                                        "res/drawable-mdpi/image.jpg"))
+                                .build())
                         .setManifest(androidManifest("com.test.app")))
             .build();
     bundleSerializer.writeToDisk(appBundle, bundlePath);
@@ -786,10 +795,17 @@ public class BuildApksManagerTest {
                         .addFile("res/drawable-ldpi/image.jpg")
                         .addFile("res/drawable-mdpi/image.jpg")
                         .setResourceTable(
-                            createResourceTable(
-                                "image",
-                                fileReference("res/drawable-ldpi/image.jpg", LDPI),
-                                fileReference("res/drawable-mdpi/image.jpg", MDPI)))
+                            new ResourceTableBuilder()
+                                .addPackage("com.test.app")
+                                .addFileResourceForMultipleConfigs(
+                                    "drawable",
+                                    "image",
+                                    ImmutableMap.of(
+                                        LDPI,
+                                        "res/drawable-ldpi/image.jpg",
+                                        MDPI,
+                                        "res/drawable-mdpi/image.jpg"))
+                                .build())
                         .setManifest(androidManifest("com.test.app")))
             .setBundleConfig(
                 BundleConfigBuilder.create()
@@ -880,10 +896,17 @@ public class BuildApksManagerTest {
                         .addFile("res/drawable-ldpi/image.jpg")
                         .addFile("res/drawable-mdpi/image.jpg")
                         .setResourceTable(
-                            createResourceTable(
-                                "image",
-                                fileReference("res/drawable-ldpi/image.jpg", LDPI),
-                                fileReference("res/drawable-mdpi/image.jpg", MDPI)))
+                            new ResourceTableBuilder()
+                                .addPackage("com.test.app")
+                                .addFileResourceForMultipleConfigs(
+                                    "drawable",
+                                    "image",
+                                    ImmutableMap.of(
+                                        LDPI,
+                                        "res/drawable-ldpi/image.jpg",
+                                        MDPI,
+                                        "res/drawable-mdpi/image.jpg"))
+                                .build())
                         .setManifest(androidManifest("com.test.app")))
             .setBundleConfig(
                 BundleConfigBuilder.create()
@@ -1269,6 +1292,75 @@ public class BuildApksManagerTest {
           .getApkDescriptionList()
           .forEach(apkDescription -> assertThat(apkSetFile).hasFile(apkDescription.getPath()));
     }
+  }
+
+  @Test
+  @Theory
+  public void buildApksCommand_systemWithDeviceSpec_oneModuleSingleVariant(
+      @FromDataPoints("systemApkBuildModes") ApkBuildMode systemApkBuildMode) throws Exception {
+    bundlePath = FileUtils.getRandomFilePath(tmp, "bundle-", ".aab");
+    AppBundle appBundle =
+        new AppBundleBuilder()
+            .addModule(
+                "base",
+                builder ->
+                    builder
+                        .addFile("dex/classes.dex")
+                        .addFile("lib/x86/libsome.so")
+                        .addFile("lib/x86_64/libsome.so")
+                        .addFile("lib/mips/libsome.so")
+                        .setNativeConfig(
+                            nativeLibraries(
+                                targetedNativeDirectory(
+                                    "lib/x86", nativeDirectoryTargeting(AbiAlias.X86)),
+                                targetedNativeDirectory(
+                                    "lib/x86_64", nativeDirectoryTargeting(AbiAlias.X86_64)),
+                                targetedNativeDirectory(
+                                    "lib/mips", nativeDirectoryTargeting(AbiAlias.MIPS))))
+                        .setManifest(androidManifest("com.test.app")))
+            .setBundleConfig(
+                BundleConfigBuilder.create()
+                    .addSplitDimension(Value.ABI)
+                    .addSplitDimension(Value.SCREEN_DENSITY, /* negate= */ true)
+                    .build())
+            .build();
+    bundleSerializer.writeToDisk(appBundle, bundlePath);
+
+    BuildApksCommand command =
+        BuildApksCommand.builder()
+            .setBundlePath(bundlePath)
+            .setApkBuildMode(systemApkBuildMode)
+            .setOutputFile(outputFilePath)
+            .setAapt2Command(aapt2Command)
+            .setDeviceSpec(
+                mergeSpecs(
+                    sdkVersion(28), abis("x86"), density(DensityAlias.MDPI), locales("en-US")))
+            .build();
+
+    Path apkSetFilePath = execute(command);
+    ZipFile apkSetFile = new ZipFile(apkSetFilePath.toFile());
+    BuildApksResult result = extractTocFromApkSetFile(apkSetFile, outputDir);
+
+    assertThat(result.getVariantList()).hasSize(1);
+    Variant x86Variant = result.getVariant(0);
+    assertThat(x86Variant.getTargeting())
+        .ignoringRepeatedFieldOrder()
+        .isEqualTo(
+            mergeVariantTargeting(
+                variantAbiTargeting(AbiAlias.X86, ImmutableSet.of(AbiAlias.X86_64, AbiAlias.MIPS)),
+                variantSdkTargeting(LOWEST_SDK_VERSION)));
+    assertThat(x86Variant.getApkSetList()).hasSize(1);
+    ApkSet apkSet = x86Variant.getApkSet(0);
+    if (systemApkBuildMode.equals(SYSTEM)) {
+      // Single System APK.
+      assertThat(apkSet.getApkDescriptionList()).hasSize(1);
+    } else {
+      // Stub and Compressed APK.
+      assertThat(apkSet.getApkDescriptionList()).hasSize(2);
+    }
+    apkSet
+        .getApkDescriptionList()
+        .forEach(apkDescription -> assertThat(apkSetFile).hasFile(apkDescription.getPath()));
   }
 
   @Test
@@ -1854,9 +1946,7 @@ public class BuildApksManagerTest {
                         .addFile("assets/file.txt")
                         .addFile("dex/classes.dex")
                         .setManifest(androidManifest("com.test.app"))
-                        .setResourceTable(
-                            resourceTable(
-                                packageWithTestLabel("Test feature", USER_PACKAGE_OFFSET - 1))))
+                        .setResourceTable(resourceTableWithTestLabel("Test feature")))
             .addModule(
                 "abi_feature",
                 builder ->
@@ -1872,9 +1962,7 @@ public class BuildApksManagerTest {
                         .setManifest(
                             androidManifestForFeature(
                                 "com.test.app",
-                                withTitle(
-                                    "@string/test_label",
-                                    makeResourceIdentifier(USER_PACKAGE_OFFSET - 1, 0x01, 0x01)))))
+                                withTitle("@string/test_label", TEST_LABEL_RESOURCE_ID))))
             .addModule(
                 "language_feature",
                 builder ->
@@ -1884,19 +1972,25 @@ public class BuildApksManagerTest {
                         .addFile("res/drawable-fr/image.jpg")
                         .addFile("res/drawable-pl/image.jpg")
                         .setResourceTable(
-                            createResourceTable(
-                                "image",
-                                fileReference(
-                                    "res/drawable/image.jpg", Configuration.getDefaultInstance()),
-                                fileReference("res/drawable-cz/image.jpg", locale("cz")),
-                                fileReference("res/drawable-fr/image.jpg", locale("fr")),
-                                fileReference("res/drawable-pl/image.jpg", locale("pl"))))
+                            new ResourceTableBuilder()
+                                .addPackage("com.test.app", USER_PACKAGE_OFFSET - 1)
+                                .addFileResourceForMultipleConfigs(
+                                    "drawable",
+                                    "image",
+                                    ImmutableMap.of(
+                                        Configuration.getDefaultInstance(),
+                                        "res/drawable/image.jpg",
+                                        locale("cz"),
+                                        "res/drawable-cz/image.jpg",
+                                        locale("fr"),
+                                        "res/drawable-fr/image.jpg",
+                                        locale("pl"),
+                                        "res/drawable-pl/image.jpg"))
+                                .build())
                         .setManifest(
                             androidManifestForFeature(
                                 "com.test.app",
-                                withTitle(
-                                    "@string/test_label",
-                                    makeResourceIdentifier(USER_PACKAGE_OFFSET - 1, 0x01, 0x01)))))
+                                withTitle("@string/test_label", TEST_LABEL_RESOURCE_ID))))
             .setBundleConfig(
                 BundleConfigBuilder.create().setUncompressNativeLibraries(false).build())
             .build();
@@ -2144,9 +2238,7 @@ public class BuildApksManagerTest {
                         .addFile("assets/file.txt")
                         .addFile("dex/classes.dex")
                         .setManifest(androidManifest("com.test.app"))
-                        .setResourceTable(
-                            resourceTable(
-                                packageWithTestLabel("test_label", USER_PACKAGE_OFFSET - 1))))
+                        .setResourceTable(resourceTableWithTestLabel("test_label")))
             .addModule(
                 "abi_feature",
                 builder ->
@@ -2162,9 +2254,7 @@ public class BuildApksManagerTest {
                         .setManifest(
                             androidManifestForFeature(
                                 "com.test.app",
-                                withTitle(
-                                    "@string/test_label",
-                                    makeResourceIdentifier(USER_PACKAGE_OFFSET - 1, 0x01, 0x01)))))
+                                withTitle("@string/test_label", TEST_LABEL_RESOURCE_ID))))
             .addModule(
                 "language_feature",
                 builder ->
@@ -2174,19 +2264,25 @@ public class BuildApksManagerTest {
                         .addFile("res/drawable-fr/image.jpg")
                         .addFile("res/drawable-pl/image.jpg")
                         .setResourceTable(
-                            createResourceTable(
-                                "image",
-                                fileReference(
-                                    "res/drawable/image.jpg", Configuration.getDefaultInstance()),
-                                fileReference("res/drawable-cz/image.jpg", locale("cz")),
-                                fileReference("res/drawable-fr/image.jpg", locale("fr")),
-                                fileReference("res/drawable-pl/image.jpg", locale("pl"))))
+                            new ResourceTableBuilder()
+                                .addPackage("com.test.app", USER_PACKAGE_OFFSET - 1)
+                                .addFileResourceForMultipleConfigs(
+                                    "drawable",
+                                    "image",
+                                    ImmutableMap.of(
+                                        Configuration.getDefaultInstance(),
+                                        "res/drawable/image.jpg",
+                                        locale("cz"),
+                                        "res/drawable-cz/image.jpg",
+                                        locale("fr"),
+                                        "res/drawable-fr/image.jpg",
+                                        locale("pl"),
+                                        "res/drawable-pl/image.jpg"))
+                                .build())
                         .setManifest(
                             androidManifestForFeature(
                                 "com.test.app",
-                                withTitle(
-                                    "@string/test_label",
-                                    makeResourceIdentifier(USER_PACKAGE_OFFSET - 1, 0x01, 0x01)))))
+                                withTitle("@string/test_label", TEST_LABEL_RESOURCE_ID))))
             .build();
     bundleSerializer.writeToDisk(appBundle, bundlePath);
 
@@ -2745,15 +2841,6 @@ public class BuildApksManagerTest {
 
   private Path execute(BuildApksCommand command) {
     return new BuildApksManager(command).execute(tmpDir);
-  }
-
-  private static int makeResourceIdentifier(int pkgId, int typeId, int entryId) {
-    return ResourceId.builder()
-        .setPackageId(pkgId)
-        .setTypeId(typeId)
-        .setEntryId(entryId)
-        .build()
-        .getFullResourceId();
   }
 
   private ImmutableMap<ApkTargeting, Variant> extractStandaloneVariantsByTargeting(

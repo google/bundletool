@@ -20,9 +20,9 @@ import static com.android.tools.build.bundletool.model.BundleModule.ASSETS_DIREC
 
 import com.android.bundle.Files.Assets;
 import com.android.bundle.Files.TargetedAssetsDirectory;
-import com.android.tools.build.bundletool.exceptions.ValidationException;
 import com.android.tools.build.bundletool.model.BundleModule;
 import com.android.tools.build.bundletool.model.ZipPath;
+import com.android.tools.build.bundletool.model.exceptions.ValidationException;
 
 /** Validates targeting of assets. */
 public class AssetsTargetingValidator extends SubValidator {

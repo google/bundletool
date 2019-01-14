@@ -19,11 +19,14 @@ package com.android.tools.build.bundletool.io;
 import static com.android.tools.build.bundletool.model.AppBundle.BUNDLE_CONFIG_FILE_NAME;
 import static com.android.tools.build.bundletool.model.AppBundle.METADATA_DIRECTORY;
 
+import com.android.tools.build.bundletool.io.ZipBuilder.EntryOption;
 import com.android.tools.build.bundletool.model.AppBundle;
 import com.android.tools.build.bundletool.model.BundleModule;
+import com.android.tools.build.bundletool.model.BundleModule.SpecialModuleEntry;
 import com.android.tools.build.bundletool.model.InputStreamSupplier;
 import com.android.tools.build.bundletool.model.ModuleEntry;
 import com.android.tools.build.bundletool.model.ZipPath;
+import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.Map.Entry;
@@ -31,23 +34,44 @@ import java.util.Map.Entry;
 /** Serializer of Bundle instances onto disk. */
 public class AppBundleSerializer {
 
+  /** Set to true if all entries should be left uncompressed in the bundle. */
+  private final boolean allEntriesUncompressed;
+
+  public AppBundleSerializer(boolean allEntriesUncompressed) {
+    this.allEntriesUncompressed = allEntriesUncompressed;
+  }
+
+  public AppBundleSerializer() {
+    this(/* allEntriesUncompressed= */ false);
+  }
+
   /** Writes the App Bundle on disk at the given location. */
   public void writeToDisk(AppBundle bundle, Path pathOnDisk) throws IOException {
+    Preconditions.checkState(
+        bundle.getAssetModules().isEmpty(),
+        "Writing AssetModules to disk is not yet implemented.");
+
     ZipBuilder zipBuilder = new ZipBuilder();
 
+    EntryOption[] compression =
+        allEntriesUncompressed ? new EntryOption[] {EntryOption.UNCOMPRESSED} : new EntryOption[0];
+
     zipBuilder.addFileWithProtoContent(
-        ZipPath.create(BUNDLE_CONFIG_FILE_NAME), bundle.getBundleConfig());
+        ZipPath.create(BUNDLE_CONFIG_FILE_NAME), bundle.getBundleConfig(), compression);
 
     // APEX bundles do not have metadata files.
-    if (bundle.getModules().isEmpty() || !bundle.getBaseModule().getApexConfig().isPresent()) {
+    if (bundle.getFeatureModules().isEmpty()
+        || !bundle.getBaseModule().getApexConfig().isPresent()) {
       for (Entry<ZipPath, InputStreamSupplier> metadataEntry :
           bundle.getBundleMetadata().getFileDataMap().entrySet()) {
         zipBuilder.addFile(
-            METADATA_DIRECTORY.resolve(metadataEntry.getKey()), metadataEntry.getValue());
+            METADATA_DIRECTORY.resolve(metadataEntry.getKey()),
+            metadataEntry.getValue(),
+            compression);
       }
     }
 
-    for (BundleModule module : bundle.getModules().values()) {
+    for (BundleModule module : bundle.getFeatureModules().values()) {
       ZipPath moduleDir = ZipPath.create(module.getName().toString());
 
       for (ModuleEntry entry : module.getEntries()) {
@@ -55,38 +79,47 @@ public class AppBundleSerializer {
         if (entry.isDirectory()) {
           zipBuilder.addDirectory(entryPath);
         } else {
-          zipBuilder.addFile(entryPath, () -> entry.getContent());
+          zipBuilder.addFile(entryPath, entry.getContentSupplier(), compression);
         }
       }
 
       // Special module files are not represented as module entries (above).
       zipBuilder.addFileWithProtoContent(
-          moduleDir.resolve(BundleModule.MANIFEST_PATH),
-          module.getAndroidManifest().getManifestRoot().getProto());
+          moduleDir.resolve(SpecialModuleEntry.ANDROID_MANIFEST.getPath()),
+          module.getAndroidManifest().getManifestRoot().getProto(),
+          compression);
       module
           .getAssetsConfig()
           .ifPresent(
               assetsConfig ->
                   zipBuilder.addFileWithProtoContent(
-                      moduleDir.resolve(BundleModule.ASSETS_PROTO_PATH), assetsConfig));
+                      moduleDir.resolve(SpecialModuleEntry.ASSETS_TABLE.getPath()),
+                      assetsConfig,
+                      compression));
       module
           .getNativeConfig()
           .ifPresent(
               nativeConfig ->
                   zipBuilder.addFileWithProtoContent(
-                      moduleDir.resolve(BundleModule.NATIVE_PROTO_PATH), nativeConfig));
+                      moduleDir.resolve(SpecialModuleEntry.NATIVE_LIBS_TABLE.getPath()),
+                      nativeConfig,
+                      compression));
       module
           .getResourceTable()
           .ifPresent(
               resourceTable ->
                   zipBuilder.addFileWithProtoContent(
-                      moduleDir.resolve(BundleModule.RESOURCES_PROTO_PATH), resourceTable));
+                      moduleDir.resolve(SpecialModuleEntry.RESOURCE_TABLE.getPath()),
+                      resourceTable,
+                      compression));
       module
           .getApexConfig()
           .ifPresent(
               apexConfig ->
                   zipBuilder.addFileWithProtoContent(
-                      moduleDir.resolve(BundleModule.APEX_PROTO_PATH), apexConfig));
+                      moduleDir.resolve(SpecialModuleEntry.APEX_TABLE.getPath()),
+                      apexConfig,
+                      compression));
     }
 
     zipBuilder.writeTo(pathOnDisk);

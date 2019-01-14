@@ -22,8 +22,9 @@ import static com.android.tools.build.bundletool.model.BundleModule.DEX_DIRECTOR
 import static com.android.tools.build.bundletool.model.BundleModule.LIB_DIRECTORY;
 import static com.android.tools.build.bundletool.model.BundleModule.RESOURCES_DIRECTORY;
 import static com.android.tools.build.bundletool.model.BundleModule.ROOT_DIRECTORY;
-import static com.android.tools.build.bundletool.utils.ResourcesUtils.SCREEN_DENSITY_TO_PROTO_VALUE_MAP;
-import static com.android.tools.build.bundletool.utils.TargetingProtoUtils.lPlusVariantTargeting;
+import static com.android.tools.build.bundletool.model.utils.ResourcesUtils.SCREEN_DENSITY_TO_PROTO_VALUE_MAP;
+import static com.android.tools.build.bundletool.model.utils.TargetingProtoUtils.lPlusVariantTargeting;
+import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.MoreCollectors.toOptional;
@@ -44,13 +45,15 @@ import com.android.bundle.Targeting.OpenGlVersion;
 import com.android.bundle.Targeting.TextureCompressionFormatTargeting;
 import com.android.bundle.Targeting.VariantTargeting;
 import com.android.bundle.Targeting.VulkanVersion;
-import com.android.tools.build.bundletool.utils.ResourcesUtils;
+import com.android.tools.build.bundletool.model.BundleModule.ModuleType;
+import com.android.tools.build.bundletool.model.utils.ResourcesUtils;
 import com.google.auto.value.AutoValue;
 import com.google.common.base.Joiner;
 import com.google.common.base.Predicate;
 import com.google.common.base.Predicates;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
+import com.google.errorprone.annotations.Immutable;
 import java.util.List;
 import java.util.Optional;
 import java.util.StringJoiner;
@@ -58,7 +61,9 @@ import java.util.stream.Stream;
 import javax.annotation.CheckReturnValue;
 
 /** A module split is a subset of a bundle module. */
+@Immutable
 @AutoValue
+@AutoValue.CopyAnnotations
 public abstract class ModuleSplit {
 
   private static final Joiner MULTI_ABI_SUFFIX_JOINER = Joiner.on('.');
@@ -68,7 +73,8 @@ public abstract class ModuleSplit {
     STANDALONE,
     SYSTEM,
     SPLIT,
-    INSTANT
+    INSTANT,
+    ASSET_SLICE,
   }
 
   /** Returns the targeting of the APK represented by this instance. */
@@ -224,6 +230,12 @@ public abstract class ModuleSplit {
     return toBuilder().setAndroidManifest(apkManifest).build();
   }
 
+  public ModuleSplit removeUnknownSplitComponents(ImmutableSet<String> knownSplits) {
+    AndroidManifest apkManifest =
+        getAndroidManifest().toEditor().removeUnknownSplitComponents(knownSplits).save();
+    return toBuilder().setAndroidManifest(apkManifest).build();
+  }
+
   /** Writes the final manifest that reflects the Split ID. */
   @CheckReturnValue
   public ModuleSplit writeSplitIdInManifest(String resolvedSplitIdSuffix) {
@@ -286,7 +298,7 @@ public abstract class ModuleSplit {
    */
   public static ModuleSplit forModule(
       BundleModule bundleModule, VariantTargeting variantTargeting) {
-    return fromBundleModule(
+    return fromFeatureBundleModule(
         bundleModule, Predicates.alwaysTrue(), /* setResourceTable= */ true, variantTargeting);
   }
 
@@ -304,7 +316,7 @@ public abstract class ModuleSplit {
    */
   public static ModuleSplit forResources(
       BundleModule bundleModule, VariantTargeting variantTargeting) {
-    return fromBundleModule(
+    return fromFeatureBundleModule(
         bundleModule,
         entry -> entry.getPath().startsWith(RESOURCES_DIRECTORY),
         /* setResourceTable= */ true,
@@ -325,7 +337,7 @@ public abstract class ModuleSplit {
    */
   public static ModuleSplit forAssets(
       BundleModule bundleModule, VariantTargeting variantTargeting) {
-    return fromBundleModule(
+    return fromFeatureBundleModule(
         bundleModule,
         entry -> entry.getPath().startsWith(ASSETS_DIRECTORY),
         /* setResourceTable= */ false,
@@ -346,7 +358,7 @@ public abstract class ModuleSplit {
    */
   public static ModuleSplit forNativeLibraries(
       BundleModule bundleModule, VariantTargeting variantTargeting) {
-    return fromBundleModule(
+    return fromFeatureBundleModule(
         bundleModule,
         entry -> entry.getPath().startsWith(LIB_DIRECTORY),
         /* setResourceTable= */ false,
@@ -366,7 +378,7 @@ public abstract class ModuleSplit {
    * variant targeting.
    */
   public static ModuleSplit forDex(BundleModule bundleModule, VariantTargeting variantTargeting) {
-    return fromBundleModule(
+    return fromFeatureBundleModule(
         bundleModule,
         entry -> entry.getPath().startsWith(DEX_DIRECTORY),
         /* setResourceTable= */ false,
@@ -378,7 +390,7 @@ public abstract class ModuleSplit {
   }
 
   public static ModuleSplit forRoot(BundleModule bundleModule, VariantTargeting variantTargeting) {
-    return fromBundleModule(
+    return fromFeatureBundleModule(
         bundleModule,
         entry -> entry.getPath().startsWith(ROOT_DIRECTORY),
         /* setResourceTable= */ false,
@@ -390,7 +402,7 @@ public abstract class ModuleSplit {
    * default L+ variant targeting.
    */
   public static ModuleSplit forApex(BundleModule bundleModule) {
-    return fromBundleModule(
+    return fromFeatureBundleModule(
         bundleModule,
         entry -> entry.getPath().startsWith(APEX_DIRECTORY),
         /* setResourceTable= */ false,
@@ -403,11 +415,15 @@ public abstract class ModuleSplit {
    *
    * <p>The created instance is not standalone thus its variant targets L+ devices initially.
    */
-  private static ModuleSplit fromBundleModule(
+  private static ModuleSplit fromFeatureBundleModule(
       BundleModule bundleModule,
       Predicate<ModuleEntry> entriesPredicate,
       boolean setResourceTable,
       VariantTargeting variantTargeting) {
+    checkArgument(
+        bundleModule.getModuleType().equals(ModuleType.FEATURE_MODULE),
+        "Expected a Feature Module, got %s",
+        bundleModule.getModuleType());
     ModuleSplit.Builder splitBuilder =
         builder()
             .setModuleName(bundleModule.getName())
@@ -428,6 +444,26 @@ public abstract class ModuleSplit {
     if (setResourceTable) {
       bundleModule.getResourceTable().ifPresent(splitBuilder::setResourceTable);
     }
+    return splitBuilder.build();
+  }
+
+  public static ModuleSplit fromAssetBundleModule(BundleModule bundleModule) {
+    checkArgument(
+        bundleModule.getModuleType().equals(ModuleType.ASSET_MODULE),
+        "Expected an Asset Module, got %s",
+        bundleModule.getModuleType());
+    ModuleSplit.Builder splitBuilder =
+        ModuleSplit.builder()
+            .setModuleName(bundleModule.getName())
+            .setEntries(bundleModule.getEntries().asList())
+            .setAndroidManifest(bundleModule.getAndroidManifest())
+            .setMasterSplit(true)
+            .setSplitType(SplitType.ASSET_SLICE)
+            .setApkTargeting(ApkTargeting.getDefaultInstance())
+            .setVariantTargeting(VariantTargeting.getDefaultInstance());
+
+    bundleModule.getAssetsConfig().ifPresent(splitBuilder::setAssetsConfig);
+
     return splitBuilder.build();
   }
 

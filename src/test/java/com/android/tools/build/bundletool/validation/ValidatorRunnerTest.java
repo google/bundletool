@@ -17,6 +17,7 @@
 package com.android.tools.build.bundletool.validation;
 
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifest;
+import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withSplitId;
 import static com.google.common.truth.Truth.assertThat;
 import static com.google.common.truth.Truth8.assertThat;
 import static org.mockito.Matchers.anyObject;
@@ -99,7 +100,7 @@ public class ValidatorRunnerTest {
             .addFileWithContent(ZipPath.create("BundleConfig.pb"), BUNDLE_CONFIG.toByteArray())
             .addFileWithProtoContent(
                 ZipPath.create("moduleX/manifest/AndroidManifest.xml"),
-                androidManifest("com.test.app"))
+                androidManifest("com.test.app", withSplitId("moduleX")))
             .addFileWithProtoContent(
                 ZipPath.create("moduleX/assets.pb"), Assets.getDefaultInstance())
             .addFileWithProtoContent(
@@ -110,11 +111,12 @@ public class ValidatorRunnerTest {
             .addFileWithContent(ZipPath.create("moduleX/lib/x86/libX.so"), DUMMY_CONTENT)
             .addFileWithProtoContent(
                 ZipPath.create("moduleY/manifest/AndroidManifest.xml"),
-                androidManifest("com.test.app"))
+                androidManifest("com.test.app", withSplitId("moduleY")))
             .addFileWithContent(ZipPath.create("moduleY/assets/file.txt"), DUMMY_CONTENT)
             .writeTo(tempFolder.resolve("bundle.aab"));
     AppBundle bundle = AppBundle.buildFromZip(new ZipFile(bundlePath.toFile()));
-    ImmutableList<BundleModule> bundleModules = ImmutableList.copyOf(bundle.getModules().values());
+    ImmutableList<BundleModule> bundleFeatureModules =
+        ImmutableList.copyOf(bundle.getFeatureModules().values());
 
     new ValidatorRunner(ImmutableList.of(validator)).validateBundle(bundle);
 
@@ -122,12 +124,13 @@ public class ValidatorRunnerTest {
     ArgumentCaptor<ZipPath> fileArgs = ArgumentCaptor.forClass(ZipPath.class);
 
     verify(validator).validateBundle(eq(bundle));
-    verify(validator).validateAllModules(eq(bundleModules));
+    verify(validator).validateAllModules(eq(bundleFeatureModules));
     verify(validator, times(2)).validateModule(moduleArgs.capture());
     verify(validator, atLeastOnce()).validateModuleFile(fileArgs.capture());
     verifyNoMoreInteractions(validator);
 
-    assertThat(moduleArgs.getAllValues()).containsExactlyElementsIn(bundle.getModules().values());
+    assertThat(moduleArgs.getAllValues())
+        .containsExactlyElementsIn(bundle.getFeatureModules().values());
     assertThat(fileArgs.getAllValues().stream().map(ZipPath::toString))
         // Note that special module files (AndroidManifest.xml, assets.pb, native.pb, resources.pb)
         // are NOT passed to the validators.
@@ -141,27 +144,28 @@ public class ValidatorRunnerTest {
             .addFileWithContent(ZipPath.create("BundleConfig.pb"), BUNDLE_CONFIG.toByteArray())
             .addFileWithProtoContent(
                 ZipPath.create("moduleX/manifest/AndroidManifest.xml"),
-                androidManifest("com.test.app"))
+                androidManifest("com.test.app", withSplitId("moduleX")))
             .addFileWithContent(ZipPath.create("moduleX/assets/file.txt"), DUMMY_CONTENT)
             .addFileWithProtoContent(
                 ZipPath.create("moduleY/manifest/AndroidManifest.xml"),
-                androidManifest("com.test.app"))
+                androidManifest("com.test.app", withSplitId("moduleY")))
             .addFileWithContent(ZipPath.create("moduleY/assets/file.txt"), DUMMY_CONTENT)
             .writeTo(tempFolder.resolve("bundle.aab"));
     AppBundle bundle = AppBundle.buildFromZip(new ZipFile(bundlePath.toFile()));
-    ImmutableList<BundleModule> bundleModules = ImmutableList.copyOf(bundle.getModules().values());
+    ImmutableList<BundleModule> bundleFeatureModules =
+        ImmutableList.copyOf(bundle.getFeatureModules().values());
 
     new ValidatorRunner(ImmutableList.of(validator, validator2)).validateBundle(bundle);
 
     InOrder order = Mockito.inOrder(validator, validator2);
 
     order.verify(validator).validateBundle(eq(bundle));
-    order.verify(validator).validateAllModules(eq(bundleModules));
+    order.verify(validator).validateAllModules(eq(bundleFeatureModules));
     order.verify(validator).validateModule(anyObject());
     order.verify(validator, atLeastOnce()).validateModuleFile(anyObject());
 
     order.verify(validator2).validateBundle(eq(bundle));
-    order.verify(validator2).validateAllModules(eq(bundleModules));
+    order.verify(validator2).validateAllModules(eq(bundleFeatureModules));
     order.verify(validator2).validateModule(anyObject());
     order.verify(validator2, atLeastOnce()).validateModuleFile(anyObject());
 

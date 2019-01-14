@@ -20,26 +20,30 @@ import static com.android.tools.build.bundletool.commands.BuildApksCommand.ApkBu
 import static com.android.tools.build.bundletool.model.OptimizationDimension.ABI;
 import static com.android.tools.build.bundletool.model.OptimizationDimension.SCREEN_DENSITY;
 import static com.android.tools.build.bundletool.testing.Aapt2Helper.AAPT2_PATH;
+import static com.android.tools.build.bundletool.testing.FakeSystemEnvironmentProvider.ANDROID_HOME;
+import static com.android.tools.build.bundletool.testing.FakeSystemEnvironmentProvider.ANDROID_SERIAL;
 import static com.android.tools.build.bundletool.testing.TestUtils.expectMissingRequiredBuilderPropertyException;
 import static com.android.tools.build.bundletool.testing.TestUtils.expectMissingRequiredFlagException;
+import static com.google.common.base.StandardSystemProperty.USER_HOME;
 import static com.google.common.truth.Truth.assertThat;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.mock;
 
 import com.android.tools.build.bundletool.device.AdbServer;
-import com.android.tools.build.bundletool.exceptions.CommandExecutionException;
-import com.android.tools.build.bundletool.exceptions.ValidationException;
+import com.android.tools.build.bundletool.flags.FlagParser;
+import com.android.tools.build.bundletool.flags.FlagParser.FlagParseException;
 import com.android.tools.build.bundletool.model.Aapt2Command;
 import com.android.tools.build.bundletool.model.SigningConfiguration;
+import com.android.tools.build.bundletool.model.exceptions.CommandExecutionException;
+import com.android.tools.build.bundletool.model.exceptions.ValidationException;
+import com.android.tools.build.bundletool.model.utils.SystemEnvironmentProvider;
+import com.android.tools.build.bundletool.model.utils.files.FileUtils;
 import com.android.tools.build.bundletool.testing.Aapt2Helper;
 import com.android.tools.build.bundletool.testing.CertificateFactory;
-import com.android.tools.build.bundletool.testing.FakeAndroidHomeVariableProvider;
-import com.android.tools.build.bundletool.testing.FakeAndroidSerialVariableProvider;
-import com.android.tools.build.bundletool.utils.EnvironmentVariableProvider;
-import com.android.tools.build.bundletool.utils.flags.FlagParser;
-import com.android.tools.build.bundletool.utils.flags.FlagParser.FlagParseException;
+import com.android.tools.build.bundletool.testing.FakeSystemEnvironmentProvider;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import java.io.ByteArrayOutputStream;
 import java.io.FileOutputStream;
@@ -83,10 +87,9 @@ public class BuildApksCommandTest {
   private Path keystorePath;
 
   private final AdbServer fakeAdbServer = mock(AdbServer.class);
-  private final EnvironmentVariableProvider androidHomeProvider =
-      new FakeAndroidHomeVariableProvider("/android/home");
-  private final EnvironmentVariableProvider androidSerialProvider =
-      new FakeAndroidSerialVariableProvider(DEVICE_ID);
+  private final SystemEnvironmentProvider systemEnvironmentProvider =
+      new FakeSystemEnvironmentProvider(
+          ImmutableMap.of(ANDROID_HOME, "/android/home", ANDROID_SERIAL, DEVICE_ID));
 
   @BeforeClass
   public static void setUpClass() throws Exception {
@@ -116,6 +119,7 @@ public class BuildApksCommandTest {
 
   @Test
   public void buildingViaFlagsAndBuilderHasSameResult_defaults() throws Exception {
+    ByteArrayOutputStream output = new ByteArrayOutputStream();
     BuildApksCommand commandViaFlags =
         BuildApksCommand.fromFlags(
             new FlagParser()
@@ -123,9 +127,11 @@ public class BuildApksCommandTest {
                     "--bundle=" + bundlePath,
                     "--output=" + outputFilePath,
                     "--aapt2=" + AAPT2_PATH),
+            new PrintStream(output),
+            systemEnvironmentProvider,
             fakeAdbServer);
 
-    BuildApksCommand commandViaBuilder =
+    BuildApksCommand.Builder commandViaBuilder =
         BuildApksCommand.builder()
             .setBundlePath(bundlePath)
             .setOutputFile(outputFilePath)
@@ -133,15 +139,18 @@ public class BuildApksCommandTest {
             .setAapt2Command(commandViaFlags.getAapt2Command().get())
             .setExecutorServiceInternal(commandViaFlags.getExecutorService())
             .setExecutorServiceCreatedByBundleTool(true)
-            .setOutputPrintStream(commandViaFlags.getOutputPrintStream().get())
-            .build();
+            .setOutputPrintStream(commandViaFlags.getOutputPrintStream().get());
 
-    assertThat(commandViaBuilder).isEqualTo(commandViaFlags);
+    DebugKeystoreUtils.getDebugSigningConfiguration(systemEnvironmentProvider)
+        .ifPresent(commandViaBuilder::setSigningConfiguration);
+
+    assertThat(commandViaBuilder.build()).isEqualTo(commandViaFlags);
   }
 
   // Remove this test when universal flag is deleted.
   @Test
   public void buildingViaFlagsWithUniversal_setsUniversalModeOnBuilder() throws Exception {
+    ByteArrayOutputStream output = new ByteArrayOutputStream();
     BuildApksCommand commandViaFlags =
         BuildApksCommand.fromFlags(
             new FlagParser()
@@ -150,9 +159,11 @@ public class BuildApksCommandTest {
                     "--output=" + outputFilePath,
                     "--aapt2=" + AAPT2_PATH,
                     "--universal"),
+            new PrintStream(output),
+            systemEnvironmentProvider,
             fakeAdbServer);
 
-    BuildApksCommand commandViaBuilder =
+    BuildApksCommand.Builder commandViaBuilder =
         BuildApksCommand.builder()
             .setBundlePath(bundlePath)
             .setOutputFile(outputFilePath)
@@ -161,14 +172,16 @@ public class BuildApksCommandTest {
             .setExecutorServiceInternal(commandViaFlags.getExecutorService())
             .setExecutorServiceCreatedByBundleTool(true)
             .setOutputPrintStream(commandViaFlags.getOutputPrintStream().get())
-            .setApkBuildMode(UNIVERSAL)
-            .build();
+            .setApkBuildMode(UNIVERSAL);
+    DebugKeystoreUtils.getDebugSigningConfiguration(systemEnvironmentProvider)
+        .ifPresent(commandViaBuilder::setSigningConfiguration);
 
-    assertThat(commandViaBuilder).isEqualTo(commandViaFlags);
+    assertThat(commandViaBuilder.build()).isEqualTo(commandViaFlags);
   }
 
   @Test
   public void buildingViaFlagsAndBuilderHasSameResult_optionalOptimizeFor() throws Exception {
+    ByteArrayOutputStream output = new ByteArrayOutputStream();
     BuildApksCommand commandViaFlags =
         BuildApksCommand.fromFlags(
             new FlagParser()
@@ -178,9 +191,11 @@ public class BuildApksCommandTest {
                     "--aapt2=" + AAPT2_PATH,
                     // Optional values.
                     "--optimize-for=screen_density"),
+            new PrintStream(output),
+            systemEnvironmentProvider,
             fakeAdbServer);
 
-    BuildApksCommand commandViaBuilder =
+    BuildApksCommand.Builder commandViaBuilder =
         BuildApksCommand.builder()
             .setBundlePath(bundlePath)
             .setOutputFile(outputFilePath)
@@ -190,10 +205,11 @@ public class BuildApksCommandTest {
             .setAapt2Command(commandViaFlags.getAapt2Command().get())
             .setExecutorServiceInternal(commandViaFlags.getExecutorService())
             .setExecutorServiceCreatedByBundleTool(true)
-            .setOutputPrintStream(commandViaFlags.getOutputPrintStream().get())
-            .build();
+            .setOutputPrintStream(commandViaFlags.getOutputPrintStream().get());
+    DebugKeystoreUtils.getDebugSigningConfiguration(systemEnvironmentProvider)
+        .ifPresent(commandViaBuilder::setSigningConfiguration);
 
-    assertThat(commandViaBuilder).isEqualTo(commandViaFlags);
+    assertThat(commandViaBuilder.build()).isEqualTo(commandViaFlags);
   }
 
   @Test
@@ -234,6 +250,7 @@ public class BuildApksCommandTest {
 
   @Test
   public void buildingViaFlagsAndBuilderHasSameResult_optionalUniversal() throws Exception {
+    ByteArrayOutputStream output = new ByteArrayOutputStream();
     BuildApksCommand commandViaFlags =
         BuildApksCommand.fromFlags(
             new FlagParser()
@@ -243,9 +260,11 @@ public class BuildApksCommandTest {
                     "--aapt2=" + AAPT2_PATH,
                     // Optional values.
                     "--mode=UNIVERSAL"),
+            new PrintStream(output),
+            systemEnvironmentProvider,
             fakeAdbServer);
 
-    BuildApksCommand commandViaBuilder =
+    BuildApksCommand.Builder commandViaBuilder =
         BuildApksCommand.builder()
             .setBundlePath(bundlePath)
             .setOutputFile(outputFilePath)
@@ -255,14 +274,16 @@ public class BuildApksCommandTest {
             .setAapt2Command(commandViaFlags.getAapt2Command().get())
             .setExecutorServiceInternal(commandViaFlags.getExecutorService())
             .setExecutorServiceCreatedByBundleTool(true)
-            .setOutputPrintStream(commandViaFlags.getOutputPrintStream().get())
-            .build();
+            .setOutputPrintStream(commandViaFlags.getOutputPrintStream().get());
+    DebugKeystoreUtils.getDebugSigningConfiguration(systemEnvironmentProvider)
+        .ifPresent(commandViaBuilder::setSigningConfiguration);
 
-    assertThat(commandViaBuilder).isEqualTo(commandViaFlags);
+    assertThat(commandViaBuilder.build()).isEqualTo(commandViaFlags);
   }
 
   @Test
   public void buildingViaFlagsAndBuilderHasSameResult_optionalOverwrite() throws Exception {
+    ByteArrayOutputStream output = new ByteArrayOutputStream();
     BuildApksCommand commandViaFlags =
         BuildApksCommand.fromFlags(
             new FlagParser()
@@ -272,8 +293,10 @@ public class BuildApksCommandTest {
                     "--aapt2=" + AAPT2_PATH,
                     // Optional values.
                     "--overwrite"),
+            new PrintStream(output),
+            systemEnvironmentProvider,
             fakeAdbServer);
-    BuildApksCommand commandViaBuilder =
+    BuildApksCommand.Builder commandViaBuilder =
         BuildApksCommand.builder()
             .setBundlePath(bundlePath)
             .setOutputFile(outputFilePath)
@@ -283,14 +306,16 @@ public class BuildApksCommandTest {
             .setAapt2Command(commandViaFlags.getAapt2Command().get())
             .setExecutorServiceInternal(commandViaFlags.getExecutorService())
             .setExecutorServiceCreatedByBundleTool(true)
-            .setOutputPrintStream(commandViaFlags.getOutputPrintStream().get())
-            .build();
+            .setOutputPrintStream(commandViaFlags.getOutputPrintStream().get());
+    DebugKeystoreUtils.getDebugSigningConfiguration(systemEnvironmentProvider)
+        .ifPresent(commandViaBuilder::setSigningConfiguration);
 
-    assertThat(commandViaBuilder).isEqualTo(commandViaFlags);
+    assertThat(commandViaBuilder.build()).isEqualTo(commandViaFlags);
   }
 
   @Test
   public void buildingViaFlagsAndBuilderHasSameResult_deviceId() throws Exception {
+    ByteArrayOutputStream output = new ByteArrayOutputStream();
     BuildApksCommand commandViaFlags =
         BuildApksCommand.fromFlags(
             new FlagParser()
@@ -301,9 +326,11 @@ public class BuildApksCommandTest {
                     "--connected-device",
                     "--adb=" + ADB_PATH,
                     "--aapt2=" + AAPT2_PATH),
+            new PrintStream(output),
+            systemEnvironmentProvider,
             fakeAdbServer);
 
-    BuildApksCommand commandViaBuilder =
+    BuildApksCommand.Builder commandViaBuilder =
         BuildApksCommand.builder()
             .setBundlePath(bundlePath)
             .setOutputFile(outputFilePath)
@@ -315,10 +342,11 @@ public class BuildApksCommandTest {
             .setAapt2Command(commandViaFlags.getAapt2Command().get())
             .setExecutorServiceInternal(commandViaFlags.getExecutorService())
             .setExecutorServiceCreatedByBundleTool(true)
-            .setOutputPrintStream(commandViaFlags.getOutputPrintStream().get())
-            .build();
+            .setOutputPrintStream(commandViaFlags.getOutputPrintStream().get());
+    DebugKeystoreUtils.getDebugSigningConfiguration(systemEnvironmentProvider)
+        .ifPresent(commandViaBuilder::setSigningConfiguration);
 
-    assertThat(commandViaBuilder).isEqualTo(commandViaFlags);
+    assertThat(commandViaBuilder.build()).isEqualTo(commandViaFlags);
   }
 
   @Test
@@ -334,10 +362,10 @@ public class BuildApksCommandTest {
                     "--adb=" + ADB_PATH,
                     "--aapt2=" + AAPT2_PATH),
             new PrintStream(output),
-            androidSerialProvider,
+            systemEnvironmentProvider,
             fakeAdbServer);
 
-    BuildApksCommand commandViaBuilder =
+    BuildApksCommand.Builder commandViaBuilder =
         BuildApksCommand.builder()
             .setBundlePath(bundlePath)
             .setOutputFile(outputFilePath)
@@ -349,10 +377,11 @@ public class BuildApksCommandTest {
             .setAapt2Command(commandViaFlags.getAapt2Command().get())
             .setExecutorServiceInternal(commandViaFlags.getExecutorService())
             .setExecutorServiceCreatedByBundleTool(true)
-            .setOutputPrintStream(commandViaFlags.getOutputPrintStream().get())
-            .build();
+            .setOutputPrintStream(commandViaFlags.getOutputPrintStream().get());
+    DebugKeystoreUtils.getDebugSigningConfiguration(systemEnvironmentProvider)
+        .ifPresent(commandViaBuilder::setSigningConfiguration);
 
-    assertThat(commandViaBuilder).isEqualTo(commandViaFlags);
+    assertThat(commandViaBuilder.build()).isEqualTo(commandViaFlags);
   }
 
   @Test
@@ -500,17 +529,47 @@ public class BuildApksCommandTest {
   }
 
   @Test
-  public void noKeystoreProvidedPrintsWarning() throws Exception {
+  public void noKeystoreProvidedPrintsWarning() {
+    SystemEnvironmentProvider provider =
+        new FakeSystemEnvironmentProvider(
+            /* variables= */ ImmutableMap.of(
+                ANDROID_HOME, "/android/home", ANDROID_SERIAL, DEVICE_ID),
+            /* properties= */ ImmutableMap.of(USER_HOME.key(), "/"));
+
     ByteArrayOutputStream output = new ByteArrayOutputStream();
     BuildApksCommand.fromFlags(
         new FlagParser()
             .parse("--bundle=" + bundlePath, "--output=" + outputFilePath, "--aapt2=" + AAPT2_PATH),
         new PrintStream(output),
-        androidHomeProvider,
+        provider,
         fakeAdbServer);
 
     assertThat(new String(output.toByteArray(), UTF_8))
         .contains("WARNING: The APKs won't be signed");
+  }
+
+  @Test
+  public void noKeystoreProvidedPrintsWarning_debugKeystore() throws Exception {
+    Path debugKeystorePath = tmpDir.resolve(".android").resolve("debug.keystore");
+    FileUtils.createParentDirectories(debugKeystorePath);
+    createDebugKeystore(debugKeystorePath);
+
+    SystemEnvironmentProvider provider =
+        new FakeSystemEnvironmentProvider(
+            /* variables= */ ImmutableMap.of(
+                ANDROID_HOME, "/android/home", ANDROID_SERIAL, DEVICE_ID),
+            /* properties= */ ImmutableMap.of(USER_HOME.key(), tmpDir.toString()));
+
+    ByteArrayOutputStream output = new ByteArrayOutputStream();
+    BuildApksCommand.fromFlags(
+        new FlagParser()
+            .parse("--bundle=" + bundlePath, "--output=" + outputFilePath, "--aapt2=" + AAPT2_PATH),
+        new PrintStream(output),
+        provider,
+        fakeAdbServer);
+
+    assertThat(new String(output.toByteArray(), UTF_8))
+        .contains("INFO: The APKs will be signed with the debug keystore");
   }
 
   @Test
@@ -527,10 +586,22 @@ public class BuildApksCommandTest {
                 "--ks-pass=pass:" + KEYSTORE_PASSWORD,
                 "--key-pass=pass:" + KEY_PASSWORD),
         new PrintStream(output),
-        androidHomeProvider,
+        systemEnvironmentProvider,
         fakeAdbServer);
 
     assertThat(new String(output.toByteArray(), UTF_8))
         .doesNotContain("WARNING: The APKs won't be signed");
+  }
+
+  private static void createDebugKeystore(Path path) throws Exception {
+    KeyPair keyPair = KeyPairGenerator.getInstance("RSA").genKeyPair();
+    PrivateKey privateKey = keyPair.getPrivate();
+    Certificate certificate =
+        CertificateFactory.buildSelfSignedCertificate(keyPair, "CN=Android Debug,O=Android,C=US");
+    KeyStore keystore = KeyStore.getInstance("JKS");
+    keystore.load(/* stream= */ null, "android".toCharArray());
+    keystore.setKeyEntry(
+        "AndroidDebugKey", privateKey, "android".toCharArray(), new Certificate[] {certificate});
+    keystore.store(new FileOutputStream(path.toFile()), "android".toCharArray());
   }
 }

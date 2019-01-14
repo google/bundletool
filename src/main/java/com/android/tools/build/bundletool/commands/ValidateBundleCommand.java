@@ -16,17 +16,17 @@
 
 package com.android.tools.build.bundletool.commands;
 
-import static com.android.tools.build.bundletool.utils.files.FilePreconditions.checkFileExistsAndReadable;
+import static com.android.tools.build.bundletool.model.utils.files.FilePreconditions.checkFileExistsAndReadable;
 
 import com.android.tools.build.bundletool.commands.CommandHelp.CommandDescription;
 import com.android.tools.build.bundletool.commands.CommandHelp.FlagDescription;
-import com.android.tools.build.bundletool.exceptions.CommandExecutionException;
+import com.android.tools.build.bundletool.flags.Flag;
+import com.android.tools.build.bundletool.flags.ParsedFlags;
 import com.android.tools.build.bundletool.model.AppBundle;
 import com.android.tools.build.bundletool.model.BundleModule;
 import com.android.tools.build.bundletool.model.BundleModuleName;
 import com.android.tools.build.bundletool.model.ModuleEntry;
-import com.android.tools.build.bundletool.utils.flags.Flag;
-import com.android.tools.build.bundletool.utils.flags.ParsedFlags;
+import com.android.tools.build.bundletool.model.exceptions.CommandExecutionException;
 import com.android.tools.build.bundletool.validation.AppBundleValidator;
 import com.google.auto.value.AutoValue;
 import java.io.IOException;
@@ -95,10 +95,19 @@ public abstract class ValidateBundleCommand {
   private void printBundleSummary(AppBundle appBundle) {
     System.out.printf("App Bundle information\n");
     System.out.printf("------------\n");
-    System.out.printf("Modules:\n");
-    for (Entry<BundleModuleName, BundleModule> moduleEntry : appBundle.getModules().entrySet()) {
-      System.out.printf("\tModule: %s\n", moduleEntry.getKey());
+    System.out.printf("Feature modules:\n");
+    for (Entry<BundleModuleName, BundleModule> moduleEntry :
+        appBundle.getFeatureModules().entrySet()) {
+      System.out.printf("\tFeature module: %s\n", moduleEntry.getKey());
       printModuleSummary(moduleEntry.getValue());
+    }
+    if (!appBundle.getAssetModules().isEmpty()) {
+      System.out.printf("Remote asset modules:\n");
+      for (Entry<BundleModuleName, BundleModule> moduleEntry :
+          appBundle.getAssetModules().entrySet()) {
+        System.out.printf("\tRemote asset module: %s\n", moduleEntry.getKey());
+        printModuleSummary(moduleEntry.getValue());
+      }
     }
   }
 

@@ -22,9 +22,9 @@ import static com.google.common.collect.ImmutableSet.toImmutableSet;
 import com.android.bundle.Files.NativeLibraries;
 import com.android.bundle.Files.TargetedNativeDirectory;
 import com.android.bundle.Targeting.NativeDirectoryTargeting;
-import com.android.tools.build.bundletool.exceptions.ValidationException;
 import com.android.tools.build.bundletool.model.BundleModule;
 import com.android.tools.build.bundletool.model.ZipPath;
+import com.android.tools.build.bundletool.model.exceptions.ValidationException;
 import com.google.common.collect.Sets;
 import com.google.common.collect.Sets.SetView;
 

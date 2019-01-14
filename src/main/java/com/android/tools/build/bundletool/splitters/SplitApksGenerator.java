@@ -16,16 +16,19 @@
 
 package com.android.tools.build.bundletool.splitters;
 
-import static com.android.tools.build.bundletool.targeting.TargetingUtils.generateAllVariantTargetings;
+import static com.android.tools.build.bundletool.model.targeting.TargetingUtils.generateAllVariantTargetings;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.collect.ImmutableList.toImmutableList;
+import static com.google.common.collect.ImmutableSet.toImmutableSet;
 
 import com.android.bundle.Targeting.VariantTargeting;
 import com.android.tools.build.bundletool.model.BundleModule;
 import com.android.tools.build.bundletool.model.ModuleSplit;
-import com.android.tools.build.bundletool.version.Version;
+import com.android.tools.build.bundletool.model.ResourceTableEntry;
+import com.android.tools.build.bundletool.model.version.Version;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
+import java.util.function.Predicate;
 
 /** Generates split APKs. */
 public final class SplitApksGenerator {
@@ -33,14 +36,17 @@ public final class SplitApksGenerator {
   private final ImmutableList<BundleModule> modules;
   private final ApkGenerationConfiguration apkGenerationConfiguration;
   private final Version bundleVersion;
+  private final Predicate<ResourceTableEntry> masterResourcesPredicate;
 
   public SplitApksGenerator(
       ImmutableList<BundleModule> modules,
       Version bundleVersion,
-      ApkGenerationConfiguration apkGenerationConfiguration) {
+      ApkGenerationConfiguration apkGenerationConfiguration,
+      Predicate<ResourceTableEntry> masterResourcesPredicate) {
     this.modules = checkNotNull(modules);
     this.bundleVersion = checkNotNull(bundleVersion);
     this.apkGenerationConfiguration = checkNotNull(apkGenerationConfiguration);
+    this.masterResourcesPredicate = masterResourcesPredicate;
   }
 
   public ImmutableList<ModuleSplit> generateSplits() {
@@ -61,11 +67,19 @@ public final class SplitApksGenerator {
   }
 
   private ImmutableList<ModuleSplit> generateSplitApks(VariantTargeting variantTargeting) {
+    ImmutableSet<String> allModuleNames =
+        modules.stream().map(module -> module.getName().getName()).collect(toImmutableSet());
     ImmutableList.Builder<ModuleSplit> splits = ImmutableList.builder();
 
     for (BundleModule module : modules) {
       ModuleSplitter moduleSplitter =
-          new ModuleSplitter(module, bundleVersion, apkGenerationConfiguration, variantTargeting);
+          new ModuleSplitter(
+              module,
+              bundleVersion,
+              apkGenerationConfiguration,
+              variantTargeting,
+              allModuleNames,
+              masterResourcesPredicate);
       splits.addAll(moduleSplitter.splitModule());
     }
     return splits.build();

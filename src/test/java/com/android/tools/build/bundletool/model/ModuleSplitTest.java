@@ -56,9 +56,9 @@ import com.android.bundle.Targeting.ScreenDensity.DensityAlias;
 import com.android.bundle.Targeting.ScreenDensityTargeting;
 import com.android.bundle.Targeting.TextureCompressionFormat.TextureCompressionFormatAlias;
 import com.android.bundle.Targeting.VariantTargeting;
+import com.android.tools.build.bundletool.model.utils.xmlproto.XmlProtoElement;
+import com.android.tools.build.bundletool.model.utils.xmlproto.XmlProtoNode;
 import com.android.tools.build.bundletool.testing.BundleModuleBuilder;
-import com.android.tools.build.bundletool.utils.xmlproto.XmlProtoElement;
-import com.android.tools.build.bundletool.utils.xmlproto.XmlProtoNode;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import java.util.Arrays;
@@ -408,6 +408,42 @@ public class ModuleSplitTest {
     assertThat(activityElement.getAttributeList())
         .containsExactly(
             xmlAttribute(ANDROID_NAMESPACE_URI, "name", NAME_RESOURCE_ID, "FooActivity"));
+  }
+
+  @Test
+  public void removeUnknownSplits() {
+    AndroidManifest manifest =
+        AndroidManifest.create(
+            androidManifest("com.test.app", withSplitNameActivity("FooActivity", "foo")));
+    ModuleSplit masterSplit =
+        ModuleSplit.builder()
+            .setModuleName(BundleModuleName.create("base"))
+            .setEntries(
+                fakeEntriesOf(
+                    "res/drawable-ldpi/image.jpg",
+                    "assets/labels.dat",
+                    "res/drawable-hdpi/image.jpg",
+                    "dex/classes.dex"))
+            .setApkTargeting(ApkTargeting.getDefaultInstance())
+            .setVariantTargeting(lPlusVariantTargeting())
+            .setMasterSplit(true)
+            .setAndroidManifest(manifest)
+            .build();
+    masterSplit = masterSplit.removeUnknownSplitComponents(ImmutableSet.of());
+
+    ImmutableList<XmlElement> activities =
+        masterSplit
+            .getAndroidManifest()
+            .getManifestElement()
+            .getChildElement("application")
+            .getChildrenElements(ACTIVITY_ELEMENT_NAME)
+            .map(XmlProtoElement::getProto)
+            .collect(toImmutableList());
+    assertThat(activities).hasSize(1);
+    XmlElement activityElement = activities.get(0);
+    assertThat(activityElement.getAttributeList())
+        .containsExactly(
+            xmlAttribute(ANDROID_NAMESPACE_URI, "name", NAME_RESOURCE_ID, "MainActivity"));
   }
 
   private ImmutableList<ModuleEntry> fakeEntriesOf(String... entries) {

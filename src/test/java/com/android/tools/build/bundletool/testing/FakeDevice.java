@@ -29,7 +29,7 @@ import com.android.ddmlib.ShellCommandUnresponsiveException;
 import com.android.ddmlib.TimeoutException;
 import com.android.sdklib.AndroidVersion;
 import com.android.tools.build.bundletool.device.Device;
-import com.android.tools.build.bundletool.utils.Versions;
+import com.android.tools.build.bundletool.model.utils.Versions;
 import com.google.common.base.Joiner;
 import com.google.common.base.Splitter;
 import com.google.common.collect.ImmutableList;

@@ -16,8 +16,8 @@
 
 package com.android.tools.build.bundletool.validation;
 
-import com.android.tools.build.bundletool.exceptions.ValidationException;
 import com.android.tools.build.bundletool.model.AppBundle;
+import com.android.tools.build.bundletool.model.exceptions.ValidationException;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
 import java.util.zip.ZipFile;
@@ -38,6 +38,7 @@ public class AppBundleValidator {
       ImmutableList.of(
           // Fundamental file validations first.
           new BundleFilesValidator(),
+          new ModuleNamesValidator(),
           new AndroidManifestValidator(),
           new BundleConfigValidator(),
           // More specific file validations.

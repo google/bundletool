@@ -19,6 +19,8 @@ package com.android.tools.build.bundletool.commands;
 import static com.android.bundle.Targeting.Abi.AbiAlias.ARM64_V8A;
 import static com.android.bundle.Targeting.Abi.AbiAlias.X86;
 import static com.android.bundle.Targeting.Abi.AbiAlias.X86_64;
+import static com.android.bundle.Targeting.ScreenDensity.DensityAlias.XXHDPI;
+import static com.android.tools.build.bundletool.model.utils.files.FilePreconditions.checkFileExistsAndReadable;
 import static com.android.tools.build.bundletool.testing.ApksArchiveHelpers.createApkDescription;
 import static com.android.tools.build.bundletool.testing.ApksArchiveHelpers.createApksArchiveFile;
 import static com.android.tools.build.bundletool.testing.ApksArchiveHelpers.createApksDirectory;
@@ -39,6 +41,7 @@ import static com.android.tools.build.bundletool.testing.DeviceFactory.locales;
 import static com.android.tools.build.bundletool.testing.DeviceFactory.mergeSpecs;
 import static com.android.tools.build.bundletool.testing.DeviceFactory.sdkVersion;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.apkAbiTargeting;
+import static com.android.tools.build.bundletool.testing.TargetingUtils.apkDensityTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.mergeModuleTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.moduleFeatureTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.moduleMinSdkVersionTargeting;
@@ -46,7 +49,6 @@ import static com.android.tools.build.bundletool.testing.TargetingUtils.multiAbi
 import static com.android.tools.build.bundletool.testing.TargetingUtils.sdkVersionFrom;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.variantSdkTargeting;
 import static com.android.tools.build.bundletool.testing.TestUtils.expectMissingRequiredFlagException;
-import static com.android.tools.build.bundletool.utils.files.FilePreconditions.checkFileExistsAndReadable;
 import static com.google.common.truth.Truth.assertThat;
 import static com.google.common.truth.extensions.proto.ProtoTruth.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -60,10 +62,10 @@ import com.android.bundle.Targeting.ScreenDensity.DensityAlias;
 import com.android.bundle.Targeting.SdkVersion;
 import com.android.bundle.Targeting.VariantTargeting;
 import com.android.tools.build.bundletool.TestData;
-import com.android.tools.build.bundletool.exceptions.CommandExecutionException;
-import com.android.tools.build.bundletool.exceptions.ValidationException;
+import com.android.tools.build.bundletool.flags.FlagParser;
 import com.android.tools.build.bundletool.model.ZipPath;
-import com.android.tools.build.bundletool.utils.flags.FlagParser;
+import com.android.tools.build.bundletool.model.exceptions.CommandExecutionException;
+import com.android.tools.build.bundletool.model.exceptions.ValidationException;
 import com.google.common.base.Splitter;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
@@ -74,6 +76,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.FileOutputStream;
 import java.io.PrintStream;
 import java.io.Reader;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import org.junit.Before;
@@ -1197,6 +1200,22 @@ public class ExtractApksCommandTest {
     for (Path matchedApk : matchedApks) {
       checkFileExistsAndReadable(tmpDir.resolve(matchedApk));
     }
+  }
+
+  @Test
+  public void testExtractFromDirectoryNoTableOfContents_throws() throws Exception {
+    Files.createFile(tmpDir.resolve("base-master.apk"));
+    Exception e =
+        assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                ExtractApksCommand.builder()
+                    .setApksArchivePath(tmpDir)
+                    .setDeviceSpec(DeviceSpec.getDefaultInstance())
+                    .build()
+                    .execute());
+
+    assertThat(e).hasMessageThat().matches("File '.*toc.pb' was not found.");
   }
 
 

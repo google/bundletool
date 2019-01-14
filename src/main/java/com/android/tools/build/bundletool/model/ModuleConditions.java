@@ -16,23 +16,29 @@
 
 package com.android.tools.build.bundletool.model;
 
-import static com.android.tools.build.bundletool.utils.TargetingProtoUtils.sdkVersionFrom;
-import static com.android.tools.build.bundletool.utils.TargetingProtoUtils.sdkVersionTargeting;
+import static com.android.tools.build.bundletool.model.utils.TargetingProtoUtils.sdkVersionFrom;
+import static com.android.tools.build.bundletool.model.utils.TargetingProtoUtils.sdkVersionTargeting;
 
 import com.android.bundle.Targeting.DeviceFeature;
 import com.android.bundle.Targeting.DeviceFeatureTargeting;
 import com.android.bundle.Targeting.ModuleTargeting;
+import com.android.bundle.Targeting.UserCountriesTargeting;
 import com.google.auto.value.AutoValue;
 import com.google.common.collect.ImmutableList;
+import com.google.errorprone.annotations.Immutable;
 import java.util.Optional;
 
 /** Encapsulates all {@link BundleModule} conditions. */
+@Immutable
 @AutoValue
+@AutoValue.CopyAnnotations
 public abstract class ModuleConditions {
 
   public abstract ImmutableList<DeviceFeatureCondition> getDeviceFeatureConditions();
 
   public abstract Optional<Integer> getMinSdkVersion();
+
+  public abstract Optional<UserCountriesCondition> getUserCountriesCondition();
 
   public boolean isEmpty() {
     return toTargeting().equals(ModuleTargeting.getDefaultInstance());
@@ -58,6 +64,15 @@ public abstract class ModuleConditions {
           sdkVersionTargeting(sdkVersionFrom(getMinSdkVersion().get())));
     }
 
+    if (getUserCountriesCondition().isPresent()) {
+      UserCountriesCondition condition = getUserCountriesCondition().get();
+      moduleTargeting.setUserCountriesTargeting(
+          UserCountriesTargeting.newBuilder()
+              .addAllCountryCodes(condition.getCountries())
+              .setExclude(condition.getExclude())
+              .build());
+    }
+
     return moduleTargeting.build();
   }
 
@@ -73,6 +88,9 @@ public abstract class ModuleConditions {
     }
 
     public abstract Builder setMinSdkVersion(int minSdkVersion);
+
+    public abstract Builder setUserCountriesCondition(
+        UserCountriesCondition userCountriesCondition);
 
     public abstract ModuleConditions build();
   }

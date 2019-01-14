@@ -24,7 +24,7 @@ import com.android.bundle.Targeting.ModuleTargeting;
 import com.android.bundle.Targeting.SdkVersion;
 import com.android.bundle.Targeting.SdkVersionTargeting;
 import com.android.bundle.Targeting.VariantTargeting;
-import com.android.tools.build.bundletool.exceptions.CommandExecutionException;
+import com.android.tools.build.bundletool.model.exceptions.CommandExecutionException;
 import java.util.stream.Stream;
 
 /** A {@link TargetingDimensionMatcher} that provides matching on SDK version. */

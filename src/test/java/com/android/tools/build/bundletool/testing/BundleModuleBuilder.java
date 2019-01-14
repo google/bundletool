@@ -28,8 +28,8 @@ import com.android.tools.build.bundletool.model.BundleModule;
 import com.android.tools.build.bundletool.model.BundleModuleName;
 import com.android.tools.build.bundletool.model.InMemoryModuleEntry;
 import com.android.tools.build.bundletool.model.ModuleEntry;
-import com.android.tools.build.bundletool.utils.xmlproto.XmlProtoNode;
-import com.android.tools.build.bundletool.utils.xmlproto.XmlProtoNodeBuilder;
+import com.android.tools.build.bundletool.model.utils.xmlproto.XmlProtoNode;
+import com.android.tools.build.bundletool.model.utils.xmlproto.XmlProtoNodeBuilder;
 import com.google.common.collect.ImmutableSet;
 import java.io.IOException;
 
@@ -95,15 +95,20 @@ public class BundleModuleBuilder {
 
   public BundleModule build() throws IOException {
     if (androidManifest != null) {
+      XmlProtoNodeBuilder manifestBuilder = new XmlProtoNode(androidManifest).toBuilder();
       boolean hasCode =
           entries.build().stream().anyMatch(entry -> entry.getPath().toString().endsWith(".dex"));
       if (hasCode) {
-        XmlProtoNodeBuilder manifestBuilder = new XmlProtoNode(androidManifest).toBuilder();
         ManifestProtoUtils.clearHasCode().accept(manifestBuilder.getElement());
-        androidManifest = manifestBuilder.build().getProto();
       }
 
-      addFile("manifest/AndroidManifest.xml", androidManifest.toByteArray());
+      // Set the 'split' attribute if one is not already set.
+      if (!moduleName.getName().equals(BundleModuleName.BASE_MODULE_NAME)
+          && !manifestBuilder.getElement().getAttribute("split").isPresent()) {
+        ManifestProtoUtils.withSplitId(moduleName.getName()).accept(manifestBuilder.getElement());
+      }
+
+      addFile("manifest/AndroidManifest.xml", manifestBuilder.build().getProto().toByteArray());
     }
 
     return BundleModule.builder()

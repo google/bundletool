@@ -16,16 +16,16 @@
 
 package com.android.tools.build.bundletool.testing;
 
-import static com.android.tools.build.bundletool.utils.ProtoUtils.mergeFromProtos;
-import static com.android.tools.build.bundletool.utils.ResourcesUtils.ANY_DENSITY_VALUE;
-import static com.android.tools.build.bundletool.utils.ResourcesUtils.HDPI_VALUE;
-import static com.android.tools.build.bundletool.utils.ResourcesUtils.LDPI_VALUE;
-import static com.android.tools.build.bundletool.utils.ResourcesUtils.MDPI_VALUE;
-import static com.android.tools.build.bundletool.utils.ResourcesUtils.NONE_DENSITY_VALUE;
-import static com.android.tools.build.bundletool.utils.ResourcesUtils.TVDPI_VALUE;
-import static com.android.tools.build.bundletool.utils.ResourcesUtils.XHDPI_VALUE;
-import static com.android.tools.build.bundletool.utils.ResourcesUtils.XXHDPI_VALUE;
-import static com.android.tools.build.bundletool.utils.ResourcesUtils.XXXHDPI_VALUE;
+import static com.android.tools.build.bundletool.model.utils.ProtoUtils.mergeFromProtos;
+import static com.android.tools.build.bundletool.model.utils.ResourcesUtils.ANY_DENSITY_VALUE;
+import static com.android.tools.build.bundletool.model.utils.ResourcesUtils.HDPI_VALUE;
+import static com.android.tools.build.bundletool.model.utils.ResourcesUtils.LDPI_VALUE;
+import static com.android.tools.build.bundletool.model.utils.ResourcesUtils.MDPI_VALUE;
+import static com.android.tools.build.bundletool.model.utils.ResourcesUtils.NONE_DENSITY_VALUE;
+import static com.android.tools.build.bundletool.model.utils.ResourcesUtils.TVDPI_VALUE;
+import static com.android.tools.build.bundletool.model.utils.ResourcesUtils.XHDPI_VALUE;
+import static com.android.tools.build.bundletool.model.utils.ResourcesUtils.XXHDPI_VALUE;
+import static com.android.tools.build.bundletool.model.utils.ResourcesUtils.XXXHDPI_VALUE;
 import static java.util.Arrays.asList;
 
 import com.android.aapt.ConfigurationOuterClass.Configuration;
@@ -72,7 +72,7 @@ public final class ResourcesTableFactory {
 
   // package id space is reserved for Android Framework from 0x00 till 0x7e.
   public static final int USER_PACKAGE_OFFSET = 0x7f;
-  public static final int TEST_LABEL_RESOURCE_ID = 0x7f010001;
+  public static final int TEST_LABEL_RESOURCE_ID = 0x7f010000;
 
   public static Configuration locale(String locale) {
     return Configuration.newBuilder().setLocale(locale).build();
@@ -157,41 +157,20 @@ public final class ResourcesTableFactory {
         .build();
   }
 
-  public static ResourceTable createResourceTable() {
-    return resourceTable(pkg(USER_PACKAGE_OFFSET, "com.test.app"));
-  }
-
-  public static ResourceTable createResourceTable(String entryName, ConfigValue... values) {
+  public static ResourceTable createResourceTable(
+      int entryId, String entryName, ConfigValue... values) {
     return resourceTable(
         pkg(
             USER_PACKAGE_OFFSET,
             "com.test.app",
-            type(0x01, "drawable", entry(0x01, entryName, values))));
-  }
-
-  public static ResourceTable createResourceTableWithRaw(
-      String entryName, ConfigValue value, String rawEntryName, ConfigValue rawValue) {
-    return resourceTable(
-        pkg(
-            USER_PACKAGE_OFFSET,
-            "com.test.app",
-            type(0x01, "drawable", entry(0x01, entryName, value)),
-            type(0x02, "raw", entry(0x01, rawEntryName, rawValue))));
-  }
-
-  public static Package packageWithTestLabel(String value, int pkgId, Configuration config) {
-    return pkg(
-        pkgId,
-        "com.test.app",
-        type(0x01, "string", entry(0x01, "test_label", value("Test feature", config))));
-  }
-
-  public static Package packageWithTestLabel(String value, int pkgId) {
-    return packageWithTestLabel(value, pkgId, Configuration.getDefaultInstance());
+            type(0x01, "drawable", entry(entryId, entryName, values))));
   }
 
   public static ResourceTable resourceTableWithTestLabel(Configuration config, String value) {
-    return resourceTable(packageWithTestLabel(value, USER_PACKAGE_OFFSET, config));
+    return new ResourceTableBuilder()
+        .addPackage("com.test.app")
+        .addResource("string", "test_label", value(value, config))
+        .build();
   }
 
   public static ResourceTable resourceTableWithTestLabel(String value) {

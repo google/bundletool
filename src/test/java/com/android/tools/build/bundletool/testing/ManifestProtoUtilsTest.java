@@ -33,7 +33,7 @@ import static com.google.common.truth.Truth.assertThat;
 
 import com.android.aapt.Resources.XmlElement;
 import com.android.tools.build.bundletool.model.AndroidManifest;
-import com.android.tools.build.bundletool.utils.xmlproto.XmlProtoElement;
+import com.android.tools.build.bundletool.model.utils.xmlproto.XmlProtoElement;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
 import org.junit.Test;

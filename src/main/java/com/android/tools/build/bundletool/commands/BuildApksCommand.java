@@ -22,25 +22,27 @@ import static com.android.tools.build.bundletool.commands.BuildApksCommand.ApkBu
 import static com.android.tools.build.bundletool.commands.BuildApksCommand.ApkBuildMode.UNIVERSAL;
 import static com.google.common.base.Preconditions.checkArgument;
 
+import com.android.bundle.Devices.DeviceSpec;
 import com.android.tools.build.bundletool.commands.CommandHelp.CommandDescription;
 import com.android.tools.build.bundletool.commands.CommandHelp.FlagDescription;
 import com.android.tools.build.bundletool.device.AdbServer;
-import com.android.tools.build.bundletool.exceptions.CommandExecutionException;
-import com.android.tools.build.bundletool.exceptions.ValidationException;
+import com.android.tools.build.bundletool.device.DeviceSpecParser;
+import com.android.tools.build.bundletool.flags.Flag;
+import com.android.tools.build.bundletool.flags.ParsedFlags;
 import com.android.tools.build.bundletool.io.TempFiles;
 import com.android.tools.build.bundletool.model.Aapt2Command;
 import com.android.tools.build.bundletool.model.ApkListener;
 import com.android.tools.build.bundletool.model.ApkModifier;
 import com.android.tools.build.bundletool.model.OptimizationDimension;
+import com.android.tools.build.bundletool.model.Password;
 import com.android.tools.build.bundletool.model.SigningConfiguration;
+import com.android.tools.build.bundletool.model.exceptions.CommandExecutionException;
+import com.android.tools.build.bundletool.model.exceptions.ValidationException;
+import com.android.tools.build.bundletool.model.utils.DefaultSystemEnvironmentProvider;
+import com.android.tools.build.bundletool.model.utils.SdkToolsLocator;
+import com.android.tools.build.bundletool.model.utils.SystemEnvironmentProvider;
 import com.android.tools.build.bundletool.splitters.DexCompressionSplitter;
 import com.android.tools.build.bundletool.splitters.NativeLibrariesCompressionSplitter;
-import com.android.tools.build.bundletool.utils.EnvironmentVariableProvider;
-import com.android.tools.build.bundletool.utils.SdkToolsLocator;
-import com.android.tools.build.bundletool.utils.SystemEnvironmentVariableProvider;
-import com.android.tools.build.bundletool.utils.flags.Flag;
-import com.android.tools.build.bundletool.utils.flags.Flag.Password;
-import com.android.tools.build.bundletool.utils.flags.ParsedFlags;
 import com.google.auto.value.AutoValue;
 import com.google.common.base.Ascii;
 import com.google.common.collect.ImmutableSet;
@@ -104,8 +106,8 @@ public abstract class BuildApksCommand {
 
   private static final String APK_SET_ARCHIVE_EXTENSION = "apks";
 
-  private static final EnvironmentVariableProvider DEFAULT_PROVIDER =
-      new SystemEnvironmentVariableProvider();
+  private static final SystemEnvironmentProvider DEFAULT_PROVIDER =
+      new DefaultSystemEnvironmentProvider();
 
   public abstract Path getBundlePath();
 
@@ -115,7 +117,7 @@ public abstract class BuildApksCommand {
 
   public abstract ImmutableSet<OptimizationDimension> getOptimizationDimensions();
 
-  public abstract Optional<Path> getDeviceSpecPath();
+  public abstract Optional<DeviceSpec> getDeviceSpec();
 
   public abstract boolean getGenerateOnlyForConnectedDevice();
 
@@ -195,8 +197,8 @@ public abstract class BuildApksCommand {
      */
     public abstract Builder setGenerateOnlyForConnectedDevice(boolean onlyForConnectedDevice);
 
-    /** Sets the path for the device spec for which the only the matching APKs will be generated. */
-    public abstract Builder setDeviceSpecPath(Path deviceSpec);
+    /** Sets the {@link DeviceSpec} for which the only the matching APKs will be generated. */
+    public abstract Builder setDeviceSpec(DeviceSpec deviceSpec);
 
     /**
      * Sets the device serial number. Required if more than one device including emulators is
@@ -305,14 +307,14 @@ public abstract class BuildApksCommand {
                 Ascii.toLowerCase(DEFAULT.name())));
       }
 
-      if (command.getDeviceSpecPath().isPresent() && !command.getApkBuildMode().equals(DEFAULT)) {
+      if (command.getDeviceSpec().isPresent() && command.getApkBuildMode().equals(UNIVERSAL)) {
         throw new ValidationException(
             String.format(
-                "Optimizing for device spec only possible when running with '%s' mode flag.",
-                Ascii.toLowerCase(DEFAULT.name())));
+                "Optimizing for device spec not possible when running with '%s' mode flag.",
+                Ascii.toLowerCase(UNIVERSAL.name())));
       }
 
-      if (command.getGenerateOnlyForConnectedDevice() && command.getDeviceSpecPath().isPresent()) {
+      if (command.getGenerateOnlyForConnectedDevice() && command.getDeviceSpec().isPresent()) {
         throw new ValidationException(
             "Cannot optimize for the device spec and connected device at the same time.");
       }
@@ -344,7 +346,7 @@ public abstract class BuildApksCommand {
   static BuildApksCommand fromFlags(
       ParsedFlags flags,
       PrintStream out,
-      EnvironmentVariableProvider environmentVariableProvider,
+      SystemEnvironmentProvider systemEnvironmentProvider,
       AdbServer adbServer) {
     BuildApksCommand.Builder buildApksCommand =
         BuildApksCommand.builder()
@@ -363,7 +365,7 @@ public abstract class BuildApksCommand {
     if (GENERATE_UNIVERSAL_APK_FLAG.getValue(flags).orElse(false)) {
       out.printf(
           "WARNING: The '%s' flag is now replaced with --mode=universal and is going to be removed "
-              + "in the next BundleTool version.",
+              + "in the next BundleTool version.%n",
           GENERATE_UNIVERSAL_APK_FLAG.getName());
       buildApksCommand.setApkBuildMode(UNIVERSAL);
     }
@@ -393,9 +395,19 @@ public abstract class BuildApksCommand {
     } else if (!keystorePath.isPresent() && keyAlias.isPresent()) {
       throw new CommandExecutionException("Flag --ks is required when --ks-key-alias is set.");
     } else {
-      out.println(
-          "WARNING: The APKs won't be signed and thus not installable unless you also pass a "
-              + "keystore via the flag --ks. See the command help for more information.");
+      // Try to use debug keystore if present.
+      Optional<SigningConfiguration> debugConfig =
+          DebugKeystoreUtils.getDebugSigningConfiguration(systemEnvironmentProvider);
+      if (debugConfig.isPresent()) {
+        out.printf(
+            "INFO: The APKs will be signed with the debug keystore found at '%s'.%n",
+            DebugKeystoreUtils.DEBUG_KEYSTORE_CACHE.getUnchecked(systemEnvironmentProvider).get());
+        buildApksCommand.setSigningConfiguration(debugConfig.get());
+      } else {
+        out.println(
+            "WARNING: The APKs won't be signed and thus not installable unless you also pass a "
+                + "keystore via the flag --ks. See the command help for more information.");
+      }
     }
 
     boolean connectedDeviceMode = CONNECTED_DEVICE_FLAG.getValue(flags).orElse(false);
@@ -405,7 +417,7 @@ public abstract class BuildApksCommand {
 
     Optional<String> deviceSerialName = DEVICE_ID_FLAG.getValue(flags);
     if (connectedDeviceMode && !deviceSerialName.isPresent()) {
-      deviceSerialName = environmentVariableProvider.getVariable(ANDROID_SERIAL_VARIABLE);
+      deviceSerialName = systemEnvironmentProvider.getVariable(ANDROID_SERIAL_VARIABLE);
     }
     deviceSerialName.ifPresent(buildApksCommand::setDeviceId);
 
@@ -416,7 +428,7 @@ public abstract class BuildApksCommand {
       Path adbPath =
           adbPathFromFlag.orElseGet(
               () ->
-                  environmentVariableProvider
+                  systemEnvironmentProvider
                       .getVariable(ANDROID_HOME_VARIABLE)
                       .flatMap(path -> new SdkToolsLocator().locateAdb(Paths.get(path)))
                       .orElseThrow(
@@ -428,7 +440,9 @@ public abstract class BuildApksCommand {
       buildApksCommand.setAdbPath(adbPath).setAdbServer(adbServer);
     }
 
-    DEVICE_SPEC_FLAG.getValue(flags).ifPresent(buildApksCommand::setDeviceSpecPath);
+    DEVICE_SPEC_FLAG
+        .getValue(flags)
+        .ifPresent(path -> buildApksCommand.setDeviceSpec(DeviceSpecParser.parseDeviceSpec(path)));
 
     flags.checkNoUnknownFlags();
 
@@ -533,8 +547,8 @@ public abstract class BuildApksCommand {
                 .setOptional(true)
                 .setDescription(
                     "Path to the keystore that should be used to sign the generated APKs. If not "
-                        + "set, the APKs will not be signed. If set, the flag '%s' must also be "
-                        + "set.",
+                        + "set, the default debug keystore will be used if it exists. If not found "
+                        + "the APKs will not be signed. If set, the flag '%s' must also be set.",
                     KEY_ALIAS_FLAG)
                 .build())
         .addFlag(

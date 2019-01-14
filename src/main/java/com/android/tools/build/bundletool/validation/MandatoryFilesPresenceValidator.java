@@ -19,11 +19,11 @@ package com.android.tools.build.bundletool.validation;
 import static com.google.common.base.Predicates.not;
 import static com.google.common.collect.ImmutableSet.toImmutableSet;
 
-import com.android.tools.build.bundletool.exceptions.BundleFileTypesException.MandatoryBundleFileMissingException;
-import com.android.tools.build.bundletool.exceptions.BundleFileTypesException.MandatoryModuleFileMissingException;
 import com.android.tools.build.bundletool.model.AppBundle;
-import com.android.tools.build.bundletool.model.BundleModule;
+import com.android.tools.build.bundletool.model.BundleModule.SpecialModuleEntry;
 import com.android.tools.build.bundletool.model.ZipPath;
+import com.android.tools.build.bundletool.model.exceptions.BundleFileTypesException.MandatoryBundleFileMissingException;
+import com.android.tools.build.bundletool.model.exceptions.BundleFileTypesException.MandatoryModuleFileMissingException;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.io.Files;
 import java.util.Collections;
@@ -47,8 +47,7 @@ public class MandatoryFilesPresenceValidator extends SubValidator {
   @Override
   public void validateBundleZipFile(ZipFile bundleFile) {
     ImmutableSet<ZipPath> moduleDirectories =
-        Collections.list(bundleFile.entries())
-            .stream()
+        Collections.list(bundleFile.entries()).stream()
             .map(ZipEntry::getName)
             .map(ZipPath::create)
             .filter(entryPath -> entryPath.getNameCount() > 1)
@@ -73,10 +72,12 @@ public class MandatoryFilesPresenceValidator extends SubValidator {
   private static void checkModuleHasAndroidManifest(
       ZipFile zipFile, ZipPath moduleBaseDir, String moduleName) {
 
-    ZipPath moduleManifestPath = moduleBaseDir.resolve(BundleModule.MANIFEST_PATH);
+    ZipPath moduleManifestPath =
+        moduleBaseDir.resolve(SpecialModuleEntry.ANDROID_MANIFEST.getPath());
 
     if (zipFile.getEntry(moduleManifestPath.toString()) == null) {
-      throw new MandatoryModuleFileMissingException(moduleName, BundleModule.MANIFEST_PATH);
+      throw new MandatoryModuleFileMissingException(
+          moduleName, SpecialModuleEntry.ANDROID_MANIFEST.getPath());
     }
   }
 }

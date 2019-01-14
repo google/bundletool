@@ -16,6 +16,7 @@
 package com.android.tools.build.bundletool.model;
 
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifest;
+import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withSplitId;
 import static com.google.common.truth.Truth.assertThat;
 
 import com.android.bundle.Config.BundleConfig;
@@ -78,6 +79,6 @@ public final class ClassDexNameSanitizerTest {
         .setBundleConfig(DEFAULT_BUNDLE_CONFIG)
         .addEntry(InMemoryModuleEntry.ofFile("assets/hello", new byte[] {0xD, 0xE, 0xA, 0xD}))
         .addEntry(InMemoryModuleEntry.ofFile("assets/world", new byte[] {0xB, 0xE, 0xE, 0xF}))
-        .setAndroidManifestProto(androidManifest("com.test.app"));
+        .setAndroidManifestProto(androidManifest("com.test.app", withSplitId("module")));
   }
 }

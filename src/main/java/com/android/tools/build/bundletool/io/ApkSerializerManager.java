@@ -15,7 +15,7 @@
  */
 package com.android.tools.build.bundletool.io;
 
-import static com.android.tools.build.bundletool.utils.CollectorUtils.groupingBySortedKeys;
+import static com.android.tools.build.bundletool.model.utils.CollectorUtils.groupingBySortedKeys;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Predicates.alwaysTrue;
 import static com.google.common.collect.ImmutableList.toImmutableList;
@@ -39,7 +39,7 @@ import com.android.tools.build.bundletool.model.GeneratedApks;
 import com.android.tools.build.bundletool.model.ModuleSplit;
 import com.android.tools.build.bundletool.model.ModuleSplit.SplitType;
 import com.android.tools.build.bundletool.model.VariantKey;
-import com.android.tools.build.bundletool.utils.ConcurrencyUtils;
+import com.android.tools.build.bundletool.model.utils.ConcurrencyUtils;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableListMultimap;
@@ -78,8 +78,8 @@ public class ApkSerializerManager {
   }
 
   public ImmutableList<Variant> serializeApksForDevice(
-      GeneratedApks generatedApks, DeviceSpec deviceSpec) {
-    return serializeApks(generatedApks, ApkBuildMode.DEFAULT, Optional.of(deviceSpec));
+      GeneratedApks generatedApks, DeviceSpec deviceSpec, ApkBuildMode apkBuildMode) {
+    return serializeApks(generatedApks, apkBuildMode, Optional.of(deviceSpec));
   }
 
   @VisibleForTesting

@@ -21,13 +21,14 @@ import com.android.aapt.Resources.ConfigValue;
 import com.android.aapt.Resources.Entry;
 import com.android.aapt.Resources.ResourceTable;
 import com.android.aapt.Resources.XmlNode;
-import com.android.tools.build.bundletool.exceptions.ValidationException;
-import com.android.tools.build.bundletool.utils.ResourcesUtils;
-import com.android.tools.build.bundletool.utils.xmlproto.XmlProtoElement;
-import com.android.tools.build.bundletool.utils.xmlproto.XmlProtoNode;
+import com.android.tools.build.bundletool.model.exceptions.ValidationException;
+import com.android.tools.build.bundletool.model.utils.ResourcesUtils;
+import com.android.tools.build.bundletool.model.utils.xmlproto.XmlProtoElement;
+import com.android.tools.build.bundletool.model.utils.xmlproto.XmlProtoNode;
 import com.google.common.collect.Iterables;
 import com.google.protobuf.InvalidProtocolBufferException;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.UncheckedIOException;
 import java.util.Optional;
 
@@ -127,8 +128,8 @@ public final class WearApkLocator {
    */
   private static Optional<String> extractWearApkName(ModuleEntry wearApkDescriptionXmlEntry) {
     XmlProtoNode root;
-    try {
-      root = new XmlProtoNode(XmlNode.parseFrom(wearApkDescriptionXmlEntry.getContent()));
+    try (InputStream content = wearApkDescriptionXmlEntry.getContent()) {
+      root = new XmlProtoNode(XmlNode.parseFrom(content));
     } catch (InvalidProtocolBufferException e) {
       throw ValidationException.builder()
           .withCause(e)

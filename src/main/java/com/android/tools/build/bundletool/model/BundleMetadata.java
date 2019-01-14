@@ -20,10 +20,13 @@ import static com.google.common.base.Preconditions.checkArgument;
 
 import com.google.auto.value.AutoValue;
 import com.google.common.collect.ImmutableMap;
+import com.google.errorprone.annotations.Immutable;
 import java.util.Optional;
 
 /** Holder of the App Bundle metadata. */
+@Immutable
 @AutoValue
+@AutoValue.CopyAnnotations
 public abstract class BundleMetadata {
 
   /** Namespaced directory where files used by BundleTool are stored. */

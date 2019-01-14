@@ -23,7 +23,7 @@ import static com.google.common.collect.ImmutableSet.toImmutableSet;
 import static java.util.function.Function.identity;
 
 import com.android.bundle.Targeting.Abi.AbiAlias;
-import com.android.tools.build.bundletool.utils.EnumMapper;
+import com.android.tools.build.bundletool.model.utils.EnumMapper;
 import com.google.common.collect.ImmutableBiMap;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;

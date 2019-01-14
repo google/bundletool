@@ -16,15 +16,15 @@
 
 package com.android.tools.build.bundletool.io;
 
-import static com.android.tools.build.bundletool.utils.FileNames.TABLE_OF_CONTENTS_FILE;
-import static com.android.tools.build.bundletool.utils.files.FilePreconditions.checkFileExistsAndReadable;
+import static com.android.tools.build.bundletool.model.utils.FileNames.TABLE_OF_CONTENTS_FILE;
+import static com.android.tools.build.bundletool.model.utils.files.FilePreconditions.checkFileExistsAndReadable;
 
 import com.android.bundle.Commands.ApkDescription;
 import com.android.bundle.Commands.BuildApksResult;
 import com.android.tools.build.bundletool.io.ZipBuilder.EntryOption;
 import com.android.tools.build.bundletool.model.ModuleSplit;
 import com.android.tools.build.bundletool.model.ZipPath;
-import com.android.tools.build.bundletool.utils.files.BufferedIo;
+import com.android.tools.build.bundletool.model.utils.files.BufferedIo;
 import com.google.common.collect.ImmutableList;
 import com.google.protobuf.Message;
 import java.io.FileNotFoundException;

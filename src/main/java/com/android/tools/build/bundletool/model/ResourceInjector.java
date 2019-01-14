@@ -23,7 +23,7 @@ import com.android.aapt.Resources.PackageId;
 import com.android.aapt.Resources.ResourceTable;
 import com.android.aapt.Resources.Type;
 import com.android.aapt.Resources.TypeId;
-import com.android.tools.build.bundletool.exceptions.CommandExecutionException;
+import com.android.tools.build.bundletool.model.exceptions.CommandExecutionException;
 import java.util.List;
 
 /**

@@ -16,9 +16,9 @@
 
 package com.android.tools.build.bundletool.commands;
 
-import static com.android.tools.build.bundletool.utils.files.FilePreconditions.checkDirectoryExists;
-import static com.android.tools.build.bundletool.utils.files.FilePreconditions.checkFileExistsAndExecutable;
-import static com.android.tools.build.bundletool.utils.files.FilePreconditions.checkFileExistsAndReadable;
+import static com.android.tools.build.bundletool.model.utils.files.FilePreconditions.checkDirectoryExists;
+import static com.android.tools.build.bundletool.model.utils.files.FilePreconditions.checkFileExistsAndExecutable;
+import static com.android.tools.build.bundletool.model.utils.files.FilePreconditions.checkFileExistsAndReadable;
 
 import com.android.bundle.Devices.DeviceSpec;
 import com.android.tools.build.bundletool.commands.CommandHelp.CommandDescription;
@@ -27,13 +27,13 @@ import com.android.tools.build.bundletool.device.AdbServer;
 import com.android.tools.build.bundletool.device.ApksInstaller;
 import com.android.tools.build.bundletool.device.Device.InstallOptions;
 import com.android.tools.build.bundletool.device.DeviceAnalyzer;
-import com.android.tools.build.bundletool.exceptions.CommandExecutionException;
+import com.android.tools.build.bundletool.flags.Flag;
+import com.android.tools.build.bundletool.flags.ParsedFlags;
 import com.android.tools.build.bundletool.io.TempFiles;
-import com.android.tools.build.bundletool.utils.EnvironmentVariableProvider;
-import com.android.tools.build.bundletool.utils.SdkToolsLocator;
-import com.android.tools.build.bundletool.utils.SystemEnvironmentVariableProvider;
-import com.android.tools.build.bundletool.utils.flags.Flag;
-import com.android.tools.build.bundletool.utils.flags.ParsedFlags;
+import com.android.tools.build.bundletool.model.exceptions.CommandExecutionException;
+import com.android.tools.build.bundletool.model.utils.DefaultSystemEnvironmentProvider;
+import com.android.tools.build.bundletool.model.utils.SdkToolsLocator;
+import com.android.tools.build.bundletool.model.utils.SystemEnvironmentProvider;
 import com.google.auto.value.AutoValue;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
@@ -57,8 +57,8 @@ public abstract class InstallApksCommand {
   private static final String ANDROID_HOME_VARIABLE = "ANDROID_HOME";
   private static final String ANDROID_SERIAL_VARIABLE = "ANDROID_SERIAL";
 
-  private static final EnvironmentVariableProvider DEFAULT_PROVIDER =
-      new SystemEnvironmentVariableProvider();
+  private static final SystemEnvironmentProvider DEFAULT_PROVIDER =
+      new DefaultSystemEnvironmentProvider();
 
   public abstract Path getAdbPath();
 
@@ -100,16 +100,14 @@ public abstract class InstallApksCommand {
   }
 
   public static InstallApksCommand fromFlags(
-      ParsedFlags flags,
-      EnvironmentVariableProvider environmentVariableProvider,
-      AdbServer adbServer) {
+      ParsedFlags flags, SystemEnvironmentProvider systemEnvironmentProvider, AdbServer adbServer) {
     Path apksArchivePath = APKS_ARCHIVE_FILE_FLAG.getRequiredValue(flags);
     Path adbPath =
         ADB_PATH_FLAG
             .getValue(flags)
             .orElseGet(
                 () ->
-                    environmentVariableProvider
+                    systemEnvironmentProvider
                         .getVariable(ANDROID_HOME_VARIABLE)
                         .flatMap(path -> new SdkToolsLocator().locateAdb(Paths.get(path)))
                         .orElseThrow(
@@ -120,7 +118,7 @@ public abstract class InstallApksCommand {
 
     Optional<String> deviceSerialName = DEVICE_ID_FLAG.getValue(flags);
     if (!deviceSerialName.isPresent()) {
-      deviceSerialName = environmentVariableProvider.getVariable(ANDROID_SERIAL_VARIABLE);
+      deviceSerialName = systemEnvironmentProvider.getVariable(ANDROID_SERIAL_VARIABLE);
     }
 
     Optional<ImmutableSet<String>> modules = MODULES_FLAG.getValue(flags);
@@ -236,9 +234,11 @@ public abstract class InstallApksCommand {
                 .setExampleValue("base,module1,module2")
                 .setOptional(true)
                 .setDescription(
-                    "List of modules to be installed (defaults to all of them). Note that the "
-                        + "dependent modules will also be installed. Ignored if the device "
-                        + "receives a standalone APK.")
+                    "List of modules to be installed, or \"%s\" for all modules. Defaults to "
+                        + "modules installed during first install, i.e. not on-demand. Note that "
+                        + "the dependent modules will also be installed. The value of this flag is "
+                        + "ignored if the device receives a standalone APK.",
+                    ExtractApksCommand.ALL_MODULES_SHORTCUT)
                 .build())
         .build();
   }

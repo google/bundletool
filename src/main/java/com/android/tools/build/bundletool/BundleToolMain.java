@@ -27,11 +27,10 @@ import com.android.tools.build.bundletool.commands.ValidateBundleCommand;
 import com.android.tools.build.bundletool.commands.VersionCommand;
 import com.android.tools.build.bundletool.device.AdbServer;
 import com.android.tools.build.bundletool.device.DdmlibAdbServer;
-import com.android.tools.build.bundletool.utils.flags.FlagParser;
-import com.android.tools.build.bundletool.utils.flags.ParsedFlags;
-import com.android.tools.build.bundletool.version.BundleToolVersion;
+import com.android.tools.build.bundletool.flags.FlagParser;
+import com.android.tools.build.bundletool.flags.ParsedFlags;
+import com.android.tools.build.bundletool.model.version.BundleToolVersion;
 import com.google.common.collect.ImmutableList;
-import java.util.List;
 import java.util.Optional;
 
 /**
@@ -57,8 +56,6 @@ public class BundleToolMain {
       runtime.exit(1);
       return;
     }
-    List<String> commands = flags.getCommands();
-
     Optional<String> command = flags.getMainCommand();
     if (!command.isPresent()) {
       System.err.println("Error: You have to specify a command.");
@@ -111,7 +108,7 @@ public class BundleToolMain {
           }
           break;
         default:
-          System.err.printf("Error: Unrecognized command '%s'.%n%n%n", commands.get(0));
+          System.err.printf("Error: Unrecognized command '%s'.%n%n%n", command.get());
           help();
           runtime.exit(1);
           return;

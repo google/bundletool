@@ -18,16 +18,19 @@ package com.android.tools.build.bundletool.xml;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static java.util.stream.Collectors.toList;
 
-import com.android.tools.build.bundletool.exceptions.ValidationException;
-import com.android.tools.build.bundletool.utils.xmlproto.XmlProtoAttribute;
-import com.android.tools.build.bundletool.utils.xmlproto.XmlProtoElement;
-import com.android.tools.build.bundletool.utils.xmlproto.XmlProtoNamespace;
-import com.android.tools.build.bundletool.utils.xmlproto.XmlProtoNode;
+import com.android.tools.build.bundletool.model.utils.xmlproto.XmlProtoAttribute;
+import com.android.tools.build.bundletool.model.utils.xmlproto.XmlProtoElement;
+import com.android.tools.build.bundletool.model.utils.xmlproto.XmlProtoNamespace;
+import com.android.tools.build.bundletool.model.utils.xmlproto.XmlProtoNode;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.Streams;
 import java.util.ArrayDeque;
 import java.util.Deque;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Optional;
+import java.util.function.Predicate;
 import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
 import org.w3c.dom.Document;
@@ -46,6 +49,19 @@ import org.w3c.dom.Node;
 public final class XmlProtoToXmlConverter {
 
   private static final String XMLNS_NAMESPACE_URI = "http://www.w3.org/2000/xmlns/";
+
+  private static final ImmutableMap<String, String> COMMON_NAMESPACE_PREFIXES =
+      ImmutableMap.<String, String>builder()
+          .put("http://schemas.android.com/apk/res/android", "android")
+          .put("http://schemas.android.com/apk/distribution", "dist")
+          .put("http://schemas.android.com/tools", "tools")
+          .build();
+
+  /**
+   * Index appended at the end of the namespace prefix created when the namespace declarations have
+   * been stripped out.
+   */
+  private int nextPrefixIndex = 0;
 
   /**
    * A map of the namespace URI to prefix.
@@ -153,13 +169,36 @@ public final class XmlProtoToXmlConverter {
   }
 
   private String getPrefixForNamespace(String attrNamespaceUri) {
-    Deque<String> prefixes = namespaceUriToPrefix.get(attrNamespaceUri);
-    if (prefixes == null || prefixes.isEmpty()) {
-      throw ValidationException.builder()
-          .withMessage("Prefix for URI '%s' not found", attrNamespaceUri)
-          .build();
-    }
+    Deque<String> prefixes =
+        namespaceUriToPrefix.computeIfAbsent(
+            attrNamespaceUri,
+            uri -> createDequeWithElement(getCommonPrefix(uri).orElseGet(() -> createNewPrefix())));
     return prefixes.peekLast();
+  }
+
+  private Optional<String> getCommonPrefix(String uri) {
+    String prefix = COMMON_NAMESPACE_PREFIXES.get(uri);
+    if (prefix == null || isNamespacePrefixInScope(prefix)) {
+      return Optional.empty();
+    }
+    return Optional.of(prefix);
+  }
+
+  /** Returns whether the given namespace {@code prefix} is used currently in the scope. */
+  private boolean isNamespacePrefixInScope(String prefix) {
+    return namespaceUriToPrefix.values().stream()
+        .flatMap(queue -> Streams.stream(queue.iterator()))
+        .anyMatch(Predicate.isEqual(prefix));
+  }
+
+  private String createNewPrefix() {
+    return String.format("_unknown%d_", nextPrefixIndex++);
+  }
+
+  private static Deque<String> createDequeWithElement(String element) {
+    Deque<String> queue = new ArrayDeque<>();
+    queue.add(element);
+    return queue;
   }
 
   /** See {@link #convert(XmlProtoNode)}. */

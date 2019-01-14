@@ -24,4 +24,4 @@ Read more about the App Bundle format and Bundletool's usage at
 
 ## Releases
 
-Latest release: [0.7.2](https://github.com/google/bundletool/releases)
+Latest release: [0.8.0](https://github.com/google/bundletool/releases)

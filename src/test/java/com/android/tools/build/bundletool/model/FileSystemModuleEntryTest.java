@@ -20,7 +20,7 @@ import static com.google.common.truth.Truth.assertThat;
 import static com.google.common.truth.Truth8.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
-import com.google.common.io.ByteStreams;
+import com.android.tools.build.bundletool.testing.TestUtils;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -46,7 +46,7 @@ public class FileSystemModuleEntryTest {
 
     assertThat(entry.getPath()).isEqualTo(ZipPath.create("assets/file.txt"));
     assertThat(entry.isDirectory()).isFalse();
-    assertThat(ByteStreams.toByteArray(entry.getContent())).isEqualTo(fileData);
+    assertThat(TestUtils.getEntryContent(entry)).isEqualTo(fileData);
   }
 
   @Test
@@ -98,8 +98,8 @@ public class FileSystemModuleEntryTest {
     assertThat(entry.getPath()).isEqualTo(compressedEntry.getPath());
     assertThat(entry.getFileSystemPath()).isEqualTo(compressedEntry.getFileSystemPath());
     assertThat(entry.isDirectory()).isEqualTo(compressedEntry.isDirectory());
-    assertThat(ByteStreams.toByteArray(entry.getContent()))
-        .isEqualTo(ByteStreams.toByteArray(compressedEntry.getContent()));
+    assertThat(TestUtils.getEntryContent(entry))
+        .isEqualTo(TestUtils.getEntryContent(compressedEntry));
   }
 
   @Test
@@ -114,7 +114,7 @@ public class FileSystemModuleEntryTest {
     assertThat(entry.getPath()).isEqualTo(compressedEntry.getPath());
     assertThat(entry.getFileSystemPath()).isEqualTo(compressedEntry.getFileSystemPath());
     assertThat(entry.isDirectory()).isEqualTo(compressedEntry.isDirectory());
-    assertThat(ByteStreams.toByteArray(entry.getContent()))
-        .isEqualTo(ByteStreams.toByteArray(compressedEntry.getContent()));
+    assertThat(TestUtils.getEntryContent(entry))
+        .isEqualTo(TestUtils.getEntryContent(compressedEntry));
   }
 }

@@ -16,8 +16,8 @@
 package com.android.tools.build.bundletool.commands;
 
 import com.android.tools.build.bundletool.commands.CommandHelp.CommandDescription;
-import com.android.tools.build.bundletool.utils.flags.ParsedFlags;
-import com.android.tools.build.bundletool.version.BundleToolVersion;
+import com.android.tools.build.bundletool.flags.ParsedFlags;
+import com.android.tools.build.bundletool.model.version.BundleToolVersion;
 import java.io.PrintStream;
 
 /** Command to print the version of BundleTool. */

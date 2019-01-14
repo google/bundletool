@@ -19,10 +19,10 @@ package com.android.tools.build.bundletool.validation;
 import static com.google.common.truth.Truth.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
-import com.android.tools.build.bundletool.exceptions.BundleFileTypesException.MandatoryBundleFileMissingException;
-import com.android.tools.build.bundletool.exceptions.BundleFileTypesException.MandatoryModuleFileMissingException;
 import com.android.tools.build.bundletool.io.ZipBuilder;
 import com.android.tools.build.bundletool.model.ZipPath;
+import com.android.tools.build.bundletool.model.exceptions.BundleFileTypesException.MandatoryBundleFileMissingException;
+import com.android.tools.build.bundletool.model.exceptions.BundleFileTypesException.MandatoryModuleFileMissingException;
 import java.nio.file.Path;
 import java.util.zip.ZipFile;
 import org.junit.Before;

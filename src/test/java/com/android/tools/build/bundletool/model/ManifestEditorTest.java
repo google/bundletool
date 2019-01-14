@@ -25,6 +25,8 @@ import static com.android.tools.build.bundletool.model.AndroidManifest.NAME_ATTR
 import static com.android.tools.build.bundletool.model.AndroidManifest.NAME_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.PROVIDER_ELEMENT_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.SERVICE_ELEMENT_NAME;
+import static com.android.tools.build.bundletool.model.AndroidManifest.SPLIT_NAME_ATTRIBUTE_NAME;
+import static com.android.tools.build.bundletool.model.AndroidManifest.SPLIT_NAME_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.TARGET_SANDBOX_VERSION_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.VALUE_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.VERSION_CODE_RESOURCE_ID;
@@ -47,9 +49,10 @@ import com.android.aapt.Resources.XmlAttribute;
 import com.android.aapt.Resources.XmlElement;
 import com.android.aapt.Resources.XmlNode;
 import com.android.tools.build.bundletool.TestData;
-import com.android.tools.build.bundletool.utils.xmlproto.XmlProtoAttribute;
-import com.android.tools.build.bundletool.utils.xmlproto.XmlProtoElement;
+import com.android.tools.build.bundletool.model.utils.xmlproto.XmlProtoAttribute;
+import com.android.tools.build.bundletool.model.utils.xmlproto.XmlProtoElement;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.protobuf.TextFormat;
 import org.junit.Test;
@@ -572,6 +575,65 @@ public class ManifestEditorTest {
         .containsExactly(
             xmlAttribute(
                 ANDROID_NAMESPACE_URI, NAME_ATTRIBUTE_NAME, NAME_RESOURCE_ID, "FooProvider"));
+  }
+
+  @Test
+  public void removeUnknownSplits() {
+    AndroidManifest manifest =
+        AndroidManifest.create(
+            androidManifest("com.test.app", withSplitNameProvider("FooProvider", "foo")));
+    AndroidManifest editedManifest =
+        manifest.toEditor().removeUnknownSplitComponents(ImmutableSet.of("bar")).save();
+
+    ImmutableList<XmlElement> providers =
+        editedManifest
+            .getManifestElement()
+            .getChildElement("application")
+            .getChildrenElements(PROVIDER_ELEMENT_NAME)
+            .map(XmlProtoElement::getProto)
+            .collect(toImmutableList());
+    assertThat(providers).isEmpty();
+  }
+
+  @Test
+  public void removeUnknownSplits_keepsKnownSplits() {
+    AndroidManifest manifest =
+        AndroidManifest.create(
+            androidManifest("com.test.app", withSplitNameProvider("FooProvider", "foo")));
+    AndroidManifest editedManifest =
+        manifest.toEditor().removeUnknownSplitComponents(ImmutableSet.of("foo")).save();
+
+    ImmutableList<XmlElement> providers =
+        editedManifest
+            .getManifestElement()
+            .getChildElement("application")
+            .getChildrenElements(PROVIDER_ELEMENT_NAME)
+            .map(XmlProtoElement::getProto)
+            .collect(toImmutableList());
+    assertThat(providers).hasSize(1);
+    XmlElement providerElement = Iterables.getOnlyElement(providers);
+    assertThat(providerElement.getAttributeList())
+        .containsExactly(
+            xmlAttribute(
+                ANDROID_NAMESPACE_URI, NAME_ATTRIBUTE_NAME, NAME_RESOURCE_ID, "FooProvider"),
+            xmlAttribute(
+                ANDROID_NAMESPACE_URI, SPLIT_NAME_ATTRIBUTE_NAME, SPLIT_NAME_RESOURCE_ID, "foo"));
+  }
+
+  @Test
+  public void removeUnknownSplits_keepsBaseSplits() {
+    AndroidManifest manifest = AndroidManifest.create(androidManifest("com.test.app"));
+    AndroidManifest editedManifest =
+        manifest.toEditor().removeUnknownSplitComponents(ImmutableSet.of()).save();
+
+    ImmutableList<XmlElement> activities =
+        editedManifest
+            .getManifestElement()
+            .getChildElement("application")
+            .getChildrenElements(ACTIVITY_ELEMENT_NAME)
+            .map(XmlProtoElement::getProto)
+            .collect(toImmutableList());
+    assertThat(activities).hasSize(1);
   }
 
   @Test

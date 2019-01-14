@@ -15,7 +15,11 @@
  */
 package com.android.tools.build.bundletool.commands;
 
+import static com.android.bundle.Targeting.ScreenDensity.DensityAlias.HDPI;
+import static com.android.bundle.Targeting.ScreenDensity.DensityAlias.XHDPI;
 import static com.android.tools.build.bundletool.commands.BuildApksCommand.ApkBuildMode.UNIVERSAL;
+import static com.android.tools.build.bundletool.model.utils.ResultUtils.instantApkVariants;
+import static com.android.tools.build.bundletool.model.utils.ResultUtils.splitApkVariants;
 import static com.android.tools.build.bundletool.testing.ApkSetUtils.extractTocFromApkSetFile;
 import static com.android.tools.build.bundletool.testing.AppBundleFactory.createInstantBundle;
 import static com.android.tools.build.bundletool.testing.AppBundleFactory.createLdpiHdpiAppBundle;
@@ -33,8 +37,6 @@ import static com.android.tools.build.bundletool.testing.DeviceFactory.mergeSpec
 import static com.android.tools.build.bundletool.testing.DeviceFactory.sdkVersion;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifest;
 import static com.android.tools.build.bundletool.testing.truth.zip.TruthZip.assertThat;
-import static com.android.tools.build.bundletool.utils.ResultUtils.instantApkVariants;
-import static com.android.tools.build.bundletool.utils.ResultUtils.splitApkVariants;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.truth.Truth.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -44,16 +46,20 @@ import com.android.bundle.Commands.ApkSet;
 import com.android.bundle.Commands.BuildApksResult;
 import com.android.bundle.Commands.Variant;
 import com.android.bundle.Devices.DeviceSpec;
-import com.android.bundle.Targeting.ScreenDensity.DensityAlias;
 import com.android.tools.build.bundletool.device.AdbServer;
-import com.android.tools.build.bundletool.exceptions.CommandExecutionException;
-import com.android.tools.build.bundletool.exceptions.ValidationException;
+import com.android.tools.build.bundletool.flags.FlagParser;
 import com.android.tools.build.bundletool.io.AppBundleSerializer;
 import com.android.tools.build.bundletool.model.AppBundle;
+import com.android.tools.build.bundletool.model.exceptions.CommandExecutionException;
+import com.android.tools.build.bundletool.model.exceptions.ValidationException;
+import com.android.tools.build.bundletool.model.utils.SystemEnvironmentProvider;
 import com.android.tools.build.bundletool.testing.AppBundleBuilder;
 import com.android.tools.build.bundletool.testing.FakeAdbServer;
-import com.android.tools.build.bundletool.utils.flags.FlagParser;
+import com.android.tools.build.bundletool.testing.FakeSystemEnvironmentProvider;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
+import java.io.ByteArrayOutputStream;
+import java.io.PrintStream;
 import java.nio.file.Path;
 import java.util.zip.ZipFile;
 import org.junit.Before;
@@ -77,6 +83,8 @@ public class BuildApksDeviceSpecTest {
   private Path outputFilePath;
   private final AdbServer fakeAdbServer =
       new FakeAdbServer(/* hasInitialDeviceList= */ true, /* devices= */ ImmutableList.of());
+  private final SystemEnvironmentProvider systemEnvironmentProvider =
+      new FakeSystemEnvironmentProvider(/* variables= */ ImmutableMap.of());
 
   @Before
   public void setUp() throws Exception {
@@ -88,8 +96,9 @@ public class BuildApksDeviceSpecTest {
 
   @Test
   public void deviceSpec_flagsEquivalent() throws Exception {
-    Path deviceSpecPath =
-        createDeviceSpecFile(DeviceSpec.getDefaultInstance(), tmpDir.resolve("device.json"));
+    ByteArrayOutputStream output = new ByteArrayOutputStream();
+    DeviceSpec deviceSpec = deviceWithSdk(28);
+    Path deviceSpecPath = createDeviceSpecFile(deviceSpec, tmpDir.resolve("device.json"));
     BuildApksCommand commandViaFlags =
         BuildApksCommand.fromFlags(
             new FlagParser()
@@ -97,26 +106,30 @@ public class BuildApksDeviceSpecTest {
                     "--bundle=" + bundlePath,
                     "--output=" + outputFilePath,
                     "--device-spec=" + deviceSpecPath),
+            new PrintStream(output),
+            systemEnvironmentProvider,
             fakeAdbServer);
 
-    BuildApksCommand commandViaBuilder =
+    BuildApksCommand.Builder commandViaBuilder =
         BuildApksCommand.builder()
             .setBundlePath(bundlePath)
             .setOutputFile(outputFilePath)
             // Optional values.
-            .setDeviceSpecPath(deviceSpecPath)
+            .setDeviceSpec(deviceSpec)
             // Must copy instance of the internal executor service.
             .setExecutorServiceInternal(commandViaFlags.getExecutorService())
             .setExecutorServiceCreatedByBundleTool(true)
-            .setOutputPrintStream(commandViaFlags.getOutputPrintStream().get())
-            .build();
+            .setOutputPrintStream(commandViaFlags.getOutputPrintStream().get());
 
-    assertThat(commandViaBuilder).isEqualTo(commandViaFlags);
+    DebugKeystoreUtils.getDebugSigningConfiguration(systemEnvironmentProvider)
+        .ifPresent(commandViaBuilder::setSigningConfiguration);
+
+    assertThat(commandViaBuilder.build()).isEqualTo(commandViaFlags);
   }
 
   @Test
   public void deviceSpec_universalApk_throws() throws Exception {
-    Path deviceSpecPath = createDeviceSpecFile(deviceWithSdk(21), tmpDir.resolve("device.json"));
+    DeviceSpec deviceSpec = deviceWithSdk(21);
 
     AppBundle appBundle =
         new AppBundleBuilder()
@@ -128,19 +141,19 @@ public class BuildApksDeviceSpecTest {
         BuildApksCommand.builder()
             .setBundlePath(bundlePath)
             .setOutputFile(outputFilePath)
-            .setDeviceSpecPath(deviceSpecPath)
+            .setDeviceSpec(deviceSpec)
             .setApkBuildMode(UNIVERSAL);
 
     Throwable exception = assertThrows(ValidationException.class, () -> command.build());
     assertThat(exception)
         .hasMessageThat()
         .contains(
-            "Optimizing for device spec only possible when running with 'default' mode flag.");
+            "Optimizing for device spec not possible when running with 'universal' mode flag.");
   }
 
   @Test
   public void deviceSpec_andConnectedDevice_throws() throws Exception {
-    Path deviceSpecPath = createDeviceSpecFile(deviceWithSdk(21), tmpDir.resolve("device.json"));
+    DeviceSpec deviceSpec = deviceWithSdk(21);
 
     AppBundle appBundle =
         new AppBundleBuilder()
@@ -152,7 +165,7 @@ public class BuildApksDeviceSpecTest {
         BuildApksCommand.builder()
             .setBundlePath(bundlePath)
             .setOutputFile(outputFilePath)
-            .setDeviceSpecPath(deviceSpecPath)
+            .setDeviceSpec(deviceSpec)
             .setGenerateOnlyForConnectedDevice(true);
 
     Throwable exception = assertThrows(ValidationException.class, () -> command.build());
@@ -163,8 +176,7 @@ public class BuildApksDeviceSpecTest {
 
   @Test
   public void deviceSpec_correctSplitsGenerated() throws Exception {
-    Path deviceSpecPath =
-        createDeviceSpecFile(lDeviceWithDensity(DensityAlias.XHDPI), tmpDir.resolve("device.json"));
+    DeviceSpec deviceSpec = lDeviceWithDensity(XHDPI);
 
     bundleSerializer.writeToDisk(createLdpiHdpiAppBundle(), bundlePath);
 
@@ -172,7 +184,7 @@ public class BuildApksDeviceSpecTest {
         BuildApksCommand.builder()
             .setBundlePath(bundlePath)
             .setOutputFile(outputFilePath)
-            .setDeviceSpecPath(deviceSpecPath)
+            .setDeviceSpec(deviceSpec)
             .build();
 
     Path apksArchive = command.execute();
@@ -192,12 +204,8 @@ public class BuildApksDeviceSpecTest {
 
   @Test
   public void deviceSpec_correctStandaloneGenerated() throws Exception {
-    Path deviceSpecPath =
-        createDeviceSpecFile(
-            mergeSpecs(
-                sdkVersion(19), abis("x86"),
-                locales("en-US"), density(DensityAlias.HDPI)),
-            tmpDir.resolve("device.json"));
+    DeviceSpec deviceSpec =
+        mergeSpecs(sdkVersion(19), abis("x86"), locales("en-US"), density(HDPI));
 
     bundleSerializer.writeToDisk(createLdpiHdpiAppBundle(), bundlePath);
 
@@ -205,7 +213,7 @@ public class BuildApksDeviceSpecTest {
         BuildApksCommand.builder()
             .setBundlePath(bundlePath)
             .setOutputFile(outputFilePath)
-            .setDeviceSpecPath(deviceSpecPath)
+            .setDeviceSpec(deviceSpec)
             .build();
 
     Path apksArchive = command.execute();
@@ -225,15 +233,13 @@ public class BuildApksDeviceSpecTest {
   public void deviceSpecL_bundleTargetsPreL_throws() throws Exception {
     bundleSerializer.writeToDisk(createMaxSdkBundle(/* KitKat */ 19), bundlePath);
 
-    Path deviceSpecPath =
-        createDeviceSpecFile(
-            lDeviceWithDensity(DensityAlias.XHDPI), outputDir.resolve("device.json"));
+    DeviceSpec deviceSpec = lDeviceWithDensity(XHDPI);
 
     BuildApksCommand command =
         BuildApksCommand.builder()
             .setBundlePath(bundlePath)
             .setOutputFile(outputFilePath)
-            .setDeviceSpecPath(deviceSpecPath)
+            .setDeviceSpec(deviceSpec)
             .build();
 
     Throwable exception = assertThrows(CommandExecutionException.class, () -> command.execute());
@@ -246,12 +252,10 @@ public class BuildApksDeviceSpecTest {
 
   @Test
   public void deviceSpecPreL_bundleTargetsLPlus_throws() throws Exception {
-    Path deviceSpecPath =
-        createDeviceSpecFile(
-            mergeSpecs(
-                sdkVersion(/* KitKat */ 19), abis("x86"),
-                locales("en-US"), density(DensityAlias.XHDPI)),
-            outputDir.resolve("device.json"));
+    DeviceSpec deviceSpec =
+        mergeSpecs(
+            sdkVersion(/* KitKat */ 19), abis("x86"),
+            locales("en-US"), density(XHDPI));
 
     bundleSerializer.writeToDisk(createMinSdkBundle(21), bundlePath);
 
@@ -259,7 +263,7 @@ public class BuildApksDeviceSpecTest {
         BuildApksCommand.builder()
             .setBundlePath(bundlePath)
             .setOutputFile(outputFilePath)
-            .setDeviceSpecPath(deviceSpecPath)
+            .setDeviceSpec(deviceSpec)
             .build();
 
     Throwable exception = assertThrows(CommandExecutionException.class, () -> command.execute());
@@ -271,12 +275,10 @@ public class BuildApksDeviceSpecTest {
   @Ignore("Re-enable when minSdk version propagation is fixed.")
   @Test
   public void deviceSpecL_bundleTargetsMPlus_throws() throws Exception {
-    Path deviceSpecPath =
-        createDeviceSpecFile(
-            mergeSpecs(
-                sdkVersion(/* Lollipop */ 21), abis("x86"),
-                locales("en-US"), density(DensityAlias.XHDPI)),
-            outputDir.resolve("device.json"));
+    DeviceSpec deviceSpec =
+        mergeSpecs(
+            sdkVersion(/* Lollipop */ 21), abis("x86"),
+            locales("en-US"), density(XHDPI));
 
     bundleSerializer.writeToDisk(createMinSdkBundle(/* Marshmallow */ 23), bundlePath);
 
@@ -284,7 +286,7 @@ public class BuildApksDeviceSpecTest {
         BuildApksCommand.builder()
             .setBundlePath(bundlePath)
             .setOutputFile(outputFilePath)
-            .setDeviceSpecPath(deviceSpecPath)
+            .setDeviceSpec(deviceSpec)
             .build();
 
     Throwable exception = assertThrows(CommandExecutionException.class, () -> command.execute());
@@ -293,12 +295,10 @@ public class BuildApksDeviceSpecTest {
 
   @Test
   public void deviceSpecMips_bundleTargetsX86_throws() throws Exception {
-    Path deviceSpecPath =
-        createDeviceSpecFile(
-            mergeSpecs(
-                sdkVersion(/* Lollipop */ 21), abis("mips"),
-                locales("en-US"), density(DensityAlias.XHDPI)),
-            outputDir.resolve("device.json"));
+    DeviceSpec deviceSpec =
+        mergeSpecs(
+            sdkVersion(/* Lollipop */ 21), abis("mips"),
+            locales("en-US"), density(XHDPI));
 
     bundleSerializer.writeToDisk(createX86AppBundle(), bundlePath);
 
@@ -306,7 +306,7 @@ public class BuildApksDeviceSpecTest {
         BuildApksCommand.builder()
             .setBundlePath(bundlePath)
             .setOutputFile(outputFilePath)
-            .setDeviceSpecPath(deviceSpecPath)
+            .setDeviceSpec(deviceSpec)
             .build();
 
     Throwable exception = assertThrows(CommandExecutionException.class, () -> command.execute());
@@ -320,12 +320,10 @@ public class BuildApksDeviceSpecTest {
   @Ignore("Re-enable when maxSdkVersion is validated in App Bundle and used in device matching.")
   @Test
   public void deviceSpecN_bundleTargetsLtoM() throws Exception {
-    Path deviceSpecPath =
-        createDeviceSpecFile(
-            mergeSpecs(
-                sdkVersion(/* Nougat */ 25), abis("x86"),
-                locales("en-US"), density(DensityAlias.XHDPI)),
-            outputDir.resolve("device.json"));
+    DeviceSpec deviceSpec =
+        mergeSpecs(
+            sdkVersion(/* Nougat */ 25), abis("x86"),
+            locales("en-US"), density(XHDPI));
 
     bundleSerializer.writeToDisk(
         createMinMaxSdkAppBundle(/* Lollipop */ 21, /* Marshmallow */ 23), bundlePath);
@@ -334,7 +332,7 @@ public class BuildApksDeviceSpecTest {
         BuildApksCommand.builder()
             .setBundlePath(bundlePath)
             .setOutputFile(outputFilePath)
-            .setDeviceSpecPath(deviceSpecPath)
+            .setDeviceSpec(deviceSpec)
             .build();
 
     Throwable exception = assertThrows(CommandExecutionException.class, () -> command.execute());
@@ -343,8 +341,7 @@ public class BuildApksDeviceSpecTest {
 
   @Test
   public void deviceSpec_instantSplitsGenerated() throws Exception {
-    Path deviceSpecPath =
-        createDeviceSpecFile(lDeviceWithDensity(DensityAlias.XHDPI), tmpDir.resolve("device.json"));
+    DeviceSpec deviceSpec = lDeviceWithDensity(XHDPI);
 
     bundleSerializer.writeToDisk(createInstantBundle(), bundlePath);
 
@@ -352,7 +349,7 @@ public class BuildApksDeviceSpecTest {
         BuildApksCommand.builder()
             .setBundlePath(bundlePath)
             .setOutputFile(outputFilePath)
-            .setDeviceSpecPath(deviceSpecPath)
+            .setDeviceSpec(deviceSpec)
             .build();
 
     Path apksArchive = command.execute();
@@ -378,9 +375,7 @@ public class BuildApksDeviceSpecTest {
   }
 
   private static ImmutableList<String> apkNamesInSet(ApkSet apkSet) {
-    return apkSet
-        .getApkDescriptionList()
-        .stream()
+    return apkSet.getApkDescriptionList().stream()
         .map(ApkDescription::getPath)
         .collect(toImmutableList());
   }

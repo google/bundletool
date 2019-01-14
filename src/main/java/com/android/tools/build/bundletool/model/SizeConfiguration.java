@@ -17,26 +17,27 @@
 package com.android.tools.build.bundletool.model;
 
 import static com.android.bundle.Targeting.ScreenDensity.DensityOneofCase.DENSITY_ALIAS;
-import static com.android.tools.build.bundletool.targeting.TargetingUtils.getMaxSdk;
-import static com.android.tools.build.bundletool.targeting.TargetingUtils.getMinSdk;
+import static com.android.tools.build.bundletool.model.targeting.TargetingUtils.getMaxSdk;
+import static com.android.tools.build.bundletool.model.targeting.TargetingUtils.getMinSdk;
 
 import com.android.bundle.Targeting.AbiTargeting;
 import com.android.bundle.Targeting.LanguageTargeting;
 import com.android.bundle.Targeting.ScreenDensity;
 import com.android.bundle.Targeting.ScreenDensityTargeting;
 import com.android.bundle.Targeting.SdkVersionTargeting;
-import com.android.tools.build.bundletool.commands.GetSizeCommand;
 import com.google.auto.value.AutoValue;
 import com.google.common.collect.Iterables;
+import com.google.errorprone.annotations.Immutable;
 import java.util.Optional;
 
 /**
- * Configuration representing different targetings in a readable format, to be outputted by the
- * {@link GetSizeCommand}. Ex: {sdk=21-22,locale=en}.
+ * Configuration representing different targetings in a readable format. Ex: {sdk=21-22,locale=en}.
  *
- * <p>We set only the configuration fields based on the dimensions passed to {@link GetSizeCommand}.
+ * <p>We set only the configuration fields based on provided dimensions.
  */
+@Immutable
 @AutoValue
+@AutoValue.CopyAnnotations
 public abstract class SizeConfiguration {
   public abstract Optional<String> getAbi();
 

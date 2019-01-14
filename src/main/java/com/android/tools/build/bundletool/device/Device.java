@@ -24,6 +24,7 @@ import com.android.ddmlib.TimeoutException;
 import com.android.sdklib.AndroidVersion;
 import com.google.auto.value.AutoValue;
 import com.google.common.collect.ImmutableList;
+import com.google.errorprone.annotations.Immutable;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.time.Duration;
@@ -61,7 +62,9 @@ public abstract class Device {
   public abstract void installApks(ImmutableList<Path> apks, InstallOptions installOptions);
 
   /** Options related to APK installation. */
+  @Immutable
   @AutoValue
+  @AutoValue.CopyAnnotations
   public abstract static class InstallOptions {
 
     public abstract boolean getAllowDowngrade();

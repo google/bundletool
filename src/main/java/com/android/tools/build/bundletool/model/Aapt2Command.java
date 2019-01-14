@@ -16,7 +16,7 @@
 
 package com.android.tools.build.bundletool.model;
 
-import com.android.tools.build.bundletool.utils.files.BufferedIo;
+import com.android.tools.build.bundletool.model.utils.files.BufferedIo;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.nio.file.Path;

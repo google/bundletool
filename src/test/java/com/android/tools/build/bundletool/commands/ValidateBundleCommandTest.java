@@ -21,8 +21,8 @@ import static com.android.tools.build.bundletool.testing.TestUtils.expectMissing
 import static com.google.common.truth.Truth.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
-import com.android.tools.build.bundletool.utils.flags.FlagParser;
-import com.android.tools.build.bundletool.utils.flags.ParsedFlags;
+import com.android.tools.build.bundletool.flags.FlagParser;
+import com.android.tools.build.bundletool.flags.ParsedFlags;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Path;

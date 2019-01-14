@@ -17,9 +17,12 @@ package com.android.tools.build.bundletool.model;
 
 import com.google.auto.value.AutoValue;
 import com.google.common.collect.ImmutableMap;
+import com.google.errorprone.annotations.Immutable;
 
 /** Holder of min and max size maps for each {@link SizeConfiguration}. */
+@Immutable
 @AutoValue
+@AutoValue.CopyAnnotations
 public abstract class ConfigurationSizes {
 
   public abstract ImmutableMap<SizeConfiguration, Long> getMinSizeConfigurationMap();

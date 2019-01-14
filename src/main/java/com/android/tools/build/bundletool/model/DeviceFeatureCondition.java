@@ -17,10 +17,13 @@
 package com.android.tools.build.bundletool.model;
 
 import com.google.auto.value.AutoValue;
+import com.google.errorprone.annotations.Immutable;
 import java.util.Optional;
 
 /** A {@link BundleModule} condition describing a certain device feature. */
+@Immutable
 @AutoValue
+@AutoValue.CopyAnnotations
 public abstract class DeviceFeatureCondition {
 
   public abstract String getFeatureName();

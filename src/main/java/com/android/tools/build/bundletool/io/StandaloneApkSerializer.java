@@ -27,6 +27,7 @@ import com.android.tools.build.bundletool.model.Aapt2Command;
 import com.android.tools.build.bundletool.model.ModuleSplit;
 import com.android.tools.build.bundletool.model.SigningConfiguration;
 import com.android.tools.build.bundletool.model.ZipPath;
+import com.android.tools.build.bundletool.model.version.Version;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
 import java.nio.file.Path;
@@ -42,9 +43,11 @@ public class StandaloneApkSerializer {
       ApkPathManager apkPathManager,
       Aapt2Command aapt2Command,
       Optional<SigningConfiguration> signingConfig,
+      Version bundleVersion,
       Compression compression) {
     this.apkPathManager = apkPathManager;
-    this.apkSerializerHelper = new ApkSerializerHelper(aapt2Command, signingConfig, compression);
+    this.apkSerializerHelper =
+        new ApkSerializerHelper(aapt2Command, signingConfig, bundleVersion, compression);
   }
 
   public ApkDescription writeToDisk(ModuleSplit standaloneSplit, Path outputDirectory) {

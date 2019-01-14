@@ -16,16 +16,17 @@
 
 package com.android.tools.build.bundletool.splitters;
 
-import static com.android.tools.build.bundletool.utils.TargetingProtoUtils.abiUniverse;
-import static com.android.tools.build.bundletool.utils.TargetingProtoUtils.densityUniverse;
+import static com.android.tools.build.bundletool.model.utils.TargetingProtoUtils.abiUniverse;
+import static com.android.tools.build.bundletool.model.utils.TargetingProtoUtils.densityUniverse;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.base.Predicates.not;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.ImmutableSet.toImmutableSet;
 
+import com.android.bundle.Devices.DeviceSpec;
 import com.android.bundle.Targeting.ApkTargeting;
-import com.android.tools.build.bundletool.exceptions.CommandExecutionException;
+import com.android.tools.build.bundletool.device.ApkMatcher;
 import com.android.tools.build.bundletool.mergers.D8DexMerger;
 import com.android.tools.build.bundletool.mergers.ModuleSplitsToShardMerger;
 import com.android.tools.build.bundletool.mergers.SameTargetingMerger;
@@ -33,7 +34,9 @@ import com.android.tools.build.bundletool.model.BundleMetadata;
 import com.android.tools.build.bundletool.model.BundleModule;
 import com.android.tools.build.bundletool.model.ModuleSplit;
 import com.android.tools.build.bundletool.model.OptimizationDimension;
-import com.android.tools.build.bundletool.version.Version;
+import com.android.tools.build.bundletool.model.exceptions.CommandExecutionException;
+import com.android.tools.build.bundletool.model.version.Version;
+import com.google.common.base.Predicates;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
@@ -41,6 +44,7 @@ import com.google.common.collect.Multimaps;
 import com.google.common.collect.Sets;
 import java.nio.file.Path;
 import java.util.Collection;
+import java.util.Optional;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.function.Predicate;
@@ -56,15 +60,25 @@ public class BundleSharder {
   private final Version bundleVersion;
   private final ModuleSplitsToShardMerger merger;
   private final boolean generate64BitShards;
+  private final Optional<DeviceSpec> deviceSpec;
 
   public BundleSharder(Path globalTempDir, Version bundleVersion) {
     this(globalTempDir, bundleVersion, /* generate64BitShards= */ true);
   }
 
   public BundleSharder(Path globalTempDir, Version bundleVersion, boolean generate64BitShards) {
+    this(globalTempDir, bundleVersion, generate64BitShards, Optional.empty());
+  }
+
+  public BundleSharder(
+      Path globalTempDir,
+      Version bundleVersion,
+      boolean generate64BitShards,
+      Optional<DeviceSpec> deviceSpec) {
     this.bundleVersion = bundleVersion;
     this.merger = new ModuleSplitsToShardMerger(new D8DexMerger(), globalTempDir);
     this.generate64BitShards = generate64BitShards;
+    this.deviceSpec = deviceSpec;
   }
 
   /**
@@ -104,6 +118,10 @@ public class BundleSharder {
     // Each sublist below represents a collection of splits targeting a specific device
     // configuration.
     ImmutableList<ImmutableList<ModuleSplit>> unfusedShards = groupSplitsToShards(moduleSplits);
+    checkState(
+        !deviceSpec.isPresent() || unfusedShards.size() == 1,
+        "Expected one set of splits when device spec is present but received %s.",
+        unfusedShards.size());
 
     // Fuse each group of splits into a sharded APK.
     return merger.merge(unfusedShards, bundleMetadata);
@@ -156,7 +174,7 @@ public class BundleSharder {
 
   private SplittingPipeline createNativeLibrariesSplittingPipeline(
       ImmutableSet<OptimizationDimension> shardingDimensions) {
-    return SplittingPipeline.create(
+    return new SplittingPipeline(
         shardingDimensions.contains(OptimizationDimension.ABI)
             ? ImmutableList.of(new AbiNativeLibrariesSplitter(generate64BitShards))
             : ImmutableList.of());
@@ -164,15 +182,17 @@ public class BundleSharder {
 
   private SplittingPipeline createResourcesSplittingPipeline(
       ImmutableSet<OptimizationDimension> shardingDimensions) {
-    return SplittingPipeline.create(
+    return new SplittingPipeline(
         shardingDimensions.contains(OptimizationDimension.SCREEN_DENSITY)
-            ? ImmutableList.of(new ScreenDensityResourcesSplitter(bundleVersion))
+            ? ImmutableList.of(
+                new ScreenDensityResourcesSplitter(
+                    bundleVersion, /* pinResourceToMaster= */ Predicates.alwaysFalse()))
             : ImmutableList.of());
   }
 
   private SplittingPipeline createApexImagesSplittingPipeline() {
     // We always split APEX image files by MultiAbi, regardless of OptimizationDimension.
-    return SplittingPipeline.create(ImmutableList.of(new AbiApexImagesSplitter()));
+    return new SplittingPipeline(ImmutableList.of(new AbiApexImagesSplitter()));
   }
 
   private ImmutableList<ImmutableList<ModuleSplit>> groupSplitsToShards(
@@ -187,21 +207,12 @@ public class BundleSharder {
     //   * master splits:  {m1-master, m2-master, ...}
     //   * ABI splits:     {m1-abi1, m1-abi2, ..., m2-abi1, m2-abi2, ...}
     //   * density splits: {m1-density1, m1-density2, ..., m2-density1, m2-density2, ...}
-    Set<ModuleSplit> abiSplits = subsetWithTargeting(splits, ApkTargeting::hasAbiTargeting);
-    Set<ModuleSplit> densitySplits =
+    ImmutableSet<ModuleSplit> abiSplits =
+        subsetWithTargeting(splits, ApkTargeting::hasAbiTargeting);
+    ImmutableSet<ModuleSplit> densitySplits =
         subsetWithTargeting(splits, ApkTargeting::hasScreenDensityTargeting);
-    Set<ModuleSplit> masterSplits =
-        Sets.difference(ImmutableSet.copyOf(splits), Sets.union(abiSplits, densitySplits));
+    ImmutableSet<ModuleSplit> masterSplits = getMasterSplits(splits);
 
-    checkState(
-        masterSplits.size() >= 1,
-        "Expecting at least one master split, got %s.",
-        masterSplits.size());
-    checkState(
-        masterSplits
-            .stream()
-            .allMatch(split -> split.getApkTargeting().equals(ApkTargeting.getDefaultInstance())),
-        "Master splits are expected to have default targeting.");
     checkState(
         Sets.intersection(Sets.newHashSet(abiSplits), Sets.newHashSet(densitySplits)).isEmpty(),
         "No split is expected to have both ABI and screen density targeting.");
@@ -270,12 +281,33 @@ public class BundleSharder {
         .collect(toImmutableList());
   }
 
-  private static ImmutableSet<ModuleSplit> subsetWithTargeting(
+  private ImmutableSet<ModuleSplit> subsetWithTargeting(
       ImmutableList<ModuleSplit> splits, Predicate<ApkTargeting> predicate) {
-    return splits
-        .stream()
+    return splits.stream()
         .filter(split -> predicate.test(split.getApkTargeting()))
+        .filter(split -> deviceSpec.map(spec -> splitMatchesDeviceSpec(split, spec)).orElse(true))
         .collect(toImmutableSet());
+  }
+
+  /** Returns master splits, i.e splits without ABI or Density targeting. */
+  private static ImmutableSet<ModuleSplit> getMasterSplits(ImmutableList<ModuleSplit> splits) {
+    ImmutableSet<ModuleSplit> masterSplits =
+        splits.stream()
+            .filter(
+                split ->
+                    !split.getApkTargeting().hasScreenDensityTargeting()
+                        && !split.getApkTargeting().hasAbiTargeting())
+            .collect(toImmutableSet());
+
+    checkState(
+        masterSplits.size() >= 1,
+        "Expecting at least one master split, got %s.",
+        masterSplits.size());
+    checkState(
+        masterSplits.stream()
+            .allMatch(split -> split.getApkTargeting().equals(ApkTargeting.getDefaultInstance())),
+        "Master splits are expected to have default targeting.");
+    return masterSplits;
   }
 
   private static Collection<Collection<ModuleSplit>> partitionByTargeting(
@@ -298,5 +330,9 @@ public class BundleSharder {
             .distinct()
             .count();
     return distinctNonEmptyUniverseCount <= 1;
+  }
+
+  private static boolean splitMatchesDeviceSpec(ModuleSplit moduleSplit, DeviceSpec deviceSpec) {
+    return new ApkMatcher(deviceSpec).matchesModuleSplitByTargeting(moduleSplit);
   }
 }

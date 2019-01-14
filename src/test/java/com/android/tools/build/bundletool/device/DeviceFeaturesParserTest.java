@@ -19,7 +19,7 @@ package com.android.tools.build.bundletool.device;
 import static com.google.common.truth.Truth.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
-import com.android.tools.build.bundletool.exceptions.ParseException;
+import com.android.tools.build.bundletool.model.exceptions.ParseException;
 import com.google.common.collect.ImmutableList;
 import org.junit.Test;
 import org.junit.runner.RunWith;

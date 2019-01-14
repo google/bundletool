@@ -15,24 +15,23 @@
  */
 package com.android.tools.build.bundletool.commands;
 
-import static com.android.tools.build.bundletool.utils.files.FilePreconditions.checkFileExistsAndReadable;
+import static com.android.tools.build.bundletool.model.utils.files.FilePreconditions.checkFileExistsAndReadable;
 import static com.google.common.collect.ImmutableMap.toImmutableMap;
 import static java.util.function.Function.identity;
 
 import com.android.tools.build.bundletool.commands.CommandHelp.CommandDescription;
 import com.android.tools.build.bundletool.commands.CommandHelp.FlagDescription;
-import com.android.tools.build.bundletool.exceptions.ValidationException;
+import com.android.tools.build.bundletool.flags.Flag;
+import com.android.tools.build.bundletool.flags.ParsedFlags;
 import com.android.tools.build.bundletool.model.BundleModuleName;
 import com.android.tools.build.bundletool.model.ResourceTableEntry;
-import com.android.tools.build.bundletool.utils.flags.Flag;
-import com.android.tools.build.bundletool.utils.flags.ParsedFlags;
+import com.android.tools.build.bundletool.model.exceptions.ValidationException;
 import com.google.auto.value.AutoValue;
 import com.google.common.collect.ImmutableMap;
 import java.io.PrintStream;
 import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.Optional;
-import java.util.Set;
 import java.util.function.Predicate;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -243,15 +242,13 @@ public abstract class DumpCommand {
   }
 
   public static CommandHelp help() {
-    Set<String> dumpTargets = DumpTarget.SUBCOMMAND_TO_TARGET.keySet();
-
     return CommandHelp.builder()
         .setCommandName(COMMAND_NAME)
+        .setSubCommandNames(DumpTarget.SUBCOMMAND_TO_TARGET.keySet().asList())
         .setCommandDescription(
             CommandDescription.builder()
                 .setShortDescription(
                     "Prints files or extract values from the bundle in a human-readable form.")
-                .addAdditionalParagraph("Subcommands available: " + dumpTargets)
                 .addAdditionalParagraph("Examples:")
                 .addAdditionalParagraph(
                     String.format(

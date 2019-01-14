@@ -23,8 +23,8 @@ import static com.google.common.truth.Truth.assertThat;
 
 import com.android.bundle.Config.SplitDimension;
 import com.android.tools.build.bundletool.model.OptimizationDimension;
+import com.android.tools.build.bundletool.model.version.Version;
 import com.android.tools.build.bundletool.testing.BundleConfigBuilder;
-import com.android.tools.build.bundletool.version.Version;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Sets;
 import org.junit.Before;

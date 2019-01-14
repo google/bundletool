@@ -44,16 +44,17 @@ import static com.android.tools.build.bundletool.model.AndroidManifest.USES_FEAT
 import static com.android.tools.build.bundletool.model.AndroidManifest.USES_SDK_ELEMENT_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.VALUE_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.VERSION_CODE_RESOURCE_ID;
-import static com.android.tools.build.bundletool.utils.xmlproto.XmlProtoAttributeBuilder.createAndroidAttribute;
+import static com.android.tools.build.bundletool.model.utils.xmlproto.XmlProtoAttributeBuilder.createAndroidAttribute;
 import static com.google.common.collect.MoreCollectors.toOptional;
 import static java.util.stream.Collectors.joining;
 
-import com.android.tools.build.bundletool.utils.xmlproto.XmlProtoAttributeBuilder;
-import com.android.tools.build.bundletool.utils.xmlproto.XmlProtoElementBuilder;
-import com.android.tools.build.bundletool.utils.xmlproto.XmlProtoNode;
-import com.android.tools.build.bundletool.utils.xmlproto.XmlProtoNodeBuilder;
-import com.android.tools.build.bundletool.version.Version;
+import com.android.tools.build.bundletool.model.utils.xmlproto.XmlProtoAttributeBuilder;
+import com.android.tools.build.bundletool.model.utils.xmlproto.XmlProtoElementBuilder;
+import com.android.tools.build.bundletool.model.utils.xmlproto.XmlProtoNode;
+import com.android.tools.build.bundletool.model.utils.xmlproto.XmlProtoNodeBuilder;
+import com.android.tools.build.bundletool.model.version.Version;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableSet;
 import java.util.Optional;
 import javax.annotation.CheckReturnValue;
 
@@ -224,6 +225,29 @@ public class ManifestEditor {
         .getChildrenElements(el -> SPLIT_NAME_ELEMENT_NAMES.contains(el.getName()))
         .forEach(element -> element.removeAndroidAttribute(SPLIT_NAME_RESOURCE_ID));
 
+    return this;
+  }
+
+  /**
+   * Removes the activities, services, and providers that contain an unknown {@code splitName}.
+   *
+   * <p>This is useful for converting between install and instant splits.
+   */
+  public ManifestEditor removeUnknownSplitComponents(ImmutableSet<String> allModuleNames) {
+    Optional<XmlProtoElementBuilder> applicationElement =
+        manifestElement.getOptionalChildElement(APPLICATION_ELEMENT_NAME);
+    if (!applicationElement.isPresent()) {
+      return this;
+    }
+    applicationElement
+        .get()
+        .removeChildrenElementsIf(
+            el ->
+                el.isElement()
+                    && el.getElement()
+                        .getAndroidAttribute(SPLIT_NAME_RESOURCE_ID)
+                        .filter(attr -> !allModuleNames.contains(attr.getValueAsString()))
+                        .isPresent());
     return this;
   }
 

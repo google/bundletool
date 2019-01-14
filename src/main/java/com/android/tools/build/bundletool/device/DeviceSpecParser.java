@@ -17,8 +17,8 @@
 package com.android.tools.build.bundletool.device;
 
 import com.android.bundle.Devices.DeviceSpec;
-import com.android.tools.build.bundletool.exceptions.ValidationException;
-import com.android.tools.build.bundletool.utils.files.BufferedIo;
+import com.android.tools.build.bundletool.model.exceptions.ValidationException;
+import com.android.tools.build.bundletool.model.utils.files.BufferedIo;
 import com.google.common.io.MoreFiles;
 import com.google.protobuf.util.JsonFormat;
 import java.io.IOException;

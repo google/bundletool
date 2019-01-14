@@ -16,12 +16,12 @@
 
 package com.android.tools.build.bundletool.mergers;
 
-import static com.android.tools.build.bundletool.utils.files.FilePreconditions.checkDirectoryExistsAndEmpty;
+import static com.android.tools.build.bundletool.model.utils.files.FilePreconditions.checkDirectoryExistsAndEmpty;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 
-import com.android.tools.build.bundletool.exceptions.CommandExecutionException;
-import com.android.tools.build.bundletool.utils.ThrowableUtils;
-import com.android.tools.build.bundletool.utils.files.FilePreconditions;
+import com.android.tools.build.bundletool.model.exceptions.CommandExecutionException;
+import com.android.tools.build.bundletool.model.utils.ThrowableUtils;
+import com.android.tools.build.bundletool.model.utils.files.FilePreconditions;
 import com.android.tools.r8.CompilationFailedException;
 import com.android.tools.r8.CompilationMode;
 import com.android.tools.r8.D8;

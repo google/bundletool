@@ -17,16 +17,14 @@
 package com.android.tools.build.bundletool.validation;
 
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifest;
-import static com.android.tools.build.bundletool.testing.ResourcesTableFactory.createResourceTable;
-import static com.android.tools.build.bundletool.testing.ResourcesTableFactory.fileReference;
 import static com.google.common.truth.Truth.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
-import com.android.aapt.ConfigurationOuterClass.Configuration;
 import com.android.aapt.Resources.ResourceTable;
-import com.android.tools.build.bundletool.exceptions.ValidationException;
 import com.android.tools.build.bundletool.model.BundleModule;
+import com.android.tools.build.bundletool.model.exceptions.ValidationException;
 import com.android.tools.build.bundletool.testing.BundleModuleBuilder;
+import com.android.tools.build.bundletool.testing.ResourceTableBuilder;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
@@ -51,9 +49,10 @@ public class ResourceTableValidatorTest {
         new BundleModuleBuilder("module")
             .addFile("res/drawable/icon.png")
             .setResourceTable(
-                createResourceTable(
-                    "icon",
-                    fileReference("res/drawable/icon.png", Configuration.getDefaultInstance())))
+                new ResourceTableBuilder()
+                    .addPackage("com.test.app")
+                    .addDrawableResource("icon", "res/drawable/icon.png")
+                    .build())
             .setManifest(androidManifest("com.test.app"))
             .build();
 
@@ -65,9 +64,10 @@ public class ResourceTableValidatorTest {
     BundleModule module =
         new BundleModuleBuilder("module")
             .setResourceTable(
-                createResourceTable(
-                    "icon",
-                    fileReference("res/drawable/icon.png", Configuration.getDefaultInstance())))
+                new ResourceTableBuilder()
+                    .addPackage("com.test.app")
+                    .addDrawableResource("icon", "res/drawable/icon.png")
+                    .build())
             .setManifest(androidManifest("com.test.app"))
             .build();
 
@@ -123,8 +123,10 @@ public class ResourceTableValidatorTest {
         new BundleModuleBuilder("module")
             .addFile("assets/icon.png")
             .setResourceTable(
-                createResourceTable(
-                    "icon", fileReference("assets/icon.png", Configuration.getDefaultInstance())))
+                new ResourceTableBuilder()
+                    .addPackage("com.test.app")
+                    .addDrawableResource("icon", "assets/icon.png")
+                    .build())
             .setManifest(androidManifest("com.test.app"))
             .build();
 

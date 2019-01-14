@@ -23,17 +23,22 @@ import com.google.common.base.Strings;
 import com.google.common.collect.ComparisonChain;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSortedSet;
+import com.google.common.collect.Iterables;
 import com.google.errorprone.annotations.FormatMethod;
 import com.google.errorprone.annotations.FormatString;
+import com.google.errorprone.annotations.Immutable;
 import java.io.PrintStream;
 import java.text.BreakIterator;
 import java.util.Comparator;
 import java.util.Locale;
 import java.util.Optional;
+import java.util.StringJoiner;
 import javax.annotation.CheckReturnValue;
 
 /** Helper to print command helps in the console. */
+@Immutable
 @AutoValue
+@AutoValue.CopyAnnotations
 public abstract class CommandHelp {
 
   private static final String LINE_SEPARATOR = System.lineSeparator();
@@ -46,12 +51,27 @@ public abstract class CommandHelp {
 
   abstract String getCommandName();
 
+  abstract ImmutableList<String> getSubCommandNames();
+
+  private String getSubCommandNamesAsString() {
+    switch (getSubCommandNames().size()) {
+      case 0:
+        return "";
+      case 1:
+        return Iterables.getOnlyElement(getSubCommandNames());
+      default:
+        StringJoiner joiner = new StringJoiner("|", "<", ">");
+        getSubCommandNames().forEach(joiner::add);
+        return joiner.toString();
+    }
+  }
+
   abstract CommandDescription getCommandDescription();
 
   abstract ImmutableSortedSet<FlagDescription> getFlags();
 
   static Builder builder() {
-    return new AutoValue_CommandHelp.Builder();
+    return new AutoValue_CommandHelp.Builder().setSubCommandNames(ImmutableList.of());
   }
 
   @AutoValue.Builder
@@ -60,6 +80,8 @@ public abstract class CommandHelp {
         ImmutableSortedSet.orderedBy(FLAG_ORDER);
 
     public abstract Builder setCommandName(String commandName);
+
+    public abstract Builder setSubCommandNames(ImmutableList<String> subCommandNames);
 
     public abstract Builder setCommandDescription(CommandDescription commandDescription);
 
@@ -111,7 +133,12 @@ public abstract class CommandHelp {
     }
 
     output.println("Synopsis:");
-    output.println(wrap("bundletool " + getCommandName(), MAX_WIDTH, INDENT_SIZE, INDENT_SIZE));
+    output.println(
+        wrap(
+            String.format("bundletool %s %s", getCommandName(), getSubCommandNamesAsString()),
+            MAX_WIDTH,
+            INDENT_SIZE,
+            INDENT_SIZE));
     for (FlagDescription flag : getFlags()) {
       output.println(
           wrap(
@@ -135,7 +162,9 @@ public abstract class CommandHelp {
   }
 
   /** Full description of a command for the command-line help. */
+  @Immutable
   @AutoValue
+  @AutoValue.CopyAnnotations
   abstract static class CommandDescription {
     abstract String getShortDescription();
 
@@ -170,7 +199,9 @@ public abstract class CommandHelp {
   }
 
   /** Full description of a flag for the command-line help. */
+  @Immutable
   @AutoValue
+  @AutoValue.CopyAnnotations
   abstract static class FlagDescription implements Comparable<FlagDescription> {
     abstract String getFlagName();
 

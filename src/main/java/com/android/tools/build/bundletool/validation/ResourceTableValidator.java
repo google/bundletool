@@ -20,14 +20,14 @@ import static com.google.common.collect.ImmutableSet.toImmutableSet;
 import static com.google.common.collect.Sets.difference;
 
 import com.android.aapt.Resources.ResourceTable;
-import com.android.tools.build.bundletool.exceptions.ResouceTableException.ReferencesFileOutsideOfResException;
-import com.android.tools.build.bundletool.exceptions.ResouceTableException.ReferencesMissingFilesException;
-import com.android.tools.build.bundletool.exceptions.ResouceTableException.ResourceTableMissingException;
-import com.android.tools.build.bundletool.exceptions.ResouceTableException.UnreferencedResourcesException;
 import com.android.tools.build.bundletool.model.BundleModule;
 import com.android.tools.build.bundletool.model.ModuleEntry;
 import com.android.tools.build.bundletool.model.ZipPath;
-import com.android.tools.build.bundletool.utils.ResourcesUtils;
+import com.android.tools.build.bundletool.model.exceptions.ResouceTableException.ReferencesFileOutsideOfResException;
+import com.android.tools.build.bundletool.model.exceptions.ResouceTableException.ReferencesMissingFilesException;
+import com.android.tools.build.bundletool.model.exceptions.ResouceTableException.ResourceTableMissingException;
+import com.android.tools.build.bundletool.model.exceptions.ResouceTableException.UnreferencedResourcesException;
+import com.android.tools.build.bundletool.model.utils.ResourcesUtils;
 import com.google.common.collect.ImmutableSet;
 
 /**

@@ -16,12 +16,14 @@
 
 package com.android.tools.build.bundletool.commands;
 
+import static com.android.tools.build.bundletool.commands.GetSizeCommand.GetSizeSubcommand.STRING_TO_SUBCOMMAND;
 import static com.android.tools.build.bundletool.commands.GetSizeCommand.GetSizeSubcommand.TOTAL;
-import static com.android.tools.build.bundletool.utils.ApkSizeUtils.getCompressedSizeByApkPaths;
-import static com.android.tools.build.bundletool.utils.CollectorUtils.combineMaps;
-import static com.android.tools.build.bundletool.utils.GetSizeCsvUtils.getSizeTotalOutputInCsv;
-import static com.android.tools.build.bundletool.utils.files.FilePreconditions.checkFileExistsAndReadable;
-import static java.util.stream.Collectors.toList;
+import static com.android.tools.build.bundletool.model.utils.ApkSizeUtils.getCompressedSizeByApkPaths;
+import static com.android.tools.build.bundletool.model.utils.CollectorUtils.combineMaps;
+import static com.android.tools.build.bundletool.model.utils.GetSizeCsvUtils.getSizeTotalOutputInCsv;
+import static com.android.tools.build.bundletool.model.utils.files.FilePreconditions.checkFileExistsAndReadable;
+import static com.google.common.collect.ImmutableMap.toImmutableMap;
+import static java.util.function.Function.identity;
 
 import com.android.bundle.Commands.BuildApksResult;
 import com.android.bundle.Commands.Variant;
@@ -30,15 +32,16 @@ import com.android.tools.build.bundletool.commands.CommandHelp.CommandDescriptio
 import com.android.tools.build.bundletool.commands.CommandHelp.FlagDescription;
 import com.android.tools.build.bundletool.device.DeviceSpecParser;
 import com.android.tools.build.bundletool.device.VariantMatcher;
-import com.android.tools.build.bundletool.exceptions.ValidationException;
+import com.android.tools.build.bundletool.device.VariantTotalSizeAggregator;
+import com.android.tools.build.bundletool.flags.Flag;
+import com.android.tools.build.bundletool.flags.ParsedFlags;
 import com.android.tools.build.bundletool.model.ConfigurationSizes;
 import com.android.tools.build.bundletool.model.GetSizeRequest;
+import com.android.tools.build.bundletool.model.GetSizeRequest.Dimension;
 import com.android.tools.build.bundletool.model.SizeConfiguration;
-import com.android.tools.build.bundletool.utils.ResultUtils;
-import com.android.tools.build.bundletool.utils.VariantTotalSizeAggregator;
-import com.android.tools.build.bundletool.utils.files.FilePreconditions;
-import com.android.tools.build.bundletool.utils.flags.Flag;
-import com.android.tools.build.bundletool.utils.flags.ParsedFlags;
+import com.android.tools.build.bundletool.model.exceptions.ValidationException;
+import com.android.tools.build.bundletool.model.utils.ResultUtils;
+import com.android.tools.build.bundletool.model.utils.files.FilePreconditions;
 import com.google.auto.value.AutoValue;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Joiner;
@@ -56,18 +59,36 @@ public abstract class GetSizeCommand implements GetSizeRequest {
 
   public static final String COMMAND_NAME = "get-size";
 
-  /** Dimensions to expand the sizes in the output against. */
-  public enum Dimension {
-    SDK,
-    ABI,
-    SCREEN_DENSITY,
-    LANGUAGE,
-    ALL
-  }
-
   /** Sub commands supported on {@link GetSizeCommand}. */
   public enum GetSizeSubcommand {
-    TOTAL
+    TOTAL("total");
+
+    static final ImmutableMap<String, GetSizeSubcommand> STRING_TO_SUBCOMMAND =
+        Arrays.stream(GetSizeSubcommand.values())
+            .collect(toImmutableMap(GetSizeSubcommand::toString, identity()));
+
+    private final String subCommand;
+
+    GetSizeSubcommand(String subCommand) {
+      this.subCommand = subCommand;
+    }
+
+    @Override
+    public String toString() {
+      return subCommand;
+    }
+
+    public static GetSizeSubcommand fromString(String subCommand) {
+      GetSizeSubcommand result = STRING_TO_SUBCOMMAND.get(subCommand);
+      if (result == null) {
+        throw ValidationException.builder()
+            .withMessage(
+                "Unrecognized get-size command target: '%s'. Accepted values are: %s",
+                subCommand, STRING_TO_SUBCOMMAND.keySet())
+            .build();
+      }
+      return result;
+    }
   }
 
   private static final Flag<Path> APKS_ARCHIVE_FILE_FLAG = Flag.path("apks");
@@ -173,20 +194,7 @@ public abstract class GetSizeCommand implements GetSizeRequest {
             .orElseThrow(
                 () -> new ValidationException("Target of the get-size command not found."));
 
-    switch (subCommand) {
-      case "total":
-        return TOTAL;
-      default:
-        throw ValidationException.builder()
-            .withMessage(
-                "Unrecognized get-size command target: '%s'. Accepted values are: %s",
-                subCommand,
-                Arrays.stream(GetSizeSubcommand.values())
-                    .map(Enum::toString)
-                    .map(String::toLowerCase)
-                    .collect(toList()))
-            .build();
-    }
+    return GetSizeSubcommand.fromString(subCommand);
   }
 
   public void execute() {
@@ -230,6 +238,7 @@ public abstract class GetSizeCommand implements GetSizeRequest {
   public static CommandHelp help() {
     return CommandHelp.builder()
         .setCommandName(COMMAND_NAME)
+        .setSubCommandNames(STRING_TO_SUBCOMMAND.keySet().asList())
         .setCommandDescription(
             CommandDescription.builder()
                 .setShortDescription(

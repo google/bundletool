@@ -19,20 +19,26 @@ package com.android.tools.build.bundletool.splitters;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 
 import com.android.tools.build.bundletool.model.ModuleSplit;
-import com.google.auto.value.AutoValue;
 import com.google.common.collect.ImmutableCollection;
 import com.google.common.collect.ImmutableList;
 import java.util.Collection;
 
 /** Pipeline chaining the execution of module splitters. */
-@AutoValue
-public abstract class SplittingPipeline {
+public final class SplittingPipeline {
 
-  public abstract ImmutableList<ModuleSplitSplitter> getSplitters();
+  private final ImmutableList<ModuleSplitSplitter> splitters;
+
+  SplittingPipeline(ImmutableList<ModuleSplitSplitter> splitters) {
+    this.splitters = splitters;
+  }
+
+  public ImmutableList<ModuleSplitSplitter> getSplitters() {
+    return splitters;
+  }
 
   public ImmutableCollection<ModuleSplit> split(ModuleSplit split) {
     ImmutableList<ModuleSplit> splits = ImmutableList.of(split);
-    for (ModuleSplitSplitter splitter : getSplitters()) {
+    for (ModuleSplitSplitter splitter : splitters) {
       splits =
           splits
               .stream()
@@ -41,9 +47,5 @@ public abstract class SplittingPipeline {
               .collect(toImmutableList());
     }
     return splits;
-  }
-
-  public static SplittingPipeline create(ImmutableList<ModuleSplitSplitter> splitters) {
-    return new AutoValue_SplittingPipeline(splitters);
   }
 }

@@ -19,10 +19,14 @@ package com.android.tools.build.bundletool.model;
 import static com.android.tools.build.bundletool.model.AndroidManifest.DEBUGGABLE_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.HAS_CODE_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.IS_FEATURE_SPLIT_RESOURCE_ID;
+import static com.android.tools.build.bundletool.model.AndroidManifest.MODULE_TYPE_ASSET_VALUE;
+import static com.android.tools.build.bundletool.model.AndroidManifest.MODULE_TYPE_FEATURE_VALUE;
 import static com.android.tools.build.bundletool.model.AndroidManifest.NAME_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.RESOURCE_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.VALUE_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.VERSION_CODE_RESOURCE_ID;
+import static com.android.tools.build.bundletool.model.BundleModule.ModuleType.ASSET_MODULE;
+import static com.android.tools.build.bundletool.model.BundleModule.ModuleType.FEATURE_MODULE;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifest;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withFusingAttribute;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withInstallTimeDelivery;
@@ -33,6 +37,7 @@ import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.with
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withOnDemandAttribute;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withOnDemandDelivery;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withTargetSandboxVersion;
+import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withTypeAttribute;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withUsesSplit;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.xmlAttribute;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.xmlBooleanAttribute;
@@ -48,12 +53,12 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.android.aapt.Resources.XmlNode;
 import com.android.tools.build.bundletool.TestData;
-import com.android.tools.build.bundletool.exceptions.ValidationException;
-import com.android.tools.build.bundletool.exceptions.manifest.ManifestFusingException.FusingMissingIncludeAttribute;
-import com.android.tools.build.bundletool.exceptions.manifest.ManifestVersionException.VersionCodeMissingException;
-import com.android.tools.build.bundletool.utils.xmlproto.UnexpectedAttributeTypeException;
-import com.android.tools.build.bundletool.utils.xmlproto.XmlProtoNode;
-import com.android.tools.build.bundletool.version.Version;
+import com.android.tools.build.bundletool.model.exceptions.ValidationException;
+import com.android.tools.build.bundletool.model.exceptions.manifest.ManifestFusingException.FusingMissingIncludeAttribute;
+import com.android.tools.build.bundletool.model.exceptions.manifest.ManifestVersionException.VersionCodeMissingException;
+import com.android.tools.build.bundletool.model.utils.xmlproto.UnexpectedAttributeTypeException;
+import com.android.tools.build.bundletool.model.utils.xmlproto.XmlProtoNode;
+import com.android.tools.build.bundletool.model.version.Version;
 import com.google.common.collect.ImmutableList;
 import com.google.protobuf.TextFormat;
 import java.util.Optional;
@@ -467,6 +472,39 @@ public class AndroidManifestTest {
     assertThat(manifest.getManifestDeliveryElement()).isPresent();
     assertThat(manifest.getOnDemandAttribute()).isEmpty();
     assertThat(manifest.isDeliveryTypeDeclared()).isTrue();
+  }
+
+  @Test
+  public void moduleTypeAttribute_assetModule() {
+    AndroidManifest manifest =
+        AndroidManifest.create(
+            androidManifest("com.test.app", withTypeAttribute(MODULE_TYPE_ASSET_VALUE)));
+
+    assertThat(manifest.getModuleType()).isPresent();
+    assertThat(manifest.getModuleType()).hasValue(ASSET_MODULE);
+  }
+
+  @Test
+  public void moduleTypeAttribute_featureModule() {
+    AndroidManifest manifest =
+        AndroidManifest.create(
+            androidManifest("com.test.app", withTypeAttribute(MODULE_TYPE_FEATURE_VALUE)));
+
+    assertThat(manifest.getModuleType()).isPresent();
+    assertThat(manifest.getModuleType()).hasValue(FEATURE_MODULE);
+  }
+
+  @Test
+  public void moduleTypeAttribute_invalid_throws() {
+    AndroidManifest manifest =
+        AndroidManifest.create(
+            androidManifest("com.test.app", withTypeAttribute("invalid-attribute")));
+
+    ValidationException exception =
+        assertThrows(ValidationException.class, () -> manifest.getModuleType());
+    assertThat(exception)
+        .hasMessageThat()
+        .contains("Found invalid type attribute invalid-attribute for <module> element.");
   }
 
   @Test

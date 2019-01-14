@@ -15,7 +15,7 @@
  */
 package com.android.tools.build.bundletool.xml;
 
-import com.android.tools.build.bundletool.exceptions.ValidationException;
+import com.android.tools.build.bundletool.model.exceptions.ValidationException;
 import com.google.common.collect.ImmutableMap;
 import java.util.StringJoiner;
 import javax.xml.xpath.XPathConstants;

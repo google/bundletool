@@ -20,6 +20,7 @@ import static com.google.common.truth.Truth.assertThat;
 import com.android.tools.build.bundletool.commands.CommandHelp.CommandDescription;
 import com.android.tools.build.bundletool.commands.CommandHelp.FlagDescription;
 import com.google.common.base.Splitter;
+import com.google.common.collect.ImmutableList;
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
 import java.util.Arrays;
@@ -69,6 +70,7 @@ public class CommandHelpTest {
 
     CommandHelp.builder()
         .setCommandName("MyCommandName")
+        .setSubCommandNames(ImmutableList.of("SubCommand1", "SubCommand2"))
         .setCommandDescription(
             CommandDescription.builder()
                 .setShortDescription(
@@ -108,7 +110,7 @@ public class CommandHelpTest {
                 "    help of the command.",
                 "",
                 "Synopsis:",
-                "    bundletool MyCommandName",
+                "    bundletool MyCommandName <SubCommand1|SubCommand2>",
                 "        --foo=<foo-value>",
                 "        [--bar]",
                 "",

@@ -14,6 +14,9 @@ message BuildApksResult {
 
   // Metadata about BundleTool used to build the APKs.
   Bundletool bundletool = 2;
+
+  // List of the created asset slices.
+  repeated AssetSlice asset_slice = 3;
 }
 
 // Variant is a group of APKs that covers a part of the device configuration
@@ -32,6 +35,20 @@ message Variant {
   // configuration, with higher variant numbers having priority over lower
   // variant numbers.
   uint32 variant_number = 3;
+}
+
+message AssetSlice {
+  // Asset slice targeting.
+  AssetSliceTargeting targeting = 1;
+
+  AssetModuleMetadata asset_module_metadata = 2;
+
+  // APKs.
+  repeated ApkDescription apk_description = 3;
+
+  // Subversion for the Asset Module that this Asset Slice belongs to (i.e. the
+  // Asset Module it was generated from).
+  uint32 asset_module_subversion = 4;
 }
 
 // Represents a module.
@@ -61,6 +78,25 @@ message ModuleMetadata {
   // The targeting that makes a conditional module installed.
   // Relevant only for Split APKs.
   ModuleTargeting targeting = 5;
+}
+
+message AssetModuleMetadata {
+  // Module name.
+  string name = 1;
+
+  // Indicates whether this module is marked "on demand" for persistent install.
+  bool on_demand = 2;
+
+  // Metadata for instant installs.
+  InstantMetadata instant_metadata = 3;
+}
+
+message InstantMetadata {
+  // Indicates whether this module is marked "instant".
+  bool is_instant = 1;
+
+  // Indicates whether this module is marked "on demand" for instant install.
+  bool on_demand = 2;
 }
 
 message ApkDescription {

@@ -17,10 +17,10 @@
 package com.android.tools.build.bundletool.splitters;
 
 import static com.android.tools.build.bundletool.model.BundleModule.DEX_DIRECTORY;
-import static com.android.tools.build.bundletool.utils.TargetingProtoUtils.sdkVersionFrom;
-import static com.android.tools.build.bundletool.utils.TargetingProtoUtils.sdkVersionTargeting;
-import static com.android.tools.build.bundletool.utils.TargetingProtoUtils.variantTargeting;
-import static com.android.tools.build.bundletool.utils.Versions.ANDROID_P_API_VERSION;
+import static com.android.tools.build.bundletool.model.utils.TargetingProtoUtils.sdkVersionFrom;
+import static com.android.tools.build.bundletool.model.utils.TargetingProtoUtils.sdkVersionTargeting;
+import static com.android.tools.build.bundletool.model.utils.TargetingProtoUtils.variantTargeting;
+import static com.android.tools.build.bundletool.model.utils.Versions.ANDROID_P_API_VERSION;
 import static com.google.common.collect.ImmutableSet.toImmutableSet;
 
 import com.android.bundle.Targeting.VariantTargeting;

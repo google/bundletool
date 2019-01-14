@@ -16,10 +16,10 @@
 
 package com.android.tools.build.bundletool.splitters;
 
-import static com.android.tools.build.bundletool.utils.TargetingProtoUtils.sdkVersionFrom;
-import static com.android.tools.build.bundletool.utils.TargetingProtoUtils.sdkVersionTargeting;
-import static com.android.tools.build.bundletool.utils.TargetingProtoUtils.variantTargeting;
-import static com.android.tools.build.bundletool.utils.Versions.ANDROID_M_API_VERSION;
+import static com.android.tools.build.bundletool.model.utils.TargetingProtoUtils.sdkVersionFrom;
+import static com.android.tools.build.bundletool.model.utils.TargetingProtoUtils.sdkVersionTargeting;
+import static com.android.tools.build.bundletool.model.utils.TargetingProtoUtils.variantTargeting;
+import static com.android.tools.build.bundletool.model.utils.Versions.ANDROID_M_API_VERSION;
 
 import com.android.bundle.Targeting.VariantTargeting;
 import com.android.tools.build.bundletool.model.BundleModule;

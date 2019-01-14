@@ -64,7 +64,7 @@ public class SplittingPipelineTest {
     TrivialSplitter splitter = new TrivialSplitter();
     TrivialSplitter splitter2 = new TrivialSplitter();
 
-    SplittingPipeline pipeline = SplittingPipeline.create(ImmutableList.of(splitter, splitter2));
+    SplittingPipeline pipeline = new SplittingPipeline(ImmutableList.of(splitter, splitter2));
     ImmutableCollection<ModuleSplit> splits = pipeline.split(baseSplit);
 
     assertThat(splitter.splitCallCount).isEqualTo(1);
@@ -77,7 +77,7 @@ public class SplittingPipelineTest {
     DoublingSplitter splitter = new DoublingSplitter();
     DoublingSplitter splitter2 = new DoublingSplitter();
 
-    SplittingPipeline pipeline = SplittingPipeline.create(ImmutableList.of(splitter, splitter2));
+    SplittingPipeline pipeline = new SplittingPipeline(ImmutableList.of(splitter, splitter2));
     ImmutableCollection<ModuleSplit> splits = pipeline.split(baseSplit);
     assertThat(splitter.splitCallCount).isEqualTo(1);
     assertThat(splitter2.splitCallCount).isEqualTo(2);

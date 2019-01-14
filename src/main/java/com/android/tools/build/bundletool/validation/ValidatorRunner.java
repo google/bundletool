@@ -67,7 +67,7 @@ public class ValidatorRunner {
   private static void validateBundleUsingSubValidator(AppBundle bundle, SubValidator subValidator) {
     subValidator.validateBundle(bundle);
     validateBundleModulesUsingSubValidator(
-        ImmutableList.copyOf(bundle.getModules().values()), subValidator);
+        ImmutableList.copyOf(bundle.getFeatureModules().values()), subValidator);
   }
 
   private static void validateBundleModulesUsingSubValidator(

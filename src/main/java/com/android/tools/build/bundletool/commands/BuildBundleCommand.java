@@ -16,11 +16,11 @@
 
 package com.android.tools.build.bundletool.commands;
 
-import static com.android.tools.build.bundletool.model.AppBundle.BUNDLE_CONFIG_FILE_NAME;
-import static com.android.tools.build.bundletool.model.AppBundle.METADATA_DIRECTORY;
-import static com.android.tools.build.bundletool.utils.files.FilePreconditions.checkFileDoesNotExist;
+import static com.android.tools.build.bundletool.model.utils.files.FilePreconditions.checkFileDoesNotExist;
+import static com.android.tools.build.bundletool.model.utils.files.FilePreconditions.checkFileExistsAndReadable;
+import static com.android.tools.build.bundletool.model.utils.files.FilePreconditions.checkFileHasExtension;
+import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.collect.ImmutableList.toImmutableList;
-import static com.google.common.io.MoreFiles.getNameWithoutExtension;
 
 import com.android.bundle.Config.BundleConfig;
 import com.android.bundle.Config.Bundletool;
@@ -29,21 +29,20 @@ import com.android.bundle.Files.Assets;
 import com.android.bundle.Files.NativeLibraries;
 import com.android.tools.build.bundletool.commands.CommandHelp.CommandDescription;
 import com.android.tools.build.bundletool.commands.CommandHelp.FlagDescription;
-import com.android.tools.build.bundletool.exceptions.CommandExecutionException;
-import com.android.tools.build.bundletool.exceptions.ValidationException;
-import com.android.tools.build.bundletool.io.ZipBuilder;
-import com.android.tools.build.bundletool.io.ZipBuilder.EntryOption;
+import com.android.tools.build.bundletool.flags.Flag;
+import com.android.tools.build.bundletool.flags.ParsedFlags;
+import com.android.tools.build.bundletool.io.AppBundleSerializer;
+import com.android.tools.build.bundletool.model.AppBundle;
 import com.android.tools.build.bundletool.model.BundleMetadata;
 import com.android.tools.build.bundletool.model.BundleModule;
-import com.android.tools.build.bundletool.model.InputStreamSupplier;
+import com.android.tools.build.bundletool.model.ModuleEntry;
 import com.android.tools.build.bundletool.model.ZipPath;
-import com.android.tools.build.bundletool.targeting.TargetingGenerator;
-import com.android.tools.build.bundletool.utils.ZipUtils;
-import com.android.tools.build.bundletool.utils.files.BufferedIo;
-import com.android.tools.build.bundletool.utils.flags.Flag;
-import com.android.tools.build.bundletool.utils.flags.ParsedFlags;
+import com.android.tools.build.bundletool.model.exceptions.CommandExecutionException;
+import com.android.tools.build.bundletool.model.exceptions.ValidationException;
+import com.android.tools.build.bundletool.model.targeting.TargetingGenerator;
+import com.android.tools.build.bundletool.model.utils.files.BufferedIo;
+import com.android.tools.build.bundletool.model.version.BundleToolVersion;
 import com.android.tools.build.bundletool.validation.BundleModulesValidator;
-import com.android.tools.build.bundletool.version.BundleToolVersion;
 import com.google.auto.value.AutoValue;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
@@ -55,7 +54,6 @@ import java.io.Reader;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.Map;
 import java.util.Optional;
 import java.util.zip.ZipException;
 import java.util.zip.ZipFile;
@@ -126,7 +124,7 @@ public abstract class BuildBundleCommand {
             .withMessage("Metadata file '%s' does not exist.", file)
             .build();
       }
-      bundleMetadataBuilder().addFile(metadataPath, () -> BufferedIo.inputStream(file));
+      bundleMetadataBuilder().addFile(metadataPath, BufferedIo.inputStreamSupplier(file));
     }
 
     /**
@@ -175,57 +173,47 @@ public abstract class BuildBundleCommand {
   public void execute() {
     validateInput();
 
-    ZipBuilder bundleBuilder = new ZipBuilder();
-
     try (Closer closer = Closer.create()) {
-      EntryOption[] compression =
-          getUncompressedBundle()
-              ? new EntryOption[] {EntryOption.UNCOMPRESSED}
-              : new EntryOption[0];
-
-      // Merge in all the modules, each module into its own sub-directory.
-      for (Path module : getModulesPaths()) {
+      ImmutableList.Builder<ZipFile> moduleZipFilesBuilder = ImmutableList.builder();
+      for (Path modulePath : getModulesPaths()) {
         try {
-          ZipFile moduleZipFile = closer.register(new ZipFile(module.toFile()));
-          ZipPath moduleDir = ZipPath.create(getNameWithoutExtension(module));
-
-          bundleBuilder.copyAllContentsFromZip(moduleDir, moduleZipFile, compression);
-
-          Optional<Assets> assetsTargeting = generateAssetsTargeting(moduleZipFile);
-          assetsTargeting.ifPresent(
-              targeting ->
-                  bundleBuilder.addFileWithProtoContent(
-                      moduleDir.resolve("assets.pb"), targeting, compression));
-
-          Optional<NativeLibraries> nativeLibrariesTargeting =
-              generateNativeLibrariesTargeting(moduleZipFile);
-          nativeLibrariesTargeting.ifPresent(
-              targeting ->
-                  bundleBuilder.addFileWithProtoContent(
-                      moduleDir.resolve("native.pb"), targeting, compression));
-
-          Optional<ApexImages> apexImagesTargeting = generateApexImagesTargeting(moduleZipFile);
-          apexImagesTargeting.ifPresent(
-              targeting ->
-                  bundleBuilder.addFileWithProtoContent(
-                      moduleDir.resolve("apex.pb"), targeting, compression));
+          moduleZipFilesBuilder.add(closer.register(new ZipFile(modulePath.toFile())));
         } catch (ZipException e) {
           throw CommandExecutionException.builder()
               .withCause(e)
-              .withMessage("File '%s' does not seem to be a valid ZIP file.", module)
+              .withMessage("File '%s' does not seem to be a valid ZIP file.", modulePath)
               .build();
         } catch (IOException e) {
           throw CommandExecutionException.builder()
               .withCause(e)
-              .withMessage("Unable to read file '%s'.", module)
-              .build();
-        } catch (CommandExecutionException e) {
-          // Re-throw with additional context.
-          throw CommandExecutionException.builder()
-              .withCause(e)
-              .withMessage("Error processing module file '%s'.", module)
+              .withMessage("Unable to read file '%s'.", modulePath)
               .build();
         }
+      }
+      ImmutableList<ZipFile> moduleZipFiles = moduleZipFilesBuilder.build();
+
+      ImmutableList<BundleModule> modules = new BundleModulesValidator().validate(moduleZipFiles);
+      checkState(
+          moduleZipFiles.size() == modules.size(),
+          "Incorrect number of modules parsed (%s != %s).",
+          moduleZipFiles.size(),
+          modules.size());
+
+      ImmutableList.Builder<BundleModule> modulesWithTargeting = ImmutableList.builder();
+      for (BundleModule module : modules) {
+        BundleModule.Builder moduleWithTargeting = module.toBuilder();
+
+        Optional<Assets> assetsTargeting = generateAssetsTargeting(module);
+        assetsTargeting.ifPresent(moduleWithTargeting::setAssetsConfig);
+
+        Optional<NativeLibraries> nativeLibrariesTargeting =
+            generateNativeLibrariesTargeting(module);
+        nativeLibrariesTargeting.ifPresent(moduleWithTargeting::setNativeConfig);
+
+        Optional<ApexImages> apexImagesTargeting = generateApexImagesTargeting(module);
+        apexImagesTargeting.ifPresent(moduleWithTargeting::setApexConfig);
+
+        modulesWithTargeting.add(moduleWithTargeting.build());
       }
 
       // Read the Bundle Config file if provided by the developer.
@@ -237,41 +225,32 @@ public abstract class BuildBundleCommand {
                   Bundletool.newBuilder()
                       .setVersion(BundleToolVersion.getCurrentVersion().toString()))
               .build();
-      bundleBuilder.addFileWithContent(
-          ZipPath.create(BUNDLE_CONFIG_FILE_NAME), bundleConfig.toByteArray(), compression);
 
-      // Add metadata files.
-      for (Map.Entry<ZipPath, InputStreamSupplier> metadataEntry :
-          getBundleMetadata().getFileDataMap().entrySet()) {
-        bundleBuilder.addFile(
-            METADATA_DIRECTORY.resolve(metadataEntry.getKey()),
-            metadataEntry.getValue(),
-            compression);
-      }
+      AppBundle appBundle =
+          AppBundle.buildFromModules(
+              modulesWithTargeting.build(), bundleConfig, getBundleMetadata());
 
-      try {
-        bundleBuilder.writeTo(getOutputPath());
-      } catch (IOException e) {
-        throw CommandExecutionException.builder()
-            .withCause(e)
-            .withMessage("Unable to write file to location '%s'.")
-            .build();
-      }
+      new AppBundleSerializer(getUncompressedBundle()).writeToDisk(appBundle, getOutputPath());
     } catch (IOException e) {
       throw new UncheckedIOException(e);
     }
   }
 
   private void validateInput() {
+    getModulesPaths()
+        .forEach(
+            path -> {
+              checkFileHasExtension("File", path, ".zip");
+              checkFileExistsAndReadable(path);
+            });
     checkFileDoesNotExist(getOutputPath());
-
-    new BundleModulesValidator().validate(getModulesPaths());
   }
 
-  private Optional<Assets> generateAssetsTargeting(ZipFile module) {
+  private static Optional<Assets> generateAssetsTargeting(BundleModule module) {
     ImmutableList<ZipPath> assetDirectories =
-        ZipUtils.allFileEntriesPaths(module)
-            .filter(path -> path.startsWith(BundleModule.ASSETS_DIRECTORY))
+        module
+            .findEntriesUnderPath(BundleModule.ASSETS_DIRECTORY)
+            .map(ModuleEntry::getPath)
             .filter(path -> path.getNameCount() > 1)
             .map(ZipPath::getParent)
             .distinct()
@@ -284,12 +263,13 @@ public abstract class BuildBundleCommand {
     return Optional.of(new TargetingGenerator().generateTargetingForAssets(assetDirectories));
   }
 
-  private Optional<NativeLibraries> generateNativeLibrariesTargeting(ZipFile module) {
+  private static Optional<NativeLibraries> generateNativeLibrariesTargeting(BundleModule module) {
     // Validation ensures that files under "lib/" conform to pattern "lib/<abi-dir>/file.so".
     // We extract the distinct "lib/<abi-dir>" directories.
     ImmutableList<String> libAbiDirs =
-        ZipUtils.allFileEntriesPaths(module)
-            .filter(path -> path.startsWith(BundleModule.LIB_DIRECTORY))
+        module
+            .findEntriesUnderPath(BundleModule.LIB_DIRECTORY)
+            .map(ModuleEntry::getPath)
             .filter(path -> path.getNameCount() > 2)
             .map(path -> path.subpath(0, 2))
             .map(ZipPath::toString)
@@ -303,12 +283,13 @@ public abstract class BuildBundleCommand {
     return Optional.of(new TargetingGenerator().generateTargetingForNativeLibraries(libAbiDirs));
   }
 
-  private Optional<ApexImages> generateApexImagesTargeting(ZipFile module) {
+  private static Optional<ApexImages> generateApexImagesTargeting(BundleModule module) {
     // Validation ensures that files under "apex/" conform to the pattern
     // "apex/<abi1>.<abi2>...<abiN>.img".
     ImmutableList<ZipPath> apexImageFiles =
-        ZipUtils.allFileEntriesPaths(module)
-            .filter(path -> path.startsWith(BundleModule.APEX_DIRECTORY))
+        module
+            .findEntriesUnderPath(BundleModule.APEX_DIRECTORY)
+            .map(ModuleEntry::getPath)
             .collect(toImmutableList());
 
     if (apexImageFiles.isEmpty()) {

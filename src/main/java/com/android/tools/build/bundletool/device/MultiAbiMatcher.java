@@ -16,7 +16,7 @@
 
 package com.android.tools.build.bundletool.device;
 
-import static com.android.tools.build.bundletool.targeting.TargetingComparators.MULTI_ABI_ALIAS_COMPARATOR;
+import static com.android.tools.build.bundletool.model.targeting.TargetingComparators.MULTI_ABI_ALIAS_COMPARATOR;
 import static com.google.common.collect.ImmutableSet.toImmutableSet;
 
 import com.android.bundle.Devices.DeviceSpec;
@@ -26,9 +26,9 @@ import com.android.bundle.Targeting.ApkTargeting;
 import com.android.bundle.Targeting.MultiAbi;
 import com.android.bundle.Targeting.MultiAbiTargeting;
 import com.android.bundle.Targeting.VariantTargeting;
-import com.android.tools.build.bundletool.exceptions.CommandExecutionException;
-import com.android.tools.build.bundletool.exceptions.ValidationException;
 import com.android.tools.build.bundletool.model.AbiName;
+import com.android.tools.build.bundletool.model.exceptions.CommandExecutionException;
+import com.android.tools.build.bundletool.model.exceptions.ValidationException;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Streams;
 

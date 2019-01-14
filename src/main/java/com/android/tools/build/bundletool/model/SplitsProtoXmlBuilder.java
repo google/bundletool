@@ -17,10 +17,10 @@
 package com.android.tools.build.bundletool.model;
 
 import com.android.aapt.Resources.XmlNode;
-import com.android.tools.build.bundletool.exceptions.CommandExecutionException;
-import com.android.tools.build.bundletool.utils.xmlproto.XmlProtoAttributeBuilder;
-import com.android.tools.build.bundletool.utils.xmlproto.XmlProtoElementBuilder;
-import com.android.tools.build.bundletool.utils.xmlproto.XmlProtoNode;
+import com.android.tools.build.bundletool.model.exceptions.CommandExecutionException;
+import com.android.tools.build.bundletool.model.utils.xmlproto.XmlProtoAttributeBuilder;
+import com.android.tools.build.bundletool.model.utils.xmlproto.XmlProtoElementBuilder;
+import com.android.tools.build.bundletool.model.utils.xmlproto.XmlProtoNode;
 import com.google.common.collect.TreeBasedTable;
 
 /**

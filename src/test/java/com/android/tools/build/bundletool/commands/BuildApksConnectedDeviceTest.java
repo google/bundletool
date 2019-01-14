@@ -28,6 +28,7 @@ import static com.android.tools.build.bundletool.testing.DeviceFactory.lDeviceWi
 import static com.android.tools.build.bundletool.testing.DeviceFactory.locales;
 import static com.android.tools.build.bundletool.testing.DeviceFactory.mergeSpecs;
 import static com.android.tools.build.bundletool.testing.DeviceFactory.sdkVersion;
+import static com.android.tools.build.bundletool.testing.FakeSystemEnvironmentProvider.ANDROID_HOME;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifest;
 import static com.android.tools.build.bundletool.testing.truth.zip.TruthZip.assertThat;
 import static com.google.common.collect.ImmutableList.toImmutableList;
@@ -41,17 +42,18 @@ import com.android.bundle.Commands.Variant;
 import com.android.bundle.Targeting.ScreenDensity.DensityAlias;
 import com.android.ddmlib.IDevice.DeviceState;
 import com.android.tools.build.bundletool.device.AdbServer;
-import com.android.tools.build.bundletool.exceptions.CommandExecutionException;
-import com.android.tools.build.bundletool.exceptions.ValidationException;
+import com.android.tools.build.bundletool.flags.FlagParser;
 import com.android.tools.build.bundletool.io.AppBundleSerializer;
 import com.android.tools.build.bundletool.model.AppBundle;
+import com.android.tools.build.bundletool.model.exceptions.CommandExecutionException;
+import com.android.tools.build.bundletool.model.exceptions.ValidationException;
+import com.android.tools.build.bundletool.model.utils.SystemEnvironmentProvider;
 import com.android.tools.build.bundletool.testing.AppBundleBuilder;
 import com.android.tools.build.bundletool.testing.FakeAdbServer;
-import com.android.tools.build.bundletool.testing.FakeAndroidHomeVariableProvider;
 import com.android.tools.build.bundletool.testing.FakeDevice;
-import com.android.tools.build.bundletool.utils.EnvironmentVariableProvider;
-import com.android.tools.build.bundletool.utils.flags.FlagParser;
+import com.android.tools.build.bundletool.testing.FakeSystemEnvironmentProvider;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.zip.ZipFile;
@@ -78,7 +80,7 @@ public class BuildApksConnectedDeviceTest {
 
   private AdbServer fakeAdbServer =
       new FakeAdbServer(/* hasInitialDeviceList= */ true, /* devices= */ ImmutableList.of());
-  private EnvironmentVariableProvider androidHomeProvider;
+  private SystemEnvironmentProvider androidHomeProvider;
 
   @Before
   public void setUp() throws Exception {
@@ -89,7 +91,8 @@ public class BuildApksConnectedDeviceTest {
 
     sdkDirPath = Files.createDirectory(tmpDir.resolve("android-sdk"));
     setUpAdb(sdkDirPath);
-    this.androidHomeProvider = new FakeAndroidHomeVariableProvider(sdkDirPath.toString());
+    this.androidHomeProvider =
+        new FakeSystemEnvironmentProvider(ImmutableMap.of(ANDROID_HOME, sdkDirPath.toString()));
   }
 
   private Path setUpAdb(Path sdkDirPath) throws Exception {
@@ -114,7 +117,7 @@ public class BuildApksConnectedDeviceTest {
             androidHomeProvider,
             fakeAdbServer);
 
-    BuildApksCommand commandViaBuilder =
+    BuildApksCommand.Builder commandViaBuilder =
         BuildApksCommand.builder()
             .setBundlePath(bundlePath)
             .setOutputFile(outputFilePath)
@@ -125,10 +128,11 @@ public class BuildApksConnectedDeviceTest {
             // Must copy instance of the internal executor service.
             .setExecutorServiceInternal(commandViaFlags.getExecutorService())
             .setExecutorServiceCreatedByBundleTool(true)
-            .setOutputPrintStream(commandViaFlags.getOutputPrintStream().get())
-            .build();
+            .setOutputPrintStream(commandViaFlags.getOutputPrintStream().get());
+    DebugKeystoreUtils.getDebugSigningConfiguration(androidHomeProvider)
+        .ifPresent(commandViaBuilder::setSigningConfiguration);
 
-    assertThat(commandViaBuilder).isEqualTo(commandViaFlags);
+    assertThat(commandViaBuilder.build()).isEqualTo(commandViaFlags);
   }
 
   @Test
@@ -148,7 +152,7 @@ public class BuildApksConnectedDeviceTest {
             androidHomeProvider,
             fakeAdbServer);
 
-    BuildApksCommand commandViaBuilder =
+    BuildApksCommand.Builder commandViaBuilder =
         BuildApksCommand.builder()
             .setBundlePath(bundlePath)
             .setOutputFile(outputFilePath)
@@ -159,10 +163,11 @@ public class BuildApksConnectedDeviceTest {
             // Must copy instance of the internal executor service.
             .setExecutorServiceInternal(commandViaFlags.getExecutorService())
             .setExecutorServiceCreatedByBundleTool(true)
-            .setOutputPrintStream(commandViaFlags.getOutputPrintStream().get())
-            .build();
+            .setOutputPrintStream(commandViaFlags.getOutputPrintStream().get());
+    DebugKeystoreUtils.getDebugSigningConfiguration(androidHomeProvider)
+        .ifPresent(commandViaBuilder::setSigningConfiguration);
 
-    assertThat(commandViaBuilder).isEqualTo(commandViaFlags);
+    assertThat(commandViaBuilder.build()).isEqualTo(commandViaFlags);
   }
 
   @Test
@@ -180,7 +185,7 @@ public class BuildApksConnectedDeviceTest {
             androidHomeProvider,
             fakeAdbServer);
 
-    BuildApksCommand commandViaBuilder =
+    BuildApksCommand.Builder commandViaBuilder =
         BuildApksCommand.builder()
             .setBundlePath(bundlePath)
             .setOutputFile(outputFilePath)
@@ -192,10 +197,11 @@ public class BuildApksConnectedDeviceTest {
             // Must copy instance of the internal executor service.
             .setExecutorServiceInternal(commandViaFlags.getExecutorService())
             .setExecutorServiceCreatedByBundleTool(true)
-            .setOutputPrintStream(commandViaFlags.getOutputPrintStream().get())
-            .build();
+            .setOutputPrintStream(commandViaFlags.getOutputPrintStream().get());
+    DebugKeystoreUtils.getDebugSigningConfiguration(androidHomeProvider)
+        .ifPresent(commandViaBuilder::setSigningConfiguration);
 
-    assertThat(commandViaBuilder).isEqualTo(commandViaFlags);
+    assertThat(commandViaBuilder.build()).isEqualTo(commandViaFlags);
   }
 
   @Test

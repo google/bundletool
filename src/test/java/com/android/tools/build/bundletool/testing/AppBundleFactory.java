@@ -16,20 +16,19 @@
 
 package com.android.tools.build.bundletool.testing;
 
+import static com.android.tools.build.bundletool.model.utils.ResourcesUtils.HDPI_VALUE;
+import static com.android.tools.build.bundletool.model.utils.ResourcesUtils.LDPI_VALUE;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifest;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withInstant;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withMaxSdkVersion;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withMinSdkVersion;
-import static com.android.tools.build.bundletool.testing.ResourcesTableFactory.HDPI;
-import static com.android.tools.build.bundletool.testing.ResourcesTableFactory.LDPI;
-import static com.android.tools.build.bundletool.testing.ResourcesTableFactory.createResourceTable;
-import static com.android.tools.build.bundletool.testing.ResourcesTableFactory.fileReference;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.nativeDirectoryTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.nativeLibraries;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.targetedNativeDirectory;
 
 import com.android.bundle.Targeting.Abi.AbiAlias;
 import com.android.tools.build.bundletool.model.AppBundle;
+import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
 
 /** A collection of convenience creators of different types of {@link AppBundle} used in testing. */
@@ -44,10 +43,16 @@ public class AppBundleFactory {
                     .addFile("res/drawable-ldpi/image.jpg")
                     .addFile("res/drawable-hdpi/image.jpg")
                     .setResourceTable(
-                        createResourceTable(
-                            "image",
-                            fileReference("res/drawable-ldpi/image.jpg", LDPI),
-                            fileReference("res/drawable-hdpi/image.jpg", HDPI)))
+                        new ResourceTableBuilder()
+                            .addPackage("com.test.app")
+                            .addDrawableResourceForMultipleDensities(
+                                "image",
+                                ImmutableMap.of(
+                                    LDPI_VALUE,
+                                    "res/drawable-ldpi/image.jpg",
+                                    HDPI_VALUE,
+                                    "res/drawable-hdpi/image.jpg"))
+                            .build())
                     .setManifest(androidManifest("com.test.app")))
         .build();
   }

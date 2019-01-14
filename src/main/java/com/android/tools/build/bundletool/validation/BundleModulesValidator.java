@@ -16,27 +16,19 @@
 
 package com.android.tools.build.bundletool.validation;
 
-import static com.android.tools.build.bundletool.utils.files.FilePreconditions.checkFileHasExtension;
-import static com.android.tools.build.bundletool.utils.files.FilePreconditions.checkFileNamesAreUnique;
 import static com.google.common.base.Predicates.not;
 import static com.google.common.collect.ImmutableList.toImmutableList;
-import static com.google.common.io.MoreFiles.getNameWithoutExtension;
 
 import com.android.bundle.Config.BundleConfig;
 import com.android.bundle.Config.Bundletool;
 import com.android.tools.build.bundletool.model.BundleModule;
 import com.android.tools.build.bundletool.model.BundleModuleName;
 import com.android.tools.build.bundletool.model.ModuleZipEntry;
-import com.android.tools.build.bundletool.utils.ZipUtils;
-import com.android.tools.build.bundletool.version.BundleToolVersion;
+import com.android.tools.build.bundletool.model.version.BundleToolVersion;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
-import com.google.common.io.Closer;
 import java.io.IOException;
 import java.io.UncheckedIOException;
-import java.nio.file.Path;
-import java.util.HashMap;
-import java.util.Map;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 
@@ -62,6 +54,7 @@ public class BundleModulesValidator {
       ImmutableList.of(
           // Fundamental file validations first.
           new BundleFilesValidator(),
+          new ModuleNamesValidator(),
           new AndroidManifestValidator(),
           // More specific file validations.
           new EntryClashValidator(),
@@ -79,48 +72,46 @@ public class BundleModulesValidator {
               Bundletool.newBuilder().setVersion(BundleToolVersion.getCurrentVersion().toString()))
           .build();
 
-  public void validate(ImmutableList<Path> modulePaths) {
-    // Name of the module zip file is name of the module it contains. Therefore filenames must
-    // be unique.
-    checkFileNamesAreUnique("Modules", modulePaths);
-
-    final Map<Path, ZipFile> zipFileByPath = new HashMap<>();
-    try (Closer closer = Closer.create()) {
-      for (Path modulePath : modulePaths) {
-        checkFileHasExtension("Module", modulePath, ".zip");
-        ZipFile moduleZip = closer.register(ZipUtils.openZipFile(modulePath));
-        zipFileByPath.put(modulePath, moduleZip);
-        new ValidatorRunner(MODULE_FILE_SUB_VALIDATORS).validateModuleZipFile(moduleZip);
-      }
-
-      ImmutableList<BundleModule> modules =
-          zipFileByPath.entrySet().stream()
-              .map(entry -> toBundleModule(entry.getKey(), entry.getValue()))
-              .collect(toImmutableList());
-
-      new ValidatorRunner(MODULES_SUB_VALIDATORS).validateBundleModules(modules);
-    } catch (IOException e) {
-      throw new UncheckedIOException(e);
+  public ImmutableList<BundleModule> validate(ImmutableList<ZipFile> moduleZips) {
+    for (ZipFile moduleZip : moduleZips) {
+      new ValidatorRunner(MODULE_FILE_SUB_VALIDATORS).validateModuleZipFile(moduleZip);
     }
+
+    ImmutableList<BundleModule> modules =
+        moduleZips.stream().map(this::toBundleModule).collect(toImmutableList());
+
+    new ValidatorRunner(MODULES_SUB_VALIDATORS).validateBundleModules(modules);
+
+    return modules;
   }
 
-  private BundleModule toBundleModule(Path modulePath, ZipFile moduleZipFile) {
-    // Validates the module name.
-    BundleModuleName moduleName = BundleModuleName.create(getNameWithoutExtension(modulePath));
-
+  private BundleModule toBundleModule(ZipFile moduleZipFile) {
+    BundleModule bundleModule;
     try {
-      return BundleModule.builder()
-          .setName(moduleName)
-          .setBundleConfig(EMPTY_CONFIG_WITH_CURRENT_VERSION)
-          .addEntries(
-              moduleZipFile.stream()
-                  .filter(not(ZipEntry::isDirectory))
-                  .map(zipEntry -> ModuleZipEntry.fromModuleZipEntry(zipEntry, moduleZipFile))
-                  .collect(toImmutableList()))
-          .build();
+      bundleModule =
+          BundleModule.builder()
+              // Assigning a temporary name because the real one will be extracted from the
+              // manifest, but this requires the BundleModule to be built.
+              .setName(BundleModuleName.create("TEMPORARY_MODULE_NAME"))
+              .setBundleConfig(EMPTY_CONFIG_WITH_CURRENT_VERSION)
+              .addEntries(
+                  moduleZipFile.stream()
+                      .filter(not(ZipEntry::isDirectory))
+                      .map(zipEntry -> ModuleZipEntry.fromModuleZipEntry(zipEntry, moduleZipFile))
+                      .collect(toImmutableList()))
+              .build();
     } catch (IOException e) {
       throw new UncheckedIOException(
-          String.format("Error reading module zip file '%s'.", modulePath), e);
+          String.format("Error reading module zip file '%s'.", moduleZipFile.getName()), e);
     }
+
+    BundleModuleName actualModuleName =
+        BundleModuleName.create(
+            bundleModule
+                .getAndroidManifest()
+                .getSplitId()
+                .orElse(BundleModuleName.BASE_MODULE_NAME));
+
+    return bundleModule.toBuilder().setName(actualModuleName).build();
   }
 }

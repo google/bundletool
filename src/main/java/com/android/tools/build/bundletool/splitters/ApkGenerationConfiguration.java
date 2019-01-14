@@ -20,9 +20,12 @@ import com.android.bundle.Targeting.Abi;
 import com.android.tools.build.bundletool.model.OptimizationDimension;
 import com.google.auto.value.AutoValue;
 import com.google.common.collect.ImmutableSet;
+import com.google.errorprone.annotations.Immutable;
 
 /** Configuration to be passed to Module Splitters and Variant generators. */
+@Immutable
 @AutoValue
+@AutoValue.CopyAnnotations
 public abstract class ApkGenerationConfiguration {
 
   public abstract ImmutableSet<OptimizationDimension> getOptimizationDimensions();
@@ -42,7 +45,9 @@ public abstract class ApkGenerationConfiguration {
    */
   public abstract ImmutableSet<Abi> getAbisForPlaceholderLibs();
 
-  public static ApkGenerationConfiguration.Builder builder() {
+  public abstract Builder toBuilder();
+
+  public static Builder builder() {
     return new AutoValue_ApkGenerationConfiguration.Builder()
         .setForInstantAppVariants(false)
         .setEnableNativeLibraryCompressionSplitter(false)

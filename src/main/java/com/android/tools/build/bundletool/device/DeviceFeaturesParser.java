@@ -16,7 +16,7 @@
 
 package com.android.tools.build.bundletool.device;
 
-import com.android.tools.build.bundletool.exceptions.ParseException;
+import com.android.tools.build.bundletool.model.exceptions.ParseException;
 import com.google.common.collect.ImmutableList;
 
 /** Parses the output of the "pm list features" ADB shell command. */

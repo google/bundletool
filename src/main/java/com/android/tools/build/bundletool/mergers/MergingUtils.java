@@ -16,10 +16,10 @@
 
 package com.android.tools.build.bundletool.mergers;
 
-import static com.android.tools.build.bundletool.utils.TargetingProtoUtils.abiUniverse;
-import static com.android.tools.build.bundletool.utils.TargetingProtoUtils.abiValues;
-import static com.android.tools.build.bundletool.utils.TargetingProtoUtils.densityUniverse;
-import static com.android.tools.build.bundletool.utils.TargetingProtoUtils.densityValues;
+import static com.android.tools.build.bundletool.model.utils.TargetingProtoUtils.abiUniverse;
+import static com.android.tools.build.bundletool.model.utils.TargetingProtoUtils.abiValues;
+import static com.android.tools.build.bundletool.model.utils.TargetingProtoUtils.densityUniverse;
+import static com.android.tools.build.bundletool.model.utils.TargetingProtoUtils.densityValues;
 import static com.google.common.base.Preconditions.checkNotNull;
 
 import com.android.bundle.Targeting.Abi;
@@ -27,7 +27,7 @@ import com.android.bundle.Targeting.AbiTargeting;
 import com.android.bundle.Targeting.ApkTargeting;
 import com.android.bundle.Targeting.ScreenDensity;
 import com.android.bundle.Targeting.ScreenDensityTargeting;
-import com.android.tools.build.bundletool.exceptions.CommandExecutionException;
+import com.android.tools.build.bundletool.model.exceptions.CommandExecutionException;
 import com.google.common.collect.Sets;
 import java.util.Optional;
 import java.util.Set;

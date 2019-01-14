@@ -16,9 +16,11 @@
 
 package com.android.tools.build.bundletool.model;
 
+import com.google.errorprone.annotations.Immutable;
 import java.util.function.Consumer;
 
 /** Represents a mutation to manifest, which can then be applied to manifest for editing it. */
+@Immutable
 public interface ManifestMutator extends Consumer<ManifestEditor> {
 
   static ManifestMutator withExtractNativeLibs(boolean value) {

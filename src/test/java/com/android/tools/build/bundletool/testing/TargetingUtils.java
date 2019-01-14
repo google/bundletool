@@ -16,7 +16,7 @@
 
 package com.android.tools.build.bundletool.testing;
 
-import static com.android.tools.build.bundletool.utils.ProtoUtils.mergeFromProtos;
+import static com.android.tools.build.bundletool.model.utils.ProtoUtils.mergeFromProtos;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.ImmutableSet.toImmutableSet;
 import static com.google.common.truth.Truth.assertThat;
@@ -51,11 +51,12 @@ import com.android.bundle.Targeting.SdkVersionTargeting;
 import com.android.bundle.Targeting.TextureCompressionFormat;
 import com.android.bundle.Targeting.TextureCompressionFormat.TextureCompressionFormatAlias;
 import com.android.bundle.Targeting.TextureCompressionFormatTargeting;
+import com.android.bundle.Targeting.UserCountriesTargeting;
 import com.android.bundle.Targeting.VariantTargeting;
 import com.android.bundle.Targeting.VulkanVersion;
 import com.android.tools.build.bundletool.model.AbiName;
 import com.android.tools.build.bundletool.model.ModuleSplit;
-import com.android.tools.build.bundletool.utils.Versions;
+import com.android.tools.build.bundletool.model.utils.Versions;
 import com.google.common.base.Predicates;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
@@ -160,6 +161,13 @@ public final class TargetingUtils {
   /** Builds APEX targeted image from the image file path and its targeting. */
   public static TargetedApexImage targetedApexImage(String path, ApexImageTargeting targeting) {
     return TargetedApexImage.newBuilder().setPath(path).setTargeting(targeting).build();
+  }
+
+  /** Builds APEX targeted image from the image file path and its multi-Abi targeting. */
+  public static TargetedApexImage targetedApexImage(String path, MultiAbiTargeting targeting) {
+    ApexImageTargeting apexImageTargeting =
+        ApexImageTargeting.newBuilder().setMultiAbi(targeting).build();
+    return TargetedApexImage.newBuilder().setPath(path).setTargeting(apexImageTargeting).build();
   }
 
   /** Builds APEX image targeting (no alternatives) according to the Abi names. */
@@ -473,6 +481,23 @@ public final class TargetingUtils {
   public static ModuleTargeting moduleMinSdkVersionTargeting(int minSdkVersion) {
     return ModuleTargeting.newBuilder()
         .setSdkVersionTargeting(sdkVersionTargeting(sdkVersionFrom(minSdkVersion)))
+        .build();
+  }
+
+  public static ModuleTargeting moduleExcludeCountriesTargeting(String... countries) {
+    return moduleCountriesTargeting(true, countries);
+  }
+
+  public static ModuleTargeting moduleIncludeCountriesTargeting(String... countries) {
+    return moduleCountriesTargeting(false, countries);
+  }
+
+  public static ModuleTargeting moduleCountriesTargeting(boolean exclude, String... countries) {
+    return ModuleTargeting.newBuilder()
+        .setUserCountriesTargeting(
+            UserCountriesTargeting.newBuilder()
+                .addAllCountryCodes(Arrays.asList(countries))
+                .setExclude(exclude))
         .build();
   }
 

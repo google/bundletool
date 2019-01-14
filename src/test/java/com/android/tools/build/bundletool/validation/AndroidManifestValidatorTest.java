@@ -17,6 +17,7 @@
 package com.android.tools.build.bundletool.validation;
 
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifest;
+import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifestForFeature;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withFeatureCondition;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withFusingAttribute;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withInstallTimeDelivery;
@@ -31,17 +32,17 @@ import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.with
 import static com.google.common.truth.Truth.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
-import com.android.tools.build.bundletool.exceptions.ValidationException;
-import com.android.tools.build.bundletool.exceptions.manifest.ManifestDuplicateAttributeException;
-import com.android.tools.build.bundletool.exceptions.manifest.ManifestSdkTargetingException.MaxSdkInvalidException;
-import com.android.tools.build.bundletool.exceptions.manifest.ManifestSdkTargetingException.MaxSdkLessThanMinInstantSdk;
-import com.android.tools.build.bundletool.exceptions.manifest.ManifestSdkTargetingException.MinSdkGreaterThanMaxSdkException;
-import com.android.tools.build.bundletool.exceptions.manifest.ManifestSdkTargetingException.MinSdkInvalidException;
-import com.android.tools.build.bundletool.exceptions.manifest.ManifestVersionCodeConflictException;
 import com.android.tools.build.bundletool.model.BundleModule;
+import com.android.tools.build.bundletool.model.exceptions.ValidationException;
+import com.android.tools.build.bundletool.model.exceptions.manifest.ManifestDuplicateAttributeException;
+import com.android.tools.build.bundletool.model.exceptions.manifest.ManifestSdkTargetingException.MaxSdkInvalidException;
+import com.android.tools.build.bundletool.model.exceptions.manifest.ManifestSdkTargetingException.MaxSdkLessThanMinInstantSdk;
+import com.android.tools.build.bundletool.model.exceptions.manifest.ManifestSdkTargetingException.MinSdkGreaterThanMaxSdkException;
+import com.android.tools.build.bundletool.model.exceptions.manifest.ManifestSdkTargetingException.MinSdkInvalidException;
+import com.android.tools.build.bundletool.model.exceptions.manifest.ManifestVersionCodeConflictException;
+import com.android.tools.build.bundletool.model.utils.xmlproto.XmlProtoAttributeBuilder;
 import com.android.tools.build.bundletool.testing.BundleModuleBuilder;
 import com.android.tools.build.bundletool.testing.ManifestProtoUtils.ManifestMutator;
-import com.android.tools.build.bundletool.utils.xmlproto.XmlProtoAttributeBuilder;
 import com.google.common.collect.ImmutableList;
 import java.io.IOException;
 import org.junit.Test;
@@ -546,12 +547,12 @@ public class AndroidManifestValidatorTest {
   @Test
   public void withMultipleDistinctSplitIds_throws() throws Exception {
     BundleModule module =
-        new BundleModuleBuilder(BASE_MODULE_NAME)
+        new BundleModuleBuilder(FEATURE_MODULE_NAME)
             .setManifest(
-                androidManifest(
+                androidManifestForFeature(
                     PKG_NAME,
-                    withSplitId("module-split-name"),
-                    withSecondSplitId("module-split-name2")))
+                    withSplitId(FEATURE_MODULE_NAME),
+                    withSecondSplitId("modulesplitname2")))
             .build();
 
     ManifestDuplicateAttributeException e =
@@ -562,16 +563,15 @@ public class AndroidManifestValidatorTest {
     assertThat(e).hasMessageThat().contains("attribute 'split' cannot be declared more than once");
   }
 
-
   @Test
   public void withMultipleEqualSplitIds() throws Exception {
     BundleModule module =
-        new BundleModuleBuilder(BASE_MODULE_NAME)
+        new BundleModuleBuilder(FEATURE_MODULE_NAME)
             .setManifest(
-                androidManifest(
+                androidManifestForFeature(
                     PKG_NAME,
-                    withSplitId("module-split-name"),
-                    withSecondSplitId("module-split-name")))
+                    withSplitId(FEATURE_MODULE_NAME),
+                    withSecondSplitId(FEATURE_MODULE_NAME)))
             .build();
 
     // We accept multiple identical split IDs, so this should not throw.
@@ -589,8 +589,8 @@ public class AndroidManifestValidatorTest {
   @Test
   public void withOneSplitId() throws Exception {
     BundleModule module =
-        new BundleModuleBuilder(BASE_MODULE_NAME)
-            .setManifest(androidManifest(PKG_NAME, withSplitId("module-split-name")))
+        new BundleModuleBuilder(FEATURE_MODULE_NAME)
+            .setManifest(androidManifestForFeature(PKG_NAME, withSplitId(FEATURE_MODULE_NAME)))
             .build();
 
     new AndroidManifestValidator().validateModule(module);

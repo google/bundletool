@@ -19,13 +19,16 @@ import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.andr
 import static com.google.common.truth.Truth.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
+import com.android.aapt.Resources.ResourceTable;
 import com.android.bundle.Config.BundleConfig;
 import com.android.bundle.Config.SplitDimension;
-import com.android.tools.build.bundletool.exceptions.ValidationException;
 import com.android.tools.build.bundletool.model.AppBundle;
+import com.android.tools.build.bundletool.model.exceptions.ValidationException;
+import com.android.tools.build.bundletool.model.utils.ResourcesUtils;
+import com.android.tools.build.bundletool.model.version.BundleToolVersion;
 import com.android.tools.build.bundletool.testing.AppBundleBuilder;
 import com.android.tools.build.bundletool.testing.BundleConfigBuilder;
-import com.android.tools.build.bundletool.version.BundleToolVersion;
+import com.android.tools.build.bundletool.testing.ResourceTableBuilder;
 import java.io.IOException;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -186,14 +189,81 @@ public final class BundleConfigValidatorTest {
     assertThat(e).hasMessageThat().contains("Invalid version");
   }
 
+  @Test
+  public void masterResources_valid_ok() throws Exception {
+    ResourceTable resourceTable =
+        new ResourceTableBuilder()
+            .addPackage("com.test.app")
+            .addStringResource("label", "Hello World")
+            .build();
+
+    int resourceId =
+        ResourcesUtils.entries(resourceTable).findFirst().get().getResourceId().getFullResourceId();
+
+    AppBundle appBundle =
+        createAppBundleBuilder(
+                BundleConfigBuilder.create().addResourcePinnedToMasterSplit(resourceId))
+            .addModule(
+                "feature",
+                module ->
+                    module
+                        .setResourceTable(resourceTable)
+                        .setManifest(androidManifest("com.test.app")))
+            .build();
+
+    new BundleConfigValidator().validateBundle(appBundle);
+  }
+
+  @Test
+  public void masterResources_undefinedResourceId_throws() throws Exception {
+    ResourceTable resourceTable =
+        new ResourceTableBuilder()
+            .addPackage("com.test.app")
+            .addStringResource("label", "Hello World")
+            .build();
+
+    int nonExistentResourceId =
+        ResourcesUtils.entries(resourceTable).findFirst().get().getResourceId().getFullResourceId()
+            + 1;
+
+    AppBundle appBundle =
+        createAppBundleBuilder(
+                BundleConfigBuilder.create().addResourcePinnedToMasterSplit(nonExistentResourceId))
+            .addModule(
+                "feature",
+                module ->
+                    module
+                        .setResourceTable(resourceTable)
+                        .setManifest(androidManifest("com.test.app")))
+            .build();
+
+    ValidationException e =
+        assertThrows(
+            ValidationException.class, () -> new BundleConfigValidator().validateBundle(appBundle));
+    assertThat(e)
+        .hasMessageThat()
+        .contains(
+            "The Master Resources list contains resource IDs not defined in any module. "
+                + "For example: 0x7f010001");
+  }
+
   private static AppBundle createAppBundle(BundleConfigBuilder bundleConfig) throws IOException {
     return createAppBundle(bundleConfig.build());
   }
 
   private static AppBundle createAppBundle(BundleConfig bundleConfig) throws IOException {
+    return createAppBundleBuilder(bundleConfig).build();
+  }
+
+  private static AppBundleBuilder createAppBundleBuilder(BundleConfigBuilder bundleConfig)
+      throws IOException {
+    return createAppBundleBuilder(bundleConfig.build());
+  }
+
+  private static AppBundleBuilder createAppBundleBuilder(BundleConfig bundleConfig)
+      throws IOException {
     return new AppBundleBuilder()
         .addModule("base", module -> module.setManifest(androidManifest("com.app")))
-        .setBundleConfig(bundleConfig)
-        .build();
+        .setBundleConfig(bundleConfig);
   }
 }

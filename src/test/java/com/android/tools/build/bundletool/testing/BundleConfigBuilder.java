@@ -19,7 +19,7 @@ package com.android.tools.build.bundletool.testing;
 import com.android.bundle.Config.BundleConfig;
 import com.android.bundle.Config.Bundletool;
 import com.android.bundle.Config.SplitDimension;
-import com.android.tools.build.bundletool.version.BundleToolVersion;
+import com.android.tools.build.bundletool.model.version.BundleToolVersion;
 
 /** Helper to create {@link BundleConfig} instances in tests. */
 public class BundleConfigBuilder {
@@ -64,6 +64,11 @@ public class BundleConfigBuilder {
 
   public BundleConfigBuilder addUncompressedGlob(String uncompressedGlob) {
     builder.getCompressionBuilder().addUncompressedGlob(uncompressedGlob);
+    return this;
+  }
+
+  public BundleConfigBuilder addResourcePinnedToMasterSplit(int resourceId) {
+    builder.getMasterResourcesBuilder().addResourceIds(resourceId);
     return this;
   }
 

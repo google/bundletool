@@ -21,15 +21,17 @@ import static com.google.common.base.Preconditions.checkState;
 
 import com.android.tools.build.bundletool.model.InputStreamSupplier;
 import com.android.tools.build.bundletool.model.ZipPath;
-import com.android.tools.build.bundletool.utils.files.BufferedIo;
+import com.android.tools.build.bundletool.model.utils.files.BufferedIo;
 import com.google.auto.value.AutoValue;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.io.ByteStreams;
+import com.google.errorprone.annotations.Immutable;
 import com.google.protobuf.MessageLite;
 import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Enumeration;
@@ -67,7 +69,8 @@ public final class ZipBuilder {
     Path tempFile = Files.createTempFile("ZipBuilder-", ".zip.tmp");
 
     try {
-      try (ZipOutputStream outZip = new ZipOutputStream(BufferedIo.outputStream(tempFile))) {
+      try (OutputStream out = BufferedIo.outputStream(tempFile);
+          ZipOutputStream outZip = new ZipOutputStream(out)) {
         for (ZipPath path : entries.keySet()) {
           Entry entry = entries.get(path);
           if (entry.getIsDirectory()) {
@@ -131,7 +134,7 @@ public final class ZipBuilder {
    */
   public ZipBuilder addFileFromDisk(ZipPath toPath, File file, EntryOption... options) {
     checkArgument(file.isFile(), "Path '%s' does not denote a file.", file);
-    return addFile(toPath, () -> BufferedIo.inputStream(file.toPath()), options);
+    return addFile(toPath, BufferedIo.inputStreamSupplier(file.toPath()), options);
   }
 
   /**
@@ -151,7 +154,7 @@ public final class ZipBuilder {
    */
   public ZipBuilder addFileFromZip(
       ZipPath toPath, ZipFile fromZipFile, ZipEntry zipEntry, EntryOption... options) {
-    return addFile(toPath, () -> BufferedIo.inputStream(fromZipFile, zipEntry), options);
+    return addFile(toPath, BufferedIo.inputStreamSupplier(fromZipFile, zipEntry), options);
   }
 
   /**
@@ -212,7 +215,9 @@ public final class ZipBuilder {
   /**
    * Internal data object holding properties of an entry to be written by the {@link ZipBuilder}.
    */
+  @Immutable
   @AutoValue
+  @AutoValue.CopyAnnotations
   protected abstract static class Entry {
     /** Absent for directory entries. */
     public abstract Optional<InputStreamSupplier> getInputStreamSupplier();

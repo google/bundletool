@@ -19,6 +19,9 @@ package com.android.tools.build.bundletool.model;
 import static com.android.tools.build.bundletool.model.BundleModule.ModuleDeliveryType.ALWAYS_INITIAL_INSTALL;
 import static com.android.tools.build.bundletool.model.BundleModule.ModuleDeliveryType.CONDITIONAL_INITIAL_INSTALL;
 import static com.android.tools.build.bundletool.model.BundleModule.ModuleDeliveryType.NO_INITIAL_INSTALL;
+import static com.google.common.base.Preconditions.checkArgument;
+import static com.google.common.collect.ImmutableMap.toImmutableMap;
+import static java.util.function.Function.identity;
 
 import com.android.aapt.Resources.ResourceTable;
 import com.android.aapt.Resources.XmlNode;
@@ -28,16 +31,18 @@ import com.android.bundle.Files.ApexImages;
 import com.android.bundle.Files.Assets;
 import com.android.bundle.Files.NativeLibraries;
 import com.android.bundle.Targeting.ModuleTargeting;
-import com.android.tools.build.bundletool.utils.xmlproto.XmlProtoAttribute;
-import com.android.tools.build.bundletool.version.BundleToolVersion;
+import com.android.tools.build.bundletool.model.utils.xmlproto.XmlProtoAttribute;
+import com.android.tools.build.bundletool.model.version.BundleToolVersion;
 import com.google.auto.value.AutoValue;
 import com.google.auto.value.extension.memoized.Memoized;
 import com.google.common.base.Splitter;
 import com.google.common.collect.ImmutableCollection;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import com.google.errorprone.annotations.Immutable;
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Optional;
 import java.util.function.Predicate;
@@ -49,7 +54,9 @@ import java.util.stream.Stream;
  * <p>The ZipEntries of the instances of this class refer only to regular files (and no
  * directories).
  */
+@Immutable
 @AutoValue
+@AutoValue.CopyAnnotations
 public abstract class BundleModule {
 
   public static final String MANIFEST_FILENAME = "AndroidManifest.xml";
@@ -64,14 +71,6 @@ public abstract class BundleModule {
   /** The top-level directory of an App Bundle module that contains APEX image files. */
   public static final ZipPath APEX_DIRECTORY = ZipPath.create("apex");
 
-  public static final ZipPath ASSETS_PROTO_PATH = ZipPath.create("assets.pb");
-  public static final ZipPath MANIFEST_PATH = MANIFEST_DIRECTORY.resolve(MANIFEST_FILENAME);
-  public static final ZipPath NATIVE_PROTO_PATH = ZipPath.create("native.pb");
-  public static final ZipPath RESOURCES_PROTO_PATH = ZipPath.create("resources.pb");
-
-  /** The top-level file of an App Bundle module that contains APEX targeting configuration. */
-  public static final ZipPath APEX_PROTO_PATH = ZipPath.create("apex.pb");
-
   /** The file of an App Bundle module that contains the APEX manifest. */
   public static final ZipPath APEX_MANIFEST_PATH = ZipPath.create("root/apex_manifest.json");
 
@@ -85,7 +84,13 @@ public abstract class BundleModule {
     ALWAYS_INITIAL_INSTALL,
     CONDITIONAL_INITIAL_INSTALL,
     NO_INITIAL_INSTALL
-  };
+  }
+
+  /** Describes the content type of the module. */
+  public enum ModuleType {
+    FEATURE_MODULE,
+    ASSET_MODULE
+  }
 
   /** The version of Bundletool that built this module, taken from BundleConfig. */
   public abstract BundleConfig getBundleConfig();
@@ -151,6 +156,12 @@ public abstract class BundleModule {
 
     // Legacy onDemand attribute is equal to false or for base module: no delivery information.
     return ALWAYS_INITIAL_INSTALL;
+  }
+
+  public ModuleType getModuleType() {
+    // If the module type is not defined in the manifest, default to feature module for backwards
+    // compatibility.
+    return getAndroidManifest().getModuleType().orElse(ModuleType.FEATURE_MODULE);
   }
 
   public boolean isIncludedInFusing() {
@@ -220,7 +231,7 @@ public abstract class BundleModule {
     return new AutoValue_BundleModule.Builder();
   }
 
-  abstract Builder toBuilder();
+  public abstract Builder toBuilder();
 
   /** Builder for BundleModule. */
   @AutoValue.Builder
@@ -229,21 +240,37 @@ public abstract class BundleModule {
 
     public abstract Builder setBundleConfig(BundleConfig value);
 
-    abstract BundleConfig getBundleConfig();
+    public abstract Builder setResourceTable(ResourceTable resourceTable);
+
+    public abstract Builder setAndroidManifestProto(XmlNode manifestProto);
+
+    public abstract Builder setAssetsConfig(Assets assetsConfig);
+
+    public abstract Builder setNativeConfig(NativeLibraries nativeConfig);
+
+    public abstract Builder setApexConfig(ApexImages apexConfig);
 
     abstract ImmutableMap.Builder<ZipPath, ModuleEntry> entryMapBuilder();
 
     abstract Builder setEntryMap(ImmutableMap<ZipPath, ModuleEntry> entryMap);
 
-    abstract Builder setAndroidManifestProto(XmlNode manifestProto);
-
-    abstract Builder setResourceTable(ResourceTable resourceTable);
-
-    abstract Builder setAssetsConfig(Assets assetsConfig);
-
-    abstract Builder setNativeConfig(NativeLibraries nativeConfig);
-
-    abstract Builder setApexConfig(ApexImages apexConfig);
+    /**
+     * Convenience method to set all entries at once.
+     *
+     * <p>Note: this method does not accept special entries such as manifest or resource table.
+     * Thus, prefer using the {@link #addEntry(ModuleEntry)} method when possible, since it also
+     * accepts the special files.
+     */
+    public Builder setRawEntries(Collection<ModuleEntry> entries) {
+      entries.forEach(
+          entry ->
+              checkArgument(
+                  !SpecialModuleEntry.getSpecialEntry(entry.getPath()).isPresent(),
+                  "Cannot add special entry '%s' using method setRawEntries.",
+                  entry.getPath()));
+      setEntryMap(entries.stream().collect(toImmutableMap(ModuleEntry::getPath, identity())));
+      return this;
+    }
 
     /** @see #addEntry(ModuleEntry) */
     public Builder addEntries(Collection<ModuleEntry> entries) throws IOException {
@@ -262,25 +289,11 @@ public abstract class BundleModule {
      * @throws IOException when the entry cannot be read or has invalid contents
      */
     public Builder addEntry(ModuleEntry moduleEntry) throws IOException {
-      if (moduleEntry.getPath().equals(MANIFEST_PATH)) {
+      Optional<SpecialModuleEntry> specialEntry =
+          SpecialModuleEntry.getSpecialEntry(moduleEntry.getPath());
+      if (specialEntry.isPresent()) {
         try (InputStream inputStream = moduleEntry.getContent()) {
-          setAndroidManifestProto(XmlNode.parseFrom(inputStream));
-        }
-      } else if (moduleEntry.getPath().equals(RESOURCES_PROTO_PATH)) {
-        try (InputStream inputStream = moduleEntry.getContent()) {
-          setResourceTable(ResourceTable.parseFrom(inputStream));
-        }
-      } else if (moduleEntry.getPath().equals(ASSETS_PROTO_PATH)) {
-        try (InputStream inputStream = moduleEntry.getContent()) {
-          setAssetsConfig(Assets.parseFrom(inputStream));
-        }
-      } else if (moduleEntry.getPath().equals(NATIVE_PROTO_PATH)) {
-        try (InputStream inputStream = moduleEntry.getContent()) {
-          setNativeConfig(NativeLibraries.parseFrom(inputStream));
-        }
-      } else if (moduleEntry.getPath().equals(APEX_PROTO_PATH)) {
-        try (InputStream inputStream = moduleEntry.getContent()) {
-          setApexConfig(ApexImages.parseFrom(inputStream));
+          specialEntry.get().addToModule(this, inputStream);
         }
       } else if (!moduleEntry.isDirectory()) {
         entryMapBuilder().put(moduleEntry.getPath(), moduleEntry);
@@ -290,5 +303,68 @@ public abstract class BundleModule {
     }
 
     public abstract BundleModule build();
+  }
+
+  /**
+   * A special entry in a module of the Android App Bundle.
+   *
+   * <p>An entry is considered special when it's read by bundletool.
+   */
+  public enum SpecialModuleEntry {
+    ANDROID_MANIFEST("manifest/AndroidManifest.xml") {
+      @Override
+      void addToModule(BundleModule.Builder module, InputStream inputStream) throws IOException {
+        module.setAndroidManifestProto(XmlNode.parseFrom(inputStream));
+      }
+    },
+    RESOURCE_TABLE("resources.pb") {
+      @Override
+      void addToModule(BundleModule.Builder module, InputStream inputStream) throws IOException {
+        module.setResourceTable(ResourceTable.parseFrom(inputStream));
+      }
+    },
+    ASSETS_TABLE("assets.pb") {
+      @Override
+      void addToModule(BundleModule.Builder module, InputStream inputStream) throws IOException {
+        module.setAssetsConfig(Assets.parseFrom(inputStream));
+      }
+    },
+    NATIVE_LIBS_TABLE("native.pb") {
+      @Override
+      void addToModule(BundleModule.Builder module, InputStream inputStream) throws IOException {
+        module.setNativeConfig(NativeLibraries.parseFrom(inputStream));
+      }
+    },
+    APEX_TABLE("apex.pb") {
+      @Override
+      void addToModule(BundleModule.Builder module, InputStream inputStream) throws IOException {
+        module.setApexConfig(ApexImages.parseFrom(inputStream));
+      }
+    };
+
+    private static final ImmutableMap<ZipPath, SpecialModuleEntry> SPECIAL_ENTRY_BY_PATH =
+        Arrays.stream(SpecialModuleEntry.values())
+            .collect(toImmutableMap(SpecialModuleEntry::getPath, identity()));
+
+    abstract void addToModule(BundleModule.Builder module, InputStream inputStream)
+        throws IOException;
+
+    /**
+     * Returns the {@link SpecialModuleEntry} instance associated with the given path, or an empty
+     * Optional if the path is not a special entry.
+     */
+    public static Optional<SpecialModuleEntry> getSpecialEntry(ZipPath entryPath) {
+      return Optional.ofNullable(SPECIAL_ENTRY_BY_PATH.get(entryPath));
+    }
+
+    private final ZipPath entryPath;
+
+    private SpecialModuleEntry(String entryPath) {
+      this.entryPath = ZipPath.create(entryPath);
+    }
+
+    public ZipPath getPath() {
+      return entryPath;
+    }
   }
 }

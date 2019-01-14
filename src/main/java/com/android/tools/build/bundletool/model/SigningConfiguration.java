@@ -15,13 +15,13 @@
  */
 package com.android.tools.build.bundletool.model;
 
-import static com.android.tools.build.bundletool.utils.files.FilePreconditions.checkFileExistsAndReadable;
+import static com.android.tools.build.bundletool.model.utils.files.FilePreconditions.checkFileExistsAndReadable;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 
-import com.android.tools.build.bundletool.exceptions.CommandExecutionException;
-import com.android.tools.build.bundletool.utils.flags.Flag.Password;
+import com.android.tools.build.bundletool.model.exceptions.CommandExecutionException;
 import com.google.auto.value.AutoValue;
 import com.google.common.collect.ImmutableList;
+import com.google.errorprone.annotations.Immutable;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -40,7 +40,10 @@ import java.util.Optional;
 import javax.security.auth.DestroyFailedException;
 
 /** Information required to sign an APK. */
+@SuppressWarnings("Immutable") // PrivateKey and X509Certificate are considered immutable.
+@Immutable
 @AutoValue
+@AutoValue.CopyAnnotations
 public abstract class SigningConfiguration {
 
   SigningConfiguration() {}

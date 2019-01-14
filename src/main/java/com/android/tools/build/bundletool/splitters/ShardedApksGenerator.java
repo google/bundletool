@@ -16,10 +16,11 @@
 
 package com.android.tools.build.bundletool.splitters;
 
-import static com.android.tools.build.bundletool.utils.TargetingProtoUtils.sdkVersionFrom;
+import static com.android.tools.build.bundletool.model.utils.TargetingProtoUtils.sdkVersionFrom;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.Iterables.getOnlyElement;
 
+import com.android.bundle.Devices.DeviceSpec;
 import com.android.bundle.Targeting.ApkTargeting;
 import com.android.bundle.Targeting.SdkVersionTargeting;
 import com.android.bundle.Targeting.VariantTargeting;
@@ -27,10 +28,11 @@ import com.android.tools.build.bundletool.model.BundleMetadata;
 import com.android.tools.build.bundletool.model.BundleModule;
 import com.android.tools.build.bundletool.model.ModuleSplit;
 import com.android.tools.build.bundletool.model.ModuleSplit.SplitType;
+import com.android.tools.build.bundletool.model.version.Version;
 import com.android.tools.build.bundletool.optimizations.ApkOptimizations;
-import com.android.tools.build.bundletool.version.Version;
 import com.google.common.collect.ImmutableList;
 import java.nio.file.Path;
+import java.util.Optional;
 
 /**
  * Generates APKs sharded by ABI and screen density.
@@ -60,12 +62,15 @@ public final class ShardedApksGenerator {
       ImmutableList<BundleModule> modules,
       BundleMetadata bundleMetadata,
       ApkOptimizations apkOptimizations) {
+    return generateSplitsInternal(modules, bundleMetadata, apkOptimizations, Optional.empty());
+  }
 
-    BundleSharder bundleSharder = new BundleSharder(tempDir, bundleVersion, generate64BitShards);
-    ImmutableList<ModuleSplit> shardedApks =
-        bundleSharder.shardBundle(modules, apkOptimizations.getSplitDimensions(), bundleMetadata);
-
-    return setVariantTargetingAndSplitType(shardedApks, splitType);
+  public ImmutableList<ModuleSplit> generateSystemSplits(
+      ImmutableList<BundleModule> modules,
+      BundleMetadata bundleMetadata,
+      ApkOptimizations apkOptimizations,
+      Optional<DeviceSpec> deviceSpec) {
+    return generateSplitsInternal(modules, bundleMetadata, apkOptimizations, deviceSpec);
   }
 
   public ImmutableList<ModuleSplit> generateApexSplits(ImmutableList<BundleModule> modules) {
@@ -75,6 +80,19 @@ public final class ShardedApksGenerator {
         bundleSharder.shardApexBundle(getOnlyElement(modules));
 
     return setVariantTargetingAndSplitType(shardedApexApks, splitType);
+  }
+
+  private ImmutableList<ModuleSplit> generateSplitsInternal(
+      ImmutableList<BundleModule> modules,
+      BundleMetadata bundleMetadata,
+      ApkOptimizations apkOptimizations,
+      Optional<DeviceSpec> deviceSpec) {
+    BundleSharder bundleSharder =
+        new BundleSharder(tempDir, bundleVersion, generate64BitShards, deviceSpec);
+    ImmutableList<ModuleSplit> shardedApks =
+        bundleSharder.shardBundle(modules, apkOptimizations.getSplitDimensions(), bundleMetadata);
+
+    return setVariantTargetingAndSplitType(shardedApks, splitType);
   }
 
   private static ImmutableList<ModuleSplit> setVariantTargetingAndSplitType(

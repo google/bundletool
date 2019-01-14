@@ -21,21 +21,23 @@ import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 
 import com.android.aapt.Resources.XmlNode;
-import com.android.tools.build.bundletool.exceptions.ValidationException;
-import com.android.tools.build.bundletool.exceptions.manifest.ManifestFusingException.FusingMissingIncludeAttribute;
-import com.android.tools.build.bundletool.exceptions.manifest.ManifestVersionException.VersionCodeMissingException;
-import com.android.tools.build.bundletool.utils.xmlproto.XmlProtoAttribute;
-import com.android.tools.build.bundletool.utils.xmlproto.XmlProtoElement;
-import com.android.tools.build.bundletool.utils.xmlproto.XmlProtoElementBuilder;
-import com.android.tools.build.bundletool.utils.xmlproto.XmlProtoNode;
-import com.android.tools.build.bundletool.version.BundleToolVersion;
-import com.android.tools.build.bundletool.version.Version;
+import com.android.tools.build.bundletool.model.BundleModule.ModuleType;
+import com.android.tools.build.bundletool.model.exceptions.ValidationException;
+import com.android.tools.build.bundletool.model.exceptions.manifest.ManifestFusingException.FusingMissingIncludeAttribute;
+import com.android.tools.build.bundletool.model.exceptions.manifest.ManifestVersionException.VersionCodeMissingException;
+import com.android.tools.build.bundletool.model.utils.xmlproto.XmlProtoAttribute;
+import com.android.tools.build.bundletool.model.utils.xmlproto.XmlProtoElement;
+import com.android.tools.build.bundletool.model.utils.xmlproto.XmlProtoElementBuilder;
+import com.android.tools.build.bundletool.model.utils.xmlproto.XmlProtoNode;
+import com.android.tools.build.bundletool.model.version.BundleToolVersion;
+import com.android.tools.build.bundletool.model.version.Version;
 import com.google.auto.value.AutoValue;
 import com.google.auto.value.extension.memoized.Memoized;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Splitter;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Range;
+import com.google.errorprone.annotations.Immutable;
 import java.util.Optional;
 import java.util.stream.Stream;
 import javax.annotation.CheckReturnValue;
@@ -45,7 +47,9 @@ import javax.annotation.CheckReturnValue;
  *
  * <p>Implementations may be not thread safe.
  */
+@Immutable
 @AutoValue
+@AutoValue.CopyAnnotations
 public abstract class AndroidManifest {
 
   private static final Splitter COMMA_SPLITTER = Splitter.on(',');
@@ -71,9 +75,16 @@ public abstract class AndroidManifest {
   public static final String MIN_SDK_VERSION_ATTRIBUTE_NAME = "minSdkVersion";
   public static final String NAME_ATTRIBUTE_NAME = "name";
   public static final String VALUE_ATTRIBUTE_NAME = "value";
+  public static final String CODE_ATTRIBUTE_NAME = "code";
+  public static final String EXCLUDE_ATTRIBUTE_NAME = "exclude";
+  public static final String COUNTRY_ELEMENT_NAME = "country";
   public static final String CONDITION_DEVICE_FEATURE_NAME = "device-feature";
   public static final String CONDITION_MIN_SDK_VERSION_NAME = "min-sdk";
+  public static final String CONDITION_USER_COUNTRIES_NAME = "user-countries";
   public static final String SPLIT_NAME_ATTRIBUTE_NAME = "splitName";
+
+  public static final String MODULE_TYPE_FEATURE_VALUE = "feature";
+  public static final String MODULE_TYPE_ASSET_VALUE = "remote-asset";
 
   public static final int DEBUGGABLE_RESOURCE_ID = 0x0101000f;
   public static final int EXTRACT_NATIVE_LIBS_RESOURCE_ID = 0x10104ea;
@@ -248,6 +259,28 @@ public abstract class AndroidManifest {
     return getManifestElement()
         .getAndroidAttribute(IS_FEATURE_SPLIT_RESOURCE_ID)
         .map(XmlProtoAttribute::getValueAsBoolean);
+  }
+
+  private static ModuleType getModuleTypeFromAttributeValue(String value) {
+    switch (value) {
+      case MODULE_TYPE_FEATURE_VALUE:
+        return ModuleType.FEATURE_MODULE;
+      case MODULE_TYPE_ASSET_VALUE:
+        return ModuleType.ASSET_MODULE;
+      default:
+        throw ValidationException.builder()
+            .withMessage("Found invalid type attribute %s for <module> element.", value)
+            .build();
+    }
+  }
+
+  public Optional<ModuleType> getModuleType() {
+    Optional<String> typeAttributeValue =
+        getManifestElement()
+            .getOptionalChildElement(DISTRIBUTION_NAMESPACE_URI, "module")
+            .flatMap(module -> module.getAttribute(DISTRIBUTION_NAMESPACE_URI, "type"))
+            .map(XmlProtoAttribute::getValueAsString);
+    return typeAttributeValue.map(AndroidManifest::getModuleTypeFromAttributeValue);
   }
 
   public Optional<Boolean> getIsModuleIncludedInFusing() {

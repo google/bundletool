@@ -16,20 +16,24 @@
 
 package com.android.tools.build.bundletool.model;
 
-import static com.android.utils.ImmutableCollectors.toImmutableSet;
 import static com.google.common.base.Preconditions.checkState;
+import static com.google.common.collect.ImmutableList.toImmutableList;
+import static com.google.common.collect.ImmutableMap.toImmutableMap;
+import static com.google.common.collect.ImmutableSet.toImmutableSet;
+import static java.util.function.Function.identity;
 
 import com.android.bundle.Config.BundleConfig;
 import com.android.bundle.Files.TargetedNativeDirectory;
 import com.android.bundle.Targeting.Abi;
 import com.android.bundle.Targeting.NativeDirectoryTargeting;
-import com.android.tools.build.bundletool.exceptions.CommandExecutionException;
-import com.android.tools.build.bundletool.exceptions.ValidationException;
-import com.android.tools.build.bundletool.utils.ZipUtils;
-import com.android.tools.build.bundletool.utils.files.BufferedIo;
-import com.android.tools.build.bundletool.version.BundleToolVersion;
-import com.android.tools.build.bundletool.version.Version;
-import com.google.common.collect.ImmutableCollection;
+import com.android.tools.build.bundletool.model.BundleModule.ModuleType;
+import com.android.tools.build.bundletool.model.exceptions.CommandExecutionException;
+import com.android.tools.build.bundletool.model.exceptions.ValidationException;
+import com.android.tools.build.bundletool.model.utils.ZipUtils;
+import com.android.tools.build.bundletool.model.utils.files.BufferedIo;
+import com.android.tools.build.bundletool.model.version.BundleToolVersion;
+import com.android.tools.build.bundletool.model.version.Version;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Maps;
@@ -39,6 +43,8 @@ import java.io.InputStream;
 import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Optional;
+import java.util.function.Predicate;
 import java.util.stream.Stream;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
@@ -56,38 +62,60 @@ public class AppBundle {
 
   public static final String BUNDLE_CONFIG_FILE_NAME = "BundleConfig.pb";
 
-  private final ImmutableMap<BundleModuleName, BundleModule> modules;
+  private final ImmutableMap<BundleModuleName, BundleModule> modulesByName;
   private final BundleConfig bundleConfig;
   private final BundleMetadata bundleMetadata;
+  private final ImmutableSet<ResourceId> pinnedResourceIds;
 
   private AppBundle(
-      ImmutableMap<BundleModuleName, BundleModule> modules,
+      ImmutableMap<BundleModuleName, BundleModule> modulesByName,
       BundleConfig bundleConfig,
-      BundleMetadata bundleMetadata) {
-    this.modules = modules;
+      BundleMetadata bundleMetadata,
+      ImmutableSet<ResourceId> pinnedResourceIds) {
+    this.modulesByName = modulesByName;
     this.bundleConfig = bundleConfig;
     this.bundleMetadata = bundleMetadata;
+    this.pinnedResourceIds = pinnedResourceIds;
   }
 
   /** Builds an {@link AppBundle} from an App Bundle on disk. */
   public static AppBundle buildFromZip(ZipFile bundleFile) {
     BundleConfig bundleConfig = readBundleConfig(bundleFile);
-    return new AppBundle(
+    return buildFromModules(
         sanitize(extractModules(bundleFile, bundleConfig), bundleConfig),
         bundleConfig,
         readBundleMetadata(bundleFile));
   }
 
   public static AppBundle buildFromModules(
-      ImmutableCollection<BundleModule> modules,
+      ImmutableList<BundleModule> modules,
       BundleConfig bundleConfig,
       BundleMetadata bundleMetadata) {
+    ImmutableSet<ResourceId> pinnedResourceIds =
+        bundleConfig.getMasterResources().getResourceIdsList().stream()
+            .map(ResourceId::create)
+            .collect(toImmutableSet());
     return new AppBundle(
-        Maps.uniqueIndex(modules, BundleModule::getName), bundleConfig, bundleMetadata);
+        Maps.uniqueIndex(modules, BundleModule::getName),
+        bundleConfig,
+        bundleMetadata,
+        pinnedResourceIds);
+  }
+
+  public ImmutableMap<BundleModuleName, BundleModule> getFeatureModules() {
+    return modulesByName.values().stream()
+        .filter(module -> module.getModuleType().equals(ModuleType.FEATURE_MODULE))
+        .collect(toImmutableMap(BundleModule::getName, identity()));
+  }
+
+  public ImmutableMap<BundleModuleName, BundleModule> getAssetModules() {
+    return modulesByName.values().stream()
+        .filter(module -> module.getModuleType().equals(ModuleType.ASSET_MODULE))
+        .collect(toImmutableMap(BundleModule::getName, identity()));
   }
 
   public ImmutableMap<BundleModuleName, BundleModule> getModules() {
-    return modules;
+    return modulesByName;
   }
 
   public BundleModule getBaseModule() {
@@ -95,7 +123,7 @@ public class AppBundle {
   }
 
   public BundleModule getModule(BundleModuleName moduleName) {
-    BundleModule module = modules.get(moduleName);
+    BundleModule module = modulesByName.get(moduleName);
     if (module == null) {
       throw CommandExecutionException.builder()
           .withMessage("Module '%s' not found.", moduleName)
@@ -104,8 +132,16 @@ public class AppBundle {
     return module;
   }
 
+  /**
+   * Predicate on resources that must remain in the master split regardless of their targeting
+   * configuration.
+   */
+  public Predicate<ResourceTableEntry> getMasterResourcesPredicate() {
+    return resource -> pinnedResourceIds.contains(resource.getResourceId());
+  }
+
   public boolean has32BitRenderscriptCode() {
-    return getModules().values().stream().anyMatch(BundleModule::hasRenderscript32Bitcode);
+    return getFeatureModules().values().stream().anyMatch(BundleModule::hasRenderscript32Bitcode);
   }
 
   public BundleConfig getBundleConfig() {
@@ -125,7 +161,7 @@ public class AppBundle {
    * <p>Returns empty set if the App Bundle has no native code at all.
    */
   public ImmutableSet<Abi> getTargetedAbis() {
-    return modules.values().stream()
+    return getFeatureModules().values().stream()
         .map(BundleModule::getNativeConfig)
         .flatMap(
             nativeConfig -> {
@@ -141,51 +177,65 @@ public class AppBundle {
         .collect(toImmutableSet());
   }
 
-  private static Map<BundleModuleName, BundleModule> extractModules(
+  /**
+   * Returns the {@link BundleModuleName} corresponding to the provided zip entry. If the zip entry
+   * does not belong to a module, a null {@link BundleModuleName} is returned.
+   */
+  public static Optional<BundleModuleName> extractModuleName(ZipEntry entry) {
+    ZipPath path = ZipPath.create(entry.getName());
+
+    // Ignoring bundle metadata files.
+    if (path.startsWith(METADATA_DIRECTORY)) {
+      return Optional.empty();
+    }
+
+    // Ignoring signature related files.
+    if (path.startsWith("META-INF")) {
+      return Optional.empty();
+    }
+
+    // Ignoring top-level files.
+    if (path.getNameCount() <= 1) {
+      return Optional.empty();
+    }
+
+    // Temporarily excluding .class files.
+    if (path.toString().endsWith(".class")) {
+      return Optional.empty();
+    }
+
+    return Optional.of(BundleModuleName.create(path.getName(0).toString()));
+  }
+
+  private static ImmutableList<BundleModule> extractModules(
       ZipFile bundleFile, BundleConfig bundleConfig) {
     Map<BundleModuleName, BundleModule.Builder> moduleBuilders = new HashMap<>();
     Enumeration<? extends ZipEntry> entries = bundleFile.entries();
     while (entries.hasMoreElements()) {
       ZipEntry entry = entries.nextElement();
-      ZipPath path = ZipPath.create(entry.getName());
-
-      // Ignoring bundle metadata files.
-      if (path.startsWith(METADATA_DIRECTORY)) {
+      Optional<BundleModuleName> moduleName = extractModuleName(entry);
+      if (!moduleName.isPresent()) {
         continue;
       }
 
-      // Ignoring signature related files.
-      if (path.startsWith("META-INF")) {
-        continue;
-      }
-
-      // Ignoring top-level files.
-      if (path.getNameCount() <= 1) {
-        continue;
-      }
-
-      // Temporarily excluding .class files.
-      if (path.toString().endsWith(".class")) {
-        continue;
-      }
-
-      BundleModuleName moduleName = BundleModuleName.create(path.getName(0).toString());
       BundleModule.Builder moduleBuilder =
-          moduleBuilders.computeIfAbsent(moduleName, name -> BundleModule.builder().setName(name));
+          moduleBuilders.computeIfAbsent(
+              moduleName.get(),
+              name -> BundleModule.builder().setName(name).setBundleConfig(bundleConfig));
       try {
         moduleBuilder.addEntry(ModuleZipEntry.fromBundleZipEntry(entry, bundleFile));
       } catch (IOException e) {
         throw ValidationException.builder()
             .withCause(e)
             .withMessage(
-                "Error processing zip entry '%s' of module '%s'.", entry.getName(), moduleName)
+                "Error processing zip entry '%s' of module '%s'.",
+                entry.getName(), moduleName.get())
             .build();
       }
     }
-    for (BundleModule.Builder value : moduleBuilders.values()) {
-      value.setBundleConfig(bundleConfig);
-    }
-    return Maps.transformValues(moduleBuilders, BundleModule.Builder::build);
+    return moduleBuilders.values().stream()
+        .map(module -> module.build())
+        .collect(toImmutableList());
   }
 
   private static BundleConfig readBundleConfig(ZipFile bundleFile) {
@@ -216,22 +266,23 @@ public class AppBundle {
               ZipPath bundlePath = ZipPath.create(zipEntry.getName());
               // Strip the top-level metadata directory.
               ZipPath metadataPath = bundlePath.subpath(1, bundlePath.getNameCount());
-              metadata.addFile(metadataPath, () -> BufferedIo.inputStream(bundleFile, zipEntry));
+              metadata.addFile(metadataPath, BufferedIo.inputStreamSupplier(bundleFile, zipEntry));
             });
     return metadata.build();
   }
 
   @CheckReturnValue
-  private static ImmutableMap<BundleModuleName, BundleModule> sanitize(
-      Map<BundleModuleName, BundleModule> moduleMap, BundleConfig bundleConfig) {
+  private static ImmutableList<BundleModule> sanitize(
+      ImmutableList<BundleModule> modules, BundleConfig bundleConfig) {
     Version bundleVersion = BundleToolVersion.getVersionFromBundleConfig(bundleConfig);
     if (bundleVersion.isOlderThan(Version.of("0.3.1"))) {
       // This is a temporary fix to cope with inconsistent ABIs.
-      moduleMap = Maps.transformValues(moduleMap, new ModuleAbiSanitizer()::sanitize);
+      modules = modules.stream().map(new ModuleAbiSanitizer()::sanitize).collect(toImmutableList());
     }
     // This is a temporary fix to work around a bug in gradle that creates a file named classes1.dex
-    moduleMap = Maps.transformValues(moduleMap, new ClassesDexNameSanitizer()::sanitize);
+    modules =
+        modules.stream().map(new ClassesDexNameSanitizer()::sanitize).collect(toImmutableList());
 
-    return ImmutableMap.copyOf(moduleMap);
+    return modules;
   }
 }

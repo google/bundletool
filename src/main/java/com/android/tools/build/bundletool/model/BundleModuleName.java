@@ -16,8 +16,9 @@
 
 package com.android.tools.build.bundletool.model;
 
-import com.android.tools.build.bundletool.exceptions.ValidationException;
+import com.android.tools.build.bundletool.model.exceptions.ValidationException;
 import com.google.auto.value.AutoValue;
+import com.google.errorprone.annotations.Immutable;
 import java.util.Comparator;
 import java.util.regex.Pattern;
 
@@ -26,7 +27,9 @@ import java.util.regex.Pattern;
  *
  * <p>This class ensures that module names meet the required naming format.
  */
+@Immutable
 @AutoValue
+@AutoValue.CopyAnnotations
 public abstract class BundleModuleName implements Comparable<BundleModuleName> {
 
   public static final String BASE_MODULE_NAME = "base";

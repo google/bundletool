@@ -34,7 +34,8 @@ public interface DexMerger {
    *     file. Specified using format "com/example/MyClass.class", one class name per line.
    * @param isDebuggable indicates whether the Android app has the 'debuggable' flag set
    * @return merged dex files
-   * @throws com.android.tools.build.bundletool.exceptions.CommandExecutionException on failure
+   * @throws com.android.tools.build.bundletool.model.exceptions.CommandExecutionException on
+   *     failure
    */
   ImmutableList<Path> merge(
       ImmutableList<Path> dexFiles,

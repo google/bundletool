@@ -18,8 +18,10 @@ package com.android.tools.build.bundletool.model;
 
 import static com.google.common.base.Preconditions.checkArgument;
 
-import com.android.tools.build.bundletool.utils.files.BufferedIo;
+import com.android.tools.build.bundletool.model.utils.files.BufferedIo;
 import com.google.auto.value.AutoValue;
+import com.google.errorprone.annotations.Immutable;
+import com.google.errorprone.annotations.MustBeClosed;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
@@ -34,7 +36,9 @@ import java.nio.file.Path;
  *
  * <p>Always reflects current content of the underlying file.
  */
+@Immutable
 @AutoValue
+@AutoValue.CopyAnnotations
 public abstract class FileSystemModuleEntry implements ModuleEntry {
 
   @Override
@@ -48,6 +52,7 @@ public abstract class FileSystemModuleEntry implements ModuleEntry {
 
   abstract Path getFileSystemPath();
 
+  @MustBeClosed
   @Override
   public InputStream getContent() {
     try {

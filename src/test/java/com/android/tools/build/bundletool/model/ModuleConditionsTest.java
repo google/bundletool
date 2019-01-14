@@ -17,11 +17,14 @@
 package com.android.tools.build.bundletool.model;
 
 import static com.android.tools.build.bundletool.testing.TargetingUtils.mergeModuleTargeting;
+import static com.android.tools.build.bundletool.testing.TargetingUtils.moduleExcludeCountriesTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.moduleFeatureTargeting;
+import static com.android.tools.build.bundletool.testing.TargetingUtils.moduleIncludeCountriesTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.moduleMinSdkVersionTargeting;
 import static com.google.common.truth.extensions.proto.ProtoTruth.assertThat;
 
 import com.android.bundle.Targeting.ModuleTargeting;
+import com.google.common.collect.ImmutableList;
 import java.util.Optional;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -76,12 +79,44 @@ public class ModuleConditionsTest {
   }
 
   @Test
+  public void toTargeting_userCountriesCondition() {
+    ModuleConditions moduleConditions =
+        ModuleConditions.builder()
+            .setUserCountriesCondition(
+                UserCountriesCondition.create(ImmutableList.of("PL", "US"), /* exclude= */ false))
+            .build();
+
+    ModuleTargeting moduleTargeting = moduleConditions.toTargeting();
+
+    assertThat(moduleTargeting)
+        .ignoringRepeatedFieldOrder()
+        .isEqualTo(mergeModuleTargeting(moduleIncludeCountriesTargeting("PL", "US")));
+  }
+
+  @Test
+  public void toTargeting_exludeUserCountriesCondition() {
+    ModuleConditions moduleConditions =
+        ModuleConditions.builder()
+            .setUserCountriesCondition(
+                UserCountriesCondition.create(ImmutableList.of("PL", "US"), /* exclude= */ true))
+            .build();
+
+    ModuleTargeting moduleTargeting = moduleConditions.toTargeting();
+
+    assertThat(moduleTargeting)
+        .ignoringRepeatedFieldOrder()
+        .isEqualTo(mergeModuleTargeting(moduleExcludeCountriesTargeting("PL", "US")));
+  }
+
+  @Test
   public void toTargeting_mixedConditions() {
     ModuleConditions moduleConditions =
         ModuleConditions.builder()
             .addDeviceFeatureCondition(DeviceFeatureCondition.create("com.feature1"))
             .addDeviceFeatureCondition(DeviceFeatureCondition.create("com.feature2"))
             .setMinSdkVersion(24)
+            .setUserCountriesCondition(
+                UserCountriesCondition.create(ImmutableList.of("FR"), /* exclude= */ false))
             .build();
 
     ModuleTargeting moduleTargeting = moduleConditions.toTargeting();
@@ -91,6 +126,7 @@ public class ModuleConditionsTest {
             mergeModuleTargeting(
                 moduleFeatureTargeting("com.feature1"),
                 moduleFeatureTargeting("com.feature2"),
-                moduleMinSdkVersionTargeting(24)));
+                moduleMinSdkVersionTargeting(24),
+                moduleIncludeCountriesTargeting("FR")));
   }
 }

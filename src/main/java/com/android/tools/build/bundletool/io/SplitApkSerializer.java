@@ -26,6 +26,7 @@ import com.android.tools.build.bundletool.model.Aapt2Command;
 import com.android.tools.build.bundletool.model.ModuleSplit;
 import com.android.tools.build.bundletool.model.SigningConfiguration;
 import com.android.tools.build.bundletool.model.ZipPath;
+import com.android.tools.build.bundletool.model.version.Version;
 import java.nio.file.Path;
 import java.util.Optional;
 import java.util.function.BiFunction;
@@ -40,9 +41,11 @@ public class SplitApkSerializer {
       ApkPathManager apkPathManager,
       Aapt2Command aapt2Command,
       Optional<SigningConfiguration> signingConfig,
+      Version bundleVersion,
       Compression compression) {
     this.apkPathManager = apkPathManager;
-    this.apkSerializerHelper = new ApkSerializerHelper(aapt2Command, signingConfig, compression);
+    this.apkSerializerHelper =
+        new ApkSerializerHelper(aapt2Command, signingConfig, bundleVersion, compression);
   }
 
   /** Writes the installable split to disk. */

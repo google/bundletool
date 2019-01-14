@@ -16,9 +16,9 @@
 
 package com.android.tools.build.bundletool.device;
 
+import static com.android.tools.build.bundletool.model.utils.ResourcesUtils.DENSITY_ALIAS_TO_DPI_MAP;
 import static com.android.tools.build.bundletool.testing.DeviceFactory.lDeviceWithDensity;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.screenDensityTargeting;
-import static com.android.tools.build.bundletool.utils.ResourcesUtils.DENSITY_ALIAS_TO_DPI_MAP;
 import static com.google.common.truth.Truth.assertThat;
 
 import com.android.bundle.Targeting.ScreenDensity.DensityAlias;

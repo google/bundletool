@@ -23,19 +23,28 @@ import static com.android.bundle.Targeting.Abi.AbiAlias.X86_64;
 import static com.android.tools.build.bundletool.model.AndroidManifest.ACTIVITY_ELEMENT_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.ANDROID_NAMESPACE_URI;
 import static com.android.tools.build.bundletool.model.AndroidManifest.NAME_RESOURCE_ID;
+import static com.android.tools.build.bundletool.model.utils.ResourcesUtils.DEFAULT_DENSITY_VALUE;
+import static com.android.tools.build.bundletool.model.utils.ResourcesUtils.HDPI_VALUE;
+import static com.android.tools.build.bundletool.model.utils.ResourcesUtils.LDPI_VALUE;
+import static com.android.tools.build.bundletool.model.utils.ResourcesUtils.MDPI_VALUE;
+import static com.android.tools.build.bundletool.testing.DeviceFactory.abis;
+import static com.android.tools.build.bundletool.testing.DeviceFactory.density;
+import static com.android.tools.build.bundletool.testing.DeviceFactory.locales;
+import static com.android.tools.build.bundletool.testing.DeviceFactory.mergeSpecs;
+import static com.android.tools.build.bundletool.testing.DeviceFactory.sdkVersion;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifest;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withSplitNameActivity;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.xmlAttribute;
 import static com.android.tools.build.bundletool.testing.ResourcesTableFactory.HDPI;
 import static com.android.tools.build.bundletool.testing.ResourcesTableFactory.LDPI;
-import static com.android.tools.build.bundletool.testing.ResourcesTableFactory.MDPI;
 import static com.android.tools.build.bundletool.testing.ResourcesTableFactory.USER_PACKAGE_OFFSET;
-import static com.android.tools.build.bundletool.testing.ResourcesTableFactory.createResourceTable;
 import static com.android.tools.build.bundletool.testing.ResourcesTableFactory.entry;
 import static com.android.tools.build.bundletool.testing.ResourcesTableFactory.fileReference;
+import static com.android.tools.build.bundletool.testing.ResourcesTableFactory.locale;
 import static com.android.tools.build.bundletool.testing.ResourcesTableFactory.pkg;
 import static com.android.tools.build.bundletool.testing.ResourcesTableFactory.resourceTable;
 import static com.android.tools.build.bundletool.testing.ResourcesTableFactory.type;
+import static com.android.tools.build.bundletool.testing.TargetingUtils.abiTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.apexImageTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.apexImages;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.apkAbiTargeting;
@@ -64,6 +73,7 @@ import com.android.aapt.ConfigurationOuterClass.Configuration;
 import com.android.aapt.Resources.ResourceTable;
 import com.android.aapt.Resources.XmlElement;
 import com.android.aapt.Resources.XmlNode;
+import com.android.bundle.Devices.DeviceSpec;
 import com.android.bundle.Files.ApexImages;
 import com.android.bundle.Targeting.Abi.AbiAlias;
 import com.android.bundle.Targeting.ApkTargeting;
@@ -75,9 +85,10 @@ import com.android.tools.build.bundletool.model.BundleModule;
 import com.android.tools.build.bundletool.model.ModuleSplit;
 import com.android.tools.build.bundletool.model.ModuleSplit.SplitType;
 import com.android.tools.build.bundletool.model.OptimizationDimension;
+import com.android.tools.build.bundletool.model.utils.xmlproto.XmlProtoElement;
+import com.android.tools.build.bundletool.model.version.BundleToolVersion;
 import com.android.tools.build.bundletool.testing.BundleModuleBuilder;
-import com.android.tools.build.bundletool.utils.xmlproto.XmlProtoElement;
-import com.android.tools.build.bundletool.version.BundleToolVersion;
+import com.android.tools.build.bundletool.testing.ResourceTableBuilder;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
@@ -87,6 +98,7 @@ import com.google.common.truth.Truth;
 import com.google.protobuf.Message;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.Optional;
 import org.junit.Before;
 import org.junit.Ignore;
 import org.junit.Test;
@@ -167,10 +179,16 @@ public class BundleSharderTest {
                     targetedNativeDirectory("lib/x86", nativeDirectoryTargeting(X86)),
                     targetedNativeDirectory("lib/x86_64", nativeDirectoryTargeting(X86_64))))
             .setResourceTable(
-                createResourceTable(
-                    "image",
-                    fileReference("res/drawable/image.jpg", Configuration.getDefaultInstance()),
-                    fileReference("res/drawable-mdpi/image.jpg", MDPI)))
+                new ResourceTableBuilder()
+                    .addPackage("com.test.app")
+                    .addDrawableResourceForMultipleDensities(
+                        "image",
+                        ImmutableMap.of(
+                            DEFAULT_DENSITY_VALUE,
+                            "res/drawable/image.jpg",
+                            MDPI_VALUE,
+                            "res/drawable-mdpi/image.jpg"))
+                    .build())
             .build();
 
     BundleSharder bundleSharder =
@@ -231,8 +249,24 @@ public class BundleSharderTest {
             xmlAttribute(ANDROID_NAMESPACE_URI, "name", NAME_RESOURCE_ID, "FooActivity"));
   }
 
+  @DataPoints("deviceSpecs")
+  public static final ImmutableSet<Optional<DeviceSpec>> DEVICE_SPECS =
+      ImmutableSet.of(
+          Optional.empty(),
+          Optional.of(
+              mergeSpecs(
+                  sdkVersion(28), abis("x86_64"), density(DensityAlias.MDPI), locales("en-US"))));
+
   @Test
-  public void shardByAbi_havingNoNativeTargeting_producesOneApk() throws Exception {
+  @Theory
+  public void shardByAbi_havingNoNativeTargeting_producesOneApk(
+      @FromDataPoints("deviceSpecs") Optional<DeviceSpec> deviceSpec) throws Exception {
+    bundleSharder =
+        new BundleSharder(
+            tmpDir,
+            BundleToolVersion.getCurrentVersion(),
+            /* generate64BitShards= */ true,
+            deviceSpec);
     BundleModule bundleModule =
         new BundleModuleBuilder("base")
             .addFile("assets/file.txt")
@@ -244,10 +278,16 @@ public class BundleSharderTest {
             .addFile("root/license.dat")
             .setManifest(androidManifest("com.test.app"))
             .setResourceTable(
-                createResourceTable(
-                    "image",
-                    fileReference("res/drawable/image.jpg", Configuration.getDefaultInstance()),
-                    fileReference("res/drawable-mdpi/image.jpg", MDPI)))
+                new ResourceTableBuilder()
+                    .addPackage("com.test.app")
+                    .addDrawableResourceForMultipleDensities(
+                        "image",
+                        ImmutableMap.of(
+                            DEFAULT_DENSITY_VALUE,
+                            "res/drawable/image.jpg",
+                            MDPI_VALUE,
+                            "res/drawable-mdpi/image.jpg"))
+                    .build())
             .build();
 
     ImmutableList<ModuleSplit> shards =
@@ -273,7 +313,15 @@ public class BundleSharderTest {
   }
 
   @Test
-  public void shardByAbi_havingSingleAbi_producesOneApk() throws Exception {
+  @Theory
+  public void shardByAbi_havingSingleAbi_producesOneApk(
+      @FromDataPoints("deviceSpecs") Optional<DeviceSpec> deviceSpec) throws Exception {
+    bundleSharder =
+        new BundleSharder(
+            tmpDir,
+            BundleToolVersion.getCurrentVersion(),
+            /* generate64BitShards= */ true,
+            deviceSpec);
     BundleModule bundleModule =
         new BundleModuleBuilder("base")
             .addFile("assets/file.txt")
@@ -287,10 +335,16 @@ public class BundleSharderTest {
                 nativeLibraries(
                     targetedNativeDirectory("lib/x86_64", nativeDirectoryTargeting(X86_64))))
             .setResourceTable(
-                createResourceTable(
-                    "image",
-                    fileReference("res/drawable/image.jpg", Configuration.getDefaultInstance()),
-                    fileReference("res/drawable-mdpi/image.jpg", MDPI)))
+                new ResourceTableBuilder()
+                    .addPackage("com.test.app")
+                    .addDrawableResourceForMultipleDensities(
+                        "image",
+                        ImmutableMap.of(
+                            DEFAULT_DENSITY_VALUE,
+                            "res/drawable/image.jpg",
+                            MDPI_VALUE,
+                            "res/drawable-mdpi/image.jpg"))
+                    .build())
             .build();
 
     ImmutableList<ModuleSplit> shards =
@@ -333,10 +387,16 @@ public class BundleSharderTest {
                     targetedNativeDirectory("lib/x86", nativeDirectoryTargeting(X86)),
                     targetedNativeDirectory("lib/x86_64", nativeDirectoryTargeting(X86_64))))
             .setResourceTable(
-                createResourceTable(
-                    "image",
-                    fileReference("res/drawable/image.jpg", Configuration.getDefaultInstance()),
-                    fileReference("res/drawable-mdpi/image.jpg", MDPI)))
+                new ResourceTableBuilder()
+                    .addPackage("com.test.app")
+                    .addDrawableResourceForMultipleDensities(
+                        "image",
+                        ImmutableMap.of(
+                            DEFAULT_DENSITY_VALUE,
+                            "res/drawable/image.jpg",
+                            MDPI_VALUE,
+                            "res/drawable-mdpi/image.jpg"))
+                    .build())
             .build();
 
     ImmutableList<ModuleSplit> shards =
@@ -383,6 +443,70 @@ public class BundleSharderTest {
         .contains("lib/x86_64/libtest.so");
     assertThat(extractPaths(shardsByTargeting.get(x64Targeting).getEntries()))
         .containsNoneOf("lib/armeabi/libtest.so", "lib/x86/libtest.so");
+  }
+
+  @Test
+  public void shardByAbi_havingManyAbisWithDeviceSpec_producesSingleApk() throws Exception {
+    bundleSharder =
+        new BundleSharder(
+            tmpDir,
+            BundleToolVersion.getCurrentVersion(),
+            /* generate64BitShards= */ true,
+            Optional.of(
+                mergeSpecs(
+                    sdkVersion(28),
+                    abis("armeabi"),
+                    density(DensityAlias.MDPI),
+                    locales("en-US"))));
+    BundleModule bundleModule =
+        new BundleModuleBuilder("base")
+            .addFile("assets/file.txt")
+            .addFile("dex/classes.dex")
+            .addFile("lib/armeabi/libtest.so")
+            .addFile("lib/x86/libtest.so")
+            .addFile("lib/x86_64/libtest.so")
+            .addFile("res/drawable/image.jpg")
+            .addFile("res/drawable-mdpi/image.jpg")
+            .addFile("root/license.dat")
+            .setManifest(androidManifest("com.test.app"))
+            .setNativeConfig(
+                nativeLibraries(
+                    targetedNativeDirectory("lib/armeabi", nativeDirectoryTargeting(ARMEABI)),
+                    targetedNativeDirectory("lib/x86", nativeDirectoryTargeting(X86)),
+                    targetedNativeDirectory("lib/x86_64", nativeDirectoryTargeting(X86_64))))
+            .setResourceTable(
+                new ResourceTableBuilder()
+                    .addPackage("com.test.app")
+                    .addDrawableResourceForMultipleDensities(
+                        "image",
+                        ImmutableMap.of(
+                            DEFAULT_DENSITY_VALUE,
+                            "res/drawable/image.jpg",
+                            MDPI_VALUE,
+                            "res/drawable-mdpi/image.jpg"))
+                    .build())
+            .build();
+
+    ImmutableList<ModuleSplit> shards =
+        bundleSharder.shardBundle(
+            ImmutableList.of(bundleModule),
+            ImmutableSet.of(OptimizationDimension.ABI),
+            DEFAULT_METADATA);
+
+    assertThat(shards).hasSize(1);
+    ModuleSplit armeabiShard = shards.get(0);
+    assertThat(armeabiShard.getApkTargeting())
+        .isEqualTo(apkAbiTargeting(ARMEABI, ImmutableSet.of(X86, X86_64)));
+    assertThat(armeabiShard.getVariantTargeting()).isEqualToDefaultInstance();
+    assertThat(armeabiShard.getSplitType()).isEqualTo(SplitType.STANDALONE);
+    assertThat(extractPaths(armeabiShard.getEntries()))
+        .containsExactly(
+            "assets/file.txt",
+            "dex/classes.dex",
+            "lib/armeabi/libtest.so",
+            "res/drawable/image.jpg",
+            "res/drawable-mdpi/image.jpg",
+            "root/license.dat");
   }
 
   @Test
@@ -573,11 +697,18 @@ public class BundleSharderTest {
   @Test
   public void shardByDensity_havingNonDensityResources_producesOneApk() throws Exception {
     ResourceTable resourceTable =
-        createResourceTable(
-            "image",
-            fileReference("res/drawable/image.jpg", Configuration.getDefaultInstance()),
-            fileReference(
-                "res/drawable-de/image.jpg", Configuration.newBuilder().setLocale("de").build()));
+        new ResourceTableBuilder()
+            .addPackage("com.test.app")
+            .addFileResourceForMultipleConfigs(
+                "drawable",
+                "image",
+                ImmutableMap.of(
+                    Configuration.getDefaultInstance(),
+                    "res/drawable/image.jpg",
+                    locale("de"),
+                    "res/drawable-de/image.jpg"))
+            .build();
+
     BundleModule bundleModule =
         new BundleModuleBuilder("base")
             .addFile("assets/file.txt")
@@ -632,7 +763,11 @@ public class BundleSharderTest {
             .addFile("root/license.dat")
             .setManifest(androidManifest("com.test.app"))
             .setResourceTable(
-                createResourceTable("image", fileReference("res/drawable-hdpi/image.jpg", HDPI)))
+                new ResourceTableBuilder()
+                    .addPackage("com.test.app")
+                    .addDrawableResourceForMultipleDensities(
+                        "image", ImmutableMap.of(HDPI_VALUE, "res/drawable-hdpi/image.jpg"))
+                    .build())
             .build();
 
     ImmutableList<ModuleSplit> shards =
@@ -661,7 +796,15 @@ public class BundleSharderTest {
   public void shardByDensity_assetsDensityTargetingIsIgnored() throws Exception {}
 
   @Test
-  public void shardByAbiAndDensity_havingNoAbiAndNoResources_producesOneApk() throws Exception {
+  @Theory
+  public void shardByAbiAndDensity_havingNoAbiAndNoResources_producesOneApk(
+      @FromDataPoints("deviceSpecs") Optional<DeviceSpec> deviceSpec) throws Exception {
+    bundleSharder =
+        new BundleSharder(
+            tmpDir,
+            BundleToolVersion.getCurrentVersion(),
+            /* generate64BitShards= */ true,
+            deviceSpec);
     BundleModule bundleModule =
         new BundleModuleBuilder("base")
             .addFile("assets/file.txt")
@@ -700,10 +843,16 @@ public class BundleSharderTest {
             .setNativeConfig(
                 nativeLibraries(targetedNativeDirectory("lib/x86", nativeDirectoryTargeting(X86))))
             .setResourceTable(
-                createResourceTable(
-                    "image",
-                    fileReference("res/drawable-ldpi/image.jpg", LDPI),
-                    fileReference("res/drawable-hdpi/image.jpg", HDPI)))
+                new ResourceTableBuilder()
+                    .addPackage("com.test.app")
+                    .addDrawableResourceForMultipleDensities(
+                        "image",
+                        ImmutableMap.of(
+                            LDPI_VALUE,
+                            "res/drawable-ldpi/image.jpg",
+                            HDPI_VALUE,
+                            "res/drawable-hdpi/image.jpg"))
+                    .build())
             .build();
 
     ImmutableList<ModuleSplit> shards =
@@ -756,6 +905,74 @@ public class BundleSharderTest {
   }
 
   @Test
+  public void
+      shardByAbiAndDensity_havingOneAbiAndSomeDensityResourceWithDeviceSpec_producesSingleApk()
+          throws Exception {
+    bundleSharder =
+        new BundleSharder(
+            tmpDir,
+            BundleToolVersion.getCurrentVersion(),
+            /* generate64BitShards= */ true,
+            Optional.of(
+                mergeSpecs(
+                    sdkVersion(28), abis("x86"), density(DensityAlias.MDPI), locales("en-US"))));
+    BundleModule bundleModule =
+        new BundleModuleBuilder("base")
+            .addFile("assets/file.txt")
+            .addFile("dex/classes.dex")
+            .addFile("lib/x86/libtest.so")
+            .addFile("res/drawable-ldpi/image.jpg")
+            .addFile("res/drawable-hdpi/image.jpg")
+            .addFile("root/license.dat")
+            .setManifest(androidManifest("com.test.app"))
+            .setNativeConfig(
+                nativeLibraries(targetedNativeDirectory("lib/x86", nativeDirectoryTargeting(X86))))
+            .setResourceTable(
+                new ResourceTableBuilder()
+                    .addPackage("com.test.app")
+                    .addDrawableResourceForMultipleDensities(
+                        "image",
+                        ImmutableMap.of(
+                            LDPI_VALUE,
+                            "res/drawable-ldpi/image.jpg",
+                            HDPI_VALUE,
+                            "res/drawable-hdpi/image.jpg"))
+                    .build())
+            .build();
+
+    ImmutableList<ModuleSplit> shards =
+        bundleSharder.shardBundle(
+            ImmutableList.of(bundleModule),
+            ImmutableSet.of(OptimizationDimension.ABI, OptimizationDimension.SCREEN_DENSITY),
+            DEFAULT_METADATA);
+
+    // 1 shards: {x86} x {MDPI}.
+    assertThat(shards).hasSize(1);
+    assertThat(shards.stream().map(ModuleSplit::getSplitType).distinct().collect(toImmutableSet()))
+        .containsExactly(SplitType.STANDALONE);
+    assertThat(shards).hasSize(1);
+
+    ModuleSplit fatShard = shards.get(0);
+    assertThat(fatShard.getApkTargeting().getAbiTargeting()).isEqualTo(abiTargeting(X86));
+    assertThat(fatShard.getApkTargeting().getScreenDensityTargeting().getValueList())
+        .containsExactly(toScreenDensity(DensityAlias.MDPI));
+    assertThat(fatShard.getVariantTargeting()).isEqualToDefaultInstance();
+    assertThat(fatShard.getSplitType()).isEqualTo(SplitType.STANDALONE);
+    // The MDPI shard would match both hdpi and ldpi variant of the resource.
+    assertThat(fatShard.getResourceTable().get())
+        .containsResource("com.test.app:drawable/image")
+        .withConfigSize(2);
+    assertThat(extractPaths(fatShard.getEntries()))
+        .containsExactly(
+            "assets/file.txt",
+            "dex/classes.dex",
+            "lib/x86/libtest.so",
+            "res/drawable-hdpi/image.jpg",
+            "res/drawable-ldpi/image.jpg",
+            "root/license.dat");
+  }
+
+  @Test
   public void shardByAbiAndDensity_havingManyAbisAndSomeResource_producesManyApks()
       throws Exception {
     BundleModule bundleModule =
@@ -775,10 +992,16 @@ public class BundleSharderTest {
                     targetedNativeDirectory("lib/x86", nativeDirectoryTargeting(X86)),
                     targetedNativeDirectory("lib/x86_64", nativeDirectoryTargeting(X86_64))))
             .setResourceTable(
-                createResourceTable(
-                    "image",
-                    fileReference("res/drawable-ldpi/image.jpg", LDPI),
-                    fileReference("res/drawable-hdpi/image.jpg", HDPI)))
+                new ResourceTableBuilder()
+                    .addPackage("com.test.app")
+                    .addDrawableResourceForMultipleDensities(
+                        "image",
+                        ImmutableMap.of(
+                            LDPI_VALUE,
+                            "res/drawable-ldpi/image.jpg",
+                            HDPI_VALUE,
+                            "res/drawable-hdpi/image.jpg"))
+                    .build())
             .build();
 
     ImmutableList<ModuleSplit> shards =
@@ -897,7 +1120,15 @@ public class BundleSharderTest {
   }
 
   @Test
-  public void manyModulesShardByNoDimension_producesFatApk() throws Exception {
+  @Theory
+  public void manyModulesShardByNoDimension_producesFatApk(
+      @FromDataPoints("deviceSpecs") Optional<DeviceSpec> deviceSpec) throws Exception {
+    bundleSharder =
+        new BundleSharder(
+            tmpDir,
+            BundleToolVersion.getCurrentVersion(),
+            /* generate64BitShards= */ true,
+            deviceSpec);
     BundleModule baseModule =
         new BundleModuleBuilder("base")
             .addFile("lib/x86_64/libtest1.so")
@@ -1092,8 +1323,15 @@ public class BundleSharderTest {
   }
 
   @Test
-  public void manyModulesShardByDensity_havingOnlyOneDensityResource_producesSingleApk()
-      throws Exception {
+  @Theory
+  public void manyModulesShardByDensity_havingOnlyOneDensityResource_producesSingleApk(
+      @FromDataPoints("deviceSpecs") Optional<DeviceSpec> deviceSpec) throws Exception {
+    bundleSharder =
+        new BundleSharder(
+            tmpDir,
+            BundleToolVersion.getCurrentVersion(),
+            /* generate64BitShards= */ true,
+            deviceSpec);
     BundleModule baseModule =
         new BundleModuleBuilder("base")
             .addFile("res/drawable-hdpi/image.jpg")
@@ -1190,10 +1428,16 @@ public class BundleSharderTest {
             .addFile("root/license.dat")
             .setManifest(androidManifest("com.test.app"))
             .setResourceTable(
-                createResourceTable(
-                    "image",
-                    fileReference("res/drawable/image.jpg", Configuration.getDefaultInstance()),
-                    fileReference("res/drawable-hdpi/image.jpg", HDPI)))
+                new ResourceTableBuilder()
+                    .addPackage("com.test.app")
+                    .addDrawableResourceForMultipleDensities(
+                        "image",
+                        ImmutableMap.of(
+                            DEFAULT_DENSITY_VALUE,
+                            "res/drawable/image.jpg",
+                            HDPI_VALUE,
+                            "res/drawable-hdpi/image.jpg"))
+                    .build())
             .build();
     BundleModule featureModule =
         new BundleModuleBuilder("feature")
@@ -1311,5 +1555,73 @@ public class BundleSharderTest {
           fail("Unexpected ABI targeting in: " + shard.getApkTargeting());
       }
     }
+  }
+
+  @Test
+  public void
+      manyModulesShardByAbiAndDensity_havingManyAbisAndSomeResourceWithDeviceSpec_producesSingleApk()
+          throws Exception {
+    bundleSharder =
+        new BundleSharder(
+            tmpDir,
+            BundleToolVersion.getCurrentVersion(),
+            /* generate64BitShards= */ true,
+            Optional.of(
+                mergeSpecs(
+                    sdkVersion(28), abis("x86"), density(DensityAlias.MDPI), locales("en-US"))));
+    BundleModule baseModule =
+        new BundleModuleBuilder("base")
+            .addFile("assets/file.txt")
+            .addFile("dex/classes.dex")
+            .addFile("res/drawable/image.jpg")
+            .addFile("res/drawable-hdpi/image.jpg")
+            .addFile("root/license.dat")
+            .setManifest(androidManifest("com.test.app"))
+            .setResourceTable(
+                new ResourceTableBuilder()
+                    .addPackage("com.test.app")
+                    .addDrawableResourceForMultipleDensities(
+                        "image",
+                        ImmutableMap.of(
+                            DEFAULT_DENSITY_VALUE,
+                            "res/drawable/image.jpg",
+                            HDPI_VALUE,
+                            "res/drawable-hdpi/image.jpg"))
+                    .build())
+            .build();
+    BundleModule featureModule =
+        new BundleModuleBuilder("feature")
+            .addFile("lib/armeabi/libtest.so")
+            .addFile("lib/x86/libtest.so")
+            .setManifest(androidManifest("com.test.app"))
+            .setNativeConfig(
+                nativeLibraries(
+                    targetedNativeDirectory("lib/armeabi", nativeDirectoryTargeting(ARMEABI)),
+                    targetedNativeDirectory("lib/x86", nativeDirectoryTargeting(X86))))
+            .build();
+
+    ImmutableList<ModuleSplit> shards =
+        bundleSharder.shardBundle(
+            ImmutableList.of(baseModule, featureModule),
+            ImmutableSet.of(OptimizationDimension.ABI, OptimizationDimension.SCREEN_DENSITY),
+            DEFAULT_METADATA);
+
+    assertThat(shards).hasSize(1);
+    assertThat(shards.stream().map(ModuleSplit::getSplitType).distinct().collect(toImmutableSet()))
+        .containsExactly(SplitType.STANDALONE);
+    ModuleSplit fatShard = shards.get(0);
+    assertThat(fatShard.getApkTargeting().getAbiTargeting())
+        .isEqualTo(abiTargeting(X86, ImmutableSet.of(ARMEABI)));
+    assertThat(fatShard.getApkTargeting().getScreenDensityTargeting().getValueList())
+        .containsExactly(toScreenDensity(DensityAlias.MDPI));
+    assertThat(fatShard.getVariantTargeting()).isEqualToDefaultInstance();
+    assertThat(fatShard.getSplitType()).isEqualTo(SplitType.STANDALONE);
+    assertThat(extractPaths(fatShard.getEntries()))
+        .containsExactly(
+            "assets/file.txt",
+            "dex/classes.dex",
+            "lib/x86/libtest.so",
+            "res/drawable/image.jpg",
+            "root/license.dat");
   }
 }

@@ -16,26 +16,33 @@
 
 package com.android.tools.build.bundletool.model;
 
+import static com.android.tools.build.bundletool.model.AndroidManifest.CODE_ATTRIBUTE_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.CONDITION_DEVICE_FEATURE_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.CONDITION_MIN_SDK_VERSION_NAME;
+import static com.android.tools.build.bundletool.model.AndroidManifest.CONDITION_USER_COUNTRIES_NAME;
+import static com.android.tools.build.bundletool.model.AndroidManifest.COUNTRY_ELEMENT_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.DISTRIBUTION_NAMESPACE_URI;
+import static com.android.tools.build.bundletool.model.AndroidManifest.EXCLUDE_ATTRIBUTE_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.NAME_ATTRIBUTE_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.VALUE_ATTRIBUTE_NAME;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 
 import com.android.aapt.Resources.XmlNode;
-import com.android.tools.build.bundletool.exceptions.ValidationException;
-import com.android.tools.build.bundletool.utils.xmlproto.XmlProtoAttribute;
-import com.android.tools.build.bundletool.utils.xmlproto.XmlProtoElement;
-import com.android.tools.build.bundletool.utils.xmlproto.XmlProtoNode;
+import com.android.tools.build.bundletool.model.exceptions.ValidationException;
+import com.android.tools.build.bundletool.model.utils.xmlproto.XmlProtoAttribute;
+import com.android.tools.build.bundletool.model.utils.xmlproto.XmlProtoElement;
+import com.android.tools.build.bundletool.model.utils.xmlproto.XmlProtoNode;
 import com.google.auto.value.AutoValue;
 import com.google.auto.value.extension.memoized.Memoized;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
+import com.google.errorprone.annotations.Immutable;
 import java.util.Optional;
 
 /** Parses and provides business logic utilities for <dist:delivery> element. */
+@Immutable
 @AutoValue
+@AutoValue.CopyAnnotations
 public abstract class ManifestDeliveryElement {
 
   private static final String VERSION_ATTRIBUTE_NAME = "version";
@@ -75,8 +82,9 @@ public abstract class ManifestDeliveryElement {
   /**
    * Returns all module conditions.
    *
-   * <p>We support <dist:min-sdk-version> and <dist:device-feature> conditions today. Any other
-   * conditions types are not supported and will result in {@link ValidationException}.
+   * <p>We support <dist:min-sdk-version>, <dist:device-feature> and <dist:user-countries>
+   * conditions today. Any other conditions types are not supported and will result in {@link
+   * ValidationException}.
    */
   @Memoized
   public ModuleConditions getModuleConditions() {
@@ -99,12 +107,47 @@ public abstract class ManifestDeliveryElement {
         case CONDITION_MIN_SDK_VERSION_NAME:
           moduleConditions.setMinSdkVersion(parseMinSdkVersionCondition(conditionElement));
           break;
+        case CONDITION_USER_COUNTRIES_NAME:
+          moduleConditions.setUserCountriesCondition(parseUserCountriesCondition(conditionElement));
+          break;
         default:
           throw new ValidationException(
               String.format("Unrecognized module condition: '%s'", conditionElement.getName()));
       }
     }
     return moduleConditions.build();
+  }
+
+  private UserCountriesCondition parseUserCountriesCondition(XmlProtoElement conditionElement) {
+    ImmutableList.Builder<String> countryCodes = ImmutableList.builder();
+    for (XmlProtoElement countryElement :
+        conditionElement.getChildrenElements().collect(toImmutableList())) {
+      if (!countryElement.getName().equals(COUNTRY_ELEMENT_NAME)) {
+        throw ValidationException.builder()
+            .withMessage(
+                "Expected only <dist:country> elements inside <dist:user-countries>, but found %s",
+                printElement(conditionElement))
+            .build();
+      }
+      countryCodes.add(
+          countryElement
+              .getAttribute(DISTRIBUTION_NAMESPACE_URI, CODE_ATTRIBUTE_NAME)
+              .map(XmlProtoAttribute::getValueAsString)
+              .map(String::toUpperCase)
+              .orElseThrow(
+                  () ->
+                      ValidationException.builder()
+                          .withMessage(
+                              "<dist:country> element is expected to have 'dist:code' attribute "
+                                  + "but found none.")
+                          .build()));
+    }
+    boolean exclude =
+        conditionElement
+            .getAttribute(DISTRIBUTION_NAMESPACE_URI, EXCLUDE_ATTRIBUTE_NAME)
+            .map(XmlProtoAttribute::getValueAsBoolean)
+            .orElse(false);
+    return UserCountriesCondition.create(countryCodes.build(), exclude);
   }
 
   private static void validateDeliveryElement(XmlProtoElement deliveryElement) {

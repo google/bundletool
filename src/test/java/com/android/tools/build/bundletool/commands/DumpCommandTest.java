@@ -21,11 +21,11 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.android.aapt.Resources.ResourceTable;
 import com.android.tools.build.bundletool.commands.DumpCommand.DumpTarget;
-import com.android.tools.build.bundletool.exceptions.ValidationException;
+import com.android.tools.build.bundletool.flags.FlagParser;
 import com.android.tools.build.bundletool.io.AppBundleSerializer;
 import com.android.tools.build.bundletool.model.AppBundle;
+import com.android.tools.build.bundletool.model.exceptions.ValidationException;
 import com.android.tools.build.bundletool.testing.AppBundleBuilder;
-import com.android.tools.build.bundletool.utils.flags.FlagParser;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;

@@ -21,7 +21,7 @@ import static com.android.tools.build.bundletool.device.AdbServer.ADB_TIMEOUT_MS
 import com.android.tools.build.bundletool.device.AdbShellCommandTask;
 import com.android.tools.build.bundletool.device.Device;
 import com.android.tools.build.bundletool.device.activitymanager.ResourceConfigParser.ResourceConfigHandler;
-import com.android.tools.build.bundletool.utils.Versions;
+import com.android.tools.build.bundletool.model.utils.Versions;
 import com.google.common.base.Suppliers;
 import com.google.common.collect.ImmutableList;
 import java.util.concurrent.TimeUnit;

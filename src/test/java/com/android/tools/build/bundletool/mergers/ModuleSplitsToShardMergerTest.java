@@ -54,7 +54,6 @@ import com.android.bundle.Targeting.Abi.AbiAlias;
 import com.android.bundle.Targeting.ApkTargeting;
 import com.android.bundle.Targeting.ScreenDensity.DensityAlias;
 import com.android.tools.build.bundletool.TestData;
-import com.android.tools.build.bundletool.exceptions.CommandExecutionException;
 import com.android.tools.build.bundletool.model.AndroidManifest;
 import com.android.tools.build.bundletool.model.BundleMetadata;
 import com.android.tools.build.bundletool.model.BundleModuleName;
@@ -62,11 +61,12 @@ import com.android.tools.build.bundletool.model.InMemoryModuleEntry;
 import com.android.tools.build.bundletool.model.ModuleEntry;
 import com.android.tools.build.bundletool.model.ModuleSplit;
 import com.android.tools.build.bundletool.model.ModuleSplit.SplitType;
+import com.android.tools.build.bundletool.model.exceptions.CommandExecutionException;
+import com.android.tools.build.bundletool.testing.TestUtils;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Maps;
-import com.google.common.io.ByteStreams;
 import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.Map;
@@ -207,10 +207,10 @@ public class ModuleSplitsToShardMergerTest {
     assertThat(extractPaths(merged.getEntries()))
         .containsExactly("dex/classes.dex", "dex/classes2.dex");
     ModuleEntry classesDexEntry = merged.findEntriesUnderPath("dex/classes.dex").findFirst().get();
-    assertThat(ByteStreams.toByteArray(classesDexEntry.getContent())).isEqualTo(classesDexData);
+    assertThat(TestUtils.getEntryContent(classesDexEntry)).isEqualTo(classesDexData);
     ModuleEntry classes2DexEntry =
         merged.findEntriesUnderPath("dex/classes2.dex").findFirst().get();
-    assertThat(ByteStreams.toByteArray(classes2DexEntry.getContent())).isEqualTo(classes2DexData);
+    assertThat(TestUtils.getEntryContent(classes2DexEntry)).isEqualTo(classes2DexData);
     // No merging means no items in cache.
     assertThat(dexMergingCache).isEmpty();
   }
@@ -242,7 +242,7 @@ public class ModuleSplitsToShardMergerTest {
 
     assertThat(extractPaths(merged.getEntries())).containsExactly("dex/classes.dex");
     ModuleEntry mergedDexEntry = merged.findEntriesUnderPath("dex/classes.dex").findFirst().get();
-    byte[] mergedDexData = ByteStreams.toByteArray(mergedDexEntry.getContent());
+    byte[] mergedDexData = TestUtils.getEntryContent(mergedDexEntry);
     assertThat(mergedDexData.length).isGreaterThan(0);
     assertThat(mergedDexData).isNotEqualTo(TestData.readBytes("testdata/dex/classes.dex"));
     assertThat(mergedDexData).isNotEqualTo(TestData.readBytes("testdata/dex/classes-other.dex"));

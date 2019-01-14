@@ -22,6 +22,8 @@ import static com.android.tools.build.bundletool.testing.DeviceFactory.lDeviceWi
 import static com.android.tools.build.bundletool.testing.DeviceFactory.locales;
 import static com.android.tools.build.bundletool.testing.DeviceFactory.mergeSpecs;
 import static com.android.tools.build.bundletool.testing.DeviceFactory.sdkVersion;
+import static com.android.tools.build.bundletool.testing.FakeSystemEnvironmentProvider.ANDROID_HOME;
+import static com.android.tools.build.bundletool.testing.FakeSystemEnvironmentProvider.ANDROID_SERIAL;
 import static com.android.tools.build.bundletool.testing.TestUtils.expectMissingRequiredBuilderPropertyException;
 import static com.android.tools.build.bundletool.testing.TestUtils.expectMissingRequiredFlagException;
 import static com.google.common.truth.Truth.assertThat;
@@ -31,15 +33,15 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import com.android.bundle.Devices.DeviceSpec;
 import com.android.ddmlib.IDevice.DeviceState;
 import com.android.tools.build.bundletool.device.AdbServer;
-import com.android.tools.build.bundletool.exceptions.ValidationException;
+import com.android.tools.build.bundletool.flags.FlagParser;
+import com.android.tools.build.bundletool.model.exceptions.ValidationException;
+import com.android.tools.build.bundletool.model.utils.SystemEnvironmentProvider;
+import com.android.tools.build.bundletool.model.utils.files.BufferedIo;
 import com.android.tools.build.bundletool.testing.FakeAdbServer;
-import com.android.tools.build.bundletool.testing.FakeAndroidHomeVariableProvider;
-import com.android.tools.build.bundletool.testing.FakeAndroidSerialVariableProvider;
 import com.android.tools.build.bundletool.testing.FakeDevice;
-import com.android.tools.build.bundletool.utils.EnvironmentVariableProvider;
-import com.android.tools.build.bundletool.utils.files.BufferedIo;
-import com.android.tools.build.bundletool.utils.flags.FlagParser;
+import com.android.tools.build.bundletool.testing.FakeSystemEnvironmentProvider;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 import com.google.protobuf.util.JsonFormat;
 import java.io.IOException;
 import java.io.Reader;
@@ -60,8 +62,7 @@ public class GetDeviceSpecCommandTest {
   private Path tmpDir;
   private static final String DEVICE_ID = "id1";
 
-  private EnvironmentVariableProvider androidHomeProvider;
-  private EnvironmentVariableProvider androidSerialProvider;
+  private SystemEnvironmentProvider systemEnvironmentProvider;
   private Path adbPath;
   private Path sdkDirPath;
 
@@ -74,8 +75,9 @@ public class GetDeviceSpecCommandTest {
     Files.createFile(adbPath);
     adbPath.toFile().setExecutable(true);
 
-    this.androidHomeProvider = new FakeAndroidHomeVariableProvider(sdkDirPath.toString());
-    this.androidSerialProvider = new FakeAndroidSerialVariableProvider(DEVICE_ID);
+    this.systemEnvironmentProvider =
+        new FakeSystemEnvironmentProvider(
+            ImmutableMap.of(ANDROID_HOME, sdkDirPath.toString(), ANDROID_SERIAL, DEVICE_ID));
   }
 
   @Test
@@ -85,7 +87,7 @@ public class GetDeviceSpecCommandTest {
     GetDeviceSpecCommand commandViaFlags =
         GetDeviceSpecCommand.fromFlags(
             new FlagParser().parse("--output=" + outputPath),
-            androidHomeProvider,
+            systemEnvironmentProvider,
             fakeServerOneDevice(lDeviceWithLocales("en-US")));
 
     // The command via flags uses $ANDROID_HOME as a base for ADB location if the --adb flag is
@@ -97,6 +99,7 @@ public class GetDeviceSpecCommandTest {
             .setAdbPath(sdkDirPath.resolve("platform-tools").resolve("adb"))
             // it's impractical not to copy.
             .setAdbServer(commandViaFlags.getAdbServer())
+            .setDeviceId(DEVICE_ID)
             .build();
 
     assertThat(commandViaFlags).isEqualTo(commandViaBuilder);
@@ -104,6 +107,8 @@ public class GetDeviceSpecCommandTest {
 
   @Test
   public void fromFlagsEquivalentToBuilder_noDeviceId() {
+    SystemEnvironmentProvider androidHomeProvider =
+        new FakeSystemEnvironmentProvider(ImmutableMap.of(ANDROID_HOME, sdkDirPath.toString()));
     Path outputPath = tmpDir.resolve("device.json");
 
     GetDeviceSpecCommand commandViaFlags =
@@ -130,7 +135,7 @@ public class GetDeviceSpecCommandTest {
         GetDeviceSpecCommand.fromFlags(
             new FlagParser()
                 .parse("--adb=" + adbPath, "--device-id=" + DEVICE_ID, "--output=" + outputPath),
-            androidHomeProvider,
+            systemEnvironmentProvider,
             fakeServerOneDevice(lDeviceWithLocales("en-US")));
 
     GetDeviceSpecCommand commandViaBuilder =
@@ -156,7 +161,7 @@ public class GetDeviceSpecCommandTest {
                     "--device-id=" + DEVICE_ID,
                     "--output=" + outputPath,
                     "--overwrite"),
-            androidHomeProvider,
+            systemEnvironmentProvider,
             fakeServerOneDevice(lDeviceWithLocales("en-US")));
 
     GetDeviceSpecCommand commandViaBuilder =
@@ -178,7 +183,7 @@ public class GetDeviceSpecCommandTest {
     GetDeviceSpecCommand commandViaFlags =
         GetDeviceSpecCommand.fromFlags(
             new FlagParser().parse("--adb=" + adbPath, "--output=" + outputPath),
-            androidSerialProvider,
+            systemEnvironmentProvider,
             fakeServerOneDevice(lDeviceWithLocales("en-US")));
 
     GetDeviceSpecCommand commandViaBuilder =
@@ -202,7 +207,7 @@ public class GetDeviceSpecCommandTest {
         () ->
             GetDeviceSpecCommand.fromFlags(
                 new FlagParser().parse("--adb=" + adbPath),
-                androidHomeProvider,
+                systemEnvironmentProvider,
                 fakeServerOneDevice(lDeviceWithLocales("en-US"))));
   }
 

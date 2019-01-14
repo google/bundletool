@@ -16,12 +16,15 @@
 package com.android.tools.build.bundletool.model;
 
 import com.google.auto.value.AutoValue;
+import com.google.errorprone.annotations.Immutable;
 import com.google.protobuf.ByteString;
 import java.io.ByteArrayInputStream;
 import java.io.InputStream;
 
 /** In-memory implementation of a {@link ModuleEntry}. */
+@Immutable
 @AutoValue
+@AutoValue.CopyAnnotations
 public abstract class InMemoryModuleEntry implements ModuleEntry {
 
   @Override

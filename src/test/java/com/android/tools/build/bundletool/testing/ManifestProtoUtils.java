@@ -53,10 +53,10 @@ import com.android.aapt.Resources.XmlElement;
 import com.android.aapt.Resources.XmlNamespace;
 import com.android.aapt.Resources.XmlNode;
 import com.android.tools.build.bundletool.model.AndroidManifest;
-import com.android.tools.build.bundletool.utils.xmlproto.XmlProtoAttributeBuilder;
-import com.android.tools.build.bundletool.utils.xmlproto.XmlProtoElementBuilder;
-import com.android.tools.build.bundletool.utils.xmlproto.XmlProtoNode;
-import com.android.tools.build.bundletool.utils.xmlproto.XmlProtoNodeBuilder;
+import com.android.tools.build.bundletool.model.utils.xmlproto.XmlProtoAttributeBuilder;
+import com.android.tools.build.bundletool.model.utils.xmlproto.XmlProtoElementBuilder;
+import com.android.tools.build.bundletool.model.utils.xmlproto.XmlProtoNode;
+import com.android.tools.build.bundletool.model.utils.xmlproto.XmlProtoNodeBuilder;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ObjectArrays;
 import java.util.Arrays;
@@ -346,6 +346,15 @@ public final class ManifestProtoUtils {
             .getOrCreateChildElement(DISTRIBUTION_NAMESPACE_URI, "module")
             .getOrCreateAttribute(DISTRIBUTION_NAMESPACE_URI, "onDemand")
             .setValueAsBoolean(value);
+  }
+
+  /** Adds the type attribute under the dist:module tag. */
+  public static ManifestMutator withTypeAttribute(String value) {
+    return manifestElement ->
+        manifestElement
+            .getOrCreateChildElement(DISTRIBUTION_NAMESPACE_URI, "module")
+            .getOrCreateAttribute(DISTRIBUTION_NAMESPACE_URI, "type")
+            .setValueAsString(value);
   }
 
   /** Same as {@link #withOnDemandAttribute(boolean)} but with the attribute not namespaced. */

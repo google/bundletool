@@ -18,7 +18,7 @@ package com.android.tools.build.bundletool.device;
 
 import static java.lang.Thread.sleep;
 
-import com.android.tools.build.bundletool.exceptions.CommandExecutionException;
+import com.android.tools.build.bundletool.model.exceptions.CommandExecutionException;
 import com.google.common.base.Stopwatch;
 import com.google.common.collect.ImmutableList;
 import java.io.Closeable;

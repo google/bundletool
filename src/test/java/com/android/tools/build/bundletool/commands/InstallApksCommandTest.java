@@ -29,6 +29,8 @@ import static com.android.tools.build.bundletool.testing.DeviceFactory.lDeviceWi
 import static com.android.tools.build.bundletool.testing.DeviceFactory.locales;
 import static com.android.tools.build.bundletool.testing.DeviceFactory.mergeSpecs;
 import static com.android.tools.build.bundletool.testing.DeviceFactory.sdkVersion;
+import static com.android.tools.build.bundletool.testing.FakeSystemEnvironmentProvider.ANDROID_HOME;
+import static com.android.tools.build.bundletool.testing.FakeSystemEnvironmentProvider.ANDROID_SERIAL;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.apkAbiTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.sdkVersionFrom;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.variantSdkTargeting;
@@ -45,16 +47,16 @@ import com.android.bundle.Targeting.ScreenDensity.DensityAlias;
 import com.android.bundle.Targeting.VariantTargeting;
 import com.android.ddmlib.IDevice.DeviceState;
 import com.android.tools.build.bundletool.device.AdbServer;
-import com.android.tools.build.bundletool.exceptions.CommandExecutionException;
-import com.android.tools.build.bundletool.exceptions.InstallationException;
+import com.android.tools.build.bundletool.flags.FlagParser;
 import com.android.tools.build.bundletool.model.ZipPath;
+import com.android.tools.build.bundletool.model.exceptions.CommandExecutionException;
+import com.android.tools.build.bundletool.model.exceptions.InstallationException;
+import com.android.tools.build.bundletool.model.utils.SystemEnvironmentProvider;
 import com.android.tools.build.bundletool.testing.FakeAdbServer;
-import com.android.tools.build.bundletool.testing.FakeAndroidHomeVariableProvider;
-import com.android.tools.build.bundletool.testing.FakeAndroidSerialVariableProvider;
 import com.android.tools.build.bundletool.testing.FakeDevice;
-import com.android.tools.build.bundletool.utils.EnvironmentVariableProvider;
-import com.android.tools.build.bundletool.utils.flags.FlagParser;
+import com.android.tools.build.bundletool.testing.FakeSystemEnvironmentProvider;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Lists;
 import java.io.IOException;
@@ -82,8 +84,7 @@ public class InstallApksCommandTest {
 
   private Path tmpDir;
 
-  private EnvironmentVariableProvider androidHomeProvider;
-  private EnvironmentVariableProvider androidSerialProvider;
+  private SystemEnvironmentProvider systemEnvironmentProvider;
   private Path adbPath;
   private Path sdkDirPath;
 
@@ -95,8 +96,9 @@ public class InstallApksCommandTest {
     Files.createDirectories(adbPath.getParent());
     Files.createFile(adbPath);
     adbPath.toFile().setExecutable(true);
-    this.androidHomeProvider = new FakeAndroidHomeVariableProvider(sdkDirPath.toString());
-    this.androidSerialProvider = new FakeAndroidSerialVariableProvider(DEVICE_ID);
+    this.systemEnvironmentProvider =
+        new FakeSystemEnvironmentProvider(
+            ImmutableMap.of(ANDROID_HOME, sdkDirPath.toString(), ANDROID_SERIAL, DEVICE_ID));
   }
 
   @Test
@@ -107,7 +109,7 @@ public class InstallApksCommandTest {
     InstallApksCommand fromFlags =
         InstallApksCommand.fromFlags(
             new FlagParser().parse("--apks=" + apksFile),
-            androidHomeProvider,
+            systemEnvironmentProvider,
             fakeServerOneDevice(lDeviceWithLocales("en-US")));
 
     InstallApksCommand fromBuilder =
@@ -115,6 +117,7 @@ public class InstallApksCommandTest {
             .setApksArchivePath(apksFile)
             .setAdbPath(adbPath)
             .setAdbServer(fromFlags.getAdbServer())
+            .setDeviceId(DEVICE_ID)
             .build();
 
     assertThat(fromBuilder).isEqualTo(fromFlags);
@@ -128,7 +131,7 @@ public class InstallApksCommandTest {
     InstallApksCommand fromFlags =
         InstallApksCommand.fromFlags(
             new FlagParser().parse("--apks=" + apksFile, "--adb=" + adbPath),
-            androidHomeProvider,
+            systemEnvironmentProvider,
             fakeServerOneDevice(lDeviceWithLocales("en-US")));
 
     InstallApksCommand fromBuilder =
@@ -136,6 +139,7 @@ public class InstallApksCommandTest {
             .setApksArchivePath(apksFile)
             .setAdbPath(adbPath)
             .setAdbServer(fromFlags.getAdbServer())
+            .setDeviceId(DEVICE_ID)
             .build();
 
     assertThat(fromBuilder).isEqualTo(fromFlags);
@@ -150,7 +154,7 @@ public class InstallApksCommandTest {
         InstallApksCommand.fromFlags(
             new FlagParser()
                 .parse("--apks=" + apksFile, "--adb=" + adbPath, "--device-id=" + DEVICE_ID),
-            androidHomeProvider,
+            systemEnvironmentProvider,
             fakeServerOneDevice(lDeviceWithLocales("en-US")));
 
     InstallApksCommand fromBuilder =
@@ -172,7 +176,7 @@ public class InstallApksCommandTest {
     InstallApksCommand fromFlags =
         InstallApksCommand.fromFlags(
             new FlagParser().parse("--apks=" + apksFile, "--allow-downgrade"),
-            androidHomeProvider,
+            systemEnvironmentProvider,
             fakeServerOneDevice(lDeviceWithLocales("en-US")));
 
     InstallApksCommand fromBuilder =
@@ -180,6 +184,7 @@ public class InstallApksCommandTest {
             .setApksArchivePath(apksFile)
             .setAdbPath(adbPath)
             .setAdbServer(fromFlags.getAdbServer())
+            .setDeviceId(DEVICE_ID)
             .setAllowDowngrade(true)
             .build();
 
@@ -194,7 +199,7 @@ public class InstallApksCommandTest {
     InstallApksCommand fromFlags =
         InstallApksCommand.fromFlags(
             new FlagParser().parse("--apks=" + apksFile, "--adb=" + adbPath),
-            androidSerialProvider,
+            systemEnvironmentProvider,
             fakeServerOneDevice(lDeviceWithLocales("en-US")));
 
     InstallApksCommand fromBuilder =
@@ -217,7 +222,7 @@ public class InstallApksCommandTest {
         InstallApksCommand.fromFlags(
             new FlagParser()
                 .parse("--apks=" + apksFile, "--adb=" + adbPath, "--modules=base,feature"),
-            androidHomeProvider,
+            systemEnvironmentProvider,
             fakeServerOneDevice(lDeviceWithLocales("en-US")));
 
     InstallApksCommand fromBuilder =
@@ -226,6 +231,7 @@ public class InstallApksCommandTest {
             .setAdbPath(adbPath)
             .setAdbServer(fromFlags.getAdbServer())
             .setModules(ImmutableSet.of("base", "feature"))
+            .setDeviceId(DEVICE_ID)
             .build();
 
     assertThat(fromBuilder).isEqualTo(fromFlags);
@@ -246,7 +252,7 @@ public class InstallApksCommandTest {
         () ->
             InstallApksCommand.fromFlags(
                 new FlagParser().parse("--adb=" + adbPath),
-                androidHomeProvider,
+                systemEnvironmentProvider,
                 fakeServerOneDevice(lDeviceWithLocales("en-US"))));
   }
 

@@ -20,13 +20,14 @@ import static com.android.tools.build.bundletool.model.ModuleSplit.SplitType.INS
 import static com.android.tools.build.bundletool.model.ModuleSplit.SplitType.SPLIT;
 import static com.android.tools.build.bundletool.model.ModuleSplit.SplitType.STANDALONE;
 import static com.android.tools.build.bundletool.model.ModuleSplit.SplitType.SYSTEM;
-import static com.android.tools.build.bundletool.targeting.TargetingComparators.VARIANT_TARGETING_COMPARATOR;
+import static com.android.tools.build.bundletool.model.targeting.TargetingComparators.VARIANT_TARGETING_COMPARATOR;
 import static java.util.Comparator.comparing;
 
 import com.android.bundle.Targeting.VariantTargeting;
 import com.android.tools.build.bundletool.model.ModuleSplit.SplitType;
 import com.google.auto.value.AutoValue;
 import com.google.common.collect.Ordering;
+import com.google.errorprone.annotations.Immutable;
 
 /**
  * Key identifying a variant.
@@ -34,7 +35,9 @@ import com.google.common.collect.Ordering;
  * <p>A variant is a set of APKs. One device is guaranteed to receive only APKs from the same
  * variant.
  */
+@Immutable
 @AutoValue
+@AutoValue.CopyAnnotations
 public abstract class VariantKey implements Comparable<VariantKey> {
   public static VariantKey create(ModuleSplit moduleSplit) {
     return new AutoValue_VariantKey(moduleSplit.getSplitType(), moduleSplit.getVariantTargeting());

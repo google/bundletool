@@ -26,7 +26,7 @@ import com.android.ddmlib.InstallException;
 import com.android.ddmlib.ShellCommandUnresponsiveException;
 import com.android.ddmlib.TimeoutException;
 import com.android.sdklib.AndroidVersion;
-import com.android.tools.build.bundletool.exceptions.InstallationException;
+import com.android.tools.build.bundletool.model.exceptions.InstallationException;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
 import java.io.File;

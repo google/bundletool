@@ -21,7 +21,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.android.bundle.Devices.DeviceSpec;
 import com.android.tools.build.bundletool.TestData;
-import com.android.tools.build.bundletool.exceptions.ValidationException;
+import com.android.tools.build.bundletool.model.exceptions.ValidationException;
 import java.nio.file.Paths;
 import org.junit.Test;
 import org.junit.runner.RunWith;

@@ -23,14 +23,14 @@ import com.android.tools.build.bundletool.commands.CommandHelp.CommandDescriptio
 import com.android.tools.build.bundletool.commands.CommandHelp.FlagDescription;
 import com.android.tools.build.bundletool.device.AdbServer;
 import com.android.tools.build.bundletool.device.DeviceAnalyzer;
-import com.android.tools.build.bundletool.exceptions.CommandExecutionException;
-import com.android.tools.build.bundletool.exceptions.ValidationException;
-import com.android.tools.build.bundletool.utils.EnvironmentVariableProvider;
-import com.android.tools.build.bundletool.utils.SdkToolsLocator;
-import com.android.tools.build.bundletool.utils.SystemEnvironmentVariableProvider;
-import com.android.tools.build.bundletool.utils.files.FilePreconditions;
-import com.android.tools.build.bundletool.utils.flags.Flag;
-import com.android.tools.build.bundletool.utils.flags.ParsedFlags;
+import com.android.tools.build.bundletool.flags.Flag;
+import com.android.tools.build.bundletool.flags.ParsedFlags;
+import com.android.tools.build.bundletool.model.exceptions.CommandExecutionException;
+import com.android.tools.build.bundletool.model.exceptions.ValidationException;
+import com.android.tools.build.bundletool.model.utils.DefaultSystemEnvironmentProvider;
+import com.android.tools.build.bundletool.model.utils.SdkToolsLocator;
+import com.android.tools.build.bundletool.model.utils.SystemEnvironmentProvider;
+import com.android.tools.build.bundletool.model.utils.files.FilePreconditions;
 import com.google.auto.value.AutoValue;
 import com.google.common.io.MoreFiles;
 import com.google.protobuf.util.JsonFormat;
@@ -55,8 +55,8 @@ public abstract class GetDeviceSpecCommand {
   private static final String ANDROID_HOME_VARIABLE = "ANDROID_HOME";
   private static final String ANDROID_SERIAL_VARIABLE = "ANDROID_SERIAL";
 
-  private static final EnvironmentVariableProvider DEFAULT_PROVIDER =
-      new SystemEnvironmentVariableProvider();
+  private static final SystemEnvironmentProvider DEFAULT_PROVIDER =
+      new DefaultSystemEnvironmentProvider();
 
   private static final String JSON_EXTENSION = "json";
 
@@ -116,15 +116,13 @@ public abstract class GetDeviceSpecCommand {
   }
 
   public static GetDeviceSpecCommand fromFlags(
-      ParsedFlags flags,
-      EnvironmentVariableProvider environmentVariableProvider,
-      AdbServer adbServer) {
+      ParsedFlags flags, SystemEnvironmentProvider systemEnvironmentProvider, AdbServer adbServer) {
     GetDeviceSpecCommand.Builder builder =
         builder().setAdbServer(adbServer).setOutputPath(OUTPUT_FLAG.getRequiredValue(flags));
 
     Optional<String> deviceSerialName = DEVICE_ID_FLAG.getValue(flags);
     if (!deviceSerialName.isPresent()) {
-      deviceSerialName = environmentVariableProvider.getVariable(ANDROID_SERIAL_VARIABLE);
+      deviceSerialName = systemEnvironmentProvider.getVariable(ANDROID_SERIAL_VARIABLE);
     }
     deviceSerialName.ifPresent(builder::setDeviceId);
 
@@ -133,7 +131,7 @@ public abstract class GetDeviceSpecCommand {
             .getValue(flags)
             .orElseGet(
                 () ->
-                    environmentVariableProvider
+                    systemEnvironmentProvider
                         .getVariable(ANDROID_HOME_VARIABLE)
                         .flatMap(path -> new SdkToolsLocator().locateAdb(Paths.get(path)))
                         .orElseThrow(

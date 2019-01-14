@@ -17,7 +17,7 @@
 package com.android.tools.build.bundletool.splitters;
 
 import static com.android.tools.build.bundletool.model.BundleModule.DEX_DIRECTORY;
-import static com.android.tools.build.bundletool.utils.Versions.ANDROID_P_API_VERSION;
+import static com.android.tools.build.bundletool.model.utils.Versions.ANDROID_P_API_VERSION;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.ImmutableSet.toImmutableSet;
 
@@ -28,10 +28,14 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 
-/** Splits the dex files in the module by their Compression. */
+/** Modifies a module by setting the compression of dex entries based on SDK version. */
 public class DexCompressionSplitter implements ModuleSplitSplitter {
 
-  /** Generates {@link ModuleSplit} objects dividing the dex files by their compression. */
+  /**
+   * Generates a single {@link ModuleSplit} setting the compression of dex entries.
+   *
+   * <p>Dex entries are only compressed for pre P devices.
+   */
   @Override
   public ImmutableCollection<ModuleSplit> split(ModuleSplit moduleSplit) {
     ImmutableSet<ModuleEntry> dexEntries =

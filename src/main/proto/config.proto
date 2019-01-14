@@ -8,6 +8,8 @@ message BundleConfig {
   Bundletool bundletool = 1;
   Optimizations optimizations = 2;
   Compression compression = 3;
+  // Resources to be always kept in the master split.
+  MasterResources master_resources = 4;
 }
 
 message Bundletool {
@@ -22,6 +24,12 @@ message Compression {
   // the name of the modules, and using forward slash ("/") as a name separator.
   // Examples: "res/raw/**", "assets/**/*.uncompressed", etc.
   repeated string uncompressed_glob = 1;
+}
+
+// Resources to keep in the master split.
+message MasterResources {
+  // Resource IDs to be kept in master splits.
+  repeated int32 resource_ids = 1;
 }
 
 message Optimizations {

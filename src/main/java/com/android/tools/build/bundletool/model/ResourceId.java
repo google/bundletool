@@ -22,14 +22,21 @@ import com.android.aapt.Resources.TypeOrBuilder;
 import com.google.auto.value.AutoValue;
 import com.google.auto.value.extension.memoized.Memoized;
 import com.google.common.base.Preconditions;
+import com.google.errorprone.annotations.Immutable;
 
 /** Represents a resource id in an APK's resource table. */
+@Immutable
 @AutoValue
+@AutoValue.CopyAnnotations
 public abstract class ResourceId {
 
   public static final int MAX_ENTRY_ID = 0xffff;
   public static final int MAX_TYPE_ID = 0xff;
   public static final int MAX_PACKAGE_ID = 0xff;
+
+  private static final int ENTRY_ID_MASK = 0x0000ffff;
+  private static final int TYPE_ID_MASK = 0x00ff0000;
+  private static final int PACKAGE_ID_MASK = 0xff000000;
 
   private static final int PACKAGE_SHIFT = 24;
   private static final int TYPE_SHIFT = 16;
@@ -45,6 +52,14 @@ public abstract class ResourceId {
         .setPackageId(pkg.getPackageId().getId())
         .setTypeId(type.getTypeId().getId())
         .setEntryId(entry.getEntryId().getId())
+        .build();
+  }
+
+  public static ResourceId create(int fullResourceId) {
+    return builder()
+        .setPackageId((fullResourceId & PACKAGE_ID_MASK) >>> PACKAGE_SHIFT)
+        .setTypeId((fullResourceId & TYPE_ID_MASK) >>> TYPE_SHIFT)
+        .setEntryId(fullResourceId & ENTRY_ID_MASK)
         .build();
   }
 
@@ -67,13 +82,16 @@ public abstract class ResourceId {
       ResourceId resourceId = autoBuild();
       Preconditions.checkState(
           0 <= resourceId.getEntryId() && resourceId.getEntryId() <= MAX_ENTRY_ID,
-          "Entry id not in [0, 0xffff]");
+          "Entry id not in [0, 0xffff]: %s",
+          resourceId.getEntryId());
       Preconditions.checkState(
           0 < resourceId.getTypeId() && resourceId.getTypeId() <= MAX_TYPE_ID,
-          "Type id not in [1, 0xff]");
+          "Type id not in [1, 0xff]: %s",
+          resourceId.getTypeId());
       Preconditions.checkState(
           0 <= resourceId.getPackageId() && resourceId.getPackageId() <= MAX_PACKAGE_ID,
-          "Package id not in [0, 0xff]");
+          "Package id not in [0, 0xff]: %s",
+          resourceId.getPackageId());
       return resourceId;
     }
   }
@@ -102,5 +120,10 @@ public abstract class ResourceId {
   @Memoized
   public int getFullResourceId() {
     return (getPackageId() << PACKAGE_SHIFT) + (getTypeId() << TYPE_SHIFT) + getEntryId();
+  }
+
+  @Override
+  public final String toString() {
+    return String.format("0x%08X", getFullResourceId());
   }
 }

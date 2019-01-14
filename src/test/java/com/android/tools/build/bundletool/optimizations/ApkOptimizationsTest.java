@@ -20,7 +20,7 @@ import static com.android.tools.build.bundletool.model.OptimizationDimension.LAN
 import static com.android.tools.build.bundletool.model.OptimizationDimension.SCREEN_DENSITY;
 import static com.google.common.truth.Truth.assertThat;
 
-import com.android.tools.build.bundletool.version.Version;
+import com.android.tools.build.bundletool.model.version.Version;
 import com.google.common.collect.ImmutableSet;
 import org.junit.Test;
 import org.junit.runner.RunWith;

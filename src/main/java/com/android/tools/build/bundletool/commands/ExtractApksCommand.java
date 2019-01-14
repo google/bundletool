@@ -16,23 +16,26 @@
 
 package com.android.tools.build.bundletool.commands;
 
-import static com.android.tools.build.bundletool.utils.files.FilePreconditions.checkDirectoryExists;
-import static com.android.tools.build.bundletool.utils.files.FilePreconditions.checkFileExistsAndReadable;
+import static com.android.tools.build.bundletool.model.utils.files.FilePreconditions.checkDirectoryExists;
+import static com.android.tools.build.bundletool.model.utils.files.FilePreconditions.checkFileExistsAndReadable;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.collect.ImmutableList.toImmutableList;
+import static com.google.common.collect.ImmutableSet.toImmutableSet;
 
+import com.android.bundle.Commands.BuildApksResult;
 import com.android.bundle.Devices.DeviceSpec;
 import com.android.tools.build.bundletool.commands.CommandHelp.CommandDescription;
 import com.android.tools.build.bundletool.commands.CommandHelp.FlagDescription;
 import com.android.tools.build.bundletool.device.ApkMatcher;
 import com.android.tools.build.bundletool.device.DeviceSpecParser;
-import com.android.tools.build.bundletool.exceptions.ValidationException;
+import com.android.tools.build.bundletool.flags.Flag;
+import com.android.tools.build.bundletool.flags.ParsedFlags;
 import com.android.tools.build.bundletool.model.ZipPath;
-import com.android.tools.build.bundletool.utils.ResultUtils;
-import com.android.tools.build.bundletool.utils.files.BufferedIo;
-import com.android.tools.build.bundletool.utils.flags.Flag;
-import com.android.tools.build.bundletool.utils.flags.ParsedFlags;
+import com.android.tools.build.bundletool.model.exceptions.ValidationException;
+import com.android.tools.build.bundletool.model.utils.FileNames;
+import com.android.tools.build.bundletool.model.utils.ResultUtils;
+import com.android.tools.build.bundletool.model.utils.files.BufferedIo;
 import com.google.auto.value.AutoValue;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
@@ -54,6 +57,7 @@ import java.util.zip.ZipFile;
 public abstract class ExtractApksCommand {
 
   public static final String COMMAND_NAME = "extract-apks";
+  static final String ALL_MODULES_SHORTCUT = "_ALL_";
 
   private static final Flag<Path> APKS_ARCHIVE_FILE_FLAG = Flag.path("apks");
   private static final Flag<Path> DEVICE_SPEC_FLAG = Flag.path("device-spec");
@@ -136,10 +140,20 @@ public abstract class ExtractApksCommand {
   ImmutableList<Path> execute(PrintStream output) {
     validateInput();
 
-    ApkMatcher apkMatcher =
-        new ApkMatcher(getDeviceSpec(), /* requestedModuleNames= */ getModules(), getInstant());
-    ImmutableList<ZipPath> matchedApks =
-        apkMatcher.getMatchingApks(ResultUtils.readTableOfContents(getApksArchivePath()));
+    BuildApksResult toc = ResultUtils.readTableOfContents(getApksArchivePath());
+    Optional<ImmutableSet<String>> requestedModuleNames =
+        getModules()
+            .map(
+                modules ->
+                    modules.contains(ALL_MODULES_SHORTCUT)
+                        ? toc.getVariantList().stream()
+                            .flatMap(variant -> variant.getApkSetList().stream())
+                            .map(apkSet -> apkSet.getModuleMetadata().getName())
+                            .collect(toImmutableSet())
+                        : modules);
+
+    ApkMatcher apkMatcher = new ApkMatcher(getDeviceSpec(), requestedModuleNames, getInstant());
+    ImmutableList<ZipPath> matchedApks = apkMatcher.getMatchingApks(toc);
 
 
     if (Files.isDirectory(getApksArchivePath())) {
@@ -161,6 +175,7 @@ public abstract class ExtractApksCommand {
           !getOutputDirectory().isPresent(),
           "Output directory should not be set when APKs are inside directory.");
       checkDirectoryExists(getApksArchivePath());
+      checkFileExistsAndReadable(getApksArchivePath().resolve(FileNames.TABLE_OF_CONTENTS_FILE));
     } else {
       checkFileExistsAndReadable(getApksArchivePath());
     }
@@ -193,7 +208,7 @@ public abstract class ExtractApksCommand {
           e);
     }
     System.err.printf(
-        "The APKs have been extracted in the directory: %s\n", outputDirectoryPath.toString());
+        "The APKs have been extracted in the directory: %s%n", outputDirectoryPath.toString());
     return builder.build();
   }
 
@@ -245,9 +260,11 @@ public abstract class ExtractApksCommand {
                 .setExampleValue("base,module1,module2")
                 .setOptional(true)
                 .setDescription(
-                    "List of modules to be extracted (defaults to all of them). Note that the "
-                        + "dependent modules will also be extracted. Ignored if the device "
-                        + "receives a standalone APK.")
+                    "List of modules to be extracted, or \"%s\" for all modules. Defaults to "
+                        + "modules installed during the first install, i.e. not on-demand. Note "
+                        + "that the dependent modules will also be extracted. The value of this "
+                        + "flag is ignored if the device receives a standalone APK.",
+                    ALL_MODULES_SHORTCUT)
                 .build())
         .addFlag(
             FlagDescription.builder()

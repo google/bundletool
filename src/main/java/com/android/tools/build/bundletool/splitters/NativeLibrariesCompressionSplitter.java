@@ -17,7 +17,7 @@
 package com.android.tools.build.bundletool.splitters;
 
 import static com.android.tools.build.bundletool.model.ManifestMutator.withExtractNativeLibs;
-import static com.android.tools.build.bundletool.utils.Versions.ANDROID_M_API_VERSION;
+import static com.android.tools.build.bundletool.model.utils.Versions.ANDROID_M_API_VERSION;
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.ImmutableSet.toImmutableSet;
@@ -32,7 +32,7 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import java.util.List;
 
-/** Splits the native libraries in the module by their Compression. */
+/** Modifies a module by setting the compression of of native libraries based on SDK version. */
 public final class NativeLibrariesCompressionSplitter implements ModuleSplitSplitter {
 
   private final ApkGenerationConfiguration apkGenerationConfiguration;
@@ -45,7 +45,12 @@ public final class NativeLibrariesCompressionSplitter implements ModuleSplitSpli
   public NativeLibrariesCompressionSplitter(ApkGenerationConfiguration apkGenerationConfiguration) {
     this.apkGenerationConfiguration = apkGenerationConfiguration;
   }
-  /** Generates {@link ModuleSplit} objects dividing the native libraries by their compression. */
+
+  /**
+   * Generates a single {@link ModuleSplit} setting the compression on native libraries.
+   *
+   * <p>Native libraries are only compressed for non instant apps on pre M devices.
+   */
   @Override
   public ImmutableCollection<ModuleSplit> split(ModuleSplit moduleSplit) {
     checkState(

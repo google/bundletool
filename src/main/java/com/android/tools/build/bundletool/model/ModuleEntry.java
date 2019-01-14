@@ -15,12 +15,20 @@
  */
 package com.android.tools.build.bundletool.model;
 
-import com.android.tools.build.bundletool.utils.files.FileUtils;
+import com.android.tools.build.bundletool.model.utils.files.FileUtils;
+import com.google.errorprone.annotations.Immutable;
+import com.google.errorprone.annotations.MustBeClosed;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
 
-/** Represents an entry in a an App Bundle's module. */
+/**
+ * Represents an entry in a an App Bundle's module.
+ *
+ * <p>All subclasses should be immutable, and we assume that they are as long as the data source
+ * backing this entry remains unchanged.
+ */
+@Immutable
 public interface ModuleEntry {
 
   /**
@@ -29,7 +37,13 @@ public interface ModuleEntry {
    * <p>Each implementation should strongly consider returning {@link java.io.BufferedInputStream}
    * for efficiency.
    */
+  @MustBeClosed
   InputStream getContent();
+
+  @SuppressWarnings("MustBeClosedChecker") // InputStreamSupplier is annotated with @MustBeClosed
+  default InputStreamSupplier getContentSupplier() {
+    return () -> getContent();
+  }
 
   /** Path of the entry inside the module. */
   ZipPath getPath();
