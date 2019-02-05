@@ -168,8 +168,8 @@ public abstract class GetDeviceSpecCommand {
         Files.deleteIfExists(getOutputPath());
       }
 
-      if (Files.notExists(outputFile.getParent())) {
-        Files.createDirectories(outputFile.getParent());
+      if (Files.notExists(getOutputPath().getParent())) {
+        Files.createDirectories(getOutputPath().getParent());
       }
 
       Files.write(outputFile, JsonFormat.printer().print(deviceSpec).getBytes(UTF_8));
