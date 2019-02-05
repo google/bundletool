@@ -167,6 +167,11 @@ public abstract class GetDeviceSpecCommand {
       if (getOverwriteOutput()) {
         Files.deleteIfExists(getOutputPath());
       }
+
+      if (Files.notExists(outputFile.getParent())) {
+        Files.createDirectories(outputFile.getParent());
+      }
+
       Files.write(outputFile, JsonFormat.printer().print(deviceSpec).getBytes(UTF_8));
     } catch (IOException e) {
       throw new UncheckedIOException(

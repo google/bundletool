@@ -264,6 +264,21 @@ public class GetDeviceSpecCommandTest {
   }
 
   @Test
+  public void nonExistentParentDirectory_works() {
+    DeviceSpec deviceSpec = mergeSpecs(sdkVersion(21), density(480), abis("x86"), locales("en-US"));
+
+    Path outputPath = tmp.getRoot().toPath().resolve("non-existent-parent-directory").resolve("device.json");
+    GetDeviceSpecCommand command =
+            GetDeviceSpecCommand.builder()
+                    .setAdbPath(adbPath)
+                    .setAdbServer(fakeServerOneDevice(deviceSpec))
+                    .setOutputPath(outputPath)
+                    .build();
+
+    assertThat(command.execute()).isEqualTo(deviceSpec);
+  }
+
+  @Test
   public void oneDevice_badSdkVersion_throws() throws Exception {
     DeviceSpec deviceSpec =
         mergeSpecs(sdkVersion(1), density(360), abis("x86_64", "x86"), locales("en-US"));
