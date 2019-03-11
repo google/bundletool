@@ -31,7 +31,7 @@ import static com.android.tools.build.bundletool.testing.ApksArchiveHelpers.crea
 import static com.android.tools.build.bundletool.testing.ApksArchiveHelpers.createStandaloneApkSet;
 import static com.android.tools.build.bundletool.testing.ApksArchiveHelpers.createVariant;
 import static com.android.tools.build.bundletool.testing.ApksArchiveHelpers.createVariantForSingleSplitApk;
-import static com.android.tools.build.bundletool.testing.ApksArchiveHelpers.multiAbiTargetingStandaloneVariant;
+import static com.android.tools.build.bundletool.testing.ApksArchiveHelpers.multiAbiTargetingApexVariant;
 import static com.android.tools.build.bundletool.testing.DeviceFactory.abis;
 import static com.android.tools.build.bundletool.testing.DeviceFactory.createDeviceSpecFile;
 import static com.android.tools.build.bundletool.testing.DeviceFactory.density;
@@ -102,8 +102,7 @@ public class ExtractApksCommandTest {
 
   @Test
   public void missingDeviceSpecFlag_throws() throws Exception {
-    Path apksArchiveFile =
-        createApksArchiveFile(BuildApksResult.getDefaultInstance(), tmpDir.resolve("bundle.apks"));
+    Path apksArchiveFile = createApksArchiveFile(minimalApkSet(), tmpDir.resolve("bundle.apks"));
 
     expectMissingRequiredFlagException(
         "device-spec",
@@ -140,8 +139,7 @@ public class ExtractApksCommandTest {
 
   @Test
   public void nonExistentDeviceSpecFile_throws() throws Exception {
-    Path apksArchiveFile =
-        createApksArchiveFile(BuildApksResult.getDefaultInstance(), tmpDir.resolve("bundle.apks"));
+    Path apksArchiveFile = createApksArchiveFile(minimalApkSet(), tmpDir.resolve("bundle.apks"));
 
     Throwable exception =
         assertThrows(
@@ -156,8 +154,7 @@ public class ExtractApksCommandTest {
 
   @Test
   public void nonExistentOutputDirectory_throws() throws Exception {
-    Path apksArchiveFile =
-        createApksArchiveFile(BuildApksResult.getDefaultInstance(), tmpDir.resolve("bundle.apks"));
+    Path apksArchiveFile = createApksArchiveFile(minimalApkSet(), tmpDir.resolve("bundle.apks"));
     Path deviceSpecFile = createDeviceSpecFile(deviceWithSdk(21), tmpDir.resolve("device.json"));
 
     Throwable exception =
@@ -177,7 +174,7 @@ public class ExtractApksCommandTest {
 
   @Test
   public void outputDirectorySetWhenUsingDirectory_throws() throws Exception {
-    Path apksArchivePath = createApksDirectory(BuildApksResult.getDefaultInstance(), tmpDir);
+    Path apksArchivePath = createApksDirectory(minimalApkSet(), tmpDir);
     DeviceSpec deviceSpec = deviceWithSdk(21);
 
     Throwable exception =
@@ -229,8 +226,7 @@ public class ExtractApksCommandTest {
 
   @Test
   public void emptyModules_throws() throws Exception {
-    Path apksArchiveFile =
-        createApksArchiveFile(BuildApksResult.getDefaultInstance(), tmpDir.resolve("bundle.apks"));
+    Path apksArchiveFile = createApksArchiveFile(minimalApkSet(), tmpDir.resolve("bundle.apks"));
     Path deviceSpecFile = createDeviceSpecFile(deviceWithSdk(21), tmpDir.resolve("device.json"));
     ExtractApksCommand command =
         ExtractApksCommand.fromFlags(
@@ -251,7 +247,7 @@ public class ExtractApksCommandTest {
     }
     DeviceSpec expectedDeviceSpec = expectedDeviceSpecBuilder.build();
 
-    BuildApksResult tableOfContentsProto = BuildApksResult.getDefaultInstance();
+    BuildApksResult tableOfContentsProto = minimalApkSet();
     Path apksArchiveFile =
         createApksArchiveFile(tableOfContentsProto, tmpDir.resolve("bundle.apks"));
     Path deviceSpecFile = copyToTempDir("testdata/device/pixel2_spec.json");
@@ -267,7 +263,7 @@ public class ExtractApksCommandTest {
   public void deviceSpecUnknownExtension_throws() throws Exception {
     DeviceSpec deviceSpec = deviceWithSdk(21);
     Path deviceSpecFile = createDeviceSpecFile(deviceSpec, tmpDir.resolve("bad_filename.dat"));
-    BuildApksResult tableOfContentsProto = BuildApksResult.getDefaultInstance();
+    BuildApksResult tableOfContentsProto = minimalApkSet();
     Path apksArchiveFile =
         createApksArchiveFile(tableOfContentsProto, tmpDir.resolve("bundle.apks"));
 
@@ -287,7 +283,7 @@ public class ExtractApksCommandTest {
   public void builderAndFlagsConstruction_equivalent() throws Exception {
     DeviceSpec deviceSpec = deviceWithSdk(21);
     Path deviceSpecFile = createDeviceSpecFile(deviceSpec, tmpDir.resolve("device.json"));
-    BuildApksResult tableOfContentsProto = BuildApksResult.getDefaultInstance();
+    BuildApksResult tableOfContentsProto = minimalApkSet();
     Path apksArchiveFile =
         createApksArchiveFile(tableOfContentsProto, tmpDir.resolve("bundle.apks"));
 
@@ -308,7 +304,7 @@ public class ExtractApksCommandTest {
   public void builderAndFlagsConstruction_optionalModules_equivalent() throws Exception {
     DeviceSpec deviceSpec = deviceWithSdk(21);
     Path deviceSpecFile = createDeviceSpecFile(deviceSpec, tmpDir.resolve("device.json"));
-    BuildApksResult tableOfContentsProto = BuildApksResult.getDefaultInstance();
+    BuildApksResult tableOfContentsProto = minimalApkSet();
     Path apksArchiveFile =
         createApksArchiveFile(tableOfContentsProto, tmpDir.resolve("bundle.apks"));
 
@@ -335,7 +331,7 @@ public class ExtractApksCommandTest {
   public void builderAndFlagsConstruction_optionalInstant_equivalent() throws Exception {
     DeviceSpec deviceSpec = deviceWithSdk(21);
     Path deviceSpecFile = createDeviceSpecFile(deviceSpec, tmpDir.resolve("device.json"));
-    BuildApksResult tableOfContentsProto = BuildApksResult.getDefaultInstance();
+    BuildApksResult tableOfContentsProto = minimalApkSet();
     Path apksArchiveFile =
         createApksArchiveFile(tableOfContentsProto, tmpDir.resolve("bundle.apks"));
 
@@ -362,7 +358,7 @@ public class ExtractApksCommandTest {
   public void builderAndFlagsConstruction_optionalInstantFalse_equivalent() throws Exception {
     DeviceSpec deviceSpec = deviceWithSdk(21);
     Path deviceSpecFile = createDeviceSpecFile(deviceSpec, tmpDir.resolve("device.json"));
-    BuildApksResult tableOfContentsProto = BuildApksResult.getDefaultInstance();
+    BuildApksResult tableOfContentsProto = minimalApkSet();
     Path apksArchiveFile =
         createApksArchiveFile(tableOfContentsProto, tmpDir.resolve("bundle.apks"));
 
@@ -384,7 +380,7 @@ public class ExtractApksCommandTest {
   public void builderAndFlagsConstruction_optionalOutputDirectory_equivalent() throws Exception {
     DeviceSpec deviceSpec = deviceWithSdk(21);
     Path deviceSpecFile = createDeviceSpecFile(deviceSpec, tmpDir.resolve("device.json"));
-    BuildApksResult tableOfContentsProto = BuildApksResult.getDefaultInstance();
+    BuildApksResult tableOfContentsProto = minimalApkSet();
     Path apksArchiveFile =
         createApksArchiveFile(tableOfContentsProto, tmpDir.resolve("bundle.apks"));
 
@@ -606,7 +602,7 @@ public class ExtractApksCommandTest {
     BuildApksResult buildApksResult =
         BuildApksResult.newBuilder()
             .addVariant(
-                multiAbiTargetingStandaloneVariant(
+                multiAbiTargetingApexVariant(
                     multiAbiTargeting(X86_64), ZipPath.create("standalones/standalone-x86_64.apk")))
             .build();
 
@@ -646,9 +642,9 @@ public class ExtractApksCommandTest {
 
     BuildApksResult buildApksResult =
         BuildApksResult.newBuilder()
-            .addVariant(multiAbiTargetingStandaloneVariant(x64Targeting, x64Apk))
-            .addVariant(multiAbiTargetingStandaloneVariant(x64X86Targeting, x64X86Apk))
-            .addVariant(multiAbiTargetingStandaloneVariant(x64ArmTargeting, x64ArmApk))
+            .addVariant(multiAbiTargetingApexVariant(x64Targeting, x64Apk))
+            .addVariant(multiAbiTargetingApexVariant(x64X86Targeting, x64X86Apk))
+            .addVariant(multiAbiTargetingApexVariant(x64ArmTargeting, x64ArmApk))
             .build();
 
     Path apksPath = createApks(buildApksResult, apksInDirectory);
@@ -1067,15 +1063,51 @@ public class ExtractApksCommandTest {
 
     DeviceSpec deviceSpec = deviceWithSdk(21);
 
-    ImmutableList<Path> matchedApks =
-        ExtractApksCommand.builder()
-            .setApksArchivePath(apksArchiveFile)
-            .setDeviceSpec(deviceSpec)
-            .setInstant(true)
-            .build()
-            .execute();
+    CommandExecutionException exception =
+        assertThrows(
+            CommandExecutionException.class,
+            () ->
+                ExtractApksCommand.builder()
+                    .setApksArchivePath(apksArchiveFile)
+                    .setDeviceSpec(deviceSpec)
+                    .setInstant(true)
+                    .build()
+                    .execute());
 
-    assertThat(matchedApks).isEmpty();
+    assertThat(exception).hasMessageThat().contains("No compatible APKs found for the device");
+  }
+
+  @Test
+  public void extractApks_aboveMaxSdk_throws() throws Exception {
+    BuildApksResult tableOfContentsProto =
+        BuildApksResult.newBuilder()
+            .addVariant(
+                createVariant(
+                    variantSdkTargeting(
+                        // The variant contains a fake alternative to limit the matching up to 23.
+                        sdkVersionFrom(21), ImmutableSet.of(sdkVersionFrom(24))),
+                    createSplitApkSet(
+                        "base",
+                        createMasterApkDescription(
+                            ApkTargeting.getDefaultInstance(), ZipPath.create("base-master.apk")))))
+            .build();
+    Path apksArchiveFile =
+        createApksArchiveFile(tableOfContentsProto, tmpDir.resolve("bundle.apks"));
+
+    DeviceSpec deviceSpec = deviceWithSdk(26);
+
+    CommandExecutionException exception =
+        assertThrows(
+            CommandExecutionException.class,
+            () ->
+                ExtractApksCommand.builder()
+                    .setApksArchivePath(apksArchiveFile)
+                    .setDeviceSpec(deviceSpec)
+                    .setInstant(true)
+                    .build()
+                    .execute());
+
+    assertThat(exception).hasMessageThat().contains("No compatible APKs found for the device");
   }
 
   @Test
@@ -1226,6 +1258,18 @@ public class ExtractApksCommandTest {
     } else {
       return createApksArchiveFile(buildApksResult, tmpDir.resolve("bundle.apks"));
     }
+  }
+
+  private static BuildApksResult minimalApkSet() {
+    return BuildApksResult.newBuilder()
+        .addVariant(
+            createVariant(
+                VariantTargeting.getDefaultInstance(),
+                createSplitApkSet(
+                    "base",
+                    createMasterApkDescription(
+                        ApkTargeting.getDefaultInstance(), ZipPath.create("base-master.apk")))))
+        .build();
   }
 
   /** Copies the testdata resource into the temporary directory. */

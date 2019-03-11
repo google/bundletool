@@ -84,7 +84,7 @@ public final class WearApkLocator {
             () ->
                 ValidationException.builder()
                     .withMessage(
-                        "Resource 0x%08X is referenced in the manifest in the '%s' metadata, but "
+                        "Resource 0x%08x is referenced in the manifest in the '%s' metadata, but "
                             + "was not found in the resource table.",
                         resourceId, WEAR_APK_1_0_METADATA_KEY)
                     .build());

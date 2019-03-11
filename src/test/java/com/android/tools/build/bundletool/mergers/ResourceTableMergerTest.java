@@ -29,8 +29,10 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.android.aapt.Resources.AllowNew;
 import com.android.aapt.Resources.CompoundValue;
+import com.android.aapt.Resources.ConfigValue;
 import com.android.aapt.Resources.Entry;
 import com.android.aapt.Resources.Overlayable;
+import com.android.aapt.Resources.OverlayableItem;
 import com.android.aapt.Resources.Reference;
 import com.android.aapt.Resources.ResourceTable;
 import com.android.aapt.Resources.Source;
@@ -39,6 +41,7 @@ import com.android.aapt.Resources.Style;
 import com.android.aapt.Resources.Visibility;
 import com.google.protobuf.ByteString;
 import java.nio.charset.StandardCharsets;
+import java.util.function.Function;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
@@ -397,24 +400,25 @@ public class ResourceTableMergerTest {
 
   @Test
   public void entryOverlayable_absent_okAndPreserved() throws Exception {
-    Entry entry = entry(0x21, "name").toBuilder().clearOverlayable().build();
+    Entry entry = entry(0x21, "name").toBuilder().clearOverlayableItem().build();
     ResourceTable table = resourceTable(pkg(0x01, "com.test.app", type(0x11, "strings", entry)));
 
     ResourceTable merged = new ResourceTableMerger().merge(table, table);
 
-    assertThat(merged.getPackage(0).getType(0).getEntry(0).hasOverlayable()).isFalse();
+    assertThat(merged.getPackage(0).getType(0).getEntry(0).hasOverlayableItem()).isFalse();
   }
 
   @Test
   public void entryOverlayable_presentAndEqual_okAndPreserved() throws Exception {
-    Overlayable overlayable = Overlayable.newBuilder().setComment("comment").build();
-    Entry entry = entry(0x21, "name").toBuilder().setOverlayable(overlayable).build();
+    OverlayableItem overlayable = OverlayableItem.newBuilder().setComment("comment").build();
+    Entry entry = entry(0x21, "name").toBuilder().setOverlayableItem(overlayable).build();
     ResourceTable table = resourceTable(pkg(0x01, "com.test.app", type(0x11, "strings", entry)));
 
     ResourceTable merged = new ResourceTableMerger().merge(table, table);
 
-    assertThat(merged.getPackage(0).getType(0).getEntry(0).hasOverlayable()).isTrue();
-    assertThat(merged.getPackage(0).getType(0).getEntry(0).getOverlayable()).isEqualTo(overlayable);
+    assertThat(merged.getPackage(0).getType(0).getEntry(0).hasOverlayableItem()).isTrue();
+    assertThat(merged.getPackage(0).getType(0).getEntry(0).getOverlayableItem())
+        .isEqualTo(overlayable);
   }
 
   @Test
@@ -423,7 +427,7 @@ public class ResourceTableMergerTest {
     Entry entryB =
         entryA
             .toBuilder()
-            .setOverlayable(Overlayable.newBuilder().setComment("difference"))
+            .setOverlayableItem(OverlayableItem.newBuilder().setComment("comment"))
             .build();
     ResourceTable table1 = resourceTable(pkg(0x01, "com.test.app", type(0x11, "strings", entryA)));
     ResourceTable table2 = resourceTable(pkg(0x01, "com.test.app", type(0x11, "strings", entryB)));
@@ -432,7 +436,9 @@ public class ResourceTableMergerTest {
         assertThrows(
             IllegalStateException.class, () -> new ResourceTableMerger().merge(table1, table2));
 
-    assertThat(exception).hasMessageThat().contains("Expected same values of field 'overlayable'");
+    assertThat(exception)
+        .hasMessageThat()
+        .contains("Expected same values of field 'overlayable_item'");
   }
 
   @Test
@@ -497,5 +503,151 @@ public class ResourceTableMergerTest {
     ResourceTableMerger.stripSourceReferences(stripped);
 
     assertThat(stripped.build()).isEqualTo(withoutSource);
+  }
+
+  @Test
+  public void mergeOverlayables_sameOverlayables() throws Exception {
+    ResourceTable table =
+        resourceTable(
+                pkg(
+                    0x7f,
+                    "com.app",
+                    type(
+                        0x01,
+                        "xml",
+                        entry(0x00, "layout1", ConfigValue.getDefaultInstance())
+                            .toBuilder()
+                            .setOverlayableItem(newOverlayableItem(/* idx= */ 0))
+                            .build(),
+                        entry(0x01, "layout2", ConfigValue.getDefaultInstance())
+                            .toBuilder()
+                            .setOverlayableItem(newOverlayableItem(/* idx= */ 1))
+                            .build())))
+            .toBuilder()
+            .addOverlayable(Overlayable.newBuilder().setName("overlayable1").setActor("actor1"))
+            .addOverlayable(Overlayable.newBuilder().setName("overlayable2").setActor("actor2"))
+            .build();
+
+    ResourceTable mergedTable = new ResourceTableMerger().merge(table, table);
+
+    assertThat(mergedTable).isEqualTo(table);
+  }
+
+  @Test
+  public void mergeOverlayables_sameNameDifferentActor_throws() throws Exception {
+    ResourceTable baseResourceTable =
+        resourceTable(
+            pkg(
+                0x7f,
+                "com.app",
+                type(
+                    0x01,
+                    "xml",
+                    entry(0x00, "layout1", ConfigValue.getDefaultInstance())
+                        .toBuilder()
+                        .setOverlayableItem(newOverlayableItem(/* idx= */ 0))
+                        .build(),
+                    entry(0x01, "layout2", ConfigValue.getDefaultInstance())
+                        .toBuilder()
+                        .setOverlayableItem(newOverlayableItem(/* idx= */ 1))
+                        .build())));
+
+    ResourceTable table1 =
+        baseResourceTable
+            .toBuilder()
+            .addOverlayable(Overlayable.newBuilder().setName("overlayable1").setActor("actor1"))
+            .addOverlayable(Overlayable.newBuilder().setName("overlayable2").setActor("actor2"))
+            .build();
+
+    ResourceTable table2 =
+        baseResourceTable
+            .toBuilder()
+            .addOverlayable(Overlayable.newBuilder().setName("overlayable1").setActor("foo"))
+            .addOverlayable(Overlayable.newBuilder().setName("overlayable2").setActor("bar"))
+            .build();
+
+    assertThrows(
+        IllegalStateException.class, () -> new ResourceTableMerger().merge(table1, table2));
+  }
+
+  @Test
+  public void mergeOverlayables_overlayablesReindexed() throws Exception {
+    Function<Integer, ResourceTable> buildResourceTable =
+        pkgId ->
+            resourceTable(
+                pkg(
+                    pkgId,
+                    "com.app",
+                    type(
+                        0x01,
+                        "xml",
+                        entry(0x00, "layout1", ConfigValue.getDefaultInstance())
+                            .toBuilder()
+                            .setOverlayableItem(newOverlayableItem(/* idx= */ 0))
+                            .build(),
+                        entry(0x01, "layout2", ConfigValue.getDefaultInstance())
+                            .toBuilder()
+                            .setOverlayableItem(newOverlayableItem(/* idx= */ 1))
+                            .build())));
+
+    ResourceTable table1 =
+        buildResourceTable
+            .apply(0x7f)
+            .toBuilder()
+            .addOverlayable(Overlayable.newBuilder().setName("c").setActor("actor_c"))
+            .addOverlayable(Overlayable.newBuilder().setName("a").setActor("actor_a"))
+            .build();
+
+    ResourceTable table2 =
+        buildResourceTable
+            .apply(0x7e)
+            .toBuilder()
+            .addOverlayable(Overlayable.newBuilder().setName("d").setActor("actor_d"))
+            .addOverlayable(Overlayable.newBuilder().setName("b").setActor("actor_b"))
+            .build();
+
+    ResourceTable mergedTable = new ResourceTableMerger().merge(table1, table2);
+
+    assertThat(mergedTable)
+        .isEqualTo(
+            resourceTable(
+                    pkg(
+                        0x7e,
+                        "com.app",
+                        type(
+                            0x01,
+                            "xml",
+                            entry(0x00, "layout1", ConfigValue.getDefaultInstance())
+                                .toBuilder()
+                                .setOverlayableItem(newOverlayableItem(/* idx= */ 3))
+                                .build(),
+                            entry(0x01, "layout2", ConfigValue.getDefaultInstance())
+                                .toBuilder()
+                                .setOverlayableItem(newOverlayableItem(/* idx= */ 1))
+                                .build())),
+                    pkg(
+                        0x7f,
+                        "com.app",
+                        type(
+                            0x01,
+                            "xml",
+                            entry(0x00, "layout1", ConfigValue.getDefaultInstance())
+                                .toBuilder()
+                                .setOverlayableItem(newOverlayableItem(/* idx= */ 2))
+                                .build(),
+                            entry(0x01, "layout2", ConfigValue.getDefaultInstance())
+                                .toBuilder()
+                                .setOverlayableItem(newOverlayableItem(/* idx= */ 0))
+                                .build())))
+                .toBuilder()
+                .addOverlayable(Overlayable.newBuilder().setName("a").setActor("actor_a"))
+                .addOverlayable(Overlayable.newBuilder().setName("b").setActor("actor_b"))
+                .addOverlayable(Overlayable.newBuilder().setName("c").setActor("actor_c"))
+                .addOverlayable(Overlayable.newBuilder().setName("d").setActor("actor_d"))
+                .build());
+  }
+
+  private static OverlayableItem newOverlayableItem(int idx) {
+    return OverlayableItem.newBuilder().setOverlayableIdx(idx).build();
   }
 }

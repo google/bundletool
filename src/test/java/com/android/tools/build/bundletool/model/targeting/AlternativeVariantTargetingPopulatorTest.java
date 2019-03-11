@@ -47,6 +47,7 @@ import com.android.tools.build.bundletool.model.utils.Versions;
 import com.google.common.collect.ImmutableCollection;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
+import java.util.Optional;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
@@ -105,6 +106,60 @@ public class AlternativeVariantTargetingPopulatorTest {
                 variantSdkTargeting(SdkVersion.getDefaultInstance(), ImmutableSet.of(lPlusVersion)),
                 variantDensityTargeting(
                     DensityAlias.XHDPI, ImmutableSet.of(DensityAlias.MDPI, DensityAlias.HDPI))));
+  }
+
+  @Test
+  public void splitAndStandalones_addsAlternatives_withMaxSdk() throws Exception {
+    SdkVersion lPlusVersion = sdkVersionFrom(Versions.ANDROID_L_API_VERSION);
+    VariantTargeting lPlusTargeting = variantSdkTargeting(lPlusVersion);
+    VariantTargeting emptySdkTargeting = variantSdkTargeting(SdkVersion.getDefaultInstance());
+
+    // Post-L splits with 1 module.
+    ImmutableList<ModuleSplit> postLSplits = ImmutableList.of(createModuleSplit(lPlusTargeting));
+    // 2 density shards.
+    ImmutableList<ModuleSplit> standaloneShards =
+        ImmutableList.of(
+            createStandaloneModuleSplit(
+                mergeVariantTargeting(
+                    emptySdkTargeting, variantDensityTargeting(DensityAlias.HDPI))),
+            createStandaloneModuleSplit(
+                mergeVariantTargeting(
+                    emptySdkTargeting, variantDensityTargeting(DensityAlias.XHDPI))));
+    GeneratedApks generatedApks =
+        GeneratedApks.builder()
+            .setStandaloneApks(standaloneShards)
+            .setSplitApks(postLSplits)
+            .build();
+
+    GeneratedApks processedApks =
+        AlternativeVariantTargetingPopulator.populateAlternativeVariantTargeting(
+            generatedApks, /* maxSdkVersion= */ 23);
+
+    assertThat(processedApks.size()).isEqualTo(3);
+    ImmutableCollection<ModuleSplit> processedShards = processedApks.getStandaloneApks();
+    assertThat(processedShards).hasSize(2);
+    assertThat(
+            processedShards.stream()
+                .map(ModuleSplit::getVariantTargeting)
+                .collect(toImmutableSet()))
+        .containsExactly(
+            mergeVariantTargeting(
+                variantSdkTargeting(
+                    SdkVersion.getDefaultInstance(),
+                    ImmutableSet.of(lPlusVersion, sdkVersionFrom(24))),
+                variantDensityTargeting(DensityAlias.HDPI, ImmutableSet.of(DensityAlias.XHDPI))),
+            mergeVariantTargeting(
+                variantSdkTargeting(
+                    SdkVersion.getDefaultInstance(),
+                    ImmutableSet.of(lPlusVersion, sdkVersionFrom(24))),
+                variantDensityTargeting(DensityAlias.XHDPI, ImmutableSet.of(DensityAlias.HDPI))));
+    assertThat(processedApks.getSplitApks()).hasSize(1);
+    assertThat(processedApks.getSplitApks().get(0).getVariantTargeting())
+        .ignoringRepeatedFieldOrder()
+        .isEqualTo(
+            variantSdkTargeting(
+                lPlusVersion,
+                ImmutableSet.of(SdkVersion.getDefaultInstance(), sdkVersionFrom(24))));
   }
 
   @Test
@@ -378,6 +433,31 @@ public class AlternativeVariantTargetingPopulatorTest {
             variantSdkTargeting(
                 SdkVersion.getDefaultInstance(),
                 ImmutableSet.of(sdkVersionFrom(21), sdkVersionFrom(23))));
+  }
+
+  @Test
+  public void sdk_maxSdk_extraAlternativePopulated() {
+    VariantTargeting lollipopTargeting = variantSdkTargeting(sdkVersionFrom(21));
+    VariantTargeting marshmallowTargeting = variantSdkTargeting(sdkVersionFrom(23));
+
+    ImmutableList<ModuleSplit> outputVariants =
+        new SdkVersionAlternativesPopulator(Optional.of(/* maxSdkVersion= */ 25))
+            .addAlternativeVariantTargeting(
+                ImmutableList.of(
+                    createModuleSplit(lollipopTargeting), createModuleSplit(marshmallowTargeting)));
+
+    ModuleSplit lollipopVariant = outputVariants.get(0);
+    assertThat(lollipopVariant.getVariantTargeting())
+        .ignoringRepeatedFieldOrder()
+        .isEqualTo(
+            variantSdkTargeting(
+                sdkVersionFrom(21), ImmutableSet.of(sdkVersionFrom(23), sdkVersionFrom(26))));
+    ModuleSplit marshmallowVariant = outputVariants.get(1);
+    assertThat(marshmallowVariant.getVariantTargeting())
+        .ignoringRepeatedFieldOrder()
+        .isEqualTo(
+            variantSdkTargeting(
+                sdkVersionFrom(23), ImmutableSet.of(sdkVersionFrom(21), sdkVersionFrom(26))));
   }
 
   private static ModuleSplit createStandaloneModuleSplit(VariantTargeting variantTargeting) {

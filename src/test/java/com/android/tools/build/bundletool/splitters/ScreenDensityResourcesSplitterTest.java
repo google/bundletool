@@ -40,8 +40,10 @@ import static com.android.tools.build.bundletool.testing.ResourcesTableFactory._
 import static com.android.tools.build.bundletool.testing.ResourcesTableFactory.entry;
 import static com.android.tools.build.bundletool.testing.ResourcesTableFactory.fileReference;
 import static com.android.tools.build.bundletool.testing.ResourcesTableFactory.forDpi;
+import static com.android.tools.build.bundletool.testing.ResourcesTableFactory.mergeConfigs;
 import static com.android.tools.build.bundletool.testing.ResourcesTableFactory.pkg;
 import static com.android.tools.build.bundletool.testing.ResourcesTableFactory.resourceTable;
+import static com.android.tools.build.bundletool.testing.ResourcesTableFactory.sdk;
 import static com.android.tools.build.bundletool.testing.ResourcesTableFactory.type;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.apkDensityTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.assertForNonDefaultSplits;
@@ -64,7 +66,7 @@ import com.android.bundle.Targeting.ScreenDensity;
 import com.android.bundle.Targeting.ScreenDensity.DensityAlias;
 import com.android.tools.build.bundletool.model.BundleModule;
 import com.android.tools.build.bundletool.model.ModuleSplit;
-import com.android.tools.build.bundletool.model.ResourceTableEntry;
+import com.android.tools.build.bundletool.model.ResourceId;
 import com.android.tools.build.bundletool.model.version.BundleToolVersion;
 import com.android.tools.build.bundletool.model.version.Version;
 import com.android.tools.build.bundletool.testing.BundleModuleBuilder;
@@ -87,12 +89,16 @@ import org.junit.runners.JUnit4;
 @RunWith(JUnit4.class)
 public class ScreenDensityResourcesSplitterTest {
 
-  private static final Predicate<ResourceTableEntry> NO_RESOURCES_PINNED_TO_MASTER =
+  private static final Predicate<ResourceId> NO_RESOURCES_PINNED_TO_MASTER =
+      Predicates.alwaysFalse();
+  private static final Predicate<ResourceId> NO_LOW_DENSITY_CONFIG_PINNED_TO_MASTER =
       Predicates.alwaysFalse();
 
   private final ScreenDensityResourcesSplitter splitter =
       new ScreenDensityResourcesSplitter(
-          BundleToolVersion.getCurrentVersion(), NO_RESOURCES_PINNED_TO_MASTER);
+          BundleToolVersion.getCurrentVersion(),
+          NO_RESOURCES_PINNED_TO_MASTER,
+          NO_LOW_DENSITY_CONFIG_PINNED_TO_MASTER);
 
   @Test
   public void noResourceTable_noResourceSplits() throws Exception {
@@ -497,7 +503,8 @@ public class ScreenDensityResourcesSplitterTest {
         new ScreenDensityResourcesSplitter(
             ImmutableSet.of(DensityAlias.XXHDPI, DensityAlias.XXXHDPI),
             BundleToolVersion.getCurrentVersion(),
-            NO_RESOURCES_PINNED_TO_MASTER);
+            NO_RESOURCES_PINNED_TO_MASTER,
+            NO_LOW_DENSITY_CONFIG_PINNED_TO_MASTER);
     ImmutableCollection<ModuleSplit> densitySplits =
         splitter.split(ModuleSplit.forResources(module));
 
@@ -686,7 +693,10 @@ public class ScreenDensityResourcesSplitterTest {
             .build();
 
     ScreenDensityResourcesSplitter splitter =
-        new ScreenDensityResourcesSplitter(Version.of("0.3.3"), NO_RESOURCES_PINNED_TO_MASTER);
+        new ScreenDensityResourcesSplitter(
+            Version.of("0.3.3"),
+            NO_RESOURCES_PINNED_TO_MASTER,
+            NO_LOW_DENSITY_CONFIG_PINNED_TO_MASTER);
     ImmutableCollection<ModuleSplit> splits = splitter.split(ModuleSplit.forResources(module));
 
     // Master split: Resource present with default targeting.
@@ -795,7 +805,10 @@ public class ScreenDensityResourcesSplitterTest {
             .build();
 
     ScreenDensityResourcesSplitter splitter =
-        new ScreenDensityResourcesSplitter(Version.of("0.3.3"), NO_RESOURCES_PINNED_TO_MASTER);
+        new ScreenDensityResourcesSplitter(
+            Version.of("0.3.3"),
+            NO_RESOURCES_PINNED_TO_MASTER,
+            NO_LOW_DENSITY_CONFIG_PINNED_TO_MASTER);
     ImmutableCollection<ModuleSplit> splits = splitter.split(ModuleSplit.forResources(module));
 
     // 1 base + 7 config splits
@@ -907,11 +920,13 @@ public class ScreenDensityResourcesSplitterTest {
             .setManifest(androidManifest("com.test.app"))
             .build();
 
-    Predicate<ResourceTableEntry> masterResourcesPredicate =
-        resource -> resource.getResourceId().getFullResourceId() == 0x7f010000;
+    Predicate<ResourceId> masterResourcesPredicate =
+        resourceId -> resourceId.getFullResourceId() == 0x7f010000;
     ScreenDensityResourcesSplitter splitter =
         new ScreenDensityResourcesSplitter(
-            BundleToolVersion.getCurrentVersion(), masterResourcesPredicate);
+            BundleToolVersion.getCurrentVersion(),
+            masterResourcesPredicate,
+            NO_LOW_DENSITY_CONFIG_PINNED_TO_MASTER);
 
     ImmutableCollection<ModuleSplit> densitySplits =
         splitter.split(ModuleSplit.forResources(testModule));
@@ -929,6 +944,188 @@ public class ScreenDensityResourcesSplitterTest {
         densitySplits.stream().filter(split -> split.isMasterSplit()).collect(onlyElement());
     assertThat(extractPaths(masterSplit.getEntries()))
         .containsExactly("res/drawable-mdpi/image.jpg", "res/drawable-hdpi/image.jpg");
+  }
+
+  @Test
+  public void lowestDensityConfigsPinnedToMaster() throws Exception {
+    BundleModule testModule =
+        new BundleModuleBuilder("testModule")
+            .addFile("res/drawable-mdpi/image.jpg")
+            .addFile("res/drawable-hdpi/image.jpg")
+            .addFile("res/drawable-mdpi/image2.jpg")
+            .addFile("res/drawable-hdpi/image2.jpg")
+            .setResourceTable(
+                new ResourceTableBuilder()
+                    .addPackage("com.test.app")
+                    .addDrawableResourceForMultipleDensities(
+                        "image",
+                        ImmutableMap.of(
+                            /* mdpi */ 160, "res/drawable-mdpi/image.jpg",
+                            /* hdpi */ 240, "res/drawable-hdpi/image.jpg"))
+                    .addDrawableResourceForMultipleDensities(
+                        "image2",
+                        ImmutableMap.of(
+                            /* mdpi */ 160, "res/drawable-mdpi/image2.jpg",
+                            /* hdpi */ 240, "res/drawable-hdpi/image2.jpg"))
+                    .build())
+            .setManifest(androidManifest("com.test.app"))
+            .build();
+
+    Predicate<ResourceId> pinnedLowDensityResourcesPredicate =
+        resourceId -> resourceId.getFullResourceId() == 0x7f010000;
+    ScreenDensityResourcesSplitter splitter =
+        new ScreenDensityResourcesSplitter(
+            BundleToolVersion.getCurrentVersion(),
+            NO_RESOURCES_PINNED_TO_MASTER,
+            pinnedLowDensityResourcesPredicate);
+
+    ImmutableCollection<ModuleSplit> densitySplits =
+        splitter.split(ModuleSplit.forResources(testModule));
+
+    ModuleSplit masterSplit =
+        densitySplits.stream().filter(split -> split.isMasterSplit()).collect(onlyElement());
+    assertThat(extractPaths(masterSplit.getEntries()))
+        .containsExactly("res/drawable-mdpi/image.jpg");
+
+    ImmutableList<ModuleSplit> configSplits =
+        densitySplits.stream().filter(split -> !split.isMasterSplit()).collect(toImmutableList());
+    assertThat(configSplits).isNotEmpty();
+    for (ModuleSplit configSplit : configSplits) {
+      assertThat(extractPaths(configSplit.getEntries()))
+          .doesNotContain("res/drawable-mdpi/image.jpg");
+    }
+  }
+
+  @Test
+  public void lowestDensityConfigsPinnedToMaster_mixedConfigsInSameDensityBucket()
+      throws Exception {
+    BundleModule testModule =
+        new BundleModuleBuilder("testModule")
+            .addFile("res/drawable-ldpi/image.jpg")
+            .addFile("res/drawable-ldpi-v21/image.jpg")
+            .addFile("res/drawable-ldpi-v24/image.jpg")
+            .addFile("res/drawable-xxhdpi/image.jpg")
+            .addFile("res/drawable-xxhdpi-v21/image.jpg")
+            .addFile("res/drawable-xxhdpi-v24/image.jpg")
+            .setResourceTable(
+                new ResourceTableBuilder()
+                    .addPackage("com.test.app")
+                    .addFileResourceForMultipleConfigs(
+                        "drawable",
+                        "image",
+                        ImmutableMap.<Configuration, String>builder()
+                            .put(mergeConfigs(LDPI), "res/drawable-ldpi/image.jpg")
+                            .put(mergeConfigs(LDPI, sdk(21)), "res/drawable-ldpi-v21/image.jpg")
+                            .put(mergeConfigs(LDPI, sdk(24)), "res/drawable-ldpi-v24/image.jpg")
+                            .put(mergeConfigs(XXXHDPI), "res/drawable-xxhdpi/image.jpg")
+                            .put(mergeConfigs(XXHDPI, sdk(21)), "res/drawable-xxhdpi-v21/image.jpg")
+                            .put(mergeConfigs(XXHDPI, sdk(24)), "res/drawable-xxhdpi-v24/image.jpg")
+                            .build())
+                    .build())
+            .setManifest(androidManifest("com.test.app"))
+            .build();
+
+    // 0x7f010000 is the "drawable/image" resource.
+    Predicate<ResourceId> pinnedLowDensityResourcesPredicate =
+        resourceId -> resourceId.getFullResourceId() == 0x7f010000;
+    ScreenDensityResourcesSplitter splitter =
+        new ScreenDensityResourcesSplitter(
+            BundleToolVersion.getCurrentVersion(),
+            NO_RESOURCES_PINNED_TO_MASTER,
+            pinnedLowDensityResourcesPredicate);
+
+    ImmutableCollection<ModuleSplit> densitySplits =
+        splitter.split(ModuleSplit.forResources(testModule));
+
+    ModuleSplit masterSplit =
+        densitySplits.stream().filter(split -> split.isMasterSplit()).collect(onlyElement());
+    assertThat(extractPaths(masterSplit.getEntries()))
+        .containsExactly(
+            "res/drawable-ldpi/image.jpg",
+            "res/drawable-ldpi-v21/image.jpg",
+            "res/drawable-ldpi-v24/image.jpg");
+
+    ImmutableList<ModuleSplit> configSplits =
+        densitySplits.stream().filter(split -> !split.isMasterSplit()).collect(toImmutableList());
+    assertThat(configSplits).isNotEmpty();
+    for (ModuleSplit configSplit : configSplits) {
+      assertThat(extractPaths(configSplit.getEntries()))
+          .containsNoneOf(
+              "res/drawable-ldpi/image.jpg",
+              "res/drawable-ldpi-v21/image.jpg",
+              "res/drawable-ldpi-v24/image.jpg");
+    }
+  }
+
+  @Test
+  public void lowestDensityConfigsPinnedToMaster_masterCoversRangeOfDensities() throws Exception {
+    BundleModule testModule =
+        new BundleModuleBuilder("testModule")
+            // Pinned resource, just for lowest and highest densities.
+            .addFile("res/drawable-ldpi/image.jpg")
+            .addFile("res/drawable-xxxhdpi/image.jpg")
+            // Non-pinned resource for all densities (to make sure no density split is empty).
+            .addFile("res/drawable-ldpi/other.jpg")
+            .addFile("res/drawable-mdpi/other.jpg")
+            .addFile("res/drawable-tvdpi/other.jpg")
+            .addFile("res/drawable-xhdpi/other.jpg")
+            .addFile("res/drawable-xxhdpi/other.jpg")
+            .addFile("res/drawable-xxxhdpi/other.jpg")
+            .setResourceTable(
+                new ResourceTableBuilder()
+                    .addPackage("com.test.app")
+                    .addDrawableResourceForMultipleDensities(
+                        "image",
+                        ImmutableMap.of(
+                            /* ldpi */ 120, "res/drawable-ldpi/image.jpg",
+                            /* xxxhdpi */ 640, "res/drawable-xxxhdpi/image.jpg"))
+                    .addDrawableResourceForMultipleDensities(
+                        "other",
+                        ImmutableMap.<Integer, String>builder()
+                            .put(/* ldpi */ 120, "res/drawable-ldpi/other.jpg")
+                            .put(/* mdpi */ 160, "res/drawable-mdpi/other.jpg")
+                            .put(/* tvdpi */ 213, "res/drawable-tvdpi/other.jpg")
+                            .put(/* hdpi */ 240, "res/drawable-hdpi/other.jpg")
+                            .put(/* xhdpi */ 320, "res/drawable-xhdpi/other.jpg")
+                            .put(/* xxhdpi */ 480, "res/drawable-xxhdpi/other.jpg")
+                            .put(/* xxxhdpi */ 640, "res/drawable-xxxhdpi/image.jpg")
+                            .build())
+                    .build())
+            .setManifest(androidManifest("com.test.app"))
+            .build();
+
+    // 0x7f010000 is the "drawable/image" resource.
+    Predicate<ResourceId> pinnedLowDensityResourcesPredicate =
+        resourceId -> resourceId.getFullResourceId() == 0x7f010000;
+    ScreenDensityResourcesSplitter splitter =
+        new ScreenDensityResourcesSplitter(
+            BundleToolVersion.getCurrentVersion(),
+            NO_RESOURCES_PINNED_TO_MASTER,
+            pinnedLowDensityResourcesPredicate);
+
+    ImmutableCollection<ModuleSplit> densitySplits =
+        splitter.split(ModuleSplit.forResources(testModule));
+
+    ImmutableList<ModuleSplit> configSplits =
+        densitySplits.stream().filter(split -> !split.isMasterSplit()).collect(toImmutableList());
+    assertThat(configSplits).isNotEmpty();
+    for (ModuleSplit configSplit : configSplits) {
+      DensityAlias targetDensity =
+          configSplit.getApkTargeting().getScreenDensityTargeting().getValue(0).getDensityAlias();
+      switch (targetDensity) {
+        case LDPI:
+        case MDPI:
+          // Devices <= MDPI are covered by the LDPI config.
+          assertThat(extractPaths(configSplit.getEntries()))
+              .doesNotContain("res/drawable-xxxhdpi/image.jpg");
+          break;
+
+        default:
+          // Devices > MDPI are covered by the XXXHDPI config.
+          assertThat(extractPaths(configSplit.getEntries()))
+              .contains("res/drawable-xxxhdpi/image.jpg");
+      }
+    }
   }
 
   private static ModuleSplit findModuleSplitWithScreenDensityTargeting(

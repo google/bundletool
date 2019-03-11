@@ -55,9 +55,13 @@ public class SplitsXmlInjector {
             .map(
                 keySplit -> {
                   switch (keySplit.getKey().getSplitType()) {
+                    case SYSTEM:
+                      // Injection for system APK variant is same as split APK variant as both
+                      // contain single base-master split which is always installed and additional
+                      // splits. In case of system APK variant base-master split is the fused system
+                      // split and splits are unmatched language splits.
                     case SPLIT:
                       return processSplitApkVariant(keySplit.getValue());
-                    case SYSTEM:
                     case STANDALONE:
                       return keySplit.getValue().stream()
                           .map(this::processStandaloneVariant)

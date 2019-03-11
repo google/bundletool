@@ -21,6 +21,7 @@ import static com.android.tools.build.bundletool.model.AndroidManifest.ANDROID_N
 import static com.android.tools.build.bundletool.model.AndroidManifest.IS_FEATURE_SPLIT_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.NAME_RESOURCE_ID;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifest;
+import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withMainActivity;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withSplitNameActivity;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.xmlAttribute;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.xmlBooleanAttribute;
@@ -378,7 +379,10 @@ public class ModuleSplitTest {
   public void splitNameRemoved() {
     AndroidManifest manifest =
         AndroidManifest.create(
-            androidManifest("com.test.app", withSplitNameActivity("FooActivity", "foo")));
+            androidManifest(
+                "com.test.app",
+                withMainActivity("MainActivity"),
+                withSplitNameActivity("FooActivity", "foo")));
     ModuleSplit masterSplit =
         ModuleSplit.builder()
             .setModuleName(BundleModuleName.create("base"))
@@ -414,7 +418,10 @@ public class ModuleSplitTest {
   public void removeUnknownSplits() {
     AndroidManifest manifest =
         AndroidManifest.create(
-            androidManifest("com.test.app", withSplitNameActivity("FooActivity", "foo")));
+            androidManifest(
+                "com.test.app",
+                withMainActivity("MainActivity"),
+                withSplitNameActivity("FooActivity", "foo")));
     ModuleSplit masterSplit =
         ModuleSplit.builder()
             .setModuleName(BundleModuleName.create("base"))

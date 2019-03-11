@@ -56,6 +56,10 @@ public class LanguageResourcesSplitter extends SplitterForOneTargetingDimension 
 
   private final Predicate<ResourceTableEntry> pinResourceToMaster;
 
+  public LanguageResourcesSplitter() {
+    this(/* pinResourceToMaster= */ Predicates.alwaysFalse());
+  }
+
   public LanguageResourcesSplitter(Predicate<ResourceTableEntry> pinResourceToMaster) {
     this.pinResourceToMaster = pinResourceToMaster;
   }
@@ -132,7 +136,12 @@ public class LanguageResourcesSplitter extends SplitterForOneTargetingDimension 
     ImmutableMap.Builder<String, ResourceTable> resourceTableByLanguage =
         new ImmutableMap.Builder<>();
     for (String language : languages) {
-      resourceTableByLanguage.put(language, filterByLanguage(table, language));
+      ResourceTable languageResourceTable = filterByLanguage(table, language);
+      // The resource table might be empty, due to resource pinning. In that case avoid creating
+      // a language split.
+      if (!languageResourceTable.equals(ResourceTable.getDefaultInstance())) {
+        resourceTableByLanguage.put(language, languageResourceTable);
+      }
     }
 
     // If there are no resources with the default language (rare and not recommended) create a

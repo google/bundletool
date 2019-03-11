@@ -26,7 +26,6 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.security.SecureRandom;
 import java.util.stream.Stream;
 import java.util.zip.GZIPInputStream;
 import org.junit.rules.TemporaryFolder;
@@ -34,29 +33,9 @@ import org.junit.rules.TemporaryFolder;
 /** File utility functions specific to unit tests. */
 public final class FileUtils {
 
-  private static final SecureRandom random = new SecureRandom();
-
   /** Creates a plain text file in the temporary directory containing the given lines. */
   public static Path createFileWithLines(TemporaryFolder tmp, String... lines) throws IOException {
     return Files.write(tmp.newFile().toPath(), ImmutableList.copyOf(lines));
-  }
-
-  /**
-   * Returns randomly generated name for the file.
-   *
-   * <p>The filename follows the pattern: prefix[random number]suffix.
-   */
-  public static String getRandomFileName(String prefix, String suffix) {
-    return prefix + Long.toString(random.nextLong()) + suffix;
-  }
-
-  /**
-   * Returns randomly generated file path in the given temp directory.
-   *
-   * <p>The filename follows the pattern: prefix[random number]suffix.
-   */
-  public static Path getRandomFilePath(TemporaryFolder tmp, String prefix, String suffix) {
-    return tmp.getRoot().toPath().resolve(getRandomFileName(prefix, suffix));
   }
 
   public static ImmutableSet<Path> getAllFilesInDirectory(Path directory) throws Exception {

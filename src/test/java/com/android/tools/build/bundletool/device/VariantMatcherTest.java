@@ -24,7 +24,7 @@ import static com.android.bundle.Targeting.ScreenDensity.DensityAlias.MDPI;
 import static com.android.bundle.Targeting.ScreenDensity.DensityAlias.XXXHDPI;
 import static com.android.tools.build.bundletool.testing.ApkSetUtils.splitApkSet;
 import static com.android.tools.build.bundletool.testing.ApksArchiveHelpers.createVariant;
-import static com.android.tools.build.bundletool.testing.ApksArchiveHelpers.multiAbiTargetingStandaloneVariant;
+import static com.android.tools.build.bundletool.testing.ApksArchiveHelpers.multiAbiTargetingApexVariant;
 import static com.android.tools.build.bundletool.testing.ApksArchiveHelpers.splitApkDescription;
 import static com.android.tools.build.bundletool.testing.ApksArchiveHelpers.standaloneVariant;
 import static com.android.tools.build.bundletool.testing.DeviceFactory.abis;
@@ -211,8 +211,8 @@ public class VariantMatcherTest {
     MultiAbiTargeting x86Targeting = multiAbiTargeting(x86Set, x64X86Set);
     MultiAbiTargeting x64X86Targeting = multiAbiTargeting(x64X86Set, x86Set);
 
-    Variant x86Variant = multiAbiTargetingStandaloneVariant(x86Targeting, x86Apk);
-    Variant x64X86Variant = multiAbiTargetingStandaloneVariant(x64X86Targeting, x64X86Apk);
+    Variant x86Variant = multiAbiTargetingApexVariant(x86Targeting, x86Apk);
+    Variant x64X86Variant = multiAbiTargetingApexVariant(x64X86Targeting, x64X86Apk);
     BuildApksResult buildApksResult =
         BuildApksResult.newBuilder()
             .addAllVariant(ImmutableList.of(x86Variant, x64X86Variant))
@@ -242,8 +242,8 @@ public class VariantMatcherTest {
     MultiAbiTargeting x86Targeting = multiAbiTargeting(x86Set, x64X86Set);
     MultiAbiTargeting x64X86Targeting = multiAbiTargeting(x64X86Set, x86Set);
 
-    Variant x86Variant = multiAbiTargetingStandaloneVariant(x86Targeting, x86Apk);
-    Variant x64X86Variant = multiAbiTargetingStandaloneVariant(x64X86Targeting, x64X86Apk);
+    Variant x86Variant = multiAbiTargetingApexVariant(x86Targeting, x86Apk);
+    Variant x64X86Variant = multiAbiTargetingApexVariant(x64X86Targeting, x64X86Apk);
     BuildApksResult buildApksResult =
         BuildApksResult.newBuilder()
             .addAllVariant(ImmutableList.of(x86Variant, x64X86Variant))

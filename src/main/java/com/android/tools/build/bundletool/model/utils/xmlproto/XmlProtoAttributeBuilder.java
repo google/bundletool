@@ -91,7 +91,7 @@ public final class XmlProtoAttributeBuilder
   }
 
   public XmlProtoAttributeBuilder setValueAsHexInteger(int value) {
-    attribute.setValue(String.format("0x%08X", value));
+    attribute.setValue(String.format("0x%08x", value));
     attribute.setCompiledItem(
         Item.newBuilder().setPrim(Primitive.newBuilder().setIntHexadecimalValue(value)));
     return this;

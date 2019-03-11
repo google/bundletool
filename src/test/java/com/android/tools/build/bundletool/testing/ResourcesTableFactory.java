@@ -37,6 +37,7 @@ import com.android.aapt.Resources.FileReference;
 import com.android.aapt.Resources.Item;
 import com.android.aapt.Resources.Package;
 import com.android.aapt.Resources.PackageId;
+import com.android.aapt.Resources.Reference;
 import com.android.aapt.Resources.ResourceTable;
 import com.android.aapt.Resources.Source;
 import com.android.aapt.Resources.StringPool;
@@ -82,6 +83,10 @@ public final class ResourcesTableFactory {
     return Configuration.newBuilder().setDensity(dpi).build();
   }
 
+  public static Configuration sdk(int apiLevel) {
+    return Configuration.newBuilder().setSdkVersion(apiLevel).build();
+  }
+
   public static Configuration mergeConfigs(Configuration config, Configuration... configs) {
     return mergeFromProtos(config, configs);
   }
@@ -91,11 +96,27 @@ public final class ResourcesTableFactory {
   }
 
   public static ConfigValue fileReference(String path, Configuration configuration) {
+    return fileReference(path, /* type= */ FileReference.Type.UNKNOWN, configuration);
+  }
+
+  public static ConfigValue fileReference(
+      String path, FileReference.Type type, Configuration configuration) {
     return ConfigValue.newBuilder()
         .setConfig(configuration)
         .setValue(
             Value.newBuilder()
-                .setItem(Item.newBuilder().setFile(FileReference.newBuilder().setPath(path))))
+                .setItem(
+                    Item.newBuilder()
+                        .setFile(FileReference.newBuilder().setPath(path).setType(type))))
+        .build();
+  }
+
+  public static ConfigValue reference(int referencedId, Configuration configuration) {
+    return ConfigValue.newBuilder()
+        .setConfig(configuration)
+        .setValue(
+            Value.newBuilder()
+                .setItem(Item.newBuilder().setRef(Reference.newBuilder().setId(referencedId))))
         .build();
   }
 

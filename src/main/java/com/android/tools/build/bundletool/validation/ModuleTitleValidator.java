@@ -22,6 +22,7 @@ import static com.google.common.collect.ImmutableSet.toImmutableSet;
 import com.android.aapt.Resources.ResourceTable;
 import com.android.tools.build.bundletool.model.BundleModule;
 import com.android.tools.build.bundletool.model.BundleModule.ModuleDeliveryType;
+import com.android.tools.build.bundletool.model.BundleModule.ModuleType;
 import com.android.tools.build.bundletool.model.exceptions.ValidationException;
 import com.android.tools.build.bundletool.model.version.BundleToolVersion;
 import com.android.tools.build.bundletool.model.version.Version;
@@ -55,8 +56,15 @@ public class ModuleTitleValidator extends SubValidator {
             .collect(toImmutableSet());
 
     for (BundleModule module : modules) {
-
-      if (!module.getDeliveryType().equals(ModuleDeliveryType.ALWAYS_INITIAL_INSTALL)) {
+      if (module.getModuleType().equals(ModuleType.ASSET_MODULE)) {
+        if (module.getAndroidManifest().getTitleRefId().isPresent()) {
+          throw ValidationException.builder()
+              .withMessage(
+                    "Module titles not supported in asset packs, but found in '%s'.",
+                  module.getName())
+              .build();
+        }
+      } else if (!module.getDeliveryType().equals(ModuleDeliveryType.ALWAYS_INITIAL_INSTALL)) {
         Optional<Integer> titleRefId = module.getAndroidManifest().getTitleRefId();
 
         if (!titleRefId.isPresent()) {

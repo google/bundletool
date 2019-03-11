@@ -19,6 +19,7 @@ package com.android.tools.build.bundletool.splitters;
 import static com.android.tools.build.bundletool.model.utils.Versions.ANDROID_P_API_VERSION;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifest;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.variantMinSdkTargeting;
+import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.truth.extensions.proto.ProtoTruth.assertThat;
 
 import com.android.bundle.Targeting.VariantTargeting;
@@ -39,7 +40,9 @@ public class DexCompressionVariantGeneratorTest {
         new DexCompressionVariantGenerator(
             ApkGenerationConfiguration.builder().setEnableDexCompressionSplitter(true).build());
     ImmutableCollection<VariantTargeting> splits =
-        dexCompressionVariantGenerator.generate(createModuleWithDexFile());
+        dexCompressionVariantGenerator
+            .generate(createModuleWithDexFile())
+            .collect(toImmutableList());
     assertThat(splits).containsExactly(variantMinSdkTargeting(ANDROID_P_API_VERSION));
   }
 
@@ -50,7 +53,9 @@ public class DexCompressionVariantGeneratorTest {
         new DexCompressionVariantGenerator(ApkGenerationConfiguration.getDefaultInstance());
 
     ImmutableCollection<VariantTargeting> splits =
-        dexCompressionVariantGenerator.generate(createModuleWithDexFile());
+        dexCompressionVariantGenerator
+            .generate(createModuleWithDexFile())
+            .collect(toImmutableList());
     assertThat(splits).isEmpty();
   }
 
@@ -67,7 +72,7 @@ public class DexCompressionVariantGeneratorTest {
             .build();
 
     ImmutableCollection<VariantTargeting> splits =
-        dexCompressionVariantGenerator.generate(bundleModule);
+        dexCompressionVariantGenerator.generate(bundleModule).collect(toImmutableList());
     assertThat(splits).isEmpty();
   }
 
@@ -80,7 +85,9 @@ public class DexCompressionVariantGeneratorTest {
                 .setEnableDexCompressionSplitter(true)
                 .build());
     ImmutableCollection<VariantTargeting> splits =
-        dexCompressionVariantGenerator.generate(createModuleWithDexFile());
+        dexCompressionVariantGenerator
+            .generate(createModuleWithDexFile())
+            .collect(toImmutableList());
     assertThat(splits).isEmpty();
   }
 

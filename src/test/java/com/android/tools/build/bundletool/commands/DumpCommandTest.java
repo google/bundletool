@@ -110,6 +110,23 @@ public final class DumpCommandTest {
   }
 
   @Test
+  public void buildingViaFlagsAndBuilderHasSameResult_negativeResourceId() {
+    DumpCommand commandViaFlags =
+        DumpCommand.fromFlags(
+            new FlagParser()
+                .parse("dump", "manifest", "--bundle=" + bundlePath, "--resource=0x80200000"));
+
+    DumpCommand commandViaBuilder =
+        DumpCommand.builder()
+            .setDumpTarget(DumpTarget.MANIFEST)
+            .setBundlePath(bundlePath)
+            .setResourceId(0x80200000)
+            .build();
+
+    assertThat(commandViaBuilder).isEqualTo(commandViaFlags);
+  }
+
+  @Test
   public void buildingViaFlagsAndBuilderHasSameResult_resourceName() {
     DumpCommand commandViaFlags =
         DumpCommand.fromFlags(

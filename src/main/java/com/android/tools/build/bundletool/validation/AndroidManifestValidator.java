@@ -16,7 +16,9 @@
 
 package com.android.tools.build.bundletool.validation;
 
+import static com.android.tools.build.bundletool.model.AndroidManifest.DISTRIBUTION_NAMESPACE_URI;
 import static com.android.tools.build.bundletool.model.AndroidManifest.NO_NAMESPACE_URI;
+import static com.android.tools.build.bundletool.model.AndroidManifest.VERSION_CODE_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.BundleModule.ModuleDeliveryType.CONDITIONAL_INITIAL_INSTALL;
 import static com.android.tools.build.bundletool.model.BundleModule.ModuleDeliveryType.NO_INITIAL_INSTALL;
 import static com.google.common.collect.ImmutableList.toImmutableList;
@@ -25,6 +27,9 @@ import static com.google.common.collect.ImmutableSet.toImmutableSet;
 import com.android.tools.build.bundletool.model.AndroidManifest;
 import com.android.tools.build.bundletool.model.BundleModule;
 import com.android.tools.build.bundletool.model.BundleModule.ModuleDeliveryType;
+import com.android.tools.build.bundletool.model.BundleModule.ModuleType;
+import com.android.tools.build.bundletool.model.ManifestDeliveryElement;
+import com.android.tools.build.bundletool.model.ModuleConditions;
 import com.android.tools.build.bundletool.model.exceptions.ValidationException;
 import com.android.tools.build.bundletool.model.exceptions.manifest.ManifestDuplicateAttributeException;
 import com.android.tools.build.bundletool.model.exceptions.manifest.ManifestFusingException.BaseModuleExcludedFromFusingException;
@@ -36,6 +41,7 @@ import com.android.tools.build.bundletool.model.exceptions.manifest.ManifestSdkT
 import com.android.tools.build.bundletool.model.exceptions.manifest.ManifestVersionCodeConflictException;
 import com.android.tools.build.bundletool.model.utils.xmlproto.XmlProtoAttribute;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMultimap;
 import com.google.common.collect.ImmutableSet;
 import java.util.Optional;
 
@@ -46,12 +52,14 @@ public class AndroidManifestValidator extends SubValidator {
   public void validateAllModules(ImmutableList<BundleModule> modules) {
     validateSameVersionCode(modules);
     validateInstant(modules);
+    validateNoVersionCodeInAssetModules(modules);
   }
 
   public void validateSameVersionCode(ImmutableList<BundleModule> modules) {
     ImmutableList<Integer> versionCodes =
         modules.stream()
             .map(BundleModule::getAndroidManifest)
+            .filter(manifest -> !manifest.getModuleType().equals(ModuleType.ASSET_MODULE))
             .map(AndroidManifest::getVersionCode)
             .distinct()
             .sorted()
@@ -59,6 +67,28 @@ public class AndroidManifestValidator extends SubValidator {
 
     if (versionCodes.size() > 1) {
       throw new ManifestVersionCodeConflictException(versionCodes.toArray(new Integer[0]));
+    }
+  }
+
+  private void validateNoVersionCodeInAssetModules(ImmutableList<BundleModule> modules) {
+    Optional<BundleModule> assetModuleWithVersionCode =
+        modules.stream()
+            .filter(
+                module ->
+                    module.getModuleType().equals(ModuleType.ASSET_MODULE)
+                        && module
+                            .getAndroidManifest()
+                            .getManifestRoot()
+                            .getElement()
+                            .getAndroidAttribute(VERSION_CODE_RESOURCE_ID)
+                            .isPresent())
+            .findFirst();
+    if (assetModuleWithVersionCode.isPresent()) {
+      throw ValidationException.builder()
+          .withMessage(
+              "Asset packs cannot specify a version code, but '%s' does.",
+              assetModuleWithVersionCode.get().getName())
+          .build();
     }
   }
 
@@ -70,6 +100,8 @@ public class AndroidManifestValidator extends SubValidator {
     validateMinMaxSdk(module);
     validateNumberOfDistinctSplitIds(module);
     validateOnDemandIsInstantMutualExclusion(module);
+    validateAssetModuleManifest(module);
+    validateMinSdkCondition(module);
   }
 
   private void validateInstant(ImmutableList<BundleModule> modules) {
@@ -217,6 +249,49 @@ public class AndroidManifestValidator extends SubValidator {
             .collect(toImmutableSet());
     if (splitIds.size() > 1) {
       throw new ManifestDuplicateAttributeException("split", splitIds, module.getName().toString());
+    }
+  }
+
+  private void validateAssetModuleManifest(BundleModule module) {
+    ImmutableMultimap<String, String> allowedManifestElementChildren =
+        ImmutableMultimap.of(DISTRIBUTION_NAMESPACE_URI, "module", NO_NAMESPACE_URI, "uses-split");
+
+    AndroidManifest manifest = module.getAndroidManifest();
+    if (!manifest.getModuleType().equals(ModuleType.ASSET_MODULE)) {
+      return;
+    }
+    if (manifest
+        .getManifestRoot()
+        .getElement()
+        .getChildrenElements()
+        .anyMatch(
+            child ->
+                !allowedManifestElementChildren.containsEntry(
+                    child.getNamespaceUri(), child.getName()))) {
+      throw ValidationException.builder()
+          .withMessage(
+              "Unexpected element declaration in manifest of asset pack '%s'.", module.getName())
+          .build();
+    }
+  }
+
+  /** Validates that if min-sdk condition is present it is >= than the effective minSdk version. */
+  private void validateMinSdkCondition(BundleModule module) {
+    int effectiveMinSdkVersion = module.getAndroidManifest().getEffectiveMinSdkVersion();
+    Optional<Integer> minSdkCondition =
+        module
+            .getAndroidManifest()
+            .getManifestDeliveryElement()
+            .map(ManifestDeliveryElement::getModuleConditions)
+            .flatMap(ModuleConditions::getMinSdkVersion);
+
+    if (minSdkCondition.isPresent() && minSdkCondition.get() < effectiveMinSdkVersion) {
+      throw ValidationException.builder()
+          .withMessage(
+              "Module '%s' has <dist:min-sdk> condition (%d) lower than the "
+                  + "minSdkVersion(%d) of the module.",
+              module.getName(), minSdkCondition.get(), effectiveMinSdkVersion)
+          .build();
     }
   }
 }

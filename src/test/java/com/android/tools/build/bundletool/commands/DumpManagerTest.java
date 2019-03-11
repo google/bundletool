@@ -267,10 +267,10 @@ public final class DumpManagerTest {
         .isEqualTo(
             String.format(
                 "Package 'com.app':%n"
-                    + "0x7F010000 - string/title%n"
+                    + "0x7f010000 - string/title%n"
                     + "\tlocale: \"en\"%n"
                     + "\tlocale: \"pt\"%n"
-                    + "0x7F020000 - drawable/icon%n"
+                    + "0x7f020000 - drawable/icon%n"
                     + "\tdensity: 160%n"
                     + "\tdensity: 240%n%n"));
   }
@@ -304,7 +304,7 @@ public final class DumpManagerTest {
         .isEqualTo(
             String.format(
                 "Package 'com.app':%n"
-                    + "0x7F010000 - string/title%n"
+                    + "0x7f010000 - string/title%n"
                     + "\tlocale: \"en\"%n"
                     + "\tlocale: \"pt\"%n%n"));
   }
@@ -334,7 +334,7 @@ public final class DumpManagerTest {
     assertThat(output)
         .isEqualTo(
             String.format(
-                "Package 'com.app':%n" + "0x7F010000 - string/icon%n" + "\t(default)%n%n"));
+                "Package 'com.app':%n" + "0x7f010000 - string/icon%n" + "\t(default)%n%n"));
   }
 
   @Test
@@ -382,7 +382,7 @@ public final class DumpManagerTest {
         .isEqualTo(
             String.format(
                 "Package 'com.app':%n"
-                    + "0x7F010000 - string/module%n"
+                    + "0x7f010000 - string/module%n"
                     + "\t(default)%n"
                     + "%n"
                     + "Package 'com.app.foo':%n"
@@ -416,9 +416,9 @@ public final class DumpManagerTest {
         .isEqualTo(
             String.format(
                 "Package 'com.app':%n"
-                    + "0x7F010000 - string/title%n"
+                    + "0x7f010000 - string/title%n"
                     + "\t(default) - [STR] \"Title\"%n"
-                    + "0x7F020000 - drawable/icon%n"
+                    + "0x7f020000 - drawable/icon%n"
                     + "\t(default) - [FILE] res/drawable/icon.png%n"
                     + "%n"));
   }
@@ -451,15 +451,15 @@ public final class DumpManagerTest {
         .isEqualTo(
             String.format(
                 "Package 'com.app':%n"
-                    + "0x7F010000 - string/text%n"
+                    + "0x7f010000 - string/text%n"
                     + "\t(default) - [STR] \"First line\\nSecond line\\nThird line\"%n"
-                    + "0x7F010001 - string/text2%n"
+                    + "0x7f010001 - string/text2%n"
                     + "\t(default) - [STR] \"First line\\r\\nSecond line\\r\\nThird line\"%n"
-                    + "0x7F010002 - string/text3%n"
+                    + "0x7f010002 - string/text3%n"
                     + "\t(default) - [STR] \"First line\\u2028Second line\\u2028Third line\"%n"
-                    + "0x7F010003 - string/text4%n"
+                    + "0x7f010003 - string/text4%n"
                     + "\t(default) - [STR] \"First line\\\\nSame line!\"%n"
-                    + "0x7F010004 - string/text5%n"
+                    + "0x7f010004 - string/text5%n"
                     + "\t(default) - [STR] \"Text \\\"with\\\" quotes!\"%n"
                     + "%n"));
   }

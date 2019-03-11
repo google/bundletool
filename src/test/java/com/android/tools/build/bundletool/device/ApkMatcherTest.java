@@ -31,7 +31,7 @@ import static com.android.tools.build.bundletool.testing.ApkSetUtils.splitApkSet
 import static com.android.tools.build.bundletool.testing.ApksArchiveHelpers.createConditionalApkSet;
 import static com.android.tools.build.bundletool.testing.ApksArchiveHelpers.createVariant;
 import static com.android.tools.build.bundletool.testing.ApksArchiveHelpers.instantApkDescription;
-import static com.android.tools.build.bundletool.testing.ApksArchiveHelpers.multiAbiTargetingStandaloneVariant;
+import static com.android.tools.build.bundletool.testing.ApksArchiveHelpers.multiAbiTargetingApexVariant;
 import static com.android.tools.build.bundletool.testing.ApksArchiveHelpers.splitApkDescription;
 import static com.android.tools.build.bundletool.testing.ApksArchiveHelpers.standaloneVariant;
 import static com.android.tools.build.bundletool.testing.DeviceFactory.abis;
@@ -475,8 +475,8 @@ public class ApkMatcherTest {
 
     BuildApksResult buildApksResult =
         BuildApksResult.newBuilder()
-            .addVariant(multiAbiTargetingStandaloneVariant(x86Targeting, x86Apk))
-            .addVariant(multiAbiTargetingStandaloneVariant(x64X86Targeting, x64X86Apk))
+            .addVariant(multiAbiTargetingApexVariant(x86Targeting, x86Apk))
+            .addVariant(multiAbiTargetingApexVariant(x64X86Targeting, x64X86Apk))
             .build();
 
     CommandExecutionException e =
@@ -503,8 +503,8 @@ public class ApkMatcherTest {
 
     BuildApksResult buildApksResult =
         BuildApksResult.newBuilder()
-            .addVariant(multiAbiTargetingStandaloneVariant(x86Targeting, x86Apk))
-            .addVariant(multiAbiTargetingStandaloneVariant(x64X86Targeting, x64X86Apk))
+            .addVariant(multiAbiTargetingApexVariant(x86Targeting, x86Apk))
+            .addVariant(multiAbiTargetingApexVariant(x64X86Targeting, x64X86Apk))
             .build();
 
     assertThat(new ApkMatcher(abis("x86")).getMatchingApks(buildApksResult))

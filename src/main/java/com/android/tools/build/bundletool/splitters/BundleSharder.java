@@ -34,6 +34,7 @@ import com.android.tools.build.bundletool.model.BundleMetadata;
 import com.android.tools.build.bundletool.model.BundleModule;
 import com.android.tools.build.bundletool.model.ModuleSplit;
 import com.android.tools.build.bundletool.model.OptimizationDimension;
+import com.android.tools.build.bundletool.model.ShardedSystemSplits;
 import com.android.tools.build.bundletool.model.exceptions.CommandExecutionException;
 import com.android.tools.build.bundletool.model.version.Version;
 import com.google.common.base.Predicates;
@@ -44,7 +45,6 @@ import com.google.common.collect.Multimaps;
 import com.google.common.collect.Sets;
 import java.nio.file.Path;
 import java.util.Collection;
-import java.util.Optional;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.function.Predicate;
@@ -53,32 +53,22 @@ import java.util.function.Predicate;
  * Generator of sharded APKs compatible with pre-L devices.
  *
  * <p>Sharded APK is a standalone APK that has been optimized in certain dimensions by stripping out
- * unnecessary files. Sharding is supported only by ABI and screen density.
+ * unnecessary files. Sharding is supported only by ABI and screen density. When device spec is
+ * present we merge only the languages supported into sharded APK.
  */
 public class BundleSharder {
 
   private final Version bundleVersion;
   private final ModuleSplitsToShardMerger merger;
-  private final boolean generate64BitShards;
-  private final Optional<DeviceSpec> deviceSpec;
-
-  public BundleSharder(Path globalTempDir, Version bundleVersion) {
-    this(globalTempDir, bundleVersion, /* generate64BitShards= */ true);
-  }
-
-  public BundleSharder(Path globalTempDir, Version bundleVersion, boolean generate64BitShards) {
-    this(globalTempDir, bundleVersion, generate64BitShards, Optional.empty());
-  }
+  private final BundleSharderConfiguration bundleSharderConfiguration;
 
   public BundleSharder(
       Path globalTempDir,
       Version bundleVersion,
-      boolean generate64BitShards,
-      Optional<DeviceSpec> deviceSpec) {
+      BundleSharderConfiguration bundleSharderConfiguration) {
     this.bundleVersion = bundleVersion;
     this.merger = new ModuleSplitsToShardMerger(new D8DexMerger(), globalTempDir);
-    this.generate64BitShards = generate64BitShards;
-    this.deviceSpec = deviceSpec;
+    this.bundleSharderConfiguration = bundleSharderConfiguration;
   }
 
   /**
@@ -106,6 +96,33 @@ public class BundleSharder {
       ImmutableList<BundleModule> modules,
       ImmutableSet<OptimizationDimension> shardingDimensions,
       BundleMetadata bundleMetadata) {
+    checkState(
+        !bundleSharderConfiguration.getDeviceSpec().isPresent(),
+        "Device spec should be set only when sharding for system apps.");
+    return merger.merge(generateUnfusedShards(modules, shardingDimensions), bundleMetadata);
+  }
+
+  /**
+   * Generates sharded system APK and additional split APK from the input modules.
+   *
+   * <p>We target a specific "ABI" x "Screen Density" x "Language" configuration specified in the
+   * device spec.
+   */
+  public ShardedSystemSplits shardForSystemApps(
+      ImmutableList<BundleModule> modules,
+      ImmutableSet<OptimizationDimension> shardingDimensions,
+      BundleMetadata bundleMetadata) {
+    checkState(
+        bundleSharderConfiguration.getDeviceSpec().isPresent(),
+        "Device spec should be set when sharding for system apps.");
+    return merger.mergeSystemShard(
+        Iterables.getOnlyElement(generateUnfusedShards(modules, shardingDimensions)),
+        bundleMetadata,
+        bundleSharderConfiguration.getDeviceSpec().get());
+  }
+
+  private ImmutableList<ImmutableList<ModuleSplit>> generateUnfusedShards(
+      ImmutableList<BundleModule> modules, ImmutableSet<OptimizationDimension> shardingDimensions) {
     checkArgument(!modules.isEmpty(), "At least one module is required.");
 
     // Generate a flat list of splits from all input modules.
@@ -117,14 +134,7 @@ public class BundleSharder {
 
     // Each sublist below represents a collection of splits targeting a specific device
     // configuration.
-    ImmutableList<ImmutableList<ModuleSplit>> unfusedShards = groupSplitsToShards(moduleSplits);
-    checkState(
-        !deviceSpec.isPresent() || unfusedShards.size() == 1,
-        "Expected one set of splits when device spec is present but received %s.",
-        unfusedShards.size());
-
-    // Fuse each group of splits into a sharded APK.
-    return merger.merge(unfusedShards, bundleMetadata);
+    return groupSplitsToShards(moduleSplits);
   }
 
   /**
@@ -153,8 +163,11 @@ public class BundleSharder {
     SplittingPipeline apexPipeline = createApexImagesSplittingPipeline();
     rawSplits.addAll(apexPipeline.split(ModuleSplit.forApex(module)));
 
+    // Assets splits.
+    SplittingPipeline assetsPipeline = createAssetsSplittingPipeline(shardingDimensions);
+    rawSplits.addAll(assetsPipeline.split(ModuleSplit.forAssets(module)));
+
     // Other files.
-    rawSplits.add(ModuleSplit.forAssets(module));
     rawSplits.add(ModuleSplit.forDex(module));
     rawSplits.add(ModuleSplit.forRoot(module));
 
@@ -176,18 +189,39 @@ public class BundleSharder {
       ImmutableSet<OptimizationDimension> shardingDimensions) {
     return new SplittingPipeline(
         shardingDimensions.contains(OptimizationDimension.ABI)
-            ? ImmutableList.of(new AbiNativeLibrariesSplitter(generate64BitShards))
+            ? ImmutableList.of(
+                new AbiNativeLibrariesSplitter(bundleSharderConfiguration.getGenerate64BitShard()))
             : ImmutableList.of());
   }
 
   private SplittingPipeline createResourcesSplittingPipeline(
       ImmutableSet<OptimizationDimension> shardingDimensions) {
-    return new SplittingPipeline(
-        shardingDimensions.contains(OptimizationDimension.SCREEN_DENSITY)
-            ? ImmutableList.of(
-                new ScreenDensityResourcesSplitter(
-                    bundleVersion, /* pinResourceToMaster= */ Predicates.alwaysFalse()))
-            : ImmutableList.of());
+    ImmutableList.Builder<ModuleSplitSplitter> resourceSplitters = ImmutableList.builder();
+
+    if (shardingDimensions.contains(OptimizationDimension.SCREEN_DENSITY)) {
+      resourceSplitters.add(
+          new ScreenDensityResourcesSplitter(
+              bundleVersion,
+              /* pinWholeResourceToMaster= */ Predicates.alwaysFalse(),
+              /* pinLowestBucketOfResourceToMaster= */ Predicates.alwaysFalse()));
+    }
+
+    if (shardingDimensions.contains(OptimizationDimension.LANGUAGE)
+        && bundleSharderConfiguration.splitByLanguage()) {
+      resourceSplitters.add(new LanguageResourcesSplitter());
+    }
+
+    return new SplittingPipeline(resourceSplitters.build());
+  }
+
+  private SplittingPipeline createAssetsSplittingPipeline(
+      ImmutableSet<OptimizationDimension> shardingDimensions) {
+    ImmutableList.Builder<ModuleSplitSplitter> assetsSplitters = ImmutableList.builder();
+    if (shardingDimensions.contains(OptimizationDimension.LANGUAGE)
+        && bundleSharderConfiguration.splitByLanguage()) {
+      assetsSplitters.add(LanguageAssetsSplitter.create());
+    }
+    return new SplittingPipeline(assetsSplitters.build());
   }
 
   private SplittingPipeline createApexImagesSplittingPipeline() {
@@ -211,6 +245,8 @@ public class BundleSharder {
         subsetWithTargeting(splits, ApkTargeting::hasAbiTargeting);
     ImmutableSet<ModuleSplit> densitySplits =
         subsetWithTargeting(splits, ApkTargeting::hasScreenDensityTargeting);
+
+    ImmutableSet<ModuleSplit> languageSplits = getLanguageSplits(splits);
     ImmutableSet<ModuleSplit> masterSplits = getMasterSplits(splits);
 
     checkState(
@@ -256,6 +292,7 @@ public class BundleSharder {
         shards.add(
             ImmutableList.<ModuleSplit>builder()
                 .addAll(masterSplits)
+                .addAll(languageSplits)
                 .addAll(abiSplitsSubset)
                 .addAll(densitySplitsSubset)
                 .build());
@@ -285,19 +322,19 @@ public class BundleSharder {
       ImmutableList<ModuleSplit> splits, Predicate<ApkTargeting> predicate) {
     return splits.stream()
         .filter(split -> predicate.test(split.getApkTargeting()))
-        .filter(split -> deviceSpec.map(spec -> splitMatchesDeviceSpec(split, spec)).orElse(true))
+        .filter(
+            split ->
+                bundleSharderConfiguration
+                    .getDeviceSpec()
+                    .map(spec -> splitMatchesDeviceSpec(split, spec))
+                    .orElse(true))
         .collect(toImmutableSet());
   }
 
-  /** Returns master splits, i.e splits without ABI or Density targeting. */
-  private static ImmutableSet<ModuleSplit> getMasterSplits(ImmutableList<ModuleSplit> splits) {
+  /** Returns master splits, i.e splits without any targeting. */
+  private ImmutableSet<ModuleSplit> getMasterSplits(ImmutableList<ModuleSplit> splits) {
     ImmutableSet<ModuleSplit> masterSplits =
-        splits.stream()
-            .filter(
-                split ->
-                    !split.getApkTargeting().hasScreenDensityTargeting()
-                        && !split.getApkTargeting().hasAbiTargeting())
-            .collect(toImmutableSet());
+        splits.stream().filter(ModuleSplit::isMasterSplit).collect(toImmutableSet());
 
     checkState(
         masterSplits.size() >= 1,
@@ -307,7 +344,14 @@ public class BundleSharder {
         masterSplits.stream()
             .allMatch(split -> split.getApkTargeting().equals(ApkTargeting.getDefaultInstance())),
         "Master splits are expected to have default targeting.");
+
     return masterSplits;
+  }
+
+  private static ImmutableSet<ModuleSplit> getLanguageSplits(ImmutableList<ModuleSplit> splits) {
+    return splits.stream()
+        .filter(split -> split.getApkTargeting().hasLanguageTargeting())
+        .collect(toImmutableSet());
   }
 
   private static Collection<Collection<ModuleSplit>> partitionByTargeting(
@@ -332,7 +376,7 @@ public class BundleSharder {
     return distinctNonEmptyUniverseCount <= 1;
   }
 
-  private static boolean splitMatchesDeviceSpec(ModuleSplit moduleSplit, DeviceSpec deviceSpec) {
+  static boolean splitMatchesDeviceSpec(ModuleSplit moduleSplit, DeviceSpec deviceSpec) {
     return new ApkMatcher(deviceSpec).matchesModuleSplitByTargeting(moduleSplit);
   }
 }

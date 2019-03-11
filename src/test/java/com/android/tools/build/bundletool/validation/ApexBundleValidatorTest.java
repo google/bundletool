@@ -261,7 +261,9 @@ public class ApexBundleValidatorTest {
                 new ApexBundleValidator()
                     .validateAllModules(ImmutableList.of(apexModule, apexModule)));
 
-    assertThat(exception).hasMessageThat().contains("Multiple APEX modules are not allowed");
+    assertThat(exception)
+        .hasMessageThat()
+        .contains("Multiple APEX modules are not allowed, found 2.");
   }
 
   @Test
@@ -277,7 +279,9 @@ public class ApexBundleValidatorTest {
                 new ApexBundleValidator()
                     .validateAllModules(ImmutableList.of(apexModule, anotherModule)));
 
-    assertThat(exception).hasMessageThat().contains("APEX bundles must only contain one module");
+    assertThat(exception)
+        .hasMessageThat()
+        .contains("APEX bundles must only contain one module, found 2.");
   }
 
   private BundleModule validApexModule() throws IOException {

@@ -24,6 +24,7 @@ import static com.android.tools.build.bundletool.model.AndroidManifest.SERVICE_E
 import static com.android.tools.build.bundletool.model.AndroidManifest.SPLIT_NAME_ATTRIBUTE_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.SPLIT_NAME_RESOURCE_ID;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifest;
+import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withMainActivity;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withSplitNameActivity;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withSplitNameProvider;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withSplitNameService;
@@ -47,7 +48,10 @@ public final class ManifestProtoUtilsTest {
   public void splitNameAttributeAddedToActivity() {
     AndroidManifest manifest =
         AndroidManifest.create(
-            androidManifest("com.test.app", withSplitNameActivity("FooActivity", "foo")));
+            androidManifest(
+                "com.test.app",
+                withMainActivity("MainActivity"),
+                withSplitNameActivity("FooActivity", "foo")));
 
     ImmutableList<XmlElement> activities =
         manifest

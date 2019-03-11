@@ -29,7 +29,7 @@ import com.android.tools.build.bundletool.device.AdbServer;
 import com.android.tools.build.bundletool.device.DeviceSpecParser;
 import com.android.tools.build.bundletool.flags.Flag;
 import com.android.tools.build.bundletool.flags.ParsedFlags;
-import com.android.tools.build.bundletool.io.TempFiles;
+import com.android.tools.build.bundletool.io.TempDirectory;
 import com.android.tools.build.bundletool.model.Aapt2Command;
 import com.android.tools.build.bundletool.model.ApkListener;
 import com.android.tools.build.bundletool.model.ApkModifier;
@@ -45,6 +45,7 @@ import com.android.tools.build.bundletool.splitters.DexCompressionSplitter;
 import com.android.tools.build.bundletool.splitters.NativeLibrariesCompressionSplitter;
 import com.google.auto.value.AutoValue;
 import com.google.common.base.Ascii;
+import com.google.common.base.Function;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.io.MoreFiles;
 import com.google.common.util.concurrent.ListeningExecutorService;
@@ -77,7 +78,15 @@ public abstract class BuildApksCommand {
      * SYSTEM_COMPRESSED mode generates compressed APK and an additional uncompressed stub APK
      * (containing only android manifest) for the system image.
      */
-    SYSTEM_COMPRESSED
+    SYSTEM_COMPRESSED;
+
+    public String getLowerCaseName() {
+      return Ascii.toLowerCase(name());
+    }
+
+    public boolean isAnySystemMode() {
+      return equals(SYSTEM) || equals(SYSTEM_COMPRESSED);
+    }
   }
 
   private static final Flag<Path> BUNDLE_LOCATION_FLAG = Flag.path("bundle");
@@ -88,7 +97,6 @@ public abstract class BuildApksCommand {
   private static final Flag<Path> AAPT2_PATH_FLAG = Flag.path("aapt2");
   private static final Flag<Integer> MAX_THREADS_FLAG = Flag.positiveInteger("max-threads");
   private static final Flag<ApkBuildMode> MODE_FLAG = Flag.enumFlag("mode", ApkBuildMode.class);
-  private static final Flag<Boolean> GENERATE_UNIVERSAL_APK_FLAG = Flag.booleanFlag("universal");
 
   private static final Flag<Path> ADB_PATH_FLAG = Flag.path("adb");
   private static final Flag<Boolean> CONNECTED_DEVICE_FLAG = Flag.booleanFlag("connected-device");
@@ -296,7 +304,7 @@ public abstract class BuildApksCommand {
         throw new ValidationException(
             String.format(
                 "Optimization dimension can be only set when running with '%s' mode flag.",
-                Ascii.toLowerCase(DEFAULT.name())));
+                DEFAULT.getLowerCaseName()));
       }
 
       if (command.getGenerateOnlyForConnectedDevice()
@@ -304,14 +312,37 @@ public abstract class BuildApksCommand {
         throw new ValidationException(
             String.format(
                 "Optimizing for connected device only possible when running with '%s' mode flag.",
-                Ascii.toLowerCase(DEFAULT.name())));
+                DEFAULT.getLowerCaseName()));
       }
 
-      if (command.getDeviceSpec().isPresent() && command.getApkBuildMode().equals(UNIVERSAL)) {
-        throw new ValidationException(
-            String.format(
-                "Optimizing for device spec not possible when running with '%s' mode flag.",
-                Ascii.toLowerCase(UNIVERSAL.name())));
+      if (command.getDeviceSpec().isPresent()) {
+        switch (command.getApkBuildMode()) {
+          case UNIVERSAL:
+            throw new ValidationException(
+                String.format(
+                    "Optimizing for device spec not possible when running with '%s' mode flag.",
+                    UNIVERSAL.getLowerCaseName()));
+          case SYSTEM:
+          case SYSTEM_COMPRESSED:
+            DeviceSpec deviceSpec = command.getDeviceSpec().get();
+            if (deviceSpec.getScreenDensity() == 0 || deviceSpec.getSupportedAbisList().isEmpty()) {
+              throw new ValidationException(
+                  String.format(
+                      "Device spec must have screen density and ABIs set when running with "
+                          + "'%s' or '%s' mode flag. ",
+                      SYSTEM.getLowerCaseName(), SYSTEM_COMPRESSED.getLowerCaseName()));
+            }
+            break;
+          case DEFAULT:
+        }
+      } else {
+        if (command.getApkBuildMode().isAnySystemMode()) {
+          throw ValidationException.builder()
+              .withMessage(
+                  "Device spec must always be set when running with '%s' or '%s' mode flag.",
+                  SYSTEM.getLowerCaseName(), SYSTEM_COMPRESSED.getLowerCaseName())
+              .build();
+        }
       }
 
       if (command.getGenerateOnlyForConnectedDevice() && command.getDeviceSpec().isPresent()) {
@@ -361,14 +392,6 @@ public abstract class BuildApksCommand {
         .ifPresent(
             aapt2Path ->
                 buildApksCommand.setAapt2Command(Aapt2Command.createFromExecutablePath(aapt2Path)));
-
-    if (GENERATE_UNIVERSAL_APK_FLAG.getValue(flags).orElse(false)) {
-      out.printf(
-          "WARNING: The '%s' flag is now replaced with --mode=universal and is going to be removed "
-              + "in the next BundleTool version.%n",
-          GENERATE_UNIVERSAL_APK_FLAG.getName());
-      buildApksCommand.setApkBuildMode(UNIVERSAL);
-    }
 
     MODE_FLAG.getValue(flags).ifPresent(buildApksCommand::setApkBuildMode);
     MAX_THREADS_FLAG
@@ -440,9 +463,18 @@ public abstract class BuildApksCommand {
       buildApksCommand.setAdbPath(adbPath).setAdbServer(adbServer);
     }
 
+    ApkBuildMode apkBuildMode = MODE_FLAG.getValue(flags).orElse(DEFAULT);
+    boolean supportsPartialDeviceSpecs = apkBuildMode.isAnySystemMode();
+
+    Function<Path, DeviceSpec> deviceSpecParser =
+        supportsPartialDeviceSpecs
+            ? DeviceSpecParser::parsePartialDeviceSpec
+            : DeviceSpecParser::parseDeviceSpec;
+
     DEVICE_SPEC_FLAG
         .getValue(flags)
-        .ifPresent(path -> buildApksCommand.setDeviceSpec(DeviceSpecParser.parseDeviceSpec(path)));
+        .map(deviceSpecParser)
+        .ifPresent(buildApksCommand::setDeviceSpec);
 
     flags.checkNoUnknownFlags();
 
@@ -450,7 +482,9 @@ public abstract class BuildApksCommand {
   }
 
   public Path execute() {
-    return TempFiles.withTempDirectoryReturning(new BuildApksManager(this)::execute);
+    try (TempDirectory tempDirectory = new TempDirectory()) {
+      return new BuildApksManager(this).execute(tempDirectory.getPath());
+    }
   }
 
   /**
@@ -513,10 +547,10 @@ public abstract class BuildApksCommand {
                         + "manifest) for the system image.",
                     BuildApksCommand.COMMAND_NAME,
                     joinFlagOptions(ApkBuildMode.values()),
-                    Ascii.toLowerCase(DEFAULT.name()),
-                    Ascii.toLowerCase(UNIVERSAL.name()),
-                    Ascii.toLowerCase(SYSTEM.name()),
-                    Ascii.toLowerCase(SYSTEM_COMPRESSED.name()))
+                    DEFAULT.getLowerCaseName(),
+                    UNIVERSAL.getLowerCaseName(),
+                    SYSTEM.getLowerCaseName(),
+                    SYSTEM_COMPRESSED.getLowerCaseName())
                 .build())
         .addFlag(
             FlagDescription.builder()
@@ -538,7 +572,7 @@ public abstract class BuildApksCommand {
                         + "--%s=%s flag.",
                     joinFlagOptions(OptimizationDimension.values()),
                     MODE_FLAG.getName(),
-                    Ascii.toLowerCase(DEFAULT.name()))
+                    DEFAULT.getLowerCaseName())
                 .build())
         .addFlag(
             FlagDescription.builder()
@@ -592,7 +626,7 @@ public abstract class BuildApksCommand {
                     "If set, will generate APK Set optimized for the connected device. The "
                         + "generated APK Set will only be installable on that specific class of "
                         + "devices. This flag should be only be set with --%s=%s flag.",
-                    MODE_FLAG.getName(), Ascii.toLowerCase(DEFAULT.name()))
+                    MODE_FLAG.getName(), DEFAULT.getLowerCaseName())
                 .build())
         .addFlag(
             FlagDescription.builder()
@@ -626,7 +660,7 @@ public abstract class BuildApksCommand {
                         + "This flag should be only be set with --%s=%s flag.",
                     GetDeviceSpecCommand.COMMAND_NAME,
                     MODE_FLAG.getName(),
-                    Ascii.toLowerCase(DEFAULT.name()))
+                    DEFAULT.getLowerCaseName())
                 .build())
         .build();
   }

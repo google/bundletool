@@ -45,10 +45,6 @@ message AssetSlice {
 
   // APKs.
   repeated ApkDescription apk_description = 3;
-
-  // Subversion for the Asset Module that this Asset Slice belongs to (i.e. the
-  // Asset Module it was generated from).
-  uint32 asset_module_subversion = 4;
 }
 
 // Represents a module.
@@ -114,6 +110,10 @@ message ApkDescription {
     SplitApkMetadata instant_apk_metadata = 5;
     // Set only for system APKs.
     SystemApkMetadata system_apk_metadata = 6;
+    // Set only for asset slices.
+    SplitApkMetadata asset_slice_metadata = 7;
+    // Set only for APEX APKs.
+    ApexApkMetadata apex_apk_metadata = 8;
   }
 }
 
@@ -129,6 +129,8 @@ message SplitApkMetadata {
 message StandaloneApkMetadata {
   // Names of the modules fused in this standalone APK.
   repeated string fused_module_name = 1;
+
+  reserved 2;
 }
 
 // Holds data specific to system APKs.
@@ -149,3 +151,6 @@ message SystemApkMetadata {
   // compressed system APK.
   SystemApkType system_apk_type = 2;
 }
+
+// Holds data specific to APEX APKs.
+message ApexApkMetadata {}

@@ -33,10 +33,13 @@ import javax.annotation.concurrent.GuardedBy;
  *
  * <ul>
  *   <li>Standalone APKs will have the format: "standalones/standalone-x86-hdpi.apk"
+ *   <li>Standalone APEXs will have the format: "standalones/standalone-x86.apex"
  *   <li>Split APKs will have the format: "splits/moduleName-master.apk",
  *       "splits/moduleName-x86.apk", etc.
  *   <li>Instant APKs will have the format: "instant/instant-moduleName-master.apk",
  *       "instant/instant-moduleName-x86.apk", etc.
+ *   <li>Asset Slices will have the format: "asset-slices/moduleName-master.apk",
+ *       "asset-slices/moduleName-x86.apk", etc.
  * </ul>
  *
  * <p>If the name of an APK conflicts with a previously generated APK, a unique number is appended
@@ -78,14 +81,23 @@ public class ApkPathManager {
         apkFileName = buildName("standalone", targetingSuffix);
         break;
       case SYSTEM:
-        directory = ZipPath.create("system");
-        apkFileName = buildName("system", targetingSuffix);
+        if (moduleSplit.isMasterSplit()) {
+          directory = ZipPath.create("system");
+          apkFileName = buildName("system", targetingSuffix);
+        } else {
+          directory = ZipPath.create("splits");
+          apkFileName = buildName(moduleName, targetingSuffix);
+        }
+        break;
+      case ASSET_SLICE:
+        directory = ZipPath.create("asset-slices");
+        apkFileName = buildName(moduleName, targetingSuffix);
         break;
       default:
         throw new IllegalStateException("Unrecognized split type: " + moduleSplit.getSplitType());
     }
 
-    return findAndClaimUnusedPath(directory, apkFileName, /* fileExtension= */ ".apk");
+    return findAndClaimUnusedPath(directory, apkFileName, fileExtension(moduleSplit));
   }
 
   /**
@@ -105,6 +117,10 @@ public class ApkPathManager {
     usedPaths.add(apkPath);
 
     return apkPath;
+  }
+
+  private static String fileExtension(ModuleSplit moduleSplit) {
+    return moduleSplit.isApex() ? ".apex" : ".apk";
   }
 
   private static String getTargetingSuffix(ModuleSplit moduleSplit) {

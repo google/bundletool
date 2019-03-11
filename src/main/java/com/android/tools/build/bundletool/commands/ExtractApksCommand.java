@@ -32,6 +32,7 @@ import com.android.tools.build.bundletool.device.DeviceSpecParser;
 import com.android.tools.build.bundletool.flags.Flag;
 import com.android.tools.build.bundletool.flags.ParsedFlags;
 import com.android.tools.build.bundletool.model.ZipPath;
+import com.android.tools.build.bundletool.model.exceptions.CommandExecutionException;
 import com.android.tools.build.bundletool.model.exceptions.ValidationException;
 import com.android.tools.build.bundletool.model.utils.FileNames;
 import com.android.tools.build.bundletool.model.utils.ResultUtils;
@@ -154,6 +155,12 @@ public abstract class ExtractApksCommand {
 
     ApkMatcher apkMatcher = new ApkMatcher(getDeviceSpec(), requestedModuleNames, getInstant());
     ImmutableList<ZipPath> matchedApks = apkMatcher.getMatchingApks(toc);
+
+    if (matchedApks.isEmpty()) {
+      throw CommandExecutionException.builder()
+          .withMessage("No compatible APKs found for the device.")
+          .build();
+    }
 
 
     if (Files.isDirectory(getApksArchivePath())) {

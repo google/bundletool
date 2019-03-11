@@ -16,6 +16,7 @@
 
 package com.android.tools.build.bundletool.splitters;
 
+import static com.android.tools.build.bundletool.model.AndroidManifest.MODULE_TYPE_ASSET_VALUE;
 import static com.android.tools.build.bundletool.model.OptimizationDimension.LANGUAGE;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifest;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withTypeAttribute;
@@ -62,7 +63,8 @@ public class RemoteAssetModuleSplitterTest {
         new BundleModuleBuilder("testModule")
             .addFile("assets/image.jpg")
             .addFile("assets/image2.jpg")
-            .setManifest(androidManifest("com.test.app", withTypeAttribute("remote-asset")))
+            .setManifest(
+                androidManifest("com.test.app", withTypeAttribute(MODULE_TYPE_ASSET_VALUE)))
             .build();
 
     assertThat(testModule.getModuleType()).isEqualTo(ModuleType.ASSET_MODULE);
@@ -77,63 +79,6 @@ public class RemoteAssetModuleSplitterTest {
     assertThat(masterSlice.getApkTargeting()).isEqualToDefaultInstance();
     assertThat(extractPaths(masterSlice.getEntries()))
         .containsExactly("assets/image.jpg", "assets/image2.jpg");
-  }
-
-  @Test
-  public void slicesByLanguage() throws Exception {
-    BundleModule testModule =
-        new BundleModuleBuilder("testModule")
-            .addFile("assets/images/image.jpg")
-            .addFile("assets/images#lang_en/image.jpg")
-            .addFile("assets/images#lang_es/image.jpg")
-            .setAssetsConfig(
-                assets(
-                    targetedAssetsDirectory(
-                        "assets/images", AssetsDirectoryTargeting.getDefaultInstance()),
-                    targetedAssetsDirectory(
-                        "assets/images#lang_es", assetsDirectoryTargeting(languageTargeting("es"))),
-                    targetedAssetsDirectory(
-                        "assets/images#lang_en",
-                        assetsDirectoryTargeting(languageTargeting("en")))))
-            .setManifest(androidManifest("com.test.app", withTypeAttribute("remote-asset")))
-            .build();
-
-    assertThat(testModule.getModuleType()).isEqualTo(ModuleType.ASSET_MODULE);
-    ImmutableList<ModuleSplit> slices =
-        new RemoteAssetModuleSplitter(
-                testModule,
-                ApkGenerationConfiguration.builder()
-                    .setOptimizationDimensions(ImmutableSet.of(LANGUAGE))
-                    .build())
-            .splitModule();
-
-    assertThat(slices).hasSize(3);
-
-    Map<ApkTargeting, ModuleSplit> slicesByTargeting =
-        Maps.uniqueIndex(slices, ModuleSplit::getApkTargeting);
-
-    assertThat(slicesByTargeting.keySet())
-        .containsExactly(
-            ApkTargeting.getDefaultInstance(),
-            apkLanguageTargeting("es"),
-            apkLanguageTargeting("en"));
-
-    ModuleSplit defaultSlice = slicesByTargeting.get(ApkTargeting.getDefaultInstance());
-    assertThat(defaultSlice.getSplitType()).isEqualTo(SplitType.ASSET_SLICE);
-    assertThat(defaultSlice.isMasterSplit()).isTrue();
-    assertThat(extractPaths(defaultSlice.getEntries())).containsExactly("assets/images/image.jpg");
-
-    ModuleSplit esSlice = slicesByTargeting.get(apkLanguageTargeting("es"));
-    assertThat(esSlice.getSplitType()).isEqualTo(SplitType.ASSET_SLICE);
-    assertThat(esSlice.isMasterSplit()).isFalse();
-    assertThat(extractPaths(esSlice.getEntries()))
-        .containsExactly("assets/images#lang_es/image.jpg");
-
-    ModuleSplit enSlice = slicesByTargeting.get(apkLanguageTargeting("en"));
-    assertThat(enSlice.getSplitType()).isEqualTo(SplitType.ASSET_SLICE);
-    assertThat(enSlice.isMasterSplit()).isFalse();
-    assertThat(extractPaths(enSlice.getEntries()))
-        .containsExactly("assets/images#lang_en/image.jpg");
   }
 
 }

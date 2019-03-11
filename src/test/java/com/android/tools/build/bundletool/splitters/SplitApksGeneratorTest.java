@@ -35,15 +35,12 @@ import com.android.bundle.Targeting.VariantTargeting;
 import com.android.tools.build.bundletool.model.BundleModule;
 import com.android.tools.build.bundletool.model.ModuleSplit;
 import com.android.tools.build.bundletool.model.ModuleSplit.SplitType;
-import com.android.tools.build.bundletool.model.ResourceTableEntry;
 import com.android.tools.build.bundletool.model.version.BundleToolVersion;
 import com.android.tools.build.bundletool.model.version.Version;
 import com.android.tools.build.bundletool.testing.BundleModuleBuilder;
-import com.google.common.base.Predicates;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
-import java.util.function.Predicate;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
@@ -52,9 +49,6 @@ import org.junit.runners.JUnit4;
 public class SplitApksGeneratorTest {
 
   private static final Version BUNDLETOOL_VERSION = BundleToolVersion.getCurrentVersion();
-
-  private static final Predicate<ResourceTableEntry> NO_RESOURCES_PINNED_TO_MASTER =
-      Predicates.alwaysFalse();
 
   @Test
   public void simpleMultipleModules() throws Exception {
@@ -72,10 +66,7 @@ public class SplitApksGeneratorTest {
 
     ImmutableList<ModuleSplit> moduleSplits =
         new SplitApksGenerator(
-                bundleModule,
-                BUNDLETOOL_VERSION,
-                ApkGenerationConfiguration.getDefaultInstance(),
-                NO_RESOURCES_PINNED_TO_MASTER)
+                bundleModule, BUNDLETOOL_VERSION, ApkGenerationConfiguration.getDefaultInstance())
             .generateSplits();
 
     assertThat(moduleSplits).hasSize(2);
@@ -118,8 +109,7 @@ public class SplitApksGeneratorTest {
                 BUNDLETOOL_VERSION,
                 ApkGenerationConfiguration.builder()
                     .setEnableNativeLibraryCompressionSplitter(true)
-                    .build(),
-                NO_RESOURCES_PINNED_TO_MASTER)
+                    .build())
             .generateSplits();
 
     VariantTargeting lVariantTargeting =
@@ -186,8 +176,7 @@ public class SplitApksGeneratorTest {
                 ApkGenerationConfiguration.builder()
                     .setEnableNativeLibraryCompressionSplitter(true)
                     .setEnableDexCompressionSplitter(true)
-                    .build(),
-                NO_RESOURCES_PINNED_TO_MASTER)
+                    .build())
             .generateSplits();
 
     VariantTargeting lVariantTargeting =
@@ -279,8 +268,7 @@ public class SplitApksGeneratorTest {
                     .setEnableNativeLibraryCompressionSplitter(true)
                     .setEnableDexCompressionSplitter(true)
                     .setForInstantAppVariants(true)
-                    .build(),
-                NO_RESOURCES_PINNED_TO_MASTER)
+                    .build())
             .generateSplits();
 
     // 2 splits for L variant

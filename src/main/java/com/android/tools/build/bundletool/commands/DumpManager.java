@@ -121,7 +121,7 @@ final class DumpManager {
 
   private void printEntry(ResourceTableEntry entry, boolean printValues) {
     printStream.printf(
-        "0x%08X - %s/%s%n",
+        "0x%08x - %s/%s%n",
         entry.getResourceId().getFullResourceId(),
         entry.getType().getName(),
         entry.getEntry().getName());

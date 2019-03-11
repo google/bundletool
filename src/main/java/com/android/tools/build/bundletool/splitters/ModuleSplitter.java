@@ -22,6 +22,7 @@ import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 
+import com.android.aapt.ConfigurationOuterClass.Configuration;
 import com.android.bundle.Targeting.ApkTargeting;
 import com.android.bundle.Targeting.SdkVersion;
 import com.android.bundle.Targeting.SdkVersionTargeting;
@@ -34,20 +35,19 @@ import com.android.tools.build.bundletool.model.ManifestMutator;
 import com.android.tools.build.bundletool.model.ModuleSplit;
 import com.android.tools.build.bundletool.model.ModuleSplit.SplitType;
 import com.android.tools.build.bundletool.model.OptimizationDimension;
+import com.android.tools.build.bundletool.model.ResourceId;
 import com.android.tools.build.bundletool.model.ResourceTableEntry;
+import com.android.tools.build.bundletool.model.SuffixManager;
 import com.android.tools.build.bundletool.model.exceptions.CommandExecutionException;
 import com.android.tools.build.bundletool.model.version.Version;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Predicates;
-import com.google.common.collect.HashMultimap;
 import com.google.common.collect.ImmutableCollection;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
-import com.google.common.collect.Multimap;
 import com.google.protobuf.Int32Value;
 import java.util.Optional;
 import java.util.function.Predicate;
-import javax.annotation.concurrent.GuardedBy;
 
 /**
  * Splits module into multiple parts called splits: each targets a specific configuration.
@@ -63,7 +63,6 @@ public class ModuleSplitter {
   private final Version bundleVersion;
   private final ApkGenerationConfiguration apkGenerationConfiguration;
   private final VariantTargeting variantTargeting;
-  private final Predicate<ResourceTableEntry> pinResourceToMaster;
 
   private final AbiPlaceholderInjector abiPlaceholderInjector;
 
@@ -74,8 +73,7 @@ public class ModuleSplitter {
         bundleVersion,
         ApkGenerationConfiguration.getDefaultInstance(),
         lPlusVariantTargeting(),
-        ImmutableSet.of(),
-        /* pinResourceToMaster= */ Predicates.alwaysFalse());
+        /* allModuleNames= */ ImmutableSet.of());
   }
 
   public ModuleSplitter(
@@ -83,8 +81,7 @@ public class ModuleSplitter {
       Version bundleVersion,
       ApkGenerationConfiguration apkGenerationConfiguration,
       VariantTargeting variantTargeting,
-      ImmutableSet<String> allModuleNames,
-      Predicate<ResourceTableEntry> pinResourceToMaster) {
+      ImmutableSet<String> allModuleNames) {
     this.module = checkNotNull(module);
     this.bundleVersion = checkNotNull(bundleVersion);
     this.apkGenerationConfiguration = checkNotNull(apkGenerationConfiguration);
@@ -92,7 +89,6 @@ public class ModuleSplitter {
     this.abiPlaceholderInjector =
         new AbiPlaceholderInjector(apkGenerationConfiguration.getAbisForPlaceholderLibs());
     this.allModuleNames = allModuleNames;
-    this.pinResourceToMaster = pinResourceToMaster;
   }
 
   public ImmutableList<ModuleSplit> splitModule() {
@@ -207,16 +203,38 @@ public class ModuleSplitter {
 
   private SplittingPipeline createResourcesSplittingPipeline() {
     ImmutableList.Builder<ModuleSplitSplitter> resourceSplitters = ImmutableList.builder();
+
+    ImmutableSet<ResourceId> masterPinnedResources =
+        apkGenerationConfiguration.getMasterPinnedResources();
+    ImmutableSet<ResourceId> baseManifestReachableResources =
+        apkGenerationConfiguration.getBaseManifestReachableResources();
+
     if (apkGenerationConfiguration
         .getOptimizationDimensions()
         .contains(OptimizationDimension.SCREEN_DENSITY)) {
-      resourceSplitters.add(new ScreenDensityResourcesSplitter(bundleVersion, pinResourceToMaster));
+      resourceSplitters.add(
+          new ScreenDensityResourcesSplitter(
+              bundleVersion,
+              /* pinWholeResourceToMaster= */ masterPinnedResources::contains,
+              /* pinLowestBucketOfResourceToMaster= */ baseManifestReachableResources::contains));
     }
+
     if (apkGenerationConfiguration
         .getOptimizationDimensions()
         .contains(OptimizationDimension.LANGUAGE)) {
-      resourceSplitters.add(new LanguageResourcesSplitter(pinResourceToMaster));
+      Predicate<ResourceTableEntry> pinLangResourceToMaster =
+          Predicates.or(
+              // Resources that are unconditionally in the master split.
+              entry -> masterPinnedResources.contains(entry.getResourceId()),
+              // Resources reachable from the AndroidManifest.xml should have at least one config
+              // in the master split (ie. either the default config, or all configs).
+              entry ->
+                  baseManifestReachableResources.contains(entry.getResourceId())
+                      && !hasDefaultConfig(entry));
+
+      resourceSplitters.add(new LanguageResourcesSplitter(pinLangResourceToMaster));
     }
+
     return new SplittingPipeline(resourceSplitters.build());
   }
 
@@ -317,19 +335,9 @@ public class ModuleSplitter {
         .build();
   }
 
-  private static class SuffixManager {
-    @GuardedBy("this")
-    private final Multimap<VariantTargeting, String> usedSuffixes = HashMultimap.create();
-
-    synchronized String createSuffix(ModuleSplit moduleSplit) {
-      String currentProposal = moduleSplit.getSuffix();
-      int serialNumber = 1;
-      while (usedSuffixes.containsEntry(moduleSplit.getVariantTargeting(), currentProposal)) {
-        serialNumber++;
-        currentProposal = String.format("%s_%d", moduleSplit.getSuffix(), serialNumber);
-      }
-      usedSuffixes.put(moduleSplit.getVariantTargeting(), currentProposal);
-      return currentProposal;
-    }
+  private static boolean hasDefaultConfig(ResourceTableEntry entry) {
+    return entry.getEntry().getConfigValueList().stream()
+        .anyMatch(
+            configValue -> configValue.getConfig().equals(Configuration.getDefaultInstance()));
   }
 }

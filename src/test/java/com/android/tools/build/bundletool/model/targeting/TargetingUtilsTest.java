@@ -37,6 +37,7 @@ import com.android.bundle.Targeting.SdkVersionTargeting;
 import com.android.bundle.Targeting.TextureCompressionFormat.TextureCompressionFormatAlias;
 import com.android.bundle.Targeting.VariantTargeting;
 import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.Range;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
@@ -144,6 +145,41 @@ public class TargetingUtilsTest {
                 sdkVersionFrom(23), ImmutableSet.of(sdkVersionFrom(21), sdkVersionFrom(25))),
             variantTargetingFromSdkVersion(
                 sdkVersionFrom(25), ImmutableSet.of(sdkVersionFrom(21), sdkVersionFrom(23))));
+  }
+
+  @Test
+  public void cropVariants_sdkRangeNoOverlap() {
+    assertThat(
+            TargetingUtils.cropVariantsWithAppSdkRange(
+                ImmutableSet.of(
+                    variantTargetingFromSdkVersion(sdkVersionFrom(21)),
+                    variantTargetingFromSdkVersion(sdkVersionFrom(25))),
+                Range.closed(15, 19)))
+        .isEmpty();
+  }
+
+  @Test
+  public void cropVariants_sdkRangeOverlaps() {
+    assertThat(
+            TargetingUtils.cropVariantsWithAppSdkRange(
+                ImmutableSet.of(
+                    variantTargetingFromSdkVersion(sdkVersionFrom(21)),
+                    variantTargetingFromSdkVersion(sdkVersionFrom(25))),
+                Range.closed(22, 26)))
+        .containsExactly(
+            variantTargetingFromSdkVersion(sdkVersionFrom(22)),
+            variantTargetingFromSdkVersion(sdkVersionFrom(25)));
+  }
+
+  @Test
+  public void cropVariants_sdkRangeOverlaps_noEmptyRanges() {
+    assertThat(
+            TargetingUtils.cropVariantsWithAppSdkRange(
+                ImmutableSet.of(
+                    variantTargetingFromSdkVersion(sdkVersionFrom(21)),
+                    variantTargetingFromSdkVersion(sdkVersionFrom(25))),
+                Range.closed(25, 26)))
+        .containsExactly(variantTargetingFromSdkVersion(sdkVersionFrom(25)));
   }
 
   @Test

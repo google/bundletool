@@ -26,7 +26,6 @@ import com.android.tools.build.bundletool.model.BundleModule.SpecialModuleEntry;
 import com.android.tools.build.bundletool.model.InputStreamSupplier;
 import com.android.tools.build.bundletool.model.ModuleEntry;
 import com.android.tools.build.bundletool.model.ZipPath;
-import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.Map.Entry;
@@ -47,10 +46,6 @@ public class AppBundleSerializer {
 
   /** Writes the App Bundle on disk at the given location. */
   public void writeToDisk(AppBundle bundle, Path pathOnDisk) throws IOException {
-    Preconditions.checkState(
-        bundle.getAssetModules().isEmpty(),
-        "Writing AssetModules to disk is not yet implemented.");
-
     ZipBuilder zipBuilder = new ZipBuilder();
 
     EntryOption[] compression =
@@ -60,8 +55,7 @@ public class AppBundleSerializer {
         ZipPath.create(BUNDLE_CONFIG_FILE_NAME), bundle.getBundleConfig(), compression);
 
     // APEX bundles do not have metadata files.
-    if (bundle.getFeatureModules().isEmpty()
-        || !bundle.getBaseModule().getApexConfig().isPresent()) {
+    if (bundle.getFeatureModules().isEmpty() || !bundle.isApex()) {
       for (Entry<ZipPath, InputStreamSupplier> metadataEntry :
           bundle.getBundleMetadata().getFileDataMap().entrySet()) {
         zipBuilder.addFile(
@@ -71,7 +65,7 @@ public class AppBundleSerializer {
       }
     }
 
-    for (BundleModule module : bundle.getFeatureModules().values()) {
+    for (BundleModule module : bundle.getModules().values()) {
       ZipPath moduleDir = ZipPath.create(module.getName().toString());
 
       for (ModuleEntry entry : module.getEntries()) {

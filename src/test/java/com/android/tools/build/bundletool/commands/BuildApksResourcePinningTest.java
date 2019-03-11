@@ -42,7 +42,6 @@ import com.android.tools.build.bundletool.model.ZipPath;
 import com.android.tools.build.bundletool.testing.Aapt2Helper;
 import com.android.tools.build.bundletool.testing.AppBundleBuilder;
 import com.android.tools.build.bundletool.testing.BundleConfigBuilder;
-import com.android.tools.build.bundletool.testing.FileUtils;
 import com.android.tools.build.bundletool.testing.ResourceTableBuilder;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
@@ -82,8 +81,6 @@ public class BuildApksResourcePinningTest {
 
   @Test
   public void resourceIds_pinnedToMasterSplits() throws Exception {
-    bundlePath = FileUtils.getRandomFilePath(tmp, "bundle-", ".aab");
-
     ResourceTable baseResourceTable =
         new ResourceTableBuilder()
             .addPackage("com.test.app")

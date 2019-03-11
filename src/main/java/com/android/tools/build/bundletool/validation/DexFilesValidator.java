@@ -21,6 +21,7 @@ import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 
 import com.android.tools.build.bundletool.model.BundleModule;
+import com.android.tools.build.bundletool.model.BundleModule.ModuleType;
 import com.android.tools.build.bundletool.model.exceptions.ValidationException;
 import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableList;
@@ -36,7 +37,9 @@ import java.util.regex.Pattern;
  * <ul>
  *   <li>Dex files in a bundle module are named correctly, forming a sequence * "classes.dex",
  *       "classes2.dex", "classes3.dex" etc.
- *   <li>'hasCode' value corresponds to whether there are dex files present in the bundle.
+ *   <li>'hasCode' value in feature modules corresponds to whether there are dex files present in
+ *       the module.
+ *   <li>Asset modules are ignored.
  * </ul>
  */
 public class DexFilesValidator extends SubValidator {
@@ -46,6 +49,9 @@ public class DexFilesValidator extends SubValidator {
 
   @Override
   public void validateModule(BundleModule module) {
+    if (module.getModuleType().equals(ModuleType.ASSET_MODULE)) {
+      return;
+    }
     ImmutableList<String> orderedDexFiles =
         module
             .findEntriesUnderPath(BundleModule.DEX_DIRECTORY)
@@ -77,7 +83,8 @@ public class DexFilesValidator extends SubValidator {
 
   private static void validateHasCode(BundleModule module, ImmutableList<String> orderedDexFiles) {
     boolean hasCode = module.getAndroidManifest().getEffectiveHasCode();
-    if (orderedDexFiles.isEmpty() && hasCode) {
+    boolean isAssetModule = module.getModuleType().equals(ModuleType.ASSET_MODULE);
+    if (orderedDexFiles.isEmpty() && hasCode && !isAssetModule) {
       throw ValidationException.builder()
           .withMessage(
               "Module '%s' has no dex files but the attribute 'hasCode' is not set to false "

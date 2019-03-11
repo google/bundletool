@@ -44,7 +44,6 @@ import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
-import java.util.function.Predicate;
 import java.util.stream.Stream;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
@@ -132,12 +131,9 @@ public class AppBundle {
     return module;
   }
 
-  /**
-   * Predicate on resources that must remain in the master split regardless of their targeting
-   * configuration.
-   */
-  public Predicate<ResourceTableEntry> getMasterResourcesPredicate() {
-    return resource -> pinnedResourceIds.contains(resource.getResourceId());
+  /** Resources that must remain in the master split regardless of their targeting configuration. */
+  public ImmutableSet<ResourceId> getMasterPinnedResources() {
+    return pinnedResourceIds;
   }
 
   public boolean has32BitRenderscriptCode() {
@@ -205,6 +201,10 @@ public class AppBundle {
     }
 
     return Optional.of(BundleModuleName.create(path.getName(0).toString()));
+  }
+
+  public boolean isApex() {
+    return getBaseModule().getApexConfig().isPresent();
   }
 
   private static ImmutableList<BundleModule> extractModules(

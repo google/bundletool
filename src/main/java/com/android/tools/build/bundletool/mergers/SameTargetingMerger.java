@@ -20,6 +20,7 @@ import static com.android.tools.build.bundletool.mergers.MergingUtils.getSameVal
 import static com.google.common.base.Preconditions.checkArgument;
 
 import com.android.aapt.Resources.ResourceTable;
+import com.android.bundle.Files.ApexImages;
 import com.android.bundle.Files.NativeLibraries;
 import com.android.bundle.Targeting.ApkTargeting;
 import com.android.bundle.Targeting.VariantTargeting;
@@ -59,6 +60,7 @@ public class SameTargetingMerger implements ModuleSplitMerger {
     AndroidManifest mergedManifest = null;
     ResourceTable mergedResourceTable = null;
     NativeLibraries mergedNativeConfig = null;
+    ApexImages mergedApexConfig = null;
     BundleModuleName mergedModuleName = null;
     Boolean mergedIsMasterSplit = null;
     VariantTargeting mergedVariantTargeting = null;
@@ -86,6 +88,14 @@ public class SameTargetingMerger implements ModuleSplitMerger {
                     () ->
                         new IllegalStateException(
                             "Encountered two distinct native configs while merging."));
+      }
+      if (split.getApexConfig().isPresent()) {
+        mergedApexConfig =
+            getSameValueOrNonNull(mergedApexConfig, split.getApexConfig().get())
+                .orElseThrow(
+                    () ->
+                        new IllegalStateException(
+                            "Encountered two distinct apex configs while merging."));
       }
       mergedModuleName =
           getSameValueOrNonNull(mergedModuleName, split.getModuleName())
@@ -117,6 +127,9 @@ public class SameTargetingMerger implements ModuleSplitMerger {
     }
     if (mergedNativeConfig != null) {
       builder.setNativeConfig(mergedNativeConfig);
+    }
+    if (mergedApexConfig != null) {
+      builder.setApexConfig(mergedApexConfig);
     }
     if (mergedModuleName != null) {
       builder.setModuleName(mergedModuleName);

@@ -39,7 +39,7 @@ public class AbiApexImagesSplitter implements ModuleSplitSplitter {
   /** Generates {@link ModuleSplit} objects dividing the APEX images by ABI. */
   @Override
   public ImmutableCollection<ModuleSplit> split(ModuleSplit moduleSplit) {
-    if (!moduleSplit.getApexConfig().isPresent()) {
+    if (!moduleSplit.isApex()) {
       return ImmutableList.of(moduleSplit);
     }
 

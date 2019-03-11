@@ -26,9 +26,8 @@ import static com.google.common.collect.ImmutableSet.toImmutableSet;
 import com.android.bundle.Targeting.VariantTargeting;
 import com.android.tools.build.bundletool.model.BundleModule;
 import com.android.tools.build.bundletool.model.ModuleEntry;
-import com.google.common.collect.ImmutableCollection;
-import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
+import java.util.stream.Stream;
 
 /** Generates variant targetings based on compression of dex files. */
 public final class DexCompressionVariantGenerator implements BundleModuleVariantGenerator {
@@ -40,10 +39,10 @@ public final class DexCompressionVariantGenerator implements BundleModuleVariant
   }
 
   @Override
-  public ImmutableCollection<VariantTargeting> generate(BundleModule module) {
+  public Stream<VariantTargeting> generate(BundleModule module) {
     if (!apkGenerationConfiguration.getEnableDexCompressionSplitter()
         || apkGenerationConfiguration.isForInstantAppVariants()) {
-      return ImmutableList.of();
+      return Stream.of();
     }
     ImmutableSet<ModuleEntry> dexEntries =
         module.getEntries().stream()
@@ -51,10 +50,9 @@ public final class DexCompressionVariantGenerator implements BundleModuleVariant
             .collect(toImmutableSet());
 
     if (dexEntries.isEmpty()) {
-      return ImmutableList.of();
+      return Stream.of();
     }
 
-    return ImmutableList.of(
-        variantTargeting(sdkVersionTargeting(sdkVersionFrom(ANDROID_P_API_VERSION))));
+    return Stream.of(variantTargeting(sdkVersionTargeting(sdkVersionFrom(ANDROID_P_API_VERSION))));
   }
 }

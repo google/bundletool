@@ -21,6 +21,7 @@ import static com.android.tools.build.bundletool.model.BundleModule.ASSETS_DIREC
 import com.android.bundle.Files.Assets;
 import com.android.bundle.Files.TargetedAssetsDirectory;
 import com.android.tools.build.bundletool.model.BundleModule;
+import com.android.tools.build.bundletool.model.BundleModule.ModuleType;
 import com.android.tools.build.bundletool.model.ZipPath;
 import com.android.tools.build.bundletool.model.exceptions.ValidationException;
 
@@ -46,6 +47,15 @@ public class AssetsTargetingValidator extends SubValidator {
       if (BundleValidationUtils.directoryContainsNoFiles(module, path)) {
         throw ValidationException.builder()
             .withMessage("Targeted directory '%s' is empty.", path)
+            .build();
+      }
+
+      if (module.getModuleType().equals(ModuleType.ASSET_MODULE)
+          && assets.getDirectoryList().stream().anyMatch(dir -> dir.getTargeting().hasLanguage())) {
+        throw ValidationException.builder()
+            .withMessage(
+                "Language targeting for asset packs is not supported, but found in module %s.",
+                module.getName().getName())
             .build();
       }
     }

@@ -22,6 +22,7 @@ import static com.android.tools.build.bundletool.testing.TargetingUtils.nativeDi
 import static com.android.tools.build.bundletool.testing.TargetingUtils.nativeLibraries;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.targetedNativeDirectory;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.variantMinSdkTargeting;
+import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.truth.extensions.proto.ProtoTruth.assertThat;
 
 import com.android.bundle.Files.NativeLibraries;
@@ -44,8 +45,9 @@ public class NativeLibsCompressionVariantGeneratorTest {
                 .setEnableNativeLibraryCompressionSplitter(true)
                 .build());
     ImmutableCollection<VariantTargeting> splits =
-        nativeLibsCompressionVariantGenerator.generate(
-            createSingleLibraryModule("testModule", "x86", "lib/x86/libnoname.so"));
+        nativeLibsCompressionVariantGenerator
+            .generate(createSingleLibraryModule("testModule", "x86", "lib/x86/libnoname.so"))
+            .collect(toImmutableList());
     assertThat(splits).containsExactly(variantMinSdkTargeting(ANDROID_M_API_VERSION));
   }
 
@@ -54,8 +56,9 @@ public class NativeLibsCompressionVariantGeneratorTest {
     NativeLibsCompressionVariantGenerator nativeLibsCompressionVariantGenerator =
         new NativeLibsCompressionVariantGenerator(ApkGenerationConfiguration.getDefaultInstance());
     ImmutableCollection<VariantTargeting> splits =
-        nativeLibsCompressionVariantGenerator.generate(
-            createSingleLibraryModule("testModule", "x86", "lib/x86/libnoname.so"));
+        nativeLibsCompressionVariantGenerator
+            .generate(createSingleLibraryModule("testModule", "x86", "lib/x86/libnoname.so"))
+            .collect(toImmutableList());
     assertThat(splits).isEmpty();
   }
 
@@ -75,7 +78,7 @@ public class NativeLibsCompressionVariantGeneratorTest {
             .build();
 
     ImmutableCollection<VariantTargeting> splits =
-        nativeLibsCompressionVariantGenerator.generate(bundleModule);
+        nativeLibsCompressionVariantGenerator.generate(bundleModule).collect(toImmutableList());
     assertThat(splits).isEmpty();
   }
 
@@ -89,8 +92,9 @@ public class NativeLibsCompressionVariantGeneratorTest {
                 .build());
 
     ImmutableCollection<VariantTargeting> splits =
-        nativeLibsCompressionVariantGenerator.generate(
-            createSingleLibraryModule("testModule", "x86", "lib/x86/libnoname.so"));
+        nativeLibsCompressionVariantGenerator
+            .generate(createSingleLibraryModule("testModule", "x86", "lib/x86/libnoname.so"))
+            .collect(toImmutableList());
 
     assertThat(splits).isEmpty();
   }

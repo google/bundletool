@@ -21,10 +21,13 @@ import static com.android.tools.build.bundletool.model.BundleMetadata.MAIN_DEX_L
 import static com.android.tools.build.bundletool.model.BundleModule.DEX_DIRECTORY;
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.collect.ImmutableList.toImmutableList;
+import static com.google.common.collect.ImmutableSet.toImmutableSet;
 
 import com.android.aapt.Resources.ResourceTable;
+import com.android.bundle.Devices.DeviceSpec;
 import com.android.bundle.Targeting.ApkTargeting;
 import com.android.bundle.Targeting.VariantTargeting;
+import com.android.tools.build.bundletool.device.ApkMatcher;
 import com.android.tools.build.bundletool.model.AndroidManifest;
 import com.android.tools.build.bundletool.model.BundleMetadata;
 import com.android.tools.build.bundletool.model.BundleModuleName;
@@ -33,6 +36,8 @@ import com.android.tools.build.bundletool.model.InputStreamSupplier;
 import com.android.tools.build.bundletool.model.ModuleEntry;
 import com.android.tools.build.bundletool.model.ModuleSplit;
 import com.android.tools.build.bundletool.model.ModuleSplit.SplitType;
+import com.android.tools.build.bundletool.model.ShardedSystemSplits;
+import com.android.tools.build.bundletool.model.SuffixManager;
 import com.android.tools.build.bundletool.model.ZipPath;
 import com.android.tools.build.bundletool.model.exceptions.CommandExecutionException;
 import com.android.tools.build.bundletool.model.utils.files.BufferedIo;
@@ -41,10 +46,13 @@ import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.HashMultimap;
 import com.google.common.collect.ImmutableCollection;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMultimap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.ListMultimap;
+import com.google.common.collect.Multimaps;
 import com.google.common.collect.SetMultimap;
+import com.google.common.collect.Sets;
 import com.google.common.io.ByteStreams;
 import java.io.IOException;
 import java.io.InputStream;
@@ -80,7 +88,7 @@ public class ModuleSplitsToShardMerger {
 
   /**
    * Gets a list of collections of splits, and merges each collection into a single standalone APK
-   * (aka shard).
+   * (aka shard) and additional unmatched language splits.
    *
    * @param unfusedShards a list of lists - each inner list is a collection of splits
    * @param bundleMetadata the App Bundle metadata
@@ -98,6 +106,46 @@ public class ModuleSplitsToShardMerger {
       shards.add(mergeSingleShard(unfusedShard, bundleMetadata, mergedDexCache));
     }
     return shards.build();
+  }
+
+  /**
+   * Gets a collections of splits and merges them into a single system APK (aka shard).
+   *
+   * @param splits a collection of splits
+   * @param bundleMetadata the App Bundle metadata
+   * @param deviceSpec the device specification
+   * @return {@link ShardedSystemSplits} containing a single fused system APK and additional
+   *     language splits
+   */
+  public ShardedSystemSplits mergeSystemShard(
+      ImmutableCollection<ModuleSplit> splits,
+      BundleMetadata bundleMetadata,
+      DeviceSpec deviceSpec) {
+
+    ApkMatcher deviceSpecMatcher = new ApkMatcher(deviceSpec);
+    ImmutableSet<ModuleSplit> nonMatchedLanguageSplits =
+        splits.stream()
+            .filter(split -> split.getApkTargeting().hasLanguageTargeting())
+            .filter(split -> !deviceSpecMatcher.matchesModuleSplitByTargeting(split))
+            .collect(toImmutableSet());
+
+    ModuleSplit fusedSplit =
+        mergeSingleShard(
+            Sets.difference(ImmutableSet.copyOf(splits), nonMatchedLanguageSplits).immutableCopy(),
+            bundleMetadata,
+            new HashMap<>());
+
+    ImmutableMultimap<BundleModuleName, ModuleSplit> langSplitsByModuleMap =
+        Multimaps.index(nonMatchedLanguageSplits, ModuleSplit::getModuleName);
+
+    ImmutableList<ModuleSplit> langSplitsWithSplitId =
+        langSplitsByModuleMap.keySet().stream()
+            .flatMap(
+                key ->
+                    writeSplitIdInManifestHavingSameModule(langSplitsByModuleMap.get(key)).stream())
+            .collect(toImmutableList());
+
+    return ShardedSystemSplits.create(fusedSplit, langSplitsWithSplitId);
   }
 
   @VisibleForTesting
@@ -187,14 +235,17 @@ public class ModuleSplitsToShardMerger {
       }
     }
 
-    // Construct the final shard.
-    return buildShard(
-        mergedEntriesByPath.values(),
-        ImmutableList.of(),
-        splitTargeting,
-        // An APEX module is made of one module, so any manifest works.
-        splitsOfShard.get(0).getAndroidManifest(),
-        Optional.empty());
+    ModuleSplit shard =
+        buildShard(
+            mergedEntriesByPath.values(),
+            ImmutableList.of(),
+            splitTargeting,
+            // An APEX module is made of one module, so any manifest works.
+            splitsOfShard.get(0).getAndroidManifest(),
+            Optional.empty());
+
+    // Add the APEX config as it's used to identify APEX APKs.
+    return shard.toBuilder().setApexConfig(splitsOfShard.get(0).getApexConfig().get()).build();
   }
 
   private ModuleSplit buildShard(
@@ -400,5 +451,13 @@ public class ModuleSplitsToShardMerger {
         OutputStream os = BufferedIo.outputStream(toFile)) {
       ByteStreams.copy(is, os);
     }
+  }
+
+  private static ImmutableList<ModuleSplit> writeSplitIdInManifestHavingSameModule(
+      ImmutableCollection<ModuleSplit> splits) {
+    SuffixManager suffixManager = new SuffixManager();
+    return splits.stream()
+        .map(split -> split.writeSplitIdInManifest(suffixManager.createSuffix(split)))
+        .collect(toImmutableList());
   }
 }

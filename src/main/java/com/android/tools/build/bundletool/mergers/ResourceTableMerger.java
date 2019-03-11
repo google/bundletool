@@ -19,25 +19,33 @@ package com.android.tools.build.bundletool.mergers;
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.base.Predicates.not;
 import static com.google.common.collect.ImmutableList.toImmutableList;
+import static com.google.common.collect.ImmutableMap.toImmutableMap;
 
 import com.android.aapt.Resources.ConfigValue;
 import com.android.aapt.Resources.Entry;
+import com.android.aapt.Resources.Overlayable;
 import com.android.aapt.Resources.Package;
 import com.android.aapt.Resources.ResourceTable;
 import com.android.aapt.Resources.Source;
 import com.android.aapt.Resources.Type;
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.collect.ImmutableBiMap;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
+import com.google.common.collect.Streams;
+import com.google.common.primitives.Ints;
 import com.google.protobuf.Descriptors.FieldDescriptor;
 import com.google.protobuf.Descriptors.FieldDescriptor.JavaType;
 import com.google.protobuf.Message;
+import java.util.AbstractMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.function.BiFunction;
 import java.util.function.Function;
+import javax.annotation.CheckReturnValue;
 
 /**
  * Recursively merges two resource tables.
@@ -79,8 +87,29 @@ public class ResourceTableMerger {
       table2 = table2Builder.build();
     }
 
+    // Merge the overlayables using the name as an id
+    ImmutableList<Overlayable> mergedOverlayables =
+        mergeRepeatedValues(
+            table1.getOverlayableList(),
+            table2.getOverlayableList(),
+            Overlayable::getName,
+            this::mergeOverlayables);
+
+    if (!mergedOverlayables.isEmpty()) {
+      // The overlayables are referenced by index in the resource entries, so now that the list has
+      // changed, we need to update the indices.
+      ImmutableMap<Integer, String> idxToOverlayableName =
+          toIndexMap(mergedOverlayables, Overlayable::getName);
+      ImmutableMap<String, Integer> idxByOverlayableName =
+          ImmutableBiMap.copyOf(idxToOverlayableName).inverse();
+      table1 = reIndexOverlayables(table1, idxByOverlayableName);
+      table2 = reIndexOverlayables(table2, idxByOverlayableName);
+    }
+
     return table1
         .toBuilder()
+        .clearOverlayable()
+        .addAllOverlayable(mergedOverlayables)
         .clearPackage()
         .addAllPackage(
             mergeRepeatedValues(
@@ -89,6 +118,44 @@ public class ResourceTableMerger {
                 pkg -> pkg.getPackageId().getId(),
                 this::mergePackages))
         .build();
+  }
+
+  @CheckReturnValue
+  private static ResourceTable reIndexOverlayables(
+      ResourceTable table, ImmutableMap<String, Integer> newOverlayableIdxMap) {
+    ImmutableMap<Integer, Integer> oldToNewIndex =
+        toIndexMap(
+            ImmutableList.copyOf(table.getOverlayableList()),
+            overlayable -> newOverlayableIdxMap.get(overlayable.getName()));
+
+    ResourceTable.Builder newTable = table.toBuilder();
+    for (Package.Builder pkg : newTable.getPackageBuilderList()) {
+      for (Type.Builder type : pkg.getTypeBuilderList()) {
+        for (Entry.Builder entry : type.getEntryBuilderList()) {
+          if (entry.hasOverlayableItem()) {
+            int newIdx = oldToNewIndex.get(entry.getOverlayableItem().getOverlayableIdx());
+            entry.getOverlayableItemBuilder().setOverlayableIdx(newIdx);
+          }
+        }
+      }
+    }
+    return newTable.build();
+  }
+
+  private static <T, R> ImmutableMap<Integer, R> toIndexMap(
+      ImmutableList<T> list, Function<T, R> valueFn) {
+    Map<Integer, T> map =
+        Streams.mapWithIndex(
+                list.stream(),
+                (value, i) -> new AbstractMap.SimpleEntry<>(Ints.checkedCast(i), value))
+            .collect(toImmutableMap(Map.Entry::getKey, Map.Entry::getValue));
+    return ImmutableMap.copyOf(Maps.transformValues(map, valueFn::apply));
+  }
+
+  private Overlayable mergeOverlayables(Overlayable overlayable1, Overlayable overlayable2) {
+    assertEqualFields(overlayable1, overlayable2, Overlayable::getName, /* fieldName= */ "name");
+    assertEqualFields(overlayable1, overlayable2, Overlayable::getActor, /* fieldName= */ "actor");
+    return overlayable1;
   }
 
   private Package mergePackages(Package pkg1, Package pkg2) {
@@ -127,7 +194,8 @@ public class ResourceTableMerger {
     assertEqualFields(entry1, entry2, Entry::getName, /* fieldName= */ "name");
     assertEqualFields(entry1, entry2, Entry::getVisibility, /* fieldName= */ "visibility");
     assertEqualFields(entry1, entry2, Entry::getAllowNew, /* fieldName= */ "allow_new");
-    assertEqualFields(entry1, entry2, Entry::getOverlayable, /* fieldName= */ "overlayable");
+    assertEqualFields(
+        entry1, entry2, Entry::getOverlayableItem, /* fieldName= */ "overlayable_item");
 
     return entry1
         .toBuilder()
@@ -143,8 +211,7 @@ public class ResourceTableMerger {
     return ImmutableList.<ConfigValue>builder()
         .addAll(configValues1)
         .addAll(
-            configValues2
-                .stream()
+            configValues2.stream()
                 .filter(not(configValues1Set::contains))
                 .collect(toImmutableList()))
         .build();
@@ -167,8 +234,7 @@ public class ResourceTableMerger {
 
     // Order the IDs (for better debugging of merged resource tables).
     ImmutableList<I> allIds =
-        Sets.union(idToValue1.keySet(), idToValue2.keySet())
-            .stream()
+        Sets.union(idToValue1.keySet(), idToValue2.keySet()).stream()
             .sorted()
             .collect(toImmutableList());
 

@@ -32,7 +32,9 @@ import static com.android.tools.build.bundletool.model.utils.Versions.ANDROID_M_
 import static com.android.tools.build.bundletool.model.utils.Versions.ANDROID_P_API_VERSION;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifest;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withInstant;
+import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withMainActivity;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withMaxSdkVersion;
+import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withMetadataResource;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withMinSdkVersion;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withSplitNameActivity;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.xmlAttribute;
@@ -102,14 +104,13 @@ import com.android.tools.build.bundletool.model.ModuleEntry;
 import com.android.tools.build.bundletool.model.ModuleSplit;
 import com.android.tools.build.bundletool.model.ModuleSplit.SplitType;
 import com.android.tools.build.bundletool.model.OptimizationDimension;
-import com.android.tools.build.bundletool.model.ResourceTableEntry;
+import com.android.tools.build.bundletool.model.ResourceId;
 import com.android.tools.build.bundletool.model.ZipPath;
 import com.android.tools.build.bundletool.model.exceptions.CommandExecutionException;
 import com.android.tools.build.bundletool.model.utils.xmlproto.XmlProtoElement;
 import com.android.tools.build.bundletool.model.version.BundleToolVersion;
 import com.android.tools.build.bundletool.model.version.Version;
 import com.android.tools.build.bundletool.testing.BundleModuleBuilder;
-import com.google.common.base.Predicates;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
@@ -119,7 +120,6 @@ import com.google.common.collect.Sets;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.function.Predicate;
 import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -133,9 +133,6 @@ public class ModuleSplitterTest {
   private static final ApkTargeting DEFAULT_MASTER_SPLIT_SDK_TARGETING = apkMinSdkTargeting(21);
 
   private static final Version BUNDLETOOL_VERSION = BundleToolVersion.getCurrentVersion();
-
-  private static final Predicate<ResourceTableEntry> NO_RESOURCES_PINNED_TO_MASTER =
-      Predicates.alwaysFalse();
 
 
   @Test
@@ -751,8 +748,7 @@ public class ModuleSplitterTest {
             BUNDLETOOL_VERSION,
             withDisabled64BitLibs(),
             lPlusVariantTargeting(),
-            ImmutableSet.of("testModule"),
-            NO_RESOURCES_PINNED_TO_MASTER);
+            ImmutableSet.of("testModule"));
 
     ImmutableList<ModuleSplit> splits = moduleSplitter.splitModule();
     ImmutableMap<ApkTargeting, ModuleSplit> toTargetingMap =
@@ -786,8 +782,7 @@ public class ModuleSplitterTest {
                 .setEnableNativeLibraryCompressionSplitter(true)
                 .build(),
             lPlusVariantTargeting(),
-            ImmutableSet.of("testModule"),
-            NO_RESOURCES_PINNED_TO_MASTER);
+            ImmutableSet.of("testModule"));
 
     List<ModuleSplit> splits = moduleSplitter.splitModule();
     // Base + X86 Split
@@ -825,8 +820,7 @@ public class ModuleSplitterTest {
                 .setEnableNativeLibraryCompressionSplitter(true)
                 .build(),
             variantMinSdkTargeting(ANDROID_M_API_VERSION),
-            ImmutableSet.of("testModule"),
-            NO_RESOURCES_PINNED_TO_MASTER);
+            ImmutableSet.of("testModule"));
 
     List<ModuleSplit> splits = moduleSplitter.splitModule();
     // Base + X86 Split
@@ -895,8 +889,7 @@ public class ModuleSplitterTest {
             BUNDLETOOL_VERSION,
             ApkGenerationConfiguration.builder().setEnableDexCompressionSplitter(true).build(),
             variantMinSdkTargeting(ANDROID_P_API_VERSION),
-            ImmutableSet.of("testModule"),
-            NO_RESOURCES_PINNED_TO_MASTER);
+            ImmutableSet.of("testModule"));
 
     List<ModuleSplit> splits = moduleSplitter.splitModule();
     assertThat(splits).hasSize(1);
@@ -921,8 +914,7 @@ public class ModuleSplitterTest {
             BUNDLETOOL_VERSION,
             ApkGenerationConfiguration.builder().setEnableDexCompressionSplitter(true).build(),
             lPlusVariantTargeting(),
-            ImmutableSet.of("testModule"),
-            NO_RESOURCES_PINNED_TO_MASTER);
+            ImmutableSet.of("testModule"));
 
     List<ModuleSplit> splits = moduleSplitter.splitModule();
     assertThat(splits).hasSize(1);
@@ -1167,7 +1159,11 @@ public class ModuleSplitterTest {
 
   @Test
   public void splitNameRemovedforInstalledSplit() throws Exception {
-    XmlNode manifest = androidManifest("com.test.app", withSplitNameActivity("FooActivity", "foo"));
+    XmlNode manifest =
+        androidManifest(
+            "com.test.app",
+            withMainActivity("MainActivity"),
+            withSplitNameActivity("FooActivity", "foo"));
     BundleModule bundleModule = new BundleModuleBuilder("testModule").setManifest(manifest).build();
 
     ImmutableList<ModuleSplit> moduleSplits =
@@ -1194,7 +1190,10 @@ public class ModuleSplitterTest {
   @Test
   public void splitNameNotRemovedforInstantSplit() throws Exception {
     XmlNode manifest =
-        androidManifest("com.test.app", withSplitNameActivity("FooActivity", "testModule"));
+        androidManifest(
+            "com.test.app",
+            withMainActivity("MainActivity"),
+            withSplitNameActivity("FooActivity", "testModule"));
     BundleModule bundleModule = new BundleModuleBuilder("testModule").setManifest(manifest).build();
 
     ImmutableList<ModuleSplit> moduleSplits =
@@ -1203,8 +1202,7 @@ public class ModuleSplitterTest {
                 BUNDLETOOL_VERSION,
                 ApkGenerationConfiguration.builder().setForInstantAppVariants(true).build(),
                 lPlusVariantTargeting(),
-                ImmutableSet.of("testModule"),
-                NO_RESOURCES_PINNED_TO_MASTER)
+                ImmutableSet.of("testModule"))
             .splitModule();
 
     assertThat(moduleSplits).hasSize(1);
@@ -1229,7 +1227,10 @@ public class ModuleSplitterTest {
   @Test
   public void nonInstantActivityRemovedforInstantManifest() throws Exception {
     XmlNode manifest =
-        androidManifest("com.test.app", withSplitNameActivity("FooActivity", "onDemandModule"));
+        androidManifest(
+            "com.test.app",
+            withMainActivity("MainActivity"),
+            withSplitNameActivity("FooActivity", "onDemandModule"));
     BundleModule bundleModule =
         new BundleModuleBuilder("onDemandModule").setManifest(manifest).build();
 
@@ -1239,8 +1240,7 @@ public class ModuleSplitterTest {
                 BUNDLETOOL_VERSION,
                 ApkGenerationConfiguration.builder().setForInstantAppVariants(true).build(),
                 lPlusVariantTargeting(),
-                ImmutableSet.of(),
-                NO_RESOURCES_PINNED_TO_MASTER)
+                ImmutableSet.of())
             .splitModule();
 
     assertThat(moduleSplits).hasSize(1);
@@ -1274,8 +1274,7 @@ public class ModuleSplitterTest {
                 BUNDLETOOL_VERSION,
                 ApkGenerationConfiguration.builder().setForInstantAppVariants(true).build(),
                 lPlusVariantTargeting(),
-                ImmutableSet.of("testModule"),
-                NO_RESOURCES_PINNED_TO_MASTER)
+                ImmutableSet.of("testModule"))
             .splitModule();
 
     assertThat(moduleSplits).hasSize(1);
@@ -1301,8 +1300,7 @@ public class ModuleSplitterTest {
                 BUNDLETOOL_VERSION,
                 ApkGenerationConfiguration.builder().setForInstantAppVariants(true).build(),
                 lPlusVariantTargeting(),
-                ImmutableSet.of("testModule"),
-                NO_RESOURCES_PINNED_TO_MASTER)
+                ImmutableSet.of("testModule"))
             .splitModule();
 
     assertThat(moduleSplits).hasSize(1);
@@ -1328,8 +1326,7 @@ public class ModuleSplitterTest {
                 BUNDLETOOL_VERSION,
                 ApkGenerationConfiguration.builder().setForInstantAppVariants(true).build(),
                 lPlusVariantTargeting(),
-                ImmutableSet.of("testModule"),
-                NO_RESOURCES_PINNED_TO_MASTER)
+                ImmutableSet.of("testModule"))
             .splitModule();
 
     assertThat(moduleSplits).hasSize(1);
@@ -1410,8 +1407,7 @@ public class ModuleSplitterTest {
                     ImmutableSet.of(toAbi(AbiAlias.X86), toAbi(AbiAlias.ARM64_V8A)))
                 .build(),
             lPlusVariantTargeting(),
-            ImmutableSet.of("base"),
-            NO_RESOURCES_PINNED_TO_MASTER);
+            ImmutableSet.of("base"));
 
     ImmutableList<ModuleSplit> splits = moduleSplitter.splitModule();
     assertThat(splits).hasSize(1);
@@ -1439,14 +1435,178 @@ public class ModuleSplitterTest {
                     ImmutableSet.of(toAbi(AbiAlias.X86), toAbi(AbiAlias.ARM64_V8A)))
                 .build(),
             lPlusVariantTargeting(),
-            ImmutableSet.of("feature"),
-            NO_RESOURCES_PINNED_TO_MASTER);
+            ImmutableSet.of("feature"));
 
     ImmutableList<ModuleSplit> splits = moduleSplitter.splitModule();
     assertThat(splits).hasSize(1);
     ModuleSplit masterSplit = splits.get(0);
     assertThat(masterSplit.isMasterSplit()).isTrue();
     assertThat(extractPaths(masterSplit.getEntries())).containsExactly("dex/classes.dex");
+  }
+
+  @Test
+  public void wholeResourcePinning_allConfigsInMaster() throws Exception {
+    BundleModule baseModule =
+        new BundleModuleBuilder("base")
+            .setResourceTable(
+                resourceTable(
+                    pkg(
+                        USER_PACKAGE_OFFSET,
+                        "com.test.app",
+                        type(
+                            0x01,
+                            "string",
+                            entry(
+                                0x0001,
+                                "welcome_label",
+                                value("Welcome", Configuration.getDefaultInstance()),
+                                value("Willkommen", locale("de")),
+                                value("Здравствуйте", locale("ru"))),
+                            entry(
+                                0x0002,
+                                "goodbye_label",
+                                value("Goodbye", Configuration.getDefaultInstance()),
+                                value("Auf Wiedersehen", locale("de")),
+                                value("До свидания", locale("ru")))))))
+            .setManifest(androidManifest("com.test.app"))
+            .build();
+    ModuleSplitter moduleSplitter =
+        new ModuleSplitter(
+            baseModule,
+            BUNDLETOOL_VERSION,
+            ApkGenerationConfiguration.builder()
+                .setOptimizationDimensions(ImmutableSet.of(LANGUAGE))
+                .setMasterPinnedResources(ImmutableSet.of(ResourceId.create(0x7f010001)))
+                .build(),
+            lPlusVariantTargeting(),
+            ImmutableSet.of("base"));
+
+    ImmutableList<ModuleSplit> splits = moduleSplitter.splitModule();
+
+    Map<String, ModuleSplit> splitsBySuffix = Maps.uniqueIndex(splits, ModuleSplit::getSuffix);
+    assertThat(splitsBySuffix.keySet()).containsExactly("", "de", "ru");
+
+    assertThat(splitsBySuffix.get("").getResourceTable().get())
+        .containsResource("com.test.app:string/welcome_label")
+        .onlyWithConfigs(Configuration.getDefaultInstance(), locale("de"), locale("ru"));
+    assertThat(splitsBySuffix.get("de").getResourceTable().get())
+        .doesNotContainResource("com.test.app:string/welcome_label");
+    assertThat(splitsBySuffix.get("ru").getResourceTable().get())
+        .doesNotContainResource("com.test.app:string/welcome_label");
+
+    assertThat(splitsBySuffix.get("").getResourceTable().get())
+        .containsResource("com.test.app:string/goodbye_label")
+        .onlyWithConfigs(Configuration.getDefaultInstance());
+    assertThat(splitsBySuffix.get("de").getResourceTable().get())
+        .containsResource("com.test.app:string/goodbye_label")
+        .onlyWithConfigs(locale("de"));
+    assertThat(splitsBySuffix.get("ru").getResourceTable().get())
+        .containsResource("com.test.app:string/goodbye_label")
+        .onlyWithConfigs(locale("ru"));
+  }
+
+  @Test
+  public void manifestResourcePinning_langResourceWithDefaultConfig_notPinned() throws Exception {
+    BundleModule baseModule =
+        new BundleModuleBuilder("base")
+            .setResourceTable(
+                resourceTable(
+                    pkg(
+                        USER_PACKAGE_OFFSET,
+                        "com.test.app",
+                        type(
+                            0x01,
+                            "string",
+                            entry(
+                                0x0001,
+                                "welcome_label",
+                                value("Welcome", Configuration.getDefaultInstance()),
+                                value("Willkommen", locale("de")),
+                                value("Здравствуйте", locale("ru")))))))
+            .setManifest(
+                androidManifest(
+                    "com.test.app", withMetadataResource("reference-to-resource", 0x7f010001)))
+            .build();
+    ModuleSplitter moduleSplitter =
+        new ModuleSplitter(
+            baseModule,
+            BUNDLETOOL_VERSION,
+            ApkGenerationConfiguration.builder()
+                .setOptimizationDimensions(ImmutableSet.of(LANGUAGE))
+                .setBaseManifestReachableResources(ImmutableSet.of(ResourceId.create(0x7f010001)))
+                .build(),
+            lPlusVariantTargeting(),
+            ImmutableSet.of("base"));
+
+    ImmutableList<ModuleSplit> splits = moduleSplitter.splitModule();
+
+    Map<String, ModuleSplit> splitsBySuffix = Maps.uniqueIndex(splits, ModuleSplit::getSuffix);
+    assertThat(splitsBySuffix.keySet()).containsExactly("", "de", "ru");
+
+    assertThat(splitsBySuffix.get("").getResourceTable().get())
+        .containsResource("com.test.app:string/welcome_label")
+        .onlyWithConfigs(Configuration.getDefaultInstance());
+    assertThat(splitsBySuffix.get("de").getResourceTable().get())
+        .containsResource("com.test.app:string/welcome_label")
+        .onlyWithConfigs(locale("de"));
+    assertThat(splitsBySuffix.get("ru").getResourceTable().get())
+        .containsResource("com.test.app:string/welcome_label")
+        .onlyWithConfigs(locale("ru"));
+  }
+
+  @Test
+  public void manifestResourcePinning_langResourceWithoutDefaultConfig_pinned() throws Exception {
+    BundleModule baseModule =
+        new BundleModuleBuilder("base")
+            .setResourceTable(
+                resourceTable(
+                    pkg(
+                        USER_PACKAGE_OFFSET,
+                        "com.test.app",
+                        type(
+                            0x01,
+                            "string",
+                            entry(
+                                0x0001,
+                                "welcome_label",
+                                value("Welcome", locale("en")),
+                                value("Willkommen", locale("de")),
+                                value("Здравствуйте", locale("ru"))),
+                            entry(
+                                0x0002,
+                                "goodbye_label",
+                                value("Goodbye", locale("en")),
+                                value("Auf Wiedersehen", locale("de")),
+                                value("До свидания", locale("ru")))))))
+            .setManifest(
+                androidManifest(
+                    "com.test.app", withMetadataResource("reference-to-resource", 0x7f010001)))
+            .build();
+    ModuleSplitter moduleSplitter =
+        new ModuleSplitter(
+            baseModule,
+            BUNDLETOOL_VERSION,
+            ApkGenerationConfiguration.builder()
+                .setOptimizationDimensions(ImmutableSet.of(LANGUAGE))
+                .setBaseManifestReachableResources(ImmutableSet.of(ResourceId.create(0x7f010001)))
+                .build(),
+            lPlusVariantTargeting(),
+            ImmutableSet.of("base"));
+
+    ImmutableList<ModuleSplit> splits = moduleSplitter.splitModule();
+
+    Map<String, ModuleSplit> splitsBySuffix = Maps.uniqueIndex(splits, ModuleSplit::getSuffix);
+    assertThat(splitsBySuffix.keySet()).containsExactly("en", "de", "ru", "");
+
+    assertThat(splitsBySuffix.get("").getResourceTable().get())
+        .containsResource("com.test.app:string/welcome_label")
+        .onlyWithConfigs(locale("en"), locale("de"), locale("ru"));
+    assertThat(splitsBySuffix.get("en").getResourceTable().get())
+        .doesNotContainResource("com.test.app:string/welcome_label");
+    assertThat(splitsBySuffix.get("de").getResourceTable().get())
+        .doesNotContainResource("com.test.app:string/welcome_label");
+    assertThat(splitsBySuffix.get("ru").getResourceTable().get())
+        .doesNotContainResource("com.test.app:string/welcome_label");
   }
 
   private ModuleSplit checkAndReturnTheOnlyMasterSplit(List<ModuleSplit> splits) {
@@ -1468,8 +1628,7 @@ public class ModuleSplitterTest {
         BUNDLETOOL_VERSION,
         withOptimizationDimensions(ImmutableSet.of(ABI, SCREEN_DENSITY)),
         lPlusVariantTargeting(),
-        ImmutableSet.of(module.getName().getName()),
-        NO_RESOURCES_PINNED_TO_MASTER);
+        ImmutableSet.of(module.getName().getName()));
   }
 
   private static ModuleSplitter createAbiDensityAndLanguageSplitter(BundleModule module) {
@@ -1478,8 +1637,7 @@ public class ModuleSplitterTest {
         BUNDLETOOL_VERSION,
         withOptimizationDimensions(ImmutableSet.of(ABI, SCREEN_DENSITY, LANGUAGE)),
         lPlusVariantTargeting(),
-        ImmutableSet.of(module.getName().getName()),
-        NO_RESOURCES_PINNED_TO_MASTER);
+        ImmutableSet.of(module.getName().getName()));
   }
 
   private static ApkGenerationConfiguration withOptimizationDimensions(

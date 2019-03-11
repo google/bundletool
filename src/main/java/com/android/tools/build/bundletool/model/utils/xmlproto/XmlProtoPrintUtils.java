@@ -211,7 +211,7 @@ public final class XmlProtoPrintUtils {
 
   private static class Tag implements Comparable<Tag> {
     private static final MapSplitter ATTRIBUTES_SPLITTER =
-        Splitter.on(';').withKeyValueSeparator('=');
+        Splitter.on(';').withKeyValueSeparator(Splitter.on('=').limit(2));
 
     private final String tag;
     private final Type type;

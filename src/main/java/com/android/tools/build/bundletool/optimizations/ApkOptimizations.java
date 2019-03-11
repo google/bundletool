@@ -102,4 +102,12 @@ public abstract class ApkOptimizations {
     // Currently no optimizations are performed.
     return ApkOptimizations.builder().setSplitDimensions(ImmutableSet.of()).build();
   }
+
+  public static ApkOptimizations getOptimizationsForAssetSlices() {
+    return ApkOptimizations.builder()
+        .setSplitDimensions(
+            ImmutableSet.of(
+                LANGUAGE))
+        .build();
+  }
 }

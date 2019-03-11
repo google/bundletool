@@ -16,8 +16,10 @@
 
 package com.android.tools.build.bundletool.validation;
 
+import static com.android.tools.build.bundletool.model.AndroidManifest.MODULE_TYPE_ASSET_VALUE;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifest;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifestForFeature;
+import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.clearApplication;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withFeatureCondition;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withFusingAttribute;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withInstallTimeDelivery;
@@ -28,7 +30,10 @@ import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.with
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withOnDemandAttribute;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withOnDemandDelivery;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withSplitId;
+import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withTargetSdkVersion;
+import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withTypeAttribute;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withVersionCode;
+import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withoutVersionCode;
 import static com.google.common.truth.Truth.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
@@ -44,12 +49,16 @@ import com.android.tools.build.bundletool.model.utils.xmlproto.XmlProtoAttribute
 import com.android.tools.build.bundletool.testing.BundleModuleBuilder;
 import com.android.tools.build.bundletool.testing.ManifestProtoUtils.ManifestMutator;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableSet;
 import java.io.IOException;
 import org.junit.Test;
+import org.junit.experimental.theories.DataPoints;
+import org.junit.experimental.theories.FromDataPoints;
+import org.junit.experimental.theories.Theories;
+import org.junit.experimental.theories.Theory;
 import org.junit.runner.RunWith;
-import org.junit.runners.JUnit4;
 
-@RunWith(JUnit4.class)
+@RunWith(Theories.class)
 public class AndroidManifestValidatorTest {
 
   private static final String BASE_MODULE_NAME = "base";
@@ -664,5 +673,152 @@ public class AndroidManifestValidatorTest {
     assertThat(exception)
         .hasMessageThat()
         .contains("App Bundle modules should have the same version code but found [2,3]");
+  }
+
+  @Test
+  public void assetModule_noApplication_ok() throws Exception {
+    BundleModule module =
+        new BundleModuleBuilder("asset_module")
+            .setManifest(
+                androidManifest(
+                    "com.test.app",
+                    withTypeAttribute(MODULE_TYPE_ASSET_VALUE),
+                    withOnDemandDelivery(),
+                    withFusingAttribute(true),
+                    clearApplication()))
+            .build();
+    new AndroidManifestValidator().validateModule(module);
+  }
+
+  @Test
+  public void assetModule_withApplication_throws() throws Exception {
+    BundleModule module =
+        new BundleModuleBuilder("asset_module")
+            .setManifest(
+                androidManifest(
+                    "com.test.app",
+                    withTypeAttribute(MODULE_TYPE_ASSET_VALUE),
+                    withOnDemandDelivery(),
+                    withFusingAttribute(true)))
+            .build();
+
+    Throwable exception =
+        assertThrows(
+            ValidationException.class, () -> new AndroidManifestValidator().validateModule(module));
+    assertThat(exception)
+        .hasMessageThat()
+        .matches("Unexpected element declaration in manifest of asset pack 'asset_module'.");
+  }
+
+  @DataPoints("sdkMutators")
+  public static final ImmutableSet<ManifestMutator> SDK_MUTATORS =
+      ImmutableSet.of(withMinSdkVersion(10), withMaxSdkVersion(20), withTargetSdkVersion("O"));
+
+  @Test
+  @Theory
+  public void assetModule_withSdkConstraint_throws(
+      @FromDataPoints("sdkMutators") ManifestMutator sdkMutator) throws Exception {
+    BundleModule module =
+        new BundleModuleBuilder("asset_module")
+            .setManifest(
+                androidManifest(
+                    "com.test.app",
+                    withTypeAttribute(MODULE_TYPE_ASSET_VALUE),
+                    withOnDemandDelivery(),
+                    withFusingAttribute(true),
+                    clearApplication(),
+                    sdkMutator))
+            .build();
+
+    ValidationException exception =
+        assertThrows(
+            ValidationException.class, () -> new AndroidManifestValidator().validateModule(module));
+    assertThat(exception)
+        .hasMessageThat()
+        .matches("Unexpected element declaration in manifest of asset pack 'asset_module'.");
+  }
+
+  @Test
+  public void assetModule_noVersionCode_ok() throws Exception {
+    ImmutableList<BundleModule> bundleModules =
+        ImmutableList.of(
+            new BundleModuleBuilder(BASE_MODULE_NAME)
+                .setManifest(androidManifest("com.test", withVersionCode(2)))
+                .build(),
+            new BundleModuleBuilder("asset_module")
+                .setManifest(
+                    androidManifest(
+                        "com.test.app",
+                        withTypeAttribute(MODULE_TYPE_ASSET_VALUE),
+                        withOnDemandDelivery(),
+                        withFusingAttribute(true),
+                        clearApplication(),
+                        withoutVersionCode()))
+                .build());
+    new AndroidManifestValidator().validateAllModules(bundleModules);
+  }
+
+  @Test
+  public void assetModule_withVersionCode_throws() throws Exception {
+    ImmutableList<BundleModule> bundleModules =
+        ImmutableList.of(
+            new BundleModuleBuilder(BASE_MODULE_NAME)
+                .setManifest(androidManifest("com.test", withVersionCode(2)))
+                .build(),
+            new BundleModuleBuilder("asset_module")
+                .setManifest(
+                    androidManifest(
+                        "com.test.app",
+                        withTypeAttribute(MODULE_TYPE_ASSET_VALUE),
+                        withOnDemandDelivery(),
+                        withFusingAttribute(true),
+                        clearApplication()))
+                .build());
+
+    Throwable exception =
+        assertThrows(
+            ValidationException.class,
+            () -> new AndroidManifestValidator().validateAllModules(bundleModules));
+    assertThat(exception)
+        .hasMessageThat()
+        .matches("Asset packs cannot specify a version code, but 'asset_module' does.");
+  }
+
+  @Test
+  public void minSdkConditionLowerThanMinSdkVersion_throws() throws Exception {
+    BundleModule featureModule =
+        new BundleModuleBuilder(FEATURE_MODULE_NAME)
+            .setManifest(
+                androidManifest(
+                    PKG_NAME,
+                    withFusingAttribute(false),
+                    withMinSdkCondition(21),
+                    withMinSdkVersion(23)))
+            .build();
+
+    Throwable exception =
+        assertThrows(
+            ValidationException.class,
+            () -> new AndroidManifestValidator().validateModule(featureModule));
+    assertThat(exception)
+        .hasMessageThat()
+        .contains(
+            "Module 'feature' has <dist:min-sdk> condition (21) lower than the "
+                + "minSdkVersion(23) of the module.");
+  }
+
+  @Test
+  public void minSdkConditionGreaterEqualThanMinSdkVersion_ok() throws Exception {
+    BundleModule featureModule =
+        new BundleModuleBuilder(FEATURE_MODULE_NAME)
+            .setManifest(
+                androidManifest(
+                    PKG_NAME,
+                    withFusingAttribute(true),
+                    withMinSdkCondition(24),
+                    withMinSdkVersion(19)))
+            .build();
+
+    new AndroidManifestValidator().validateModule(featureModule);
   }
 }

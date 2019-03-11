@@ -18,7 +18,7 @@ package com.android.tools.build.bundletool.splitters;
 
 import com.android.bundle.Targeting.VariantTargeting;
 import com.android.tools.build.bundletool.model.BundleModule;
-import com.google.common.collect.ImmutableCollection;
+import java.util.stream.Stream;
 
 /**
  * Generates additional variant targetings that would be created from the {@link BundleModule}.
@@ -27,5 +27,5 @@ import com.google.common.collect.ImmutableCollection;
  * targeting. These targetings are later merged together in the {@link VariantGenerator}.
  */
 public interface BundleModuleVariantGenerator {
-  ImmutableCollection<VariantTargeting> generate(BundleModule module);
+  Stream<VariantTargeting> generate(BundleModule module);
 }

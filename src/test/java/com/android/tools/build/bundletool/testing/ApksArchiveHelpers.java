@@ -23,6 +23,7 @@ import static com.android.tools.build.bundletool.testing.TargetingUtils.variantM
 import static com.android.tools.build.bundletool.testing.TargetingUtils.variantSdkTargeting;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 
+import com.android.bundle.Commands.ApexApkMetadata;
 import com.android.bundle.Commands.ApkDescription;
 import com.android.bundle.Commands.ApkSet;
 import com.android.bundle.Commands.BuildApksResult;
@@ -110,10 +111,26 @@ public final class ApksArchiveHelpers {
             .build());
   }
 
+  public static Variant apexVariant(
+      VariantTargeting variantTargeting, ApkTargeting apkTargeting, ZipPath apkPath) {
+    // An apex variant has only a single APK with module named "base".
+    return createVariant(
+        variantTargeting,
+        ApkSet.newBuilder()
+            .setModuleMetadata(ModuleMetadata.newBuilder().setName("base"))
+            .addApkDescription(
+                ApkDescription.newBuilder()
+                    .setTargeting(apkTargeting)
+                    .setPath(apkPath.toString())
+                    // Contents of the apex APK metadata is not important for these tests
+                    // as long as the field is set.
+                    .setApexApkMetadata(ApexApkMetadata.getDefaultInstance()))
+            .build());
+  }
+
   /** Create standalone variant with multi ABI targeting only. */
-  public static Variant multiAbiTargetingStandaloneVariant(
-      MultiAbiTargeting targeting, ZipPath apkPath) {
-    return standaloneVariant(
+  public static Variant multiAbiTargetingApexVariant(MultiAbiTargeting targeting, ZipPath apkPath) {
+    return apexVariant(
         mergeVariantTargeting(
             variantSdkTargeting(sdkVersionFrom(1)), variantMultiAbiTargeting(targeting)),
         apkMultiAbiTargeting(targeting),

@@ -18,6 +18,7 @@ package com.android.tools.build.bundletool.splitters;
 
 import com.android.bundle.Targeting.Abi;
 import com.android.tools.build.bundletool.model.OptimizationDimension;
+import com.android.tools.build.bundletool.model.ResourceId;
 import com.google.auto.value.AutoValue;
 import com.google.common.collect.ImmutableSet;
 import com.google.errorprone.annotations.Immutable;
@@ -45,6 +46,12 @@ public abstract class ApkGenerationConfiguration {
    */
   public abstract ImmutableSet<Abi> getAbisForPlaceholderLibs();
 
+  /** Resources that are pinned to the master split. */
+  public abstract ImmutableSet<ResourceId> getMasterPinnedResources();
+
+  /** Resources that are (transitively) reachable from AndroidManifest.xml of the base module. */
+  public abstract ImmutableSet<ResourceId> getBaseManifestReachableResources();
+
   public abstract Builder toBuilder();
 
   public static Builder builder() {
@@ -54,7 +61,9 @@ public abstract class ApkGenerationConfiguration {
         .setEnableDexCompressionSplitter(false)
         .setInclude64BitLibs(true)
         .setAbisForPlaceholderLibs(ImmutableSet.of())
-        .setOptimizationDimensions(ImmutableSet.of());
+        .setOptimizationDimensions(ImmutableSet.of())
+        .setMasterPinnedResources(ImmutableSet.of())
+        .setBaseManifestReachableResources(ImmutableSet.of());
   }
 
   public static ApkGenerationConfiguration getDefaultInstance() {
@@ -78,6 +87,10 @@ public abstract class ApkGenerationConfiguration {
     public abstract Builder setAbisForPlaceholderLibs(ImmutableSet<Abi> abis);
 
     public abstract Builder setInclude64BitLibs(boolean shouldGenerate);
+
+    public abstract Builder setMasterPinnedResources(ImmutableSet<ResourceId> resourceIds);
+
+    public abstract Builder setBaseManifestReachableResources(ImmutableSet<ResourceId> resourceIds);
 
     public abstract ApkGenerationConfiguration build();
   }

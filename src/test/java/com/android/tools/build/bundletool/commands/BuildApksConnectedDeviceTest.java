@@ -451,10 +451,12 @@ public class BuildApksConnectedDeviceTest {
             .build();
 
     Path apksArchive = command.execute();
-    ZipFile apksZipFile = new ZipFile(apksArchive.toFile());
-    assertThat(apksZipFile)
-        .containsExactlyEntries("toc.pb", "splits/base-master.apk", "splits/base-xhdpi.apk");
-    BuildApksResult result = extractTocFromApkSetFile(apksZipFile, outputDir);
+    BuildApksResult result;
+    try (ZipFile apksZipFile = new ZipFile(apksArchive.toFile())) {
+      assertThat(apksZipFile)
+          .containsExactlyEntries("toc.pb", "splits/base-master.apk", "splits/base-xhdpi.apk");
+      result = extractTocFromApkSetFile(apksZipFile, outputDir);
+    }
     assertThat(result.getVariantList()).hasSize(1);
     Variant variant = result.getVariant(0);
     assertThat(variant.getApkSetList()).hasSize(1);
@@ -490,10 +492,12 @@ public class BuildApksConnectedDeviceTest {
             .build();
 
     Path apksArchive = command.execute();
-    ZipFile apksZipFile = new ZipFile(apksArchive.toFile());
-    assertThat(apksZipFile)
-        .containsExactlyEntries("toc.pb", "splits/base-master.apk", "splits/base-mdpi.apk");
-    BuildApksResult result = extractTocFromApkSetFile(apksZipFile, outputDir);
+    BuildApksResult result;
+    try (ZipFile apksZipFile = new ZipFile(apksArchive.toFile())) {
+      assertThat(apksZipFile)
+          .containsExactlyEntries("toc.pb", "splits/base-master.apk", "splits/base-mdpi.apk");
+      result = extractTocFromApkSetFile(apksZipFile, outputDir);
+    }
     assertThat(result.getVariantList()).hasSize(1);
     Variant variant = result.getVariant(0);
     assertThat(variant.getApkSetList()).hasSize(1);
@@ -529,9 +533,11 @@ public class BuildApksConnectedDeviceTest {
             .build();
 
     Path apksArchive = command.execute();
-    ZipFile apksZipFile = new ZipFile(apksArchive.toFile());
-    assertThat(apksZipFile).containsExactlyEntries("toc.pb", "standalones/standalone-hdpi.apk");
-    BuildApksResult result = extractTocFromApkSetFile(apksZipFile, outputDir);
+    BuildApksResult result;
+    try (ZipFile apksZipFile = new ZipFile(apksArchive.toFile())) {
+      assertThat(apksZipFile).containsExactlyEntries("toc.pb", "standalones/standalone-hdpi.apk");
+      result = extractTocFromApkSetFile(apksZipFile, outputDir);
+    }
     assertThat(result.getVariantList()).hasSize(1);
     Variant variant = result.getVariant(0);
     assertThat(variant.getApkSetList()).hasSize(1);
@@ -570,9 +576,11 @@ public class BuildApksConnectedDeviceTest {
             .build();
 
     Path apksArchive = command.execute();
-    ZipFile apksZipFile = new ZipFile(apksArchive.toFile());
-    assertThat(apksZipFile).containsExactlyEntries("toc.pb", "standalones/standalone-xhdpi.apk");
-    BuildApksResult result = extractTocFromApkSetFile(apksZipFile, outputDir);
+    BuildApksResult result;
+    try (ZipFile apksZipFile = new ZipFile(apksArchive.toFile())) {
+      assertThat(apksZipFile).containsExactlyEntries("toc.pb", "standalones/standalone-xhdpi.apk");
+      result = extractTocFromApkSetFile(apksZipFile, outputDir);
+    }
     assertThat(result.getVariantList()).hasSize(1);
     Variant variant = result.getVariant(0);
     assertThat(variant.getApkSetList()).hasSize(1);

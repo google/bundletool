@@ -35,12 +35,25 @@ public abstract class GeneratedAssetSlices {
     return getAssetSlices().size();
   }
 
+  public static Builder builder() {
+    return new AutoValue_GeneratedAssetSlices.Builder().setAssetSlices(ImmutableList.of());
+  }
+
   /** Creates a GeneratedAssetSlices instance from a list of module splits. */
   public static GeneratedAssetSlices fromModuleSplits(ImmutableList<ModuleSplit> moduleSplits) {
     ImmutableList<ModuleSplit> assetSlices =
         moduleSplits.stream()
             .filter(split -> split.getSplitType().equals(SplitType.ASSET_SLICE))
             .collect(toImmutableList());
-    return new AutoValue_GeneratedAssetSlices(assetSlices);
+    return builder().setAssetSlices(assetSlices).build();
+  }
+
+  /** Builder for {@link GeneratedAssetSlices}. */
+  @AutoValue.Builder
+  public abstract static class Builder {
+
+    public abstract Builder setAssetSlices(ImmutableList<ModuleSplit> assetSlices);
+
+    public abstract GeneratedAssetSlices build();
   }
 }

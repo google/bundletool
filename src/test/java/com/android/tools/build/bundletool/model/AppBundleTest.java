@@ -16,6 +16,7 @@
 
 package com.android.tools.build.bundletool.model;
 
+import static com.android.tools.build.bundletool.model.AndroidManifest.MODULE_TYPE_ASSET_VALUE;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifest;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withTypeAttribute;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.nativeDirectoryTargeting;
@@ -53,7 +54,7 @@ public class AppBundleTest {
   private static final BundleConfig BUNDLE_CONFIG = BundleConfigBuilder.create().build();
   public static final XmlNode MANIFEST = androidManifest("com.test.app.detail");
   public static final XmlNode REMOTE_ASSET_MANIFEST =
-      androidManifest("com.test.app.detail", withTypeAttribute("remote-asset"));
+      androidManifest("com.test.app.detail", withTypeAttribute(MODULE_TYPE_ASSET_VALUE));
 
   @Rule public TemporaryFolder tmp = new TemporaryFolder();
 
@@ -70,11 +71,13 @@ public class AppBundleTest {
         .addFileWithContent(ZipPath.create("base/dex/classes.dex"), DUMMY_CONTENT)
         .writeTo(bundleFile);
 
-    AppBundle appBundle = AppBundle.buildFromZip(new ZipFile(bundleFile.toFile()));
-    assertThat(appBundle.getFeatureModules().keySet())
-        .containsExactly(BundleModuleName.create("base"));
+    try (ZipFile appBundleZip = new ZipFile(bundleFile.toFile())) {
+      AppBundle appBundle = AppBundle.buildFromZip(appBundleZip);
+      assertThat(appBundle.getFeatureModules().keySet())
+          .containsExactly(BundleModuleName.create("base"));
+    }
   }
-
+  
   @Test
   public void testMultipleModules() throws Exception {
     createBasicZipBuilder(BUNDLE_CONFIG)
@@ -85,9 +88,11 @@ public class AppBundleTest {
         .addFileWithContent(ZipPath.create("detail/assets/file.txt"), DUMMY_CONTENT)
         .writeTo(bundleFile);
 
-    AppBundle appBundle = AppBundle.buildFromZip(new ZipFile(bundleFile.toFile()));
-    assertThat(appBundle.getFeatureModules().keySet())
-        .containsExactly(BundleModuleName.create("base"), BundleModuleName.create("detail"));
+    try (ZipFile appBundleZip = new ZipFile(bundleFile.toFile())) {
+      AppBundle appBundle = AppBundle.buildFromZip(appBundleZip);
+      assertThat(appBundle.getFeatureModules().keySet())
+          .containsExactly(BundleModuleName.create("base"), BundleModuleName.create("detail"));
+    }
   }
 
   @Test
@@ -98,10 +103,13 @@ public class AppBundleTest {
         .addFileWithContent(ZipPath.create("base/root/Foo.class"), DUMMY_CONTENT)
         .writeTo(bundleFile);
 
-    AppBundle appBundle = AppBundle.buildFromZip(new ZipFile(bundleFile.toFile()));
-    assertThat(appBundle.getBaseModule().getEntry(ZipPath.create("root/Foo.classes"))).isPresent();
-    assertThat(appBundle.getBaseModule().getEntry(ZipPath.create("root/class.txt"))).isPresent();
-    assertThat(appBundle.getBaseModule().getEntry(ZipPath.create("root/Foo.class"))).isEmpty();
+    try (ZipFile appBundleZip = new ZipFile(bundleFile.toFile())) {
+      AppBundle appBundle = AppBundle.buildFromZip(appBundleZip);
+      assertThat(appBundle.getBaseModule().getEntry(ZipPath.create("root/Foo.classes")))
+          .isPresent();
+      assertThat(appBundle.getBaseModule().getEntry(ZipPath.create("root/class.txt"))).isPresent();
+      assertThat(appBundle.getBaseModule().getEntry(ZipPath.create("root/Foo.class"))).isEmpty();
+    }
   }
 
   // Ensures that the ClassesDexNameSanitizer is invoked.
@@ -113,11 +121,15 @@ public class AppBundleTest {
         .addFileWithContent(ZipPath.create("base/dex/classes2.dex"), DUMMY_CONTENT)
         .writeTo(bundleFile);
 
-    AppBundle appBundle = AppBundle.buildFromZip(new ZipFile(bundleFile.toFile()));
-    assertThat(appBundle.getBaseModule().getEntry(ZipPath.create("dex/classes.dex"))).isPresent();
-    assertThat(appBundle.getBaseModule().getEntry(ZipPath.create("dex/classes1.dex"))).isEmpty();
-    assertThat(appBundle.getBaseModule().getEntry(ZipPath.create("dex/classes2.dex"))).isPresent();
-    assertThat(appBundle.getBaseModule().getEntry(ZipPath.create("dex/classes3.dex"))).isPresent();
+    try (ZipFile appBundleZip = new ZipFile(bundleFile.toFile())) {
+      AppBundle appBundle = AppBundle.buildFromZip(appBundleZip);
+      assertThat(appBundle.getBaseModule().getEntry(ZipPath.create("dex/classes.dex"))).isPresent();
+      assertThat(appBundle.getBaseModule().getEntry(ZipPath.create("dex/classes1.dex"))).isEmpty();
+      assertThat(appBundle.getBaseModule().getEntry(ZipPath.create("dex/classes2.dex")))
+          .isPresent();
+      assertThat(appBundle.getBaseModule().getEntry(ZipPath.create("dex/classes3.dex")))
+          .isPresent();
+    }
   }
 
   @Test
@@ -129,29 +141,31 @@ public class AppBundleTest {
             ZipPath.create("BUNDLE-METADATA/some.namespace/sub-dir/metadata2"), new byte[] {0x02})
         .writeTo(bundleFile);
 
-    AppBundle appBundle = AppBundle.buildFromZip(new ZipFile(bundleFile.toFile()));
+    try (ZipFile appBundleZip = new ZipFile(bundleFile.toFile())) {
+      AppBundle appBundle = AppBundle.buildFromZip(appBundleZip);
 
-    Optional<InputStreamSupplier> existingMetadataFile =
-        appBundle
-            .getBundleMetadata()
-            .getFileData(/* namespacedDir= */ "some.namespace", /* fileName= */ "metadata1");
-    assertThat(existingMetadataFile).isPresent();
-    assertThat(TestUtils.toByteArray(existingMetadataFile.get())).isEqualTo(new byte[] {0x01});
+      Optional<InputStreamSupplier> existingMetadataFile =
+          appBundle
+              .getBundleMetadata()
+              .getFileData(/* namespacedDir= */ "some.namespace", /* fileName= */ "metadata1");
+      assertThat(existingMetadataFile).isPresent();
+      assertThat(TestUtils.toByteArray(existingMetadataFile.get())).isEqualTo(new byte[] {0x01});
 
-    Optional<InputStreamSupplier> existingMetadataFileInSubDir =
-        appBundle
-            .getBundleMetadata()
-            .getFileData(
-                /* namespacedDir= */ "some.namespace/sub-dir", /* fileName= */ "metadata2");
-    assertThat(existingMetadataFileInSubDir).isPresent();
-    assertThat(TestUtils.toByteArray(existingMetadataFileInSubDir.get()))
-        .isEqualTo(new byte[] {0x02});
+      Optional<InputStreamSupplier> existingMetadataFileInSubDir =
+          appBundle
+              .getBundleMetadata()
+              .getFileData(
+                  /* namespacedDir= */ "some.namespace/sub-dir", /* fileName= */ "metadata2");
+      assertThat(existingMetadataFileInSubDir).isPresent();
+      assertThat(TestUtils.toByteArray(existingMetadataFileInSubDir.get()))
+          .isEqualTo(new byte[] {0x02});
 
-    Optional<InputStreamSupplier> nonExistingMetadataFile =
-        appBundle
-            .getBundleMetadata()
-            .getFileData(/* namespacedDir= */ "unknown.namespace", /* fileName= */ "blah");
-    assertThat(nonExistingMetadataFile).isEmpty();
+      Optional<InputStreamSupplier> nonExistingMetadataFile =
+          appBundle
+              .getBundleMetadata()
+              .getFileData(/* namespacedDir= */ "unknown.namespace", /* fileName= */ "blah");
+      assertThat(nonExistingMetadataFile).isEmpty();
+    }
   }
 
   @Test
@@ -161,9 +175,11 @@ public class AppBundleTest {
             ZipPath.create("BUNDLE-METADATA/some.namespace/metadata-file.txt"), DUMMY_CONTENT)
         .writeTo(bundleFile);
 
-    AppBundle appBundle = AppBundle.buildFromZip(new ZipFile(bundleFile.toFile()));
-    assertThat(appBundle.getFeatureModules().keySet())
-        .containsExactly(BundleModuleName.create("base"));
+    try (ZipFile appBundleZip = new ZipFile(bundleFile.toFile())) {
+      AppBundle appBundle = AppBundle.buildFromZip(appBundleZip);
+      assertThat(appBundle.getFeatureModules().keySet())
+          .containsExactly(BundleModuleName.create("base"));
+    }
   }
 
   @Test
@@ -173,9 +189,11 @@ public class AppBundleTest {
         .addFileWithContent(ZipPath.create("META-INF/MANIFEST.SF"), DUMMY_CONTENT)
         .writeTo(bundleFile);
 
-    AppBundle appBundle = AppBundle.buildFromZip(new ZipFile(bundleFile.toFile()));
-    assertThat(appBundle.getFeatureModules().keySet())
-        .containsExactly(BundleModuleName.create("base"));
+    try (ZipFile appBundleZip = new ZipFile(bundleFile.toFile())) {
+      AppBundle appBundle = AppBundle.buildFromZip(appBundleZip);
+      assertThat(appBundle.getFeatureModules().keySet())
+          .containsExactly(BundleModuleName.create("base"));
+    }
   }
 
   @Test
@@ -205,8 +223,10 @@ public class AppBundleTest {
   public void bundleConfigExtracted() throws Exception {
     createBasicZipBuilderWithManifest(BUNDLE_CONFIG).writeTo(bundleFile);
 
-    AppBundle appBundle = AppBundle.buildFromZip(new ZipFile(bundleFile.toFile()));
-    assertThat(appBundle.getBundleConfig()).isEqualTo(BUNDLE_CONFIG);
+    try (ZipFile appBundleZip = new ZipFile(bundleFile.toFile())) {
+      AppBundle appBundle = AppBundle.buildFromZip(appBundleZip);
+      assertThat(appBundle.getBundleConfig()).isEqualTo(BUNDLE_CONFIG);
+    }
   }
 
   @Test
@@ -217,14 +237,18 @@ public class AppBundleTest {
         .addFileWithContent(ZipPath.create("base/lib/armeabi/libbar.so"), DUMMY_CONTENT)
         .writeTo(bundleFile);
 
-    assertThat(
-            AppBundle.buildFromZip(new ZipFile(bundleFile.toFile()))
-                .getBaseModule()
-                .findEntriesUnderPath(ZipPath.create("lib"))
-                .map(ModuleEntry::getPath)
-                .collect(toImmutableList()))
-        .containsExactly(
-            ZipPath.create("lib/armeabi/libfoo.so"), ZipPath.create("lib/armeabi/libbar.so"));
+    try (ZipFile appBundleZip = new ZipFile(bundleFile.toFile())) {
+      AppBundle appBundle = AppBundle.buildFromZip(appBundleZip);
+
+      assertThat(
+              appBundle
+                  .getBaseModule()
+                  .findEntriesUnderPath(ZipPath.create("lib"))
+                  .map(ModuleEntry::getPath)
+                  .collect(toImmutableList()))
+          .containsExactly(
+              ZipPath.create("lib/armeabi/libfoo.so"), ZipPath.create("lib/armeabi/libbar.so"));
+    }
   }
 
   @Test
@@ -235,16 +259,20 @@ public class AppBundleTest {
         .addFileWithContent(ZipPath.create("base/lib/armeabi/libbar.so"), DUMMY_CONTENT)
         .writeTo(bundleFile);
 
-    assertThat(
-            AppBundle.buildFromZip(new ZipFile(bundleFile.toFile()))
-                .getBaseModule()
-                .findEntriesUnderPath(ZipPath.create("lib"))
-                .map(ModuleEntry::getPath)
-                .collect(toImmutableList()))
-        .containsExactly(
-            ZipPath.create("lib/x86/libfoo.so"),
-            ZipPath.create("lib/armeabi/libfoo.so"),
-            ZipPath.create("lib/armeabi/libbar.so"));
+    try (ZipFile appBundleZip = new ZipFile(bundleFile.toFile())) {
+      AppBundle appBundle = AppBundle.buildFromZip(appBundleZip);
+
+      assertThat(
+              appBundle
+                  .getBaseModule()
+                  .findEntriesUnderPath(ZipPath.create("lib"))
+                  .map(ModuleEntry::getPath)
+                  .collect(toImmutableList()))
+          .containsExactly(
+              ZipPath.create("lib/x86/libfoo.so"),
+              ZipPath.create("lib/armeabi/libfoo.so"),
+              ZipPath.create("lib/armeabi/libbar.so"));
+    }
   }
 
   @Test
@@ -253,9 +281,9 @@ public class AppBundleTest {
         .addFileWithContent(ZipPath.create("base/dex/classes.dex"), DUMMY_CONTENT)
         .writeTo(bundleFile);
 
-    assertThrows(
-        IllegalStateException.class,
-        () -> AppBundle.buildFromZip(new ZipFile(bundleFile.toFile())));
+    try (ZipFile appBundleZip = new ZipFile(bundleFile.toFile())) {
+      assertThrows(IllegalStateException.class, () -> AppBundle.buildFromZip(appBundleZip));
+    }
   }
 
   @Test
@@ -406,11 +434,13 @@ public class AppBundleTest {
         .addFileWithContent(ZipPath.create("remote_assets/assets/file.txt"), DUMMY_CONTENT)
         .writeTo(bundleFile);
 
-    AppBundle appBundle = AppBundle.buildFromZip(new ZipFile(bundleFile.toFile()));
-    assertThat(appBundle.getFeatureModules().keySet())
-        .containsExactly(BundleModuleName.create("base"));
-    assertThat(appBundle.getAssetModules().keySet())
-        .containsExactly(BundleModuleName.create("remote_assets"));
+    try (ZipFile appBundleZip = new ZipFile(bundleFile.toFile())) {
+      AppBundle appBundle = AppBundle.buildFromZip(appBundleZip);
+      assertThat(appBundle.getFeatureModules().keySet())
+          .containsExactly(BundleModuleName.create("base"));
+      assertThat(appBundle.getAssetModules().keySet())
+          .containsExactly(BundleModuleName.create("remote_assets"));
+    }
   }
 
   private static ZipBuilder createBasicZipBuilder(BundleConfig config) {

@@ -19,6 +19,8 @@ package com.android.tools.build.bundletool.model;
 import static com.android.tools.build.bundletool.model.BundleModule.ModuleDeliveryType.ALWAYS_INITIAL_INSTALL;
 import static com.android.tools.build.bundletool.model.BundleModule.ModuleDeliveryType.CONDITIONAL_INITIAL_INSTALL;
 import static com.android.tools.build.bundletool.model.BundleModule.ModuleDeliveryType.NO_INITIAL_INSTALL;
+import static com.android.tools.build.bundletool.model.utils.TargetingProtoUtils.sdkVersionFrom;
+import static com.android.tools.build.bundletool.model.utils.TargetingProtoUtils.sdkVersionTargeting;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.collect.ImmutableMap.toImmutableMap;
 import static java.util.function.Function.identity;
@@ -161,7 +163,7 @@ public abstract class BundleModule {
   public ModuleType getModuleType() {
     // If the module type is not defined in the manifest, default to feature module for backwards
     // compatibility.
-    return getAndroidManifest().getModuleType().orElse(ModuleType.FEATURE_MODULE);
+    return getAndroidManifest().getModuleType();
   }
 
   public boolean isIncludedInFusing() {
@@ -188,7 +190,25 @@ public abstract class BundleModule {
         .getManifestDeliveryElement()
         .map(ManifestDeliveryElement::getModuleConditions)
         .map(ModuleConditions::toTargeting)
+        .map(this::applyMinSdkVersion)
         .orElse(ModuleTargeting.getDefaultInstance());
+  }
+
+  private ModuleTargeting applyMinSdkVersion(ModuleTargeting moduleTargeting) {
+    // MinSdkVersion of the module is applied to module targeting if:
+    // (1) module is conditional, (2) it doesn't have min-sdk condition already
+    // and (3) minSdkVersion of the module is explicitly defined in the manifest.
+    Optional<Integer> minSdkVersion = getAndroidManifest().getMinSdkVersion();
+    if (moduleTargeting.equals(ModuleTargeting.getDefaultInstance())
+        || moduleTargeting.hasSdkVersionTargeting()
+        || !minSdkVersion.isPresent()) {
+      return moduleTargeting;
+    }
+
+    return moduleTargeting
+        .toBuilder()
+        .setSdkVersionTargeting(sdkVersionTargeting(sdkVersionFrom(minSdkVersion.get())))
+        .build();
   }
 
   /**

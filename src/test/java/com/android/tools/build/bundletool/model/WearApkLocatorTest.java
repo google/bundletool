@@ -99,7 +99,7 @@ public final class WearApkLocatorTest {
     assertThat(exception)
         .hasMessageThat()
         .isEqualTo(
-            "Resource 0x7F000000 is referenced in the manifest in the "
+            "Resource 0x7f000000 is referenced in the manifest in the "
                 + "'com.google.android.wearable.beta.app' metadata, but was not found in the "
                 + "resource table.");
   }

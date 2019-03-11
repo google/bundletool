@@ -40,16 +40,21 @@ public class ZipUtilsTest {
 
   @Test
   public void allFileEntriesPaths_emptyZip() throws Exception {
-    ZipFile zipFile = createZipFileWithFiles();
-    ImmutableList<ZipPath> files = ZipUtils.allFileEntriesPaths(zipFile).collect(toImmutableList());
-    assertThat(files).isEmpty();
+    try (ZipFile zipFile = createZipFileWithFiles()) {
+      ImmutableList<ZipPath> files =
+          ZipUtils.allFileEntriesPaths(zipFile).collect(toImmutableList());
+      assertThat(files).isEmpty();
+    }
   }
 
   @Test
   public void allFileEntries_multipleFiles() throws Exception {
-    ZipFile zipFile = createZipFileWithFiles("a", "b", "c");
-    ImmutableList<ZipPath> files = ZipUtils.allFileEntriesPaths(zipFile).collect(toImmutableList());
-    assertThat(files.stream().map(Path::toString).collect(toList())).containsExactly("a", "b", "c");
+    try (ZipFile zipFile = createZipFileWithFiles("a", "b", "c")) {
+      ImmutableList<ZipPath> files =
+          ZipUtils.allFileEntriesPaths(zipFile).collect(toImmutableList());
+      assertThat(files.stream().map(Path::toString).collect(toList()))
+          .containsExactly("a", "b", "c");
+    }
   }
 
   private ZipFile createZipFileWithFiles(String... fileNames) throws IOException {

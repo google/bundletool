@@ -108,7 +108,8 @@ public class ApkMatcher {
 
       for (ApkDescription apkDescription : apkSet.getApkDescriptionList()) {
         ApkTargeting apkTargeting = apkDescription.getTargeting();
-        boolean isSplit = !apkDescription.hasStandaloneApkMetadata();
+        boolean isSplit =
+            !apkDescription.hasStandaloneApkMetadata() && !apkDescription.hasApexApkMetadata();
 
         checkCompatibleWithApkTargeting(apkTargeting);
 

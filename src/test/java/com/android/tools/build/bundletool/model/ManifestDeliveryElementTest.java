@@ -26,6 +26,7 @@ import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.with
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withMinSdkVersion;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withOnDemandDelivery;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withUnsupportedCondition;
+import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withUserCountriesCondition;
 import static com.google.common.truth.Truth.assertThat;
 import static com.google.common.truth.Truth8.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -36,6 +37,7 @@ import com.android.tools.build.bundletool.model.utils.xmlproto.XmlProtoAttribute
 import com.android.tools.build.bundletool.model.utils.xmlproto.XmlProtoElement;
 import com.android.tools.build.bundletool.model.utils.xmlproto.XmlProtoElementBuilder;
 import com.android.tools.build.bundletool.model.utils.xmlproto.XmlProtoNode;
+import com.google.common.collect.ImmutableList;
 import java.util.Optional;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -219,6 +221,20 @@ public class ManifestDeliveryElementTest {
     assertThat(exception)
         .hasMessageThat()
         .contains("Missing required 'dist:value' attribute in the 'min-sdk' condition element.");
+  }
+
+  @Test
+  public void getModuleConditions_multipleMinSdkCondition_throws() {
+    Optional<ManifestDeliveryElement> element =
+        ManifestDeliveryElement.fromManifestRootNode(
+            androidManifest("com.test.app", withMinSdkCondition(24), withMinSdkCondition(28)));
+    assertThat(element).isPresent();
+
+    ValidationException exception =
+        assertThrows(ValidationException.class, () -> element.get().getModuleConditions());
+    assertThat(exception)
+        .hasMessageThat()
+        .contains("Multiple '<dist:min-sdk>' conditions are not supported.");
   }
 
   @Test
@@ -500,6 +516,23 @@ public class ManifestDeliveryElementTest {
     assertThat(exception)
         .hasMessageThat()
         .contains("<dist:country> element is expected to have 'dist:code' attribute");
+  }
+
+  @Test
+  public void getModuleConditions_multipleUserCountriesConditions_throws() {
+    Optional<ManifestDeliveryElement> element =
+        ManifestDeliveryElement.fromManifestRootNode(
+            androidManifest(
+                "com.test.app",
+                withUserCountriesCondition(ImmutableList.of("en", "us")),
+                withUserCountriesCondition(ImmutableList.of("sg"), /* exclude= */ true)));
+    assertThat(element).isPresent();
+
+    ValidationException exception =
+        assertThrows(ValidationException.class, () -> element.get().getModuleConditions());
+    assertThat(exception)
+        .hasMessageThat()
+        .contains("Multiple '<dist:user-countries>' conditions are not supported.");
   }
 
   private static XmlNode createAndroidManifestWithDeliveryElement(

@@ -58,6 +58,11 @@ public class SplitApkSerializer {
     return writeToDisk(split, outputDirectory, ApkDescription.Builder::setInstantApkMetadata);
   }
 
+  /** Writes the asset slice to disk. */
+  public ApkDescription writeAssetSliceToDisk(ModuleSplit split, Path outputDirectory) {
+    return writeToDisk(split, outputDirectory, ApkDescription.Builder::setAssetSliceMetadata);
+  }
+
   /** Writes the given split to the path subdirectory in the APK Set. */
   private ApkDescription writeToDisk(
       ModuleSplit split,

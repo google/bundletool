@@ -19,9 +19,11 @@ package com.android.tools.build.bundletool.splitters;
 import static com.android.tools.build.bundletool.model.ManifestMutator.withSplitsRequired;
 import static com.android.tools.build.bundletool.model.utils.ResourcesUtils.DEFAULT_DENSITY_VALUE;
 import static com.android.tools.build.bundletool.model.utils.ResourcesUtils.MIPMAP_TYPE;
+import static com.android.tools.build.bundletool.model.utils.ResourcesUtils.getLowestDensity;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.collect.ImmutableList.toImmutableList;
+import static com.google.common.collect.ImmutableSet.toImmutableSet;
 import static java.util.stream.Collectors.groupingBy;
 
 import com.android.aapt.ConfigurationOuterClass.Configuration;
@@ -51,6 +53,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.Predicate;
+import java.util.stream.Stream;
 
 /** Splits module resources by screen density. */
 public class ScreenDensityResourcesSplitter extends SplitterForOneTargetingDimension {
@@ -67,20 +70,29 @@ public class ScreenDensityResourcesSplitter extends SplitterForOneTargetingDimen
 
   private final ImmutableSet<DensityAlias> densityBuckets;
   private final Version bundleVersion;
-  private final Predicate<ResourceTableEntry> pinResourceToMaster;
+  private final Predicate<ResourceId> pinWholeResourceToMaster;
+  private final Predicate<ResourceId> pinLowestBucketOfResourceToMaster;
 
   public ScreenDensityResourcesSplitter(
-      Version bundleVersion, Predicate<ResourceTableEntry> pinResourceToMaster) {
-    this(DEFAULT_DENSITY_BUCKETS, bundleVersion, pinResourceToMaster);
+      Version bundleVersion,
+      Predicate<ResourceId> pinWholeResourceToMaster,
+      Predicate<ResourceId> pinLowestBucketOfResourceToMaster) {
+    this(
+        DEFAULT_DENSITY_BUCKETS,
+        bundleVersion,
+        pinWholeResourceToMaster,
+        pinLowestBucketOfResourceToMaster);
   }
 
   public ScreenDensityResourcesSplitter(
       ImmutableSet<DensityAlias> densityBuckets,
       Version bundleVersion,
-      Predicate<ResourceTableEntry> pinResourceToMaster) {
+      Predicate<ResourceId> pinWholeResourceToMaster,
+      Predicate<ResourceId> pinLowestBucketOfResourceToMaster) {
     this.densityBuckets = densityBuckets;
     this.bundleVersion = bundleVersion;
-    this.pinResourceToMaster = pinResourceToMaster;
+    this.pinWholeResourceToMaster = pinWholeResourceToMaster;
+    this.pinLowestBucketOfResourceToMaster = pinLowestBucketOfResourceToMaster;
   }
 
   @Override
@@ -197,8 +209,7 @@ public class ScreenDensityResourcesSplitter extends SplitterForOneTargetingDimen
     return ResourcesUtils.filterResourceTable(
         input,
         // Put mipmaps into the master split.
-        /* removeEntryPredicate= */ pinResourceToMaster.or(
-            resourceTableEntry -> resourceTableEntry.getType().getName().equals(MIPMAP_TYPE)),
+        /* removeEntryPredicate= */ entry -> entry.getType().getName().equals(MIPMAP_TYPE),
         /* configValuesFilterFn= */ entry -> filterEntryForDensity(entry, density));
   }
 
@@ -233,13 +244,29 @@ public class ScreenDensityResourcesSplitter extends SplitterForOneTargetingDimen
 
     ImmutableList<List<ConfigValue>> densityGroups =
         ImmutableList.copyOf(configValuesByConfiguration.values());
+
+    // We want to pin specific configs to the master, instead of putting them into a density split.
+    Predicate<ConfigValue> pinConfigToMaster;
+    if (pinWholeResourceToMaster.test(tableEntry.getResourceId())) {
+      pinConfigToMaster = anyConfig -> true;
+    } else if (pinLowestBucketOfResourceToMaster.test(tableEntry.getResourceId())) {
+      ImmutableSet<ConfigValue> lowDensityConfigsPinnedToMaster =
+          pickBestDensityForEachGroup(densityGroups, getLowestDensity(densityBuckets))
+              .collect(toImmutableSet());
+      pinConfigToMaster = lowDensityConfigsPinnedToMaster::contains;
+    } else {
+      pinConfigToMaster = anyConfig -> false;
+    }
+
     ImmutableList<ConfigValue> valuesToKeep =
-        pickBestDensityForEachGroup(densityGroups, targetDensity);
+        pickBestDensityForEachGroup(densityGroups, targetDensity)
+            .filter(config -> !pinConfigToMaster.test(config))
+            .collect(toImmutableList());
     return initialEntry.toBuilder().clearConfigValue().addAllConfigValue(valuesToKeep).build();
   }
 
   /** For each density group, it picks the best match for a given desired densityAlias. */
-  private ImmutableList<ConfigValue> pickBestDensityForEachGroup(
+  private Stream<ConfigValue> pickBestDensityForEachGroup(
       ImmutableList<List<ConfigValue>> densityGroups, DensityAlias densityAlias) {
     return densityGroups.stream()
         .flatMap(
@@ -249,8 +276,7 @@ public class ScreenDensityResourcesSplitter extends SplitterForOneTargetingDimen
                             ImmutableList.copyOf(group),
                             densityAlias,
                             allBut(densityBuckets, densityAlias))
-                        .stream())
-        .collect(toImmutableList());
+                        .stream());
   }
 
   private static Set<DensityAlias> allBut(

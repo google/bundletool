@@ -16,6 +16,7 @@
 package com.android.tools.build.bundletool.io;
 
 import static com.android.tools.build.bundletool.model.BundleModule.APEX_DIRECTORY;
+import static com.android.tools.build.bundletool.model.BundleModule.ASSETS_DIRECTORY;
 import static com.android.tools.build.bundletool.model.BundleModule.DEX_DIRECTORY;
 import static com.android.tools.build.bundletool.model.BundleModule.MANIFEST_FILENAME;
 import static com.android.tools.build.bundletool.model.BundleModule.ROOT_DIRECTORY;
@@ -30,6 +31,7 @@ import com.android.apksig.ApkSigner;
 import com.android.apksig.ApkSigner.SignerConfig;
 import com.android.apksig.apk.ApkFormatException;
 import com.android.bundle.Config.Compression;
+import com.android.tools.build.apkzlib.sign.SigningOptions;
 import com.android.tools.build.apkzlib.zfile.ZFiles;
 import com.android.tools.build.apkzlib.zip.AlignmentRule;
 import com.android.tools.build.apkzlib.zip.AlignmentRules;
@@ -40,13 +42,13 @@ import com.android.tools.build.bundletool.model.Aapt2Command;
 import com.android.tools.build.bundletool.model.BundleModule.SpecialModuleEntry;
 import com.android.tools.build.bundletool.model.ModuleEntry;
 import com.android.tools.build.bundletool.model.ModuleSplit;
+import com.android.tools.build.bundletool.model.ModuleSplit.SplitType;
 import com.android.tools.build.bundletool.model.SigningConfiguration;
 import com.android.tools.build.bundletool.model.WearApkLocator;
 import com.android.tools.build.bundletool.model.ZipPath;
 import com.android.tools.build.bundletool.model.exceptions.ValidationException;
 import com.android.tools.build.bundletool.model.utils.files.FileUtils;
 import com.android.tools.build.bundletool.model.version.Version;
-import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Predicate;
 import com.google.common.base.Predicates;
 import com.google.common.collect.ImmutableList;
@@ -80,24 +82,6 @@ final class ApkSerializerHelper {
 
   /** Name identifying uniquely the {@link SignerConfig} passed to the engine. */
   private static final String SIGNER_CONFIG_NAME = "BNDLTOOL";
-
-  /**
-   * Alignment rule for all APKs.
-   *
-   * <ul>
-   *   <li>Align by 4 all uncompressed files.
-   *   <li>Align by 4096 all uncompressed native libraries.
-   * </ul>
-   *
-   * Note that it's fine to always provide the same alignment rule regardless of the value of
-   * 'extractNativeLibs' because apkzlib will only apply these rules to uncompressed files, so a
-   * compressed file will remain unaligned.
-   */
-  @VisibleForTesting
-  static final AlignmentRule APK_ALIGNMENT_RULE =
-      AlignmentRules.compose(
-          AlignmentRules.constantForSuffix(NATIVE_LIBRARIES_SUFFIX, 4096),
-          AlignmentRules.constant(4));
 
   private static final Predicate<ZipPath> FILES_FOR_AAPT2 =
       path ->
@@ -139,7 +123,9 @@ final class ApkSerializerHelper {
   }
 
   Path writeToZipFile(ModuleSplit split, Path outputPath) {
-    TempFiles.withTempDirectory(tempDir -> writeToZipFile(split, outputPath, tempDir));
+    try (TempDirectory tempDirectory = new TempDirectory()) {
+      writeToZipFile(split, outputPath, tempDirectory.getPath());
+    }
     return outputPath;
   }
 
@@ -158,21 +144,30 @@ final class ApkSerializerHelper {
 
     // Create a new APK that includes files processed by aapt2 and the other ones.
     int minSdkVersion = split.getAndroidManifest().getEffectiveMinSdkVersion();
+    com.google.common.base.Optional<SigningOptions> signingOptions =
+        signingConfig
+            .map(
+                config ->
+                    com.google.common.base.Optional.of(
+                        SigningOptions.builder()
+                            .setKey(config.getPrivateKey())
+                            .setCertificates(config.getCertificates())
+                            .setV1SigningEnabled(true)
+                            .setV2SigningEnabled(true)
+                            .setMinSdkVersion(minSdkVersion)
+                            .build()))
+            .orElse(com.google.common.base.Optional.absent());
     try (ZFile zOutputApk =
             ZFiles.apk(
                 outputPath.toFile(),
                 createZFileOptions(tempDir)
-                    .setAlignmentRule(APK_ALIGNMENT_RULE)
+                    .setAlignmentRule(splitAlignmentRule(split))
                     .setCoverEmptySpaceUsingExtraField(true)
                     // Clear timestamps on zip entries to minimize diffs between APKs.
                     .setNoTimestamps(true),
-                signingConfig.map(config -> config.getPrivateKey()).orElse(null),
-                signingConfig.map(config -> config.getCertificates()).orElse(ImmutableList.of()),
-                /* v1SigningEnabled= */ true,
-                /* v2SigningEnabled= */ true,
+                signingOptions,
                 BUILT_BY,
-                CREATED_BY,
-                minSdkVersion);
+                CREATED_BY);
         ZFile zAapt2Files =
             new ZFile(binaryApk.toFile(), createZFileOptions(tempDir), /* readOnly= */ true)) {
 
@@ -189,12 +184,11 @@ final class ApkSerializerHelper {
   }
 
   Path writeCompressedApkToZipFile(ModuleSplit split, Path outputPath) {
-    TempFiles.withTempDirectory(
-        tempDir -> {
-          Path tempApkOutputPath = tempDir.resolve("output.apk");
-          writeToZipFile(split, tempApkOutputPath, tempDir);
-          writeCompressedApkToZipFile(tempApkOutputPath, outputPath);
-        });
+    try (TempDirectory tempDirectory = new TempDirectory()) {
+      Path tempApkOutputPath = tempDirectory.getPath().resolve("output.apk");
+      writeToZipFile(split, tempApkOutputPath, tempDirectory.getPath());
+      writeCompressedApkToZipFile(tempApkOutputPath, outputPath);
+    }
     return outputPath;
   }
 
@@ -227,6 +221,7 @@ final class ApkSerializerHelper {
    */
   private Path writeProtoApk(ModuleSplit split, Path outputPath, Path tempDir) {
     boolean extractNativeLibs = split.getAndroidManifest().getExtractNativeLibsValue().orElse(true);
+    boolean isAssetSlice = split.getSplitType().equals(SplitType.ASSET_SLICE);
 
     // Embedded Wear 1.x APKs are supposed to be under res/raw/*
     Optional<ZipPath> wear1ApkPath = WearApkLocator.findEmbeddedWearApkPath(split);
@@ -239,7 +234,11 @@ final class ApkSerializerHelper {
       }
 
       EntryOption[] entryOptions =
-          entryOptionForPath(pathInApk, !extractNativeLibs, entry.shouldCompress());
+          entryOptionForPath(
+              pathInApk,
+              /* uncompressNativeLibs= */ !extractNativeLibs,
+              /* splitIsAssetSlice= */ isAssetSlice,
+              /* entryShouldCompress= */ entry.shouldCompress());
       if (signingConfig.isPresent()
           && wear1ApkPath.isPresent()
           && wear1ApkPath.get().equals(pathInApk)) {
@@ -271,16 +270,43 @@ final class ApkSerializerHelper {
   }
 
   private EntryOption[] entryOptionForPath(
-      ZipPath path, boolean uncompressNativeLibs, boolean entryShouldCompress) {
-    if (shouldCompress(path, uncompressNativeLibs, entryShouldCompress)) {
+      ZipPath path,
+      boolean uncompressNativeLibs,
+      boolean splitIsAssetSlice,
+      boolean entryShouldCompress) {
+    if (shouldCompress(path, uncompressNativeLibs, splitIsAssetSlice, entryShouldCompress)) {
       return new EntryOption[] {};
     } else {
       return new EntryOption[] {EntryOption.UNCOMPRESSED};
     }
   }
 
+  /**
+   * Alignment rule for all APKs.
+   *
+   * <ul>
+   *   <li>Align by 4 all uncompressed files.
+   *   <li>Align by 4096 all uncompressed native libraries.
+   *   <li>Align by 4096 all assets inside asset slices.
+   * </ul>
+   *
+   * Note that it's fine to always provide the same alignment rule regardless of the value of
+   * 'extractNativeLibs' because apkzlib will only apply these rules to uncompressed files, so a
+   * compressed file will remain unaligned.
+   */
+  private static AlignmentRule splitAlignmentRule(ModuleSplit split) {
+    return split.getSplitType().equals(SplitType.ASSET_SLICE)
+        ? AlignmentRules.constant(4096)
+        : AlignmentRules.compose(
+            AlignmentRules.constantForSuffix(NATIVE_LIBRARIES_SUFFIX, 4096),
+            AlignmentRules.constant(4));
+  }
+
   private boolean shouldCompress(
-      ZipPath path, boolean uncompressNativeLibs, boolean entryShouldCompress) {
+      ZipPath path,
+      boolean uncompressNativeLibs,
+      boolean splitIsAssetSlice,
+      boolean entryShouldCompress) {
     // Developer knows best: when they provide the uncompressed glob, we respect it.
     // We convert the ZipPath to a FileSystem's path for the PathMatcher to work.
     if (uncompressedPathMatchers.stream()
@@ -290,6 +316,11 @@ final class ApkSerializerHelper {
 
     // The Module entries with shouldCompress flag turned off should be uncompressed.
     if (!entryShouldCompress) {
+      return false;
+    }
+
+    // Asset entries from asset slices should be uncompressed.
+    if (splitIsAssetSlice && path.startsWith(ASSETS_DIRECTORY)) {
       return false;
     }
 
@@ -314,6 +345,7 @@ final class ApkSerializerHelper {
   /** Takes the given APK and adds the files that weren't processed by AAPT2. */
   private void addNonAapt2Files(ZFile zFile, ModuleSplit split) throws IOException {
     boolean extractNativeLibs = split.getAndroidManifest().getExtractNativeLibsValue().orElse(true);
+    boolean isAssetSlice = split.getSplitType().equals(SplitType.ASSET_SLICE);
 
     // Add the non-Aapt2 files.
     for (ModuleEntry entry : split.getEntries()) {
@@ -323,7 +355,7 @@ final class ApkSerializerHelper {
           zFile.add(
               pathInApk.toString(),
               entryInputStream,
-              shouldCompress(pathInApk, !extractNativeLibs, entry.shouldCompress()));
+              shouldCompress(pathInApk, !extractNativeLibs, isAssetSlice, entry.shouldCompress()));
         }
       }
     }

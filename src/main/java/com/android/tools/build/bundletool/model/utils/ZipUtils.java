@@ -19,7 +19,9 @@ package com.android.tools.build.bundletool.model.utils;
 import static com.android.tools.build.bundletool.model.utils.files.FilePreconditions.checkFileExistsAndReadable;
 import static com.google.common.base.Predicates.not;
 
+import com.android.tools.build.bundletool.model.InputStreamSupplier;
 import com.android.tools.build.bundletool.model.ZipPath;
+import com.google.common.collect.ImmutableList;
 import com.google.common.io.ByteStreams;
 import com.google.common.io.CountingOutputStream;
 import java.io.IOException;
@@ -34,6 +36,9 @@ import javax.annotation.WillNotClose;
 
 /** Misc utilities for working with zip files. */
 public final class ZipUtils {
+
+  // See {@link GZIPOutputStream#writeHeader}.
+  private static final long GZIP_HEADER_SIZE = 10L;
 
   public static Stream<ZipPath> allFileEntriesPaths(ZipFile zipFile) {
     return allFileEntries(zipFile).map(zipEntry -> ZipPath.create(zipEntry.getName()));
@@ -61,6 +66,33 @@ public final class ZipUtils {
       ByteStreams.copy(stream, compressedStream);
     }
     return countingOutputStream.getCount();
+  }
+
+  /**
+   * Given a list of {@link InputStreamSupplier} passes those streams through a {@link
+   * GZIPOutputStream} and computes the GZIP size increments attributed to each stream.
+   */
+  public static ImmutableList<Long> calculateGZipSizeForEntries(
+      ImmutableList<InputStreamSupplier> streams) throws IOException {
+    ImmutableList.Builder<Long> gzipSizeIncrements = ImmutableList.builder();
+    CountingOutputStream countingOutputStream =
+        new CountingOutputStream(ByteStreams.nullOutputStream());
+    long lastOffset = GZIP_HEADER_SIZE;
+    // We need to use syncFlush which is slower but allows us to accurately count GZIP bytes.
+    // See {@link Deflater#SYNC_FLUSH}. Sync-flush flushes all deflater's pending output upon
+    // calling flush().
+    try (GZIPOutputStream compressedStream =
+        new GZIPOutputStream(countingOutputStream, /* syncFlush= */ true)) {
+      for (InputStreamSupplier stream : streams) {
+        try (InputStream is = stream.get()) {
+          ByteStreams.copy(is, compressedStream);
+          compressedStream.flush();
+          gzipSizeIncrements.add(countingOutputStream.getCount() - lastOffset);
+          lastOffset = countingOutputStream.getCount();
+        }
+      }
+    }
+    return gzipSizeIncrements.build();
   }
 
   // Not meant to be instantiated.

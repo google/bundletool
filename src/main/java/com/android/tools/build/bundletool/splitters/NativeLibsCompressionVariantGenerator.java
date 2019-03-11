@@ -23,8 +23,7 @@ import static com.android.tools.build.bundletool.model.utils.Versions.ANDROID_M_
 
 import com.android.bundle.Targeting.VariantTargeting;
 import com.android.tools.build.bundletool.model.BundleModule;
-import com.google.common.collect.ImmutableCollection;
-import com.google.common.collect.ImmutableList;
+import java.util.stream.Stream;
 
 /** Generates variant targetings based on native libraries compression. */
 public class NativeLibsCompressionVariantGenerator implements BundleModuleVariantGenerator {
@@ -37,14 +36,13 @@ public class NativeLibsCompressionVariantGenerator implements BundleModuleVarian
   }
 
   @Override
-  public ImmutableCollection<VariantTargeting> generate(BundleModule module) {
+  public Stream<VariantTargeting> generate(BundleModule module) {
     if (!apkGenerationConfiguration.getEnableNativeLibraryCompressionSplitter()
         || apkGenerationConfiguration.isForInstantAppVariants()
         || !module.getNativeConfig().isPresent()) {
-      return ImmutableList.of();
+      return Stream.of();
     }
 
-    return ImmutableList.of(
-        variantTargeting(sdkVersionTargeting(sdkVersionFrom(ANDROID_M_API_VERSION))));
+    return Stream.of(variantTargeting(sdkVersionTargeting(sdkVersionFrom(ANDROID_M_API_VERSION))));
   }
 }

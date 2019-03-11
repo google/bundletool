@@ -282,6 +282,11 @@ public final class TargetingUtils {
     return apkLanguageTargeting(languageTargeting(languages));
   }
 
+  public static ApkTargeting apkLanguageTargeting(
+      ImmutableSet<String> languages, ImmutableSet<String> alternativeLanguages) {
+    return apkLanguageTargeting(languageTargeting(languages, alternativeLanguages));
+  }
+
   public static ApkTargeting apkAlternativeLanguageTargeting(String... alternativeLanguages) {
     return apkLanguageTargeting(alternativeLanguageTargeting(alternativeLanguages));
   }
@@ -638,8 +643,7 @@ public final class TargetingUtils {
         .addAllValue(
             densities.stream().map(TargetingUtils::toScreenDensity).collect(toImmutableList()))
         .addAllAlternatives(
-            alternativeDensities
-                .stream()
+            alternativeDensities.stream()
                 .map(TargetingUtils::toScreenDensity)
                 .collect(toImmutableList()))
         .build();
@@ -650,19 +654,10 @@ public final class TargetingUtils {
     return ScreenDensityTargeting.newBuilder()
         .addValue(toScreenDensity(densityDpiValue))
         .addAllAlternatives(
-            alternativeDensities
-                .stream()
+            alternativeDensities.stream()
                 .map(TargetingUtils::toScreenDensity)
                 .collect(toImmutableList()))
         .build();
-  }
-
-  public static ScreenDensity toScreenDensity(DensityAlias densityAlias) {
-    return ScreenDensity.newBuilder().setDensityAlias(densityAlias).build();
-  }
-
-  public static ScreenDensity toScreenDensity(int densityDpi) {
-    return ScreenDensity.newBuilder().setDensityDpi(densityDpi).build();
   }
 
   public static ScreenDensityTargeting screenDensityTargeting(
@@ -672,6 +667,14 @@ public final class TargetingUtils {
 
   public static ScreenDensityTargeting screenDensityTargeting(DensityAlias density) {
     return screenDensityTargeting(ImmutableSet.of(density), ImmutableSet.of());
+  }
+
+  public static ScreenDensity toScreenDensity(DensityAlias densityAlias) {
+    return ScreenDensity.newBuilder().setDensityAlias(densityAlias).build();
+  }
+
+  public static ScreenDensity toScreenDensity(int densityDpi) {
+    return ScreenDensity.newBuilder().setDensityDpi(densityDpi).build();
   }
 
   // Language targeting.

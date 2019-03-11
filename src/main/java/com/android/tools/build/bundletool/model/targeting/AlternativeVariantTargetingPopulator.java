@@ -16,6 +16,7 @@
 
 package com.android.tools.build.bundletool.model.targeting;
 
+import static com.android.tools.build.bundletool.model.utils.TargetingProtoUtils.sdkVersionFrom;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.collect.ImmutableList.toImmutableList;
@@ -24,6 +25,7 @@ import static com.google.common.collect.ImmutableSet.toImmutableSet;
 import com.android.bundle.Targeting.Abi;
 import com.android.bundle.Targeting.ScreenDensity;
 import com.android.bundle.Targeting.SdkVersion;
+import com.android.bundle.Targeting.SdkVersionTargeting;
 import com.android.bundle.Targeting.VariantTargeting;
 import com.android.tools.build.bundletool.model.GeneratedApks;
 import com.android.tools.build.bundletool.model.ModuleSplit;
@@ -36,12 +38,23 @@ import com.google.common.collect.Sets;
 import com.google.protobuf.Message;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Optional;
 import javax.annotation.CheckReturnValue;
 
 /** Adds alternative targeting in the {@code T} dimension. */
 public abstract class AlternativeVariantTargetingPopulator<T extends Message> {
 
+  public static GeneratedApks populateAlternativeVariantTargeting(
+      GeneratedApks generatedApks, int maxSdkVersion) {
+    return populateAlternativeVariantTargeting(generatedApks, Optional.of(maxSdkVersion));
+  }
+
   public static GeneratedApks populateAlternativeVariantTargeting(GeneratedApks generatedApks) {
+    return populateAlternativeVariantTargeting(generatedApks, Optional.empty());
+  }
+
+  public static GeneratedApks populateAlternativeVariantTargeting(
+      GeneratedApks generatedApks, Optional<Integer> maxSdkVersion) {
     ImmutableList<ModuleSplit> standaloneApks =
         new AbiAlternativesPopulator()
             .addAlternativeVariantTargeting(generatedApks.getStandaloneApks());
@@ -51,7 +64,7 @@ public abstract class AlternativeVariantTargetingPopulator<T extends Message> {
     ImmutableList<ModuleSplit> moduleSplits =
         ImmutableList.<ModuleSplit>builder()
             .addAll(
-                new SdkVersionAlternativesPopulator()
+                new SdkVersionAlternativesPopulator(maxSdkVersion)
                     .addAlternativeVariantTargeting(generatedApks.getSplitApks(), standaloneApks))
             .addAll(generatedApks.getInstantApks())
             .addAll(generatedApks.getSystemApks())
@@ -173,6 +186,16 @@ public abstract class AlternativeVariantTargetingPopulator<T extends Message> {
   static class SdkVersionAlternativesPopulator
       extends AlternativeVariantTargetingPopulator<SdkVersion> {
 
+    private final Optional<Integer> maxSdkVersion;
+
+    public SdkVersionAlternativesPopulator() {
+      this(Optional.empty());
+    }
+
+    public SdkVersionAlternativesPopulator(Optional<Integer> maxSdkVersion) {
+      this.maxSdkVersion = maxSdkVersion;
+    }
+
     @Override
     protected ImmutableList<SdkVersion> getValues(VariantTargeting targeting) {
       return ImmutableList.copyOf(targeting.getSdkVersionTargeting().getValueList());
@@ -185,6 +208,32 @@ public abstract class AlternativeVariantTargetingPopulator<T extends Message> {
           .getSdkVersionTargetingBuilder()
           .clearAlternatives()
           .addAllAlternatives(alternatives);
+    }
+
+    /** This extends the helper method to add a sentinel alternative to express maxSdkVersion. */
+    @CheckReturnValue
+    @Override
+    ImmutableList<VariantTargeting> addAlternativeVariantTargetingInternal(
+        ImmutableList<VariantTargeting> variantTargetings) {
+      ImmutableList<VariantTargeting> variantsWithoutSentinel =
+          super.addAlternativeVariantTargetingInternal(variantTargetings);
+      if (!maxSdkVersion.isPresent()) {
+        return variantsWithoutSentinel;
+      } else {
+        return variantsWithoutSentinel.stream()
+            .map(targeting -> addSentinelVariantTargeting(targeting, maxSdkVersion.get()))
+            .collect(toImmutableList());
+      }
+    }
+
+    private static VariantTargeting addSentinelVariantTargeting(
+        VariantTargeting targeting, int maxSdkVersion) {
+      SdkVersionTargeting sdkTargeting = targeting.getSdkVersionTargeting();
+      return targeting
+          .toBuilder()
+          .setSdkVersionTargeting(
+              sdkTargeting.toBuilder().addAlternatives(sdkVersionFrom(maxSdkVersion + 1)))
+          .build();
     }
   }
 }

@@ -20,6 +20,7 @@ import static com.android.tools.build.bundletool.model.BundleModuleName.BASE_MOD
 import static com.android.tools.build.bundletool.model.ModuleSplit.SplitType.INSTANT;
 import static com.android.tools.build.bundletool.model.ModuleSplit.SplitType.SPLIT;
 import static com.android.tools.build.bundletool.model.ModuleSplit.SplitType.STANDALONE;
+import static com.android.tools.build.bundletool.model.ModuleSplit.SplitType.SYSTEM;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifest;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.languageTargeting;
 import static com.android.tools.build.bundletool.testing.truth.resources.TruthResourceTable.assertThat;
@@ -45,14 +46,10 @@ import com.android.tools.build.bundletool.testing.ResourceTableBuilder;
 import com.android.tools.build.bundletool.testing.TestUtils;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
-import com.google.common.collect.ImmutableSet;
-import org.checkerframework.checker.nullness.qual.Nullable;
+import javax.annotation.Nullable;
 import org.junit.Before;
 import org.junit.Test;
-import org.junit.experimental.theories.DataPoints;
-import org.junit.experimental.theories.FromDataPoints;
 import org.junit.experimental.theories.Theories;
-import org.junit.experimental.theories.Theory;
 import org.junit.runner.RunWith;
 
 @RunWith(Theories.class)
@@ -171,20 +168,81 @@ public class SplitsXmlInjectorTest {
         .isEqualTo(expectedSplitsProtoXml);
   }
 
-  @DataPoints("standaloneSplitTypes")
-  public static final ImmutableSet<SplitType> STANDALONE_SPLIT_TYPES =
-      ImmutableSet.of(SplitType.STANDALONE, SplitType.SYSTEM);
+  @Test
+  public void process_systemSplits() throws Exception {
+    ModuleSplit baseMasterSplit =
+        createModuleSplit(
+            BASE_MODULE_NAME,
+            /* splitId= */ "",
+            /* masterSplit= */ true,
+            SYSTEM,
+            languageTargeting("es"));
+    ImmutableList<ModuleSplit> otherSplits =
+        ImmutableList.of(
+            createModuleSplit(
+                BASE_MODULE_NAME,
+                /* splitId= */ "config.ru",
+                /* masterSplit= */ false,
+                SYSTEM,
+                languageTargeting("ru")),
+            createModuleSplit(
+                BASE_MODULE_NAME,
+                /* splitId= */ "config.fr",
+                /* masterSplit= */ false,
+                SYSTEM,
+                languageTargeting("fr")),
+            createModuleSplit(
+                "module",
+                /* splitId= */ "module.config.ru",
+                /* masterSplit= */ false,
+                SYSTEM,
+                languageTargeting("ru")));
+    GeneratedApks result =
+        splitsXmlInjector.process(
+            GeneratedApks.fromModuleSplits(
+                ImmutableList.<ModuleSplit>builder()
+                    .add(baseMasterSplit)
+                    .addAll(otherSplits)
+                    .build()));
+
+    assertThat(result.getAllApksStream()).containsAllIn(otherSplits);
+    ModuleSplit processedBaseMasterSplit =
+        result
+            .getAllApksStream()
+            .filter(module -> module.isMasterSplit() && module.isBaseModuleSplit())
+            .collect(onlyElement());
+
+    assertThat(
+            processedBaseMasterSplit
+                .getAndroidManifest()
+                .getMetadataResourceId("com.android.vending.splits"))
+        .hasValue(0x7f010000);
+    assertThat(processedBaseMasterSplit.getResourceTable().get())
+        .containsResource("com.example.app:xml/splits0")
+        .withFileReference("res/xml/splits0.xml");
+
+    XmlNode expectedSplitsProtoXml =
+        new SplitsProtoXmlBuilder()
+            .addLanguageMapping(BundleModuleName.create("module"), "ru", "module.config.ru")
+            .addLanguageMapping(BundleModuleName.create(BASE_MODULE_NAME), "ru", "config.ru")
+            .addLanguageMapping(BundleModuleName.create(BASE_MODULE_NAME), "fr", "config.fr")
+            .addLanguageMapping(BundleModuleName.create(BASE_MODULE_NAME), "es", "")
+            .build();
+    assertThat(
+            XmlNode.parseFrom(
+                TestUtils.getEntryContent(processedBaseMasterSplit.getEntries().get(0))))
+        .ignoringRepeatedFieldOrder()
+        .isEqualTo(expectedSplitsProtoXml);
+  }
 
   @Test
-  @Theory
-  public void process_standaloneSplitTypes(
-      @FromDataPoints("standaloneSplitTypes") SplitType standaloneSplitType) throws Exception {
+  public void process_standaloneSplitTypes() throws Exception {
     ModuleSplit standalone =
         createModuleSplit(
             BASE_MODULE_NAME,
             /* splitId= */ "",
             /* masterSplit= */ true,
-            standaloneSplitType,
+            STANDALONE,
             /* languageTargeting= */ null);
     ResourceTable standaloneResourceTable =
         new ResourceTableBuilder()

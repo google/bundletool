@@ -21,9 +21,12 @@ import static com.android.tools.build.bundletool.testing.TargetingUtils.moduleEx
 import static com.android.tools.build.bundletool.testing.TargetingUtils.moduleFeatureTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.moduleIncludeCountriesTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.moduleMinSdkVersionTargeting;
+import static com.google.common.truth.Truth.assertThat;
 import static com.google.common.truth.extensions.proto.ProtoTruth.assertThat;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.android.bundle.Targeting.ModuleTargeting;
+import com.android.tools.build.bundletool.model.exceptions.ValidationException;
 import com.google.common.collect.ImmutableList;
 import java.util.Optional;
 import org.junit.Test;
@@ -32,6 +35,24 @@ import org.junit.runners.JUnit4;
 
 @RunWith(JUnit4.class)
 public class ModuleConditionsTest {
+
+  @Test
+  public void multipleDeviceFeatureConditions_sameFeatureName_throws() {
+    ModuleConditions.Builder builder = ModuleConditions.builder();
+
+    builder.addDeviceFeatureCondition(
+        DeviceFeatureCondition.create("com.android.feature", /* version= */ Optional.of(1)));
+    builder.addDeviceFeatureCondition(
+        DeviceFeatureCondition.create("com.android.feature", /* version= */ Optional.of(2)));
+
+    ValidationException exception = assertThrows(ValidationException.class, () -> builder.build());
+
+    assertThat(exception)
+        .hasMessageThat()
+        .contains(
+            "The device feature condition on 'com.android.feature' "
+                + "is present more than once.");
+  }
 
   @Test
   public void toTargeting_emptyIfNoConditionsUsed() {

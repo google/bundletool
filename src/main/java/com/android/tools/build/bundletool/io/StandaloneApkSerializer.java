@@ -18,6 +18,7 @@ package com.android.tools.build.bundletool.io;
 
 import static com.google.common.base.Preconditions.checkArgument;
 
+import com.android.bundle.Commands.ApexApkMetadata;
 import com.android.bundle.Commands.ApkDescription;
 import com.android.bundle.Commands.StandaloneApkMetadata;
 import com.android.bundle.Commands.SystemApkMetadata;
@@ -86,13 +87,20 @@ public class StandaloneApkSerializer {
     apkSerializerHelper.writeToZipFile(
         standaloneSplit, outputDirectory.resolve(apkPath.toString()));
 
-    return ApkDescription.newBuilder()
-        .setPath(apkPath.toString())
-        .setStandaloneApkMetadata(
-            StandaloneApkMetadata.newBuilder()
-                .addAllFusedModuleName(standaloneSplit.getAndroidManifest().getFusedModuleNames()))
-        .setTargeting(standaloneSplit.getApkTargeting())
-        .build();
+    ApkDescription.Builder apkDescription =
+        ApkDescription.newBuilder()
+            .setPath(apkPath.toString())
+            .setTargeting(standaloneSplit.getApkTargeting());
+
+    if (standaloneSplit.isApex()) {
+      apkDescription.setApexApkMetadata(ApexApkMetadata.getDefaultInstance());
+    } else {
+      apkDescription.setStandaloneApkMetadata(
+          StandaloneApkMetadata.newBuilder()
+              .addAllFusedModuleName(standaloneSplit.getAndroidManifest().getFusedModuleNames()));
+    }
+
+    return apkDescription.build();
   }
 
   private ApkDescription writeSystemApkToDiskInternal(

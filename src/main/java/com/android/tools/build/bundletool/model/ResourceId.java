@@ -124,6 +124,6 @@ public abstract class ResourceId {
 
   @Override
   public final String toString() {
-    return String.format("0x%08X", getFullResourceId());
+    return String.format("0x%08x", getFullResourceId());
   }
 }

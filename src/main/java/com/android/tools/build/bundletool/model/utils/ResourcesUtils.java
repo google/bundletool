@@ -18,6 +18,7 @@ package com.android.tools.build.bundletool.model.utils;
 
 import static com.google.common.collect.ImmutableSet.toImmutableSet;
 import static com.google.common.collect.MoreCollectors.toOptional;
+import static java.util.Comparator.comparing;
 
 import com.android.aapt.Resources.ConfigValue;
 import com.android.aapt.Resources.Entry;
@@ -29,6 +30,7 @@ import com.android.bundle.Targeting.ScreenDensity.DensityAlias;
 import com.android.tools.build.bundletool.model.ResourceTableEntry;
 import com.android.tools.build.bundletool.model.ZipPath;
 import com.google.common.collect.ImmutableBiMap;
+import com.google.common.collect.ImmutableCollection;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import java.util.Collection;
@@ -204,6 +206,11 @@ public final class ResourcesUtils {
         .map(configValue -> configValue.getConfig().getLocale())
         .map(ResourcesUtils::convertLocaleToLanguage)
         .collect(toImmutableSet());
+  }
+
+  /** Returns the smallest screen density from the ones given. */
+  public static DensityAlias getLowestDensity(ImmutableCollection<DensityAlias> densities) {
+    return densities.stream().min(comparing(DENSITY_ALIAS_TO_DPI_MAP::get)).get();
   }
 
   // Not meant to be instantiated.

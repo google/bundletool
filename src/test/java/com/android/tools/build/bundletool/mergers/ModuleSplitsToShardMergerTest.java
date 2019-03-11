@@ -16,6 +16,9 @@
 
 package com.android.tools.build.bundletool.mergers;
 
+import static com.android.tools.build.bundletool.testing.DeviceFactory.abis;
+import static com.android.tools.build.bundletool.testing.DeviceFactory.locales;
+import static com.android.tools.build.bundletool.testing.DeviceFactory.mergeSpecs;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifest;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withDebuggableAttribute;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withMinSdkVersion;
@@ -28,8 +31,10 @@ import static com.android.tools.build.bundletool.testing.ResourcesTableFactory.t
 import static com.android.tools.build.bundletool.testing.ResourcesTableFactory.value;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.apkAbiTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.apkDensityTargeting;
+import static com.android.tools.build.bundletool.testing.TargetingUtils.apkLanguageTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.apkMultiAbiTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.lPlusVariantTargeting;
+import static com.android.tools.build.bundletool.testing.TargetingUtils.languageTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.mergeApkTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.nativeDirectoryTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.nativeLibraries;
@@ -49,6 +54,7 @@ import static org.mockito.Mockito.verifyNoMoreInteractions;
 
 import com.android.aapt.ConfigurationOuterClass.Configuration;
 import com.android.aapt.Resources.Type;
+import com.android.bundle.Files.ApexImages;
 import com.android.bundle.Files.NativeLibraries;
 import com.android.bundle.Targeting.Abi.AbiAlias;
 import com.android.bundle.Targeting.ApkTargeting;
@@ -61,11 +67,13 @@ import com.android.tools.build.bundletool.model.InMemoryModuleEntry;
 import com.android.tools.build.bundletool.model.ModuleEntry;
 import com.android.tools.build.bundletool.model.ModuleSplit;
 import com.android.tools.build.bundletool.model.ModuleSplit.SplitType;
+import com.android.tools.build.bundletool.model.ShardedSystemSplits;
 import com.android.tools.build.bundletool.model.exceptions.CommandExecutionException;
 import com.android.tools.build.bundletool.testing.TestUtils;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.Iterables;
 import com.google.common.collect.Maps;
 import java.nio.file.Path;
 import java.util.HashMap;
@@ -150,6 +158,144 @@ public class ModuleSplitsToShardMergerTest {
         shardsByTargeting.get(apkAbiTargeting(AbiAlias.X86)), "lib/x86/libtest.so");
     assertSingleEntryStandaloneShard(
         shardsByTargeting.get(apkAbiTargeting(AbiAlias.MIPS)), "lib/mips/libtest.so");
+  }
+
+  @Test
+  public void mergeSystemShard_oneSetsOfSplits_producesOneShard() throws Exception {
+    ModuleSplit masterSplit = createModuleSplitBuilder().setMasterSplit(true).build();
+    ModuleSplit x86Split =
+        createModuleSplitBuilder()
+            .setEntries(
+                ImmutableList.of(InMemoryModuleEntry.ofFile("lib/x86/libtest.so", DUMMY_CONTENT)))
+            .setMasterSplit(false)
+            .setApkTargeting(apkAbiTargeting(AbiAlias.X86))
+            .build();
+    ModuleSplit esSplit =
+        createModuleSplitBuilder()
+            .setEntries(
+                ImmutableList.of(
+                    InMemoryModuleEntry.ofFile("assets/i18n#lang_es/strings.pak", DUMMY_CONTENT)))
+            .setApkTargeting(apkLanguageTargeting(languageTargeting("es")))
+            .setMasterSplit(false)
+            .build();
+    ModuleSplit frSplit =
+        createModuleSplitBuilder()
+            .setEntries(
+                ImmutableList.of(
+                    InMemoryModuleEntry.ofFile("assets/i18n#lang_fr/strings.pak", DUMMY_CONTENT)))
+            .setApkTargeting(apkLanguageTargeting(languageTargeting("fr")))
+            .setMasterSplit(false)
+            .build();
+
+    ShardedSystemSplits shards =
+        new ModuleSplitsToShardMerger(d8DexMerger, tmpDir)
+            .mergeSystemShard(
+                ImmutableList.of(masterSplit, x86Split, esSplit, frSplit),
+                NO_MAIN_DEX_LIST,
+                mergeSpecs(abis("x86"), locales("es")));
+
+    ModuleSplit fusedSplit = shards.getSystemImageSplit();
+
+    assertThat(extractPaths(fusedSplit.getEntries()))
+        .containsExactly("lib/x86/libtest.so", "assets/i18n#lang_es/strings.pak");
+    assertThat(fusedSplit.getApkTargeting())
+        .isEqualTo(mergeApkTargeting(apkAbiTargeting(AbiAlias.X86), apkLanguageTargeting("es")));
+    assertThat(fusedSplit.getVariantTargeting()).isEqualToDefaultInstance();
+    assertThat(fusedSplit.getSplitType()).isEqualTo(SplitType.STANDALONE);
+    assertThat(fusedSplit.isBaseModuleSplit()).isTrue();
+    assertThat(fusedSplit.getResourceTable()).isEmpty();
+    assertThat(fusedSplit.getAndroidManifest().getSplitId()).isEmpty();
+
+    ModuleSplit frLangSplit = Iterables.getOnlyElement(shards.getAdditionalLanguageSplits());
+
+    assertThat(extractPaths(frLangSplit.getEntries()))
+        .containsExactly("assets/i18n#lang_fr/strings.pak");
+    assertThat(frLangSplit.getApkTargeting()).isEqualTo(apkLanguageTargeting("fr"));
+    assertThat(frLangSplit.getSplitType()).isEqualTo(SplitType.SPLIT);
+    assertThat(frLangSplit.isMasterSplit()).isFalse();
+    assertThat(frLangSplit.getResourceTable()).isEmpty();
+    assertThat(frLangSplit.getAndroidManifest().getSplitId()).hasValue("config.fr");
+  }
+
+  @Test
+  public void mergeSystemShard_multipleModules_producesOneShard() throws Exception {
+    ModuleSplit masterSplit = createModuleSplitBuilder().setMasterSplit(true).build();
+    ModuleSplit esSplit =
+        createModuleSplitBuilder()
+            .setEntries(
+                ImmutableList.of(
+                    InMemoryModuleEntry.ofFile("assets/i18n#lang_es/strings.pak", DUMMY_CONTENT)))
+            .setApkTargeting(apkLanguageTargeting(languageTargeting("es")))
+            .setMasterSplit(false)
+            .build();
+    ModuleSplit frSplit =
+        createModuleSplitBuilder()
+            .setEntries(
+                ImmutableList.of(
+                    InMemoryModuleEntry.ofFile("assets/i18n#lang_fr/strings.pak", DUMMY_CONTENT)))
+            .setApkTargeting(apkLanguageTargeting(languageTargeting("fr")))
+            .setMasterSplit(false)
+            .build();
+    ModuleSplit esVrSplit =
+        createModuleSplitBuilder()
+            .setModuleName(BundleModuleName.create("vr"))
+            .setEntries(
+                ImmutableList.of(
+                    InMemoryModuleEntry.ofFile(
+                        "assets/vr/i18n#lang_es/strings.pak", DUMMY_CONTENT)))
+            .setApkTargeting(apkLanguageTargeting(languageTargeting("es")))
+            .setMasterSplit(false)
+            .build();
+    ModuleSplit frVrSplit =
+        createModuleSplitBuilder()
+            .setModuleName(BundleModuleName.create("vr"))
+            .setEntries(
+                ImmutableList.of(
+                    InMemoryModuleEntry.ofFile(
+                        "assets/vr/i18n#lang_fr/strings.pak", DUMMY_CONTENT)))
+            .setApkTargeting(apkLanguageTargeting(languageTargeting("fr")))
+            .setMasterSplit(false)
+            .build();
+    ModuleSplit itVrSplit =
+        createModuleSplitBuilder()
+            .setModuleName(BundleModuleName.create("vr"))
+            .setEntries(
+                ImmutableList.of(
+                    InMemoryModuleEntry.ofFile(
+                        "assets/vr/i18n#lang_it/strings.pak", DUMMY_CONTENT)))
+            .setApkTargeting(apkLanguageTargeting(languageTargeting("it")))
+            .setMasterSplit(false)
+            .build();
+
+    ShardedSystemSplits shards =
+        new ModuleSplitsToShardMerger(d8DexMerger, tmpDir)
+            .mergeSystemShard(
+                ImmutableList.of(masterSplit, esSplit, frSplit, esVrSplit, frVrSplit, itVrSplit),
+                NO_MAIN_DEX_LIST,
+                mergeSpecs(abis("x86"), locales("fr")));
+
+    ModuleSplit fusedShard = shards.getSystemImageSplit();
+    assertThat(fusedShard.isBaseModuleSplit()).isTrue();
+
+    assertThat(extractPaths(fusedShard.getEntries()))
+        .containsExactly("assets/i18n#lang_fr/strings.pak", "assets/vr/i18n#lang_fr/strings.pak");
+
+    // es-base, es-vr, it-vr splits.
+    ImmutableList<ModuleSplit> langSplits = shards.getAdditionalLanguageSplits();
+    assertThat(langSplits).hasSize(3);
+
+    ImmutableMap<String, ModuleSplit> langSplitsNameMap =
+        Maps.uniqueIndex(langSplits, split -> split.getAndroidManifest().getSplitId().orElse(""));
+
+    assertThat(langSplitsNameMap.keySet())
+        .containsExactly("config.es", "vr.config.es", "vr.config.it");
+
+    assertThat(extractPaths(langSplitsNameMap.get("config.es").getEntries()))
+        .containsExactly("assets/i18n#lang_es/strings.pak");
+    assertThat(extractPaths(langSplitsNameMap.get("vr.config.es").getEntries()))
+        .containsExactly("assets/vr/i18n#lang_es/strings.pak");
+    assertThat(extractPaths(langSplitsNameMap.get("vr.config.it").getEntries()))
+        .containsExactly("assets/vr/i18n#lang_it/strings.pak");
   }
 
   @Test
@@ -277,6 +423,40 @@ public class ModuleSplitsToShardMergerTest {
         .isEqualTo(
             mergeApkTargeting(
                 apkAbiTargeting(AbiAlias.X86), apkDensityTargeting(DensityAlias.HDPI)));
+  }
+
+  @Test
+  public void systemShards_splitTargetingWithLanguages_areMerged() {
+    // Note: Master splits have restrictions on targeting dimensions, so use non-master splits in
+    // the test.
+    ModuleSplit split1 =
+        createModuleSplitBuilder()
+            .setApkTargeting(apkAbiTargeting(AbiAlias.X86))
+            .setMasterSplit(false)
+            .build();
+    ModuleSplit split2 =
+        createModuleSplitBuilder()
+            .setApkTargeting(apkDensityTargeting(DensityAlias.HDPI))
+            .setMasterSplit(false)
+            .build();
+
+    ModuleSplit split3 =
+        createModuleSplitBuilder()
+            .setApkTargeting(apkLanguageTargeting("en"))
+            .setMasterSplit(false)
+            .build();
+
+    ModuleSplit merged =
+        new ModuleSplitsToShardMerger(d8DexMerger, tmpDir)
+            .mergeSingleShard(
+                ImmutableList.of(split1, split2, split3), NO_MAIN_DEX_LIST, createCache());
+
+    assertThat(merged.getApkTargeting())
+        .isEqualTo(
+            mergeApkTargeting(
+                apkAbiTargeting(AbiAlias.X86),
+                apkDensityTargeting(DensityAlias.HDPI),
+                apkLanguageTargeting("en")));
   }
 
   @Test
@@ -547,11 +727,14 @@ public class ModuleSplitsToShardMergerTest {
 
   @Test
   public void mergeApex_oneSetOfSplits_producesOneShard() throws Exception {
-    ModuleSplit masterSplit = createModuleSplitBuilder().setMasterSplit(true).build();
+    ApexImages apexConfig = ApexImages.getDefaultInstance();
+    ModuleSplit masterSplit =
+        createModuleSplitBuilder().setMasterSplit(true).setApexConfig(apexConfig).build();
     ModuleSplit x86Split =
         createModuleSplitBuilder()
             .setEntries(ImmutableList.of(InMemoryModuleEntry.ofFile("apex/x86.img", DUMMY_CONTENT)))
             .setMasterSplit(false)
+            .setApexConfig(apexConfig)
             .setApkTargeting(apkMultiAbiTargeting(AbiAlias.X86))
             .build();
 
@@ -566,11 +749,14 @@ public class ModuleSplitsToShardMergerTest {
 
   @Test
   public void mergeApex_twoSetsOfSplits_producesTwoShards() throws Exception {
-    ModuleSplit masterSplit = createModuleSplitBuilder().setMasterSplit(true).build();
+    ApexImages apexConfig = ApexImages.getDefaultInstance();
+    ModuleSplit masterSplit =
+        createModuleSplitBuilder().setMasterSplit(true).setApexConfig(apexConfig).build();
     ModuleSplit x86Split =
         createModuleSplitBuilder()
             .setEntries(ImmutableList.of(InMemoryModuleEntry.ofFile("apex/x86.img", DUMMY_CONTENT)))
             .setMasterSplit(false)
+            .setApexConfig(apexConfig)
             .setApkTargeting(apkMultiAbiTargeting(AbiAlias.X86))
             .build();
     ModuleSplit mipsSplit =
@@ -578,6 +764,7 @@ public class ModuleSplitsToShardMergerTest {
             .setEntries(
                 ImmutableList.of(InMemoryModuleEntry.ofFile("apex/mips.img", DUMMY_CONTENT)))
             .setMasterSplit(false)
+            .setApexConfig(apexConfig)
             .setApkTargeting(apkMultiAbiTargeting(AbiAlias.MIPS))
             .build();
 
@@ -600,6 +787,7 @@ public class ModuleSplitsToShardMergerTest {
 
   @Test
   public void mergeApex_twoSetsOfSplits_multipleAbi_producesTwoShards() throws Exception {
+    ApexImages apexConfig = ApexImages.getDefaultInstance();
     ApkTargeting singleAbiTargeting =
         apkMultiAbiTargeting(
             ImmutableSet.of(ImmutableSet.of(AbiAlias.X86_64)),
@@ -608,12 +796,14 @@ public class ModuleSplitsToShardMergerTest {
         apkMultiAbiTargeting(
             ImmutableSet.of(ImmutableSet.of(AbiAlias.X86_64, AbiAlias.X86)),
             ImmutableSet.of(ImmutableSet.of(AbiAlias.X86_64)));
-    ModuleSplit masterSplit = createModuleSplitBuilder().setMasterSplit(true).build();
+    ModuleSplit masterSplit =
+        createModuleSplitBuilder().setMasterSplit(true).setApexConfig(apexConfig).build();
     ModuleSplit singleAbiSplit =
         createModuleSplitBuilder()
             .setEntries(
                 ImmutableList.of(InMemoryModuleEntry.ofFile("apex/x86_64.img", DUMMY_CONTENT)))
             .setMasterSplit(false)
+            .setApexConfig(apexConfig)
             .setApkTargeting(singleAbiTargeting)
             .build();
     ModuleSplit doubleAbiSplit =
@@ -621,6 +811,7 @@ public class ModuleSplitsToShardMergerTest {
             .setEntries(
                 ImmutableList.of(InMemoryModuleEntry.ofFile("apex/x86_64.x86.img", DUMMY_CONTENT)))
             .setMasterSplit(false)
+            .setApexConfig(apexConfig)
             .setApkTargeting(doubleAbiTargeting)
             .build();
 

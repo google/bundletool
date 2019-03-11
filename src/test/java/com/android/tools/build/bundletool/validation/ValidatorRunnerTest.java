@@ -114,27 +114,30 @@ public class ValidatorRunnerTest {
                 androidManifest("com.test.app", withSplitId("moduleY")))
             .addFileWithContent(ZipPath.create("moduleY/assets/file.txt"), DUMMY_CONTENT)
             .writeTo(tempFolder.resolve("bundle.aab"));
-    AppBundle bundle = AppBundle.buildFromZip(new ZipFile(bundlePath.toFile()));
-    ImmutableList<BundleModule> bundleFeatureModules =
-        ImmutableList.copyOf(bundle.getFeatureModules().values());
 
-    new ValidatorRunner(ImmutableList.of(validator)).validateBundle(bundle);
+    try (ZipFile bundleZip = new ZipFile(bundlePath.toFile())) {
+      AppBundle bundle = AppBundle.buildFromZip(bundleZip);
+      ImmutableList<BundleModule> bundleFeatureModules =
+          ImmutableList.copyOf(bundle.getFeatureModules().values());
 
-    ArgumentCaptor<BundleModule> moduleArgs = ArgumentCaptor.forClass(BundleModule.class);
-    ArgumentCaptor<ZipPath> fileArgs = ArgumentCaptor.forClass(ZipPath.class);
+      new ValidatorRunner(ImmutableList.of(validator)).validateBundle(bundle);
 
-    verify(validator).validateBundle(eq(bundle));
-    verify(validator).validateAllModules(eq(bundleFeatureModules));
-    verify(validator, times(2)).validateModule(moduleArgs.capture());
-    verify(validator, atLeastOnce()).validateModuleFile(fileArgs.capture());
-    verifyNoMoreInteractions(validator);
+      ArgumentCaptor<BundleModule> moduleArgs = ArgumentCaptor.forClass(BundleModule.class);
+      ArgumentCaptor<ZipPath> fileArgs = ArgumentCaptor.forClass(ZipPath.class);
 
-    assertThat(moduleArgs.getAllValues())
-        .containsExactlyElementsIn(bundle.getFeatureModules().values());
-    assertThat(fileArgs.getAllValues().stream().map(ZipPath::toString))
-        // Note that special module files (AndroidManifest.xml, assets.pb, native.pb, resources.pb)
-        // are NOT passed to the validators.
-        .containsExactly("assets/file.txt", "lib/x86/libX.so", "res/drawable/icon.png");
+      verify(validator).validateBundle(eq(bundle));
+      verify(validator).validateAllModules(eq(bundleFeatureModules));
+      verify(validator, times(2)).validateModule(moduleArgs.capture());
+      verify(validator, atLeastOnce()).validateModuleFile(fileArgs.capture());
+      verifyNoMoreInteractions(validator);
+
+      assertThat(moduleArgs.getAllValues())
+          .containsExactlyElementsIn(bundle.getFeatureModules().values());
+      assertThat(fileArgs.getAllValues().stream().map(ZipPath::toString))
+          // Note that special module files (AndroidManifest.xml, assets.pb, native.pb,
+          // resources.pb) are NOT passed to the validators.
+          .containsExactly("assets/file.txt", "lib/x86/libX.so", "res/drawable/icon.png");
+    }
   }
 
   @Test
@@ -151,25 +154,28 @@ public class ValidatorRunnerTest {
                 androidManifest("com.test.app", withSplitId("moduleY")))
             .addFileWithContent(ZipPath.create("moduleY/assets/file.txt"), DUMMY_CONTENT)
             .writeTo(tempFolder.resolve("bundle.aab"));
-    AppBundle bundle = AppBundle.buildFromZip(new ZipFile(bundlePath.toFile()));
-    ImmutableList<BundleModule> bundleFeatureModules =
-        ImmutableList.copyOf(bundle.getFeatureModules().values());
 
-    new ValidatorRunner(ImmutableList.of(validator, validator2)).validateBundle(bundle);
+    try (ZipFile bundleZip = new ZipFile(bundlePath.toFile())) {
+      AppBundle bundle = AppBundle.buildFromZip(bundleZip);
+      ImmutableList<BundleModule> bundleFeatureModules =
+          ImmutableList.copyOf(bundle.getFeatureModules().values());
 
-    InOrder order = Mockito.inOrder(validator, validator2);
+      new ValidatorRunner(ImmutableList.of(validator, validator2)).validateBundle(bundle);
 
-    order.verify(validator).validateBundle(eq(bundle));
-    order.verify(validator).validateAllModules(eq(bundleFeatureModules));
-    order.verify(validator).validateModule(anyObject());
-    order.verify(validator, atLeastOnce()).validateModuleFile(anyObject());
+      InOrder order = Mockito.inOrder(validator, validator2);
 
-    order.verify(validator2).validateBundle(eq(bundle));
-    order.verify(validator2).validateAllModules(eq(bundleFeatureModules));
-    order.verify(validator2).validateModule(anyObject());
-    order.verify(validator2, atLeastOnce()).validateModuleFile(anyObject());
+      order.verify(validator).validateBundle(eq(bundle));
+      order.verify(validator).validateAllModules(eq(bundleFeatureModules));
+      order.verify(validator).validateModule(anyObject());
+      order.verify(validator, atLeastOnce()).validateModuleFile(anyObject());
 
-    order.verifyNoMoreInteractions();
+      order.verify(validator2).validateBundle(eq(bundle));
+      order.verify(validator2).validateAllModules(eq(bundleFeatureModules));
+      order.verify(validator2).validateModule(anyObject());
+      order.verify(validator2, atLeastOnce()).validateModuleFile(anyObject());
+
+      order.verifyNoMoreInteractions();
+    }
   }
 
   @Test

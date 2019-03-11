@@ -61,13 +61,13 @@ public class ApexBundleValidator extends SubValidator {
 
     if (numberOfApexModules > 1) {
       throw ValidationException.builder()
-          .withMessage("Multiple APEX modules are not allowed, found %s.", numberOfApexModules)
+          .withMessage("Multiple APEX modules are not allowed, found %d.", numberOfApexModules)
           .build();
     }
 
     if (modules.size() > 1) {
       throw ValidationException.builder()
-          .withMessage("APEX bundles must only contain one module, found %s.", modules)
+          .withMessage("APEX bundles must only contain one module, found %d.", modules.size())
           .build();
     }
   }

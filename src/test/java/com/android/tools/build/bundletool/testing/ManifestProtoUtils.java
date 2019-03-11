@@ -25,6 +25,8 @@ import static com.android.tools.build.bundletool.model.AndroidManifest.DISTRIBUT
 import static com.android.tools.build.bundletool.model.AndroidManifest.EXTRACT_NATIVE_LIBS_ATTRIBUTE_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.EXTRACT_NATIVE_LIBS_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.HAS_CODE_RESOURCE_ID;
+import static com.android.tools.build.bundletool.model.AndroidManifest.ICON_ATTRIBUTE_NAME;
+import static com.android.tools.build.bundletool.model.AndroidManifest.ICON_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.MAX_SDK_VERSION_ATTRIBUTE_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.MAX_SDK_VERSION_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.META_DATA_ELEMENT_NAME;
@@ -40,6 +42,8 @@ import static com.android.tools.build.bundletool.model.AndroidManifest.SERVICE_E
 import static com.android.tools.build.bundletool.model.AndroidManifest.SPLIT_NAME_ATTRIBUTE_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.SPLIT_NAME_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.TARGET_SANDBOX_VERSION_RESOURCE_ID;
+import static com.android.tools.build.bundletool.model.AndroidManifest.TARGET_SDK_VERSION_ATTRIBUTE_NAME;
+import static com.android.tools.build.bundletool.model.AndroidManifest.TARGET_SDK_VERSION_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.USES_SDK_ELEMENT_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.VALUE_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.VERSION_CODE_RESOURCE_ID;
@@ -60,6 +64,7 @@ import com.android.tools.build.bundletool.model.utils.xmlproto.XmlProtoNodeBuild
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ObjectArrays;
 import java.util.Arrays;
+import java.util.Optional;
 import java.util.function.Consumer;
 import javax.annotation.Nullable;
 
@@ -207,6 +212,12 @@ public final class ManifestProtoUtils {
         Item.newBuilder().setRef(Reference.newBuilder().setId(valueResourceId)).build());
   }
 
+  public static XmlAttribute xmlCompiledItemAttribute(
+      String namespaceUri, String name, Item compiledItem) {
+    return xmlCompiledItemAttribute(
+        namespaceUri, name, /* resourceId= */ null, compiledItem, /* value= */ null);
+  }
+
   private static XmlAttribute xmlCompiledItemAttribute(
       String namespaceUri, String name, int resourceId, Item compiledItem) {
     return xmlCompiledItemAttribute(
@@ -214,13 +225,19 @@ public final class ManifestProtoUtils {
   }
 
   private static XmlAttribute xmlCompiledItemAttribute(
-      String namespaceUri, String name, int resourceId, Item compiledItem, @Nullable String value) {
+      String namespaceUri,
+      String name,
+      @Nullable Integer resourceId,
+      Item compiledItem,
+      @Nullable String value) {
     XmlAttribute.Builder attribute =
         XmlAttribute.newBuilder()
             .setNamespaceUri(namespaceUri)
             .setName(name)
-            .setResourceId(resourceId)
             .setCompiledItem(compiledItem);
+    if (resourceId != null) {
+      attribute.setResourceId(resourceId);
+    }
     if (value != null) {
       attribute.setValue(value);
     }
@@ -241,36 +258,7 @@ public final class ManifestProtoUtils {
                 ImmutableList.of(
                     xmlAttribute("package", packageName),
                     xmlDecimalIntegerAttribute(
-                        ANDROID_NAMESPACE_URI, "versionCode", 0x0101021b, 1)),
-                xmlNode(
-                    xmlElement(
-                        NO_NAMESPACE_URI,
-                        APPLICATION_ELEMENT_NAME,
-                        xmlAttribute(ANDROID_NAMESPACE_URI, "label", 0x01010001, "minimal"),
-                        xmlNode(
-                            xmlElement(
-                                "activity",
-                                xmlAttribute(
-                                    ANDROID_NAMESPACE_URI, "name", 0x01010003, "MainActivity"),
-                                xmlNode(
-                                    xmlElement(
-                                        "intent-filter",
-                                        xmlNode(
-                                            xmlElement(
-                                                "action",
-                                                xmlAttribute(
-                                                    ANDROID_NAMESPACE_URI,
-                                                    "name",
-                                                    0x01010003,
-                                                    "android.intent.action.MAIN"))),
-                                        xmlNode(
-                                            xmlElement(
-                                                "category",
-                                                xmlAttribute(
-                                                    ANDROID_NAMESPACE_URI,
-                                                    "name",
-                                                    0x01010003,
-                                                    "android.intent.category.LAUNCHER")))))))))));
+                        ANDROID_NAMESPACE_URI, "versionCode", 0x0101021b, 1))));
 
     XmlProtoNodeBuilder xmlProtoNode = new XmlProtoNode(manifestNode).toBuilder();
     withHasCode(false).accept(xmlProtoNode.getElement());
@@ -298,6 +286,16 @@ public final class ManifestProtoUtils {
             .setValueAsBoolean(value);
   }
 
+  public static ManifestMutator withAppIcon(int refId) {
+    return manifestElement ->
+        manifestElement
+            .getOrCreateChildElement(APPLICATION_ELEMENT_NAME)
+            .addAttribute(
+                XmlProtoAttributeBuilder.createAndroidAttribute(
+                        ICON_ATTRIBUTE_NAME, ICON_RESOURCE_ID)
+                    .setValueAsRefId(refId));
+  }
+
   public static ManifestMutator withTitle(String title, int refId) {
     if (title.isEmpty()) {
       return manifestElement -> {};
@@ -323,6 +321,15 @@ public final class ManifestProtoUtils {
             .getOptionalChildElement(APPLICATION_ELEMENT_NAME)
             .ifPresent(
                 application -> application.removeAttribute(ANDROID_NAMESPACE_URI, "hasCode"));
+  }
+
+  public static ManifestMutator clearApplication() {
+    return manifestElement ->
+        manifestElement.removeChildrenElementsIf(
+            child ->
+                child.isElement()
+                    && child.getElement().getNamespaceUri().equals(NO_NAMESPACE_URI)
+                    && child.getElement().getName().equals(APPLICATION_ELEMENT_NAME));
   }
 
   public static ManifestMutator withSplitId(String splitId) {
@@ -419,6 +426,11 @@ public final class ManifestProtoUtils {
             .getOrCreateChildElement(DISTRIBUTION_NAMESPACE_URI, "fusing")
             .getOrCreateAttribute(DISTRIBUTION_NAMESPACE_URI, "include")
             .setValueAsBoolean(value);
+  }
+
+  public static ManifestMutator withTargetSdkVersion(String version) {
+    return withUsesSdkAttribute(
+        TARGET_SDK_VERSION_ATTRIBUTE_NAME, TARGET_SDK_VERSION_RESOURCE_ID, version);
   }
 
   public static ManifestMutator withMinSdkVersion(int version) {
@@ -581,6 +593,51 @@ public final class ManifestProtoUtils {
                             .setValueAsDecimalInteger(minSdkVersion)));
   }
 
+  /**
+   * Creates a user countries condition for the supplied list of country codes and with the
+   * dist:exclude attribute set to a given value.
+   */
+  public static ManifestMutator withUserCountriesCondition(
+      ImmutableList<String> codes, boolean exclude) {
+    return withUserCountriesConditionInternal(codes, Optional.of(exclude));
+  }
+
+  /**
+   * Creates a user countries condition for the supplied list of country codes. The dist:exclude
+   * element is not added.
+   */
+  public static ManifestMutator withUserCountriesCondition(ImmutableList<String> codes) {
+    return withUserCountriesConditionInternal(codes, Optional.empty());
+  }
+
+  private static ManifestMutator withUserCountriesConditionInternal(
+      ImmutableList<String> codes, Optional<Boolean> exclude) {
+    XmlProtoElementBuilder userCountries =
+        XmlProtoElementBuilder.create(DISTRIBUTION_NAMESPACE_URI, "user-countries");
+
+    exclude.ifPresent(
+        excludeValue ->
+            userCountries.addAttribute(
+                XmlProtoAttributeBuilder.create(DISTRIBUTION_NAMESPACE_URI, "exclude")
+                    .setValueAsBoolean(excludeValue)));
+
+    for (String countryCode : codes) {
+      userCountries.addChildElement(
+          XmlProtoElementBuilder.create(DISTRIBUTION_NAMESPACE_URI, "country")
+              .addAttribute(
+                  XmlProtoAttributeBuilder.create(DISTRIBUTION_NAMESPACE_URI, "code")
+                      .setValueAsString(countryCode)));
+    }
+
+    return manifestElement ->
+        manifestElement
+            .getOrCreateChildElement(DISTRIBUTION_NAMESPACE_URI, "module")
+            .getOrCreateChildElement(DISTRIBUTION_NAMESPACE_URI, "delivery")
+            .getOrCreateChildElement(DISTRIBUTION_NAMESPACE_URI, "install-time")
+            .getOrCreateChildElement(DISTRIBUTION_NAMESPACE_URI, "conditions")
+            .addChildElement(userCountries);
+  }
+
   public static ManifestMutator withUnsupportedCondition() {
     return manifestElement ->
         manifestElement
@@ -622,6 +679,33 @@ public final class ManifestProtoUtils {
                         XmlProtoAttributeBuilder.createAndroidAttribute(
                                 SPLIT_NAME_ATTRIBUTE_NAME, SPLIT_NAME_RESOURCE_ID)
                             .setValueAsString(splitName)));
+  }
+
+  public static ManifestMutator withMainActivity(String activityName) {
+    return manifestElement ->
+        manifestElement
+            .getOrCreateChildElement(APPLICATION_ELEMENT_NAME)
+            .addChildElement(
+                XmlProtoElementBuilder.create(ACTIVITY_ELEMENT_NAME)
+                    .addAttribute(
+                        XmlProtoAttributeBuilder.createAndroidAttribute(
+                                NAME_ATTRIBUTE_NAME, NAME_RESOURCE_ID)
+                            .setValueAsString(activityName))
+                    .addChildElement(
+                        XmlProtoElementBuilder.create("intent-filter")
+                            .addChildElement(
+                                XmlProtoElementBuilder.create("action")
+                                    .addAttribute(
+                                        XmlProtoAttributeBuilder.createAndroidAttribute(
+                                                "name", NAME_RESOURCE_ID)
+                                            .setValueAsString("android.intent.action.MAIN"))
+                                    .addChildElement(
+                                        XmlProtoElementBuilder.create("category")
+                                            .addAttribute(
+                                                XmlProtoAttributeBuilder.createAndroidAttribute(
+                                                        "name", NAME_RESOURCE_ID)
+                                                    .setValueAsString(
+                                                        "android.intent.category.LAUNCHER"))))));
   }
 
   /** Defined solely for readability. */

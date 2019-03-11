@@ -128,7 +128,8 @@ public abstract class DumpCommand {
     resource.ifPresent(
         r -> {
           try {
-            dumpCommand.setResourceId(Integer.decode(r));
+            // Using Long.decode to support negative resource IDs specified in hexadecimal.
+            dumpCommand.setResourceId(Long.decode(r).intValue());
           } catch (NumberFormatException e) {
             dumpCommand.setResourceName(r);
           }

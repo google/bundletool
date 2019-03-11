@@ -56,6 +56,7 @@ import com.android.tools.build.bundletool.testing.ResourcesTableFactory;
 import com.google.common.base.Predicates;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.Iterables;
 import com.google.common.collect.Maps;
 import com.google.protobuf.ByteString;
 import java.util.Collection;
@@ -674,6 +675,31 @@ public class LanguageResourcesSplitterTest {
         .hasValue(
             getStringResourceTable(
                 "text2", 0x02, ImmutableList.of(value("de rien", locale("fr")))));
+  }
+
+  @Test
+  public void resourcesPinnedToMasterSplit_emptySplitsNotCreated() throws Exception {
+    ResourceTable resourceTable =
+        getStringResourceTable(
+            "welcome_label",
+            ImmutableList.of(value("hello", locale("en")), value("bienvenue", locale("fr"))),
+            "text2",
+            ImmutableList.of(value("no worries", locale("en")), value("de rien", locale("fr"))));
+
+    BundleModule module =
+        new BundleModuleBuilder("testModule")
+            .setResourceTable(resourceTable)
+            .setManifest(androidManifest("com.test.app"))
+            .build();
+    ModuleSplit baseSplit = ModuleSplit.forResources(module);
+
+    LanguageResourcesSplitter languageSplitter = new LanguageResourcesSplitter(resource -> true);
+
+    Collection<ModuleSplit> languageSplits = languageSplitter.split(baseSplit);
+
+    assertThat(languageSplits).hasSize(1);
+    assertThat(Iterables.getOnlyElement(languageSplits).getResourceTable().get())
+        .isEqualTo(resourceTable);
   }
 
   @Test

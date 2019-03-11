@@ -17,11 +17,14 @@
 package com.android.tools.build.bundletool.validation;
 
 import static com.android.bundle.Targeting.Abi.AbiAlias.X86;
+import static com.android.tools.build.bundletool.model.AndroidManifest.MODULE_TYPE_ASSET_VALUE;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifest;
+import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withTypeAttribute;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.abiTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.assets;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.assetsDirectoryTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.graphicsApiTargeting;
+import static com.android.tools.build.bundletool.testing.TargetingUtils.languageTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.openGlVersionFrom;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.targetedAssetsDirectory;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.textureCompressionTargeting;
@@ -118,5 +121,43 @@ public class AssetsTargetingValidatorTest {
             ValidationException.class, () -> new AssetsTargetingValidator().validateModule(module));
 
     assertThat(e).hasMessageThat().contains("Targeted directory 'assets/dir#opengl_3.0' is empty.");
+  }
+
+  @Test
+  public void validateModule_validAssetModuleSucceeds() throws Exception {
+    BundleModule module =
+        new BundleModuleBuilder("testModule")
+            .addFile("assets/dir/raw.dat")
+            .addFile("assets/dir_other/raw.dat")
+            .setAssetsConfig(Assets.getDefaultInstance())
+            .setManifest(
+                androidManifest("com.test.app", withTypeAttribute(MODULE_TYPE_ASSET_VALUE)))
+            .build();
+
+    new AssetsTargetingValidator().validateModule(module);
+  }
+
+  @Test
+  public void validateModule_assetModuleLanguageTargeting_throws() throws Exception {
+    Assets config =
+        assets(
+            targetedAssetsDirectory(
+                "assets/dir#lang_en", assetsDirectoryTargeting(languageTargeting("en"))));
+    BundleModule module =
+        new BundleModuleBuilder("testModule")
+            .addFile("assets/dir#lang_en/raw.dat")
+            .setAssetsConfig(config)
+            .setManifest(
+                androidManifest("com.test.app", withTypeAttribute(MODULE_TYPE_ASSET_VALUE)))
+            .build();
+
+    ValidationException e =
+        assertThrows(
+            ValidationException.class, () -> new AssetsTargetingValidator().validateModule(module));
+
+    assertThat(e)
+        .hasMessageThat()
+        .contains(
+            "Language targeting for asset packs is not supported, but found in module testModule.");
   }
 }

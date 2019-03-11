@@ -23,11 +23,13 @@ import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.with
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withOnDemandAttribute;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withOnDemandDelivery;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withSplitId;
+import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withTypeAttribute;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withUsesSplit;
 import static com.google.common.truth.Truth.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.android.aapt.Resources.XmlNode;
+import com.android.tools.build.bundletool.model.AndroidManifest;
 import com.android.tools.build.bundletool.model.BundleModule;
 import com.android.tools.build.bundletool.model.exceptions.ValidationException;
 import com.android.tools.build.bundletool.testing.BundleModuleBuilder;
@@ -408,6 +410,21 @@ public class ModuleDependencyValidatorTest {
                 "feature1",
                 androidManifest(
                     PKG_NAME, withMinSdkVersion(18), withFeatureCondition("android.feature"))));
+
+    new ModuleDependencyValidator().validateAllModules(allModules);
+  }
+
+  @Test
+  public void validateAllModules_assetModuleWithoutSdk_succeeds() throws Exception {
+    ImmutableList<BundleModule> allModules =
+        ImmutableList.of(
+            module("base", androidManifest(PKG_NAME, withMinSdkVersion(20))),
+            module(
+                "asset",
+                androidManifest(
+                    PKG_NAME,
+                    withTypeAttribute(AndroidManifest.MODULE_TYPE_ASSET_VALUE),
+                    withInstallTimeDelivery())));
 
     new ModuleDependencyValidator().validateAllModules(allModules);
   }

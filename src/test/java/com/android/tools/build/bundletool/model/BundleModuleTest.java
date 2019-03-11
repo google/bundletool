@@ -16,11 +16,14 @@
 
 package com.android.tools.build.bundletool.model;
 
+import static com.android.tools.build.bundletool.model.AndroidManifest.MODULE_TYPE_ASSET_VALUE;
+import static com.android.tools.build.bundletool.model.AndroidManifest.MODULE_TYPE_FEATURE_VALUE;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifest;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withFeatureCondition;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withFusingAttribute;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withInstallTimeDelivery;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withMinSdkCondition;
+import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withMinSdkVersion;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withOnDemandAttribute;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withOnDemandDelivery;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withSplitId;
@@ -45,6 +48,7 @@ import com.android.bundle.Files.NativeLibraries;
 import com.android.bundle.Files.TargetedApexImage;
 import com.android.bundle.Files.TargetedAssetsDirectory;
 import com.android.bundle.Files.TargetedNativeDirectory;
+import com.android.bundle.Targeting.ModuleTargeting;
 import com.android.tools.build.bundletool.model.BundleModule.ModuleDeliveryType;
 import com.android.tools.build.bundletool.model.BundleModule.ModuleType;
 import com.android.tools.build.bundletool.testing.BundleConfigBuilder;
@@ -435,7 +439,8 @@ public class BundleModuleTest {
   public void getModuleType_feature() {
     BundleModule bundleModule =
         createMinimalModuleBuilder()
-            .setAndroidManifestProto(androidManifest("com.test.app", withTypeAttribute("feature")))
+            .setAndroidManifestProto(
+                androidManifest("com.test.app", withTypeAttribute(MODULE_TYPE_FEATURE_VALUE)))
             .build();
 
     assertThat(bundleModule.getModuleType()).isEqualTo(ModuleType.FEATURE_MODULE);
@@ -446,7 +451,7 @@ public class BundleModuleTest {
     BundleModule bundleModule =
         createMinimalModuleBuilder()
             .setAndroidManifestProto(
-                androidManifest("com.test.app", withTypeAttribute("remote-asset")))
+                androidManifest("com.test.app", withTypeAttribute(MODULE_TYPE_ASSET_VALUE)))
             .build();
 
     assertThat(bundleModule.getModuleType()).isEqualTo(ModuleType.ASSET_MODULE);
@@ -473,6 +478,68 @@ public class BundleModuleTest {
             .build();
 
     assertThat(bundleModule.hasRenderscript32Bitcode()).isFalse();
+  }
+
+  @Test
+  public void moduleTargeting_noModuleMinSdkVersion_noConditionsAddded() {
+    BundleModule bundleModule =
+        createMinimalModuleBuilder()
+            .setAndroidManifestProto(
+                androidManifest("com.test.app", withFeatureCondition("com.feature1")))
+            .build();
+
+    ModuleTargeting moduleTargeting = bundleModule.getModuleMetadata().getTargeting();
+    assertThat(moduleTargeting)
+        .ignoringRepeatedFieldOrder()
+        .isEqualTo(moduleFeatureTargeting("com.feature1"));
+  }
+
+  @Test
+  public void moduleTargeting_moduleMinSdkVersionInherited() {
+    BundleModule bundleModule =
+        createMinimalModuleBuilder()
+            .setAndroidManifestProto(
+                androidManifest(
+                    "com.test.app", withMinSdkVersion(24), withFeatureCondition("com.feature1")))
+            .build();
+
+    ModuleTargeting moduleTargeting = bundleModule.getModuleMetadata().getTargeting();
+    assertThat(moduleTargeting)
+        .ignoringRepeatedFieldOrder()
+        .isEqualTo(
+            mergeModuleTargeting(
+                moduleFeatureTargeting("com.feature1"), moduleMinSdkVersionTargeting(24)));
+  }
+
+  @Test
+  public void moduleTargeting_moduleMinSdkVersion_minSdkConditionPreferred() {
+    BundleModule bundleModule =
+        createMinimalModuleBuilder()
+            .setAndroidManifestProto(
+                androidManifest(
+                    "com.test.app",
+                    withMinSdkVersion(24),
+                    withMinSdkCondition(28),
+                    withFeatureCondition("com.feature1")))
+            .build();
+
+    ModuleTargeting moduleTargeting = bundleModule.getModuleMetadata().getTargeting();
+    assertThat(moduleTargeting)
+        .ignoringRepeatedFieldOrder()
+        .isEqualTo(
+            mergeModuleTargeting(
+                moduleFeatureTargeting("com.feature1"), moduleMinSdkVersionTargeting(28)));
+  }
+
+  @Test
+  public void moduleTargeting_noConditions_noMinSdkInherited() {
+    BundleModule bundleModule =
+        createMinimalModuleBuilder()
+            .setAndroidManifestProto(androidManifest("com.test.app", withMinSdkVersion(24)))
+            .build();
+
+    ModuleTargeting moduleTargeting = bundleModule.getModuleMetadata().getTargeting();
+    assertThat(moduleTargeting).isEqualToDefaultInstance();
   }
 
   private static BundleModule.Builder createMinimalModuleBuilder() {

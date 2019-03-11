@@ -17,6 +17,7 @@
 package com.android.tools.build.bundletool.model;
 
 import static com.android.tools.build.bundletool.model.AndroidManifest.DEBUGGABLE_RESOURCE_ID;
+import static com.android.tools.build.bundletool.model.AndroidManifest.DEVELOPMENT_SDK_VERSION;
 import static com.android.tools.build.bundletool.model.AndroidManifest.HAS_CODE_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.IS_FEATURE_SPLIT_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.MODULE_TYPE_ASSET_VALUE;
@@ -143,16 +144,23 @@ public class AndroidManifestTest {
   public void getMinSdkVersion_asString() {
     AndroidManifest androidManifest =
         AndroidManifest.create(androidManifest("com.test.app", withMinSdkVersion("Q")));
-    assertThat(androidManifest.getMinSdkVersion()).hasValue(10_000);
+    assertThat(androidManifest.getMinSdkVersion()).hasValue(DEVELOPMENT_SDK_VERSION);
 
     AndroidManifest androidManifest2 =
         AndroidManifest.create(androidManifest("com.test.app", withMinSdkVersion("R")));
-    assertThat(androidManifest2.getMinSdkVersion()).hasValue(10_000);
+    assertThat(androidManifest2.getMinSdkVersion()).hasValue(DEVELOPMENT_SDK_VERSION);
 
     // Lowercase disallowed.
     AndroidManifest androidManifest3 =
         AndroidManifest.create(androidManifest("com.test.app", withMinSdkVersion("r")));
     assertThrows(UnexpectedAttributeTypeException.class, () -> androidManifest3.getMinSdkVersion());
+  }
+
+  @Test
+  public void getMinSdkVersion_asStringWithFingerprint() {
+    AndroidManifest androidManifest =
+        AndroidManifest.create(androidManifest("com.test.app", withMinSdkVersion("R.fingerprint")));
+    assertThat(androidManifest.getMinSdkVersion()).hasValue(DEVELOPMENT_SDK_VERSION);
   }
 
   @Test
@@ -480,8 +488,9 @@ public class AndroidManifestTest {
         AndroidManifest.create(
             androidManifest("com.test.app", withTypeAttribute(MODULE_TYPE_ASSET_VALUE)));
 
-    assertThat(manifest.getModuleType()).isPresent();
-    assertThat(manifest.getModuleType()).hasValue(ASSET_MODULE);
+    assertThat(manifest.getOptionalModuleType()).isPresent();
+    assertThat(manifest.getOptionalModuleType()).hasValue(ASSET_MODULE);
+    assertThat(manifest.getModuleType()).isEqualTo(ASSET_MODULE);
   }
 
   @Test
@@ -490,8 +499,17 @@ public class AndroidManifestTest {
         AndroidManifest.create(
             androidManifest("com.test.app", withTypeAttribute(MODULE_TYPE_FEATURE_VALUE)));
 
-    assertThat(manifest.getModuleType()).isPresent();
-    assertThat(manifest.getModuleType()).hasValue(FEATURE_MODULE);
+    assertThat(manifest.getOptionalModuleType()).isPresent();
+    assertThat(manifest.getOptionalModuleType()).hasValue(FEATURE_MODULE);
+    assertThat(manifest.getModuleType()).isEqualTo(FEATURE_MODULE);
+  }
+
+  @Test
+  public void moduleTypeAttribute_defaultsToFeatureModule() {
+    AndroidManifest manifest = AndroidManifest.create(androidManifest("com.test.app"));
+
+    assertThat(manifest.getOptionalModuleType()).isEmpty();
+    assertThat(manifest.getModuleType()).isEqualTo(FEATURE_MODULE);
   }
 
   @Test

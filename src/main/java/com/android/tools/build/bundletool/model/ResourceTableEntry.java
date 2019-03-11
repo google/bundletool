@@ -15,8 +15,8 @@
  */
 package com.android.tools.build.bundletool.model;
 
-import com.android.aapt.Resources;
 import com.android.aapt.Resources.Entry;
+import com.android.aapt.Resources.Package;
 import com.android.aapt.Resources.Type;
 import com.google.auto.value.AutoValue;
 import com.google.auto.value.extension.memoized.Memoized;
@@ -28,11 +28,11 @@ import com.google.errorprone.annotations.Immutable;
 @AutoValue.CopyAnnotations
 public abstract class ResourceTableEntry {
 
-  public static ResourceTableEntry create(Resources.Package pkg, Type type, Entry entry) {
+  public static ResourceTableEntry create(Package pkg, Type type, Entry entry) {
     return new AutoValue_ResourceTableEntry(pkg, type, entry);
   }
 
-  public abstract Resources.Package getPackage();
+  public abstract Package getPackage();
 
   public abstract Type getType();
 

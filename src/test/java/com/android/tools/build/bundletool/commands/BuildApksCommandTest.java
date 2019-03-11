@@ -147,38 +147,6 @@ public class BuildApksCommandTest {
     assertThat(commandViaBuilder.build()).isEqualTo(commandViaFlags);
   }
 
-  // Remove this test when universal flag is deleted.
-  @Test
-  public void buildingViaFlagsWithUniversal_setsUniversalModeOnBuilder() throws Exception {
-    ByteArrayOutputStream output = new ByteArrayOutputStream();
-    BuildApksCommand commandViaFlags =
-        BuildApksCommand.fromFlags(
-            new FlagParser()
-                .parse(
-                    "--bundle=" + bundlePath,
-                    "--output=" + outputFilePath,
-                    "--aapt2=" + AAPT2_PATH,
-                    "--universal"),
-            new PrintStream(output),
-            systemEnvironmentProvider,
-            fakeAdbServer);
-
-    BuildApksCommand.Builder commandViaBuilder =
-        BuildApksCommand.builder()
-            .setBundlePath(bundlePath)
-            .setOutputFile(outputFilePath)
-            // Must copy instance of the internal executor service.
-            .setAapt2Command(commandViaFlags.getAapt2Command().get())
-            .setExecutorServiceInternal(commandViaFlags.getExecutorService())
-            .setExecutorServiceCreatedByBundleTool(true)
-            .setOutputPrintStream(commandViaFlags.getOutputPrintStream().get())
-            .setApkBuildMode(UNIVERSAL);
-    DebugKeystoreUtils.getDebugSigningConfiguration(systemEnvironmentProvider)
-        .ifPresent(commandViaBuilder::setSigningConfiguration);
-
-    assertThat(commandViaBuilder.build()).isEqualTo(commandViaFlags);
-  }
-
   @Test
   public void buildingViaFlagsAndBuilderHasSameResult_optionalOptimizeFor() throws Exception {
     ByteArrayOutputStream output = new ByteArrayOutputStream();

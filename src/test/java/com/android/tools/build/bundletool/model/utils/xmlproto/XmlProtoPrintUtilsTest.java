@@ -140,6 +140,22 @@ public final class XmlProtoPrintUtilsTest {
   }
 
   @Test
+  public void processStyledString_withAttributeValueContainingEqualSign() {
+    StyledString styledString =
+        StyledString.newBuilder()
+            .setValue("hello")
+            .addSpan(
+                Span.newBuilder()
+                    .setTag("a;href=https://support.google.com?topic=123")
+                    .setFirstChar(0)
+                    .setLastChar(4))
+            .build();
+    String processedString = XmlProtoPrintUtils.processStyledString(styledString);
+    assertThat(processedString)
+        .isEqualTo("<a href=\"https://support.google.com?topic=123\">hello</a>");
+  }
+
+  @Test
   public void getRefAsString_reference() {
     Reference ref =
         Reference.newBuilder().setId(0x00000123).setName("name").setType(Type.REFERENCE).build();

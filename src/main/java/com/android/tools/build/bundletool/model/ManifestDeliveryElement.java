@@ -26,6 +26,8 @@ import static com.android.tools.build.bundletool.model.AndroidManifest.EXCLUDE_A
 import static com.android.tools.build.bundletool.model.AndroidManifest.NAME_ATTRIBUTE_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.VALUE_ATTRIBUTE_NAME;
 import static com.google.common.collect.ImmutableList.toImmutableList;
+import static java.util.stream.Collectors.counting;
+import static java.util.stream.Collectors.groupingBy;
 
 import com.android.aapt.Resources.XmlNode;
 import com.android.tools.build.bundletool.model.exceptions.ValidationException;
@@ -37,6 +39,7 @@ import com.google.auto.value.extension.memoized.Memoized;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
 import com.google.errorprone.annotations.Immutable;
+import java.util.Map;
 import java.util.Optional;
 
 /** Parses and provides business logic utilities for <dist:delivery> element. */
@@ -48,6 +51,8 @@ public abstract class ManifestDeliveryElement {
   private static final String VERSION_ATTRIBUTE_NAME = "version";
   private static final ImmutableList<String> ALLOWED_DELIVERY_MODES =
       ImmutableList.of("install-time", "on-demand");
+  private static final ImmutableList<String> CONDITIONS_ALLOWED_ONLY_ONCE =
+      ImmutableList.of(CONDITION_MIN_SDK_VERSION_NAME, CONDITION_USER_COUNTRIES_NAME);
 
   abstract XmlProtoElement getDeliveryElement();
 
@@ -89,6 +94,16 @@ public abstract class ManifestDeliveryElement {
   @Memoized
   public ModuleConditions getModuleConditions() {
     ImmutableList<XmlProtoElement> conditionElements = getModuleConditionElements();
+
+    Map<String, Long> conditionCounts =
+        conditionElements.stream().collect(groupingBy(XmlProtoElement::getName, counting()));
+    for (String conditionName : CONDITIONS_ALLOWED_ONLY_ONCE) {
+      if (conditionCounts.getOrDefault(conditionName, 0L) > 1) {
+        throw ValidationException.builder()
+            .withMessage("Multiple '<dist:%s>' conditions are not supported.", conditionName)
+            .build();
+      }
+    }
 
     ModuleConditions.Builder moduleConditions = ModuleConditions.builder();
     for (XmlProtoElement conditionElement : conditionElements) {

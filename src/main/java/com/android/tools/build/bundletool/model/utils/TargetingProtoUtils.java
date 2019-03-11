@@ -97,6 +97,24 @@ public final class TargetingProtoUtils {
         .build();
   }
 
+  /** Extracts language values from the targeting. */
+  public static ImmutableSet<String> languageValues(ApkTargeting targeting) {
+    return ImmutableSet.copyOf(targeting.getLanguageTargeting().getValueList());
+  }
+
+  /** Extracts language alternatives from the targeting. */
+  public static ImmutableSet<String> languageAlternatives(ApkTargeting targeting) {
+    return ImmutableSet.copyOf(targeting.getLanguageTargeting().getAlternativesList());
+  }
+
+  /** Extracts targeted language universe (values and alternatives) from the targeting. */
+  public static ImmutableSet<String> languageUniverse(ApkTargeting targeting) {
+    return ImmutableSet.<String>builder()
+        .addAll(languageValues(targeting))
+        .addAll(languageAlternatives(targeting))
+        .build();
+  }
+
   public static SdkVersion sdkVersionFrom(int from) {
     return SdkVersion.newBuilder().setMin(Int32Value.newBuilder().setValue(from)).build();
   }

@@ -18,14 +18,17 @@ package com.android.tools.build.bundletool.splitters;
 
 import static com.android.tools.build.bundletool.model.utils.TargetingProtoUtils.lPlusVariantTargeting;
 import static com.android.tools.build.bundletool.model.utils.Versions.ANDROID_L_API_VERSION;
+import static com.google.common.collect.ImmutableSet.toImmutableSet;
 
 import com.android.bundle.Targeting.VariantTargeting;
 import com.android.tools.build.bundletool.model.BundleModule;
 import com.android.tools.build.bundletool.model.exceptions.CommandExecutionException;
+import com.android.tools.build.bundletool.model.targeting.TargetingUtils;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import java.util.Optional;
+import java.util.stream.Stream;
 
 /**
  * Generates all variant targetings that would be created from the {@link BundleModule}.
@@ -58,18 +61,19 @@ public final class VariantGenerator {
               module.getName())
           .build();
     }
-    ImmutableSet.Builder<VariantTargeting> splits =
-        ImmutableSet.<VariantTargeting>builder().add(lPlusVariantTargeting());
 
-    for (BundleModuleVariantGenerator bundleModuleVariantGenerator : getVariantGenerators()) {
-      splits.addAll(bundleModuleVariantGenerator.generate(module));
-    }
+    ImmutableSet<VariantTargeting> splitVariants =
+        getVariantGenerators().stream()
+            .flatMap(generator -> generator.generate(module))
+            .collect(toImmutableSet());
 
-    return splits.build();
+    return TargetingUtils.cropVariantsWithAppSdkRange(
+        splitVariants, module.getAndroidManifest().getSdkRange());
   };
 
   private ImmutableList<BundleModuleVariantGenerator> getVariantGenerators() {
     return ImmutableList.of(
+        apkGenerationConfiguration -> Stream.of(lPlusVariantTargeting()),
         new NativeLibsCompressionVariantGenerator(apkGenerationConfiguration),
         new DexCompressionVariantGenerator(apkGenerationConfiguration));
   }

@@ -16,10 +16,12 @@
 
 package com.android.tools.build.bundletool.validation;
 
+import static com.android.tools.build.bundletool.model.AndroidManifest.MODULE_TYPE_ASSET_VALUE;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifest;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withMinSdkCondition;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withOnDemandAttribute;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withTitle;
+import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withTypeAttribute;
 import static com.android.tools.build.bundletool.testing.ResourcesTableFactory.TEST_LABEL_RESOURCE_ID;
 import static com.android.tools.build.bundletool.testing.ResourcesTableFactory.resourceTableWithTestLabel;
 import static com.google.common.truth.Truth.assertThat;
@@ -139,6 +141,40 @@ public class ModuleTitleValidatorTest {
                     withTitle("@string/test_label", TEST_LABEL_RESOURCE_ID))));
 
     new ModuleTitleValidator().validateAllModules(allModules);
+  }
+
+  @Test
+  public void validateAllModules_baseAndAssetModuleWithoutTitle_succeeds() throws Exception {
+
+    ImmutableList<BundleModule> allModules =
+        ImmutableList.of(
+            module("base", androidManifest(PKG_NAME)),
+            module("asset", androidManifest(PKG_NAME, withTypeAttribute(MODULE_TYPE_ASSET_VALUE))));
+
+    new ModuleTitleValidator().validateAllModules(allModules);
+  }
+
+  @Test
+  public void validateAllModules_baseAndAssetModuleWithTitle_throws() throws Exception {
+
+    ImmutableList<BundleModule> allModules =
+        ImmutableList.of(
+            module("base", androidManifest(PKG_NAME)),
+            module(
+                "asset",
+                androidManifest(
+                    PKG_NAME,
+                    withTypeAttribute(MODULE_TYPE_ASSET_VALUE),
+                    withTitle("test_label", TEST_LABEL_RESOURCE_ID))));
+
+    ValidationException exception =
+        assertThrows(
+            ValidationException.class,
+            () -> new ModuleTitleValidator().validateAllModules(allModules));
+
+    assertThat(exception)
+        .hasMessageThat()
+        .matches("Module titles not supported in asset packs, but found in 'asset'.");
   }
 
   private static BundleModule module(String moduleName, XmlNode manifest) throws IOException {

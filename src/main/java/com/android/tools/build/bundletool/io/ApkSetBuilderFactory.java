@@ -53,6 +53,9 @@ public final class ApkSetBuilderFactory {
     /** Adds an system APK to the APK Set archive. */
     ApkDescription addSystemApk(ModuleSplit split);
 
+    /** Adds an asset slice APK to the APK Set archive. */
+    ApkDescription addAssetSliceApk(ModuleSplit split);
+
     /**
      * Adds an compressed system APK and an and an additional uncompressed stub APK containing just
      * the android manifest to the APK Set archive.
@@ -108,6 +111,14 @@ public final class ApkSetBuilderFactory {
     public ApkDescription addInstantApk(ModuleSplit split) {
       ApkDescription apkDescription =
           splitApkSerializer.writeInstantSplitToDisk(split, tempDirectory);
+      addToApkSetArchive(apkDescription.getPath());
+      return apkDescription;
+    }
+
+    @Override
+    public ApkDescription addAssetSliceApk(ModuleSplit split) {
+      ApkDescription apkDescription =
+          splitApkSerializer.writeAssetSliceToDisk(split, tempDirectory);
       addToApkSetArchive(apkDescription.getPath());
       return apkDescription;
     }
@@ -191,6 +202,11 @@ public final class ApkSetBuilderFactory {
     @Override
     public ApkDescription addSplitApk(ModuleSplit split) {
       return splitApkSerializer.writeSplitToDisk(split, outputDirectory);
+    }
+
+    @Override
+    public ApkDescription addAssetSliceApk(ModuleSplit split) {
+      return splitApkSerializer.writeAssetSliceToDisk(split, outputDirectory);
     }
 
     @Override

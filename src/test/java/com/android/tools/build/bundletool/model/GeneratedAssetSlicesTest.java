@@ -16,6 +16,7 @@
 
 package com.android.tools.build.bundletool.model;
 
+import static com.android.tools.build.bundletool.model.AndroidManifest.MODULE_TYPE_ASSET_VALUE;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifest;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withTypeAttribute;
 import static com.google.common.truth.Truth.assertThat;
@@ -54,7 +55,7 @@ public class GeneratedAssetSlicesTest {
         ModuleSplit.builder()
             .setAndroidManifest(
                 AndroidManifest.create(
-                    androidManifest("com.test.app", withTypeAttribute("remote-asset"))))
+                    androidManifest("com.test.app", withTypeAttribute(MODULE_TYPE_ASSET_VALUE))))
             .setEntries(ImmutableList.of())
             .setMasterSplit(true)
             .setSplitType(SplitType.ASSET_SLICE)
@@ -69,6 +70,26 @@ public class GeneratedAssetSlicesTest {
     assertThat(generatedApks.getSplitApks()).containsExactly(baseSplit);
 
     GeneratedAssetSlices generatedAssetSlices = GeneratedAssetSlices.fromModuleSplits(splits);
+    assertThat(generatedAssetSlices.size()).isEqualTo(1);
+    assertThat(generatedAssetSlices.getAssetSlices()).containsExactly(assetSlice);
+  }
+
+  @Test
+  public void fromBuilder() {
+    ModuleSplit assetSlice =
+        ModuleSplit.builder()
+            .setAndroidManifest(
+                AndroidManifest.create(
+                    androidManifest("com.test.app", withTypeAttribute(MODULE_TYPE_ASSET_VALUE))))
+            .setEntries(ImmutableList.of())
+            .setMasterSplit(true)
+            .setSplitType(SplitType.ASSET_SLICE)
+            .setModuleName(BundleModuleName.create("some_assets"))
+            .setApkTargeting(ApkTargeting.getDefaultInstance())
+            .setVariantTargeting(VariantTargeting.getDefaultInstance())
+            .build();
+    GeneratedAssetSlices generatedAssetSlices =
+        GeneratedAssetSlices.builder().setAssetSlices(ImmutableList.of(assetSlice)).build();
     assertThat(generatedAssetSlices.size()).isEqualTo(1);
     assertThat(generatedAssetSlices.getAssetSlices()).containsExactly(assetSlice);
   }

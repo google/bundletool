@@ -1,0 +1,27 @@
+syntax = "proto3";
+
+package android.bundle;
+
+option java_package = "com.android.bundle";
+
+// Sizes of the breakdown item: bytes in the APK, and bytes over the wire.
+message Sizes {
+  int64 disk_size = 1;
+  int64 download_size = 2;
+}
+
+// Breakdown of APK, or an aggregate.
+message Breakdown {
+  // Total size of entries and ZIP format overheads.
+  Sizes total = 1;
+  // Only dex code.
+  Sizes dex = 2;
+  // Resources, resource table and Android Manifest.
+  Sizes resources = 3;
+  // Only assets.
+  Sizes assets = 4;
+  // Only native libraries.
+  Sizes native_libs = 5;
+  // Other entries e.g. META-INF/ and ZIP format overheads.
+  Sizes other = 6;
+}

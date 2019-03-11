@@ -496,6 +496,10 @@ public abstract class ModuleSplit {
     return findEntry(ZipPath.create(path));
   }
 
+  public boolean isApex() {
+    return getApexConfig().isPresent();
+  }
+
   /** Builder for {@link ModuleSplit}. */
   @AutoValue.Builder
   public abstract static class Builder {
@@ -536,7 +540,9 @@ public abstract class ModuleSplit {
 
     public ModuleSplit build() {
       ModuleSplit moduleSplit = autoBuild();
-      if (moduleSplit.isMasterSplit()) {
+      // For system splits the master split is formed by fusing Screen Density, Abi, Language
+      // splits, hence it might have Abi, Screen Density, Language targeting set.
+      if (moduleSplit.isMasterSplit() && !moduleSplit.getSplitType().equals(SplitType.SYSTEM)) {
         checkState(
             moduleSplit
                 .getApkTargeting()

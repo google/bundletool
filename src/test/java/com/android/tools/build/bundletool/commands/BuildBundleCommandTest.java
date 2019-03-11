@@ -67,7 +67,6 @@ import com.android.tools.build.bundletool.model.exceptions.CommandExecutionExcep
 import com.android.tools.build.bundletool.model.exceptions.ValidationException;
 import com.android.tools.build.bundletool.model.version.BundleToolVersion;
 import com.android.tools.build.bundletool.testing.BundleConfigBuilder;
-import com.android.tools.build.bundletool.testing.FileUtils;
 import com.android.tools.build.bundletool.testing.ManifestProtoUtils.ManifestMutator;
 import com.android.tools.build.bundletool.testing.ResourceTableBuilder;
 import com.google.common.collect.ImmutableList;
@@ -228,17 +227,17 @@ public class BuildBundleCommandTest {
         .build()
         .execute();
 
-    ZipFile bundle = new ZipFile(bundlePath.toFile());
-
-    assertThat(bundle).hasFile("base/assets/anything.dat").withContent("any".getBytes(UTF_8));
-    assertThat(bundle).hasFile("base/dex/classes.dex").withContent("dex".getBytes(UTF_8));
-    assertThat(bundle).hasFile("base/lib/x86/libX.so").withContent("native".getBytes(UTF_8));
-    assertThat(bundle)
-        .hasFile("base/manifest/AndroidManifest.xml")
-        .withContent(manifest.toByteArray());
-    assertThat(bundle).hasFile("base/res/drawable/icon.png").withContent("image".getBytes(UTF_8));
-    assertThat(bundle).hasFile("base/root/anything2.dat").withContent("any2".getBytes(UTF_8));
-    assertThat(bundle).hasFile("base/resources.pb").withContent(resourceTable.toByteArray());
+    try (ZipFile bundle = new ZipFile(bundlePath.toFile())) {
+      assertThat(bundle).hasFile("base/assets/anything.dat").withContent("any".getBytes(UTF_8));
+      assertThat(bundle).hasFile("base/dex/classes.dex").withContent("dex".getBytes(UTF_8));
+      assertThat(bundle).hasFile("base/lib/x86/libX.so").withContent("native".getBytes(UTF_8));
+      assertThat(bundle)
+          .hasFile("base/manifest/AndroidManifest.xml")
+          .withContent(manifest.toByteArray());
+      assertThat(bundle).hasFile("base/res/drawable/icon.png").withContent("image".getBytes(UTF_8));
+      assertThat(bundle).hasFile("base/root/anything2.dat").withContent("any2".getBytes(UTF_8));
+      assertThat(bundle).hasFile("base/resources.pb").withContent(resourceTable.toByteArray());
+    }
   }
 
   @Test
@@ -269,20 +268,23 @@ public class BuildBundleCommandTest {
         .build()
         .execute();
 
-    ZipFile bundle = new ZipFile(bundlePath.toFile());
-    assertThat(bundle)
-        .hasFile("base/manifest/AndroidManifest.xml")
-        .withContent(manifest.toByteArray());
-    assertThat(bundle).hasFile("base/apex/x86_64.img").withContent("x86_64".getBytes(UTF_8));
-    assertThat(bundle).hasFile("base/apex/x86.img").withContent("x86".getBytes(UTF_8));
-    assertThat(bundle).hasFile("base/apex/arm64-v8a.img").withContent("arm64-v8a".getBytes(UTF_8));
-    assertThat(bundle)
-        .hasFile("base/apex/armeabi-v7a.img")
-        .withContent("armeabi-v7a".getBytes(UTF_8));
-    assertThat(bundle)
-        .hasFile("base/root/apex_manifest.json")
-        .withContent("manifest".getBytes(UTF_8));
-    assertThat(bundle).hasFile("base/apex.pb").withContent(apexConfig.toByteArray());
+    try (ZipFile bundle = new ZipFile(bundlePath.toFile())) {
+      assertThat(bundle)
+          .hasFile("base/manifest/AndroidManifest.xml")
+          .withContent(manifest.toByteArray());
+      assertThat(bundle).hasFile("base/apex/x86_64.img").withContent("x86_64".getBytes(UTF_8));
+      assertThat(bundle).hasFile("base/apex/x86.img").withContent("x86".getBytes(UTF_8));
+      assertThat(bundle)
+          .hasFile("base/apex/arm64-v8a.img")
+          .withContent("arm64-v8a".getBytes(UTF_8));
+      assertThat(bundle)
+          .hasFile("base/apex/armeabi-v7a.img")
+          .withContent("armeabi-v7a".getBytes(UTF_8));
+      assertThat(bundle)
+          .hasFile("base/root/apex_manifest.json")
+          .withContent("manifest".getBytes(UTF_8));
+      assertThat(bundle).hasFile("base/apex.pb").withContent(apexConfig.toByteArray());
+    }
   }
 
   @Test
@@ -319,17 +321,17 @@ public class BuildBundleCommandTest {
         .build()
         .execute();
 
-    ZipFile bundle = new ZipFile(bundlePath.toFile());
-
-    assertThat(bundle).hasFile("base/assets/anything.dat").withContent("any".getBytes(UTF_8));
-    assertThat(bundle)
-        .hasFile("base/assets/gfx#opengl_3.0/texture#tcf_atc/file.dat")
-        .withContent("any2".getBytes(UTF_8));
-    assertThat(bundle).hasFile("base/dex/classes.dex").withContent("dex".getBytes(UTF_8));
-    assertThat(bundle)
-        .hasFile("base/manifest/AndroidManifest.xml")
-        .withContent(manifest.toByteArray());
-    assertThat(bundle).hasFile("base/assets.pb").withContent(assetsConfig.toByteArray());
+    try (ZipFile bundle = new ZipFile(bundlePath.toFile())) {
+      assertThat(bundle).hasFile("base/assets/anything.dat").withContent("any".getBytes(UTF_8));
+      assertThat(bundle)
+          .hasFile("base/assets/gfx#opengl_3.0/texture#tcf_atc/file.dat")
+          .withContent("any2".getBytes(UTF_8));
+      assertThat(bundle).hasFile("base/dex/classes.dex").withContent("dex".getBytes(UTF_8));
+      assertThat(bundle)
+          .hasFile("base/manifest/AndroidManifest.xml")
+          .withContent(manifest.toByteArray());
+      assertThat(bundle).hasFile("base/assets.pb").withContent(assetsConfig.toByteArray());
+    }
   }
 
   @Test
@@ -342,8 +344,9 @@ public class BuildBundleCommandTest {
         .build()
         .execute();
 
-    ZipFile bundleZip = new ZipFile(bundlePath.toFile());
-    assertThat(bundleZip).doesNotHaveFile("base/assets.pb");
+    try (ZipFile bundleZip = new ZipFile(bundlePath.toFile())) {
+      assertThat(bundleZip).doesNotHaveFile("base/assets.pb");
+    }
   }
 
   @Test
@@ -356,8 +359,9 @@ public class BuildBundleCommandTest {
         .build()
         .execute();
 
-    ZipFile bundleZip = new ZipFile(bundlePath.toFile());
-    assertThat(bundleZip).doesNotHaveFile("base/native.pb");
+    try (ZipFile bundleZip = new ZipFile(bundlePath.toFile())) {
+      assertThat(bundleZip).doesNotHaveFile("base/native.pb");
+    }
   }
 
   @Test
@@ -370,8 +374,9 @@ public class BuildBundleCommandTest {
         .build()
         .execute();
 
-    ZipFile bundleZip = new ZipFile(bundlePath.toFile());
-    assertThat(bundleZip).doesNotHaveFile("base/apex.pb");
+    try (ZipFile bundleZip = new ZipFile(bundlePath.toFile())) {
+      assertThat(bundleZip).doesNotHaveFile("base/apex.pb");
+    }
   }
 
   @Test
@@ -391,11 +396,13 @@ public class BuildBundleCommandTest {
         .build()
         .execute();
 
-    ZipFile bundle = new ZipFile(bundlePath.toFile());
-    assertThat(bundle).hasFile("base/native.pb");
+    NativeLibraries actualTargeting;
+    try (ZipFile bundle = new ZipFile(bundlePath.toFile())) {
+      assertThat(bundle).hasFile("base/native.pb");
 
-    NativeLibraries actualTargeting =
-        NativeLibraries.parseFrom(bundle.getInputStream(new ZipEntry("base/native.pb")));
+      actualTargeting =
+          NativeLibraries.parseFrom(bundle.getInputStream(new ZipEntry("base/native.pb")));
+    }
 
     NativeLibraries expectedTargeting =
         NativeLibraries.newBuilder()
@@ -430,8 +437,10 @@ public class BuildBundleCommandTest {
         .build()
         .execute();
 
-    AppBundle appBundle = AppBundle.buildFromZip(new ZipFile(bundlePath.toFile()));
-    assertThat(appBundle.getBundleConfig()).isEqualTo(bundleConfigInBundle);
+    try (ZipFile appBundleZip = new ZipFile(bundlePath.toFile())) {
+      AppBundle appBundle = AppBundle.buildFromZip(appBundleZip);
+      assertThat(appBundle.getBundleConfig()).isEqualTo(bundleConfigInBundle);
+    }
   }
 
   @Test
@@ -475,16 +484,17 @@ public class BuildBundleCommandTest {
         .build()
         .execute();
 
-    ZipFile bundleZip = new ZipFile(bundlePath.toFile());
-    assertThat(bundleZip)
-        .hasFile("BUNDLE-METADATA/first.namespace/metadata-1.txt")
-        .withContent(new byte[] {0x01});
-    assertThat(bundleZip)
-        .hasFile("BUNDLE-METADATA/first.namespace/metadata-2.dat")
-        .withContent(new byte[] {0x02});
-    assertThat(bundleZip)
-        .hasFile("BUNDLE-METADATA/second.namespace/metadata-3.bin")
-        .withContent(new byte[] {0x03});
+    try (ZipFile bundleZip = new ZipFile(bundlePath.toFile())) {
+      assertThat(bundleZip)
+          .hasFile("BUNDLE-METADATA/first.namespace/metadata-1.txt")
+          .withContent(new byte[] {0x01});
+      assertThat(bundleZip)
+          .hasFile("BUNDLE-METADATA/first.namespace/metadata-2.dat")
+          .withContent(new byte[] {0x02});
+      assertThat(bundleZip)
+          .hasFile("BUNDLE-METADATA/second.namespace/metadata-3.bin")
+          .withContent(new byte[] {0x03});
+    }
   }
 
   @Test
@@ -500,10 +510,11 @@ public class BuildBundleCommandTest {
         .build()
         .execute();
 
-    ZipFile bundleZip = new ZipFile(bundlePath.toFile());
-    assertThat(bundleZip)
-        .hasFile("BUNDLE-METADATA/com.android.tools.build.bundletool/mainDexList.txt")
-        .withContent(new byte[] {0x42});
+    try (ZipFile bundleZip = new ZipFile(bundlePath.toFile())) {
+      assertThat(bundleZip)
+          .hasFile("BUNDLE-METADATA/com.android.tools.build.bundletool/mainDexList.txt")
+          .withContent(new byte[] {0x42});
+    }
   }
 
   @Test
@@ -631,7 +642,7 @@ public class BuildBundleCommandTest {
   public void duplicateModules_throws() throws Exception {
     Path moduleBase = buildSimpleModule("base");
     Path moduleFeature1 = buildSimpleModule("feature");
-    Path moduleFeature2 = buildSimpleModule("feature");
+    Path moduleFeature2 = buildSimpleModule("feature", /* fileName= */ "feature2");
 
     ValidationException exception =
         assertThrows(
@@ -864,9 +875,11 @@ public class BuildBundleCommandTest {
         .build()
         .execute();
 
-    AppBundle appBundle = AppBundle.buildFromZip(new ZipFile(bundlePath.toFile()));
-    assertThat(appBundle.getBundleConfig().getBundletool().getVersion())
-        .isEqualTo(BundleToolVersion.getCurrentVersion().toString());
+    try (ZipFile appBundleZip = new ZipFile(bundlePath.toFile())) {
+      AppBundle appBundle = AppBundle.buildFromZip(appBundleZip);
+      assertThat(appBundle.getBundleConfig().getBundletool().getVersion())
+          .isEqualTo(BundleToolVersion.getCurrentVersion().toString());
+    }
   }
 
   @Test
@@ -917,7 +930,12 @@ public class BuildBundleCommandTest {
         .writeTo(tmpDir.resolve("base.zip"));
   }
 
+  /** Builds a module zip with the moduleName as filename. */
   private Path buildSimpleModule(String moduleName) throws IOException {
+    return buildSimpleModule(moduleName, /* fileName= */ moduleName);
+  }
+
+  private Path buildSimpleModule(String moduleName, String fileName) throws IOException {
     ManifestMutator[] manifestMutators =
         moduleName.equals("base")
             ? new ManifestMutator[0]
@@ -927,7 +945,7 @@ public class BuildBundleCommandTest {
         .addFileWithProtoContent(
             ZipPath.create("manifest/AndroidManifest.xml"),
             androidManifest(PKG_NAME, manifestMutators))
-        .writeTo(FileUtils.getRandomFilePath(tmp, moduleName, ".zip"));
+        .writeTo(tmpDir.resolve(fileName + ".zip"));
   }
 
   private TargetedApexImage targetedImageWithAlternatives(

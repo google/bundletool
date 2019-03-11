@@ -29,7 +29,7 @@ import com.android.tools.build.bundletool.device.Device.InstallOptions;
 import com.android.tools.build.bundletool.device.DeviceAnalyzer;
 import com.android.tools.build.bundletool.flags.Flag;
 import com.android.tools.build.bundletool.flags.ParsedFlags;
-import com.android.tools.build.bundletool.io.TempFiles;
+import com.android.tools.build.bundletool.io.TempDirectory;
 import com.android.tools.build.bundletool.model.exceptions.CommandExecutionException;
 import com.android.tools.build.bundletool.model.utils.DefaultSystemEnvironmentProvider;
 import com.android.tools.build.bundletool.model.utils.SdkToolsLocator;
@@ -141,31 +141,30 @@ public abstract class InstallApksCommand {
     AdbServer adbServer = getAdbServer();
     adbServer.init(getAdbPath());
 
-    TempFiles.withTempDirectory(
-        tempDir -> {
-          DeviceSpec deviceSpec = new DeviceAnalyzer(adbServer).getDeviceSpec(getDeviceId());
+    try (TempDirectory tempDirectory = new TempDirectory()) {
+      DeviceSpec deviceSpec = new DeviceAnalyzer(adbServer).getDeviceSpec(getDeviceId());
 
-          ExtractApksCommand.Builder extractApksCommand =
-              ExtractApksCommand.builder()
-                  .setApksArchivePath(getApksArchivePath())
-                  .setDeviceSpec(deviceSpec);
+      ExtractApksCommand.Builder extractApksCommand =
+          ExtractApksCommand.builder()
+              .setApksArchivePath(getApksArchivePath())
+              .setDeviceSpec(deviceSpec);
 
-          if (!Files.isDirectory(getApksArchivePath())) {
-            extractApksCommand.setOutputDirectory(tempDir);
-          }
-          getModules().ifPresent(extractApksCommand::setModules);
-          ImmutableList<Path> extractedApks = extractApksCommand.build().execute();
+      if (!Files.isDirectory(getApksArchivePath())) {
+        extractApksCommand.setOutputDirectory(tempDirectory.getPath());
+      }
+      getModules().ifPresent(extractApksCommand::setModules);
+      ImmutableList<Path> extractedApks = extractApksCommand.build().execute();
 
-          ApksInstaller installer = new ApksInstaller(adbServer);
-          InstallOptions installOptions =
-              InstallOptions.builder().setAllowDowngrade(getAllowDowngrade()).build();
+      ApksInstaller installer = new ApksInstaller(adbServer);
+      InstallOptions installOptions =
+          InstallOptions.builder().setAllowDowngrade(getAllowDowngrade()).build();
 
-          if (getDeviceId().isPresent()) {
-            installer.installApks(extractedApks, installOptions, getDeviceId().get());
-          } else {
-            installer.installApks(extractedApks, installOptions);
-          }
-        });
+      if (getDeviceId().isPresent()) {
+        installer.installApks(extractedApks, installOptions, getDeviceId().get());
+      } else {
+        installer.installApks(extractedApks, installOptions);
+      }
+    }
   }
 
   private void validateInput() {

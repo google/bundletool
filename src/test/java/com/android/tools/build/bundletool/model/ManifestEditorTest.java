@@ -31,6 +31,7 @@ import static com.android.tools.build.bundletool.model.AndroidManifest.TARGET_SA
 import static com.android.tools.build.bundletool.model.AndroidManifest.VALUE_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.VERSION_CODE_RESOURCE_ID;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifest;
+import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withMainActivity;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withOnDemandAttribute;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withSplitNameActivity;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withSplitNameProvider;
@@ -404,8 +405,8 @@ public class ManifestEditorTest {
         .containsExactly(xmlAttribute("split", "feature1.config.x86"));
   }
 
-  @Test
   /** Tests the whole process of editing manifest to catch any unintended changes. */
+  @Test
   public void complexManifest_featureSplit() throws Exception {
     XmlNode.Builder xmlNodeBuilder = XmlNode.newBuilder();
     TextFormat.merge(TestData.openReader("testdata/manifest/manifest1.textpb"), xmlNodeBuilder);
@@ -515,7 +516,10 @@ public class ManifestEditorTest {
   public void removeSplitNameActivity() {
     AndroidManifest manifest =
         AndroidManifest.create(
-            androidManifest("com.test.app", withSplitNameActivity("FooActivity", "foo")));
+            androidManifest(
+                "com.test.app",
+                withMainActivity("MainActivity"),
+                withSplitNameActivity("FooActivity", "foo")));
     AndroidManifest editedManifest = manifest.toEditor().removeSplitName().save();
 
     ImmutableList<XmlElement> activities =
@@ -622,7 +626,8 @@ public class ManifestEditorTest {
 
   @Test
   public void removeUnknownSplits_keepsBaseSplits() {
-    AndroidManifest manifest = AndroidManifest.create(androidManifest("com.test.app"));
+    AndroidManifest manifest =
+        AndroidManifest.create(androidManifest("com.test.app", withMainActivity("MainActivity")));
     AndroidManifest editedManifest =
         manifest.toEditor().removeUnknownSplitComponents(ImmutableSet.of()).save();
 

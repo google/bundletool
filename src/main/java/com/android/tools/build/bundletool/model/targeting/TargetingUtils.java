@@ -26,9 +26,11 @@ import com.android.bundle.Targeting.SdkVersion;
 import com.android.bundle.Targeting.SdkVersionTargeting;
 import com.android.bundle.Targeting.VariantTargeting;
 import com.android.tools.build.bundletool.model.utils.TargetingProtoUtils;
+import com.google.common.base.Predicates;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
+import com.google.common.collect.Range;
 import com.google.common.collect.Sets;
 
 /** Utility functions for Targeting proto. */
@@ -67,9 +69,8 @@ public final class TargetingUtils {
     }
 
     ImmutableList<SdkVersionTargeting> sdkVersionTargetings =
-        generateAllSdkTargetings(
-            variantTargetings
-                .stream()
+        disjointSdkTargetings(
+            variantTargetings.stream()
                 .map(variantTargeting -> variantTargeting.getSdkVersionTargeting())
                 .collect(toImmutableList()));
 
@@ -82,12 +83,49 @@ public final class TargetingUtils {
   }
 
   /**
+   * Returns the filtered out or modified variant targetings that are an intersection of the given
+   * variant targetings and SDK version range we want to support.
+   *
+   * <p>It is assumed that the variantTargetings contain only {@link SdkVersionTargeting}.
+   *
+   * <p>Each given and returned variant doesn't have the alternatives populated.
+   */
+  public static ImmutableSet<VariantTargeting> cropVariantsWithAppSdkRange(
+      ImmutableSet<VariantTargeting> variantTargetings, Range<Integer> sdkRange) {
+    ImmutableList<Range<Integer>> ranges = calculateVariantSdkRanges(variantTargetings, sdkRange);
+
+    return ranges.stream()
+        .map(range -> sdkVariantTargeting(range.lowerEndpoint()))
+        .collect(toImmutableSet());
+  }
+
+  /**
+   * Generates ranges of effective sdk versions each given variants covers intersected with the
+   * range of SDK levels an app supports.
+   *
+   * <p>Variants that have no overlap with app's SDK level range are discarded.
+   */
+  private static ImmutableList<Range<Integer>> calculateVariantSdkRanges(
+      ImmutableSet<VariantTargeting> variantTargetings, Range<Integer> appSdkRange) {
+    return disjointSdkTargetings(
+            variantTargetings.stream()
+                .map(variantTargeting -> variantTargeting.getSdkVersionTargeting())
+                .collect(toImmutableList()))
+        .stream()
+        .map(sdkTargeting -> Range.closedOpen(getMinSdk(sdkTargeting), getMaxSdk(sdkTargeting)))
+        .filter(appSdkRange::isConnected)
+        .map(appSdkRange::intersection)
+        .filter(Predicates.not(Range::isEmpty))
+        .collect(toImmutableList());
+  }
+
+  /**
    * Given a set of potentially overlapping sdk targetings generate set of disjoint sdk targetings
    * covering all of them.
    *
    * <p>Assumption: There are no sdk range gaps in targetings.
    */
-  private static ImmutableList<SdkVersionTargeting> generateAllSdkTargetings(
+  private static ImmutableList<SdkVersionTargeting> disjointSdkTargetings(
       ImmutableList<SdkVersionTargeting> sdkVersionTargetings) {
 
     sdkVersionTargetings.forEach(
@@ -135,5 +173,12 @@ public final class TargetingUtils {
             .orElse(Integer.MAX_VALUE);
 
     return alternativeMinSdk;
+  }
+
+  private static VariantTargeting sdkVariantTargeting(int minSdk) {
+    return VariantTargeting.newBuilder()
+        .setSdkVersionTargeting(
+            SdkVersionTargeting.newBuilder().addValue(TargetingProtoUtils.sdkVersionFrom(minSdk)))
+        .build();
   }
 }

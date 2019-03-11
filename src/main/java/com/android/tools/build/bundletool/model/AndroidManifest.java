@@ -71,8 +71,10 @@ public abstract class AndroidManifest {
   public static final String DEBUGGABLE_ATTRIBUTE_NAME = "debuggable";
   public static final String EXTRACT_NATIVE_LIBS_ATTRIBUTE_NAME = "extractNativeLibs";
   public static final String GL_VERSION_ATTRIBUTE_NAME = "glEsVersion";
+  public static final String ICON_ATTRIBUTE_NAME = "icon";
   public static final String MAX_SDK_VERSION_ATTRIBUTE_NAME = "maxSdkVersion";
   public static final String MIN_SDK_VERSION_ATTRIBUTE_NAME = "minSdkVersion";
+  public static final String TARGET_SDK_VERSION_ATTRIBUTE_NAME = "targetSdkVersion";
   public static final String NAME_ATTRIBUTE_NAME = "name";
   public static final String VALUE_ATTRIBUTE_NAME = "value";
   public static final String CODE_ATTRIBUTE_NAME = "code";
@@ -84,13 +86,15 @@ public abstract class AndroidManifest {
   public static final String SPLIT_NAME_ATTRIBUTE_NAME = "splitName";
 
   public static final String MODULE_TYPE_FEATURE_VALUE = "feature";
-  public static final String MODULE_TYPE_ASSET_VALUE = "remote-asset";
+  public static final String MODULE_TYPE_ASSET_VALUE = "asset-pack";
 
   public static final int DEBUGGABLE_RESOURCE_ID = 0x0101000f;
   public static final int EXTRACT_NATIVE_LIBS_RESOURCE_ID = 0x10104ea;
   public static final int HAS_CODE_RESOURCE_ID = 0x101000c;
+  public static final int ICON_RESOURCE_ID = 0x01010002;
   public static final int MAX_SDK_VERSION_RESOURCE_ID = 0x01010271;
   public static final int MIN_SDK_VERSION_RESOURCE_ID = 0x0101020c;
+  public static final int TARGET_SDK_VERSION_RESOURCE_ID = 0x01010270;
   public static final int NAME_RESOURCE_ID = 0x01010003;
   public static final int VALUE_RESOURCE_ID = 0x01010024;
   public static final int RESOURCE_RESOURCE_ID = 0x01010025;
@@ -99,6 +103,10 @@ public abstract class AndroidManifest {
   public static final int GL_ES_VERSION_RESOURCE_ID = 0x01010281;
   public static final int TARGET_SANDBOX_VERSION_RESOURCE_ID = 0x0101054c;
   public static final int SPLIT_NAME_RESOURCE_ID = 0x01010549;
+
+  // Matches the value of android.os.Build.VERSION_CODES.CUR_DEVELOPMENT, used when turning
+  // a manifest attribute which references a prerelease API version (e.g., "Q") into an integer.
+  public static final int DEVELOPMENT_SDK_VERSION = 10_000;
 
   public static final String META_DATA_KEY_FUSED_MODULE_NAMES =
       "com.android.dynamic.apk.fused.modules";
@@ -221,6 +229,16 @@ public abstract class AndroidManifest {
     return getUsesSdkAttribute(MAX_SDK_VERSION_RESOURCE_ID);
   }
 
+  /** Returns SDK level range this {@link AndroidManifest} declares as supported. */
+  public Range<Integer> getSdkRange() {
+    Optional<Integer> maxSdkVersion = getMaxSdkVersion();
+    if (maxSdkVersion.isPresent()) {
+      return Range.closed(getEffectiveMinSdkVersion(), maxSdkVersion.get());
+    } else {
+      return Range.atLeast(getEffectiveMinSdkVersion());
+    }
+  }
+
   public Optional<Integer> getTargetSandboxVersion() {
     return getManifestElement()
         .getAndroidAttribute(TARGET_SANDBOX_VERSION_RESOURCE_ID)
@@ -232,16 +250,17 @@ public abstract class AndroidManifest {
         .getOptionalChildElement(USES_SDK_ELEMENT_NAME)
         .flatMap(usesSdk -> usesSdk.getAndroidAttribute(attributeResId))
         .map(
-            attribute -> {
-              // Hack for APKs that have a string for the SDK version.
-              String str = attribute.getValueAsString();
-              if (str.length() == 1 && Range.closed('A', 'Z').contains(str.charAt(0))) {
-                // The platform treats any codename as API level 10,000.
-                return 10_000;
-              }
+            attribute ->
+                isSdkCodename(attribute.getValueAsString())
+                    ? DEVELOPMENT_SDK_VERSION
+                    : attribute.getValueAsDecimalInteger());
+  }
 
-              return attribute.getValueAsDecimalInteger();
-            });
+  private static boolean isSdkCodename(String sdkVersion) {
+    // Codename version can be of the form "[codename]" or "[codename].[fingerprint]".
+    return !sdkVersion.isEmpty()
+        && Range.closed('A', 'Z').contains(sdkVersion.charAt(0))
+        && (sdkVersion.length() == 1 || '.' == sdkVersion.charAt(1));
   }
 
   public Optional<Boolean> getHasCode() {
@@ -274,13 +293,19 @@ public abstract class AndroidManifest {
     }
   }
 
-  public Optional<ModuleType> getModuleType() {
+  public Optional<ModuleType> getOptionalModuleType() {
     Optional<String> typeAttributeValue =
         getManifestElement()
             .getOptionalChildElement(DISTRIBUTION_NAMESPACE_URI, "module")
             .flatMap(module -> module.getAttribute(DISTRIBUTION_NAMESPACE_URI, "type"))
             .map(XmlProtoAttribute::getValueAsString);
     return typeAttributeValue.map(AndroidManifest::getModuleTypeFromAttributeValue);
+  }
+
+  public ModuleType getModuleType() {
+    // If the module type is not defined in the manifest, default to feature module for backwards
+    // compatibility.
+    return getOptionalModuleType().orElse(ModuleType.FEATURE_MODULE);
   }
 
   public Optional<Boolean> getIsModuleIncludedInFusing() {

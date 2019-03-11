@@ -46,11 +46,6 @@ public class RemoteAssetModuleSplitter {
 
   private SplittingPipeline createAssetsSplittingPipeline() {
     ImmutableList.Builder<ModuleSplitSplitter> assetsSplitters = ImmutableList.builder();
-    if (apkGenerationConfiguration
-        .getOptimizationDimensions()
-        .contains(OptimizationDimension.LANGUAGE)) {
-      assetsSplitters.add(LanguageAssetsSplitter.create());
-    }
     return new SplittingPipeline(assetsSplitters.build());
   }
 }

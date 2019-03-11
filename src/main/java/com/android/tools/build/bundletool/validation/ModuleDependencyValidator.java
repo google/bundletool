@@ -22,6 +22,7 @@ import static com.google.common.base.Preconditions.checkArgument;
 import com.android.tools.build.bundletool.model.AndroidManifest;
 import com.android.tools.build.bundletool.model.BundleModule;
 import com.android.tools.build.bundletool.model.BundleModule.ModuleDeliveryType;
+import com.android.tools.build.bundletool.model.BundleModule.ModuleType;
 import com.android.tools.build.bundletool.model.exceptions.ValidationException;
 import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.ImmutableList;
@@ -265,6 +266,9 @@ public class ModuleDependencyValidator extends SubValidator {
       String moduleName = dependencyEntry.getKey();
       String moduleDepName = dependencyEntry.getValue();
       BundleModule module = modulesByName.get(moduleName);
+      if (module.getModuleType().equals(ModuleType.ASSET_MODULE)) {
+        continue; // Asset modules don't have SDK constraints.
+      }
       BundleModule moduleDep = modulesByName.get(moduleDepName);
       int minSdk = module.getAndroidManifest().getEffectiveMinSdkVersion();
       int minSdkDep = moduleDep.getAndroidManifest().getEffectiveMinSdkVersion();
