@@ -91,9 +91,9 @@ public abstract class GetSizeCommand implements GetSizeRequest {
 
   /** Sub Sub commands supported on {@link GetSizeCommand}*/
   public enum GetSizeSubSubCommand {
-    MB("mb"),
-    KB("kb"),
-    BYTES("bytes");
+    MB("MB"),
+    KB("KB"),
+    BYTES("BYTES");
 
     static final ImmutableMap<String, GetSizeSubSubCommand> STRING_TO_SUB_SUBCOMMAND =
             Arrays.stream(GetSizeSubSubCommand.values())
@@ -183,7 +183,7 @@ public abstract class GetSizeCommand implements GetSizeRequest {
     /** Sets the sub-command of the get-size command, e.g. total. */
     public abstract Builder setGetSizeSubCommand(GetSizeSubcommand getSizeSubcommand);
 
-    /** Sets the sub-sub-command of the get-size command, e.g. kb,mb,bytes */
+    /** Sets the sub-sub-command of the get-size command, e.g. BYTES, KB, MB */
     public abstract Builder setGetSizeSubSubCommand(GetSizeSubSubCommand getSizeSubSubCommand);
 
     public abstract GetSizeCommand build();

@@ -288,7 +288,7 @@ public final class GetSizeCommandTest {
 
     GetSizeCommand fromFlags =
         GetSizeCommand.fromFlags(
-            new FlagParser().parse("get-size", "total", "kb", "--apks=" + apksArchiveFile));
+            new FlagParser().parse("get-size", "total", "KB", "--apks=" + apksArchiveFile));
 
     GetSizeCommand fromBuilderApi =
         GetSizeCommand.builder()
