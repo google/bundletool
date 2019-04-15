@@ -17,7 +17,6 @@
 package com.android.tools.build.bundletool.commands;
 
 import static com.android.tools.build.bundletool.commands.GetSizeCommand.GetSizeSubcommand.STRING_TO_SUBCOMMAND;
-import static com.android.tools.build.bundletool.commands.GetSizeCommand.GetSizeSubcommand.TOTAL;
 import static com.android.tools.build.bundletool.model.utils.ApkSizeUtils.getCompressedSizeByApkPaths;
 import static com.android.tools.build.bundletool.model.utils.CollectorUtils.combineMaps;
 import static com.android.tools.build.bundletool.model.utils.GetSizeCsvUtils.getSizeTotalOutputInCsv;
@@ -37,7 +36,6 @@ import com.android.tools.build.bundletool.flags.Flag;
 import com.android.tools.build.bundletool.flags.ParsedFlags;
 import com.android.tools.build.bundletool.model.ConfigurationSizes;
 import com.android.tools.build.bundletool.model.GetSizeRequest;
-import com.android.tools.build.bundletool.model.GetSizeRequest.Dimension;
 import com.android.tools.build.bundletool.model.SizeConfiguration;
 import com.android.tools.build.bundletool.model.exceptions.ValidationException;
 import com.android.tools.build.bundletool.model.utils.ResultUtils;
@@ -91,6 +89,40 @@ public abstract class GetSizeCommand implements GetSizeRequest {
     }
   }
 
+  /** Sub Sub commands supported on {@link GetSizeCommand}*/
+  public enum GetSizeSubSubCommand {
+    MB("mb"),
+    KB("kb"),
+    BYTES("bytes");
+
+    static final ImmutableMap<String, GetSizeSubSubCommand> STRING_TO_SUB_SUBCOMMAND =
+            Arrays.stream(GetSizeSubSubCommand.values())
+                    .collect(toImmutableMap(GetSizeSubSubCommand::toString, identity()));
+
+    private final String subSubCommand;
+
+    GetSizeSubSubCommand(String subSubCommand) {
+      this.subSubCommand = subSubCommand;
+    }
+
+    @Override
+    public String toString() {
+      return subSubCommand;
+    }
+
+    public static GetSizeSubSubCommand fromString(String subSubCommand) {
+      GetSizeSubSubCommand result = STRING_TO_SUB_SUBCOMMAND.get(subSubCommand);
+      if (result == null) {
+        throw ValidationException.builder()
+                .withMessage(
+                        "Unrecognized get-size command target: '%s'. Accepted values are: %s",
+                        subSubCommand, STRING_TO_SUB_SUBCOMMAND.keySet())
+                .build();
+      }
+      return result;
+    }
+  }
+
   private static final Flag<Path> APKS_ARCHIVE_FILE_FLAG = Flag.path("apks");
   private static final Flag<Path> DEVICE_SPEC_FLAG = Flag.path("device-spec");
   private static final Flag<ImmutableSet<String>> MODULES_FLAG = Flag.stringSet("modules");
@@ -115,6 +147,8 @@ public abstract class GetSizeCommand implements GetSizeRequest {
   public abstract ImmutableSet<Dimension> getDimensions();
 
   public abstract GetSizeSubcommand getGetSizeSubCommand();
+
+  public abstract GetSizeSubSubCommand getGetSizeSubSubCommand();
 
   /** Gets whether instant APKs should be used for size calculation. */
   @Override
@@ -149,6 +183,9 @@ public abstract class GetSizeCommand implements GetSizeRequest {
     /** Sets the sub-command of the get-size command, e.g. total. */
     public abstract Builder setGetSizeSubCommand(GetSizeSubcommand getSizeSubcommand);
 
+    /** Sets the sub-sub-command of the get-size command, e.g. kb,mb,bytes */
+    public abstract Builder setGetSizeSubSubCommand(GetSizeSubSubCommand getSizeSubSubCommand);
+
     public abstract GetSizeCommand build();
   }
 
@@ -172,7 +209,8 @@ public abstract class GetSizeCommand implements GetSizeRequest {
         builder()
             .setApksArchivePath(apksArchivePath)
             .setDeviceSpec(deviceSpec)
-            .setGetSizeSubCommand(parseGetSizeSubCommand(flags));
+            .setGetSizeSubCommand(parseGetSizeSubCommand(flags))
+            .setGetSizeSubSubCommand(parseGetSizeSubSubCommand(flags));
 
     modules.ifPresent(command::setModules);
 
@@ -197,29 +235,38 @@ public abstract class GetSizeCommand implements GetSizeRequest {
     return GetSizeSubcommand.fromString(subCommand);
   }
 
+  private static GetSizeSubSubCommand parseGetSizeSubSubCommand(ParsedFlags flags) {
+    String subSubCommand =
+            flags
+                    .getSubSubCommand()
+                    .orElse(GetSizeSubSubCommand.MB.toString()); //default size is printed in MBs
+
+    return GetSizeSubSubCommand.fromString(subSubCommand);
+  }
+
   public void execute() {
     switch (getGetSizeSubCommand()) {
       case TOTAL:
-        getSizeTotal(System.out);
+        getSizeTotal(System.out, getGetSizeSubSubCommand());
         break;
     }
   }
 
-  public void getSizeTotal(PrintStream output) {
-    output.print(getSizeTotalOutputInCsv(getSizeTotalInternal(), getDimensions()));
+  public void getSizeTotal(PrintStream output, GetSizeSubSubCommand sizeSubSubCommand) {
+    output.print(getSizeTotalOutputInCsv(getSizeTotalInternal(sizeSubSubCommand), getDimensions()));
   }
 
   @VisibleForTesting
-  ConfigurationSizes getSizeTotalInternal() {
+  ConfigurationSizes getSizeTotalInternal(GetSizeSubSubCommand sizeSubSubCommand) {
     BuildApksResult buildApksResult = ResultUtils.readTableOfContents(getApksArchivePath());
 
     ImmutableList<Variant> variants =
-        new VariantMatcher(getDeviceSpec(), getInstant()).getAllMatchingVariants(buildApksResult);
-    ImmutableMap<String, Long> compressedSizeByApkPaths =
-        getCompressedSizeByApkPaths(variants, getApksArchivePath());
+            new VariantMatcher(getDeviceSpec(), getInstant()).getAllMatchingVariants(buildApksResult);
+    ImmutableMap<String, Double> compressedSizeByApkPaths =
+            getCompressedSizeByApkPaths(variants, getApksArchivePath(), sizeSubSubCommand);
 
-    ImmutableMap<SizeConfiguration, Long> minSizeConfigurationMap = ImmutableMap.of();
-    ImmutableMap<SizeConfiguration, Long> maxSizeConfigurationMap = ImmutableMap.of();
+    ImmutableMap<SizeConfiguration, Double> minSizeConfigurationMap = ImmutableMap.of();
+    ImmutableMap<SizeConfiguration, Double> maxSizeConfigurationMap = ImmutableMap.of();
 
     for (Variant variant : variants) {
       ConfigurationSizes configurationSizes =

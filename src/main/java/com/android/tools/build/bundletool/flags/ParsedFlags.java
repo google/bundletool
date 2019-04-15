@@ -77,6 +77,16 @@ public final class ParsedFlags {
     return getSubCommand(1);
   }
 
+  /**
+   * Returns the third command provided on the command line if provided.
+   *
+   * <p>e.g. for "bundletool get-size total bytes", the command is 'get-size', the sub-command
+   * is 'total' and the sub-sub-command is 'bytes'.
+   */
+  public Optional<String> getSubSubCommand() {
+    return getSubCommand(2);
+  }
+
   private Optional<String> getSubCommand(int index) {
     return index < commands.size() ? Optional.of(commands.get(index)) : Optional.empty();
   }

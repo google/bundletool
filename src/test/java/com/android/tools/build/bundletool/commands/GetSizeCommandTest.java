@@ -26,6 +26,9 @@ import static com.android.bundle.Targeting.Abi.AbiAlias.X86_64;
 import static com.android.bundle.Targeting.ScreenDensity.DensityAlias.HDPI;
 import static com.android.bundle.Targeting.ScreenDensity.DensityAlias.LDPI;
 import static com.android.bundle.Targeting.ScreenDensity.DensityAlias.MDPI;
+import static com.android.tools.build.bundletool.commands.GetSizeCommand.GetSizeSubSubCommand.BYTES;
+import static com.android.tools.build.bundletool.commands.GetSizeCommand.GetSizeSubSubCommand.KB;
+import static com.android.tools.build.bundletool.commands.GetSizeCommand.GetSizeSubSubCommand.MB;
 import static com.android.tools.build.bundletool.commands.GetSizeCommand.SUPPORTED_DIMENSIONS;
 import static com.android.tools.build.bundletool.model.GetSizeRequest.Dimension.ALL;
 import static com.android.tools.build.bundletool.model.utils.CsvFormatter.CRLF;
@@ -102,7 +105,7 @@ public final class GetSizeCommandTest {
 
   @Rule public final TemporaryFolder tmp = new TemporaryFolder();
   private Path tmpDir;
-  private long compressedApkSize;
+  private double compressedApkSize;
 
   @Before
   public void setUp() throws Exception {
@@ -271,6 +274,7 @@ public final class GetSizeCommandTest {
             .setApksArchivePath(apksArchiveFile)
             .setDimensions(ImmutableSet.of(Dimension.ABI, Dimension.SCREEN_DENSITY))
             .setGetSizeSubCommand(GetSizeSubcommand.TOTAL)
+            .setGetSizeSubSubCommand(MB)
             .build();
 
     assertThat(fromFlags).isEqualTo(fromBuilderApi);
@@ -284,13 +288,14 @@ public final class GetSizeCommandTest {
 
     GetSizeCommand fromFlags =
         GetSizeCommand.fromFlags(
-            new FlagParser().parse("get-size", "total", "--apks=" + apksArchiveFile));
+            new FlagParser().parse("get-size", "total", "kb", "--apks=" + apksArchiveFile));
 
     GetSizeCommand fromBuilderApi =
         GetSizeCommand.builder()
             .setApksArchivePath(apksArchiveFile)
             .setDeviceSpec(DeviceSpec.getDefaultInstance())
             .setGetSizeSubCommand(GetSizeSubcommand.TOTAL)
+            .setGetSizeSubSubCommand(KB)
             .build();
 
     assertThat(fromFlags).isEqualTo(fromBuilderApi);
@@ -319,6 +324,7 @@ public final class GetSizeCommandTest {
             .setApksArchivePath(apksArchiveFile)
             .setDeviceSpec(deviceSpec)
             .setGetSizeSubCommand(GetSizeSubcommand.TOTAL)
+            .setGetSizeSubSubCommand(MB)
             .build();
 
     assertThat(fromFlags).isEqualTo(fromBuilderApi);
@@ -345,6 +351,7 @@ public final class GetSizeCommandTest {
             .setApksArchivePath(apksArchiveFile)
             .setModules(ImmutableSet.of("base"))
             .setGetSizeSubCommand(GetSizeSubcommand.TOTAL)
+            .setGetSizeSubSubCommand(MB)
             .build();
 
     assertThat(fromFlags).isEqualTo(fromBuilderApi);
@@ -371,6 +378,7 @@ public final class GetSizeCommandTest {
             .setApksArchivePath(apksArchiveFile)
             .setInstant(true)
             .setGetSizeSubCommand(GetSizeSubcommand.TOTAL)
+            .setGetSizeSubSubCommand(MB)
             .build();
 
     assertThat(fromFlags).isEqualTo(fromBuilderApi);
@@ -408,24 +416,25 @@ public final class GetSizeCommandTest {
     ConfigurationSizes configurationSizes =
         GetSizeCommand.builder()
             .setGetSizeSubCommand(GetSizeSubcommand.TOTAL)
+            .setGetSizeSubSubCommand(BYTES)
             .setApksArchivePath(apksArchiveFile)
             .build()
-            .getSizeTotalInternal();
+            .getSizeTotalInternal(BYTES);
 
     assertThat(configurationSizes.getMinSizeConfigurationMap().keySet())
         .containsExactly(SizeConfiguration.getDefaultInstance());
     assertThat(
-            configurationSizes
-                .getMinSizeConfigurationMap()
-                .get(SizeConfiguration.getDefaultInstance()))
-        .isEqualTo(2 * compressedApkSize); // base+x86
+        configurationSizes
+            .getMinSizeConfigurationMap()
+            .get(SizeConfiguration.getDefaultInstance()))
+        .isEqualTo(2 * compressedApkSize*1.0); // base+x86
     assertThat(configurationSizes.getMaxSizeConfigurationMap().keySet())
         .containsExactly(SizeConfiguration.getDefaultInstance());
     assertThat(
-            configurationSizes
-                .getMaxSizeConfigurationMap()
-                .get(SizeConfiguration.getDefaultInstance()))
-        .isGreaterThan(2 * compressedApkSize); // base+x86_64
+        configurationSizes
+            .getMaxSizeConfigurationMap()
+            .get(SizeConfiguration.getDefaultInstance()))
+        .isGreaterThan(2 * compressedApkSize*1.0); // base+x86_64
   }
 
   @Test
@@ -460,23 +469,24 @@ public final class GetSizeCommandTest {
     ConfigurationSizes configurationSizes =
         GetSizeCommand.builder()
             .setGetSizeSubCommand(GetSizeSubcommand.TOTAL)
+            .setGetSizeSubSubCommand(BYTES)
             .setApksArchivePath(apksArchiveFile)
             .build()
-            .getSizeTotalInternal();
+            .getSizeTotalInternal(BYTES);
 
     assertThat(configurationSizes.getMinSizeConfigurationMap().keySet())
         .containsExactly(SizeConfiguration.getDefaultInstance());
     assertThat(
-            configurationSizes
-                .getMinSizeConfigurationMap()
-                .get(SizeConfiguration.getDefaultInstance()))
+        configurationSizes
+            .getMinSizeConfigurationMap()
+            .get(SizeConfiguration.getDefaultInstance()))
         .isLessThan(compressedApkSize);
     assertThat(configurationSizes.getMaxSizeConfigurationMap().keySet())
         .containsExactly(SizeConfiguration.getDefaultInstance());
     assertThat(
-            configurationSizes
-                .getMaxSizeConfigurationMap()
-                .get(SizeConfiguration.getDefaultInstance()))
+        configurationSizes
+            .getMaxSizeConfigurationMap()
+            .get(SizeConfiguration.getDefaultInstance()))
         .isGreaterThan(compressedApkSize);
   }
 
@@ -508,10 +518,11 @@ public final class GetSizeCommandTest {
     ConfigurationSizes configurationSizes =
         GetSizeCommand.builder()
             .setGetSizeSubCommand(GetSizeSubcommand.TOTAL)
+            .setGetSizeSubSubCommand(BYTES)
             .setApksArchivePath(apksArchiveFile)
             .setDeviceSpec(DeviceSpec.newBuilder().setSdkVersion(21).build())
             .build()
-            .getSizeTotalInternal();
+            .getSizeTotalInternal(BYTES);
 
     assertThat(configurationSizes.getMinSizeConfigurationMap())
         .containsExactly(
@@ -563,6 +574,7 @@ public final class GetSizeCommandTest {
     ConfigurationSizes configurationSizes =
         GetSizeCommand.builder()
             .setGetSizeSubCommand(GetSizeSubcommand.TOTAL)
+            .setGetSizeSubSubCommand(BYTES)
             .setApksArchivePath(apksArchiveFile)
             .setDeviceSpec(
                 DeviceSpec.newBuilder()
@@ -574,41 +586,41 @@ public final class GetSizeCommandTest {
                 ImmutableSet.of(
                     Dimension.SDK, Dimension.ABI, Dimension.LANGUAGE, Dimension.SCREEN_DENSITY))
             .build()
-            .getSizeTotalInternal();
+            .getSizeTotalInternal(BYTES);
 
     assertThat(configurationSizes.getMinSizeConfigurationMap())
         .containsExactly(
             SizeConfiguration.builder()
-                    .setAbi("armeabi-v7a")
-                    .setLocale("jp")
-                    .setScreenDensity("125")
-                    .setSdkVersion("21")
-                    .build(),
-                4 * compressedApkSize,
+                .setAbi("armeabi-v7a")
+                .setLocale("jp")
+                .setScreenDensity("125")
+                .setSdkVersion("21")
+                .build(),
+            4 * compressedApkSize*1.0,
             SizeConfiguration.builder()
-                    .setAbi("arm64-v8a")
-                    .setLocale("jp")
-                    .setScreenDensity("125")
-                    .setSdkVersion("21")
-                    .build(),
-                4 * compressedApkSize);
+                .setAbi("arm64-v8a")
+                .setLocale("jp")
+                .setScreenDensity("125")
+                .setSdkVersion("21")
+                .build(),
+            4 * compressedApkSize*1.0);
 
     assertThat(configurationSizes.getMaxSizeConfigurationMap())
         .containsExactly(
             SizeConfiguration.builder()
-                    .setAbi("armeabi-v7a")
-                    .setLocale("jp")
-                    .setScreenDensity("125")
-                    .setSdkVersion("21")
-                    .build(),
-                4 * compressedApkSize,
+                .setAbi("armeabi-v7a")
+                .setLocale("jp")
+                .setScreenDensity("125")
+                .setSdkVersion("21")
+                .build(),
+            4 * compressedApkSize*1.0,
             SizeConfiguration.builder()
-                    .setAbi("arm64-v8a")
-                    .setLocale("jp")
-                    .setScreenDensity("125")
-                    .setSdkVersion("21")
-                    .build(),
-                4 * compressedApkSize);
+                .setAbi("arm64-v8a")
+                .setLocale("jp")
+                .setScreenDensity("125")
+                .setSdkVersion("21")
+                .build(),
+            4 * compressedApkSize*1.0);
   }
 
   @Test
@@ -644,12 +656,13 @@ public final class GetSizeCommandTest {
     ConfigurationSizes configurationSizes =
         GetSizeCommand.builder()
             .setGetSizeSubCommand(GetSizeSubcommand.TOTAL)
+            .setGetSizeSubSubCommand(BYTES)
             .setApksArchivePath(apksArchiveFile)
             .setDimensions(
                 ImmutableSet.of(
                     Dimension.SDK, Dimension.ABI, Dimension.LANGUAGE, Dimension.SCREEN_DENSITY))
             .build()
-            .getSizeTotalInternal();
+            .getSizeTotalInternal(BYTES);
 
     assertThat(configurationSizes.getMinSizeConfigurationMap())
         .containsExactly(
@@ -659,21 +672,21 @@ public final class GetSizeCommandTest {
                 .setAbi("")
                 .setLocale("")
                 .build(),
-            2 * compressedApkSize,
+            2 * compressedApkSize*1.0,
             SizeConfiguration.builder()
                 .setSdkVersion("21-")
                 .setScreenDensity("MDPI")
                 .setAbi("")
                 .setLocale("")
                 .build(),
-            2 * compressedApkSize,
+            2 * compressedApkSize*1.0,
             SizeConfiguration.builder()
                 .setSdkVersion("15-20")
                 .setAbi("armeabi")
                 .setScreenDensity("")
                 .setLocale("")
                 .build(),
-            compressedApkSize);
+            compressedApkSize*1.0);
     assertThat(configurationSizes.getMaxSizeConfigurationMap())
         .containsExactly(
             SizeConfiguration.builder()
@@ -682,21 +695,21 @@ public final class GetSizeCommandTest {
                 .setAbi("")
                 .setLocale("")
                 .build(),
-            2 * compressedApkSize,
+            2 * compressedApkSize*1.0,
             SizeConfiguration.builder()
                 .setSdkVersion("21-")
                 .setScreenDensity("MDPI")
                 .setAbi("")
                 .setLocale("")
                 .build(),
-            2 * compressedApkSize,
+            2 * compressedApkSize*1.0,
             SizeConfiguration.builder()
                 .setSdkVersion("15-20")
                 .setAbi("armeabi")
                 .setScreenDensity("")
                 .setLocale("")
                 .build(),
-            compressedApkSize);
+            compressedApkSize*1.0);
   }
 
   @Test
@@ -737,15 +750,16 @@ public final class GetSizeCommandTest {
 
     GetSizeCommand.builder()
         .setGetSizeSubCommand(GetSizeSubcommand.TOTAL)
+        .setGetSizeSubSubCommand(BYTES)
         .setApksArchivePath(apksArchiveFile)
         .build()
-        .getSizeTotal(new PrintStream(outputStream));
+        .getSizeTotal(new PrintStream(outputStream), BYTES);
 
     assertThat(new String(outputStream.toByteArray(), UTF_8))
         .isEqualTo(
             "MIN,MAX"
                 + CRLF
-                + String.format("%d,%d", compressedApkSize, 3 * compressedApkSize)
+                + String.format("%.1f,%.1f", compressedApkSize, 3 * compressedApkSize)
                 + CRLF);
   }
 
@@ -793,17 +807,18 @@ public final class GetSizeCommandTest {
 
     GetSizeCommand.builder()
         .setGetSizeSubCommand(GetSizeSubcommand.TOTAL)
+        .setGetSizeSubSubCommand(BYTES)
         .setApksArchivePath(apksArchiveFile)
         .setModules(ImmutableSet.of("base", "feature2"))
         .build()
-        .getSizeTotal(new PrintStream(outputStream));
+        .getSizeTotal(new PrintStream(outputStream), BYTES);
 
     // base, feature2, feature 3 modules are selected and standalone variants are skipped.
     assertThat(new String(outputStream.toByteArray(), UTF_8))
         .isEqualTo(
             "MIN,MAX"
                 + CRLF
-                + String.format("%d,%d", 3 * compressedApkSize, 3 * compressedApkSize)
+                + String.format("%.1f,%.1f", 3 * compressedApkSize, 3 * compressedApkSize)
                 + CRLF);
   }
 
@@ -848,17 +863,18 @@ public final class GetSizeCommandTest {
 
     GetSizeCommand.builder()
         .setGetSizeSubCommand(GetSizeSubcommand.TOTAL)
+        .setGetSizeSubSubCommand(BYTES)
         .setApksArchivePath(apksArchiveFile)
         .setInstant(true)
         .build()
-        .getSizeTotal(new PrintStream(outputStream));
+        .getSizeTotal(new PrintStream(outputStream), BYTES);
 
     // only instant split variant is selected
     assertThat(new String(outputStream.toByteArray(), UTF_8))
         .isEqualTo(
             "MIN,MAX"
                 + CRLF
-                + String.format("%d,%d", 2 * compressedApkSize, 2 * compressedApkSize)
+                + String.format("%.1f,%.1f", 2 * compressedApkSize, 2 * compressedApkSize)
                 + CRLF);
   }
 
@@ -889,12 +905,13 @@ public final class GetSizeCommandTest {
 
     GetSizeCommand.builder()
         .setGetSizeSubCommand(GetSizeSubcommand.TOTAL)
+        .setGetSizeSubSubCommand(BYTES)
         .setApksArchivePath(apksArchiveFile)
         .setDimensions(
             ImmutableSet.of(
                 Dimension.SDK, Dimension.ABI, Dimension.LANGUAGE, Dimension.SCREEN_DENSITY))
         .build()
-        .getSizeTotal(new PrintStream(outputStream));
+        .getSizeTotal(new PrintStream(outputStream), BYTES);
 
     ImmutableList<String> csvRows =
         ImmutableList.copyOf(new String(outputStream.toByteArray(), UTF_8).split(CRLF));
@@ -902,8 +919,8 @@ public final class GetSizeCommandTest {
     assertThat(csvRows)
         .containsExactly(
             "SDK,ABI,SCREEN_DENSITY,LANGUAGE,MIN,MAX",
-            String.format("21-,mips64,,,%d,%d", 2 * compressedApkSize, 2 * compressedApkSize),
-            String.format("21-,mips,,,%d,%d", 2 * compressedApkSize, 2 * compressedApkSize));
+            String.format("21-,mips64,,,%.1f,%.1f", 2 * compressedApkSize, 2 * compressedApkSize),
+            String.format("21-,mips,,,%.1f,%.1f", 2 * compressedApkSize, 2 * compressedApkSize));
   }
 
   @Test
@@ -950,18 +967,19 @@ public final class GetSizeCommandTest {
 
     GetSizeCommand.builder()
         .setGetSizeSubCommand(GetSizeSubcommand.TOTAL)
+        .setGetSizeSubSubCommand(BYTES)
         .setApksArchivePath(apksArchiveFile)
         .setDeviceSpec(
             DeviceSpec.newBuilder().setScreenDensity(124).addSupportedAbis("x86").build())
         .setDimensions(ImmutableSet.of(Dimension.ABI, Dimension.SCREEN_DENSITY))
         .build()
-        .getSizeTotal(new PrintStream(outputStream));
+        .getSizeTotal(new PrintStream(outputStream), BYTES);
 
     assertThat(new String(outputStream.toByteArray(), UTF_8))
         .isEqualTo(
             "ABI,SCREEN_DENSITY,MIN,MAX"
                 + CRLF
-                + String.format("x86,124,%d,%d", compressedApkSize, 3 * compressedApkSize)
+                + String.format("x86,124,%.1f,%.1f", compressedApkSize, 3 * compressedApkSize)
                 + CRLF);
   }
 

@@ -40,10 +40,10 @@ public class GetSizeCsvUtilsTest {
     assertThat(
             getSizeTotalOutputInCsv(
                 ConfigurationSizes.create(
-                    ImmutableMap.of(SizeConfiguration.getDefaultInstance(), 10L),
-                    ImmutableMap.of(SizeConfiguration.getDefaultInstance(), 15L)),
+                    ImmutableMap.of(SizeConfiguration.getDefaultInstance(), 10D),
+                    ImmutableMap.of(SizeConfiguration.getDefaultInstance(), 15D)),
                 ImmutableSet.of()))
-        .isEqualTo("MIN,MAX" + CRLF + "10,15" + CRLF);
+        .isEqualTo("MIN,MAX" + CRLF + "10.0,15.0" + CRLF);
   }
 
   @Test
@@ -53,23 +53,23 @@ public class GetSizeCsvUtilsTest {
                 ConfigurationSizes.create(
                     ImmutableMap.of(
                         SizeConfiguration.builder().setSdkVersion("21-").setAbi("x86").build(),
-                        5L,
+                        5D,
                         SizeConfiguration.builder()
                             .setSdkVersion("21-")
                             .setAbi("armeabi-v7a")
                             .build(),
-                        2L),
+                        2D),
                     ImmutableMap.of(
                         SizeConfiguration.builder().setSdkVersion("21-").setAbi("x86").build(),
-                        10L,
+                        10D,
                         SizeConfiguration.builder()
                             .setSdkVersion("21-")
                             .setAbi("armeabi-v7a")
                             .build(),
-                        15L)),
+                        15D)),
                 ImmutableSet.of(ABI, SDK)))
         .isEqualTo(
-            "SDK,ABI,MIN,MAX" + CRLF + "21-,x86,5,10" + CRLF + "21-,armeabi-v7a,2,15" + CRLF);
+            "SDK,ABI,MIN,MAX" + CRLF + "21-,x86,5.0,10.0" + CRLF + "21-,armeabi-v7a,2.0,15.0" + CRLF);
   }
 
   @Test
@@ -84,7 +84,7 @@ public class GetSizeCsvUtilsTest {
                             .setScreenDensity("480")
                             .setLocale("en,fr")
                             .build(),
-                        1L),
+                        1D),
                     ImmutableMap.of(
                         SizeConfiguration.builder()
                             .setSdkVersion("22")
@@ -92,12 +92,12 @@ public class GetSizeCsvUtilsTest {
                             .setScreenDensity("480")
                             .setLocale("en,fr")
                             .build(),
-                        6L)),
+                        6D)),
                 ImmutableSet.of(SCREEN_DENSITY, ABI, LANGUAGE, SDK)))
         .isEqualTo(
             "SDK,ABI,SCREEN_DENSITY,LANGUAGE,MIN,MAX"
                 + CRLF
-                + "22,\"x86,armeabi-v7a\",480,\"en,fr\",1,6"
+                + "22,\"x86,armeabi-v7a\",480,\"en,fr\",1.0,6.0"
                 + CRLF);
   }
 }

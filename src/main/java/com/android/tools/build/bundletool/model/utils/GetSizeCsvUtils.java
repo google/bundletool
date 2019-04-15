@@ -72,8 +72,8 @@ public final class GetSizeCsvUtils {
   private static ImmutableList<String> getSizeTotalCsvRow(
       ImmutableSet<Dimension> dimensions,
       SizeConfiguration sizeConfiguration,
-      long minSize,
-      long maxSize) {
+      double minSize,
+      double maxSize) {
     ImmutableMap<Dimension, Supplier<Optional<String>>> dimensionToTextMap =
         ImmutableMap.of(
             Dimension.ABI, sizeConfiguration::getAbi,

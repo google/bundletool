@@ -77,7 +77,8 @@ public class VariantTotalSizeAggregatorTest {
   private final GetSizeCommand.Builder getSizeCommand =
       GetSizeCommand.builder()
           .setApksArchivePath(ZipPath.create("dummy.apks"))
-          .setGetSizeSubCommand(GetSizeSubcommand.TOTAL);
+          .setGetSizeSubCommand(GetSizeSubcommand.TOTAL)
+          .setGetSizeSubSubCommand(GetSizeCommand.GetSizeSubSubCommand.BYTES);
 
   @Test
   public void splitVariant_singleModule_SingleTargeting() {
@@ -90,12 +91,12 @@ public class VariantTotalSizeAggregatorTest {
                     ApkTargeting.getDefaultInstance(), ZipPath.create("base-master.apk"))));
     ConfigurationSizes configurationSizes =
         new VariantTotalSizeAggregator(
-                ImmutableMap.of("base-master.apk", 10L), lVariant, getSizeCommand.build())
+            ImmutableMap.of("base-master.apk", 10D), lVariant, getSizeCommand.build())
             .getSize();
     assertThat(configurationSizes.getMaxSizeConfigurationMap())
-        .containsExactly(SizeConfiguration.getDefaultInstance(), 10L);
+        .containsExactly(SizeConfiguration.getDefaultInstance(), 10D);
     assertThat(configurationSizes.getMinSizeConfigurationMap())
-        .containsExactly(SizeConfiguration.getDefaultInstance(), 10L);
+        .containsExactly(SizeConfiguration.getDefaultInstance(), 10D);
   }
 
   @Test
@@ -117,15 +118,15 @@ public class VariantTotalSizeAggregatorTest {
                     /* isMasterSplit= */ false)));
     ConfigurationSizes configurationSizes =
         new VariantTotalSizeAggregator(
-                ImmutableMap.of("base-master.apk", 10L, "base-x86.apk", 4L, "base-x86_64.apk", 6L),
-                lVariant,
-                getSizeCommand.build())
+            ImmutableMap.of("base-master.apk", 10D, "base-x86.apk", 4D, "base-x86_64.apk", 6D),
+            lVariant,
+            getSizeCommand.build())
             .getSize();
 
     assertThat(configurationSizes.getMaxSizeConfigurationMap())
-        .containsExactly(SizeConfiguration.getDefaultInstance(), 16L);
+        .containsExactly(SizeConfiguration.getDefaultInstance(), 16D);
     assertThat(configurationSizes.getMinSizeConfigurationMap())
-        .containsExactly(SizeConfiguration.getDefaultInstance(), 14L);
+        .containsExactly(SizeConfiguration.getDefaultInstance(), 14D);
   }
 
   @Test
@@ -160,39 +161,39 @@ public class VariantTotalSizeAggregatorTest {
 
     ConfigurationSizes configurationSizes =
         new VariantTotalSizeAggregator(
-                ImmutableMap.<String, Long>builder()
-                    .put("base-master.apk", 10L)
-                    .put("base-armeabi.apk", 4L)
-                    .put("base-arm64_v8a.apk", 6L)
-                    .put("base-xhdpi.apk", 2L)
-                    .put("base-xxhdpi.apk", 3L)
-                    .put("base-en.apk", 1L)
-                    .build(),
-                lVariant,
-                getSizeCommand.setDimensions(ImmutableSet.of(ABI, SCREEN_DENSITY)).build())
+            ImmutableMap.<String, Double>builder()
+                .put("base-master.apk", 10D)
+                .put("base-armeabi.apk", 4D)
+                .put("base-arm64_v8a.apk", 6D)
+                .put("base-xhdpi.apk", 2D)
+                .put("base-xxhdpi.apk", 3D)
+                .put("base-en.apk", 1D)
+                .build(),
+            lVariant,
+            getSizeCommand.setDimensions(ImmutableSet.of(ABI, SCREEN_DENSITY)).build())
             .getSize();
 
     assertThat(configurationSizes.getMaxSizeConfigurationMap())
         .containsExactly(
             SizeConfiguration.builder().setAbi("armeabi").setScreenDensity("XHDPI").build(),
-            17L,
+            17D,
             SizeConfiguration.builder().setAbi("armeabi").setScreenDensity("XXHDPI").build(),
-            18L,
+            18D,
             SizeConfiguration.builder().setAbi("arm64-v8a").setScreenDensity("XHDPI").build(),
-            19L,
+            19D,
             SizeConfiguration.builder().setAbi("arm64-v8a").setScreenDensity("XXHDPI").build(),
-            20L);
+            20D);
 
     assertThat(configurationSizes.getMinSizeConfigurationMap())
         .containsExactly(
             SizeConfiguration.builder().setAbi("armeabi").setScreenDensity("XHDPI").build(),
-            17L,
+            17D,
             SizeConfiguration.builder().setAbi("armeabi").setScreenDensity("XXHDPI").build(),
-            18L,
+            18D,
             SizeConfiguration.builder().setAbi("arm64-v8a").setScreenDensity("XHDPI").build(),
-            19L,
+            19D,
             SizeConfiguration.builder().setAbi("arm64-v8a").setScreenDensity("XXHDPI").build(),
-            20L);
+            20D);
   }
 
   @Test
@@ -223,25 +224,25 @@ public class VariantTotalSizeAggregatorTest {
 
     ConfigurationSizes configurationSizes =
         new VariantTotalSizeAggregator(
-                ImmutableMap.<String, Long>builder()
-                    .put("base-master.apk", 10L)
-                    .put("base-en.apk", 1L)
-                    .put("base-fr.apk", 2L)
-                    .put("base-mdpi.apk", 6L)
-                    .put("base-ldpi.apk", 3L)
-                    .build(),
-                lVariant,
-                getSizeCommand
-                    .setDimensions(ImmutableSet.of(LANGUAGE))
-                    .setDeviceSpec(mergeSpecs(locales("en")))
-                    .build())
+            ImmutableMap.<String, Double>builder()
+                .put("base-master.apk", 10D)
+                .put("base-en.apk", 1D)
+                .put("base-fr.apk", 2D)
+                .put("base-mdpi.apk", 6D)
+                .put("base-ldpi.apk", 3D)
+                .build(),
+            lVariant,
+            getSizeCommand
+                .setDimensions(ImmutableSet.of(LANGUAGE))
+                .setDeviceSpec(mergeSpecs(locales("en")))
+                .build())
             .getSize();
 
     assertThat(configurationSizes.getMaxSizeConfigurationMap())
-        .containsExactly(SizeConfiguration.builder().setLocale("en").build(), 17L);
+        .containsExactly(SizeConfiguration.builder().setLocale("en").build(), 17D);
 
     assertThat(configurationSizes.getMinSizeConfigurationMap())
-        .containsExactly(SizeConfiguration.builder().setLocale("en").build(), 14L);
+        .containsExactly(SizeConfiguration.builder().setLocale("en").build(), 14D);
   }
 
   @Test
@@ -280,35 +281,35 @@ public class VariantTotalSizeAggregatorTest {
 
     ConfigurationSizes configurationSizes =
         new VariantTotalSizeAggregator(
-                ImmutableMap.<String, Long>builder()
-                    .put("base-master.apk", 10L)
-                    .put("base-jp.apk", 1L)
-                    .put("base-en-US.apk", 2L)
-                    .put("base-xhdpi.apk", 6L)
-                    .put("base-xxhdpi.apk", 3L)
-                    .put("base-x86.apk", 4L)
-                    .put("base-x86_64.apk", 5L)
-                    .build(),
-                lVariant,
-                getSizeCommand
-                    .setDimensions(ImmutableSet.of(SCREEN_DENSITY, SDK))
-                    .setDeviceSpec(mergeSpecs(locales("jp"), abis("x86")))
-                    .build())
+            ImmutableMap.<String, Double>builder()
+                .put("base-master.apk", 10D)
+                .put("base-jp.apk", 1D)
+                .put("base-en-US.apk", 2D)
+                .put("base-xhdpi.apk", 6D)
+                .put("base-xxhdpi.apk", 3D)
+                .put("base-x86.apk", 4D)
+                .put("base-x86_64.apk", 5D)
+                .build(),
+            lVariant,
+            getSizeCommand
+                .setDimensions(ImmutableSet.of(SCREEN_DENSITY, SDK))
+                .setDeviceSpec(mergeSpecs(locales("jp"), abis("x86")))
+                .build())
             .getSize();
 
     assertThat(configurationSizes.getMaxSizeConfigurationMap())
         .containsExactly(
             SizeConfiguration.builder().setSdkVersion("21-").setScreenDensity("XHDPI").build(),
-            21L,
+            21D,
             SizeConfiguration.builder().setSdkVersion("21-").setScreenDensity("XXHDPI").build(),
-            18L);
+            18D);
 
     assertThat(configurationSizes.getMinSizeConfigurationMap())
         .containsExactly(
             SizeConfiguration.builder().setSdkVersion("21-").setScreenDensity("XHDPI").build(),
-            21L,
+            21D,
             SizeConfiguration.builder().setSdkVersion("21-").setScreenDensity("XXHDPI").build(),
-            18L);
+            18D);
   }
 
   @Test
@@ -347,25 +348,25 @@ public class VariantTotalSizeAggregatorTest {
 
     ConfigurationSizes configurationSizes =
         new VariantTotalSizeAggregator(
-                ImmutableMap.<String, Long>builder()
-                    .put("base-master.apk", 10L)
-                    .put("base-fr.apk", 1L)
-                    .put("base-en-GB.apk", 2L)
-                    .put("base-xhdpi.apk", 6L)
-                    .put("base-xxhdpi.apk", 3L)
-                    .put("base-mips.apk", 4L)
-                    .put("base-mips64.apk", 5L)
-                    .build(),
-                lVariant,
-                getSizeCommand
-                    .setDimensions(ImmutableSet.of(SCREEN_DENSITY, SDK, LANGUAGE, ABI))
-                    .setDeviceSpec(
-                        mergeSpecs(
-                            locales("fr", "jp"),
-                            abis("x86", "mips"),
-                            density(XHDPI),
-                            sdkVersion(21)))
-                    .build())
+            ImmutableMap.<String, Double>builder()
+                .put("base-master.apk", 10D)
+                .put("base-fr.apk", 1D)
+                .put("base-en-GB.apk", 2D)
+                .put("base-xhdpi.apk", 6D)
+                .put("base-xxhdpi.apk", 3D)
+                .put("base-mips.apk", 4D)
+                .put("base-mips64.apk", 5D)
+                .build(),
+            lVariant,
+            getSizeCommand
+                .setDimensions(ImmutableSet.of(SCREEN_DENSITY, SDK, LANGUAGE, ABI))
+                .setDeviceSpec(
+                    mergeSpecs(
+                        locales("fr", "jp"),
+                        abis("x86", "mips"),
+                        density(XHDPI),
+                        sdkVersion(21)))
+                .build())
             .getSize();
 
     assertThat(configurationSizes.getMaxSizeConfigurationMap())
@@ -376,7 +377,7 @@ public class VariantTotalSizeAggregatorTest {
                 .setLocale("fr,jp")
                 .setAbi("x86,mips")
                 .build(),
-            21L);
+            21D);
 
     assertThat(configurationSizes.getMinSizeConfigurationMap())
         .containsExactly(
@@ -386,7 +387,7 @@ public class VariantTotalSizeAggregatorTest {
                 .setLocale("fr,jp")
                 .setAbi("x86,mips")
                 .build(),
-            21L);
+            21D);
   }
 
   @Test
@@ -405,9 +406,9 @@ public class VariantTotalSizeAggregatorTest {
 
     VariantTotalSizeAggregator variantTotalSizeAggregator =
         new VariantTotalSizeAggregator(
-            ImmutableMap.<String, Long>builder()
-                .put("apkL.apk", 10L)
-                .put("apkL-x86.apk", 6L)
+            ImmutableMap.<String, Double>builder()
+                .put("apkL.apk", 10D)
+                .put("apkL-x86.apk", 6D)
                 .build(),
             lVariant,
             getSizeCommand
@@ -450,22 +451,22 @@ public class VariantTotalSizeAggregatorTest {
 
     ConfigurationSizes configurationSizes =
         new VariantTotalSizeAggregator(
-                ImmutableMap.<String, Long>builder()
-                    .put("base-master.apk", 10L)
-                    .put("feature-master.apk", 15L)
-                    .put("feature1-master.apk", 6L)
-                    .put("feature2-master.apk", 4L)
-                    .build(),
-                lVariant,
-                getSizeCommand.setModules(ImmutableSet.of("base", "feature1")).build())
+            ImmutableMap.<String, Double>builder()
+                .put("base-master.apk", 10D)
+                .put("feature-master.apk", 15D)
+                .put("feature1-master.apk", 6D)
+                .put("feature2-master.apk", 4D)
+                .build(),
+            lVariant,
+            getSizeCommand.setModules(ImmutableSet.of("base", "feature1")).build())
             .getSize();
 
     // base, feature1, feature2 (install-time) modules are selected.
     assertThat(configurationSizes.getMaxSizeConfigurationMap())
-        .containsExactly(SizeConfiguration.getDefaultInstance(), 20L);
+        .containsExactly(SizeConfiguration.getDefaultInstance(), 20D);
 
     assertThat(configurationSizes.getMinSizeConfigurationMap())
-        .containsExactly(SizeConfiguration.getDefaultInstance(), 20L);
+        .containsExactly(SizeConfiguration.getDefaultInstance(), 20D);
   }
 
   @Test
@@ -489,20 +490,20 @@ public class VariantTotalSizeAggregatorTest {
 
     ConfigurationSizes configurationSizes =
         new VariantTotalSizeAggregator(
-                ImmutableMap.<String, Long>builder()
-                    .put("base-master.apk", 10L)
-                    .put("feature-master.apk", 15L)
-                    .put("feature1-master.apk", 6L)
-                    .build(),
-                lVariant,
-                getSizeCommand.setInstant(true).build())
+            ImmutableMap.<String, Double>builder()
+                .put("base-master.apk", 10D)
+                .put("feature-master.apk", 15D)
+                .put("feature1-master.apk", 6D)
+                .build(),
+            lVariant,
+            getSizeCommand.setInstant(true).build())
             .getSize();
 
     assertThat(configurationSizes.getMaxSizeConfigurationMap())
-        .containsExactly(SizeConfiguration.getDefaultInstance(), 31L);
+        .containsExactly(SizeConfiguration.getDefaultInstance(), 31D);
 
     assertThat(configurationSizes.getMinSizeConfigurationMap())
-        .containsExactly(SizeConfiguration.getDefaultInstance(), 31L);
+        .containsExactly(SizeConfiguration.getDefaultInstance(), 31D);
   }
 
   @Test
@@ -545,25 +546,25 @@ public class VariantTotalSizeAggregatorTest {
 
     ConfigurationSizes configurationSizes =
         new VariantTotalSizeAggregator(
-                ImmutableMap.<String, Long>builder()
-                    .put("base-master.apk", 10L)
-                    .put("base-mips.apk", 3L)
-                    .put("base-x86.apk", 4L)
-                    .put("base-en.apk", 1L)
-                    .put("base-fr.apk", 2L)
-                    .put("feature-master.apk", 15L)
-                    .put("feature-xhdpi.apk", 6L)
-                    .put("feature-xxhdpi.apk", 5L)
-                    .build(),
-                lVariant,
-                getSizeCommand.setDeviceSpec(mergeSpecs(density(XHDPI), abis("mips"))).build())
+            ImmutableMap.<String, Double>builder()
+                .put("base-master.apk", 10D)
+                .put("base-mips.apk", 3D)
+                .put("base-x86.apk", 4D)
+                .put("base-en.apk", 1D)
+                .put("base-fr.apk", 2D)
+                .put("feature-master.apk", 15D)
+                .put("feature-xhdpi.apk", 6D)
+                .put("feature-xxhdpi.apk", 5D)
+                .build(),
+            lVariant,
+            getSizeCommand.setDeviceSpec(mergeSpecs(density(XHDPI), abis("mips"))).build())
             .getSize();
 
     assertThat(configurationSizes.getMaxSizeConfigurationMap())
-        .containsExactly(SizeConfiguration.getDefaultInstance(), 36L); // 10+3+2+15+6
+        .containsExactly(SizeConfiguration.getDefaultInstance(), 36D); // 10+3+2+15+6
 
     assertThat(configurationSizes.getMinSizeConfigurationMap())
-        .containsExactly(SizeConfiguration.getDefaultInstance(), 35L); // 10+3+1+15+6
+        .containsExactly(SizeConfiguration.getDefaultInstance(), 35D); // 10+3+1+15+6
   }
 
   @Test
@@ -579,12 +580,12 @@ public class VariantTotalSizeAggregatorTest {
 
     ConfigurationSizes configurationSizes =
         new VariantTotalSizeAggregator(
-                ImmutableMap.of("sample.apk", 10L), variant, getSizeCommand.build())
+            ImmutableMap.of("sample.apk", 10D), variant, getSizeCommand.build())
             .getSize();
     assertThat(configurationSizes.getMinSizeConfigurationMap())
         .isEqualTo(configurationSizes.getMaxSizeConfigurationMap());
     assertThat(configurationSizes.getMinSizeConfigurationMap())
-        .containsExactly(SizeConfiguration.getDefaultInstance(), 10L);
+        .containsExactly(SizeConfiguration.getDefaultInstance(), 10D);
   }
 
   @Test
@@ -599,9 +600,9 @@ public class VariantTotalSizeAggregatorTest {
 
     ConfigurationSizes configurationSizes =
         new VariantTotalSizeAggregator(
-                ImmutableMap.of("sample.apk", 10L),
-                variant,
-                getSizeCommand.setModules(ImmutableSet.of("base")).build())
+            ImmutableMap.of("sample.apk", 10D),
+            variant,
+            getSizeCommand.setModules(ImmutableSet.of("base")).build())
             .getSize();
     assertThat(configurationSizes.getMaxSizeConfigurationMap()).isEmpty();
     assertThat(configurationSizes.getMinSizeConfigurationMap()).isEmpty();
@@ -621,11 +622,11 @@ public class VariantTotalSizeAggregatorTest {
 
     ConfigurationSizes configurationSizes =
         new VariantTotalSizeAggregator(
-                ImmutableMap.of("sample.apk", 20L),
-                variant,
-                getSizeCommand
-                    .setDimensions(ImmutableSet.of(ABI, SCREEN_DENSITY, LANGUAGE, SDK))
-                    .build())
+            ImmutableMap.of("sample.apk", 20D),
+            variant,
+            getSizeCommand
+                .setDimensions(ImmutableSet.of(ABI, SCREEN_DENSITY, LANGUAGE, SDK))
+                .build())
             .getSize();
     assertThat(configurationSizes.getMinSizeConfigurationMap())
         .isEqualTo(configurationSizes.getMaxSizeConfigurationMap());
@@ -637,7 +638,7 @@ public class VariantTotalSizeAggregatorTest {
                 .setSdkVersion("1-20")
                 .setLocale("")
                 .build(),
-            20L);
+            20D);
   }
 
   @Test
@@ -654,14 +655,14 @@ public class VariantTotalSizeAggregatorTest {
 
     ConfigurationSizes configurationSizes =
         new VariantTotalSizeAggregator(
-                ImmutableMap.of("sample.apk", 15L),
-                variant,
-                getSizeCommand.setDeviceSpec(mergeSpecs(locales("jp"), abis("mips"))).build())
+            ImmutableMap.of("sample.apk", 15D),
+            variant,
+            getSizeCommand.setDeviceSpec(mergeSpecs(locales("jp"), abis("mips"))).build())
             .getSize();
     assertThat(configurationSizes.getMinSizeConfigurationMap())
         .isEqualTo(configurationSizes.getMaxSizeConfigurationMap());
     assertThat(configurationSizes.getMinSizeConfigurationMap())
-        .containsExactly(SizeConfiguration.getDefaultInstance(), 15L);
+        .containsExactly(SizeConfiguration.getDefaultInstance(), 15D);
   }
 
   @Test
@@ -678,17 +679,17 @@ public class VariantTotalSizeAggregatorTest {
 
     ConfigurationSizes configurationSizes =
         new VariantTotalSizeAggregator(
-                ImmutableMap.of("sample.apk", 11L),
-                variant,
-                getSizeCommand
-                    .setDimensions(ImmutableSet.of(ABI, SCREEN_DENSITY, LANGUAGE, SDK))
-                    .setDeviceSpec(
-                        mergeSpecs(
-                            locales("fr", "jp"),
-                            abis("arm64-v8a", "mips"),
-                            density(MDPI),
-                            sdkVersion(15)))
-                    .build())
+            ImmutableMap.of("sample.apk", 11D),
+            variant,
+            getSizeCommand
+                .setDimensions(ImmutableSet.of(ABI, SCREEN_DENSITY, LANGUAGE, SDK))
+                .setDeviceSpec(
+                    mergeSpecs(
+                        locales("fr", "jp"),
+                        abis("arm64-v8a", "mips"),
+                        density(MDPI),
+                        sdkVersion(15)))
+                .build())
             .getSize();
     assertThat(configurationSizes.getMinSizeConfigurationMap())
         .isEqualTo(configurationSizes.getMaxSizeConfigurationMap());
@@ -700,6 +701,6 @@ public class VariantTotalSizeAggregatorTest {
                 .setLocale("fr,jp")
                 .setAbi("arm64-v8a,mips")
                 .build(),
-            11L);
+            11D);
   }
 }

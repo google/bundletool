@@ -61,12 +61,12 @@ public class VariantTotalSizeAggregator {
 
   private static final Joiner COMMA_JOINER = Joiner.on(',');
 
-  private final ImmutableMap<String, Long> sizeByApkPaths;
+  private final ImmutableMap<String, Double> sizeByApkPaths;
   private final Variant variant;
   private final GetSizeRequest getSizeRequest;
 
   public VariantTotalSizeAggregator(
-      ImmutableMap<String, Long> sizeByApkPaths, Variant variant, GetSizeRequest getSizeRequest) {
+      ImmutableMap<String, Double> sizeByApkPaths, Variant variant, GetSizeRequest getSizeRequest) {
     this.sizeByApkPaths = sizeByApkPaths;
     this.variant = variant;
     this.getSizeRequest = getSizeRequest;
@@ -118,13 +118,13 @@ public class VariantTotalSizeAggregator {
             getSizeRequest.getDeviceSpec());
 
     // Variants of standalone APKs have only one APK each.
-    long compressedSize =
+    double compressedSize =
         sizeByApkPaths.get(
             Iterables.getOnlyElement(
                     Iterables.getOnlyElement(variant.getApkSetList()).getApkDescriptionList())
                 .getPath());
 
-    ImmutableMap<SizeConfiguration, Long> sizeConfigurationMap =
+    ImmutableMap<SizeConfiguration, Double> sizeConfigurationMap =
         ImmutableMap.of(sizeConfiguration, compressedSize);
     return ConfigurationSizes.create(sizeConfigurationMap, sizeConfigurationMap);
   }
@@ -194,8 +194,8 @@ public class VariantTotalSizeAggregator {
       ImmutableSet<AbiTargeting> abiTargetingOptions,
       ImmutableSet<LanguageTargeting> languageTargetingOptions,
       ImmutableSet<ScreenDensityTargeting> screenDensityTargetingOptions) {
-    Map<SizeConfiguration, Long> minSizeByConfiguration = new HashMap<>();
-    Map<SizeConfiguration, Long> maxSizeByConfiguration = new HashMap<>();
+    Map<SizeConfiguration, Double> minSizeByConfiguration = new HashMap<>();
+    Map<SizeConfiguration, Double> maxSizeByConfiguration = new HashMap<>();
 
     SdkVersionTargeting sdkVersionTargeting = variant.getTargeting().getSdkVersionTargeting();
     for (AbiTargeting abiTargeting : abiTargetingOptions) {
@@ -208,7 +208,7 @@ public class VariantTotalSizeAggregator {
                       sdkVersionTargeting, abiTargeting, screenDensityTargeting, languageTargeting),
                   getSizeRequest.getDeviceSpec());
 
-          long compressedSize =
+          double compressedSize =
               getCompressedSize(
                   new ApkMatcher(
                           getDeviceSpec(
@@ -301,7 +301,7 @@ public class VariantTotalSizeAggregator {
   }
 
   /** Gets the total compressed sizes represented by the APK paths. */
-  private long getCompressedSize(ImmutableList<ZipPath> apkPaths) {
-    return apkPaths.stream().mapToLong(apkPath -> sizeByApkPaths.get(apkPath.toString())).sum();
+  private double getCompressedSize(ImmutableList<ZipPath> apkPaths) {
+    return apkPaths.stream().mapToDouble(apkPath -> sizeByApkPaths.get(apkPath.toString())).sum();
   }
 }

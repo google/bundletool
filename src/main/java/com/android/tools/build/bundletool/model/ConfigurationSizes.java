@@ -25,13 +25,13 @@ import com.google.errorprone.annotations.Immutable;
 @AutoValue.CopyAnnotations
 public abstract class ConfigurationSizes {
 
-  public abstract ImmutableMap<SizeConfiguration, Long> getMinSizeConfigurationMap();
+  public abstract ImmutableMap<SizeConfiguration, Double> getMinSizeConfigurationMap();
 
-  public abstract ImmutableMap<SizeConfiguration, Long> getMaxSizeConfigurationMap();
+  public abstract ImmutableMap<SizeConfiguration, Double> getMaxSizeConfigurationMap();
 
   public static ConfigurationSizes create(
-      ImmutableMap<SizeConfiguration, Long> minSizeConfigurationMap,
-      ImmutableMap<SizeConfiguration, Long> maxSizeConfigurationMap) {
+      ImmutableMap<SizeConfiguration, Double> minSizeConfigurationMap,
+      ImmutableMap<SizeConfiguration, Double> maxSizeConfigurationMap) {
     return new AutoValue_ConfigurationSizes(minSizeConfigurationMap, maxSizeConfigurationMap);
   }
 }
