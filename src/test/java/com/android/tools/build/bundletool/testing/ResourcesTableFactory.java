@@ -18,6 +18,7 @@ package com.android.tools.build.bundletool.testing;
 
 import static com.android.tools.build.bundletool.model.utils.ProtoUtils.mergeFromProtos;
 import static com.android.tools.build.bundletool.model.utils.ResourcesUtils.ANY_DENSITY_VALUE;
+import static com.android.tools.build.bundletool.model.utils.ResourcesUtils.DEFAULT_DENSITY_VALUE;
 import static com.android.tools.build.bundletool.model.utils.ResourcesUtils.HDPI_VALUE;
 import static com.android.tools.build.bundletool.model.utils.ResourcesUtils.LDPI_VALUE;
 import static com.android.tools.build.bundletool.model.utils.ResourcesUtils.MDPI_VALUE;
@@ -68,6 +69,8 @@ public final class ResourcesTableFactory {
       Configuration.newBuilder().setDensity(XXXHDPI_VALUE).build();
   public static final Configuration ANY_DPI =
       Configuration.newBuilder().setDensity(ANY_DENSITY_VALUE).build();
+  public static final Configuration DEFAULT_DPI =
+      Configuration.newBuilder().setDensity(DEFAULT_DENSITY_VALUE).build();
   public static final Configuration NO_DPI =
       Configuration.newBuilder().setDensity(NONE_DENSITY_VALUE).build();
 

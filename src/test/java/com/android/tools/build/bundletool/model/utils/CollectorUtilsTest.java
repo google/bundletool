@@ -17,9 +17,7 @@ package com.android.tools.build.bundletool.model.utils;
 
 import static com.android.tools.build.bundletool.model.utils.CollectorUtils.combineMaps;
 import static com.google.common.truth.Truth.assertThat;
-import static com.google.common.util.concurrent.Futures.immediateFuture;
 
-import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Multimap;
 import java.util.stream.Stream;
@@ -50,18 +48,6 @@ public final class CollectorUtilsTest {
     assertThat(map)
         .containsExactly(1, "A", 2, "IS", 3, "FOR", 4, "THIS", 4, "TEST", 4, "THAT", 6, "METHOD")
         .inOrder();
-  }
-
-  @Test
-  public void waitForAll() {
-    ImmutableList<String> result =
-        Stream.of(
-                immediateFuture("this"),
-                immediateFuture("is"),
-                immediateFuture("a"),
-                immediateFuture("test"))
-            .collect(CollectorUtils.waitForAll());
-    assertThat(result).containsExactly("this", "is", "a", "test").inOrder();
   }
 
   @Test

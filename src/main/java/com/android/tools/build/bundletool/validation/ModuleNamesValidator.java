@@ -42,7 +42,7 @@ final class ModuleNamesValidator extends SubValidator {
       boolean isFeatureModule =
           module.getAndroidManifest().getModuleType().equals(ModuleType.FEATURE_MODULE);
 
-      if (moduleName.getName().equals(BundleModuleName.BASE_MODULE_NAME)) {
+      if (moduleName.equals(BundleModuleName.BASE_MODULE_NAME)) {
         if (splitId.isPresent()) {
           throw new ValidationException(
               "The base module should not have the 'split' attribute set in the "
@@ -85,7 +85,7 @@ final class ModuleNamesValidator extends SubValidator {
       }
     }
 
-    if (!moduleNames.contains(BundleModuleName.create(BundleModuleName.BASE_MODULE_NAME))) {
+    if (!moduleNames.contains(BundleModuleName.BASE_MODULE_NAME)) {
       throw new ValidationException(
           "No base module found. At least one module must not have a 'split' attribute set in the "
               + "AndroidManifest.xml.");

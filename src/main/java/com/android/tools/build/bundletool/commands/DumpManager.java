@@ -22,6 +22,7 @@ import com.android.aapt.ConfigurationOuterClass.Configuration;
 import com.android.aapt.Resources.ConfigValue;
 import com.android.aapt.Resources.ResourceTable;
 import com.android.aapt.Resources.XmlNode;
+import com.android.bundle.Config.BundleConfig;
 import com.android.tools.build.bundletool.model.BundleModule.SpecialModuleEntry;
 import com.android.tools.build.bundletool.model.BundleModuleName;
 import com.android.tools.build.bundletool.model.ResourceTableEntry;
@@ -38,6 +39,7 @@ import com.android.tools.build.bundletool.xml.XmlProtoToXmlConverter;
 import com.android.tools.build.bundletool.xml.XmlUtils;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableListMultimap;
+import com.google.protobuf.util.JsonFormat;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -116,6 +118,16 @@ final class DumpManager {
       printStream.printf("Package '%s':%n", packageName);
       entriesByPackageName.get(packageName).forEach(entry -> printEntry(entry, printValues));
       printStream.println();
+    }
+  }
+
+  void printBundleConfig() {
+    try (ZipFile zipFile = new ZipFile(bundlePath.toFile())) {
+      BundleConfig bundleConfig =
+          extractAndParse(zipFile, ZipPath.create("BundleConfig.pb"), BundleConfig::parseFrom);
+      printStream.println(JsonFormat.printer().print(bundleConfig));
+    } catch (IOException e) {
+      throw new ValidationException("Error occurred when reading the bundle.", e);
     }
   }
 

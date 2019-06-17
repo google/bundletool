@@ -18,11 +18,13 @@ package com.android.tools.build.bundletool.splitters;
 
 import static com.android.tools.build.bundletool.model.ManifestMutator.withExtractNativeLibs;
 import static com.android.tools.build.bundletool.model.utils.Versions.ANDROID_M_API_VERSION;
+import static com.android.tools.build.bundletool.model.utils.Versions.ANDROID_P_API_VERSION;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifest;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.lPlusVariantTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.nativeDirectoryTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.nativeLibraries;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.targetedNativeDirectory;
+import static com.android.tools.build.bundletool.testing.TargetingUtils.variantMinSdkTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.variantSdkTargeting;
 import static com.android.tools.build.bundletool.testing.TestUtils.extractPaths;
 import static com.google.common.truth.Truth.assertThat;
@@ -34,6 +36,7 @@ import com.android.tools.build.bundletool.model.AndroidManifest;
 import com.android.tools.build.bundletool.model.BundleModule;
 import com.android.tools.build.bundletool.model.ModuleEntry;
 import com.android.tools.build.bundletool.model.ModuleSplit;
+import com.android.tools.build.bundletool.model.utils.Versions;
 import com.android.tools.build.bundletool.testing.BundleModuleBuilder;
 import com.android.tools.build.bundletool.testing.ManifestProtoUtils.ManifestMutator;
 import com.google.common.collect.ImmutableCollection;
@@ -50,7 +53,7 @@ public class NativeLibrariesCompressionSplitterTest {
       AndroidManifest.create(androidManifest("com.test.app"));
 
   @Test
-  public void nativeCompressionSplitter_withM_withLibs() throws Exception {
+  public void nativeCompressionSplitter_withM_withLibsWithoutExternalStorage() throws Exception {
     NativeLibrariesCompressionSplitter nativeLibrariesCompressionSplitter =
         new NativeLibrariesCompressionSplitter();
     ImmutableCollection<ModuleSplit> splits =
@@ -64,6 +67,33 @@ public class NativeLibrariesCompressionSplitterTest {
 
     assertThat(moduleSplit.getVariantTargeting())
         .isEqualTo(variantSdkTargeting(ANDROID_M_API_VERSION));
+
+    assertThat(extractPaths(moduleSplit.getEntries())).containsExactly("lib/x86/libnoname.so");
+    assertThat(moduleSplit.isMasterSplit()).isTrue();
+    assertThat(getShouldCompress(moduleSplit, "lib/x86/libnoname.so")).isFalse();
+    assertThat(moduleSplit.getApkTargeting()).isEqualToDefaultInstance();
+    assertThat(
+            compareManifestMutators(
+                moduleSplit.getMasterManifestMutators(), withExtractNativeLibs(false)))
+        .isTrue();
+  }
+
+  @Test
+  public void nativeCompressionSplitter_withP_withLibsWithExternalStorage() throws Exception {
+    NativeLibrariesCompressionSplitter nativeLibrariesCompressionSplitter =
+        new NativeLibrariesCompressionSplitter(
+            ApkGenerationConfiguration.builder().setInstallableOnExternalStorage(true).build());
+    ImmutableCollection<ModuleSplit> splits =
+        nativeLibrariesCompressionSplitter.split(
+            ModuleSplit.forNativeLibraries(
+                createSingleLibraryModule("testModule", "x86", "lib/x86/libnoname.so"),
+                variantSdkTargeting(ANDROID_P_API_VERSION)));
+
+    assertThat(splits).hasSize(1);
+    ModuleSplit moduleSplit = Iterables.getOnlyElement(splits);
+
+    assertThat(moduleSplit.getVariantTargeting())
+        .isEqualTo(variantSdkTargeting(ANDROID_P_API_VERSION));
 
     assertThat(extractPaths(moduleSplit.getEntries())).containsExactly("lib/x86/libnoname.so");
     assertThat(moduleSplit.isMasterSplit()).isTrue();
@@ -147,7 +177,7 @@ public class NativeLibrariesCompressionSplitterTest {
   }
 
   @Test
-  public void nativeCompressionSplitter_preM_withLibs() throws Exception {
+  public void nativeCompressionSplitter_preM_withLibsWithoutExternalStorage() throws Exception {
     NativeLibrariesCompressionSplitter nativeLibrariesCompressionSplitter =
         new NativeLibrariesCompressionSplitter();
     ImmutableCollection<ModuleSplit> splits =
@@ -160,6 +190,33 @@ public class NativeLibrariesCompressionSplitterTest {
     ModuleSplit moduleSplit = Iterables.getOnlyElement(splits);
 
     assertThat(moduleSplit.getVariantTargeting()).isEqualTo(lPlusVariantTargeting());
+
+    assertThat(extractPaths(moduleSplit.getEntries())).containsExactly("lib/x86/libnoname.so");
+    assertThat(moduleSplit.isMasterSplit()).isTrue();
+    assertThat(getShouldCompress(moduleSplit, "lib/x86/libnoname.so")).isTrue();
+    assertThat(moduleSplit.getApkTargeting()).isEqualToDefaultInstance();
+    assertThat(
+            compareManifestMutators(
+                moduleSplit.getMasterManifestMutators(), withExtractNativeLibs(true)))
+        .isTrue();
+  }
+
+  @Test
+  public void nativeCompressionSplitter_preP_withLibsWithoutExternalStorage() throws Exception {
+    NativeLibrariesCompressionSplitter nativeLibrariesCompressionSplitter =
+        new NativeLibrariesCompressionSplitter(
+            ApkGenerationConfiguration.builder().setInstallableOnExternalStorage(true).build());
+    ImmutableCollection<ModuleSplit> splits =
+        nativeLibrariesCompressionSplitter.split(
+            ModuleSplit.forNativeLibraries(
+                createSingleLibraryModule("testModule", "x86", "lib/x86/libnoname.so"),
+                variantMinSdkTargeting(Versions.ANDROID_O_API_VERSION)));
+
+    assertThat(splits).hasSize(1);
+    ModuleSplit moduleSplit = Iterables.getOnlyElement(splits);
+
+    assertThat(moduleSplit.getVariantTargeting())
+        .isEqualTo(variantMinSdkTargeting(Versions.ANDROID_O_API_VERSION));
 
     assertThat(extractPaths(moduleSplit.getEntries())).containsExactly("lib/x86/libnoname.so");
     assertThat(moduleSplit.isMasterSplit()).isTrue();

@@ -48,11 +48,14 @@ import com.android.bundle.Targeting.VulkanVersion;
 import com.android.tools.build.bundletool.model.BundleModule.ModuleType;
 import com.android.tools.build.bundletool.model.utils.ResourcesUtils;
 import com.google.auto.value.AutoValue;
+import com.google.auto.value.extension.memoized.Memoized;
 import com.google.common.base.Joiner;
 import com.google.common.base.Predicate;
 import com.google.common.base.Predicates;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.Multimap;
+import com.google.common.collect.Multimaps;
 import com.google.errorprone.annotations.Immutable;
 import java.util.List;
 import java.util.Optional;
@@ -116,7 +119,7 @@ public abstract class ModuleSplit {
 
   /** Returns true iff this is split of the base module. */
   public boolean isBaseModuleSplit() {
-    return getModuleName().getName().equals(BundleModuleName.BASE_MODULE_NAME);
+    return getModuleName().equals(BundleModuleName.BASE_MODULE_NAME);
   }
 
   /**
@@ -467,26 +470,33 @@ public abstract class ModuleSplit {
     return splitBuilder.build();
   }
 
-  /** Returns all {@link ModuleEntry} that have a relative module path under a given path. */
-  public Stream<ModuleEntry> findEntriesUnderPath(String path) {
-    return getEntries().stream().filter(entry -> entry.getPath().startsWith(path));
+  @Memoized
+  Multimap<ZipPath, ModuleEntry> getEntriesByDirectory() {
+    return Multimaps.index(getEntries(), entry -> entry.getPath().getParent());
+  }
+
+  /** Returns all {@link ModuleEntry} that are directly inside the specified directory. */
+  public Stream<ModuleEntry> getEntriesInDirectory(ZipPath directory) {
+    checkArgument(directory.getNameCount() > 0, "ZipPath '%s' is empty", directory);
+    return getEntriesByDirectory().get(directory).stream();
   }
 
   /**
-   * Returns all {@link ModuleEntry} living directly under a given relative module directory path.
+   * Returns all {@link ModuleEntry} that have a relative module path under a given path.
    *
-   * <p>Entries inside subdirectories relative to the given directory are not returned.
+   * <p>Note: Consider using {@link #getEntriesByDirectory()} for performance, unless a recursive
+   * search is truly needed.
    */
-  public Stream<ModuleEntry> findEntriesInsideDirectory(String directory) {
-    return getEntries()
-        .stream()
-        .filter(entry -> entry.getPath().getParent().equals(ZipPath.create(directory)));
+  public Stream<ModuleEntry> findEntriesUnderPath(String path) {
+    ZipPath zipPath = ZipPath.create(path);
+    return getEntriesByDirectory().asMap().entrySet().stream()
+        .filter(dirAndEntries -> dirAndEntries.getKey().startsWith(zipPath))
+        .flatMap(dirAndEntries -> dirAndEntries.getValue().stream());
   }
 
   /** Returns the {@link ModuleEntry} associated with the given path, or empty if not found. */
   public Optional<ModuleEntry> findEntry(ZipPath path) {
-    return getEntries()
-        .stream()
+    return getEntriesInDirectory(path.getParent())
         .filter(entry -> entry.getPath().equals(path))
         .collect(toOptional());
   }

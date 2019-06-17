@@ -19,7 +19,6 @@ import static com.google.common.base.Preconditions.checkNotNull;
 import com.android.bundle.Errors.BundleToolError;
 import com.android.bundle.Errors.FileTypeDirectoryInBundleError;
 import com.android.bundle.Errors.FileTypeFileUsesReservedNameError;
-import com.android.bundle.Errors.FileTypeFilesInResourceDirectoryRootError;
 import com.android.bundle.Errors.FileTypeInvalidApexImagePathError;
 import com.android.bundle.Errors.FileTypeInvalidFileExtensionError;
 import com.android.bundle.Errors.FileTypeInvalidFileNameInDirectoryError;
@@ -185,28 +184,6 @@ public class BundleFileTypesException extends ValidationException {
       builder.setFileTypeInvalidNativeArchitecture(
           FileTypeInvalidNativeArchitectureError.newBuilder()
               .setInvalidArchitectureDirectory(fileOrDirectory.toString()));
-    }
-  }
-
-  /** self describing */
-  public static class FilesInResourceDirectoryRootException extends BundleFileTypesException {
-
-    private final ZipPath resourcesDirectory;
-    private final ZipPath file;
-
-    public FilesInResourceDirectoryRootException(ZipPath resourcesDirectory, ZipPath file) {
-      super(
-          "The %s/ directory cannot contain files directly, found '%s'.", resourcesDirectory, file);
-      this.resourcesDirectory = resourcesDirectory;
-      this.file = file;
-    }
-
-    @Override
-    protected void customizeProto(BundleToolError.Builder builder) {
-      builder.setFileTypeFileInResourceDirectoryRoot(
-          FileTypeFilesInResourceDirectoryRootError.newBuilder()
-              .setInvalidFile(file.toString())
-              .setResourceDirectory(resourcesDirectory.toString()));
     }
   }
 

@@ -155,9 +155,7 @@ public class ApkMatcher {
       Set<String> unknownModules =
           Sets.difference(
               requestedModuleNames.get(),
-              variant
-                  .getApkSetList()
-                  .stream()
+              variant.getApkSetList().stream()
                   .map(ApkSet::getModuleMetadata)
                   .map(ModuleMetadata::getName)
                   .collect(toImmutableSet()));
@@ -173,9 +171,7 @@ public class ApkMatcher {
   /** Builds a map of module dependencies. */
   private static ImmutableMultimap<String, String> buildAdjacencyMap(Variant variant) {
     ImmutableMultimap.Builder<String, String> moduleDependenciesMap = ImmutableMultimap.builder();
-    variant
-        .getApkSetList()
-        .stream()
+    variant.getApkSetList().stream()
         .map(ApkSet::getModuleMetadata)
         .forEach(
             moduleMetadata -> {
@@ -258,6 +254,16 @@ public class ApkMatcher {
         && matchesApkTargeting(moduleSplit.getApkTargeting());
   }
 
+  /**
+   * Checks if a device is compatible with targeting of a given split, considering the targeting
+   * alternatives.
+   *
+   * @throws IncompatibleDeviceException
+   */
+  public void checkCompatibleWithApkTargeting(ModuleSplit moduleSplit) {
+    checkCompatibleWithApkTargeting(moduleSplit.getApkTargeting());
+  }
+
   private void checkCompatibleWithApkTargeting(ApkTargeting apkTargeting) {
     apkMatchers.forEach(matcher -> checkCompatibleWithApkTargetingHelper(matcher, apkTargeting));
   }
@@ -266,5 +272,4 @@ public class ApkMatcher {
       TargetingDimensionMatcher<T> matcher, ApkTargeting apkTargeting) {
     matcher.checkDeviceCompatible(matcher.getTargetingValue(apkTargeting));
   }
-
 }

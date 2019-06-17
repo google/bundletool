@@ -42,6 +42,7 @@ import com.android.bundle.Commands.Variant;
 import com.android.bundle.Targeting.ScreenDensity.DensityAlias;
 import com.android.ddmlib.IDevice.DeviceState;
 import com.android.tools.build.bundletool.device.AdbServer;
+import com.android.tools.build.bundletool.device.IncompatibleDeviceException;
 import com.android.tools.build.bundletool.flags.FlagParser;
 import com.android.tools.build.bundletool.io.AppBundleSerializer;
 import com.android.tools.build.bundletool.model.AppBundle;
@@ -347,7 +348,6 @@ public class BuildApksConnectedDeviceTest {
                 + "app ABIs: [x86]");
   }
 
-  @Ignore("Re-enable when maxSdkVersion is validated in App Bundle and used in device matching.")
   @Test
   public void connectedDeviceN_bundleTargetsLtoM() throws Exception {
     fakeAdbServer =
@@ -373,8 +373,10 @@ public class BuildApksConnectedDeviceTest {
             .setAdbServer(fakeAdbServer)
             .build();
 
-    Throwable exception = assertThrows(CommandExecutionException.class, () -> command.execute());
-    assertThat(exception).hasMessageThat().contains("... enter the validation message here ...");
+    Throwable exception = assertThrows(IncompatibleDeviceException.class, () -> command.execute());
+    assertThat(exception)
+        .hasMessageThat()
+        .contains("Max SDK version of the App Bundle is lower than SDK version of the device");
   }
 
   @Test
@@ -591,9 +593,7 @@ public class BuildApksConnectedDeviceTest {
   }
 
   public static ImmutableList<String> apkNamesInSet(ApkSet apkSet) {
-    return apkSet
-        .getApkDescriptionList()
-        .stream()
+    return apkSet.getApkDescriptionList().stream()
         .map(ApkDescription::getPath)
         .collect(toImmutableList());
   }

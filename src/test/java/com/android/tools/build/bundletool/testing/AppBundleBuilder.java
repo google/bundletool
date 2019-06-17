@@ -51,6 +51,11 @@ public class AppBundleBuilder {
     return this;
   }
 
+  public AppBundleBuilder addModule(BundleModule bundleModule) {
+    modules.add(bundleModule);
+    return this;
+  }
+
   public AppBundleBuilder addMetadataFile(String namespacedDir, String fileName, Path file) {
     metadata.addFile(namespacedDir, fileName, BufferedIo.inputStreamSupplier(file));
     return this;

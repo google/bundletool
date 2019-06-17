@@ -76,7 +76,7 @@ public class DeviceSpecParser {
     return deviceSpec;
   }
 
-  private static void validateDeviceSpec(DeviceSpec deviceSpec, boolean canSkipFields) {
+  public static void validateDeviceSpec(DeviceSpec deviceSpec, boolean canSkipFields) {
     if (deviceSpec.getSdkVersion() < 0 || (!canSkipFields && deviceSpec.getSdkVersion() == 0)) {
       throw ValidationException.builder()
           .withMessage(

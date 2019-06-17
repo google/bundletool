@@ -134,6 +134,10 @@ public abstract class GetSizeCommand implements GetSizeRequest {
 
     public abstract Builder setDeviceSpec(DeviceSpec deviceSpec);
 
+    public Builder setDeviceSpec(Path deviceSpecPath) {
+      return setDeviceSpec(DeviceSpecParser.parsePartialDeviceSpec(deviceSpecPath));
+    }
+
     public abstract Builder setModules(ImmutableSet<String> modules);
 
     public abstract Builder setDimensions(ImmutableSet<Dimension> dimensions);

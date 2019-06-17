@@ -114,7 +114,7 @@ public class ResourceTableValidatorTest {
 
     assertThat(exception)
         .hasMessageThat()
-        .contains("is missing resource table but contains resource files");
+        .contains("contains resource files but is missing a resource table");
   }
 
   @Test

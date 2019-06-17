@@ -20,7 +20,6 @@ import static com.android.tools.build.bundletool.model.AndroidManifest.DEBUGGABL
 import static com.android.tools.build.bundletool.model.AndroidManifest.DEVELOPMENT_SDK_VERSION;
 import static com.android.tools.build.bundletool.model.AndroidManifest.HAS_CODE_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.IS_FEATURE_SPLIT_RESOURCE_ID;
-import static com.android.tools.build.bundletool.model.AndroidManifest.MODULE_TYPE_ASSET_VALUE;
 import static com.android.tools.build.bundletool.model.AndroidManifest.MODULE_TYPE_FEATURE_VALUE;
 import static com.android.tools.build.bundletool.model.AndroidManifest.NAME_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.RESOURCE_RESOURCE_ID;
@@ -29,8 +28,11 @@ import static com.android.tools.build.bundletool.model.AndroidManifest.VERSION_C
 import static com.android.tools.build.bundletool.model.BundleModule.ModuleType.ASSET_MODULE;
 import static com.android.tools.build.bundletool.model.BundleModule.ModuleType.FEATURE_MODULE;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifest;
+import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifestForAssetModule;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withFusingAttribute;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withInstallTimeDelivery;
+import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withInstantInstallTimeDelivery;
+import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withInstantOnDemandDelivery;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withLegacyFusingAttribute;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withLegacyOnDemand;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withMinSdkCondition;
@@ -483,10 +485,39 @@ public class AndroidManifestTest {
   }
 
   @Test
-  public void moduleTypeAttribute_assetModule() {
+  public void instantDeliveryType_deliveryElement_onDemand() {
     AndroidManifest manifest =
         AndroidManifest.create(
-            androidManifest("com.test.app", withTypeAttribute(MODULE_TYPE_ASSET_VALUE)));
+            androidManifestForAssetModule("com.test.app", withInstantOnDemandDelivery()));
+
+    assertThat(manifest.getInstantManifestDeliveryElement()).isPresent();
+    assertThat(
+            manifest
+                .getInstantManifestDeliveryElement()
+                .map(ManifestDeliveryElement::hasOnDemandElement))
+        .hasValue(true);
+    assertThat(manifest.isInstantModule()).hasValue(true);
+  }
+
+  @Test
+  public void instantDeliveryType_deliveryElement_installTime() {
+    AndroidManifest manifest =
+        AndroidManifest.create(
+            androidManifestForAssetModule("com.test.app", withInstantInstallTimeDelivery()));
+
+    assertThat(manifest.getInstantManifestDeliveryElement()).isPresent();
+    assertThat(
+            manifest
+                .getInstantManifestDeliveryElement()
+                .map(ManifestDeliveryElement::hasInstallTimeElement))
+        .hasValue(true);
+    assertThat(manifest.isInstantModule()).hasValue(true);
+  }
+
+  @Test
+  public void moduleTypeAttribute_assetModule() {
+    AndroidManifest manifest =
+        AndroidManifest.create(androidManifestForAssetModule("com.test.app"));
 
     assertThat(manifest.getOptionalModuleType()).isPresent();
     assertThat(manifest.getOptionalModuleType()).hasValue(ASSET_MODULE);

@@ -16,6 +16,8 @@
 
 package com.android.tools.build.bundletool.commands;
 
+import static com.android.tools.build.bundletool.model.utils.SdkToolsLocator.ANDROID_HOME_VARIABLE;
+import static com.android.tools.build.bundletool.model.utils.SdkToolsLocator.SYSTEM_PATH_VARIABLE;
 import static java.nio.charset.StandardCharsets.UTF_8;
 
 import com.android.bundle.Devices.DeviceSpec;
@@ -38,12 +40,14 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.Optional;
+import java.util.logging.Logger;
 
 /** Command to fetch the configuration of the connected device. */
 @AutoValue
 public abstract class GetDeviceSpecCommand {
+
+  private static final Logger logger = Logger.getLogger(GetDeviceSpecCommand.class.getName());
 
   public static final String COMMAND_NAME = "get-device-spec";
 
@@ -52,7 +56,6 @@ public abstract class GetDeviceSpecCommand {
   private static final Flag<Path> OUTPUT_FLAG = Flag.path("output");
   private static final Flag<Boolean> OVERWRITE_OUTPUT_FLAG = Flag.booleanFlag("overwrite");
 
-  private static final String ANDROID_HOME_VARIABLE = "ANDROID_HOME";
   private static final String ANDROID_SERIAL_VARIABLE = "ANDROID_SERIAL";
 
   private static final SystemEnvironmentProvider DEFAULT_PROVIDER =
@@ -131,14 +134,14 @@ public abstract class GetDeviceSpecCommand {
             .getValue(flags)
             .orElseGet(
                 () ->
-                    systemEnvironmentProvider
-                        .getVariable(ANDROID_HOME_VARIABLE)
-                        .flatMap(path -> new SdkToolsLocator().locateAdb(Paths.get(path)))
+                    new SdkToolsLocator()
+                        .locateAdb(systemEnvironmentProvider)
                         .orElseThrow(
                             () ->
                                 new CommandExecutionException(
                                     "Unable to determine the location of ADB. Please set the --adb "
-                                        + "flag or define ANDROID_HOME environment variable.")));
+                                        + "flag or define ANDROID_HOME or PATH environment "
+                                        + "variable.")));
     builder.setAdbPath(adbPath);
 
     OVERWRITE_OUTPUT_FLAG.getValue(flags).ifPresent(builder::setOverwriteOutput);
@@ -168,8 +171,10 @@ public abstract class GetDeviceSpecCommand {
         Files.deleteIfExists(getOutputPath());
       }
 
-      if (Files.notExists(getOutputPath().getParent())) {
-        Files.createDirectories(getOutputPath().getParent());
+      Path outputDirectory = getOutputPath().getParent();
+      if (!Files.exists(outputDirectory)) {
+        logger.info("Output directory '" + outputDirectory + "' does not exist, creating it.");
+        Files.createDirectories(outputDirectory);
       }
 
       Files.write(outputFile, JsonFormat.printer().print(deviceSpec).getBytes(UTF_8));
@@ -202,8 +207,8 @@ public abstract class GetDeviceSpecCommand {
                 .setOptional(true)
                 .setDescription(
                     "Path to the adb utility. If absent, an attempt will be made to locate it if "
-                        + "the %s environment variable is set.",
-                    ANDROID_HOME_VARIABLE)
+                        + "the %s or %s environment variable is set.",
+                    ANDROID_HOME_VARIABLE, SYSTEM_PATH_VARIABLE)
                 .build())
         .addFlag(
             FlagDescription.builder()

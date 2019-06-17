@@ -68,19 +68,19 @@ public class SplitsXmlInjectorTest {
     ImmutableList<ModuleSplit> modules =
         ImmutableList.of(
             createModuleSplit(
-                BASE_MODULE_NAME,
+                BASE_MODULE_NAME.getName(),
                 /* splitId= */ "",
                 /* masterSplit= */ true,
                 INSTANT,
                 /* languageTargeting= */ null),
             createModuleSplit(
-                BASE_MODULE_NAME,
+                BASE_MODULE_NAME.getName(),
                 /* splitId= */ "",
                 /* masterSplit= */ true,
                 STANDALONE,
                 /* languageTargeting= */ null),
             createModuleSplit(
-                BASE_MODULE_NAME,
+                BASE_MODULE_NAME.getName(),
                 /* splitId= */ "",
                 /* masterSplit= */ false,
                 SPLIT,
@@ -100,7 +100,7 @@ public class SplitsXmlInjectorTest {
   public void process() throws Exception {
     ModuleSplit baseMasterSplit =
         createModuleSplit(
-            BASE_MODULE_NAME,
+            BASE_MODULE_NAME.getName(),
             /* splitId= */ "",
             /* masterSplit= */ true,
             SPLIT,
@@ -108,13 +108,13 @@ public class SplitsXmlInjectorTest {
     ImmutableList<ModuleSplit> otherSplits =
         ImmutableList.of(
             createModuleSplit(
-                BASE_MODULE_NAME,
+                BASE_MODULE_NAME.getName(),
                 /* splitId= */ "config.ru",
                 /* masterSplit= */ false,
                 SPLIT,
                 languageTargeting("ru")),
             createModuleSplit(
-                BASE_MODULE_NAME,
+                BASE_MODULE_NAME.getName(),
                 /* splitId= */ "config.fr",
                 /* masterSplit= */ false,
                 SPLIT,
@@ -139,7 +139,7 @@ public class SplitsXmlInjectorTest {
                     .addAll(otherSplits)
                     .build()));
 
-    assertThat(result.getAllApksStream()).containsAllIn(otherSplits);
+    assertThat(result.getAllApksStream()).containsAtLeastElementsIn(otherSplits);
     ModuleSplit processedBaseMasterSplit =
         result
             .getAllApksStream()
@@ -158,8 +158,8 @@ public class SplitsXmlInjectorTest {
     XmlNode expectedSplitsProtoXml =
         new SplitsProtoXmlBuilder()
             .addLanguageMapping(BundleModuleName.create("module"), "ru", "module.config.ru")
-            .addLanguageMapping(BundleModuleName.create(BASE_MODULE_NAME), "ru", "config.ru")
-            .addLanguageMapping(BundleModuleName.create(BASE_MODULE_NAME), "fr", "config.fr")
+            .addLanguageMapping(BASE_MODULE_NAME, "ru", "config.ru")
+            .addLanguageMapping(BASE_MODULE_NAME, "fr", "config.fr")
             .build();
     assertThat(
             XmlNode.parseFrom(
@@ -172,7 +172,7 @@ public class SplitsXmlInjectorTest {
   public void process_systemSplits() throws Exception {
     ModuleSplit baseMasterSplit =
         createModuleSplit(
-            BASE_MODULE_NAME,
+            BASE_MODULE_NAME.getName(),
             /* splitId= */ "",
             /* masterSplit= */ true,
             SYSTEM,
@@ -180,13 +180,13 @@ public class SplitsXmlInjectorTest {
     ImmutableList<ModuleSplit> otherSplits =
         ImmutableList.of(
             createModuleSplit(
-                BASE_MODULE_NAME,
+                BASE_MODULE_NAME.getName(),
                 /* splitId= */ "config.ru",
                 /* masterSplit= */ false,
                 SYSTEM,
                 languageTargeting("ru")),
             createModuleSplit(
-                BASE_MODULE_NAME,
+                BASE_MODULE_NAME.getName(),
                 /* splitId= */ "config.fr",
                 /* masterSplit= */ false,
                 SYSTEM,
@@ -205,7 +205,7 @@ public class SplitsXmlInjectorTest {
                     .addAll(otherSplits)
                     .build()));
 
-    assertThat(result.getAllApksStream()).containsAllIn(otherSplits);
+    assertThat(result.getAllApksStream()).containsAtLeastElementsIn(otherSplits);
     ModuleSplit processedBaseMasterSplit =
         result
             .getAllApksStream()
@@ -224,9 +224,9 @@ public class SplitsXmlInjectorTest {
     XmlNode expectedSplitsProtoXml =
         new SplitsProtoXmlBuilder()
             .addLanguageMapping(BundleModuleName.create("module"), "ru", "module.config.ru")
-            .addLanguageMapping(BundleModuleName.create(BASE_MODULE_NAME), "ru", "config.ru")
-            .addLanguageMapping(BundleModuleName.create(BASE_MODULE_NAME), "fr", "config.fr")
-            .addLanguageMapping(BundleModuleName.create(BASE_MODULE_NAME), "es", "")
+            .addLanguageMapping(BASE_MODULE_NAME, "ru", "config.ru")
+            .addLanguageMapping(BASE_MODULE_NAME, "fr", "config.fr")
+            .addLanguageMapping(BASE_MODULE_NAME, "es", "")
             .build();
     assertThat(
             XmlNode.parseFrom(
@@ -239,7 +239,7 @@ public class SplitsXmlInjectorTest {
   public void process_standaloneSplitTypes() throws Exception {
     ModuleSplit standalone =
         createModuleSplit(
-            BASE_MODULE_NAME,
+            BASE_MODULE_NAME.getName(),
             /* splitId= */ "",
             /* masterSplit= */ true,
             STANDALONE,
@@ -268,8 +268,8 @@ public class SplitsXmlInjectorTest {
 
     XmlNode expectedSplitsProtoXml =
         new SplitsProtoXmlBuilder()
-            .addLanguageMapping(BundleModuleName.create(BASE_MODULE_NAME), "ru", "")
-            .addLanguageMapping(BundleModuleName.create(BASE_MODULE_NAME), "fr", "")
+            .addLanguageMapping(BASE_MODULE_NAME, "ru", "")
+            .addLanguageMapping(BASE_MODULE_NAME, "fr", "")
             .build();
     assertThat(
             XmlNode.parseFrom(TestUtils.getEntryContent(processedStandalone.getEntries().get(0))))
@@ -284,7 +284,7 @@ public class SplitsXmlInjectorTest {
 
     ModuleSplit baseMasterSplit =
         createModuleSplit(
-                BASE_MODULE_NAME,
+                BASE_MODULE_NAME.getName(),
                 /* splitId= */ "",
                 /* masterSplit= */ true,
                 SPLIT,

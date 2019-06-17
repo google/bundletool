@@ -22,7 +22,6 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.android.tools.build.bundletool.model.ZipPath;
 import com.android.tools.build.bundletool.model.exceptions.BundleFileTypesException.FileUsesReservedNameException;
-import com.android.tools.build.bundletool.model.exceptions.BundleFileTypesException.FilesInResourceDirectoryRootException;
 import com.android.tools.build.bundletool.model.exceptions.BundleFileTypesException.InvalidApexImagePathException;
 import com.android.tools.build.bundletool.model.exceptions.BundleFileTypesException.InvalidFileExtensionInDirectoryException;
 import com.android.tools.build.bundletool.model.exceptions.BundleFileTypesException.InvalidFileNameInDirectoryException;
@@ -186,15 +185,10 @@ public class BundleFilesValidatorTest {
   }
 
   @Test
-  public void validateResourceFile_directlyInRes_throws() throws Exception {
-    ZipPath directFile = ZipPath.create("res/icon.png");
+  public void validateResourceFile_directlyInRes_success() throws Exception {
+    ZipPath directFile = ZipPath.create("res/no-subdirectory.png");
 
-    FilesInResourceDirectoryRootException e =
-        assertThrows(
-            FilesInResourceDirectoryRootException.class,
-            () -> new BundleFilesValidator().validateModuleFile(directFile));
-
-    assertThat(e).hasMessageThat().contains("The res/ directory cannot contain files directly");
+    new BundleFilesValidator().validateModuleFile(directFile);
   }
 
   @Test

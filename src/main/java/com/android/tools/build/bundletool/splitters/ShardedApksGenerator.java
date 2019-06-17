@@ -91,21 +91,17 @@ public final class ShardedApksGenerator {
             .setMasterSplit(true)
             .build();
 
-    ImmutableList<ModuleSplit> additionalLanguageApks =
-        shardedApks.getAdditionalLanguageSplits().stream()
+    ImmutableList<ModuleSplit> additionalSplitApks =
+        shardedApks.getAdditionalSplits().stream()
             .map(
                 split ->
-                    split
-                        .toBuilder()
+                    split.toBuilder()
                         .setVariantTargeting(fusedApk.getVariantTargeting())
                         .setSplitType(SplitType.SYSTEM)
                         .build())
             .collect(toImmutableList());
 
-    return ImmutableList.<ModuleSplit>builder()
-        .add(fusedApk)
-        .addAll(additionalLanguageApks)
-        .build();
+    return ImmutableList.<ModuleSplit>builder().add(fusedApk).addAll(additionalSplitApks).build();
   }
 
   public ImmutableList<ModuleSplit> generateApexSplits(ImmutableList<BundleModule> modules) {
@@ -128,8 +124,7 @@ public final class ShardedApksGenerator {
 
   private static ModuleSplit setVariantTargetingAndSplitType(
       ModuleSplit moduleSplit, SplitType splitType) {
-    return moduleSplit
-        .toBuilder()
+    return moduleSplit.toBuilder()
         .setVariantTargeting(standaloneApkVariantTargeting(moduleSplit))
         .setSplitType(splitType)
         .build();

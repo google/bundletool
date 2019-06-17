@@ -20,6 +20,8 @@ import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.MoreCollectors.toOptional;
+import static com.google.common.truth.Fact.fact;
+import static com.google.common.truth.Fact.simpleFact;
 
 import com.android.aapt.Resources.Package;
 import com.android.aapt.Resources.ResourceTable;
@@ -33,28 +35,29 @@ import java.util.function.Predicate;
 import java.util.regex.Pattern;
 
 /** A subject for ResourceTable. */
-public class ResourceTableSubject extends Subject<ResourceTableSubject, ResourceTable> {
+public class ResourceTableSubject extends Subject {
 
   private static final Pattern RESOURCE_PATTERN =
       Pattern.compile("[a-zA-z][a-zA-z0-9_.]*:[a-zA-Z][a-zA-Z0-9_]*/[a-zA-Z][a-zA-Z0-9_]*");
   private static final Splitter COLON_SPLITTER = Splitter.on(':');
 
+  private final ResourceTable actual;
   private final FailureMetadata metadata;
 
   public ResourceTableSubject(FailureMetadata metadata, ResourceTable actual) {
     super(metadata, actual);
+    this.actual = actual;
     this.metadata = metadata;
   }
 
   public PackageSubject hasPackage(String packageName) {
     ImmutableList<Package> foundPackages = findPackages(packageName);
     if (foundPackages.isEmpty()) {
-      failWithoutActual("contains package with name '" + packageName + "'");
+      failWithoutActual(fact("expected to contain package with name", packageName));
     } else if (foundPackages.size() > 1) {
       failWithoutActual(
-          "contains more than one package with name '"
-              + packageName
-              + "'. Please also specify the package ID.");
+          fact("expected to contain exactly one package with name", packageName),
+          simpleFact("but contained multiple. Please also specify the package ID."));
     }
     return new PackageSubject(metadata, foundPackages.get(0));
   }
@@ -63,7 +66,7 @@ public class ResourceTableSubject extends Subject<ResourceTableSubject, Resource
     Optional<Package> foundPackage = findPackage(packageId);
 
     if (!foundPackage.isPresent()) {
-      failWithoutActual("contains package with id '" + packageId + "'");
+      failWithoutActual(fact("expected to contain package with id", packageId));
     }
     return new PackageSubject(metadata, foundPackage.get());
   }
@@ -73,14 +76,14 @@ public class ResourceTableSubject extends Subject<ResourceTableSubject, Resource
 
     if (!foundPackage.isPresent()) {
       failWithoutActual(
-          "contains package with id '" + packageId + "' and name: '" + packageName + "'");
+          fact("expected to contain package with id", packageId), fact("and name", packageName));
     }
     return new PackageSubject(metadata, foundPackage.get());
   }
 
   public void hasNoPackage(String packageName) {
     if (!findPackages(packageName).isEmpty()) {
-      failWithoutActual("does not contain package of name '" + packageName + "'");
+      failWithoutActual(fact("expected not to contain package with name", packageName));
     }
   }
 
@@ -135,7 +138,7 @@ public class ResourceTableSubject extends Subject<ResourceTableSubject, Resource
   }
 
   private Optional<Package> findPackage(Predicate<Package> predicate) {
-    return actual().getPackageList().stream().filter(predicate).collect(toOptional());
+    return actual.getPackageList().stream().filter(predicate).collect(toOptional());
   }
 
   /**
@@ -143,9 +146,7 @@ public class ResourceTableSubject extends Subject<ResourceTableSubject, Resource
    * expressed by returning a list of matched packages.
    */
   private ImmutableList<Package> findPackages(String packageName) {
-    return actual()
-        .getPackageList()
-        .stream()
+    return actual.getPackageList().stream()
         .filter(pkg -> pkg.getPackageName().equals(packageName))
         .collect(toImmutableList());
   }

@@ -15,6 +15,7 @@
  */
 package com.android.tools.build.bundletool.xml;
 
+import com.google.common.collect.ImmutableBiMap;
 import java.io.StringWriter;
 import javax.xml.transform.OutputKeys;
 import javax.xml.transform.Transformer;
@@ -26,6 +27,13 @@ import org.w3c.dom.Node;
 
 /** Utility methods related to XML manipulation. */
 public final class XmlUtils {
+
+  static final ImmutableBiMap<String, String> COMMON_NAMESPACE_PREFIXES =
+      ImmutableBiMap.<String, String>builder()
+          .put("http://schemas.android.com/apk/res/android", "android")
+          .put("http://schemas.android.com/apk/distribution", "dist")
+          .put("http://schemas.android.com/tools", "tools")
+          .build();
 
   public static String documentToString(Node document) {
     StringWriter sw = new StringWriter();

@@ -14,7 +14,7 @@
  * limitations under the License
  */
 
-package com.android.tools.build.bundletool.model.utils;
+package com.android.tools.build.bundletool.io;
 
 import com.android.tools.build.bundletool.model.exceptions.CommandExecutionException;
 import com.google.common.collect.ImmutableList;
@@ -29,7 +29,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 
 /** Utility methods for working with concurrent code. */
-public final class ConcurrencyUtils {
+final class ConcurrencyUtils {
 
   /** Retrieves results of all futures, if they succeed. If any fails, eagerly throws. */
   public static <T> ImmutableList<T> waitForAll(Iterable<ListenableFuture<T>> futures) {

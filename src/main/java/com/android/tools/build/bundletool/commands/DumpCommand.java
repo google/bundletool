@@ -142,9 +142,13 @@ public abstract class DumpCommand {
     validateInput();
 
     switch (getDumpTarget()) {
+      case CONFIG:
+        new DumpManager(getOutputStream(), getBundlePath()).printBundleConfig();
+        break;
+    
       case MANIFEST:
         BundleModuleName moduleName =
-            BundleModuleName.create(getModuleName().orElse(BundleModuleName.BASE_MODULE_NAME));
+            getModuleName().map(BundleModuleName::create).orElse(BundleModuleName.BASE_MODULE_NAME);
         new DumpManager(getOutputStream(), getBundlePath())
             .printManifest(moduleName, getXPathExpression());
         break;
@@ -212,7 +216,8 @@ public abstract class DumpCommand {
   /** Target of the dump. */
   public enum DumpTarget {
     MANIFEST("manifest"),
-    RESOURCES("resources");
+    RESOURCES("resources"),
+    CONFIG("config");
 
     static final ImmutableMap<String, DumpTarget> SUBCOMMAND_TO_TARGET =
         Arrays.stream(DumpTarget.values())
@@ -274,6 +279,10 @@ public abstract class DumpCommand {
                         "5. Prints a resource's configs and values from its resource type & name:%n"
                             + "$ bundletool dump resources --bundle=/tmp/app.aab "
                             + "--resource=drawable/icon --values"))
+                .addAdditionalParagraph(
+                    String.format(
+                        "6. Prints the content of the bundle configuration file:%n"
+                            + "$ bundletool dump config --bundle=/tmp/app.aab"))
                 .build())
         .addFlag(
             FlagDescription.builder()

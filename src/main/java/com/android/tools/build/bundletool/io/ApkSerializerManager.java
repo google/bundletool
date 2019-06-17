@@ -26,21 +26,22 @@ import static java.util.function.Function.identity;
 import com.android.bundle.Commands.ApkDescription;
 import com.android.bundle.Commands.ApkSet;
 import com.android.bundle.Commands.AssetModuleMetadata;
-import com.android.bundle.Commands.AssetSlice;
+import com.android.bundle.Commands.AssetSliceSet;
 import com.android.bundle.Commands.BuildApksResult;
+import com.android.bundle.Commands.InstantMetadata;
 import com.android.bundle.Commands.Variant;
 import com.android.bundle.Config.Bundletool;
 import com.android.bundle.Devices.DeviceSpec;
-import com.android.bundle.Targeting.ApkTargeting;
-import com.android.bundle.Targeting.AssetSliceTargeting;
 import com.android.bundle.Targeting.VariantTargeting;
 import com.android.tools.build.bundletool.commands.BuildApksCommand.ApkBuildMode;
 import com.android.tools.build.bundletool.device.ApkMatcher;
 import com.android.tools.build.bundletool.io.ApkSetBuilderFactory.ApkSetBuilder;
+import com.android.tools.build.bundletool.model.AndroidManifest;
 import com.android.tools.build.bundletool.model.ApkListener;
 import com.android.tools.build.bundletool.model.ApkModifier;
 import com.android.tools.build.bundletool.model.ApkModifier.ApkDescription.ApkType;
 import com.android.tools.build.bundletool.model.AppBundle;
+import com.android.tools.build.bundletool.model.BundleModule;
 import com.android.tools.build.bundletool.model.BundleModuleName;
 import com.android.tools.build.bundletool.model.GeneratedApks;
 import com.android.tools.build.bundletool.model.GeneratedAssetSlices;
@@ -48,15 +49,15 @@ import com.android.tools.build.bundletool.model.ManifestDeliveryElement;
 import com.android.tools.build.bundletool.model.ModuleSplit;
 import com.android.tools.build.bundletool.model.ModuleSplit.SplitType;
 import com.android.tools.build.bundletool.model.VariantKey;
-import com.android.tools.build.bundletool.model.exceptions.CommandExecutionException;
-import com.android.tools.build.bundletool.model.utils.ConcurrencyUtils;
 import com.android.tools.build.bundletool.model.version.BundleToolVersion;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableListMultimap;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Multimap;
+import com.google.common.collect.Multimaps;
 import com.google.common.util.concurrent.ListeningExecutorService;
+import java.util.Collection;
 import java.util.Map.Entry;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -95,7 +96,7 @@ public class ApkSerializerManager {
       Optional<DeviceSpec> deviceSpec) {
     ImmutableList<Variant> allVariantsWithTargeting =
         serializeApks(generatedApks, apkBuildMode, deviceSpec);
-    ImmutableList<AssetSlice> allAssetSlicesWithTargeting =
+    ImmutableList<AssetSliceSet> allAssetSliceSets =
         serializeAssetSlices(generatedAssetSlices, apkBuildMode, deviceSpec);
 
     // Finalize the output archive.
@@ -105,7 +106,7 @@ public class ApkSerializerManager {
             .setBundletool(
                 Bundletool.newBuilder()
                     .setVersion(BundleToolVersion.getCurrentVersion().toString()))
-            .addAllAssetSlice(allAssetSlicesWithTargeting)
+            .addAllAssetSliceSet(allAssetSliceSets)
             .build());
   }
 
@@ -164,13 +165,7 @@ public class ApkSerializerManager {
                             modifyApk(
                                 entry.getValue(), variantNumberByVariantKey.get(entry.getKey())))));
 
-    if (finalSplitsByVariant.isEmpty()) {
-      throw CommandExecutionException.builder()
-          .withMessage(
-              "No variants were generated or the generated variants are not matching "
-                  + "the device spec.")
-          .build();
-    }
+    checkState(!finalSplitsByVariant.isEmpty(), "Internal error: No variants were generated.");
 
     // After variant targeting of APKs are cleared, there might be duplicate APKs
     // which are removed and the distinct APKs are then serialized in parallel.
@@ -214,53 +209,68 @@ public class ApkSerializerManager {
   }
 
   @VisibleForTesting
-  ImmutableList<AssetSlice> serializeAssetSlices(
+  ImmutableList<AssetSliceSet> serializeAssetSlices(
       GeneratedAssetSlices generatedAssetSlices,
       ApkBuildMode apkBuildMode,
       Optional<DeviceSpec> deviceSpec) {
-
-    ImmutableList<ModuleSplit> assetSlices = generatedAssetSlices.getAssetSlices();
 
     Predicate<ModuleSplit> deviceFilter =
         deviceSpec.isPresent()
             ? new ApkMatcher(deviceSpec.get())::matchesModuleSplitByTargeting
             : alwaysTrue();
 
+    ImmutableList<ModuleSplit> assetSlices =
+        generatedAssetSlices.getAssetSlices().stream()
+            .filter(deviceFilter)
+            .collect(toImmutableList());
+
+    ImmutableMap<BundleModuleName, Collection<ModuleSplit>> slicesByModule =
+        Multimaps.index(assetSlices, ModuleSplit::getModuleName).asMap();
+
+    ImmutableList.Builder<AssetSliceSet> finalSlices = new ImmutableList.Builder<>();
+
     ApkSerializer apkSerializer = new ApkSerializer(apkListener, apkBuildMode);
-    ImmutableList.Builder<AssetSlice> finalSlices = new ImmutableList.Builder<>();
-    for (ModuleSplit slice : assetSlices) {
-      if (deviceFilter.test(slice)) {
-        finalSlices.add(
-            AssetSlice.newBuilder()
-                .setTargeting(getAssetSliceTargeting(slice))
-                .setAssetModuleMetadata(getAssetModuleMetadata(slice))
-                .addAllApkDescription(apkSerializer.serialize(slice))
-                .build());
-      }
+
+    for (BundleModuleName moduleName : slicesByModule.keySet()) {
+      finalSlices.add(
+          AssetSliceSet.newBuilder()
+              .setAssetModuleMetadata(getAssetModuleMetadata(appBundle.getModule(moduleName)))
+              .addAllApkDescription(
+                  slicesByModule.get(moduleName).stream()
+                      .flatMap(slice -> apkSerializer.serialize(slice).stream())
+                      .collect(toImmutableList()))
+              .build());
     }
     return finalSlices.build();
   }
 
-  private AssetSliceTargeting getAssetSliceTargeting(ModuleSplit slice) {
-    AssetSliceTargeting.Builder targetingBuilder = AssetSliceTargeting.newBuilder();
-    return targetingBuilder.build();
-  }
-
-  private AssetModuleMetadata getAssetModuleMetadata(ModuleSplit slice) {
-    // This implementation does not handle instant metadata.
-    checkState(
-        !slice.getAndroidManifest().isInstantModule().orElse(false),
-        "Serialization of asset slices doesn't yet support instant metadata.");
+  private AssetModuleMetadata getAssetModuleMetadata(BundleModule module) {
+    AndroidManifest manifest = module.getAndroidManifest();
     AssetModuleMetadata.Builder metadataBuilder =
-        AssetModuleMetadata.newBuilder().setName(slice.getModuleName().getName());
-    Optional<ManifestDeliveryElement> persistentDelivery =
-        slice.getAndroidManifest().getManifestDeliveryElement();
+        AssetModuleMetadata.newBuilder().setName(module.getName().getName());
+    Optional<ManifestDeliveryElement> persistentDelivery = manifest.getManifestDeliveryElement();
     persistentDelivery.ifPresent(
         delivery -> metadataBuilder.setOnDemand(delivery.hasOnDemandElement()));
+    // The module is instant if either the dist:instant attribute is true or the
+    // dist:instant-delivery element is present.
+    boolean isInstantModule = module.isInstantModule();
+    InstantMetadata.Builder instantMetadataBuilder =
+        InstantMetadata.newBuilder().setIsInstant(isInstantModule);
+    // The ManifestDeliveryElement is present if the dist:instant-delivery element is used.
+    Optional<ManifestDeliveryElement> instantDelivery =
+        manifest.getInstantManifestDeliveryElement();
+    if (isInstantModule) {
+      // If it's an instant-enabled module, the instant delivery is on-demand if the dist:instant
+      // attribute was set to true or if the dist:instant-delivery element was used without an
+      // install-time element.
+      instantMetadataBuilder.setOnDemand(
+          instantDelivery.map(delivery -> !delivery.hasInstallTimeElement()).orElse(true));
+    }
+    metadataBuilder.setInstantMetadata(instantMetadataBuilder.build());
     return metadataBuilder.build();
   }
 
-  private void validateInput(GeneratedApks generatedApks, ApkBuildMode apkBuildMode) {
+  private static void validateInput(GeneratedApks generatedApks, ApkBuildMode apkBuildMode) {
     switch (apkBuildMode) {
       case DEFAULT:
         checkArgument(
@@ -282,6 +292,22 @@ public class ApkSerializerManager {
                 && generatedApks.getStandaloneApks().isEmpty(),
             "Internal error: For system mode expecting only system APKs.");
         break;
+      case PERSISTENT:
+        checkArgument(
+            generatedApks.getSystemApks().isEmpty(),
+            "Internal error: System APKs not expected with persistent mode.");
+        checkArgument(
+            generatedApks.getInstantApks().isEmpty(),
+            "Internal error: Instant APKs not expected with persistent mode.");
+        break;
+      case INSTANT:
+        checkArgument(
+            generatedApks.getSystemApks().isEmpty(),
+            "Internal error: System APKs not expected with instant mode.");
+        checkArgument(
+            generatedApks.getSplitApks().isEmpty() && generatedApks.getStandaloneApks().isEmpty(),
+            "Internal error: Persistent APKs not expected with instant mode.");
+        break;
     }
   }
 
@@ -298,16 +324,14 @@ public class ApkSerializerManager {
             .setApkTargeting(moduleSplit.getApkTargeting())
             .build();
 
-    return moduleSplit
-        .toBuilder()
+    return moduleSplit.toBuilder()
         .setAndroidManifest(
             apkModifier.modifyManifest(moduleSplit.getAndroidManifest(), apkDescription))
         .build();
   }
 
   private static ModuleSplit clearVariantTargeting(ModuleSplit moduleSplit) {
-    return moduleSplit
-        .toBuilder()
+    return moduleSplit.toBuilder()
         .setVariantTargeting(VariantTargeting.getDefaultInstance())
         .build();
   }
@@ -331,7 +355,7 @@ public class ApkSerializerManager {
           apkDescriptions = ImmutableList.of(apkSetBuilder.addSplitApk(split));
           break;
         case SYSTEM:
-          if (split.isMasterSplit()) {
+          if (split.isBaseModuleSplit() && split.isMasterSplit()) {
             apkDescriptions =
                 apkBuildMode.equals(ApkBuildMode.SYSTEM_COMPRESSED)
                     ? apkSetBuilder.addCompressedSystemApks(split)

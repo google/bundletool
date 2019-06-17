@@ -19,7 +19,6 @@ package com.android.tools.build.bundletool.device.activitymanager;
 import static com.google.common.truth.Truth.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
-import com.android.tools.build.bundletool.model.exceptions.CommandExecutionException;
 import com.google.common.collect.ImmutableList;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -44,12 +43,8 @@ public class AbiStringParserTest {
 
   @Test
   public void unrecognizedSingleAbi() {
-    Throwable exception =
-        assertThrows(
-            CommandExecutionException.class, () -> AbiStringParser.parseAbiLine("abi: arm64-v9a"));
-    assertThat(exception)
-        .hasMessageThat()
-        .contains("Unknown ABI 'arm64-v9a' encountered while parsing activity manager config.");
+    ImmutableList<String> abis = AbiStringParser.parseAbiLine("abi: arm64-v9a");
+    assertThat(abis).isEmpty();
   }
 
   @Test
@@ -60,13 +55,8 @@ public class AbiStringParserTest {
 
   @Test
   public void unrecognizedMultipleAbis() {
-    Throwable exception =
-        assertThrows(
-            CommandExecutionException.class,
-            () -> AbiStringParser.parseAbiLine("abi: x86_64,arm64-v10a,arm64-v8a"));
-    assertThat(exception)
-        .hasMessageThat()
-        .contains("Unknown ABI 'arm64-v10a' encountered while parsing activity manager config.");
+    ImmutableList<String> abis = AbiStringParser.parseAbiLine("abi: x86_64,arm64-v10a,arm64-v8a");
+    assertThat(abis).containsExactly("x86_64", "arm64-v8a").inOrder();
   }
 
   @Test

@@ -248,7 +248,7 @@ public final class GetSizeCommandTest {
             new FlagParser()
                 .parse("get-size", "total", "--apks=" + apksArchiveFile, "--dimensions=" + "ALL"));
 
-    assertThat(command.getDimensions()).isSameAs(SUPPORTED_DIMENSIONS);
+    assertThat(command.getDimensions()).isSameInstanceAs(SUPPORTED_DIMENSIONS);
   }
 
   @Test
@@ -297,7 +297,8 @@ public final class GetSizeCommandTest {
   }
 
   @Test
-  public void builderAndFlagsConstruction_optionalDeviceSpec_equivalent() throws Exception {
+  public void builderAndFlagsConstruction_optionalDeviceSpec_inJavaViaApi_equivalent()
+      throws Exception {
     DeviceSpec deviceSpec = deviceWithSdk(21);
     Path deviceSpecFile = createDeviceSpecFile(deviceSpec, tmpDir.resolve("device.json"));
     BuildApksResult tableOfContentsProto = BuildApksResult.getDefaultInstance();
@@ -318,6 +319,35 @@ public final class GetSizeCommandTest {
         GetSizeCommand.builder()
             .setApksArchivePath(apksArchiveFile)
             .setDeviceSpec(deviceSpec)
+            .setGetSizeSubCommand(GetSizeSubcommand.TOTAL)
+            .build();
+
+    assertThat(fromFlags).isEqualTo(fromBuilderApi);
+  }
+
+  @Test
+  public void builderAndFlagsConstruction_optionalDeviceSpec_inJavaViaFiles_equivalent()
+      throws Exception {
+    DeviceSpec deviceSpec = deviceWithSdk(21);
+    Path deviceSpecFile = createDeviceSpecFile(deviceSpec, tmpDir.resolve("device.json"));
+    BuildApksResult tableOfContentsProto = BuildApksResult.getDefaultInstance();
+    Path apksArchiveFile =
+        createApksArchiveFile(tableOfContentsProto, tmpDir.resolve("bundle.apks"));
+
+    GetSizeCommand fromFlags =
+        GetSizeCommand.fromFlags(
+            new FlagParser()
+                .parse(
+                    "get-size",
+                    "total",
+                    "--apks=" + apksArchiveFile,
+                    // Optional values.
+                    "--device-spec=" + deviceSpecFile));
+
+    GetSizeCommand fromBuilderApi =
+        GetSizeCommand.builder()
+            .setApksArchivePath(apksArchiveFile)
+            .setDeviceSpec(deviceSpecFile)
             .setGetSizeSubCommand(GetSizeSubcommand.TOTAL)
             .build();
 

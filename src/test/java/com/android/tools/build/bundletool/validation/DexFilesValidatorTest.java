@@ -16,11 +16,10 @@
 
 package com.android.tools.build.bundletool.validation;
 
-import static com.android.tools.build.bundletool.model.AndroidManifest.MODULE_TYPE_ASSET_VALUE;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifest;
+import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifestForAssetModule;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.clearHasCode;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withHasCode;
-import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withTypeAttribute;
 import static com.google.common.truth.Truth.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
@@ -218,9 +217,7 @@ public class DexFilesValidatorTest {
         new BundleModuleBuilder("base")
             .addFile(
                 "manifest/AndroidManifest.xml",
-                androidManifest(
-                        "com.test.app", withTypeAttribute(MODULE_TYPE_ASSET_VALUE), clearHasCode())
-                    .toByteArray())
+                androidManifestForAssetModule("com.test.app").toByteArray())
             .build();
 
     new DexFilesValidator().validateModule(module);

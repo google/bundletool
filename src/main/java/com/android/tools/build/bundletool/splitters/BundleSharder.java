@@ -103,10 +103,9 @@ public class BundleSharder {
   }
 
   /**
-   * Generates sharded system APK and additional split APK from the input modules.
+   * Generates sharded system APK and additional split APK from the given modules.
    *
-   * <p>We target a specific "ABI" x "Screen Density" x "Language" configuration specified in the
-   * device spec.
+   * <p>We target the (ABI, Screen Density, Languages) configuration specified in the device spec.
    */
   public ShardedSystemSplits shardForSystemApps(
       ImmutableList<BundleModule> modules,
@@ -117,6 +116,10 @@ public class BundleSharder {
         "Device spec should be set when sharding for system apps.");
     return merger.mergeSystemShard(
         Iterables.getOnlyElement(generateUnfusedShards(modules, shardingDimensions)),
+        modules.stream()
+            .filter(BundleModule::isIncludedInFusing)
+            .map(BundleModule::getName)
+            .collect(toImmutableSet()),
         bundleMetadata,
         bundleSharderConfiguration.getDeviceSpec().get());
   }
@@ -127,8 +130,7 @@ public class BundleSharder {
 
     // Generate a flat list of splits from all input modules.
     ImmutableList<ModuleSplit> moduleSplits =
-        modules
-            .stream()
+        modules.stream()
             .flatMap(module -> generateSplits(module, shardingDimensions).stream())
             .collect(toImmutableList());
 
@@ -366,8 +368,7 @@ public class BundleSharder {
   private static boolean sameTargetedUniverse(
       Set<ModuleSplit> splits, Function<ModuleSplit, Collection<?>> getUniverseFn) {
     long distinctNonEmptyUniverseCount =
-        splits
-            .stream()
+        splits.stream()
             .map(getUniverseFn::apply)
             // Filter out splits having no targeting in the dimension of the universe.
             .filter(not(Collection::isEmpty))

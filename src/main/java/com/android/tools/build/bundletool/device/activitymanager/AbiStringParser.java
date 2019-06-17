@@ -20,10 +20,8 @@ import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 
 import com.android.tools.build.bundletool.model.AbiName;
-import com.android.tools.build.bundletool.model.exceptions.CommandExecutionException;
 import com.google.common.collect.ImmutableList;
 import java.util.Arrays;
-import java.util.Optional;
 
 /**
  * Parsing utilities of the ABI line output of ActivityManager shell command.
@@ -39,19 +37,9 @@ public class AbiStringParser {
 
     String abiString = abiLine.substring("abi: ".length());
 
-    ImmutableList<String> abiNames =
-        Arrays.stream(abiString.split(",")).map(String::trim).collect(toImmutableList());
-
-    // Validate all discovered ABI strings.
-    for (String abiName : abiNames) {
-      Optional<AbiName> abi = AbiName.fromPlatformName(abiName);
-      if (!abi.isPresent()) {
-        throw CommandExecutionException.builder()
-            .withMessage(
-                "Unknown ABI '%s' encountered while parsing activity manager config.", abiName)
-            .build();
-      }
-    }
-    return abiNames;
+    return Arrays.stream(abiString.split(","))
+        .map(String::trim)
+        .filter(abiName -> AbiName.fromPlatformName(abiName).isPresent())
+        .collect(toImmutableList());
   }
 }

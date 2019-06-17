@@ -27,12 +27,15 @@ import static com.android.tools.build.bundletool.model.AndroidManifest.EXTRACT_N
 import static com.android.tools.build.bundletool.model.AndroidManifest.HAS_CODE_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.ICON_ATTRIBUTE_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.ICON_RESOURCE_ID;
+import static com.android.tools.build.bundletool.model.AndroidManifest.INSTALL_LOCATION_ATTRIBUTE_NAME;
+import static com.android.tools.build.bundletool.model.AndroidManifest.INSTALL_LOCATION_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.MAX_SDK_VERSION_ATTRIBUTE_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.MAX_SDK_VERSION_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.META_DATA_ELEMENT_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.META_DATA_KEY_FUSED_MODULE_NAMES;
 import static com.android.tools.build.bundletool.model.AndroidManifest.MIN_SDK_VERSION_ATTRIBUTE_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.MIN_SDK_VERSION_RESOURCE_ID;
+import static com.android.tools.build.bundletool.model.AndroidManifest.MODULE_TYPE_ASSET_VALUE;
 import static com.android.tools.build.bundletool.model.AndroidManifest.NAME_ATTRIBUTE_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.NAME_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.NO_NAMESPACE_URI;
@@ -47,6 +50,8 @@ import static com.android.tools.build.bundletool.model.AndroidManifest.TARGET_SD
 import static com.android.tools.build.bundletool.model.AndroidManifest.USES_SDK_ELEMENT_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.VALUE_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.VERSION_CODE_RESOURCE_ID;
+import static com.android.tools.build.bundletool.model.AndroidManifest.VERSION_NAME_ATTRIBUTE_NAME;
+import static com.android.tools.build.bundletool.model.AndroidManifest.VERSION_NAME_RESOURCE_ID;
 
 import com.android.aapt.Resources;
 import com.android.aapt.Resources.Item;
@@ -149,25 +154,8 @@ public final class ManifestProtoUtils {
     return xmlAttribute(NO_NAMESPACE_URI, name, NO_RESOURCE_ID, value);
   }
 
-  public static XmlAttribute xmlBooleanAttribute(String name, boolean value) {
-    return xmlBooleanAttribute(NO_NAMESPACE_URI, name, NO_RESOURCE_ID, value);
-  }
-
-  public static XmlAttribute xmlDecimalIntegerAttribute(String name, int value) {
-    return xmlDecimalIntegerAttribute(NO_NAMESPACE_URI, name, NO_RESOURCE_ID, value);
-  }
-
   public static XmlAttribute xmlAttribute(String namespaceUri, String name, String value) {
     return xmlAttribute(namespaceUri, name, NO_RESOURCE_ID, value);
-  }
-
-  public static XmlAttribute xmlBooleanAttribute(String namespaceUri, String name, boolean value) {
-    return xmlBooleanAttribute(namespaceUri, name, NO_RESOURCE_ID, value);
-  }
-
-  public static XmlAttribute xmlDecimalIntegerAttribute(
-      String namespaceUri, String name, int value) {
-    return xmlDecimalIntegerAttribute(namespaceUri, name, NO_RESOURCE_ID, value);
   }
 
   public static XmlAttribute xmlAttribute(
@@ -181,10 +169,27 @@ public final class ManifestProtoUtils {
         .build();
   }
 
+  public static XmlAttribute xmlBooleanAttribute(String name, boolean value) {
+    return xmlBooleanAttribute(NO_NAMESPACE_URI, name, NO_RESOURCE_ID, value);
+  }
+
+  public static XmlAttribute xmlBooleanAttribute(String namespaceUri, String name, boolean value) {
+    return xmlBooleanAttribute(namespaceUri, name, NO_RESOURCE_ID, value);
+  }
+
   public static XmlAttribute xmlBooleanAttribute(
       String namespaceUri, String name, int resourceId, boolean value) {
     return xmlPrimitiveAttribute(
         namespaceUri, name, resourceId, Primitive.newBuilder().setBooleanValue(value).build(), "");
+  }
+
+  public static XmlAttribute xmlDecimalIntegerAttribute(String name, int value) {
+    return xmlDecimalIntegerAttribute(NO_NAMESPACE_URI, name, NO_RESOURCE_ID, value);
+  }
+
+  public static XmlAttribute xmlDecimalIntegerAttribute(
+      String namespaceUri, String name, int value) {
+    return xmlDecimalIntegerAttribute(namespaceUri, name, NO_RESOURCE_ID, value);
   }
 
   public static XmlAttribute xmlDecimalIntegerAttribute(
@@ -278,6 +283,30 @@ public final class ManifestProtoUtils {
             ManifestMutator.class));
   }
 
+  public static XmlNode androidManifestForAssetModule(
+      String packageName, ManifestMutator... manifestMutators) {
+    XmlNode manifestNode =
+        xmlNode(
+            xmlElement(
+                "manifest",
+                ImmutableList.of(xmlNamespace("android", ANDROID_NAMESPACE_URI)),
+                ImmutableList.of(xmlAttribute("package", packageName))));
+
+    XmlProtoNodeBuilder xmlProtoNode = new XmlProtoNode(manifestNode).toBuilder();
+    // Default mutators
+    withTypeAttribute(MODULE_TYPE_ASSET_VALUE).accept(xmlProtoNode.getElement());
+    withFusingAttribute(true).accept(xmlProtoNode.getElement());
+    // Additional mutators and overrides of defaults.
+    for (ManifestMutator manifestMutator : manifestMutators) {
+      manifestMutator.accept(xmlProtoNode.getElement());
+    }
+    // Set a delivery mode if none was set.
+    if (!AndroidManifest.create(xmlProtoNode.build().getProto()).isDeliveryTypeDeclared()) {
+      withOnDemandDelivery().accept(xmlProtoNode.getElement());
+    }
+    return xmlProtoNode.build().getProto();
+  }
+
   public static ManifestMutator withDebuggableAttribute(boolean value) {
     return manifestElement ->
         manifestElement
@@ -307,6 +336,10 @@ public final class ManifestProtoUtils {
             .setValueAsRefId(refId);
   }
 
+  public static ManifestMutator withApplication() {
+    return manifestElement -> manifestElement.getOrCreateChildElement(APPLICATION_ELEMENT_NAME);
+  }
+
   public static ManifestMutator withHasCode(boolean hasCode) {
     return manifestElement ->
         manifestElement
@@ -321,15 +354,6 @@ public final class ManifestProtoUtils {
             .getOptionalChildElement(APPLICATION_ELEMENT_NAME)
             .ifPresent(
                 application -> application.removeAttribute(ANDROID_NAMESPACE_URI, "hasCode"));
-  }
-
-  public static ManifestMutator clearApplication() {
-    return manifestElement ->
-        manifestElement.removeChildrenElementsIf(
-            child ->
-                child.isElement()
-                    && child.getElement().getNamespaceUri().equals(NO_NAMESPACE_URI)
-                    && child.getElement().getName().equals(APPLICATION_ELEMENT_NAME));
   }
 
   public static ManifestMutator withSplitId(String splitId) {
@@ -405,6 +429,30 @@ public final class ManifestProtoUtils {
             .setValueAsBoolean(value);
   }
 
+  /**
+   * Adds the dist:instant-delivery tag under the dist:module tag, with a dist:on-demand tag inside
+   * it.
+   */
+  public static ManifestMutator withInstantOnDemandDelivery() {
+    return manifestElement ->
+        manifestElement
+            .getOrCreateChildElement(DISTRIBUTION_NAMESPACE_URI, "module")
+            .getOrCreateChildElement(DISTRIBUTION_NAMESPACE_URI, "instant-delivery")
+            .getOrCreateChildElement(DISTRIBUTION_NAMESPACE_URI, "on-demand");
+  }
+
+  /**
+   * Adds the dist:instant-delivery tag under the dist:module tag, with a dist:install-time tag
+   * inside it.
+   */
+  public static ManifestMutator withInstantInstallTimeDelivery() {
+    return manifestElement ->
+        manifestElement
+            .getOrCreateChildElement(DISTRIBUTION_NAMESPACE_URI, "module")
+            .getOrCreateChildElement(DISTRIBUTION_NAMESPACE_URI, "instant-delivery")
+            .getOrCreateChildElement(DISTRIBUTION_NAMESPACE_URI, "install-time");
+  }
+
   public static ManifestMutator withFusedModuleNames(String modulesString) {
     return withMetadataValue(META_DATA_KEY_FUSED_MODULE_NAMES, modulesString);
   }
@@ -477,6 +525,21 @@ public final class ManifestProtoUtils {
         manifestElement
             .getOrCreateAndroidAttribute("versionCode", VERSION_CODE_RESOURCE_ID)
             .setValueAsDecimalInteger(versionCode);
+  }
+
+  public static ManifestMutator withVersionName(String versionName) {
+    return manifestElement ->
+        manifestElement
+            .getOrCreateAndroidAttribute(VERSION_NAME_ATTRIBUTE_NAME, VERSION_NAME_RESOURCE_ID)
+            .setValueAsString(versionName);
+  }
+
+  public static ManifestMutator withInstallLocation(String installLocation) {
+    return manifestElement ->
+        manifestElement
+            .getOrCreateAndroidAttribute(
+                INSTALL_LOCATION_ATTRIBUTE_NAME, INSTALL_LOCATION_RESOURCE_ID)
+            .setValueAsString(installLocation);
   }
 
   public static ManifestMutator withUsesSplit(String... splitIds) {

@@ -20,7 +20,7 @@ import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.andr
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withSplitId;
 import static com.google.common.truth.Truth.assertThat;
 import static com.google.common.truth.Truth8.assertThat;
-import static org.mockito.Matchers.anyObject;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Matchers.eq;
 import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.times;
@@ -166,13 +166,13 @@ public class ValidatorRunnerTest {
 
       order.verify(validator).validateBundle(eq(bundle));
       order.verify(validator).validateAllModules(eq(bundleFeatureModules));
-      order.verify(validator).validateModule(anyObject());
-      order.verify(validator, atLeastOnce()).validateModuleFile(anyObject());
+      order.verify(validator).validateModule(any());
+      order.verify(validator, atLeastOnce()).validateModuleFile(any());
 
       order.verify(validator2).validateBundle(eq(bundle));
       order.verify(validator2).validateAllModules(eq(bundleFeatureModules));
-      order.verify(validator2).validateModule(anyObject());
-      order.verify(validator2, atLeastOnce()).validateModuleFile(anyObject());
+      order.verify(validator2).validateModule(any());
+      order.verify(validator2, atLeastOnce()).validateModuleFile(any());
 
       order.verifyNoMoreInteractions();
     }

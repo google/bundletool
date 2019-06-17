@@ -15,11 +15,10 @@
  */
 package com.android.tools.build.bundletool.validation;
 
-import static com.android.tools.build.bundletool.model.AndroidManifest.MODULE_TYPE_ASSET_VALUE;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifest;
+import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifestForAssetModule;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifestForFeature;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withSplitId;
-import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withTypeAttribute;
 import static com.google.common.truth.Truth.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
@@ -76,12 +75,9 @@ public final class ModuleNamesValidatorTest {
         buildBundleModule("base").setAndroidManifestProto(androidManifest("com.app")).build();
     BundleModule assetModule =
         buildBundleModule("asset")
-            .setAndroidManifestProto(
-                androidManifest(
-                    "com.app", withTypeAttribute(MODULE_TYPE_ASSET_VALUE), withSplitId("asset")))
+            .setAndroidManifestProto(androidManifestForAssetModule("com.app", withSplitId("asset")))
             .build();
 
-    // Check that the validation passes with two modules with no split id set (base and assetModule)
     new ModuleNamesValidator().validateAllModules(ImmutableList.of(base, assetModule));
   }
 

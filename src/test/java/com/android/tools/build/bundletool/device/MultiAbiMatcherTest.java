@@ -26,7 +26,6 @@ import static com.google.common.truth.Truth.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.android.bundle.Targeting.MultiAbiTargeting;
-import com.android.tools.build.bundletool.model.exceptions.CommandExecutionException;
 import com.google.common.collect.ImmutableSet;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -68,27 +67,27 @@ public class MultiAbiMatcherTest {
 
     // Only 64-bit architectures.
     assertThrows(
-        CommandExecutionException.class,
+        IncompatibleDeviceException.class,
         () -> matcher.checkDeviceCompatible(multiAbiTargeting(X86_64)));
     assertThrows(
-        CommandExecutionException.class,
+        IncompatibleDeviceException.class,
         () -> matcher.checkDeviceCompatible(multiAbiTargeting(setOf(setOf(X86_64, ARM64_V8A)))));
     assertThrows(
-        CommandExecutionException.class,
+        IncompatibleDeviceException.class,
         () ->
             matcher.checkDeviceCompatible(
                 multiAbiTargeting(setOf(setOf(ARM64_V8A), setOf(X86_64)))));
     assertThrows(
-        CommandExecutionException.class,
+        IncompatibleDeviceException.class,
         () -> matcher.checkDeviceCompatible(multiAbiTargeting(ARM64_V8A, setOf(X86_64))));
     // No set is fully contained in (x86, armeabi-v7a).
     assertThrows(
-        CommandExecutionException.class,
+        IncompatibleDeviceException.class,
         () ->
             matcher.checkDeviceCompatible(
                 multiAbiTargeting(setOf(setOf(X86_64, X86), setOf(ARM64_V8A)))));
     assertThrows(
-        CommandExecutionException.class,
+        IncompatibleDeviceException.class,
         () ->
             matcher.checkDeviceCompatible(
                 multiAbiTargeting(setOf(setOf(X86_64, X86, ARM64_V8A, ARMEABI_V7A)))));

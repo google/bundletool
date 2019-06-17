@@ -46,7 +46,7 @@ public class ResouceTableException extends ValidationException {
     private final String moduleName;
 
     public ResourceTableMissingException(String moduleName) {
-      super("Module '%s' is missing resource table but contains resource files.", moduleName);
+      super("Module '%s' contains resource files but is missing a resource table.", moduleName);
       this.moduleName = moduleName;
     }
 

@@ -27,6 +27,7 @@ import com.android.bundle.Targeting.AssetsDirectoryTargeting;
 import com.android.tools.build.bundletool.mergers.SameTargetingMerger;
 import com.android.tools.build.bundletool.model.ModuleEntry;
 import com.android.tools.build.bundletool.model.ModuleSplit;
+import com.android.tools.build.bundletool.model.ZipPath;
 import com.google.common.base.Function;
 import com.google.common.collect.ImmutableCollection;
 import com.google.common.collect.ImmutableList;
@@ -127,7 +128,8 @@ public class AssetsDimensionSplitterFactory {
       private ImmutableList<ModuleEntry> findEntriesInDirectories(
           Collection<TargetedAssetsDirectory> directories, ModuleSplit moduleSplit) {
         return directories.stream()
-            .flatMap(directory -> moduleSplit.findEntriesInsideDirectory(directory.getPath()))
+            .map(targetedAssetsDirectory -> ZipPath.create(targetedAssetsDirectory.getPath()))
+            .flatMap(moduleSplit::getEntriesInDirectory)
             .collect(toImmutableList());
       }
     };

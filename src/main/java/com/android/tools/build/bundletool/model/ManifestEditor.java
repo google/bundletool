@@ -44,6 +44,8 @@ import static com.android.tools.build.bundletool.model.AndroidManifest.USES_FEAT
 import static com.android.tools.build.bundletool.model.AndroidManifest.USES_SDK_ELEMENT_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.VALUE_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.VERSION_CODE_RESOURCE_ID;
+import static com.android.tools.build.bundletool.model.AndroidManifest.VERSION_NAME_ATTRIBUTE_NAME;
+import static com.android.tools.build.bundletool.model.AndroidManifest.VERSION_NAME_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.utils.xmlproto.XmlProtoAttributeBuilder.createAndroidAttribute;
 import static com.google.common.collect.MoreCollectors.toOptional;
 import static java.util.stream.Collectors.joining;
@@ -125,6 +127,13 @@ public class ManifestEditor {
     manifestElement
         .getOrCreateAndroidAttribute("versionCode", VERSION_CODE_RESOURCE_ID)
         .setValueAsDecimalInteger(versionCode);
+    return this;
+  }
+
+  public ManifestEditor setVersionName(String versionName) {
+    manifestElement
+        .getOrCreateAndroidAttribute(VERSION_NAME_ATTRIBUTE_NAME, VERSION_NAME_RESOURCE_ID)
+        .setValueAsString(versionName);
     return this;
   }
 

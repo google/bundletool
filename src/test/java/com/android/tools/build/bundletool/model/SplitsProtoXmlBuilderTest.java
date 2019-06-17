@@ -80,9 +80,7 @@ public final class SplitsProtoXmlBuilderTest {
   public void buildManyModules() {
     SplitsProtoXmlBuilder splitsProtoXmlBuilder = new SplitsProtoXmlBuilder();
     splitsProtoXmlBuilder.addLanguageMapping(
-        BundleModuleName.create(BASE_MODULE_NAME),
-        /* language = */ "ru",
-        /* splitId = */ "config.ru");
+        BASE_MODULE_NAME, /* language = */ "ru", /* splitId = */ "config.ru");
     splitsProtoXmlBuilder.addLanguageMapping(
         BundleModuleName.create("module"),
         /* language = */ "en",
@@ -129,17 +127,13 @@ public final class SplitsProtoXmlBuilderTest {
   public void buildManyEntries() {
     SplitsProtoXmlBuilder splitsProtoXmlBuilder = new SplitsProtoXmlBuilder();
     splitsProtoXmlBuilder.addLanguageMapping(
-        BundleModuleName.create(BASE_MODULE_NAME),
-        /* language = */ "ru",
-        /* splitId = */ "config.ru");
+        BASE_MODULE_NAME, /* language = */ "ru", /* splitId = */ "config.ru");
 
     splitsProtoXmlBuilder.addLanguageMapping(
-        BundleModuleName.create(BASE_MODULE_NAME), /* language = */ "en", /* splitId = */ "");
+        BASE_MODULE_NAME, /* language = */ "en", /* splitId = */ "");
 
     splitsProtoXmlBuilder.addLanguageMapping(
-        BundleModuleName.create(BASE_MODULE_NAME),
-        /* language = */ "fr",
-        /* splitId = */ "config.fr");
+        BASE_MODULE_NAME, /* language = */ "fr", /* splitId = */ "config.fr");
 
     XmlNode rootNode = splitsProtoXmlBuilder.build();
     // Answer:
@@ -205,20 +199,16 @@ public final class SplitsProtoXmlBuilderTest {
   public void buildMultipleAssign_throws() {
     SplitsProtoXmlBuilder splitsProtoXmlBuilder = new SplitsProtoXmlBuilder();
     splitsProtoXmlBuilder.addLanguageMapping(
-        BundleModuleName.create(BASE_MODULE_NAME),
-        /* language = */ "ru",
-        /* splitId = */ "config.ru");
+        BASE_MODULE_NAME, /* language = */ "ru", /* splitId = */ "config.ru");
 
     splitsProtoXmlBuilder.addLanguageMapping(
-        BundleModuleName.create(BASE_MODULE_NAME), /* language = */ "en", /* splitId = */ "");
+        BASE_MODULE_NAME, /* language = */ "en", /* splitId = */ "");
 
     assertThrows(
         CommandExecutionException.class,
         () ->
             splitsProtoXmlBuilder.addLanguageMapping(
-                BundleModuleName.create(BASE_MODULE_NAME),
-                /* language = */ "ru",
-                /* splitId = */ "config.ru"));
+                BASE_MODULE_NAME, /* language = */ "ru", /* splitId = */ "config.ru"));
   }
 
   private static XmlProtoAttributeBuilder createAttribute(String key, String value) {

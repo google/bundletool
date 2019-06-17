@@ -102,7 +102,7 @@ public class BuildApksDeviceSpecTest {
   }
 
   @Test
-  public void deviceSpec_flagsEquivalent() throws Exception {
+  public void deviceSpecFlags_inJavaViaProtos_equivalent() throws Exception {
     ByteArrayOutputStream output = new ByteArrayOutputStream();
     DeviceSpec deviceSpec = deviceWithSdk(28);
     Path deviceSpecPath = createDeviceSpecFile(deviceSpec, tmpDir.resolve("device.json"));
@@ -123,6 +123,39 @@ public class BuildApksDeviceSpecTest {
             .setOutputFile(outputFilePath)
             // Optional values.
             .setDeviceSpec(deviceSpec)
+            // Must copy instance of the internal executor service.
+            .setExecutorServiceInternal(commandViaFlags.getExecutorService())
+            .setExecutorServiceCreatedByBundleTool(true)
+            .setOutputPrintStream(commandViaFlags.getOutputPrintStream().get());
+
+    DebugKeystoreUtils.getDebugSigningConfiguration(systemEnvironmentProvider)
+        .ifPresent(commandViaBuilder::setSigningConfiguration);
+
+    assertThat(commandViaBuilder.build()).isEqualTo(commandViaFlags);
+  }
+
+  @Test
+  public void deviceSpecFlags_inJavaViaFiles_equivalent() throws Exception {
+    ByteArrayOutputStream output = new ByteArrayOutputStream();
+    DeviceSpec deviceSpec = deviceWithSdk(28);
+    Path deviceSpecPath = createDeviceSpecFile(deviceSpec, tmpDir.resolve("device.json"));
+    BuildApksCommand commandViaFlags =
+        BuildApksCommand.fromFlags(
+            new FlagParser()
+                .parse(
+                    "--bundle=" + bundlePath,
+                    "--output=" + outputFilePath,
+                    "--device-spec=" + deviceSpecPath),
+            new PrintStream(output),
+            systemEnvironmentProvider,
+            fakeAdbServer);
+
+    BuildApksCommand.Builder commandViaBuilder =
+        BuildApksCommand.builder()
+            .setBundlePath(bundlePath)
+            .setOutputFile(outputFilePath)
+            // Optional values.
+            .setDeviceSpec(deviceSpecPath)
             // Must copy instance of the internal executor service.
             .setExecutorServiceInternal(commandViaFlags.getExecutorService())
             .setExecutorServiceCreatedByBundleTool(true)
@@ -451,9 +484,7 @@ public class BuildApksDeviceSpecTest {
     Throwable exception = assertThrows(CommandExecutionException.class, () -> command.execute());
     assertThat(exception)
         .hasMessageThat()
-        .contains(
-            "No variants were generated or the generated variants are not matching "
-                + "the device spec.");
+        .contains("Max SDK version of the App Bundle is lower than SDK version of the device");
   }
 
   @Test

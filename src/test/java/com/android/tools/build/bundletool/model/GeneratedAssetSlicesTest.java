@@ -16,9 +16,8 @@
 
 package com.android.tools.build.bundletool.model;
 
-import static com.android.tools.build.bundletool.model.AndroidManifest.MODULE_TYPE_ASSET_VALUE;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifest;
-import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withTypeAttribute;
+import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifestForAssetModule;
 import static com.google.common.truth.Truth.assertThat;
 
 import com.android.bundle.Targeting.ApkTargeting;
@@ -54,8 +53,7 @@ public class GeneratedAssetSlicesTest {
     ModuleSplit assetSlice =
         ModuleSplit.builder()
             .setAndroidManifest(
-                AndroidManifest.create(
-                    androidManifest("com.test.app", withTypeAttribute(MODULE_TYPE_ASSET_VALUE))))
+                AndroidManifest.create(androidManifestForAssetModule("com.test.app")))
             .setEntries(ImmutableList.of())
             .setMasterSplit(true)
             .setSplitType(SplitType.ASSET_SLICE)
@@ -79,8 +77,7 @@ public class GeneratedAssetSlicesTest {
     ModuleSplit assetSlice =
         ModuleSplit.builder()
             .setAndroidManifest(
-                AndroidManifest.create(
-                    androidManifest("com.test.app", withTypeAttribute(MODULE_TYPE_ASSET_VALUE))))
+                AndroidManifest.create(androidManifestForAssetModule("com.test.app")))
             .setEntries(ImmutableList.of())
             .setMasterSplit(true)
             .setSplitType(SplitType.ASSET_SLICE)

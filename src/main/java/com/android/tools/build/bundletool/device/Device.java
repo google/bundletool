@@ -34,7 +34,7 @@ import java.util.concurrent.TimeUnit;
 /** Interface for BundleTool - Ddmlib interactions. Represents a connected device. */
 public abstract class Device {
 
-  private static final Duration DEFAULT_ADB_TIMEOUT = Duration.ofMinutes(1);
+  private static final Duration DEFAULT_ADB_TIMEOUT = Duration.ofMinutes(10);
 
   public abstract DeviceState getState();
 

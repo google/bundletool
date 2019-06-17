@@ -137,7 +137,7 @@ public class BuildExtractApksTest {
             .collect(toImmutableList());
     assertThat(extractedApks).hasSize(4);
 
-    assertThat(extractedApks).containsAllOf("base-xhdpi.apk", "base-es.apk");
+    assertThat(extractedApks).containsAtLeast("base-xhdpi.apk", "base-es.apk");
     assertThat(extractedApks).containsAnyOf("base-master.apk", "base-master_2.apk");
     assertThat(extractedApks).containsAnyOf("base-x86_64.apk", "base-x86_64_2.apk");
   }

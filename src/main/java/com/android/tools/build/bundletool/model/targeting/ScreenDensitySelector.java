@@ -20,14 +20,17 @@ import static com.android.tools.build.bundletool.model.utils.ResourcesUtils.ANY_
 import static com.android.tools.build.bundletool.model.utils.ResourcesUtils.DEFAULT_DENSITY_VALUE;
 import static com.android.tools.build.bundletool.model.utils.ResourcesUtils.DENSITY_ALIAS_TO_DPI_MAP;
 import static com.android.tools.build.bundletool.model.utils.ResourcesUtils.MDPI_VALUE;
+import static com.android.tools.build.bundletool.model.utils.ResourcesUtils.NONE_DENSITY_VALUE;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.ImmutableSet.toImmutableSet;
+import static com.google.common.primitives.Booleans.falseFirst;
 
 import com.android.aapt.Resources.ConfigValue;
 import com.android.bundle.Targeting.ScreenDensity.DensityAlias;
 import com.android.tools.build.bundletool.model.utils.ResourcesUtils;
+import com.android.tools.build.bundletool.model.version.Version;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Ordering;
@@ -61,12 +64,13 @@ public final class ScreenDensitySelector {
   public ImmutableList<ConfigValue> selectAllMatchingConfigValues(
       ImmutableList<ConfigValue> values,
       DensityAlias forDensityAlias,
-      Set<DensityAlias> alternatives) {
+      Set<DensityAlias> alternatives,
+      Version bundleVersion) {
     Integer targetDpi = DENSITY_ALIAS_TO_DPI_MAP.get(forDensityAlias);
     ImmutableSet<Integer> alternativeDpis =
         alternatives.stream().map(DENSITY_ALIAS_TO_DPI_MAP::get).collect(toImmutableSet());
 
-    return getReachableConfigValues(getDpiRange(targetDpi, alternativeDpis), values);
+    return getReachableConfigValues(getDpiRange(targetDpi, alternativeDpis), values, bundleVersion);
   }
 
   /**
@@ -82,7 +86,7 @@ public final class ScreenDensitySelector {
    */
   @CheckReturnValue
   private ImmutableList<ConfigValue> getReachableConfigValues(
-      Range<Integer> deviceDpiRange, ImmutableList<ConfigValue> values) {
+      Range<Integer> deviceDpiRange, ImmutableList<ConfigValue> values, Version bundleVersion) {
     // We are calculating the lowest and highest dpi of the resource that could be matched by the
     // devices from the given deviceDpiRange.
     // We take the lowest eligible dpi device and find the best matching resource for it, similarly
@@ -95,14 +99,14 @@ public final class ScreenDensitySelector {
     if (deviceDpiRange.hasLowerBound()) {
       lowestResourceDpi =
           Optional.of(
-              selectBestConfigValue(values, deviceDpiRange.lowerEndpoint())
+              selectBestConfigValue(values, deviceDpiRange.lowerEndpoint(), bundleVersion)
                   .getConfig()
                   .getDensity());
     }
     if (deviceDpiRange.hasUpperBound()) {
       highestResourceDpi =
           Optional.of(
-              selectBestConfigValue(values, deviceDpiRange.upperEndpoint())
+              selectBestConfigValue(values, deviceDpiRange.upperEndpoint(), bundleVersion)
                   .getConfig()
                   .getDensity());
     }
@@ -119,8 +123,7 @@ public final class ScreenDensitySelector {
       effectiveDpiRange = Range.closed(lowestResourceDpi.get(), highestResourceDpi.get());
     }
 
-    return values
-        .stream()
+    return values.stream()
         .filter(configValue -> effectiveDpiRange.contains(configValue.getConfig().getDensity()))
         .collect(toImmutableList());
   }
@@ -171,13 +174,15 @@ public final class ScreenDensitySelector {
    * density.
    */
   public ConfigValue selectBestConfigValue(
-      Iterable<ConfigValue> values, DensityAlias desiredDensityAlias) {
+      Iterable<ConfigValue> values, DensityAlias desiredDensityAlias, Version bundleVersion) {
     checkArgument(DENSITY_ALIAS_TO_DPI_MAP.containsKey(desiredDensityAlias));
-    return selectBestConfigValue(values, DENSITY_ALIAS_TO_DPI_MAP.get(desiredDensityAlias));
+    return selectBestConfigValue(
+        values, DENSITY_ALIAS_TO_DPI_MAP.get(desiredDensityAlias), bundleVersion);
   }
 
-  public ConfigValue selectBestConfigValue(Iterable<ConfigValue> values, int desiredDpi) {
-    return Ordering.from(comparatorForConfigValues(desiredDpi)).max(values);
+  public ConfigValue selectBestConfigValue(
+      Iterable<ConfigValue> values, int desiredDpi, Version bundleVersion) {
+    return Ordering.from(comparatorForConfigValues(desiredDpi, bundleVersion)).max(values);
   }
 
   /*
@@ -188,10 +193,25 @@ public final class ScreenDensitySelector {
     return Ordering.from(new ScreenDensityComparator(desiredDpi)).max(densities);
   }
 
-  /* Convenient comparator wrapper for analyzing {@link ConfigValue} objects. */
-  private static Comparator<ConfigValue> comparatorForConfigValues(int desiredDpi) {
-    return Comparator.comparing(
-        ScreenDensitySelector::getDpiValue, new ScreenDensityComparator(desiredDpi));
+  /**
+   * Convenient comparator wrapper for analyzing {@link ConfigValue} objects.
+   *
+   * <p>Note: If two densities have an implicit and explicit representation (eg. MDPI is considered
+   * the same as default (no density qualifier)), then the explicit value is preferred (since bundle
+   * version 0.9.1).
+   */
+  private Comparator<ConfigValue> comparatorForConfigValues(int desiredDpi, Version bundleVersion) {
+    // The bundle version is passed in as a method parameter instead of being a field of the whole
+    // class to avoid plumbing the version from every place that uses the class, but not the methods
+    // sensitive to bundle version.
+    Comparator<ConfigValue> compositeComparator =
+        Comparator.comparing(
+            ScreenDensitySelector::getDpiValue, new ScreenDensityComparator(desiredDpi));
+    if (!bundleVersion.isOlderThan(Version.of("0.9.1"))) {
+      compositeComparator =
+          compositeComparator.thenComparing(ScreenDensitySelector::isExplicitDpi, falseFirst());
+    }
+    return compositeComparator;
   }
 
   private static int getDpiValue(ConfigValue configValue) {
@@ -200,6 +220,13 @@ public final class ScreenDensitySelector {
     } else {
       return configValue.getConfig().getDensity();
     }
+  }
+
+  private static boolean isExplicitDpi(ConfigValue configValue) {
+    int configDpi = configValue.getConfig().getDensity();
+    return configDpi != ANY_DENSITY_VALUE
+        && configDpi != DEFAULT_DENSITY_VALUE
+        && configDpi != NONE_DENSITY_VALUE;
   }
 
   /*

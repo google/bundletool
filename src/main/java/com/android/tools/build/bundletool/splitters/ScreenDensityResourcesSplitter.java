@@ -275,7 +275,8 @@ public class ScreenDensityResourcesSplitter extends SplitterForOneTargetingDimen
                         .selectAllMatchingConfigValues(
                             ImmutableList.copyOf(group),
                             densityAlias,
-                            allBut(densityBuckets, densityAlias))
+                            allBut(densityBuckets, densityAlias),
+                            bundleVersion)
                         .stream());
   }
 

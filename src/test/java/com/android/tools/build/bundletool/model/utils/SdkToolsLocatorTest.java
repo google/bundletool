@@ -15,9 +15,12 @@
  */
 package com.android.tools.build.bundletool.model.utils;
 
+import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.truth.Truth.assertThat;
 import static com.google.common.truth.Truth8.assertThat;
 
+import com.android.tools.build.bundletool.testing.FakeSystemEnvironmentProvider;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.jimfs.Configuration;
 import com.google.common.jimfs.Jimfs;
 import java.io.IOException;
@@ -42,13 +45,15 @@ import org.junit.runners.Parameterized.Parameters;
 @RunWith(Enclosed.class)
 public final class SdkToolsLocatorTest {
 
+  private static final String ANDROID_HOME_VARIABLE = "ANDROID_HOME";
+  private static final String SYSTEM_PATH_VARIABLE = "PATH";
   private static final String PLATFORM_TOOLS_DIR = "platform-tools";
   private static final String ADB_FILENAME = "adb";
 
   // Technically the parameterized tests could be small since using JimFs but the non-parameterized
   // test is medium so all the tests in the class must be medium as well
     @RunWith(Parameterized.class)
-  public static final class SdkToolsLocatorParameterizedTest {
+  public static final class AdbInSdkDirTest {
 
     @Parameters(name = "os = {0}")
     public static Collection<Object[]> data() {
@@ -74,15 +79,20 @@ public final class SdkToolsLocatorTest {
     public String executableExtension;
 
     private FileSystem fileSystem;
-    private Path sdkDir;
     private Path platformToolsDir;
+    private SystemEnvironmentProvider systemEnvironmentProvider;
 
     @Before
     public void setUp() throws Exception {
       fileSystem = Jimfs.newFileSystem(osConfiguration);
-      sdkDir = Files.createDirectories(fileSystem.getPath(sdkPath));
       platformToolsDir =
           Files.createDirectories(fileSystem.getPath(sdkPath).resolve(PLATFORM_TOOLS_DIR));
+
+      systemEnvironmentProvider =
+          new FakeSystemEnvironmentProvider(
+              /* variables= */ ImmutableMap.of(
+                  ANDROID_HOME_VARIABLE,
+                  Files.createDirectories(fileSystem.getPath(sdkPath)).toString()));
     }
 
     @Test
@@ -90,13 +100,88 @@ public final class SdkToolsLocatorTest {
       Path expectedAdb =
           createFileAndParentDirectories(platformToolsDir.resolve(getExecutableName(ADB_FILENAME)));
 
-      Optional<Path> locatedAdb = new SdkToolsLocator(fileSystem).locateAdb(sdkDir);
+      Optional<Path> locatedAdb =
+          new SdkToolsLocator(fileSystem).locateAdb(systemEnvironmentProvider);
       assertThat(locatedAdb).hasValue(expectedAdb);
     }
 
     @Test
     public void locateAdb_notFound() {
-      Optional<Path> locatedAdb = new SdkToolsLocator(fileSystem).locateAdb(sdkDir);
+      Optional<Path> locatedAdb =
+          new SdkToolsLocator(fileSystem).locateAdb(systemEnvironmentProvider);
+      assertThat(locatedAdb).isEmpty();
+    }
+
+    private String getExecutableName(String baseName) {
+      return baseName + executableExtension;
+    }
+  }
+
+  // Technically the parameterized tests could be small since using JimFs but the non-parameterized
+  // test is medium so all the tests in the class must be medium as well
+    @RunWith(Parameterized.class)
+  public static final class AdbOnSystemPathTest {
+
+    @Parameters(name = "os = {0}")
+    public static Collection<Object[]> data() {
+      return Arrays.asList(
+          new Object[][] {
+            {"Unix", Configuration.unix(), ":", "/nonexistent:/bin", "/bin", ""},
+            {"Windows", Configuration.windows(), ";", "C:\\nonexistent;C:\\bin", "C:\\bin", ".exe"},
+            {"OS X", Configuration.osX(), ":", "/nonexistent:/bin", "/bin", ""}
+          });
+    }
+
+    // Only used for the name of the test.
+    @Parameter(0)
+    public String osName;
+
+    @Parameter(1)
+    public Configuration osConfiguration;
+
+    @Parameter(2)
+    public String pathSeparator;
+
+    @Parameter(3)
+    public String systemPath;
+
+    @Parameter(4)
+    public String goodPathDir;
+
+    @Parameter(5)
+    public String executableExtension;
+
+    private FileSystem fileSystem;
+    private SystemEnvironmentProvider systemEnvironmentProvider;
+
+    @Before
+    public void setUp() throws Exception {
+      fileSystem = Jimfs.newFileSystem(osConfiguration);
+
+      checkState(systemPath.contains(goodPathDir));
+      Files.createDirectories(fileSystem.getPath(goodPathDir));
+
+      systemEnvironmentProvider =
+          new FakeSystemEnvironmentProvider(
+              /* variables= */ ImmutableMap.of(SYSTEM_PATH_VARIABLE, systemPath),
+              /* properties= */ ImmutableMap.of("path.separator", pathSeparator));
+    }
+
+    @Test
+    public void locateAdb_found() throws Exception {
+      Path expectedAdb =
+          createFileAndParentDirectories(
+              fileSystem.getPath(goodPathDir).resolve(getExecutableName(ADB_FILENAME)));
+
+      Optional<Path> locatedAdb =
+          new SdkToolsLocator(fileSystem).locateAdb(systemEnvironmentProvider);
+      assertThat(locatedAdb).hasValue(expectedAdb);
+    }
+
+    @Test
+    public void locateAdb_notFound() {
+      Optional<Path> locatedAdb =
+          new SdkToolsLocator(fileSystem).locateAdb(systemEnvironmentProvider);
       assertThat(locatedAdb).isEmpty();
     }
 

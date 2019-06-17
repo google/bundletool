@@ -16,6 +16,8 @@
 
 package com.android.tools.build.bundletool.commands;
 
+import static com.android.tools.build.bundletool.model.utils.SdkToolsLocator.ANDROID_HOME_VARIABLE;
+import static com.android.tools.build.bundletool.model.utils.SdkToolsLocator.SYSTEM_PATH_VARIABLE;
 import static com.android.tools.build.bundletool.model.utils.files.FilePreconditions.checkDirectoryExists;
 import static com.android.tools.build.bundletool.model.utils.files.FilePreconditions.checkFileExistsAndExecutable;
 import static com.android.tools.build.bundletool.model.utils.files.FilePreconditions.checkFileExistsAndReadable;
@@ -39,7 +41,6 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.Optional;
 
 /** Installs APKs on a connected device. */
@@ -54,7 +55,6 @@ public abstract class InstallApksCommand {
   private static final Flag<ImmutableSet<String>> MODULES_FLAG = Flag.stringSet("modules");
   private static final Flag<Boolean> ALLOW_DOWNGRADE_FLAG = Flag.booleanFlag("allow-downgrade");
 
-  private static final String ANDROID_HOME_VARIABLE = "ANDROID_HOME";
   private static final String ANDROID_SERIAL_VARIABLE = "ANDROID_SERIAL";
 
   private static final SystemEnvironmentProvider DEFAULT_PROVIDER =
@@ -107,14 +107,14 @@ public abstract class InstallApksCommand {
             .getValue(flags)
             .orElseGet(
                 () ->
-                    systemEnvironmentProvider
-                        .getVariable(ANDROID_HOME_VARIABLE)
-                        .flatMap(path -> new SdkToolsLocator().locateAdb(Paths.get(path)))
+                    new SdkToolsLocator()
+                        .locateAdb(systemEnvironmentProvider)
                         .orElseThrow(
                             () ->
                                 new CommandExecutionException(
                                     "Unable to determine the location of ADB. Please set the --adb "
-                                        + "flag or define ANDROID_HOME environment variable.")));
+                                        + "flag or define ANDROID_HOME or PATH environment "
+                                        + "variable.")));
 
     Optional<String> deviceSerialName = DEVICE_ID_FLAG.getValue(flags);
     if (!deviceSerialName.isPresent()) {
@@ -197,8 +197,8 @@ public abstract class InstallApksCommand {
                 .setOptional(true)
                 .setDescription(
                     "Path to the adb utility. If absent, an attempt will be made to locate it if "
-                        + "the %s environment variable is set.",
-                    ANDROID_HOME_VARIABLE)
+                        + "the %s or %s environment variable is set.",
+                    ANDROID_HOME_VARIABLE, SYSTEM_PATH_VARIABLE)
                 .build())
         .addFlag(
             FlagDescription.builder()

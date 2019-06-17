@@ -34,11 +34,15 @@ public final class FileUtils {
 
   /** Creates the parent directories of the given path. */
   public static void createParentDirectories(Path path) {
-    Path dirs = path.getParent();
+    createDirectories(path.getParent());
+  }
+
+  /** Creates the given directory (including parents) with the given path. */
+  public static void createDirectories(Path dir) {
     try {
-      Files.createDirectories(dirs);
+      Files.createDirectories(dir);
     } catch (IOException e) {
-      throw new UncheckedIOException(String.format("Error creating directories '%s'.", dirs), e);
+      throw new UncheckedIOException(String.format("Error creating directories '%s'.", dir), e);
     }
   }
 

@@ -64,7 +64,8 @@ public class BundleModulesValidator {
           // Other.
           new ModuleDependencyValidator(),
           new ModuleTitleValidator(),
-          new ResourceTableValidator());
+          new ResourceTableValidator(),
+          new AssetModuleFilesValidator());
 
   private static final BundleConfig EMPTY_CONFIG_WITH_CURRENT_VERSION =
       BundleConfig.newBuilder()
@@ -106,11 +107,11 @@ public class BundleModulesValidator {
     }
 
     BundleModuleName actualModuleName =
-        BundleModuleName.create(
-            bundleModule
-                .getAndroidManifest()
-                .getSplitId()
-                .orElse(BundleModuleName.BASE_MODULE_NAME));
+        bundleModule
+            .getAndroidManifest()
+            .getSplitId()
+            .map(BundleModuleName::create)
+            .orElse(BundleModuleName.BASE_MODULE_NAME);
 
     return bundleModule.toBuilder().setName(actualModuleName).build();
   }

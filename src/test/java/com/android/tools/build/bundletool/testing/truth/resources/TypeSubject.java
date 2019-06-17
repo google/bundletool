@@ -17,6 +17,7 @@
 package com.android.tools.build.bundletool.testing.truth.resources;
 
 import static com.google.common.collect.MoreCollectors.toOptional;
+import static com.google.common.truth.Fact.fact;
 
 import com.android.aapt.Resources.Entry;
 import com.android.aapt.Resources.Type;
@@ -25,19 +26,21 @@ import com.google.common.truth.Subject;
 import java.util.Optional;
 
 /** A subject for Type. */
-public class TypeSubject extends Subject<TypeSubject, Type> {
+public class TypeSubject extends Subject {
 
+  private final Type actual;
   private FailureMetadata metadata;
 
   public TypeSubject(FailureMetadata metadata, Type actual) {
     super(metadata, actual);
+    this.actual = actual;
     this.metadata = metadata;
   }
 
   public EntrySubject containingResource(String entryName) {
     Optional<Entry> foundEntry = findEntry(entryName);
     if (!foundEntry.isPresent()) {
-      failWithoutActual("contains entry '" + entryName + "'");
+      failWithoutActual(fact("expected to contain entry", entryName));
     }
     return new EntrySubject(metadata, foundEntry.get());
   }
@@ -45,14 +48,12 @@ public class TypeSubject extends Subject<TypeSubject, Type> {
   public void notContainingResource(String entryName) {
     Optional<Entry> foundEntry = findEntry(entryName);
     if (foundEntry.isPresent()) {
-      failWithoutActual("does not contain entry '" + entryName + "'");
+      failWithoutActual(fact("expected not to contain entry", entryName));
     }
   }
 
   private Optional<Entry> findEntry(String entryName) {
-    return actual()
-        .getEntryList()
-        .stream()
+    return actual.getEntryList().stream()
         .filter(entry -> entry.getName().equals(entryName))
         .collect(toOptional());
   }

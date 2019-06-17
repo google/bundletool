@@ -17,9 +17,8 @@
 package com.android.tools.build.bundletool.validation;
 
 import static com.android.bundle.Targeting.Abi.AbiAlias.X86;
-import static com.android.tools.build.bundletool.model.AndroidManifest.MODULE_TYPE_ASSET_VALUE;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifest;
-import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withTypeAttribute;
+import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifestForAssetModule;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.abiTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.assets;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.assetsDirectoryTargeting;
@@ -130,8 +129,7 @@ public class AssetsTargetingValidatorTest {
             .addFile("assets/dir/raw.dat")
             .addFile("assets/dir_other/raw.dat")
             .setAssetsConfig(Assets.getDefaultInstance())
-            .setManifest(
-                androidManifest("com.test.app", withTypeAttribute(MODULE_TYPE_ASSET_VALUE)))
+            .setManifest(androidManifestForAssetModule("com.test.app"))
             .build();
 
     new AssetsTargetingValidator().validateModule(module);
@@ -147,8 +145,7 @@ public class AssetsTargetingValidatorTest {
         new BundleModuleBuilder("testModule")
             .addFile("assets/dir#lang_en/raw.dat")
             .setAssetsConfig(config)
-            .setManifest(
-                androidManifest("com.test.app", withTypeAttribute(MODULE_TYPE_ASSET_VALUE)))
+            .setManifest(androidManifestForAssetModule("com.test.app"))
             .build();
 
     ValidationException e =

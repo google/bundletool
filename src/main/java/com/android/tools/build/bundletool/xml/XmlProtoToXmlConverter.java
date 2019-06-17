@@ -23,7 +23,6 @@ import com.android.tools.build.bundletool.model.utils.xmlproto.XmlProtoElement;
 import com.android.tools.build.bundletool.model.utils.xmlproto.XmlProtoNamespace;
 import com.android.tools.build.bundletool.model.utils.xmlproto.XmlProtoNode;
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Streams;
 import java.util.ArrayDeque;
 import java.util.Deque;
@@ -49,13 +48,6 @@ import org.w3c.dom.Node;
 public final class XmlProtoToXmlConverter {
 
   private static final String XMLNS_NAMESPACE_URI = "http://www.w3.org/2000/xmlns/";
-
-  private static final ImmutableMap<String, String> COMMON_NAMESPACE_PREFIXES =
-      ImmutableMap.<String, String>builder()
-          .put("http://schemas.android.com/apk/res/android", "android")
-          .put("http://schemas.android.com/apk/distribution", "dist")
-          .put("http://schemas.android.com/tools", "tools")
-          .build();
 
   /**
    * Index appended at the end of the namespace prefix created when the namespace declarations have
@@ -177,7 +169,7 @@ public final class XmlProtoToXmlConverter {
   }
 
   private Optional<String> getCommonPrefix(String uri) {
-    String prefix = COMMON_NAMESPACE_PREFIXES.get(uri);
+    String prefix = XmlUtils.COMMON_NAMESPACE_PREFIXES.get(uri);
     if (prefix == null || isNamespacePrefixInScope(prefix)) {
       return Optional.empty();
     }

@@ -8,8 +8,8 @@ buildscript {
         }
     }
     dependencies {
-        classpath "com.google.protobuf:protobuf-gradle-plugin:0.8.3"
-        classpath "com.github.jengelman.gradle.plugins:shadow:2.0.2"
+        classpath "com.google.protobuf:protobuf-gradle-plugin:0.8.8"
+        classpath "com.github.jengelman.gradle.plugins:shadow:4.0.4"
     }
 }
 
@@ -53,8 +53,8 @@ dependencies {
     testAnnotationProcessor "com.google.auto.value:auto-value:1.5.2"
     testCompile "com.google.errorprone:error_prone_annotations:2.3.1"
     testCompile "com.google.guava:guava:27.0.1-jre"
-    testCompile "com.google.truth.extensions:truth-java8-extension:0.42"
-    testCompile "com.google.truth.extensions:truth-proto-extension:0.42"
+    testCompile "com.google.truth.extensions:truth-java8-extension:0.45"
+    testCompile "com.google.truth.extensions:truth-proto-extension:0.45"
     testCompile "com.google.jimfs:jimfs:1.1"
     testCompile "com.google.protobuf:protobuf-java:3.4.0"
     testCompile "com.google.protobuf:protobuf-java-util:3.4.0"

@@ -153,23 +153,19 @@ public class ExtractApksCommandTest {
   }
 
   @Test
-  public void nonExistentOutputDirectory_throws() throws Exception {
-    Path apksArchiveFile = createApksArchiveFile(minimalApkSet(), tmpDir.resolve("bundle.apks"));
-    Path deviceSpecFile = createDeviceSpecFile(deviceWithSdk(21), tmpDir.resolve("device.json"));
+  public void outputDirectoryCreatedIfDoesNotExist() throws Exception {
+    Path apksArchivePath = createApksArchiveFile(minimalApkSet(), tmpDir.resolve("bundle.apks"));
+    DeviceSpec deviceSpec = deviceWithSdk(21);
 
-    Throwable exception =
-        assertThrows(
-            IllegalArgumentException.class,
-            () ->
-                ExtractApksCommand.fromFlags(
-                        new FlagParser()
-                            .parse(
-                                "--device-spec=" + deviceSpecFile,
-                                "--apks=" + apksArchiveFile,
-                                "--output-dir=doesnt-exist"))
-                    .execute());
+    Path outputDirectory = tmpDir.resolve("directory-that-does-not-exist");
+    ExtractApksCommand.builder()
+        .setApksArchivePath(apksArchivePath)
+        .setDeviceSpec(deviceSpec)
+        .setOutputDirectory(outputDirectory)
+        .build()
+        .execute();
 
-    assertThat(exception).hasMessageThat().contains("Directory 'doesnt-exist' was not found");
+    assertThat(Files.exists(outputDirectory)).isTrue();
   }
 
   @Test
@@ -280,7 +276,7 @@ public class ExtractApksCommandTest {
   }
 
   @Test
-  public void builderAndFlagsConstruction_equivalent() throws Exception {
+  public void builderAndFlagsConstruction_inJavaViaProtos_equivalent() throws Exception {
     DeviceSpec deviceSpec = deviceWithSdk(21);
     Path deviceSpecFile = createDeviceSpecFile(deviceSpec, tmpDir.resolve("device.json"));
     BuildApksResult tableOfContentsProto = minimalApkSet();
@@ -295,6 +291,26 @@ public class ExtractApksCommandTest {
         ExtractApksCommand.builder()
             .setApksArchivePath(apksArchiveFile)
             .setDeviceSpec(deviceSpec)
+            .build();
+
+    assertThat(fromFlags).isEqualTo(fromBuilderApi);
+  }
+
+  @Test
+  public void builderAndFlagsConstruction_inJavaViaFiles_equivalent() throws Exception {
+    Path deviceSpecFile = createDeviceSpecFile(deviceWithSdk(21), tmpDir.resolve("device.json"));
+    BuildApksResult tableOfContentsProto = minimalApkSet();
+    Path apksArchiveFile =
+        createApksArchiveFile(tableOfContentsProto, tmpDir.resolve("bundle.apks"));
+
+    ExtractApksCommand fromFlags =
+        ExtractApksCommand.fromFlags(
+            new FlagParser().parse("--device-spec=" + deviceSpecFile, "--apks=" + apksArchiveFile));
+
+    ExtractApksCommand fromBuilderApi =
+        ExtractApksCommand.builder()
+            .setApksArchivePath(apksArchiveFile)
+            .setDeviceSpec(deviceSpecFile)
             .build();
 
     assertThat(fromFlags).isEqualTo(fromBuilderApi);

@@ -95,8 +95,21 @@ public abstract class BuildBundleCommand {
 
     public abstract Builder setModulesPaths(ImmutableList<Path> modulesPaths);
 
-    /** Sets the Bundle configuration. Optional. */
+    /**
+     * Sets the Bundle configuration.
+     *
+     * <p>Optional. This configuration will be merged with BundleTool defaults.
+     */
     public abstract Builder setBundleConfig(BundleConfig bundleConfig);
+
+    /**
+     * Sets the Bundle configuration from a JSON file.
+     *
+     * <p>Optional. This configuration will be merged with BundleTool defaults.
+     */
+    public Builder setBundleConfig(Path bundleConfigFile) {
+      return setBundleConfig(parseBundleConfigJson(bundleConfigFile));
+    }
 
     abstract BundleMetadata.Builder bundleMetadataBuilder();
 

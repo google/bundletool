@@ -305,7 +305,7 @@ public final class WearApkLocatorTest {
         .setAndroidManifest(androidManifest)
         .setResourceTable(resourceTable)
         .setEntries(entries)
-        .setModuleName(BundleModuleName.create(BundleModuleName.BASE_MODULE_NAME))
+        .setModuleName(BundleModuleName.BASE_MODULE_NAME)
         .setApkTargeting(ApkTargeting.getDefaultInstance())
         .setVariantTargeting(VariantTargeting.getDefaultInstance())
         .setMasterSplit(true)
