@@ -16,6 +16,7 @@
 
 package com.android.tools.build.bundletool.testing.truth.zip;
 
+import static com.google.common.truth.Fact.fact;
 import static com.google.common.truth.Truth.assertThat;
 import static java.util.stream.Collectors.toList;
 
@@ -27,45 +28,48 @@ import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 
 /** A subject for a ZipInputStream. */
-public class ZipFileSubject extends Subject<ZipFileSubject, ZipFile> {
+public class ZipFileSubject extends Subject {
+
+  private final ZipFile actual;
 
   public ZipFileSubject(FailureMetadata failureMetadata, ZipFile actual) {
     super(failureMetadata, actual);
+    this.actual = actual;
   }
 
   public void hasDirectory(String dirPath) {
-    ZipEntry zipEntry = actual().getEntry(dirPath);
+    ZipEntry zipEntry = actual.getEntry(dirPath);
     if (zipEntry == null || !zipEntry.isDirectory()) {
-      failWithoutActual("contains a directory entry with path \"" + dirPath + "\"");
+      failWithoutActual(fact("expected to contain a directory entry with path", dirPath));
     }
   }
 
   public void doesNotHaveDirectory(String dirPath) {
-    ZipEntry zipEntry = actual().getEntry(dirPath);
+    ZipEntry zipEntry = actual.getEntry(dirPath);
     if (zipEntry != null) {
-      failWithoutActual("does not contain a directory entry with path \"" + dirPath + "\"");
+      failWithoutActual(fact("expected not to contain a directory entry with path", dirPath));
     }
   }
 
   public ZipEntrySubject hasFile(String filePath) {
-    ZipEntry zipEntry = actual().getEntry(filePath);
+    ZipEntry zipEntry = actual.getEntry(filePath);
     if (zipEntry == null) {
-      failWithoutActual("contains a file with path \"" + filePath + "\"");
+      failWithoutActual(fact("expected to contain a file with path", filePath));
     }
 
-    return check().about(ZipEntrySubject.zipEntries(actual())).that(zipEntry);
+    return check("file(%s)", filePath).about(ZipEntrySubject.zipEntries(actual)).that(zipEntry);
   }
 
   public void doesNotHaveFile(String filePath) {
-    ZipEntry zipEntry = actual().getEntry(filePath);
+    ZipEntry zipEntry = actual.getEntry(filePath);
     if (zipEntry != null) {
-      failWithoutActual("does not contain a file with path \"" + filePath + "\"");
+      failWithoutActual(fact("expected not to contain a file with path", filePath));
     }
   }
 
   public Ordered containsExactlyEntries(String... entryNames) {
     return assertThat(
-            Collections.list(actual().entries()).stream().map(ZipEntry::getName).collect(toList()))
+            Collections.list(actual.entries()).stream().map(ZipEntry::getName).collect(toList()))
         .containsExactlyElementsIn(entryNames);
   }
 }

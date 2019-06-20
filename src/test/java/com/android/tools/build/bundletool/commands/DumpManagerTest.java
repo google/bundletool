@@ -16,6 +16,7 @@
 package com.android.tools.build.bundletool.commands;
 
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifest;
+import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withDebuggableAttribute;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withMetadataValue;
 import static com.google.common.truth.Truth.assertThat;
 import static java.nio.charset.StandardCharsets.UTF_8;
@@ -25,6 +26,9 @@ import com.android.aapt.Resources.ResourceTable;
 import com.android.aapt.Resources.XmlAttribute;
 import com.android.aapt.Resources.XmlElement;
 import com.android.aapt.Resources.XmlNode;
+import com.android.bundle.Config.BundleConfig;
+import com.android.bundle.Config.Bundletool;
+import com.android.bundle.Config.Compression;
 import com.android.tools.build.bundletool.commands.DumpCommand.DumpTarget;
 import com.android.tools.build.bundletool.io.AppBundleSerializer;
 import com.android.tools.build.bundletool.model.AppBundle;
@@ -240,8 +244,35 @@ public final class DumpManagerTest {
   }
 
   @Test
+  public void dumpManifest_withXPath_noNamespaceDeclaration() throws Exception {
+    XmlNode manifestWithoutNamespaceDeclaration =
+        androidManifest(
+            "com.app",
+            withDebuggableAttribute(true),
+            manifestElement -> manifestElement.getProto().clearNamespaceDeclaration());
+
+    AppBundle appBundle =
+        new AppBundleBuilder()
+            .addModule("base", module -> module.setManifest(manifestWithoutNamespaceDeclaration))
+            .build();
+    new AppBundleSerializer().writeToDisk(appBundle, bundlePath);
+
+    ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+
+    DumpCommand.builder()
+        .setBundlePath(bundlePath)
+        .setDumpTarget(DumpTarget.MANIFEST)
+        .setXPathExpression("/manifest/application/@android:debuggable")
+        .setOutputStream(new PrintStream(outputStream))
+        .build()
+        .execute();
+
+    assertThat(new String(outputStream.toByteArray(), UTF_8).trim()).isEqualTo("true");
+  }
+
+  @Test
   public void dumpResources_allTable() throws Exception {
-    createBundleWithResourceTable(
+    createBundle(
         bundlePath,
         new ResourceTableBuilder()
             .addPackage("com.app")
@@ -277,7 +308,7 @@ public final class DumpManagerTest {
 
   @Test
   public void dumpResources_resourceId() throws Exception {
-    createBundleWithResourceTable(
+    createBundle(
         bundlePath,
         new ResourceTableBuilder()
             .addPackage("com.app")
@@ -311,7 +342,7 @@ public final class DumpManagerTest {
 
   @Test
   public void dumpResources_resourceName() throws Exception {
-    createBundleWithResourceTable(
+    createBundle(
         bundlePath,
         new ResourceTableBuilder()
             .addPackage("com.app")
@@ -393,7 +424,7 @@ public final class DumpManagerTest {
 
   @Test
   public void printResources_withValues() throws Exception {
-    createBundleWithResourceTable(
+    createBundle(
         bundlePath,
         new ResourceTableBuilder()
             .addPackage("com.app")
@@ -425,7 +456,7 @@ public final class DumpManagerTest {
 
   @Test
   public void printResources_valuesEscaped() throws Exception {
-    createBundleWithResourceTable(
+    createBundle(
         bundlePath,
         new ResourceTableBuilder()
             .addPackage("com.app")
@@ -464,18 +495,60 @@ public final class DumpManagerTest {
                     + "%n"));
   }
 
-  private static void createBundle(Path bundlePath) throws IOException {
-    createBundleWithResourceTable(bundlePath, ResourceTable.getDefaultInstance());
+  @Test
+  public void printBundleConfig() throws Exception {
+    createBundle(
+        bundlePath,
+        BundleConfig.newBuilder()
+            .setBundletool(Bundletool.newBuilder().setVersion("1.2.3"))
+            .setCompression(Compression.newBuilder().addUncompressedGlob("**.raw"))
+            .build());
+
+    ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+
+    DumpCommand.builder()
+        .setBundlePath(bundlePath)
+        .setDumpTarget(DumpTarget.CONFIG)
+        .setOutputStream(new PrintStream(outputStream))
+        .build()
+        .execute();
+
+    String output = new String(outputStream.toByteArray(), UTF_8);
+    assertThat(output)
+        .isEqualTo(
+            String.format(
+                "{\n"
+                    + "  \"bundletool\": {\n"
+                    + "    \"version\": \"1.2.3\"\n"
+                    + "  },\n"
+                    + "  \"compression\": {\n"
+                    + "    \"uncompressedGlob\": [\"**.raw\"]\n"
+                    + "  }\n"
+                    + "}%n"));
   }
 
-  private static void createBundleWithResourceTable(Path bundlePath, ResourceTable resourceTable)
+  private static void createBundle(Path bundlePath) throws IOException {
+    createBundle(bundlePath, ResourceTable.getDefaultInstance());
+  }
+
+  private static void createBundle(Path bundlePath, BundleConfig bundleConfig) throws IOException {
+    createBundle(bundlePath, ResourceTable.getDefaultInstance(), bundleConfig);
+  }
+
+  private static void createBundle(Path bundlePath, ResourceTable resourceTable)
       throws IOException {
+    createBundle(bundlePath, resourceTable, BundleConfig.getDefaultInstance());
+  }
+
+  private static void createBundle(
+      Path bundlePath, ResourceTable resourceTable, BundleConfig bundleConfig) throws IOException {
     AppBundle appBundle =
         new AppBundleBuilder()
             .addModule(
                 "base",
                 module ->
                     module.setManifest(androidManifest("com.app")).setResourceTable(resourceTable))
+            .setBundleConfig(bundleConfig)
             .build();
     new AppBundleSerializer().writeToDisk(appBundle, bundlePath);
   }

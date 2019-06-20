@@ -16,10 +16,12 @@
 
 package com.android.tools.build.bundletool.splitters;
 
-import static com.android.tools.build.bundletool.model.AndroidManifest.MODULE_TYPE_ASSET_VALUE;
 import static com.android.tools.build.bundletool.model.OptimizationDimension.LANGUAGE;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifest;
-import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withTypeAttribute;
+import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifestForAssetModule;
+import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withInstallTimeDelivery;
+import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withOnDemandDelivery;
+import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withVersionCode;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.apkLanguageTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.assets;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.assetsDirectoryTargeting;
@@ -28,11 +30,15 @@ import static com.android.tools.build.bundletool.testing.TargetingUtils.targeted
 import static com.android.tools.build.bundletool.testing.TestUtils.extractPaths;
 import static com.google.common.truth.Truth.assertThat;
 import static com.google.common.truth.extensions.proto.ProtoTruth.assertThat;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.android.bundle.Targeting.ApkTargeting;
+import com.android.tools.build.bundletool.model.AppBundle;
 import com.android.tools.build.bundletool.model.BundleModule;
 import com.android.tools.build.bundletool.model.ModuleSplit;
 import com.android.tools.build.bundletool.model.ModuleSplit.SplitType;
+import com.android.tools.build.bundletool.model.exceptions.manifest.ManifestVersionException.VersionCodeMissingException;
+import com.android.tools.build.bundletool.testing.AppBundleBuilder;
 import com.android.tools.build.bundletool.testing.BundleModuleBuilder;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
@@ -45,22 +51,23 @@ import org.junit.runners.JUnit4;
 @RunWith(JUnit4.class)
 public class AssetSlicesGeneratorTest {
 
+  private static final String PACKAGE_NAME = "com.test.app";
+  private static final int VERSION_CODE = 12341;
+
   @Test
   public void singleAssetModule() throws Exception {
-    ImmutableList<BundleModule> modules =
-        ImmutableList.of(
+    AppBundle appBundle =
+        createAppBundle(
             new BundleModuleBuilder("asset_module")
                 .addFile("assets/some_asset.txt")
-                .setManifest(
-                    androidManifest("com.test.app", withTypeAttribute(MODULE_TYPE_ASSET_VALUE)))
+                .setManifest(androidManifestForAssetModule(PACKAGE_NAME))
                 .build());
 
     ImmutableList<ModuleSplit> assetSlices =
-        new AssetSlicesGenerator(modules, ApkGenerationConfiguration.getDefaultInstance())
+        new AssetSlicesGenerator(appBundle, ApkGenerationConfiguration.getDefaultInstance())
             .generateAssetSlices();
 
     assertThat(assetSlices).hasSize(1);
-
     ModuleSplit assetSlice = assetSlices.get(0);
 
     assertThat(assetSlice.getModuleName().getName()).isEqualTo("asset_module");
@@ -68,5 +75,54 @@ public class AssetSlicesGeneratorTest {
     assertThat(assetSlice.isMasterSplit()).isTrue();
     assertThat(assetSlice.getApkTargeting()).isEqualToDefaultInstance();
     assertThat(extractPaths(assetSlice.getEntries())).containsExactly("assets/some_asset.txt");
+  }
+
+  @Test
+  public void upfrontAssetModule_addsVersionCode() throws Exception {
+    AppBundle appBundle =
+        createAppBundle(
+            new BundleModuleBuilder("asset_module")
+                .setManifest(androidManifestForAssetModule(PACKAGE_NAME, withInstallTimeDelivery()))
+                .build());
+
+    ImmutableList<ModuleSplit> assetSlices =
+        new AssetSlicesGenerator(appBundle, ApkGenerationConfiguration.getDefaultInstance())
+            .generateAssetSlices();
+
+    assertThat(assetSlices).hasSize(1);
+    ModuleSplit assetSlice = assetSlices.get(0);
+    assertThat(assetSlice.getAndroidManifest().getVersionCode()).isEqualTo(VERSION_CODE);
+  }
+
+  @Test
+  public void onDemandAssetModule_leavesVersionCodeEmpty() throws Exception {
+    AppBundle appBundle =
+        createAppBundle(
+            new BundleModuleBuilder("asset_module")
+                .setManifest(androidManifestForAssetModule(PACKAGE_NAME, withOnDemandDelivery()))
+                .build());
+
+    ImmutableList<ModuleSplit> assetSlices =
+        new AssetSlicesGenerator(appBundle, ApkGenerationConfiguration.getDefaultInstance())
+            .generateAssetSlices();
+
+    assertThat(assetSlices).hasSize(1);
+    ModuleSplit assetSlice = assetSlices.get(0);
+    assertThrows(
+        VersionCodeMissingException.class, () -> assetSlice.getAndroidManifest().getVersionCode());
+  }
+
+
+  private static AppBundle createAppBundle(BundleModule... assetModules) throws Exception {
+    AppBundleBuilder appBundleBuilder =
+        new AppBundleBuilder()
+            .addModule(
+                new BundleModuleBuilder("base")
+                    .setManifest(androidManifest(PACKAGE_NAME, withVersionCode(VERSION_CODE)))
+                    .build());
+    for (BundleModule assetModule : assetModules) {
+      appBundleBuilder.addModule(assetModule);
+    }
+    return appBundleBuilder.build();
   }
 }

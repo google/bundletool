@@ -17,6 +17,7 @@
 package com.android.tools.build.bundletool.testing.truth.zip;
 
 import static com.android.tools.build.bundletool.testing.DateTimeConverter.fromLocalTimeToUtc;
+import static com.google.common.truth.Fact.simpleFact;
 import static com.google.common.truth.Truth.assertWithMessage;
 
 import com.google.common.io.ByteStreams;
@@ -30,7 +31,7 @@ import java.util.zip.ZipFile;
 import java.util.zip.ZipInputStream;
 
 /** A subject for a ZipEntry. */
-public class ZipEntrySubject extends Subject<ZipEntrySubject, ZipEntry> {
+public class ZipEntrySubject extends Subject {
 
   /**
    * The constant {@code 0} in DOS time converted to Java epoch time.
@@ -39,15 +40,18 @@ public class ZipEntrySubject extends Subject<ZipEntrySubject, ZipEntry> {
    */
   private static final long EXTENDED_DOS_TIME_EPOCH_START_TIMESTAMP = 312768000000L;
 
+  private final ZipEntry actual;
   private InputStream zip;
 
   public ZipEntrySubject(FailureMetadata failureMetadata, ZipInputStream zip, ZipEntry actual) {
     super(failureMetadata, actual);
+    this.actual = actual;
     this.zip = zip;
   }
 
   public ZipEntrySubject(FailureMetadata failureMetadata, ZipFile zip, ZipEntry actual) {
     super(failureMetadata, actual);
+    this.actual = actual;
     try {
       this.zip = zip.getInputStream(actual);
     } catch (IOException e) {
@@ -65,50 +69,53 @@ public class ZipEntrySubject extends Subject<ZipEntrySubject, ZipEntry> {
   }
 
   public ZipEntrySubject withContent(byte[] expectedContent) throws IOException {
-    assertWithMessage("File \"%s\" in zip file does not have the expected content", actual())
+    assertWithMessage("File \"%s\" in zip file does not have the expected content", actual)
         .that(ByteStreams.toByteArray(zip))
         .isEqualTo(expectedContent);
     return this;
   }
 
   public ZipEntrySubject withSize(long size) {
-    assertWithMessage("File \"%s\" in zip file does not have the expected size", actual())
-        .that(actual().getSize())
+    check("getSize()")
+        .withMessage("File \"%s\" in zip file does not have the expected size", actual)
+        .that(actual.getSize())
         .isEqualTo(size);
     return this;
   }
 
   public ZipEntrySubject withoutTimestamp() throws IOException {
-    assertWithMessage("File \"%s\" in zip file has no creation time set", actual())
-        .that(actual().getCreationTime())
+    check("getCreationTime()")
+        .withMessage("File \"%s\" in zip file has no creation time set", actual)
+        .that(actual.getCreationTime())
         .isNull();
-    assertWithMessage("File \"%s\" in zip file has no last access time set", actual())
-        .that(actual().getLastAccessTime())
+    check("getLastAccessTime()")
+        .withMessage("File \"%s\" in zip file has no last access time set", actual)
+        .that(actual.getLastAccessTime())
         .isNull();
     // Zip files internally use extended DOS time.
-    assertWithMessage("File \"%s\" in zip file does not have the expected time", actual())
-        .that(fromLocalTimeToUtc(actual().getTime()))
+    assertWithMessage("File \"%s\" in zip file does not have the expected time", actual)
+        .that(fromLocalTimeToUtc(actual.getTime()))
         .isEqualTo(EXTENDED_DOS_TIME_EPOCH_START_TIMESTAMP);
     return this;
   }
 
   public ZipEntrySubject thatIsCompressed() {
-    if (actual().getMethod() != ZipEntry.DEFLATED) {
-      fail("is compressed in the zip file.");
+    if (actual.getMethod() != ZipEntry.DEFLATED) {
+      failWithActual(simpleFact("expected to be compressed in the zip file."));
     }
     return this;
   }
 
   public ZipEntrySubject thatIsUncompressed() {
-    if (actual().getMethod() != ZipEntry.STORED) {
-      fail("is uncompressed in the zip file.");
+    if (actual.getMethod() != ZipEntry.STORED) {
+      failWithActual(simpleFact("expected to be uncompressed in the zip file."));
     }
     return this;
   }
 
   public ZipEntrySubject thatIsDirectory() {
-    if (!actual().isDirectory()) {
-      fail("is a directory.");
+    if (!actual.isDirectory()) {
+      failWithActual(simpleFact("expected to be a directory."));
     }
     return this;
   }

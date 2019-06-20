@@ -27,7 +27,6 @@ import com.android.bundle.Targeting.MultiAbi;
 import com.android.bundle.Targeting.MultiAbiTargeting;
 import com.android.bundle.Targeting.VariantTargeting;
 import com.android.tools.build.bundletool.model.AbiName;
-import com.android.tools.build.bundletool.model.exceptions.CommandExecutionException;
 import com.android.tools.build.bundletool.model.exceptions.ValidationException;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Streams;
@@ -88,7 +87,7 @@ public class MultiAbiMatcher extends TargetingDimensionMatcher<MultiAbiTargeting
     ImmutableSet<AbiAlias> deviceAbis = deviceAbiAliases();
 
     if (valuesAndAlternativesSet.stream().noneMatch(deviceAbis::containsAll)) {
-      throw CommandExecutionException.builder()
+      throw IncompatibleDeviceException.builder()
           .withMessage(
               "No set of ABI architectures that the app supports is contained in the ABI "
                   + "architecture set of the device. Device ABIs: %s, app ABIs: %s.",

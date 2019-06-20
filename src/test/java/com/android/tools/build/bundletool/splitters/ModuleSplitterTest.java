@@ -872,7 +872,7 @@ public class ModuleSplitterTest {
             .collect(toImmutableSet());
     ImmutableSet<String> expectedFiles =
         ImmutableSet.of("dex/classes.dex", "assets/some_asset.txt", "root/some_other_file.txt");
-    assertThat(actualFiles).containsAllIn(expectedFiles);
+    assertThat(actualFiles).containsAtLeastElementsIn(expectedFiles);
   }
 
   @Test

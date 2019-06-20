@@ -29,14 +29,15 @@ import com.android.tools.build.bundletool.commands.CommandHelp.CommandDescriptio
 import com.android.tools.build.bundletool.commands.CommandHelp.FlagDescription;
 import com.android.tools.build.bundletool.device.ApkMatcher;
 import com.android.tools.build.bundletool.device.DeviceSpecParser;
+import com.android.tools.build.bundletool.device.IncompatibleDeviceException;
 import com.android.tools.build.bundletool.flags.Flag;
 import com.android.tools.build.bundletool.flags.ParsedFlags;
 import com.android.tools.build.bundletool.model.ZipPath;
-import com.android.tools.build.bundletool.model.exceptions.CommandExecutionException;
 import com.android.tools.build.bundletool.model.exceptions.ValidationException;
 import com.android.tools.build.bundletool.model.utils.FileNames;
 import com.android.tools.build.bundletool.model.utils.ResultUtils;
 import com.android.tools.build.bundletool.model.utils.files.BufferedIo;
+import com.android.tools.build.bundletool.model.utils.files.FileUtils;
 import com.google.auto.value.AutoValue;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
@@ -50,12 +51,15 @@ import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Optional;
+import java.util.logging.Logger;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 
 /** Extracts from an APK Set the APKs to be installed on a given device. */
 @AutoValue
 public abstract class ExtractApksCommand {
+
+  private static final Logger logger = Logger.getLogger(ExtractApksCommand.class.getName());
 
   public static final String COMMAND_NAME = "extract-apks";
   static final String ALL_MODULES_SHORTCUT = "_ALL_";
@@ -89,6 +93,10 @@ public abstract class ExtractApksCommand {
     public abstract Builder setApksArchivePath(Path apksArchivePath);
 
     public abstract Builder setDeviceSpec(DeviceSpec deviceSpec);
+
+    public Builder setDeviceSpec(Path deviceSpecPath) {
+      return setDeviceSpec(DeviceSpecParser.parseDeviceSpec(deviceSpecPath));
+    }
 
     public abstract Builder setOutputDirectory(Path outputDirectory);
 
@@ -157,9 +165,7 @@ public abstract class ExtractApksCommand {
     ImmutableList<ZipPath> matchedApks = apkMatcher.getMatchingApks(toc);
 
     if (matchedApks.isEmpty()) {
-      throw CommandExecutionException.builder()
-          .withMessage("No compatible APKs found for the device.")
-          .build();
+      throw new IncompatibleDeviceException("No compatible APKs found for the device.");
     }
 
 
@@ -192,7 +198,15 @@ public abstract class ExtractApksCommand {
       ImmutableList<ZipPath> matchedApkPaths) {
     Path outputDirectoryPath =
         getOutputDirectory().orElseGet(ExtractApksCommand::createTempDirectory);
-    checkDirectoryExists(outputDirectoryPath);
+
+    getOutputDirectory()
+        .ifPresent(
+            dir -> {
+              if (!Files.exists(dir)) {
+                logger.info("Output directory '" + dir + "' does not exist, creating it.");
+                FileUtils.createDirectories(dir);
+              }
+            });
 
     ImmutableList.Builder<Path> builder = ImmutableList.builder();
     try (ZipFile apksArchive = new ZipFile(getApksArchivePath().toFile())) {

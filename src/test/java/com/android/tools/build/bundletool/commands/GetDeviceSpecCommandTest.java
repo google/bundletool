@@ -267,15 +267,17 @@ public class GetDeviceSpecCommandTest {
   public void nonExistentParentDirectory_works() {
     DeviceSpec deviceSpec = mergeSpecs(sdkVersion(21), density(480), abis("x86"), locales("en-US"));
 
-    Path outputPath = tmp.getRoot().toPath().resolve("non-existent-parent-directory").resolve("device.json");
+    Path outputPath =
+        tmp.getRoot().toPath().resolve("non-existent-parent-directory").resolve("device.json");
     GetDeviceSpecCommand command =
-            GetDeviceSpecCommand.builder()
-                    .setAdbPath(adbPath)
-                    .setAdbServer(fakeServerOneDevice(deviceSpec))
-                    .setOutputPath(outputPath)
-                    .build();
+        GetDeviceSpecCommand.builder()
+            .setAdbPath(adbPath)
+            .setAdbServer(fakeServerOneDevice(deviceSpec))
+            .setOutputPath(outputPath)
+            .build();
 
     assertThat(command.execute()).isEqualTo(deviceSpec);
+    assertThat(Files.exists(outputPath)).isTrue();
   }
 
   @Test

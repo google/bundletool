@@ -83,10 +83,13 @@ import java.util.List;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import org.junit.Test;
+import org.junit.experimental.theories.DataPoints;
+import org.junit.experimental.theories.FromDataPoints;
+import org.junit.experimental.theories.Theories;
+import org.junit.experimental.theories.Theory;
 import org.junit.runner.RunWith;
-import org.junit.runners.JUnit4;
 
-@RunWith(JUnit4.class)
+@RunWith(Theories.class)
 public class ScreenDensityResourcesSplitterTest {
 
   private static final Predicate<ResourceId> NO_RESOURCES_PINNED_TO_MASTER =
@@ -99,6 +102,10 @@ public class ScreenDensityResourcesSplitterTest {
           BundleToolVersion.getCurrentVersion(),
           NO_RESOURCES_PINNED_TO_MASTER,
           NO_LOW_DENSITY_CONFIG_PINNED_TO_MASTER);
+
+  @DataPoints("bundleFeatureEnabled")
+  public static final ImmutableSet<Boolean> BUNDLE_FEATURE_ENABLED_DATA_POINTS =
+      ImmutableSet.of(false, true);
 
   @Test
   public void noResourceTable_noResourceSplits() throws Exception {
@@ -271,13 +278,13 @@ public class ScreenDensityResourcesSplitterTest {
         StringPool.newBuilder().setData(ByteString.copyFrom(new byte[] {'x'})).build();
     ResourceTable table =
         new ResourceTableBuilder()
-            .addPackage("com.test.app")
-            .addDrawableResourceForMultipleDensities(
-                "image", ImmutableMap.of(MDPI_VALUE, "res/drawable-mdpi/image.jpg"))
-            .build()
-            .toBuilder()
-            .setSourcePool(sourcePool)
-            .build();
+                .addPackage("com.test.app")
+                .addDrawableResourceForMultipleDensities(
+                    "image", ImmutableMap.of(MDPI_VALUE, "res/drawable-mdpi/image.jpg"))
+                .build()
+                .toBuilder()
+                .setSourcePool(sourcePool)
+                .build();
     BundleModule testModule =
         new BundleModuleBuilder("testModule")
             .addFile("res/drawable-mdpi/test.jpg")
@@ -752,42 +759,14 @@ public class ScreenDensityResourcesSplitterTest {
     assertThat(masterSplit.findEntry("res/drawable/image.jpg")).isPresent();
   }
 
-  @Test
-  public void nonDefaultDensityResourceWithoutAlternatives() throws Exception {
-    ResourceTable table =
-        resourceTable(
-            pkg(
-                USER_PACKAGE_OFFSET,
-                "com.test.app",
-                type(
-                    0x01,
-                    "drawable",
-                    entry(0x01, "image", fileReference("res/drawable-hdpi/image.jpg", HDPI)))));
-    BundleModule module =
-        new BundleModuleBuilder("base")
-            .addFile("res/drawable-hdpi/image.jpg")
-            .setResourceTable(table)
-            .setManifest(androidManifest("com.test.app"))
-            .build();
-
-    ImmutableCollection<ModuleSplit> splits = splitter.split(ModuleSplit.forResources(module));
-
-    // No config split because the resource has no alternatives so ends up in the master split.
-    assertThat(splits).hasSize(1);
-
-    ModuleSplit masterSplit = findModuleSplitWithDefaultTargeting(splits);
-    assertThat(masterSplit.getResourceTable().get())
-        .containsResource("com.test.app:drawable/image")
-        .onlyWithConfigs(HDPI);
-    assertThat(masterSplit.findEntry("res/drawable-hdpi/image.jpg")).isPresent();
-  }
-
   /**
    * Before 0.4.0, non-default density resources without alternatives ended up in config splits
-   * instead of in the base split.
+   * instead of in the master split.
    */
   @Test
-  public void nonDefaultDensityResourceWithoutAlternatives_before_0_4_0() throws Exception {
+  @Theory
+  public void nonDefaultDensityResourceWithoutAlternatives_inMasterSince_0_4_0(
+      @FromDataPoints("bundleFeatureEnabled") boolean bundleFeatureEnabled) throws Exception {
     ResourceTable table =
         resourceTable(
             pkg(
@@ -806,28 +785,40 @@ public class ScreenDensityResourcesSplitterTest {
 
     ScreenDensityResourcesSplitter splitter =
         new ScreenDensityResourcesSplitter(
-            Version.of("0.3.3"),
+            Version.of(bundleFeatureEnabled ? "0.4.0" : "0.3.3"),
             NO_RESOURCES_PINNED_TO_MASTER,
             NO_LOW_DENSITY_CONFIG_PINNED_TO_MASTER);
     ImmutableCollection<ModuleSplit> splits = splitter.split(ModuleSplit.forResources(module));
 
-    // 1 base + 7 config splits
-    assertThat(splits).hasSize(8);
+    if (bundleFeatureEnabled) {
+      // No config split because the resource has no alternatives so ends up in the master split.
+      assertThat(splits).hasSize(1);
 
-    // The resource is not present in the base.
-    ModuleSplit masterSplit = findModuleSplitWithDefaultTargeting(splits);
-    assertThat(masterSplit.getResourceTable().get())
-        .doesNotContainResource("com.test.app:drawable/image");
+      ModuleSplit masterSplit = findModuleSplitWithDefaultTargeting(splits);
+      assertThat(masterSplit.getResourceTable().get())
+          .containsResource("com.test.app:drawable/image")
+          .onlyWithConfigs(HDPI);
+      assertThat(masterSplit.findEntry("res/drawable-hdpi/image.jpg")).isPresent();
 
-    // The resource is present in all config splits.
-    assertForNonDefaultSplits(
-        splits,
-        densitySplit -> {
-          assertThat(densitySplit.getResourceTable().get())
-              .containsResource("com.test.app:drawable/image")
-              .onlyWithConfigs(HDPI);
-          assertThat(densitySplit.findEntry("res/drawable-hdpi/image.jpg")).isPresent();
-        });
+    } else {
+      // 1 base + 7 config splits
+      assertThat(splits).hasSize(8);
+
+      // The resource is not present in the base.
+      ModuleSplit masterSplit = findModuleSplitWithDefaultTargeting(splits);
+      assertThat(masterSplit.getResourceTable().get())
+          .doesNotContainResource("com.test.app:drawable/image");
+
+      // The resource is present in all config splits.
+      assertForNonDefaultSplits(
+          splits,
+          densitySplit -> {
+            assertThat(densitySplit.getResourceTable().get())
+                .containsResource("com.test.app:drawable/image")
+                .onlyWithConfigs(HDPI);
+            assertThat(densitySplit.findEntry("res/drawable-hdpi/image.jpg")).isPresent();
+          });
+    }
   }
 
   @Test

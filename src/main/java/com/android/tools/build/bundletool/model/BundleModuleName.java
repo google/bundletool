@@ -32,7 +32,7 @@ import java.util.regex.Pattern;
 @AutoValue.CopyAnnotations
 public abstract class BundleModuleName implements Comparable<BundleModuleName> {
 
-  public static final String BASE_MODULE_NAME = "base";
+  public static final BundleModuleName BASE_MODULE_NAME = new AutoValue_BundleModuleName("base");
 
   // Do not use "." in the module name because it's used as a separator for split id.
   private static final Pattern MODULE_NAME_FORMAT = Pattern.compile("[a-zA-Z][a-zA-Z0-9_]*");
@@ -52,7 +52,7 @@ public abstract class BundleModuleName implements Comparable<BundleModuleName> {
 
   /** Returns the name satisfying Split APK requirements. */
   public String getNameForSplitId() {
-    if (getName().equals(BASE_MODULE_NAME)) {
+    if (this.equals(BASE_MODULE_NAME)) {
       return "";
     }
     return getName();

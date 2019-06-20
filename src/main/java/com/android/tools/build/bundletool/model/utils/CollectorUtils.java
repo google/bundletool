@@ -15,19 +15,14 @@
  */
 package com.android.tools.build.bundletool.model.utils;
 
-import static com.android.tools.build.bundletool.model.utils.ConcurrencyUtils.waitFor;
 import static com.google.common.collect.ImmutableMap.toImmutableMap;
 import static java.util.function.Function.identity;
 
-import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableListMultimap;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.MultimapBuilder;
 import com.google.common.collect.Multimaps;
 import com.google.common.collect.Streams;
-import com.google.common.util.concurrent.ListenableFuture;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.function.BinaryOperator;
@@ -65,22 +60,6 @@ public final class CollectorUtils {
         Multimaps.toMultimap(
             keyFunction, valueFunction, MultimapBuilder.treeKeys().arrayListValues()::<K, V>build),
         ImmutableListMultimap::copyOf);
-  }
-
-  /**
-   * Given a stream of {@link ListenableFuture}s, returns a {@link Collector} that waits
-   * indefinitely for all the executions to complete, then returns an {@link ImmutableList} of the
-   * result of the computations.
-   */
-  public static <T> Collector<ListenableFuture<T>, List<T>, ImmutableList<T>> waitForAll() {
-    return Collector.of(
-        ArrayList::new,
-        (list, future) -> list.add(waitFor(future)),
-        (list1, list2) -> {
-          list1.addAll(list2);
-          return list1;
-        },
-        ImmutableList::copyOf);
   }
 
   /**

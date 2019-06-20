@@ -33,10 +33,12 @@ import com.android.tools.build.bundletool.model.utils.ZipUtils;
 import com.android.tools.build.bundletool.model.utils.files.BufferedIo;
 import com.android.tools.build.bundletool.model.version.BundleToolVersion;
 import com.android.tools.build.bundletool.model.version.Version;
+import com.google.auto.value.AutoValue;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Maps;
+import com.google.errorprone.annotations.Immutable;
 import com.google.protobuf.InvalidProtocolBufferException;
 import java.io.IOException;
 import java.io.InputStream;
@@ -55,27 +57,13 @@ import javax.annotation.CheckReturnValue;
  * <p>When AppBundle is read, the optional but valid ZIP directories entries are skipped so any code
  * using the model objects can assume any ZIP entry is referring to a regular file.
  */
-public class AppBundle {
+@Immutable
+@AutoValue
+public abstract class AppBundle {
 
   public static final ZipPath METADATA_DIRECTORY = ZipPath.create("BUNDLE-METADATA");
 
   public static final String BUNDLE_CONFIG_FILE_NAME = "BundleConfig.pb";
-
-  private final ImmutableMap<BundleModuleName, BundleModule> modulesByName;
-  private final BundleConfig bundleConfig;
-  private final BundleMetadata bundleMetadata;
-  private final ImmutableSet<ResourceId> pinnedResourceIds;
-
-  private AppBundle(
-      ImmutableMap<BundleModuleName, BundleModule> modulesByName,
-      BundleConfig bundleConfig,
-      BundleMetadata bundleMetadata,
-      ImmutableSet<ResourceId> pinnedResourceIds) {
-    this.modulesByName = modulesByName;
-    this.bundleConfig = bundleConfig;
-    this.bundleMetadata = bundleMetadata;
-    this.pinnedResourceIds = pinnedResourceIds;
-  }
 
   /** Builds an {@link AppBundle} from an App Bundle on disk. */
   public static AppBundle buildFromZip(ZipFile bundleFile) {
@@ -94,35 +82,42 @@ public class AppBundle {
         bundleConfig.getMasterResources().getResourceIdsList().stream()
             .map(ResourceId::create)
             .collect(toImmutableSet());
-    return new AppBundle(
-        Maps.uniqueIndex(modules, BundleModule::getName),
-        bundleConfig,
-        bundleMetadata,
-        pinnedResourceIds);
+
+    return builder()
+        .setModules(Maps.uniqueIndex(modules, BundleModule::getName))
+        .setMasterPinnedResources(pinnedResourceIds)
+        .setBundleConfig(bundleConfig)
+        .setBundleMetadata(bundleMetadata)
+        .build();
   }
 
+  public abstract ImmutableMap<BundleModuleName, BundleModule> getModules();
+
+  /** Resources that must remain in the master split regardless of their targeting configuration. */
+  public abstract ImmutableSet<ResourceId> getMasterPinnedResources();
+
+  public abstract BundleConfig getBundleConfig();
+
+  public abstract BundleMetadata getBundleMetadata();
+
   public ImmutableMap<BundleModuleName, BundleModule> getFeatureModules() {
-    return modulesByName.values().stream()
+    return getModules().values().stream()
         .filter(module -> module.getModuleType().equals(ModuleType.FEATURE_MODULE))
         .collect(toImmutableMap(BundleModule::getName, identity()));
   }
 
   public ImmutableMap<BundleModuleName, BundleModule> getAssetModules() {
-    return modulesByName.values().stream()
+    return getModules().values().stream()
         .filter(module -> module.getModuleType().equals(ModuleType.ASSET_MODULE))
         .collect(toImmutableMap(BundleModule::getName, identity()));
   }
 
-  public ImmutableMap<BundleModuleName, BundleModule> getModules() {
-    return modulesByName;
-  }
-
   public BundleModule getBaseModule() {
-    return getModule(BundleModuleName.create(BundleModuleName.BASE_MODULE_NAME));
+    return getModule(BundleModuleName.BASE_MODULE_NAME);
   }
 
   public BundleModule getModule(BundleModuleName moduleName) {
-    BundleModule module = modulesByName.get(moduleName);
+    BundleModule module = getModules().get(moduleName);
     if (module == null) {
       throw CommandExecutionException.builder()
           .withMessage("Module '%s' not found.", moduleName)
@@ -131,21 +126,12 @@ public class AppBundle {
     return module;
   }
 
-  /** Resources that must remain in the master split regardless of their targeting configuration. */
-  public ImmutableSet<ResourceId> getMasterPinnedResources() {
-    return pinnedResourceIds;
+  public Version getVersion() {
+    return Version.of(getBundleConfig().getBundletool().getVersion());
   }
 
   public boolean has32BitRenderscriptCode() {
     return getFeatureModules().values().stream().anyMatch(BundleModule::hasRenderscript32Bitcode);
-  }
-
-  public BundleConfig getBundleConfig() {
-    return bundleConfig;
-  }
-
-  public BundleMetadata getBundleMetadata() {
-    return bundleMetadata;
   }
 
   /**
@@ -205,6 +191,12 @@ public class AppBundle {
 
   public boolean isApex() {
     return getBaseModule().getApexConfig().isPresent();
+  }
+
+  public abstract Builder toBuilder();
+
+  static Builder builder() {
+    return new AutoValue_AppBundle.Builder();
   }
 
   private static ImmutableList<BundleModule> extractModules(
@@ -284,5 +276,19 @@ public class AppBundle {
         modules.stream().map(new ClassesDexNameSanitizer()::sanitize).collect(toImmutableList());
 
     return modules;
+  }
+
+  /** Builder for App Bundle object */
+  @AutoValue.Builder
+  public abstract static class Builder {
+    public abstract Builder setModules(ImmutableMap<BundleModuleName, BundleModule> modules);
+
+    public abstract Builder setMasterPinnedResources(ImmutableSet<ResourceId> pinnedResourceIds);
+
+    public abstract Builder setBundleConfig(BundleConfig bundleConfig);
+
+    public abstract Builder setBundleMetadata(BundleMetadata bundleMetadata);
+
+    public abstract AppBundle build();
   }
 }

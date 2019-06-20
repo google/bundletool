@@ -16,9 +16,8 @@
 
 package com.android.tools.build.bundletool.model;
 
-import static com.android.tools.build.bundletool.model.AndroidManifest.MODULE_TYPE_ASSET_VALUE;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifest;
-import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withTypeAttribute;
+import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifestForAssetModule;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.nativeDirectoryTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.nativeLibraries;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.targetedNativeDirectory;
@@ -53,8 +52,8 @@ public class AppBundleTest {
   private static final byte[] DUMMY_CONTENT = new byte[1];
   private static final BundleConfig BUNDLE_CONFIG = BundleConfigBuilder.create().build();
   public static final XmlNode MANIFEST = androidManifest("com.test.app.detail");
-  public static final XmlNode REMOTE_ASSET_MANIFEST =
-      androidManifest("com.test.app.detail", withTypeAttribute(MODULE_TYPE_ASSET_VALUE));
+  public static final XmlNode ASSET_MODULE_MANIFEST =
+      androidManifestForAssetModule("com.test.app.detail");
 
   @Rule public TemporaryFolder tmp = new TemporaryFolder();
 
@@ -413,7 +412,7 @@ public class AppBundleTest {
                 "some_asset_module",
                 module ->
                     module
-                        .setManifest(REMOTE_ASSET_MANIFEST)
+                        .setManifest(ASSET_MODULE_MANIFEST)
                         .addFile("assets/img1.png", DUMMY_CONTENT))
             .build();
 
@@ -430,7 +429,7 @@ public class AppBundleTest {
         .addFileWithContent(ZipPath.create("base/dex/classes.dex"), DUMMY_CONTENT)
         .addFileWithContent(ZipPath.create("base/assets/file.txt"), DUMMY_CONTENT)
         .addFileWithProtoContent(
-            ZipPath.create("remote_assets/manifest/AndroidManifest.xml"), REMOTE_ASSET_MANIFEST)
+            ZipPath.create("remote_assets/manifest/AndroidManifest.xml"), ASSET_MODULE_MANIFEST)
         .addFileWithContent(ZipPath.create("remote_assets/assets/file.txt"), DUMMY_CONTENT)
         .writeTo(bundleFile);
 

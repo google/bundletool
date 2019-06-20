@@ -174,7 +174,7 @@ public class BuildApksResourcePinningTest {
             .setAapt2Command(aapt2Command)
             .build();
 
-    Path apkSetFilePath = new BuildApksManager(command).execute(tmpDir);
+    Path apkSetFilePath = new BuildApksManager(command, aapt2Command, tmpDir).execute();
     ZipFile apkSetFile = new ZipFile(apkSetFilePath.toFile());
     BuildApksResult result = extractTocFromApkSetFile(apkSetFile, outputDir);
 

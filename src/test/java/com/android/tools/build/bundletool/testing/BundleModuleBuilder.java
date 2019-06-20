@@ -59,13 +59,13 @@ public class BundleModuleBuilder {
     return this;
   }
 
+  public BundleModuleBuilder addFile(String relativePath) {
+    return addFile(relativePath, new byte[1]);
+  }
+
   public BundleModuleBuilder addDirectory(String relativePath) {
     entries.add(InMemoryModuleEntry.ofDirectory(relativePath));
     return this;
-  }
-
-  public BundleModuleBuilder addFile(String relativePath) {
-    return addFile(relativePath, new byte[1]);
   }
 
   public BundleModuleBuilder setNativeConfig(NativeLibraries nativeConfig) {
@@ -103,7 +103,7 @@ public class BundleModuleBuilder {
       }
 
       // Set the 'split' attribute if one is not already set.
-      if (!moduleName.getName().equals(BundleModuleName.BASE_MODULE_NAME)
+      if (!moduleName.equals(BundleModuleName.BASE_MODULE_NAME)
           && !manifestBuilder.getElement().getAttribute("split").isPresent()) {
         ManifestProtoUtils.withSplitId(moduleName.getName()).accept(manifestBuilder.getElement());
       }

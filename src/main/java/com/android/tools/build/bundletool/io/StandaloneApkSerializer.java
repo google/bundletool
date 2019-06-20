@@ -20,6 +20,7 @@ import static com.google.common.base.Preconditions.checkArgument;
 
 import com.android.bundle.Commands.ApexApkMetadata;
 import com.android.bundle.Commands.ApkDescription;
+import com.android.bundle.Commands.SplitApkMetadata;
 import com.android.bundle.Commands.StandaloneApkMetadata;
 import com.android.bundle.Commands.SystemApkMetadata;
 import com.android.bundle.Commands.SystemApkMetadata.SystemApkType;
@@ -121,14 +122,24 @@ public class StandaloneApkSerializer {
 
   private static ApkDescription createSystemApkDescription(
       ModuleSplit systemSplit, ZipPath apkPath, SystemApkMetadata.SystemApkType apkType) {
-    return ApkDescription.newBuilder()
-        .setPath(apkPath.toString())
-        .setSystemApkMetadata(
-            SystemApkMetadata.newBuilder()
-                .addAllFusedModuleName(systemSplit.getAndroidManifest().getFusedModuleNames())
-                .setSystemApkType(apkType))
-        .setTargeting(systemSplit.getApkTargeting())
-        .build();
+    ApkDescription.Builder apkDescription =
+        ApkDescription.newBuilder()
+            .setPath(apkPath.toString())
+            .setTargeting(systemSplit.getApkTargeting());
+
+    if (systemSplit.isBaseModuleSplit() && systemSplit.isMasterSplit()) {
+      apkDescription.setSystemApkMetadata(
+          SystemApkMetadata.newBuilder()
+              .addAllFusedModuleName(systemSplit.getAndroidManifest().getFusedModuleNames())
+              .setSystemApkType(apkType));
+    } else {
+      apkDescription.setSplitApkMetadata(
+          SplitApkMetadata.newBuilder()
+              // Only the base master split doesn't have a split id.
+              .setSplitId(systemSplit.getAndroidManifest().getSplitId().get())
+              .setIsMasterSplit(systemSplit.isMasterSplit()));
+    }
+    return apkDescription.build();
   }
 
   private static ModuleSplit splitWithOnlyManifest(ModuleSplit split) {

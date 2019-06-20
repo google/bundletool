@@ -134,13 +134,6 @@ message AssetsDirectoryTargeting {
   LanguageTargeting language = 4;
 }
 
-// Targeting of individual asset slices.
-message AssetSliceTargeting {
-  GraphicsApiTargeting graphics_api_targeting = 1;
-  LanguageTargeting language_targeting = 2;
-  TextureCompressionFormatTargeting texture_compression_format_targeting = 3;
-}
-
 // Targeting specific for directories under lib/.
 message NativeDirectoryTargeting {
   Abi abi = 1;

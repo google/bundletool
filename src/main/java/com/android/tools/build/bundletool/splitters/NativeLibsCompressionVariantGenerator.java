@@ -20,6 +20,7 @@ import static com.android.tools.build.bundletool.model.utils.TargetingProtoUtils
 import static com.android.tools.build.bundletool.model.utils.TargetingProtoUtils.sdkVersionTargeting;
 import static com.android.tools.build.bundletool.model.utils.TargetingProtoUtils.variantTargeting;
 import static com.android.tools.build.bundletool.model.utils.Versions.ANDROID_M_API_VERSION;
+import static com.android.tools.build.bundletool.model.utils.Versions.ANDROID_P_API_VERSION;
 
 import com.android.bundle.Targeting.VariantTargeting;
 import com.android.tools.build.bundletool.model.BundleModule;
@@ -43,6 +44,17 @@ public class NativeLibsCompressionVariantGenerator implements BundleModuleVarian
       return Stream.of();
     }
 
-    return Stream.of(variantTargeting(sdkVersionTargeting(sdkVersionFrom(ANDROID_M_API_VERSION))));
+    // If persistent app is not installable on external storage, only the split APKs targeting
+    // devices above Android M should be uncompressed. If the persistent app is installable on
+    // external storage only split APKs targeting device above Android P should be uncompressed (as
+    // uncompressed native libraries crashes with ASEC external storage and support for ASEC
+    // external storage is removed in Android P).
+    if (apkGenerationConfiguration.isInstallableOnExternalStorage()) {
+      return Stream.of(
+          variantTargeting(sdkVersionTargeting(sdkVersionFrom(ANDROID_P_API_VERSION))));
+    } else {
+      return Stream.of(
+          variantTargeting(sdkVersionTargeting(sdkVersionFrom(ANDROID_M_API_VERSION))));
+    }
   }
 }

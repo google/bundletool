@@ -19,6 +19,7 @@ import static com.google.common.base.Preconditions.checkArgument;
 
 import com.android.tools.build.bundletool.model.utils.files.BufferedIo;
 import com.google.auto.value.AutoValue;
+import com.google.auto.value.extension.memoized.Memoized;
 import com.google.errorprone.annotations.Immutable;
 import com.google.errorprone.annotations.MustBeClosed;
 import java.io.IOException;
@@ -76,6 +77,7 @@ public abstract class ModuleZipEntry implements ModuleEntry {
     }
   }
 
+  @Memoized
   @Override
   public ZipPath getPath() {
     ZipPath path = ZipPath.create(getZipEntry().getName());

@@ -20,6 +20,7 @@ import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Preconditions.checkState;
 
 import com.google.auto.value.AutoValue;
+import com.google.auto.value.extension.memoized.Memoized;
 import com.google.common.base.Joiner;
 import com.google.common.base.Splitter;
 import com.google.common.collect.Comparators;
@@ -121,6 +122,7 @@ public abstract class ZipPath implements Path {
   @Override
   @Nullable
   @CheckReturnValue
+  @Memoized
   public ZipPath getParent() {
     if (getNames().isEmpty()) {
       return null;
@@ -202,6 +204,7 @@ public abstract class ZipPath implements Path {
     return JOINER.join(getNames());
   }
 
+  @Memoized
   @Override
   public ZipPath getFileName() {
     checkArgument(getNameCount() > 0, "Root does not have a file name.");

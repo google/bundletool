@@ -158,6 +158,21 @@ public final class ZipBuilder {
   }
 
   /**
+   * Lazily copies the given zip file entry to the specified path, preserving the existing
+   * compression setting.
+   *
+   * <p>Will throw an exception if the path is already taken.
+   */
+  public ZipBuilder addFileFromZipPreservingCompression(
+      ZipPath toPath, ZipFile fromZipFile, ZipEntry zipEntry) {
+    EntryOption[] entryOption =
+        zipEntry.getMethod() == ZipEntry.STORED
+            ? new EntryOption[] {EntryOption.UNCOMPRESSED}
+            : new EntryOption[0];
+    return addFileFromZip(toPath, fromZipFile, zipEntry, entryOption);
+  }
+
+  /**
    * Lazily adds a file in the zip at the given location with the content of the {@code
    * inputStreamSupplier}.
    *

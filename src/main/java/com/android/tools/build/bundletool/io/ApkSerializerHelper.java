@@ -83,6 +83,23 @@ final class ApkSerializerHelper {
   /** Name identifying uniquely the {@link SignerConfig} passed to the engine. */
   private static final String SIGNER_CONFIG_NAME = "BNDLTOOL";
 
+  /**
+   * Alignment rule for all APKs.
+   *
+   * <ul>
+   *   <li>Align by 4 all uncompressed files.
+   *   <li>Align by 4096 all uncompressed native libraries.
+   * </ul>
+   *
+   * Note that it's fine to always provide the same alignment rule regardless of the value of
+   * 'extractNativeLibs' because apkzlib will only apply these rules to uncompressed files, so a
+   * compressed file will remain unaligned.
+   */
+  static final AlignmentRule APK_ALIGNMENT_RULE =
+      AlignmentRules.compose(
+          AlignmentRules.constantForSuffix(NATIVE_LIBRARIES_SUFFIX, 4096),
+          AlignmentRules.constant(4));
+
   private static final Predicate<ZipPath> FILES_FOR_AAPT2 =
       path ->
           path.startsWith("res")
@@ -161,7 +178,7 @@ final class ApkSerializerHelper {
             ZFiles.apk(
                 outputPath.toFile(),
                 createZFileOptions(tempDir)
-                    .setAlignmentRule(splitAlignmentRule(split))
+                    .setAlignmentRule(APK_ALIGNMENT_RULE)
                     .setCoverEmptySpaceUsingExtraField(true)
                     // Clear timestamps on zip entries to minimize diffs between APKs.
                     .setNoTimestamps(true),
@@ -279,27 +296,6 @@ final class ApkSerializerHelper {
     } else {
       return new EntryOption[] {EntryOption.UNCOMPRESSED};
     }
-  }
-
-  /**
-   * Alignment rule for all APKs.
-   *
-   * <ul>
-   *   <li>Align by 4 all uncompressed files.
-   *   <li>Align by 4096 all uncompressed native libraries.
-   *   <li>Align by 4096 all assets inside asset slices.
-   * </ul>
-   *
-   * Note that it's fine to always provide the same alignment rule regardless of the value of
-   * 'extractNativeLibs' because apkzlib will only apply these rules to uncompressed files, so a
-   * compressed file will remain unaligned.
-   */
-  private static AlignmentRule splitAlignmentRule(ModuleSplit split) {
-    return split.getSplitType().equals(SplitType.ASSET_SLICE)
-        ? AlignmentRules.constant(4096)
-        : AlignmentRules.compose(
-            AlignmentRules.constantForSuffix(NATIVE_LIBRARIES_SUFFIX, 4096),
-            AlignmentRules.constant(4));
   }
 
   private boolean shouldCompress(

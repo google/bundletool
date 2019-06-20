@@ -16,7 +16,7 @@ message BuildApksResult {
   Bundletool bundletool = 2;
 
   // List of the created asset slices.
-  repeated AssetSlice asset_slice = 3;
+  repeated AssetSliceSet asset_slice_set = 3;
 }
 
 // Variant is a group of APKs that covers a part of the device configuration
@@ -35,16 +35,6 @@ message Variant {
   // configuration, with higher variant numbers having priority over lower
   // variant numbers.
   uint32 variant_number = 3;
-}
-
-message AssetSlice {
-  // Asset slice targeting.
-  AssetSliceTargeting targeting = 1;
-
-  AssetModuleMetadata asset_module_metadata = 2;
-
-  // APKs.
-  repeated ApkDescription apk_description = 3;
 }
 
 // Represents a module.
@@ -74,6 +64,15 @@ message ModuleMetadata {
   // The targeting that makes a conditional module installed.
   // Relevant only for Split APKs.
   ModuleTargeting targeting = 5;
+}
+
+// Set of asset slices belonging to a single asset module.
+message AssetSliceSet {
+  // Module level metadata.
+  AssetModuleMetadata asset_module_metadata = 1;
+
+  // Asset slices.
+  repeated ApkDescription apk_description = 2;
 }
 
 message AssetModuleMetadata {

@@ -45,9 +45,9 @@ import static com.google.common.truth.Truth.assertThat;
 import static com.google.common.truth.Truth8.assertThat;
 import static com.google.common.truth.extensions.proto.ProtoTruth.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.mockito.Matchers.any;
-import static org.mockito.Matchers.anyBoolean;
-import static org.mockito.Matchers.anyInt;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Matchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
@@ -191,6 +191,7 @@ public class ModuleSplitsToShardMergerTest {
         new ModuleSplitsToShardMerger(d8DexMerger, tmpDir)
             .mergeSystemShard(
                 ImmutableList.of(masterSplit, x86Split, esSplit, frSplit),
+                ImmutableSet.of(BundleModuleName.create("base")),
                 NO_MAIN_DEX_LIST,
                 mergeSpecs(abis("x86"), locales("es")));
 
@@ -206,7 +207,7 @@ public class ModuleSplitsToShardMergerTest {
     assertThat(fusedSplit.getResourceTable()).isEmpty();
     assertThat(fusedSplit.getAndroidManifest().getSplitId()).isEmpty();
 
-    ModuleSplit frLangSplit = Iterables.getOnlyElement(shards.getAdditionalLanguageSplits());
+    ModuleSplit frLangSplit = Iterables.getOnlyElement(shards.getAdditionalSplits());
 
     assertThat(extractPaths(frLangSplit.getEntries()))
         .containsExactly("assets/i18n#lang_fr/strings.pak");
@@ -236,6 +237,7 @@ public class ModuleSplitsToShardMergerTest {
             .setApkTargeting(apkLanguageTargeting(languageTargeting("fr")))
             .setMasterSplit(false)
             .build();
+
     ModuleSplit esVrSplit =
         createModuleSplitBuilder()
             .setModuleName(BundleModuleName.create("vr"))
@@ -271,6 +273,7 @@ public class ModuleSplitsToShardMergerTest {
         new ModuleSplitsToShardMerger(d8DexMerger, tmpDir)
             .mergeSystemShard(
                 ImmutableList.of(masterSplit, esSplit, frSplit, esVrSplit, frVrSplit, itVrSplit),
+                ImmutableSet.of(BundleModuleName.create("base"), BundleModuleName.create("vr")),
                 NO_MAIN_DEX_LIST,
                 mergeSpecs(abis("x86"), locales("fr")));
 
@@ -281,7 +284,7 @@ public class ModuleSplitsToShardMergerTest {
         .containsExactly("assets/i18n#lang_fr/strings.pak", "assets/vr/i18n#lang_fr/strings.pak");
 
     // es-base, es-vr, it-vr splits.
-    ImmutableList<ModuleSplit> langSplits = shards.getAdditionalLanguageSplits();
+    ImmutableList<ModuleSplit> langSplits = shards.getAdditionalSplits();
     assertThat(langSplits).hasSize(3);
 
     ImmutableMap<String, ModuleSplit> langSplitsNameMap =
@@ -352,10 +355,9 @@ public class ModuleSplitsToShardMergerTest {
 
     assertThat(extractPaths(merged.getEntries()))
         .containsExactly("dex/classes.dex", "dex/classes2.dex");
-    ModuleEntry classesDexEntry = merged.findEntriesUnderPath("dex/classes.dex").findFirst().get();
+    ModuleEntry classesDexEntry = merged.findEntry("dex/classes.dex").get();
     assertThat(TestUtils.getEntryContent(classesDexEntry)).isEqualTo(classesDexData);
-    ModuleEntry classes2DexEntry =
-        merged.findEntriesUnderPath("dex/classes2.dex").findFirst().get();
+    ModuleEntry classes2DexEntry = merged.findEntry("dex/classes2.dex").get();
     assertThat(TestUtils.getEntryContent(classes2DexEntry)).isEqualTo(classes2DexData);
     // No merging means no items in cache.
     assertThat(dexMergingCache).isEmpty();
@@ -387,7 +389,7 @@ public class ModuleSplitsToShardMergerTest {
                 ImmutableList.of(baseSplit, featureSplit), NO_MAIN_DEX_LIST, dexMergingCache);
 
     assertThat(extractPaths(merged.getEntries())).containsExactly("dex/classes.dex");
-    ModuleEntry mergedDexEntry = merged.findEntriesUnderPath("dex/classes.dex").findFirst().get();
+    ModuleEntry mergedDexEntry = merged.findEntry("dex/classes.dex").get();
     byte[] mergedDexData = TestUtils.getEntryContent(mergedDexEntry);
     assertThat(mergedDexData.length).isGreaterThan(0);
     assertThat(mergedDexData).isNotEqualTo(TestData.readBytes("testdata/dex/classes.dex"));

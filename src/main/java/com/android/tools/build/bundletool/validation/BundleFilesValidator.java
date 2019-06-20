@@ -33,7 +33,6 @@ import com.android.tools.build.bundletool.model.AbiName;
 import com.android.tools.build.bundletool.model.BundleModule.SpecialModuleEntry;
 import com.android.tools.build.bundletool.model.ZipPath;
 import com.android.tools.build.bundletool.model.exceptions.BundleFileTypesException.FileUsesReservedNameException;
-import com.android.tools.build.bundletool.model.exceptions.BundleFileTypesException.FilesInResourceDirectoryRootException;
 import com.android.tools.build.bundletool.model.exceptions.BundleFileTypesException.InvalidApexImagePathException;
 import com.android.tools.build.bundletool.model.exceptions.BundleFileTypesException.InvalidFileExtensionInDirectoryException;
 import com.android.tools.build.bundletool.model.exceptions.BundleFileTypesException.InvalidFileNameInDirectoryException;
@@ -110,9 +109,7 @@ public class BundleFilesValidator extends SubValidator {
       }
 
     } else if (file.startsWith(RESOURCES_DIRECTORY)) {
-      if (file.getNameCount() == 2) {
-        throw new FilesInResourceDirectoryRootException(RESOURCES_DIRECTORY, file);
-      }
+      // No restrictions.
 
     } else if (file.startsWith(ROOT_DIRECTORY)) {
       ZipPath nameUnderRoot = file.getName(1);

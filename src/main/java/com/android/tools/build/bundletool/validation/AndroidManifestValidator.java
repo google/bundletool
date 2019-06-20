@@ -19,11 +19,13 @@ package com.android.tools.build.bundletool.validation;
 import static com.android.tools.build.bundletool.model.AndroidManifest.DISTRIBUTION_NAMESPACE_URI;
 import static com.android.tools.build.bundletool.model.AndroidManifest.NO_NAMESPACE_URI;
 import static com.android.tools.build.bundletool.model.AndroidManifest.VERSION_CODE_RESOURCE_ID;
+import static com.android.tools.build.bundletool.model.BundleModule.ModuleDeliveryType.ALWAYS_INITIAL_INSTALL;
 import static com.android.tools.build.bundletool.model.BundleModule.ModuleDeliveryType.CONDITIONAL_INITIAL_INSTALL;
 import static com.android.tools.build.bundletool.model.BundleModule.ModuleDeliveryType.NO_INITIAL_INSTALL;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.ImmutableSet.toImmutableSet;
 
+import com.android.bundle.Targeting.ModuleTargeting;
 import com.android.tools.build.bundletool.model.AndroidManifest;
 import com.android.tools.build.bundletool.model.BundleModule;
 import com.android.tools.build.bundletool.model.BundleModule.ModuleDeliveryType;
@@ -96,12 +98,15 @@ public class AndroidManifestValidator extends SubValidator {
   public void validateModule(BundleModule module) {
     validateInstant(module);
     validateDeliverySettings(module);
+    validateInstantDeliverySettings(module);
     validateFusingConfig(module);
     validateMinMaxSdk(module);
     validateNumberOfDistinctSplitIds(module);
     validateOnDemandIsInstantMutualExclusion(module);
     validateAssetModuleManifest(module);
     validateMinSdkCondition(module);
+    validateNoConditionalTargetingInAssetModules(module);
+    validateInstantAndPersistentDeliveryCombinationsForAssetModules(module);
   }
 
   private void validateInstant(ImmutableList<BundleModule> modules) {
@@ -167,16 +172,30 @@ public class AndroidManifestValidator extends SubValidator {
                   + "<dist:delivery> element (module: '%s').",
               module.getName())
           .build();
-        }
     }
+  }
+
+  private void validateInstantDeliverySettings(BundleModule module) {
+    if (module.getAndroidManifest().getInstantManifestDeliveryElement().isPresent()
+        && module.getAndroidManifest().getInstantAttribute().isPresent()) {
+      throw ValidationException.builder()
+          .withMessage(
+              "The <dist:instant-delivery> element and dist:instant attribute cannot be used"
+                  + " together (module: '%s').",
+              module.getName())
+          .build();
+    }
+  }
 
   private void validateOnDemandIsInstantMutualExclusion(BundleModule module) {
     boolean isInstant = module.getAndroidManifest().isInstantModule().orElse(false);
 
-    if (module.getDeliveryType().equals(NO_INITIAL_INSTALL) && isInstant) {
+    if (module.getDeliveryType().equals(NO_INITIAL_INSTALL)
+        && isInstant
+        && module.getModuleType().equals(ModuleType.FEATURE_MODULE)) {
       throw ValidationException.builder()
           .withMessage(
-              "Module cannot be on-demand and 'instant' at the same time (module '%s').",
+              "Feature module cannot be on-demand and 'instant' at the same time (module '%s').",
               module.getName())
           .build();
     }
@@ -291,6 +310,45 @@ public class AndroidManifestValidator extends SubValidator {
               "Module '%s' has <dist:min-sdk> condition (%d) lower than the "
                   + "minSdkVersion(%d) of the module.",
               module.getName(), minSdkCondition.get(), effectiveMinSdkVersion)
+          .build();
+    }
+  }
+
+  private void validateNoConditionalTargetingInAssetModules(BundleModule module) {
+    if (module.getModuleType().equals(ModuleType.ASSET_MODULE)
+        && !module
+            .getModuleMetadata()
+            .getTargeting()
+            .equals(ModuleTargeting.getDefaultInstance())) {
+      throw ValidationException.builder()
+          .withMessage(
+              "Conditional targeting is not allowed in asset packs, but found in '%s'.",
+              module.getName())
+          .build();
+    }
+  }
+
+  private void validateInstantAndPersistentDeliveryCombinationsForAssetModules(
+      BundleModule module) {
+    if (!module.getAndroidManifest().getModuleType().equals(ModuleType.ASSET_MODULE)
+        || !module.isInstantModule()) {
+      return;
+    }
+    // The two delivery combinations not allowed for asset modules are:
+    // - Persistent install-time delivery + any instant delivery.
+    // - Any persistent delivery + install-time instant delivery.
+    if (!module.getDeliveryType().equals(NO_INITIAL_INSTALL)) {
+      throw ValidationException.builder()
+          .withMessage(
+              "Instant asset packs cannot have install-time delivery (module '%s').",
+              module.getName())
+          .build();
+    }
+    ModuleDeliveryType instantDelivery = module.getInstantDeliveryType().get();
+    if (instantDelivery.equals(ALWAYS_INITIAL_INSTALL)
+        || instantDelivery.equals(CONDITIONAL_INITIAL_INSTALL)) {
+      throw ValidationException.builder()
+          .withMessage("Instant delivery cannot be install-time (module '%s').", module.getName())
           .build();
     }
   }

@@ -17,8 +17,11 @@
 package com.android.tools.build.bundletool.splitters;
 
 import static com.google.common.base.Preconditions.checkNotNull;
+import static com.google.common.collect.ImmutableList.toImmutableList;
 
+import com.android.tools.build.bundletool.model.AppBundle;
 import com.android.tools.build.bundletool.model.BundleModule;
+import com.android.tools.build.bundletool.model.BundleModule.ModuleDeliveryType;
 import com.android.tools.build.bundletool.model.ModuleSplit;
 import com.google.common.collect.ImmutableList;
 
@@ -29,23 +32,38 @@ import com.google.common.collect.ImmutableList;
  */
 public class AssetSlicesGenerator {
 
-  private final ImmutableList<BundleModule> modules;
+  private final AppBundle appBundle;
   private final ApkGenerationConfiguration apkGenerationConfiguration;
 
   public AssetSlicesGenerator(
-      ImmutableList<BundleModule> modules, ApkGenerationConfiguration apkGenerationConfiguration) {
-    this.modules = checkNotNull(modules);
+      AppBundle appBundle, ApkGenerationConfiguration apkGenerationConfiguration) {
+    this.appBundle = checkNotNull(appBundle);
     this.apkGenerationConfiguration = checkNotNull(apkGenerationConfiguration);
   }
 
   public ImmutableList<ModuleSplit> generateAssetSlices() {
     ImmutableList.Builder<ModuleSplit> splits = ImmutableList.builder();
+    int versionCode = appBundle.getBaseModule().getAndroidManifest().getVersionCode();
 
-    for (BundleModule module : modules) {
+    for (BundleModule module : appBundle.getAssetModules().values()) {
       RemoteAssetModuleSplitter moduleSplitter =
           new RemoteAssetModuleSplitter(module, apkGenerationConfiguration);
-      splits.addAll(moduleSplitter.splitModule());
+      if (module.getDeliveryType().equals(ModuleDeliveryType.ALWAYS_INITIAL_INSTALL)) {
+        splits.addAll(
+            moduleSplitter.splitModule().stream()
+                .map(split -> addVersionCode(split, versionCode))
+                .collect(toImmutableList()));
+      } else {
+        splits.addAll(moduleSplitter.splitModule());
+      }
     }
     return splits.build();
+  }
+
+  public static ModuleSplit addVersionCode(ModuleSplit moduleSplit, int versionCode) {
+    return moduleSplit.toBuilder()
+        .setAndroidManifest(
+            moduleSplit.getAndroidManifest().toEditor().setVersionCode(versionCode).save())
+        .build();
   }
 }

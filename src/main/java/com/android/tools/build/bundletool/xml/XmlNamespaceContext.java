@@ -37,6 +37,9 @@ public final class XmlNamespaceContext implements NamespaceContext {
   public XmlNamespaceContext(XmlProtoNode manifestProto) {
     this.prefixToNamespaceUri =
         collectNamespaces(manifestProto.getElement())
+            // get rid of other proto fields
+            .map(xmlProto -> XmlProtoNamespace.create(xmlProto.getPrefix(), xmlProto.getUri()))
+            .distinct()
             .collect(toImmutableMap(XmlProtoNamespace::getPrefix, XmlProtoNamespace::getUri));
   }
 
@@ -50,6 +53,11 @@ public final class XmlNamespaceContext implements NamespaceContext {
   @Override
   public String getNamespaceURI(String prefix) {
     String namespaceUri = prefixToNamespaceUri.get(prefix);
+    if (namespaceUri == null) {
+      // Some apps strip the namespace declarations to save space, so we keep an internal dictionary
+      // to avoid crashing for the common use-cases.
+      namespaceUri = XmlUtils.COMMON_NAMESPACE_PREFIXES.inverse().get(prefix);
+    }
     if (namespaceUri == null) {
       throw ValidationException.builder()
           .withMessage("Namespace prefix '%s' not found.", prefix)

@@ -32,10 +32,17 @@ import com.android.tools.build.bundletool.model.BundleModule;
 import com.android.tools.build.bundletool.model.ModuleEntry;
 import com.android.tools.build.bundletool.model.ZipPath;
 import com.android.tools.build.bundletool.model.exceptions.ValidationException;
+import com.android.tools.build.bundletool.model.utils.files.BufferedIo;
 import com.google.common.base.Joiner;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Sets;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.UncheckedIOException;
 import java.util.Optional;
 
 /** Validates an APEX bundle. */
@@ -78,11 +85,13 @@ public class ApexBundleValidator extends SubValidator {
       return;
     }
 
-    if (!module.getEntry(APEX_MANIFEST_PATH).isPresent()) {
+    Optional<ModuleEntry> apexManifest = module.getEntry(APEX_MANIFEST_PATH);
+    if (!apexManifest.isPresent()) {
       throw ValidationException.builder()
           .withMessage("Missing expected file in APEX bundle: '%s'.", APEX_MANIFEST_PATH)
           .build();
     }
+    validateApexManifest(apexManifest.get());
 
     ImmutableSet.Builder<String> apexImagesBuilder = ImmutableSet.builder();
     ImmutableSet.Builder<String> apexFileNamesBuilder = ImmutableSet.builder();
@@ -153,6 +162,20 @@ public class ApexBundleValidator extends SubValidator {
       throw ValidationException.builder()
           .withMessage("Targeted APEX image files are missing: %s", missingTargetedImages)
           .build();
+    }
+  }
+
+  private static void validateApexManifest(ModuleEntry entry) {
+    try (InputStream inputStream = entry.getContent();
+        BufferedReader reader = BufferedIo.reader(inputStream)) {
+      JsonObject json = new JsonParser().parse(reader).getAsJsonObject();
+      if (json.get("name") == null) {
+        throw ValidationException.builder()
+            .withMessage("APEX manifest must have a package name.")
+            .build();
+      }
+    } catch (IOException e) {
+      throw new UncheckedIOException("Couldn't read APEX manifest.", e);
     }
   }
 }

@@ -22,7 +22,6 @@ import static com.google.common.truth.Truth.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.android.bundle.Targeting.Abi.AbiAlias;
-import com.android.tools.build.bundletool.model.exceptions.CommandExecutionException;
 import com.google.common.collect.ImmutableSet;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -51,12 +50,12 @@ public class AbiMatcherTest {
     AbiMatcher abiMatcher = new AbiMatcher(lDeviceWithAbis("x86", "armeabi"));
 
     assertThrows(
-        CommandExecutionException.class,
+        IncompatibleDeviceException.class,
         () ->
             abiMatcher.checkDeviceCompatible(
                 abiTargeting(AbiAlias.ARM64_V8A, ImmutableSet.of(AbiAlias.X86_64))));
     assertThrows(
-        CommandExecutionException.class,
+        IncompatibleDeviceException.class,
         () -> abiMatcher.checkDeviceCompatible(abiTargeting(AbiAlias.X86_64, ImmutableSet.of())));
   }
 

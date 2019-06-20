@@ -123,7 +123,8 @@ public class BuildBundleCommandTest {
   }
 
   @Test
-  public void buildingViaFlagsAndBuilderHasSameResult_optionalBundleConfig() throws Exception {
+  public void buildingViaFlagsAndBuilderHasSameResult_optionalBundleConfig_inJavaViaProto()
+      throws Exception {
     Path modulePath = createSimpleBaseModule();
 
     Path bundleConfigJsonPath = tmpDir.resolve("BundleConfig.pb.json");
@@ -140,6 +141,36 @@ public class BuildBundleCommandTest {
                 BundleConfig.newBuilder()
                     .setCompression(Compression.newBuilder().addUncompressedGlob("foo"))
                     .build())
+            .build();
+
+    BuildBundleCommand commandViaFlags =
+        BuildBundleCommand.fromFlags(
+            new FlagParser()
+                .parse(
+                    "--output=" + bundlePath,
+                    "--modules=" + modulePath,
+                    // Optional values.
+                    "--config=" + bundleConfigJsonPath));
+
+    assertThat(commandViaBuilder).isEqualTo(commandViaFlags);
+  }
+
+  @Test
+  public void buildingViaFlagsAndBuilderHasSameResult_optionalBundleConfig_inJavaViaFile()
+      throws Exception {
+    Path modulePath = createSimpleBaseModule();
+
+    Path bundleConfigJsonPath = tmpDir.resolve("BundleConfig.pb.json");
+    Files.write(
+        bundleConfigJsonPath,
+        "{ \"compression\": { \"uncompressedGlob\": [\"foo\"] } }".getBytes(UTF_8));
+
+    BuildBundleCommand commandViaBuilder =
+        BuildBundleCommand.builder()
+            .setOutputPath(bundlePath)
+            .setModulesPaths(ImmutableList.of(modulePath))
+            // Optional values.
+            .setBundleConfig(bundleConfigJsonPath)
             .build();
 
     BuildBundleCommand commandViaFlags =
@@ -250,6 +281,7 @@ public class BuildBundleCommandTest {
             targetedImageWithAlternatives("apex/x86.img", X86, targetedAbis),
             targetedImageWithAlternatives("apex/arm64-v8a.img", ARM64_V8A, targetedAbis),
             targetedImageWithAlternatives("apex/armeabi-v7a.img", ARMEABI_V7A, targetedAbis));
+    byte[] apexManifest = "{\"name\": \"com.test.app\"}".getBytes(UTF_8);
     Path module =
         new ZipBuilder()
             .addFileWithContent(ZipPath.create("apex/x86_64.img"), "x86_64".getBytes(UTF_8))
@@ -258,8 +290,7 @@ public class BuildBundleCommandTest {
             .addFileWithContent(
                 ZipPath.create("apex/armeabi-v7a.img"), "armeabi-v7a".getBytes(UTF_8))
             .addFileWithProtoContent(ZipPath.create("manifest/AndroidManifest.xml"), manifest)
-            .addFileWithContent(
-                ZipPath.create("root/apex_manifest.json"), "manifest".getBytes(UTF_8))
+            .addFileWithContent(ZipPath.create("root/apex_manifest.json"), apexManifest)
             .writeTo(tmpDir.resolve("base.zip"));
 
     BuildBundleCommand.builder()
@@ -280,9 +311,7 @@ public class BuildBundleCommandTest {
       assertThat(bundle)
           .hasFile("base/apex/armeabi-v7a.img")
           .withContent("armeabi-v7a".getBytes(UTF_8));
-      assertThat(bundle)
-          .hasFile("base/root/apex_manifest.json")
-          .withContent("manifest".getBytes(UTF_8));
+      assertThat(bundle).hasFile("base/root/apex_manifest.json").withContent(apexManifest);
       assertThat(bundle).hasFile("base/apex.pb").withContent(apexConfig.toByteArray());
     }
   }

@@ -26,6 +26,7 @@ import static com.android.tools.build.bundletool.testing.DeviceFactory.locales;
 import static com.android.tools.build.bundletool.testing.DeviceFactory.mergeSpecs;
 import static com.android.tools.build.bundletool.testing.DeviceFactory.sdkVersion;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifest;
+import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifestForFeature;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.abiTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.apkAbiTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.apkLanguageTargeting;
@@ -112,7 +113,7 @@ public class ShardedApksGeneratorTest {
                 .build(),
             new BundleModuleBuilder("test")
                 .addFile("assets/test.txt")
-                .setManifest(androidManifest("com.test.app"))
+                .setManifest(androidManifestForFeature("com.test.app"))
                 .build());
 
     ImmutableList<ModuleSplit> moduleSplits =
@@ -402,7 +403,7 @@ public class ShardedApksGeneratorTest {
                         targetedAssetsDirectory(
                             "assets/vr/languages#lang_it",
                             assetsDirectoryTargeting(languageTargeting("it")))))
-                .setManifest(androidManifest("com.test.app"))
+                .setManifest(androidManifestForFeature("com.test.app"))
                 .build());
 
     ImmutableList<ModuleSplit> moduleSplits =

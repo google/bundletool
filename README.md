@@ -21,7 +21,9 @@ Bundletool has a few different responsibilities:
 Read more about the App Bundle format and Bundletool's usage at
 [g.co/androidappbundle](https://g.co/androidappbundle)
 
+Documentation of bundletool commands can be found at:
+https://developer.android.com/studio/command-line/bundletool
 
 ## Releases
 
-Latest release: [0.9.0](https://github.com/google/bundletool/releases)
+Latest release: [0.10.0](https://github.com/google/bundletool/releases)

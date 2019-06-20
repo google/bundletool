@@ -19,9 +19,12 @@ package com.android.tools.build.bundletool.mergers;
 import static com.android.tools.build.bundletool.model.BundleMetadata.BUNDLETOOL_NAMESPACE;
 import static com.android.tools.build.bundletool.model.BundleMetadata.MAIN_DEX_LIST_FILE_NAME;
 import static com.android.tools.build.bundletool.model.BundleModule.DEX_DIRECTORY;
+import static com.android.tools.build.bundletool.model.BundleModuleName.BASE_MODULE_NAME;
 import static com.google.common.base.Preconditions.checkState;
+import static com.google.common.base.Predicates.not;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.ImmutableSet.toImmutableSet;
+import static java.util.stream.Collectors.groupingBy;
 
 import com.android.aapt.Resources.ResourceTable;
 import com.android.bundle.Devices.DeviceSpec;
@@ -46,13 +49,10 @@ import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.HashMultimap;
 import com.google.common.collect.ImmutableCollection;
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableMultimap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.ListMultimap;
-import com.google.common.collect.Multimaps;
 import com.google.common.collect.SetMultimap;
-import com.google.common.collect.Sets;
 import com.google.common.io.ByteStreams;
 import java.io.IOException;
 import java.io.InputStream;
@@ -66,6 +66,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.stream.Stream;
 
 /**
  * Merges given module splits into standalone APKs.
@@ -74,9 +75,6 @@ import java.util.Set;
  * ModuleEntry} instances that are contained in the produced {@link ModuleSplit} instances.
  */
 public class ModuleSplitsToShardMerger {
-
-  private static final BundleModuleName BASE_MODULE_NAME =
-      BundleModuleName.create(BundleModuleName.BASE_MODULE_NAME);
 
   private final DexMerger dexMerger;
   private final Path globalTempDir;
@@ -111,41 +109,45 @@ public class ModuleSplitsToShardMerger {
   /**
    * Gets a collections of splits and merges them into a single system APK (aka shard).
    *
-   * @param splits a collection of splits
+   * @param splits Collection of generated splits from all modules and configurations.
    * @param bundleMetadata the App Bundle metadata
-   * @param deviceSpec the device specification
+   * @param deviceSpec the device specification to generate a system APK for.
    * @return {@link ShardedSystemSplits} containing a single fused system APK and additional
-   *     language splits
+   *     language and feature splits.
    */
   public ShardedSystemSplits mergeSystemShard(
       ImmutableCollection<ModuleSplit> splits,
+      ImmutableSet<BundleModuleName> modulesToFuse,
       BundleMetadata bundleMetadata,
       DeviceSpec deviceSpec) {
-
     ApkMatcher deviceSpecMatcher = new ApkMatcher(deviceSpec);
-    ImmutableSet<ModuleSplit> nonMatchedLanguageSplits =
+
+    ImmutableSet<ModuleSplit> splitsForTheSystemApk =
         splits.stream()
-            .filter(split -> split.getApkTargeting().hasLanguageTargeting())
-            .filter(split -> !deviceSpecMatcher.matchesModuleSplitByTargeting(split))
+            .filter(split -> modulesToFuse.contains(split.getModuleName()))
+            .filter(
+                split ->
+                    !split.getApkTargeting().hasLanguageTargeting()
+                        || deviceSpecMatcher.matchesModuleSplitByTargeting(split))
             .collect(toImmutableSet());
 
     ModuleSplit fusedSplit =
-        mergeSingleShard(
-            Sets.difference(ImmutableSet.copyOf(splits), nonMatchedLanguageSplits).immutableCopy(),
-            bundleMetadata,
-            new HashMap<>());
+        mergeSingleShard(splitsForTheSystemApk, bundleMetadata, new HashMap<>());
 
-    ImmutableMultimap<BundleModuleName, ModuleSplit> langSplitsByModuleMap =
-        Multimaps.index(nonMatchedLanguageSplits, ModuleSplit::getModuleName);
-
-    ImmutableList<ModuleSplit> langSplitsWithSplitId =
-        langSplitsByModuleMap.keySet().stream()
-            .flatMap(
-                key ->
-                    writeSplitIdInManifestHavingSameModule(langSplitsByModuleMap.get(key)).stream())
+    // List of remaining language and feature splits that weren't fused.
+    ImmutableList<ModuleSplit> otherSplits =
+        splits.stream()
+            .filter(not(splitsForTheSystemApk::contains))
+            .collect(groupingBy(ModuleSplit::getModuleName))
+            .values()
+            .stream()
+            .flatMap(ModuleSplitsToShardMerger::writeSplitIdInManifestHavingSameModule)
             .collect(toImmutableList());
 
-    return ShardedSystemSplits.create(fusedSplit, langSplitsWithSplitId);
+    return ShardedSystemSplits.builder()
+        .setSystemImageSplit(fusedSplit)
+        .setAdditionalSplits(otherSplits)
+        .build();
   }
 
   @VisibleForTesting
@@ -300,8 +302,7 @@ public class ModuleSplitsToShardMerger {
               key -> mergeDexFiles(dexEntries, bundleMetadata, androidManifest));
 
       // Names of the merged dex files need to be preserved ("classes.dex", "classes2.dex" etc.).
-      return mergedDexFiles
-          .stream()
+      return mergedDexFiles.stream()
           .map(
               filePath ->
                   FileSystemModuleEntry.ofFile(
@@ -423,8 +424,7 @@ public class ModuleSplitsToShardMerger {
 
   private static ImmutableList<String> getUniqueModuleNames(
       ImmutableCollection<ModuleSplit> splits) {
-    return splits
-        .stream()
+    return splits.stream()
         .map(ModuleSplit::getModuleName)
         .map(BundleModuleName::getName)
         .distinct()
@@ -453,11 +453,11 @@ public class ModuleSplitsToShardMerger {
     }
   }
 
-  private static ImmutableList<ModuleSplit> writeSplitIdInManifestHavingSameModule(
-      ImmutableCollection<ModuleSplit> splits) {
+  private static Stream<ModuleSplit> writeSplitIdInManifestHavingSameModule(
+      List<ModuleSplit> splits) {
+    checkState(splits.stream().map(ModuleSplit::getModuleName).distinct().count() == 1);
     SuffixManager suffixManager = new SuffixManager();
     return splits.stream()
-        .map(split -> split.writeSplitIdInManifest(suffixManager.createSuffix(split)))
-        .collect(toImmutableList());
+        .map(split -> split.writeSplitIdInManifest(suffixManager.createSuffix(split)));
   }
 }

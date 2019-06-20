@@ -16,10 +16,8 @@
 
 package com.android.tools.build.bundletool.splitters;
 
-import static com.android.tools.build.bundletool.model.AndroidManifest.MODULE_TYPE_ASSET_VALUE;
 import static com.android.tools.build.bundletool.model.OptimizationDimension.LANGUAGE;
-import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifest;
-import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withTypeAttribute;
+import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifestForAssetModule;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.apkGraphicsTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.apkLanguageTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.apkTextureTargeting;
@@ -63,8 +61,7 @@ public class RemoteAssetModuleSplitterTest {
         new BundleModuleBuilder("testModule")
             .addFile("assets/image.jpg")
             .addFile("assets/image2.jpg")
-            .setManifest(
-                androidManifest("com.test.app", withTypeAttribute(MODULE_TYPE_ASSET_VALUE)))
+            .setManifest(androidManifestForAssetModule("com.test.app"))
             .build();
 
     assertThat(testModule.getModuleType()).isEqualTo(ModuleType.ASSET_MODULE);

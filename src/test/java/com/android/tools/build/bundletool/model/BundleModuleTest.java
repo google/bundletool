@@ -16,12 +16,17 @@
 
 package com.android.tools.build.bundletool.model;
 
-import static com.android.tools.build.bundletool.model.AndroidManifest.MODULE_TYPE_ASSET_VALUE;
 import static com.android.tools.build.bundletool.model.AndroidManifest.MODULE_TYPE_FEATURE_VALUE;
+import static com.android.tools.build.bundletool.model.BundleModule.ModuleDeliveryType.ALWAYS_INITIAL_INSTALL;
+import static com.android.tools.build.bundletool.model.BundleModule.ModuleDeliveryType.NO_INITIAL_INSTALL;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifest;
+import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifestForAssetModule;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withFeatureCondition;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withFusingAttribute;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withInstallTimeDelivery;
+import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withInstant;
+import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withInstantInstallTimeDelivery;
+import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withInstantOnDemandDelivery;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withMinSdkCondition;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withMinSdkVersion;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withOnDemandAttribute;
@@ -426,6 +431,60 @@ public class BundleModuleTest {
   }
 
   @Test
+  public void getInstantDeliveryType_noConfig() {
+    BundleModule bundleModule =
+        createMinimalModuleBuilder()
+            .setAndroidManifestProto(androidManifestForAssetModule("com.test.app"))
+            .build();
+
+    assertThat(bundleModule.getInstantDeliveryType()).isEmpty();
+  }
+
+  @Test
+  public void getInstantDeliveryType_instantAttributeTrue() {
+    BundleModule bundleModule =
+        createMinimalModuleBuilder()
+            .setAndroidManifestProto(
+                androidManifestForAssetModule("com.test.app", withInstant(true)))
+            .build();
+
+    assertThat(bundleModule.getInstantDeliveryType()).hasValue(NO_INITIAL_INSTALL);
+  }
+
+  @Test
+  public void getInstantDeliveryType_instantAttributeFalse() {
+    BundleModule bundleModule =
+        createMinimalModuleBuilder()
+            .setAndroidManifestProto(
+                androidManifestForAssetModule("com.test.app", withInstant(false)))
+            .build();
+
+    assertThat(bundleModule.getInstantDeliveryType()).isEmpty();
+  }
+
+  @Test
+  public void getInstantDeliveryType_onDemandElement() {
+    BundleModule bundleModule =
+        createMinimalModuleBuilder()
+            .setAndroidManifestProto(
+                androidManifestForAssetModule("com.test.app", withInstantOnDemandDelivery()))
+            .build();
+
+    assertThat(bundleModule.getInstantDeliveryType()).hasValue(NO_INITIAL_INSTALL);
+  }
+
+  @Test
+  public void getInstantDeliveryType_installTimeElement() {
+    BundleModule bundleModule =
+        createMinimalModuleBuilder()
+            .setAndroidManifestProto(
+                androidManifestForAssetModule("com.test.app", withInstantInstallTimeDelivery()))
+            .build();
+
+    assertThat(bundleModule.getInstantDeliveryType()).hasValue(ALWAYS_INITIAL_INSTALL);
+  }
+
+  @Test
   public void getModuleType_notSpecified_defaultsToFeature() {
     BundleModule bundleModule =
         createMinimalModuleBuilder()
@@ -450,8 +509,7 @@ public class BundleModuleTest {
   public void getModuleType_remoteAsset() {
     BundleModule bundleModule =
         createMinimalModuleBuilder()
-            .setAndroidManifestProto(
-                androidManifest("com.test.app", withTypeAttribute(MODULE_TYPE_ASSET_VALUE)))
+            .setAndroidManifestProto(androidManifestForAssetModule("com.test.app"))
             .build();
 
     assertThat(bundleModule.getModuleType()).isEqualTo(ModuleType.ASSET_MODULE);

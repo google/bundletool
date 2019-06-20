@@ -84,6 +84,8 @@ public abstract class AndroidManifest {
   public static final String CONDITION_MIN_SDK_VERSION_NAME = "min-sdk";
   public static final String CONDITION_USER_COUNTRIES_NAME = "user-countries";
   public static final String SPLIT_NAME_ATTRIBUTE_NAME = "splitName";
+  public static final String VERSION_NAME_ATTRIBUTE_NAME = "versionName";
+  public static final String INSTALL_LOCATION_ATTRIBUTE_NAME = "installLocation";
 
   public static final String MODULE_TYPE_FEATURE_VALUE = "feature";
   public static final String MODULE_TYPE_ASSET_VALUE = "asset-pack";
@@ -99,10 +101,12 @@ public abstract class AndroidManifest {
   public static final int VALUE_RESOURCE_ID = 0x01010024;
   public static final int RESOURCE_RESOURCE_ID = 0x01010025;
   public static final int VERSION_CODE_RESOURCE_ID = 0x0101021b;
+  public static final int VERSION_NAME_RESOURCE_ID = 0x0101021c;
   public static final int IS_FEATURE_SPLIT_RESOURCE_ID = 0x0101055b;
   public static final int GL_ES_VERSION_RESOURCE_ID = 0x01010281;
   public static final int TARGET_SANDBOX_VERSION_RESOURCE_ID = 0x0101054c;
   public static final int SPLIT_NAME_RESOURCE_ID = 0x01010549;
+  public static final int INSTALL_LOCATION_RESOURCE_ID = 0x010102b7;
 
   // Matches the value of android.os.Build.VERSION_CODES.CUR_DEVELOPMENT, used when turning
   // a manifest attribute which references a prerelease API version (e.g., "Q") into an integer.
@@ -131,6 +135,11 @@ public abstract class AndroidManifest {
   @Memoized
   public Optional<ManifestDeliveryElement> getManifestDeliveryElement() {
     return ManifestDeliveryElement.fromManifestElement(getManifestElement());
+  }
+
+  @Memoized
+  public Optional<ManifestDeliveryElement> getInstantManifestDeliveryElement() {
+    return ManifestDeliveryElement.instantFromManifestElement(getManifestElement());
   }
 
   /**
@@ -402,6 +411,18 @@ public abstract class AndroidManifest {
   }
 
   public Optional<Boolean> isInstantModule() {
+    if (getInstantManifestDeliveryElement().isPresent()) {
+      if (!getModuleType().equals(ModuleType.ASSET_MODULE)) {
+        throw ValidationException.builder()
+            .withMessage("Instant-delivery element is only supported for asset packs.")
+            .build();
+      }
+      return getInstantManifestDeliveryElement().map(ManifestDeliveryElement::isWellFormed);
+    }
+    return getInstantAttribute();
+  }
+
+  public Optional<Boolean> getInstantAttribute() {
     return getManifestElement()
         .getOptionalChildElement(DISTRIBUTION_NAMESPACE_URI, "module")
         .flatMap(module -> module.getAttribute(DISTRIBUTION_NAMESPACE_URI, "instant"))
@@ -419,6 +440,13 @@ public abstract class AndroidManifest {
         .getOptionalChildElement(APPLICATION_ELEMENT_NAME)
         .flatMap(app -> app.getAndroidAttribute(EXTRACT_NATIVE_LIBS_RESOURCE_ID))
         .map(XmlProtoAttribute::getValueAsBoolean);
+  }
+
+  /** Returns the string value of the 'installLocation' attribute if set. */
+  public Optional<String> getInstallLocationValue() {
+    return getManifestElement()
+        .getAndroidAttribute(INSTALL_LOCATION_RESOURCE_ID)
+        .map(XmlProtoAttribute::getValueAsString);
   }
 
   /**

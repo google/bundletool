@@ -104,7 +104,7 @@ public final class ResultUtils {
 
   public static ImmutableList<Variant> systemApkVariants(ImmutableList<Variant> variants) {
     return variants.stream()
-        .filter(variant -> !isStandaloneApkVariant(variant))
+        .filter(variant -> isSystemApkVariant(variant))
         .collect(toImmutableList());
   }
 
@@ -139,9 +139,11 @@ public final class ResultUtils {
   }
 
   public static boolean isSystemApkVariant(Variant variant) {
-    return variant.getApkSetList().stream()
+    return variant
+        .getApkSetList()
+        .stream()
         .flatMap(apkSet -> apkSet.getApkDescriptionList().stream())
-        .allMatch(ApkDescription::hasSystemApkMetadata);
+        .anyMatch(ApkDescription::hasSystemApkMetadata);
   }
 
   private ResultUtils() {}

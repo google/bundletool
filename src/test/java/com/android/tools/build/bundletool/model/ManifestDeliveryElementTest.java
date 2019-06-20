@@ -22,6 +22,8 @@ import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.with
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withFeatureConditionHexVersion;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withFusingAttribute;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withInstallTimeDelivery;
+import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withInstantInstallTimeDelivery;
+import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withInstantOnDemandDelivery;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withMinSdkCondition;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withMinSdkVersion;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withOnDemandDelivery;
@@ -97,6 +99,32 @@ public class ManifestDeliveryElementTest {
     assertThat(deliveryElement).isPresent();
     assertThat(deliveryElement.get().hasInstallTimeElement()).isTrue();
     assertThat(deliveryElement.get().hasOnDemandElement()).isTrue();
+    assertThat(deliveryElement.get().hasModuleConditions()).isFalse();
+    assertThat(deliveryElement.get().isWellFormed()).isTrue();
+  }
+
+  @Test
+  public void instantOnDemandDelivery() {
+    Optional<ManifestDeliveryElement> deliveryElement =
+        ManifestDeliveryElement.instantFromManifestRootNode(
+            androidManifest("com.test.app", withInstantOnDemandDelivery()));
+
+    assertThat(deliveryElement).isPresent();
+    assertThat(deliveryElement.get().hasInstallTimeElement()).isFalse();
+    assertThat(deliveryElement.get().hasOnDemandElement()).isTrue();
+    assertThat(deliveryElement.get().hasModuleConditions()).isFalse();
+    assertThat(deliveryElement.get().isWellFormed()).isTrue();
+  }
+
+  @Test
+  public void instantInstallTimeDelivery() {
+    Optional<ManifestDeliveryElement> deliveryElement =
+        ManifestDeliveryElement.instantFromManifestRootNode(
+            androidManifest("com.test.app", withInstantInstallTimeDelivery()));
+
+    assertThat(deliveryElement).isPresent();
+    assertThat(deliveryElement.get().hasInstallTimeElement()).isTrue();
+    assertThat(deliveryElement.get().hasOnDemandElement()).isFalse();
     assertThat(deliveryElement.get().hasModuleConditions()).isFalse();
     assertThat(deliveryElement.get().isWellFormed()).isTrue();
   }

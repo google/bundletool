@@ -132,7 +132,7 @@ public abstract class BundleModule {
   }
 
   public boolean isBaseModule() {
-    return BundleModuleName.BASE_MODULE_NAME.equals(getName().getName());
+    return BundleModuleName.BASE_MODULE_NAME.equals(getName());
   }
 
   public ModuleDeliveryType getDeliveryType() {
@@ -158,6 +158,26 @@ public abstract class BundleModule {
 
     // Legacy onDemand attribute is equal to false or for base module: no delivery information.
     return ALWAYS_INITIAL_INSTALL;
+  }
+
+  public Optional<ModuleDeliveryType> getInstantDeliveryType() {
+    if (!isInstantModule()) {
+      return Optional.empty();
+    }
+    if (getAndroidManifest().getInstantManifestDeliveryElement().isPresent()) {
+      ManifestDeliveryElement instantManifestDeliveryElement =
+          getAndroidManifest().getInstantManifestDeliveryElement().get();
+      if (instantManifestDeliveryElement.hasInstallTimeElement()) {
+        return instantManifestDeliveryElement.hasModuleConditions()
+            ? Optional.of(CONDITIONAL_INITIAL_INSTALL)
+            : Optional.of(ALWAYS_INITIAL_INSTALL);
+      } else {
+        return Optional.of(NO_INITIAL_INSTALL);
+      }
+    }
+
+    // Handling dist:instant attribute value.
+    return Optional.of(NO_INITIAL_INSTALL);
   }
 
   public ModuleType getModuleType() {

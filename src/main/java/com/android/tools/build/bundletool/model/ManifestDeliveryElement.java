@@ -269,12 +269,29 @@ public abstract class ManifestDeliveryElement {
         "'%s' with namespace URI: '%s'", element.getName(), element.getNamespaceUri());
   }
 
-  /** Returns the instance if Android Manifest contains the <dist:delivery> element. */
+  /**
+   * Returns the instance of the delivery element for persistent delivery if Android Manifest
+   * contains the <dist:delivery> element.
+   */
   public static Optional<ManifestDeliveryElement> fromManifestElement(
       XmlProtoElement manifestElement) {
+    return fromManifestElement(manifestElement, "delivery");
+  }
+
+  /**
+   * Returns the instance of the delivery element for instant delivery if Android Manifest contains
+   * the <dist:instant-delivery> element.
+   */
+  public static Optional<ManifestDeliveryElement> instantFromManifestElement(
+      XmlProtoElement manifestElement) {
+    return fromManifestElement(manifestElement, "instant-delivery");
+  }
+
+  private static Optional<ManifestDeliveryElement> fromManifestElement(
+      XmlProtoElement manifestElement, String deliveryTag) {
     return manifestElement
         .getOptionalChildElement(DISTRIBUTION_NAMESPACE_URI, "module")
-        .flatMap(elem -> elem.getOptionalChildElement(DISTRIBUTION_NAMESPACE_URI, "delivery"))
+        .flatMap(elem -> elem.getOptionalChildElement(DISTRIBUTION_NAMESPACE_URI, deliveryTag))
         .map(
             (XmlProtoElement elem) -> {
               validateDeliveryElement(elem);
@@ -285,5 +302,10 @@ public abstract class ManifestDeliveryElement {
   @VisibleForTesting
   static Optional<ManifestDeliveryElement> fromManifestRootNode(XmlNode xmlNode) {
     return fromManifestElement(new XmlProtoNode(xmlNode).getElement());
+  }
+
+  @VisibleForTesting
+  static Optional<ManifestDeliveryElement> instantFromManifestRootNode(XmlNode xmlNode) {
+    return instantFromManifestElement(new XmlProtoNode(xmlNode).getElement());
   }
 }

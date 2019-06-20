@@ -24,6 +24,7 @@ import static com.android.tools.build.bundletool.model.utils.ResourcesUtils.MDPI
 import static com.android.tools.build.bundletool.model.utils.ResourcesUtils.TVDPI_VALUE;
 import static com.android.tools.build.bundletool.model.utils.ResourcesUtils.XHDPI_VALUE;
 import static com.android.tools.build.bundletool.testing.ResourcesTableFactory.ANY_DPI;
+import static com.android.tools.build.bundletool.testing.ResourcesTableFactory.DEFAULT_DPI;
 import static com.android.tools.build.bundletool.testing.ResourcesTableFactory.HDPI;
 import static com.android.tools.build.bundletool.testing.ResourcesTableFactory.LDPI;
 import static com.android.tools.build.bundletool.testing.ResourcesTableFactory.MDPI;
@@ -33,6 +34,7 @@ import static com.android.tools.build.bundletool.testing.ResourcesTableFactory.X
 import static com.android.tools.build.bundletool.testing.ResourcesTableFactory.XXXHDPI;
 import static com.android.tools.build.bundletool.testing.ResourcesTableFactory.forDpi;
 import static com.android.tools.build.bundletool.testing.ResourcesTableFactory.onlyConfig;
+import static com.android.tools.build.bundletool.testing.ResourcesTableFactory.value;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.truth.Truth.assertThat;
 import static com.google.common.truth.extensions.proto.ProtoTruth.assertThat;
@@ -40,6 +42,8 @@ import static com.google.common.truth.extensions.proto.ProtoTruth.assertThat;
 import com.android.aapt.ConfigurationOuterClass.Configuration;
 import com.android.aapt.Resources.ConfigValue;
 import com.android.bundle.Targeting.ScreenDensity.DensityAlias;
+import com.android.tools.build.bundletool.model.version.BundleToolVersion;
+import com.android.tools.build.bundletool.model.version.Version;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import org.junit.Test;
@@ -51,13 +55,17 @@ public class ScreenDensitySelectorTest {
 
   private static final int NEXUS_7_2013_DPI = 323;
 
+  private static final Version DEFAULT_BUNDLE_VERSION = BundleToolVersion.getCurrentVersion();
+
   @Test
   public void sortedOrder_deviceMatchesExistingDpi_notGreaterThan() {
     DensityAlias desiredDensity = DensityAlias.HDPI;
     ImmutableList<ConfigValue> densityConfigs =
         ImmutableList.of(onlyConfig(LDPI), onlyConfig(MDPI), onlyConfig(TVDPI), onlyConfig(HDPI));
 
-    assertThat(new ScreenDensitySelector().selectBestConfigValue(densityConfigs, desiredDensity))
+    assertThat(
+            new ScreenDensitySelector()
+                .selectBestConfigValue(densityConfigs, desiredDensity, DEFAULT_BUNDLE_VERSION))
         .isEqualTo(onlyConfig(HDPI));
     assertThat(
             new ScreenDensitySelector()
@@ -72,7 +80,9 @@ public class ScreenDensitySelectorTest {
         ImmutableList.of(
             onlyConfig(HDPI), onlyConfig(XHDPI), onlyConfig(XXHDPI), onlyConfig(XXXHDPI));
 
-    assertThat(new ScreenDensitySelector().selectBestConfigValue(densityConfigs, desiredDensity))
+    assertThat(
+            new ScreenDensitySelector()
+                .selectBestConfigValue(densityConfigs, desiredDensity, DEFAULT_BUNDLE_VERSION))
         .isEqualTo(onlyConfig(HDPI));
     assertThat(
             new ScreenDensitySelector()
@@ -92,19 +102,24 @@ public class ScreenDensitySelectorTest {
             onlyConfig(XXXHDPI));
 
     assertThat(
-            new ScreenDensitySelector().selectBestConfigValue(densityConfigs, DensityAlias.XXHDPI))
+            new ScreenDensitySelector()
+                .selectBestConfigValue(densityConfigs, DensityAlias.XXHDPI, DEFAULT_BUNDLE_VERSION))
         .isEqualTo(onlyConfig(ANY_DPI));
     assertThat(
             new ScreenDensitySelector()
                 .selectBestDensity(toDensities(densityConfigs), toDpi(DensityAlias.XXHDPI)))
         .isEqualTo(ANY_DENSITY_VALUE);
-    assertThat(new ScreenDensitySelector().selectBestConfigValue(densityConfigs, DensityAlias.MDPI))
+    assertThat(
+            new ScreenDensitySelector()
+                .selectBestConfigValue(densityConfigs, DensityAlias.MDPI, DEFAULT_BUNDLE_VERSION))
         .isEqualTo(onlyConfig(ANY_DPI));
     assertThat(
             new ScreenDensitySelector()
                 .selectBestDensity(toDensities(densityConfigs), toDpi(DensityAlias.XXHDPI)))
         .isEqualTo(ANY_DENSITY_VALUE);
-    assertThat(new ScreenDensitySelector().selectBestConfigValue(densityConfigs, DensityAlias.LDPI))
+    assertThat(
+            new ScreenDensitySelector()
+                .selectBestConfigValue(densityConfigs, DensityAlias.LDPI, DEFAULT_BUNDLE_VERSION))
         .isEqualTo(onlyConfig(ANY_DPI));
     assertThat(
             new ScreenDensitySelector()
@@ -122,13 +137,17 @@ public class ScreenDensitySelectorTest {
             onlyConfig(XXHDPI),
             onlyConfig(XXXHDPI));
 
-    assertThat(new ScreenDensitySelector().selectBestConfigValue(densityConfigs, ANY_DENSITY_VALUE))
+    assertThat(
+            new ScreenDensitySelector()
+                .selectBestConfigValue(densityConfigs, ANY_DENSITY_VALUE, DEFAULT_BUNDLE_VERSION))
         .isEqualTo(onlyConfig(MDPI));
     assertThat(
             new ScreenDensitySelector()
                 .selectBestDensity(toDensities(densityConfigs), ANY_DENSITY_VALUE))
         .isEqualTo(MDPI_VALUE);
-    assertThat(new ScreenDensitySelector().selectBestConfigValue(densityConfigs, MDPI_VALUE))
+    assertThat(
+            new ScreenDensitySelector()
+                .selectBestConfigValue(densityConfigs, MDPI_VALUE, DEFAULT_BUNDLE_VERSION))
         .isEqualTo(onlyConfig(MDPI));
     assertThat(
             new ScreenDensitySelector().selectBestDensity(toDensities(densityConfigs), MDPI_VALUE))
@@ -147,17 +166,37 @@ public class ScreenDensitySelectorTest {
 
     assertThat(
             new ScreenDensitySelector()
-                .selectBestConfigValue(densityConfigs, DEFAULT_DENSITY_VALUE))
+                .selectBestConfigValue(
+                    densityConfigs, DEFAULT_DENSITY_VALUE, DEFAULT_BUNDLE_VERSION))
         .isEqualTo(onlyConfig(MDPI));
     assertThat(
             new ScreenDensitySelector()
                 .selectBestDensity(toDensities(densityConfigs), DEFAULT_DENSITY_VALUE))
         .isEqualTo(MDPI_VALUE);
-    assertThat(new ScreenDensitySelector().selectBestConfigValue(densityConfigs, MDPI_VALUE))
+    assertThat(
+            new ScreenDensitySelector()
+                .selectBestConfigValue(densityConfigs, MDPI_VALUE, DEFAULT_BUNDLE_VERSION))
         .isEqualTo(onlyConfig(MDPI));
     assertThat(
             new ScreenDensitySelector().selectBestDensity(toDensities(densityConfigs), MDPI_VALUE))
         .isEqualTo(MDPI_VALUE);
+  }
+
+  @Test
+  public void prefersExplicitMdpiOverDefault_enabledSince_0_9_1() {
+    ImmutableList<ConfigValue> densityConfigs =
+        ImmutableList.of(value("default", DEFAULT_DPI), value("explicit", MDPI));
+
+    // When enabled.
+    assertThat(
+            new ScreenDensitySelector()
+                .selectBestConfigValue(densityConfigs, MDPI_VALUE, Version.of("0.9.1")))
+        .isEqualTo(value("explicit", MDPI));
+    // When disabled.
+    assertThat(
+            new ScreenDensitySelector()
+                .selectBestConfigValue(densityConfigs, MDPI_VALUE, Version.of("0.9.0")))
+        .isEqualTo(value("default", DEFAULT_DPI));
   }
 
   @Test
@@ -171,7 +210,9 @@ public class ScreenDensitySelectorTest {
     ImmutableList<ConfigValue> densityConfigs =
         ImmutableList.of(onlyConfig(TVDPI), onlyConfig(XHDPI));
 
-    assertThat(new ScreenDensitySelector().selectBestConfigValue(densityConfigs, desiredDensity))
+    assertThat(
+            new ScreenDensitySelector()
+                .selectBestConfigValue(densityConfigs, desiredDensity, DEFAULT_BUNDLE_VERSION))
         .isEqualTo(onlyConfig(TVDPI));
     assertThat(
             new ScreenDensitySelector()
@@ -190,7 +231,9 @@ public class ScreenDensitySelectorTest {
     ImmutableList<ConfigValue> densityConfigs =
         ImmutableList.of(onlyConfig(XXHDPI), onlyConfig(XHDPI));
 
-    assertThat(new ScreenDensitySelector().selectBestConfigValue(densityConfigs, desiredDpi))
+    assertThat(
+            new ScreenDensitySelector()
+                .selectBestConfigValue(densityConfigs, desiredDpi, DEFAULT_BUNDLE_VERSION))
         .isEqualTo(onlyConfig(XHDPI));
     assertThat(
             new ScreenDensitySelector().selectBestDensity(toDensities(densityConfigs), desiredDpi))
@@ -208,7 +251,9 @@ public class ScreenDensitySelectorTest {
     ImmutableList<ConfigValue> densityConfigs =
         ImmutableList.of(onlyConfig(HDPI), onlyConfig(LDPI));
 
-    assertThat(new ScreenDensitySelector().selectBestConfigValue(densityConfigs, desiredDensity))
+    assertThat(
+            new ScreenDensitySelector()
+                .selectBestConfigValue(densityConfigs, desiredDensity, DEFAULT_BUNDLE_VERSION))
         .isEqualTo(onlyConfig(HDPI));
     assertThat(
             new ScreenDensitySelector()
@@ -227,7 +272,9 @@ public class ScreenDensitySelectorTest {
     ImmutableList<ConfigValue> densityConfigs =
         ImmutableList.of(onlyConfig(LDPI), onlyConfig(HDPI));
 
-    assertThat(new ScreenDensitySelector().selectBestConfigValue(densityConfigs, desiredDensity))
+    assertThat(
+            new ScreenDensitySelector()
+                .selectBestConfigValue(densityConfigs, desiredDensity, DEFAULT_BUNDLE_VERSION))
         .isEqualTo(onlyConfig(HDPI));
     assertThat(
             new ScreenDensitySelector()
@@ -245,7 +292,10 @@ public class ScreenDensitySelectorTest {
     assertThat(
             new ScreenDensitySelector()
                 .selectAllMatchingConfigValues(
-                    densityConfigs, desiredDensity, /* alternatives= */ ImmutableSet.of()))
+                    densityConfigs,
+                    desiredDensity,
+                    /* alternatives= */ ImmutableSet.of(),
+                    DEFAULT_BUNDLE_VERSION))
         .containsExactlyElementsIn(densityConfigs);
   }
 
@@ -263,7 +313,8 @@ public class ScreenDensitySelectorTest {
 
     assertThat(
             new ScreenDensitySelector()
-                .selectAllMatchingConfigValues(densityConfigs, desiredDensity, alternatives))
+                .selectAllMatchingConfigValues(
+                    densityConfigs, desiredDensity, alternatives, DEFAULT_BUNDLE_VERSION))
         .containsExactlyElementsIn(
             ImmutableList.of(onlyConfig(LDPI), onlyConfig(MDPI), onlyConfig(HDPI)));
   }
@@ -280,7 +331,8 @@ public class ScreenDensitySelectorTest {
 
     assertThat(
             new ScreenDensitySelector()
-                .selectAllMatchingConfigValues(densityConfigs, desiredDensity, alternatives))
+                .selectAllMatchingConfigValues(
+                    densityConfigs, desiredDensity, alternatives, DEFAULT_BUNDLE_VERSION))
         .containsExactlyElementsIn(ImmutableList.of(onlyConfig(forDpi(481)), onlyConfig(XXXHDPI)));
   }
 
@@ -304,14 +356,14 @@ public class ScreenDensitySelectorTest {
 
     assertThat(
             new ScreenDensitySelector()
-                .selectAllMatchingConfigValues(densityConfigs, desiredDensity, alternatives))
+                .selectAllMatchingConfigValues(
+                    densityConfigs, desiredDensity, alternatives, DEFAULT_BUNDLE_VERSION))
         .containsExactlyElementsIn(
             ImmutableList.of(onlyConfig(forDpi(241)), onlyConfig(XHDPI), onlyConfig(forDpi(475))));
   }
 
   private static ImmutableList<Integer> toDensities(ImmutableList<ConfigValue> densities) {
-    return densities
-        .stream()
+    return densities.stream()
         .map(ConfigValue::getConfig)
         .map(Configuration::getDensity)
         .collect(toImmutableList());

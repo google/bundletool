@@ -16,12 +16,11 @@
 
 package com.android.tools.build.bundletool.validation;
 
-import static com.android.tools.build.bundletool.model.AndroidManifest.MODULE_TYPE_ASSET_VALUE;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifest;
+import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifestForAssetModule;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withMinSdkCondition;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withOnDemandAttribute;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withTitle;
-import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withTypeAttribute;
 import static com.android.tools.build.bundletool.testing.ResourcesTableFactory.TEST_LABEL_RESOURCE_ID;
 import static com.android.tools.build.bundletool.testing.ResourcesTableFactory.resourceTableWithTestLabel;
 import static com.google.common.truth.Truth.assertThat;
@@ -149,7 +148,7 @@ public class ModuleTitleValidatorTest {
     ImmutableList<BundleModule> allModules =
         ImmutableList.of(
             module("base", androidManifest(PKG_NAME)),
-            module("asset", androidManifest(PKG_NAME, withTypeAttribute(MODULE_TYPE_ASSET_VALUE))));
+            module("asset", androidManifestForAssetModule(PKG_NAME)));
 
     new ModuleTitleValidator().validateAllModules(allModules);
   }
@@ -162,10 +161,8 @@ public class ModuleTitleValidatorTest {
             module("base", androidManifest(PKG_NAME)),
             module(
                 "asset",
-                androidManifest(
-                    PKG_NAME,
-                    withTypeAttribute(MODULE_TYPE_ASSET_VALUE),
-                    withTitle("test_label", TEST_LABEL_RESOURCE_ID))));
+                androidManifestForAssetModule(
+                    PKG_NAME, withTitle("test_label", TEST_LABEL_RESOURCE_ID))));
 
     ValidationException exception =
         assertThrows(

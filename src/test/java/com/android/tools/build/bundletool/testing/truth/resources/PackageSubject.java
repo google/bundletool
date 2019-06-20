@@ -19,6 +19,7 @@ package com.android.tools.build.bundletool.testing.truth.resources;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.collect.MoreCollectors.toOptional;
+import static com.google.common.truth.Fact.fact;
 
 import com.android.aapt.Resources.Package;
 import com.android.aapt.Resources.Type;
@@ -28,21 +29,23 @@ import java.util.Optional;
 import java.util.regex.Pattern;
 
 /** A subject for {@link Package}. */
-public class PackageSubject extends Subject<PackageSubject, Package> {
+public class PackageSubject extends Subject {
 
   private static final Pattern RESOURCE_PATTERN =
       Pattern.compile("[a-zA-Z][a-zA-Z0-9_]*/[a-zA-Z][a-zA-Z0-9_]*");
+  private final Package actual;
   private final FailureMetadata metadata;
 
   public PackageSubject(FailureMetadata metadata, Package actual) {
     super(metadata, actual);
+    this.actual = actual;
     this.metadata = metadata;
   }
 
   public TypeSubject withType(String typeName) {
     Optional<Type> matchingType = findType(typeName);
     if (!matchingType.isPresent()) {
-      failWithoutActual("contains type '" + typeName + "'");
+      failWithoutActual(fact("expected to contain type", typeName));
     }
     return new TypeSubject(metadata, matchingType.get());
   }
@@ -50,7 +53,7 @@ public class PackageSubject extends Subject<PackageSubject, Package> {
   public void withNoType(String typeName) {
     Optional<Type> matchingType = findType(typeName);
     if (matchingType.isPresent()) {
-      failWithoutActual("does not contain type '" + typeName + "'");
+      failWithoutActual(fact("expected not to contain type", typeName));
     }
   }
 
@@ -94,9 +97,7 @@ public class PackageSubject extends Subject<PackageSubject, Package> {
   }
 
   private Optional<Type> findType(String typeName) {
-    return actual()
-        .getTypeList()
-        .stream()
+    return actual.getTypeList().stream()
         .filter(type -> type.getName().equals(typeName))
         .collect(toOptional());
   }

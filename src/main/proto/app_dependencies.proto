@@ -1,0 +1,47 @@
+syntax = "proto3";
+
+package android.bundle;
+
+option java_package = "com.android.bundle";
+
+// Lists the dependencies of an application.
+message AppDependencies {
+    // List of all the dependencies, direct and indirect.
+    repeated Library library = 1;
+
+    // Dependencies of the libraries from the list above.
+    repeated LibraryDependencies library_dependencies = 2;
+
+    // List of direct dependencies per bundle module.
+    repeated ModuleDependencies module_dependencies = 3;
+}
+
+// List of dependencies of a given library.
+message LibraryDependencies {
+    // Indices correspond to the pool of libraries defined in AppDependencies.
+    int32 library_index = 1;
+    repeated int32 library_dep_index = 2;
+}
+
+// Lists the dependencies of a given module.
+message ModuleDependencies {
+    string module_name = 1;
+    // Direct module dependencies.
+    // Index is from the pool of libraries defined in AppDependencies.
+    repeated int32 dependency_index = 2;
+}
+
+message Library {
+    // Oneof allows for support of other library identification systems in the future.
+    oneof library_oneof {
+        MavenLibrary maven_library = 1;
+    }
+}
+
+message MavenLibrary {
+    string groupId = 1;
+    string artifactId = 2;
+    string packaging = 3;
+    string classifier = 4;
+    string version = 5;
+}

@@ -165,6 +165,17 @@ public final class DumpCommandTest {
   }
 
   @Test
+  public void buildingViaFlagsAndBuilderHasSameResult_bundleConfig() {
+    DumpCommand commandViaFlags =
+        DumpCommand.fromFlags(new FlagParser().parse("dump", "config", "--bundle=" + bundlePath));
+
+    DumpCommand commandViaBuilder =
+        DumpCommand.builder().setDumpTarget(DumpTarget.CONFIG).setBundlePath(bundlePath).build();
+
+    assertThat(commandViaBuilder).isEqualTo(commandViaFlags);
+  }
+
+  @Test
   public void dumpFileThatDoesNotExist() {
     DumpCommand command =
         DumpCommand.builder()

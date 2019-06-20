@@ -20,6 +20,8 @@ import static com.android.tools.build.bundletool.commands.BuildApksCommand.ApkBu
 import static com.android.tools.build.bundletool.commands.BuildApksCommand.ApkBuildMode.SYSTEM;
 import static com.android.tools.build.bundletool.commands.BuildApksCommand.ApkBuildMode.SYSTEM_COMPRESSED;
 import static com.android.tools.build.bundletool.commands.BuildApksCommand.ApkBuildMode.UNIVERSAL;
+import static com.android.tools.build.bundletool.model.utils.SdkToolsLocator.ANDROID_HOME_VARIABLE;
+import static com.android.tools.build.bundletool.model.utils.SdkToolsLocator.SYSTEM_PATH_VARIABLE;
 import static com.google.common.base.Preconditions.checkArgument;
 
 import com.android.bundle.Devices.DeviceSpec;
@@ -52,7 +54,6 @@ import com.google.common.util.concurrent.ListeningExecutorService;
 import com.google.common.util.concurrent.MoreExecutors;
 import java.io.PrintStream;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.Arrays;
 import java.util.Optional;
 import java.util.concurrent.Executors;
@@ -78,13 +79,19 @@ public abstract class BuildApksCommand {
      * SYSTEM_COMPRESSED mode generates compressed APK and an additional uncompressed stub APK
      * (containing only android manifest) for the system image.
      */
-    SYSTEM_COMPRESSED;
+    SYSTEM_COMPRESSED,
+    /** PERSISTENT mode only generates non-instant APKs (i.e. splits and standalone APKs). */
+    PERSISTENT,
+    /**
+     * INSTANT mode only generates instant APKs, assuming at least one module is instant-enabled.
+     */
+    INSTANT;
 
-    public String getLowerCaseName() {
+    public final String getLowerCaseName() {
       return Ascii.toLowerCase(name());
     }
 
-    public boolean isAnySystemMode() {
+    public final boolean isAnySystemMode() {
       return equals(SYSTEM) || equals(SYSTEM_COMPRESSED);
     }
   }
@@ -101,7 +108,6 @@ public abstract class BuildApksCommand {
   private static final Flag<Path> ADB_PATH_FLAG = Flag.path("adb");
   private static final Flag<Boolean> CONNECTED_DEVICE_FLAG = Flag.booleanFlag("connected-device");
   private static final Flag<String> DEVICE_ID_FLAG = Flag.string("device-id");
-  private static final String ANDROID_HOME_VARIABLE = "ANDROID_HOME";
   private static final String ANDROID_SERIAL_VARIABLE = "ANDROID_SERIAL";
 
   private static final Flag<Path> DEVICE_SPEC_FLAG = Flag.path("device-spec");
@@ -207,6 +213,12 @@ public abstract class BuildApksCommand {
 
     /** Sets the {@link DeviceSpec} for which the only the matching APKs will be generated. */
     public abstract Builder setDeviceSpec(DeviceSpec deviceSpec);
+
+    /** Sets the {@link DeviceSpec} for which the only the matching APKs will be generated. */
+    public Builder setDeviceSpec(Path deviceSpecFile) {
+      // Parse as partial and fully validate later.
+      return setDeviceSpec(DeviceSpecParser.parsePartialDeviceSpec(deviceSpecFile));
+    }
 
     /**
      * Sets the device serial number. Required if more than one device including emulators is
@@ -316,6 +328,10 @@ public abstract class BuildApksCommand {
       }
 
       if (command.getDeviceSpec().isPresent()) {
+        boolean supportsPartialDeviceSpecs = command.getApkBuildMode().isAnySystemMode();
+        DeviceSpecParser.validateDeviceSpec(
+            command.getDeviceSpec().get(), /* canSkipFields= */ supportsPartialDeviceSpecs);
+
         switch (command.getApkBuildMode()) {
           case UNIVERSAL:
             throw new ValidationException(
@@ -334,6 +350,8 @@ public abstract class BuildApksCommand {
             }
             break;
           case DEFAULT:
+          case INSTANT:
+          case PERSISTENT:
         }
       } else {
         if (command.getApkBuildMode().isAnySystemMode()) {
@@ -451,14 +469,13 @@ public abstract class BuildApksCommand {
       Path adbPath =
           adbPathFromFlag.orElseGet(
               () ->
-                  systemEnvironmentProvider
-                      .getVariable(ANDROID_HOME_VARIABLE)
-                      .flatMap(path -> new SdkToolsLocator().locateAdb(Paths.get(path)))
+                  new SdkToolsLocator()
+                      .locateAdb(systemEnvironmentProvider)
                       .orElseThrow(
                           () ->
                               new CommandExecutionException(
-                                  "Unable to determine the location of ADB. Please set the "
-                                      + "--adb flag or define ANDROID_HOME environment "
+                                  "Unable to determine the location of ADB. Please set the --adb "
+                                      + "flag or define ANDROID_HOME or PATH environment "
                                       + "variable.")));
       buildApksCommand.setAdbPath(adbPath).setAdbServer(adbServer);
     }
@@ -482,9 +499,22 @@ public abstract class BuildApksCommand {
   }
 
   public Path execute() {
-    try (TempDirectory tempDirectory = new TempDirectory()) {
-      return new BuildApksManager(this).execute(tempDirectory.getPath());
+    try (TempDirectory tempDir = new TempDirectory()) {
+      Aapt2Command aapt2 =
+          getAapt2Command().orElseGet(() -> extractAapt2FromJar(tempDir.getPath()));
+      return new BuildApksManager(this, aapt2, tempDir.getPath()).execute();
     }
+  }
+
+  private static Aapt2Command extractAapt2FromJar(Path tempDir) {
+    return new SdkToolsLocator()
+        .extractAapt2(tempDir)
+        .map(Aapt2Command::createFromExecutablePath)
+        .orElseThrow(
+            () ->
+                new CommandExecutionException(
+                    "Could not extract aapt2: consider updating bundletool to a more recent "
+                        + "version or providing the path to aapt2 using the flag --aapt2."));
   }
 
   /**
@@ -635,8 +665,8 @@ public abstract class BuildApksCommand {
                 .setOptional(true)
                 .setDescription(
                     "Path to the adb utility. If absent, an attempt will be made to locate it if "
-                        + "the %s environment variable is set. Used only if %s flag is set.",
-                    ANDROID_HOME_VARIABLE, CONNECTED_DEVICE_FLAG)
+                        + "the %s or %s environment variable is set. Used only if %s flag is set.",
+                    ANDROID_HOME_VARIABLE, SYSTEM_PATH_VARIABLE, CONNECTED_DEVICE_FLAG)
                 .build())
         .addFlag(
             FlagDescription.builder()

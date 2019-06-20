@@ -37,6 +37,8 @@ public abstract class ApkGenerationConfiguration {
 
   public abstract boolean getEnableDexCompressionSplitter();
 
+  public abstract boolean isInstallableOnExternalStorage();
+
   /** Whether to include 64-bit native library config splits. */
   public abstract boolean getInclude64BitLibs();
 
@@ -59,6 +61,7 @@ public abstract class ApkGenerationConfiguration {
         .setForInstantAppVariants(false)
         .setEnableNativeLibraryCompressionSplitter(false)
         .setEnableDexCompressionSplitter(false)
+        .setInstallableOnExternalStorage(false)
         .setInclude64BitLibs(true)
         .setAbisForPlaceholderLibs(ImmutableSet.of())
         .setOptimizationDimensions(ImmutableSet.of())
@@ -78,6 +81,8 @@ public abstract class ApkGenerationConfiguration {
         ImmutableSet<OptimizationDimension> optimizationDimensions);
 
     public abstract Builder setForInstantAppVariants(boolean forInstantAppVariants);
+
+    public abstract Builder setInstallableOnExternalStorage(boolean installableOnExternalStorage);
 
     public abstract Builder setEnableNativeLibraryCompressionSplitter(
         boolean enableNativeLibraryCompressionSplitter);

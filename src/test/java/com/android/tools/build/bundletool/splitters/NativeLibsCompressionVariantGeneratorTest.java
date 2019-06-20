@@ -17,6 +17,7 @@
 package com.android.tools.build.bundletool.splitters;
 
 import static com.android.tools.build.bundletool.model.utils.Versions.ANDROID_M_API_VERSION;
+import static com.android.tools.build.bundletool.model.utils.Versions.ANDROID_P_API_VERSION;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifest;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.nativeDirectoryTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.nativeLibraries;
@@ -38,7 +39,7 @@ import org.junit.runners.JUnit4;
 @RunWith(JUnit4.class)
 public class NativeLibsCompressionVariantGeneratorTest {
   @Test
-  public void variantsWithNativeLibs() throws Exception {
+  public void variantsWithNativeLibs_withoutExternalStorage() throws Exception {
     NativeLibsCompressionVariantGenerator nativeLibsCompressionVariantGenerator =
         new NativeLibsCompressionVariantGenerator(
             ApkGenerationConfiguration.builder()
@@ -49,6 +50,21 @@ public class NativeLibsCompressionVariantGeneratorTest {
             .generate(createSingleLibraryModule("testModule", "x86", "lib/x86/libnoname.so"))
             .collect(toImmutableList());
     assertThat(splits).containsExactly(variantMinSdkTargeting(ANDROID_M_API_VERSION));
+  }
+
+  @Test
+  public void variantsWithNativeLibs_withExternalStorage() throws Exception {
+    NativeLibsCompressionVariantGenerator nativeLibsCompressionVariantGenerator =
+        new NativeLibsCompressionVariantGenerator(
+            ApkGenerationConfiguration.builder()
+                .setEnableNativeLibraryCompressionSplitter(true)
+                .setInstallableOnExternalStorage(true)
+                .build());
+    ImmutableCollection<VariantTargeting> splits =
+        nativeLibsCompressionVariantGenerator
+            .generate(createSingleLibraryModule("testModule", "x86", "lib/x86/libnoname.so"))
+            .collect(toImmutableList());
+    assertThat(splits).containsExactly(variantMinSdkTargeting(ANDROID_P_API_VERSION));
   }
 
   @Test

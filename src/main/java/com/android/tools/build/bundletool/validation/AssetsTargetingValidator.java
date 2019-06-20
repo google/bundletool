@@ -17,6 +17,7 @@
 package com.android.tools.build.bundletool.validation;
 
 import static com.android.tools.build.bundletool.model.BundleModule.ASSETS_DIRECTORY;
+import static com.google.common.collect.ImmutableSet.toImmutableSet;
 
 import com.android.bundle.Files.Assets;
 import com.android.bundle.Files.TargetedAssetsDirectory;
@@ -24,6 +25,7 @@ import com.android.tools.build.bundletool.model.BundleModule;
 import com.android.tools.build.bundletool.model.BundleModule.ModuleType;
 import com.android.tools.build.bundletool.model.ZipPath;
 import com.android.tools.build.bundletool.model.exceptions.ValidationException;
+import com.google.common.collect.ImmutableSet;
 
 /** Validates targeting of assets. */
 public class AssetsTargetingValidator extends SubValidator {
@@ -34,6 +36,8 @@ public class AssetsTargetingValidator extends SubValidator {
   }
 
   private void validateTargeting(BundleModule module, Assets assets) {
+    ImmutableSet<ZipPath> assetDirsWithFiles = getDirectoriesWithFiles(module);
+
     for (TargetedAssetsDirectory targetedDirectory : assets.getDirectoryList()) {
       ZipPath path = ZipPath.create(targetedDirectory.getPath());
 
@@ -44,7 +48,7 @@ public class AssetsTargetingValidator extends SubValidator {
             .build();
       }
 
-      if (BundleValidationUtils.directoryContainsNoFiles(module, path)) {
+      if (!assetDirsWithFiles.contains(path)) {
         throw ValidationException.builder()
             .withMessage("Targeted directory '%s' is empty.", path)
             .build();
@@ -59,5 +63,12 @@ public class AssetsTargetingValidator extends SubValidator {
             .build();
       }
     }
+  }
+
+  private static ImmutableSet<ZipPath> getDirectoriesWithFiles(BundleModule module) {
+    return module.getEntries().stream()
+        .filter(entry -> !entry.isDirectory())
+        .map(entry -> entry.getPath().getParent())
+        .collect(toImmutableSet());
   }
 }

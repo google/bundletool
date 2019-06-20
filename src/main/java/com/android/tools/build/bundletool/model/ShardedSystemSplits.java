@@ -28,12 +28,26 @@ import com.google.errorprone.annotations.Immutable;
 @AutoValue
 @AutoValue.CopyAnnotations
 public abstract class ShardedSystemSplits {
+  /** The APK that will end up on the system image. */
   public abstract ModuleSplit getSystemImageSplit();
 
-  public abstract ImmutableList<ModuleSplit> getAdditionalLanguageSplits();
+  /**
+   * The language and feature module splits not included in the system image APK but that can still
+   * be requested on-demand.
+   */
+  public abstract ImmutableList<ModuleSplit> getAdditionalSplits();
 
-  public static ShardedSystemSplits create(
-      ModuleSplit systemImageSplit, ImmutableList<ModuleSplit> additionalLanguageSplits) {
-    return new AutoValue_ShardedSystemSplits(systemImageSplit, additionalLanguageSplits);
+  public static Builder builder() {
+    return new AutoValue_ShardedSystemSplits.Builder();
+  }
+
+  /** Builder for the {@link ShardedSystemSplits} class. */
+  @AutoValue.Builder
+  public abstract static class Builder {
+    public abstract Builder setSystemImageSplit(ModuleSplit systemImageSplit);
+
+    public abstract Builder setAdditionalSplits(ImmutableList<ModuleSplit> languageSplits);
+
+    public abstract ShardedSystemSplits build();
   }
 }

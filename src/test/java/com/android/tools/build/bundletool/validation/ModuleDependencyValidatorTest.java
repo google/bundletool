@@ -17,19 +17,19 @@
 package com.android.tools.build.bundletool.validation;
 
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifest;
+import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifestForAssetModule;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withFeatureCondition;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withInstallTimeDelivery;
+import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withInstant;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withMinSdkVersion;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withOnDemandAttribute;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withOnDemandDelivery;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withSplitId;
-import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withTypeAttribute;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withUsesSplit;
 import static com.google.common.truth.Truth.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.android.aapt.Resources.XmlNode;
-import com.android.tools.build.bundletool.model.AndroidManifest;
 import com.android.tools.build.bundletool.model.BundleModule;
 import com.android.tools.build.bundletool.model.exceptions.ValidationException;
 import com.android.tools.build.bundletool.testing.BundleModuleBuilder;
@@ -419,12 +419,7 @@ public class ModuleDependencyValidatorTest {
     ImmutableList<BundleModule> allModules =
         ImmutableList.of(
             module("base", androidManifest(PKG_NAME, withMinSdkVersion(20))),
-            module(
-                "asset",
-                androidManifest(
-                    PKG_NAME,
-                    withTypeAttribute(AndroidManifest.MODULE_TYPE_ASSET_VALUE),
-                    withInstallTimeDelivery())));
+            module("asset", androidManifestForAssetModule(PKG_NAME)));
 
     new ModuleDependencyValidator().validateAllModules(allModules);
   }
@@ -496,5 +491,131 @@ public class ModuleDependencyValidatorTest {
         .hasMessageThat()
         .contains(
             "An on-demand module 'ondemand' cannot depend on a conditional module 'conditional'");
+  }
+
+  @Test
+  public void validateAllModules_assetModuleDependsOnFeatureModule_throws() throws Exception {
+    ImmutableList<BundleModule> allModules =
+        ImmutableList.of(
+            module("base", androidManifest(PKG_NAME)),
+            module(
+                "asset",
+                androidManifestForAssetModule(
+                    PKG_NAME, withOnDemandDelivery(), withUsesSplit("feature"))),
+            module("feature", androidManifest(PKG_NAME, withOnDemandDelivery())));
+
+    ValidationException exception =
+        assertThrows(
+            ValidationException.class,
+            () -> new ModuleDependencyValidator().validateAllModules(allModules));
+    assertThat(exception)
+        .hasMessageThat()
+        .contains(
+            "Module 'asset' cannot depend on module 'feature' because the module types are"
+                + " different.");
+  }
+
+  @Test
+  public void validateAllModules_featureModuleDependsOnAssetModule_throws() throws Exception {
+    ImmutableList<BundleModule> allModules =
+        ImmutableList.of(
+            module("base", androidManifest(PKG_NAME)),
+            module("asset", androidManifestForAssetModule(PKG_NAME, withOnDemandDelivery())),
+            module(
+                "feature",
+                androidManifest(PKG_NAME, withOnDemandDelivery(), withUsesSplit("asset"))));
+
+    ValidationException exception =
+        assertThrows(
+            ValidationException.class,
+            () -> new ModuleDependencyValidator().validateAllModules(allModules));
+    assertThat(exception)
+        .hasMessageThat()
+        .contains(
+            "Module 'feature' cannot depend on module 'asset' because the module types are"
+                + " different.");
+  }
+
+  @Test
+  public void validateAllModules_instantModuleToInstallTimeDependency_throws() throws Exception {
+    ImmutableList<BundleModule> allModules =
+        ImmutableList.of(
+            module("base", androidManifest(PKG_NAME, withInstant(true))),
+            module("feature1", androidManifest(PKG_NAME, withInstant(false))),
+            module(
+                "feature2",
+                androidManifest(PKG_NAME, withUsesSplit("feature1"), withInstant(true))));
+
+    ValidationException exception =
+        assertThrows(
+            ValidationException.class,
+            () -> new ModuleDependencyValidator().validateAllModules(allModules));
+
+    assertThat(exception)
+        .hasMessageThat()
+        .contains(
+            "Instant module 'feature2' cannot depend on a module 'feature1' that is not instant.");
+  }
+
+  @Test
+  public void validateAllModules_instantModuleToOnDemandModulesDependency_throws()
+      throws Exception {
+    ImmutableList<BundleModule> allModules =
+        ImmutableList.of(
+            module("base", androidManifest(PKG_NAME, withInstant(true))),
+            module(
+                "feature1",
+                androidManifest(PKG_NAME, withOnDemandAttribute(true), withInstant(false))),
+            module(
+                "feature2",
+                androidManifest(PKG_NAME, withUsesSplit("feature1"), withInstant(true))));
+
+    ValidationException exception =
+        assertThrows(
+            ValidationException.class,
+            () -> new ModuleDependencyValidator().validateAllModules(allModules));
+
+    assertThat(exception)
+        .hasMessageThat()
+        .contains(
+            "Instant module 'feature2' cannot depend on a module 'feature1' that is not instant.");
+  }
+
+  @Test
+  public void validateAllModules_instantModuleToConditionalModulesDependency_throws()
+      throws Exception {
+    ImmutableList<BundleModule> allModules =
+        ImmutableList.of(
+            module("base", androidManifest(PKG_NAME, withInstant(true))),
+            module(
+                "feature1",
+                androidManifest(
+                    PKG_NAME, withFeatureCondition("android.feature"), withInstant(false))),
+            module(
+                "feature2",
+                androidManifest(PKG_NAME, withUsesSplit("feature1"), withInstant(true))));
+
+    ValidationException exception =
+        assertThrows(
+            ValidationException.class,
+            () -> new ModuleDependencyValidator().validateAllModules(allModules));
+
+    assertThat(exception)
+        .hasMessageThat()
+        .contains(
+            "Instant module 'feature2' cannot depend on a module 'feature1' that is not instant.");
+  }
+
+  @Test
+  public void validateAllModules_instantToInstantModulesDependency_succeeds() throws Exception {
+    ImmutableList<BundleModule> allModules =
+        ImmutableList.of(
+            module("base", androidManifest(PKG_NAME, withInstant(true))),
+            module("feature1", androidManifest(PKG_NAME, withInstant(true))),
+            module(
+                "feature2",
+                androidManifest(PKG_NAME, withInstant(true), withUsesSplit("feature1"))));
+
+    new ModuleDependencyValidator().validateAllModules(allModules);
   }
 }

@@ -52,7 +52,8 @@ public class AppBundleValidator {
           // Other.
           new ModuleDependencyValidator(),
           new ModuleTitleValidator(),
-          new ResourceTableValidator());
+          new ResourceTableValidator(),
+          new AssetModuleFilesValidator());
 
   /**
    * Validates the given App Bundle zip file.
