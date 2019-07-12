@@ -16,7 +16,6 @@
 
 package com.android.tools.build.bundletool.model;
 
-import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.ImmutableMap.toImmutableMap;
 import static com.google.common.collect.ImmutableSet.toImmutableSet;
@@ -232,7 +231,11 @@ public abstract class AppBundle {
 
   private static BundleConfig readBundleConfig(ZipFile bundleFile) {
     ZipEntry bundleConfigEntry = bundleFile.getEntry(BUNDLE_CONFIG_FILE_NAME);
-    checkState(bundleConfigEntry != null, "File '%s' was not found.", BUNDLE_CONFIG_FILE_NAME);
+    if (bundleConfigEntry == null) {
+      throw ValidationException.builder()
+          .withMessage("File '%s' was not found.", BUNDLE_CONFIG_FILE_NAME)
+          .build();
+    }
 
     try (InputStream is = BufferedIo.inputStream(bundleFile, bundleConfigEntry)) {
       return BundleConfig.parseFrom(is);

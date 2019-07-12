@@ -37,6 +37,7 @@ import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.with
 import static com.google.common.truth.Truth.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
+import com.android.tools.build.bundletool.model.AppBundle;
 import com.android.tools.build.bundletool.model.BundleModule;
 import com.android.tools.build.bundletool.model.exceptions.ValidationException;
 import com.android.tools.build.bundletool.model.exceptions.manifest.ManifestDuplicateAttributeException;
@@ -46,6 +47,7 @@ import com.android.tools.build.bundletool.model.exceptions.manifest.ManifestSdkT
 import com.android.tools.build.bundletool.model.exceptions.manifest.ManifestSdkTargetingException.MinSdkInvalidException;
 import com.android.tools.build.bundletool.model.exceptions.manifest.ManifestVersionCodeConflictException;
 import com.android.tools.build.bundletool.model.utils.xmlproto.XmlProtoAttributeBuilder;
+import com.android.tools.build.bundletool.testing.AppBundleBuilder;
 import com.android.tools.build.bundletool.testing.BundleModuleBuilder;
 import com.android.tools.build.bundletool.testing.ManifestProtoUtils.ManifestMutator;
 import com.google.common.collect.ImmutableList;
@@ -901,5 +903,62 @@ public class AndroidManifestValidatorTest {
 
     AndroidManifestValidator validator = new AndroidManifestValidator();
     modules.forEach(validator::validateModule);
+  }
+
+  @Test
+  public void validateBundle_upfront_highMinSdk_succeeds() throws Exception {
+    new AndroidManifestValidator()
+        .validateBundle(
+            createAppBundle(
+                /* minSdkVersion= */ 23,
+                new BundleModuleBuilder("asset_module")
+                    .setManifest(androidManifestForAssetModule(PKG_NAME, withInstallTimeDelivery()))
+                    .build()));
+  }
+
+  @Test
+  public void validateBundle_onDemand_lowMinSdk_succeeds() throws Exception {
+    new AndroidManifestValidator()
+        .validateBundle(
+            createAppBundle(
+                /* minSdkVersion= */ 15,
+                new BundleModuleBuilder("asset_module")
+                    .setManifest(androidManifestForAssetModule(PKG_NAME, withOnDemandDelivery()))
+                    .build()));
+  }
+
+  @Test
+  public void validateBundle_upfront_lowMinSdk_throws() throws Exception {
+    ValidationException e =
+        assertThrows(
+            ValidationException.class,
+            () ->
+                new AndroidManifestValidator()
+                    .validateBundle(
+                        createAppBundle(
+                            /* minSdkVersion= */ 15,
+                            new BundleModuleBuilder("asset_module")
+                                .setManifest(
+                                    androidManifestForAssetModule(
+                                        PKG_NAME, withInstallTimeDelivery()))
+                                .build())));
+
+    assertThat(e)
+        .hasMessageThat()
+        .contains("Asset packs with install time delivery are not supported in SDK 15");
+  }
+
+  private static AppBundle createAppBundle(int minSdkVersion, BundleModule... assetModules)
+      throws Exception {
+    AppBundleBuilder appBundleBuilder =
+        new AppBundleBuilder()
+            .addModule(
+                new BundleModuleBuilder(BASE_MODULE_NAME)
+                    .setManifest(androidManifest(PKG_NAME, withMinSdkVersion(minSdkVersion)))
+                    .build());
+    for (BundleModule assetModule : assetModules) {
+      appBundleBuilder.addModule(assetModule);
+    }
+    return appBundleBuilder.build();
   }
 }

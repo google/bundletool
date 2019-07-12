@@ -25,6 +25,8 @@ import static com.android.tools.build.bundletool.model.AndroidManifest.GL_ES_VER
 import static com.android.tools.build.bundletool.model.AndroidManifest.GL_VERSION_ATTRIBUTE_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.HAS_CODE_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.IS_FEATURE_SPLIT_RESOURCE_ID;
+import static com.android.tools.build.bundletool.model.AndroidManifest.IS_SPLIT_REQUIRED_ATTRIBUTE_NAME;
+import static com.android.tools.build.bundletool.model.AndroidManifest.IS_SPLIT_REQUIRED_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.MAX_SDK_VERSION_ATTRIBUTE_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.MAX_SDK_VERSION_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.META_DATA_ELEMENT_NAME;
@@ -213,13 +215,26 @@ public class ManifestEditor {
   /**
    * Sets a flag whether the app is able to run without any config splits.
    *
-   * <p>The information is stored as a {@code <meta-data android:name="..." android:value="..."/>}
-   * element inside the {@code <application>} element.
+   * <p>The information is stored as:
+   *
+   * <ul>
+   *   <li>{@code <meta-data android:name="..." android:value="..."/>} element inside the {@code
+   *       <application>} element (read by the PlayCore library).
+   *   <li>{@code <application android:isSplitRequired="..."/>} attribute (read by the Android
+   *       Platform since Q).
+   * </ul>
    */
   public ManifestEditor setSplitsRequired(boolean value) {
     setMetadataValue(
         META_DATA_KEY_SPLITS_REQUIRED,
         createAndroidAttribute("value", VALUE_RESOURCE_ID).setValueAsBoolean(value));
+
+    manifestElement
+        .getOrCreateChildElement(APPLICATION_ELEMENT_NAME)
+        .getOrCreateAndroidAttribute(
+            IS_SPLIT_REQUIRED_ATTRIBUTE_NAME, IS_SPLIT_REQUIRED_RESOURCE_ID)
+        .setValueAsBoolean(value);
+
     return this;
   }
 

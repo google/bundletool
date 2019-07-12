@@ -86,6 +86,7 @@ public abstract class AndroidManifest {
   public static final String SPLIT_NAME_ATTRIBUTE_NAME = "splitName";
   public static final String VERSION_NAME_ATTRIBUTE_NAME = "versionName";
   public static final String INSTALL_LOCATION_ATTRIBUTE_NAME = "installLocation";
+  public static final String IS_SPLIT_REQUIRED_ATTRIBUTE_NAME = "isSplitRequired";
 
   public static final String MODULE_TYPE_FEATURE_VALUE = "feature";
   public static final String MODULE_TYPE_ASSET_VALUE = "asset-pack";
@@ -107,6 +108,7 @@ public abstract class AndroidManifest {
   public static final int TARGET_SANDBOX_VERSION_RESOURCE_ID = 0x0101054c;
   public static final int SPLIT_NAME_RESOURCE_ID = 0x01010549;
   public static final int INSTALL_LOCATION_RESOURCE_ID = 0x010102b7;
+  public static final int IS_SPLIT_REQUIRED_RESOURCE_ID = 0x01010591;
 
   // Matches the value of android.os.Build.VERSION_CODES.CUR_DEVELOPMENT, used when turning
   // a manifest attribute which references a prerelease API version (e.g., "Q") into an integer.

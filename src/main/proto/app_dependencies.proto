@@ -1,4 +1,4 @@
-syntax = "proto3";
+syntax = "proto2";
 
 package android.bundle;
 
@@ -19,13 +19,13 @@ message AppDependencies {
 // List of dependencies of a given library.
 message LibraryDependencies {
     // Indices correspond to the pool of libraries defined in AppDependencies.
-    int32 library_index = 1;
+    optional int32 library_index = 1;
     repeated int32 library_dep_index = 2;
 }
 
 // Lists the dependencies of a given module.
 message ModuleDependencies {
-    string module_name = 1;
+    optional string module_name = 1;
     // Direct module dependencies.
     // Index is from the pool of libraries defined in AppDependencies.
     repeated int32 dependency_index = 2;
@@ -39,9 +39,9 @@ message Library {
 }
 
 message MavenLibrary {
-    string groupId = 1;
-    string artifactId = 2;
-    string packaging = 3;
-    string classifier = 4;
-    string version = 5;
+    optional string groupId = 1;
+    optional string artifactId = 2;
+    optional string packaging = 3;
+    optional string classifier = 4;
+    optional string version = 5;
 }

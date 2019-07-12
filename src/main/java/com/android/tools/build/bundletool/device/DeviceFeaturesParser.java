@@ -23,6 +23,7 @@ import com.google.common.collect.ImmutableList;
 public class DeviceFeaturesParser {
 
   private static final String EXPECTED_LINE_PREFIX = "feature:";
+  private static final String WARNING_LINE_PREFIX = "WARNING:";
 
   /** Parses the "pm list features" command output. */
   public ImmutableList<String> parse(ImmutableList<String> packageManagerListOutput) {
@@ -30,6 +31,9 @@ public class DeviceFeaturesParser {
 
     for (String line : packageManagerListOutput) {
       if (line.isEmpty()) {
+        continue;
+      }
+      if (line.startsWith(WARNING_LINE_PREFIX)) {
         continue;
       }
       if (!line.startsWith(EXPECTED_LINE_PREFIX)) {

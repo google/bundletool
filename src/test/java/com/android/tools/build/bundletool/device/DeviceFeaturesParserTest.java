@@ -49,6 +49,14 @@ public class DeviceFeaturesParserTest {
   }
 
   @Test
+  public void simpleOutput_warningsIgnored() {
+    ImmutableList<String> packageManagerCommandOutput =
+        ImmutableList.of("WARNING: don't do this", "feature:android.hardware.fingerprint");
+    ImmutableList<String> features = new DeviceFeaturesParser().parse(packageManagerCommandOutput);
+    assertThat(features).containsExactly("android.hardware.fingerprint");
+  }
+
+  @Test
   public void invalidOutput_throws() {
     ImmutableList<String> packageManagerCommandOutput =
         ImmutableList.of("", "feature:android.hardware.camera.any", "some bad line");

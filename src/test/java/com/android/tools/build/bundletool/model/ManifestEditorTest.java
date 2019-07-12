@@ -19,6 +19,8 @@ package com.android.tools.build.bundletool.model;
 import static com.android.tools.build.bundletool.model.AndroidManifest.ACTIVITY_ELEMENT_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.HAS_CODE_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.IS_FEATURE_SPLIT_RESOURCE_ID;
+import static com.android.tools.build.bundletool.model.AndroidManifest.IS_SPLIT_REQUIRED_ATTRIBUTE_NAME;
+import static com.android.tools.build.bundletool.model.AndroidManifest.IS_SPLIT_REQUIRED_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.MAX_SDK_VERSION_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.MIN_SDK_VERSION_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.NAME_ATTRIBUTE_NAME;
@@ -463,6 +465,13 @@ public class ManifestEditorTest {
         editedManifest,
         "com.android.vending.splits.required",
         xmlBooleanAttribute(ANDROID_NAMESPACE_URI, "value", VALUE_RESOURCE_ID, true));
+    assertThat(getApplicationElement(editedManifest).getAttributeList())
+        .containsExactly(
+            xmlBooleanAttribute(
+                ANDROID_NAMESPACE_URI,
+                IS_SPLIT_REQUIRED_ATTRIBUTE_NAME,
+                IS_SPLIT_REQUIRED_RESOURCE_ID,
+                true));
   }
 
   @Test
@@ -477,6 +486,13 @@ public class ManifestEditorTest {
         editedManifest,
         "com.android.vending.splits.required",
         xmlBooleanAttribute(ANDROID_NAMESPACE_URI, "value", VALUE_RESOURCE_ID, true));
+    assertThat(getApplicationElement(editedManifest).getAttributeList())
+        .containsExactly(
+            xmlBooleanAttribute(
+                ANDROID_NAMESPACE_URI,
+                IS_SPLIT_REQUIRED_ATTRIBUTE_NAME,
+                IS_SPLIT_REQUIRED_RESOURCE_ID,
+                true));
   }
 
   @Test
@@ -491,6 +507,13 @@ public class ManifestEditorTest {
         editedManifest,
         "com.android.vending.splits.required",
         xmlBooleanAttribute(ANDROID_NAMESPACE_URI, "value", VALUE_RESOURCE_ID, false));
+    assertThat(getApplicationElement(editedManifest).getAttributeList())
+        .containsExactly(
+            xmlBooleanAttribute(
+                ANDROID_NAMESPACE_URI,
+                IS_SPLIT_REQUIRED_ATTRIBUTE_NAME,
+                IS_SPLIT_REQUIRED_RESOURCE_ID,
+                false));
   }
 
   @Test
@@ -673,13 +696,7 @@ public class ManifestEditorTest {
 
   private static void assertOnlyMetadataElement(
       AndroidManifest manifest, String name, XmlAttribute valueAttr) {
-    XmlNode manifestRoot = manifest.getManifestRoot().getProto();
-    XmlElement manifestElement = manifestRoot.getElement();
-    assertThat(manifestElement.getName()).isEqualTo("manifest");
-    assertThat(manifestElement.getChildCount()).isEqualTo(1);
-    XmlNode applicationNode = manifestElement.getChild(0);
-    XmlElement applicationElement = applicationNode.getElement();
-    assertThat(applicationElement.getName()).isEqualTo("application");
+    XmlElement applicationElement = getApplicationElement(manifest);
     assertThat(applicationElement.getChildCount()).isEqualTo(1);
     XmlNode metadataNode = applicationElement.getChild(0);
     XmlElement metadataElement = metadataNode.getElement();
@@ -687,5 +704,16 @@ public class ManifestEditorTest {
     assertThat(metadataElement.getAttributeList())
         .containsExactly(
             xmlAttribute(ANDROID_NAMESPACE_URI, "name", NAME_RESOURCE_ID, name), valueAttr);
+  }
+
+  private static XmlElement getApplicationElement(AndroidManifest manifest) {
+    XmlNode manifestRoot = manifest.getManifestRoot().getProto();
+    XmlElement manifestElement = manifestRoot.getElement();
+    assertThat(manifestElement.getName()).isEqualTo("manifest");
+    assertThat(manifestElement.getChildCount()).isEqualTo(1);
+    XmlNode applicationNode = manifestElement.getChild(0);
+    XmlElement applicationElement = applicationNode.getElement();
+    assertThat(applicationElement.getName()).isEqualTo("application");
+    return applicationElement;
   }
 }

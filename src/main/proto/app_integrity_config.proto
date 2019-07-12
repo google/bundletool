@@ -1,0 +1,51 @@
+syntax = "proto3";
+
+package android.bundle;
+
+option java_package = "com.android.bundle";
+
+// Specifies integrity protection options that should be applied to an app
+// bundle.
+// Next tag: 6.
+message AppIntegrityConfig {
+  bool enabled = 1;
+  LicenseCheck license_check = 2;
+  InstallerCheck installer_check = 3;
+  DebuggerCheck debugger_check = 4;
+  EmulatorCheck emulator_check = 5;
+}
+
+// Next tag: 4.
+message LicenseCheck {
+  bool enabled = 1;
+  bool online_only = 2;
+  Policy policy = 3;
+}
+
+// Next tag: 4.
+message InstallerCheck {
+  bool enabled = 1;
+  Policy policy = 2;
+  repeated string additional_install_source = 3;
+}
+
+// Next tag: 2
+message DebuggerCheck {
+  bool enabled = 1;
+}
+
+// Next tag: 2
+message EmulatorCheck {
+  bool enabled = 1;
+}
+
+// Next tag: 2
+message Policy {
+  enum Action {
+    UNSPECIFIED = 0;
+    WARN = 1;
+    DISABLE = 2;
+    WARN_THEN_DISABLE = 3;
+  }
+  Action action = 1;
+}

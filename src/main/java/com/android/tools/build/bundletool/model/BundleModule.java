@@ -282,6 +282,10 @@ public abstract class BundleModule {
 
     public abstract Builder setResourceTable(ResourceTable resourceTable);
 
+    public Builder setAndroidManifest(AndroidManifest androidManifest) {
+      return setAndroidManifestProto(androidManifest.getManifestRoot().getProto());
+    }
+
     public abstract Builder setAndroidManifestProto(XmlNode manifestProto);
 
     public abstract Builder setAssetsConfig(Assets assetsConfig);

@@ -27,6 +27,7 @@ import static com.google.common.collect.ImmutableSet.toImmutableSet;
 
 import com.android.bundle.Targeting.ModuleTargeting;
 import com.android.tools.build.bundletool.model.AndroidManifest;
+import com.android.tools.build.bundletool.model.AppBundle;
 import com.android.tools.build.bundletool.model.BundleModule;
 import com.android.tools.build.bundletool.model.BundleModule.ModuleDeliveryType;
 import com.android.tools.build.bundletool.model.BundleModule.ModuleType;
@@ -42,6 +43,7 @@ import com.android.tools.build.bundletool.model.exceptions.manifest.ManifestSdkT
 import com.android.tools.build.bundletool.model.exceptions.manifest.ManifestSdkTargetingException.MinSdkInvalidException;
 import com.android.tools.build.bundletool.model.exceptions.manifest.ManifestVersionCodeConflictException;
 import com.android.tools.build.bundletool.model.utils.xmlproto.XmlProtoAttribute;
+import com.google.common.collect.ImmutableCollection;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMultimap;
 import com.google.common.collect.ImmutableSet;
@@ -49,6 +51,8 @@ import java.util.Optional;
 
 /** Validates {@code AndroidManifest.xml} file of each module. */
 public class AndroidManifestValidator extends SubValidator {
+
+  private static final int UPFRONT_ASSET_PACK_MIN_SDK_VERSION = 21;
 
   @Override
   public void validateAllModules(ImmutableList<BundleModule> modules) {
@@ -107,6 +111,20 @@ public class AndroidManifestValidator extends SubValidator {
     validateMinSdkCondition(module);
     validateNoConditionalTargetingInAssetModules(module);
     validateInstantAndPersistentDeliveryCombinationsForAssetModules(module);
+  }
+
+  @Override
+  public void validateBundle(AppBundle appBundle) {
+    int minSdkVersion = appBundle.getBaseModule().getAndroidManifest().getEffectiveMinSdkVersion();
+    if (hasUpfrontModule(appBundle.getAssetModules().values())
+        && minSdkVersion < UPFRONT_ASSET_PACK_MIN_SDK_VERSION) {
+      throw ValidationException.builder()
+          .withMessage(
+              "Asset packs with install time delivery are not supported in SDK %s. Please set"
+                  + " minimum supported SDK to at least %s.",
+              minSdkVersion, UPFRONT_ASSET_PACK_MIN_SDK_VERSION)
+          .build();
+    }
   }
 
   private void validateInstant(ImmutableList<BundleModule> modules) {
@@ -351,5 +369,13 @@ public class AndroidManifestValidator extends SubValidator {
           .withMessage("Instant delivery cannot be install-time (module '%s').", module.getName())
           .build();
     }
+  }
+
+  private static boolean hasUpfrontModule(ImmutableCollection<BundleModule> bundleModules) {
+    return bundleModules.stream()
+        .anyMatch(
+            module ->
+                module.getModuleType().equals(ModuleType.ASSET_MODULE)
+                    && module.getDeliveryType().equals(ModuleDeliveryType.ALWAYS_INITIAL_INSTALL));
   }
 }

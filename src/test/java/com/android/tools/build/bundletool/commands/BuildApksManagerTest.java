@@ -2173,7 +2173,7 @@ public class BuildApksManagerTest {
   }
 
   @Test
-  public void buildApksCommand_apexBundle() throws Exception {
+  public void buildApksCommand_apkNotificationMessageKeyApexBundle() throws Exception {
     ApexImages apexConfig =
         apexImages(
             targetedApexImage("apex/x86_64.x86.img", apexImageTargeting("x86_64", "x86")),
@@ -2270,7 +2270,8 @@ public class BuildApksManagerTest {
   }
 
   @Test
-  public void buildApksCommand_apexBundle_previewTargetSdk() throws Exception {
+  public void buildApksCommand_apkNotificationMessageKeyApexBundle_previewTargetSdk()
+      throws Exception {
     ApexImages apexConfig =
         apexImages(
             targetedApexImage("apex/x86_64.img", apexImageTargeting("x86_64")),
@@ -2331,7 +2332,8 @@ public class BuildApksManagerTest {
   }
 
   @Test
-  public void buildApksCommand_apexBundle_hasRightSuffix() throws Exception {
+  public void buildApksCommand_apkNotificationMessageKeyApexBundle_hasRightSuffix()
+      throws Exception {
     ApexImages apexConfig =
         apexImages(
             targetedApexImage("apex/x86_64.img", apexImageTargeting("x86_64")),
