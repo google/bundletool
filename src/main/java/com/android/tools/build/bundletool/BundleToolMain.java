@@ -15,6 +15,7 @@
  */
 package com.android.tools.build.bundletool;
 
+import com.android.ddmlib.DdmPreferences;
 import com.android.tools.build.bundletool.commands.BuildApksCommand;
 import com.android.tools.build.bundletool.commands.BuildBundleCommand;
 import com.android.tools.build.bundletool.commands.CommandHelp;
@@ -62,6 +63,13 @@ public class BundleToolMain {
       help();
       runtime.exit(1);
       return;
+    }
+
+    String adbhost = System.getenv("ADBHOST");
+    if (adbhost != null) {
+      System.out.println("Using ADBHOST=" + adbhost);
+      DdmPreferences.setAdbHostValue(adbhost);
+      DdmPreferences.setUseAdbHost(true);
     }
 
     try {
