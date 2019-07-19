@@ -32,6 +32,7 @@ import com.android.tools.build.bundletool.mergers.ModuleSplitsToShardMerger;
 import com.android.tools.build.bundletool.mergers.SameTargetingMerger;
 import com.android.tools.build.bundletool.model.BundleMetadata;
 import com.android.tools.build.bundletool.model.BundleModule;
+import com.android.tools.build.bundletool.model.BundleModuleName;
 import com.android.tools.build.bundletool.model.ModuleSplit;
 import com.android.tools.build.bundletool.model.OptimizationDimension;
 import com.android.tools.build.bundletool.model.ShardedSystemSplits;
@@ -109,6 +110,7 @@ public class BundleSharder {
    */
   public ShardedSystemSplits shardForSystemApps(
       ImmutableList<BundleModule> modules,
+      ImmutableSet<BundleModuleName> modulesToFuse,
       ImmutableSet<OptimizationDimension> shardingDimensions,
       BundleMetadata bundleMetadata) {
     checkState(
@@ -116,10 +118,7 @@ public class BundleSharder {
         "Device spec should be set when sharding for system apps.");
     return merger.mergeSystemShard(
         Iterables.getOnlyElement(generateUnfusedShards(modules, shardingDimensions)),
-        modules.stream()
-            .filter(BundleModule::isIncludedInFusing)
-            .map(BundleModule::getName)
-            .collect(toImmutableSet()),
+        modulesToFuse,
         bundleMetadata,
         bundleSharderConfiguration.getDeviceSpec().get());
   }

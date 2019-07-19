@@ -99,6 +99,10 @@ public abstract class Version implements Comparable<Version> {
     return this.compareTo(version) < 0;
   }
 
+  public boolean isNewerThan(Version version) {
+    return this.compareTo(version) > 0;
+  }
+
   @Override
   public final String toString() {
     return getFullVersion();

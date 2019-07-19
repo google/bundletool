@@ -136,12 +136,16 @@ public abstract class AndroidManifest {
 
   @Memoized
   public Optional<ManifestDeliveryElement> getManifestDeliveryElement() {
-    return ManifestDeliveryElement.fromManifestElement(getManifestElement());
+    return ManifestDeliveryElement.fromManifestElement(
+        getManifestElement(),
+        /* isFastFollowAllowed= */ getModuleType().equals(ModuleType.ASSET_MODULE));
   }
 
   @Memoized
   public Optional<ManifestDeliveryElement> getInstantManifestDeliveryElement() {
-    return ManifestDeliveryElement.instantFromManifestElement(getManifestElement());
+    return ManifestDeliveryElement.instantFromManifestElement(
+        getManifestElement(),
+        /* isFastFollowAllowed= */ getModuleType().equals(ModuleType.ASSET_MODULE));
   }
 
   /**

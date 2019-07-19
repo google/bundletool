@@ -45,6 +45,7 @@ import com.android.tools.build.bundletool.model.GetSizeRequest;
 import com.android.tools.build.bundletool.model.GetSizeRequest.Dimension;
 import com.android.tools.build.bundletool.model.SizeConfiguration;
 import com.android.tools.build.bundletool.model.ZipPath;
+import com.android.tools.build.bundletool.model.version.Version;
 import com.google.common.base.Joiner;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
@@ -62,12 +63,17 @@ public class VariantTotalSizeAggregator {
   private static final Joiner COMMA_JOINER = Joiner.on(',');
 
   private final ImmutableMap<String, Long> sizeByApkPaths;
+  private final Version bundleVersion;
   private final Variant variant;
   private final GetSizeRequest getSizeRequest;
 
   public VariantTotalSizeAggregator(
-      ImmutableMap<String, Long> sizeByApkPaths, Variant variant, GetSizeRequest getSizeRequest) {
+      ImmutableMap<String, Long> sizeByApkPaths,
+      Version bundleVersion,
+      Variant variant,
+      GetSizeRequest getSizeRequest) {
     this.sizeByApkPaths = sizeByApkPaths;
+    this.bundleVersion = bundleVersion;
     this.variant = variant;
     this.getSizeRequest = getSizeRequest;
   }
@@ -219,7 +225,7 @@ public class VariantTotalSizeAggregator {
                               languageTargeting),
                           getSizeRequest.getModules(),
                           getSizeRequest.getInstant())
-                      .getMatchingApksFromVariant(variant));
+                      .getMatchingApksFromVariant(variant, bundleVersion));
 
           minSizeByConfiguration.merge(configuration, compressedSize, Math::min);
           maxSizeByConfiguration.merge(configuration, compressedSize, Math::max);

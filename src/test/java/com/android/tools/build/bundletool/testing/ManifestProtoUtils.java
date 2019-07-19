@@ -61,6 +61,7 @@ import com.android.aapt.Resources.XmlAttribute;
 import com.android.aapt.Resources.XmlElement;
 import com.android.aapt.Resources.XmlNamespace;
 import com.android.aapt.Resources.XmlNode;
+import com.android.bundle.Commands.DeliveryType;
 import com.android.tools.build.bundletool.model.AndroidManifest;
 import com.android.tools.build.bundletool.model.utils.xmlproto.XmlProtoAttributeBuilder;
 import com.android.tools.build.bundletool.model.utils.xmlproto.XmlProtoElementBuilder;
@@ -418,6 +419,27 @@ public final class ManifestProtoUtils {
             .getOrCreateChildElement(DISTRIBUTION_NAMESPACE_URI, "module")
             .getOrCreateChildElement(DISTRIBUTION_NAMESPACE_URI, "delivery")
             .getOrCreateChildElement(DISTRIBUTION_NAMESPACE_URI, "on-demand");
+  }
+
+  public static ManifestMutator withFastFollowDelivery() {
+    return manifestElement ->
+        manifestElement
+            .getOrCreateChildElement(DISTRIBUTION_NAMESPACE_URI, "module")
+            .getOrCreateChildElement(DISTRIBUTION_NAMESPACE_URI, "delivery")
+            .getOrCreateChildElement(DISTRIBUTION_NAMESPACE_URI, "fast-follow");
+  }
+
+  public static ManifestMutator withDelivery(DeliveryType deliveryType) {
+    switch (deliveryType) {
+      case INSTALL_TIME:
+        return withInstallTimeDelivery();
+      case ON_DEMAND:
+        return withOnDemandDelivery();
+      case FAST_FOLLOW:
+        return withFastFollowDelivery();
+      default:
+        return withEmptyDeliveryElement();
+    }
   }
 
   /** Adds the instant attribute under the dist:module tag. */

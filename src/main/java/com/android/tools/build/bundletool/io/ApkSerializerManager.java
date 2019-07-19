@@ -15,6 +15,7 @@
  */
 package com.android.tools.build.bundletool.io;
 
+import static com.android.tools.build.bundletool.io.ConcurrencyUtils.waitForAll;
 import static com.android.tools.build.bundletool.model.utils.CollectorUtils.groupingBySortedKeys;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
@@ -22,12 +23,16 @@ import static com.google.common.base.Predicates.alwaysTrue;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.ImmutableMap.toImmutableMap;
 import static java.util.function.Function.identity;
+import static java.util.stream.Collectors.collectingAndThen;
+import static java.util.stream.Collectors.groupingBy;
+import static java.util.stream.Collectors.mapping;
 
 import com.android.bundle.Commands.ApkDescription;
 import com.android.bundle.Commands.ApkSet;
 import com.android.bundle.Commands.AssetModuleMetadata;
 import com.android.bundle.Commands.AssetSliceSet;
 import com.android.bundle.Commands.BuildApksResult;
+import com.android.bundle.Commands.DeliveryType;
 import com.android.bundle.Commands.InstantMetadata;
 import com.android.bundle.Commands.Variant;
 import com.android.bundle.Config.Bundletool;
@@ -55,14 +60,12 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableListMultimap;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Multimap;
-import com.google.common.collect.Multimaps;
 import com.google.common.util.concurrent.ListeningExecutorService;
 import java.util.Collection;
 import java.util.Map.Entry;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Predicate;
-import java.util.stream.Collectors;
 
 /** Creates parts of table of contents and writes out APKs. */
 public class ApkSerializerManager {
@@ -175,7 +178,7 @@ public class ApkSerializerManager {
         finalSplitsByVariant.values().stream()
             .distinct()
             .collect(
-                Collectors.collectingAndThen(
+                collectingAndThen(
                     toImmutableMap(
                         identity(),
                         split -> executorService.submit(() -> apkSerializer.serialize(split))),
@@ -219,29 +222,33 @@ public class ApkSerializerManager {
             ? new ApkMatcher(deviceSpec.get())::matchesModuleSplitByTargeting
             : alwaysTrue();
 
-    ImmutableList<ModuleSplit> assetSlices =
-        generatedAssetSlices.getAssetSlices().stream()
-            .filter(deviceFilter)
-            .collect(toImmutableList());
-
-    ImmutableMap<BundleModuleName, Collection<ModuleSplit>> slicesByModule =
-        Multimaps.index(assetSlices, ModuleSplit::getModuleName).asMap();
-
-    ImmutableList.Builder<AssetSliceSet> finalSlices = new ImmutableList.Builder<>();
-
     ApkSerializer apkSerializer = new ApkSerializer(apkListener, apkBuildMode);
 
-    for (BundleModuleName moduleName : slicesByModule.keySet()) {
-      finalSlices.add(
-          AssetSliceSet.newBuilder()
-              .setAssetModuleMetadata(getAssetModuleMetadata(appBundle.getModule(moduleName)))
-              .addAllApkDescription(
-                  slicesByModule.get(moduleName).stream()
-                      .flatMap(slice -> apkSerializer.serialize(slice).stream())
-                      .collect(toImmutableList()))
-              .build());
-    }
-    return finalSlices.build();
+    ImmutableListMultimap<BundleModuleName, ApkDescription> generatedSlicesByModule =
+        generatedAssetSlices.getAssetSlices().stream()
+            .filter(deviceFilter)
+            .collect(
+                groupingBy(
+                    ModuleSplit::getModuleName,
+                    mapping(
+                        assetSlice ->
+                            executorService.submit(() -> apkSerializer.serialize(assetSlice)),
+                        toImmutableList())))
+            .entrySet()
+            .stream()
+            .collect(
+                ImmutableListMultimap.flatteningToImmutableListMultimap(
+                    Entry::getKey,
+                    entry -> waitForAll(entry.getValue()).stream().flatMap(Collection::stream)));
+    return generatedSlicesByModule.asMap().entrySet().stream()
+        .map(
+            entry ->
+                AssetSliceSet.newBuilder()
+                    .setAssetModuleMetadata(
+                        getAssetModuleMetadata(appBundle.getModule(entry.getKey())))
+                    .addAllApkDescription(entry.getValue())
+                    .build())
+        .collect(toImmutableList());
   }
 
   private AssetModuleMetadata getAssetModuleMetadata(BundleModule module) {
@@ -249,8 +256,10 @@ public class ApkSerializerManager {
     AssetModuleMetadata.Builder metadataBuilder =
         AssetModuleMetadata.newBuilder().setName(module.getName().getName());
     Optional<ManifestDeliveryElement> persistentDelivery = manifest.getManifestDeliveryElement();
-    persistentDelivery.ifPresent(
-        delivery -> metadataBuilder.setOnDemand(delivery.hasOnDemandElement()));
+    metadataBuilder.setDeliveryType(
+        persistentDelivery
+            .map(delivery -> getDeliveryType(delivery))
+            .orElse(DeliveryType.INSTALL_TIME));
     // The module is instant if either the dist:instant attribute is true or the
     // dist:instant-delivery element is present.
     boolean isInstantModule = module.isInstantModule();
@@ -263,8 +272,10 @@ public class ApkSerializerManager {
       // If it's an instant-enabled module, the instant delivery is on-demand if the dist:instant
       // attribute was set to true or if the dist:instant-delivery element was used without an
       // install-time element.
-      instantMetadataBuilder.setOnDemand(
-          instantDelivery.map(delivery -> !delivery.hasInstallTimeElement()).orElse(true));
+      instantMetadataBuilder.setDeliveryType(
+          instantDelivery
+              .map(delivery -> getDeliveryType(delivery))
+              .orElse(DeliveryType.ON_DEMAND));
     }
     metadataBuilder.setInstantMetadata(instantMetadataBuilder.build());
     return metadataBuilder.build();
@@ -334,6 +345,16 @@ public class ApkSerializerManager {
     return moduleSplit.toBuilder()
         .setVariantTargeting(VariantTargeting.getDefaultInstance())
         .build();
+  }
+
+  private static DeliveryType getDeliveryType(ManifestDeliveryElement deliveryElement) {
+    if (deliveryElement.hasOnDemandElement()) {
+      return DeliveryType.ON_DEMAND;
+    }
+    if (deliveryElement.hasFastFollowElement()) {
+      return DeliveryType.FAST_FOLLOW;
+    }
+    return DeliveryType.INSTALL_TIME;
   }
 
   private final class ApkSerializer {

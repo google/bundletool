@@ -16,7 +16,7 @@
 
 package com.android.tools.build.bundletool.splitters;
 
-import static com.android.tools.build.bundletool.model.utils.Versions.ANDROID_P_API_VERSION;
+import static com.android.tools.build.bundletool.model.utils.Versions.ANDROID_Q_API_VERSION;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifest;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.variantMinSdkTargeting;
 import static com.google.common.collect.ImmutableList.toImmutableList;
@@ -35,7 +35,7 @@ import org.junit.runners.JUnit4;
 @RunWith(JUnit4.class)
 public class DexCompressionVariantGeneratorTest {
   @Test
-  public void variantsGeneration_withDexFile_generatesPVariant() throws Exception {
+  public void variantsGeneration_withDexFile_generatesQVariant() throws Exception {
     DexCompressionVariantGenerator dexCompressionVariantGenerator =
         new DexCompressionVariantGenerator(
             ApkGenerationConfiguration.builder().setEnableDexCompressionSplitter(true).build());
@@ -43,7 +43,7 @@ public class DexCompressionVariantGeneratorTest {
         dexCompressionVariantGenerator
             .generate(createModuleWithDexFile())
             .collect(toImmutableList());
-    assertThat(splits).containsExactly(variantMinSdkTargeting(ANDROID_P_API_VERSION));
+    assertThat(splits).containsExactly(variantMinSdkTargeting(ANDROID_Q_API_VERSION));
   }
 
   @Test

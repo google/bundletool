@@ -59,6 +59,7 @@ message SplitDimension {
     ABI = 1;
     SCREEN_DENSITY = 2;
     LANGUAGE = 3;
+    TEXTURE_COMPRESSION_FORMAT = 4;
   }
   Value value = 1;
 

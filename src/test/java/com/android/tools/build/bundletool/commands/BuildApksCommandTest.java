@@ -16,9 +16,11 @@
 
 package com.android.tools.build.bundletool.commands;
 
+import static com.android.tools.build.bundletool.commands.BuildApksCommand.ApkBuildMode.DEFAULT;
 import static com.android.tools.build.bundletool.commands.BuildApksCommand.ApkBuildMode.UNIVERSAL;
 import static com.android.tools.build.bundletool.model.OptimizationDimension.ABI;
 import static com.android.tools.build.bundletool.model.OptimizationDimension.SCREEN_DENSITY;
+import static com.android.tools.build.bundletool.model.OptimizationDimension.TEXTURE_COMPRESSION_FORMAT;
 import static com.android.tools.build.bundletool.testing.Aapt2Helper.AAPT2_PATH;
 import static com.android.tools.build.bundletool.testing.FakeSystemEnvironmentProvider.ANDROID_HOME;
 import static com.android.tools.build.bundletool.testing.FakeSystemEnvironmentProvider.ANDROID_SERIAL;
@@ -169,6 +171,40 @@ public class BuildApksCommandTest {
             .setOutputFile(outputFilePath)
             // Optional values.
             .setOptimizationDimensions(ImmutableSet.of(SCREEN_DENSITY))
+            // Must copy instance of the internal executor service.
+            .setAapt2Command(commandViaFlags.getAapt2Command().get())
+            .setExecutorServiceInternal(commandViaFlags.getExecutorService())
+            .setExecutorServiceCreatedByBundleTool(true)
+            .setOutputPrintStream(commandViaFlags.getOutputPrintStream().get());
+    DebugKeystoreUtils.getDebugSigningConfiguration(systemEnvironmentProvider)
+        .ifPresent(commandViaBuilder::setSigningConfiguration);
+
+    assertThat(commandViaBuilder.build()).isEqualTo(commandViaFlags);
+  }
+
+  @Test
+  public void buildingViaFlagsAndBuilderHasSameResult_optimizeForTextureCompressionFormat()
+      throws Exception {
+    ByteArrayOutputStream output = new ByteArrayOutputStream();
+    BuildApksCommand commandViaFlags =
+        BuildApksCommand.fromFlags(
+            new FlagParser()
+                .parse(
+                    "--bundle=" + bundlePath,
+                    "--output=" + outputFilePath,
+                    "--aapt2=" + AAPT2_PATH,
+                    // Optional values.
+                    "--optimize-for=texture_compression_format"),
+            new PrintStream(output),
+            systemEnvironmentProvider,
+            fakeAdbServer);
+
+    BuildApksCommand.Builder commandViaBuilder =
+        BuildApksCommand.builder()
+            .setBundlePath(bundlePath)
+            .setOutputFile(outputFilePath)
+            // Optional values.
+            .setOptimizationDimensions(ImmutableSet.of(TEXTURE_COMPRESSION_FORMAT))
             // Must copy instance of the internal executor service.
             .setAapt2Command(commandViaFlags.getAapt2Command().get())
             .setExecutorServiceInternal(commandViaFlags.getExecutorService())
@@ -418,6 +454,26 @@ public class BuildApksCommandTest {
     assertThat(flagsException)
         .hasMessageThat()
         .contains("Optimization dimension can be only set when running with 'default' mode flag.");
+  }
+
+  @Test
+  public void modulesFlagWithDefault_throws() throws Exception {
+    ValidationException builderException =
+        assertThrows(
+            ValidationException.class,
+            () ->
+                BuildApksCommand.builder()
+                    .setBundlePath(bundlePath)
+                    .setOutputFile(outputFilePath)
+                    .setAapt2Command(aapt2Command)
+                    .setApkBuildMode(DEFAULT)
+                    .setModules(ImmutableSet.of("base"))
+                    .build());
+    assertThat(builderException)
+        .hasMessageThat()
+        .contains(
+            "Modules can be only set when running with 'universal', 'system' or "
+                + "'system_compressed' mode flag.");
   }
 
   @Test

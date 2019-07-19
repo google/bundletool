@@ -26,12 +26,14 @@ import com.android.bundle.Targeting.SdkVersionTargeting;
 import com.android.bundle.Targeting.VariantTargeting;
 import com.android.tools.build.bundletool.model.BundleMetadata;
 import com.android.tools.build.bundletool.model.BundleModule;
+import com.android.tools.build.bundletool.model.BundleModuleName;
 import com.android.tools.build.bundletool.model.ModuleSplit;
 import com.android.tools.build.bundletool.model.ModuleSplit.SplitType;
 import com.android.tools.build.bundletool.model.ShardedSystemSplits;
 import com.android.tools.build.bundletool.model.version.Version;
 import com.android.tools.build.bundletool.optimizations.ApkOptimizations;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableSet;
 import java.nio.file.Path;
 import java.util.Optional;
 
@@ -71,6 +73,7 @@ public final class ShardedApksGenerator {
 
   public ImmutableList<ModuleSplit> generateSystemSplits(
       ImmutableList<BundleModule> modules,
+      ImmutableSet<BundleModuleName> modulesToFuse,
       BundleMetadata bundleMetadata,
       ApkOptimizations apkOptimizations,
       Optional<DeviceSpec> deviceSpec) {
@@ -83,7 +86,7 @@ public final class ShardedApksGenerator {
     BundleSharder bundleSharder = new BundleSharder(tempDir, bundleVersion, configuration);
     ShardedSystemSplits shardedApks =
         bundleSharder.shardForSystemApps(
-            modules, apkOptimizations.getSplitDimensions(), bundleMetadata);
+            modules, modulesToFuse, apkOptimizations.getSplitDimensions(), bundleMetadata);
 
     ModuleSplit fusedApk =
         setVariantTargetingAndSplitType(shardedApks.getSystemImageSplit(), SplitType.SYSTEM)

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2017 The Android Open Source Project
+ * Copyright (C) 2019 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,12 +14,14 @@
  * limitations under the License
  */
 
-package com.android.tools.build.bundletool.model;
+package com.android.tools.build.bundletool.model.exceptions;
 
-/** Represents additional optimization dimensions that can be requested manually. */
-public enum OptimizationDimension {
-  ABI,
-  SCREEN_DENSITY,
-  LANGUAGE,
-  TEXTURE_COMPRESSION_FORMAT,
+import java.util.zip.ZipException;
+
+/** Thrown when bundletool validation detects that the bundle is not in the valid zip format */
+public class BundleInvalidZipException extends ValidationException {
+
+  public BundleInvalidZipException(ZipException cause) {
+    super("Bundle is not a valid zip file", cause);
+  }
 }

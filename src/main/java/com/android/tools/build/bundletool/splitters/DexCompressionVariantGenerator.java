@@ -20,7 +20,7 @@ import static com.android.tools.build.bundletool.model.BundleModule.DEX_DIRECTOR
 import static com.android.tools.build.bundletool.model.utils.TargetingProtoUtils.sdkVersionFrom;
 import static com.android.tools.build.bundletool.model.utils.TargetingProtoUtils.sdkVersionTargeting;
 import static com.android.tools.build.bundletool.model.utils.TargetingProtoUtils.variantTargeting;
-import static com.android.tools.build.bundletool.model.utils.Versions.ANDROID_P_API_VERSION;
+import static com.android.tools.build.bundletool.model.utils.Versions.ANDROID_Q_API_VERSION;
 import static com.google.common.collect.ImmutableSet.toImmutableSet;
 
 import com.android.bundle.Targeting.VariantTargeting;
@@ -53,6 +53,8 @@ public final class DexCompressionVariantGenerator implements BundleModuleVariant
       return Stream.of();
     }
 
-    return Stream.of(variantTargeting(sdkVersionTargeting(sdkVersionFrom(ANDROID_P_API_VERSION))));
+    // Uncompressed dex are supported starting from Android P, but only starting from Android Q the
+    // performance impact is negligible compared to a compressed dex.
+    return Stream.of(variantTargeting(sdkVersionTargeting(sdkVersionFrom(ANDROID_Q_API_VERSION))));
   }
 }

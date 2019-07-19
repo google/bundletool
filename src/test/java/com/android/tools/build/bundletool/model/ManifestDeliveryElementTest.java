@@ -18,6 +18,7 @@ package com.android.tools.build.bundletool.model;
 
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifest;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withEmptyDeliveryElement;
+import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withFastFollowDelivery;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withFeatureCondition;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withFeatureConditionHexVersion;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withFusingAttribute;
@@ -55,11 +56,13 @@ public class ManifestDeliveryElementTest {
   public void emptyDeliveryElement_notWellFormed() {
     Optional<ManifestDeliveryElement> deliveryElement =
         ManifestDeliveryElement.fromManifestRootNode(
-            androidManifest("com.test.app", withEmptyDeliveryElement()));
+            androidManifest("com.test.app", withEmptyDeliveryElement()),
+            /* isFastFollowAllowed= */ false);
 
     assertThat(deliveryElement).isPresent();
     assertThat(deliveryElement.get().hasInstallTimeElement()).isFalse();
     assertThat(deliveryElement.get().hasOnDemandElement()).isFalse();
+    assertThat(deliveryElement.get().hasFastFollowElement()).isFalse();
     assertThat(deliveryElement.get().hasModuleConditions()).isFalse();
     assertThat(deliveryElement.get().isWellFormed()).isFalse();
   }
@@ -68,11 +71,13 @@ public class ManifestDeliveryElementTest {
   public void installTimeDeliveryOnly() {
     Optional<ManifestDeliveryElement> deliveryElement =
         ManifestDeliveryElement.fromManifestRootNode(
-            androidManifest("com.test.app", withInstallTimeDelivery()));
+            androidManifest("com.test.app", withInstallTimeDelivery()),
+            /* isFastFollowAllowed= */ false);
 
     assertThat(deliveryElement).isPresent();
     assertThat(deliveryElement.get().hasInstallTimeElement()).isTrue();
     assertThat(deliveryElement.get().hasOnDemandElement()).isFalse();
+    assertThat(deliveryElement.get().hasFastFollowElement()).isFalse();
     assertThat(deliveryElement.get().hasModuleConditions()).isFalse();
     assertThat(deliveryElement.get().isWellFormed()).isTrue();
   }
@@ -81,11 +86,28 @@ public class ManifestDeliveryElementTest {
   public void onDemandDeliveryOnly() {
     Optional<ManifestDeliveryElement> deliveryElement =
         ManifestDeliveryElement.fromManifestRootNode(
-            androidManifest("com.test.app", withOnDemandDelivery()));
+            androidManifest("com.test.app", withOnDemandDelivery()),
+            /* isFastFollowAllowed= */ false);
 
     assertThat(deliveryElement).isPresent();
     assertThat(deliveryElement.get().hasInstallTimeElement()).isFalse();
     assertThat(deliveryElement.get().hasOnDemandElement()).isTrue();
+    assertThat(deliveryElement.get().hasFastFollowElement()).isFalse();
+    assertThat(deliveryElement.get().hasModuleConditions()).isFalse();
+    assertThat(deliveryElement.get().isWellFormed()).isTrue();
+  }
+
+  @Test
+  public void fastFollowDeliveryOnly_fastFollowAllowed() {
+    Optional<ManifestDeliveryElement> deliveryElement =
+        ManifestDeliveryElement.fromManifestRootNode(
+            androidManifest("com.test.app", withFastFollowDelivery()),
+            /* isFastFollowAllowed= */ true);
+
+    assertThat(deliveryElement).isPresent();
+    assertThat(deliveryElement.get().hasInstallTimeElement()).isFalse();
+    assertThat(deliveryElement.get().hasOnDemandElement()).isFalse();
+    assertThat(deliveryElement.get().hasFastFollowElement()).isTrue();
     assertThat(deliveryElement.get().hasModuleConditions()).isFalse();
     assertThat(deliveryElement.get().isWellFormed()).isTrue();
   }
@@ -94,11 +116,32 @@ public class ManifestDeliveryElementTest {
   public void onDemandAndInstallTimeDelivery() {
     Optional<ManifestDeliveryElement> deliveryElement =
         ManifestDeliveryElement.fromManifestRootNode(
-            androidManifest("com.test.app", withInstallTimeDelivery(), withOnDemandDelivery()));
+            androidManifest("com.test.app", withInstallTimeDelivery(), withOnDemandDelivery()),
+            /* isFastFollowAllowed= */ false);
 
     assertThat(deliveryElement).isPresent();
     assertThat(deliveryElement.get().hasInstallTimeElement()).isTrue();
     assertThat(deliveryElement.get().hasOnDemandElement()).isTrue();
+    assertThat(deliveryElement.get().hasFastFollowElement()).isFalse();
+    assertThat(deliveryElement.get().hasModuleConditions()).isFalse();
+    assertThat(deliveryElement.get().isWellFormed()).isTrue();
+  }
+
+  @Test
+  public void onDemandAndInstallTimeAndFastFollowDelivery_fastFollowAllowed() {
+    Optional<ManifestDeliveryElement> deliveryElement =
+        ManifestDeliveryElement.fromManifestRootNode(
+            androidManifest(
+                "com.test.app",
+                withInstallTimeDelivery(),
+                withOnDemandDelivery(),
+                withFastFollowDelivery()),
+            /* isFastFollowAllowed= */ true);
+
+    assertThat(deliveryElement).isPresent();
+    assertThat(deliveryElement.get().hasInstallTimeElement()).isTrue();
+    assertThat(deliveryElement.get().hasOnDemandElement()).isTrue();
+    assertThat(deliveryElement.get().hasFastFollowElement()).isTrue();
     assertThat(deliveryElement.get().hasModuleConditions()).isFalse();
     assertThat(deliveryElement.get().isWellFormed()).isTrue();
   }
@@ -107,11 +150,13 @@ public class ManifestDeliveryElementTest {
   public void instantOnDemandDelivery() {
     Optional<ManifestDeliveryElement> deliveryElement =
         ManifestDeliveryElement.instantFromManifestRootNode(
-            androidManifest("com.test.app", withInstantOnDemandDelivery()));
+            androidManifest("com.test.app", withInstantOnDemandDelivery()),
+            /* isFastFollowAllowed= */ false);
 
     assertThat(deliveryElement).isPresent();
     assertThat(deliveryElement.get().hasInstallTimeElement()).isFalse();
     assertThat(deliveryElement.get().hasOnDemandElement()).isTrue();
+    assertThat(deliveryElement.get().hasFastFollowElement()).isFalse();
     assertThat(deliveryElement.get().hasModuleConditions()).isFalse();
     assertThat(deliveryElement.get().isWellFormed()).isTrue();
   }
@@ -120,11 +165,13 @@ public class ManifestDeliveryElementTest {
   public void instantInstallTimeDelivery() {
     Optional<ManifestDeliveryElement> deliveryElement =
         ManifestDeliveryElement.instantFromManifestRootNode(
-            androidManifest("com.test.app", withInstantInstallTimeDelivery()));
+            androidManifest("com.test.app", withInstantInstallTimeDelivery()),
+            /* isFastFollowAllowed= */ false);
 
     assertThat(deliveryElement).isPresent();
     assertThat(deliveryElement.get().hasInstallTimeElement()).isTrue();
     assertThat(deliveryElement.get().hasOnDemandElement()).isFalse();
+    assertThat(deliveryElement.get().hasFastFollowElement()).isFalse();
     assertThat(deliveryElement.get().hasModuleConditions()).isFalse();
     assertThat(deliveryElement.get().isWellFormed()).isTrue();
   }
@@ -136,7 +183,8 @@ public class ManifestDeliveryElementTest {
             androidManifest(
                 "com.test.app",
                 withFeatureCondition("android.hardware.camera.ar"),
-                withMinSdkCondition(24)));
+                withMinSdkCondition(24)),
+            /* isFastFollowAllowed= */ false);
 
     assertThat(deliveryElement).isPresent();
 
@@ -158,7 +206,8 @@ public class ManifestDeliveryElementTest {
                 "com.test.app",
                 withFeatureCondition("android.hardware.camera.ar"),
                 withFeatureCondition("android.software.vr.mode"),
-                withMinSdkVersion(24)));
+                withMinSdkVersion(24)),
+            /* isFastFollowAllowed= */ false);
 
     assertThat(deliveryElement).isPresent();
 
@@ -176,7 +225,8 @@ public class ManifestDeliveryElementTest {
             androidManifest(
                 "com.test.app",
                 withFeatureConditionHexVersion("android.software.opengl", 0x30000),
-                withFeatureCondition("android.hardware.vr.headtracking", 1)));
+                withFeatureCondition("android.hardware.vr.headtracking", 1)),
+            /* isFastFollowAllowed= */ false);
 
     assertThat(deliveryElement).isPresent();
 
@@ -191,8 +241,8 @@ public class ManifestDeliveryElementTest {
   public void moduleConditions_unsupportedCondition_throws() throws Exception {
     Optional<ManifestDeliveryElement> manifestDeliveryElement =
         ManifestDeliveryElement.fromManifestRootNode(
-            androidManifest(
-                "com.test.app", withFusingAttribute(false), withUnsupportedCondition()));
+            androidManifest("com.test.app", withFusingAttribute(false), withUnsupportedCondition()),
+            /* isFastFollowAllowed= */ false);
 
     assertThat(manifestDeliveryElement).isPresent();
 
@@ -216,7 +266,7 @@ public class ManifestDeliveryElementTest {
 
     Optional<ManifestDeliveryElement> manifestDeliveryElement =
         ManifestDeliveryElement.fromManifestRootNode(
-            createAndroidManifestWithConditions(badCondition));
+            createAndroidManifestWithConditions(badCondition), /* isFastFollowAllowed= */ false);
 
     assertThat(manifestDeliveryElement).isPresent();
 
@@ -239,7 +289,7 @@ public class ManifestDeliveryElementTest {
 
     Optional<ManifestDeliveryElement> manifestDeliveryElement =
         ManifestDeliveryElement.fromManifestRootNode(
-            createAndroidManifestWithConditions(badCondition));
+            createAndroidManifestWithConditions(badCondition), /* isFastFollowAllowed= */ false);
 
     assertThat(manifestDeliveryElement).isPresent();
 
@@ -255,7 +305,8 @@ public class ManifestDeliveryElementTest {
   public void getModuleConditions_multipleMinSdkCondition_throws() {
     Optional<ManifestDeliveryElement> element =
         ManifestDeliveryElement.fromManifestRootNode(
-            androidManifest("com.test.app", withMinSdkCondition(24), withMinSdkCondition(28)));
+            androidManifest("com.test.app", withMinSdkCondition(24), withMinSdkCondition(28)),
+            /* isFastFollowAllowed= */ false);
     assertThat(element).isPresent();
 
     ValidationException exception =
@@ -279,7 +330,9 @@ public class ManifestDeliveryElementTest {
     ValidationException exception =
         assertThrows(
             ValidationException.class,
-            () -> ManifestDeliveryElement.fromManifestRootNode(nodeWithTypo));
+            () ->
+                ManifestDeliveryElement.fromManifestRootNode(
+                    nodeWithTypo, /* isFastFollowAllowed= */ false));
 
     assertThat(exception)
         .hasMessageThat()
@@ -300,13 +353,64 @@ public class ManifestDeliveryElementTest {
     ValidationException exception =
         assertThrows(
             ValidationException.class,
-            () -> ManifestDeliveryElement.fromManifestRootNode(nodeWithTypo));
+            () ->
+                ManifestDeliveryElement.fromManifestRootNode(
+                    nodeWithTypo, /* isFastFollowAllowed= */ false));
 
     assertThat(exception)
         .hasMessageThat()
         .contains(
-            "Expected <dist:delivery> element to contain only <dist:install-time> or "
+            "Expected <dist:delivery> element to contain only <dist:install-time>, "
                 + "<dist:on-demand> elements but found: 'instal-time' with namespace URI: "
+                + "'http://schemas.android.com/apk/distribution'");
+  }
+
+  @Test
+  public void deliveryElement_typoInChildElement_throws_fastFollowEnabled() {
+    XmlNode nodeWithTypo =
+        createAndroidManifestWithDeliveryElement(
+            XmlProtoElementBuilder.create(DISTRIBUTION_NAMESPACE_URI, "delivery")
+                .addChildElement(
+                    XmlProtoElementBuilder.create(DISTRIBUTION_NAMESPACE_URI, "instal-time")));
+
+    ValidationException exception =
+        assertThrows(
+            ValidationException.class,
+            () ->
+                ManifestDeliveryElement.fromManifestRootNode(
+                    nodeWithTypo, /* isFastFollowAllowed= */ true));
+
+    assertThat(exception)
+        .hasMessageThat()
+        .contains(
+            "Expected <dist:delivery> element to contain only <dist:install-time>, "
+                + "<dist:on-demand>, <dist:fast-follow> elements but found: 'instal-time' "
+                + "with namespace URI: 'http://schemas.android.com/apk/distribution'");
+  }
+
+  @Test
+  public void fastFollowElement_childElement_throws() {
+    XmlNode nodeWithTypo =
+        createAndroidManifestWithDeliveryElement(
+            XmlProtoElementBuilder.create(DISTRIBUTION_NAMESPACE_URI, "delivery")
+                .addChildElement(
+                    XmlProtoElementBuilder.create(DISTRIBUTION_NAMESPACE_URI, "fast-follow")
+                        .addChildElement(
+                            XmlProtoElementBuilder.create(
+                                DISTRIBUTION_NAMESPACE_URI, "conditions"))));
+
+    ValidationException exception =
+        assertThrows(
+            ValidationException.class,
+            () ->
+                ManifestDeliveryElement.fromManifestRootNode(
+                    nodeWithTypo, /* isFastFollowAllowed= */ true));
+
+    assertThat(exception)
+        .hasMessageThat()
+        .contains(
+            "Expected <dist:fast-follow> element to have no child elements but found: "
+                + "'conditions' with namespace URI: "
                 + "'http://schemas.android.com/apk/distribution'");
   }
 
@@ -324,7 +428,9 @@ public class ManifestDeliveryElementTest {
     ValidationException exception =
         assertThrows(
             ValidationException.class,
-            () -> ManifestDeliveryElement.fromManifestRootNode(nodeWithTypo));
+            () ->
+                ManifestDeliveryElement.fromManifestRootNode(
+                    nodeWithTypo, /* isFastFollowAllowed= */ false));
 
     assertThat(exception)
         .hasMessageThat()
@@ -344,12 +450,14 @@ public class ManifestDeliveryElementTest {
     ValidationException exception =
         assertThrows(
             ValidationException.class,
-            () -> ManifestDeliveryElement.fromManifestRootNode(nodeWithTypo));
+            () ->
+                ManifestDeliveryElement.fromManifestRootNode(
+                    nodeWithTypo, /* isFastFollowAllowed= */ false));
 
     assertThat(exception)
         .hasMessageThat()
         .contains(
-            "Expected <dist:delivery> element to contain only <dist:install-time> or "
+            "Expected <dist:delivery> element to contain only <dist:install-time>, "
                 + "<dist:on-demand> elements but found: 'on-demand' with namespace not provided");
   }
 
@@ -363,12 +471,14 @@ public class ManifestDeliveryElementTest {
     ValidationException exception =
         assertThrows(
             ValidationException.class,
-            () -> ManifestDeliveryElement.fromManifestRootNode(nodeWithTypo));
+            () ->
+                ManifestDeliveryElement.fromManifestRootNode(
+                    nodeWithTypo, /* isFastFollowAllowed= */ false));
 
     assertThat(exception)
         .hasMessageThat()
         .contains(
-            "Expected <dist:delivery> element to contain only <dist:install-time> or "
+            "Expected <dist:delivery> element to contain only <dist:install-time>, "
                 + "<dist:on-demand> elements but found: 'install-time' with namespace not "
                 + "provided");
   }
@@ -385,7 +495,9 @@ public class ManifestDeliveryElementTest {
     ValidationException exception =
         assertThrows(
             ValidationException.class,
-            () -> ManifestDeliveryElement.fromManifestRootNode(nodeWithTypo));
+            () ->
+                ManifestDeliveryElement.fromManifestRootNode(
+                    nodeWithTypo, /* isFastFollowAllowed= */ false));
 
     assertThat(exception)
         .hasMessageThat()
@@ -414,7 +526,8 @@ public class ManifestDeliveryElementTest {
         assertThrows(
             ValidationException.class,
             () ->
-                ManifestDeliveryElement.fromManifestRootNode(nodeWithTypo)
+                ManifestDeliveryElement.fromManifestRootNode(
+                        nodeWithTypo, /* isFastFollowAllowed= */ false)
                     .get()
                     .getModuleConditions());
 
@@ -443,7 +556,8 @@ public class ManifestDeliveryElementTest {
         assertThrows(
             ValidationException.class,
             () ->
-                ManifestDeliveryElement.fromManifestRootNode(nodeWithTypo)
+                ManifestDeliveryElement.fromManifestRootNode(
+                        nodeWithTypo, /* isFastFollowAllowed= */ false)
                     .get()
                     .getModuleConditions());
 
@@ -462,7 +576,7 @@ public class ManifestDeliveryElementTest {
                 .addChildElement(createCountryCodeEntry("GB"))
                 .build());
     Optional<ManifestDeliveryElement> deliveryElement =
-        ManifestDeliveryElement.fromManifestRootNode(manifest);
+        ManifestDeliveryElement.fromManifestRootNode(manifest, /* isFastFollowAllowed= */ false);
     assertThat(deliveryElement).isPresent();
 
     Optional<UserCountriesCondition> userCountriesCondition =
@@ -485,7 +599,7 @@ public class ManifestDeliveryElementTest {
                 .addChildElement(createCountryCodeEntry("SN"))
                 .build());
     Optional<ManifestDeliveryElement> deliveryElement =
-        ManifestDeliveryElement.fromManifestRootNode(manifest);
+        ManifestDeliveryElement.fromManifestRootNode(manifest, /* isFastFollowAllowed= */ false);
     assertThat(deliveryElement).isPresent();
 
     Optional<UserCountriesCondition> userCountriesCondition =
@@ -508,7 +622,7 @@ public class ManifestDeliveryElementTest {
                                 .setValueAsString("DE")))
                 .build());
     Optional<ManifestDeliveryElement> deliveryElement =
-        ManifestDeliveryElement.fromManifestRootNode(manifest);
+        ManifestDeliveryElement.fromManifestRootNode(manifest, /* isFastFollowAllowed= */ false);
     assertThat(deliveryElement).isPresent();
 
     ValidationException exception =
@@ -533,7 +647,7 @@ public class ManifestDeliveryElementTest {
                                 .setValueAsString("DE")))
                 .build());
     Optional<ManifestDeliveryElement> deliveryElement =
-        ManifestDeliveryElement.fromManifestRootNode(manifest);
+        ManifestDeliveryElement.fromManifestRootNode(manifest, /* isFastFollowAllowed= */ false);
     assertThat(deliveryElement).isPresent();
 
     ValidationException exception =
@@ -553,7 +667,8 @@ public class ManifestDeliveryElementTest {
             androidManifest(
                 "com.test.app",
                 withUserCountriesCondition(ImmutableList.of("en", "us")),
-                withUserCountriesCondition(ImmutableList.of("sg"), /* exclude= */ true)));
+                withUserCountriesCondition(ImmutableList.of("sg"), /* exclude= */ true)),
+            /* isFastFollowAllowed= */ false);
     assertThat(element).isPresent();
 
     ValidationException exception =

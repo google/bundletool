@@ -99,6 +99,8 @@ public class DdmlibDevice extends Device {
   @Override
   public void installApks(ImmutableList<Path> apks, InstallOptions installOptions) {
     ImmutableList<File> apkFiles = apks.stream().map(Path::toFile).collect(toImmutableList());
+    ImmutableList<String> extraArgs =
+        installOptions.getAllowDowngrade() ? ImmutableList.of("-d") : ImmutableList.of();
 
     try {
       if (getVersion()
@@ -106,14 +108,14 @@ public class DdmlibDevice extends Device {
         device.installPackages(
             apkFiles,
             installOptions.getAllowReinstall(),
-            installOptions.getAllowDowngrade() ? ImmutableList.of("-d") : ImmutableList.of(),
+            extraArgs,
             installOptions.getTimeout().toMillis(),
             TimeUnit.MILLISECONDS);
       } else {
         device.installPackage(
             Iterables.getOnlyElement(apkFiles).toString(),
             installOptions.getAllowReinstall(),
-            installOptions.getAllowDowngrade() ? "-d" : null);
+            extraArgs.toArray(new String[0]));
       }
     } catch (InstallException e) {
       throw InstallationException.builder()

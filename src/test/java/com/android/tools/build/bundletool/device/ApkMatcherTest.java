@@ -64,7 +64,9 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.android.bundle.Commands.ApkSet;
 import com.android.bundle.Commands.BuildApksResult;
+import com.android.bundle.Commands.DeliveryType;
 import com.android.bundle.Commands.Variant;
+import com.android.bundle.Config.Bundletool;
 import com.android.bundle.Devices.DeviceSpec;
 import com.android.bundle.Targeting.Abi.AbiAlias;
 import com.android.bundle.Targeting.ApkTargeting;
@@ -79,6 +81,7 @@ import com.android.tools.build.bundletool.model.ZipPath;
 import com.android.tools.build.bundletool.model.exceptions.CommandExecutionException;
 import com.android.tools.build.bundletool.model.exceptions.ValidationException;
 import com.android.tools.build.bundletool.model.utils.Versions;
+import com.android.tools.build.bundletool.model.version.BundleToolVersion;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import java.util.Arrays;
@@ -505,6 +508,9 @@ public class ApkMatcherTest {
         BuildApksResult.newBuilder()
             .addVariant(multiAbiTargetingApexVariant(x86Targeting, x86Apk))
             .addVariant(multiAbiTargetingApexVariant(x64X86Targeting, x64X86Apk))
+            .setBundletool(
+                Bundletool.newBuilder()
+                    .setVersion(BundleToolVersion.getCurrentVersion().toString()))
             .build();
 
     assertThat(new ApkMatcher(abis("x86")).getMatchingApks(buildApksResult))
@@ -874,12 +880,12 @@ public class ApkMatcherTest {
                     splitApkDescription(ApkTargeting.getDefaultInstance(), baseApk)),
                 splitApkSet(
                     /* moduleName= */ "feature1",
-                    /* onDemand= */ true,
+                    DeliveryType.ON_DEMAND,
                     /* moduleDependencies= */ ImmutableList.of(),
                     splitApkDescription(ApkTargeting.getDefaultInstance(), feature1Apk)),
                 splitApkSet(
                     /* moduleName= */ "feature2",
-                    /* onDemand= */ true,
+                    DeliveryType.ON_DEMAND,
                     /* moduleDependencies= */ ImmutableList.of("feature1"),
                     splitApkDescription(ApkTargeting.getDefaultInstance(), feature2Apk))));
 
@@ -925,22 +931,22 @@ public class ApkMatcherTest {
                     splitApkDescription(ApkTargeting.getDefaultInstance(), baseApk)),
                 splitApkSet(
                     /* moduleName= */ "feature1",
-                    /* onDemand= */ true,
+                    DeliveryType.ON_DEMAND,
                     /* moduleDependencies= */ ImmutableList.of(),
                     splitApkDescription(ApkTargeting.getDefaultInstance(), feature1Apk)),
                 splitApkSet(
                     /* moduleName= */ "feature2",
-                    /* onDemand= */ true,
+                    DeliveryType.ON_DEMAND,
                     /* moduleDependencies= */ ImmutableList.of("feature1"),
                     splitApkDescription(ApkTargeting.getDefaultInstance(), feature2Apk)),
                 splitApkSet(
                     /* moduleName= */ "feature3",
-                    /* onDemand= */ true,
+                    DeliveryType.ON_DEMAND,
                     /* moduleDependencies= */ ImmutableList.of("feature1"),
                     splitApkDescription(ApkTargeting.getDefaultInstance(), feature3Apk)),
                 splitApkSet(
                     /* moduleName= */ "feature4",
-                    /* onDemand= */ true,
+                    DeliveryType.ON_DEMAND,
                     /* moduleDependencies= */ ImmutableList.of("feature2", "feature3"),
                     splitApkDescription(ApkTargeting.getDefaultInstance(), feature4Apk))));
 
@@ -968,7 +974,8 @@ public class ApkMatcherTest {
     DeviceSpec device = deviceWithSdk(21);
     ZipPath baseApk = ZipPath.create("master-base.apk");
     ZipPath onDemandFeatureApk = ZipPath.create("master-feature1.apk");
-    ZipPath feature2Apk = ZipPath.create("master-feature2.apk");
+    ZipPath installTimeFeatureApk = ZipPath.create("master-feature2.apk");
+    ZipPath fastFollowFeatureApk = ZipPath.create("master-feature3.apk");
     BuildApksResult buildApksResult =
         buildApksResult(
             createVariant(
@@ -978,39 +985,86 @@ public class ApkMatcherTest {
                     splitApkDescription(ApkTargeting.getDefaultInstance(), baseApk)),
                 splitApkSet(
                     /* moduleName= */ "onDemandFeature",
-                    /* onDemand= */ true,
+                    DeliveryType.ON_DEMAND,
                     /* moduleDependencies= */ ImmutableList.of(),
                     splitApkDescription(ApkTargeting.getDefaultInstance(), onDemandFeatureApk)),
                 splitApkSet(
-                    /* moduleName= */ "feature2",
-                    /* onDemand= */ false,
+                    /* moduleName= */ "installTimeFeature",
+                    DeliveryType.INSTALL_TIME,
                     /* moduleDependencies= */ ImmutableList.of(),
-                    splitApkDescription(ApkTargeting.getDefaultInstance(), feature2Apk))));
+                    splitApkDescription(ApkTargeting.getDefaultInstance(), installTimeFeatureApk)),
+                splitApkSet(
+                    /* moduleName= */ "fastFollowFeature",
+                    /* deliveryType= */ DeliveryType.FAST_FOLLOW,
+                    /* moduleDependencies= */ ImmutableList.of(),
+                    splitApkDescription(ApkTargeting.getDefaultInstance(), fastFollowFeatureApk))));
 
     // By default only install-time module are matched.
     Optional<ImmutableSet<String>> allModules = Optional.empty();
     assertThat(
             new ApkMatcher(device, allModules, NOT_MATCH_INSTANT).getMatchingApks(buildApksResult))
-        .containsExactly(baseApk, feature2Apk);
+        .containsExactly(baseApk, installTimeFeatureApk);
 
     Optional<ImmutableSet<String>> baseModuleOnly = Optional.of(ImmutableSet.of("base"));
     assertThat(
             new ApkMatcher(device, baseModuleOnly, NOT_MATCH_INSTANT)
                 .getMatchingApks(buildApksResult))
-        .containsExactly(baseApk, feature2Apk);
+        .containsExactly(baseApk, installTimeFeatureApk);
 
-    Optional<ImmutableSet<String>> feature2ModuleOnly = Optional.of(ImmutableSet.of("feature2"));
+    Optional<ImmutableSet<String>> installTimeModuleOnly =
+        Optional.of(ImmutableSet.of("installTimeFeature"));
     assertThat(
-            new ApkMatcher(device, feature2ModuleOnly, NOT_MATCH_INSTANT)
+            new ApkMatcher(device, installTimeModuleOnly, NOT_MATCH_INSTANT)
                 .getMatchingApks(buildApksResult))
-        .containsExactly(baseApk, feature2Apk);
+        .containsExactly(baseApk, installTimeFeatureApk);
 
     Optional<ImmutableSet<String>> onDemandModuleOnly =
         Optional.of(ImmutableSet.of("onDemandFeature"));
     assertThat(
             new ApkMatcher(device, onDemandModuleOnly, NOT_MATCH_INSTANT)
                 .getMatchingApks(buildApksResult))
-        .containsExactly(baseApk, onDemandFeatureApk, feature2Apk);
+        .containsExactly(baseApk, onDemandFeatureApk, installTimeFeatureApk);
+
+    Optional<ImmutableSet<String>> fastFollowModuleOnly =
+        Optional.of(ImmutableSet.of("fastFollowFeature"));
+    assertThat(
+            new ApkMatcher(device, fastFollowModuleOnly, NOT_MATCH_INSTANT)
+                .getMatchingApks(buildApksResult))
+        .containsExactly(baseApk, fastFollowFeatureApk, installTimeFeatureApk);
+  }
+
+  @Test
+  public void apkMatch_withModuleTypeFiltering_splitApks_installTimeModules_deprecatedOnDemand() {
+    DeviceSpec device = deviceWithSdk(21);
+    ZipPath baseApk = ZipPath.create("master-base.apk");
+    ZipPath onDemandFeatureApk = ZipPath.create("master-feature1.apk");
+    ApkSet onDemandFeature =
+        splitApkSet(
+            /* moduleName= */ "onDemandFeature",
+            DeliveryType.ON_DEMAND,
+            /* moduleDependencies= */ ImmutableList.of(),
+            splitApkDescription(ApkTargeting.getDefaultInstance(), onDemandFeatureApk));
+    ApkSet onDemandFeatureWithDeprecatedField =
+        onDemandFeature.toBuilder()
+            .setModuleMetadata(
+                onDemandFeature.getModuleMetadata().toBuilder().setOnDemandDeprecated(true))
+            .build();
+
+    BuildApksResult buildApksResult =
+        buildApksResult(
+            /* bundletoolVersion= */ "0.10.0",
+            createVariant(
+                VariantTargeting.getDefaultInstance(),
+                splitApkSet(
+                    /* moduleName= */ "base",
+                    splitApkDescription(ApkTargeting.getDefaultInstance(), baseApk)),
+                onDemandFeatureWithDeprecatedField));
+
+    // By default only install-time module are matched.
+    Optional<ImmutableSet<String>> allModules = Optional.empty();
+    assertThat(
+            new ApkMatcher(device, allModules, NOT_MATCH_INSTANT).getMatchingApks(buildApksResult))
+        .containsExactly(baseApk);
   }
 
   @Test
@@ -1193,7 +1247,14 @@ public class ApkMatcherTest {
   }
 
   private static BuildApksResult buildApksResult(Variant... variants) {
-    return BuildApksResult.newBuilder().addAllVariant(Arrays.asList(variants)).build();
+    return buildApksResult(BundleToolVersion.getCurrentVersion().toString(), variants);
+  }
+
+  private static BuildApksResult buildApksResult(String bundletoolVersion, Variant... variants) {
+    return BuildApksResult.newBuilder()
+        .addAllVariant(Arrays.asList(variants))
+        .setBundletool(Bundletool.newBuilder().setVersion(bundletoolVersion))
+        .build();
   }
 
   private static Variant splitApkVariant(

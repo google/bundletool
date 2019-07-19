@@ -18,7 +18,7 @@ package com.android.tools.build.bundletool.splitters;
 
 import static com.android.tools.build.bundletool.model.utils.Versions.ANDROID_L_API_VERSION;
 import static com.android.tools.build.bundletool.model.utils.Versions.ANDROID_M_API_VERSION;
-import static com.android.tools.build.bundletool.model.utils.Versions.ANDROID_P_API_VERSION;
+import static com.android.tools.build.bundletool.model.utils.Versions.ANDROID_Q_API_VERSION;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifest;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.lPlusVariantTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.nativeDirectoryTargeting;
@@ -183,15 +183,15 @@ public class SplitApksGeneratorTest {
         variantMinSdkTargeting(
             /* minSdkVersion= */ ANDROID_L_API_VERSION,
             /* alternativeSdkVersions= */ ANDROID_M_API_VERSION,
-            ANDROID_P_API_VERSION);
+            ANDROID_Q_API_VERSION);
     VariantTargeting mVariantTargeting =
         variantMinSdkTargeting(
             /* minSdkVersion= */ ANDROID_M_API_VERSION,
             /* alternativeSdkVersions= */ ANDROID_L_API_VERSION,
-            ANDROID_P_API_VERSION);
-    VariantTargeting pVariantTargeting =
+            ANDROID_Q_API_VERSION);
+    VariantTargeting qVariantTargeting =
         variantMinSdkTargeting(
-            /* minSdkVersion= */ ANDROID_P_API_VERSION,
+            /* minSdkVersion= */ ANDROID_Q_API_VERSION,
             /* alternativeSdkVersions= */ ANDROID_L_API_VERSION,
             ANDROID_M_API_VERSION);
 
@@ -199,7 +199,7 @@ public class SplitApksGeneratorTest {
     assertThat(moduleSplits).hasSize(6);
     assertThat(
             moduleSplits.stream().map(ModuleSplit::getVariantTargeting).collect(toImmutableSet()))
-        .containsExactly(lVariantTargeting, mVariantTargeting, pVariantTargeting);
+        .containsExactly(lVariantTargeting, mVariantTargeting, qVariantTargeting);
 
     ModuleSplit baseLModule = getModuleSplit(moduleSplits, lVariantTargeting, "base");
     assertThat(baseLModule.getSplitType()).isEqualTo(SplitType.SPLIT);
@@ -225,13 +225,13 @@ public class SplitApksGeneratorTest {
         .containsExactly("assets/test.txt", "dex/classes.dex");
     assertThat(isCompressed(testMModule, "dex/classes.dex")).isTrue();
 
-    ModuleSplit basePModule = getModuleSplit(moduleSplits, pVariantTargeting, "base");
+    ModuleSplit basePModule = getModuleSplit(moduleSplits, qVariantTargeting, "base");
     assertThat(basePModule.getSplitType()).isEqualTo(SplitType.SPLIT);
     assertThat(extractPaths(basePModule.getEntries()))
         .containsExactly("assets/leftover.txt", "lib/x86_64/libsome.so");
     assertThat(isCompressed(basePModule, "lib/x86_64/libsome.so")).isFalse();
 
-    ModuleSplit testPModule = getModuleSplit(moduleSplits, pVariantTargeting, "test");
+    ModuleSplit testPModule = getModuleSplit(moduleSplits, qVariantTargeting, "test");
     assertThat(testPModule.getSplitType()).isEqualTo(SplitType.SPLIT);
     assertThat(extractPaths(testPModule.getEntries()))
         .containsExactly("assets/test.txt", "dex/classes.dex");

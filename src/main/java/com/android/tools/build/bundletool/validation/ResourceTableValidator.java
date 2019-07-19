@@ -18,17 +18,23 @@ package com.android.tools.build.bundletool.validation;
 
 import static com.google.common.collect.ImmutableSet.toImmutableSet;
 import static com.google.common.collect.Sets.difference;
+import static com.google.common.collect.Sets.newHashSet;
 
 import com.android.aapt.Resources.ResourceTable;
 import com.android.tools.build.bundletool.model.BundleModule;
 import com.android.tools.build.bundletool.model.ModuleEntry;
+import com.android.tools.build.bundletool.model.ResourceId;
 import com.android.tools.build.bundletool.model.ZipPath;
 import com.android.tools.build.bundletool.model.exceptions.ResouceTableException.ReferencesFileOutsideOfResException;
 import com.android.tools.build.bundletool.model.exceptions.ResouceTableException.ReferencesMissingFilesException;
 import com.android.tools.build.bundletool.model.exceptions.ResouceTableException.ResourceTableMissingException;
 import com.android.tools.build.bundletool.model.exceptions.ResouceTableException.UnreferencedResourcesException;
+import com.android.tools.build.bundletool.model.exceptions.ValidationException;
 import com.android.tools.build.bundletool.model.utils.ResourcesUtils;
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
+import java.util.HashSet;
 
 /**
  * Validates the resource table.
@@ -80,6 +86,32 @@ public class ResourceTableValidator extends SubValidator {
         ImmutableSet.copyOf(difference(referencedFiles, resFiles));
     if (!nonExistingFiles.isEmpty()) {
       throw new ReferencesMissingFilesException(moduleName, nonExistingFiles);
+    }
+  }
+
+  @Override
+  public void validateAllModules(ImmutableList<BundleModule> modules) {
+    checkResourceIdsAreUnique(modules);
+  }
+
+  @VisibleForTesting
+  void checkResourceIdsAreUnique(ImmutableList<BundleModule> modules) {
+    HashSet<ResourceId> usedResourceIds = newHashSet();
+    for (BundleModule module : modules) {
+      ResourceTable resourceTable =
+          module.getResourceTable().orElse(ResourceTable.getDefaultInstance());
+      ResourcesUtils.entries(resourceTable)
+          .forEach(
+              resourceTableEntry -> {
+                boolean foundDuplicate = !usedResourceIds.add(resourceTableEntry.getResourceId());
+                if (foundDuplicate) {
+                  throw ValidationException.builder()
+                      .withMessage(
+                          "Duplicate resource id (%s).",
+                          resourceTableEntry.getResourceId().toString())
+                      .build();
+                }
+              });
     }
   }
 }

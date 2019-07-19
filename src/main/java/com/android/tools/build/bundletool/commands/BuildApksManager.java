@@ -15,12 +15,14 @@
  */
 package com.android.tools.build.bundletool.commands;
 
+import static com.android.tools.build.bundletool.model.utils.ModuleDependenciesUtils.getModulesIncludingDependencies;
 import static com.android.tools.build.bundletool.model.utils.files.FilePreconditions.checkFileDoesNotExist;
 import static com.android.tools.build.bundletool.model.utils.files.FilePreconditions.checkFileExistsAndExecutable;
 import static com.android.tools.build.bundletool.model.utils.files.FilePreconditions.checkFileExistsAndReadable;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.collect.ImmutableList.toImmutableList;
+import static com.google.common.collect.ImmutableSet.toImmutableSet;
 
 import com.android.bundle.Config.BundleConfig;
 import com.android.bundle.Config.Compression;
@@ -41,6 +43,7 @@ import com.android.tools.build.bundletool.model.ApkListener;
 import com.android.tools.build.bundletool.model.ApkModifier;
 import com.android.tools.build.bundletool.model.AppBundle;
 import com.android.tools.build.bundletool.model.BundleModule;
+import com.android.tools.build.bundletool.model.BundleModuleName;
 import com.android.tools.build.bundletool.model.GeneratedApks;
 import com.android.tools.build.bundletool.model.GeneratedAssetSlices;
 import com.android.tools.build.bundletool.model.ModuleSplit;
@@ -61,6 +64,7 @@ import com.android.tools.build.bundletool.splitters.ShardedApksGenerator;
 import com.android.tools.build.bundletool.splitters.SplitApksGenerator;
 import com.android.tools.build.bundletool.validation.AppBundleValidator;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableSet;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
@@ -133,6 +137,12 @@ final class BuildApksManager {
               + "APKs.");
     }
 
+    ImmutableSet<BundleModule> requestedModules =
+        command.getModules().isEmpty()
+            ? ImmutableSet.of()
+            : getModulesIncludingDependencies(
+                appBundle, getBundleModules(appBundle, command.getModules()));
+
     BundleConfig bundleConfig = appBundle.getBundleConfig();
     Version bundleVersion = BundleToolVersion.getVersionFromBundleConfig(bundleConfig);
 
@@ -160,28 +170,22 @@ final class BuildApksManager {
     // Universal APK
     if (apksToGenerate.generateUniversalApk()) {
       // Note: Universal APK is a special type of standalone, with no optimization dimensions.
-      ImmutableList<BundleModule> featureModules = appBundle.getFeatureModules().values().asList();
+      ImmutableList<BundleModule> modulesToFuse =
+          requestedModules.isEmpty()
+              ? modulesToFuse(appBundle.getFeatureModules().values().asList())
+              : requestedModules.asList();
       generatedApksBuilder.setStandaloneApks(
           new ShardedApksGenerator(tempDir, bundleVersion)
               .generateSplits(
-                  modulesToFuse(featureModules),
+                  modulesToFuse,
                   appBundle.getBundleMetadata(),
                   ApkOptimizations.getOptimizationsForUniversalApk()));
     }
 
     // System APKs
     if (apksToGenerate.generateSystemApks()) {
-      ImmutableList<BundleModule> featureModules = appBundle.getFeatureModules().values().asList();
       generatedApksBuilder.setSystemApks(
-          new ShardedApksGenerator(
-                  tempDir,
-                  bundleVersion,
-                  /* generate64BitShards= */ !appBundle.has32BitRenderscriptCode())
-              .generateSystemSplits(
-                  featureModules,
-                  appBundle.getBundleMetadata(),
-                  getApkOptimizations(bundleConfig),
-                  deviceSpec));
+          generateSystemApks(appBundle, deviceSpec, requestedModules));
     }
 
     // Asset Slices
@@ -289,6 +293,28 @@ final class BuildApksManager {
         .generateSplits();
   }
 
+  private ImmutableList<ModuleSplit> generateSystemApks(
+      AppBundle appBundle,
+      Optional<DeviceSpec> deviceSpec,
+      ImmutableSet<BundleModule> requestedModules) {
+    Version bundleVersion = Version.of(appBundle.getBundleConfig().getBundletool().getVersion());
+    ImmutableList<BundleModule> featureModules = appBundle.getFeatureModules().values().asList();
+    ImmutableList<BundleModule> modulesToFuse =
+        requestedModules.isEmpty() ? modulesToFuse(featureModules) : requestedModules.asList();
+    return new ShardedApksGenerator(
+            tempDir,
+            bundleVersion,
+            /* generate64BitShards= */ !appBundle.has32BitRenderscriptCode())
+        .generateSystemSplits(
+            /* modules= */ featureModules,
+            /* modulesToFuse= */ modulesToFuse.stream()
+                .map(BundleModule::getName)
+                .collect(toImmutableSet()),
+            appBundle.getBundleMetadata(),
+            getApkOptimizations(appBundle.getBundleConfig()),
+            deviceSpec);
+  }
+
   private static void checkDeviceCompatibilityWithBundle(
       GeneratedApks generatedApks, DeviceSpec deviceSpec) {
     ApkMatcher apkMatcher = new ApkMatcher(deviceSpec);
@@ -371,7 +397,7 @@ final class BuildApksManager {
         .build();
   }
 
-  private ImmutableList<BundleModule> modulesToFuse(ImmutableList<BundleModule> modules) {
+  private static ImmutableList<BundleModule> modulesToFuse(ImmutableList<BundleModule> modules) {
     return modules.stream().filter(BundleModule::isIncludedInFusing).collect(toImmutableList());
   }
 
@@ -409,6 +435,14 @@ final class BuildApksManager {
   private static boolean targetsPreL(AppBundle bundle) {
     int baseMinSdkVersion = bundle.getBaseModule().getAndroidManifest().getEffectiveMinSdkVersion();
     return baseMinSdkVersion < Versions.ANDROID_L_API_VERSION;
+  }
+
+  private static ImmutableList<BundleModule> getBundleModules(
+      AppBundle appBundle, ImmutableSet<String> moduleNames) {
+    return moduleNames.stream()
+        .map(BundleModuleName::create)
+        .map(appBundle::getModule)
+        .collect(toImmutableList());
   }
 
   private static class ApksToGenerate {

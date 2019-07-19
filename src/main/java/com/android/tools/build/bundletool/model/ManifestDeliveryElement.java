@@ -39,8 +39,11 @@ import com.google.auto.value.extension.memoized.Memoized;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
 import com.google.errorprone.annotations.Immutable;
+import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 /** Parses and provides business logic utilities for <dist:delivery> element. */
 @Immutable
@@ -49,12 +52,14 @@ import java.util.Optional;
 public abstract class ManifestDeliveryElement {
 
   private static final String VERSION_ATTRIBUTE_NAME = "version";
-  private static final ImmutableList<String> ALLOWED_DELIVERY_MODES =
-      ImmutableList.of("install-time", "on-demand");
+  private static final ImmutableList<String> KNOWN_DELIVERY_MODES =
+      ImmutableList.of("install-time", "on-demand", "fast-follow");
   private static final ImmutableList<String> CONDITIONS_ALLOWED_ONLY_ONCE =
       ImmutableList.of(CONDITION_MIN_SDK_VERSION_NAME, CONDITION_USER_COUNTRIES_NAME);
 
   abstract XmlProtoElement getDeliveryElement();
+
+  abstract boolean isFastFollowAllowed();
 
   /**
    * Returns if this <dist:delivery> element is well-formed.
@@ -63,7 +68,9 @@ public abstract class ManifestDeliveryElement {
    * elements.
    */
   public boolean isWellFormed() {
-    return hasOnDemandElement() || hasInstallTimeElement();
+    return hasOnDemandElement()
+        || hasInstallTimeElement()
+        || (isFastFollowAllowed() && hasFastFollowElement());
   }
 
   public boolean hasModuleConditions() {
@@ -74,6 +81,12 @@ public abstract class ManifestDeliveryElement {
   public boolean hasOnDemandElement() {
     return getDeliveryElement()
         .getOptionalChildElement(DISTRIBUTION_NAMESPACE_URI, "on-demand")
+        .isPresent();
+  }
+
+  public boolean hasFastFollowElement() {
+    return getDeliveryElement()
+        .getOptionalChildElement(DISTRIBUTION_NAMESPACE_URI, "fast-follow")
         .isPresent();
   }
 
@@ -165,28 +178,40 @@ public abstract class ManifestDeliveryElement {
     return UserCountriesCondition.create(countryCodes.build(), exclude);
   }
 
-  private static void validateDeliveryElement(XmlProtoElement deliveryElement) {
-    validateDeliveryElementChildren(deliveryElement);
+  private static void validateDeliveryElement(
+      XmlProtoElement deliveryElement, boolean isFastFollowAllowed) {
+    validateDeliveryElementChildren(deliveryElement, isFastFollowAllowed);
     validateInstallTimeElement(
         deliveryElement.getOptionalChildElement(DISTRIBUTION_NAMESPACE_URI, "install-time"));
     validateOnDemandElement(
         deliveryElement.getOptionalChildElement(DISTRIBUTION_NAMESPACE_URI, "on-demand"));
+    if (isFastFollowAllowed) {
+      validateFastFollowElement(
+          deliveryElement.getOptionalChildElement(DISTRIBUTION_NAMESPACE_URI, "fast-follow"));
+    }
   }
 
-  private static void validateDeliveryElementChildren(XmlProtoElement deliveryElement) {
+  private static void validateDeliveryElementChildren(
+      XmlProtoElement deliveryElement, boolean isFastFollowAllowed) {
+    Set<String> allowedDeliveryModes = new LinkedHashSet<>(KNOWN_DELIVERY_MODES);
+    if (!isFastFollowAllowed) {
+      allowedDeliveryModes.remove("fast-follow");
+    }
     Optional<XmlProtoElement> offendingElement =
         deliveryElement
             .getChildrenElements(
                 child ->
                     !(child.getNamespaceUri().equals(DISTRIBUTION_NAMESPACE_URI)
-                        && ALLOWED_DELIVERY_MODES.contains(child.getName())))
+                        && allowedDeliveryModes.contains(child.getName())))
             .findAny();
 
     if (offendingElement.isPresent()) {
       throw ValidationException.builder()
           .withMessage(
-              "Expected <dist:delivery> element to contain only <dist:install-time> or "
-                  + "<dist:on-demand> elements but found: %s",
+              "Expected <dist:delivery> element to contain only %s elements but found: %s",
+              allowedDeliveryModes.stream()
+                  .map(name -> String.format("<dist:%s>", name))
+                  .collect(Collectors.joining(", ")),
               printElement(offendingElement.get()))
           .build();
     }
@@ -220,6 +245,18 @@ public abstract class ManifestDeliveryElement {
       throw ValidationException.builder()
           .withMessage(
               "Expected <dist:on-demand> element to have no child elements but found: %s.",
+              printElement(offendingChild.get()))
+          .build();
+    }
+  }
+
+  private static void validateFastFollowElement(Optional<XmlProtoElement> fastFollowElement) {
+    Optional<XmlProtoElement> offendingChild =
+        fastFollowElement.flatMap(element -> element.getChildrenElements().findAny());
+    if (offendingChild.isPresent()) {
+      throw ValidationException.builder()
+          .withMessage(
+              "Expected <dist:fast-follow> element to have no child elements but found: %s.",
               printElement(offendingChild.get()))
           .build();
     }
@@ -274,8 +311,8 @@ public abstract class ManifestDeliveryElement {
    * contains the <dist:delivery> element.
    */
   public static Optional<ManifestDeliveryElement> fromManifestElement(
-      XmlProtoElement manifestElement) {
-    return fromManifestElement(manifestElement, "delivery");
+      XmlProtoElement manifestElement, boolean isFastFollowAllowed) {
+    return fromManifestElement(manifestElement, "delivery", isFastFollowAllowed);
   }
 
   /**
@@ -283,29 +320,31 @@ public abstract class ManifestDeliveryElement {
    * the <dist:instant-delivery> element.
    */
   public static Optional<ManifestDeliveryElement> instantFromManifestElement(
-      XmlProtoElement manifestElement) {
-    return fromManifestElement(manifestElement, "instant-delivery");
+      XmlProtoElement manifestElement, boolean isFastFollowAllowed) {
+    return fromManifestElement(manifestElement, "instant-delivery", isFastFollowAllowed);
   }
 
   private static Optional<ManifestDeliveryElement> fromManifestElement(
-      XmlProtoElement manifestElement, String deliveryTag) {
+      XmlProtoElement manifestElement, String deliveryTag, boolean isFastFollowAllowed) {
     return manifestElement
         .getOptionalChildElement(DISTRIBUTION_NAMESPACE_URI, "module")
         .flatMap(elem -> elem.getOptionalChildElement(DISTRIBUTION_NAMESPACE_URI, deliveryTag))
         .map(
             (XmlProtoElement elem) -> {
-              validateDeliveryElement(elem);
-              return new AutoValue_ManifestDeliveryElement(elem);
+              validateDeliveryElement(elem, isFastFollowAllowed);
+              return new AutoValue_ManifestDeliveryElement(elem, isFastFollowAllowed);
             });
   }
 
   @VisibleForTesting
-  static Optional<ManifestDeliveryElement> fromManifestRootNode(XmlNode xmlNode) {
-    return fromManifestElement(new XmlProtoNode(xmlNode).getElement());
+  static Optional<ManifestDeliveryElement> fromManifestRootNode(
+      XmlNode xmlNode, boolean isFastFollowAllowed) {
+    return fromManifestElement(new XmlProtoNode(xmlNode).getElement(), isFastFollowAllowed);
   }
 
   @VisibleForTesting
-  static Optional<ManifestDeliveryElement> instantFromManifestRootNode(XmlNode xmlNode) {
-    return instantFromManifestElement(new XmlProtoNode(xmlNode).getElement());
+  static Optional<ManifestDeliveryElement> instantFromManifestRootNode(
+      XmlNode xmlNode, boolean isFastFollowAllowed) {
+    return instantFromManifestElement(new XmlProtoNode(xmlNode).getElement(), isFastFollowAllowed);
   }
 }

@@ -42,6 +42,7 @@ import com.android.tools.build.bundletool.model.SizeConfiguration;
 import com.android.tools.build.bundletool.model.exceptions.ValidationException;
 import com.android.tools.build.bundletool.model.utils.ResultUtils;
 import com.android.tools.build.bundletool.model.utils.files.FilePreconditions;
+import com.android.tools.build.bundletool.model.version.Version;
 import com.google.auto.value.AutoValue;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Joiner;
@@ -227,7 +228,12 @@ public abstract class GetSizeCommand implements GetSizeRequest {
 
     for (Variant variant : variants) {
       ConfigurationSizes configurationSizes =
-          new VariantTotalSizeAggregator(compressedSizeByApkPaths, variant, this).getSize();
+          new VariantTotalSizeAggregator(
+                  compressedSizeByApkPaths,
+                  Version.of(buildApksResult.getBundletool().getVersion()),
+                  variant,
+                  this)
+              .getSize();
       minSizeConfigurationMap =
           combineMaps(
               minSizeConfigurationMap, configurationSizes.getMinSizeConfigurationMap(), Math::min);

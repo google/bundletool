@@ -111,7 +111,21 @@ public abstract class ExtractApksCommand {
     public abstract Builder setInstant(boolean instant);
 
 
-    public abstract ExtractApksCommand build();
+    abstract ExtractApksCommand autoBuild();
+
+    /**
+     * Builds the command
+     *
+     * @throws ValidationException if the device spec is invalid. See {@link
+     *     DeviceSpecParser#validateDeviceSpec}
+     */
+    public ExtractApksCommand build() {
+      ExtractApksCommand command = autoBuild();
+      DeviceSpecParser.validateDeviceSpec(
+          command.getDeviceSpec(),
+          /* canSkipFields= */ true); // Allow partial device spec for APEX bundles
+      return command;
+    }
   }
 
   public static ExtractApksCommand fromFlags(ParsedFlags flags) {

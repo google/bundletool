@@ -17,6 +17,7 @@
 package com.android.tools.build.bundletool.splitters;
 
 import static com.android.tools.build.bundletool.model.utils.Versions.ANDROID_P_API_VERSION;
+import static com.android.tools.build.bundletool.model.utils.Versions.ANDROID_Q_API_VERSION;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifest;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.variantSdkTargeting;
 import static com.android.tools.build.bundletool.testing.TestUtils.extractPaths;
@@ -37,19 +38,19 @@ import org.junit.runners.JUnit4;
 public class DexCompressionSplitterTest {
 
   @Test
-  public void dexCompressionSplitter_withP_withDexFiles() throws Exception {
+  public void dexCompressionSplitter_withQ_withDexFiles() throws Exception {
     DexCompressionSplitter dexCompressionSplitter = new DexCompressionSplitter();
     ImmutableCollection<ModuleSplit> splits =
         dexCompressionSplitter.split(
             ModuleSplit.forDex(
-                createModuleWithDexFile(), variantSdkTargeting(ANDROID_P_API_VERSION)));
+                createModuleWithDexFile(), variantSdkTargeting(ANDROID_Q_API_VERSION)));
 
     assertThat(splits).hasSize(1);
 
     ModuleSplit moduleSplit = Iterables.getOnlyElement(splits);
 
     assertThat(moduleSplit.getVariantTargeting())
-        .isEqualTo(variantSdkTargeting(ANDROID_P_API_VERSION));
+        .isEqualTo(variantSdkTargeting(ANDROID_Q_API_VERSION));
 
     assertThat(extractPaths(moduleSplit.getEntries())).containsExactly("dex/classes.dex");
     assertThat(moduleSplit.isMasterSplit()).isTrue();
@@ -58,7 +59,7 @@ public class DexCompressionSplitterTest {
   }
 
   @Test
-  public void dexCompressionSplitter_withP_noDexFiles() throws Exception {
+  public void dexCompressionSplitter_withQ_noDexFiles() throws Exception {
     DexCompressionSplitter dexCompressionSplitter = new DexCompressionSplitter();
     ModuleSplit moduleSplit =
         ModuleSplit.forModule(
@@ -67,7 +68,7 @@ public class DexCompressionSplitterTest {
                 .addFile("assets/leftover.txt")
                 .setManifest(androidManifest("com.test.app"))
                 .build(),
-            variantSdkTargeting(ANDROID_P_API_VERSION));
+            variantSdkTargeting(ANDROID_Q_API_VERSION));
 
     ImmutableCollection<ModuleSplit> splits = dexCompressionSplitter.split(moduleSplit);
 
@@ -76,7 +77,7 @@ public class DexCompressionSplitterTest {
   }
 
   @Test
-  public void dexCompressionSplitter_withP_otherEntriesCompressionUnchanged() throws Exception {
+  public void dexCompressionSplitter_withQ_otherEntriesCompressionUnchanged() throws Exception {
     DexCompressionSplitter dexCompressionSplitter = new DexCompressionSplitter();
     BundleModule bundleModule =
         createModuleBuilderWithDexFile()
@@ -86,14 +87,14 @@ public class DexCompressionSplitterTest {
 
     ImmutableCollection<ModuleSplit> splits =
         dexCompressionSplitter.split(
-            ModuleSplit.forModule(bundleModule, variantSdkTargeting(ANDROID_P_API_VERSION)));
+            ModuleSplit.forModule(bundleModule, variantSdkTargeting(ANDROID_Q_API_VERSION)));
 
     assertThat(splits).hasSize(1);
 
     ModuleSplit moduleSplit = Iterables.getOnlyElement(splits);
 
     assertThat(moduleSplit.getVariantTargeting())
-        .isEqualTo(variantSdkTargeting(ANDROID_P_API_VERSION));
+        .isEqualTo(variantSdkTargeting(ANDROID_Q_API_VERSION));
 
     assertThat(extractPaths(moduleSplit.getEntries()))
         .containsExactly("lib/x86_64/libsome.so", "assets/leftover.txt", "dex/classes.dex");
@@ -107,17 +108,19 @@ public class DexCompressionSplitterTest {
   }
 
   @Test
-  public void dexCompressionSplitter_preP_withDexFiles() throws Exception {
+  public void dexCompressionSplitter_preQ_withDexFiles() throws Exception {
     DexCompressionSplitter dexCompressionSplitter = new DexCompressionSplitter();
     ImmutableCollection<ModuleSplit> splits =
         dexCompressionSplitter.split(
-            ModuleSplit.forDex(createModuleWithDexFile(), variantSdkTargeting(27)));
+            ModuleSplit.forDex(
+                createModuleWithDexFile(), variantSdkTargeting(ANDROID_P_API_VERSION)));
 
     assertThat(splits).hasSize(1);
 
     ModuleSplit moduleSplit = Iterables.getOnlyElement(splits);
 
-    assertThat(moduleSplit.getVariantTargeting()).isEqualTo(variantSdkTargeting(27));
+    assertThat(moduleSplit.getVariantTargeting())
+        .isEqualTo(variantSdkTargeting(ANDROID_P_API_VERSION));
 
     assertThat(extractPaths(moduleSplit.getEntries())).containsExactly("dex/classes.dex");
     assertThat(isCompressed(moduleSplit, "dex/classes.dex")).isTrue();

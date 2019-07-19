@@ -20,6 +20,7 @@ import static com.android.tools.build.bundletool.model.AndroidManifest.DEBUGGABL
 import static com.android.tools.build.bundletool.model.AndroidManifest.DEVELOPMENT_SDK_VERSION;
 import static com.android.tools.build.bundletool.model.AndroidManifest.HAS_CODE_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.IS_FEATURE_SPLIT_RESOURCE_ID;
+import static com.android.tools.build.bundletool.model.AndroidManifest.MODULE_TYPE_ASSET_VALUE;
 import static com.android.tools.build.bundletool.model.AndroidManifest.MODULE_TYPE_FEATURE_VALUE;
 import static com.android.tools.build.bundletool.model.AndroidManifest.NAME_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.RESOURCE_RESOURCE_ID;
@@ -29,6 +30,7 @@ import static com.android.tools.build.bundletool.model.BundleModule.ModuleType.A
 import static com.android.tools.build.bundletool.model.BundleModule.ModuleType.FEATURE_MODULE;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifest;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifestForAssetModule;
+import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withFastFollowDelivery;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withFusingAttribute;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withInstallTimeDelivery;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withInstantInstallTimeDelivery;
@@ -468,6 +470,20 @@ public class AndroidManifestTest {
   public void deliveryTypeAndOnDemandAttribute_deliveryElement_onDemand() {
     AndroidManifest manifest =
         AndroidManifest.create(androidManifest("com.test.app", withOnDemandDelivery()));
+
+    assertThat(manifest.getManifestDeliveryElement()).isPresent();
+    assertThat(manifest.getOnDemandAttribute()).isEmpty();
+    assertThat(manifest.isDeliveryTypeDeclared()).isTrue();
+  }
+
+  @Test
+  public void deliveryTypeAndOnDemandAttribute_deliveryElement_fastFollow() {
+    AndroidManifest manifest =
+        AndroidManifest.create(
+            androidManifest(
+                "com.test.app",
+                withTypeAttribute(MODULE_TYPE_ASSET_VALUE),
+                withFastFollowDelivery()));
 
     assertThat(manifest.getManifestDeliveryElement()).isPresent();
     assertThat(manifest.getOnDemandAttribute()).isEmpty();

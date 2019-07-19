@@ -290,6 +290,11 @@ public class ModuleSplitter {
         .contains(OptimizationDimension.LANGUAGE)) {
       assetsSplitters.add(LanguageAssetsSplitter.create());
     }
+    if (apkGenerationConfiguration
+        .getOptimizationDimensions()
+        .contains(OptimizationDimension.TEXTURE_COMPRESSION_FORMAT)) {
+      assetsSplitters.add(TextureCompressionFormatAssetsSplitter.create());
+    }
     return new SplittingPipeline(assetsSplitters.build());
   }
 

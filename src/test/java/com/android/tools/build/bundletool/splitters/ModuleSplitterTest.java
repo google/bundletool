@@ -29,7 +29,7 @@ import static com.android.tools.build.bundletool.model.OptimizationDimension.LAN
 import static com.android.tools.build.bundletool.model.OptimizationDimension.SCREEN_DENSITY;
 import static com.android.tools.build.bundletool.model.utils.Versions.ANDROID_L_API_VERSION;
 import static com.android.tools.build.bundletool.model.utils.Versions.ANDROID_M_API_VERSION;
-import static com.android.tools.build.bundletool.model.utils.Versions.ANDROID_P_API_VERSION;
+import static com.android.tools.build.bundletool.model.utils.Versions.ANDROID_Q_API_VERSION;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifest;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withInstant;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withMainActivity;
@@ -888,7 +888,7 @@ public class ModuleSplitterTest {
             testModule,
             BUNDLETOOL_VERSION,
             ApkGenerationConfiguration.builder().setEnableDexCompressionSplitter(true).build(),
-            variantMinSdkTargeting(ANDROID_P_API_VERSION),
+            variantMinSdkTargeting(ANDROID_Q_API_VERSION),
             ImmutableSet.of("testModule"));
 
     List<ModuleSplit> splits = moduleSplitter.splitModule();
@@ -896,7 +896,7 @@ public class ModuleSplitterTest {
     ModuleSplit moduleSplit = Iterables.getOnlyElement(splits);
     assertThat(moduleSplit.getSplitType()).isEqualTo(SplitType.SPLIT);
     assertThat(moduleSplit.getVariantTargeting())
-        .isEqualTo(variantMinSdkTargeting(ANDROID_P_API_VERSION));
+        .isEqualTo(variantMinSdkTargeting(ANDROID_Q_API_VERSION));
     assertThat(moduleSplit.findEntry("dex/classes.dex").get().shouldCompress()).isFalse();
   }
 

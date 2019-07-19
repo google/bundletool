@@ -18,6 +18,7 @@ package com.android.tools.build.bundletool.optimizations;
 import static com.android.tools.build.bundletool.model.OptimizationDimension.ABI;
 import static com.android.tools.build.bundletool.model.OptimizationDimension.LANGUAGE;
 import static com.android.tools.build.bundletool.model.OptimizationDimension.SCREEN_DENSITY;
+import static com.android.tools.build.bundletool.model.OptimizationDimension.TEXTURE_COMPRESSION_FORMAT;
 import static com.google.common.base.Preconditions.checkNotNull;
 
 import com.android.tools.build.bundletool.model.OptimizationDimension;
@@ -52,6 +53,14 @@ public abstract class ApkOptimizations {
                   Version.of("0.6.0"),
                   ApkOptimizations.builder()
                       .setSplitDimensions(ImmutableSet.of(ABI, SCREEN_DENSITY, LANGUAGE))
+                      .setUncompressNativeLibraries(true)
+                      .build())
+              .put(
+                  Version.of("0.10.2"),
+                  ApkOptimizations.builder()
+                      .setSplitDimensions(
+                          ImmutableSet.of(
+                              ABI, SCREEN_DENSITY, TEXTURE_COMPRESSION_FORMAT, LANGUAGE))
                       .setUncompressNativeLibraries(true)
                       .build())
               .build();

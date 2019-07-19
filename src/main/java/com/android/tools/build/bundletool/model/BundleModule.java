@@ -27,6 +27,7 @@ import static java.util.function.Function.identity;
 
 import com.android.aapt.Resources.ResourceTable;
 import com.android.aapt.Resources.XmlNode;
+import com.android.bundle.Commands.DeliveryType;
 import com.android.bundle.Commands.ModuleMetadata;
 import com.android.bundle.Config.BundleConfig;
 import com.android.bundle.Files.ApexImages;
@@ -85,6 +86,7 @@ public abstract class BundleModule {
   public enum ModuleDeliveryType {
     ALWAYS_INITIAL_INSTALL,
     CONDITIONAL_INITIAL_INSTALL,
+    // Covers both on-demand and fast-follow modes.
     NO_INITIAL_INSTALL
   }
 
@@ -260,11 +262,23 @@ public abstract class BundleModule {
   public ModuleMetadata getModuleMetadata() {
     return ModuleMetadata.newBuilder()
         .setName(getName().getName())
-        .setOnDemand(getDeliveryType().equals(NO_INITIAL_INSTALL))
         .setIsInstant(isInstantModule())
         .addAllDependencies(getDependencies())
         .setTargeting(getModuleTargeting())
+        .setDeliveryType(moduleDeliveryTypeToDeliveryType(getDeliveryType()))
         .build();
+  }
+
+  private static DeliveryType moduleDeliveryTypeToDeliveryType(
+      ModuleDeliveryType moduleDeliveryType) {
+    switch (moduleDeliveryType) {
+      case ALWAYS_INITIAL_INSTALL:
+      case CONDITIONAL_INITIAL_INSTALL:
+        return DeliveryType.INSTALL_TIME;
+      case NO_INITIAL_INSTALL:
+        return DeliveryType.ON_DEMAND;
+    }
+    throw new IllegalArgumentException("Unknown module delivery type: " + moduleDeliveryType);
   }
 
   public static Builder builder() {

@@ -27,6 +27,7 @@ import com.android.tools.build.bundletool.model.BundleModule.SpecialModuleEntry;
 import com.android.tools.build.bundletool.model.BundleModuleName;
 import com.android.tools.build.bundletool.model.ResourceTableEntry;
 import com.android.tools.build.bundletool.model.ZipPath;
+import com.android.tools.build.bundletool.model.exceptions.BundleInvalidZipException;
 import com.android.tools.build.bundletool.model.exceptions.ValidationException;
 import com.android.tools.build.bundletool.model.utils.ResourcesUtils;
 import com.android.tools.build.bundletool.model.utils.ZipUtils;
@@ -49,6 +50,7 @@ import java.nio.file.Path;
 import java.util.Optional;
 import java.util.function.Predicate;
 import java.util.zip.ZipEntry;
+import java.util.zip.ZipException;
 import java.util.zip.ZipFile;
 import javax.xml.xpath.XPath;
 import javax.xml.xpath.XPathExpression;
@@ -159,6 +161,8 @@ final class DumpManager {
       Path bundlePath, ZipPath filePath, ProtoParser<T> protoParser) {
     try (ZipFile zipFile = new ZipFile(bundlePath.toFile())) {
       return extractAndParse(zipFile, filePath, protoParser);
+    } catch (ZipException e) {
+      throw new BundleInvalidZipException(e);
     } catch (IOException e) {
       throw new UncheckedIOException("Error occurred when trying to open the bundle.", e);
     }

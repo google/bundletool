@@ -17,7 +17,7 @@
 package com.android.tools.build.bundletool.splitters;
 
 import static com.android.tools.build.bundletool.model.utils.Versions.ANDROID_M_API_VERSION;
-import static com.android.tools.build.bundletool.model.utils.Versions.ANDROID_P_API_VERSION;
+import static com.android.tools.build.bundletool.model.utils.Versions.ANDROID_Q_API_VERSION;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifest;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withMaxSdkVersion;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withMinSdkVersion;
@@ -93,7 +93,7 @@ public class VariantGeneratorTest {
 
     ImmutableCollection<VariantTargeting> splits = variantGenerator.generateVariants();
     assertThat(splits)
-        .containsExactly(lPlusVariantTargeting(), variantMinSdkTargeting(ANDROID_P_API_VERSION));
+        .containsExactly(lPlusVariantTargeting(), variantMinSdkTargeting(ANDROID_Q_API_VERSION));
   }
 
   @Test
@@ -112,7 +112,7 @@ public class VariantGeneratorTest {
         .containsExactly(
             lPlusVariantTargeting(),
             variantMinSdkTargeting(ANDROID_M_API_VERSION),
-            variantMinSdkTargeting(ANDROID_P_API_VERSION));
+            variantMinSdkTargeting(ANDROID_Q_API_VERSION));
   }
 
   @Test
@@ -131,7 +131,7 @@ public class VariantGeneratorTest {
         .containsExactly(
             variantMinSdkTargeting(22),
             variantMinSdkTargeting(ANDROID_M_API_VERSION),
-            variantMinSdkTargeting(ANDROID_P_API_VERSION));
+            variantMinSdkTargeting(ANDROID_Q_API_VERSION));
   }
 
   @Test
@@ -149,14 +149,14 @@ public class VariantGeneratorTest {
     assertThat(splits)
         .containsExactly(
             variantMinSdkTargeting(ANDROID_M_API_VERSION),
-            variantMinSdkTargeting(ANDROID_P_API_VERSION));
+            variantMinSdkTargeting(ANDROID_Q_API_VERSION));
   }
 
   @Test
   public void variantsWithAllOptimizations_maxSdkRemovesDexVariant() throws Exception {
     VariantGenerator variantGenerator =
         new VariantGenerator(
-            createSingleLibraryDexModuleMaxSdk(ANDROID_P_API_VERSION - 1),
+            createSingleLibraryDexModuleMaxSdk(ANDROID_Q_API_VERSION - 1),
             ApkGenerationConfiguration.builder()
                 .setEnableDexCompressionSplitter(true)
                 .setEnableNativeLibraryCompressionSplitter(true)

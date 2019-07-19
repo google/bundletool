@@ -172,7 +172,7 @@ public abstract class GetDeviceSpecCommand {
       }
 
       Path outputDirectory = getOutputPath().getParent();
-      if (!Files.exists(outputDirectory)) {
+      if (outputDirectory != null && !Files.exists(outputDirectory)) {
         logger.info("Output directory '" + outputDirectory + "' does not exist, creating it.");
         Files.createDirectories(outputDirectory);
       }

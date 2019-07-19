@@ -18,6 +18,7 @@ package com.android.tools.build.bundletool.optimizations;
 import static com.android.tools.build.bundletool.model.OptimizationDimension.ABI;
 import static com.android.tools.build.bundletool.model.OptimizationDimension.LANGUAGE;
 import static com.android.tools.build.bundletool.model.OptimizationDimension.SCREEN_DENSITY;
+import static com.android.tools.build.bundletool.model.OptimizationDimension.TEXTURE_COMPRESSION_FORMAT;
 import static com.google.common.truth.Truth.assertThat;
 
 import com.android.tools.build.bundletool.model.version.Version;
@@ -49,6 +50,20 @@ public class ApkOptimizationsTest {
         .isEqualTo(
             ApkOptimizations.builder()
                 .setSplitDimensions(ImmutableSet.of(ABI, SCREEN_DENSITY, LANGUAGE))
+                .setUncompressNativeLibraries(true)
+                .build());
+  }
+
+  @Test
+  public void
+      getDefaultOptimizations_0_10_2_onlySplitsByAbiDensityTextureLanguageAndUncompressNativeLibs() {
+    ApkOptimizations defaultOptimizations =
+        ApkOptimizations.getDefaultOptimizationsForVersion(Version.of("0.10.2"));
+    assertThat(defaultOptimizations)
+        .isEqualTo(
+            ApkOptimizations.builder()
+                .setSplitDimensions(
+                    ImmutableSet.of(ABI, SCREEN_DENSITY, TEXTURE_COMPRESSION_FORMAT, LANGUAGE))
                 .setUncompressNativeLibraries(true)
                 .build());
   }

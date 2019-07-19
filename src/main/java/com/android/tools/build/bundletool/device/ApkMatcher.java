@@ -16,12 +16,15 @@
 
 package com.android.tools.build.bundletool.device;
 
+import static com.android.tools.build.bundletool.model.utils.ModuleDependenciesUtils.addModuleDependencies;
+import static com.android.tools.build.bundletool.model.utils.ModuleDependenciesUtils.buildAdjacencyMap;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.collect.ImmutableSet.toImmutableSet;
 
 import com.android.bundle.Commands.ApkDescription;
 import com.android.bundle.Commands.ApkSet;
 import com.android.bundle.Commands.BuildApksResult;
+import com.android.bundle.Commands.DeliveryType;
 import com.android.bundle.Commands.ModuleMetadata;
 import com.android.bundle.Commands.Variant;
 import com.android.bundle.Devices.DeviceSpec;
@@ -30,12 +33,12 @@ import com.android.tools.build.bundletool.model.ModuleSplit;
 import com.android.tools.build.bundletool.model.ZipPath;
 import com.android.tools.build.bundletool.model.exceptions.CommandExecutionException;
 import com.android.tools.build.bundletool.model.exceptions.ValidationException;
+import com.android.tools.build.bundletool.model.version.Version;
 import com.google.common.base.Predicate;
 import com.google.common.base.Predicates;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMultimap;
 import com.google.common.collect.ImmutableSet;
-import com.google.common.collect.Multimap;
 import com.google.common.collect.Sets;
 import java.util.HashSet;
 import java.util.Optional;
@@ -94,14 +97,15 @@ public class ApkMatcher {
     Optional<Variant> matchingVariant = variantMatcher.getMatchingVariant(buildApksResult);
 
     return matchingVariant.isPresent()
-        ? getMatchingApksFromVariant(matchingVariant.get())
+        ? getMatchingApksFromVariant(
+            matchingVariant.get(), Version.of(buildApksResult.getBundletool().getVersion()))
         : ImmutableList.of();
   }
 
-  public ImmutableList<ZipPath> getMatchingApksFromVariant(Variant variant) {
+  public ImmutableList<ZipPath> getMatchingApksFromVariant(Variant variant, Version bundleVersion) {
     ImmutableList.Builder<ZipPath> matchedApksBuilder = ImmutableList.builder();
 
-    Predicate<String> moduleNameMatcher = getModuleNameMatcher(variant);
+    Predicate<String> moduleNameMatcher = getModuleNameMatcher(variant, bundleVersion);
 
     for (ApkSet apkSet : variant.getApkSetList()) {
       String moduleName = apkSet.getModuleMetadata().getName();
@@ -122,7 +126,7 @@ public class ApkMatcher {
     return matchedApksBuilder.build();
   }
 
-  private Predicate<String> getModuleNameMatcher(Variant variant) {
+  private Predicate<String> getModuleNameMatcher(Variant variant, Version bundleVersion) {
     if (requestedModuleNames.isPresent()) {
       validateVariant(variant);
 
@@ -137,7 +141,8 @@ public class ApkMatcher {
         return dependencyModules::contains;
       } else {
         return Predicates.or(
-            buildModulesDeliveredInstallTime(variant)::contains, dependencyModules::contains);
+            buildModulesDeliveredInstallTime(variant, bundleVersion)::contains,
+            dependencyModules::contains);
       }
     } else {
       if (matchInstant) {
@@ -145,7 +150,7 @@ public class ApkMatcher {
         return Predicates.alwaysTrue();
       } else {
         // For conventional matching, only install-time modules are matched.
-        return buildModulesDeliveredInstallTime(variant)::contains;
+        return buildModulesDeliveredInstallTime(variant, bundleVersion)::contains;
       }
     }
   }
@@ -168,51 +173,25 @@ public class ApkMatcher {
     }
   }
 
-  /** Builds a map of module dependencies. */
-  private static ImmutableMultimap<String, String> buildAdjacencyMap(Variant variant) {
-    ImmutableMultimap.Builder<String, String> moduleDependenciesMap = ImmutableMultimap.builder();
-    variant.getApkSetList().stream()
-        .map(ApkSet::getModuleMetadata)
-        .forEach(
-            moduleMetadata -> {
-              moduleDependenciesMap.putAll(
-                  moduleMetadata.getName(), moduleMetadata.getDependenciesList());
-              moduleDependenciesMap.put(moduleMetadata.getName(), "base");
-            });
-    return moduleDependenciesMap.build();
-  }
-
   /** Builds a list of modules that will be delivered on installation. */
-  private ImmutableSet<String> buildModulesDeliveredInstallTime(Variant variant) {
+  private ImmutableSet<String> buildModulesDeliveredInstallTime(
+      Variant variant, Version bundleVersion) {
     // Module dependency resolution can be skipped because install-time modules can't depend on
     // on-demand modules.
     return variant.getApkSetList().stream()
         .map(ApkSet::getModuleMetadata)
-        .filter(this::willBeDeliveredInstallTime)
+        .filter(moduleMetadata -> willBeDeliveredInstallTime(moduleMetadata, bundleVersion))
         .map(ModuleMetadata::getName)
         .collect(toImmutableSet());
   }
 
-  private boolean willBeDeliveredInstallTime(ModuleMetadata moduleMetadata) {
-    return !moduleMetadata.getOnDemand()
-        && moduleMatcher.matchesModuleTargeting(moduleMetadata.getTargeting());
-  }
+  private boolean willBeDeliveredInstallTime(ModuleMetadata moduleMetadata, Version bundleVersion) {
+    boolean installTime =
+        bundleVersion.isNewerThan(Version.of("0.10.1"))
+            ? moduleMetadata.getDeliveryType().equals(DeliveryType.INSTALL_TIME)
+            : !moduleMetadata.getOnDemandDeprecated();
 
-  /** Adds module dependencies to {@code dependencyModules}. */
-  private static void addModuleDependencies(
-      String moduleName,
-      Multimap<String, String> moduleDependenciesMap,
-      Set<String> dependencyModules) {
-    if (!moduleDependenciesMap.containsKey(moduleName)) {
-      return;
-    }
-
-    for (String moduleDependency : moduleDependenciesMap.get(moduleName)) {
-      // We do not examine again the dependency that was previously handled and added.
-      if (dependencyModules.add(moduleDependency)) {
-        addModuleDependencies(moduleDependency, moduleDependenciesMap, dependencyModules);
-      }
-    }
+    return installTime && moduleMatcher.matchesModuleTargeting(moduleMetadata.getTargeting());
   }
 
   /** Returns whether a given APK generated by the Bundle Tool should be installed on a device. */

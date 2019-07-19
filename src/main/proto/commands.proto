@@ -2,10 +2,10 @@ syntax = "proto3";
 
 package android.bundle;
 
-option java_package = "com.android.bundle";
-
 import "config.proto";
 import "targeting.proto";
+
+option java_package = "com.android.bundle";
 
 // Describes the output of the "build-apks" command.
 message BuildApksResult {
@@ -50,9 +50,8 @@ message ModuleMetadata {
   // Module name.
   string name = 1;
 
-  // Indicates whether this module is marked "on demand".
-  // Set only for Split APKs.
-  bool on_demand = 2;
+  // Indicates the delivery type (e.g. on-demand) of the module.
+  DeliveryType delivery_type = 6;
 
   // Indicates whether this module is marked "instant".
   bool is_instant = 3;
@@ -64,6 +63,9 @@ message ModuleMetadata {
   // The targeting that makes a conditional module installed.
   // Relevant only for Split APKs.
   ModuleTargeting targeting = 5;
+
+  // Deprecated. Please use delivery_type.
+  bool on_demand_deprecated = 2 [deprecated = true];
 }
 
 // Set of asset slices belonging to a single asset module.
@@ -79,19 +81,32 @@ message AssetModuleMetadata {
   // Module name.
   string name = 1;
 
-  // Indicates whether this module is marked "on demand" for persistent install.
-  bool on_demand = 2;
+  // Indicates the delivery type for persistent install.
+  DeliveryType delivery_type = 4;
 
   // Metadata for instant installs.
   InstantMetadata instant_metadata = 3;
+
+  // Deprecated. Use delivery_type.
+  bool on_demand_deprecated = 2 [deprecated = true];
 }
 
 message InstantMetadata {
   // Indicates whether this module is marked "instant".
   bool is_instant = 1;
 
-  // Indicates whether this module is marked "on demand" for instant install.
-  bool on_demand = 2;
+  // Indicates the delivery type for instant install.
+  DeliveryType delivery_type = 3;
+
+  // Deprecated. Use delivery_type.
+  bool on_demand_deprecated = 2 [deprecated = true];
+}
+
+enum DeliveryType {
+  UNKNOWN_DELIVERY_TYPE = 0;
+  INSTALL_TIME = 1;
+  ON_DEMAND = 2;
+  FAST_FOLLOW = 3;
 }
 
 message ApkDescription {

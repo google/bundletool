@@ -40,6 +40,8 @@ import static com.google.common.truth.Truth.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.android.bundle.Commands.BuildApksResult;
+import com.android.bundle.Commands.DeliveryType;
+import com.android.bundle.Config.Bundletool;
 import com.android.bundle.Devices.DeviceSpec;
 import com.android.bundle.Targeting.Abi.AbiAlias;
 import com.android.bundle.Targeting.ApkTargeting;
@@ -52,6 +54,7 @@ import com.android.tools.build.bundletool.model.ZipPath;
 import com.android.tools.build.bundletool.model.exceptions.CommandExecutionException;
 import com.android.tools.build.bundletool.model.exceptions.InstallationException;
 import com.android.tools.build.bundletool.model.utils.SystemEnvironmentProvider;
+import com.android.tools.build.bundletool.model.version.BundleToolVersion;
 import com.android.tools.build.bundletool.testing.FakeAdbServer;
 import com.android.tools.build.bundletool.testing.FakeDevice;
 import com.android.tools.build.bundletool.testing.FakeSystemEnvironmentProvider;
@@ -401,6 +404,9 @@ public class InstallApksCommandTest {
     ZipPath apkLx86 = ZipPath.create("splits/apkL-x86.apk");
     BuildApksResult tableOfContentsProto =
         BuildApksResult.newBuilder()
+            .setBundletool(
+                Bundletool.newBuilder()
+                    .setVersion(BundleToolVersion.getCurrentVersion().toString()))
             .addVariant(
                 createVariant(
                     variantSdkTargeting(sdkVersionFrom(21)),
@@ -517,6 +523,9 @@ public class InstallApksCommandTest {
       @FromDataPoints("apksInDirectory") boolean apksInDirectory) throws Exception {
     BuildApksResult tableOfContent =
         BuildApksResult.newBuilder()
+            .setBundletool(
+                Bundletool.newBuilder()
+                    .setVersion(BundleToolVersion.getCurrentVersion().toString()))
             .addVariant(
                 createVariant(
                     VariantTargeting.getDefaultInstance(),
@@ -562,6 +571,9 @@ public class InstallApksCommandTest {
       @FromDataPoints("apksInDirectory") boolean apksInDirectory) throws Exception {
     BuildApksResult tableOfContent =
         BuildApksResult.newBuilder()
+            .setBundletool(
+                Bundletool.newBuilder()
+                    .setVersion(BundleToolVersion.getCurrentVersion().toString()))
             .addVariant(
                 createVariant(
                     VariantTargeting.getDefaultInstance(),
@@ -571,21 +583,21 @@ public class InstallApksCommandTest {
                             ApkTargeting.getDefaultInstance(), ZipPath.create("base-master.apk"))),
                     createSplitApkSet(
                         /* moduleName= */ "feature1",
-                        /* onDemand= */ true,
+                        DeliveryType.ON_DEMAND,
                         /* moduleDependencies= */ ImmutableList.of(),
                         createMasterApkDescription(
                             ApkTargeting.getDefaultInstance(),
                             ZipPath.create("feature1-master.apk"))),
                     createSplitApkSet(
                         /* moduleName= */ "feature2",
-                        /* onDemand= */ true,
+                        DeliveryType.ON_DEMAND,
                         /* moduleDependencies= */ ImmutableList.of("feature1"),
                         createMasterApkDescription(
                             ApkTargeting.getDefaultInstance(),
                             ZipPath.create("feature2-master.apk"))),
                     createSplitApkSet(
                         /* moduleName= */ "feature3",
-                        /* onDemand= */ true,
+                        DeliveryType.ON_DEMAND,
                         /* moduleDependencies= */ ImmutableList.of("feature2"),
                         createMasterApkDescription(
                             ApkTargeting.getDefaultInstance(),
@@ -618,6 +630,9 @@ public class InstallApksCommandTest {
       @FromDataPoints("apksInDirectory") boolean apksInDirectory) throws Exception {
     BuildApksResult tableOfContent =
         BuildApksResult.newBuilder()
+            .setBundletool(
+                Bundletool.newBuilder()
+                    .setVersion(BundleToolVersion.getCurrentVersion().toString()))
             .addVariant(
                 createVariant(
                     VariantTargeting.getDefaultInstance(),
@@ -627,28 +642,28 @@ public class InstallApksCommandTest {
                             ApkTargeting.getDefaultInstance(), ZipPath.create("base-master.apk"))),
                     createSplitApkSet(
                         /* moduleName= */ "feature1",
-                        /* onDemand= */ true,
+                        DeliveryType.ON_DEMAND,
                         /* moduleDependencies= */ ImmutableList.of(),
                         createMasterApkDescription(
                             ApkTargeting.getDefaultInstance(),
                             ZipPath.create("feature1-master.apk"))),
                     createSplitApkSet(
                         /* moduleName= */ "feature2",
-                        /* onDemand= */ true,
+                        DeliveryType.ON_DEMAND,
                         /* moduleDependencies= */ ImmutableList.of("feature1"),
                         createMasterApkDescription(
                             ApkTargeting.getDefaultInstance(),
                             ZipPath.create("feature2-master.apk"))),
                     createSplitApkSet(
                         /* moduleName= */ "feature3",
-                        /* onDemand= */ true,
+                        DeliveryType.ON_DEMAND,
                         /* moduleDependencies= */ ImmutableList.of("feature1"),
                         createMasterApkDescription(
                             ApkTargeting.getDefaultInstance(),
                             ZipPath.create("feature3-master.apk"))),
                     createSplitApkSet(
                         /* moduleName= */ "feature4",
-                        /* onDemand= */ true,
+                        DeliveryType.ON_DEMAND,
                         /* moduleDependencies= */ ImmutableList.of("feature2", "feature3"),
                         createMasterApkDescription(
                             ApkTargeting.getDefaultInstance(),
@@ -694,6 +709,8 @@ public class InstallApksCommandTest {
   /** Creates a table of content matching L+ devices. */
   private static BuildApksResult createLPlusTableOfContent(ZipPath apkPath) {
     return BuildApksResult.newBuilder()
+        .setBundletool(
+            Bundletool.newBuilder().setVersion(BundleToolVersion.getCurrentVersion().toString()))
         .addVariant(
             createVariantForSingleSplitApk(
                 variantSdkTargeting(sdkVersionFrom(21)),
@@ -705,6 +722,8 @@ public class InstallApksCommandTest {
   /** Creates a table of content matching all devices to a given apkPath. */
   private static BuildApksResult createSimpleTableOfContent(ZipPath apkPath) {
     return BuildApksResult.newBuilder()
+        .setBundletool(
+            Bundletool.newBuilder().setVersion(BundleToolVersion.getCurrentVersion().toString()))
         .addVariant(
             createVariantForSingleSplitApk(
                 VariantTargeting.getDefaultInstance(), ApkTargeting.getDefaultInstance(), apkPath))

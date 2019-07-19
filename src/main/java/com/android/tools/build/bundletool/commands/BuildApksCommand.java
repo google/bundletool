@@ -109,6 +109,7 @@ public abstract class BuildApksCommand {
   private static final Flag<Boolean> CONNECTED_DEVICE_FLAG = Flag.booleanFlag("connected-device");
   private static final Flag<String> DEVICE_ID_FLAG = Flag.string("device-id");
   private static final String ANDROID_SERIAL_VARIABLE = "ANDROID_SERIAL";
+  private static final Flag<ImmutableSet<String>> MODULES_FLAG = Flag.stringSet("modules");
 
   private static final Flag<Path> DEVICE_SPEC_FLAG = Flag.path("device-spec");
 
@@ -130,6 +131,8 @@ public abstract class BuildApksCommand {
   public abstract boolean getOverwriteOutput();
 
   public abstract ImmutableSet<OptimizationDimension> getOptimizationDimensions();
+
+  public abstract ImmutableSet<String> getModules();
 
   public abstract Optional<DeviceSpec> getDeviceSpec();
 
@@ -174,7 +177,8 @@ public abstract class BuildApksCommand {
         .setApkBuildMode(DEFAULT)
         .setGenerateOnlyForConnectedDevice(false)
         .setCreateApkSetArchive(true)
-        .setOptimizationDimensions(ImmutableSet.of());
+        .setOptimizationDimensions(ImmutableSet.of())
+        .setModules(ImmutableSet.of());
   }
 
   /** Builder for the {@link BuildApksCommand}. */
@@ -210,6 +214,8 @@ public abstract class BuildApksCommand {
      * Sets if the generated APK Set will contain APKs compatible only with the connected device.
      */
     public abstract Builder setGenerateOnlyForConnectedDevice(boolean onlyForConnectedDevice);
+
+    public abstract Builder setModules(ImmutableSet<String> modules);
 
     /** Sets the {@link DeviceSpec} for which the only the matching APKs will be generated. */
     public abstract Builder setDeviceSpec(DeviceSpec deviceSpec);
@@ -384,6 +390,17 @@ public abstract class BuildApksCommand {
         }
       }
 
+      if (!command.getModules().isEmpty()
+          && !command.getApkBuildMode().isAnySystemMode()
+          && !command.getApkBuildMode().equals(UNIVERSAL)) {
+        throw ValidationException.builder()
+            .withMessage(
+                "Modules can be only set when running with '%s', '%s' or '%s' mode flag.",
+                UNIVERSAL.getLowerCaseName(),
+                SYSTEM.getLowerCaseName(),
+                SYSTEM_COMPRESSED.getLowerCaseName())
+            .build();
+      }
       return command;
     }
   }
@@ -492,6 +509,8 @@ public abstract class BuildApksCommand {
         .getValue(flags)
         .map(deviceSpecParser)
         .ifPresent(buildApksCommand::setDeviceSpec);
+
+    MODULES_FLAG.getValue(flags).ifPresent(buildApksCommand::setModules);
 
     flags.checkNoUnknownFlags();
 
@@ -691,6 +710,18 @@ public abstract class BuildApksCommand {
                     GetDeviceSpecCommand.COMMAND_NAME,
                     MODE_FLAG.getName(),
                     DEFAULT.getLowerCaseName())
+                .build())
+        .addFlag(
+            FlagDescription.builder()
+                .setFlagName(MODULES_FLAG.getName())
+                .setExampleValue("base,module1,module2")
+                .setOptional(true)
+                .setDescription(
+                    "List of module names to include in the generated APK Set in modes %s, %s and "
+                        + "%s.",
+                    UNIVERSAL.getLowerCaseName(),
+                    SYSTEM.getLowerCaseName(),
+                    SYSTEM_COMPRESSED.getLowerCaseName())
                 .build())
         .build();
   }

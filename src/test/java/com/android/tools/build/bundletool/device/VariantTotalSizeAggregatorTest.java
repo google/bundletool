@@ -55,6 +55,7 @@ import static com.android.tools.build.bundletool.testing.TargetingUtils.variantS
 import static com.google.common.truth.Truth.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
+import com.android.bundle.Commands.DeliveryType;
 import com.android.bundle.Commands.Variant;
 import com.android.bundle.Targeting.Abi.AbiAlias;
 import com.android.bundle.Targeting.ApkTargeting;
@@ -64,6 +65,7 @@ import com.android.tools.build.bundletool.model.ConfigurationSizes;
 import com.android.tools.build.bundletool.model.SizeConfiguration;
 import com.android.tools.build.bundletool.model.ZipPath;
 import com.android.tools.build.bundletool.model.exceptions.CommandExecutionException;
+import com.android.tools.build.bundletool.model.version.BundleToolVersion;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
@@ -90,7 +92,10 @@ public class VariantTotalSizeAggregatorTest {
                     ApkTargeting.getDefaultInstance(), ZipPath.create("base-master.apk"))));
     ConfigurationSizes configurationSizes =
         new VariantTotalSizeAggregator(
-                ImmutableMap.of("base-master.apk", 10L), lVariant, getSizeCommand.build())
+                ImmutableMap.of("base-master.apk", 10L),
+                BundleToolVersion.getCurrentVersion(),
+                lVariant,
+                getSizeCommand.build())
             .getSize();
     assertThat(configurationSizes.getMaxSizeConfigurationMap())
         .containsExactly(SizeConfiguration.getDefaultInstance(), 10L);
@@ -118,6 +123,7 @@ public class VariantTotalSizeAggregatorTest {
     ConfigurationSizes configurationSizes =
         new VariantTotalSizeAggregator(
                 ImmutableMap.of("base-master.apk", 10L, "base-x86.apk", 4L, "base-x86_64.apk", 6L),
+                BundleToolVersion.getCurrentVersion(),
                 lVariant,
                 getSizeCommand.build())
             .getSize();
@@ -168,6 +174,7 @@ public class VariantTotalSizeAggregatorTest {
                     .put("base-xxhdpi.apk", 3L)
                     .put("base-en.apk", 1L)
                     .build(),
+                BundleToolVersion.getCurrentVersion(),
                 lVariant,
                 getSizeCommand.setDimensions(ImmutableSet.of(ABI, SCREEN_DENSITY)).build())
             .getSize();
@@ -230,6 +237,7 @@ public class VariantTotalSizeAggregatorTest {
                     .put("base-mdpi.apk", 6L)
                     .put("base-ldpi.apk", 3L)
                     .build(),
+                BundleToolVersion.getCurrentVersion(),
                 lVariant,
                 getSizeCommand
                     .setDimensions(ImmutableSet.of(LANGUAGE))
@@ -289,6 +297,7 @@ public class VariantTotalSizeAggregatorTest {
                     .put("base-x86.apk", 4L)
                     .put("base-x86_64.apk", 5L)
                     .build(),
+                BundleToolVersion.getCurrentVersion(),
                 lVariant,
                 getSizeCommand
                     .setDimensions(ImmutableSet.of(SCREEN_DENSITY, SDK))
@@ -356,6 +365,7 @@ public class VariantTotalSizeAggregatorTest {
                     .put("base-mips.apk", 4L)
                     .put("base-mips64.apk", 5L)
                     .build(),
+                BundleToolVersion.getCurrentVersion(),
                 lVariant,
                 getSizeCommand
                     .setDimensions(ImmutableSet.of(SCREEN_DENSITY, SDK, LANGUAGE, ABI))
@@ -409,6 +419,7 @@ public class VariantTotalSizeAggregatorTest {
                 .put("apkL.apk", 10L)
                 .put("apkL-x86.apk", 6L)
                 .build(),
+            BundleToolVersion.getCurrentVersion(),
             lVariant,
             getSizeCommand
                 .setDeviceSpec(mergeSpecs(abis("arm64-v8a"), locales("en"), density(XHDPI)))
@@ -433,13 +444,13 @@ public class VariantTotalSizeAggregatorTest {
                     ApkTargeting.getDefaultInstance(), ZipPath.create("base-master.apk"))),
             createSplitApkSet(
                 /* moduleName= */ "feature",
-                /* onDemand= */ true,
+                DeliveryType.ON_DEMAND,
                 /* moduleDependencies= */ ImmutableList.of(),
                 createMasterApkDescription(
                     ApkTargeting.getDefaultInstance(), ZipPath.create("feature-master.apk"))),
             createSplitApkSet(
                 /* moduleName= */ "feature1",
-                /* onDemand= */ true,
+                DeliveryType.ON_DEMAND,
                 /* moduleDependencies= */ ImmutableList.of(),
                 createMasterApkDescription(
                     ApkTargeting.getDefaultInstance(), ZipPath.create("feature1-master.apk"))),
@@ -456,6 +467,7 @@ public class VariantTotalSizeAggregatorTest {
                     .put("feature1-master.apk", 6L)
                     .put("feature2-master.apk", 4L)
                     .build(),
+                BundleToolVersion.getCurrentVersion(),
                 lVariant,
                 getSizeCommand.setModules(ImmutableSet.of("base", "feature1")).build())
             .getSize();
@@ -494,6 +506,7 @@ public class VariantTotalSizeAggregatorTest {
                     .put("feature-master.apk", 15L)
                     .put("feature1-master.apk", 6L)
                     .build(),
+                BundleToolVersion.getCurrentVersion(),
                 lVariant,
                 getSizeCommand.setInstant(true).build())
             .getSize();
@@ -555,6 +568,7 @@ public class VariantTotalSizeAggregatorTest {
                     .put("feature-xhdpi.apk", 6L)
                     .put("feature-xxhdpi.apk", 5L)
                     .build(),
+                BundleToolVersion.getCurrentVersion(),
                 lVariant,
                 getSizeCommand.setDeviceSpec(mergeSpecs(density(XHDPI), abis("mips"))).build())
             .getSize();
@@ -579,7 +593,10 @@ public class VariantTotalSizeAggregatorTest {
 
     ConfigurationSizes configurationSizes =
         new VariantTotalSizeAggregator(
-                ImmutableMap.of("sample.apk", 10L), variant, getSizeCommand.build())
+                ImmutableMap.of("sample.apk", 10L),
+                BundleToolVersion.getCurrentVersion(),
+                variant,
+                getSizeCommand.build())
             .getSize();
     assertThat(configurationSizes.getMinSizeConfigurationMap())
         .isEqualTo(configurationSizes.getMaxSizeConfigurationMap());
@@ -600,6 +617,7 @@ public class VariantTotalSizeAggregatorTest {
     ConfigurationSizes configurationSizes =
         new VariantTotalSizeAggregator(
                 ImmutableMap.of("sample.apk", 10L),
+                BundleToolVersion.getCurrentVersion(),
                 variant,
                 getSizeCommand.setModules(ImmutableSet.of("base")).build())
             .getSize();
@@ -622,6 +640,7 @@ public class VariantTotalSizeAggregatorTest {
     ConfigurationSizes configurationSizes =
         new VariantTotalSizeAggregator(
                 ImmutableMap.of("sample.apk", 20L),
+                BundleToolVersion.getCurrentVersion(),
                 variant,
                 getSizeCommand
                     .setDimensions(ImmutableSet.of(ABI, SCREEN_DENSITY, LANGUAGE, SDK))
@@ -655,6 +674,7 @@ public class VariantTotalSizeAggregatorTest {
     ConfigurationSizes configurationSizes =
         new VariantTotalSizeAggregator(
                 ImmutableMap.of("sample.apk", 15L),
+                BundleToolVersion.getCurrentVersion(),
                 variant,
                 getSizeCommand.setDeviceSpec(mergeSpecs(locales("jp"), abis("mips"))).build())
             .getSize();
@@ -679,6 +699,7 @@ public class VariantTotalSizeAggregatorTest {
     ConfigurationSizes configurationSizes =
         new VariantTotalSizeAggregator(
                 ImmutableMap.of("sample.apk", 11L),
+                BundleToolVersion.getCurrentVersion(),
                 variant,
                 getSizeCommand
                     .setDimensions(ImmutableSet.of(ABI, SCREEN_DENSITY, LANGUAGE, SDK))

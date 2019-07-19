@@ -39,8 +39,8 @@ message Library {
 }
 
 message MavenLibrary {
-    optional string groupId = 1;
-    optional string artifactId = 2;
+    optional string group_id = 1;
+    optional string artifact_id = 2;
     optional string packaging = 3;
     optional string classifier = 4;
     optional string version = 5;

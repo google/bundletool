@@ -93,6 +93,7 @@ import com.android.bundle.Targeting.TextureCompressionFormat.TextureCompressionF
 import com.android.bundle.Targeting.VariantTargeting;
 import com.android.tools.build.bundletool.model.BundleMetadata;
 import com.android.tools.build.bundletool.model.BundleModule;
+import com.android.tools.build.bundletool.model.BundleModuleName;
 import com.android.tools.build.bundletool.model.ModuleSplit;
 import com.android.tools.build.bundletool.model.ModuleSplit.SplitType;
 import com.android.tools.build.bundletool.model.OptimizationDimension;
@@ -159,6 +160,10 @@ public class BundleSharderTest {
       apkDensityTargeting(
           DensityAlias.XXXHDPI,
           Sets.difference(ALL_DENSITIES, ImmutableSet.of(DensityAlias.XXXHDPI)));
+
+  private static final BundleModuleName BASE_MODULE_NAME = BundleModuleName.create("base");
+  private static final BundleModuleName FEATURE_MODULE_NAME = BundleModuleName.create("feature");
+  private static final BundleModuleName VR_MODULE_NAME = BundleModuleName.create("vr");
 
   private BundleSharder bundleSharder;
   private Path tmpDir;
@@ -319,7 +324,8 @@ public class BundleSharderTest {
     if (deviceSpec.isPresent()) {
       ShardedSystemSplits shardedSystemSplits =
           bundleSharder.shardForSystemApps(
-              ImmutableList.of(bundleModule),
+              /* modules= */ ImmutableList.of(bundleModule),
+              /* modulesToFuse= */ ImmutableSet.of(BASE_MODULE_NAME),
               ImmutableSet.of(OptimizationDimension.ABI),
               DEFAULT_METADATA);
       assertThat(shardedSystemSplits.getAdditionalSplits()).isEmpty();
@@ -387,7 +393,8 @@ public class BundleSharderTest {
     if (deviceSpec.isPresent()) {
       ShardedSystemSplits shardedSystemSplits =
           bundleSharder.shardForSystemApps(
-              ImmutableList.of(bundleModule),
+              /* modules= */ ImmutableList.of(bundleModule),
+              /* modulesToFuse= */ ImmutableSet.of(BASE_MODULE_NAME),
               ImmutableSet.of(OptimizationDimension.ABI),
               DEFAULT_METADATA);
       assertThat(shardedSystemSplits.getAdditionalSplits()).isEmpty();
@@ -539,7 +546,8 @@ public class BundleSharderTest {
 
     ShardedSystemSplits shards =
         bundleSharder.shardForSystemApps(
-            ImmutableList.of(bundleModule),
+            /* modules= */ ImmutableList.of(bundleModule),
+            /* modulesToFuse= */ ImmutableSet.of(BASE_MODULE_NAME),
             ImmutableSet.of(OptimizationDimension.ABI),
             DEFAULT_METADATA);
 
@@ -612,7 +620,8 @@ public class BundleSharderTest {
 
     ShardedSystemSplits shards =
         bundleSharder.shardForSystemApps(
-            ImmutableList.of(baseModule, vrModule),
+            /* modules= */ ImmutableList.of(baseModule, vrModule),
+            /* modulesToFuse= */ ImmutableSet.of(BASE_MODULE_NAME, VR_MODULE_NAME),
             ImmutableSet.of(
                 OptimizationDimension.ABI,
                 OptimizationDimension.LANGUAGE,
@@ -953,7 +962,8 @@ public class BundleSharderTest {
     if (deviceSpec.isPresent()) {
       ShardedSystemSplits shardedSystemSplits =
           bundleSharder.shardForSystemApps(
-              ImmutableList.of(bundleModule),
+              /* modules= */ ImmutableList.of(bundleModule),
+              /* modulesToFuse= */ ImmutableSet.of(BASE_MODULE_NAME),
               ImmutableSet.of(OptimizationDimension.ABI, OptimizationDimension.SCREEN_DENSITY),
               DEFAULT_METADATA);
       assertThat(shardedSystemSplits.getAdditionalSplits()).isEmpty();
@@ -1095,7 +1105,8 @@ public class BundleSharderTest {
 
     ShardedSystemSplits shards =
         bundleSharder.shardForSystemApps(
-            ImmutableList.of(bundleModule),
+            /* modules= */ ImmutableList.of(bundleModule),
+            /* modulesToFuse= */ ImmutableSet.of(BASE_MODULE_NAME),
             ImmutableSet.of(OptimizationDimension.ABI, OptimizationDimension.SCREEN_DENSITY),
             DEFAULT_METADATA);
 
@@ -1168,7 +1179,8 @@ public class BundleSharderTest {
 
     ShardedSystemSplits shards =
         bundleSharder.shardForSystemApps(
-            ImmutableList.of(bundleModule),
+            /* modules= */ ImmutableList.of(bundleModule),
+            /* modulesToFuse= */ ImmutableSet.of(BASE_MODULE_NAME),
             ImmutableSet.of(
                 OptimizationDimension.ABI,
                 OptimizationDimension.SCREEN_DENSITY,
@@ -1261,7 +1273,8 @@ public class BundleSharderTest {
 
     ShardedSystemSplits shards =
         bundleSharder.shardForSystemApps(
-            ImmutableList.of(bundleModule),
+            /* modules= */ ImmutableList.of(bundleModule),
+            /* modulesToFuse= */ ImmutableSet.of(BASE_MODULE_NAME),
             ImmutableSet.of(
                 OptimizationDimension.ABI,
                 OptimizationDimension.SCREEN_DENSITY,
@@ -1525,7 +1538,10 @@ public class BundleSharderTest {
     if (deviceSpec.isPresent()) {
       ShardedSystemSplits shardedSystemSplits =
           bundleSharder.shardForSystemApps(
-              ImmutableList.of(baseModule, featureModule), ImmutableSet.of(), DEFAULT_METADATA);
+              /* modules= */ ImmutableList.of(baseModule, featureModule),
+              /* modulesToFuse= */ ImmutableSet.of(BASE_MODULE_NAME, FEATURE_MODULE_NAME),
+              ImmutableSet.of(),
+              DEFAULT_METADATA);
       assertThat(shardedSystemSplits.getAdditionalSplits()).isEmpty();
       shards = ImmutableList.of(shardedSystemSplits.getSystemImageSplit());
 
@@ -1728,7 +1744,8 @@ public class BundleSharderTest {
     if (deviceSpec.isPresent()) {
       ShardedSystemSplits shardedSystemSplits =
           bundleSharder.shardForSystemApps(
-              ImmutableList.of(baseModule, featureModule),
+              /* modules= */ ImmutableList.of(baseModule, featureModule),
+              /* modulesToFuse= */ ImmutableSet.of(BASE_MODULE_NAME, FEATURE_MODULE_NAME),
               ImmutableSet.of(OptimizationDimension.SCREEN_DENSITY),
               DEFAULT_METADATA);
       assertThat(shardedSystemSplits.getAdditionalSplits()).isEmpty();
@@ -1970,7 +1987,8 @@ public class BundleSharderTest {
 
     ShardedSystemSplits shards =
         bundleSharder.shardForSystemApps(
-            ImmutableList.of(baseModule, featureModule),
+            /* modules= */ ImmutableList.of(baseModule, featureModule),
+            /* modulesToFuse= */ ImmutableSet.of(BASE_MODULE_NAME, FEATURE_MODULE_NAME),
             ImmutableSet.of(OptimizationDimension.ABI, OptimizationDimension.SCREEN_DENSITY),
             DEFAULT_METADATA);
 

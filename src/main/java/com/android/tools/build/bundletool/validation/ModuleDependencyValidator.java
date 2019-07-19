@@ -17,19 +17,16 @@
 package com.android.tools.build.bundletool.validation;
 
 import static com.android.tools.build.bundletool.model.BundleModuleName.BASE_MODULE_NAME;
-import static com.google.common.base.Preconditions.checkArgument;
+import static com.android.tools.build.bundletool.model.utils.ModuleDependenciesUtils.buildAdjacencyMap;
 
-import com.android.tools.build.bundletool.model.AndroidManifest;
 import com.android.tools.build.bundletool.model.BundleModule;
 import com.android.tools.build.bundletool.model.BundleModule.ModuleDeliveryType;
 import com.android.tools.build.bundletool.model.BundleModule.ModuleType;
 import com.android.tools.build.bundletool.model.exceptions.ValidationException;
-import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Multimap;
-import com.google.common.collect.Multimaps;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
@@ -65,46 +62,6 @@ public class ModuleDependencyValidator extends SubValidator {
     checkValidModuleDeliveryTypeDependencies(moduleDependenciesMap, modulesByName);
     checkMinSdkIsCompatibleWithDependencies(moduleDependenciesMap, modulesByName);
     checkNoDependenciesBetweenModulesOfDifferentTypes(moduleDependenciesMap, modulesByName);
-  }
-
-  /**
-   * Builds a map of module dependencies.
-   *
-   * <p>If module "a" contains {@code <uses-split name="b"/>} manifest entry, then the map contains
-   * entry ("a", "b").
-   *
-   * <p>All modules implicitly depend on the "base" module. Hence the map contains also dependency
-   * ("base", "base").
-   */
-  private static Multimap<String, String> buildAdjacencyMap(ImmutableList<BundleModule> modules) {
-    Multimap<String, String> moduleDependenciesMap = ArrayListMultimap.create();
-
-    for (BundleModule module : modules) {
-      String moduleName = module.getName().getName();
-      AndroidManifest manifest = module.getAndroidManifest();
-
-      checkArgument(
-          !moduleDependenciesMap.containsKey(moduleName),
-          "Module named '%s' was passed in multiple times.",
-          moduleName);
-
-      moduleDependenciesMap.putAll(moduleName, manifest.getUsesSplits());
-
-      // Check that module does not declare explicit dependency on the "base" module
-      // (whose split ID actually is empty instead of "base" anyway).
-      if (moduleDependenciesMap.containsEntry(moduleName, BASE_MODULE_NAME.getName())) {
-        throw ValidationException.builder()
-            .withMessage(
-                "Module '%s' declares dependency on the '%s' module, which is implicit.",
-                moduleName, BASE_MODULE_NAME)
-            .build();
-      }
-
-      // Add implicit dependency on the base. Also ensures that every module has a key in the map.
-      moduleDependenciesMap.put(moduleName, BASE_MODULE_NAME.getName());
-    }
-
-    return Multimaps.unmodifiableMultimap(moduleDependenciesMap);
   }
 
   private static void checkHasBaseModule(ImmutableList<BundleModule> modules) {
