@@ -247,7 +247,7 @@ final class BuildApksManager {
               command.getApkModifier().orElse(ApkModifier.NO_OP),
               command.getFirstVariantNumber().orElse(0));
       apkSerializerManager.populateApkSetBuilder(
-          generatedApks, generatedAssetSlices, command.getApkBuildMode(), deviceSpec);
+          generatedApks, generatedAssetSlices, command.getApkBuildMode(), deviceSpec, command.getDebuggable());
 
       if (command.getOverwriteOutput()) {
         Files.deleteIfExists(command.getOutputFile());

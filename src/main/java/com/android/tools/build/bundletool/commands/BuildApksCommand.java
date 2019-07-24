@@ -41,8 +41,6 @@ import com.android.tools.build.bundletool.model.exceptions.ValidationException;
 import com.android.tools.build.bundletool.model.utils.DefaultSystemEnvironmentProvider;
 import com.android.tools.build.bundletool.model.utils.SdkToolsLocator;
 import com.android.tools.build.bundletool.model.utils.SystemEnvironmentProvider;
-import com.android.tools.build.bundletool.splitters.DexCompressionSplitter;
-import com.android.tools.build.bundletool.splitters.NativeLibrariesCompressionSplitter;
 import com.google.auto.value.AutoValue;
 import com.google.common.base.Ascii;
 import com.google.common.base.Function;
@@ -92,6 +90,7 @@ public abstract class BuildApksCommand {
   private static final Flag<Path> BUNDLE_LOCATION_FLAG = Flag.path("bundle");
   private static final Flag<Path> OUTPUT_FILE_FLAG = Flag.path("output");
   private static final Flag<Boolean> OVERWRITE_OUTPUT_FLAG = Flag.booleanFlag("overwrite");
+  private static final Flag<Boolean> DEBUGGABLE_FLAG = Flag.booleanFlag("debuggable");
   private static final Flag<ImmutableSet<OptimizationDimension>> OPTIMIZE_FOR_FLAG =
       Flag.enumSet("optimize-for", OptimizationDimension.class);
   private static final Flag<Path> AAPT2_PATH_FLAG = Flag.path("aapt2");
@@ -122,6 +121,8 @@ public abstract class BuildApksCommand {
   public abstract Path getOutputFile();
 
   public abstract boolean getOverwriteOutput();
+
+  public abstract boolean getDebuggable();
 
   public abstract ImmutableSet<OptimizationDimension> getOptimizationDimensions();
 
@@ -165,6 +166,7 @@ public abstract class BuildApksCommand {
   public static Builder builder() {
     return new AutoValue_BuildApksCommand.Builder()
         .setOverwriteOutput(false)
+        .setDebuggable(false)
         .setApkBuildMode(DEFAULT)
         .setGenerateOnlyForConnectedDevice(false)
         .setCreateApkSetArchive(true)
@@ -187,6 +189,14 @@ public abstract class BuildApksCommand {
      * exception is thrown.
      */
     public abstract Builder setOverwriteOutput(boolean overwriteOutput);
+
+    /**
+     * Sets whether to make apks debuggable
+     *
+     * <p>The default is {@code false}.
+     * exception is thrown.
+     */
+    public abstract Builder setDebuggable(boolean overwriteOutput);
 
     /** List of config dimensions to split the APKs by. */
     @Deprecated // Use setBundleConfig() instead.
@@ -387,6 +397,7 @@ public abstract class BuildApksCommand {
 
     // Optional arguments.
     OVERWRITE_OUTPUT_FLAG.getValue(flags).ifPresent(buildApksCommand::setOverwriteOutput);
+    DEBUGGABLE_FLAG.getValue(flags).ifPresent(buildApksCommand::setDebuggable);
     AAPT2_PATH_FLAG
         .getValue(flags)
         .ifPresent(
