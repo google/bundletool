@@ -16,34 +16,7 @@
 
 package com.android.tools.build.bundletool.model;
 
-import static com.android.tools.build.bundletool.model.AndroidManifest.ACTIVITY_ELEMENT_NAME;
-import static com.android.tools.build.bundletool.model.AndroidManifest.ANDROID_NAMESPACE_URI;
-import static com.android.tools.build.bundletool.model.AndroidManifest.APPLICATION_ELEMENT_NAME;
-import static com.android.tools.build.bundletool.model.AndroidManifest.EXTRACT_NATIVE_LIBS_ATTRIBUTE_NAME;
-import static com.android.tools.build.bundletool.model.AndroidManifest.EXTRACT_NATIVE_LIBS_RESOURCE_ID;
-import static com.android.tools.build.bundletool.model.AndroidManifest.GL_ES_VERSION_RESOURCE_ID;
-import static com.android.tools.build.bundletool.model.AndroidManifest.GL_VERSION_ATTRIBUTE_NAME;
-import static com.android.tools.build.bundletool.model.AndroidManifest.HAS_CODE_RESOURCE_ID;
-import static com.android.tools.build.bundletool.model.AndroidManifest.IS_FEATURE_SPLIT_RESOURCE_ID;
-import static com.android.tools.build.bundletool.model.AndroidManifest.MAX_SDK_VERSION_ATTRIBUTE_NAME;
-import static com.android.tools.build.bundletool.model.AndroidManifest.MAX_SDK_VERSION_RESOURCE_ID;
-import static com.android.tools.build.bundletool.model.AndroidManifest.META_DATA_ELEMENT_NAME;
-import static com.android.tools.build.bundletool.model.AndroidManifest.META_DATA_KEY_FUSED_MODULE_NAMES;
-import static com.android.tools.build.bundletool.model.AndroidManifest.META_DATA_KEY_SPLITS_REQUIRED;
-import static com.android.tools.build.bundletool.model.AndroidManifest.MIN_SDK_VERSION_ATTRIBUTE_NAME;
-import static com.android.tools.build.bundletool.model.AndroidManifest.MIN_SDK_VERSION_RESOURCE_ID;
-import static com.android.tools.build.bundletool.model.AndroidManifest.NAME_RESOURCE_ID;
-import static com.android.tools.build.bundletool.model.AndroidManifest.NO_NAMESPACE_URI;
-import static com.android.tools.build.bundletool.model.AndroidManifest.PROVIDER_ELEMENT_NAME;
-import static com.android.tools.build.bundletool.model.AndroidManifest.RESOURCE_RESOURCE_ID;
-import static com.android.tools.build.bundletool.model.AndroidManifest.SERVICE_ELEMENT_NAME;
-import static com.android.tools.build.bundletool.model.AndroidManifest.SPLIT_NAME_RESOURCE_ID;
-import static com.android.tools.build.bundletool.model.AndroidManifest.SUPPORTS_GL_TEXTURE_ELEMENT_NAME;
-import static com.android.tools.build.bundletool.model.AndroidManifest.TARGET_SANDBOX_VERSION_RESOURCE_ID;
-import static com.android.tools.build.bundletool.model.AndroidManifest.USES_FEATURE_ELEMENT_NAME;
-import static com.android.tools.build.bundletool.model.AndroidManifest.USES_SDK_ELEMENT_NAME;
-import static com.android.tools.build.bundletool.model.AndroidManifest.VALUE_RESOURCE_ID;
-import static com.android.tools.build.bundletool.model.AndroidManifest.VERSION_CODE_RESOURCE_ID;
+import static com.android.tools.build.bundletool.model.AndroidManifest.*;
 import static com.android.tools.build.bundletool.model.utils.xmlproto.XmlProtoAttributeBuilder.createAndroidAttribute;
 import static com.google.common.collect.MoreCollectors.toOptional;
 import static java.util.stream.Collectors.joining;
@@ -289,6 +262,20 @@ public class ManifestEditor {
         .getOrCreateChildElement(USES_SDK_ELEMENT_NAME)
         .getOrCreateAndroidAttribute(attributeName, attributeResId)
         .setValueAsDecimalInteger(value);
+    return this;
+  }
+
+  /**
+   * Sets the 'android:debuggable' value in the {@code application} tag.
+   *
+   * <p>Note: the {@code application} tag is created if not found.
+   */
+  public ManifestEditor setDebuggable(boolean value) {
+    manifestElement
+            .getOrCreateChildElement(APPLICATION_ELEMENT_NAME)
+            .getOrCreateAndroidAttribute(
+                    DEBUGGABLE_ATTRIBUTE_NAME, DEBUGGABLE_RESOURCE_ID)
+            .setValueAsBoolean(value);
     return this;
   }
 

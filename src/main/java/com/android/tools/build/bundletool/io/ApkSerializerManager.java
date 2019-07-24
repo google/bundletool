@@ -37,17 +37,9 @@ import com.android.bundle.Targeting.VariantTargeting;
 import com.android.tools.build.bundletool.commands.BuildApksCommand.ApkBuildMode;
 import com.android.tools.build.bundletool.device.ApkMatcher;
 import com.android.tools.build.bundletool.io.ApkSetBuilderFactory.ApkSetBuilder;
-import com.android.tools.build.bundletool.model.ApkListener;
-import com.android.tools.build.bundletool.model.ApkModifier;
+import com.android.tools.build.bundletool.model.*;
 import com.android.tools.build.bundletool.model.ApkModifier.ApkDescription.ApkType;
-import com.android.tools.build.bundletool.model.AppBundle;
-import com.android.tools.build.bundletool.model.BundleModuleName;
-import com.android.tools.build.bundletool.model.GeneratedApks;
-import com.android.tools.build.bundletool.model.GeneratedAssetSlices;
-import com.android.tools.build.bundletool.model.ManifestDeliveryElement;
-import com.android.tools.build.bundletool.model.ModuleSplit;
 import com.android.tools.build.bundletool.model.ModuleSplit.SplitType;
-import com.android.tools.build.bundletool.model.VariantKey;
 import com.android.tools.build.bundletool.model.exceptions.CommandExecutionException;
 import com.android.tools.build.bundletool.model.utils.ConcurrencyUtils;
 import com.android.tools.build.bundletool.model.version.BundleToolVersion;
@@ -301,7 +293,8 @@ public class ApkSerializerManager {
     return moduleSplit
         .toBuilder()
         .setAndroidManifest(
-            apkModifier.modifyManifest(moduleSplit.getAndroidManifest(), apkDescription))
+            apkModifier.modifyManifest(moduleSplit.getAndroidManifest().applyMutators(ImmutableList.of(ManifestMutator.withDebuggable(true)))
+            , apkDescription))
         .build();
   }
 

@@ -27,6 +27,10 @@ public interface ManifestMutator extends Consumer<ManifestEditor> {
     return manifestEditor -> manifestEditor.setExtractNativeLibsValue(value);
   }
 
+  static ManifestMutator withDebuggable(boolean value) {
+    return manifestEditor -> manifestEditor.setDebuggable(value);
+  }
+
   static ManifestMutator withSplitsRequired(boolean value) {
     return manifestEditor -> manifestEditor.setSplitsRequired(value);
   }
