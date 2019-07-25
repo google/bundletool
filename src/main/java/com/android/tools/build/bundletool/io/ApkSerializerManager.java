@@ -85,7 +85,7 @@ public class ApkSerializerManager {
       GeneratedAssetSlices generatedAssetSlices,
       ApkBuildMode apkBuildMode,
       Optional<DeviceSpec> deviceSpec,
-      boolean debuggable) {
+      Optional<Boolean> debuggable) {
     ImmutableList<Variant> allVariantsWithTargeting =
         serializeApks(generatedApks, apkBuildMode, deviceSpec, debuggable);
     ImmutableList<AssetSlice> allAssetSlicesWithTargeting =
@@ -104,22 +104,22 @@ public class ApkSerializerManager {
 
   @VisibleForTesting
   ImmutableList<Variant> serializeApksForDevice(
-      GeneratedApks generatedApks, DeviceSpec deviceSpec, ApkBuildMode apkBuildMode, boolean debuggable) {
+      GeneratedApks generatedApks, DeviceSpec deviceSpec, ApkBuildMode apkBuildMode, Optional<Boolean> debuggable) {
     return serializeApks(generatedApks, apkBuildMode, Optional.of(deviceSpec), debuggable);
   }
 
   @VisibleForTesting
   ImmutableList<Variant> serializeApks(GeneratedApks generatedApks) {
-    return serializeApks(generatedApks, ApkBuildMode.DEFAULT, false);
+    return serializeApks(generatedApks, ApkBuildMode.DEFAULT, Optional.empty());
   }
 
   @VisibleForTesting
-  ImmutableList<Variant> serializeApks(GeneratedApks generatedApks, ApkBuildMode apkBuildMode, boolean debuggable) {
+  ImmutableList<Variant> serializeApks(GeneratedApks generatedApks, ApkBuildMode apkBuildMode, Optional<Boolean> debuggable) {
     return serializeApks(generatedApks, apkBuildMode, Optional.empty(), debuggable);
   }
 
   private ImmutableList<Variant> serializeApks(
-      GeneratedApks generatedApks, ApkBuildMode apkBuildMode, Optional<DeviceSpec> deviceSpec, boolean debuggable) {
+      GeneratedApks generatedApks, ApkBuildMode apkBuildMode, Optional<DeviceSpec> deviceSpec, Optional<Boolean> debuggable) {
     validateInput(generatedApks, apkBuildMode);
 
     // Running with system APK mode generates a fused APK and additional unmatched language splits.
@@ -278,7 +278,7 @@ public class ApkSerializerManager {
     }
   }
 
-  private ModuleSplit modifyApk(ModuleSplit moduleSplit, int variantNumber, boolean debuggable) {
+  private ModuleSplit modifyApk(ModuleSplit moduleSplit, int variantNumber, Optional<Boolean> debuggable) {
     ApkModifier.ApkDescription apkDescription =
         ApkModifier.ApkDescription.builder()
             .setBase(moduleSplit.isBaseModuleSplit())
@@ -291,12 +291,19 @@ public class ApkSerializerManager {
             .setApkTargeting(moduleSplit.getApkTargeting())
             .build();
 
-    return moduleSplit
-        .toBuilder()
-        .setAndroidManifest(
-            apkModifier.modifyManifest(moduleSplit.getAndroidManifest().applyMutators(ImmutableList.of(ManifestMutator.withDebuggable(debuggable)))
-            , apkDescription))
-        .build();
+    ModuleSplit.Builder builder = moduleSplit.toBuilder();
+
+    if (moduleSplit.isMasterSplit() && debuggable.isPresent()) {
+
+        builder.setAndroidManifest(
+              apkModifier.modifyManifest(
+                      moduleSplit.getAndroidManifest().applyMutators(ImmutableList.of(ManifestMutator.withDebuggable(debuggable.get())))
+                      , apkDescription));
+    } else {
+      builder.setAndroidManifest(moduleSplit.getAndroidManifest());
+    }
+
+    return builder.build();
   }
 
   private static ModuleSplit clearVariantTargeting(ModuleSplit moduleSplit) {

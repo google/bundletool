@@ -122,7 +122,7 @@ public abstract class BuildApksCommand {
 
   public abstract boolean getOverwriteOutput();
 
-  public abstract boolean getDebuggable();
+  public abstract Optional<Boolean> getDebuggable();
 
   public abstract ImmutableSet<OptimizationDimension> getOptimizationDimensions();
 
@@ -166,7 +166,6 @@ public abstract class BuildApksCommand {
   public static Builder builder() {
     return new AutoValue_BuildApksCommand.Builder()
         .setOverwriteOutput(false)
-        .setDebuggable(false)
         .setApkBuildMode(DEFAULT)
         .setGenerateOnlyForConnectedDevice(false)
         .setCreateApkSetArchive(true)
