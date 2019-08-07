@@ -16,7 +16,7 @@
 
 package com.android.tools.build.bundletool.splitters;
 
-import static com.android.tools.build.bundletool.model.BundleModule.RESOURCES_DIRECTORY;
+import static com.android.tools.build.bundletool.model.BundleModule.RESOURCES_DIRECTORIES;
 import static com.android.tools.build.bundletool.model.utils.ResourcesUtils.convertLocaleToLanguage;
 import static com.android.tools.build.bundletool.model.utils.ResourcesUtils.entries;
 import static com.google.common.collect.ImmutableList.toImmutableList;
@@ -30,12 +30,11 @@ import com.android.tools.build.bundletool.model.ModuleSplit;
 import com.android.tools.build.bundletool.model.ResourceTableEntry;
 import com.android.tools.build.bundletool.model.utils.ResourcesUtils;
 import com.google.common.base.Predicates;
-import com.google.common.collect.ImmutableCollection;
-import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableMap;
-import com.google.common.collect.ImmutableSet;
-import com.google.common.collect.Iterables;
+import com.google.common.collect.*;
+
+import java.util.Collection;
 import java.util.function.Predicate;
+import java.util.stream.Stream;
 
 /**
  * Splits the module resources by languages.
@@ -108,7 +107,9 @@ public class LanguageResourcesSplitter extends SplitterForOneTargetingDimension 
 
   private static boolean hasNonResourceEntries(ModuleSplit split) {
     return split.getEntries().stream()
-        .anyMatch(entry -> !entry.getPath().startsWith(RESOURCES_DIRECTORY));
+        .anyMatch(moduleEntry -> Stream.of(RESOURCES_DIRECTORIES)
+            .flatMap(Collection::stream)
+            .anyMatch(path -> !moduleEntry.getPath().startsWith(path)));
   }
 
   private static ImmutableList<ModuleEntry> getEntriesForSplit(
@@ -121,7 +122,9 @@ public class LanguageResourcesSplitter extends SplitterForOneTargetingDimension 
           // Add non-resource entries.
           .addAll(
               inputEntries.stream()
-                  .filter(entry -> !entry.getPath().startsWith(RESOURCES_DIRECTORY))
+                  .filter(entry -> Stream.of(RESOURCES_DIRECTORIES)
+                      .flatMap(Collection::stream)
+                      .anyMatch(path -> !entry.getPath().startsWith(path)))
                   .collect(toImmutableList()))
           .build();
     } else {

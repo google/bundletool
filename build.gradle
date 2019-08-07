@@ -41,7 +41,7 @@ dependencies {
     annotationProcessor "com.google.auto.value:auto-value:1.5.2"
     shadow "com.google.errorprone:error_prone_annotations:2.3.1"
     shadow "com.google.guava:guava:27.0.1-jre"
-    shadow "com.google.protobuf:protobuf-java:3.4.0"
+    shadow "com.google.protobuf:protobuf-java:3.6.1"
     shadow "com.google.protobuf:protobuf-java-util:3.4.0"
 
     compileWindows "com.android.tools.build:aapt2:3.5.0-alpha03-5252756:windows"
@@ -56,7 +56,7 @@ dependencies {
     testCompile "com.google.truth.extensions:truth-java8-extension:0.45"
     testCompile "com.google.truth.extensions:truth-proto-extension:0.45"
     testCompile "com.google.jimfs:jimfs:1.1"
-    testCompile "com.google.protobuf:protobuf-java:3.4.0"
+    testCompile "com.google.protobuf:protobuf-java:3.6.1"
     testCompile "com.google.protobuf:protobuf-java-util:3.4.0"
     testCompile "org.mockito:mockito-core:2.18.3"
     testCompile "junit:junit:4.12"

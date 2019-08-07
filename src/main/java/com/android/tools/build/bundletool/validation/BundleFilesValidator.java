@@ -24,6 +24,7 @@ import static com.android.tools.build.bundletool.model.BundleModule.LIB_DIRECTOR
 import static com.android.tools.build.bundletool.model.BundleModule.MANIFEST_DIRECTORY;
 import static com.android.tools.build.bundletool.model.BundleModule.MANIFEST_FILENAME;
 import static com.android.tools.build.bundletool.model.BundleModule.RESOURCES_DIRECTORY;
+import static com.android.tools.build.bundletool.model.BundleModule.RESOURCES_DIRECTORIES;
 import static com.android.tools.build.bundletool.model.BundleModule.ROOT_DIRECTORY;
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.collect.ImmutableList.toImmutableList;
@@ -129,6 +130,11 @@ public class BundleFilesValidator extends SubValidator {
       validateMultiAbiFileName(file);
 
     } else {
+      for (ZipPath dir : RESOURCES_DIRECTORIES) {
+        if(file.startsWith(dir)){
+          return;
+        }
+      }
       throw new UnknownFileOrDirectoryFoundInModuleException(file);
     }
   }

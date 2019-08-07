@@ -20,7 +20,7 @@ import static com.android.tools.build.bundletool.model.BundleModule.APEX_DIRECTO
 import static com.android.tools.build.bundletool.model.BundleModule.ASSETS_DIRECTORY;
 import static com.android.tools.build.bundletool.model.BundleModule.DEX_DIRECTORY;
 import static com.android.tools.build.bundletool.model.BundleModule.LIB_DIRECTORY;
-import static com.android.tools.build.bundletool.model.BundleModule.RESOURCES_DIRECTORY;
+import static com.android.tools.build.bundletool.model.BundleModule.RESOURCES_DIRECTORIES;
 import static com.android.tools.build.bundletool.model.BundleModule.ROOT_DIRECTORY;
 import static com.android.tools.build.bundletool.model.utils.ResourcesUtils.SCREEN_DENSITY_TO_PROTO_VALUE_MAP;
 import static com.android.tools.build.bundletool.model.utils.TargetingProtoUtils.lPlusVariantTargeting;
@@ -57,6 +57,9 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Multimap;
 import com.google.common.collect.Multimaps;
 import com.google.errorprone.annotations.Immutable;
+
+import javax.annotation.CheckReturnValue;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.StringJoiner;
@@ -321,7 +324,9 @@ public abstract class ModuleSplit {
       BundleModule bundleModule, VariantTargeting variantTargeting) {
     return fromFeatureBundleModule(
         bundleModule,
-        entry -> entry.getPath().startsWith(RESOURCES_DIRECTORY),
+        entry -> Stream.of(RESOURCES_DIRECTORIES)
+            .flatMap(Collection::stream)
+            .anyMatch(path -> entry.getPath().startsWith(path)),
         /* setResourceTable= */ true,
         variantTargeting);
   }

@@ -123,6 +123,7 @@ public class ScreenDensityResourcesSplitterTest {
     BundleModule testModule =
         new BundleModuleBuilder("testModule")
             .addFile("res/drawable/test.jpg")
+            .addFile("a/a/a.jpg")
             .setResourceTable(
                 resourceTable(
                     pkg(
@@ -136,7 +137,14 @@ public class ScreenDensityResourcesSplitterTest {
                                 "test",
                                 fileReference(
                                     "res/drawable/test.jpg",
-                                    Configuration.getDefaultInstance()))))))
+                                    Configuration.getDefaultInstance())),
+                            entry(
+                                0x01,
+                                "a",
+                                fileReference(
+                                    "a/a/a.jpg",
+                                    Configuration.getDefaultInstance()))
+                        ))))
             .setManifest(androidManifest("com.test.app"))
             .build();
 
@@ -147,7 +155,9 @@ public class ScreenDensityResourcesSplitterTest {
 
     ModuleSplit baseSplit = splits.iterator().next();
     assertThat(baseSplit.getResourceTable().get()).containsResource("com.test.app:drawable/test");
+    assertThat(baseSplit.getResourceTable().get()).containsResource("com.test.app:drawable/a");
     assertThat(baseSplit.findEntry("res/drawable/test.jpg")).isPresent();
+    assertThat(baseSplit.findEntry("a/a/a.jpg")).isPresent();
   }
 
   @Test
@@ -156,6 +166,8 @@ public class ScreenDensityResourcesSplitterTest {
         new BundleModuleBuilder("testModule")
             .addFile("res/drawable-mdpi/image.jpg")
             .addFile("res/drawable-hdpi/image.jpg")
+            .addFile("a/a/a.jpg")
+            .addFile("b/b/b.jpg")
             .setResourceTable(
                 new ResourceTableBuilder()
                     .addPackage("com.test.app")
@@ -166,6 +178,13 @@ public class ScreenDensityResourcesSplitterTest {
                             "res/drawable-ldpi/image.jpg",
                             MDPI_VALUE,
                             "res/drawable-mdpi/image.jpg"))
+                    .addDrawableResourceForMultipleDensities(
+                        "test",
+                        ImmutableMap.of(
+                            LDPI_VALUE,
+                            "a/a/a.jpg",
+                            MDPI_VALUE,
+                            "b/b/b.jpg"))
                     .build())
             .setManifest(androidManifest("com.test.app"))
             .build();
@@ -226,7 +245,14 @@ public class ScreenDensityResourcesSplitterTest {
                         "launcher_icon",
                         fileReference("res/mipmap-hdpi/launcher_icon.png", HDPI),
                         fileReference(
-                            "res/mipmap/launcher_icon.png", Configuration.getDefaultInstance()))),
+                            "res/mipmap/launcher_icon.png", Configuration.getDefaultInstance())),
+                    entry(
+                        0x02,
+                        "a",
+                        fileReference("a/a/a.png", HDPI),
+                        fileReference(
+                            "a/b/a.png", Configuration.getDefaultInstance()))
+                    ),
                 type(
                     0x02,
                     "drawable",
@@ -234,7 +260,15 @@ public class ScreenDensityResourcesSplitterTest {
                         0x01,
                         "image",
                         fileReference("res/drawable-hdpi/image.jpg", HDPI),
-                        fileReference("res/drawable-xhdpi/image.jpg", XHDPI)))));
+                        fileReference("res/drawable-xhdpi/image.jpg", XHDPI)),
+                    entry(
+                        0x02,
+                        "a",
+                        fileReference("b/a/a.jpg", HDPI),
+                        fileReference("b/b/a.jpg", XHDPI))
+                    )
+            )
+        );
 
     BundleModule testModule =
         new BundleModuleBuilder("testModule")
@@ -242,6 +276,10 @@ public class ScreenDensityResourcesSplitterTest {
             .addFile("res/mipmap-hdpi/launcher_icon.png")
             .addFile("res/drawable-hdpi/image.jpg")
             .addFile("res/drawable-xhdpi/image.jpg")
+            .addFile("a/a/a.jpg")
+            .addFile("a/b/a.jpg")
+            .addFile("b/a/a.jpg")
+            .addFile("b/b/a.jpg")
             .setResourceTable(table)
             .setManifest(androidManifest("com.test.app"))
             .build();
@@ -257,6 +295,11 @@ public class ScreenDensityResourcesSplitterTest {
           ResourceTable defaultResourceTable = defaultSplit.getResourceTable().get();
           assertThat(defaultResourceTable)
               .containsResource("com.test.app:mipmap/launcher_icon")
+              .withConfigSize(2)
+              .withDensity(DEFAULT_DENSITY_VALUE)
+              .withDensity(HDPI_VALUE);
+          assertThat(defaultResourceTable)
+              .containsResource("com.test.app:mipmap/a")
               .withConfigSize(2)
               .withDensity(DEFAULT_DENSITY_VALUE)
               .withDensity(HDPI_VALUE);
@@ -280,7 +323,10 @@ public class ScreenDensityResourcesSplitterTest {
         new ResourceTableBuilder()
                 .addPackage("com.test.app")
                 .addDrawableResourceForMultipleDensities(
-                    "image", ImmutableMap.of(MDPI_VALUE, "res/drawable-mdpi/image.jpg"))
+                    "image", ImmutableMap.of(
+                        MDPI_VALUE, "res/drawable-mdpi/image.jpg",
+                        HDPI_VALUE, "a/a/a.jpg"
+                    ))
                 .build()
                 .toBuilder()
                 .setSourcePool(sourcePool)
@@ -288,6 +334,7 @@ public class ScreenDensityResourcesSplitterTest {
     BundleModule testModule =
         new BundleModuleBuilder("testModule")
             .addFile("res/drawable-mdpi/test.jpg")
+            .addFile("a/a/a.jpg")
             .setResourceTable(table)
             .setManifest(androidManifest("com.test.app"))
             .build();
@@ -318,6 +365,17 @@ public class ScreenDensityResourcesSplitterTest {
                     .put(XXHDPI_VALUE, "res/drawable-xxhdpi/image.jpg")
                     .put(XXXHDPI_VALUE, "res/drawable-xxxhdpi/image.jpg")
                     .build())
+            .addDrawableResourceForMultipleDensities(
+                "a",
+                ImmutableMap.<Integer, String>builder()
+                    .put(LDPI_VALUE, "a/a/a.jpg")
+                    .put(MDPI_VALUE, "a/b/a.jpg")
+                    .put(TVDPI_VALUE, "a/c/a.jpg")
+                    .put(HDPI_VALUE, "a/d/a.jpg")
+                    .put(XHDPI_VALUE, "a/e/a.jpg")
+                    .put(XXHDPI_VALUE, "a/f/a.jpg")
+                    .put(XXXHDPI_VALUE, "a/g/a.jpg")
+                    .build())
             .build();
 
     BundleModule testModule =
@@ -329,6 +387,13 @@ public class ScreenDensityResourcesSplitterTest {
             .addFile("res/drawable-xhdpi/image.jpg")
             .addFile("res/drawable-xxhdpi/image.jpg")
             .addFile("res/drawable-xxxhdpi/image.jpg")
+            .addFile("a/a/a.jpg")
+            .addFile("a/b/a.jpg")
+            .addFile("a/c/a.jpg")
+            .addFile("a/d/a.jpg")
+            .addFile("a/e/a.jpg")
+            .addFile("a/f/a.jpg")
+            .addFile("a/g/a.jpg")
             .setResourceTable(table)
             .setManifest(androidManifest("com.test.app"))
             .build();
@@ -390,35 +455,56 @@ public class ScreenDensityResourcesSplitterTest {
           assertThat(splitResourceTable)
               .containsResource("com.test.app:drawable/image")
               .onlyWithConfigs(LDPI);
+          assertThat(splitResourceTable)
+              .containsResource("com.test.app:drawable/a")
+              .onlyWithConfigs(LDPI);
           break;
         case MDPI:
           assertThat(splitResourceTable)
               .containsResource("com.test.app:drawable/image")
+              .onlyWithConfigs(MDPI);
+          assertThat(splitResourceTable)
+              .containsResource("com.test.app:drawable/a")
               .onlyWithConfigs(MDPI);
           break;
         case TVDPI:
           assertThat(splitResourceTable)
               .containsResource("com.test.app:drawable/image")
               .onlyWithConfigs(TVDPI);
+          assertThat(splitResourceTable)
+              .containsResource("com.test.app:drawable/a")
+              .onlyWithConfigs(TVDPI);
           break;
         case HDPI:
           assertThat(splitResourceTable)
               .containsResource("com.test.app:drawable/image")
+              .onlyWithConfigs(HDPI);
+          assertThat(splitResourceTable)
+              .containsResource("com.test.app:drawable/a")
               .onlyWithConfigs(HDPI);
           break;
         case XHDPI:
           assertThat(splitResourceTable)
               .containsResource("com.test.app:drawable/image")
               .onlyWithConfigs(XHDPI);
+          assertThat(splitResourceTable)
+              .containsResource("com.test.app:drawable/a")
+              .onlyWithConfigs(XHDPI);
           break;
         case XXHDPI:
           assertThat(splitResourceTable)
               .containsResource("com.test.app:drawable/image")
               .onlyWithConfigs(XXHDPI);
+          assertThat(splitResourceTable)
+              .containsResource("com.test.app:drawable/a")
+              .onlyWithConfigs(XXHDPI);
           break;
         case XXXHDPI:
           assertThat(splitResourceTable)
               .containsResource("com.test.app:drawable/image")
+              .onlyWithConfigs(XXXHDPI);
+          assertThat(splitResourceTable)
+              .containsResource("com.test.app:drawable/a")
               .onlyWithConfigs(XXXHDPI);
           break;
         default:
@@ -442,12 +528,22 @@ public class ScreenDensityResourcesSplitterTest {
                         "image",
                         fileReference("res/drawable-xxhdpi/image.png", XXHDPI),
                         fileReference("res/drawable-560dpi/image.png", _560DPI),
-                        fileReference("res/drawable-xxxhdpi/image.png", XXXHDPI)))));
+                        fileReference("res/drawable-xxxhdpi/image.png", XXXHDPI)),
+                    entry(
+                        0x02,
+                        "a",
+                        fileReference("a/a/a.png", XXHDPI),
+                        fileReference("a/b/a.png", _560DPI),
+                        fileReference("a/c/a", XXXHDPI))
+                )));
     BundleModule module =
         new BundleModuleBuilder("base")
             .addFile("res/drawable-xxhdpi/image.png")
             .addFile("res/drawable-560dpi/image.png")
             .addFile("res/drawable-xxxhdpi/image.png")
+            .addFile("a/a/a.png")
+            .addFile("a/b/a.png")
+            .addFile("a/c/a.png")
             .setResourceTable(table)
             .setManifest(androidManifest("com.test.app"))
             .build();
@@ -464,6 +560,11 @@ public class ScreenDensityResourcesSplitterTest {
 
     assertThat(resourceTable)
         .containsResource("com.test.app:drawable/image")
+        .withConfigSize(2)
+        .withDensity(XXXHDPI_VALUE)
+        .withDensity(560);
+    assertThat(resourceTable)
+        .containsResource("com.test.app:drawable/a")
         .withConfigSize(2)
         .withDensity(XXXHDPI_VALUE)
         .withDensity(560);
@@ -495,13 +596,25 @@ public class ScreenDensityResourcesSplitterTest {
                         fileReference("res/drawable-mdpi/image.png", MDPI),
                         fileReference("res/drawable-512dpi/image.png", forDpi(512)),
                         fileReference("res/drawable-560dpi/image.png", _560DPI),
-                        fileReference("res/drawable-xxxhdpi/image.png", XXXHDPI)))));
+                        fileReference("res/drawable-xxxhdpi/image.png", XXXHDPI)),
+                    entry(
+                        0x02,
+                        "a",
+                        fileReference("a/a/a.png", MDPI),
+                        fileReference("a/b/a.png", forDpi(512)),
+                        fileReference("a/c/a.png", _560DPI),
+                        fileReference("a/d/a/image.png", XXXHDPI))
+                )));
     BundleModule module =
         new BundleModuleBuilder("base")
             .addFile("res/drawable-mdpi/image.png")
             .addFile("res/drawable-512dpi/image.png")
             .addFile("res/drawable-560dpi/image.png")
             .addFile("res/drawable-xxxhdpi/image.png")
+            .addFile("a/a/a.png")
+            .addFile("a/b/a.png")
+            .addFile("a/c/a.png")
+            .addFile("a/d/a.png")
             .setResourceTable(table)
             .setManifest(androidManifest("com.test.app"))
             .build();
@@ -528,6 +641,12 @@ public class ScreenDensityResourcesSplitterTest {
         .withDensity(XXXHDPI_VALUE)
         .withDensity(560)
         .withDensity(512);
+    assertThat(xxxHdpiResourceTable)
+        .containsResource("com.test.app:drawable/a")
+        .withConfigSize(3)
+        .withDensity(XXXHDPI_VALUE)
+        .withDensity(560)
+        .withDensity(512);
 
     ModuleSplit xxhdpiSplit =
         findModuleSplitWithScreenDensityTargeting(
@@ -537,6 +656,11 @@ public class ScreenDensityResourcesSplitterTest {
 
     assertThat(xxHdpiResourceTable)
         .containsResource("com.test.app:drawable/image")
+        .withConfigSize(2)
+        .withDensity(MDPI_VALUE)
+        .withDensity(512);
+    assertThat(xxHdpiResourceTable)
+        .containsResource("com.test.app:drawable/a")
         .withConfigSize(2)
         .withDensity(MDPI_VALUE)
         .withDensity(512);
@@ -557,7 +681,14 @@ public class ScreenDensityResourcesSplitterTest {
                         "launcher_icon",
                         fileReference("res/mipmap-hdpi/launcher_icon.png", HDPI),
                         fileReference(
-                            "res/mipmap/launcher_icon.png", Configuration.getDefaultInstance()))),
+                            "res/mipmap/launcher_icon.png", Configuration.getDefaultInstance())),
+                    entry(
+                        0x02,
+                        "a",
+                        fileReference("a/a/a.png", HDPI),
+                        fileReference(
+                            "a/b/a.png", Configuration.getDefaultInstance()))
+                ),
                 type(
                     0x02,
                     "drawable",
@@ -565,13 +696,23 @@ public class ScreenDensityResourcesSplitterTest {
                         0x01,
                         "title_image",
                         fileReference("res/drawable-hdpi/title_image.jpg", HDPI),
-                        fileReference("res/drawable-xhdpi/title_image.jpg", XHDPI)))));
+                        fileReference("res/drawable-xhdpi/title_image.jpg", XHDPI)),
+                    entry(
+                        0x02,
+                        "a",
+                        fileReference("b/a/a.jpg", HDPI),
+                        fileReference("b/b/a.jpg", XHDPI))
+                )));
     BundleModule testModule =
         new BundleModuleBuilder("testModule")
             .addFile("res/mipmap/launcher_icon.png")
             .addFile("res/mipmap-hdpi/launcher_icon.png")
             .addFile("res/drawable-hdpi/title_image.jpg")
             .addFile("res/drawable-xhdpi/title_image.jpg")
+            .addFile("a/a/a.jpg")
+            .addFile("a/b/a.jpg")
+            .addFile("b/a/a.jpg")
+            .addFile("b/b/a.jpg")
             .setResourceTable(table)
             .setManifest(androidManifest("com.test.app"))
             .build();
@@ -591,6 +732,11 @@ public class ScreenDensityResourcesSplitterTest {
               .withConfigSize(2)
               .withDensity(HDPI_VALUE)
               .withDensity(DEFAULT_DENSITY_VALUE);
+          assertThat(resourceTable)
+              .containsResource("com.test.app:mipmap/a")
+              .withConfigSize(2)
+              .withDensity(HDPI_VALUE)
+              .withDensity(DEFAULT_DENSITY_VALUE);
           assertThat(resourceTable).doesNotContainResource("com.test.app:drawable/title_image");
         });
 
@@ -603,6 +749,9 @@ public class ScreenDensityResourcesSplitterTest {
           assertThat(resourceTable).hasPackage("com.test.app").withNoType("mipmap");
           assertThat(resourceTable)
               .containsResource("com.test.app:drawable/title_image")
+              .withConfigSize(1);
+          assertThat(resourceTable)
+              .containsResource("com.test.app:drawable/a")
               .withConfigSize(1);
           assertThat(densitySplit.getApkTargeting().hasScreenDensityTargeting()).isTrue();
           switch (densitySplit
@@ -617,12 +766,18 @@ public class ScreenDensityResourcesSplitterTest {
               assertThat(resourceTable)
                   .containsResource("com.test.app:drawable/title_image")
                   .onlyWithConfigs(HDPI);
+              assertThat(resourceTable)
+                  .containsResource("com.test.app:drawable/a")
+                  .onlyWithConfigs(HDPI);
               break;
             case XHDPI:
             case XXHDPI:
             case XXXHDPI:
               assertThat(resourceTable)
                   .containsResource("com.test.app:drawable/title_image")
+                  .onlyWithConfigs(XHDPI);
+              assertThat(resourceTable)
+                  .containsResource("com.test.app:drawable/a")
                   .onlyWithConfigs(XHDPI);
               break;
             default:
@@ -646,11 +801,19 @@ public class ScreenDensityResourcesSplitterTest {
                         0x01,
                         "image",
                         fileReference("res/drawable/image.jpg", Configuration.getDefaultInstance()),
-                        fileReference("res/drawable-hdpi/image.jpg", HDPI)))));
+                        fileReference("res/drawable-hdpi/image.jpg", HDPI)),
+                    entry(
+                        0x02,
+                        "a",
+                        fileReference("a/a/a.jpg", Configuration.getDefaultInstance()),
+                        fileReference("a/b/a.jpg", HDPI))
+                )));
     BundleModule module =
         new BundleModuleBuilder("base")
             .addFile("res/drawable/image.jpg")
             .addFile("res/drawable-hdpi/image.jpg")
+            .addFile("a/a/a.jpg")
+            .addFile("a/b/a.jpg")
             .setResourceTable(table)
             .setManifest(androidManifest("com.test.app"))
             .build();
@@ -667,11 +830,17 @@ public class ScreenDensityResourcesSplitterTest {
     assertThat(mdpiSplit.getResourceTable().get())
         .containsResource("com.test.app:drawable/image")
         .onlyWithConfigs(Configuration.getDefaultInstance());
+    assertThat(mdpiSplit.getResourceTable().get())
+        .containsResource("com.test.app:drawable/a")
+        .onlyWithConfigs(Configuration.getDefaultInstance());
 
     // HDPI split: hdpi resource present.
     ModuleSplit hdpiSplit = findModuleSplitWithScreenDensityTargeting(splits, DensityAlias.HDPI);
     assertThat(hdpiSplit.getResourceTable().get())
         .containsResource("com.test.app:drawable/image")
+        .onlyWithConfigs(HDPI);
+    assertThat(hdpiSplit.getResourceTable().get())
+        .containsResource("com.test.app:drawable/a")
         .onlyWithConfigs(HDPI);
   }
 
@@ -690,11 +859,19 @@ public class ScreenDensityResourcesSplitterTest {
                         0x01,
                         "image",
                         fileReference("res/drawable/image.jpg", Configuration.getDefaultInstance()),
-                        fileReference("res/drawable-hdpi/image.jpg", HDPI)))));
+                        fileReference("res/drawable-hdpi/image.jpg", HDPI)),
+                    entry(
+                        0x02,
+                        "a",
+                        fileReference("a/a/a.jpg", Configuration.getDefaultInstance()),
+                        fileReference("a/b/a.jpg", HDPI))
+                )));
     BundleModule module =
         new BundleModuleBuilder("base")
             .addFile("res/drawable/image.jpg")
             .addFile("res/drawable-hdpi/image.jpg")
+            .addFile("a/a/a.jpg")
+            .addFile("a/b/a.jpg")
             .setResourceTable(table)
             .setManifest(androidManifest("com.test.app"))
             .build();
@@ -711,17 +888,26 @@ public class ScreenDensityResourcesSplitterTest {
     assertThat(masterSplit.getResourceTable().get())
         .containsResource("com.test.app:drawable/image")
         .onlyWithConfigs(Configuration.getDefaultInstance());
+    assertThat(masterSplit.getResourceTable().get())
+        .containsResource("com.test.app:drawable/a")
+        .onlyWithConfigs(Configuration.getDefaultInstance());
 
     // MDPI split: hdpi resource present.
     ModuleSplit mdpiSplit = findModuleSplitWithScreenDensityTargeting(splits, DensityAlias.MDPI);
     assertThat(mdpiSplit.getResourceTable().get())
         .containsResource("com.test.app:drawable/image")
         .onlyWithConfigs(HDPI);
+    assertThat(mdpiSplit.getResourceTable().get())
+        .containsResource("com.test.app:drawable/a")
+        .onlyWithConfigs(HDPI);
 
     // HDPI split: hdpi resource present.
     ModuleSplit hdpiSplit = findModuleSplitWithScreenDensityTargeting(splits, DensityAlias.HDPI);
     assertThat(hdpiSplit.getResourceTable().get())
         .containsResource("com.test.app:drawable/image")
+        .onlyWithConfigs(HDPI);
+    assertThat(hdpiSplit.getResourceTable().get())
+        .containsResource("com.test.app:drawable/a")
         .onlyWithConfigs(HDPI);
   }
 
@@ -739,10 +925,17 @@ public class ScreenDensityResourcesSplitterTest {
                         0x01,
                         "image",
                         fileReference(
-                            "res/drawable/image.jpg", Configuration.getDefaultInstance())))));
+                            "res/drawable/image.jpg", Configuration.getDefaultInstance())),
+                    entry(
+                        0x02,
+                        "a",
+                        fileReference(
+                            "a/a/a.jpg", Configuration.getDefaultInstance()))
+                )));
     BundleModule module =
         new BundleModuleBuilder("base")
             .addFile("res/drawable/image.jpg")
+            .addFile("a/a/a.jpg")
             .setResourceTable(table)
             .setManifest(androidManifest("com.test.app"))
             .build();
@@ -756,7 +949,11 @@ public class ScreenDensityResourcesSplitterTest {
     assertThat(masterSplit.getResourceTable().get())
         .containsResource("com.test.app:drawable/image")
         .onlyWithConfigs(Configuration.getDefaultInstance());
+    assertThat(masterSplit.getResourceTable().get())
+        .containsResource("com.test.app:drawable/a")
+        .onlyWithConfigs(Configuration.getDefaultInstance());
     assertThat(masterSplit.findEntry("res/drawable/image.jpg")).isPresent();
+    assertThat(masterSplit.findEntry("a/a/a.jpg")).isPresent();
   }
 
   /**
@@ -775,10 +972,13 @@ public class ScreenDensityResourcesSplitterTest {
                 type(
                     0x01,
                     "drawable",
-                    entry(0x01, "image", fileReference("res/drawable-hdpi/image.jpg", HDPI)))));
+                    entry(0x01, "image", fileReference("res/drawable-hdpi/image.jpg", HDPI)),
+                    entry(0x02, "a", fileReference("a/a/a.jpg", HDPI))
+                )));
     BundleModule module =
         new BundleModuleBuilder("base")
             .addFile("res/drawable-hdpi/image.jpg")
+            .addFile("a/a/a.jpg")
             .setResourceTable(table)
             .setManifest(androidManifest("com.test.app"))
             .build();
@@ -798,7 +998,11 @@ public class ScreenDensityResourcesSplitterTest {
       assertThat(masterSplit.getResourceTable().get())
           .containsResource("com.test.app:drawable/image")
           .onlyWithConfigs(HDPI);
+      assertThat(masterSplit.getResourceTable().get())
+          .containsResource("com.test.app:drawable/a")
+          .onlyWithConfigs(HDPI);
       assertThat(masterSplit.findEntry("res/drawable-hdpi/image.jpg")).isPresent();
+      assertThat(masterSplit.findEntry("a/a/a.jpg")).isPresent();
 
     } else {
       // 1 base + 7 config splits
@@ -808,6 +1012,8 @@ public class ScreenDensityResourcesSplitterTest {
       ModuleSplit masterSplit = findModuleSplitWithDefaultTargeting(splits);
       assertThat(masterSplit.getResourceTable().get())
           .doesNotContainResource("com.test.app:drawable/image");
+      assertThat(masterSplit.getResourceTable().get())
+          .doesNotContainResource("com.test.app:drawable/a");
 
       // The resource is present in all config splits.
       assertForNonDefaultSplits(
@@ -817,6 +1023,7 @@ public class ScreenDensityResourcesSplitterTest {
                 .containsResource("com.test.app:drawable/image")
                 .onlyWithConfigs(HDPI);
             assertThat(densitySplit.findEntry("res/drawable-hdpi/image.jpg")).isPresent();
+            assertThat(densitySplit.findEntry("a/a/a.jpg")).isPresent();
           });
     }
   }
@@ -827,6 +1034,7 @@ public class ScreenDensityResourcesSplitterTest {
     BundleModule testModule =
         new BundleModuleBuilder("testModule")
             .addFile("res/drawable/test.jpg")
+            .addFile("a/a/a.jpg")
             .setResourceTable(
                 resourceTable(
                     pkg(
@@ -840,7 +1048,14 @@ public class ScreenDensityResourcesSplitterTest {
                                 "test",
                                 fileReference(
                                     "res/drawable/test.jpg",
-                                    Configuration.getDefaultInstance()))))))
+                                    Configuration.getDefaultInstance())),
+                            entry(
+                                0x02,
+                                "a",
+                                fileReference(
+                                    "a/a/a.jpg",
+                                    Configuration.getDefaultInstance())))
+                        )))
             .setManifest(androidManifest("com.test.app"))
             .build();
 
@@ -858,6 +1073,8 @@ public class ScreenDensityResourcesSplitterTest {
         new BundleModuleBuilder("testModule")
             .addFile("res/drawable-mdpi/image.jpg")
             .addFile("res/drawable-hdpi/image.jpg")
+            .addFile("a/a/a.jpg")
+            .addFile("a/b/a.jpg")
             .setResourceTable(
                 new ResourceTableBuilder()
                     .addPackage("com.test.app")
@@ -867,7 +1084,16 @@ public class ScreenDensityResourcesSplitterTest {
                             MDPI_VALUE,
                             "res/drawable-ldpi/image.jpg",
                             HDPI_VALUE,
-                            "res/drawable-dpi/image.jpg"))
+                            "res/drawable-dpi/image.jpg"
+                        ))
+                    .addDrawableResourceForMultipleDensities(
+                        "a",
+                        ImmutableMap.of(
+                            MDPI_VALUE,
+                            "a/a/a.jpg",
+                            HDPI_VALUE,
+                            "a/b/a.jpg"
+                        ))
                     .build())
             .setManifest(androidManifest("com.test.app"))
             .build();
@@ -894,6 +1120,8 @@ public class ScreenDensityResourcesSplitterTest {
             .addFile("res/drawable-hdpi/image.jpg")
             .addFile("res/drawable-mdpi/image2.jpg")
             .addFile("res/drawable-hdpi/image2.jpg")
+            .addFile("a/a/a.jpg")
+            .addFile("a/b/a.jpg")
             .setResourceTable(
                 new ResourceTableBuilder()
                     .addPackage("com.test.app")
@@ -907,6 +1135,11 @@ public class ScreenDensityResourcesSplitterTest {
                         ImmutableMap.of(
                             /* mdpi */ 160, "res/drawable-mdpi/image2.jpg",
                             /* hdpi */ 240, "res/drawable-hdpi/image2.jpg"))
+                    .addDrawableResourceForMultipleDensities(
+                        "a",
+                        ImmutableMap.of(
+                            /* mdpi */ 160, "a/a/a.jpg",
+                            /* hdpi */ 240, "a/b/a.jpg"))
                     .build())
             .setManifest(androidManifest("com.test.app"))
             .build();
@@ -941,8 +1174,8 @@ public class ScreenDensityResourcesSplitterTest {
   public void lowestDensityConfigsPinnedToMaster() throws Exception {
     BundleModule testModule =
         new BundleModuleBuilder("testModule")
-            .addFile("res/drawable-mdpi/image.jpg")
-            .addFile("res/drawable-hdpi/image.jpg")
+            .addFile("a/a/a.jpg")
+            .addFile("a/b/a.jpg")
             .addFile("res/drawable-mdpi/image2.jpg")
             .addFile("res/drawable-hdpi/image2.jpg")
             .setResourceTable(
@@ -951,8 +1184,8 @@ public class ScreenDensityResourcesSplitterTest {
                     .addDrawableResourceForMultipleDensities(
                         "image",
                         ImmutableMap.of(
-                            /* mdpi */ 160, "res/drawable-mdpi/image.jpg",
-                            /* hdpi */ 240, "res/drawable-hdpi/image.jpg"))
+                            /* mdpi */ 160, "a/a/a.jpg",
+                            /* hdpi */ 240, "a/b/a.jpg"))
                     .addDrawableResourceForMultipleDensities(
                         "image2",
                         ImmutableMap.of(
@@ -976,14 +1209,14 @@ public class ScreenDensityResourcesSplitterTest {
     ModuleSplit masterSplit =
         densitySplits.stream().filter(split -> split.isMasterSplit()).collect(onlyElement());
     assertThat(extractPaths(masterSplit.getEntries()))
-        .containsExactly("res/drawable-mdpi/image.jpg");
+        .containsExactly("a/a/a.jpg");
 
     ImmutableList<ModuleSplit> configSplits =
         densitySplits.stream().filter(split -> !split.isMasterSplit()).collect(toImmutableList());
     assertThat(configSplits).isNotEmpty();
     for (ModuleSplit configSplit : configSplits) {
       assertThat(extractPaths(configSplit.getEntries()))
-          .doesNotContain("res/drawable-mdpi/image.jpg");
+          .doesNotContain("a/a/a.jpg");
     }
   }
 
@@ -998,6 +1231,8 @@ public class ScreenDensityResourcesSplitterTest {
             .addFile("res/drawable-xxhdpi/image.jpg")
             .addFile("res/drawable-xxhdpi-v21/image.jpg")
             .addFile("res/drawable-xxhdpi-v24/image.jpg")
+            .addFile("a/a21/a.jpg")
+            .addFile("a/a24/a.jpg")
             .setResourceTable(
                 new ResourceTableBuilder()
                     .addPackage("com.test.app")
@@ -1008,6 +1243,8 @@ public class ScreenDensityResourcesSplitterTest {
                             .put(mergeConfigs(LDPI), "res/drawable-ldpi/image.jpg")
                             .put(mergeConfigs(LDPI, sdk(21)), "res/drawable-ldpi-v21/image.jpg")
                             .put(mergeConfigs(LDPI, sdk(24)), "res/drawable-ldpi-v24/image.jpg")
+                            .put(mergeConfigs(MDPI, sdk(21)), "a/a21/a.jpg")
+                            .put(mergeConfigs(MDPI, sdk(24)), "a/a24/a.jpg")
                             .put(mergeConfigs(XXXHDPI), "res/drawable-xxhdpi/image.jpg")
                             .put(mergeConfigs(XXHDPI, sdk(21)), "res/drawable-xxhdpi-v21/image.jpg")
                             .put(mergeConfigs(XXHDPI, sdk(24)), "res/drawable-xxhdpi-v24/image.jpg")
@@ -1062,6 +1299,8 @@ public class ScreenDensityResourcesSplitterTest {
             .addFile("res/drawable-xhdpi/other.jpg")
             .addFile("res/drawable-xxhdpi/other.jpg")
             .addFile("res/drawable-xxxhdpi/other.jpg")
+            .addFile("a/a/a.jpg")
+            .addFile("a/b/a.jpg")
             .setResourceTable(
                 new ResourceTableBuilder()
                     .addPackage("com.test.app")
@@ -1081,6 +1320,11 @@ public class ScreenDensityResourcesSplitterTest {
                             .put(/* xxhdpi */ 480, "res/drawable-xxhdpi/other.jpg")
                             .put(/* xxxhdpi */ 640, "res/drawable-xxxhdpi/image.jpg")
                             .build())
+                    .addDrawableResourceForMultipleDensities(
+                        "a",
+                        ImmutableMap.of(
+                            /* ldpi */ 120, "a/a/a.jpg",
+                            /* xxxhdpi */ 640, "a/b/a.jpg"))
                     .build())
             .setManifest(androidManifest("com.test.app"))
             .build();
@@ -1109,12 +1353,16 @@ public class ScreenDensityResourcesSplitterTest {
           // Devices <= MDPI are covered by the LDPI config.
           assertThat(extractPaths(configSplit.getEntries()))
               .doesNotContain("res/drawable-xxxhdpi/image.jpg");
+          assertThat(extractPaths(configSplit.getEntries()))
+              .doesNotContain("a/b/a.jpg");
           break;
 
         default:
           // Devices > MDPI are covered by the XXXHDPI config.
           assertThat(extractPaths(configSplit.getEntries()))
               .contains("res/drawable-xxxhdpi/image.jpg");
+          assertThat(extractPaths(configSplit.getEntries()))
+              .contains("a/b/a.jpg");
       }
     }
   }

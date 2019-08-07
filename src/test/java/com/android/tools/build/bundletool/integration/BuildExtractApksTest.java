@@ -215,6 +215,8 @@ public class BuildExtractApksTest {
                 builder
                     .addFile("lib/x86/libsome.so")
                     .addFile("lib/x86_64/libsome.so")
+                    .addFile("a/a/a.jpg")
+                    .addFile("a/b/a.jpg")
                     .addFile("res/drawable-hdpi/image.jpg")
                     .addFile("res/drawable-xhdpi/image.jpg")
                     .setNativeConfig(
@@ -232,9 +234,12 @@ public class BuildExtractApksTest {
     return new ResourceTableBuilder()
         .addPackage("com.test.app")
         .addDrawableResourceForMultipleDensities(
-            "image",
+            "a",
             ImmutableMap.of(
-                240, "res/drawable-hdpi/image.jpg", 320, "res/drawable-xhdpi/image.jpg"))
+                240, "a/a/a.jpg", 320, "a/b/a.jpg"))
+        .addDrawableResourceForMultipleDensities(
+            "image",
+            ImmutableMap.of( 240, "res/drawable-hdpi/image.jpg", 320, "res/drawable-xhdpi/image.jpg"))
         .addStringResourceForMultipleLocales(
             "text", ImmutableMap.of(/* default locale */ "", "hello", "es", "hola"))
         .build();

@@ -19,6 +19,8 @@ package com.android.tools.build.bundletool.validation;
 import static com.google.common.collect.ImmutableSet.toImmutableSet;
 import static com.google.common.collect.Sets.difference;
 import static com.google.common.collect.Sets.newHashSet;
+import static com.android.tools.build.bundletool.model.BundleModule.RESOURCES_DIRECTORIES;
+import static com.android.tools.build.bundletool.model.BundleModule.RESOURCES_DIRECTORY;
 
 import com.android.aapt.Resources.ResourceTable;
 import com.android.tools.build.bundletool.model.BundleModule;
@@ -34,7 +36,12 @@ import com.android.tools.build.bundletool.model.utils.ResourcesUtils;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
+
+import java.util.Collection;
 import java.util.HashSet;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
+
 
 /**
  * Validates the resource table.
@@ -58,8 +65,12 @@ public class ResourceTableValidator extends SubValidator {
     String moduleName = module.getName().getName();
 
     ImmutableSet<ZipPath> resFiles =
-        module
-            .findEntriesUnderPath(BundleModule.RESOURCES_DIRECTORY)
+        Stream.of(RESOURCES_DIRECTORIES)
+            .flatMap(Collection::stream)
+            .filter(path -> path.getNameCount()>0)
+            .map(path -> module.findEntriesUnderPath(path)
+                .collect(Collectors.toSet())
+            ).flatMap(Collection::stream)
             .map(ModuleEntry::getPath)
             .collect(toImmutableSet());
 
@@ -69,11 +80,15 @@ public class ResourceTableValidator extends SubValidator {
 
     ImmutableSet<ZipPath> referencedFiles = ResourcesUtils.getAllFileReferences(resourceTable);
 
+    OUT:
     for (ZipPath referencedFile : referencedFiles) {
-      if (!referencedFile.startsWith(BundleModule.RESOURCES_DIRECTORY)) {
-        throw new ReferencesFileOutsideOfResException(
-            moduleName, referencedFile, BundleModule.RESOURCES_DIRECTORY);
+      for (ZipPath dir : RESOURCES_DIRECTORIES) {
+        if (referencedFile.startsWith(dir)) {
+          continue OUT;
+        }
       }
+      throw new ReferencesFileOutsideOfResException(
+          moduleName, referencedFile, RESOURCES_DIRECTORY);
     }
 
     ImmutableSet<ZipPath> nonReferencedFiles =

@@ -20,6 +20,7 @@ import static com.android.tools.build.bundletool.model.BundleModule.ASSETS_DIREC
 import static com.android.tools.build.bundletool.model.BundleModule.DEX_DIRECTORY;
 import static com.android.tools.build.bundletool.model.BundleModule.MANIFEST_FILENAME;
 import static com.android.tools.build.bundletool.model.BundleModule.ROOT_DIRECTORY;
+import static com.android.tools.build.bundletool.model.BundleModule.RESOURCES_DIRECTORIES;
 import static com.android.tools.build.bundletool.model.utils.files.FilePreconditions.checkFileDoesNotExist;
 import static com.android.tools.build.bundletool.model.utils.files.FilePreconditions.checkFileHasExtension;
 import static com.android.tools.build.bundletool.model.utils.files.FileUtils.createParentDirectories;
@@ -68,8 +69,10 @@ import java.nio.file.Paths;
 import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
 import java.security.SignatureException;
+import java.util.Collection;
 import java.util.Optional;
 import java.util.regex.Pattern;
+import java.util.stream.Stream;
 import java.util.zip.GZIPOutputStream;
 
 /** Serializes APKs to Proto or Binary format. */
@@ -104,7 +107,11 @@ final class ApkSerializerHelper {
       path ->
           path.startsWith("res")
               || path.equals(SpecialModuleEntry.RESOURCE_TABLE.getPath())
-              || path.equals(ZipPath.create(MANIFEST_FILENAME));
+              || path.equals(ZipPath.create(MANIFEST_FILENAME))
+              || Stream.of(RESOURCES_DIRECTORIES).flatMap(Collection::stream)
+                      .map(resDir-> path.startsWith(resDir.toString()))
+                      .filter(matched -> matched)
+                      .findAny().get();
 
   private static final String BUILT_BY = "BundleTool";
   private static final String CREATED_BY = BUILT_BY;

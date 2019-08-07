@@ -35,6 +35,7 @@ import com.android.tools.build.bundletool.io.ZipBuilder;
 import com.android.tools.build.bundletool.model.AppBundle;
 import com.android.tools.build.bundletool.model.BundleModule;
 import com.android.tools.build.bundletool.model.ZipPath;
+import com.android.tools.build.bundletool.testing.AppBundleFactory;
 import com.android.tools.build.bundletool.testing.BundleConfigBuilder;
 import com.google.common.collect.ImmutableList;
 import java.nio.file.Path;
@@ -46,11 +47,9 @@ import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
-import org.mockito.ArgumentCaptor;
-import org.mockito.InOrder;
-import org.mockito.Mock;
-import org.mockito.Mockito;
-import org.mockito.MockitoAnnotations;
+import org.mockito.*;
+import java.io.IOException;
+
 
 @RunWith(JUnit4.class)
 public class ValidatorRunnerTest {
@@ -192,5 +191,12 @@ public class ValidatorRunnerTest {
       verify(validator).validateModuleZipFile(eq(moduleZip));
       verifyNoMoreInteractions(validator);
     }
+  }
+
+  @Test
+  public void validateBundle_validateBundle_currentResourceDirectories() throws IOException {
+    AppBundle appBundle = AppBundleFactory.createCustomResourceDirsAppBundle();
+    new ValidatorRunner(AppBundleValidator.BUNDLE_SUB_VALIDATORS).validateBundle(appBundle);
+    new ValidatorRunner(BundleModulesValidator.MODULES_SUB_VALIDATORS).validateBundle(appBundle);
   }
 }

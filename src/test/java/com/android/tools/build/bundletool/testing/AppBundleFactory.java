@@ -112,4 +112,24 @@ public class AppBundleFactory {
                         withMaxSdkVersion(maxSdkVersion))))
         .build();
   }
+
+  public static AppBundle createCustomResourceDirsAppBundle() throws IOException {
+    return new AppBundleBuilder()
+        .addModule("base", builder ->
+            builder.addFile("a/a/a.jpg")
+                .addFile("b/b/b.jpg")
+                .setResourceTable(
+                    new ResourceTableBuilder()
+                        .addPackage("com.test.app")
+                        .addDrawableResourceForMultipleDensities(
+                            "image",
+                            ImmutableMap.of(
+                                LDPI_VALUE,
+                                "a/a/a.jpg",
+                                HDPI_VALUE,
+                                "b/b/b.jpg"))
+                        .build())
+                .setManifest(androidManifest("com.test.app")))
+        .build();
+  }
 }

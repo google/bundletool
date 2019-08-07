@@ -25,6 +25,7 @@ import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.collect.ImmutableMap.toImmutableMap;
 import static java.util.function.Function.identity;
 
+import com.android.aapt.Resources;
 import com.android.aapt.Resources.ResourceTable;
 import com.android.aapt.Resources.XmlNode;
 import com.android.bundle.Commands.DeliveryType;
@@ -47,8 +48,10 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.HashSet;
 import java.util.Optional;
 import java.util.function.Predicate;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 /**
@@ -70,6 +73,8 @@ public abstract class BundleModule {
   public static final ZipPath MANIFEST_DIRECTORY = ZipPath.create("manifest");
   public static final ZipPath RESOURCES_DIRECTORY = ZipPath.create("res");
   public static final ZipPath ROOT_DIRECTORY = ZipPath.create("root");
+  public static final HashSet<ZipPath> RESOURCES_DIRECTORIES =
+          new HashSet<>();
 
   /** The top-level directory of an App Bundle module that contains APEX image files. */
   public static final ZipPath APEX_DIRECTORY = ZipPath.create("apex");
@@ -360,7 +365,36 @@ public abstract class BundleModule {
       return this;
     }
 
-    public abstract BundleModule build();
+    abstract BundleModule autoBuild();
+
+    public BundleModule build() {
+      BundleModule bundleModule = autoBuild();
+      Resources.ResourceTable resourceTable =
+          bundleModule.getResourceTable().orElse(Resources.ResourceTable.getDefaultInstance());
+      resourceTable.getPackageList().forEach(pkg -> {
+        pkg.getTypeList().forEach(type -> {
+          type.getEntryList().forEach(entry -> {
+            RESOURCES_DIRECTORIES.addAll(
+                Stream.of(entry.getConfigValueList())
+                    .flatMap(Collection::stream)
+                    .map(Resources.ConfigValue::getValue)
+                    .map(Resources.Value::getItem)
+                    .map(Resources.Item::getFile)
+                    .map(Resources.FileReference::getPath)
+                    .map(path -> {
+                      String[] arr = path.split("/");
+                      if (arr.length > 0) {
+                        return ZipPath.create(arr[0]);
+                      }
+                      return null;
+                    })
+                    .collect(Collectors.toSet())
+            );
+          });
+        });
+      });
+      return bundleModule;
+    }
   }
 
   /**
