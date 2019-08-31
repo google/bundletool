@@ -3,6 +3,7 @@ import com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar
 buildscript {
     repositories {
         jcenter()
+        google()
         maven {
             url "https://plugins.gradle.org/m2/"
         }
@@ -32,7 +33,7 @@ configurations {
 
 // The repackaging rules are defined in the "shadowJar" task below.
 dependencies {
-    compile "com.android.tools:r8:1.4.93"
+    compile "com.android.tools:r8:1.5.68"
     compile "org.jetbrains.kotlinx:kotlinx-metadata-jvm:0.1.0"
     compile "com.android.tools.build:apkzlib:3.4.0-beta01"
     compile "com.android.tools.ddms:ddmlib:26.2.0"
