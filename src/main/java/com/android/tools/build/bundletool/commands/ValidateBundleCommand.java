@@ -102,10 +102,10 @@ public abstract class ValidateBundleCommand {
       printModuleSummary(moduleEntry.getValue());
     }
     if (!appBundle.getAssetModules().isEmpty()) {
-      System.out.printf("Remote asset modules:\n");
+      System.out.printf("Asset packs:\n");
       for (Entry<BundleModuleName, BundleModule> moduleEntry :
           appBundle.getAssetModules().entrySet()) {
-        System.out.printf("\tRemote asset module: %s\n", moduleEntry.getKey());
+        System.out.printf("\tAsset pack: %s\n", moduleEntry.getKey());
         printModuleSummary(moduleEntry.getValue());
       }
     }

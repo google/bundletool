@@ -77,6 +77,9 @@ public abstract class BundleModule {
   /** The file of an App Bundle module that contains the APEX manifest. */
   public static final ZipPath APEX_MANIFEST_PATH = ZipPath.create("root/apex_manifest.json");
 
+  /** The NOTICE file of an APEX Bundle module. */
+  public static final ZipPath APEX_NOTICE_PATH = ZipPath.create("assets/NOTICE.html.gz");
+
   /** Used to parse file names in the apex/ directory, for multi-Abi targeting. */
   public static final Splitter ABI_SPLITTER = Splitter.on(".").omitEmptyStrings();
 

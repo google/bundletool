@@ -23,7 +23,10 @@ import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.ImmutableSet.toImmutableSet;
 
+import com.android.bundle.Commands.AssetModuleMetadata;
+import com.android.bundle.Commands.AssetSliceSet;
 import com.android.bundle.Commands.BuildApksResult;
+import com.android.bundle.Commands.DeliveryType;
 import com.android.bundle.Devices.DeviceSpec;
 import com.android.tools.build.bundletool.commands.CommandHelp.CommandDescription;
 import com.android.tools.build.bundletool.commands.CommandHelp.FlagDescription;
@@ -52,6 +55,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Optional;
 import java.util.logging.Logger;
+import java.util.stream.Stream;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 
@@ -169,11 +173,22 @@ public abstract class ExtractApksCommand {
             .map(
                 modules ->
                     modules.contains(ALL_MODULES_SHORTCUT)
-                        ? toc.getVariantList().stream()
-                            .flatMap(variant -> variant.getApkSetList().stream())
-                            .map(apkSet -> apkSet.getModuleMetadata().getName())
+                        ? Stream.concat(
+                                toc.getVariantList().stream()
+                                    .flatMap(variant -> variant.getApkSetList().stream())
+                                    .map(apkSet -> apkSet.getModuleMetadata().getName()),
+                                toc.getAssetSliceSetList().stream()
+                                    .filter(
+                                        sliceSet ->
+                                            sliceSet
+                                                .getAssetModuleMetadata()
+                                                .getDeliveryType()
+                                                .equals(DeliveryType.INSTALL_TIME))
+                                    .map(AssetSliceSet::getAssetModuleMetadata)
+                                    .map(AssetModuleMetadata::getName))
                             .collect(toImmutableSet())
                         : modules);
+    validateAssetModules(toc, requestedModuleNames);
 
     ApkMatcher apkMatcher = new ApkMatcher(getDeviceSpec(), requestedModuleNames, getInstant());
     ImmutableList<ZipPath> matchedApks = apkMatcher.getMatchingApks(toc);
@@ -205,6 +220,33 @@ public abstract class ExtractApksCommand {
       checkFileExistsAndReadable(getApksArchivePath().resolve(FileNames.TABLE_OF_CONTENTS_FILE));
     } else {
       checkFileExistsAndReadable(getApksArchivePath());
+    }
+  }
+
+  /** Check that none of the requested modules is an asset module that is not install-time. */
+  private static void validateAssetModules(
+      BuildApksResult toc, Optional<ImmutableSet<String>> requestedModuleNames) {
+    if (requestedModuleNames.isPresent()) {
+      ImmutableList<String> requestedNonInstallTimeAssetModules =
+          toc.getAssetSliceSetList().stream()
+              .filter(
+                  sliceSet ->
+                      !sliceSet
+                          .getAssetModuleMetadata()
+                          .getDeliveryType()
+                          .equals(DeliveryType.INSTALL_TIME))
+              .map(AssetSliceSet::getAssetModuleMetadata)
+              .map(AssetModuleMetadata::getName)
+              .filter(requestedModuleNames.get()::contains)
+              .collect(toImmutableList());
+      if (!requestedNonInstallTimeAssetModules.isEmpty()) {
+        throw ValidationException.builder()
+            .withMessage(
+                String.format(
+                    "The following requested asset packs do not have install time delivery: %s.",
+                    requestedNonInstallTimeAssetModules))
+            .build();
+      }
     }
   }
 
@@ -295,10 +337,10 @@ public abstract class ExtractApksCommand {
                 .setExampleValue("base,module1,module2")
                 .setOptional(true)
                 .setDescription(
-                    "List of modules to be extracted, or \"%s\" for all modules. Defaults to "
-                        + "modules installed during the first install, i.e. not on-demand. Note "
-                        + "that the dependent modules will also be extracted. The value of this "
-                        + "flag is ignored if the device receives a standalone APK.",
+                    "List of modules to be extracted, or \"%s\" for all modules. "
+                        + "Defaults to modules installed during the first install, i.e. not "
+                        + "on-demand. Note that the dependent modules will also be extracted. The "
+                        + "value of this flag is ignored if the device receives a standalone APK.",
                     ALL_MODULES_SHORTCUT)
                 .build())
         .addFlag(

@@ -26,4 +26,4 @@ https://developer.android.com/studio/command-line/bundletool
 
 ## Releases
 
-Latest release: [0.10.2](https://github.com/google/bundletool/releases)
+Latest release: [0.10.3](https://github.com/google/bundletool/releases)

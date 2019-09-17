@@ -61,7 +61,7 @@ public class ModuleDependencyValidator extends SubValidator {
     checkInstantModuleDependencies(moduleDependenciesMap, modulesByName);
     checkValidModuleDeliveryTypeDependencies(moduleDependenciesMap, modulesByName);
     checkMinSdkIsCompatibleWithDependencies(moduleDependenciesMap, modulesByName);
-    checkNoDependenciesBetweenModulesOfDifferentTypes(moduleDependenciesMap, modulesByName);
+    checkAssetModulesHaveNoDependencies(moduleDependenciesMap, modulesByName);
   }
 
   private static void checkHasBaseModule(ImmutableList<BundleModule> modules) {
@@ -252,7 +252,7 @@ public class ModuleDependencyValidator extends SubValidator {
     }
   }
 
-  private static void checkNoDependenciesBetweenModulesOfDifferentTypes(
+  private static void checkAssetModulesHaveNoDependencies(
       Multimap<String, String> moduleDependenciesMap,
       ImmutableMap<String, BundleModule> modulesByName) {
     for (Entry<String, String> dependencyEntry : moduleDependenciesMap.entries()) {
@@ -260,10 +260,12 @@ public class ModuleDependencyValidator extends SubValidator {
       String moduleDepName = dependencyEntry.getValue();
       ModuleType moduleType = modulesByName.get(moduleName).getModuleType();
       ModuleType moduleDepType = modulesByName.get(moduleDepName).getModuleType();
-      if (!moduleDepName.equals(BASE_MODULE_NAME.getName()) && !moduleType.equals(moduleDepType)) {
+      if (!moduleDepName.equals(BASE_MODULE_NAME.getName())
+          && (moduleType.equals(ModuleType.ASSET_MODULE)
+              || moduleDepType.equals(ModuleType.ASSET_MODULE))) {
         throw ValidationException.builder()
             .withMessage(
-                "Module '%s' cannot depend on module '%s' because the module types are different.",
+                "Module '%s' cannot depend on module '%s' because one of them is an asset pack.",
                 moduleName, moduleDepName)
             .build();
       }

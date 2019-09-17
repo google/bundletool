@@ -32,6 +32,7 @@ import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.with
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withOnDemandAttribute;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withOnDemandDelivery;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withSplitId;
+import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withTargetSandboxVersion;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withTargetSdkVersion;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withVersionCode;
 import static com.google.common.truth.Truth.assertThat;
@@ -343,49 +344,6 @@ public class AndroidManifestValidatorTest {
   }
 
   @Test
-  public void onDemandAndInstantAttributeSetToTrue_throws() throws Exception {
-    BundleModule module =
-        new BundleModuleBuilder(FEATURE_MODULE_NAME)
-            .setManifest(
-                androidManifest(
-                    PKG_NAME,
-                    withOnDemandAttribute(true),
-                    withInstant(true),
-                    withFusingAttribute(true)))
-            .build();
-
-    ValidationException exception =
-        assertThrows(
-            ValidationException.class, () -> new AndroidManifestValidator().validateModule(module));
-    assertThat(exception)
-        .hasMessageThat()
-        .contains(
-            String.format(
-                "Feature module cannot be on-demand and 'instant' at the same time (module '%s').",
-                FEATURE_MODULE_NAME));
-  }
-
-  @Test
-  public void onDemandElementAndInstantAttributeSetToTrue_throws() throws Exception {
-    BundleModule module =
-        new BundleModuleBuilder(FEATURE_MODULE_NAME)
-            .setManifest(
-                androidManifest(
-                    PKG_NAME, withOnDemandDelivery(), withInstant(true), withFusingAttribute(true)))
-            .build();
-
-    ValidationException exception =
-        assertThrows(
-            ValidationException.class, () -> new AndroidManifestValidator().validateModule(module));
-    assertThat(exception)
-        .hasMessageThat()
-        .contains(
-            String.format(
-                "Feature module cannot be on-demand and 'instant' at the same time (module '%s').",
-                FEATURE_MODULE_NAME));
-  }
-
-  @Test
   public void onDemandSetToFalseAndInstantAttributeSetToTrue_ok() throws Exception {
     BundleModule module =
         new BundleModuleBuilder(FEATURE_MODULE_NAME)
@@ -434,26 +392,80 @@ public class AndroidManifestValidatorTest {
   }
 
   @Test
-  public void moduleConditionsSetAndInstantAttributeTrue_throws() throws Exception {
+  public void withCorrectTargetSandboxVersionCode_ok() throws Exception {
+    BundleModule module = baseModule(withTargetSandboxVersion(2));
+
+    new AndroidManifestValidator().validateAllModules(ImmutableList.of(module));
+  }
+
+  @Test
+  public void withHighTargetSandboxVersionCode_throws() throws Exception {
+    BundleModule module = baseModule(withTargetSandboxVersion(3));
+
+    ValidationException e =
+        assertThrows(
+            ValidationException.class,
+            () -> new AndroidManifestValidator().validateAllModules(ImmutableList.of(module)));
+
+    assertThat(e).hasMessageThat().contains("cannot have a value greater than 2, but found 3");
+  }
+
+  @Test
+  public void withMinSdkLowerThanBase_throws() throws Exception {
+    BundleModule base = baseModule(withMinSdkVersion(20));
     BundleModule module =
         new BundleModuleBuilder(FEATURE_MODULE_NAME)
-            .setManifest(
-                androidManifest(
-                    PKG_NAME,
-                    withFeatureCondition("com.android.feature"),
-                    withInstant(true),
-                    withFusingAttribute(true)))
+            .setManifest(androidManifest(PKG_NAME, withMinSdkVersion(19)))
             .build();
 
-    ValidationException exception =
+    ValidationException e =
         assertThrows(
-            ValidationException.class, () -> new AndroidManifestValidator().validateModule(module));
-    assertThat(exception)
+            ValidationException.class,
+            () ->
+                new AndroidManifestValidator().validateAllModules(ImmutableList.of(base, module)));
+
+    assertThat(e)
         .hasMessageThat()
         .contains(
-            String.format(
-                "The attribute 'instant' cannot be true for conditional module" + " (module '%s').",
-                FEATURE_MODULE_NAME));
+            "cannot have a minSdkVersion attribute with a value lower than the one from the base"
+                + " module");
+  }
+
+  @Test
+  public void withMinSdkEqualThanBase_ok() throws Exception {
+    BundleModule base = baseModule(withMinSdkVersion(20));
+    BundleModule module =
+        new BundleModuleBuilder(FEATURE_MODULE_NAME)
+            .setManifest(androidManifest(PKG_NAME, withMinSdkVersion(20)))
+            .build();
+
+    new AndroidManifestValidator().validateAllModules(ImmutableList.of(base, module));
+
+    // No exception thrown.
+  }
+
+  @Test
+  public void withMinSdkUndeclared_ok() throws Exception {
+    BundleModule base = baseModule(withMinSdkVersion(20));
+    BundleModule module =
+        new BundleModuleBuilder(FEATURE_MODULE_NAME).setManifest(androidManifest(PKG_NAME)).build();
+
+    new AndroidManifestValidator().validateAllModules(ImmutableList.of(base, module));
+
+    // No exception thrown.
+  }
+
+  @Test
+  public void withMinSdkHigherThanBase_ok() throws Exception {
+    BundleModule base = baseModule(withMinSdkVersion(20));
+    BundleModule module =
+        new BundleModuleBuilder(FEATURE_MODULE_NAME)
+            .setManifest(androidManifest(PKG_NAME, withMinSdkVersion(21)))
+            .build();
+
+    new AndroidManifestValidator().validateAllModules(ImmutableList.of(base, module));
+
+    // No exception thrown.
   }
 
   @Test
@@ -675,6 +687,26 @@ public class AndroidManifestValidatorTest {
     assertThat(exception)
         .hasMessageThat()
         .contains("App Bundle modules should have the same version code but found [2,3]");
+  }
+
+  @Test
+  public void bundleModules_differentTargetSandboxVersionCode_throws() throws Exception {
+    ImmutableList<BundleModule> bundleModules =
+        ImmutableList.of(
+            new BundleModuleBuilder(BASE_MODULE_NAME)
+                .setManifest(androidManifest("com.test", withTargetSandboxVersion(1)))
+                .build(),
+            new BundleModuleBuilder(FEATURE_MODULE_NAME)
+                .setManifest(androidManifest("com.test", withTargetSandboxVersion(2)))
+                .build());
+
+    ValidationException exception =
+        assertThrows(
+            ValidationException.class,
+            () -> new AndroidManifestValidator().validateAllModules(bundleModules));
+    assertThat(exception)
+        .hasMessageThat()
+        .contains("should have the same value across modules, but found [1,2]");
   }
 
   @Test

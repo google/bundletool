@@ -30,6 +30,7 @@ import static com.android.tools.build.bundletool.model.AndroidManifest.SERVICE_E
 import static com.android.tools.build.bundletool.model.AndroidManifest.SPLIT_NAME_ATTRIBUTE_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.SPLIT_NAME_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.TARGET_SANDBOX_VERSION_RESOURCE_ID;
+import static com.android.tools.build.bundletool.model.AndroidManifest.TARGET_SDK_VERSION_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.VALUE_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.VERSION_CODE_RESOURCE_ID;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifest;
@@ -144,6 +145,40 @@ public class ManifestEditorTest {
                         ANDROID_NAMESPACE_URI,
                         "minSdkVersion",
                         MIN_SDK_VERSION_RESOURCE_ID,
+                        123))));
+  }
+
+  @Test
+  public void setTargetSdkVersion_existingAttribute_adjusted() throws Exception {
+    AndroidManifest androidManifest =
+        AndroidManifest.create(
+            xmlNode(
+                xmlElement(
+                    "manifest",
+                    xmlNode(
+                        xmlElement(
+                            "uses-sdk",
+                            xmlDecimalIntegerAttribute(
+                                ANDROID_NAMESPACE_URI,
+                                "targetSdkVersion",
+                                TARGET_SDK_VERSION_RESOURCE_ID,
+                                1))))));
+
+    AndroidManifest editedManifest = androidManifest.toEditor().setTargetSdkVersion(123).save();
+
+    XmlNode editedManifestRoot = editedManifest.getManifestRoot().getProto();
+    assertThat(editedManifestRoot.hasElement()).isTrue();
+    XmlElement manifestElement = editedManifestRoot.getElement();
+    assertThat(manifestElement.getName()).isEqualTo("manifest");
+    assertThat(manifestElement.getChildList())
+        .containsExactly(
+            xmlNode(
+                xmlElement(
+                    "uses-sdk",
+                    xmlDecimalIntegerAttribute(
+                        ANDROID_NAMESPACE_URI,
+                        "targetSdkVersion",
+                        TARGET_SDK_VERSION_RESOURCE_ID,
                         123))));
   }
 

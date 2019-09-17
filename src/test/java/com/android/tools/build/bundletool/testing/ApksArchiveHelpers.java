@@ -46,6 +46,7 @@ import com.google.common.collect.ImmutableList;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Arrays;
+import java.util.stream.Stream;
 
 /** Helpers related to creating APKs archives in tests. */
 public final class ApksArchiveHelpers {
@@ -55,9 +56,7 @@ public final class ApksArchiveHelpers {
   public static Path createApksArchiveFile(BuildApksResult result, Path location) throws Exception {
     ZipBuilder archiveBuilder = new ZipBuilder();
 
-    result.getVariantList().stream()
-        .flatMap(variant -> variant.getApkSetList().stream())
-        .flatMap(apkSet -> apkSet.getApkDescriptionList().stream())
+    apkDescriptionStream(result)
         .forEach(
             apkDesc ->
                 archiveBuilder.addFileWithContent(ZipPath.create(apkDesc.getPath()), DUMMY_BYTES));
@@ -68,10 +67,7 @@ public final class ApksArchiveHelpers {
 
   public static Path createApksDirectory(BuildApksResult result, Path location) throws Exception {
     ImmutableList<ApkDescription> apkDescriptions =
-        result.getVariantList().stream()
-            .flatMap(variant -> variant.getApkSetList().stream())
-            .flatMap(apkSet -> apkSet.getApkDescriptionList().stream())
-            .collect(toImmutableList());
+        apkDescriptionStream(result).collect(toImmutableList());
 
     for (ApkDescription apkDescription : apkDescriptions) {
       Path apkPath = location.resolve(apkDescription.getPath());
@@ -263,5 +259,14 @@ public final class ApksArchiveHelpers {
                         .addFusedModuleName("base")
                         .setSystemApkType(SystemApkType.SYSTEM)))
         .build();
+  }
+
+  private static Stream<ApkDescription> apkDescriptionStream(BuildApksResult buildApksResult) {
+    return Stream.concat(
+        buildApksResult.getVariantList().stream()
+            .flatMap(variant -> variant.getApkSetList().stream())
+            .flatMap(apkSet -> apkSet.getApkDescriptionList().stream()),
+        buildApksResult.getAssetSliceSetList().stream()
+            .flatMap(assetSliceSet -> assetSliceSet.getApkDescriptionList().stream()));
   }
 }
