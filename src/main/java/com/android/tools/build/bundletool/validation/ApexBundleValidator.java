@@ -23,6 +23,7 @@ import static com.android.tools.build.bundletool.model.AbiName.X86_64;
 import static com.android.tools.build.bundletool.model.BundleModule.ABI_SPLITTER;
 import static com.android.tools.build.bundletool.model.BundleModule.APEX_DIRECTORY;
 import static com.android.tools.build.bundletool.model.BundleModule.APEX_MANIFEST_PATH;
+import static com.android.tools.build.bundletool.model.BundleModule.APEX_NOTICE_PATH;
 import static com.google.common.collect.ImmutableSet.toImmutableSet;
 
 import com.android.bundle.Files.ApexImages;
@@ -47,6 +48,9 @@ import java.util.Optional;
 
 /** Validates an APEX bundle. */
 public class ApexBundleValidator extends SubValidator {
+
+  private static final ImmutableList<ZipPath> ALLOWED_APEX_FILES_OUTSIDE_APEX_DIRECTORY =
+      ImmutableList.of(APEX_MANIFEST_PATH, APEX_NOTICE_PATH);
 
   // The bundle must contain a system image for at least one of each of these sets.
   private static final ImmutableSet<ImmutableSet<ImmutableSet<AbiName>>> REQUIRED_ONE_OF_ABI_SETS =
@@ -100,7 +104,7 @@ public class ApexBundleValidator extends SubValidator {
       if (path.startsWith(APEX_DIRECTORY)) {
         apexImagesBuilder.add(path.toString());
         apexFileNamesBuilder.add(path.getFileName().toString());
-      } else if (!path.equals(APEX_MANIFEST_PATH)) {
+      } else if (!ALLOWED_APEX_FILES_OUTSIDE_APEX_DIRECTORY.contains(path)) {
         throw ValidationException.builder()
             .withMessage("Unexpected file in APEX bundle: '%s'.", entry.getPath())
             .build();

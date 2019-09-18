@@ -315,15 +315,6 @@ public abstract class ManifestDeliveryElement {
     return fromManifestElement(manifestElement, "delivery", isFastFollowAllowed);
   }
 
-  /**
-   * Returns the instance of the delivery element for instant delivery if Android Manifest contains
-   * the <dist:instant-delivery> element.
-   */
-  public static Optional<ManifestDeliveryElement> instantFromManifestElement(
-      XmlProtoElement manifestElement, boolean isFastFollowAllowed) {
-    return fromManifestElement(manifestElement, "instant-delivery", isFastFollowAllowed);
-  }
-
   private static Optional<ManifestDeliveryElement> fromManifestElement(
       XmlProtoElement manifestElement, String deliveryTag, boolean isFastFollowAllowed) {
     return manifestElement
@@ -334,6 +325,15 @@ public abstract class ManifestDeliveryElement {
               validateDeliveryElement(elem, isFastFollowAllowed);
               return new AutoValue_ManifestDeliveryElement(elem, isFastFollowAllowed);
             });
+  }
+
+  /**
+   * Returns the instance of the delivery element for instant delivery if Android Manifest contains
+   * the <dist:instant-delivery> element.
+   */
+  public static Optional<ManifestDeliveryElement> instantFromManifestElement(
+      XmlProtoElement manifestElement, boolean isFastFollowAllowed) {
+    return fromManifestElement(manifestElement, "instant-delivery", isFastFollowAllowed);
   }
 
   @VisibleForTesting

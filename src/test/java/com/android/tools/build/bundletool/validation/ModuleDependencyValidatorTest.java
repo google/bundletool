@@ -494,7 +494,7 @@ public class ModuleDependencyValidatorTest {
   }
 
   @Test
-  public void validateAllModules_assetModuleDependsOnFeatureModule_throws() throws Exception {
+  public void validateAllModules_assetModuleHasDependency_throws() throws Exception {
     ImmutableList<BundleModule> allModules =
         ImmutableList.of(
             module("base", androidManifest(PKG_NAME)),
@@ -511,12 +511,12 @@ public class ModuleDependencyValidatorTest {
     assertThat(exception)
         .hasMessageThat()
         .contains(
-            "Module 'asset' cannot depend on module 'feature' because the module types are"
-                + " different.");
+            "Module 'asset' cannot depend on module 'feature' because one of them is an asset"
+                + " pack.");
   }
 
   @Test
-  public void validateAllModules_featureModuleDependsOnAssetModule_throws() throws Exception {
+  public void validateAllModules_assetModuleHasDependee_throws() throws Exception {
     ImmutableList<BundleModule> allModules =
         ImmutableList.of(
             module("base", androidManifest(PKG_NAME)),
@@ -532,8 +532,8 @@ public class ModuleDependencyValidatorTest {
     assertThat(exception)
         .hasMessageThat()
         .contains(
-            "Module 'feature' cannot depend on module 'asset' because the module types are"
-                + " different.");
+            "Module 'feature' cannot depend on module 'asset' because one of them is an asset"
+                + " pack.");
   }
 
   @Test

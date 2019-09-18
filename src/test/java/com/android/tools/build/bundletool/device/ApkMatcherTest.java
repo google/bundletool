@@ -63,6 +63,8 @@ import static com.google.common.truth.Truth.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.android.bundle.Commands.ApkSet;
+import com.android.bundle.Commands.AssetModuleMetadata;
+import com.android.bundle.Commands.AssetSliceSet;
 import com.android.bundle.Commands.BuildApksResult;
 import com.android.bundle.Commands.DeliveryType;
 import com.android.bundle.Commands.Variant;
@@ -1244,6 +1246,78 @@ public class ApkMatcherTest {
         .contains(
             "The app doesn't support ABI architectures of the device. Device ABIs: [mips], "
                 + "app ABIs: [arm64-v8a, x86]");
+  }
+
+  @Test
+  public void assetModuleMatch() {
+    String installTimeModule1 = "installtime_assetmodule1";
+    String installTimeModule2 = "installtime_assetmodule2";
+    String onDemandModule = "ondemand_assetmodule";
+    ZipPath installTimeMasterApk1 = ZipPath.create(installTimeModule1 + "-master.apk");
+    ZipPath installTimeEnApk1 = ZipPath.create(installTimeModule1 + "-en.apk");
+    ZipPath installTimeMasterApk2 = ZipPath.create(installTimeModule2 + "-master.apk");
+    ZipPath installTimeEnApk2 = ZipPath.create(installTimeModule2 + "-en.apk");
+    ZipPath onDemandMasterApk = ZipPath.create(onDemandModule + "-master.apk");
+    ZipPath baseApk = ZipPath.create("base-master.apk");
+    BuildApksResult buildApksResult =
+        BuildApksResult.newBuilder()
+            .setBundletool(
+                Bundletool.newBuilder()
+                    .setVersion(BundleToolVersion.getCurrentVersion().toString()))
+            .addVariant(
+                oneApkSplitApkVariant(
+                    variantSdkTargeting(sdkVersionFrom(21), ImmutableSet.of(sdkVersionFrom(1))),
+                    ApkTargeting.getDefaultInstance(),
+                    baseApk))
+            .addAssetSliceSet(
+                AssetSliceSet.newBuilder()
+                    .setAssetModuleMetadata(
+                        AssetModuleMetadata.newBuilder()
+                            .setName(installTimeModule1)
+                            .setDeliveryType(DeliveryType.INSTALL_TIME))
+                    .addApkDescription(
+                        splitApkDescription(
+                            ApkTargeting.getDefaultInstance(), installTimeMasterApk1))
+                    .addApkDescription(
+                        splitApkDescription(apkLanguageTargeting("en"), installTimeEnApk1)))
+            .addAssetSliceSet(
+                AssetSliceSet.newBuilder()
+                    .setAssetModuleMetadata(
+                        AssetModuleMetadata.newBuilder()
+                            .setName(installTimeModule2)
+                            .setDeliveryType(DeliveryType.INSTALL_TIME))
+                    .addApkDescription(
+                        splitApkDescription(
+                            ApkTargeting.getDefaultInstance(), installTimeMasterApk2))
+                    .addApkDescription(
+                        splitApkDescription(apkLanguageTargeting("en"), installTimeEnApk2)))
+            .addAssetSliceSet(
+                AssetSliceSet.newBuilder()
+                    .setAssetModuleMetadata(
+                        AssetModuleMetadata.newBuilder()
+                            .setName(onDemandModule)
+                            .setDeliveryType(DeliveryType.ON_DEMAND))
+                    .addApkDescription(
+                        splitApkDescription(ApkTargeting.getDefaultInstance(), onDemandMasterApk)))
+            .build();
+
+    DeviceSpec enDevice = lDeviceWithLocales("en");
+    assertThat(new ApkMatcher(enDevice).getMatchingApks(buildApksResult))
+        .containsExactly(
+            baseApk,
+            installTimeMasterApk1,
+            installTimeEnApk1,
+            installTimeMasterApk2,
+            installTimeEnApk2);
+
+    DeviceSpec esDevice = lDeviceWithLocales("fr");
+    assertThat(new ApkMatcher(esDevice).getMatchingApks(buildApksResult))
+        .containsExactly(baseApk, installTimeMasterApk1, installTimeMasterApk2);
+
+    assertThat(
+            new ApkMatcher(enDevice, Optional.of(ImmutableSet.of(installTimeModule1)), false)
+                .getMatchingApks(buildApksResult))
+        .containsExactly(baseApk, installTimeMasterApk1, installTimeEnApk1);
   }
 
   private static BuildApksResult buildApksResult(Variant... variants) {

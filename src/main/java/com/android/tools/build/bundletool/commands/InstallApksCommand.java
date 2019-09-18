@@ -233,10 +233,10 @@ public abstract class InstallApksCommand {
                 .setExampleValue("base,module1,module2")
                 .setOptional(true)
                 .setDescription(
-                    "List of modules to be installed, or \"%s\" for all modules. Defaults to "
-                        + "modules installed during first install, i.e. not on-demand. Note that "
-                        + "the dependent modules will also be installed. The value of this flag is "
-                        + "ignored if the device receives a standalone APK.",
+                    "List of modules to be installed, or \"%s\" for all modules. "
+                        + "Defaults to modules installed during the first install, i.e. not "
+                        + "on-demand. Note that the dependent modules will also be extracted. The "
+                        + "value of this flag is ignored if the device receives a standalone APK.",
                     ExtractApksCommand.ALL_MODULES_SHORTCUT)
                 .build())
         .build();

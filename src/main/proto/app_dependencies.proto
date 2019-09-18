@@ -6,42 +6,51 @@ option java_package = "com.android.bundle";
 
 // Lists the dependencies of an application.
 message AppDependencies {
-    // List of all the dependencies, direct and indirect.
-    repeated Library library = 1;
+  // List of all the dependencies, direct and indirect.
+  repeated Library library = 1;
 
-    // Dependencies of the libraries from the list above.
-    repeated LibraryDependencies library_dependencies = 2;
+  // Dependencies of the libraries from the list above.
+  repeated LibraryDependencies library_dependencies = 2;
 
-    // List of direct dependencies per bundle module.
-    repeated ModuleDependencies module_dependencies = 3;
+  // List of direct dependencies per bundle module.
+  repeated ModuleDependencies module_dependencies = 3;
 }
 
 // List of dependencies of a given library.
 message LibraryDependencies {
-    // Indices correspond to the pool of libraries defined in AppDependencies.
-    optional int32 library_index = 1;
-    repeated int32 library_dep_index = 2;
+  // Indices correspond to the pool of libraries defined in AppDependencies.
+  optional int32 library_index = 1;
+  repeated int32 library_dep_index = 2;
 }
 
 // Lists the dependencies of a given module.
 message ModuleDependencies {
-    optional string module_name = 1;
-    // Direct module dependencies.
-    // Index is from the pool of libraries defined in AppDependencies.
-    repeated int32 dependency_index = 2;
+  optional string module_name = 1;
+  // Direct module dependencies.
+  // Index is from the pool of libraries defined in AppDependencies.
+  repeated int32 dependency_index = 2;
 }
 
 message Library {
-    // Oneof allows for support of other library identification systems in the future.
-    oneof library_oneof {
-        MavenLibrary maven_library = 1;
-    }
+  // Oneof allows for support of other library identification systems in the
+  // future.
+  oneof library_oneof {
+    MavenLibrary maven_library = 1;
+  }
+
+  // This message contains various digests of the library contents.
+  message Digests {
+    // SHA256 hash value of the file contents.
+    optional bytes sha256 = 1;
+  }
+
+  optional Digests digests = 2;
 }
 
 message MavenLibrary {
-    optional string group_id = 1;
-    optional string artifact_id = 2;
-    optional string packaging = 3;
-    optional string classifier = 4;
-    optional string version = 5;
+  optional string group_id = 1;
+  optional string artifact_id = 2;
+  optional string packaging = 3;
+  optional string classifier = 4;
+  optional string version = 5;
 }

@@ -453,7 +453,7 @@ public abstract class ModuleSplit {
   public static ModuleSplit fromAssetBundleModule(BundleModule bundleModule) {
     checkArgument(
         bundleModule.getModuleType().equals(ModuleType.ASSET_MODULE),
-        "Expected an Asset Module, got %s",
+        "Expected an asset pack, got %s",
         bundleModule.getModuleType());
     ModuleSplit.Builder splitBuilder =
         ModuleSplit.builder()

@@ -59,6 +59,18 @@ public interface ModuleEntry {
    */
   ModuleEntry setCompression(boolean shouldCompress);
 
+  /**
+   * Creates and returns a new ModuleEntry, identical with the old one, but with a different path.
+   */
+  default ModuleEntry setPath(ZipPath newPath) {
+    return new DelegatingModuleEntry(this) {
+      @Override
+      public ZipPath getPath() {
+        return newPath;
+      }
+    };
+  }
+
   /** Checks whether the given entries are identical. */
   static boolean equal(ModuleEntry entry1, ModuleEntry entry2) {
     if (!entry1.getPath().equals(entry2.getPath())) {

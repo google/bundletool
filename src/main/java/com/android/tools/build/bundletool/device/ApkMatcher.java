@@ -23,6 +23,8 @@ import static com.google.common.collect.ImmutableSet.toImmutableSet;
 
 import com.android.bundle.Commands.ApkDescription;
 import com.android.bundle.Commands.ApkSet;
+import com.android.bundle.Commands.AssetModuleMetadata;
+import com.android.bundle.Commands.AssetSliceSet;
 import com.android.bundle.Commands.BuildApksResult;
 import com.android.bundle.Commands.DeliveryType;
 import com.android.bundle.Commands.ModuleMetadata;
@@ -96,10 +98,19 @@ public class ApkMatcher {
   public ImmutableList<ZipPath> getMatchingApks(BuildApksResult buildApksResult) {
     Optional<Variant> matchingVariant = variantMatcher.getMatchingVariant(buildApksResult);
 
-    return matchingVariant.isPresent()
-        ? getMatchingApksFromVariant(
-            matchingVariant.get(), Version.of(buildApksResult.getBundletool().getVersion()))
-        : ImmutableList.of();
+    if (matchingVariant.isPresent()) {
+      validateVariant(matchingVariant.get(), buildApksResult);
+    }
+
+    ImmutableList<ZipPath> variantApks =
+        matchingVariant.isPresent()
+            ? getMatchingApksFromVariant(
+                matchingVariant.get(), Version.of(buildApksResult.getBundletool().getVersion()))
+            : ImmutableList.of();
+
+    ImmutableList<ZipPath> assetModuleApks = getMatchingApksFromAssetModules(buildApksResult);
+
+    return ImmutableList.<ZipPath>builder().addAll(variantApks).addAll(assetModuleApks).build();
   }
 
   public ImmutableList<ZipPath> getMatchingApksFromVariant(Variant variant, Version bundleVersion) {
@@ -128,8 +139,6 @@ public class ApkMatcher {
 
   private Predicate<String> getModuleNameMatcher(Variant variant, Version bundleVersion) {
     if (requestedModuleNames.isPresent()) {
-      validateVariant(variant);
-
       ImmutableMultimap<String, String> moduleDependenciesMap = buildAdjacencyMap(variant);
 
       HashSet<String> dependencyModules = new HashSet<>(requestedModuleNames.get());
@@ -155,15 +164,19 @@ public class ApkMatcher {
     }
   }
 
-  private void validateVariant(Variant variant) {
+  private void validateVariant(Variant variant, BuildApksResult buildApksResult) {
     if (requestedModuleNames.isPresent()) {
-      Set<String> unknownModules =
-          Sets.difference(
-              requestedModuleNames.get(),
+      Set<String> availableModules =
+          Sets.union(
               variant.getApkSetList().stream()
                   .map(ApkSet::getModuleMetadata)
                   .map(ModuleMetadata::getName)
+                  .collect(toImmutableSet()),
+              buildApksResult.getAssetSliceSetList().stream()
+                  .map(AssetSliceSet::getAssetModuleMetadata)
+                  .map(AssetModuleMetadata::getName)
                   .collect(toImmutableSet()));
+      Set<String> unknownModules = Sets.difference(requestedModuleNames.get(), availableModules);
       if (!unknownModules.isEmpty()) {
         throw ValidationException.builder()
             .withMessage(
@@ -250,5 +263,43 @@ public class ApkMatcher {
   private <T> void checkCompatibleWithApkTargetingHelper(
       TargetingDimensionMatcher<T> matcher, ApkTargeting apkTargeting) {
     matcher.checkDeviceCompatible(matcher.getTargetingValue(apkTargeting));
+  }
+
+  private ImmutableList<ZipPath> getMatchingApksFromAssetModules(BuildApksResult buildApksResult) {
+    ImmutableList.Builder<ZipPath> matchedApksBuilder = ImmutableList.builder();
+
+    Predicate<String> assetModuleNameMatcher =
+        getInstallTimeAssetModuleNameMatcher(buildApksResult);
+
+    for (AssetSliceSet sliceSet : buildApksResult.getAssetSliceSetList()) {
+      String moduleName = sliceSet.getAssetModuleMetadata().getName();
+      for (ApkDescription apkDescription : sliceSet.getApkDescriptionList()) {
+        ApkTargeting apkTargeting = apkDescription.getTargeting();
+
+        checkCompatibleWithApkTargeting(apkTargeting);
+
+        if (matchesApk(apkTargeting, /*isSplit=*/ true, moduleName, assetModuleNameMatcher)) {
+          matchedApksBuilder.add(ZipPath.create(apkDescription.getPath()));
+        }
+      }
+    }
+    return matchedApksBuilder.build();
+  }
+
+  private Predicate<String> getInstallTimeAssetModuleNameMatcher(BuildApksResult buildApksResult) {
+    ImmutableSet<String> upfrontAssetModuleNames =
+        buildApksResult.getAssetSliceSetList().stream()
+            .filter(
+                sliceSet ->
+                    sliceSet
+                        .getAssetModuleMetadata()
+                        .getDeliveryType()
+                        .equals(DeliveryType.INSTALL_TIME))
+            .map(sliceSet -> sliceSet.getAssetModuleMetadata().getName())
+            .collect(toImmutableSet());
+
+    return requestedModuleNames.isPresent()
+        ? Sets.intersection(upfrontAssetModuleNames, requestedModuleNames.get())::contains
+        : upfrontAssetModuleNames::contains;
   }
 }

@@ -43,22 +43,27 @@ import com.android.tools.build.bundletool.model.exceptions.manifest.ManifestSdkT
 import com.android.tools.build.bundletool.model.exceptions.manifest.ManifestSdkTargetingException.MinSdkInvalidException;
 import com.android.tools.build.bundletool.model.exceptions.manifest.ManifestVersionCodeConflictException;
 import com.android.tools.build.bundletool.model.utils.xmlproto.XmlProtoAttribute;
+import com.google.common.base.Joiner;
 import com.google.common.collect.ImmutableCollection;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMultimap;
 import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.Iterables;
 import java.util.Optional;
 
 /** Validates {@code AndroidManifest.xml} file of each module. */
 public class AndroidManifestValidator extends SubValidator {
 
   private static final int UPFRONT_ASSET_PACK_MIN_SDK_VERSION = 21;
+  private static final Joiner COMMA_JOINER = Joiner.on(',');
 
   @Override
   public void validateAllModules(ImmutableList<BundleModule> modules) {
     validateSameVersionCode(modules);
     validateInstant(modules);
     validateNoVersionCodeInAssetModules(modules);
+    validateTargetSandboxVersion(modules);
+    validateMinSdk(modules);
   }
 
   public void validateSameVersionCode(ImmutableList<BundleModule> modules) {
@@ -76,7 +81,7 @@ public class AndroidManifestValidator extends SubValidator {
     }
   }
 
-  private void validateNoVersionCodeInAssetModules(ImmutableList<BundleModule> modules) {
+  private static void validateNoVersionCodeInAssetModules(ImmutableList<BundleModule> modules) {
     Optional<BundleModule> assetModuleWithVersionCode =
         modules.stream()
             .filter(
@@ -98,6 +103,56 @@ public class AndroidManifestValidator extends SubValidator {
     }
   }
 
+  void validateTargetSandboxVersion(ImmutableList<BundleModule> modules) {
+    ImmutableList<Integer> targetSandboxVersion =
+        modules.stream()
+            .map(BundleModule::getAndroidManifest)
+            .filter(manifest -> !manifest.getModuleType().equals(ModuleType.ASSET_MODULE))
+            .map(AndroidManifest::getTargetSandboxVersion)
+            .filter(Optional::isPresent)
+            .map(Optional::get)
+            .distinct()
+            .sorted()
+            .collect(toImmutableList());
+
+    if (targetSandboxVersion.size() > 1) {
+      throw ValidationException.builder()
+          .withMessage(
+              "The attribute 'targetSandboxVersion' should have the same value across modules, but "
+                  + "found [%s]",
+              COMMA_JOINER.join(targetSandboxVersion))
+          .build();
+    } else if (targetSandboxVersion.size() == 1
+        && Iterables.getOnlyElement(targetSandboxVersion) > 2) {
+      throw ValidationException.builder()
+          .withMessage(
+              "The attribute 'targetSandboxVersion' cannot have a value greater than 2, but found "
+                  + "%d",
+              Iterables.getOnlyElement(targetSandboxVersion))
+          .build();
+    }
+  }
+
+  private static void validateMinSdk(ImmutableList<BundleModule> modules) {
+    int baseMinSdk =
+        modules.stream()
+            .filter(BundleModule::isBaseModule)
+            .map(BundleModule::getAndroidManifest)
+            .mapToInt(AndroidManifest::getEffectiveMinSdkVersion)
+            .findFirst()
+            .orElseThrow(() -> new ValidationException("No base module found."));
+
+    if (modules.stream()
+        .filter(m -> m.getAndroidManifest().getMinSdkVersion().isPresent())
+        .anyMatch(m -> m.getAndroidManifest().getEffectiveMinSdkVersion() < baseMinSdk)) {
+      throw ValidationException.builder()
+          .withMessage(
+              "Modules cannot have a minSdkVersion attribute with a value lower than "
+                  + "the one from the base module.")
+          .build();
+    }
+  }
+
   @Override
   public void validateModule(BundleModule module) {
     validateInstant(module);
@@ -106,7 +161,6 @@ public class AndroidManifestValidator extends SubValidator {
     validateFusingConfig(module);
     validateMinMaxSdk(module);
     validateNumberOfDistinctSplitIds(module);
-    validateOnDemandIsInstantMutualExclusion(module);
     validateAssetModuleManifest(module);
     validateMinSdkCondition(module);
     validateNoConditionalTargetingInAssetModules(module);
@@ -127,7 +181,7 @@ public class AndroidManifestValidator extends SubValidator {
     }
   }
 
-  private void validateInstant(ImmutableList<BundleModule> modules) {
+  private static void validateInstant(ImmutableList<BundleModule> modules) {
     // If any module is 'instant' validate that 'base' is instant too.
     BundleModule baseModule =
         modules.stream()
@@ -145,7 +199,7 @@ public class AndroidManifestValidator extends SubValidator {
     }
   }
 
-  private void validateInstant(BundleModule module) {
+  private static void validateInstant(BundleModule module) {
     AndroidManifest manifest = module.getAndroidManifest();
     Optional<Boolean> isInstantModule = manifest.isInstantModule();
     if (isInstantModule.orElse(false)) {
@@ -158,7 +212,7 @@ public class AndroidManifestValidator extends SubValidator {
     }
   }
 
-  private void validateDeliverySettings(BundleModule module) {
+  private static void validateDeliverySettings(BundleModule module) {
 
     boolean deliveryTypeDeclared = module.getAndroidManifest().isDeliveryTypeDeclared();
     ModuleDeliveryType deliveryType = module.getDeliveryType();
@@ -193,7 +247,7 @@ public class AndroidManifestValidator extends SubValidator {
     }
   }
 
-  private void validateInstantDeliverySettings(BundleModule module) {
+  private static void validateInstantDeliverySettings(BundleModule module) {
     if (module.getAndroidManifest().getInstantManifestDeliveryElement().isPresent()
         && module.getAndroidManifest().getInstantAttribute().isPresent()) {
       throw ValidationException.builder()
@@ -205,28 +259,7 @@ public class AndroidManifestValidator extends SubValidator {
     }
   }
 
-  private void validateOnDemandIsInstantMutualExclusion(BundleModule module) {
-    boolean isInstant = module.getAndroidManifest().isInstantModule().orElse(false);
-
-    if (module.getDeliveryType().equals(NO_INITIAL_INSTALL)
-        && isInstant
-        && module.getModuleType().equals(ModuleType.FEATURE_MODULE)) {
-      throw ValidationException.builder()
-          .withMessage(
-              "Feature module cannot be on-demand and 'instant' at the same time (module '%s').",
-              module.getName())
-          .build();
-    }
-    if (module.getDeliveryType().equals(CONDITIONAL_INITIAL_INSTALL) && isInstant) {
-      throw ValidationException.builder()
-          .withMessage(
-              "The attribute 'instant' cannot be true for conditional module (module '%s').",
-              module.getName())
-          .build();
-    }
-  }
-
-  private void validateFusingConfig(BundleModule module) {
+  private static void validateFusingConfig(BundleModule module) {
     Optional<Boolean> isInstant = module.getAndroidManifest().isInstantModule();
     // Skip validations for instant modules. This is only relevant for Pre-L,
     // where instant apps are not available
@@ -248,7 +281,7 @@ public class AndroidManifestValidator extends SubValidator {
     }
   }
 
-  private void validateMinMaxSdk(BundleModule module) {
+  private static void validateMinMaxSdk(BundleModule module) {
     AndroidManifest manifest = module.getAndroidManifest();
     Optional<Integer> maxSdk = manifest.getMaxSdkVersion();
     Optional<Integer> minSdk = manifest.getMinSdkVersion();
@@ -272,7 +305,7 @@ public class AndroidManifestValidator extends SubValidator {
     }
   }
 
-  private void validateNumberOfDistinctSplitIds(BundleModule module) {
+  private static void validateNumberOfDistinctSplitIds(BundleModule module) {
     ImmutableSet<XmlProtoAttribute> splitIds =
         module
             .getAndroidManifest()
@@ -289,7 +322,7 @@ public class AndroidManifestValidator extends SubValidator {
     }
   }
 
-  private void validateAssetModuleManifest(BundleModule module) {
+  private static void validateAssetModuleManifest(BundleModule module) {
     ImmutableMultimap<String, String> allowedManifestElementChildren =
         ImmutableMultimap.of(DISTRIBUTION_NAMESPACE_URI, "module", NO_NAMESPACE_URI, "uses-split");
 
@@ -313,7 +346,7 @@ public class AndroidManifestValidator extends SubValidator {
   }
 
   /** Validates that if min-sdk condition is present it is >= than the effective minSdk version. */
-  private void validateMinSdkCondition(BundleModule module) {
+  private static void validateMinSdkCondition(BundleModule module) {
     int effectiveMinSdkVersion = module.getAndroidManifest().getEffectiveMinSdkVersion();
     Optional<Integer> minSdkCondition =
         module
@@ -332,7 +365,7 @@ public class AndroidManifestValidator extends SubValidator {
     }
   }
 
-  private void validateNoConditionalTargetingInAssetModules(BundleModule module) {
+  private static void validateNoConditionalTargetingInAssetModules(BundleModule module) {
     if (module.getModuleType().equals(ModuleType.ASSET_MODULE)
         && !module
             .getModuleMetadata()
@@ -346,7 +379,7 @@ public class AndroidManifestValidator extends SubValidator {
     }
   }
 
-  private void validateInstantAndPersistentDeliveryCombinationsForAssetModules(
+  private static void validateInstantAndPersistentDeliveryCombinationsForAssetModules(
       BundleModule module) {
     if (!module.getAndroidManifest().getModuleType().equals(ModuleType.ASSET_MODULE)
         || !module.isInstantModule()) {
