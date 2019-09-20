@@ -59,7 +59,6 @@ dependencies {
     testCompile "com.google.auto.value:auto-value-annotations:1.6.2"
     testAnnotationProcessor "com.google.auto.value:auto-value:1.6.2"
     testCompile "com.google.errorprone:error_prone_annotations:2.3.1"
-    testCompile "com.google.errorprone:error_prone_annotations:2.3.1"
     testCompile "com.google.guava:guava:27.0.1-jre"
     testCompile "com.google.truth.extensions:truth-java8-extension:0.45"
     testCompile "com.google.truth.extensions:truth-proto-extension:0.45"
