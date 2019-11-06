@@ -525,7 +525,7 @@ public abstract class BuildApksCommand {
     }
   }
 
-  private static Aapt2Command extractAapt2FromJar(Path tempDir) {
+  static Aapt2Command extractAapt2FromJar(Path tempDir) {
     return new SdkToolsLocator()
         .extractAapt2(tempDir)
         .map(Aapt2Command::createFromExecutablePath)

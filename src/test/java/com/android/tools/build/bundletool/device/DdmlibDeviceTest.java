@@ -95,4 +95,12 @@ public final class DdmlibDeviceTest {
 
     assertThat(extraArgsCaptor.getValue()).contains("-d");
   }
+
+  @Test
+  public void pathToUnixStringTest() {
+    Path path = Paths.get("/", "splits", "mysplits");
+    assertThat(DdmlibDevice.pathToUnixString(path)).isEqualTo("/splits/mysplits");
+    path = Paths.get("splits", "mysplits");
+    assertThat(DdmlibDevice.pathToUnixString(path)).isEqualTo("splits/mysplits");
+  }
 }

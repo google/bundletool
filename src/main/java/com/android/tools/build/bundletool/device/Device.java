@@ -26,6 +26,7 @@ import com.google.auto.value.AutoValue;
 import com.google.common.collect.ImmutableList;
 import com.google.errorprone.annotations.Immutable;
 import java.io.IOException;
+import java.io.PrintStream;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.Optional;
@@ -61,6 +62,8 @@ public abstract class Device {
 
   public abstract void installApks(ImmutableList<Path> apks, InstallOptions installOptions);
 
+  public abstract void pushApks(ImmutableList<Path> apks, PushOptions installOptions);
+
   /** Options related to APK installation. */
   @Immutable
   @AutoValue
@@ -89,6 +92,39 @@ public abstract class Device {
       public abstract Builder setTimeout(Duration timeout);
 
       public abstract InstallOptions build();
+    }
+  }
+
+  /** Options related to APK installation. */
+  @Immutable
+  @AutoValue
+  @AutoValue.CopyAnnotations
+  public abstract static class PushOptions {
+    public abstract Path getDestinationPath();
+
+//    public abstract PrintStream getPrintStream();
+
+    public abstract Duration getTimeout();
+
+    public abstract Optional<String> getPackageName();
+
+    public static Builder builder() {
+      return new AutoValue_Device_PushOptions.Builder()
+              .setTimeout(DEFAULT_ADB_TIMEOUT);
+    }
+
+    /** Builder for {@link InstallOptions}. */
+    @AutoValue.Builder
+    public abstract static class Builder {
+      public abstract Builder setDestinationPath(Path destinationPath);
+
+//      public abstract Builder setPrintStream(PrintStream printStream);
+
+      public abstract Builder setTimeout(Duration timeout);
+
+      public abstract Builder setPackageName(String packageName);
+
+      public abstract PushOptions build();
     }
   }
 }

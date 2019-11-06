@@ -54,8 +54,8 @@ public class ApksInstallerTest {
         assertThrows(
             CommandExecutionException.class,
             () ->
-                apksInstaller.installApks(
-                    ImmutableList.of(Paths.get("apkOne.apk")), DEFAULT_INSTALL_OPTIONS));
+                apksInstaller.run(device -> device.installApks(
+                    ImmutableList.of(Paths.get("apkOne.apk")), DEFAULT_INSTALL_OPTIONS)));
     assertThat(exception)
         .hasMessageThat()
         .contains("Expected to find one connected device, but found none.");
@@ -71,7 +71,7 @@ public class ApksInstallerTest {
     testAdbServer.init(Paths.get("/test/adb"));
     ApksInstaller apksInstaller = new ApksInstaller(testAdbServer);
 
-    apksInstaller.installApks(ImmutableList.of(Paths.get("apkOne.apk")), DEFAULT_INSTALL_OPTIONS);
+    apksInstaller.run(device -> device.installApks(ImmutableList.of(Paths.get("apkOne.apk")), DEFAULT_INSTALL_OPTIONS));
   }
 
   @Test
@@ -89,8 +89,8 @@ public class ApksInstallerTest {
         assertThrows(
             CommandExecutionException.class,
             () ->
-                apksInstaller.installApks(
-                    ImmutableList.of(Paths.get("apkOne.apk")), DEFAULT_INSTALL_OPTIONS));
+                apksInstaller.run(device -> device.installApks(
+                    ImmutableList.of(Paths.get("apkOne.apk")), DEFAULT_INSTALL_OPTIONS)));
     assertThat(exception)
         .hasMessageThat()
         .contains("Expected to find one connected device, but found 2.");
@@ -107,8 +107,8 @@ public class ApksInstallerTest {
         assertThrows(
             CommandExecutionException.class,
             () ->
-                apksInstaller.installApks(
-                    ImmutableList.of(Paths.get("apkOne.apk")), DEFAULT_INSTALL_OPTIONS, "device1"));
+                apksInstaller.run(device -> device.installApks(
+                    ImmutableList.of(Paths.get("apkOne.apk")), DEFAULT_INSTALL_OPTIONS), "device1"));
     assertThat(exception)
         .hasMessageThat()
         .contains("Expected to find one connected device with serial number 'device1'.");
@@ -126,8 +126,8 @@ public class ApksInstallerTest {
     testAdbServer.init(Paths.get("/test/adb"));
     ApksInstaller apksInstaller = new ApksInstaller(testAdbServer);
 
-    apksInstaller.installApks(
-        ImmutableList.of(Paths.get("apkOne.apk")), DEFAULT_INSTALL_OPTIONS, "device1");
+    apksInstaller.run(device -> device.installApks(
+        ImmutableList.of(Paths.get("apkOne.apk")), DEFAULT_INSTALL_OPTIONS), "device1");
   }
 
   @Test
@@ -154,8 +154,8 @@ public class ApksInstallerTest {
         assertThrows(
             InstallationException.class,
             () ->
-                apksInstaller.installApks(
-                    ImmutableList.of(Paths.get("apkOne.apk")), DEFAULT_INSTALL_OPTIONS, "device2"));
+                apksInstaller.run(device -> device.installApks(
+                    ImmutableList.of(Paths.get("apkOne.apk")), DEFAULT_INSTALL_OPTIONS), "device2"));
     assertThat(exception)
         .hasMessageThat()
         .contains("Enable USB debugging on the connected device.");
@@ -177,8 +177,8 @@ public class ApksInstallerTest {
           }
         });
 
-    apksInstaller.installApks(
+    apksInstaller.run(device -> device.installApks(
         ImmutableList.of(Paths.get("apkOne.apk")),
-        InstallOptions.builder().setAllowDowngrade(true).build());
+        InstallOptions.builder().setAllowDowngrade(true).build()));
   }
 }

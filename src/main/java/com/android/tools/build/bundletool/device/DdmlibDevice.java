@@ -18,20 +18,26 @@ package com.android.tools.build.bundletool.device;
 
 import static com.google.common.collect.ImmutableList.toImmutableList;
 
+import com.android.annotations.VisibleForTesting;
 import com.android.ddmlib.AdbCommandRejectedException;
 import com.android.ddmlib.IDevice;
 import com.android.ddmlib.IDevice.DeviceState;
 import com.android.ddmlib.IShellOutputReceiver;
 import com.android.ddmlib.InstallException;
+import com.android.ddmlib.MultiLineReceiver;
 import com.android.ddmlib.ShellCommandUnresponsiveException;
+import com.android.ddmlib.SyncException;
 import com.android.ddmlib.TimeoutException;
 import com.android.sdklib.AndroidVersion;
+import com.android.tools.build.bundletool.model.exceptions.CommandExecutionException;
 import com.android.tools.build.bundletool.model.exceptions.InstallationException;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
 import java.io.File;
 import java.io.IOException;
+import java.io.PrintStream;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 
@@ -123,5 +129,108 @@ public class DdmlibDevice extends Device {
           .withMessage("Installation of the app failed.")
           .build();
     }
+  }
+
+  @Override
+  public void pushApks(ImmutableList<Path> apks, PushOptions pushOptions) {
+    Path splitsPath = pushOptions.getDestinationPath();
+    RemoteCommandExecutor commandExecutor = new RemoteCommandExecutor(
+            this, pushOptions.getTimeout().toMillis(), System.err);
+    try {
+      if (!pushOptions.getDestinationPath().isAbsolute()) {
+        String packageName = pushOptions.getPackageName()
+                .orElseThrow(() ->
+                        new CommandExecutionException("PushOptions.packageName must be set for relative paths."));
+
+        Path remoteTmpPath = Paths.get("/data/local/tmp/", packageName);
+        commandExecutor.executeAndPrintCommand("run-as %s rm -rf \"%s\"", packageName, splitsPath);
+        commandExecutor.executeAndPrintCommand("run-as %s mkdir -p \"%s\"", packageName, splitsPath);
+        commandExecutor.executeAndPrintCommand("mkdir -p \"%s\"", remoteTmpPath);
+
+        for (Path path : apks) {
+          Path remoteTmpFilePath = remoteTmpPath.resolve(path.getFileName());
+          device.pushFile(
+                  path.toFile().getAbsolutePath(),
+                  pathToUnixString(remoteTmpFilePath)
+          );
+          commandExecutor.executeAndPrintCommand("run-as %s sh -c 'cat \"%s\" > \"%s\"'",
+                          packageName,
+                          remoteTmpFilePath,
+                          splitsPath.resolve(path.getFileName()));
+          commandExecutor.executeAndPrintCommand("rm \"%s\"", remoteTmpFilePath);
+          System.err.println(String.format("Pushed \"%s\"", pathToUnixString(splitsPath.resolve(path.getFileName()))));
+        }
+      } else {
+        commandExecutor.executeAndPrintCommand("rm -f \"%s\"/*.apk", splitsPath);
+        commandExecutor.executeAndPrintCommand("mkdir -p \"%s\"", splitsPath);
+        for (Path path : apks) {
+          device.pushFile(
+                  path.toFile().getAbsolutePath(),
+                  pathToUnixString(splitsPath.resolve(path.getFileName()))
+          );
+          System.err.println(String.format("Pushed \"%s\"", pathToUnixString(splitsPath.resolve(path.getFileName()))));
+        }
+      }
+    } catch (IOException | TimeoutException | SyncException | AdbCommandRejectedException | ShellCommandUnresponsiveException e) {
+      throw CommandExecutionException.builder()
+              .withCause(e)
+              .withMessage("Splits push failed.")
+              .build();
+    }
+  }
+
+  static class RemoteCommandExecutor {
+    private final Device device;
+    private final MultiLineReceiver receiver;
+    private final long timeout;
+    private final PrintStream out;
+    private String lastLine;
+
+    RemoteCommandExecutor(Device device, long timeout, PrintStream out) {
+      this.device = device;
+      this.timeout = timeout;
+      this.out = out;
+      this.receiver = new MultiLineReceiver() {
+        @Override
+        public void processNewLines(String[] lines) {
+          for (String line : lines) {
+            if (!line.isEmpty()) {
+              out.println("ADB >> " + line);
+              lastLine = line;
+            }
+          }
+        }
+
+        @Override
+        public boolean isCancelled() {
+          return false;
+        }
+      };
+    }
+
+    private void executeAndPrintCommand(
+            String commandFormat,
+            Object... args)
+            throws TimeoutException,
+            AdbCommandRejectedException,
+            ShellCommandUnresponsiveException,
+            IOException {
+      for (int i = 0; i < args.length; i++) {
+        if (args[i] instanceof Path) {
+          args[i] = pathToUnixString((Path) args[i]);
+        }
+      }
+      String command = String.format(commandFormat, args);
+      out.println("ADB << " + command);
+      device.executeShellCommand(command + " && echo OK", receiver, timeout, TimeUnit.MILLISECONDS);
+      if (!"OK".equals(lastLine)) {
+        throw new CommandExecutionException("ADB command failed.");
+      }
+    }
+  }
+
+  @VisibleForTesting
+  static String pathToUnixString(Path path) {
+    return path.toString().replace(File.separatorChar, '/');
   }
 }

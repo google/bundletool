@@ -26,6 +26,7 @@ import com.google.common.base.Predicates;
 import com.google.common.collect.ImmutableList;
 import java.nio.file.Path;
 import java.util.concurrent.TimeoutException;
+import java.util.function.Consumer;
 import java.util.function.Predicate;
 
 /** Responsible for installing the APKs. */
@@ -39,9 +40,9 @@ public class ApksInstaller {
   }
 
   /** Attempts to install the given APKs to the only connected device. */
-  public void installApks(ImmutableList<Path> apkPaths, InstallOptions installOptions) {
+  public void run(Consumer<Device> deviceAction) {
     try {
-      installApks(apkPaths, installOptions, Predicates.alwaysTrue());
+      run(deviceAction, Predicates.alwaysTrue());
     } catch (TooManyDevicesMatchedException e) {
       throw CommandExecutionException.builder()
           .withMessage("Expected to find one connected device, but found %d.", e.getMatchedNumber())
@@ -56,10 +57,9 @@ public class ApksInstaller {
   }
 
   /** Attempts to install the given APKs to a device with a given serial number. */
-  public void installApks(
-      ImmutableList<Path> apkPaths, InstallOptions installOptions, String deviceId) {
+  public void run(Consumer<Device> deviceAction, String deviceId) {
     try {
-      installApks(apkPaths, installOptions, device -> device.getSerialNumber().equals(deviceId));
+      run(deviceAction, device -> device.getSerialNumber().equals(deviceId));
     } catch (DeviceNotFoundException e) {
       throw CommandExecutionException.builder()
           .withMessage("Expected to find one connected device with serial number '%s'.", deviceId)
@@ -68,8 +68,7 @@ public class ApksInstaller {
     }
   }
 
-  private void installApks(
-      ImmutableList<Path> apkPaths, InstallOptions installOptions, Predicate<Device> deviceFilter) {
+  private void run(Consumer<Device> deviceAction, Predicate<Device> deviceFilter) {
     try {
       ImmutableList<Device> matchedDevices =
           adbServer.getDevices().stream().filter(deviceFilter).collect(toImmutableList());
@@ -79,7 +78,7 @@ public class ApksInstaller {
         throw new TooManyDevicesMatchedException(matchedDevices.size());
       }
 
-      installOnDevice(apkPaths, installOptions, matchedDevices.get(0));
+      deviceAction.accept(matchedDevices.get(0));
 
     } catch (TimeoutException e) {
       throw CommandExecutionException.builder()
@@ -87,10 +86,5 @@ public class ApksInstaller {
           .withMessage("Timed out while waiting for ADB.")
           .build();
     }
-  }
-
-  private void installOnDevice(
-      ImmutableList<Path> apkPaths, InstallOptions installOptions, Device device) {
-    device.installApks(apkPaths, installOptions);
   }
 }

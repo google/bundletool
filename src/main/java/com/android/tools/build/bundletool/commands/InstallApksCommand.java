@@ -27,11 +27,13 @@ import com.android.tools.build.bundletool.commands.CommandHelp.CommandDescriptio
 import com.android.tools.build.bundletool.commands.CommandHelp.FlagDescription;
 import com.android.tools.build.bundletool.device.AdbServer;
 import com.android.tools.build.bundletool.device.ApksInstaller;
+import com.android.tools.build.bundletool.device.Device;
 import com.android.tools.build.bundletool.device.Device.InstallOptions;
 import com.android.tools.build.bundletool.device.DeviceAnalyzer;
 import com.android.tools.build.bundletool.flags.Flag;
 import com.android.tools.build.bundletool.flags.ParsedFlags;
 import com.android.tools.build.bundletool.io.TempDirectory;
+import com.android.tools.build.bundletool.model.Aapt2Command;
 import com.android.tools.build.bundletool.model.exceptions.CommandExecutionException;
 import com.android.tools.build.bundletool.model.utils.DefaultSystemEnvironmentProvider;
 import com.android.tools.build.bundletool.model.utils.SdkToolsLocator;
@@ -54,6 +56,7 @@ public abstract class InstallApksCommand {
   private static final Flag<String> DEVICE_ID_FLAG = Flag.string("device-id");
   private static final Flag<ImmutableSet<String>> MODULES_FLAG = Flag.stringSet("modules");
   private static final Flag<Boolean> ALLOW_DOWNGRADE_FLAG = Flag.booleanFlag("allow-downgrade");
+  private static final Flag<Path> PUSH_SPLITS_FLAG = Flag.path("push-splits-to");
 
   private static final String ANDROID_SERIAL_VARIABLE = "ANDROID_SERIAL";
 
@@ -69,6 +72,8 @@ public abstract class InstallApksCommand {
   public abstract Optional<ImmutableSet<String>> getModules();
 
   public abstract boolean getAllowDowngrade();
+
+  public abstract Optional<Path> getPushSplitsPath();
 
   abstract AdbServer getAdbServer();
 
@@ -91,6 +96,8 @@ public abstract class InstallApksCommand {
 
     /** The caller is responsible for the lifecycle of the {@link AdbServer}. */
     public abstract Builder setAdbServer(AdbServer adbServer);
+
+    public abstract Builder setPushSplitsPath(Path pushSplitsPath);
 
     public abstract InstallApksCommand build();
   }
@@ -123,6 +130,7 @@ public abstract class InstallApksCommand {
 
     Optional<ImmutableSet<String>> modules = MODULES_FLAG.getValue(flags);
     Optional<Boolean> allowDowngrade = ALLOW_DOWNGRADE_FLAG.getValue(flags);
+    Optional<Path> pushSplits = PUSH_SPLITS_FLAG.getValue(flags);
 
     flags.checkNoUnknownFlags();
 
@@ -131,6 +139,7 @@ public abstract class InstallApksCommand {
     deviceSerialName.ifPresent(command::setDeviceId);
     modules.ifPresent(command::setModules);
     allowDowngrade.ifPresent(command::setAllowDowngrade);
+    pushSplits.ifPresent(command::setPushSplitsPath);
 
     return command.build();
   }
@@ -160,9 +169,42 @@ public abstract class InstallApksCommand {
           InstallOptions.builder().setAllowDowngrade(getAllowDowngrade()).build();
 
       if (getDeviceId().isPresent()) {
-        installer.installApks(extractedApks, installOptions, getDeviceId().get());
+        ImmutableList<Path> finalExtractedApks = extractedApks;
+        installer.run(device -> device.installApks(finalExtractedApks, installOptions), getDeviceId().get());
       } else {
-        installer.installApks(extractedApks, installOptions);
+        ImmutableList<Path> finalExtractedApks = extractedApks;
+        installer.run(device -> device.installApks(finalExtractedApks, installOptions));
+      }
+
+      if (getPushSplitsPath().isPresent()) {
+        extractApksCommand.setModules(ImmutableSet.of(ExtractApksCommand.ALL_MODULES_SHORTCUT));
+        extractedApks = extractApksCommand.build().execute(); //TODO add device spec for languages
+
+        Device.PushOptions.Builder pushOptions = Device.PushOptions.builder()
+                .setDestinationPath(getPushSplitsPath().get());
+
+        if (!getPushSplitsPath().get().isAbsolute()) {
+          Aapt2Command aapt2Command = BuildApksCommand.extractAapt2FromJar(tempDirectory.getPath());
+          Optional<String> packageName = extractedApks.stream()
+                  .filter(path -> "base-master.apk".equals(path.getFileName().toString()))
+                  .findFirst()
+                  .map(aapt2Command::getPackageNameFromApk);
+          if (packageName.isPresent()) {
+            pushOptions.setPackageName(packageName.get());
+          } else {
+            throw new CommandExecutionException("Unable to determine the package name of the base APK." +
+                    "You can try again with an absolute path for --push-splits-to, pointing" +
+                    "to a location that is writeable by the shell user, e.g. /sdcard/...");
+          }
+        }
+
+        if (getDeviceId().isPresent()) {
+          ImmutableList<Path> finalExtractedApks = extractedApks;
+          installer.run(device -> device.pushApks(finalExtractedApks, pushOptions.build()), getDeviceId().get());
+        } else {
+          ImmutableList<Path> finalExtractedApks = extractedApks;
+          installer.run(device -> device.pushApks(finalExtractedApks, pushOptions.build()));
+        }
       }
     }
   }
@@ -239,6 +281,19 @@ public abstract class InstallApksCommand {
                         + "value of this flag is ignored if the device receives a standalone APK.",
                     ExtractApksCommand.ALL_MODULES_SHORTCUT)
                 .build())
+        .addFlag(
+                FlagDescription.builder()
+                        .setFlagName(PUSH_SPLITS_FLAG.getName())
+                        .setExampleValue("mysplits")
+                        .setOptional(true)
+                        .setDescription(
+                                "If set, bundletool will also extract and push all splits (including "
+                                    + "on-demand) to the chosen location on the device. This is useful "
+                                    + "if you want to test split installation with FakeSplitInstallManager. "
+                                    + "For debuggable apps, you can use a relative path, which will resolve "
+                                    + "into the private application directory. If you use an absolute path, "
+                                    + "it must point to a location writable by the ADB user.")
+                        .build())
         .build();
   }
 }
