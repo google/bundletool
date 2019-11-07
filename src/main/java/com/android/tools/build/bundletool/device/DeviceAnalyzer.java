@@ -58,6 +58,7 @@ public class DeviceAnalyzer {
       int deviceDensity = device.getDensity();
       checkState(deviceDensity > 0, "Error retrieving device density. Please try again.");
       ImmutableList<String> deviceFeatures = device.getDeviceFeatures();
+      ImmutableList<String> glExtensions = device.getGlExtensions();
 
       ActivityManagerRunner activityManagerRunner = new ActivityManagerRunner(device);
       ImmutableList<String> deviceLocales = activityManagerRunner.getDeviceLocales();
@@ -78,6 +79,7 @@ public class DeviceAnalyzer {
           .addAllSupportedLocales(deviceLocales)
           .setScreenDensity(deviceDensity)
           .addAllDeviceFeatures(deviceFeatures)
+          .addAllGlExtensions(glExtensions)
           .build();
     } catch (TimeoutException e) {
       throw CommandExecutionException.builder()

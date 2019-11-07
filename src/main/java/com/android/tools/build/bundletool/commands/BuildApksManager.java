@@ -26,6 +26,7 @@ import static com.google.common.collect.ImmutableSet.toImmutableSet;
 
 import com.android.bundle.Config.BundleConfig;
 import com.android.bundle.Config.Compression;
+import com.android.bundle.Config.SuffixStripping;
 import com.android.bundle.Devices.DeviceSpec;
 import com.android.tools.build.bundletool.commands.BuildApksCommand.ApkBuildMode;
 import com.android.tools.build.bundletool.device.AdbServer;
@@ -43,10 +44,12 @@ import com.android.tools.build.bundletool.model.ApkListener;
 import com.android.tools.build.bundletool.model.ApkModifier;
 import com.android.tools.build.bundletool.model.AppBundle;
 import com.android.tools.build.bundletool.model.BundleModule;
+import com.android.tools.build.bundletool.model.BundleModule.ModuleDeliveryType;
 import com.android.tools.build.bundletool.model.BundleModuleName;
 import com.android.tools.build.bundletool.model.GeneratedApks;
 import com.android.tools.build.bundletool.model.GeneratedAssetSlices;
 import com.android.tools.build.bundletool.model.ModuleSplit;
+import com.android.tools.build.bundletool.model.OptimizationDimension;
 import com.android.tools.build.bundletool.model.SigningConfiguration;
 import com.android.tools.build.bundletool.model.exceptions.CommandExecutionException;
 import com.android.tools.build.bundletool.model.targeting.AlternativeVariantTargetingPopulator;
@@ -57,6 +60,7 @@ import com.android.tools.build.bundletool.model.version.BundleToolVersion;
 import com.android.tools.build.bundletool.model.version.Version;
 import com.android.tools.build.bundletool.optimizations.ApkOptimizations;
 import com.android.tools.build.bundletool.optimizations.OptimizationsMerger;
+import com.android.tools.build.bundletool.preprocessors.AppBundle64BitNativeLibrariesPreprocessor;
 import com.android.tools.build.bundletool.splitters.ApkGenerationConfiguration;
 import com.android.tools.build.bundletool.splitters.AssetSlicesGenerator;
 import com.android.tools.build.bundletool.splitters.ResourceAnalyzer;
@@ -64,6 +68,7 @@ import com.android.tools.build.bundletool.splitters.ShardedApksGenerator;
 import com.android.tools.build.bundletool.splitters.SplitApksGenerator;
 import com.android.tools.build.bundletool.validation.AppBundleValidator;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -71,6 +76,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Optional;
 import java.util.logging.Logger;
+import java.util.stream.Stream;
 import java.util.zip.ZipFile;
 
 /** Executes the "build-apks" command. */
@@ -124,18 +130,15 @@ final class BuildApksManager {
 
   private void executeWithZip(ZipFile bundleZip, Optional<DeviceSpec> deviceSpec)
       throws IOException {
-    AppBundleValidator bundleValidator = new AppBundleValidator();
+    AppBundleValidator bundleValidator = AppBundleValidator.create(command.getExtraValidators());
 
     bundleValidator.validateFile(bundleZip);
     AppBundle appBundle = AppBundle.buildFromZip(bundleZip);
     bundleValidator.validate(appBundle);
 
-    if (appBundle.has32BitRenderscriptCode()) {
-      printWarning(
-          "App Bundle contains 32-bit RenderScript bitcode file (.bc) which disables 64-bit "
-              + "support in Android. 64-bit native libraries won't be included in generated "
-              + "APKs.");
-    }
+    appBundle =
+        new AppBundle64BitNativeLibrariesPreprocessor(command.getOutputPrintStream())
+            .preprocess(appBundle);
 
     ImmutableSet<BundleModule> requestedModules =
         command.getModules().isEmpty()
@@ -175,7 +178,10 @@ final class BuildApksManager {
               ? modulesToFuse(appBundle.getFeatureModules().values().asList())
               : requestedModules.asList();
       generatedApksBuilder.setStandaloneApks(
-          new ShardedApksGenerator(tempDir, bundleVersion)
+          new ShardedApksGenerator(
+                  tempDir,
+                  bundleVersion,
+                  getSuffixStrippings(bundleConfig))
               .generateSplits(
                   modulesToFuse,
                   appBundle.getBundleMetadata(),
@@ -236,24 +242,25 @@ final class BuildApksManager {
   }
 
   private ImmutableList<ModuleSplit> generateStandaloneApks(Path tempDir, AppBundle appBundle) {
-    ImmutableList<BundleModule> allFeatureModules = appBundle.getFeatureModules().values().asList();
+    ImmutableList<BundleModule> allModules = getModulesForStandaloneApks(appBundle);
     Version bundleVersion = Version.of(appBundle.getBundleConfig().getBundletool().getVersion());
     ShardedApksGenerator shardedApksGenerator =
         new ShardedApksGenerator(
             tempDir,
             bundleVersion,
-            /* generate64BitShards= */ !appBundle.has32BitRenderscriptCode());
+            shouldStrip64BitLibrariesFromShards(appBundle),
+            getSuffixStrippings(appBundle.getBundleConfig()));
     return appBundle.isApex()
-        ? shardedApksGenerator.generateApexSplits(modulesToFuse(allFeatureModules))
+        ? shardedApksGenerator.generateApexSplits(modulesToFuse(allModules))
         : shardedApksGenerator.generateSplits(
-            modulesToFuse(allFeatureModules),
+            modulesToFuse(allModules),
             appBundle.getBundleMetadata(),
             getApkOptimizations(appBundle.getBundleConfig()));
   }
 
   private ImmutableList<ModuleSplit> generateAssetSlices(AppBundle appBundle) {
     ApkGenerationConfiguration assetSlicesGenerationConfiguration =
-        getAssetSliceGenerationConfiguration();
+        getAssetSliceGenerationConfiguration(appBundle.getBundleConfig());
     AssetSlicesGenerator assetSlicesGenerator =
         new AssetSlicesGenerator(appBundle, assetSlicesGenerationConfiguration);
     return assetSlicesGenerator.generateAssetSlices();
@@ -304,7 +311,8 @@ final class BuildApksManager {
     return new ShardedApksGenerator(
             tempDir,
             bundleVersion,
-            /* generate64BitShards= */ !appBundle.has32BitRenderscriptCode())
+            shouldStrip64BitLibrariesFromShards(appBundle),
+            getSuffixStrippings(appBundle.getBundleConfig()))
         .generateSystemSplits(
             /* modules= */ featureModules,
             /* modulesToFuse= */ modulesToFuse.stream()
@@ -319,10 +327,6 @@ final class BuildApksManager {
       GeneratedApks generatedApks, DeviceSpec deviceSpec) {
     ApkMatcher apkMatcher = new ApkMatcher(deviceSpec);
     generatedApks.getAllApksStream().forEach(apkMatcher::checkCompatibleWithApkTargeting);
-  }
-
-  private void printWarning(String message) {
-    command.getOutputPrintStream().ifPresent(out -> out.println("WARNING: " + message));
   }
 
   private DeviceSpec getDeviceSpecFromConnectedDevice() {
@@ -380,25 +384,31 @@ final class BuildApksManager {
                     installLocation.equals("auto") || installLocation.equals("preferExternal"))
             .orElse(false));
 
-    if (appBundle.has32BitRenderscriptCode()) {
-      apkGenerationConfiguration.setInclude64BitLibs(false);
-    }
-
     apkGenerationConfiguration.setMasterPinnedResources(appBundle.getMasterPinnedResources());
+
+    apkGenerationConfiguration.setSuffixStrippings(getSuffixStrippings(bundleConfig));
 
     return apkGenerationConfiguration;
   }
 
-  private ApkGenerationConfiguration getAssetSliceGenerationConfiguration() {
+  private static ApkGenerationConfiguration getAssetSliceGenerationConfiguration(
+      BundleConfig bundleConfig) {
     ApkOptimizations apkOptimizations = ApkOptimizations.getOptimizationsForAssetSlices();
 
     return ApkGenerationConfiguration.builder()
         .setOptimizationDimensions(apkOptimizations.getSplitDimensions())
+        .setSuffixStrippings(getSuffixStrippings(bundleConfig))
         .build();
   }
 
   private static ImmutableList<BundleModule> modulesToFuse(ImmutableList<BundleModule> modules) {
     return modules.stream().filter(BundleModule::isIncludedInFusing).collect(toImmutableList());
+  }
+
+  private static ImmutableMap<OptimizationDimension, SuffixStripping> getSuffixStrippings(
+      BundleConfig bundleConfig) {
+    return OptimizationsMerger.getSuffixStrippings(
+        bundleConfig.getOptimizations().getSplitsConfig().getSplitDimensionList());
   }
 
   private ApkOptimizations getApkOptimizations(BundleConfig bundleConfig) {
@@ -443,6 +453,24 @@ final class BuildApksManager {
         .map(BundleModuleName::create)
         .map(appBundle::getModule)
         .collect(toImmutableList());
+  }
+
+  private static ImmutableList<BundleModule> getModulesForStandaloneApks(AppBundle appBundle) {
+    return Stream.concat(
+            appBundle.getFeatureModules().values().stream(),
+            appBundle.getAssetModules().values().stream()
+                .filter(
+                    module ->
+                        module.getDeliveryType().equals(ModuleDeliveryType.ALWAYS_INITIAL_INSTALL)))
+        .collect(toImmutableList());
+  }
+
+  private static boolean shouldStrip64BitLibrariesFromShards(AppBundle appBundle) {
+    return appBundle
+        .getBundleConfig()
+        .getOptimizations()
+        .getStandaloneConfig()
+        .getStrip64BitLibraries();
   }
 
   private static class ApksToGenerate {

@@ -27,6 +27,7 @@ import com.android.bundle.Targeting.ScreenDensity;
 import com.android.bundle.Targeting.ScreenDensityTargeting;
 import com.android.bundle.Targeting.SdkVersion;
 import com.android.bundle.Targeting.SdkVersionTargeting;
+import com.android.bundle.Targeting.TextureCompressionFormat;
 import com.android.bundle.Targeting.VariantTargeting;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.MoreCollectors;
@@ -112,6 +113,31 @@ public final class TargetingProtoUtils {
     return ImmutableSet.<String>builder()
         .addAll(languageValues(targeting))
         .addAll(languageAlternatives(targeting))
+        .build();
+  }
+
+  /** Extracts Texture Compression Format values from the targeting. */
+  public static ImmutableSet<TextureCompressionFormat> textureCompressionFormatValues(
+      ApkTargeting targeting) {
+    return ImmutableSet.copyOf(targeting.getTextureCompressionFormatTargeting().getValueList());
+  }
+
+  /** Extracts Texture Compression Format alternatives from the targeting. */
+  public static ImmutableSet<TextureCompressionFormat> textureCompressionFormatAlternatives(
+      ApkTargeting targeting) {
+    return ImmutableSet.copyOf(
+        targeting.getTextureCompressionFormatTargeting().getAlternativesList());
+  }
+
+  /**
+   * Extracts targeted Texture Compression Format universe (values and alternatives) from the
+   * targeting.
+   */
+  public static ImmutableSet<TextureCompressionFormat> textureCompressionFormatUniverse(
+      ApkTargeting targeting) {
+    return ImmutableSet.<TextureCompressionFormat>builder()
+        .addAll(textureCompressionFormatValues(targeting))
+        .addAll(textureCompressionFormatAlternatives(targeting))
         .build();
   }
 

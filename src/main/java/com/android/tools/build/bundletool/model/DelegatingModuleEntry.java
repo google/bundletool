@@ -27,9 +27,9 @@ import java.io.InputStream;
  * functionality unchanged.
  */
 @Immutable
-public class DelegatingModuleEntry implements ModuleEntry {
+public class DelegatingModuleEntry extends ModuleEntry {
 
-  private final ModuleEntry delegate;
+  protected final ModuleEntry delegate;
 
   public DelegatingModuleEntry(ModuleEntry delegate) {
     this.delegate = delegate;
@@ -54,10 +54,5 @@ public class DelegatingModuleEntry implements ModuleEntry {
   @Override
   public boolean shouldCompress() {
     return delegate.shouldCompress();
-  }
-
-  @Override
-  public ModuleEntry setCompression(boolean shouldCompress) {
-    return delegate.setCompression(shouldCompress);
   }
 }

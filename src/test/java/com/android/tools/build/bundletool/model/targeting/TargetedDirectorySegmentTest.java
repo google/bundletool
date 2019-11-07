@@ -86,6 +86,19 @@ public class TargetedDirectorySegmentTest {
   }
 
   @Test
+  public void testTargeting_tcf_astc() {
+    TargetedDirectorySegment segment =
+        TargetedDirectorySegment.parse(ZipPath.create("test#tcf_astc"));
+    assertThat(segment.getName()).isEqualTo("test");
+    assertThat(segment.getTargetingDimension())
+        .hasValue(TargetingDimension.TEXTURE_COMPRESSION_FORMAT);
+    assertThat(segment.getTargeting())
+        .isEqualTo(
+            assetsDirectoryTargeting(
+                textureCompressionTargeting(TextureCompressionFormatAlias.ASTC)));
+  }
+
+  @Test
   public void testTargeting_tcf_atc() {
     TargetedDirectorySegment segment =
         TargetedDirectorySegment.parse(ZipPath.create("test#tcf_atc"));
@@ -161,6 +174,19 @@ public class TargetedDirectorySegmentTest {
         .isEqualTo(
             assetsDirectoryTargeting(
                 textureCompressionTargeting(TextureCompressionFormatAlias.ETC1_RGB8)));
+  }
+
+  @Test
+  public void testTargeting_tcf_etc2() {
+    TargetedDirectorySegment segment =
+        TargetedDirectorySegment.parse(ZipPath.create("test#tcf_etc2"));
+    assertThat(segment.getName()).isEqualTo("test");
+    assertThat(segment.getTargetingDimension())
+        .hasValue(TargetingDimension.TEXTURE_COMPRESSION_FORMAT);
+    assertThat(segment.getTargeting())
+        .isEqualTo(
+            assetsDirectoryTargeting(
+                textureCompressionTargeting(TextureCompressionFormatAlias.ETC2)));
   }
 
   @Test
@@ -255,5 +281,57 @@ public class TargetedDirectorySegmentTest {
     assertThrows(
         ValidationException.class,
         () -> TargetedDirectorySegment.parse(ZipPath.create("bad#lang_filo")));
+  }
+
+  @Test
+  public void testTargeting_nokey_toPathIdempotent() {
+    TargetedDirectorySegment segment = TargetedDirectorySegment.parse(ZipPath.create("test"));
+    assertThat(segment.toPathSegment()).isEqualTo("test");
+  }
+
+  @Test
+  public void testTargeting_openGl_toPathIdempotent() {
+    TargetedDirectorySegment segment =
+        TargetedDirectorySegment.parse(ZipPath.create("test#opengl_2.3"));
+    assertThat(segment.toPathSegment()).isEqualTo("test#opengl_2.3");
+  }
+
+  @Test
+  public void testTargeting_vulkan_toPathIdempotent() {
+    TargetedDirectorySegment segment =
+        TargetedDirectorySegment.parse(ZipPath.create("test#vulkan_2.3"));
+    assertThat(segment.toPathSegment()).isEqualTo("test#vulkan_2.3");
+  }
+
+  @Test
+  public void testTargeting_tcf_toPathIdempotent() {
+    TargetedDirectorySegment segment;
+    segment = TargetedDirectorySegment.parse(ZipPath.create("test#tcf_astc"));
+    assertThat(segment.toPathSegment()).isEqualTo("test#tcf_astc");
+    segment = TargetedDirectorySegment.parse(ZipPath.create("test#tcf_atc"));
+    assertThat(segment.toPathSegment()).isEqualTo("test#tcf_atc");
+    segment = TargetedDirectorySegment.parse(ZipPath.create("test#tcf_dxt1"));
+    assertThat(segment.toPathSegment()).isEqualTo("test#tcf_dxt1");
+    segment = TargetedDirectorySegment.parse(ZipPath.create("test#tcf_etc1"));
+    assertThat(segment.toPathSegment()).isEqualTo("test#tcf_etc1");
+    segment = TargetedDirectorySegment.parse(ZipPath.create("test#tcf_etc2"));
+    assertThat(segment.toPathSegment()).isEqualTo("test#tcf_etc2");
+    segment = TargetedDirectorySegment.parse(ZipPath.create("test#tcf_latc"));
+    assertThat(segment.toPathSegment()).isEqualTo("test#tcf_latc");
+    segment = TargetedDirectorySegment.parse(ZipPath.create("test#tcf_paletted"));
+    assertThat(segment.toPathSegment()).isEqualTo("test#tcf_paletted");
+    segment = TargetedDirectorySegment.parse(ZipPath.create("test#tcf_pvrtc"));
+    assertThat(segment.toPathSegment()).isEqualTo("test#tcf_pvrtc");
+    segment = TargetedDirectorySegment.parse(ZipPath.create("test#tcf_s3tc"));
+    assertThat(segment.toPathSegment()).isEqualTo("test#tcf_s3tc");
+    segment = TargetedDirectorySegment.parse(ZipPath.create("test#tcf_3dc"));
+    assertThat(segment.toPathSegment()).isEqualTo("test#tcf_3dc");
+  }
+
+  @Test
+  public void testTargeting_language_toPathIdempotent() {
+    TargetedDirectorySegment segment =
+        TargetedDirectorySegment.parse(ZipPath.create("test#lang_fr"));
+    assertThat(segment.toPathSegment()).isEqualTo("test#lang_fr");
   }
 }

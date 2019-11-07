@@ -19,7 +19,9 @@ import com.android.bundle.Targeting.TextureCompressionFormat;
 import com.android.bundle.Targeting.TextureCompressionFormat.TextureCompressionFormatAlias;
 import com.android.bundle.Targeting.TextureCompressionFormatTargeting;
 import com.google.common.collect.ImmutableBiMap;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import java.util.Optional;
 
 /** Utilities for Texture Compression Format support. */
 public final class TextureCompressionUtils {
@@ -27,6 +29,7 @@ public final class TextureCompressionUtils {
   public static final ImmutableBiMap<TextureCompressionFormatAlias, String>
       TEXTURE_COMPRESSION_FORMAT_TO_MANIFEST_VALUE =
           ImmutableBiMap.<TextureCompressionFormatAlias, String>builder()
+              .put(TextureCompressionFormatAlias.ASTC, "GL_KHR_texture_compression_astc_ldr")
               .put(TextureCompressionFormatAlias.ATC, "GL_AMD_compressed_ATC_texture")
               .put(TextureCompressionFormatAlias.DXT1, "GL_EXT_texture_compression_dxt1")
               .put(TextureCompressionFormatAlias.ETC1_RGB8, "GL_OES_compressed_ETC1_RGB8_texture")
@@ -39,15 +42,50 @@ public final class TextureCompressionUtils {
 
   public static final ImmutableMap<String, TextureCompressionFormatTargeting> TEXTURE_TO_TARGETING =
       new ImmutableMap.Builder<String, TextureCompressionFormatTargeting>()
+          .put("astc", textureCompressionFormat(TextureCompressionFormatAlias.ASTC))
           .put("atc", textureCompressionFormat(TextureCompressionFormatAlias.ATC))
           .put("dxt1", textureCompressionFormat(TextureCompressionFormatAlias.DXT1))
           .put("latc", textureCompressionFormat(TextureCompressionFormatAlias.LATC))
           .put("paletted", textureCompressionFormat(TextureCompressionFormatAlias.PALETTED))
           .put("pvrtc", textureCompressionFormat(TextureCompressionFormatAlias.PVRTC))
           .put("etc1", textureCompressionFormat(TextureCompressionFormatAlias.ETC1_RGB8))
+          .put("etc2", textureCompressionFormat(TextureCompressionFormatAlias.ETC2))
           .put("s3tc", textureCompressionFormat(TextureCompressionFormatAlias.S3TC))
           .put("3dc", textureCompressionFormat(TextureCompressionFormatAlias.THREE_DC))
           .build();
+
+  public static final ImmutableBiMap<TextureCompressionFormatAlias, String> TARGETING_TO_TEXTURE =
+      ImmutableBiMap.<TextureCompressionFormatAlias, String>builder()
+          .put(TextureCompressionFormatAlias.ASTC, "astc")
+          .put(TextureCompressionFormatAlias.ATC, "atc")
+          .put(TextureCompressionFormatAlias.DXT1, "dxt1")
+          .put(TextureCompressionFormatAlias.ETC1_RGB8, "etc1")
+          .put(TextureCompressionFormatAlias.ETC2, "etc2")
+          .put(TextureCompressionFormatAlias.LATC, "latc")
+          .put(TextureCompressionFormatAlias.PALETTED, "paletted")
+          .put(TextureCompressionFormatAlias.PVRTC, "pvrtc")
+          .put(TextureCompressionFormatAlias.S3TC, "s3tc")
+          .put(TextureCompressionFormatAlias.THREE_DC, "3dc")
+          .build();
+
+  /** Return the texture compression format associated to the GL extension, if any. */
+  public static Optional<TextureCompressionFormatAlias> textureCompressionFormat(
+      String glExtension) {
+    return Optional.ofNullable(
+        TEXTURE_COMPRESSION_FORMAT_TO_MANIFEST_VALUE.inverse().get(glExtension));
+  }
+
+  /** Return the texture compression formats supported by the given OpenGL version. */
+  public static ImmutableList<TextureCompressionFormatAlias> textureCompressionFormatsForGl(
+      int glVersion) {
+    // OpenGL ES 3.0 mandates the support for ETC2
+    // (see appendix C in https://www.khronos.org/registry/OpenGL/specs/es/3.0/es_spec_3.0.pdf).
+    if (glVersion >= 0x30000) {
+      return ImmutableList.of(TextureCompressionFormatAlias.ETC2);
+    }
+
+    return ImmutableList.of();
+  }
 
   private static TextureCompressionFormatTargeting textureCompressionFormat(
       TextureCompressionFormatAlias alias) {

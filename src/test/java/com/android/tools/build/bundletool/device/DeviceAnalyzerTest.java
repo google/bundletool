@@ -19,6 +19,7 @@ package com.android.tools.build.bundletool.device;
 import static com.android.tools.build.bundletool.testing.DeviceFactory.abis;
 import static com.android.tools.build.bundletool.testing.DeviceFactory.density;
 import static com.android.tools.build.bundletool.testing.DeviceFactory.deviceFeatures;
+import static com.android.tools.build.bundletool.testing.DeviceFactory.glExtensions;
 import static com.android.tools.build.bundletool.testing.DeviceFactory.locales;
 import static com.android.tools.build.bundletool.testing.DeviceFactory.mergeSpecs;
 import static com.android.tools.build.bundletool.testing.DeviceFactory.sdkVersion;
@@ -302,6 +303,30 @@ public class DeviceAnalyzerTest {
 
     DeviceSpec deviceSpec = analyzer.getDeviceSpec(Optional.empty());
     assertThat(deviceSpec.getDeviceFeaturesList()).containsExactly("com.feature1", "com.feature2");
+  }
+
+  @Test
+  public void extractsGlExtensions() {
+    FakeDevice fakeDevice =
+        FakeDevice.fromDeviceSpec(
+            "id1",
+            DeviceState.ONLINE,
+            mergeSpecs(
+                density(240),
+                locales("en-US"),
+                abis("x86"),
+                sdkVersion(21),
+                glExtensions("GL_EXT_extension1", "GL_EXT_extension2")));
+
+    FakeAdbServer fakeAdbServer =
+        new FakeAdbServer(
+            /* hasInitialDeviceList= */ true, /* devices= */ ImmutableList.of(fakeDevice));
+    fakeAdbServer.init(Paths.get("path/to/adb"));
+
+    DeviceAnalyzer analyzer = new DeviceAnalyzer(fakeAdbServer);
+
+    DeviceSpec deviceSpec = analyzer.getDeviceSpec(Optional.empty());
+    assertThat(deviceSpec.getGlExtensionsList()).containsExactly("GL_EXT_extension1", "GL_EXT_extension2");
   }
 
   @Test

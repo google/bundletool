@@ -54,6 +54,8 @@ import java.util.function.Predicate;
  *
  * <p>The splits ultimately become split APKs which are supported only since Android L onwards, so
  * the minSdkVersion is added to the targeting.
+ *
+ * <p>Note: This is for split apks, not for asset slices.
  */
 public class ModuleSplitter {
 
@@ -277,9 +279,9 @@ public class ModuleSplitter {
     if (apkGenerationConfiguration
         .getOptimizationDimensions()
         .contains(OptimizationDimension.ABI)) {
-      nativeSplitters.add(
-          new AbiNativeLibrariesSplitter(apkGenerationConfiguration.getInclude64BitLibs()));
+      nativeSplitters.add(new AbiNativeLibrariesSplitter());
     }
+    nativeSplitters.add(new SanitizerNativeLibrariesSplitter());
     return new SplittingPipeline(nativeSplitters.build());
   }
 
@@ -293,7 +295,10 @@ public class ModuleSplitter {
     if (apkGenerationConfiguration
         .getOptimizationDimensions()
         .contains(OptimizationDimension.TEXTURE_COMPRESSION_FORMAT)) {
-      assetsSplitters.add(TextureCompressionFormatAssetsSplitter.create());
+      assetsSplitters.add(
+          TextureCompressionFormatAssetsSplitter.create(
+              false
+              ));
     }
     return new SplittingPipeline(assetsSplitters.build());
   }

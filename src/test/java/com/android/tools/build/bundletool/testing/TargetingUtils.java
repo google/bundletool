@@ -43,6 +43,9 @@ import com.android.bundle.Targeting.MultiAbi;
 import com.android.bundle.Targeting.MultiAbiTargeting;
 import com.android.bundle.Targeting.NativeDirectoryTargeting;
 import com.android.bundle.Targeting.OpenGlVersion;
+import com.android.bundle.Targeting.Sanitizer;
+import com.android.bundle.Targeting.Sanitizer.SanitizerAlias;
+import com.android.bundle.Targeting.SanitizerTargeting;
 import com.android.bundle.Targeting.ScreenDensity;
 import com.android.bundle.Targeting.ScreenDensity.DensityAlias;
 import com.android.bundle.Targeting.ScreenDensityTargeting;
@@ -145,10 +148,22 @@ public final class TargetingUtils {
   }
 
   public static NativeDirectoryTargeting nativeDirectoryTargeting(
+      AbiAlias abi, SanitizerAlias sanitizerAlias) {
+    return NativeDirectoryTargeting.newBuilder()
+        .setAbi(toAbi(abi))
+        .setSanitizer(toSanitizer(sanitizerAlias))
+        .build();
+  }
+
+  public static NativeDirectoryTargeting nativeDirectoryTargeting(
       TextureCompressionFormatAlias tcf) {
     return NativeDirectoryTargeting.newBuilder()
         .setTextureCompressionFormat(TextureCompressionFormat.newBuilder().setAlias(tcf))
         .build();
+  }
+
+  public static Sanitizer toSanitizer(SanitizerAlias sanitizerAlias) {
+    return Sanitizer.newBuilder().setAlias(sanitizerAlias).build();
   }
 
   // Apex image file targeting helpers.
@@ -202,6 +217,12 @@ public final class TargetingUtils {
 
   public static ApkTargeting apkAbiTargeting(AbiAlias abiAlias) {
     return apkAbiTargeting(abiTargeting(abiAlias));
+  }
+
+  public static ApkTargeting apkSanitizerTargeting(SanitizerAlias sanitizerAlias) {
+    SanitizerTargeting sanitizerTargeting =
+        SanitizerTargeting.newBuilder().addValue(toSanitizer(sanitizerAlias)).build();
+    return ApkTargeting.newBuilder().setSanitizerTargeting(sanitizerTargeting).build();
   }
 
   /** Builds APK targeting, of multi-Abi targeting only. */
@@ -306,9 +327,26 @@ public final class TargetingUtils {
   }
 
   public static ApkTargeting apkTextureTargeting(
-      TextureCompressionFormatTargeting textureCompressionFormatTargeting) {
+      TextureCompressionFormatAlias textureCompressionFormatAlias) {
+    return apkTextureTargeting(textureCompressionTargeting(textureCompressionFormatAlias));
+  }
+
+  public static ApkTargeting apkTextureTargeting(
+      TextureCompressionFormatAlias value,
+      ImmutableSet<TextureCompressionFormatAlias> alternatives) {
+    return apkTextureTargeting(textureCompressionTargeting(value, alternatives));
+  }
+
+  public static ApkTargeting apkTextureTargeting(
+      ImmutableSet<TextureCompressionFormatAlias> values,
+      ImmutableSet<TextureCompressionFormatAlias> alternatives) {
+    return apkTextureTargeting(textureCompressionTargeting(values, alternatives));
+  }
+
+  public static ApkTargeting apkTextureTargeting(
+      TextureCompressionFormatTargeting textureCompressionTargeting) {
     return ApkTargeting.newBuilder()
-        .setTextureCompressionFormatTargeting(textureCompressionFormatTargeting)
+        .setTextureCompressionFormatTargeting(textureCompressionTargeting)
         .build();
   }
 
@@ -427,8 +465,7 @@ public final class TargetingUtils {
       int minSdkVersion, ImmutableSet<Integer> alternativeMinSdkVersions) {
     return variantSdkTargeting(
         sdkVersionFrom(minSdkVersion),
-        alternativeMinSdkVersions
-            .stream()
+        alternativeMinSdkVersions.stream()
             .map(TargetingUtils::sdkVersionFrom)
             .collect(toImmutableSet()));
   }
@@ -464,6 +501,27 @@ public final class TargetingUtils {
         .build();
   }
 
+  public static VariantTargeting variantTextureTargeting(TextureCompressionFormatAlias value) {
+    return variantTextureTargeting(textureCompressionTargeting(value));
+  }
+
+  public static VariantTargeting variantTextureTargeting(
+      ImmutableSet<TextureCompressionFormatAlias> values,
+      ImmutableSet<TextureCompressionFormatAlias> alternatives) {
+    return variantTextureTargeting(textureCompressionTargeting(values, alternatives));
+  }
+
+  public static VariantTargeting variantTextureTargeting(
+      TextureCompressionFormatAlias value,
+      ImmutableSet<TextureCompressionFormatAlias> alternatives) {
+    return variantTextureTargeting(textureCompressionTargeting(value, alternatives));
+  }
+
+  public static VariantTargeting variantTextureTargeting(
+      TextureCompressionFormatTargeting targeting) {
+    return VariantTargeting.newBuilder().setTextureCompressionFormatTargeting(targeting).build();
+  }
+
   public static VariantTargeting mergeVariantTargeting(
       VariantTargeting targeting, VariantTargeting... targetings) {
     return mergeFromProtos(targeting, targetings);
@@ -486,6 +544,26 @@ public final class TargetingUtils {
   public static ModuleTargeting moduleMinSdkVersionTargeting(int minSdkVersion) {
     return ModuleTargeting.newBuilder()
         .setSdkVersionTargeting(sdkVersionTargeting(sdkVersionFrom(minSdkVersion)))
+        .build();
+  }
+
+  /** Creates module targeting with provided max SDK version. */
+  public static ModuleTargeting moduleMaxSdkVersionTargeting(int maxSdkVersion) {
+    // Sentinel alternatives are not inclusive, hence +1.
+    return ModuleTargeting.newBuilder()
+        .setSdkVersionTargeting(maxOnlySdkVersionTargeting(sdkVersionFrom(maxSdkVersion + 1)))
+        .build();
+  }
+
+  /** Creates module targeting with provided min and max SDK versions. */
+  public static ModuleTargeting moduleMinMaxSdkVersionTargeting(
+      int minSdkVersion, int maxSdkVersion) {
+    // Sentinel alternatives are not inclusive, hence +1.
+    return ModuleTargeting.newBuilder()
+        .setSdkVersionTargeting(
+            sdkVersionTargeting(sdkVersionFrom(minSdkVersion)).toBuilder()
+                .addAlternatives(sdkVersionFrom(maxSdkVersion + 1))
+                .build())
         .build();
   }
 
@@ -729,6 +807,10 @@ public final class TargetingUtils {
     return SdkVersionTargeting.newBuilder().addValue(sdkVersion).build();
   }
 
+  public static SdkVersionTargeting maxOnlySdkVersionTargeting(SdkVersion sdkVersion) {
+    return sdkVersionTargeting(sdkVersionFrom(1), /* alternatives= */ ImmutableSet.of(sdkVersion));
+  }
+
   // Texture Compression Format targeting.
 
   public static TextureCompressionFormat textureCompressionFormat(
@@ -741,13 +823,11 @@ public final class TargetingUtils {
       ImmutableSet<TextureCompressionFormatAlias> alternatives) {
     return TextureCompressionFormatTargeting.newBuilder()
         .addAllValue(
-            values
-                .stream()
+            values.stream()
                 .map(alias -> TextureCompressionFormat.newBuilder().setAlias(alias).build())
                 .collect(toImmutableList()))
         .addAllAlternatives(
-            alternatives
-                .stream()
+            alternatives.stream()
                 .map(alias -> TextureCompressionFormat.newBuilder().setAlias(alias).build())
                 .collect(toImmutableList()))
         .build();
@@ -762,6 +842,11 @@ public final class TargetingUtils {
       TextureCompressionFormatAlias value,
       ImmutableSet<TextureCompressionFormatAlias> alternatives) {
     return textureCompressionTargeting(ImmutableSet.of(value), alternatives);
+  }
+
+  public static TextureCompressionFormatTargeting alternativeTextureCompressionTargeting(
+      TextureCompressionFormatAlias... alternatives) {
+    return textureCompressionTargeting(ImmutableSet.of(), ImmutableSet.copyOf(alternatives));
   }
 
   // Device Feature targeting.
@@ -795,8 +880,7 @@ public final class TargetingUtils {
       Collection<ModuleSplit> splits,
       Predicate<ApkTargeting> apkTargetingPredicate,
       Predicate<VariantTargeting> variantTargetingPredicate) {
-    return splits
-        .stream()
+    return splits.stream()
         .filter(moduleSplit -> apkTargetingPredicate.test(moduleSplit.getApkTargeting()))
         .filter(moduleSplit -> variantTargetingPredicate.test(moduleSplit.getVariantTargeting()))
         .collect(toImmutableList());

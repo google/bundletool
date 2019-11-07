@@ -29,7 +29,7 @@ import java.util.zip.ZipFile;
  * <p>Sub-classes override some of the methods that is/are most convenient for the particular type
  * of validation.
  */
-abstract class SubValidator {
+public abstract class SubValidator {
 
   // Validations of the App Bundle module zip file.
 

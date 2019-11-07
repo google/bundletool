@@ -33,6 +33,8 @@ import com.android.bundle.Targeting.AssetsDirectoryTargeting;
 import com.android.bundle.Targeting.MultiAbi;
 import com.android.bundle.Targeting.MultiAbiTargeting;
 import com.android.bundle.Targeting.NativeDirectoryTargeting;
+import com.android.bundle.Targeting.Sanitizer;
+import com.android.bundle.Targeting.Sanitizer.SanitizerAlias;
 import com.android.tools.build.bundletool.model.AbiName;
 import com.android.tools.build.bundletool.model.ZipPath;
 import com.android.tools.build.bundletool.model.exceptions.ValidationException;
@@ -178,14 +180,19 @@ public class TargetingGenerator {
       checkRootDirectoryName(LIB_DIR, directory);
 
       // Split the directory under lib/ into tokens.
-      String abiName = directory.substring(LIB_DIR.length());
+      String subDirName = directory.substring(LIB_DIR.length());
 
-      Abi abi = checkAbiName(abiName, directory);
+      Abi abi = checkAbiName(subDirName, directory);
+      NativeDirectoryTargeting.Builder nativeBuilder =
+          NativeDirectoryTargeting.newBuilder().setAbi(abi);
+      if (subDirName.equals("arm64-v8a-hwasan")) {
+        nativeBuilder.setSanitizer(Sanitizer.newBuilder().setAlias(SanitizerAlias.HWADDRESS));
+      }
 
       nativeLibraries.addDirectory(
           TargetedNativeDirectory.newBuilder()
               .setPath(directory)
-              .setTargeting(NativeDirectoryTargeting.newBuilder().setAbi(abi))
+              .setTargeting(nativeBuilder)
               .build());
     }
 
@@ -248,9 +255,9 @@ public class TargetingGenerator {
   }
 
   private static Abi checkAbiName(String token, String forFileOrDirectory) {
-    Optional<AbiName> abiName = AbiName.fromPlatformName(token);
+    Optional<AbiName> abiName = AbiName.fromLibSubDirName(token);
     if (!abiName.isPresent()) {
-      Optional<AbiName> abiNameLowerCase = AbiName.fromPlatformName(token.toLowerCase());
+      Optional<AbiName> abiNameLowerCase = AbiName.fromLibSubDirName(token.toLowerCase());
       if (abiNameLowerCase.isPresent()) {
         throw ValidationException.builder()
             .withMessage(

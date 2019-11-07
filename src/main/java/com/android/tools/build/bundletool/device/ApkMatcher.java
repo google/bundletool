@@ -77,16 +77,28 @@ public class ApkMatcher {
     ScreenDensityMatcher screenDensityMatcher = new ScreenDensityMatcher(deviceSpec);
     LanguageMatcher languageMatcher = new LanguageMatcher(deviceSpec);
     DeviceFeatureMatcher deviceFeatureMatcher = new DeviceFeatureMatcher(deviceSpec);
+    TextureCompressionFormatMatcher textureCompressionFormatMatcher =
+        new TextureCompressionFormatMatcher(deviceSpec);
 
     this.apkMatchers =
         ImmutableList.of(
-            sdkVersionMatcher, abiMatcher, multiAbiMatcher, screenDensityMatcher, languageMatcher);
+            sdkVersionMatcher,
+            abiMatcher,
+            multiAbiMatcher,
+            screenDensityMatcher,
+            languageMatcher,
+            textureCompressionFormatMatcher);
     this.requestedModuleNames = requestedModuleNames;
     this.matchInstant = matchInstant;
     this.moduleMatcher = new ModuleMatcher(sdkVersionMatcher, deviceFeatureMatcher);
     this.variantMatcher =
         new VariantMatcher(
-            sdkVersionMatcher, abiMatcher, multiAbiMatcher, screenDensityMatcher, matchInstant);
+            sdkVersionMatcher,
+            abiMatcher,
+            multiAbiMatcher,
+            screenDensityMatcher,
+            textureCompressionFormatMatcher,
+            matchInstant);
   }
 
   /**
@@ -275,8 +287,6 @@ public class ApkMatcher {
       String moduleName = sliceSet.getAssetModuleMetadata().getName();
       for (ApkDescription apkDescription : sliceSet.getApkDescriptionList()) {
         ApkTargeting apkTargeting = apkDescription.getTargeting();
-
-        checkCompatibleWithApkTargeting(apkTargeting);
 
         if (matchesApk(apkTargeting, /*isSplit=*/ true, moduleName, assetModuleNameMatcher)) {
           matchedApksBuilder.add(ZipPath.create(apkDescription.getPath()));

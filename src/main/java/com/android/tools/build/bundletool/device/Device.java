@@ -51,6 +51,8 @@ public abstract class Device {
 
   public abstract ImmutableList<String> getDeviceFeatures();
 
+  public abstract ImmutableList<String> getGlExtensions();
+
   public abstract void executeShellCommand(
       String command,
       IShellOutputReceiver receiver,

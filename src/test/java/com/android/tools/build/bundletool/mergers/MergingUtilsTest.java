@@ -16,15 +16,20 @@
 
 package com.android.tools.build.bundletool.mergers;
 
+import static com.android.bundle.Targeting.TextureCompressionFormat.TextureCompressionFormatAlias.ATC;
+import static com.android.bundle.Targeting.TextureCompressionFormat.TextureCompressionFormatAlias.ETC1_RGB8;
+import static com.android.bundle.Targeting.TextureCompressionFormat.TextureCompressionFormatAlias.S3TC;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.abiTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.apkAbiTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.apkAlternativeLanguageTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.apkDensityTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.apkLanguageTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.apkMinSdkTargeting;
+import static com.android.tools.build.bundletool.testing.TargetingUtils.apkTextureTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.languageTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.mergeApkTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.screenDensityTargeting;
+import static com.android.tools.build.bundletool.testing.TargetingUtils.textureCompressionTargeting;
 import static com.google.common.truth.Truth.assertThat;
 import static com.google.common.truth.extensions.proto.ProtoTruth.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -52,7 +57,9 @@ public class MergingUtilsTest {
 
     assertThat(exception)
         .hasMessageThat()
-        .contains("Expecting only ABI, screen density and language targeting");
+        .contains(
+            "Expecting only ABI, screen density, language and texture compression format"
+                + " targeting");
   }
 
   @Test
@@ -66,7 +73,9 @@ public class MergingUtilsTest {
 
     assertThat(exception)
         .hasMessageThat()
-        .contains("Expecting only ABI, screen density and language targeting");
+        .contains(
+            "Expecting only ABI, screen density, language and texture compression format"
+                + " targeting");
   }
 
   @Test
@@ -106,6 +115,16 @@ public class MergingUtilsTest {
 
     assertThat(MergingUtils.mergeShardTargetings(targeting, targeting))
         .isEqualTo(apkLanguageTargeting("en"));
+  }
+
+  @Test
+  public void mergeShardTargetings_equalTextureCompressionFormat_ok() {
+    ApkTargeting targeting =
+        apkTextureTargeting(textureCompressionTargeting(S3TC, ImmutableSet.of(ETC1_RGB8)));
+
+    assertThat(MergingUtils.mergeShardTargetings(targeting, targeting))
+        .isEqualTo(
+            apkTextureTargeting(textureCompressionTargeting(S3TC, ImmutableSet.of(ETC1_RGB8))));
   }
 
   @Test
@@ -150,6 +169,19 @@ public class MergingUtilsTest {
 
     assertThat(MergingUtils.mergeShardTargetings(targeting1, targeting2))
         .isEqualTo(apkLanguageTargeting(ImmutableSet.of("fr"), ImmutableSet.of("en", "jp")));
+  }
+
+  @Test
+  public void mergeShardTargetings_differentTextureCompressionFormats_ok() {
+    ApkTargeting targeting1 =
+        apkTextureTargeting(textureCompressionTargeting(S3TC, ImmutableSet.of(ETC1_RGB8)));
+    ApkTargeting targeting2 =
+        apkTextureTargeting(textureCompressionTargeting(S3TC, ImmutableSet.of(ATC)));
+
+    assertThat(MergingUtils.mergeShardTargetings(targeting1, targeting2))
+        .isEqualTo(
+            apkTextureTargeting(
+                textureCompressionTargeting(S3TC, ImmutableSet.of(ETC1_RGB8, ATC))));
   }
 
   @Test

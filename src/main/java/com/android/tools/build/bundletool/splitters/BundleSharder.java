@@ -18,12 +18,14 @@ package com.android.tools.build.bundletool.splitters;
 
 import static com.android.tools.build.bundletool.model.utils.TargetingProtoUtils.abiUniverse;
 import static com.android.tools.build.bundletool.model.utils.TargetingProtoUtils.densityUniverse;
+import static com.android.tools.build.bundletool.model.utils.TextureCompressionUtils.TEXTURE_TO_TARGETING;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.base.Predicates.not;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.ImmutableSet.toImmutableSet;
 
+import com.android.bundle.Config.SuffixStripping;
 import com.android.bundle.Devices.DeviceSpec;
 import com.android.bundle.Targeting.ApkTargeting;
 import com.android.tools.build.bundletool.device.ApkMatcher;
@@ -37,7 +39,10 @@ import com.android.tools.build.bundletool.model.ModuleSplit;
 import com.android.tools.build.bundletool.model.OptimizationDimension;
 import com.android.tools.build.bundletool.model.ShardedSystemSplits;
 import com.android.tools.build.bundletool.model.exceptions.CommandExecutionException;
+import com.android.tools.build.bundletool.model.targeting.TargetingDimension;
+import com.android.tools.build.bundletool.model.targeting.TargetingUtils;
 import com.android.tools.build.bundletool.model.version.Version;
+import com.android.tools.build.bundletool.preprocessors.AppBundle64BitNativeLibrariesPreprocessor;
 import com.google.common.base.Predicates;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
@@ -127,6 +132,10 @@ public class BundleSharder {
       ImmutableList<BundleModule> modules, ImmutableSet<OptimizationDimension> shardingDimensions) {
     checkArgument(!modules.isEmpty(), "At least one module is required.");
 
+    if (bundleSharderConfiguration.getStrip64BitLibrariesFromShards()) {
+      modules =
+          ImmutableList.copyOf(AppBundle64BitNativeLibrariesPreprocessor.processModules(modules));
+    }
     // Generate a flat list of splits from all input modules.
     ImmutableList<ModuleSplit> moduleSplits =
         modules.stream()
@@ -172,8 +181,11 @@ public class BundleSharder {
     rawSplits.add(ModuleSplit.forDex(module));
     rawSplits.add(ModuleSplit.forRoot(module));
 
+    ImmutableList<ModuleSplit> unmergedSplits = rawSplits.build();
+
+
     // Merge splits with the same targeting and make a single master split.
-    ImmutableList<ModuleSplit> mergedSplits = new SameTargetingMerger().merge(rawSplits.build());
+    ImmutableList<ModuleSplit> mergedSplits = new SameTargetingMerger().merge(unmergedSplits);
 
     // Remove the splitName from any standalone apks, as these are only used for instant apps (L+).
     mergedSplits =
@@ -186,13 +198,64 @@ public class BundleSharder {
     return mergedSplits;
   }
 
+  /** Apply the suffix stripping (if any) for dimensions. */
+  private ImmutableList<ModuleSplit> applySuffixStripping(ImmutableList<ModuleSplit> splits) {
+    SuffixStripping tcfSuffixStripping =
+        bundleSharderConfiguration
+            .getSuffixStrippings()
+            .get(OptimizationDimension.TEXTURE_COMPRESSION_FORMAT);
+    if (tcfSuffixStripping == null || !tcfSuffixStripping.getEnabled()) {
+      // Return the unmodified list if no suffix stripping is applied for TCF
+      // (only TCF is supported for now).
+      return splits;
+    }
+
+    return splits.stream()
+        .map(
+            split ->
+                applySuffixStripping(
+                    split, TargetingDimension.TEXTURE_COMPRESSION_FORMAT, tcfSuffixStripping))
+        .collect(toImmutableList());
+  }
+
+  private static ModuleSplit applySuffixStripping(
+      ModuleSplit split, TargetingDimension dimension, SuffixStripping suffixStripping) {
+    // Only TCF is supported for now in suffix stripping.
+    checkArgument(dimension.equals(TargetingDimension.TEXTURE_COMPRESSION_FORMAT));
+
+    // Only keep assets for the selected texture compression format.
+    split =
+        TargetingUtils.excludeAssetsTargetingOtherValue(
+            split, dimension, suffixStripping.getDefaultSuffix());
+
+    // Strip the targeting from the asset paths.
+    split = TargetingUtils.removeAssetsTargeting(split, dimension);
+
+    // Apply the updated targeting to the module split (as it now only contains assets for
+    // the selected TCF), both for the APK and the variant targeting.
+    return split.toBuilder()
+        .setApkTargeting(
+            split.getApkTargeting().toBuilder()
+                .setTextureCompressionFormatTargeting(
+                    TEXTURE_TO_TARGETING.get(suffixStripping.getDefaultSuffix()))
+                .build())
+        .setVariantTargeting(
+            split.getVariantTargeting().toBuilder().
+                setTextureCompressionFormatTargeting(
+                    TEXTURE_TO_TARGETING.get(suffixStripping.getDefaultSuffix()))
+                .build())
+        .build();
+  }
+
   private SplittingPipeline createNativeLibrariesSplittingPipeline(
       ImmutableSet<OptimizationDimension> shardingDimensions) {
-    return new SplittingPipeline(
-        shardingDimensions.contains(OptimizationDimension.ABI)
-            ? ImmutableList.of(
-                new AbiNativeLibrariesSplitter(bundleSharderConfiguration.getGenerate64BitShard()))
-            : ImmutableList.of());
+    ImmutableList.Builder<ModuleSplitSplitter> nativeSplitters = ImmutableList.builder();
+    if (shardingDimensions.contains(OptimizationDimension.ABI)) {
+      nativeSplitters.add(new AbiNativeLibrariesSplitter());
+    }
+    nativeSplitters.add(new SanitizerNativeLibrariesSplitter());
+
+    return new SplittingPipeline(nativeSplitters.build());
   }
 
   private SplittingPipeline createResourcesSplittingPipeline(
@@ -222,6 +285,7 @@ public class BundleSharder {
         && bundleSharderConfiguration.splitByLanguage()) {
       assetsSplitters.add(LanguageAssetsSplitter.create());
     }
+
     return new SplittingPipeline(assetsSplitters.build());
   }
 
@@ -343,8 +407,13 @@ public class BundleSharder {
         masterSplits.size());
     checkState(
         masterSplits.stream()
-            .allMatch(split -> split.getApkTargeting().equals(ApkTargeting.getDefaultInstance())),
-        "Master splits are expected to have default targeting.");
+            .allMatch(
+                split ->
+                    split.getApkTargeting().toBuilder()
+                        .clearTextureCompressionFormatTargeting()
+                        .build()
+                        .equals(ApkTargeting.getDefaultInstance())),
+        "Master splits are expected to have default or Texture Compression Format only targeting.");
 
     return masterSplits;
   }

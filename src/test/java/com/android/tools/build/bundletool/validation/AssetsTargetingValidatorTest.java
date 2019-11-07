@@ -31,8 +31,12 @@ import static com.google.common.truth.Truth.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.android.bundle.Files.Assets;
+import com.android.bundle.Targeting.AbiTargeting;
 import com.android.bundle.Targeting.AssetsDirectoryTargeting;
+import com.android.bundle.Targeting.GraphicsApiTargeting;
+import com.android.bundle.Targeting.LanguageTargeting;
 import com.android.bundle.Targeting.TextureCompressionFormat.TextureCompressionFormatAlias;
+import com.android.bundle.Targeting.TextureCompressionFormatTargeting;
 import com.android.tools.build.bundletool.model.BundleModule;
 import com.android.tools.build.bundletool.model.exceptions.ValidationException;
 import com.android.tools.build.bundletool.testing.BundleModuleBuilder;
@@ -156,5 +160,121 @@ public class AssetsTargetingValidatorTest {
         .hasMessageThat()
         .contains(
             "Language targeting for asset packs is not supported, but found in module testModule.");
+  }
+
+  @Test
+  public void validateModule_defaultInstanceOfAbiTargeting_throws() throws Exception {
+    Assets config =
+        assets(
+            targetedAssetsDirectory(
+                "assets/dir",
+                AssetsDirectoryTargeting.newBuilder()
+                    .setAbi(AbiTargeting.getDefaultInstance())
+                    .build()));
+    BundleModule module =
+        new BundleModuleBuilder("testModule")
+            .addFile("assets/dir/raw.dat")
+            .setAssetsConfig(config)
+            .setManifest(androidManifestForAssetModule("com.test.app"))
+            .build();
+
+    ValidationException e =
+        assertThrows(
+            ValidationException.class, () -> new AssetsTargetingValidator().validateModule(module));
+
+    assertThat(e).hasMessageThat().contains("set but empty ABI targeting");
+  }
+
+  @Test
+  public void validateModule_defaultInstanceOfGraphicsTargeting_throws() throws Exception {
+    Assets config =
+        assets(
+            targetedAssetsDirectory(
+                "assets/dir",
+                AssetsDirectoryTargeting.newBuilder()
+                    .setGraphicsApi(GraphicsApiTargeting.getDefaultInstance())
+                    .build()));
+    BundleModule module =
+        new BundleModuleBuilder("testModule")
+            .addFile("assets/dir/raw.dat")
+            .setAssetsConfig(config)
+            .setManifest(androidManifestForAssetModule("com.test.app"))
+            .build();
+
+    ValidationException e =
+        assertThrows(
+            ValidationException.class, () -> new AssetsTargetingValidator().validateModule(module));
+
+    assertThat(e).hasMessageThat().contains("set but empty Graphics API targeting");
+  }
+
+  @Test
+  public void validateModule_defaultInstanceOfGraphicsApiTargeting_throws() throws Exception {
+    Assets config =
+        assets(
+            targetedAssetsDirectory(
+                "assets/dir",
+                AssetsDirectoryTargeting.newBuilder()
+                    .setGraphicsApi(GraphicsApiTargeting.getDefaultInstance())
+                    .build()));
+    BundleModule module =
+        new BundleModuleBuilder("testModule")
+            .addFile("assets/dir/raw.dat")
+            .setAssetsConfig(config)
+            .setManifest(androidManifestForAssetModule("com.test.app"))
+            .build();
+
+    ValidationException e =
+        assertThrows(
+            ValidationException.class, () -> new AssetsTargetingValidator().validateModule(module));
+
+    assertThat(e).hasMessageThat().contains("set but empty Graphics API targeting");
+  }
+
+  @Test
+  public void validateModule_defaultInstanceOfLanguageTargeting_throws() throws Exception {
+    Assets config =
+        assets(
+            targetedAssetsDirectory(
+                "assets/dir",
+                AssetsDirectoryTargeting.newBuilder()
+                    .setLanguage(LanguageTargeting.getDefaultInstance())
+                    .build()));
+    BundleModule module =
+        new BundleModuleBuilder("testModule")
+            .addFile("assets/dir/raw.dat")
+            .setAssetsConfig(config)
+            .setManifest(androidManifestForAssetModule("com.test.app"))
+            .build();
+
+    ValidationException e =
+        assertThrows(
+            ValidationException.class, () -> new AssetsTargetingValidator().validateModule(module));
+
+    assertThat(e).hasMessageThat().contains("set but empty language targeting");
+  }
+
+  @Test
+  public void validateModule_defaultInstanceOfTcfTargeting_throws() throws Exception {
+    Assets config =
+        assets(
+            targetedAssetsDirectory(
+                "assets/dir",
+                AssetsDirectoryTargeting.newBuilder()
+                    .setTextureCompressionFormat(
+                        TextureCompressionFormatTargeting.getDefaultInstance())
+                    .build()));
+    BundleModule module =
+        new BundleModuleBuilder("testModule")
+            .addFile("assets/dir/raw.dat")
+            .setAssetsConfig(config)
+            .setManifest(androidManifestForAssetModule("com.test.app"))
+            .build();
+
+    ValidationException e =
+        assertThrows(
+            ValidationException.class, () -> new AssetsTargetingValidator().validateModule(module));
+
+    assertThat(e).hasMessageThat().contains("set but empty Texture Compression Format targeting");
   }
 }

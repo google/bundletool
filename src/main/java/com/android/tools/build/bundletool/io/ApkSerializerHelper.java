@@ -47,8 +47,10 @@ import com.android.tools.build.bundletool.model.SigningConfiguration;
 import com.android.tools.build.bundletool.model.WearApkLocator;
 import com.android.tools.build.bundletool.model.ZipPath;
 import com.android.tools.build.bundletool.model.exceptions.ValidationException;
+import com.android.tools.build.bundletool.model.utils.Versions;
 import com.android.tools.build.bundletool.model.utils.files.FileUtils;
 import com.android.tools.build.bundletool.model.version.Version;
+import com.android.tools.build.bundletool.model.version.VersionGuardedFeature;
 import com.google.common.base.Predicate;
 import com.google.common.base.Predicates;
 import com.google.common.collect.ImmutableList;
@@ -159,6 +161,10 @@ final class ApkSerializerHelper {
     aapt2Command.convertApkProtoToBinary(partialProtoApk, binaryApk);
     checkState(Files.exists(binaryApk), "No APK created by aapt2 convert command.");
 
+    boolean signWithV1 =
+        split.getAndroidManifest().getEffectiveMinSdkVersion() < Versions.ANDROID_N_API_VERSION
+            || !VersionGuardedFeature.NO_V1_SIGNING_WHEN_POSSIBLE.enabledForVersion(bundleVersion);
+
     // Create a new APK that includes files processed by aapt2 and the other ones.
     int minSdkVersion = split.getAndroidManifest().getEffectiveMinSdkVersion();
     com.google.common.base.Optional<SigningOptions> signingOptions =
@@ -169,7 +175,7 @@ final class ApkSerializerHelper {
                         SigningOptions.builder()
                             .setKey(config.getPrivateKey())
                             .setCertificates(config.getCertificates())
-                            .setV1SigningEnabled(true)
+                            .setV1SigningEnabled(signWithV1)
                             .setV2SigningEnabled(true)
                             .setMinSdkVersion(minSdkVersion)
                             .build()))

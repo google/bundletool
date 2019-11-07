@@ -33,22 +33,29 @@ import java.util.stream.Stream;
 
 /** List of ABIs supported by BundleTool. */
 public enum AbiName {
-  ARMEABI("armeabi"),
-  ARMEABI_V7A("armeabi-v7a"),
-  ARM64_V8A("arm64-v8a"),
-  X86("x86"),
-  X86_64("x86_64"),
-  MIPS("mips"),
-  MIPS64("mips64");
+  ARMEABI("armeabi", 32),
+  ARMEABI_V7A("armeabi-v7a", 32),
+  ARM64_V8A("arm64-v8a", 64),
+  X86("x86", 32),
+  X86_64("x86_64", 64),
+  MIPS("mips", 32),
+  MIPS64("mips64", 64);
 
   private final String platformName;
 
-  AbiName(String platformName) {
+  private final int bitSize;
+
+  AbiName(String platformName, int bitSize) {
     this.platformName = platformName;
+    this.bitSize = bitSize;
   }
 
   public String getPlatformName() {
     return platformName;
+  }
+
+  public int getBitSize() {
+    return bitSize;
   }
 
   public AbiAlias toProto() {
@@ -67,6 +74,13 @@ public enum AbiName {
   public static AbiName fromProto(AbiAlias abiAlias) {
     return checkNotNull(
         ABI_ALIAS_TO_ABI_NAME_MAP.get(abiAlias), "Unrecognized ABI '%s'.", abiAlias);
+  }
+
+  public static Optional<AbiName> fromLibSubDirName(String subDirName) {
+    if (subDirName.equals("arm64-v8a-hwasan")) {
+      return Optional.of(ARM64_V8A);
+    }
+    return fromPlatformName(subDirName);
   }
 
   public static Optional<AbiName> fromPlatformName(String platformAbiName) {

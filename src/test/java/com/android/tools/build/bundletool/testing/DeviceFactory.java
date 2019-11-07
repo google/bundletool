@@ -68,6 +68,24 @@ public final class DeviceFactory {
         locales("en-US"));
   }
 
+  public static DeviceSpec lDeviceWithGlExtensions(String... glExtensions) {
+    return mergeSpecs(
+        sdkVersion(Versions.ANDROID_L_API_VERSION),
+        abis("arm64-v8a"),
+        density(DensityAlias.MDPI),
+        locales("en-US"),
+        glExtensions(glExtensions));
+  }
+
+  public static DeviceSpec preLDeviceWithGlExtensions(String... glExtensions) {
+    return mergeSpecs(
+        sdkVersion(15),
+        abis("arm64-v8a"),
+        density(DensityAlias.MDPI),
+        locales("en-US"),
+        glExtensions(glExtensions));
+  }
+
   public static DeviceSpec locales(String... locales) {
     return DeviceSpec.newBuilder().addAllSupportedLocales(Arrays.asList(locales)).build();
   }
@@ -90,6 +108,10 @@ public final class DeviceFactory {
 
   public static DeviceSpec deviceFeatures(String... features) {
     return DeviceSpec.newBuilder().addAllDeviceFeatures(Arrays.asList(features)).build();
+  }
+
+  public static DeviceSpec glExtensions(String... glExtensions) {
+    return DeviceSpec.newBuilder().addAllGlExtensions(Arrays.asList(glExtensions)).build();
   }
 
   public static DeviceSpec mergeSpecs(DeviceSpec deviceSpec, DeviceSpec... specParts) {

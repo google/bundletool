@@ -68,7 +68,7 @@ public class AdbShellCommandTaskTest {
     // unknown command will cause timeout.
     AdbShellCommandTask task = new AdbShellCommandTask(fakeDevice, "getprop");
     Throwable e = assertThrows(CommandExecutionException.class, () -> task.execute());
-    assertThat(e).hasMessageThat().contains("Timeout while executing adb shell");
+    assertThat(e).hasMessageThat().contains("Timeout while executing 'adb shell");
     assertThat(e).hasCauseThat().isInstanceOf(TimeoutException.class);
   }
 
@@ -84,7 +84,7 @@ public class AdbShellCommandTaskTest {
 
     AdbShellCommandTask task = new AdbShellCommandTask(fakeDevice, "getprop");
     Throwable e = assertThrows(CommandExecutionException.class, () -> task.execute());
-    assertThat(e).hasMessageThat().contains("I/O error while executing adb shell");
+    assertThat(e).hasMessageThat().contains("I/O error while executing 'adb shell");
     assertThat(e).hasCauseThat().isInstanceOf(IOException.class);
   }
 
@@ -100,7 +100,9 @@ public class AdbShellCommandTaskTest {
 
     AdbShellCommandTask task = new AdbShellCommandTask(fakeDevice, "getprop");
     Throwable e = assertThrows(CommandExecutionException.class, () -> task.execute());
-    assertThat(e).hasMessageThat().contains("Unresponsive shell command while executing adb shell");
+    assertThat(e)
+        .hasMessageThat()
+        .contains("Unresponsive shell command while executing 'adb shell");
     assertThat(e).hasCauseThat().isInstanceOf(ShellCommandUnresponsiveException.class);
   }
 
@@ -119,6 +121,6 @@ public class AdbShellCommandTaskTest {
 
     AdbShellCommandTask task = new AdbShellCommandTask(fakeDevice, "getprop");
     Throwable e = assertThrows(CommandExecutionException.class, () -> task.execute());
-    assertThat(e).hasMessageThat().contains("Rejected adb shell command");
+    assertThat(e).hasMessageThat().contains("Rejected 'adb shell getprop' command");
   }
 }

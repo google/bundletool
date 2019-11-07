@@ -2,9 +2,9 @@ syntax = "proto3";
 
 package android.bundle;
 
-option java_package = "com.android.bundle";
-
 import "google/protobuf/wrappers.proto";
+
+option java_package = "com.android.bundle";
 
 // Targeting on the level of variants.
 message VariantTargeting {
@@ -12,6 +12,7 @@ message VariantTargeting {
   AbiTargeting abi_targeting = 2;
   ScreenDensityTargeting screen_density_targeting = 3;
   MultiAbiTargeting multi_abi_targeting = 4;
+  TextureCompressionFormatTargeting texture_compression_format_targeting = 5;
 }
 
 // Targeting on the level of individual APKs.
@@ -23,6 +24,7 @@ message ApkTargeting {
   SdkVersionTargeting sdk_version_targeting = 5;
   TextureCompressionFormatTargeting texture_compression_format_targeting = 6;
   MultiAbiTargeting multi_abi_targeting = 7;
+  SanitizerTargeting sanitizer_targeting = 8;
 }
 
 // Targeting on the module level.
@@ -98,6 +100,8 @@ message TextureCompressionFormat {
     DXT1 = 6;
     S3TC = 7;
     PVRTC = 8;
+    ASTC = 9;
+    ETC2 = 10;
   }
   TextureCompressionFormatAlias alias = 1;
 }
@@ -120,6 +124,14 @@ message MultiAbi {
   repeated Abi abi = 1;
 }
 
+message Sanitizer {
+  enum SanitizerAlias {
+    NONE = 0;
+    HWADDRESS = 1;
+  }
+  SanitizerAlias alias = 1;
+}
+
 message DeviceFeature {
   string feature_name = 1;
   // Equivalent of android:glEsVersion or android:version in <uses-feature>.
@@ -139,6 +151,7 @@ message NativeDirectoryTargeting {
   Abi abi = 1;
   GraphicsApi graphics_api = 2;
   TextureCompressionFormat texture_compression_format = 3;
+  Sanitizer sanitizer = 4;
 }
 
 // Targeting specific for image files under apex/.
@@ -194,6 +207,10 @@ message TextureCompressionFormatTargeting {
   // Targeting of other sibling directories that were in the Bundle.
   // For master splits this is targeting of other master splits.
   repeated TextureCompressionFormat alternatives = 2;
+}
+
+message SanitizerTargeting {
+  repeated Sanitizer value = 1;
 }
 
 // Since other atom targeting messages have the "OR" semantic on values

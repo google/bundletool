@@ -48,12 +48,14 @@ public abstract class ApkOptimizations {
                   Version.of("0.0.0-dev"),
                   ApkOptimizations.builder()
                       .setSplitDimensions(ImmutableSet.of(ABI, SCREEN_DENSITY, LANGUAGE))
+                      .setStandaloneDimensions(ImmutableSet.of(ABI, SCREEN_DENSITY))
                       .build())
               .put(
                   Version.of("0.6.0"),
                   ApkOptimizations.builder()
                       .setSplitDimensions(ImmutableSet.of(ABI, SCREEN_DENSITY, LANGUAGE))
                       .setUncompressNativeLibraries(true)
+                      .setStandaloneDimensions(ImmutableSet.of(ABI, SCREEN_DENSITY))
                       .build())
               .put(
                   Version.of("0.10.2"),
@@ -62,6 +64,7 @@ public abstract class ApkOptimizations {
                           ImmutableSet.of(
                               ABI, SCREEN_DENSITY, TEXTURE_COMPRESSION_FORMAT, LANGUAGE))
                       .setUncompressNativeLibraries(true)
+                      .setStandaloneDimensions(ImmutableSet.of(ABI, SCREEN_DENSITY))
                       .build())
               .build();
 
@@ -70,6 +73,8 @@ public abstract class ApkOptimizations {
   public abstract boolean getUncompressNativeLibraries();
 
   public abstract boolean getUncompressDexFiles();
+
+  public abstract ImmutableSet<OptimizationDimension> getStandaloneDimensions();
 
   static Builder builder() {
     return new AutoValue_ApkOptimizations.Builder()
@@ -85,6 +90,9 @@ public abstract class ApkOptimizations {
     abstract Builder setUncompressNativeLibraries(boolean enable);
 
     abstract Builder setUncompressDexFiles(boolean enable);
+
+    abstract Builder setStandaloneDimensions(
+        ImmutableSet<OptimizationDimension> standaloneDimensions);
 
     abstract ApkOptimizations build();
   }
@@ -109,7 +117,10 @@ public abstract class ApkOptimizations {
   /** Returns an optimizations specific to the universal APK. */
   public static ApkOptimizations getOptimizationsForUniversalApk() {
     // Currently no optimizations are performed.
-    return ApkOptimizations.builder().setSplitDimensions(ImmutableSet.of()).build();
+    return ApkOptimizations.builder()
+        .setSplitDimensions(ImmutableSet.of())
+        .setStandaloneDimensions(ImmutableSet.of())
+        .build();
   }
 
   public static ApkOptimizations getOptimizationsForAssetSlices() {
@@ -117,6 +128,7 @@ public abstract class ApkOptimizations {
         .setSplitDimensions(
             ImmutableSet.of(
                 LANGUAGE))
+        .setStandaloneDimensions(ImmutableSet.of())
         .build();
   }
 }

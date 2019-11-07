@@ -37,6 +37,7 @@ import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.with
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withInstantOnDemandDelivery;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withLegacyFusingAttribute;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withLegacyOnDemand;
+import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withMaxSdkCondition;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withMinSdkCondition;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withMinSdkVersion;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withOnDemandAttribute;
@@ -491,9 +492,19 @@ public class AndroidManifestTest {
   }
 
   @Test
-  public void deliveryTypeAndOnDemandAttribute_deliveryElement_conditions() {
+  public void deliveryTypeAndOnDemandAttribute_deliveryElement_minSdkCondition() {
     AndroidManifest manifest =
         AndroidManifest.create(androidManifest("com.test.app", withMinSdkCondition(21)));
+
+    assertThat(manifest.getManifestDeliveryElement()).isPresent();
+    assertThat(manifest.getOnDemandAttribute()).isEmpty();
+    assertThat(manifest.isDeliveryTypeDeclared()).isTrue();
+  }
+
+  @Test
+  public void deliveryTypeAndOnDemandAttribute_deliveryElement_maxSdkCondition() {
+    AndroidManifest manifest =
+        AndroidManifest.create(androidManifest("com.test.app", withMaxSdkCondition(21)));
 
     assertThat(manifest.getManifestDeliveryElement()).isPresent();
     assertThat(manifest.getOnDemandAttribute()).isEmpty();

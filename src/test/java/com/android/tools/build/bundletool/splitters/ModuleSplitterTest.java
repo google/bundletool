@@ -27,6 +27,7 @@ import static com.android.tools.build.bundletool.model.ManifestMutator.withExtra
 import static com.android.tools.build.bundletool.model.OptimizationDimension.ABI;
 import static com.android.tools.build.bundletool.model.OptimizationDimension.LANGUAGE;
 import static com.android.tools.build.bundletool.model.OptimizationDimension.SCREEN_DENSITY;
+import static com.android.tools.build.bundletool.model.OptimizationDimension.TEXTURE_COMPRESSION_FORMAT;
 import static com.android.tools.build.bundletool.model.utils.Versions.ANDROID_L_API_VERSION;
 import static com.android.tools.build.bundletool.model.utils.Versions.ANDROID_M_API_VERSION;
 import static com.android.tools.build.bundletool.model.utils.Versions.ANDROID_Q_API_VERSION;
@@ -90,6 +91,7 @@ import com.android.aapt.Resources.ConfigValue;
 import com.android.aapt.Resources.ResourceTable;
 import com.android.aapt.Resources.XmlElement;
 import com.android.aapt.Resources.XmlNode;
+import com.android.bundle.Config.SuffixStripping;
 import com.android.bundle.Files.Assets;
 import com.android.bundle.Files.NativeLibraries;
 import com.android.bundle.Targeting.Abi.AbiAlias;
@@ -726,39 +728,6 @@ public class ModuleSplitterTest {
     }
     assertThat(hasMasterSplit).isTrue();
     assertThat(hasX86Split).isTrue();
-  }
-
-  @Test
-  public void nativeSplits_64BitLibsDisabled() throws Exception {
-    NativeLibraries nativeConfig =
-        nativeLibraries(
-            targetedNativeDirectory("lib/x86", nativeDirectoryTargeting("x86")),
-            targetedNativeDirectory("lib/arm64-v8a", nativeDirectoryTargeting("arm64-v8a")));
-    BundleModule testModule =
-        new BundleModuleBuilder("testModule")
-            .setManifest(androidManifest("com.test.app"))
-            .setNativeConfig(nativeConfig)
-            .addFile("lib/x86/liba.so")
-            .addFile("lib/arm64-v8a/liba.so")
-            .build();
-
-    ModuleSplitter moduleSplitter =
-        new ModuleSplitter(
-            testModule,
-            BUNDLETOOL_VERSION,
-            withDisabled64BitLibs(),
-            lPlusVariantTargeting(),
-            ImmutableSet.of("testModule"));
-
-    ImmutableList<ModuleSplit> splits = moduleSplitter.splitModule();
-    ImmutableMap<ApkTargeting, ModuleSplit> toTargetingMap =
-        Maps.uniqueIndex(splits, ModuleSplit::getApkTargeting);
-    ApkTargeting x86SplitTargeting =
-        mergeApkTargeting(DEFAULT_MASTER_SPLIT_SDK_TARGETING, apkAbiTargeting(AbiAlias.X86));
-    assertThat(toTargetingMap.keySet())
-        .containsExactly(DEFAULT_MASTER_SPLIT_SDK_TARGETING, x86SplitTargeting);
-    assertThat(toTargetingMap.get(DEFAULT_MASTER_SPLIT_SDK_TARGETING).isMasterSplit()).isTrue();
-    assertThat(toTargetingMap.get(x86SplitTargeting).isMasterSplit()).isFalse();
   }
 
   @Test
@@ -1647,10 +1616,16 @@ public class ModuleSplitterTest {
         .build();
   }
 
-  private static ApkGenerationConfiguration withDisabled64BitLibs() {
-    return ApkGenerationConfiguration.builder()
-        .setInclude64BitLibs(false)
-        .setOptimizationDimensions(ImmutableSet.of(ABI))
+  private static ApkGenerationConfiguration withTcfSuffixStripping(
+      ApkGenerationConfiguration apkGenerationConfiguration) {
+    return apkGenerationConfiguration.toBuilder()
+        .setSuffixStrippings(
+            ImmutableMap.of(
+                TEXTURE_COMPRESSION_FORMAT,
+                SuffixStripping.newBuilder()
+                    .setEnabled(true)
+                    .setDefaultSuffix("etc1")
+                    .build()))
         .build();
   }
 }

@@ -20,6 +20,7 @@ import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
 
 import com.android.bundle.Targeting.AssetsDirectoryTargeting;
+import com.android.bundle.Targeting.GraphicsApi;
 import com.android.bundle.Targeting.GraphicsApiTargeting;
 import com.android.bundle.Targeting.LanguageTargeting;
 import com.android.tools.build.bundletool.model.ZipPath;
@@ -29,10 +30,14 @@ import com.android.tools.build.bundletool.model.utils.TextureCompressionUtils;
 import com.google.auto.value.AutoValue;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableSetMultimap;
+import com.google.common.collect.Iterables;
 import com.google.errorprone.annotations.Immutable;
+import java.util.Collection;
 import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import javax.annotation.CheckReturnValue;
 
 /** A single parsed name of the assets directory path. */
 @Immutable
@@ -57,6 +62,8 @@ public abstract class TargetedDirectorySegment {
           .put(LANG_KEY, TargetingDimension.LANGUAGE)
           .put(TCF_KEY, TargetingDimension.TEXTURE_COMPRESSION_FORMAT)
           .build();
+  private static final ImmutableSetMultimap<TargetingDimension, String> DIMENSION_TO_KEY =
+      KEY_TO_DIMENSION.asMultimap().inverse();
 
   private static final Pattern OPENGL_VALUE_PATTERN = Pattern.compile("(\\d)\\.(\\d)");
   private static final Pattern VULKAN_VALUE_PATTERN = Pattern.compile("(\\d)\\.(\\d)");
@@ -66,6 +73,7 @@ public abstract class TargetedDirectorySegment {
   /** Positive targeting resolved from this directory name. */
   public abstract AssetsDirectoryTargeting getTargeting();
 
+  /** Get the targeting applied on this segment (if any). */
   public Optional<TargetingDimension> getTargetingDimension() {
     ImmutableList<TargetingDimension> dimensions =
         TargetingUtils.getTargetingDimensions(getTargeting());
@@ -76,6 +84,28 @@ public abstract class TargetedDirectorySegment {
     } else {
       return Optional.of(dimensions.get(0));
     }
+  }
+
+  /** Remove the targeting done for a specific dimension. */
+  @CheckReturnValue
+  public TargetedDirectorySegment removeTargeting(TargetingDimension dimension) {
+    AssetsDirectoryTargeting.Builder newTargeting = getTargeting().toBuilder();
+    if (dimension.equals(TargetingDimension.ABI) && getTargeting().hasAbi()) {
+      newTargeting.clearAbi();
+    } else if (dimension.equals(TargetingDimension.GRAPHICS_API)
+        && getTargeting().hasGraphicsApi()) {
+      newTargeting.clearGraphicsApi();
+    } else if (dimension.equals(TargetingDimension.LANGUAGE) && getTargeting().hasLanguage()) {
+      newTargeting.clearLanguage();
+    } else if (dimension.equals(TargetingDimension.TEXTURE_COMPRESSION_FORMAT)
+        && getTargeting().hasTextureCompressionFormat()) {
+      newTargeting.clearTextureCompressionFormat();
+    } else {
+      // Nothing to remove, return the existing immutable object.
+      return this;
+    }
+
+    return new AutoValue_TargetedDirectorySegment(getName(), newTargeting.build());
   }
 
   public static TargetedDirectorySegment parse(ZipPath directorySegment) {
@@ -96,6 +126,33 @@ public abstract class TargetedDirectorySegment {
         .build();
   }
 
+  /** Do the reverse of parse, returns the path represented by the segment. */
+  public String toPathSegment() {
+    ImmutableList<TargetingDimension> dimensions =
+        TargetingUtils.getTargetingDimensions(getTargeting());
+    checkState(dimensions.size() <= 1);
+
+    Optional<String> key = getTargetingKey(getTargeting());
+    Optional<String> value = getTargetingValue(getTargeting());
+
+    if (!key.isPresent() || !value.isPresent()) {
+      return getName();
+    }
+
+    return String.format("%s#%s_%s", getName(), key.get(), value.get());
+  }
+
+  /**
+   * Fast check (without parsing) that verifies if a dimension can be targeted in a path.
+   * If this returns true, you should construct a TargetedDirectory from the path to do any work on
+   * it. If this returns false, the dimension is guaranteed not to be targeted in the specified
+   * path.
+   */
+  public static boolean pathMayContain(String path, TargetingDimension dimension) {
+    Collection<String> keys = DIMENSION_TO_KEY.get(dimension);
+    return keys.stream().anyMatch(key -> path.contains("#" + key + "_"));
+  }
+
   private static TargetedDirectorySegment create(String name) {
     return new AutoValue_TargetedDirectorySegment(
         name, AssetsDirectoryTargeting.getDefaultInstance());
@@ -104,6 +161,44 @@ public abstract class TargetedDirectorySegment {
   private static TargetedDirectorySegment create(String name, String key, String value) {
     return new AutoValue_TargetedDirectorySegment(
         name, toAssetsDirectoryTargeting(name, key, value));
+  }
+
+  /** Do the reverse of toAssetsDirectoryTargeting, return the key of the targeting. */
+  private static Optional<String> getTargetingKey(AssetsDirectoryTargeting targeting) {
+    ImmutableList<TargetingDimension> dimensions = TargetingUtils.getTargetingDimensions(targeting);
+    checkArgument(
+        dimensions.size() <= 1, "Multiple targeting for a same directory is not supported");
+
+    if (targeting.hasLanguage()) {
+      return Optional.of(LANG_KEY);
+    } else if (targeting.hasGraphicsApi()) {
+      return getGraphicsApiKey(targeting);
+    } else if (targeting.hasTextureCompressionFormat()) {
+      return Optional.of(TCF_KEY);
+    }
+
+    return Optional.empty();
+  }
+
+  /** Do the reverse of toAssetsDirectoryTargeting, return the value of the targeting. */
+  private static Optional<String> getTargetingValue(AssetsDirectoryTargeting targeting) {
+    ImmutableList<TargetingDimension> dimensions = TargetingUtils.getTargetingDimensions(targeting);
+    checkArgument(
+        dimensions.size() <= 1, "Multiple targeting for a same directory is not supported");
+
+    if (targeting.hasLanguage()) {
+      return Optional.of(Iterables.getOnlyElement(targeting.getLanguage().getValueList()));
+    } else if (targeting.hasGraphicsApi()) {
+      return getGraphicsApiValue(targeting);
+    } else if (targeting.hasTextureCompressionFormat()) {
+      return Optional.ofNullable(
+          TextureCompressionUtils.TARGETING_TO_TEXTURE.getOrDefault(
+              Iterables.getOnlyElement(targeting.getTextureCompressionFormat().getValueList())
+                  .getAlias(),
+              null));
+    }
+
+    return Optional.empty();
   }
 
   /** Returns the targeting specified by the directory name, alternatives are not generated. */
@@ -162,6 +257,34 @@ public abstract class TargetedDirectorySegment {
     }
 
     return AssetsDirectoryTargeting.newBuilder().setGraphicsApi(graphicsApiTargeting).build();
+  }
+
+  /** Do the reverse of parseGraphicsApi, return the key of the graphics api. */
+  private static Optional<String> getGraphicsApiKey(AssetsDirectoryTargeting targeting) {
+    GraphicsApi graphicsApi = Iterables.getOnlyElement(targeting.getGraphicsApi().getValueList());
+    if (graphicsApi.hasMinOpenGlVersion()) {
+      return Optional.of(OPENGL_KEY);
+    } else if (graphicsApi.hasMinVulkanVersion()) {
+      return Optional.of(VULKAN_KEY);
+    }
+
+    return Optional.empty();
+  }
+
+  /** Do the reverse of parseGraphicsApi, return the key and value to be used in a path. */
+  private static Optional<String> getGraphicsApiValue(AssetsDirectoryTargeting targeting) {
+    GraphicsApi graphicsApi = Iterables.getOnlyElement(targeting.getGraphicsApi().getValueList());
+    if (graphicsApi.hasMinOpenGlVersion()) {
+      int majorVersion = graphicsApi.getMinOpenGlVersion().getMajor();
+      int minorVersion = graphicsApi.getMinOpenGlVersion().getMinor();
+      return Optional.of(String.format("%d.%d", majorVersion, minorVersion));
+    } else if (graphicsApi.hasMinVulkanVersion()) {
+      int majorVersion = graphicsApi.getMinVulkanVersion().getMajor();
+      int minorVersion = graphicsApi.getMinVulkanVersion().getMinor();
+      return Optional.of(String.format("%d.%d", majorVersion, minorVersion));
+    }
+
+    return Optional.empty();
   }
 
   private static AssetsDirectoryTargeting parseTextureCompressionFormat(String name, String value) {

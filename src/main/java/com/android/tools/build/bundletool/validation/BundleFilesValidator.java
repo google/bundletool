@@ -99,7 +99,7 @@ public class BundleFilesValidator extends SubValidator {
       }
 
       String subDirName = file.getName(1).toString();
-      if (!AbiName.fromPlatformName(subDirName).isPresent()) {
+      if (!AbiName.fromLibSubDirName(subDirName).isPresent()) {
         throw InvalidNativeArchitectureNameException.createForDirectory(file.subpath(0, 2));
       }
 

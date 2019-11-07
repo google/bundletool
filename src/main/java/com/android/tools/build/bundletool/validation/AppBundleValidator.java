@@ -27,13 +27,13 @@ public class AppBundleValidator {
 
   /** Validators run on the bundle zip file. */
   @VisibleForTesting
-  static final ImmutableList<SubValidator> BUNDLE_FILE_SUB_VALIDATORS =
+  static final ImmutableList<SubValidator> DEFAULT_BUNDLE_FILE_SUB_VALIDATORS =
       // Keep order of common validators in sync with BundleModulesValidator.
       ImmutableList.of(new BundleZipValidator(), new MandatoryFilesPresenceValidator());
 
   /** Validators run on the internal representation of bundle and bundle modules. */
   @VisibleForTesting
-  static final ImmutableList<SubValidator> BUNDLE_SUB_VALIDATORS =
+  static final ImmutableList<SubValidator> DEFAULT_BUNDLE_SUB_VALIDATORS =
       // Keep order of common validators in sync with BundleModulesValidator.
       ImmutableList.of(
           // Fundamental file validations first.
@@ -55,13 +55,41 @@ public class AppBundleValidator {
           new ResourceTableValidator(),
           new AssetModuleFilesValidator());
 
+  private final ImmutableList<SubValidator> allBundleSubValidators;
+  private final ImmutableList<SubValidator> allBundleFileSubValidators;
+
+  private AppBundleValidator(
+      ImmutableList<SubValidator> allBundleSubValidators,
+      ImmutableList<SubValidator> allBundleFileSubValidators) {
+    this.allBundleSubValidators = allBundleSubValidators;
+    this.allBundleFileSubValidators = allBundleFileSubValidators;
+  }
+
+  public static AppBundleValidator create() {
+    return create(ImmutableList.of());
+  }
+
+  public static AppBundleValidator create(ImmutableList<SubValidator> extraSubValidators) {
+    AppBundleValidator validator =
+        new AppBundleValidator(
+            ImmutableList.<SubValidator>builder()
+                .addAll(DEFAULT_BUNDLE_SUB_VALIDATORS)
+                .addAll(extraSubValidators)
+                .build(),
+            ImmutableList.<SubValidator>builder()
+                .addAll(DEFAULT_BUNDLE_FILE_SUB_VALIDATORS)
+                .addAll(extraSubValidators)
+                .build());
+    return validator;
+  }
+
   /**
    * Validates the given App Bundle zip file.
    *
    * <p>Note that this method performs different checks than {@link #validate(AppBundle)}.
    */
   public void validateFile(ZipFile bundleFile) {
-    new ValidatorRunner(BUNDLE_FILE_SUB_VALIDATORS).validateBundleZipFile(bundleFile);
+    new ValidatorRunner(allBundleFileSubValidators).validateBundleZipFile(bundleFile);
   }
 
   /**
@@ -72,6 +100,6 @@ public class AppBundleValidator {
    * @throws ValidationException If the bundle is invalid.
    */
   public void validate(AppBundle bundle) {
-    new ValidatorRunner(BUNDLE_SUB_VALIDATORS).validateBundle(bundle);
+    new ValidatorRunner(allBundleSubValidators).validateBundle(bundle);
   }
 }

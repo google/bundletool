@@ -17,11 +17,14 @@
 package com.android.tools.build.bundletool.mergers;
 
 import static com.android.tools.build.bundletool.mergers.MergingUtils.getSameValueOrNonNull;
+import static com.android.tools.build.bundletool.mergers.MergingUtils.mergeTargetedAssetsDirectories;
 import static com.google.common.base.Preconditions.checkArgument;
 
 import com.android.aapt.Resources.ResourceTable;
 import com.android.bundle.Files.ApexImages;
+import com.android.bundle.Files.Assets;
 import com.android.bundle.Files.NativeLibraries;
+import com.android.bundle.Files.TargetedAssetsDirectory;
 import com.android.bundle.Targeting.ApkTargeting;
 import com.android.bundle.Targeting.VariantTargeting;
 import com.android.tools.build.bundletool.model.AndroidManifest;
@@ -32,6 +35,8 @@ import com.google.common.collect.ImmutableCollection;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableListMultimap;
 import com.google.common.collect.Multimaps;
+import java.util.HashMap;
+import java.util.Map;
 
 /**
  * Merges module splits together that have the same targeting.
@@ -60,6 +65,7 @@ public class SameTargetingMerger implements ModuleSplitMerger {
     AndroidManifest mergedManifest = null;
     ResourceTable mergedResourceTable = null;
     NativeLibraries mergedNativeConfig = null;
+    Map<String, TargetedAssetsDirectory> mergedAssetsConfig = new HashMap<>();
     ApexImages mergedApexConfig = null;
     BundleModuleName mergedModuleName = null;
     Boolean mergedIsMasterSplit = null;
@@ -117,6 +123,14 @@ public class SameTargetingMerger implements ModuleSplitMerger {
                           "Encountered conflicting variant targeting values while merging."));
       entries.addAll(split.getEntries());
       builder.setApkTargeting(split.getApkTargeting());
+
+      split
+          .getAssetsConfig()
+          .ifPresent(
+              assetsConfig -> {
+                mergeTargetedAssetsDirectories(
+                    mergedAssetsConfig, assetsConfig.getDirectoryList());
+              });
     }
 
     if (mergedManifest != null) {
@@ -127,6 +141,10 @@ public class SameTargetingMerger implements ModuleSplitMerger {
     }
     if (mergedNativeConfig != null) {
       builder.setNativeConfig(mergedNativeConfig);
+    }
+    if (!mergedAssetsConfig.isEmpty()) {
+      builder.setAssetsConfig(
+          Assets.newBuilder().addAllDirectory(mergedAssetsConfig.values()).build());
     }
     if (mergedApexConfig != null) {
       builder.setApexConfig(mergedApexConfig);

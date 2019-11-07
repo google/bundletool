@@ -16,10 +16,12 @@
 
 package com.android.tools.build.bundletool.splitters;
 
+import com.android.bundle.Config.SuffixStripping;
 import com.android.bundle.Targeting.Abi;
 import com.android.tools.build.bundletool.model.OptimizationDimension;
 import com.android.tools.build.bundletool.model.ResourceId;
 import com.google.auto.value.AutoValue;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.errorprone.annotations.Immutable;
 
@@ -39,9 +41,6 @@ public abstract class ApkGenerationConfiguration {
 
   public abstract boolean isInstallableOnExternalStorage();
 
-  /** Whether to include 64-bit native library config splits. */
-  public abstract boolean getInclude64BitLibs();
-
   /**
    * Returns a list of ABIs for placeholder libraries that should be populated for base modules
    * without native code. See {@link AbiPlaceholderInjector} for details.
@@ -54,6 +53,15 @@ public abstract class ApkGenerationConfiguration {
   /** Resources that are (transitively) reachable from AndroidManifest.xml of the base module. */
   public abstract ImmutableSet<ResourceId> getBaseManifestReachableResources();
 
+  /** The configuration of the suffixes for the different dimensions. */
+  public abstract ImmutableMap<OptimizationDimension, SuffixStripping>
+      getSuffixStrippings();
+
+  public boolean shouldStripTargetingSuffix(OptimizationDimension dimension) {
+    return getSuffixStrippings().containsKey(dimension)
+        && getSuffixStrippings().get(dimension).getEnabled();
+  }
+
   public abstract Builder toBuilder();
 
   public static Builder builder() {
@@ -62,11 +70,11 @@ public abstract class ApkGenerationConfiguration {
         .setEnableNativeLibraryCompressionSplitter(false)
         .setEnableDexCompressionSplitter(false)
         .setInstallableOnExternalStorage(false)
-        .setInclude64BitLibs(true)
         .setAbisForPlaceholderLibs(ImmutableSet.of())
         .setOptimizationDimensions(ImmutableSet.of())
         .setMasterPinnedResources(ImmutableSet.of())
-        .setBaseManifestReachableResources(ImmutableSet.of());
+        .setBaseManifestReachableResources(ImmutableSet.of())
+        .setSuffixStrippings(ImmutableMap.of());
   }
 
   public static ApkGenerationConfiguration getDefaultInstance() {
@@ -91,11 +99,12 @@ public abstract class ApkGenerationConfiguration {
 
     public abstract Builder setAbisForPlaceholderLibs(ImmutableSet<Abi> abis);
 
-    public abstract Builder setInclude64BitLibs(boolean shouldGenerate);
-
     public abstract Builder setMasterPinnedResources(ImmutableSet<ResourceId> resourceIds);
 
     public abstract Builder setBaseManifestReachableResources(ImmutableSet<ResourceId> resourceIds);
+
+    public abstract Builder setSuffixStrippings(
+        ImmutableMap<OptimizationDimension, SuffixStripping> suffixStripping);
 
     public abstract ApkGenerationConfiguration build();
   }

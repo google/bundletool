@@ -39,6 +39,10 @@ message Optimizations {
   UncompressNativeLibraries uncompress_native_libraries = 2;
   // This is for uncompressing dex files on P+ devices.
   UncompressDexFiles uncompress_dex_files = 3;
+  // Configuration for the generation of standalone APKs.
+  // If no StandaloneConfig is set, the configuration is inherited from
+  // splits_config.
+  StandaloneConfig standalone_config = 4;
 }
 
 message UncompressNativeLibraries {
@@ -49,8 +53,17 @@ message UncompressDexFiles {
   bool enabled = 1;
 }
 
+// Optimization configuration used to generate Split APKs.
 message SplitsConfig {
   repeated SplitDimension split_dimension = 1;
+}
+
+// Optimization configuration used to generate Standalone APKs.
+message StandaloneConfig {
+  // Device targeting dimensions to shard.
+  repeated SplitDimension split_dimension = 1;
+  // Whether 64 bit libraries should be stripped from Standalone APKs.
+  bool strip_64_bit_libraries = 2;
 }
 
 message SplitDimension {
@@ -66,4 +79,27 @@ message SplitDimension {
   // If set to 'true', indicates that APKs should *not* be split by this
   // dimension.
   bool negate = 2;
+
+  // Optional transformation to be applied to asset directories where
+  // the targeting is encoded in the directory name (e.g: assets/foo#tcf_etc1)
+  SuffixStripping suffix_stripping = 3;
+}
+
+message SuffixStripping {
+  // If set to 'true', indicates that the targeting suffix should be removed
+  // from assets paths for this dimension when splits (or asset slices) are
+  // generated.
+  // This only applies to assets.
+  // For example a folder with path "assets/level1_textures#tcf_etc1"
+  // would be outputted to "assets/level1_textures". File contents are
+  // unchanged.
+  bool enabled = 1;
+
+  // The default suffix to be used for the cases where separate slices can't
+  // be generated for this dimension. In the case of standalone/universal APKs
+  // generation, stripping the suffix can lead to file name collisions. This
+  // default suffix defines the directories to retain. The others are
+  // discarded: standalone/universal APKs will contain only directories
+  // targeted at this value for the dimension.
+  string default_suffix = 2;
 }

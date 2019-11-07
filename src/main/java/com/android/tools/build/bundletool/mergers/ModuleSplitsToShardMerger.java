@@ -16,6 +16,7 @@
 
 package com.android.tools.build.bundletool.mergers;
 
+import static com.android.tools.build.bundletool.mergers.MergingUtils.mergeTargetedAssetsDirectories;
 import static com.android.tools.build.bundletool.model.BundleMetadata.BUNDLETOOL_NAMESPACE;
 import static com.android.tools.build.bundletool.model.BundleMetadata.MAIN_DEX_LIST_FILE_NAME;
 import static com.android.tools.build.bundletool.model.BundleModule.DEX_DIRECTORY;
@@ -28,6 +29,8 @@ import static java.util.stream.Collectors.groupingBy;
 
 import com.android.aapt.Resources.ResourceTable;
 import com.android.bundle.Devices.DeviceSpec;
+import com.android.bundle.Files.Assets;
+import com.android.bundle.Files.TargetedAssetsDirectory;
 import com.android.bundle.Targeting.ApkTargeting;
 import com.android.bundle.Targeting.VariantTargeting;
 import com.android.tools.build.bundletool.device.ApkMatcher;
@@ -168,6 +171,7 @@ public class ModuleSplitsToShardMerger {
 
     Map<ZipPath, ModuleEntry> mergedEntriesByPath = new HashMap<>();
     Optional<ResourceTable> mergedResourceTable = Optional.empty();
+    Map<String, TargetedAssetsDirectory> mergedAssetsConfig = new HashMap<>();
     ApkTargeting mergedSplitTargeting = ApkTargeting.getDefaultInstance();
 
     for (ModuleSplit split : splitsOfShard) {
@@ -186,6 +190,13 @@ public class ModuleSplitsToShardMerger {
           mergeEntries(mergedEntriesByPath, split, entry);
         }
       }
+
+      split
+          .getAssetsConfig()
+          .ifPresent(
+              assetsConfig -> {
+                mergeTargetedAssetsDirectories(mergedAssetsConfig, assetsConfig.getDirectoryList());
+              });
     }
 
     AndroidManifest mergedAndroidManifest = mergeAndroidManifests(androidManifestsToMergeByModule);
@@ -205,7 +216,8 @@ public class ModuleSplitsToShardMerger {
         mergedDexFiles,
         mergedSplitTargeting,
         finalAndroidManifest,
-        mergedResourceTable);
+        mergedResourceTable,
+        mergedAssetsConfig);
   }
 
   /**
@@ -244,7 +256,8 @@ public class ModuleSplitsToShardMerger {
             splitTargeting,
             // An APEX module is made of one module, so any manifest works.
             splitsOfShard.get(0).getAndroidManifest(),
-            Optional.empty());
+            /* mergedResourceTable= */ Optional.empty(),
+            /* mergedAssetsConfig= */ new HashMap<>());
 
     // Add the APEX config as it's used to identify APEX APKs.
     return shard.toBuilder().setApexConfig(splitsOfShard.get(0).getApexConfig().get()).build();
@@ -255,7 +268,8 @@ public class ModuleSplitsToShardMerger {
       Collection<ModuleEntry> mergedDexFiles,
       ApkTargeting splitTargeting,
       AndroidManifest androidManifest,
-      Optional<ResourceTable> mergedResourceTable) {
+      Optional<ResourceTable> mergedResourceTable,
+      Map<String, TargetedAssetsDirectory> mergedAssetsConfig) {
     ImmutableList<ModuleEntry> entries =
         ImmutableList.<ModuleEntry>builder().addAll(entriesByPath).addAll(mergedDexFiles).build();
     ModuleSplit.Builder shard =
@@ -271,6 +285,10 @@ public class ModuleSplitsToShardMerger {
             .setModuleName(BASE_MODULE_NAME)
             .setVariantTargeting(VariantTargeting.getDefaultInstance());
     mergedResourceTable.ifPresent(shard::setResourceTable);
+    if (!mergedAssetsConfig.isEmpty()) {
+      shard.setAssetsConfig(
+          Assets.newBuilder().addAllDirectory(mergedAssetsConfig.values()).build());
+    }
     return shard.build();
   }
 
@@ -353,7 +371,7 @@ public class ModuleSplitsToShardMerger {
     ModuleEntry existingEntry = mergedEntriesByPath.putIfAbsent(entry.getPath(), entry);
     // Any conflicts of plain entries should be caught by bundle validations.
     checkState(
-        existingEntry == null || ModuleEntry.equal(existingEntry, entry),
+        existingEntry == null || existingEntry.equals(entry),
         "Module '%s' and some other module(s) contain entry '%s' with different contents.",
         split.getModuleName(),
         entry.getPath());

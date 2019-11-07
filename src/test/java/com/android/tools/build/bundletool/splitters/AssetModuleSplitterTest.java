@@ -17,6 +17,7 @@
 package com.android.tools.build.bundletool.splitters;
 
 import static com.android.tools.build.bundletool.model.OptimizationDimension.LANGUAGE;
+import static com.android.tools.build.bundletool.model.OptimizationDimension.TEXTURE_COMPRESSION_FORMAT;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifestForAssetModule;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.apkGraphicsTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.apkLanguageTargeting;
@@ -31,9 +32,11 @@ import static com.android.tools.build.bundletool.testing.TargetingUtils.openGlVe
 import static com.android.tools.build.bundletool.testing.TargetingUtils.targetedAssetsDirectory;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.textureCompressionTargeting;
 import static com.android.tools.build.bundletool.testing.TestUtils.extractPaths;
+import static com.android.tools.build.bundletool.testing.TestUtils.getEntryContent;
 import static com.google.common.truth.Truth.assertThat;
 import static com.google.common.truth.extensions.proto.ProtoTruth.assertThat;
 
+import com.android.bundle.Config.SuffixStripping;
 import com.android.bundle.Targeting.ApkTargeting;
 import com.android.bundle.Targeting.AssetsDirectoryTargeting;
 import com.android.bundle.Targeting.TextureCompressionFormat.TextureCompressionFormatAlias;
@@ -44,6 +47,7 @@ import com.android.tools.build.bundletool.model.ModuleSplit.SplitType;
 import com.android.tools.build.bundletool.model.OptimizationDimension;
 import com.android.tools.build.bundletool.testing.BundleModuleBuilder;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Maps;
 import java.util.Map;
@@ -52,7 +56,7 @@ import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 
 @RunWith(JUnit4.class)
-public class RemoteAssetModuleSplitterTest {
+public class AssetModuleSplitterTest {
 
 
   @Test
@@ -66,7 +70,7 @@ public class RemoteAssetModuleSplitterTest {
 
     assertThat(testModule.getModuleType()).isEqualTo(ModuleType.ASSET_MODULE);
     ImmutableList<ModuleSplit> slices =
-        new RemoteAssetModuleSplitter(testModule, ApkGenerationConfiguration.getDefaultInstance())
+        new AssetModuleSplitter(testModule, ApkGenerationConfiguration.getDefaultInstance())
             .splitModule();
 
     assertThat(slices).hasSize(1);

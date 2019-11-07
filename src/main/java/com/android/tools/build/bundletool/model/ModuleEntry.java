@@ -16,11 +16,13 @@
 package com.android.tools.build.bundletool.model;
 
 import com.android.tools.build.bundletool.model.utils.files.FileUtils;
+import com.google.errorprone.annotations.CheckReturnValue;
 import com.google.errorprone.annotations.Immutable;
 import com.google.errorprone.annotations.MustBeClosed;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
+import java.util.Objects;
 
 /**
  * Represents an entry in a an App Bundle's module.
@@ -29,7 +31,7 @@ import java.io.UncheckedIOException;
  * backing this entry remains unchanged.
  */
 @Immutable
-public interface ModuleEntry {
+public abstract class ModuleEntry {
 
   /**
    * Returns the content of the entry as a stream of bytes.
@@ -38,32 +40,44 @@ public interface ModuleEntry {
    * for efficiency.
    */
   @MustBeClosed
-  InputStream getContent();
-
-  @SuppressWarnings("MustBeClosedChecker") // InputStreamSupplier is annotated with @MustBeClosed
-  default InputStreamSupplier getContentSupplier() {
-    return () -> getContent();
-  }
+  public abstract InputStream getContent();
 
   /** Path of the entry inside the module. */
-  ZipPath getPath();
+  public abstract ZipPath getPath();
 
   /** Whether the entry is a directory. */
-  boolean isDirectory();
+  public abstract boolean isDirectory();
 
-  boolean shouldCompress();
+  public abstract boolean shouldCompress();
+
+  @SuppressWarnings("MustBeClosedChecker") // InputStreamSupplier is annotated with @MustBeClosed
+  public final InputStreamSupplier getContentSupplier() {
+    return () -> getContent();
+  }
 
   /**
    * Creates a new instance if passed shouldCompress doesnt match object's shouldCompress, otherwise
    * returns original object.
    */
-  ModuleEntry setCompression(boolean shouldCompress);
+  @CheckReturnValue
+  public final ModuleEntry setCompression(boolean newShouldCompress) {
+    if (newShouldCompress == shouldCompress()) {
+      return this;
+    }
+    return new DelegatingModuleEntry(/* delegate= */ this) {
+      @Override
+      public boolean shouldCompress() {
+        return newShouldCompress;
+      }
+    };
+  }
 
   /**
    * Creates and returns a new ModuleEntry, identical with the old one, but with a different path.
    */
-  default ModuleEntry setPath(ZipPath newPath) {
-    return new DelegatingModuleEntry(this) {
+  @CheckReturnValue
+  public final ModuleEntry setPath(ZipPath newPath) {
+    return new DelegatingModuleEntry(/* delegate= */ this) {
       @Override
       public ZipPath getPath() {
         return newPath;
@@ -72,8 +86,24 @@ public interface ModuleEntry {
   }
 
   /** Checks whether the given entries are identical. */
-  static boolean equal(ModuleEntry entry1, ModuleEntry entry2) {
+  @Override
+  public boolean equals(Object obj2) {
+    if (!(obj2 instanceof ModuleEntry)) {
+      return false;
+    }
+
+    ModuleEntry entry1 = this;
+    ModuleEntry entry2 = (ModuleEntry) obj2;
+
+    if (entry1 == entry2) {
+      return true;
+    }
+
     if (!entry1.getPath().equals(entry2.getPath())) {
+      return false;
+    }
+
+    if (entry1.shouldCompress() != entry2.shouldCompress()) {
       return false;
     }
 
@@ -93,5 +123,11 @@ public interface ModuleEntry {
               entry1.getPath(), entry2.getPath()),
           e);
     }
+  }
+
+  @Override
+  public int hashCode() {
+    // Deliberately omit the content for performance.
+    return Objects.hash(getPath(), shouldCompress(), isDirectory());
   }
 }

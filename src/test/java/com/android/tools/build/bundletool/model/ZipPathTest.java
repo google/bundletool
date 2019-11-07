@@ -70,6 +70,21 @@ public final class ZipPathTest {
   }
 
   @Test
+  public void testCreate_fromImmutableList() {
+    ZipPath path1 = ZipPath.create("foo/bar");
+    ZipPath path2 = ZipPath.create(ImmutableList.of("foo", "bar"));
+    assertThat((Object) path1).isEqualTo(path2);
+  }
+
+  @Test
+  public void testCreate_throwsIfInvalidImmutableList() {
+    assertThrows(
+        IllegalArgumentException.class, () -> ZipPath.create(ImmutableList.of("foo", "", "bar")));
+    assertThrows(
+        IllegalArgumentException.class, () -> ZipPath.create(ImmutableList.of("foo", "/", "bar")));
+  }
+
+  @Test
   public void testResolve_fromEmptyPath() {
     assertThat((Object) ZipPath.create("").resolve("foo")).isEqualTo(ZipPath.create("foo"));
     assertThat((Object) ZipPath.create("").resolve("foo/bar")).isEqualTo(ZipPath.create("foo/bar"));

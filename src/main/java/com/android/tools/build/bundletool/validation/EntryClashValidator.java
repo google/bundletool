@@ -58,7 +58,7 @@ public class EntryClashValidator extends SubValidator {
   private static void checkEqualEntries(ZipPath path, BundleModule module1, BundleModule module2) {
     ModuleEntry entry1 = module1.getEntry(path).get();
     ModuleEntry entry2 = module2.getEntry(path).get();
-    if (!ModuleEntry.equal(entry1, entry2)) {
+    if (!entry1.equals(entry2)) {
       throw ValidationException.builder()
           .withMessage(
               "Modules '%s' and '%s' contain entry '%s' with different content.",

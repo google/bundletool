@@ -28,6 +28,7 @@ import com.android.tools.build.bundletool.model.ResourceId;
 import com.android.tools.build.bundletool.model.ResourceTableEntry;
 import com.android.tools.build.bundletool.model.exceptions.ValidationException;
 import com.android.tools.build.bundletool.model.utils.ResourcesUtils;
+import com.android.tools.build.bundletool.model.utils.TextureCompressionUtils;
 import com.android.tools.build.bundletool.model.version.BundleToolVersion;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Sets;
@@ -36,6 +37,7 @@ import java.nio.file.FileSystem;
 import java.nio.file.FileSystems;
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 /** Validator of the BundleConfig. */
 public final class BundleConfigValidator extends SubValidator {
@@ -100,6 +102,51 @@ public final class BundleConfigValidator extends SubValidator {
           .withMessage("BundleConfig.pb contains duplicate split dimensions: %s", splitDimensions)
           .build();
     }
+
+    if (splitDimensions.stream()
+        .anyMatch(
+            dimension ->
+                dimension.hasSuffixStripping()
+                    && !dimension.getValue().equals(Value.TEXTURE_COMPRESSION_FORMAT))) {
+      throw ValidationException.builder()
+          .withMessage(
+              "Suffix stripping was enabled for an unsupported dimension. Only"
+                  + " TEXTURE_COMPRESSION_FORMAT is supported.")
+          .build();
+    }
+
+    if (splitDimensions.stream()
+        .anyMatch(
+            dimension ->
+                dimension.hasSuffixStripping()
+                    && dimension.getSuffixStripping().getEnabled()
+                    && dimension.getSuffixStripping().getDefaultSuffix().isEmpty())) {
+      throw ValidationException.builder()
+          .withMessage("Suffix stripping was enabled without specifying a default suffix.")
+          .build();
+    }
+
+    splitDimensions.stream()
+        .filter(dimension -> dimension.getValue().equals(Value.TEXTURE_COMPRESSION_FORMAT))
+        .filter(dimension -> !dimension.getSuffixStripping().getDefaultSuffix().isEmpty())
+        .filter(
+            dimension ->
+                !TextureCompressionUtils.TEXTURE_TO_TARGETING.containsKey(
+                    dimension.getSuffixStripping().getDefaultSuffix()))
+        .findFirst()
+        .ifPresent(
+            dimension -> {
+              ImmutableSet<String> supportedTextures =
+                  TextureCompressionUtils.TEXTURE_TO_TARGETING.keySet();
+
+              throw ValidationException.builder()
+                  .withMessage(
+                      "The default texture compression format chosen for suffix stripping (\"%s\") "
+                          + "is not valid. Supported formats are: %s.",
+                      dimension.getSuffixStripping().getDefaultSuffix(),
+                      supportedTextures.stream().collect(Collectors.joining(", ")))
+                  .build();
+            });
   }
 
   private void validateVersion(BundleConfig bundleConfig) {

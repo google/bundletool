@@ -16,11 +16,53 @@
 
 package com.android.tools.build.bundletool.validation;
 
+import com.android.bundle.Targeting.AbiTargeting;
+import com.android.bundle.Targeting.GraphicsApiTargeting;
+import com.android.bundle.Targeting.LanguageTargeting;
+import com.android.bundle.Targeting.TextureCompressionFormatTargeting;
 import com.android.tools.build.bundletool.model.BundleModule;
 import com.android.tools.build.bundletool.model.ZipPath;
+import com.android.tools.build.bundletool.model.exceptions.ValidationException;
 
 /** Misc bundle validation functions. */
 public final class BundleValidationUtils {
+
+  public static void checkHasValuesOrAlternatives(AbiTargeting targeting, String directoryPath) {
+    if (targeting.getValueCount() == 0 && targeting.getAlternativesCount() == 0) {
+      throw ValidationException.builder()
+          .withMessage("Directory '%s' has set but empty ABI targeting.", directoryPath)
+          .build();
+    }
+  }
+
+  public static void checkHasValuesOrAlternatives(
+      GraphicsApiTargeting targeting, String directoryPath) {
+    if (targeting.getValueCount() == 0 && targeting.getAlternativesCount() == 0) {
+      throw ValidationException.builder()
+          .withMessage("Directory '%s' has set but empty Graphics API targeting.", directoryPath)
+          .build();
+    }
+  }
+
+  public static void checkHasValuesOrAlternatives(
+      LanguageTargeting targeting, String directoryPath) {
+    if (targeting.getValueCount() == 0 && targeting.getAlternativesCount() == 0) {
+      throw ValidationException.builder()
+          .withMessage("Directory '%s' has set but empty language targeting.", directoryPath)
+          .build();
+    }
+  }
+
+  public static void checkHasValuesOrAlternatives(
+      TextureCompressionFormatTargeting targeting, String directoryPath) {
+    if (targeting.getValueCount() == 0 && targeting.getAlternativesCount() == 0) {
+      throw ValidationException.builder()
+          .withMessage(
+              "Directory '%s' has set but empty Texture Compression Format targeting.",
+              directoryPath)
+          .build();
+    }
+  }
 
   /** Checks whether directory inside the specified module contains any files. */
   public static boolean directoryContainsNoFiles(BundleModule module, ZipPath dir) {

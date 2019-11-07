@@ -39,7 +39,7 @@ import java.nio.file.Path;
 @Immutable
 @AutoValue
 @AutoValue.CopyAnnotations
-public abstract class FileSystemModuleEntry implements ModuleEntry {
+public abstract class FileSystemModuleEntry extends ModuleEntry {
 
   @Override
   public abstract ZipPath getPath();
@@ -61,14 +61,6 @@ public abstract class FileSystemModuleEntry implements ModuleEntry {
       throw new UncheckedIOException(
           String.format("Error while reading file '%s'.", getFileSystemPath()), e);
     }
-  }
-
-  @Override
-  public FileSystemModuleEntry setCompression(boolean shouldCompress) {
-    if (shouldCompress == shouldCompress()) {
-      return this;
-    }
-    return create(getPath(), isDirectory(), shouldCompress, getFileSystemPath());
   }
 
   /**

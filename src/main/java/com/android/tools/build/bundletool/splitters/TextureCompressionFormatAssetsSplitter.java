@@ -19,19 +19,27 @@ package com.android.tools.build.bundletool.splitters;
 import com.android.bundle.Targeting.ApkTargeting;
 import com.android.bundle.Targeting.AssetsDirectoryTargeting;
 import com.android.bundle.Targeting.TextureCompressionFormatTargeting;
+import com.android.tools.build.bundletool.model.targeting.TargetingDimension;
+import java.util.Optional;
 
 /**
  * Splits assets by the texture compression format support.
+ *
+ * <p>This dimension has the specificity that the targeting dimension suffix in paths ("#tcf_xxx")
+ * can optionally be not persisted after splitting - the suffix is removed from paths.
  *
  * <p>See {@link AssetsDimensionSplitterFactory} for details of the implementation.
  */
 public class TextureCompressionFormatAssetsSplitter {
 
-  public static ModuleSplitSplitter create() {
+  public static ModuleSplitSplitter create(boolean stripTargetingSuffix) {
     return AssetsDimensionSplitterFactory.createSplitter(
         AssetsDirectoryTargeting::getTextureCompressionFormat,
         TextureCompressionFormatAssetsSplitter::fromTextureCompressionFormat,
-        ApkTargeting::hasTextureCompressionFormatTargeting);
+        ApkTargeting::hasTextureCompressionFormatTargeting,
+        stripTargetingSuffix
+            ? Optional.of(TargetingDimension.TEXTURE_COMPRESSION_FORMAT)
+            : Optional.empty());
   }
 
   private static ApkTargeting fromTextureCompressionFormat(

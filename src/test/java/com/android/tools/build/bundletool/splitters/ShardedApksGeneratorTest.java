@@ -71,6 +71,7 @@ import java.nio.file.Path;
 import java.util.List;
 import java.util.Optional;
 import org.junit.Before;
+import org.junit.Ignore;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.experimental.theories.DataPoints;
@@ -121,10 +122,10 @@ public class ShardedApksGeneratorTest {
 
     ImmutableList<ModuleSplit> moduleSplits =
         standaloneSplitType.equals(SplitType.STANDALONE)
-            ? generateModuleSplitsForStandalone(bundleModule, /* generate64BitShards= */ true)
+            ? generateModuleSplitsForStandalone(bundleModule, /* strip64BitLibraries= */ false)
             : generateModuleSplitsForSystem(
                 bundleModule,
-                /* generate64BitShards= */ true,
+                /* strip64BitLibraries= */ false,
                 ImmutableSet.of(BASE_MODULE_NAME, VR_MODULE_NAME));
 
     assertThat(moduleSplits).hasSize(1);
@@ -172,20 +173,21 @@ public class ShardedApksGeneratorTest {
     if (standaloneSplitType.equals(SplitType.SYSTEM)) {
       moduleSplits =
           generateModuleSplitsForSystem(
-              bundleModule, /* generate64BitShards= */ true, ImmutableSet.of(BASE_MODULE_NAME));
+              bundleModule, /* strip64BitLibraries= */ false, ImmutableSet.of(BASE_MODULE_NAME));
       assertThat(moduleSplits).hasSize(1); // x86, mdpi split
     } else {
       moduleSplits =
-          generateModuleSplitsForStandalone(bundleModule, /* generate64BitShards= */ true);
+          generateModuleSplitsForStandalone(bundleModule, /* strip64BitLibraries= */ false);
       assertThat(moduleSplits).hasSize(14); // 7 (density), 2 (abi) splits
     }
     assertThat(moduleSplits.stream().map(ModuleSplit::getSplitType).collect(toImmutableSet()))
         .containsExactly(standaloneSplitType);
   }
 
+  @Ignore
   @Test
   @Theory
-  public void singleModule_withNativeLibsAndDensity_64bitNativeLibsDisabled(
+  public void singleModule_withNativeLibsAndDensity_strip64bitNativeLibs(
       @FromDataPoints("standaloneSplitTypes") SplitType standaloneSplitType) throws Exception {
 
     ImmutableList<BundleModule> bundleModule =
@@ -220,11 +222,11 @@ public class ShardedApksGeneratorTest {
     if (standaloneSplitType.equals(SplitType.SYSTEM)) {
       moduleSplits =
           generateModuleSplitsForSystem(
-              bundleModule, /* generate64BitShards= */ false, ImmutableSet.of(BASE_MODULE_NAME));
+              bundleModule, /* strip64BitLibraries= */ true, ImmutableSet.of(BASE_MODULE_NAME));
       assertThat(moduleSplits).hasSize(1); // x86, mdpi split
     } else {
       moduleSplits =
-          generateModuleSplitsForStandalone(bundleModule, /* generate64BitShards= */ false);
+          generateModuleSplitsForStandalone(bundleModule, /* strip64BitLibraries= */ true);
       assertThat(moduleSplits).hasSize(7); // 7 (density), 1 (abi) split
     }
     // Verify that the only ABI is x86.
@@ -249,6 +251,7 @@ public class ShardedApksGeneratorTest {
         .containsExactly(standaloneSplitType);
   }
 
+  @Ignore
   @Test
   public void singleModule_withNativeLibsAndDensityWithDeviceSpec_64bitNativeLibsDisabled()
       throws Exception {
@@ -281,7 +284,8 @@ public class ShardedApksGeneratorTest {
                 .build());
 
     ImmutableList<ModuleSplit> moduleSplits =
-        new ShardedApksGenerator(tmpDir, BUNDLETOOL_VERSION, /* generate64BitShards= */ false)
+        new ShardedApksGenerator(
+                tmpDir, BUNDLETOOL_VERSION, /* strip64BitLibrariesFromShards= */ true)
             .generateSystemSplits(
                 /* modules= */ bundleModule,
                 /* modulesToFuse= */ ImmutableSet.of(BASE_MODULE_NAME),
@@ -339,7 +343,8 @@ public class ShardedApksGeneratorTest {
                 .build());
 
     ImmutableList<ModuleSplit> moduleSplits =
-        new ShardedApksGenerator(tmpDir, BUNDLETOOL_VERSION, /* generate64BitShards= */ true)
+        new ShardedApksGenerator(
+                tmpDir, BUNDLETOOL_VERSION, /* strip64BitLibrariesFromShards= */ false)
             .generateSystemSplits(
                 /* modules= */ bundleModule,
                 /* modulesToFuse= */ ImmutableSet.of(BASE_MODULE_NAME),
@@ -425,7 +430,8 @@ public class ShardedApksGeneratorTest {
                 .build());
 
     ImmutableList<ModuleSplit> moduleSplits =
-        new ShardedApksGenerator(tmpDir, BUNDLETOOL_VERSION, /* generate64BitShards= */ true)
+        new ShardedApksGenerator(
+                tmpDir, BUNDLETOOL_VERSION, /* strip64BitLibrariesFromShards= */ false)
             .generateSystemSplits(
                 /* modules= */ bundleModule,
                 /* modulesToFuse= */ ImmutableSet.of(BASE_MODULE_NAME, VR_MODULE_NAME),
@@ -476,16 +482,16 @@ public class ShardedApksGeneratorTest {
   }
 
   private ImmutableList<ModuleSplit> generateModuleSplitsForStandalone(
-      ImmutableList<BundleModule> bundleModule, boolean generate64BitShards) {
-      return new ShardedApksGenerator(tmpDir, BUNDLETOOL_VERSION, generate64BitShards)
-          .generateSplits(bundleModule, DEFAULT_METADATA, DEFAULT_APK_OPTIMIZATIONS);
+      ImmutableList<BundleModule> bundleModule, boolean strip64BitLibraries) {
+    return new ShardedApksGenerator(tmpDir, BUNDLETOOL_VERSION, strip64BitLibraries)
+        .generateSplits(bundleModule, DEFAULT_METADATA, DEFAULT_APK_OPTIMIZATIONS);
   }
 
   private ImmutableList<ModuleSplit> generateModuleSplitsForSystem(
       ImmutableList<BundleModule> bundleModule,
-      boolean generate64BitShards,
+      boolean strip64BitLibraries,
       ImmutableSet<BundleModuleName> moduleToFuse) {
-    return new ShardedApksGenerator(tmpDir, BUNDLETOOL_VERSION, generate64BitShards)
+    return new ShardedApksGenerator(tmpDir, BUNDLETOOL_VERSION, strip64BitLibraries)
         .generateSystemSplits(
             /* modules= */ bundleModule,
             /* modulesToFuse= */ moduleToFuse,

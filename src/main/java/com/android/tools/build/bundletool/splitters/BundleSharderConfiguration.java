@@ -16,9 +16,11 @@
 
 package com.android.tools.build.bundletool.splitters;
 
-
+import com.android.bundle.Config.SuffixStripping;
 import com.android.bundle.Devices.DeviceSpec;
+import com.android.tools.build.bundletool.model.OptimizationDimension;
 import com.google.auto.value.AutoValue;
+import com.google.common.collect.ImmutableMap;
 import com.google.errorprone.annotations.Immutable;
 import java.util.Optional;
 
@@ -28,15 +30,20 @@ import java.util.Optional;
 @AutoValue.CopyAnnotations
 public abstract class BundleSharderConfiguration {
 
-  public abstract boolean getGenerate64BitShard();
+  public abstract boolean getStrip64BitLibrariesFromShards();
 
   public abstract Optional<DeviceSpec> getDeviceSpec();
+
+  /** The configuration of the suffixes for the different dimensions. */
+  public abstract ImmutableMap<OptimizationDimension, SuffixStripping>
+      getSuffixStrippings();
 
   public abstract Builder toBuilder();
 
   public static Builder builder() {
     return new AutoValue_BundleSharderConfiguration.Builder()
-        .setGenerate64BitShard(true);
+        .setStrip64BitLibrariesFromShards(false)
+        .setSuffixStrippings(ImmutableMap.of());
   }
 
   public static BundleSharderConfiguration getDefaultInstance() {
@@ -51,9 +58,12 @@ public abstract class BundleSharderConfiguration {
   @AutoValue.Builder
   public abstract static class Builder {
 
-    public abstract Builder setGenerate64BitShard(boolean generate64BitShard);
+    public abstract Builder setStrip64BitLibrariesFromShards(boolean strip64BitLibrariesFromShards);
 
     public abstract Builder setDeviceSpec(Optional<DeviceSpec> deviceSpec);
+
+    public abstract Builder setSuffixStrippings(
+        ImmutableMap<OptimizationDimension, SuffixStripping> suffixStrippings);
 
     abstract BundleSharderConfiguration build();
   }

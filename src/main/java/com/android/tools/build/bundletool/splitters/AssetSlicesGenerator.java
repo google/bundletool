@@ -46,8 +46,8 @@ public class AssetSlicesGenerator {
     int versionCode = appBundle.getBaseModule().getAndroidManifest().getVersionCode();
 
     for (BundleModule module : appBundle.getAssetModules().values()) {
-      RemoteAssetModuleSplitter moduleSplitter =
-          new RemoteAssetModuleSplitter(module, apkGenerationConfiguration);
+      AssetModuleSplitter moduleSplitter =
+          new AssetModuleSplitter(module, apkGenerationConfiguration);
       if (module.getDeliveryType().equals(ModuleDeliveryType.ALWAYS_INITIAL_INSTALL)) {
         splits.addAll(
             moduleSplitter.splitModule().stream()

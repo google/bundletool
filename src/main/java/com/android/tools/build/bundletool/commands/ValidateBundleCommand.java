@@ -73,7 +73,7 @@ public abstract class ValidateBundleCommand {
     validateInput();
 
     try (ZipFile bundleZip = new ZipFile(getBundlePath().toFile())) {
-      AppBundleValidator bundleValidator = new AppBundleValidator();
+      AppBundleValidator bundleValidator = AppBundleValidator.create();
 
       bundleValidator.validateFile(bundleZip);
       AppBundle appBundle = AppBundle.buildFromZip(bundleZip);

@@ -678,6 +678,20 @@ public final class ManifestProtoUtils {
                             .setValueAsDecimalInteger(minSdkVersion)));
   }
 
+  public static ManifestMutator withMaxSdkCondition(int maxSdkVersion) {
+    return manifestElement ->
+        manifestElement
+            .getOrCreateChildElement(DISTRIBUTION_NAMESPACE_URI, "module")
+            .getOrCreateChildElement(DISTRIBUTION_NAMESPACE_URI, "delivery")
+            .getOrCreateChildElement(DISTRIBUTION_NAMESPACE_URI, "install-time")
+            .getOrCreateChildElement(DISTRIBUTION_NAMESPACE_URI, "conditions")
+            .addChildElement(
+                XmlProtoElementBuilder.create(DISTRIBUTION_NAMESPACE_URI, "max-sdk")
+                    .addAttribute(
+                        XmlProtoAttributeBuilder.create(DISTRIBUTION_NAMESPACE_URI, "value")
+                            .setValueAsDecimalInteger(maxSdkVersion)));
+  }
+
   /**
    * Creates a user countries condition for the supplied list of country codes and with the
    * dist:exclude attribute set to a given value.

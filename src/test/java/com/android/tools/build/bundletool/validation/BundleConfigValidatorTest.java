@@ -22,6 +22,8 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import com.android.aapt.Resources.ResourceTable;
 import com.android.bundle.Config.BundleConfig;
 import com.android.bundle.Config.SplitDimension;
+import com.android.bundle.Config.SplitDimension.Value;
+import com.android.bundle.Config.SuffixStripping;
 import com.android.tools.build.bundletool.model.AppBundle;
 import com.android.tools.build.bundletool.model.exceptions.ValidationException;
 import com.android.tools.build.bundletool.model.utils.ResourcesUtils;
@@ -148,6 +150,90 @@ public final class BundleConfigValidatorTest {
     assertThat(exception)
         .hasMessageThat()
         .contains("BundleConfig.pb contains an unrecognized split dimension.");
+  }
+
+  @Test
+  public void optimizations_tcfDimensionSuffixStripping_ok() throws Exception {
+    AppBundle appBundle =
+        createAppBundle(
+            BundleConfigBuilder.create()
+                .clearOptimizations()
+                .addSplitDimension(
+                    SplitDimension.newBuilder()
+                        .setValueValue(Value.TEXTURE_COMPRESSION_FORMAT_VALUE)
+                        .setSuffixStripping(
+                            SuffixStripping.newBuilder().setEnabled(true).setDefaultSuffix("pvrtc"))
+                        .build()));
+
+    new BundleConfigValidator().validateBundle(appBundle);
+  }
+
+  @Test
+  public void optimizations_nonTcfDimensionsSuffixStripping_throws() throws Exception {
+    AppBundle appBundle =
+        createAppBundle(
+            BundleConfigBuilder.create()
+                .clearOptimizations()
+                .addSplitDimension(
+                    SplitDimension.newBuilder()
+                        .setValueValue(Value.LANGUAGE_VALUE)
+                        .setSuffixStripping(SuffixStripping.newBuilder().setEnabled(true))
+                        .build()));
+
+    ValidationException exception =
+        assertThrows(
+            ValidationException.class, () -> new BundleConfigValidator().validateBundle(appBundle));
+    assertThat(exception)
+        .hasMessageThat()
+        .contains(
+            "Suffix stripping was enabled for an unsupported dimension. Only"
+                + " TEXTURE_COMPRESSION_FORMAT is supported.");
+  }
+
+  @Test
+  public void optimizations_tcfDimensionSuffixStrippingWithoutDefault_throws() throws Exception {
+    AppBundle appBundle =
+        createAppBundle(
+            BundleConfigBuilder.create()
+                .clearOptimizations()
+                .addSplitDimension(
+                    SplitDimension.newBuilder()
+                        .setValueValue(Value.TEXTURE_COMPRESSION_FORMAT_VALUE)
+                        .setSuffixStripping(SuffixStripping.newBuilder().setEnabled(true))
+                        .build()));
+
+    ValidationException exception =
+        assertThrows(
+            ValidationException.class, () -> new BundleConfigValidator().validateBundle(appBundle));
+    assertThat(exception)
+        .hasMessageThat()
+        .contains("Suffix stripping was enabled without specifying a default suffix.");
+  }
+
+  @Test
+  public void optimizations_tcfDimensionSuffixStrippingWithInvalidDefault_throws()
+      throws Exception {
+    AppBundle appBundle =
+        createAppBundle(
+            BundleConfigBuilder.create()
+                .clearOptimizations()
+                .addSplitDimension(
+                    SplitDimension.newBuilder()
+                        .setValueValue(Value.TEXTURE_COMPRESSION_FORMAT_VALUE)
+                        .setSuffixStripping(
+                            SuffixStripping.newBuilder()
+                                .setEnabled(true)
+                                .setDefaultSuffix("unrecognized_tcf"))
+                        .build()));
+
+    ValidationException exception =
+        assertThrows(
+            ValidationException.class, () -> new BundleConfigValidator().validateBundle(appBundle));
+    assertThat(exception)
+        .hasMessageThat()
+        .contains(
+            "The default texture compression format chosen for suffix stripping"
+                + " (\"unrecognized_tcf\") is not valid.");
   }
 
   @Test

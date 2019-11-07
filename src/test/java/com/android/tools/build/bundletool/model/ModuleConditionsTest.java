@@ -20,6 +20,8 @@ import static com.android.tools.build.bundletool.testing.TargetingUtils.mergeMod
 import static com.android.tools.build.bundletool.testing.TargetingUtils.moduleExcludeCountriesTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.moduleFeatureTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.moduleIncludeCountriesTargeting;
+import static com.android.tools.build.bundletool.testing.TargetingUtils.moduleMaxSdkVersionTargeting;
+import static com.android.tools.build.bundletool.testing.TargetingUtils.moduleMinMaxSdkVersionTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.moduleMinSdkVersionTargeting;
 import static com.google.common.truth.Truth.assertThat;
 import static com.google.common.truth.extensions.proto.ProtoTruth.assertThat;
@@ -67,6 +69,23 @@ public class ModuleConditionsTest {
 
     ModuleTargeting moduleTargeting = moduleConditions.toTargeting();
     assertThat(moduleTargeting).isEqualTo(moduleMinSdkVersionTargeting(26));
+  }
+
+  @Test
+  public void toTargeting_maxSdkVersion() {
+    ModuleConditions moduleConditions = ModuleConditions.builder().setMaxSdkVersion(26).build();
+
+    ModuleTargeting moduleTargeting = moduleConditions.toTargeting();
+    assertThat(moduleTargeting).isEqualTo(moduleMaxSdkVersionTargeting(26));
+  }
+
+  @Test
+  public void toTargeting_minMaxSdkVersions() {
+    ModuleConditions moduleConditions =
+        ModuleConditions.builder().setMinSdkVersion(26).setMaxSdkVersion(28).build();
+
+    ModuleTargeting moduleTargeting = moduleConditions.toTargeting();
+    assertThat(moduleTargeting).isEqualTo(moduleMinMaxSdkVersionTargeting(26, 28));
   }
 
   @Test

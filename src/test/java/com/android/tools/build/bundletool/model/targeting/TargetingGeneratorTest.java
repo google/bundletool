@@ -21,6 +21,7 @@ import static com.android.tools.build.bundletool.testing.TargetingUtils.assetsDi
 import static com.android.tools.build.bundletool.testing.TargetingUtils.graphicsApiTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.languageTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.mergeAssetsTargeting;
+import static com.android.tools.build.bundletool.testing.TargetingUtils.nativeDirectoryTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.openGlVersionFrom;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.openGlVersionTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.textureCompressionTargeting;
@@ -37,7 +38,9 @@ import com.android.bundle.Files.NativeLibraries;
 import com.android.bundle.Files.TargetedApexImage;
 import com.android.bundle.Files.TargetedAssetsDirectory;
 import com.android.bundle.Files.TargetedNativeDirectory;
+import com.android.bundle.Targeting.Abi.AbiAlias;
 import com.android.bundle.Targeting.AssetsDirectoryTargeting;
+import com.android.bundle.Targeting.Sanitizer.SanitizerAlias;
 import com.android.bundle.Targeting.TextureCompressionFormat.TextureCompressionFormatAlias;
 import com.android.tools.build.bundletool.model.AbiName;
 import com.android.tools.build.bundletool.model.ZipPath;
@@ -98,6 +101,22 @@ public class TargetingGeneratorTest {
 
     List<TargetedNativeDirectory> directories = nativeTargeting.getDirectoryList();
     assertThat(directories).hasSize(manyDirectories.size());
+  }
+
+  @Test
+  public void generateTargetingForNativeLibraries_sanitizer() throws Exception {
+    NativeLibraries nativeTargeting =
+        generator.generateTargetingForNativeLibraries(ImmutableList.of("lib/arm64-v8a-hwasan"));
+
+    List<TargetedNativeDirectory> directories = nativeTargeting.getDirectoryList();
+    assertThat(directories).hasSize(1);
+    assertThat(directories.get(0))
+        .isEqualTo(
+            TargetedNativeDirectory.newBuilder()
+                .setPath("lib/arm64-v8a-hwasan")
+                .setTargeting(
+                    nativeDirectoryTargeting(AbiAlias.ARM64_V8A, SanitizerAlias.HWADDRESS))
+                .build());
   }
 
   @Test

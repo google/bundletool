@@ -18,6 +18,7 @@ package com.android.tools.build.bundletool.model;
 
 import static com.android.tools.build.bundletool.model.AndroidManifest.CODE_ATTRIBUTE_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.CONDITION_DEVICE_FEATURE_NAME;
+import static com.android.tools.build.bundletool.model.AndroidManifest.CONDITION_MAX_SDK_VERSION_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.CONDITION_MIN_SDK_VERSION_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.CONDITION_USER_COUNTRIES_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.COUNTRY_ELEMENT_NAME;
@@ -55,7 +56,10 @@ public abstract class ManifestDeliveryElement {
   private static final ImmutableList<String> KNOWN_DELIVERY_MODES =
       ImmutableList.of("install-time", "on-demand", "fast-follow");
   private static final ImmutableList<String> CONDITIONS_ALLOWED_ONLY_ONCE =
-      ImmutableList.of(CONDITION_MIN_SDK_VERSION_NAME, CONDITION_USER_COUNTRIES_NAME);
+      ImmutableList.of(
+          CONDITION_MIN_SDK_VERSION_NAME,
+          CONDITION_MAX_SDK_VERSION_NAME,
+          CONDITION_USER_COUNTRIES_NAME);
 
   abstract XmlProtoElement getDeliveryElement();
 
@@ -135,6 +139,9 @@ public abstract class ManifestDeliveryElement {
         case CONDITION_MIN_SDK_VERSION_NAME:
           moduleConditions.setMinSdkVersion(parseMinSdkVersionCondition(conditionElement));
           break;
+        case CONDITION_MAX_SDK_VERSION_NAME:
+          moduleConditions.setMaxSdkVersion(parseMaxSdkVersionCondition(conditionElement));
+          break;
         case CONDITION_USER_COUNTRIES_NAME:
           moduleConditions.setUserCountriesCondition(parseUserCountriesCondition(conditionElement));
           break;
@@ -143,7 +150,24 @@ public abstract class ManifestDeliveryElement {
               String.format("Unrecognized module condition: '%s'", conditionElement.getName()));
       }
     }
-    return moduleConditions.build();
+
+    ModuleConditions processedModuleConditions = moduleConditions.build();
+
+    if (processedModuleConditions.getMinSdkVersion().isPresent()
+        && processedModuleConditions.getMaxSdkVersion().isPresent()) {
+      if (processedModuleConditions.getMinSdkVersion().get()
+          > processedModuleConditions.getMaxSdkVersion().get()) {
+        throw ValidationException.builder()
+            .withMessage(
+                "Illegal SDK-based conditional module targeting (min SDK must be less than or"
+                    + " equal to max SD). Provided min and max values, respectively, are %s and %s",
+                processedModuleConditions.getMinSdkVersion(),
+                processedModuleConditions.getMaxSdkVersion())
+            .build();
+      }
+    }
+
+    return processedModuleConditions;
   }
 
   private UserCountriesCondition parseUserCountriesCondition(XmlProtoElement conditionElement) {
@@ -288,13 +312,23 @@ public abstract class ManifestDeliveryElement {
             .map(XmlProtoAttribute::getValueAsInteger));
   }
 
-  private int parseMinSdkVersionCondition(XmlProtoElement conditionElement) {
+  private static int parseMinSdkVersionCondition(XmlProtoElement conditionElement) {
     return conditionElement
         .getAttribute(DISTRIBUTION_NAMESPACE_URI, VALUE_ATTRIBUTE_NAME)
         .orElseThrow(
             () ->
                 new ValidationException(
                     "Missing required 'dist:value' attribute in the 'min-sdk' condition element."))
+        .getValueAsDecimalInteger();
+  }
+
+  private static int parseMaxSdkVersionCondition(XmlProtoElement conditionElement) {
+    return conditionElement
+        .getAttribute(DISTRIBUTION_NAMESPACE_URI, VALUE_ATTRIBUTE_NAME)
+        .orElseThrow(
+            () ->
+                new ValidationException(
+                    "Missing required 'dist:value' attribute in the 'max-sdk' condition element."))
         .getValueAsDecimalInteger();
   }
 

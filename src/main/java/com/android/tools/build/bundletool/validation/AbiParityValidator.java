@@ -63,7 +63,7 @@ public class AbiParityValidator extends SubValidator {
         // Extract ABI from the directory name.
         .map(TargetedDirectorySegment::parse)
         .map(TargetedDirectorySegment::getName)
-        .map(abi -> AbiName.fromPlatformName(abi).get().toProto())
+        .map(subDir -> AbiName.fromLibSubDirName(subDir).get().toProto())
         .collect(toImmutableSet());
   }
 }

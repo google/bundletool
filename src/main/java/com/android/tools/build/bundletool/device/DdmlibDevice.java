@@ -41,8 +41,10 @@ public class DdmlibDevice extends Device {
   private final IDevice device;
   private static final int ADB_TIMEOUT_MS = 60000;
   private static final String DEVICE_FEATURES_COMMAND = "pm list features";
+  private static final String GL_EXTENSIONS_COMMAND = "dumpsys SurfaceFlinger";
 
   private final DeviceFeaturesParser deviceFeaturesParser = new DeviceFeaturesParser();
+  private final GlExtensionsParser glExtensionsParser = new GlExtensionsParser();
 
   public DdmlibDevice(IDevice device) {
     this.device = device;
@@ -82,6 +84,13 @@ public class DdmlibDevice extends Device {
   public ImmutableList<String> getDeviceFeatures() {
     return deviceFeaturesParser.parse(
         new AdbShellCommandTask(this, DEVICE_FEATURES_COMMAND)
+            .execute(ADB_TIMEOUT_MS, TimeUnit.MILLISECONDS));
+  }
+
+  @Override
+  public ImmutableList<String> getGlExtensions() {
+    return glExtensionsParser.parse(
+        new AdbShellCommandTask(this, GL_EXTENSIONS_COMMAND)
             .execute(ADB_TIMEOUT_MS, TimeUnit.MILLISECONDS));
   }
 

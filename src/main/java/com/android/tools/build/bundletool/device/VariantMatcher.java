@@ -49,6 +49,7 @@ public class VariantMatcher {
         new AbiMatcher(deviceSpec),
         new MultiAbiMatcher(deviceSpec),
         new ScreenDensityMatcher(deviceSpec),
+        new TextureCompressionFormatMatcher(deviceSpec),
         matchInstant);
   }
 
@@ -57,9 +58,15 @@ public class VariantMatcher {
       AbiMatcher abiMatcher,
       MultiAbiMatcher multiAbiMatcher,
       ScreenDensityMatcher screenDensityMatcher,
+      TextureCompressionFormatMatcher textureCompressionFormatMatcher,
       boolean matchInstant) {
     this.variantMatchers =
-        ImmutableList.of(sdkVersionMatcher, abiMatcher, multiAbiMatcher, screenDensityMatcher);
+        ImmutableList.of(
+            sdkVersionMatcher,
+            abiMatcher,
+            multiAbiMatcher,
+            screenDensityMatcher,
+            textureCompressionFormatMatcher);
     this.matchInstant = matchInstant;
   }
 

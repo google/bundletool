@@ -85,36 +85,4 @@ public class FileSystemModuleEntryTest {
 
     assertThat(exception).hasMessageThat().contains("Error while reading file");
   }
-
-  @Test
-  public void setCompression_setFalse_ok() throws Exception {
-    Path filePath = tmp.newFile("file.txt").toPath();
-    FileSystemModuleEntry entry =
-        FileSystemModuleEntry.ofFile(ZipPath.create("assets/file.txt"), filePath);
-    assertThat(entry.shouldCompress()).isTrue();
-
-    FileSystemModuleEntry compressedEntry = entry.setCompression(false);
-    assertThat(compressedEntry.shouldCompress()).isFalse();
-    assertThat(entry.getPath()).isEqualTo(compressedEntry.getPath());
-    assertThat(entry.getFileSystemPath()).isEqualTo(compressedEntry.getFileSystemPath());
-    assertThat(entry.isDirectory()).isEqualTo(compressedEntry.isDirectory());
-    assertThat(TestUtils.getEntryContent(entry))
-        .isEqualTo(TestUtils.getEntryContent(compressedEntry));
-  }
-
-  @Test
-  public void setCompression_setTrue_ok() throws Exception {
-    Path filePath = tmp.newFile("file.txt").toPath();
-    FileSystemModuleEntry entry =
-        FileSystemModuleEntry.ofFile(ZipPath.create("assets/file.txt"), filePath);
-    assertThat(entry.shouldCompress()).isTrue();
-
-    FileSystemModuleEntry compressedEntry = entry.setCompression(true);
-    assertThat(entry.shouldCompress()).isTrue();
-    assertThat(entry.getPath()).isEqualTo(compressedEntry.getPath());
-    assertThat(entry.getFileSystemPath()).isEqualTo(compressedEntry.getFileSystemPath());
-    assertThat(entry.isDirectory()).isEqualTo(compressedEntry.isDirectory());
-    assertThat(TestUtils.getEntryContent(entry))
-        .isEqualTo(TestUtils.getEntryContent(compressedEntry));
-  }
 }

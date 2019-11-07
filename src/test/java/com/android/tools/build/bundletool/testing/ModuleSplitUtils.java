@@ -20,6 +20,8 @@ import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.andr
 import static com.android.tools.build.bundletool.testing.TargetingUtils.lPlusVariantTargeting;
 
 import com.android.bundle.Targeting.ApkTargeting;
+import com.android.bundle.Targeting.AssetsDirectoryTargeting;
+import com.android.bundle.Targeting.LanguageTargeting;
 import com.android.tools.build.bundletool.model.AndroidManifest;
 import com.android.tools.build.bundletool.model.BundleModuleName;
 import com.android.tools.build.bundletool.model.ManifestMutator;
@@ -53,6 +55,12 @@ public class ModuleSplitUtils {
     return moduleSplit
         .toBuilder()
         .setAndroidManifest(moduleSplit.getAndroidManifest().applyMutators(manifestMutators))
+        .build();
+  }
+
+  public static AssetsDirectoryTargeting createAssetsDirectoryLanguageTargeting(String lang) {
+    return AssetsDirectoryTargeting.newBuilder()
+        .setLanguage(LanguageTargeting.newBuilder().addValue(lang).build())
         .build();
   }
 }

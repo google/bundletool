@@ -33,6 +33,7 @@ import static com.android.tools.build.bundletool.testing.TargetingUtils.apkDensi
 import static com.android.tools.build.bundletool.testing.TargetingUtils.apkGraphicsTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.apkLanguageTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.apkMultiAbiTargeting;
+import static com.android.tools.build.bundletool.testing.TargetingUtils.apkSanitizerTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.apkTextureTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.graphicsApiTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.lPlusVariantTargeting;
@@ -52,6 +53,7 @@ import com.android.bundle.Targeting.Abi;
 import com.android.bundle.Targeting.Abi.AbiAlias;
 import com.android.bundle.Targeting.AbiTargeting;
 import com.android.bundle.Targeting.ApkTargeting;
+import com.android.bundle.Targeting.Sanitizer.SanitizerAlias;
 import com.android.bundle.Targeting.ScreenDensity;
 import com.android.bundle.Targeting.ScreenDensity.DensityAlias;
 import com.android.bundle.Targeting.ScreenDensityTargeting;
@@ -373,6 +375,21 @@ public class ModuleSplitTest {
             .build();
     langSplit = langSplit.writeSplitIdInManifest(langSplit.getSuffix());
     assertThat(langSplit.getAndroidManifest().getSplitId()).hasValue("config.other_lang");
+  }
+
+  @Test
+  public void moduleSanitizerSplitSuffixAndName() {
+    ModuleSplit sanitizerSplit =
+        ModuleSplit.builder()
+            .setModuleName(BundleModuleName.create("base"))
+            .setEntries(ImmutableList.of())
+            .setVariantTargeting(lPlusVariantTargeting())
+            .setApkTargeting(apkSanitizerTargeting(SanitizerAlias.HWADDRESS))
+            .setMasterSplit(false)
+            .setAndroidManifest(AndroidManifest.create(androidManifest("com.test.app")))
+            .build();
+    sanitizerSplit = sanitizerSplit.writeSplitIdInManifest(sanitizerSplit.getSuffix());
+    assertThat(sanitizerSplit.getAndroidManifest().getSplitId()).hasValue("config.hwasan");
   }
 
   @Test

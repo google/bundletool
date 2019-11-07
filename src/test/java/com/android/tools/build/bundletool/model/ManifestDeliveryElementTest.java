@@ -25,6 +25,7 @@ import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.with
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withInstallTimeDelivery;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withInstantInstallTimeDelivery;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withInstantOnDemandDelivery;
+import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withMaxSdkCondition;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withMinSdkCondition;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withMinSdkVersion;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withOnDemandDelivery;
@@ -183,7 +184,8 @@ public class ManifestDeliveryElementTest {
             androidManifest(
                 "com.test.app",
                 withFeatureCondition("android.hardware.camera.ar"),
-                withMinSdkCondition(24)),
+                withMinSdkCondition(24),
+                withMaxSdkCondition(27)),
             /* isFastFollowAllowed= */ false);
 
     assertThat(deliveryElement).isPresent();
@@ -195,7 +197,23 @@ public class ManifestDeliveryElementTest {
                 .addDeviceFeatureCondition(
                     DeviceFeatureCondition.create("android.hardware.camera.ar"))
                 .setMinSdkVersion(24)
+                .setMaxSdkVersion(27)
                 .build());
+  }
+
+  @Test
+  public void getModuleConditions_illegalMinMaxSdk() {
+    Optional<ManifestDeliveryElement> deliveryElement =
+        ManifestDeliveryElement.fromManifestRootNode(
+            androidManifest("com.test.app", withMinSdkCondition(27), withMaxSdkCondition(20)),
+            /* isFastFollowAllowed= */ false);
+
+    Throwable exception =
+        assertThrows(ValidationException.class, () -> deliveryElement.get().getModuleConditions());
+
+    assertThat(exception)
+        .hasMessageThat()
+        .contains("Illegal SDK-based conditional module targeting");
   }
 
   @Test

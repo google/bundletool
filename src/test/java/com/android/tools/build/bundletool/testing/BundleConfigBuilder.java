@@ -19,6 +19,7 @@ package com.android.tools.build.bundletool.testing;
 import com.android.bundle.Config.BundleConfig;
 import com.android.bundle.Config.Bundletool;
 import com.android.bundle.Config.SplitDimension;
+import com.android.bundle.Config.SuffixStripping;
 import com.android.tools.build.bundletool.model.version.BundleToolVersion;
 
 /** Helper to create {@link BundleConfig} instances in tests. */
@@ -47,6 +48,23 @@ public class BundleConfigBuilder {
         SplitDimension.newBuilder().setValue(splitDimension).setNegate(negate).build());
   }
 
+  public BundleConfigBuilder addSplitDimension(
+      SplitDimension.Value splitDimension,
+      boolean negate,
+      boolean stripSuffix,
+      String defaultSuffix) {
+    return addSplitDimension(
+        SplitDimension.newBuilder()
+            .setValue(splitDimension)
+            .setNegate(negate)
+            .setSuffixStripping(
+                SuffixStripping.newBuilder()
+                    .setEnabled(stripSuffix)
+                    .setDefaultSuffix(defaultSuffix)
+                    .build())
+            .build());
+  }
+
   public BundleConfigBuilder addSplitDimension(SplitDimension splitDimension) {
     builder.getOptimizationsBuilder().getSplitsConfigBuilder().addSplitDimension(splitDimension);
     return this;
@@ -69,6 +87,24 @@ public class BundleConfigBuilder {
 
   public BundleConfigBuilder addResourcePinnedToMasterSplit(int resourceId) {
     builder.getMasterResourcesBuilder().addResourceIds(resourceId);
+    return this;
+  }
+
+  public BundleConfigBuilder addStandaloneDimension(SplitDimension.Value standaloneDimension) {
+    return addStandaloneDimension(standaloneDimension, /* negate= */ false);
+  }
+
+  public BundleConfigBuilder addStandaloneDimension(
+      SplitDimension.Value standaloneDimension, boolean negate) {
+    return addStandaloneDimension(
+        SplitDimension.newBuilder().setValue(standaloneDimension).setNegate(negate).build());
+  }
+
+  public BundleConfigBuilder addStandaloneDimension(SplitDimension standaloneDimension) {
+    builder
+        .getOptimizationsBuilder()
+        .getStandaloneConfigBuilder()
+        .addSplitDimension(standaloneDimension);
     return this;
   }
 

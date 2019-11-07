@@ -42,6 +42,9 @@ import com.android.bundle.Targeting.LanguageTargeting;
 import com.android.bundle.Targeting.MultiAbi;
 import com.android.bundle.Targeting.MultiAbiTargeting;
 import com.android.bundle.Targeting.OpenGlVersion;
+import com.android.bundle.Targeting.Sanitizer;
+import com.android.bundle.Targeting.Sanitizer.SanitizerAlias;
+import com.android.bundle.Targeting.SanitizerTargeting;
 import com.android.bundle.Targeting.TextureCompressionFormatTargeting;
 import com.android.bundle.Targeting.VariantTargeting;
 import com.android.bundle.Targeting.VulkanVersion;
@@ -151,6 +154,15 @@ public abstract class ModuleSplit {
               value.getAbiList().stream().map(ModuleSplit::formatAbi).collect(toImmutableList())));
     }
     // Alternatives without values are not supported for MultiAbiTargeting.
+
+    SanitizerTargeting sanitizerTargeting = getApkTargeting().getSanitizerTargeting();
+    for (Sanitizer sanitizer : sanitizerTargeting.getValueList()) {
+      if (sanitizer.getAlias().equals(SanitizerAlias.HWADDRESS)) {
+        suffixJoiner.add("hwasan");
+      } else {
+        throw new IllegalArgumentException("Unknown sanitizer");
+      }
+    }
 
     LanguageTargeting languageTargeting = getApkTargeting().getLanguageTargeting();
     if (!languageTargeting.getValueList().isEmpty()) {
@@ -301,7 +313,7 @@ public abstract class ModuleSplit {
    */
   public static ModuleSplit forModule(
       BundleModule bundleModule, VariantTargeting variantTargeting) {
-    return fromFeatureBundleModule(
+    return fromBundleModule(
         bundleModule, Predicates.alwaysTrue(), /* setResourceTable= */ true, variantTargeting);
   }
 
@@ -319,7 +331,7 @@ public abstract class ModuleSplit {
    */
   public static ModuleSplit forResources(
       BundleModule bundleModule, VariantTargeting variantTargeting) {
-    return fromFeatureBundleModule(
+    return fromBundleModule(
         bundleModule,
         entry -> entry.getPath().startsWith(RESOURCES_DIRECTORY),
         /* setResourceTable= */ true,
@@ -340,7 +352,7 @@ public abstract class ModuleSplit {
    */
   public static ModuleSplit forAssets(
       BundleModule bundleModule, VariantTargeting variantTargeting) {
-    return fromFeatureBundleModule(
+    return fromBundleModule(
         bundleModule,
         entry -> entry.getPath().startsWith(ASSETS_DIRECTORY),
         /* setResourceTable= */ false,
@@ -361,7 +373,7 @@ public abstract class ModuleSplit {
    */
   public static ModuleSplit forNativeLibraries(
       BundleModule bundleModule, VariantTargeting variantTargeting) {
-    return fromFeatureBundleModule(
+    return fromBundleModule(
         bundleModule,
         entry -> entry.getPath().startsWith(LIB_DIRECTORY),
         /* setResourceTable= */ false,
@@ -381,7 +393,7 @@ public abstract class ModuleSplit {
    * variant targeting.
    */
   public static ModuleSplit forDex(BundleModule bundleModule, VariantTargeting variantTargeting) {
-    return fromFeatureBundleModule(
+    return fromBundleModule(
         bundleModule,
         entry -> entry.getPath().startsWith(DEX_DIRECTORY),
         /* setResourceTable= */ false,
@@ -393,7 +405,7 @@ public abstract class ModuleSplit {
   }
 
   public static ModuleSplit forRoot(BundleModule bundleModule, VariantTargeting variantTargeting) {
-    return fromFeatureBundleModule(
+    return fromBundleModule(
         bundleModule,
         entry -> entry.getPath().startsWith(ROOT_DIRECTORY),
         /* setResourceTable= */ false,
@@ -405,7 +417,7 @@ public abstract class ModuleSplit {
    * default L+ variant targeting.
    */
   public static ModuleSplit forApex(BundleModule bundleModule) {
-    return fromFeatureBundleModule(
+    return fromBundleModule(
         bundleModule,
         entry -> entry.getPath().startsWith(APEX_DIRECTORY),
         /* setResourceTable= */ false,
@@ -418,15 +430,11 @@ public abstract class ModuleSplit {
    *
    * <p>The created instance is not standalone thus its variant targets L+ devices initially.
    */
-  private static ModuleSplit fromFeatureBundleModule(
+  private static ModuleSplit fromBundleModule(
       BundleModule bundleModule,
       Predicate<ModuleEntry> entriesPredicate,
       boolean setResourceTable,
       VariantTargeting variantTargeting) {
-    checkArgument(
-        bundleModule.getModuleType().equals(ModuleType.FEATURE_MODULE),
-        "Expected a Feature Module, got %s",
-        bundleModule.getModuleType());
     ModuleSplit.Builder splitBuilder =
         builder()
             .setModuleName(bundleModule.getName())
@@ -437,7 +445,7 @@ public abstract class ModuleSplit {
             .setAndroidManifest(bundleModule.getAndroidManifest())
             // Initially each split is master split.
             .setMasterSplit(true)
-            .setSplitType(SplitType.SPLIT)
+            .setSplitType(getSplitTypeFromModuleType(bundleModule.getModuleType()))
             .setApkTargeting(ApkTargeting.getDefaultInstance())
             .setVariantTargeting(variantTargeting);
 
@@ -450,24 +458,14 @@ public abstract class ModuleSplit {
     return splitBuilder.build();
   }
 
-  public static ModuleSplit fromAssetBundleModule(BundleModule bundleModule) {
-    checkArgument(
-        bundleModule.getModuleType().equals(ModuleType.ASSET_MODULE),
-        "Expected an asset pack, got %s",
-        bundleModule.getModuleType());
-    ModuleSplit.Builder splitBuilder =
-        ModuleSplit.builder()
-            .setModuleName(bundleModule.getName())
-            .setEntries(bundleModule.getEntries().asList())
-            .setAndroidManifest(bundleModule.getAndroidManifest())
-            .setMasterSplit(true)
-            .setSplitType(SplitType.ASSET_SLICE)
-            .setApkTargeting(ApkTargeting.getDefaultInstance())
-            .setVariantTargeting(VariantTargeting.getDefaultInstance());
-
-    bundleModule.getAssetsConfig().ifPresent(splitBuilder::setAssetsConfig);
-
-    return splitBuilder.build();
+  private static SplitType getSplitTypeFromModuleType(ModuleType moduleType) {
+    switch (moduleType) {
+      case FEATURE_MODULE:
+        return SplitType.SPLIT;
+      case ASSET_MODULE:
+        return SplitType.ASSET_SLICE;
+    }
+    throw new IllegalStateException();
   }
 
   @Memoized
@@ -554,13 +552,15 @@ public abstract class ModuleSplit {
       // splits, hence it might have Abi, Screen Density, Language targeting set.
       if (moduleSplit.isMasterSplit() && !moduleSplit.getSplitType().equals(SplitType.SYSTEM)) {
         checkState(
-            moduleSplit
-                .getApkTargeting()
-                .toBuilder()
+            moduleSplit.getApkTargeting().toBuilder()
                 .clearSdkVersionTargeting()
+                // TCF can be set on standalone/universal APKs: if suffix stripping was enabled,
+                // a default targeting suffix was used.
+                .clearTextureCompressionFormatTargeting()
                 .build()
                 .equals(ApkTargeting.getDefaultInstance()),
-            "Master split cannot have any targeting other than SDK version.");
+            "Master split cannot have any targeting other than SDK version or Texture"
+                + "Compression Format.");
       }
       return moduleSplit;
     }

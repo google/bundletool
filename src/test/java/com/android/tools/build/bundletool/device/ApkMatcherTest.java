@@ -27,6 +27,9 @@ import static com.android.bundle.Targeting.ScreenDensity.DensityAlias.MDPI;
 import static com.android.bundle.Targeting.ScreenDensity.DensityAlias.XHDPI;
 import static com.android.bundle.Targeting.ScreenDensity.DensityAlias.XXHDPI;
 import static com.android.bundle.Targeting.ScreenDensity.DensityAlias.XXXHDPI;
+import static com.android.bundle.Targeting.TextureCompressionFormat.TextureCompressionFormatAlias.ATC;
+import static com.android.bundle.Targeting.TextureCompressionFormat.TextureCompressionFormatAlias.ETC1_RGB8;
+import static com.android.bundle.Targeting.TextureCompressionFormat.TextureCompressionFormatAlias.PVRTC;
 import static com.android.tools.build.bundletool.testing.ApkSetUtils.splitApkSet;
 import static com.android.tools.build.bundletool.testing.ApksArchiveHelpers.createConditionalApkSet;
 import static com.android.tools.build.bundletool.testing.ApksArchiveHelpers.createVariant;
@@ -40,15 +43,18 @@ import static com.android.tools.build.bundletool.testing.DeviceFactory.deviceFea
 import static com.android.tools.build.bundletool.testing.DeviceFactory.deviceWithSdk;
 import static com.android.tools.build.bundletool.testing.DeviceFactory.lDeviceWithAbis;
 import static com.android.tools.build.bundletool.testing.DeviceFactory.lDeviceWithDensity;
+import static com.android.tools.build.bundletool.testing.DeviceFactory.lDeviceWithGlExtensions;
 import static com.android.tools.build.bundletool.testing.DeviceFactory.lDeviceWithLocales;
 import static com.android.tools.build.bundletool.testing.DeviceFactory.locales;
 import static com.android.tools.build.bundletool.testing.DeviceFactory.mergeSpecs;
+import static com.android.tools.build.bundletool.testing.DeviceFactory.preLDeviceWithGlExtensions;
 import static com.android.tools.build.bundletool.testing.DeviceFactory.sdkVersion;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifest;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.apkAbiTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.apkAlternativeLanguageTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.apkDensityTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.apkLanguageTargeting;
+import static com.android.tools.build.bundletool.testing.TargetingUtils.apkTextureTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.mergeApkTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.mergeModuleTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.mergeVariantTargeting;
@@ -59,6 +65,7 @@ import static com.android.tools.build.bundletool.testing.TargetingUtils.sdkVersi
 import static com.android.tools.build.bundletool.testing.TargetingUtils.variantAbiTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.variantDensityTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.variantSdkTargeting;
+import static com.android.tools.build.bundletool.testing.TargetingUtils.variantTextureTargeting;
 import static com.google.common.truth.Truth.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
@@ -738,6 +745,187 @@ public class ApkMatcherTest {
         .containsExactly(apk);
     assertThat(
             new ApkMatcher(lDeviceWithLocales("de-DE", "de-AT", "en-US"))
+                .getMatchingApks(buildApksResult))
+        .containsExactly(apk);
+  }
+
+  // Texture variants
+
+  @Test
+  public void textureVariant() {
+    ZipPath apk = ZipPath.create("master-etc1_rgb8.apk");
+    BuildApksResult buildApksResult =
+        buildApksResult(
+            createVariant(
+                mergeVariantTargeting(
+                    variantSdkTargeting(sdkVersionFrom(Versions.ANDROID_L_API_VERSION)),
+                    variantTextureTargeting(ETC1_RGB8, ImmutableSet.of(ATC, PVRTC))),
+                splitApkSet(
+                    /* moduleName= */ "base",
+                    splitApkDescription(ApkTargeting.getDefaultInstance(), apk))));
+
+    assertThat(
+            new ApkMatcher(lDeviceWithGlExtensions("GL_OES_compressed_ETC1_RGB8_texture"))
+                .getMatchingApks(buildApksResult))
+        .containsExactly(apk);
+  }
+
+  @Test
+  public void textureVariant_preL() {
+    ZipPath apk = ZipPath.create("master-etc1_rgb8.apk");
+    BuildApksResult buildApksResult =
+        buildApksResult(
+            standaloneVariant(
+                mergeVariantTargeting(
+                    variantSdkTargeting(sdkVersionFrom(1), ImmutableSet.of(sdkVersionFrom(21))),
+                    variantTextureTargeting(ETC1_RGB8, ImmutableSet.of(ATC, PVRTC))),
+                ApkTargeting.getDefaultInstance(),
+                apk));
+
+    assertThat(
+            new ApkMatcher(preLDeviceWithGlExtensions("GL_OES_compressed_ETC1_RGB8_texture"))
+                .getMatchingApks(buildApksResult))
+        .containsExactly(apk);
+  }
+
+  @Test
+  public void textureVariant_betterAlternative() {
+    ZipPath apk = ZipPath.create("master-etc1_rgb8.apk");
+    BuildApksResult buildApksResult =
+        buildApksResult(
+            createVariant(
+                mergeVariantTargeting(
+                    variantSdkTargeting(sdkVersionFrom(Versions.ANDROID_L_API_VERSION)),
+                    variantTextureTargeting(ATC, ImmutableSet.of(ETC1_RGB8, PVRTC))),
+                splitApkSet(
+                    /* moduleName= */ "base",
+                    splitApkDescription(ApkTargeting.getDefaultInstance(), apk))));
+
+    assertThat(
+            new ApkMatcher(lDeviceWithGlExtensions("GL_OES_compressed_ETC1_RGB8_texture"))
+                .getMatchingApks(buildApksResult))
+        .isEmpty();
+  }
+
+  @Test
+  public void textureVariant_preL_betterAlternative() {
+    ZipPath apk = ZipPath.create("master-etc1_rgb8.apk");
+    BuildApksResult buildApksResult =
+        buildApksResult(
+            standaloneVariant(
+                mergeVariantTargeting(
+                    variantSdkTargeting(sdkVersionFrom(1), ImmutableSet.of(sdkVersionFrom(21))),
+                    variantTextureTargeting(ATC, ImmutableSet.of(ETC1_RGB8, PVRTC))),
+                ApkTargeting.getDefaultInstance(),
+                apk));
+
+    assertThat(
+            new ApkMatcher(preLDeviceWithGlExtensions("GL_OES_compressed_ETC1_RGB8_texture"))
+                .getMatchingApks(buildApksResult))
+        .isEmpty();
+  }
+
+  @Test
+  public void textureVariant_incompatibleDevice() {
+    ZipPath apk = ZipPath.create("master-etc1_rgb8.apk");
+    BuildApksResult buildApksResult =
+        buildApksResult(
+            createVariant(
+                mergeVariantTargeting(
+                    variantSdkTargeting(sdkVersionFrom(Versions.ANDROID_L_API_VERSION)),
+                    variantTextureTargeting(ATC)),
+                splitApkSet(
+                    /* moduleName= */ "base",
+                    splitApkDescription(ApkTargeting.getDefaultInstance(), apk))));
+
+    IncompatibleDeviceException exception =
+        assertThrows(
+            IncompatibleDeviceException.class,
+            () ->
+                new ApkMatcher(lDeviceWithGlExtensions("GL_OES_compressed_ETC1_RGB8_texture"))
+                    .getMatchingApks(buildApksResult));
+
+    assertThat(exception)
+        .hasMessageThat()
+        .contains(
+            "The app doesn't support texture compression formats of the device. Device formats:"
+                + " [ETC1_RGB8], app formats: [ATC]");
+  }
+
+  @Test
+  public void textureVariant_preL_incompatibleDevice() {
+    ZipPath apk = ZipPath.create("master-etc1_rgb8.apk");
+    BuildApksResult buildApksResult =
+        buildApksResult(
+            standaloneVariant(
+                mergeVariantTargeting(
+                    variantSdkTargeting(sdkVersionFrom(1), ImmutableSet.of(sdkVersionFrom(21))),
+                    variantTextureTargeting(ATC)),
+                ApkTargeting.getDefaultInstance(),
+                apk));
+
+    IncompatibleDeviceException exception =
+        assertThrows(
+            IncompatibleDeviceException.class,
+            () ->
+                new ApkMatcher(preLDeviceWithGlExtensions("GL_OES_compressed_ETC1_RGB8_texture"))
+                    .getMatchingApks(buildApksResult));
+
+    assertThat(exception)
+        .hasMessageThat()
+        .contains(
+            "The app doesn't support texture compression formats of the device. Device formats:"
+                + " [ETC1_RGB8], app formats: [ATC]");
+  }
+
+  // Texture splits
+
+  @Test
+  public void apkMatch_textureSplit() {
+    ZipPath apk = ZipPath.create("master-etc1_rgb8.apk");
+    BuildApksResult buildApksResult =
+        buildApksResult(
+            oneApkSplitApkVariant(
+                variantSdkTargeting(sdkVersionFrom(Versions.ANDROID_L_API_VERSION)),
+                apkTextureTargeting(ETC1_RGB8, ImmutableSet.of(ATC, PVRTC)),
+                apk));
+
+    assertThat(
+            new ApkMatcher(lDeviceWithGlExtensions("GL_OES_compressed_ETC1_RGB8_texture"))
+                .getMatchingApks(buildApksResult))
+        .containsExactly(apk);
+  }
+
+  @Test
+  public void apkMatch_textureSplit_betterAlternative() {
+    ZipPath apk = ZipPath.create("master-etc1_rgb8.apk");
+    BuildApksResult buildApksResult =
+        buildApksResult(
+            oneApkSplitApkVariant(
+                variantSdkTargeting(sdkVersionFrom(Versions.ANDROID_L_API_VERSION)),
+                apkTextureTargeting(ETC1_RGB8, ImmutableSet.of(ATC, PVRTC)),
+                apk));
+
+    assertThat(
+            new ApkMatcher(
+                    lDeviceWithGlExtensions(
+                        "GL_OES_compressed_ETC1_RGB8_texture", "GL_IMG_texture_compression_pvrtc"))
+                .getMatchingApks(buildApksResult))
+        .isEmpty();
+  }
+
+  @Test
+  public void apkMatch_textureSplit_noBetterAlternative() {
+    ZipPath apk = ZipPath.create("master-etc1_rgb8.apk");
+    BuildApksResult buildApksResult =
+        buildApksResult(
+            oneApkSplitApkVariant(
+                variantSdkTargeting(sdkVersionFrom(Versions.ANDROID_L_API_VERSION)),
+                apkTextureTargeting(ETC1_RGB8, ImmutableSet.of(ATC, PVRTC)),
+                apk));
+
+    assertThat(
+            new ApkMatcher(lDeviceWithGlExtensions("GL_OES_compressed_ETC1_RGB8_texture"))
                 .getMatchingApks(buildApksResult))
         .containsExactly(apk);
   }

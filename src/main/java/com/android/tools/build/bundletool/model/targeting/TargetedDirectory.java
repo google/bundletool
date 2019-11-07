@@ -72,6 +72,26 @@ public abstract class TargetedDirectory {
   }
 
   /**
+   * Returns a copy of the TargetedDirectory with a targeting dimension removed.
+   *
+   * @param dimension The dimension to be removed
+   * @return A new TargetedDirectory with the specified dimension removed.
+   */
+  public TargetedDirectory removeTargeting(TargetingDimension dimension) {
+    ImmutableList<TargetedDirectorySegment> newSegments =
+        getPathSegments().stream()
+            .map(segment -> segment.removeTargeting(dimension))
+            .collect(toImmutableList());
+
+    // If no changes are made to any segments, return the original immutable object.
+    if (getPathSegments().equals(newSegments)) {
+      return this;
+    }
+
+    return create(newSegments, originalPath());
+  }
+
+  /**
    * Parses a given path giving back object that can be used to determine the directory targeting.
    *
    * @param directoryPath relative directory inside the App Bundle module.
@@ -86,6 +106,14 @@ public abstract class TargetedDirectory {
     checkNoDuplicateDimensions(segments, directoryPath);
 
     return TargetedDirectory.create(segments, directoryPath);
+  }
+
+  public ZipPath toZipPath() {
+    ImmutableList<String> pathSegments =
+        getPathSegments().stream()
+            .map(TargetedDirectorySegment::toPathSegment)
+            .collect(toImmutableList());
+    return ZipPath.create(pathSegments);
   }
 
   private static void checkNoDuplicateDimensions(

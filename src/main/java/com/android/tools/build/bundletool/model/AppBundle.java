@@ -41,6 +41,7 @@ import com.google.errorprone.annotations.Immutable;
 import com.google.protobuf.InvalidProtocolBufferException;
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.Collection;
 import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.Map;
@@ -285,6 +286,12 @@ public abstract class AppBundle {
   @AutoValue.Builder
   public abstract static class Builder {
     public abstract Builder setModules(ImmutableMap<BundleModuleName, BundleModule> modules);
+
+    /** Convenience method to extract module names and set module map. */
+    public Builder setRawModules(Collection<BundleModule> bundleModules) {
+      setModules(bundleModules.stream().collect(toImmutableMap(BundleModule::getName, identity())));
+      return this;
+    }
 
     public abstract Builder setMasterPinnedResources(ImmutableSet<ResourceId> pinnedResourceIds);
 

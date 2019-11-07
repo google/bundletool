@@ -25,7 +25,7 @@ import java.io.InputStream;
 @Immutable
 @AutoValue
 @AutoValue.CopyAnnotations
-public abstract class InMemoryModuleEntry implements ModuleEntry {
+public abstract class InMemoryModuleEntry extends ModuleEntry {
 
   @Override
   public abstract ZipPath getPath();
@@ -41,14 +41,6 @@ public abstract class InMemoryModuleEntry implements ModuleEntry {
   @Override
   public InputStream getContent() {
     return new ByteArrayInputStream(getContentAsBytes().toByteArray());
-  }
-
-  @Override
-  public InMemoryModuleEntry setCompression(boolean shouldCompress) {
-    if (shouldCompress == shouldCompress()) {
-      return this;
-    }
-    return create(getPath(), getContentAsBytes(), isDirectory(), shouldCompress);
   }
 
   public static InMemoryModuleEntry ofFile(String path, byte[] content) {
@@ -74,10 +66,5 @@ public abstract class InMemoryModuleEntry implements ModuleEntry {
         ByteString.copyFrom(new byte[0]),
         /* isDirectory= */ true,
         /* shouldCompress= */ true);
-  }
-
-  private static InMemoryModuleEntry create(
-      ZipPath zipPath, ByteString content, boolean isDirectory, boolean shouldCompress) {
-    return new AutoValue_InMemoryModuleEntry(zipPath, content, isDirectory, shouldCompress);
   }
 }

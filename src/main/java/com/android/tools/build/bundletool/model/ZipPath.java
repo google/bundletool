@@ -54,7 +54,7 @@ public abstract class ZipPath implements Path {
   private static final String SEPARATOR = "/";
   private static final Splitter SPLITTER = Splitter.on(SEPARATOR).omitEmptyStrings();
   private static final Joiner JOINER = Joiner.on(SEPARATOR);
-  private static final ImmutableSet<String> FORBIDDEN_NAMES = ImmutableSet.of(".", "..");
+  private static final ImmutableSet<String> FORBIDDEN_NAMES = ImmutableSet.of("", ".", "..");
 
   public static final ZipPath ROOT = ZipPath.create("");
 
@@ -73,11 +73,16 @@ public abstract class ZipPath implements Path {
     return create(ImmutableList.copyOf(SPLITTER.splitToList(path)));
   }
 
-  private static ZipPath create(ImmutableList<String> names) {
+  public static ZipPath create(ImmutableList<String> names) {
     names.forEach(
-        name ->
-            checkArgument(
-                !FORBIDDEN_NAMES.contains(name), "Name '%s' is not supported inside path.", name));
+        name -> {
+          checkArgument(
+              !name.contains("/"),
+              "Name '%s' contains a forward slash and cannot be used in a path.",
+              name);
+          checkArgument(
+              !FORBIDDEN_NAMES.contains(name), "Name '%s' is not supported inside path.", name);
+        });
     return new AutoValue_ZipPath(names);
   }
 

@@ -38,6 +38,7 @@ public class ApkOptimizationsTest {
         .isEqualTo(
             ApkOptimizations.builder()
                 .setSplitDimensions(ImmutableSet.of(ABI, SCREEN_DENSITY, LANGUAGE))
+                .setStandaloneDimensions(ImmutableSet.of(ABI, SCREEN_DENSITY))
                 .build());
   }
 
@@ -51,6 +52,7 @@ public class ApkOptimizationsTest {
             ApkOptimizations.builder()
                 .setSplitDimensions(ImmutableSet.of(ABI, SCREEN_DENSITY, LANGUAGE))
                 .setUncompressNativeLibraries(true)
+                .setStandaloneDimensions(ImmutableSet.of(ABI, SCREEN_DENSITY))
                 .build());
   }
 
@@ -65,6 +67,7 @@ public class ApkOptimizationsTest {
                 .setSplitDimensions(
                     ImmutableSet.of(ABI, SCREEN_DENSITY, TEXTURE_COMPRESSION_FORMAT, LANGUAGE))
                 .setUncompressNativeLibraries(true)
+                .setStandaloneDimensions(ImmutableSet.of(ABI, SCREEN_DENSITY))
                 .build());
   }
 }

@@ -17,10 +17,12 @@
 package com.android.tools.build.bundletool.validation;
 
 import static com.android.tools.build.bundletool.model.BundleModule.ASSETS_DIRECTORY;
+import static com.android.tools.build.bundletool.validation.BundleValidationUtils.checkHasValuesOrAlternatives;
 import static com.google.common.collect.ImmutableSet.toImmutableSet;
 
 import com.android.bundle.Files.Assets;
 import com.android.bundle.Files.TargetedAssetsDirectory;
+import com.android.bundle.Targeting.AssetsDirectoryTargeting;
 import com.android.tools.build.bundletool.model.BundleModule;
 import com.android.tools.build.bundletool.model.BundleModule.ModuleType;
 import com.android.tools.build.bundletool.model.ZipPath;
@@ -54,14 +56,16 @@ public class AssetsTargetingValidator extends SubValidator {
             .build();
       }
 
-      if (module.getModuleType().equals(ModuleType.ASSET_MODULE)
-          && assets.getDirectoryList().stream().anyMatch(dir -> dir.getTargeting().hasLanguage())) {
-        throw ValidationException.builder()
-            .withMessage(
-                "Language targeting for asset packs is not supported, but found in module %s.",
-                module.getName().getName())
-            .build();
-      }
+      checkNoDimensionWithoutValuesAndAlternatives(targetedDirectory);
+    }
+
+    if (module.getModuleType().equals(ModuleType.ASSET_MODULE)
+        && assets.getDirectoryList().stream().anyMatch(dir -> dir.getTargeting().hasLanguage())) {
+      throw ValidationException.builder()
+          .withMessage(
+              "Language targeting for asset packs is not supported, but found in module %s.",
+              module.getName().getName())
+          .build();
     }
   }
 
@@ -70,5 +74,24 @@ public class AssetsTargetingValidator extends SubValidator {
         .filter(entry -> !entry.isDirectory())
         .map(entry -> entry.getPath().getParent())
         .collect(toImmutableSet());
+  }
+
+  private static void checkNoDimensionWithoutValuesAndAlternatives(
+      TargetedAssetsDirectory targetedDirectory) {
+    AssetsDirectoryTargeting targeting = targetedDirectory.getTargeting();
+
+    if (targeting.hasAbi()) {
+      checkHasValuesOrAlternatives(targeting.getAbi(), targetedDirectory.getPath());
+    }
+    if (targeting.hasGraphicsApi()) {
+      checkHasValuesOrAlternatives(targeting.getGraphicsApi(), targetedDirectory.getPath());
+    }
+    if (targeting.hasLanguage()) {
+      checkHasValuesOrAlternatives(targeting.getLanguage(), targetedDirectory.getPath());
+    }
+    if (targeting.hasTextureCompressionFormat()) {
+      checkHasValuesOrAlternatives(
+          targeting.getTextureCompressionFormat(), targetedDirectory.getPath());
+    }
   }
 }

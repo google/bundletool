@@ -29,48 +29,41 @@ import org.junit.runners.JUnit4;
 public class ModuleEntryTest {
 
   @Test
-  public void equal_differentPath() throws Exception {
-    assertThat(
-            ModuleEntry.equal(
-                createDirectoryEntry(ZipPath.create("a")),
-                createDirectoryEntry(ZipPath.create("b"))))
-        .isFalse();
+  public void equals_differentPath() throws Exception {
+    ModuleEntry entry1 = createDirectoryEntry(ZipPath.create("a"));
+    ModuleEntry entry2 = createDirectoryEntry(ZipPath.create("b"));
+
+    assertThat(entry1.equals(entry2)).isFalse();
   }
 
   @Test
-  public void equal_differentType() throws Exception {
-    assertThat(
-            ModuleEntry.equal(
-                createDirectoryEntry(ZipPath.create("a")),
-                createFileEntry(ZipPath.create("a"), new byte[0])))
-        .isFalse();
+  public void equals_differentType() throws Exception {
+    ModuleEntry entry1 = createDirectoryEntry(ZipPath.create("a"));
+    ModuleEntry entry2 = createFileEntry(ZipPath.create("a"), new byte[0]);
+
+    assertThat(entry1.equals(entry2)).isFalse();
   }
 
   @Test
-  public void equal_differentFileContents() throws Exception {
-    assertThat(
-            ModuleEntry.equal(
-                createFileEntry(ZipPath.create("a"), new byte[] {'a'}),
-                createFileEntry(ZipPath.create("a"), new byte[] {'b'})))
-        .isFalse();
+  public void equals_differentFileContents() throws Exception {
+    ModuleEntry entry1 = createFileEntry(ZipPath.create("a"), new byte[] {'a'});
+    ModuleEntry entry2 = createFileEntry(ZipPath.create("a"), new byte[] {'b'});
+
+    assertThat(entry1.equals(entry2)).isFalse();
   }
 
   @Test
-  public void equal_sameDirectories() throws Exception {
-    assertThat(
-            ModuleEntry.equal(
-                createDirectoryEntry(ZipPath.create("a")),
-                createDirectoryEntry(ZipPath.create("a"))))
-        .isTrue();
+  public void equals_sameDirectories() throws Exception {
+    ModuleEntry entry = createDirectoryEntry(ZipPath.create("a"));
+
+    assertThat(entry.equals(entry)).isTrue();
   }
 
   @Test
-  public void equal_sameFiles() throws Exception {
-    assertThat(
-            ModuleEntry.equal(
-                createFileEntry(ZipPath.create("a"), new byte[] {'a'}),
-                createFileEntry(ZipPath.create("a"), new byte[] {'a'})))
-        .isTrue();
+  public void equals_sameFiles() throws Exception {
+    ModuleEntry entry = createFileEntry(ZipPath.create("a"), new byte[] {'a'});
+
+    assertThat(entry.equals(entry)).isTrue();
   }
 
   private static ModuleEntry createFileEntry(ZipPath path, byte[] content) throws Exception {
@@ -107,11 +100,6 @@ public class ModuleEntryTest {
       @Override
       public boolean shouldCompress() {
         return true;
-      }
-
-      @Override
-      public ModuleEntry setCompression(boolean shouldCompress) {
-        throw new UnsupportedOperationException();
       }
     };
   }

@@ -22,6 +22,7 @@ import static com.android.tools.build.bundletool.testing.DeviceFactory.mergeSpec
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifest;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withDebuggableAttribute;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withMinSdkVersion;
+import static com.android.tools.build.bundletool.testing.ModuleSplitUtils.createAssetsDirectoryLanguageTargeting;
 import static com.android.tools.build.bundletool.testing.ResourcesTableFactory.USER_PACKAGE_OFFSET;
 import static com.android.tools.build.bundletool.testing.ResourcesTableFactory.entry;
 import static com.android.tools.build.bundletool.testing.ResourcesTableFactory.locale;
@@ -55,7 +56,9 @@ import static org.mockito.Mockito.verifyNoMoreInteractions;
 import com.android.aapt.ConfigurationOuterClass.Configuration;
 import com.android.aapt.Resources.Type;
 import com.android.bundle.Files.ApexImages;
+import com.android.bundle.Files.Assets;
 import com.android.bundle.Files.NativeLibraries;
+import com.android.bundle.Files.TargetedAssetsDirectory;
 import com.android.bundle.Targeting.Abi.AbiAlias;
 import com.android.bundle.Targeting.ApkTargeting;
 import com.android.bundle.Targeting.ScreenDensity.DensityAlias;
@@ -330,6 +333,148 @@ public class ModuleSplitsToShardMergerTest {
     assertThat(merged.getVariantTargeting()).isEqualToDefaultInstance();
     assertThat(merged.getSplitType()).isEqualTo(SplitType.STANDALONE);
     assertThat(merged.getResourceTable()).isEmpty();
+  }
+
+  @Test
+  public void mergeSingleShard_mergeDisjointAssets() throws Exception {
+    ModuleSplit baseModuleSplit =
+        createModuleSplitBuilder()
+            .setEntries(
+                ImmutableList.of(
+                    InMemoryModuleEntry.ofFile("assets/some_assets/file.txt", DUMMY_CONTENT)))
+            .setAssetsConfig(
+                Assets.newBuilder()
+                    .addDirectory(
+                        TargetedAssetsDirectory.newBuilder().setPath("assets/some_assets").build())
+                    .build())
+            .build();
+    ModuleSplit featureModuleSplit =
+        createModuleSplitBuilder()
+            .setModuleName(BundleModuleName.create("feature"))
+            .setEntries(
+                ImmutableList.of(
+                    InMemoryModuleEntry.ofFile("assets/some_other_assets/file.txt", DUMMY_CONTENT)))
+            .setAssetsConfig(
+                Assets.newBuilder()
+                    .addDirectory(
+                        TargetedAssetsDirectory.newBuilder()
+                            .setPath("assets/some_other_assets")
+                            .build())
+                    .build())
+            .build();
+
+    ModuleSplit merged =
+        new ModuleSplitsToShardMerger(d8DexMerger, tmpDir)
+            .mergeSingleShard(
+                ImmutableList.of(baseModuleSplit, featureModuleSplit),
+                NO_MAIN_DEX_LIST,
+                createCache());
+
+    assertThat(extractPaths(merged.getEntries()))
+        .containsExactly("assets/some_assets/file.txt", "assets/some_other_assets/file.txt");
+    assertThat(merged.getAssetsConfig()).isPresent();
+    assertThat(
+            merged.getAssetsConfig().get().getDirectoryList().stream()
+                .map(TargetedAssetsDirectory::getPath))
+        .containsExactly("assets/some_assets", "assets/some_other_assets");
+  }
+
+  @Test
+  public void mergeSingleShard_mergeAssetsWithIntersection() throws Exception {
+    ModuleSplit baseModuleSplit =
+        createModuleSplitBuilder()
+            .setEntries(
+                ImmutableList.of(
+                    InMemoryModuleEntry.ofFile("assets/some_assets/file.txt", DUMMY_CONTENT)))
+            .setAssetsConfig(
+                Assets.newBuilder()
+                    .addDirectory(
+                        TargetedAssetsDirectory.newBuilder()
+                            .setPath("assets/some_assets")
+                            .setTargeting(createAssetsDirectoryLanguageTargeting("de"))
+                            .build())
+                    .build())
+            .build();
+    ModuleSplit featureModuleSplit =
+        createModuleSplitBuilder()
+            .setModuleName(BundleModuleName.create("feature"))
+            .setEntries(
+                ImmutableList.of(
+                    InMemoryModuleEntry.ofFile("assets/some_assets/file.txt", DUMMY_CONTENT),
+                    InMemoryModuleEntry.ofFile("assets/some_other_assets/file.txt", DUMMY_CONTENT)))
+            .setAssetsConfig(
+                Assets.newBuilder()
+                    .addDirectory(
+                        TargetedAssetsDirectory.newBuilder()
+                            .setPath("assets/some_assets")
+                            .setTargeting(createAssetsDirectoryLanguageTargeting("de"))
+                            .build())
+                    .addDirectory(
+                        TargetedAssetsDirectory.newBuilder()
+                            .setPath("assets/some_other_assets")
+                            .build())
+                    .build())
+            .build();
+
+    ModuleSplit merged =
+        new ModuleSplitsToShardMerger(d8DexMerger, tmpDir)
+            .mergeSingleShard(
+                ImmutableList.of(baseModuleSplit, featureModuleSplit),
+                NO_MAIN_DEX_LIST,
+                createCache());
+
+    assertThat(extractPaths(merged.getEntries()))
+        .containsExactly("assets/some_assets/file.txt", "assets/some_other_assets/file.txt");
+    assertThat(merged.getAssetsConfig()).isPresent();
+    assertThat(
+            merged.getAssetsConfig().get().getDirectoryList().stream()
+                .map(TargetedAssetsDirectory::getPath))
+        .containsExactly("assets/some_assets", "assets/some_other_assets");
+  }
+
+
+  @Test
+  public void mergeSingleShard_throwsIfConflictingAssets() throws Exception {
+    ModuleSplit split1 =
+        createModuleSplitBuilder()
+            .setEntries(
+                ImmutableList.of(
+                    InMemoryModuleEntry.ofFile("assets/some_assets/file.txt", DUMMY_CONTENT)))
+            .setAssetsConfig(
+                Assets.newBuilder()
+                    .addDirectory(
+                        TargetedAssetsDirectory.newBuilder()
+                            .setPath("assets/some_assets")
+                            .setTargeting(createAssetsDirectoryLanguageTargeting("en"))
+                            .build())
+                    .build())
+            .build();
+    ModuleSplit split2 =
+        createModuleSplitBuilder()
+            .setEntries(
+                ImmutableList.of(
+                    InMemoryModuleEntry.ofFile("assets/some_assets/file.txt", DUMMY_CONTENT)))
+            .setAssetsConfig(
+                Assets.newBuilder()
+                    .addDirectory(
+                        TargetedAssetsDirectory.newBuilder()
+                            .setPath("assets/some_assets")
+                            .setTargeting(createAssetsDirectoryLanguageTargeting("de"))
+                            .build())
+                    .build())
+            .build();
+
+    Throwable exception =
+        assertThrows(
+            IllegalStateException.class,
+            () ->
+                new ModuleSplitsToShardMerger(d8DexMerger, tmpDir)
+                    .mergeSingleShard(
+                        ImmutableList.of(split1, split2), NO_MAIN_DEX_LIST, createCache()));
+
+    assertThat(exception)
+        .hasMessageThat()
+        .contains("conflicting targeting values while merging assets config");
   }
 
   @Test

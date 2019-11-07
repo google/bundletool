@@ -40,7 +40,7 @@ import java.util.zip.ZipFile;
 @Immutable
 @AutoValue
 @AutoValue.CopyAnnotations
-public abstract class ModuleZipEntry implements ModuleEntry {
+public abstract class ModuleZipEntry extends ModuleEntry {
 
   abstract ZipEntry getZipEntry();
 
@@ -87,14 +87,6 @@ public abstract class ModuleZipEntry implements ModuleEntry {
   @Override
   public boolean isDirectory() {
     return getZipEntry().isDirectory();
-  }
-
-  @Override
-  public ModuleZipEntry setCompression(boolean shouldCompress) {
-    if (shouldCompress == shouldCompress()) {
-      return this;
-    }
-    return create(getZipEntry(), getZipFile(), getPathNamesToSkip(), shouldCompress);
   }
 
   /** Constructs a {@link ModuleEntry} for {@link ZipEntry} contained in a bundle zip file. */

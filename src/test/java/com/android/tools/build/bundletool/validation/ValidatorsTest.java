@@ -55,8 +55,8 @@ public class ValidatorsTest {
 
     ImmutableSet<Class<?>> registeredSubValidators =
         ImmutableSet.<Class<?>>builder()
-            .addAll(toClasses(AppBundleValidator.BUNDLE_FILE_SUB_VALIDATORS))
-            .addAll(toClasses(AppBundleValidator.BUNDLE_SUB_VALIDATORS))
+            .addAll(toClasses(AppBundleValidator.DEFAULT_BUNDLE_FILE_SUB_VALIDATORS))
+            .addAll(toClasses(AppBundleValidator.DEFAULT_BUNDLE_SUB_VALIDATORS))
             .addAll(toClasses(BundleModulesValidator.MODULE_FILE_SUB_VALIDATORS))
             .addAll(toClasses(BundleModulesValidator.MODULES_SUB_VALIDATORS))
             .build();
@@ -67,11 +67,12 @@ public class ValidatorsTest {
   @Test
   public void sameOrderOfCommonSubValidators() throws Exception {
     assertSameOrderOfCommonClasses(
-        AppBundleValidator.BUNDLE_FILE_SUB_VALIDATORS,
+        AppBundleValidator.DEFAULT_BUNDLE_FILE_SUB_VALIDATORS,
         BundleModulesValidator.MODULE_FILE_SUB_VALIDATORS);
 
     assertSameOrderOfCommonClasses(
-        AppBundleValidator.BUNDLE_SUB_VALIDATORS, BundleModulesValidator.MODULES_SUB_VALIDATORS);
+        AppBundleValidator.DEFAULT_BUNDLE_SUB_VALIDATORS,
+        BundleModulesValidator.MODULES_SUB_VALIDATORS);
   }
 
   private static void assertSameOrderOfCommonClasses(

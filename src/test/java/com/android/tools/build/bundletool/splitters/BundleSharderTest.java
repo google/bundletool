@@ -33,6 +33,7 @@ import static com.android.tools.build.bundletool.testing.DeviceFactory.locales;
 import static com.android.tools.build.bundletool.testing.DeviceFactory.mergeSpecs;
 import static com.android.tools.build.bundletool.testing.DeviceFactory.sdkVersion;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifest;
+import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifestForAssetModule;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifestForFeature;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withFusingAttribute;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withMainActivity;
@@ -83,6 +84,7 @@ import com.android.aapt.ConfigurationOuterClass.Configuration;
 import com.android.aapt.Resources.ResourceTable;
 import com.android.aapt.Resources.XmlElement;
 import com.android.aapt.Resources.XmlNode;
+import com.android.bundle.Config.SuffixStripping;
 import com.android.bundle.Devices.DeviceSpec;
 import com.android.bundle.Files.ApexImages;
 import com.android.bundle.Targeting.Abi.AbiAlias;
@@ -108,7 +110,6 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
-import com.google.common.truth.Truth;
 import com.google.protobuf.Message;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -168,9 +169,6 @@ public class BundleSharderTest {
   private BundleSharder bundleSharder;
   private Path tmpDir;
 
-  @DataPoints("generate64BitShards")
-  public static final ImmutableSet<Boolean> GENERATE_64_BIT_LIBS = ImmutableSet.of(true, false);
-
   @Before
   public void setUp() {
     tmpDir = Paths.get("real/directory/not/needed/in/this/test");
@@ -181,11 +179,8 @@ public class BundleSharderTest {
             BundleSharderConfiguration.getDefaultInstance());
   }
 
-  /** If no dimension is set, the generate-64-bits-native-libs has no effect. */
   @Test
-  @Theory
-  public void shardByNoDimension_producesOneApk(
-      @FromDataPoints("generate64BitShards") boolean generate64BitShards) throws Exception {
+  public void shardByNoDimension_producesOneApk() throws Exception {
     BundleModule bundleModule =
         new BundleModuleBuilder("base")
             .addFile("assets/file.txt")
@@ -217,9 +212,7 @@ public class BundleSharderTest {
         new BundleSharder(
             tmpDir,
             BundleToolVersion.getCurrentVersion(),
-            BundleSharderConfiguration.builder()
-                .setGenerate64BitShard(generate64BitShards)
-                .build());
+            BundleSharderConfiguration.getDefaultInstance());
 
     ImmutableList<ModuleSplit> shards =
         bundleSharder.shardBundle(
@@ -236,6 +229,101 @@ public class BundleSharderTest {
             "dex/classes.dex",
             "lib/x86/libtest.so",
             "lib/x86_64/libtest.so",
+            "res/drawable/image.jpg",
+            "res/drawable-mdpi/image.jpg",
+            "root/license.dat");
+  }
+
+  @Test
+  public void shardByNoDimension_keepMultipleTcfTargetedDirectories() throws Exception {
+    BundleModule bundleModule =
+        new BundleModuleBuilder("base")
+            .addFile("assets/data#tcf_etc1/file.txt")
+            .addFile("assets/data#tcf_atc/file.txt")
+            .addFile("lib/x86/libtest.so")
+            .addFile("root/license.dat")
+            .setManifest(androidManifest("com.test.app"))
+            .setAssetsConfig(
+                assets(
+                    targetedAssetsDirectory(
+                        "assets/data#tcf_etc1",
+                        assetsDirectoryTargeting(
+                            textureCompressionTargeting(TextureCompressionFormatAlias.ETC1_RGB8))),
+                    targetedAssetsDirectory(
+                        "assets/data#tcf_atc",
+                        assetsDirectoryTargeting(
+                            textureCompressionTargeting(TextureCompressionFormatAlias.ATC)))))
+            .build();
+
+    BundleSharder bundleSharder =
+        new BundleSharder(
+            tmpDir,
+            BundleToolVersion.getCurrentVersion(),
+            BundleSharderConfiguration.getDefaultInstance());
+
+    ImmutableList<ModuleSplit> shards =
+        bundleSharder.shardBundle(
+            ImmutableList.of(bundleModule), ImmutableSet.of(), DEFAULT_METADATA);
+
+    assertThat(shards).hasSize(1);
+    assertThat(extractPaths(shards.get(0).getEntries()))
+        .containsExactly(
+            "assets/data#tcf_etc1/file.txt",
+            "assets/data#tcf_atc/file.txt",
+            "lib/x86/libtest.so",
+            "root/license.dat");
+  }
+
+
+  @Test
+  public void shardByNoDimension_strip64BitLibraries_filteredOut() throws Exception {
+    BundleModule bundleModule =
+        new BundleModuleBuilder("base")
+            .addFile("assets/file.txt")
+            .addFile("dex/classes.dex")
+            .addFile("lib/x86/libtest.so")
+            .addFile("lib/x86_64/libtest.so")
+            .addFile("res/drawable/image.jpg")
+            .addFile("res/drawable-mdpi/image.jpg")
+            .addFile("root/license.dat")
+            .setManifest(androidManifest("com.test.app"))
+            .setNativeConfig(
+                nativeLibraries(
+                    targetedNativeDirectory("lib/x86", nativeDirectoryTargeting(X86)),
+                    targetedNativeDirectory("lib/x86_64", nativeDirectoryTargeting(X86_64))))
+            .setResourceTable(
+                new ResourceTableBuilder()
+                    .addPackage("com.test.app")
+                    .addDrawableResourceForMultipleDensities(
+                        "image",
+                        ImmutableMap.of(
+                            DEFAULT_DENSITY_VALUE,
+                            "res/drawable/image.jpg",
+                            MDPI_VALUE,
+                            "res/drawable-mdpi/image.jpg"))
+                    .build())
+            .build();
+
+    BundleSharder bundleSharder =
+        new BundleSharder(
+            tmpDir,
+            BundleToolVersion.getCurrentVersion(),
+            BundleSharderConfiguration.builder().setStrip64BitLibrariesFromShards(true).build());
+
+    ImmutableList<ModuleSplit> shards =
+        bundleSharder.shardBundle(
+            ImmutableList.of(bundleModule), ImmutableSet.of(), DEFAULT_METADATA);
+
+    assertThat(shards).hasSize(1);
+    ModuleSplit fatShard = shards.get(0);
+    assertThat(fatShard.getApkTargeting()).isEqualToDefaultInstance();
+    assertThat(fatShard.getVariantTargeting()).isEqualToDefaultInstance();
+    assertThat(fatShard.getSplitType()).isEqualTo(SplitType.STANDALONE);
+    assertThat(extractPaths(fatShard.getEntries()))
+        .containsExactly(
+            "assets/file.txt",
+            "dex/classes.dex",
+            "lib/x86/libtest.so",
             "res/drawable/image.jpg",
             "res/drawable-mdpi/image.jpg",
             "root/license.dat");
@@ -653,8 +741,9 @@ public class BundleSharderTest {
     assertThat(frVrSplit.getAndroidManifest().getSplitId()).hasValue("vr.config.fr");
   }
 
+  @Ignore
   @Test
-  public void shardByAbi_64BitAbisDisabled_filteredOut() throws Exception {
+  public void shardByAbi_strip64BitLibraries_filteredOut() throws Exception {
     BundleModule bundleModule =
         new BundleModuleBuilder("base")
             .addFile("dex/classes.dex")
@@ -671,7 +760,7 @@ public class BundleSharderTest {
         new BundleSharder(
             tmpDir,
             BundleToolVersion.getCurrentVersion(),
-            BundleSharderConfiguration.builder().setGenerate64BitShard(false).build());
+            BundleSharderConfiguration.builder().setStrip64BitLibrariesFromShards(true).build());
 
     ImmutableList<ModuleSplit> shards =
         bundleSharder.shardBundle(
@@ -833,7 +922,7 @@ public class BundleSharderTest {
     ModuleSplit shard = shards.get(0);
     assertThat(shard.getApkTargeting()).isEqualToDefaultInstance();
     assertThat(shard.getVariantTargeting()).isEqualToDefaultInstance();
-    Truth.assertThat(shard.getSplitType()).isEqualTo(SplitType.STANDALONE);
+    assertThat(shard.getSplitType()).isEqualTo(SplitType.STANDALONE);
     assertThat(shard.getResourceTable()).isEmpty();
     assertThat(extractPaths(shard.getEntries()))
         .containsExactly(
@@ -2008,5 +2097,34 @@ public class BundleSharderTest {
             "res/drawable/image.jpg",
             "root/license.dat");
     assertThat(shards.getAdditionalSplits()).isEmpty();
+  }
+
+  @Test
+  public void shardAssetModules() throws Exception {
+    BundleModule baseModule =
+        new BundleModuleBuilder("base")
+            .addFile("dex/classes.dex")
+            .addFile("root/license.dat")
+            .setManifest(androidManifest("com.test.app"))
+            .build();
+    BundleModule assetModule =
+        new BundleModuleBuilder("upfront_asset")
+            .addFile("assets/file.txt")
+            .setManifest(androidManifestForAssetModule("com.test.app"))
+            .build();
+
+    ImmutableList<ModuleSplit> shards =
+        bundleSharder.shardBundle(
+            ImmutableList.of(baseModule, assetModule),
+            ImmutableSet.of(OptimizationDimension.ABI, OptimizationDimension.SCREEN_DENSITY),
+            DEFAULT_METADATA);
+
+    assertThat(shards).hasSize(1);
+    ModuleSplit fatShard = shards.get(0);
+    assertThat(fatShard.getApkTargeting()).isEqualToDefaultInstance();
+    assertThat(fatShard.getVariantTargeting()).isEqualToDefaultInstance();
+    assertThat(fatShard.getSplitType()).isEqualTo(SplitType.STANDALONE);
+    assertThat(extractPaths(fatShard.getEntries()))
+        .containsExactly("assets/file.txt", "dex/classes.dex", "root/license.dat");
   }
 }

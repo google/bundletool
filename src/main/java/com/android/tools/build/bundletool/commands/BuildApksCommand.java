@@ -45,9 +45,11 @@ import com.android.tools.build.bundletool.model.utils.SdkToolsLocator;
 import com.android.tools.build.bundletool.model.utils.SystemEnvironmentProvider;
 import com.android.tools.build.bundletool.splitters.DexCompressionSplitter;
 import com.android.tools.build.bundletool.splitters.NativeLibrariesCompressionSplitter;
+import com.android.tools.build.bundletool.validation.SubValidator;
 import com.google.auto.value.AutoValue;
 import com.google.common.base.Ascii;
 import com.google.common.base.Function;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.io.MoreFiles;
 import com.google.common.util.concurrent.ListeningExecutorService;
@@ -167,6 +169,8 @@ public abstract class BuildApksCommand {
 
   public abstract Optional<ApkModifier> getApkModifier();
 
+  public abstract ImmutableList<SubValidator> getExtraValidators();
+
   public abstract Optional<Integer> getFirstVariantNumber();
 
   public abstract Optional<PrintStream> getOutputPrintStream();
@@ -178,7 +182,8 @@ public abstract class BuildApksCommand {
         .setGenerateOnlyForConnectedDevice(false)
         .setCreateApkSetArchive(true)
         .setOptimizationDimensions(ImmutableSet.of())
-        .setModules(ImmutableSet.of());
+        .setModules(ImmutableSet.of())
+        .setExtraValidators(ImmutableList.of());
   }
 
   /** Builder for the {@link BuildApksCommand}. */
@@ -296,6 +301,9 @@ public abstract class BuildApksCommand {
      * concurrently for the different APKs.
      */
     public abstract Builder setApkModifier(ApkModifier apkModifier);
+
+    /** Provides additional {@link SubValidator}s that will be invoked during validation. */
+    public abstract Builder setExtraValidators(ImmutableList<SubValidator> extraValidators);
 
     /**
      * Provides the lowest variant number to use.

@@ -50,6 +50,7 @@ public class FakeDevice extends Device {
   private final ImmutableList<String> abis;
   private final int density;
   private final ImmutableList<String> features;
+  private final ImmutableList<String> glExtensions;
   private final String serialNumber;
   private final ImmutableMap<String, String> properties;
   private final Map<String, FakeShellCommandAction> commandInjections = new HashMap<>();
@@ -66,6 +67,7 @@ public class FakeDevice extends Device {
       ImmutableList<String> abis,
       int density,
       ImmutableList<String> features,
+      ImmutableList<String> glExtensions,
       ImmutableMap<String, String> properties) {
     this.state = state;
     this.androidVersion = new AndroidVersion(sdkVersion);
@@ -73,6 +75,7 @@ public class FakeDevice extends Device {
     this.density = density;
     this.serialNumber = serialNumber;
     this.properties = properties;
+    this.glExtensions = glExtensions;
     this.features = features;
   }
 
@@ -89,6 +92,7 @@ public class FakeDevice extends Device {
             ImmutableList.copyOf(deviceSpec.getSupportedAbisList()),
             deviceSpec.getScreenDensity(),
             ImmutableList.copyOf(deviceSpec.getDeviceFeaturesList()),
+            ImmutableList.copyOf(deviceSpec.getGlExtensionsList()),
             properties);
     device.injectShellCommandOutput(
         "pm list features",
@@ -108,6 +112,15 @@ public class FakeDevice extends Device {
                             deviceSpec.getSupportedLocalesList().stream()
                                 .map(FakeDevice::convertLocaleToResourceString)
                                 .collect(toImmutableList())))));
+    device.injectShellCommandOutput(
+        "dumpsys SurfaceFlinger",
+        () ->
+            LINE_JOINER.join(
+                ImmutableList.of(
+                    "SurfaceFlinger global state:",
+                    "EGL implementation : 1.4",
+                    "GLES: FakeDevice, OpenGL ES 3.0",
+                    DASH_JOINER.join(deviceSpec.getGlExtensionsList()))));
     return device;
   }
 
@@ -153,6 +166,7 @@ public class FakeDevice extends Device {
         ImmutableList.of(),
         /* density= */ -1,
         ImmutableList.of(),
+        ImmutableList.of(),
         ImmutableMap.of());
   }
 
@@ -189,6 +203,11 @@ public class FakeDevice extends Device {
   @Override
   public ImmutableList<String> getDeviceFeatures() {
     return features;
+  }
+
+  @Override
+  public ImmutableList<String> getGlExtensions() {
+    return glExtensions;
   }
 
   @Override

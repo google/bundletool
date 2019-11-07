@@ -82,6 +82,7 @@ public abstract class AndroidManifest {
   public static final String COUNTRY_ELEMENT_NAME = "country";
   public static final String CONDITION_DEVICE_FEATURE_NAME = "device-feature";
   public static final String CONDITION_MIN_SDK_VERSION_NAME = "min-sdk";
+  public static final String CONDITION_MAX_SDK_VERSION_NAME = "max-sdk";
   public static final String CONDITION_USER_COUNTRIES_NAME = "user-countries";
   public static final String SPLIT_NAME_ATTRIBUTE_NAME = "splitName";
   public static final String VERSION_NAME_ATTRIBUTE_NAME = "versionName";
