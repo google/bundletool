@@ -52,7 +52,7 @@ public class ZipUtilsTest {
     try (ZipFile zipFile = createZipFileWithFiles("a", "b", "c")) {
       ImmutableList<ZipPath> files =
           ZipUtils.allFileEntriesPaths(zipFile).collect(toImmutableList());
-      assertThat(files.stream().map(Path::toString).collect(toList()))
+      assertThat(files.stream().map(ZipPath::toString).collect(toList()))
           .containsExactly("a", "b", "c");
     }
   }

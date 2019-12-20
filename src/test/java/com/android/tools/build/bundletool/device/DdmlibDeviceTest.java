@@ -26,6 +26,7 @@ import static org.mockito.Mockito.when;
 import com.android.ddmlib.IDevice;
 import com.android.sdklib.AndroidVersion;
 import com.android.sdklib.AndroidVersion.VersionCodes;
+import com.android.tools.build.bundletool.device.DdmlibDevice.RemoteCommandExecutor;
 import com.android.tools.build.bundletool.device.Device.InstallOptions;
 import com.google.common.collect.ImmutableList;
 import java.nio.file.Path;
@@ -94,5 +95,40 @@ public final class DdmlibDeviceTest {
             any(TimeUnit.class));
 
     assertThat(extraArgsCaptor.getValue()).contains("-d");
+  }
+
+  @Test
+  public void allowTestOnly() throws Exception {
+    when(mockDevice.getVersion()).thenReturn(new AndroidVersion(VersionCodes.KITKAT));
+    DdmlibDevice ddmlibDevice = new DdmlibDevice(mockDevice);
+
+    ddmlibDevice.installApks(
+        ImmutableList.of(APK_PATH), InstallOptions.builder().setAllowTestOnly(true).build());
+
+    verify(mockDevice).installPackage(eq(APK_PATH.toString()), anyBoolean(), eq("-t"));
+  }
+
+  @Test
+  public void joinUnixPathsTest() {
+    assertThat(DdmlibDevice.joinUnixPaths("/", "splits", "mysplits")).isEqualTo("/splits/mysplits");
+    assertThat(DdmlibDevice.joinUnixPaths("splits", "mysplits")).isEqualTo("splits/mysplits");
+    assertThat(DdmlibDevice.joinUnixPaths("/", "splits/", "mysplits"))
+        .isEqualTo("/splits/mysplits");
+    assertThat(DdmlibDevice.joinUnixPaths("/", "splits", "mysplits/"))
+        .isEqualTo("/splits/mysplits/");
+  }
+
+  @Test
+  public void escapeAndSingleQuoteTest() {
+    assertThat(RemoteCommandExecutor.escapeAndSingleQuote("abc")).isEqualTo("'abc'");
+    assertThat(RemoteCommandExecutor.escapeAndSingleQuote("ab'c")).isEqualTo("'ab'\\''c'");
+  }
+
+  @Test
+  public void formatCommandWithArgsTest() {
+    assertThat(RemoteCommandExecutor.formatCommandWithArgs("cat %s %s", "abc", "def"))
+        .isEqualTo("cat 'abc' 'def'");
+    assertThat(RemoteCommandExecutor.formatCommandWithArgs("cat %s %s", "ab'c", "de'f"))
+        .isEqualTo("cat 'ab'\\''c' 'de'\\''f'");
   }
 }

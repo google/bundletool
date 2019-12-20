@@ -16,9 +16,8 @@
 
 package com.android.tools.build.bundletool.model.utils;
 
-import static com.android.bundle.Targeting.ScreenDensity.DensityOneofCase.DENSITY_ALIAS;
-import static com.android.tools.build.bundletool.model.utils.ResourcesUtils.DENSITY_ALIAS_TO_DPI_MAP;
 import static com.android.tools.build.bundletool.model.utils.Versions.ANDROID_L_API_VERSION;
+import static com.google.common.collect.MoreCollectors.onlyElement;
 
 import com.android.bundle.Targeting.Abi;
 import com.android.bundle.Targeting.ApkTargeting;
@@ -30,7 +29,6 @@ import com.android.bundle.Targeting.SdkVersionTargeting;
 import com.android.bundle.Targeting.TextureCompressionFormat;
 import com.android.bundle.Targeting.VariantTargeting;
 import com.google.common.collect.ImmutableSet;
-import com.google.common.collect.MoreCollectors;
 import com.google.protobuf.Int32Value;
 import java.util.Optional;
 
@@ -174,10 +172,7 @@ public final class TargetingProtoUtils {
     ScreenDensity densityTargeting =
         screenDensityTargeting.getValueList().stream()
             // For now we only support one value in ScreenDensityTargeting.
-            .collect(MoreCollectors.onlyElement());
-    return Optional.of(
-        densityTargeting.getDensityOneofCase().equals(DENSITY_ALIAS)
-            ? DENSITY_ALIAS_TO_DPI_MAP.get(densityTargeting.getDensityAlias())
-            : densityTargeting.getDensityDpi());
+            .collect(onlyElement());
+    return Optional.of(ResourcesUtils.convertToDpi(densityTargeting));
   }
 }

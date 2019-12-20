@@ -27,12 +27,14 @@ import static com.android.tools.build.bundletool.testing.ApksArchiveHelpers.crea
 import static com.android.tools.build.bundletool.testing.ApksArchiveHelpers.createSystemApkSet;
 import static com.android.tools.build.bundletool.testing.ApksArchiveHelpers.createVariant;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.apkAbiTargeting;
+import static com.android.tools.build.bundletool.testing.TargetingUtils.apkLanguageTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.lPlusVariantTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.sdkVersionFrom;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.variantSdkTargeting;
 import static com.google.common.truth.Truth.assertThat;
 import static com.google.common.truth.extensions.proto.ProtoTruth.assertThat;
 
+import com.android.bundle.Commands.AssetSliceSet;
 import com.android.bundle.Commands.BuildApksResult;
 import com.android.bundle.Commands.Variant;
 import com.android.bundle.Targeting.Abi.AbiAlias;
@@ -211,10 +213,49 @@ public class ResultUtilsTest {
     assertThat(ResultUtils.isSystemApkVariant(variant)).isTrue();
   }
 
+  @Test
+  public void getAllTargetedLanguages() {
+    BuildApksResult tableOfContentsProto =
+        BuildApksResult.newBuilder()
+            .addVariant(
+                createVariant(
+                    VariantTargeting.getDefaultInstance(),
+                    createSplitApkSet(
+                        "base",
+                        createMasterApkDescription(
+                            ApkTargeting.getDefaultInstance(), ZipPath.create("master.apk")),
+                        createApkDescription(
+                            apkLanguageTargeting("en"),
+                            ZipPath.create("en.apk"),
+                            /* isMasterSplit= */ false),
+                        createApkDescription(
+                            apkLanguageTargeting("pl"),
+                            ZipPath.create("pl.apk"),
+                            /* isMasterSplit= */ false),
+                        createApkDescription(
+                            apkLanguageTargeting("ru"),
+                            ZipPath.create("ru.apk"),
+                            /* isMasterSplit= */ false))))
+            .addAssetSliceSet(
+                AssetSliceSet.newBuilder()
+                    .addApkDescription(
+                        createMasterApkDescription(
+                            ApkTargeting.getDefaultInstance(), ZipPath.create("assets.apk")))
+                    .addApkDescription(
+                        createApkDescription(
+                            apkLanguageTargeting("fr"),
+                            ZipPath.create("fr.apk"),
+                            /* isMasterSplit= */ false))
+                    .build())
+            .build();
+    ImmutableSet<String> langs = ResultUtils.getAllTargetedLanguages(tableOfContentsProto);
+    assertThat(langs).containsExactly("pl", "en", "ru", "fr");
+  }
+
   private Variant createInstantVariant() {
-    Path apkLBase = ZipPath.create("instant/apkL-base.apk");
-    Path apkLFeature = ZipPath.create("instant/apkL-feature.apk");
-    Path apkLOther = ZipPath.create("instant/apkL-other.apk");
+    ZipPath apkLBase = ZipPath.create("instant/apkL-base.apk");
+    ZipPath apkLFeature = ZipPath.create("instant/apkL-feature.apk");
+    ZipPath apkLOther = ZipPath.create("instant/apkL-other.apk");
     return createVariant(
         variantSdkTargeting(sdkVersionFrom(21), ImmutableSet.of(SdkVersion.getDefaultInstance())),
         createInstantApkSet("base", ApkTargeting.getDefaultInstance(), apkLBase),
@@ -237,14 +278,14 @@ public class ResultUtilsTest {
   }
 
   private Variant createStandaloneVariant() {
-    Path apkPreL = ZipPath.create("apkPreL.apk");
+    ZipPath apkPreL = ZipPath.create("apkPreL.apk");
     return createVariant(
         variantSdkTargeting(sdkVersionFrom(15), ImmutableSet.of(SdkVersion.getDefaultInstance())),
         createStandaloneApkSet(ApkTargeting.getDefaultInstance(), apkPreL));
   }
 
   private Variant createSystemVariant() {
-    Path systemApk = ZipPath.create("system.apk");
+    ZipPath systemApk = ZipPath.create("system.apk");
     return createVariant(
         variantSdkTargeting(sdkVersionFrom(15), ImmutableSet.of(SdkVersion.getDefaultInstance())),
         createSystemApkSet(ApkTargeting.getDefaultInstance(), systemApk));

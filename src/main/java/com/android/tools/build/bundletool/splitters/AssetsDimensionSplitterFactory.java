@@ -17,7 +17,9 @@
 package com.android.tools.build.bundletool.splitters;
 
 import static com.android.tools.build.bundletool.model.ManifestMutator.withSplitsRequired;
+import static com.android.utils.ImmutableCollectors.toImmutableSet;
 import static com.google.common.base.Preconditions.checkArgument;
+import static com.google.common.base.Predicates.not;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 
 import com.android.bundle.Files.Assets;
@@ -33,6 +35,7 @@ import com.android.tools.build.bundletool.model.targeting.TargetingUtils;
 import com.google.common.base.Function;
 import com.google.common.collect.ImmutableCollection;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Multimap;
 import com.google.common.collect.Multimaps;
 import com.google.protobuf.Message;
@@ -108,7 +111,9 @@ public class AssetsDimensionSplitterFactory {
             .map(assetsConfig -> splitAssetsDirectories(assetsConfig, split))
             .orElse(ImmutableList.of(split))
             .stream()
-            .map(moduleSplit -> removeAssetsTargeting(moduleSplit))
+            .map(
+                moduleSplit ->
+                    moduleSplit.isMasterSplit() ? moduleSplit : removeAssetsTargeting(moduleSplit))
             .collect(toImmutableList());
       }
 
@@ -120,29 +125,54 @@ public class AssetsDimensionSplitterFactory {
 
       private ImmutableList<ModuleSplit> splitAssetsDirectories(Assets assets, ModuleSplit split) {
         Multimap<T, TargetedAssetsDirectory> directoriesMap =
-            Multimaps.index(
-                assets.getDirectoryList(),
-                targetedDirectory -> dimensionGetter.apply(targetedDirectory.getTargeting()));
-        return directoriesMap.asMap().entrySet().stream()
-            .map(
+            Multimaps.filterKeys(
+                Multimaps.index(
+                    assets.getDirectoryList(),
+                    targetedDirectory -> dimensionGetter.apply(targetedDirectory.getTargeting())),
+                not(this::isDefaultTargeting));
+        ImmutableList.Builder<ModuleSplit> splitsBuilder = new ImmutableList.Builder<>();
+        // Generate config splits.
+        directoriesMap
+            .asMap()
+            .entrySet()
+            .forEach(
                 entry -> {
+                  ImmutableList<ModuleEntry> entries =
+                      listEntriesFromDirectories(entry.getValue(), split);
+                  if (entries.isEmpty()) {
+                    return;
+                  }
                   ModuleSplit.Builder modifiedSplit = split.toBuilder();
 
-                  boolean isMasterSplit =
-                      split.isMasterSplit() && isDefaultTargeting(entry.getKey());
-
                   modifiedSplit
-                      .setEntries(listEntriesFromDirectories(entry.getValue(), split))
+                      .setEntries(entries)
                       .setApkTargeting(generateTargeting(split.getApkTargeting(), entry.getKey()))
-                      .setMasterSplit(isMasterSplit);
-                  if (!isMasterSplit) {
-                    modifiedSplit.addMasterManifestMutator(withSplitsRequired(true));
-                  }
+                      .setMasterSplit(false)
+                      .addMasterManifestMutator(withSplitsRequired(true));
 
-                  return modifiedSplit.build();
-                })
-            .filter(moduleSplit -> !moduleSplit.getEntries().isEmpty())
-            .collect(toImmutableList());
+                  splitsBuilder.add(modifiedSplit.build());
+                });
+        // Ensure that master split (even an empty one) always exists.
+        ModuleSplit defaultSplit = getDefaultAssetsSplit(split, splitsBuilder.build());
+        if (defaultSplit.isMasterSplit() || !defaultSplit.getEntries().isEmpty()) {
+          splitsBuilder.add(defaultSplit);
+        }
+        return splitsBuilder.build();
+      }
+
+      private ModuleSplit getDefaultAssetsSplit(
+          ModuleSplit inputSplit, ImmutableList<ModuleSplit> configSplits) {
+        ImmutableSet<ModuleEntry> claimedEntries =
+            configSplits.stream()
+                .map(ModuleSplit::getEntries)
+                .flatMap(Collection::stream)
+                .collect(toImmutableSet());
+        return inputSplit.toBuilder()
+            .setEntries(
+                inputSplit.getEntries().stream()
+                    .filter(not(claimedEntries::contains))
+                    .collect(toImmutableList()))
+            .build();
       }
 
       private boolean isDefaultTargeting(T splittingDimensionTargeting) {

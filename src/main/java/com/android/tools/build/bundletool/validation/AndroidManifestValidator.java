@@ -41,6 +41,7 @@ import com.android.tools.build.bundletool.model.exceptions.manifest.ManifestSdkT
 import com.android.tools.build.bundletool.model.exceptions.manifest.ManifestSdkTargetingException.MinSdkGreaterThanMaxSdkException;
 import com.android.tools.build.bundletool.model.exceptions.manifest.ManifestSdkTargetingException.MinSdkInvalidException;
 import com.android.tools.build.bundletool.model.exceptions.manifest.ManifestVersionCodeConflictException;
+import com.android.tools.build.bundletool.model.exceptions.manifest.ManifestVersionException.VersionCodeMissingException;
 import com.android.tools.build.bundletool.model.utils.xmlproto.XmlProtoAttribute;
 import com.google.common.base.Joiner;
 import com.google.common.collect.ImmutableList;
@@ -69,6 +70,7 @@ public class AndroidManifestValidator extends SubValidator {
             .map(BundleModule::getAndroidManifest)
             .filter(manifest -> !manifest.getModuleType().equals(ModuleType.ASSET_MODULE))
             .map(AndroidManifest::getVersionCode)
+            .map(optVersionCode -> optVersionCode.orElseThrow(VersionCodeMissingException::new))
             .distinct()
             .sorted()
             .collect(toImmutableList());

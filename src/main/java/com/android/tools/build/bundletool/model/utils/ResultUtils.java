@@ -18,12 +18,15 @@ package com.android.tools.build.bundletool.model.utils;
 
 import static com.android.tools.build.bundletool.model.utils.FileNames.TABLE_OF_CONTENTS_FILE;
 import static com.google.common.collect.ImmutableList.toImmutableList;
+import static com.google.common.collect.ImmutableSet.toImmutableSet;
 
 import com.android.bundle.Commands.ApkDescription;
 import com.android.bundle.Commands.BuildApksResult;
 import com.android.bundle.Commands.Variant;
 import com.android.tools.build.bundletool.model.utils.files.BufferedIo;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.Streams;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -144,6 +147,19 @@ public final class ResultUtils {
         .stream()
         .flatMap(apkSet -> apkSet.getApkDescriptionList().stream())
         .anyMatch(ApkDescription::hasSystemApkMetadata);
+  }
+
+  public static ImmutableSet<String> getAllTargetedLanguages(BuildApksResult result) {
+    return Streams.concat(
+            result.getAssetSliceSetList().stream()
+                .flatMap(assetSliceSet -> assetSliceSet.getApkDescriptionList().stream()),
+            result.getVariantList().stream()
+                .flatMap(variant -> variant.getApkSetList().stream())
+                .flatMap(apkSet -> apkSet.getApkDescriptionList().stream()))
+        .flatMap(
+            apkDescription ->
+                apkDescription.getTargeting().getLanguageTargeting().getValueList().stream())
+        .collect(toImmutableSet());
   }
 
   private ResultUtils() {}

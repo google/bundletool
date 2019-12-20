@@ -69,6 +69,7 @@ import com.android.tools.build.bundletool.model.version.BundleToolVersion;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
+import java.nio.file.Paths;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
@@ -78,7 +79,7 @@ public class VariantTotalSizeAggregatorTest {
 
   private final GetSizeCommand.Builder getSizeCommand =
       GetSizeCommand.builder()
-          .setApksArchivePath(ZipPath.create("dummy.apks"))
+          .setApksArchivePath(Paths.get("dummy.apks"))
           .setGetSizeSubCommand(GetSizeSubcommand.TOTAL);
 
   @Test

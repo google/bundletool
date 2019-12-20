@@ -21,6 +21,7 @@ import static com.android.tools.build.bundletool.model.utils.ResourcesUtils.DEFA
 import static com.android.tools.build.bundletool.model.utils.ResourcesUtils.DENSITY_ALIAS_TO_DPI_MAP;
 import static com.android.tools.build.bundletool.model.utils.ResourcesUtils.MDPI_VALUE;
 import static com.android.tools.build.bundletool.model.utils.ResourcesUtils.NONE_DENSITY_VALUE;
+import static com.android.tools.build.bundletool.model.version.VersionGuardedFeature.PREFER_EXPLICIT_DPI_OVER_DEFAULT_CONFIG;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.collect.ImmutableList.toImmutableList;
@@ -207,7 +208,7 @@ public final class ScreenDensitySelector {
     Comparator<ConfigValue> compositeComparator =
         Comparator.comparing(
             ScreenDensitySelector::getDpiValue, new ScreenDensityComparator(desiredDpi));
-    if (!bundleVersion.isOlderThan(Version.of("0.9.1"))) {
+    if (PREFER_EXPLICIT_DPI_OVER_DEFAULT_CONFIG.enabledForVersion(bundleVersion)) {
       compositeComparator =
           compositeComparator.thenComparing(ScreenDensitySelector::isExplicitDpi, falseFirst());
     }

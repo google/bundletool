@@ -63,6 +63,8 @@ public abstract class Device {
 
   public abstract void installApks(ImmutableList<Path> apks, InstallOptions installOptions);
 
+  public abstract void pushApks(ImmutableList<Path> apks, PushOptions installOptions);
+
   /** Options related to APK installation. */
   @Immutable
   @AutoValue
@@ -73,12 +75,16 @@ public abstract class Device {
 
     public abstract boolean getAllowReinstall();
 
+    public abstract boolean getAllowTestOnly();
+
     public abstract Duration getTimeout();
 
     public static Builder builder() {
       return new AutoValue_Device_InstallOptions.Builder()
           .setTimeout(DEFAULT_ADB_TIMEOUT)
-          .setAllowReinstall(true);
+          .setAllowReinstall(true)
+          .setAllowDowngrade(false)
+          .setAllowTestOnly(false);
     }
 
     /** Builder for {@link InstallOptions}. */
@@ -90,7 +96,43 @@ public abstract class Device {
 
       public abstract Builder setTimeout(Duration timeout);
 
+      public abstract Builder setAllowTestOnly(boolean allowTestOnly);
+
       public abstract InstallOptions build();
+    }
+  }
+
+  /** Options related to APK installation. */
+  @Immutable
+  @AutoValue
+  @AutoValue.CopyAnnotations
+  public abstract static class PushOptions {
+    public abstract String getDestinationPath();
+
+    public abstract Duration getTimeout();
+
+    public abstract Optional<String> getPackageName();
+
+    public abstract boolean getClearDestinationPath();
+
+    public static Builder builder() {
+      return new AutoValue_Device_PushOptions.Builder()
+          .setTimeout(DEFAULT_ADB_TIMEOUT)
+          .setClearDestinationPath(false);
+    }
+
+    /** Builder for {@link InstallOptions}. */
+    @AutoValue.Builder
+    public abstract static class Builder {
+      public abstract Builder setDestinationPath(String destinationPath);
+
+      public abstract Builder setTimeout(Duration timeout);
+
+      public abstract Builder setPackageName(String packageName);
+
+      public abstract Builder setClearDestinationPath(boolean shouldClear);
+
+      public abstract PushOptions build();
     }
   }
 }

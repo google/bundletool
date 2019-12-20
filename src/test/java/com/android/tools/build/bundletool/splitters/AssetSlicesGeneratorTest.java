@@ -29,8 +29,8 @@ import static com.android.tools.build.bundletool.testing.TargetingUtils.language
 import static com.android.tools.build.bundletool.testing.TargetingUtils.targetedAssetsDirectory;
 import static com.android.tools.build.bundletool.testing.TestUtils.extractPaths;
 import static com.google.common.truth.Truth.assertThat;
+import static com.google.common.truth.Truth8.assertThat;
 import static com.google.common.truth.extensions.proto.ProtoTruth.assertThat;
-import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.android.bundle.Targeting.ApkTargeting;
 import com.android.tools.build.bundletool.model.AppBundle;
@@ -91,7 +91,12 @@ public class AssetSlicesGeneratorTest {
 
     assertThat(assetSlices).hasSize(1);
     ModuleSplit assetSlice = assetSlices.get(0);
-    assertThat(assetSlice.getAndroidManifest().getVersionCode()).isEqualTo(VERSION_CODE);
+    assertThat(
+            assetSlice
+                .getAndroidManifest()
+                .getVersionCode()
+                .orElseThrow(VersionCodeMissingException::new))
+        .isEqualTo(VERSION_CODE);
   }
 
   @Test
@@ -108,8 +113,7 @@ public class AssetSlicesGeneratorTest {
 
     assertThat(assetSlices).hasSize(1);
     ModuleSplit assetSlice = assetSlices.get(0);
-    assertThrows(
-        VersionCodeMissingException.class, () -> assetSlice.getAndroidManifest().getVersionCode());
+    assertThat(assetSlice.getAndroidManifest().getVersionCode()).isEmpty();
   }
 
 

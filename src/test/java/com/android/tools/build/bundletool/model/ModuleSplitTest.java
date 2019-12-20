@@ -344,7 +344,7 @@ public class ModuleSplitTest {
             .build();
     resSplit = resSplit.writeSplitIdInManifest(resSplit.getSuffix());
     assertThat(resSplit.getAndroidManifest().getSplitId())
-        .hasValue("config.x86_64.x86_arm64_v8a.armeabi_v7a");
+        .hasValue("config.armeabi_v7a.arm64_v8a_x86.x86_64");
   }
 
   @Test

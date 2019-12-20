@@ -31,6 +31,7 @@ import com.android.tools.build.bundletool.model.AppBundle;
 import com.android.tools.build.bundletool.model.BundleModule;
 import com.android.tools.build.bundletool.model.ModuleEntry;
 import com.android.tools.build.bundletool.model.ZipPath;
+import com.android.tools.build.bundletool.model.utils.files.FileUtils;
 import com.android.tools.build.bundletool.validation.ResourceTableValidator;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Ascii;
@@ -39,7 +40,6 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.hash.HashCode;
 import com.google.common.hash.Hashing;
-import com.google.common.io.MoreFiles;
 import java.math.BigInteger;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
@@ -77,7 +77,7 @@ public class AppBundleObfuscationPreprocessor implements AppBundlePreprocessor {
     }
     return newAppBundle.setRawModules(obfuscatedBundleModules.build()).build();
   }
-  
+
   private static ResourceTable obfuscateResourceTableEntries(
       ResourceTable initialResourceTable, ImmutableMap<String, String> resourceNameMapping) {
     ResourceTable.Builder modifiedResourceTable = initialResourceTable.toBuilder();
@@ -169,7 +169,7 @@ public class AppBundleObfuscationPreprocessor implements AppBundlePreprocessor {
     while (resourceNameMapping.containsValue("res/" + encodedString)) {
       encodedString = handleCollision(hashCode.asBytes());
     }
-    String fileExtension = MoreFiles.getFileExtension(oldZipPath);
+    String fileExtension = FileUtils.getFileExtension(oldZipPath);
     // The "xml" extension has to be preserved, because the Android Platform requires it
     if (Ascii.equalsIgnoreCase(fileExtension, "xml")) {
       encodedString = encodedString + "." + fileExtension;

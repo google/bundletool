@@ -34,6 +34,7 @@ import static com.android.tools.build.bundletool.testing.TargetingUtils.textureC
 import static com.android.tools.build.bundletool.testing.TestUtils.extractPaths;
 import static com.android.tools.build.bundletool.testing.TestUtils.getEntryContent;
 import static com.google.common.truth.Truth.assertThat;
+import static com.google.common.truth.Truth8.assertThat;
 import static com.google.common.truth.extensions.proto.ProtoTruth.assertThat;
 
 import com.android.bundle.Config.SuffixStripping;
@@ -58,11 +59,12 @@ import org.junit.runners.JUnit4;
 @RunWith(JUnit4.class)
 public class AssetModuleSplitterTest {
 
+  private static final String MODULE_NAME = "test_module";
 
   @Test
   public void singleSlice() throws Exception {
     BundleModule testModule =
-        new BundleModuleBuilder("testModule")
+        new BundleModuleBuilder(MODULE_NAME)
             .addFile("assets/image.jpg")
             .addFile("assets/image2.jpg")
             .setManifest(androidManifestForAssetModule("com.test.app"))
@@ -77,6 +79,7 @@ public class AssetModuleSplitterTest {
     ModuleSplit masterSlice = slices.get(0);
     assertThat(masterSlice.getSplitType()).isEqualTo(SplitType.ASSET_SLICE);
     assertThat(masterSlice.isMasterSplit()).isTrue();
+    assertThat(masterSlice.getAndroidManifest().getSplitId()).hasValue(MODULE_NAME);
     assertThat(masterSlice.getApkTargeting()).isEqualToDefaultInstance();
     assertThat(extractPaths(masterSlice.getEntries()))
         .containsExactly("assets/image.jpg", "assets/image2.jpg");

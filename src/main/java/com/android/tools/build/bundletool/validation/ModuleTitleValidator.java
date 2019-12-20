@@ -17,6 +17,7 @@
 package com.android.tools.build.bundletool.validation;
 
 import static com.android.tools.build.bundletool.model.utils.ResourcesUtils.entries;
+import static com.android.tools.build.bundletool.model.version.VersionGuardedFeature.MODULE_TITLE_VALIDATION_ENFORCED;
 import static com.google.common.collect.ImmutableSet.toImmutableSet;
 
 import com.android.aapt.Resources.ResourceTable;
@@ -43,8 +44,9 @@ public class ModuleTitleValidator extends SubValidator {
     BundleModule baseModule = modules.stream().filter(BundleModule::isBaseModule).findFirst().get();
 
     // For bundles built using older versions we haven't strictly enforced module Title Validation.
-    if (BundleToolVersion.getVersionFromBundleConfig(baseModule.getBundleConfig())
-        .isOlderThan(Version.of("0.4.3"))) {
+    Version bundleVersion =
+        BundleToolVersion.getVersionFromBundleConfig(baseModule.getBundleConfig());
+    if (!MODULE_TITLE_VALIDATION_ENFORCED.enabledForVersion(bundleVersion)) {
       return;
     }
     ResourceTable table = baseModule.getResourceTable().orElse(ResourceTable.getDefaultInstance());
@@ -60,7 +62,7 @@ public class ModuleTitleValidator extends SubValidator {
         if (module.getAndroidManifest().getTitleRefId().isPresent()) {
           throw ValidationException.builder()
               .withMessage(
-                    "Module titles not supported in asset packs, but found in '%s'.",
+                  "Module titles not supported in asset packs, but found in '%s'.",
                   module.getName())
               .build();
         }

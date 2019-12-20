@@ -441,12 +441,11 @@ public class ShardedApksGeneratorTest {
                     mergeSpecs(
                         sdkVersion(28), abis("x86"), density(DensityAlias.MDPI), locales("fr"))));
 
-    assertThat(moduleSplits).hasSize(4); // fused, base-es, vr-es, vr-it splits
+    assertThat(moduleSplits).hasSize(3); // fused, base-es, vr-es, vr-it splits
     ImmutableMap<String, ModuleSplit> splitBySplitIdMap =
         Maps.uniqueIndex(moduleSplits, split -> split.getAndroidManifest().getSplitId().orElse(""));
 
-    assertThat(splitBySplitIdMap.keySet())
-        .containsExactly("", "config.es", "vr.config.es", "vr.config.it");
+    assertThat(splitBySplitIdMap.keySet()).containsExactly("", "config.es", "config.it");
 
     ModuleSplit fusedSplit = splitBySplitIdMap.get("");
     assertThat(fusedSplit.getApkTargeting()).isEqualTo(apkLanguageTargeting("fr"));
@@ -462,22 +461,15 @@ public class ShardedApksGeneratorTest {
     assertThat(esBaseSplit.getSplitType()).isEqualTo(SplitType.SYSTEM);
     assertThat(esBaseSplit.isMasterSplit()).isFalse();
     assertThat(extractPaths(esBaseSplit.getEntries()))
-        .containsExactly("assets/languages#lang_es/image.jpg");
+        .containsExactly(
+            "assets/languages#lang_es/image.jpg", "assets/vr/languages#lang_es/image.jpg");
 
-    ModuleSplit esVrSplit = splitBySplitIdMap.get("vr.config.es");
-    assertThat(esVrSplit.getApkTargeting()).isEqualTo(apkLanguageTargeting("es"));
-    assertThat(esVrSplit.getVariantTargeting()).isEqualTo(fusedSplit.getVariantTargeting());
-    assertThat(esVrSplit.getSplitType()).isEqualTo(SplitType.SYSTEM);
-    assertThat(esVrSplit.isMasterSplit()).isFalse();
-    assertThat(extractPaths(esVrSplit.getEntries()))
-        .containsExactly("assets/vr/languages#lang_es/image.jpg");
-
-    ModuleSplit itVrSplit = splitBySplitIdMap.get("vr.config.it");
-    assertThat(itVrSplit.getApkTargeting()).isEqualTo(apkLanguageTargeting("it"));
-    assertThat(itVrSplit.getVariantTargeting()).isEqualTo(fusedSplit.getVariantTargeting());
-    assertThat(itVrSplit.getSplitType()).isEqualTo(SplitType.SYSTEM);
-    assertThat(itVrSplit.isMasterSplit()).isFalse();
-    assertThat(extractPaths(itVrSplit.getEntries()))
+    ModuleSplit itBaseSplit = splitBySplitIdMap.get("config.it");
+    assertThat(itBaseSplit.getApkTargeting()).isEqualTo(apkLanguageTargeting("it"));
+    assertThat(itBaseSplit.getVariantTargeting()).isEqualTo(fusedSplit.getVariantTargeting());
+    assertThat(itBaseSplit.getSplitType()).isEqualTo(SplitType.SYSTEM);
+    assertThat(itBaseSplit.isMasterSplit()).isFalse();
+    assertThat(extractPaths(itBaseSplit.getEntries()))
         .containsExactly("assets/vr/languages#lang_it/image.jpg");
   }
 

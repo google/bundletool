@@ -220,6 +220,7 @@ public class InstallApksCommandTest {
     assertThat(fromBuilder).isEqualTo(fromFlags);
   }
 
+
   @Test
   public void fromFlagsEquivalentToBuilder_modules() throws Exception {
     Path apksFile = tmpDir.resolve("appbundle.apks");
@@ -243,6 +244,7 @@ public class InstallApksCommandTest {
 
     assertThat(fromBuilder).isEqualTo(fromFlags);
   }
+
 
   @Test
   public void missingApksFlag_fails() {
@@ -697,6 +699,54 @@ public class InstallApksCommandTest {
             "feature2-master.apk",
             "feature3-master.apk",
             "feature4-master.apk");
+  }
+
+  @Test
+  @Theory
+  public void installModules_withPush(@FromDataPoints("apksInDirectory") boolean apksInDirectory)
+      throws Exception {
+    BuildApksResult tableOfContent =
+        BuildApksResult.newBuilder()
+            .setBundletool(
+                Bundletool.newBuilder()
+                    .setVersion(BundleToolVersion.getCurrentVersion().toString()))
+            .addVariant(
+                createVariant(
+                    VariantTargeting.getDefaultInstance(),
+                    createSplitApkSet(
+                        "base",
+                        createMasterApkDescription(
+                            ApkTargeting.getDefaultInstance(), ZipPath.create("base-master.apk"))),
+                    createSplitApkSet(
+                        "base",
+                        createApkDescription(
+                            apkLanguageTargeting("pl"),
+                            ZipPath.create("base-pl.apk"),
+                            /* isMasterSplit= */ false))))
+            .build();
+    Path apksFile = createApks(tableOfContent, apksInDirectory);
+    List<Path> installedApks = new ArrayList<>();
+    List<Path> pushedApks = new ArrayList<>();
+    FakeDevice fakeDevice =
+        FakeDevice.fromDeviceSpec(DEVICE_ID, DeviceState.ONLINE, lDeviceWithLocales("en-US"));
+    AdbServer adbServer =
+        new FakeAdbServer(/* hasInitialDeviceList= */ true, ImmutableList.of(fakeDevice));
+    fakeDevice.setInstallApksSideEffect((apks, installOptions) -> installedApks.addAll(apks));
+    fakeDevice.setPushApksSideEffect((apks, installOptions) -> pushedApks.addAll(apks));
+
+    InstallApksCommand.builder()
+        .setApksArchivePath(apksFile)
+        .setAdbPath(adbPath)
+        .setAdbServer(adbServer)
+        .setPushSplitsPath("/tmp/")
+        .build()
+        .execute();
+
+    assertThat(Lists.transform(installedApks, apkPath -> apkPath.getFileName().toString()))
+        .containsExactly("base-master.apk");
+
+    assertThat(Lists.transform(pushedApks, apkPath -> apkPath.getFileName().toString()))
+        .containsExactly("base-master.apk", "base-pl.apk");
   }
 
   @Test

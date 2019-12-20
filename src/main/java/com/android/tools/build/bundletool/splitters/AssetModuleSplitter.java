@@ -27,6 +27,7 @@ import com.android.tools.build.bundletool.model.BundleModule;
 import com.android.tools.build.bundletool.model.BundleModule.ModuleDeliveryType;
 import com.android.tools.build.bundletool.model.ModuleSplit;
 import com.android.tools.build.bundletool.model.OptimizationDimension;
+import com.android.tools.build.bundletool.model.SuffixManager;
 import com.google.common.collect.ImmutableList;
 import com.google.protobuf.Int32Value;
 
@@ -34,6 +35,7 @@ import com.google.protobuf.Int32Value;
 public class AssetModuleSplitter {
   private final BundleModule module;
   private final ApkGenerationConfiguration apkGenerationConfiguration;
+  private final SuffixManager suffixManager = new SuffixManager();
 
   public AssetModuleSplitter(
       BundleModule module, ApkGenerationConfiguration apkGenerationConfiguration) {
@@ -53,7 +55,7 @@ public class AssetModuleSplitter {
       splits =
           splits.stream().map(AssetModuleSplitter::addLPlusApkTargeting).collect(toImmutableList());
     }
-    return splits;
+    return splits.stream().map(this::setAssetSliceManifest).collect(toImmutableList());
   }
 
   private SplittingPipeline createAssetsSplittingPipeline() {
@@ -80,5 +82,10 @@ public class AssetModuleSplitter {
                                 .setMin(Int32Value.newBuilder().setValue(ANDROID_L_API_VERSION))))
                 .build())
         .build();
+  }
+
+  private ModuleSplit setAssetSliceManifest(ModuleSplit assetSlice) {
+    String resolvedSuffix = suffixManager.createSuffix(assetSlice);
+    return assetSlice.writeSplitIdInManifest(resolvedSuffix);
   }
 }

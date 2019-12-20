@@ -101,5 +101,10 @@ message SuffixStripping {
   // default suffix defines the directories to retain. The others are
   // discarded: standalone/universal APKs will contain only directories
   // targeted at this value for the dimension.
+  //
+  // If not set or empty, the fallback directory in each directory group will be
+  // used (for example, if both "assets/level1_textures#tcf_etc1" and
+  // "assets/level1_textures" are present and the default suffix is empty,
+  // then only "assets/level1_textures" will be used).
   string default_suffix = 2;
 }

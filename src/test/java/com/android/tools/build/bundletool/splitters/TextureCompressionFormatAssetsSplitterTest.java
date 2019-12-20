@@ -16,6 +16,7 @@
 
 package com.android.tools.build.bundletool.splitters;
 
+import static com.android.tools.build.bundletool.model.BundleModule.ASSETS_DIRECTORY;
 import static com.android.tools.build.bundletool.model.ManifestMutator.withSplitsRequired;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifest;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.compareManifestMutators;
@@ -86,7 +87,8 @@ public class TextureCompressionFormatAssetsSplitterTest {
     assertThat(assetsSplits).hasSize(3);
     List<ModuleSplit> defaultSplits = getSplitsWithDefaultTargeting(assetsSplits);
     assertThat(defaultSplits).hasSize(1);
-    assertThat(extractPaths(defaultSplits.get(0).getEntries())).containsExactly("assets/file.txt");
+    assertThat(extractPaths(defaultSplits.get(0).findEntriesUnderPath(ASSETS_DIRECTORY)))
+        .containsExactly("assets/file.txt");
     List<ModuleSplit> etc1Splits =
         getSplitsWithTargetingEqualTo(
             assetsSplits,
@@ -95,7 +97,7 @@ public class TextureCompressionFormatAssetsSplitterTest {
                     TextureCompressionFormatAlias.ETC1_RGB8,
                     ImmutableSet.of(TextureCompressionFormatAlias.THREE_DC))));
     assertThat(etc1Splits).hasSize(1);
-    assertThat(extractPaths(etc1Splits.get(0).getEntries()))
+    assertThat(extractPaths(etc1Splits.get(0).findEntriesUnderPath(ASSETS_DIRECTORY)))
         .containsExactly("assets/images#tcf_etc1/image.jpg");
     List<ModuleSplit> threeDcSplits =
         getSplitsWithTargetingEqualTo(
@@ -105,7 +107,7 @@ public class TextureCompressionFormatAssetsSplitterTest {
                     TextureCompressionFormatAlias.THREE_DC,
                     ImmutableSet.of(TextureCompressionFormatAlias.ETC1_RGB8))));
     assertThat(threeDcSplits).hasSize(1);
-    assertThat(extractPaths(threeDcSplits.get(0).getEntries()))
+    assertThat(extractPaths(threeDcSplits.get(0).findEntriesUnderPath(ASSETS_DIRECTORY)))
         .containsExactly("assets/images#tcf_3dc/image.jpg");
   }
 

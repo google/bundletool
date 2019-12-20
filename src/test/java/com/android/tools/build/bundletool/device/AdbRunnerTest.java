@@ -34,7 +34,7 @@ import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 
 @RunWith(JUnit4.class)
-public class ApksInstallerTest {
+public class AdbRunnerTest {
 
   private static final InstallOptions DEFAULT_INSTALL_OPTIONS =
       InstallOptions.builder()
@@ -48,14 +48,16 @@ public class ApksInstallerTest {
     AdbServer testAdbServer =
         new FakeAdbServer(/* hasInitialDeviceList= */ true, ImmutableList.of());
     testAdbServer.init(Paths.get("/test/adb"));
-    ApksInstaller apksInstaller = new ApksInstaller(testAdbServer);
+    AdbRunner adbRunner = new AdbRunner(testAdbServer);
 
     Throwable exception =
         assertThrows(
             CommandExecutionException.class,
             () ->
-                apksInstaller.installApks(
-                    ImmutableList.of(Paths.get("apkOne.apk")), DEFAULT_INSTALL_OPTIONS));
+                adbRunner.run(
+                    device ->
+                        device.installApks(
+                            ImmutableList.of(Paths.get("apkOne.apk")), DEFAULT_INSTALL_OPTIONS)));
     assertThat(exception)
         .hasMessageThat()
         .contains("Expected to find one connected device, but found none.");
@@ -69,9 +71,11 @@ public class ApksInstallerTest {
             ImmutableList.of(
                 FakeDevice.fromDeviceSpec("a", DeviceState.ONLINE, lDeviceWithLocales("en-US"))));
     testAdbServer.init(Paths.get("/test/adb"));
-    ApksInstaller apksInstaller = new ApksInstaller(testAdbServer);
+    AdbRunner adbRunner = new AdbRunner(testAdbServer);
 
-    apksInstaller.installApks(ImmutableList.of(Paths.get("apkOne.apk")), DEFAULT_INSTALL_OPTIONS);
+    adbRunner.run(
+        device ->
+            device.installApks(ImmutableList.of(Paths.get("apkOne.apk")), DEFAULT_INSTALL_OPTIONS));
   }
 
   @Test
@@ -83,14 +87,16 @@ public class ApksInstallerTest {
                 FakeDevice.fromDeviceSpec("a", DeviceState.ONLINE, lDeviceWithLocales("en-US")),
                 FakeDevice.inDisconnectedState("b", DeviceState.UNAUTHORIZED)));
     testAdbServer.init(Paths.get("/test/adb"));
-    ApksInstaller apksInstaller = new ApksInstaller(testAdbServer);
+    AdbRunner adbRunner = new AdbRunner(testAdbServer);
 
     Throwable exception =
         assertThrows(
             CommandExecutionException.class,
             () ->
-                apksInstaller.installApks(
-                    ImmutableList.of(Paths.get("apkOne.apk")), DEFAULT_INSTALL_OPTIONS));
+                adbRunner.run(
+                    device ->
+                        device.installApks(
+                            ImmutableList.of(Paths.get("apkOne.apk")), DEFAULT_INSTALL_OPTIONS)));
     assertThat(exception)
         .hasMessageThat()
         .contains("Expected to find one connected device, but found 2.");
@@ -101,14 +107,17 @@ public class ApksInstallerTest {
     AdbServer testAdbServer =
         new FakeAdbServer(/* hasInitialDeviceList= */ true, ImmutableList.of());
     testAdbServer.init(Paths.get("/test/adb"));
-    ApksInstaller apksInstaller = new ApksInstaller(testAdbServer);
+    AdbRunner adbRunner = new AdbRunner(testAdbServer);
 
     Throwable exception =
         assertThrows(
             CommandExecutionException.class,
             () ->
-                apksInstaller.installApks(
-                    ImmutableList.of(Paths.get("apkOne.apk")), DEFAULT_INSTALL_OPTIONS, "device1"));
+                adbRunner.run(
+                    device ->
+                        device.installApks(
+                            ImmutableList.of(Paths.get("apkOne.apk")), DEFAULT_INSTALL_OPTIONS),
+                    "device1"));
     assertThat(exception)
         .hasMessageThat()
         .contains("Expected to find one connected device with serial number 'device1'.");
@@ -124,10 +133,12 @@ public class ApksInstallerTest {
                     "device1", DeviceState.ONLINE, lDeviceWithLocales("en-US")),
                 FakeDevice.inDisconnectedState("device2", DeviceState.UNAUTHORIZED)));
     testAdbServer.init(Paths.get("/test/adb"));
-    ApksInstaller apksInstaller = new ApksInstaller(testAdbServer);
+    AdbRunner adbRunner = new AdbRunner(testAdbServer);
 
-    apksInstaller.installApks(
-        ImmutableList.of(Paths.get("apkOne.apk")), DEFAULT_INSTALL_OPTIONS, "device1");
+    adbRunner.run(
+        device ->
+            device.installApks(ImmutableList.of(Paths.get("apkOne.apk")), DEFAULT_INSTALL_OPTIONS),
+        "device1");
   }
 
   @Test
@@ -142,7 +153,7 @@ public class ApksInstallerTest {
                     "device1", DeviceState.ONLINE, lDeviceWithLocales("en-US")),
                 disconnectedDevice));
     testAdbServer.init(Paths.get("/test/adb"));
-    ApksInstaller apksInstaller = new ApksInstaller(testAdbServer);
+    AdbRunner adbRunner = new AdbRunner(testAdbServer);
 
     disconnectedDevice.setInstallApksSideEffect(
         (apks, installOptions) -> {
@@ -154,8 +165,11 @@ public class ApksInstallerTest {
         assertThrows(
             InstallationException.class,
             () ->
-                apksInstaller.installApks(
-                    ImmutableList.of(Paths.get("apkOne.apk")), DEFAULT_INSTALL_OPTIONS, "device2"));
+                adbRunner.run(
+                    device ->
+                        device.installApks(
+                            ImmutableList.of(Paths.get("apkOne.apk")), DEFAULT_INSTALL_OPTIONS),
+                    "device2"));
     assertThat(exception)
         .hasMessageThat()
         .contains("Enable USB debugging on the connected device.");
@@ -168,7 +182,7 @@ public class ApksInstallerTest {
     AdbServer testAdbServer =
         new FakeAdbServer(/* hasInitialDeviceList= */ true, ImmutableList.of(fakeDevice));
     testAdbServer.init(Paths.get("/test/adb"));
-    ApksInstaller apksInstaller = new ApksInstaller(testAdbServer);
+    AdbRunner adbRunner = new AdbRunner(testAdbServer);
 
     fakeDevice.setInstallApksSideEffect(
         (apks, installOptions) -> {
@@ -177,8 +191,10 @@ public class ApksInstallerTest {
           }
         });
 
-    apksInstaller.installApks(
-        ImmutableList.of(Paths.get("apkOne.apk")),
-        InstallOptions.builder().setAllowDowngrade(true).build());
+    adbRunner.run(
+        device ->
+            device.installApks(
+                ImmutableList.of(Paths.get("apkOne.apk")),
+                InstallOptions.builder().setAllowDowngrade(true).build()));
   }
 }

@@ -29,6 +29,7 @@ import com.google.common.io.ByteStreams;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
+import java.util.stream.Stream;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 import org.junit.jupiter.api.function.Executable;
@@ -61,7 +62,15 @@ public final class TestUtils {
    * instances, preserving the order.
    */
   public static ImmutableList<String> extractPaths(ImmutableList<ModuleEntry> entries) {
-    return entries.stream()
+    return extractPaths(entries.stream());
+  }
+
+  /**
+   * Returns paths of the given {@link com.android.tools.build.bundletool.model.ModuleEntry}
+   * instances, preserving the order.
+   */
+  public static ImmutableList<String> extractPaths(Stream<ModuleEntry> entries) {
+    return entries
         .map(ModuleEntry::getPath)
         .map(ZipPath::toString)
         .collect(toImmutableList());

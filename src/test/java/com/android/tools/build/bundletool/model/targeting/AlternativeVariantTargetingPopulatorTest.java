@@ -31,7 +31,6 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import com.android.bundle.Targeting.Abi;
 import com.android.bundle.Targeting.Abi.AbiAlias;
 import com.android.bundle.Targeting.ApkTargeting;
-import com.android.bundle.Targeting.ScreenDensity;
 import com.android.bundle.Targeting.ScreenDensity.DensityAlias;
 import com.android.bundle.Targeting.SdkVersion;
 import com.android.bundle.Targeting.VariantTargeting;
@@ -327,8 +326,7 @@ public class AlternativeVariantTargetingPopulatorTest {
   public void screenDensity_alternativesPopulated() throws Exception {
     VariantTargeting ldpiTargeting = variantDensityTargeting(DensityAlias.LDPI);
     VariantTargeting mdpiTargeting = variantDensityTargeting(DensityAlias.MDPI);
-    VariantTargeting defaultDensityTargeting =
-        variantDensityTargeting(ScreenDensity.getDefaultInstance());
+    VariantTargeting hdpiTargeting = variantDensityTargeting(DensityAlias.HDPI);
 
     ImmutableList<ModuleSplit> outputVariants =
         new ScreenDensityAlternativesPopulator()
@@ -336,7 +334,7 @@ public class AlternativeVariantTargetingPopulatorTest {
                 ImmutableList.of(
                     createModuleSplit(ldpiTargeting),
                     createModuleSplit(mdpiTargeting),
-                    createModuleSplit(defaultDensityTargeting)));
+                    createModuleSplit(hdpiTargeting)));
 
     assertThat(outputVariants).hasSize(3);
     ModuleSplit ldpiVariantNew = outputVariants.get(0);
@@ -346,7 +344,7 @@ public class AlternativeVariantTargetingPopulatorTest {
             variantDensityTargeting(
                 toScreenDensity(DensityAlias.LDPI),
                 ImmutableSet.of(
-                    ScreenDensity.getDefaultInstance(), toScreenDensity(DensityAlias.MDPI))));
+                    toScreenDensity(DensityAlias.MDPI), toScreenDensity(DensityAlias.HDPI))));
     ModuleSplit mdpiVariantNew = outputVariants.get(1);
     assertThat(mdpiVariantNew.getVariantTargeting())
         .ignoringRepeatedFieldOrder()
@@ -354,13 +352,13 @@ public class AlternativeVariantTargetingPopulatorTest {
             variantDensityTargeting(
                 toScreenDensity(DensityAlias.MDPI),
                 ImmutableSet.of(
-                    ScreenDensity.getDefaultInstance(), toScreenDensity(DensityAlias.LDPI))));
-    ModuleSplit defaultVariantNew = outputVariants.get(2);
-    assertThat(defaultVariantNew.getVariantTargeting())
+                    toScreenDensity(DensityAlias.LDPI), toScreenDensity(DensityAlias.HDPI))));
+    ModuleSplit hdpiVariantNew = outputVariants.get(2);
+    assertThat(hdpiVariantNew.getVariantTargeting())
         .ignoringRepeatedFieldOrder()
         .isEqualTo(
             variantDensityTargeting(
-                ScreenDensity.getDefaultInstance(),
+                toScreenDensity(DensityAlias.HDPI),
                 ImmutableSet.of(
                     toScreenDensity(DensityAlias.LDPI), toScreenDensity(DensityAlias.MDPI))));
   }

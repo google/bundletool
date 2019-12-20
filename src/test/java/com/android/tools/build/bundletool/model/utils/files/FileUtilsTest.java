@@ -19,6 +19,7 @@ package com.android.tools.build.bundletool.model.utils.files;
 import static com.google.common.truth.Truth.assertThat;
 import static java.nio.charset.StandardCharsets.UTF_8;
 
+import com.android.tools.build.bundletool.model.ZipPath;
 import java.io.ByteArrayInputStream;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -113,42 +114,42 @@ public class FileUtilsTest {
 
   @Test
   public void getExtension_emptyFile() {
-    assertThat(FileUtils.getFileExtension(Paths.get(""))).isEmpty();
+    assertThat(FileUtils.getFileExtension(ZipPath.create(""))).isEmpty();
   }
 
   @Test
   public void getExtension_fileNoExtension() {
-    assertThat(FileUtils.getFileExtension(Paths.get("file"))).isEmpty();
+    assertThat(FileUtils.getFileExtension(ZipPath.create("file"))).isEmpty();
   }
 
   @Test
   public void getExtension_fileInDirectoryNoExtension() {
-    assertThat(FileUtils.getFileExtension(Paths.get("directory", "file"))).isEmpty();
+    assertThat(FileUtils.getFileExtension(ZipPath.create("directory/file"))).isEmpty();
   }
 
   @Test
   public void getExtension_fileInDirectoryNoExtension_EndWithDot() {
-    assertThat(FileUtils.getFileExtension(Paths.get("directory", "file."))).isEmpty();
+    assertThat(FileUtils.getFileExtension(ZipPath.create("directory/file."))).isEmpty();
   }
 
   @Test
   public void getExtension_fileInDirectoryOneLetterExtension() {
-    assertThat(FileUtils.getFileExtension(Paths.get("directory", "file.a"))).isEqualTo("a");
+    assertThat(FileUtils.getFileExtension(ZipPath.create("directory/file.a"))).isEqualTo("a");
   }
 
   @Test
   public void getExtension_fileInDirectorySimpleExtension() {
-    assertThat(FileUtils.getFileExtension(Paths.get("directory", "file.txt"))).isEqualTo("txt");
+    assertThat(FileUtils.getFileExtension(ZipPath.create("directory/file.txt"))).isEqualTo("txt");
   }
 
   @Test
   public void getExtension_fileInDirectorySimpleExtension_EndsWithDot() {
-    assertThat(FileUtils.getFileExtension(Paths.get("directory", "file.txt."))).isEqualTo("");
+    assertThat(FileUtils.getFileExtension(ZipPath.create("directory/file.txt."))).isEmpty();
   }
 
   @Test
   public void getExtension_fileInDirectoryDoubleExtension() {
-    assertThat(FileUtils.getFileExtension(Paths.get("directory", "file.pb.json")))
+    assertThat(FileUtils.getFileExtension(ZipPath.create("directory/file.pb.json")))
         .isEqualTo("json");
   }
 }

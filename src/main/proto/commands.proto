@@ -9,6 +9,9 @@ option java_package = "com.android.bundle";
 
 // Describes the output of the "build-apks" command.
 message BuildApksResult {
+  // The package name of this app.
+  string package_name = 4;
+
   // List of the created variants.
   repeated Variant variant = 1;
 

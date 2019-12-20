@@ -23,7 +23,6 @@ import com.android.bundle.Targeting.AssetsDirectoryTargeting;
 import com.android.bundle.Targeting.GraphicsApi;
 import com.android.bundle.Targeting.GraphicsApiTargeting;
 import com.android.bundle.Targeting.LanguageTargeting;
-import com.android.tools.build.bundletool.model.ZipPath;
 import com.android.tools.build.bundletool.model.exceptions.ValidationException;
 import com.android.tools.build.bundletool.model.utils.GraphicsApiUtils;
 import com.android.tools.build.bundletool.model.utils.TextureCompressionUtils;
@@ -108,12 +107,11 @@ public abstract class TargetedDirectorySegment {
     return new AutoValue_TargetedDirectorySegment(getName(), newTargeting.build());
   }
 
-  public static TargetedDirectorySegment parse(ZipPath directorySegment) {
-    checkArgument(directorySegment.getNameCount() == 1);
-    if (!directorySegment.toString().contains("#")) {
-      return TargetedDirectorySegment.create(directorySegment.toString());
+  public static TargetedDirectorySegment parse(String directorySegment) {
+    if (!directorySegment.contains("#")) {
+      return TargetedDirectorySegment.create(directorySegment);
     }
-    Matcher matcher = DIRECTORY_SEGMENT_PATTERN.matcher(directorySegment.toString());
+    Matcher matcher = DIRECTORY_SEGMENT_PATTERN.matcher(directorySegment);
     if (matcher.matches()) {
       return TargetedDirectorySegment.create(
           matcher.group("base"), matcher.group("key"), matcher.group("value"));
@@ -143,10 +141,9 @@ public abstract class TargetedDirectorySegment {
   }
 
   /**
-   * Fast check (without parsing) that verifies if a dimension can be targeted in a path.
-   * If this returns true, you should construct a TargetedDirectory from the path to do any work on
-   * it. If this returns false, the dimension is guaranteed not to be targeted in the specified
-   * path.
+   * Fast check (without parsing) that verifies if a dimension can be targeted in a path. If this
+   * returns true, you should construct a TargetedDirectory from the path to do any work on it. If
+   * this returns false, the dimension is guaranteed not to be targeted in the specified path.
    */
   public static boolean pathMayContain(String path, TargetingDimension dimension) {
     Collection<String> keys = DIMENSION_TO_KEY.get(dimension);

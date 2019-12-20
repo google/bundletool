@@ -26,7 +26,6 @@ import static com.android.tools.build.bundletool.testing.TargetingUtils.assetsDi
 import static com.android.tools.build.bundletool.testing.TargetingUtils.getSplitsWithDefaultTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.getSplitsWithTargetingEqualTo;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.graphicsApiTargeting;
-import static com.android.tools.build.bundletool.testing.TargetingUtils.lPlusVariantTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.mergeApkTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.mergeAssetsTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.openGlVersionFrom;
@@ -37,7 +36,6 @@ import static com.android.tools.build.bundletool.testing.TestUtils.extractPaths;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.ImmutableSet.toImmutableSet;
 import static com.google.common.truth.Truth.assertThat;
-import static com.google.common.truth.extensions.proto.ProtoTruth.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.android.bundle.Targeting.Abi.AbiAlias;
@@ -62,7 +60,7 @@ import org.junit.runners.JUnit4;
 public class GraphicsApiAssetsSplitterTest {
 
   @Test
-  public void singleSplit() throws Exception {
+  public void singleOpenGlSplitAndEmptyDefaultSplit() throws Exception {
     BundleModule testModule =
         new BundleModuleBuilder("testModule")
             .addFile("assets/images#opengl_2.0/image.jpg")
@@ -77,13 +75,21 @@ public class GraphicsApiAssetsSplitterTest {
 
     ModuleSplit baseSplit = ModuleSplit.forAssets(testModule);
     Collection<ModuleSplit> assetsSplits = GraphicsApiAssetsSplitter.create().split(baseSplit);
-    assertThat(assetsSplits).hasSize(1);
-    ModuleSplit split = assetsSplits.iterator().next();
-    assertThat(split.getApkTargeting())
-        .isEqualTo(apkGraphicsTargeting(graphicsApiTargeting(openGlVersionFrom(2))));
-    assertThat(split.getVariantTargeting()).isEqualTo(lPlusVariantTargeting());
-    assertThat(split.getSplitType()).isEqualTo(SplitType.SPLIT);
-    assertThat(extractPaths(split.getEntries()))
+    assertThat(assetsSplits).hasSize(2);
+    assertThat(
+            assetsSplits.stream()
+                .map(ModuleSplit::getSplitType)
+                .distinct()
+                .collect(toImmutableSet()))
+        .containsExactly(SplitType.SPLIT);
+    List<ModuleSplit> defaultSplits = getSplitsWithDefaultTargeting(assetsSplits);
+    assertThat(defaultSplits).hasSize(1);
+    assertThat(extractPaths(defaultSplits.get(0).getEntries())).isEmpty();
+    List<ModuleSplit> gl2PlusSplits =
+        getSplitsWithTargetingEqualTo(
+            assetsSplits, apkGraphicsTargeting(graphicsApiTargeting(openGlVersionFrom(2))));
+    assertThat(gl2PlusSplits).hasSize(1);
+    assertThat(extractPaths(gl2PlusSplits.get(0).getEntries()))
         .containsExactly(
             "assets/images#opengl_2.0/image.jpg", "assets/images#opengl_2.0/image2.jpg");
   }
@@ -216,7 +222,7 @@ public class GraphicsApiAssetsSplitterTest {
 
     ModuleSplit baseSplit = ModuleSplit.forAssets(testModule);
     Collection<ModuleSplit> assetsSplits = GraphicsApiAssetsSplitter.create().split(baseSplit);
-    assertThat(assetsSplits).hasSize(3);
+    assertThat(assetsSplits).hasSize(4);
     assertThat(
             assetsSplits
                 .stream()
@@ -254,6 +260,10 @@ public class GraphicsApiAssetsSplitterTest {
     assertThat(gl3Splits).hasSize(1);
     assertThat(extractPaths(gl3Splits.get(0).getEntries()))
         .containsExactly("assets/images#opengl_3.0/image.jpg");
+    List<ModuleSplit> defaultSplits = getSplitsWithDefaultTargeting(assetsSplits);
+    assertThat(defaultSplits).hasSize(1);
+    assertThat(defaultSplits.get(0).isMasterSplit()).isTrue();
+    assertThat(extractPaths(defaultSplits.get(0).getEntries())).isEmpty();
   }
 
   @Test

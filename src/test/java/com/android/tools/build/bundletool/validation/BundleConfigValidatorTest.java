@@ -169,6 +169,21 @@ public final class BundleConfigValidatorTest {
   }
 
   @Test
+  public void optimizations_nonTcfDimensionsSuffixStrippingDisabled_ok() throws Exception {
+    AppBundle appBundle =
+        createAppBundle(
+            BundleConfigBuilder.create()
+                .clearOptimizations()
+                .addSplitDimension(
+                    SplitDimension.newBuilder()
+                        .setValueValue(Value.LANGUAGE_VALUE)
+                        .setSuffixStripping(SuffixStripping.newBuilder().setEnabled(false))
+                        .build()));
+
+    new BundleConfigValidator().validateBundle(appBundle);
+  }
+
+  @Test
   public void optimizations_nonTcfDimensionsSuffixStripping_throws() throws Exception {
     AppBundle appBundle =
         createAppBundle(
@@ -191,7 +206,7 @@ public final class BundleConfigValidatorTest {
   }
 
   @Test
-  public void optimizations_tcfDimensionSuffixStrippingWithoutDefault_throws() throws Exception {
+  public void optimizations_tcfDimensionSuffixStrippingWithoutDefault_ok() throws Exception {
     AppBundle appBundle =
         createAppBundle(
             BundleConfigBuilder.create()
@@ -202,12 +217,7 @@ public final class BundleConfigValidatorTest {
                         .setSuffixStripping(SuffixStripping.newBuilder().setEnabled(true))
                         .build()));
 
-    ValidationException exception =
-        assertThrows(
-            ValidationException.class, () -> new BundleConfigValidator().validateBundle(appBundle));
-    assertThat(exception)
-        .hasMessageThat()
-        .contains("Suffix stripping was enabled without specifying a default suffix.");
+    new BundleConfigValidator().validateBundle(appBundle);
   }
 
   @Test

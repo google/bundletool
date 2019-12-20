@@ -33,9 +33,11 @@ import com.android.tools.build.bundletool.model.BundleModule;
 import com.android.tools.build.bundletool.model.ResourceId;
 import com.android.tools.build.bundletool.model.ResourceTableEntry;
 import com.android.tools.build.bundletool.model.ZipPath;
+import com.android.tools.build.bundletool.model.exceptions.ValidationException;
 import com.android.tools.build.bundletool.model.utils.ResourcesUtils;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
+import com.google.protobuf.InvalidProtocolBufferException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
@@ -140,6 +142,11 @@ public class ResourceAnalyzer {
         try (InputStream is = module.getEntry(xmlResourcePath).get().getContent()) {
           XmlNode xmlRoot = XmlNode.parseFrom(is);
           return findAllReferencedAppResources(xmlRoot, module);
+        } catch (InvalidProtocolBufferException e) {
+          throw ValidationException.builder()
+              .withMessage("Error parsing XML file '%s'.", xmlResourcePath)
+              .withCause(e)
+              .build();
         } catch (IOException e) {
           throw new UncheckedIOException(
               String.format(

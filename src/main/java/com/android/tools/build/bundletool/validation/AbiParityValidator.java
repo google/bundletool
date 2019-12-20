@@ -59,7 +59,7 @@ public class AbiParityValidator extends SubValidator {
     return module
         .findEntriesUnderPath(BundleModule.LIB_DIRECTORY)
         // From "lib/<dir>/..." extract the "<dir>" part.
-        .map(entry -> entry.getPath().getName(1))
+        .map(entry -> entry.getPath().getName(1).toString())
         // Extract ABI from the directory name.
         .map(TargetedDirectorySegment::parse)
         .map(TargetedDirectorySegment::getName)

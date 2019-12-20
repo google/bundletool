@@ -20,6 +20,7 @@ import static com.android.tools.build.bundletool.model.ManifestMutator.withSplit
 import static com.android.tools.build.bundletool.model.utils.ResourcesUtils.DEFAULT_DENSITY_VALUE;
 import static com.android.tools.build.bundletool.model.utils.ResourcesUtils.MIPMAP_TYPE;
 import static com.android.tools.build.bundletool.model.utils.ResourcesUtils.getLowestDensity;
+import static com.android.tools.build.bundletool.model.version.VersionGuardedFeature.RESOURCES_WITH_NO_ALTERNATIVES_IN_MASTER_SPLIT;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.collect.ImmutableList.toImmutableList;
@@ -113,12 +114,9 @@ public class ScreenDensityResourcesSplitter extends SplitterForOneTargetingDimen
         continue;
       }
       ModuleSplit.Builder moduleSplitBuilder =
-          split
-              .toBuilder()
+          split.toBuilder()
               .setApkTargeting(
-                  split
-                      .getApkTargeting()
-                      .toBuilder()
+                  split.getApkTargeting().toBuilder()
                       .setScreenDensityTargeting(
                           ScreenDensityTargeting.newBuilder()
                               .addValue(toScreenDensity(density))
@@ -147,8 +145,7 @@ public class ScreenDensityResourcesSplitter extends SplitterForOneTargetingDimen
       ModuleSplit inputSplit, ImmutableCollection<ModuleSplit> densitySplits) {
     ResourceTable defaultSplitTable =
         getResourceTableForDefaultSplit(inputSplit, getClaimedConfigs(densitySplits));
-    return inputSplit
-        .toBuilder()
+    return inputSplit.toBuilder()
         .setEntries(ModuleSplit.filterResourceEntries(inputSplit.getEntries(), defaultSplitTable))
         .setResourceTable(defaultSplitTable)
         .build();
@@ -228,16 +225,15 @@ public class ScreenDensityResourcesSplitter extends SplitterForOneTargetingDimen
     // Groups together configs that only differ on density.
     Map<Configuration, List<ConfigValue>> configValuesByConfiguration =
         initialEntry.getConfigValueList().stream()
-            // Remove this filter entirely once 0.4.0 is no longer being actively used.
             .filter(
                 configValue ->
-                    !bundleVersion.isOlderThan(Version.of("0.4.0"))
+                    RESOURCES_WITH_NO_ALTERNATIVES_IN_MASTER_SPLIT.enabledForVersion(bundleVersion)
                         || configValue.getConfig().getDensity() != DEFAULT_DENSITY_VALUE)
             .collect(groupingBy(configValue -> clearDensity(configValue.getConfig())));
 
     // Filter out configs that don't have alternatives on density. These configurations can go in
     // the master split.
-    if (!bundleVersion.isOlderThan(Version.of("0.4.0"))) {
+    if (RESOURCES_WITH_NO_ALTERNATIVES_IN_MASTER_SPLIT.enabledForVersion(bundleVersion)) {
       configValuesByConfiguration =
           Maps.filterValues(configValuesByConfiguration, configValues -> configValues.size() > 1);
     }

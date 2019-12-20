@@ -61,7 +61,6 @@ import com.android.aapt.Resources.XmlNode;
 import com.android.tools.build.bundletool.TestData;
 import com.android.tools.build.bundletool.model.exceptions.ValidationException;
 import com.android.tools.build.bundletool.model.exceptions.manifest.ManifestFusingException.FusingMissingIncludeAttribute;
-import com.android.tools.build.bundletool.model.exceptions.manifest.ManifestVersionException.VersionCodeMissingException;
 import com.android.tools.build.bundletool.model.utils.xmlproto.UnexpectedAttributeTypeException;
 import com.android.tools.build.bundletool.model.utils.xmlproto.XmlProtoNode;
 import com.android.tools.build.bundletool.model.version.Version;
@@ -335,14 +334,14 @@ public class AndroidManifestTest {
                     xmlDecimalIntegerAttribute(
                         ANDROID_NAMESPACE_URI, "versionCode", VERSION_CODE_RESOURCE_ID, 123),
                     xmlNode(xmlElement("application")))));
-    assertThat(androidManifest.getVersionCode()).isEqualTo(123);
+    assertThat(androidManifest.getVersionCode()).hasValue(123);
   }
 
   @Test
-  public void getVersionCode_missing_throws() {
+  public void getVersionCode_missing_isEmpty() {
     AndroidManifest androidManifest =
         AndroidManifest.create(xmlNode(xmlElement("manifest", xmlNode(xmlElement("application")))));
-    assertThrows(VersionCodeMissingException.class, () -> androidManifest.getVersionCode());
+    assertThat(androidManifest.getVersionCode()).isEmpty();
   }
 
   @Test
@@ -869,7 +868,7 @@ public class AndroidManifestTest {
             Optional.of(false));
 
     assertThat(configManifest.getPackageName()).isEqualTo("com.package.test");
-    assertThat(configManifest.getVersionCode()).isEqualTo(1);
+    assertThat(configManifest.getVersionCode()).hasValue(1);
     assertThat(configManifest.getHasCode()).hasValue(false);
     assertThat(configManifest.getSplitId()).hasValue("x86");
     assertThat(configManifest.getConfigForSplit()).hasValue("feature1");
@@ -898,7 +897,9 @@ public class AndroidManifestTest {
             Optional.empty());
 
     XmlProtoNode generatedManifest = configManifest.getManifestRoot();
-    assertThat(generatedManifest.getProto()).isEqualTo(expectedXmlNodeBuilder.build());
+    assertThat(generatedManifest.getProto())
+        .ignoringRepeatedFieldOrder()
+        .isEqualTo(expectedXmlNodeBuilder.build());
   }
 
   @Test

@@ -54,7 +54,8 @@ public class FakeDevice extends Device {
   private final String serialNumber;
   private final ImmutableMap<String, String> properties;
   private final Map<String, FakeShellCommandAction> commandInjections = new HashMap<>();
-  private Optional<SideEffect> installApksSideEffect = Optional.empty();
+  private Optional<SideEffect<InstallOptions>> installApksSideEffect = Optional.empty();
+  private Optional<SideEffect<PushOptions>> pushApksSideEffect = Optional.empty();
   private static final Joiner COMMA_JOINER = Joiner.on(',');
   private static final Joiner DASH_JOINER = Joiner.on('-');
   private static final Joiner LINE_JOINER = Joiner.on(System.getProperty("line.separator"));
@@ -230,8 +231,17 @@ public class FakeDevice extends Device {
     installApksSideEffect.ifPresent(val -> val.apply(apks, installOptions));
   }
 
-  public void setInstallApksSideEffect(SideEffect sideEffect) {
+  @Override
+  public void pushApks(ImmutableList<Path> apks, PushOptions pushOptions) {
+    pushApksSideEffect.ifPresent(val -> val.apply(apks, pushOptions));
+  }
+
+  public void setInstallApksSideEffect(SideEffect<InstallOptions> sideEffect) {
     installApksSideEffect = Optional.of(sideEffect);
+  }
+
+  public void setPushApksSideEffect(SideEffect<PushOptions> sideEffect) {
+    pushApksSideEffect = Optional.of(sideEffect);
   }
 
   public void clearInstallApksSideEffect() {
@@ -251,7 +261,7 @@ public class FakeDevice extends Device {
   }
 
   /** Side effect. */
-  public interface SideEffect {
-    void apply(ImmutableList<Path> apks, InstallOptions installOptions);
+  public interface SideEffect<T> {
+    void apply(ImmutableList<Path> apks, T options);
   }
 }

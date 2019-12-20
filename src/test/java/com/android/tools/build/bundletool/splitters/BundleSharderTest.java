@@ -23,6 +23,7 @@ import static com.android.bundle.Targeting.Abi.AbiAlias.X86_64;
 import static com.android.tools.build.bundletool.model.AndroidManifest.ACTIVITY_ELEMENT_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.ANDROID_NAMESPACE_URI;
 import static com.android.tools.build.bundletool.model.AndroidManifest.NAME_RESOURCE_ID;
+import static com.android.tools.build.bundletool.model.BundleModule.ASSETS_DIRECTORY;
 import static com.android.tools.build.bundletool.model.utils.ResourcesUtils.DEFAULT_DENSITY_VALUE;
 import static com.android.tools.build.bundletool.model.utils.ResourcesUtils.HDPI_VALUE;
 import static com.android.tools.build.bundletool.model.utils.ResourcesUtils.LDPI_VALUE;
@@ -248,11 +249,15 @@ public class BundleSharderTest {
                     targetedAssetsDirectory(
                         "assets/data#tcf_etc1",
                         assetsDirectoryTargeting(
-                            textureCompressionTargeting(TextureCompressionFormatAlias.ETC1_RGB8))),
+                            textureCompressionTargeting(
+                                TextureCompressionFormatAlias.ETC1_RGB8,
+                                ImmutableSet.of(TextureCompressionFormatAlias.ATC)))),
                     targetedAssetsDirectory(
                         "assets/data#tcf_atc",
                         assetsDirectoryTargeting(
-                            textureCompressionTargeting(TextureCompressionFormatAlias.ATC)))))
+                            textureCompressionTargeting(
+                                TextureCompressionFormatAlias.ATC,
+                                ImmutableSet.of(TextureCompressionFormatAlias.ETC1_RGB8))))))
             .build();
 
     BundleSharder bundleSharder =
@@ -724,21 +729,17 @@ public class BundleSharderTest {
             "assets/vr/languages#lang_es/image.jpg", "assets/languages#lang_es/image.jpg");
 
     ImmutableList<ModuleSplit> langSplits = shards.getAdditionalSplits();
-    assertThat(langSplits).hasSize(2);
+    assertThat(langSplits).hasSize(1);
     ImmutableMap<String, ModuleSplit> langSplitsNameMap =
         Maps.uniqueIndex(langSplits, split -> split.getModuleName().getName());
 
-    assertThat(langSplitsNameMap.keySet()).containsExactly("base", "vr");
+    assertThat(langSplitsNameMap.keySet()).containsExactly("base");
 
     ModuleSplit frBaseSplit = langSplitsNameMap.get("base");
     assertThat(extractPaths(frBaseSplit.getEntries()))
-        .containsExactly("assets/languages#lang_fr/image.jpg");
+        .containsExactly(
+            "assets/languages#lang_fr/image.jpg", "assets/vr/languages#lang_fr/image.jpg");
     assertThat(frBaseSplit.getAndroidManifest().getSplitId()).hasValue("config.fr");
-
-    ModuleSplit frVrSplit = langSplitsNameMap.get("vr");
-    assertThat(extractPaths(frVrSplit.getEntries()))
-        .containsExactly("assets/vr/languages#lang_fr/image.jpg");
-    assertThat(frVrSplit.getAndroidManifest().getSplitId()).hasValue("vr.config.fr");
   }
 
   @Ignore
@@ -863,14 +864,14 @@ public class BundleSharderTest {
                 .distinct()
                 .collect(toImmutableSet()))
         .containsExactly(VariantTargeting.getDefaultInstance());
-    ImmutableSet<AbiAlias> x64X86Set = ImmutableSet.of(X86_64, X86);
-    ImmutableSet<AbiAlias> x64ArmSet = ImmutableSet.of(X86_64, ARMEABI_V7A);
+    ImmutableSet<AbiAlias> x64X86Set = ImmutableSet.of(X86, X86_64);
+    ImmutableSet<AbiAlias> x64ArmSet = ImmutableSet.of(ARMEABI_V7A, X86_64);
     ImmutableSet<AbiAlias> x64Set = ImmutableSet.of(X86_64);
-    ImmutableSet<AbiAlias> x86ArmSet = ImmutableSet.of(X86, ARMEABI_V7A);
+    ImmutableSet<AbiAlias> x86ArmSet = ImmutableSet.of(ARMEABI_V7A, X86);
     ImmutableSet<AbiAlias> x86Set = ImmutableSet.of(X86);
     ImmutableSet<AbiAlias> armSet = ImmutableSet.of(ARMEABI_V7A);
     ImmutableSet<ImmutableSet<AbiAlias>> allTargeting =
-        ImmutableSet.of(x64X86Set, x64ArmSet, x64Set, x86ArmSet, x86Set, armSet);
+        ImmutableSet.of(armSet, x86ArmSet, x64ArmSet, x86Set, x64X86Set, x64Set);
     ApkTargeting x64X86Targeting = apkMultiAbiTargetingFromAllTargeting(x64X86Set, allTargeting);
     ApkTargeting x64ArmTargeting = apkMultiAbiTargetingFromAllTargeting(x64ArmSet, allTargeting);
     ApkTargeting a64Targeting = apkMultiAbiTargetingFromAllTargeting(x64Set, allTargeting);
@@ -1513,7 +1514,7 @@ public class BundleSharderTest {
           shard.getApkTargeting().getScreenDensityTargeting().getValue(0).getDensityAlias();
       switch (density) {
         case LDPI:
-          assertThat(extractPaths(shard.findEntriesUnderPath("res").collect(toImmutableList())))
+          assertThat(extractPaths(shard.findEntriesUnderPath("res")))
               .containsExactly("res/drawable-ldpi/image.jpg");
           assertThat(shard.getResourceTable().get())
               .containsResource("com.test.app:drawable/image")
@@ -1523,7 +1524,7 @@ public class BundleSharderTest {
         case MDPI:
           // MDPI is a special case because the bucket encompasses devices that could serve either
           // the LDPI or the HDPI resource, so both resources are present.
-          assertThat(extractPaths(shard.findEntriesUnderPath("res").collect(toImmutableList())))
+          assertThat(extractPaths(shard.findEntriesUnderPath("res")))
               .containsExactly("res/drawable-ldpi/image.jpg", "res/drawable-hdpi/image.jpg");
           assertThat(shard.getResourceTable().get())
               .containsResource("com.test.app:drawable/image")
@@ -1535,7 +1536,7 @@ public class BundleSharderTest {
         case XHDPI:
         case XXHDPI:
         case XXXHDPI:
-          assertThat(extractPaths(shard.findEntriesUnderPath("res").collect(toImmutableList())))
+          assertThat(extractPaths(shard.findEntriesUnderPath("res")))
               .containsExactly("res/drawable-hdpi/image.jpg");
           assertThat(shard.getResourceTable().get())
               .containsResource("com.test.app:drawable/image")
@@ -1849,7 +1850,7 @@ public class BundleSharderTest {
 
     assertThat(shards).hasSize(1);
     ModuleSplit shard = shards.get(0);
-    assertThat(extractPaths(shard.findEntriesUnderPath("res").collect(toImmutableList())))
+    assertThat(extractPaths(shard.findEntriesUnderPath("res")))
         .containsExactly("res/drawable-hdpi/image.jpg", "res/drawable-hdpi/image2.jpg");
     assertThat(shard.getResourceTable().get())
         .containsResource("com.test.app:drawable/image")
@@ -1978,7 +1979,7 @@ public class BundleSharderTest {
       switch (density) {
         case LDPI:
         case MDPI:
-          assertThat(extractPaths(shard.findEntriesUnderPath("res/").collect(toImmutableList())))
+          assertThat(extractPaths(shard.findEntriesUnderPath("res/")))
               .containsExactly("res/drawable/image.jpg");
           assertThat(shard.getResourceTable().get())
               .containsResource("com.test.app:drawable/image")
@@ -1988,7 +1989,7 @@ public class BundleSharderTest {
         case TVDPI:
           // TVDPI is a special case because the bucket encompasses devices that could serve either
           // the MDPI or the HDPI resource, so both resources are present.
-          assertThat(extractPaths(shard.findEntriesUnderPath("res/").collect(toImmutableList())))
+          assertThat(extractPaths(shard.findEntriesUnderPath("res/")))
               .containsExactly("res/drawable/image.jpg", "res/drawable-hdpi/image.jpg");
           assertThat(shard.getResourceTable().get())
               .containsResource("com.test.app:drawable/image")
@@ -1999,7 +2000,7 @@ public class BundleSharderTest {
         case XHDPI:
         case XXHDPI:
         case XXXHDPI:
-          assertThat(extractPaths(shard.findEntriesUnderPath("res/").collect(toImmutableList())))
+          assertThat(extractPaths(shard.findEntriesUnderPath("res/")))
               .containsExactly("res/drawable-hdpi/image.jpg");
           assertThat(shard.getResourceTable().get())
               .containsResource("com.test.app:drawable/image")

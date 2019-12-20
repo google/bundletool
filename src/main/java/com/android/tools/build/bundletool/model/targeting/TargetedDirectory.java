@@ -24,7 +24,6 @@ import com.android.tools.build.bundletool.model.exceptions.ValidationException;
 import com.google.auto.value.AutoValue;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
-import com.google.common.collect.Streams;
 import com.google.errorprone.annotations.Immutable;
 import java.util.HashSet;
 import java.util.Set;
@@ -100,8 +99,8 @@ public abstract class TargetedDirectory {
     checkArgument(directoryPath.getNameCount() > 0, "Empty paths are not supported.");
 
     ImmutableList<TargetedDirectorySegment> segments =
-        Streams.stream(directoryPath)
-            .map(path -> TargetedDirectorySegment.parse((ZipPath) path))
+        directoryPath.getNames().stream()
+            .map(TargetedDirectorySegment::parse)
             .collect(toImmutableList());
     checkNoDuplicateDimensions(segments, directoryPath);
 

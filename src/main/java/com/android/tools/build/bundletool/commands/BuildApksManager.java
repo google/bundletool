@@ -19,6 +19,7 @@ import static com.android.tools.build.bundletool.model.utils.ModuleDependenciesU
 import static com.android.tools.build.bundletool.model.utils.files.FilePreconditions.checkFileDoesNotExist;
 import static com.android.tools.build.bundletool.model.utils.files.FilePreconditions.checkFileExistsAndExecutable;
 import static com.android.tools.build.bundletool.model.utils.files.FilePreconditions.checkFileExistsAndReadable;
+import static com.android.tools.build.bundletool.model.version.VersionGuardedFeature.RESOURCES_REFERENCED_IN_MANIFEST_TO_MASTER_SPLIT;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.collect.ImmutableList.toImmutableList;
@@ -178,10 +179,7 @@ final class BuildApksManager {
               ? modulesToFuse(appBundle.getFeatureModules().values().asList())
               : requestedModules.asList();
       generatedApksBuilder.setStandaloneApks(
-          new ShardedApksGenerator(
-                  tempDir,
-                  bundleVersion,
-                  getSuffixStrippings(bundleConfig))
+          new ShardedApksGenerator(tempDir, bundleVersion, getSuffixStrippings(bundleConfig))
               .generateSplits(
                   modulesToFuse,
                   appBundle.getBundleMetadata(),
@@ -286,7 +284,7 @@ final class BuildApksManager {
     Version bundleVersion = Version.of(appBundle.getBundleConfig().getBundletool().getVersion());
     ApkGenerationConfiguration.Builder apkGenerationConfiguration =
         getCommonSplitApkGenerationConfiguration(appBundle);
-    if (!bundleVersion.isOlderThan(Version.of("0.8.1"))) {
+    if (RESOURCES_REFERENCED_IN_MANIFEST_TO_MASTER_SPLIT.enabledForVersion(bundleVersion)) {
       // Make sure that resources reachable from the manifest of the base module will be
       // represented in the master split (by at least one config). This prevents the app
       // from crashing too soon (before reaching Application#onCreate), in case when only

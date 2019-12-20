@@ -18,9 +18,9 @@ package com.android.tools.build.bundletool.validation;
 
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifest;
 import static com.google.common.truth.Truth.assertThat;
-import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
+import com.android.apex.ApexManifestProto.ApexManifest;
 import com.android.bundle.Files.ApexImages;
 import com.android.bundle.Files.TargetedApexImage;
 import com.android.tools.build.bundletool.model.BundleModule;
@@ -35,8 +35,9 @@ import org.junit.runners.JUnit4;
 @RunWith(JUnit4.class)
 public class ApexBundleValidatorTest {
   private static final String PKG_NAME = "com.test.app";
-  private static final String APEX_MANIFEST_PATH = "root/apex_manifest.json";
-  private static final byte[] APEX_MANIFEST = "{\"name\": \"com.test.app\"}".getBytes(UTF_8);
+  private static final String APEX_MANIFEST_PATH = "root/apex_manifest.pb";
+  private static final byte[] APEX_MANIFEST =
+      ApexManifest.newBuilder().setName("com.test.app").build().toByteArray();
   private static final ApexImages APEX_CONFIG =
       ApexImages.newBuilder()
           .addImage(TargetedApexImage.newBuilder().setPath("apex/x86_64.img"))
@@ -98,7 +99,7 @@ public class ApexBundleValidatorTest {
         new BundleModuleBuilder("apexTestModule")
             .setManifest(androidManifest(PKG_NAME))
             .setApexConfig(APEX_CONFIG)
-            .addFile(APEX_MANIFEST_PATH, "{}".getBytes(UTF_8))
+            .addFile(APEX_MANIFEST_PATH, ApexManifest.getDefaultInstance().toByteArray())
             .addFile("apex/x86_64.img")
             .addFile("apex/x86.img")
             .addFile("apex/armeabi-v7a.img")

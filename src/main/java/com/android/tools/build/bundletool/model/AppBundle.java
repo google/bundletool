@@ -16,6 +16,7 @@
 
 package com.android.tools.build.bundletool.model;
 
+import static com.android.tools.build.bundletool.model.version.VersionGuardedFeature.ABI_SANITIZER_DISABLED;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.ImmutableMap.toImmutableMap;
 import static com.google.common.collect.ImmutableSet.toImmutableSet;
@@ -271,7 +272,7 @@ public abstract class AppBundle {
   private static ImmutableList<BundleModule> sanitize(
       ImmutableList<BundleModule> modules, BundleConfig bundleConfig) {
     Version bundleVersion = BundleToolVersion.getVersionFromBundleConfig(bundleConfig);
-    if (bundleVersion.isOlderThan(Version.of("0.3.1"))) {
+    if (!ABI_SANITIZER_DISABLED.enabledForVersion(bundleVersion)) {
       // This is a temporary fix to cope with inconsistent ABIs.
       modules = modules.stream().map(new ModuleAbiSanitizer()::sanitize).collect(toImmutableList());
     }

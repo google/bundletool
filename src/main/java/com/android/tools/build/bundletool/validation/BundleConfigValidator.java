@@ -27,14 +27,14 @@ import com.android.tools.build.bundletool.model.BundleModule;
 import com.android.tools.build.bundletool.model.ResourceId;
 import com.android.tools.build.bundletool.model.ResourceTableEntry;
 import com.android.tools.build.bundletool.model.exceptions.ValidationException;
+import com.android.tools.build.bundletool.model.utils.PathMatcher;
+import com.android.tools.build.bundletool.model.utils.PathMatcher.GlobPatternSyntaxException;
 import com.android.tools.build.bundletool.model.utils.ResourcesUtils;
 import com.android.tools.build.bundletool.model.utils.TextureCompressionUtils;
 import com.android.tools.build.bundletool.model.version.BundleToolVersion;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Sets;
 import com.google.common.collect.Sets.SetView;
-import java.nio.file.FileSystem;
-import java.nio.file.FileSystems;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
@@ -59,8 +59,6 @@ public final class BundleConfigValidator extends SubValidator {
   }
 
   private void validateCompression(Compression compression) {
-    FileSystem fileSystem = FileSystems.getDefault();
-
     for (String pattern : compression.getUncompressedGlobList()) {
       if (FORBIDDEN_CHARS_IN_GLOB.stream().anyMatch(pattern::contains)) {
         throw ValidationException.builder()
@@ -69,8 +67,8 @@ public final class BundleConfigValidator extends SubValidator {
       }
 
       try {
-        fileSystem.getPathMatcher("glob:" + pattern);
-      } catch (IllegalArgumentException e) {
+        PathMatcher.createFromGlob(pattern);
+      } catch (GlobPatternSyntaxException e) {
         throw ValidationException.builder()
             .withCause(e)
             .withMessage("Invalid uncompressed glob: '%s'.", pattern)
@@ -85,8 +83,7 @@ public final class BundleConfigValidator extends SubValidator {
     // We only throw if an unrecognized dimension is enabled, since that would generate an
     // unexpected output. However, we tolerate if the unknown dimension is negated since the output
     // will be the same.
-    if (splitDimensions
-        .stream()
+    if (splitDimensions.stream()
         .anyMatch(
             dimension ->
                 dimension.getValue().equals(Value.UNRECOGNIZED) && !dimension.getNegate())) {
@@ -107,22 +104,12 @@ public final class BundleConfigValidator extends SubValidator {
         .anyMatch(
             dimension ->
                 dimension.hasSuffixStripping()
+                    && dimension.getSuffixStripping().getEnabled()
                     && !dimension.getValue().equals(Value.TEXTURE_COMPRESSION_FORMAT))) {
       throw ValidationException.builder()
           .withMessage(
               "Suffix stripping was enabled for an unsupported dimension. Only"
                   + " TEXTURE_COMPRESSION_FORMAT is supported.")
-          .build();
-    }
-
-    if (splitDimensions.stream()
-        .anyMatch(
-            dimension ->
-                dimension.hasSuffixStripping()
-                    && dimension.getSuffixStripping().getEnabled()
-                    && dimension.getSuffixStripping().getDefaultSuffix().isEmpty())) {
-      throw ValidationException.builder()
-          .withMessage("Suffix stripping was enabled without specifying a default suffix.")
           .build();
     }
 

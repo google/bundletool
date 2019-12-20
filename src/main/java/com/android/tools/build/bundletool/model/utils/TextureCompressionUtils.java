@@ -75,6 +75,13 @@ public final class TextureCompressionUtils {
         TEXTURE_COMPRESSION_FORMAT_TO_MANIFEST_VALUE.inverse().get(glExtension));
   }
 
+  private static TextureCompressionFormatTargeting textureCompressionFormat(
+      TextureCompressionFormatAlias alias) {
+    return TextureCompressionFormatTargeting.newBuilder()
+        .addValue(TextureCompressionFormat.newBuilder().setAlias(alias))
+        .build();
+  }
+
   /** Return the texture compression formats supported by the given OpenGL version. */
   public static ImmutableList<TextureCompressionFormatAlias> textureCompressionFormatsForGl(
       int glVersion) {
@@ -85,13 +92,6 @@ public final class TextureCompressionUtils {
     }
 
     return ImmutableList.of();
-  }
-
-  private static TextureCompressionFormatTargeting textureCompressionFormat(
-      TextureCompressionFormatAlias alias) {
-    return TextureCompressionFormatTargeting.newBuilder()
-        .addValue(TextureCompressionFormat.newBuilder().setAlias(alias))
-        .build();
   }
 
   // Do not instantiate.

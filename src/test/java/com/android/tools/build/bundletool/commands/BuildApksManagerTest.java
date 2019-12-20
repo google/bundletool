@@ -18,6 +18,7 @@ package com.android.tools.build.bundletool.commands;
 
 import static com.android.bundle.Targeting.Abi.AbiAlias.ARM64_V8A;
 import static com.android.bundle.Targeting.Abi.AbiAlias.ARMEABI_V7A;
+import static com.android.bundle.Targeting.Abi.AbiAlias.MIPS;
 import static com.android.bundle.Targeting.Abi.AbiAlias.X86;
 import static com.android.bundle.Targeting.Abi.AbiAlias.X86_64;
 import static com.android.bundle.Targeting.TextureCompressionFormat.TextureCompressionFormatAlias.ATC;
@@ -113,6 +114,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.android.aapt.ConfigurationOuterClass.Configuration;
 import com.android.aapt.Resources.XmlNode;
+import com.android.apex.ApexManifestProto.ApexManifest;
 import com.android.apksig.ApkVerifier;
 import com.android.bundle.Commands.ApkDescription;
 import com.android.bundle.Commands.ApkSet;
@@ -160,6 +162,7 @@ import com.android.tools.build.bundletool.model.SigningConfiguration;
 import com.android.tools.build.bundletool.model.ZipPath;
 import com.android.tools.build.bundletool.model.exceptions.CommandExecutionException;
 import com.android.tools.build.bundletool.model.exceptions.ValidationException;
+import com.android.tools.build.bundletool.model.exceptions.manifest.ManifestVersionException.VersionCodeMissingException;
 import com.android.tools.build.bundletool.model.utils.files.FilePreconditions;
 import com.android.tools.build.bundletool.model.version.BundleToolVersion;
 import com.android.tools.build.bundletool.model.version.Version;
@@ -177,6 +180,7 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableMultiset;
 import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.Iterables;
 import com.google.common.collect.Maps;
 import com.google.common.io.ByteStreams;
 import com.google.common.io.Closer;
@@ -231,8 +235,9 @@ public class BuildApksManagerTest {
       variantSdkTargeting(/* minSdkVersion= */ 1);
   private static final SdkVersion LOWEST_SDK_VERSION = sdkVersionFrom(1);
 
-  private static final String APEX_MANIFEST_PATH = "root/apex_manifest.json";
-  private static final byte[] APEX_MANIFEST = "{\"name\": \"com.test.app\"}".getBytes(UTF_8);
+  private static final String APEX_MANIFEST_PATH = "root/apex_manifest.pb";
+  private static final byte[] APEX_MANIFEST =
+      ApexManifest.newBuilder().setName("com.test.app").build().toByteArray();
 
   @Rule public final TemporaryFolder tmp = new TemporaryFolder();
 
@@ -710,11 +715,108 @@ public class BuildApksManagerTest {
     assertThat(systemApkVariants(result)).hasSize(1);
     Variant systemVariant = result.getVariant(0);
     assertThat(systemVariant.getVariantNumber()).isEqualTo(0);
+    assertThat(systemVariant.getApkSetList()).hasSize(1);
+    ApkSet baseApkSet = Iterables.getOnlyElement(systemVariant.getApkSetList());
+    assertThat(baseApkSet.getModuleMetadata().getName()).isEqualTo("base");
+    if (systemApkBuildMode.equals(SYSTEM)) {
+      // Single System APK.
+      assertThat(baseApkSet.getApkDescriptionList()).hasSize(2);
+      assertThat(
+              baseApkSet.getApkDescriptionList().stream()
+                  .map(ApkDescription::getPath)
+                  .collect(toImmutableSet()))
+          .containsExactly("system/system.apk", "splits/base-fr.apk");
+    } else if (systemApkBuildMode.equals(SYSTEM_COMPRESSED)) {
+      // Stub and Compressed APK.
+      assertThat(baseApkSet.getApkDescriptionList()).hasSize(3);
+      assertThat(
+              baseApkSet.getApkDescriptionList().stream()
+                  .map(ApkDescription::getPath)
+                  .collect(toImmutableSet()))
+          .containsExactly("system/system.apk", "system/system.apk.gz", "splits/base-fr.apk");
+    } else {
+      throw new RuntimeException("Unknown APK build mode");
+    }
+    baseApkSet
+        .getApkDescriptionList()
+        .forEach(apkDescription -> assertThat(apkSetFile).hasFile(apkDescription.getPath()));
+  }
+
+  @Test
+  @Theory
+  public void multipleModulesFusedAndNotFused_systemApks_hasCorrectAdditionalLanguageSplits(
+      @FromDataPoints("systemApkBuildModes") ApkBuildMode systemApkBuildMode) throws Exception {
+    AppBundle appBundle =
+        new AppBundleBuilder()
+            .addModule(
+                "base",
+                module ->
+                    module
+                        .addFile("assets/base.txt")
+                        .setManifest(androidManifest("com.app"))
+                        .setResourceTable(resourceTableWithTestLabel("Test feature")))
+            .addModule(
+                "fused",
+                module ->
+                    module
+                        .addFile("assets/fused.txt")
+                        .addFile("assets/fused/languages#lang_es/image.jpg")
+                        .addFile("assets/fused/languages#lang_fr/image.jpg")
+                        .setAssetsConfig(
+                            assets(
+                                targetedAssetsDirectory(
+                                    "assets/fused/languages#lang_es",
+                                    assetsDirectoryTargeting(languageTargeting("es"))),
+                                targetedAssetsDirectory(
+                                    "assets/fused/languages#lang_fr",
+                                    assetsDirectoryTargeting(languageTargeting("fr")))))
+                        .setManifest(
+                            androidManifestForFeature(
+                                "com.app",
+                                withFusingAttribute(true),
+                                withTitle("@string/test_label", TEST_LABEL_RESOURCE_ID))))
+            .addModule(
+                "notfused",
+                module ->
+                    module
+                        .addFile("assets/notfused.txt")
+                        .addFile("assets/notfused/languages#lang_it/image.jpg")
+                        .setAssetsConfig(
+                            assets(
+                                targetedAssetsDirectory(
+                                    "assets/notfused/languages#lang_it",
+                                    assetsDirectoryTargeting(languageTargeting("it")))))
+                        .setManifest(
+                            androidManifestForFeature(
+                                "com.app",
+                                withFusingAttribute(false),
+                                withTitle("@string/test_label", TEST_LABEL_RESOURCE_ID))))
+            .build();
+    Path bundlePath = createAndStoreBundle(appBundle);
+
+    Path apkSetFilePath =
+        execute(
+            BuildApksCommand.builder()
+                .setBundlePath(bundlePath)
+                .setOutputFile(outputFilePath)
+                .setAapt2Command(aapt2Command)
+                .setApkBuildMode(systemApkBuildMode)
+                .setDeviceSpec(
+                    mergeSpecs(
+                        sdkVersion(28), abis("x86"), density(DensityAlias.MDPI), locales("es")))
+                .build());
+
+    ZipFile apkSetFile = openZipFile(apkSetFilePath.toFile());
+    BuildApksResult result = extractTocFromApkSetFile(apkSetFile, outputDir);
+
+    assertThat(systemApkVariants(result)).hasSize(1);
+    Variant systemVariant = result.getVariant(0);
+    assertThat(systemVariant.getVariantNumber()).isEqualTo(0);
     assertThat(systemVariant.getApkSetList()).hasSize(2);
     ImmutableMap<String, ApkSet> apkSetByModule =
         Maps.uniqueIndex(
             systemVariant.getApkSetList(), apkSet -> apkSet.getModuleMetadata().getName());
-    assertThat(apkSetByModule.keySet()).containsExactly("base", "fused");
+    assertThat(apkSetByModule.keySet()).containsExactly("base", "notfused");
     ApkSet baseApkSet = apkSetByModule.get("base");
     if (systemApkBuildMode.equals(SYSTEM)) {
       // Single System APK.
@@ -724,7 +826,7 @@ public class BuildApksManagerTest {
                   .map(ApkDescription::getPath)
                   .collect(toImmutableSet()))
           .containsExactly("system/system.apk", "splits/base-fr.apk");
-    } else {
+    } else if (systemApkBuildMode.equals(SYSTEM_COMPRESSED)) {
       // Stub and Compressed APK.
       assertThat(baseApkSet.getApkDescriptionList()).hasSize(3);
       assertThat(
@@ -732,22 +834,25 @@ public class BuildApksManagerTest {
                   .map(ApkDescription::getPath)
                   .collect(toImmutableSet()))
           .containsExactly("system/system.apk", "system/system.apk.gz", "splits/base-fr.apk");
+    } else {
+      throw new RuntimeException("Unknown APK build mode");
     }
     baseApkSet
         .getApkDescriptionList()
         .forEach(apkDescription -> assertThat(apkSetFile).hasFile(apkDescription.getPath()));
 
-    ApkSet fusedApkSet = apkSetByModule.get("fused");
-    assertThat(fusedApkSet.getApkDescriptionList()).hasSize(1);
+    ApkSet nonFusedApkSet = apkSetByModule.get("notfused");
+    assertThat(nonFusedApkSet.getApkDescriptionList()).hasSize(2);
     assertThat(
-            fusedApkSet.getApkDescriptionList().stream()
+            nonFusedApkSet.getApkDescriptionList().stream()
                 .map(ApkDescription::getPath)
                 .collect(toImmutableSet()))
-        .containsExactly("splits/fused-fr.apk");
-    fusedApkSet
+        .containsExactly("splits/notfused-master.apk", "splits/notfused-it.apk");
+    nonFusedApkSet
         .getApkDescriptionList()
         .forEach(apkDescription -> assertThat(apkSetFile).hasFile(apkDescription.getPath()));
   }
+
 
   @Test
   public void bundleWithDirectoryZipEntries_throws() throws Exception {
@@ -1158,10 +1263,9 @@ public class BuildApksManagerTest {
                         .addFile("lib/x86_64/libsome.so")
                         .setNativeConfig(
                             nativeLibraries(
+                                targetedNativeDirectory("lib/x86", nativeDirectoryTargeting(X86)),
                                 targetedNativeDirectory(
-                                    "lib/x86", nativeDirectoryTargeting(AbiAlias.X86)),
-                                targetedNativeDirectory(
-                                    "lib/x86_64", nativeDirectoryTargeting(AbiAlias.X86_64))))
+                                    "lib/x86_64", nativeDirectoryTargeting(X86_64))))
                         // Add some density-specific resources.
                         .addFile("res/drawable-ldpi/image.jpg")
                         .addFile("res/drawable-mdpi/image.jpg")
@@ -1352,10 +1456,9 @@ public class BuildApksManagerTest {
                         .addFile("lib/x86_64/libsome.so")
                         .setNativeConfig(
                             nativeLibraries(
+                                targetedNativeDirectory("lib/x86", nativeDirectoryTargeting(X86)),
                                 targetedNativeDirectory(
-                                    "lib/x86", nativeDirectoryTargeting(AbiAlias.X86)),
-                                targetedNativeDirectory(
-                                    "lib/x86_64", nativeDirectoryTargeting(AbiAlias.X86_64))))
+                                    "lib/x86_64", nativeDirectoryTargeting(X86_64))))
                         // Add some density-specific resources.
                         .addFile("res/drawable-ldpi/image.jpg")
                         .addFile("res/drawable-mdpi/image.jpg")
@@ -1455,10 +1558,9 @@ public class BuildApksManagerTest {
                         .addFile("lib/x86_64/libsome.so")
                         .setNativeConfig(
                             nativeLibraries(
+                                targetedNativeDirectory("lib/x86", nativeDirectoryTargeting(X86)),
                                 targetedNativeDirectory(
-                                    "lib/x86", nativeDirectoryTargeting(AbiAlias.X86)),
-                                targetedNativeDirectory(
-                                    "lib/x86_64", nativeDirectoryTargeting(AbiAlias.X86_64))))
+                                    "lib/x86_64", nativeDirectoryTargeting(X86_64))))
                         // Add some density-specific resources.
                         .addFile("res/drawable-ldpi/image.jpg")
                         .addFile("res/drawable-mdpi/image.jpg")
@@ -1660,8 +1762,7 @@ public class BuildApksManagerTest {
                         .addFile("lib/x86/libsome.so")
                         .setNativeConfig(
                             nativeLibraries(
-                                targetedNativeDirectory(
-                                    "lib/x86", nativeDirectoryTargeting(AbiAlias.X86))))
+                                targetedNativeDirectory("lib/x86", nativeDirectoryTargeting(X86))))
                         .setManifest(androidManifest("com.test.app", withMinSdkVersion(25))))
             .build();
     Path bundlePath = createAndStoreBundle(appBundle);
@@ -1697,8 +1798,7 @@ public class BuildApksManagerTest {
                         .addFile("lib/x86/libsome.so")
                         .setNativeConfig(
                             nativeLibraries(
-                                targetedNativeDirectory(
-                                    "lib/x86", nativeDirectoryTargeting(AbiAlias.X86))))
+                                targetedNativeDirectory("lib/x86", nativeDirectoryTargeting(X86))))
                         .setManifest(androidManifest("com.test.app", withMaxSdkVersion(21))))
             .build();
     Path bundlePath = createAndStoreBundle(appBundle);
@@ -1769,12 +1869,11 @@ public class BuildApksManagerTest {
                         .addFile("lib/mips/libsome.so")
                         .setNativeConfig(
                             nativeLibraries(
+                                targetedNativeDirectory("lib/x86", nativeDirectoryTargeting(X86)),
                                 targetedNativeDirectory(
-                                    "lib/x86", nativeDirectoryTargeting(AbiAlias.X86)),
+                                    "lib/x86_64", nativeDirectoryTargeting(X86_64)),
                                 targetedNativeDirectory(
-                                    "lib/x86_64", nativeDirectoryTargeting(AbiAlias.X86_64)),
-                                targetedNativeDirectory(
-                                    "lib/mips", nativeDirectoryTargeting(AbiAlias.MIPS))))
+                                    "lib/mips", nativeDirectoryTargeting(MIPS))))
                         .setManifest(androidManifest("com.test.app")))
             .build();
     Path bundlePath = createAndStoreBundle(appBundle);
@@ -1799,32 +1898,32 @@ public class BuildApksManagerTest {
               return getOnlyElement(apkDescription.getTargeting().getAbiTargeting().getValueList());
             });
     assertThat(standaloneVariantsByAbi.keySet())
-        .containsExactly(toAbi(AbiAlias.X86), toAbi(AbiAlias.X86_64), toAbi(AbiAlias.MIPS));
-    assertThat(standaloneVariantsByAbi.get(toAbi(AbiAlias.X86)).getTargeting())
+        .containsExactly(toAbi(X86), toAbi(X86_64), toAbi(MIPS));
+    assertThat(standaloneVariantsByAbi.get(toAbi(X86)).getTargeting())
         .ignoringRepeatedFieldOrder()
         .isEqualTo(
             mergeVariantTargeting(
-                variantAbiTargeting(AbiAlias.X86, ImmutableSet.of(AbiAlias.X86_64, AbiAlias.MIPS)),
+                variantAbiTargeting(X86, ImmutableSet.of(X86_64, MIPS)),
                 variantSdkTargeting(
                     LOWEST_SDK_VERSION,
                     ImmutableSet.of(
                         sdkVersionFrom(ANDROID_L_API_VERSION),
                         sdkVersionFrom(ANDROID_M_API_VERSION)))));
-    assertThat(standaloneVariantsByAbi.get(toAbi(AbiAlias.X86_64)).getTargeting())
+    assertThat(standaloneVariantsByAbi.get(toAbi(X86_64)).getTargeting())
         .ignoringRepeatedFieldOrder()
         .isEqualTo(
             mergeVariantTargeting(
-                variantAbiTargeting(AbiAlias.X86_64, ImmutableSet.of(AbiAlias.X86, AbiAlias.MIPS)),
+                variantAbiTargeting(X86_64, ImmutableSet.of(X86, MIPS)),
                 variantSdkTargeting(
                     LOWEST_SDK_VERSION,
                     ImmutableSet.of(
                         sdkVersionFrom(ANDROID_L_API_VERSION),
                         sdkVersionFrom(ANDROID_M_API_VERSION)))));
-    assertThat(standaloneVariantsByAbi.get(toAbi(AbiAlias.MIPS)).getTargeting())
+    assertThat(standaloneVariantsByAbi.get(toAbi(MIPS)).getTargeting())
         .ignoringRepeatedFieldOrder()
         .isEqualTo(
             mergeVariantTargeting(
-                variantAbiTargeting(AbiAlias.MIPS, ImmutableSet.of(AbiAlias.X86, AbiAlias.X86_64)),
+                variantAbiTargeting(MIPS, ImmutableSet.of(X86, X86_64)),
                 variantSdkTargeting(
                     LOWEST_SDK_VERSION,
                     ImmutableSet.of(
@@ -1854,12 +1953,11 @@ public class BuildApksManagerTest {
                         .addFile("lib/mips/libsome.so")
                         .setNativeConfig(
                             nativeLibraries(
+                                targetedNativeDirectory("lib/x86", nativeDirectoryTargeting(X86)),
                                 targetedNativeDirectory(
-                                    "lib/x86", nativeDirectoryTargeting(AbiAlias.X86)),
+                                    "lib/x86_64", nativeDirectoryTargeting(X86_64)),
                                 targetedNativeDirectory(
-                                    "lib/x86_64", nativeDirectoryTargeting(AbiAlias.X86_64)),
-                                targetedNativeDirectory(
-                                    "lib/mips", nativeDirectoryTargeting(AbiAlias.MIPS))))
+                                    "lib/mips", nativeDirectoryTargeting(MIPS))))
                         .setManifest(androidManifest("com.test.app")))
             .setBundleConfig(
                 BundleConfigBuilder.create()
@@ -1893,7 +1991,7 @@ public class BuildApksManagerTest {
     assertThat(systemVariant.getTargeting())
         .isEqualTo(
             mergeVariantTargeting(
-                variantAbiTargeting(AbiAlias.MIPS, ImmutableSet.of(AbiAlias.X86, AbiAlias.X86_64)),
+                variantAbiTargeting(MIPS, ImmutableSet.of(X86, X86_64)),
                 variantSdkTargeting(LOWEST_SDK_VERSION)));
 
     if (systemApkBuildMode.equals(SYSTEM)) {
@@ -1944,12 +2042,11 @@ public class BuildApksManagerTest {
                                     assetsDirectoryTargeting(languageTargeting("fr")))))
                         .setNativeConfig(
                             nativeLibraries(
+                                targetedNativeDirectory("lib/x86", nativeDirectoryTargeting(X86)),
                                 targetedNativeDirectory(
-                                    "lib/x86", nativeDirectoryTargeting(AbiAlias.X86)),
+                                    "lib/x86_64", nativeDirectoryTargeting(X86_64)),
                                 targetedNativeDirectory(
-                                    "lib/x86_64", nativeDirectoryTargeting(AbiAlias.X86_64)),
-                                targetedNativeDirectory(
-                                    "lib/mips", nativeDirectoryTargeting(AbiAlias.MIPS))))
+                                    "lib/mips", nativeDirectoryTargeting(MIPS))))
                         .setManifest(androidManifest("com.test.app")))
             .addModule(
                 "not_fused",
@@ -1974,12 +2071,11 @@ public class BuildApksManagerTest {
                                     assetsDirectoryTargeting(languageTargeting("fr")))))
                         .setNativeConfig(
                             nativeLibraries(
+                                targetedNativeDirectory("lib/x86", nativeDirectoryTargeting(X86)),
                                 targetedNativeDirectory(
-                                    "lib/x86", nativeDirectoryTargeting(AbiAlias.X86)),
+                                    "lib/x86_64", nativeDirectoryTargeting(X86_64)),
                                 targetedNativeDirectory(
-                                    "lib/x86_64", nativeDirectoryTargeting(AbiAlias.X86_64)),
-                                targetedNativeDirectory(
-                                    "lib/mips", nativeDirectoryTargeting(AbiAlias.MIPS))))
+                                    "lib/mips", nativeDirectoryTargeting(MIPS))))
                         .setManifest(
                             androidManifestForFeature(
                                 "com.test.app",
@@ -2009,7 +2105,7 @@ public class BuildApksManagerTest {
         .ignoringRepeatedFieldOrder()
         .isEqualTo(
             mergeVariantTargeting(
-                variantAbiTargeting(AbiAlias.X86, ImmutableSet.of(AbiAlias.X86_64, AbiAlias.MIPS)),
+                variantAbiTargeting(X86, ImmutableSet.of(X86_64, MIPS)),
                 variantSdkTargeting(LOWEST_SDK_VERSION)));
     assertThat(x86Variant.getApkSetList()).hasSize(2);
 
@@ -2069,10 +2165,9 @@ public class BuildApksManagerTest {
                         .addFile("lib/x86_64/libfeature.so")
                         .setNativeConfig(
                             nativeLibraries(
+                                targetedNativeDirectory("lib/x86", nativeDirectoryTargeting(X86)),
                                 targetedNativeDirectory(
-                                    "lib/x86", nativeDirectoryTargeting(AbiAlias.X86)),
-                                targetedNativeDirectory(
-                                    "lib/x86_64", nativeDirectoryTargeting(AbiAlias.X86_64))))
+                                    "lib/x86_64", nativeDirectoryTargeting(X86_64))))
                         .setManifest(
                             androidManifestForFeature(
                                 "com.test.app",
@@ -2134,12 +2229,10 @@ public class BuildApksManagerTest {
             apkDescriptions(standaloneApkVariants(result)),
             apkDesc -> getOnlyElement(apkDesc.getTargeting().getAbiTargeting().getValueList()));
 
-    assertThat(standaloneApksByAbi.keySet())
-        .containsExactly(toAbi(AbiAlias.X86), toAbi(AbiAlias.X86_64));
+    assertThat(standaloneApksByAbi.keySet()).containsExactly(toAbi(X86), toAbi(X86_64));
 
     File x86ApkFile =
-        extractFromApkSetFile(
-            apkSetFile, standaloneApksByAbi.get(toAbi(AbiAlias.X86)).getPath(), outputDir);
+        extractFromApkSetFile(apkSetFile, standaloneApksByAbi.get(toAbi(X86)).getPath(), outputDir);
     try (ZipFile x86Zip = new ZipFile(x86ApkFile)) {
       // ABI-specific files.
       assertThat(x86Zip).hasFile("lib/x86/libfeature.so");
@@ -2153,7 +2246,7 @@ public class BuildApksManagerTest {
 
     File x64ApkFile =
         extractFromApkSetFile(
-            apkSetFile, standaloneApksByAbi.get(toAbi(AbiAlias.X86_64)).getPath(), outputDir);
+            apkSetFile, standaloneApksByAbi.get(toAbi(X86_64)).getPath(), outputDir);
     try (ZipFile x64Zip = new ZipFile(x64ApkFile)) {
       // ABI-specific files.
       assertThat(x64Zip).hasFile("lib/x86_64/libfeature.so");
@@ -2362,10 +2455,9 @@ public class BuildApksManagerTest {
                         .addFile("lib/x86_64/libsome.so")
                         .setNativeConfig(
                             nativeLibraries(
+                                targetedNativeDirectory("lib/x86", nativeDirectoryTargeting(X86)),
                                 targetedNativeDirectory(
-                                    "lib/x86", nativeDirectoryTargeting(AbiAlias.X86)),
-                                targetedNativeDirectory(
-                                    "lib/x86_64", nativeDirectoryTargeting(AbiAlias.X86_64))))
+                                    "lib/x86_64", nativeDirectoryTargeting(X86_64))))
                         .setManifest(androidManifest("com.test.app")))
             .build();
     Path bundlePath = createAndStoreBundle(appBundle);
@@ -2388,21 +2480,21 @@ public class BuildApksManagerTest {
     VariantTargeting lSplitVariantTargeting =
         variantSdkTargeting(
             sdkVersionFrom(ANDROID_L_API_VERSION),
-            ImmutableSet.of(sdkVersionFrom(ANDROID_M_API_VERSION), LOWEST_SDK_VERSION));
+            ImmutableSet.of(LOWEST_SDK_VERSION, sdkVersionFrom(ANDROID_M_API_VERSION)));
     VariantTargeting mSplitVariantTargeting =
         variantSdkTargeting(
             sdkVersionFrom(ANDROID_M_API_VERSION),
-            ImmutableSet.of(sdkVersionFrom(ANDROID_L_API_VERSION), LOWEST_SDK_VERSION));
+            ImmutableSet.of(LOWEST_SDK_VERSION, sdkVersionFrom(ANDROID_L_API_VERSION)));
     VariantTargeting standaloneX86VariantTargeting =
         mergeVariantTargeting(
-            variantAbiTargeting(AbiAlias.X86, ImmutableSet.of(AbiAlias.X86_64)),
+            variantAbiTargeting(X86, ImmutableSet.of(X86_64)),
             variantSdkTargeting(
                 LOWEST_SDK_VERSION,
                 ImmutableSet.of(
                     sdkVersionFrom(ANDROID_L_API_VERSION), sdkVersionFrom(ANDROID_M_API_VERSION))));
     VariantTargeting standaloneX64VariantTargeting =
         mergeVariantTargeting(
-            variantAbiTargeting(AbiAlias.X86_64, ImmutableSet.of(AbiAlias.X86)),
+            variantAbiTargeting(X86_64, ImmutableSet.of(X86)),
             variantSdkTargeting(
                 LOWEST_SDK_VERSION,
                 ImmutableSet.of(
@@ -2451,12 +2543,11 @@ public class BuildApksManagerTest {
                         .setManifest(androidManifest("com.app"))
                         .setNativeConfig(
                             nativeLibraries(
+                                targetedNativeDirectory("lib/x86", nativeDirectoryTargeting(X86)),
                                 targetedNativeDirectory(
-                                    "lib/x86", nativeDirectoryTargeting(AbiAlias.X86)),
+                                    "lib/x86_64", nativeDirectoryTargeting(X86_64)),
                                 targetedNativeDirectory(
-                                    "lib/x86_64", nativeDirectoryTargeting(AbiAlias.X86_64)),
-                                targetedNativeDirectory(
-                                    "lib/mips", nativeDirectoryTargeting(AbiAlias.MIPS)))))
+                                    "lib/mips", nativeDirectoryTargeting(MIPS)))))
             // The inconsistent ABIs are discarded up until 0.3.0.
             .setBundleConfig(BundleConfigBuilder.create().setVersion("0.3.0").build())
             .build();
@@ -2480,13 +2571,13 @@ public class BuildApksManagerTest {
             apkDescriptions(splitApkVariants(result)),
             apkDesc -> apkDesc.getTargeting().getAbiTargeting());
     assertThat(splitApksByAbiTargeting.keySet())
-        .containsExactly(AbiTargeting.getDefaultInstance(), abiTargeting(AbiAlias.X86));
+        .containsExactly(AbiTargeting.getDefaultInstance(), abiTargeting(X86));
 
     // x86_64- and mips-specific files should be discarded in the standalone APK.
     ImmutableList<ApkDescription> standaloneApks = apkDescriptions(standaloneApkVariants(result));
     assertThat(standaloneApks).hasSize(1);
     assertThat(standaloneApks.get(0).getTargeting().getAbiTargeting())
-        .isEqualTo(abiTargeting(AbiAlias.X86, ImmutableSet.of()));
+        .isEqualTo(abiTargeting(X86, ImmutableSet.of()));
     File standaloneApkFile =
         extractFromApkSetFile(apkSetFile, standaloneApks.get(0).getPath(), outputDir);
     try (ZipFile standaloneApkZipFile = new ZipFile(standaloneApkFile)) {
@@ -2533,16 +2624,16 @@ public class BuildApksManagerTest {
                 .setOutputFile(outputFilePath)
                 .build());
 
-    ImmutableSet<AbiAlias> x64X86Set = ImmutableSet.of(X86_64, X86);
-    ImmutableSet<AbiAlias> x64ArmSet = ImmutableSet.of(X86_64, ARMEABI_V7A);
+    ImmutableSet<AbiAlias> x64X86Set = ImmutableSet.of(X86, X86_64);
+    ImmutableSet<AbiAlias> x64ArmSet = ImmutableSet.of(ARMEABI_V7A, X86_64);
     ImmutableSet<AbiAlias> x64Set = ImmutableSet.of(X86_64);
-    ImmutableSet<AbiAlias> x86ArmSet = ImmutableSet.of(X86, ARMEABI_V7A);
+    ImmutableSet<AbiAlias> x86ArmSet = ImmutableSet.of(ARMEABI_V7A, X86);
     ImmutableSet<AbiAlias> x86Set = ImmutableSet.of(X86);
     ImmutableSet<AbiAlias> arm8Set = ImmutableSet.of(ARM64_V8A);
     ImmutableSet<AbiAlias> arm7Set = ImmutableSet.of(ARMEABI_V7A);
 
     ImmutableSet<ImmutableSet<AbiAlias>> allTargeting =
-        ImmutableSet.of(x64X86Set, x64ArmSet, x64Set, x86ArmSet, x86Set, arm8Set, arm7Set);
+        ImmutableSet.of(arm7Set, x86ArmSet, x64ArmSet, arm8Set, x86Set, x64X86Set, x64Set);
     ApkTargeting x64X86Targeting = apkMultiAbiTargetingFromAllTargeting(x64X86Set, allTargeting);
     ApkTargeting x64ArmTargeting = apkMultiAbiTargetingFromAllTargeting(x64ArmSet, allTargeting);
     ApkTargeting x64Targeting = apkMultiAbiTargetingFromAllTargeting(x64Set, allTargeting);
@@ -2634,7 +2725,7 @@ public class BuildApksManagerTest {
     ImmutableSet<AbiAlias> arm7Set = ImmutableSet.of(ARMEABI_V7A);
 
     ImmutableSet<ImmutableSet<AbiAlias>> allTargeting =
-        ImmutableSet.of(x64Set, x86Set, arm8Set, arm7Set);
+        ImmutableSet.of(arm7Set, arm8Set, x86Set, x64Set);
     ApkTargeting x64Targeting = apkMultiAbiTargetingFromAllTargeting(x64Set, allTargeting);
     ApkTargeting x86Targeting = apkMultiAbiTargetingFromAllTargeting(x86Set, allTargeting);
     ApkTargeting arm8Targeting = apkMultiAbiTargetingFromAllTargeting(arm8Set, allTargeting);
@@ -2706,7 +2797,7 @@ public class BuildApksManagerTest {
             "standalones/standalone-x86.apex",
             "standalones/standalone-arm64_v8a.apex",
             "standalones/standalone-armeabi_v7a.apex",
-            "standalones/standalone-arm64_v8a.armeabi_v7a.apex");
+            "standalones/standalone-armeabi_v7a.arm64_v8a.apex");
   }
 
   @DataPoints("bundleVersion")
@@ -2868,10 +2959,9 @@ public class BuildApksManagerTest {
                         .addFile("lib/x86_64/libsome.so")
                         .setNativeConfig(
                             nativeLibraries(
+                                targetedNativeDirectory("lib/x86", nativeDirectoryTargeting(X86)),
                                 targetedNativeDirectory(
-                                    "lib/x86", nativeDirectoryTargeting(AbiAlias.X86)),
-                                targetedNativeDirectory(
-                                    "lib/x86_64", nativeDirectoryTargeting(AbiAlias.X86_64))))
+                                    "lib/x86_64", nativeDirectoryTargeting(X86_64))))
                         .setManifest(
                             androidManifestForFeature(
                                 "com.test.app",
@@ -3017,8 +3107,7 @@ public class BuildApksManagerTest {
                         .setManifest(androidManifest("com.test.app"))
                         .setNativeConfig(
                             nativeLibraries(
-                                targetedNativeDirectory(
-                                    "lib/x86", nativeDirectoryTargeting(AbiAlias.X86)))))
+                                targetedNativeDirectory("lib/x86", nativeDirectoryTargeting(X86)))))
             .build();
     Path bundlePath = createAndStoreBundle(appBundle);
 
@@ -3040,11 +3129,11 @@ public class BuildApksManagerTest {
     VariantTargeting lSplitVariantTargeting =
         variantSdkTargeting(
             sdkVersionFrom(ANDROID_L_API_VERSION),
-            ImmutableSet.of(sdkVersionFrom(ANDROID_M_API_VERSION), LOWEST_SDK_VERSION));
+            ImmutableSet.of(LOWEST_SDK_VERSION, sdkVersionFrom(ANDROID_M_API_VERSION)));
     VariantTargeting mSplitVariantTargeting =
         variantSdkTargeting(
             sdkVersionFrom(ANDROID_M_API_VERSION),
-            ImmutableSet.of(sdkVersionFrom(ANDROID_L_API_VERSION), LOWEST_SDK_VERSION));
+            ImmutableSet.of(LOWEST_SDK_VERSION, sdkVersionFrom(ANDROID_L_API_VERSION)));
 
     assertThat(splitVariantsByTargeting.keySet())
         .containsExactly(lSplitVariantTargeting, mSplitVariantTargeting);
@@ -3280,10 +3369,9 @@ public class BuildApksManagerTest {
                         .addFile("lib/x86_64/libsome.so")
                         .setNativeConfig(
                             nativeLibraries(
+                                targetedNativeDirectory("lib/x86", nativeDirectoryTargeting(X86)),
                                 targetedNativeDirectory(
-                                    "lib/x86", nativeDirectoryTargeting(AbiAlias.X86)),
-                                targetedNativeDirectory(
-                                    "lib/x86_64", nativeDirectoryTargeting(AbiAlias.X86_64))))
+                                    "lib/x86_64", nativeDirectoryTargeting(X86_64))))
                         .setManifest(
                             androidManifestForFeature(
                                 "com.test.app",
@@ -4216,7 +4304,7 @@ public class BuildApksManagerTest {
             AndroidManifest.create(
                 XmlNode.parseFrom(
                     protoApk.getInputStream(protoApk.getEntry("AndroidManifest.xml"))));
-        return androidManifest.getVersionCode();
+        return androidManifest.getVersionCode().orElseThrow(VersionCodeMissingException::new);
       } finally {
         Files.deleteIfExists(protoApkPath);
       }

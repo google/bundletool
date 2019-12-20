@@ -143,6 +143,11 @@ shadowJar {
         exclude 'com.android.bundle.**'
         // Aapt protos.
         exclude 'com.android.aapt.**'
+        // String constants in classes.
+        // For some reason, the Shadow plug-in seems to rename strings in classes too!
+        exclude 'com.android.vending.splits'
+        exclude 'com.android.vending.splits.required'
+        exclude 'com.android.dynamic.apk.fused.modules'
     }
 }
 

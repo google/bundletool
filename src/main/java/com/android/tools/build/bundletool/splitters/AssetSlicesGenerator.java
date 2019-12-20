@@ -23,10 +23,11 @@ import com.android.tools.build.bundletool.model.AppBundle;
 import com.android.tools.build.bundletool.model.BundleModule;
 import com.android.tools.build.bundletool.model.BundleModule.ModuleDeliveryType;
 import com.android.tools.build.bundletool.model.ModuleSplit;
+import com.android.tools.build.bundletool.model.exceptions.manifest.ManifestVersionException.VersionCodeMissingException;
 import com.google.common.collect.ImmutableList;
 
 /**
- * Generates asset slices from remote asset modules.
+ * Generates asset slices from asset modules.
  *
  * <p>Each asset in the module is inserted in at most one asset slice, according to its target.
  */
@@ -43,7 +44,12 @@ public class AssetSlicesGenerator {
 
   public ImmutableList<ModuleSplit> generateAssetSlices() {
     ImmutableList.Builder<ModuleSplit> splits = ImmutableList.builder();
-    int versionCode = appBundle.getBaseModule().getAndroidManifest().getVersionCode();
+    int versionCode =
+        appBundle
+            .getBaseModule()
+            .getAndroidManifest()
+            .getVersionCode()
+            .orElseThrow(VersionCodeMissingException::new);
 
     for (BundleModule module : appBundle.getAssetModules().values()) {
       AssetModuleSplitter moduleSplitter =

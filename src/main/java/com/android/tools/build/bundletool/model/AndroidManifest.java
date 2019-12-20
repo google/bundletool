@@ -16,6 +16,7 @@
 
 package com.android.tools.build.bundletool.model;
 
+import static com.android.tools.build.bundletool.model.version.VersionGuardedFeature.NAMESPACE_ON_INCLUDE_ATTRIBUTE_REQUIRED;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.collect.ImmutableList.toImmutableList;
@@ -24,13 +25,13 @@ import com.android.aapt.Resources.XmlNode;
 import com.android.tools.build.bundletool.model.BundleModule.ModuleType;
 import com.android.tools.build.bundletool.model.exceptions.ValidationException;
 import com.android.tools.build.bundletool.model.exceptions.manifest.ManifestFusingException.FusingMissingIncludeAttribute;
-import com.android.tools.build.bundletool.model.exceptions.manifest.ManifestVersionException.VersionCodeMissingException;
 import com.android.tools.build.bundletool.model.utils.xmlproto.XmlProtoAttribute;
 import com.android.tools.build.bundletool.model.utils.xmlproto.XmlProtoElement;
 import com.android.tools.build.bundletool.model.utils.xmlproto.XmlProtoElementBuilder;
 import com.android.tools.build.bundletool.model.utils.xmlproto.XmlProtoNode;
 import com.android.tools.build.bundletool.model.version.BundleToolVersion;
 import com.android.tools.build.bundletool.model.version.Version;
+import com.android.tools.build.bundletool.model.version.VersionGuardedFeature;
 import com.google.auto.value.AutoValue;
 import com.google.auto.value.extension.memoized.Memoized;
 import com.google.common.annotations.VisibleForTesting;
@@ -178,7 +179,7 @@ public abstract class AndroidManifest {
    */
   public static AndroidManifest createForConfigSplit(
       String packageName,
-      int versionCode,
+      Optional<Integer> versionCode,
       String splitId,
       String featureSplitId,
       Optional<Boolean> extractNativeLibs) {
@@ -190,11 +191,11 @@ public abstract class AndroidManifest {
     ManifestEditor editor =
         new ManifestEditor(createMinimalManifestTag(), BundleToolVersion.getCurrentVersion())
             .setPackage(packageName)
-            .setVersionCode(versionCode)
             .setSplitId(splitId)
             .setConfigForSplit(featureSplitId)
             .setHasCode(false);
 
+    versionCode.ifPresent(editor::setVersionCode);
     extractNativeLibs.ifPresent(editor::setExtractNativeLibsValue);
 
     return editor.save();
@@ -330,13 +331,14 @@ public abstract class AndroidManifest {
         .flatMap(module -> module.getOptionalChildElement(DISTRIBUTION_NAMESPACE_URI, "fusing"))
         .map(
             fusing -> {
-              if (getBundleToolVersion().isOlderThan(Version.of("0.3.4-dev"))) {
+              if (NAMESPACE_ON_INCLUDE_ATTRIBUTE_REQUIRED.enabledForVersion(
+                  getBundleToolVersion())) {
                 return fusing
-                    .getAttributeIgnoringNamespace("include")
+                    .getAttribute(DISTRIBUTION_NAMESPACE_URI, "include")
                     .orElseThrow(() -> new FusingMissingIncludeAttribute(getSplitId()));
               } else {
                 return fusing
-                    .getAttribute(DISTRIBUTION_NAMESPACE_URI, "include")
+                    .getAttributeIgnoringNamespace("include")
                     .orElseThrow(() -> new FusingMissingIncludeAttribute(getSplitId()));
               }
             })
@@ -356,11 +358,15 @@ public abstract class AndroidManifest {
         .getValueAsString();
   }
 
-  public int getVersionCode() {
+  /**
+   * Returns the version code.
+   *
+   * <p>Note: Version code is not present for non-upfront asset slices.
+   */
+  public Optional<Integer> getVersionCode() {
     return getManifestElement()
         .getAndroidAttribute(VERSION_CODE_RESOURCE_ID)
-        .orElseThrow(() -> new VersionCodeMissingException())
-        .getValueAsDecimalInteger();
+        .map(XmlProtoAttribute::getValueAsDecimalInteger);
   }
 
   public Optional<String> getSplitId() {
@@ -394,10 +400,11 @@ public abstract class AndroidManifest {
         .getOptionalChildElement(DISTRIBUTION_NAMESPACE_URI, "module")
         .flatMap(
             module -> {
-              if (getBundleToolVersion().isOlderThan(Version.of("0.3.4-dev"))) {
-                return module.getAttributeIgnoringNamespace("onDemand");
-              } else {
+              if (VersionGuardedFeature.NAMESPACE_ON_INCLUDE_ATTRIBUTE_REQUIRED.enabledForVersion(
+                  getBundleToolVersion())) {
                 return module.getAttribute(DISTRIBUTION_NAMESPACE_URI, "onDemand");
+              } else {
+                return module.getAttributeIgnoringNamespace("onDemand");
               }
             });
   }

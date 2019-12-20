@@ -23,6 +23,7 @@ import static com.android.tools.build.bundletool.model.BundleModule.ROOT_DIRECTO
 import static com.android.tools.build.bundletool.model.utils.files.FilePreconditions.checkFileDoesNotExist;
 import static com.android.tools.build.bundletool.model.utils.files.FilePreconditions.checkFileHasExtension;
 import static com.android.tools.build.bundletool.model.utils.files.FileUtils.createParentDirectories;
+import static com.android.tools.build.bundletool.model.version.VersionGuardedFeature.NO_DEFAULT_UNCOMPRESS_EXTENSIONS;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.collect.ImmutableList.toImmutableList;
@@ -47,6 +48,7 @@ import com.android.tools.build.bundletool.model.SigningConfiguration;
 import com.android.tools.build.bundletool.model.WearApkLocator;
 import com.android.tools.build.bundletool.model.ZipPath;
 import com.android.tools.build.bundletool.model.exceptions.ValidationException;
+import com.android.tools.build.bundletool.model.utils.PathMatcher;
 import com.android.tools.build.bundletool.model.utils.Versions;
 import com.android.tools.build.bundletool.model.utils.files.FileUtils;
 import com.android.tools.build.bundletool.model.version.Version;
@@ -61,12 +63,8 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
-import java.nio.file.FileSystem;
-import java.nio.file.FileSystems;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.PathMatcher;
-import java.nio.file.Paths;
 import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
 import java.security.SignatureException;
@@ -130,14 +128,9 @@ final class ApkSerializerHelper {
     this.bundleVersion = bundleVersion;
     this.signingConfig = signingConfig;
 
-    // Using the default filesystem will work on Windows because the "/" of the glob are swapped
-    // with "\" when the PathMatcher is constructed and we then use a FileSystem's Path when
-    // comparing which will thus also use the "\" separator.
-    FileSystem fileSystem = FileSystems.getDefault();
     this.uncompressedPathMatchers =
         compression.getUncompressedGlobList().stream()
-            .map(glob -> "glob:" + glob)
-            .map(fileSystem::getPathMatcher)
+            .map(PathMatcher::createFromGlob)
             .collect(toImmutableList());
   }
 
@@ -309,10 +302,8 @@ final class ApkSerializerHelper {
       boolean uncompressNativeLibs,
       boolean splitIsAssetSlice,
       boolean entryShouldCompress) {
-    // Developer knows best: when they provide the uncompressed glob, we respect it.
-    // We convert the ZipPath to a FileSystem's path for the PathMatcher to work.
     if (uncompressedPathMatchers.stream()
-        .anyMatch(pathMatcher -> pathMatcher.matches(Paths.get(path.toString())))) {
+        .anyMatch(pathMatcher -> pathMatcher.matches(path.toString()))) {
       return false;
     }
 
@@ -328,9 +319,7 @@ final class ApkSerializerHelper {
 
     // Common extensions that should remain uncompressed because compression doesn't provide any
     // gains.
-    // For bundle versions starting by 0.7.3 the no-compression is fully configured through the
-    // bundle config file.
-    if (bundleVersion.isOlderThan(Version.of("0.7.3"))
+    if (!NO_DEFAULT_UNCOMPRESS_EXTENSIONS.enabledForVersion(bundleVersion)
         && NO_COMPRESSION_EXTENSIONS.contains(FileUtils.getFileExtension(path))) {
       return false;
     }

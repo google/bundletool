@@ -52,8 +52,11 @@ public final class FileUtils {
   }
 
   /** Gets the extension of the path file. */
-  public static String getFileExtension(Path path) {
-    Path name = path.getFileName();
+  public static String getFileExtension(ZipPath path) {
+    if (path.getNameCount() == 0) {
+      return "";
+    }
+    ZipPath name = path.getFileName();
 
     // null for empty paths and root-only paths
     if (name == null) {

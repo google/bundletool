@@ -23,6 +23,8 @@ import static com.android.tools.build.bundletool.model.BundleModule.LIB_DIRECTOR
 import static com.android.tools.build.bundletool.model.BundleModule.RESOURCES_DIRECTORY;
 import static com.android.tools.build.bundletool.model.BundleModule.ROOT_DIRECTORY;
 import static com.android.tools.build.bundletool.model.utils.ResourcesUtils.SCREEN_DENSITY_TO_PROTO_VALUE_MAP;
+import static com.android.tools.build.bundletool.model.utils.TargetingNormalizer.normalizeApkTargeting;
+import static com.android.tools.build.bundletool.model.utils.TargetingNormalizer.normalizeVariantTargeting;
 import static com.android.tools.build.bundletool.model.utils.TargetingProtoUtils.lPlusVariantTargeting;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
@@ -83,10 +85,18 @@ public abstract class ModuleSplit {
     ASSET_SLICE,
   }
 
-  /** Returns the targeting of the APK represented by this instance. */
+  /**
+   * Returns the targeting of the APK represented by this instance.
+   *
+   * <p>Order of repeated all repeated fields is guaranteed to be deterministic.
+   */
   public abstract ApkTargeting getApkTargeting();
 
-  /** Returns the targeting of the Variant this instance belongs to. */
+  /**
+   * Returns the targeting of the Variant this instance belongs to.
+   *
+   * <p>Order of repeated all repeated fields is guaranteed to be deterministic.
+   */
   public abstract VariantTargeting getVariantTargeting();
 
   /** Whether this ModuleSplit instance represents a standalone, split, instant or system apk. */
@@ -487,6 +497,16 @@ public abstract class ModuleSplit {
    */
   public Stream<ModuleEntry> findEntriesUnderPath(String path) {
     ZipPath zipPath = ZipPath.create(path);
+    return findEntriesUnderPath(zipPath);
+  }
+
+  /**
+   * Returns all {@link ModuleEntry} that have a relative module path under a given path.
+   *
+   * <p>Note: Consider using {@link #getEntriesByDirectory()} for performance, unless a recursive
+   * search is truly needed.
+   */
+  public Stream<ModuleEntry> findEntriesUnderPath(ZipPath zipPath) {
     return getEntriesByDirectory().asMap().entrySet().stream()
         .filter(dirAndEntries -> dirAndEntries.getKey().startsWith(zipPath))
         .flatMap(dirAndEntries -> dirAndEntries.getValue().stream());
@@ -525,7 +545,11 @@ public abstract class ModuleSplit {
      */
     public abstract Builder setApexConfig(ApexImages apexConfig);
 
+    protected abstract ApkTargeting getApkTargeting();
+
     public abstract Builder setApkTargeting(ApkTargeting targeting);
+
+    protected abstract VariantTargeting getVariantTargeting();
 
     public abstract Builder setVariantTargeting(VariantTargeting targeting);
 
@@ -547,7 +571,10 @@ public abstract class ModuleSplit {
     protected abstract ModuleSplit autoBuild();
 
     public ModuleSplit build() {
-      ModuleSplit moduleSplit = autoBuild();
+      ModuleSplit moduleSplit =
+          this.setApkTargeting(normalizeApkTargeting(getApkTargeting()))
+              .setVariantTargeting(normalizeVariantTargeting(getVariantTargeting()))
+              .autoBuild();
       // For system splits the master split is formed by fusing Screen Density, Abi, Language
       // splits, hence it might have Abi, Screen Density, Language targeting set.
       if (moduleSplit.isMasterSplit() && !moduleSplit.getSplitType().equals(SplitType.SYSTEM)) {

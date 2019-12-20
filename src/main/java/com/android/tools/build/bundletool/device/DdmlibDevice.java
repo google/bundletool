@@ -16,6 +16,7 @@
 
 package com.android.tools.build.bundletool.device;
 
+import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 
 import com.android.ddmlib.AdbCommandRejectedException;
@@ -23,15 +24,22 @@ import com.android.ddmlib.IDevice;
 import com.android.ddmlib.IDevice.DeviceState;
 import com.android.ddmlib.IShellOutputReceiver;
 import com.android.ddmlib.InstallException;
+import com.android.ddmlib.MultiLineReceiver;
 import com.android.ddmlib.ShellCommandUnresponsiveException;
+import com.android.ddmlib.SyncException;
 import com.android.ddmlib.TimeoutException;
 import com.android.sdklib.AndroidVersion;
+import com.android.tools.build.bundletool.model.exceptions.CommandExecutionException;
 import com.android.tools.build.bundletool.model.exceptions.InstallationException;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
+import com.google.errorprone.annotations.FormatMethod;
+import com.google.errorprone.annotations.FormatString;
 import java.io.File;
 import java.io.IOException;
+import java.io.PrintStream;
 import java.nio.file.Path;
+import java.util.Arrays;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 
@@ -108,8 +116,13 @@ public class DdmlibDevice extends Device {
   @Override
   public void installApks(ImmutableList<Path> apks, InstallOptions installOptions) {
     ImmutableList<File> apkFiles = apks.stream().map(Path::toFile).collect(toImmutableList());
-    ImmutableList<String> extraArgs =
-        installOptions.getAllowDowngrade() ? ImmutableList.of("-d") : ImmutableList.of();
+    ImmutableList.Builder<String> extraArgs = ImmutableList.builder();
+    if (installOptions.getAllowDowngrade()) {
+      extraArgs.add("-d");
+    }
+    if (installOptions.getAllowTestOnly()) {
+      extraArgs.add("-t");
+    }
 
     try {
       if (getVersion()
@@ -117,14 +130,14 @@ public class DdmlibDevice extends Device {
         device.installPackages(
             apkFiles,
             installOptions.getAllowReinstall(),
-            extraArgs,
+            extraArgs.build(),
             installOptions.getTimeout().toMillis(),
             TimeUnit.MILLISECONDS);
       } else {
         device.installPackage(
             Iterables.getOnlyElement(apkFiles).toString(),
             installOptions.getAllowReinstall(),
-            extraArgs.toArray(new String[0]));
+            extraArgs.build().toArray(new String[0]));
       }
     } catch (InstallException e) {
       throw InstallationException.builder()
@@ -132,5 +145,184 @@ public class DdmlibDevice extends Device {
           .withMessage("Installation of the app failed.")
           .build();
     }
+  }
+
+  @Override
+  public void pushApks(ImmutableList<Path> apks, PushOptions pushOptions) {
+    String splitsPath = pushOptions.getDestinationPath();
+    checkArgument(!splitsPath.isEmpty(), "Splits path cannot be empty.");
+
+    RemoteCommandExecutor commandExecutor =
+        new RemoteCommandExecutor(this, pushOptions.getTimeout().toMillis(), System.err);
+
+    try {
+      // There are two different flows, depending on if the path is absolute or not...
+      if (!pushOptions.getDestinationPath().startsWith("/")) {
+        // Path is relative, so we're going to try to push it to the app's private dir
+        // For that, we will need the package name to use with "run-as" command
+        String packageName =
+            pushOptions
+                .getPackageName()
+                .orElseThrow(
+                    () ->
+                        new CommandExecutionException(
+                            "PushOptions.packageName must be set for relative paths."));
+
+        // Some clean up first. Remove the destination dir if flag is set...
+        if (pushOptions.getClearDestinationPath()) {
+          commandExecutor.executeAsUserAndPrint(packageName, "rm -rf %s", splitsPath);
+        }
+
+        // ...and recreate it, making sure the destination dir is empty.
+        // We don't want splits from previous runs in the directory.
+        // There isn't a nice way to test if dir is empty in shell, but rmdir will return error
+        commandExecutor.executeAsUserAndPrint(
+            packageName,
+            "mkdir -p %s && rmdir %s && mkdir -p %s",
+            splitsPath,
+            splitsPath,
+            splitsPath);
+
+        // The push command further down doesn't support "run-as", so we're going to push
+        // to a temporary folder, then copy the files to the final destination
+        String remoteTmpPath = joinUnixPaths("/data/local/tmp/", packageName);
+        commandExecutor.executeAndPrint("mkdir -p %s", remoteTmpPath);
+        for (Path apkPath : apks) {
+          String remoteTmpFilePath = joinUnixPaths(remoteTmpPath, apkPath.getFileName().toString());
+          device.pushFile(apkPath.toFile().getAbsolutePath(), remoteTmpFilePath);
+
+          // Now we can copy ("cat" in case there is no "cp" on device) from tmp to splitsPath
+          // "sh -c" needed to wrap the whole "cat" call because of ">" redirect
+          commandExecutor.executeAsUserAndPrint(
+              packageName,
+              "cat %s > %s",
+              remoteTmpFilePath,
+              joinUnixPaths(splitsPath, apkPath.getFileName().toString()));
+          commandExecutor.executeAndPrint("rm %s", remoteTmpFilePath);
+          System.err.printf(
+              "Pushed \"%s\"%n", joinUnixPaths(splitsPath, apkPath.getFileName().toString()));
+        }
+      } else {
+        // Path is absolute. We assume it's pointing to a location writeable by ADB shell,
+        // which is explained in the bundletool help. It shouldn't point to app's private directory.
+
+        // Some clean up first. Remove the destination dir if flag is set...
+        if (pushOptions.getClearDestinationPath()) {
+          commandExecutor.executeAndPrint("rm -rf %s", splitsPath);
+        }
+
+        // ... and recreate it, making sure the destination dir is empty.
+        // We don't want splits from previous runs in the directory.
+        // There isn't a nice way to test if dir is empty in shell, but rmdir will return error
+        commandExecutor.executeAndPrint(
+            "mkdir -p %s && rmdir %s && mkdir -p %s", splitsPath, splitsPath, splitsPath);
+
+        // Try to push files normally. Will fail if ADB shell doesn't have permission to write.
+        for (Path path : apks) {
+          device.pushFile(
+              path.toFile().getAbsolutePath(),
+              joinUnixPaths(splitsPath, path.getFileName().toString()));
+          System.err.printf(
+              "Pushed \"%s\"%n", joinUnixPaths(splitsPath, path.getFileName().toString()));
+        }
+      }
+    } catch (IOException
+        | TimeoutException
+        | SyncException
+        | AdbCommandRejectedException
+        | ShellCommandUnresponsiveException e) {
+      throw CommandExecutionException.builder()
+          .withCause(e)
+          .withMessage(
+              "Pushing additional splits for offline testing of dynamic features failed. Your app"
+                  + " might still have been installed correctly, but you won't be able to test"
+                  + " with FakeSplitInstallManager.")
+          .build();
+    }
+  }
+
+  static class RemoteCommandExecutor {
+    private final Device device;
+    private final MultiLineReceiver receiver;
+    private final long timeout;
+    private final PrintStream out;
+    private String lastOutputLine;
+
+    RemoteCommandExecutor(Device device, long timeout, PrintStream out) {
+      this.device = device;
+      this.timeout = timeout;
+      this.out = out;
+      this.receiver =
+          new MultiLineReceiver() {
+            @Override
+            public void processNewLines(String[] lines) {
+              for (String line : lines) {
+                if (!line.isEmpty()) {
+                  out.println("ADB >> " + line);
+                  lastOutputLine = line;
+                }
+              }
+            }
+
+            @Override
+            public boolean isCancelled() {
+              return false;
+            }
+          };
+    }
+
+    @FormatMethod
+    private void executeAndPrint(String commandFormat, String... args)
+        throws TimeoutException, AdbCommandRejectedException, ShellCommandUnresponsiveException,
+            IOException {
+      String command = formatCommandWithArgs(commandFormat, args);
+      lastOutputLine = null;
+      out.println("ADB << " + command);
+      // ExecuteShellCommand would only tell us about ADB errors, and NOT the actual shell commands
+      // We need another way to check exit values of the commands we run.
+      // By adding " && echo OK" we can make sure "OK" is printed if the cmd executed successfully.
+      device.executeShellCommand(command + " && echo OK", receiver, timeout, TimeUnit.MILLISECONDS);
+      if (!"OK".equals(lastOutputLine)) {
+        throw new IOException("ADB command failed.");
+      }
+    }
+
+    /** Runs the command as the user of the debuggable app with specified package name. */
+    @FormatMethod
+    private void executeAsUserAndPrint(
+        String packageName, @FormatString String command, String... args)
+        throws TimeoutException, AdbCommandRejectedException, ShellCommandUnresponsiveException,
+            IOException {
+      // "run-as packageName" lets us run with the permissions of the app to access its directory
+      // "sh -c 'cmd'" is needed to be able to use > redirects and && operator inside the cmd
+      executeAndPrint("run-as %s sh -c %s", packageName, formatCommandWithArgs(command, args));
+    }
+
+    /** Returns the string in single quotes, with any single quotes in the string escaped. */
+    static String escapeAndSingleQuote(String string) {
+      return "'" + string.replace("'", "'\\''") + "'";
+    }
+
+    /**
+     * Formats the command string, replacing %s argument placeholders with escaped and single quoted
+     * args. This was made to work with Strings only, so format your args beforehand.
+     */
+    @FormatMethod
+    static String formatCommandWithArgs(String command, String... args) {
+      return String.format(
+          command, Arrays.stream(args).map(RemoteCommandExecutor::escapeAndSingleQuote).toArray());
+    }
+  }
+
+  // We can't rely on Path and friends if running on Windows, emulator always needs UNIX paths
+  static String joinUnixPaths(String... parts) {
+    StringBuilder sb = new StringBuilder();
+    for (String part : parts) {
+      if (sb.length() > 0 && sb.charAt(sb.length() - 1) != '/') {
+        sb.append('/');
+      }
+      sb.append(part);
+    }
+    return sb.toString();
   }
 }

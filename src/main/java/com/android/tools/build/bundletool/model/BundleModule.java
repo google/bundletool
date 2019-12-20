@@ -75,7 +75,11 @@ public abstract class BundleModule {
   public static final ZipPath APEX_DIRECTORY = ZipPath.create("apex");
 
   /** The file of an App Bundle module that contains the APEX manifest. */
-  public static final ZipPath APEX_MANIFEST_PATH = ZipPath.create("root/apex_manifest.json");
+  public static final ZipPath APEX_MANIFEST_PATH = ZipPath.create("root/apex_manifest.pb");
+  public static final ZipPath APEX_MANIFEST_JSON_PATH = ZipPath.create("root/apex_manifest.json");
+
+  /** The public key used to sign the apex */
+  public static final ZipPath APEX_PUBKEY_PATH = ZipPath.create("root/apex_pubkey");
 
   /** The NOTICE file of an APEX Bundle module. */
   public static final ZipPath APEX_NOTICE_PATH = ZipPath.create("assets/NOTICE.html.gz");

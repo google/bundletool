@@ -18,7 +18,6 @@ package com.android.tools.build.bundletool.splitters;
 
 import static com.android.tools.build.bundletool.model.utils.TargetingProtoUtils.abiUniverse;
 import static com.android.tools.build.bundletool.model.utils.TargetingProtoUtils.densityUniverse;
-import static com.android.tools.build.bundletool.model.utils.TextureCompressionUtils.TEXTURE_TO_TARGETING;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.base.Predicates.not;
@@ -232,19 +231,12 @@ public class BundleSharder {
     split = TargetingUtils.removeAssetsTargeting(split, dimension);
 
     // Apply the updated targeting to the module split (as it now only contains assets for
-    // the selected TCF), both for the APK and the variant targeting.
-    return split.toBuilder()
-        .setApkTargeting(
-            split.getApkTargeting().toBuilder()
-                .setTextureCompressionFormatTargeting(
-                    TEXTURE_TO_TARGETING.get(suffixStripping.getDefaultSuffix()))
-                .build())
-        .setVariantTargeting(
-            split.getVariantTargeting().toBuilder().
-                setTextureCompressionFormatTargeting(
-                    TEXTURE_TO_TARGETING.get(suffixStripping.getDefaultSuffix()))
-                .build())
-        .build();
+    // the selected TCF)
+    split =
+        TargetingUtils.setTargetingByDefaultSuffix(
+            split, dimension, suffixStripping.getDefaultSuffix());
+
+    return split;
   }
 
   private SplittingPipeline createNativeLibrariesSplittingPipeline(

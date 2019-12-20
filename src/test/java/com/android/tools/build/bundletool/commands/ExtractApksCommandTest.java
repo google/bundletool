@@ -1087,7 +1087,7 @@ public class ExtractApksCommandTest {
 
   @Test
   public void extractInstant_withBaseOnly() throws Exception {
-    Path apkLBase = ZipPath.create("apkL-base.apk");
+    ZipPath apkLBase = ZipPath.create("apkL-base.apk");
     BuildApksResult tableOfContentsProto =
         BuildApksResult.newBuilder()
             .setBundletool(
@@ -1206,10 +1206,10 @@ public class ExtractApksCommandTest {
 
   @Test
   public void extractInstant_withModulesFlag() throws Exception {
-    Path apkPreL = ZipPath.create("apkPreL.apk");
-    Path apkLBase = ZipPath.create("apkL-base.apk");
-    Path apkLFeature = ZipPath.create("apkL-feature.apk");
-    Path apkLOther = ZipPath.create("apkL-other.apk");
+    ZipPath apkPreL = ZipPath.create("apkPreL.apk");
+    ZipPath apkLBase = ZipPath.create("apkL-base.apk");
+    ZipPath apkLFeature = ZipPath.create("apkL-feature.apk");
+    ZipPath apkLOther = ZipPath.create("apkL-other.apk");
     BuildApksResult tableOfContentsProto =
         BuildApksResult.newBuilder()
             .setBundletool(
@@ -1297,9 +1297,9 @@ public class ExtractApksCommandTest {
 
   @Test
   public void extractInstant_withMultipleInstantModule() throws Exception {
-    Path apkBase = ZipPath.create("apkL-base.apk");
-    Path apkInstant = ZipPath.create("apkL-instant.apk");
-    Path apkInstant2 = ZipPath.create("apkL-instant2.apk");
+    ZipPath apkBase = ZipPath.create("apkL-base.apk");
+    ZipPath apkInstant = ZipPath.create("apkL-instant.apk");
+    ZipPath apkInstant2 = ZipPath.create("apkL-instant2.apk");
     BuildApksResult tableOfContentsProto =
         BuildApksResult.newBuilder()
             .setBundletool(
@@ -1387,7 +1387,7 @@ public class ExtractApksCommandTest {
     return outputFile;
   }
 
-  private Path inOutputDirectory(Path file) {
+  private Path inOutputDirectory(ZipPath file) {
     return tmpDir.resolve(Paths.get(file.toString()));
   }
 

@@ -21,12 +21,15 @@ import static com.android.tools.build.bundletool.model.utils.SdkToolsLocator.SYS
 import static com.android.tools.build.bundletool.model.utils.files.FilePreconditions.checkDirectoryExists;
 import static com.android.tools.build.bundletool.model.utils.files.FilePreconditions.checkFileExistsAndExecutable;
 import static com.android.tools.build.bundletool.model.utils.files.FilePreconditions.checkFileExistsAndReadable;
+import static com.google.common.base.Preconditions.checkArgument;
 
+import com.android.bundle.Commands.BuildApksResult;
 import com.android.bundle.Devices.DeviceSpec;
 import com.android.tools.build.bundletool.commands.CommandHelp.CommandDescription;
 import com.android.tools.build.bundletool.commands.CommandHelp.FlagDescription;
+import com.android.tools.build.bundletool.device.AdbRunner;
 import com.android.tools.build.bundletool.device.AdbServer;
-import com.android.tools.build.bundletool.device.ApksInstaller;
+import com.android.tools.build.bundletool.device.Device;
 import com.android.tools.build.bundletool.device.Device.InstallOptions;
 import com.android.tools.build.bundletool.device.DeviceAnalyzer;
 import com.android.tools.build.bundletool.flags.Flag;
@@ -34,6 +37,7 @@ import com.android.tools.build.bundletool.flags.ParsedFlags;
 import com.android.tools.build.bundletool.io.TempDirectory;
 import com.android.tools.build.bundletool.model.exceptions.CommandExecutionException;
 import com.android.tools.build.bundletool.model.utils.DefaultSystemEnvironmentProvider;
+import com.android.tools.build.bundletool.model.utils.ResultUtils;
 import com.android.tools.build.bundletool.model.utils.SdkToolsLocator;
 import com.android.tools.build.bundletool.model.utils.SystemEnvironmentProvider;
 import com.google.auto.value.AutoValue;
@@ -54,6 +58,9 @@ public abstract class InstallApksCommand {
   private static final Flag<String> DEVICE_ID_FLAG = Flag.string("device-id");
   private static final Flag<ImmutableSet<String>> MODULES_FLAG = Flag.stringSet("modules");
   private static final Flag<Boolean> ALLOW_DOWNGRADE_FLAG = Flag.booleanFlag("allow-downgrade");
+  private static final Flag<String> PUSH_SPLITS_FLAG = Flag.string("push-splits-to");
+  private static final Flag<Boolean> CLEAR_PUSH_PATH_FLAG = Flag.booleanFlag("clear-push-path");
+  private static final Flag<Boolean> ALLOW_TEST_ONLY_FLAG = Flag.booleanFlag("allow-test-only");
 
   private static final String ANDROID_SERIAL_VARIABLE = "ANDROID_SERIAL";
 
@@ -70,10 +77,19 @@ public abstract class InstallApksCommand {
 
   public abstract boolean getAllowDowngrade();
 
+  public abstract Optional<String> getPushSplitsPath();
+
+  public abstract boolean getClearPushPath();
+
+  public abstract boolean getAllowTestOnly();
+
   abstract AdbServer getAdbServer();
 
   public static Builder builder() {
-    return new AutoValue_InstallApksCommand.Builder().setAllowDowngrade(false);
+    return new AutoValue_InstallApksCommand.Builder()
+        .setAllowDowngrade(false)
+        .setClearPushPath(false)
+        .setAllowTestOnly(false);
   }
 
   /** Builder for the {@link InstallApksCommand}. */
@@ -91,6 +107,12 @@ public abstract class InstallApksCommand {
 
     /** The caller is responsible for the lifecycle of the {@link AdbServer}. */
     public abstract Builder setAdbServer(AdbServer adbServer);
+
+    public abstract Builder setPushSplitsPath(String pushSplitsPath);
+
+    public abstract Builder setClearPushPath(boolean clearPushPath);
+
+    public abstract Builder setAllowTestOnly(boolean allowTestOnly);
 
     public abstract InstallApksCommand build();
   }
@@ -123,6 +145,9 @@ public abstract class InstallApksCommand {
 
     Optional<ImmutableSet<String>> modules = MODULES_FLAG.getValue(flags);
     Optional<Boolean> allowDowngrade = ALLOW_DOWNGRADE_FLAG.getValue(flags);
+    Optional<String> pushSplits = PUSH_SPLITS_FLAG.getValue(flags);
+    Optional<Boolean> clearPushPath = CLEAR_PUSH_PATH_FLAG.getValue(flags);
+    Optional<Boolean> allowTestOnly = ALLOW_TEST_ONLY_FLAG.getValue(flags);
 
     flags.checkNoUnknownFlags();
 
@@ -131,6 +156,7 @@ public abstract class InstallApksCommand {
     deviceSerialName.ifPresent(command::setDeviceId);
     modules.ifPresent(command::setModules);
     allowDowngrade.ifPresent(command::setAllowDowngrade);
+    allowTestOnly.ifPresent(command::setAllowTestOnly);
 
     return command.build();
   }
@@ -153,17 +179,73 @@ public abstract class InstallApksCommand {
         extractApksCommand.setOutputDirectory(tempDirectory.getPath());
       }
       getModules().ifPresent(extractApksCommand::setModules);
-      ImmutableList<Path> extractedApks = extractApksCommand.build().execute();
+      final ImmutableList<Path> extractedApks = extractApksCommand.build().execute();
 
-      ApksInstaller installer = new ApksInstaller(adbServer);
+      AdbRunner adbRunner = new AdbRunner(adbServer);
       InstallOptions installOptions =
-          InstallOptions.builder().setAllowDowngrade(getAllowDowngrade()).build();
+          InstallOptions.builder()
+              .setAllowDowngrade(getAllowDowngrade())
+              .setAllowTestOnly(getAllowTestOnly())
+              .build();
 
       if (getDeviceId().isPresent()) {
-        installer.installApks(extractedApks, installOptions, getDeviceId().get());
+        adbRunner.run(
+            device -> device.installApks(extractedApks, installOptions), getDeviceId().get());
       } else {
-        installer.installApks(extractedApks, installOptions);
+        adbRunner.run(device -> device.installApks(extractedApks, installOptions));
       }
+
+      pushSplits(deviceSpec, extractApksCommand.build(), adbRunner);
+    }
+  }
+
+  private void pushSplits(
+      DeviceSpec baseSpec, ExtractApksCommand baseExtractCommand, AdbRunner adbRunner) {
+    if (!getPushSplitsPath().isPresent()) {
+      return;
+    }
+
+    ExtractApksCommand.Builder extractApksCommand = ExtractApksCommand.builder();
+    extractApksCommand.setApksArchivePath(baseExtractCommand.getApksArchivePath());
+    baseExtractCommand.getOutputDirectory().ifPresent(extractApksCommand::setOutputDirectory);
+
+    // We want to push all modules...
+    extractApksCommand.setModules(ImmutableSet.of(ExtractApksCommand.ALL_MODULES_SHORTCUT));
+    // ... and all languages
+    BuildApksResult toc = ResultUtils.readTableOfContents(getApksArchivePath());
+    ImmutableSet<String> targetedLanguages = ResultUtils.getAllTargetedLanguages(toc);
+    final ImmutableList<Path> extractedApksForPush =
+        extractApksCommand
+            .setDeviceSpec(baseSpec.toBuilder().addAllSupportedLocales(targetedLanguages).build())
+            .build()
+            .execute();
+
+    Device.PushOptions.Builder pushOptions =
+        Device.PushOptions.builder()
+            .setDestinationPath(getPushSplitsPath().get())
+            .setClearDestinationPath(getClearPushPath());
+
+    // We're going to need the package name later for pushing to relative paths
+    // (i.e. inside the app's private directory)
+    if (!getPushSplitsPath().get().startsWith("/")) {
+      String packageName = toc.getPackageName();
+      if (packageName.isEmpty()) {
+        throw new CommandExecutionException(
+            "Unable to determine the package name of the base APK. If your APK "
+                + "set was produced using an older version of bundletool, please "
+                + "regenerate it. Alternatively, you can try again with an "
+                + "absolute path for --push-splits-to, pointing to a location "
+                + "that is writeable by the shell user, e.g. /sdcard/...");
+      }
+      pushOptions.setPackageName(packageName);
+    }
+
+    if (getDeviceId().isPresent()) {
+      adbRunner.run(
+          device -> device.pushApks(extractedApksForPush, pushOptions.build()),
+          getDeviceId().get());
+    } else {
+      adbRunner.run(device -> device.pushApks(extractedApksForPush, pushOptions.build()));
     }
   }
 
@@ -174,6 +256,20 @@ public abstract class InstallApksCommand {
       checkFileExistsAndReadable(getApksArchivePath());
     }
     checkFileExistsAndExecutable(getAdbPath());
+    if (getClearPushPath()) {
+      checkArgument(
+          getPushSplitsPath().isPresent(),
+          "--%s only applies when --%s is set.",
+          CLEAR_PUSH_PATH_FLAG.getName(),
+          PUSH_SPLITS_FLAG.getName());
+    }
+    getPushSplitsPath()
+        .ifPresent(
+            path ->
+                checkArgument(
+                    !path.isEmpty(),
+                    "The value of the flag --%s cannot be empty.",
+                    PUSH_SPLITS_FLAG.getName()));
   }
 
   public static CommandHelp help() {
@@ -238,6 +334,14 @@ public abstract class InstallApksCommand {
                         + "on-demand. Note that the dependent modules will also be extracted. The "
                         + "value of this flag is ignored if the device receives a standalone APK.",
                     ExtractApksCommand.ALL_MODULES_SHORTCUT)
+                .build())
+        .addFlag(
+            FlagDescription.builder()
+                .setFlagName(ALLOW_TEST_ONLY_FLAG.getName())
+                .setOptional(true)
+                .setDescription(
+                    "If set, apps with 'android:testOnly=true' set in their manifest can also be"
+                        + " deployed")
                 .build())
         .build();
   }

@@ -22,10 +22,13 @@ import static com.android.tools.build.bundletool.model.AbiName.X86;
 import static com.android.tools.build.bundletool.model.AbiName.X86_64;
 import static com.android.tools.build.bundletool.model.BundleModule.ABI_SPLITTER;
 import static com.android.tools.build.bundletool.model.BundleModule.APEX_DIRECTORY;
+import static com.android.tools.build.bundletool.model.BundleModule.APEX_MANIFEST_JSON_PATH;
 import static com.android.tools.build.bundletool.model.BundleModule.APEX_MANIFEST_PATH;
 import static com.android.tools.build.bundletool.model.BundleModule.APEX_NOTICE_PATH;
+import static com.android.tools.build.bundletool.model.BundleModule.APEX_PUBKEY_PATH;
 import static com.google.common.collect.ImmutableSet.toImmutableSet;
 
+import com.android.apex.ApexManifestProto.ApexManifest;
 import com.android.bundle.Files.ApexImages;
 import com.android.bundle.Files.TargetedApexImage;
 import com.android.tools.build.bundletool.model.AbiName;
@@ -38,8 +41,11 @@ import com.google.common.base.Joiner;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Sets;
+import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
+import com.google.protobuf.ExtensionRegistry;
+import com.google.protobuf.InvalidProtocolBufferException;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
@@ -50,7 +56,8 @@ import java.util.Optional;
 public class ApexBundleValidator extends SubValidator {
 
   private static final ImmutableList<ZipPath> ALLOWED_APEX_FILES_OUTSIDE_APEX_DIRECTORY =
-      ImmutableList.of(APEX_MANIFEST_PATH, APEX_NOTICE_PATH);
+      ImmutableList.of(
+          APEX_MANIFEST_PATH, APEX_MANIFEST_JSON_PATH, APEX_NOTICE_PATH, APEX_PUBKEY_PATH);
 
   // The bundle must contain a system image for at least one of each of these sets.
   private static final ImmutableSet<ImmutableSet<ImmutableSet<AbiName>>> REQUIRED_ONE_OF_ABI_SETS =
@@ -90,12 +97,19 @@ public class ApexBundleValidator extends SubValidator {
     }
 
     Optional<ModuleEntry> apexManifest = module.getEntry(APEX_MANIFEST_PATH);
-    if (!apexManifest.isPresent()) {
-      throw ValidationException.builder()
-          .withMessage("Missing expected file in APEX bundle: '%s'.", APEX_MANIFEST_PATH)
-          .build();
+    if (apexManifest.isPresent()) {
+      validateApexManifest(apexManifest.get());
+    } else {
+      apexManifest = module.getEntry(APEX_MANIFEST_JSON_PATH);
+      if (!apexManifest.isPresent()) {
+        throw ValidationException.builder()
+            .withMessage(
+                "Missing expected file in APEX bundle: '%s' or '%s'.",
+                APEX_MANIFEST_PATH, APEX_MANIFEST_JSON_PATH)
+            .build();
+      }
+      validateApexManifestJson(apexManifest.get());
     }
-    validateApexManifest(apexManifest.get());
 
     ImmutableSet.Builder<String> apexImagesBuilder = ImmutableSet.builder();
     ImmutableSet.Builder<String> apexFileNamesBuilder = ImmutableSet.builder();
@@ -170,10 +184,30 @@ public class ApexBundleValidator extends SubValidator {
   }
 
   private static void validateApexManifest(ModuleEntry entry) {
+    try (InputStream inputStream = entry.getContent()) {
+      ApexManifest apexManifest =
+          ApexManifest.parseFrom(inputStream, ExtensionRegistry.getEmptyRegistry());
+      if (apexManifest.getName().isEmpty()) {
+        throw ValidationException.builder()
+            .withMessage("APEX manifest must have a package name.")
+            .build();
+      }
+    } catch (InvalidProtocolBufferException e) {
+      throw ValidationException.builder()
+          .withMessage("Couldn't parse APEX manifest")
+          .withCause(e)
+          .build();
+    } catch (IOException e) {
+      throw new UncheckedIOException("Couldn't read APEX manifest.", e);
+    }
+  }
+
+  private static void validateApexManifestJson(ModuleEntry entry) {
     try (InputStream inputStream = entry.getContent();
         BufferedReader reader = BufferedIo.reader(inputStream)) {
       JsonObject json = new JsonParser().parse(reader).getAsJsonObject();
-      if (json.get("name") == null) {
+      JsonElement element = json.get("name");
+      if (element == null || element.getAsString().isEmpty()) {
         throw ValidationException.builder()
             .withMessage("APEX manifest must have a package name.")
             .build();

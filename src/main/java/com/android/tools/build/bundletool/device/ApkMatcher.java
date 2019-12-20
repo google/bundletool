@@ -18,6 +18,7 @@ package com.android.tools.build.bundletool.device;
 
 import static com.android.tools.build.bundletool.model.utils.ModuleDependenciesUtils.addModuleDependencies;
 import static com.android.tools.build.bundletool.model.utils.ModuleDependenciesUtils.buildAdjacencyMap;
+import static com.android.tools.build.bundletool.model.version.VersionGuardedFeature.NEW_DELIVERY_TYPE_MANIFEST_TAG;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.collect.ImmutableSet.toImmutableSet;
 
@@ -212,7 +213,7 @@ public class ApkMatcher {
 
   private boolean willBeDeliveredInstallTime(ModuleMetadata moduleMetadata, Version bundleVersion) {
     boolean installTime =
-        bundleVersion.isNewerThan(Version.of("0.10.1"))
+        NEW_DELIVERY_TYPE_MANIFEST_TAG.enabledForVersion(bundleVersion)
             ? moduleMetadata.getDeliveryType().equals(DeliveryType.INSTALL_TIME)
             : !moduleMetadata.getOnDemandDeprecated();
 

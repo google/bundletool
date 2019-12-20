@@ -105,6 +105,7 @@ public class ApkSerializerManager {
     // Finalize the output archive.
     apkSetBuilder.setTableOfContentsFile(
         BuildApksResult.newBuilder()
+            .setPackageName(appBundle.getBaseModule().getAndroidManifest().getPackageName())
             .addAllVariant(allVariantsWithTargeting)
             .setBundletool(
                 Bundletool.newBuilder()

@@ -17,6 +17,7 @@
 package com.android.tools.build.bundletool.model.targeting;
 
 import static com.android.tools.build.bundletool.model.utils.TargetingProtoUtils.sdkVersionTargeting;
+import static com.android.tools.build.bundletool.model.utils.TextureCompressionUtils.TEXTURE_TO_TARGETING;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.collect.ImmutableList.toImmutableList;
@@ -190,6 +191,35 @@ public final class TargetingUtils {
   }
 
   /**
+   * Update the module to have the targeting specified by a default value for a dimension. This
+   * means that the Apk and Variant targeting for this module will have the value passed for this
+   * dimension - or none if the value is empty.
+   */
+  public static ModuleSplit setTargetingByDefaultSuffix(
+      ModuleSplit moduleSplit, TargetingDimension dimension, String value) {
+    // Only TCF is supported for now in targeting by a default suffix.
+    checkArgument(dimension.equals(TargetingDimension.TEXTURE_COMPRESSION_FORMAT));
+
+    // If the value is empty, we don't need to modify the targeting of the module split.
+    if (value.isEmpty()) {
+      return moduleSplit;
+    }
+
+    // Apply the updated targeting to the module split (as it now only contains assets for
+    // the selected TCF), both for the APK and the variant targeting.
+    return moduleSplit.toBuilder()
+        .setApkTargeting(
+            moduleSplit.getApkTargeting().toBuilder()
+                .setTextureCompressionFormatTargeting(TEXTURE_TO_TARGETING.get(value))
+                .build())
+        .setVariantTargeting(
+            moduleSplit.getVariantTargeting().toBuilder()
+                .setTextureCompressionFormatTargeting(TEXTURE_TO_TARGETING.get(value))
+                .build())
+        .build();
+  }
+
+  /**
    * Update the module to remove the specified targeting from the assets - both the directories in
    * assets config and the associated module entries having the specified targeting will be updated.
    */
@@ -325,30 +355,36 @@ public final class TargetingUtils {
    * the dimension, or targeting another value).
    */
   private static boolean isDirectoryTargetingOtherValue(
-      TargetedAssetsDirectory directory, TargetingDimension dimension, String value) {
+      TargetedAssetsDirectory directory, TargetingDimension dimension, String searchedValue) {
     // Only TCF is supported for now in targeting detection.
     checkArgument(dimension.equals(TargetingDimension.TEXTURE_COMPRESSION_FORMAT));
 
     AssetsDirectoryTargeting targeting = directory.getTargeting();
 
     if (!targeting.hasTextureCompressionFormat()) {
+      // The directory is not even targeting the specified dimension,
+      // so it's not targeting another value for this dimension.
       return false;
     }
 
-    if (targeting.getTextureCompressionFormat().getValueList().isEmpty()) {
-      // If no value is specified for this directory, it means that it is a fallback for other
-      // sibling directories containing alternative TCFs. By doing so, it is targeting another value
-      // than the one passed as parameter.
-      return !targeting.getTextureCompressionFormat().getAlternativesList().isEmpty();
+    // If no value is specified for this directory, it means that it is a fallback for other
+    // sibling directories containing alternative TCFs.
+    // Similarly, an empty searched value means that we're looking for fallback directories.
+    boolean isDirectoryValueFallback =
+        targeting.getTextureCompressionFormat().getValueList().isEmpty();
+    boolean isSearchedValueFallback = searchedValue.isEmpty();
+    if (isSearchedValueFallback || isDirectoryValueFallback) {
+      return isSearchedValueFallback != isDirectoryValueFallback;
     }
 
-    // A value was specified, read it and check if it's the same as the one passed as parameter.
+    // If a searched value is specified, and the directory has a value for this dimension too,
+    // read it and check if it's the same as the searched one.
     String targetingValue =
         TextureCompressionUtils.TARGETING_TO_TEXTURE.getOrDefault(
             Iterables.getOnlyElement(targeting.getTextureCompressionFormat().getValueList())
                 .getAlias(),
             null);
 
-    return !value.equals(targetingValue);
+    return !searchedValue.equals(targetingValue);
   }
 }

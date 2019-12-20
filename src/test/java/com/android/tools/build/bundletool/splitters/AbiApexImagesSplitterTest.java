@@ -125,14 +125,14 @@ public class AbiApexImagesSplitterTest {
     assertThat(splits).hasSize(6);
     assertThat(splits.stream().map(ModuleSplit::getVariantTargeting).collect(toImmutableSet()))
         .containsExactly(lPlusVariantTargeting());
-    ImmutableSet<AbiAlias> x64X86Set = ImmutableSet.of(X86_64, X86);
-    ImmutableSet<AbiAlias> x64ArmSet = ImmutableSet.of(X86_64, ARMEABI_V7A);
+    ImmutableSet<AbiAlias> x64X86Set = ImmutableSet.of(X86, X86_64);
+    ImmutableSet<AbiAlias> x64ArmSet = ImmutableSet.of(ARMEABI_V7A, X86_64);
     ImmutableSet<AbiAlias> x64Set = ImmutableSet.of(X86_64);
-    ImmutableSet<AbiAlias> x86ArmSet = ImmutableSet.of(X86, ARMEABI_V7A);
+    ImmutableSet<AbiAlias> x86ArmSet = ImmutableSet.of(ARMEABI_V7A, X86);
     ImmutableSet<AbiAlias> x86Set = ImmutableSet.of(X86);
     ImmutableSet<AbiAlias> armSet = ImmutableSet.of(ARMEABI_V7A);
     ImmutableSet<ImmutableSet<AbiAlias>> allTargeting =
-        ImmutableSet.of(x64X86Set, x64ArmSet, x64Set, x86ArmSet, x86Set, armSet);
+        ImmutableSet.of(armSet, x86ArmSet, x64ArmSet, x86Set, x64X86Set, x64Set);
     ApkTargeting x64X86Targeting = apkMultiAbiTargetingFromAllTargeting(x64X86Set, allTargeting);
     ApkTargeting x64ArmTargeting = apkMultiAbiTargetingFromAllTargeting(x64ArmSet, allTargeting);
     ApkTargeting a64Targeting = apkMultiAbiTargetingFromAllTargeting(x64Set, allTargeting);

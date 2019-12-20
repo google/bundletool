@@ -27,17 +27,7 @@ import com.google.common.collect.Comparators;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.errorprone.annotations.Immutable;
-import java.io.File;
-import java.io.IOException;
-import java.net.URI;
-import java.nio.file.FileSystem;
-import java.nio.file.LinkOption;
-import java.nio.file.Path;
-import java.nio.file.WatchEvent;
-import java.nio.file.WatchKey;
-import java.nio.file.WatchService;
 import java.util.Comparator;
-import java.util.Iterator;
 import javax.annotation.CheckReturnValue;
 import javax.annotation.Nullable;
 
@@ -49,7 +39,7 @@ import javax.annotation.Nullable;
 @Immutable
 @AutoValue
 @AutoValue.CopyAnnotations
-public abstract class ZipPath implements Path {
+public abstract class ZipPath implements Comparable<ZipPath> {
 
   private static final String SEPARATOR = "/";
   private static final Splitter SPLITTER = Splitter.on(SEPARATOR).omitEmptyStrings();
@@ -66,7 +56,7 @@ public abstract class ZipPath implements Path {
    *
    * <p>Note that this list can be empty when denoting the root of the zip.
    */
-  abstract ImmutableList<String> getNames();
+  public abstract ImmutableList<String> getNames();
 
   public static ZipPath create(String path) {
     checkNotNull(path, "Path cannot be null.");
@@ -86,36 +76,29 @@ public abstract class ZipPath implements Path {
     return new AutoValue_ZipPath(names);
   }
 
-  @Override
   @CheckReturnValue
-  public ZipPath resolve(Path p) {
+  public ZipPath resolve(ZipPath p) {
     checkNotNull(p, "Path cannot be null.");
-    ZipPath path = (ZipPath) p;
-    return create(
-        ImmutableList.<String>builder().addAll(getNames()).addAll(path.getNames()).build());
+    return create(ImmutableList.<String>builder().addAll(getNames()).addAll(p.getNames()).build());
   }
 
-  @Override
   @CheckReturnValue
   public ZipPath resolve(String path) {
     return resolve(ZipPath.create(path));
   }
 
-  @Override
   @CheckReturnValue
-  public ZipPath resolveSibling(Path path) {
+  public ZipPath resolveSibling(ZipPath path) {
     checkNotNull(path, "Path cannot be null.");
     checkState(!getNames().isEmpty(), "Root has not sibling.");
     return getParent().resolve(path);
   }
 
-  @Override
   @CheckReturnValue
   public ZipPath resolveSibling(String path) {
     return resolveSibling(ZipPath.create(path));
   }
 
-  @Override
   @CheckReturnValue
   public ZipPath subpath(int from, int to) {
     checkArgument(from >= 0 && from < getNames().size());
@@ -124,7 +107,6 @@ public abstract class ZipPath implements Path {
     return create(getNames().subList(from, to));
   }
 
-  @Override
   @Nullable
   @CheckReturnValue
   @Memoized
@@ -135,32 +117,27 @@ public abstract class ZipPath implements Path {
     return create(getNames().subList(0, getNames().size() - 1));
   }
 
-  @Override
   public int getNameCount() {
     return getNames().size();
   }
 
-  @Override
   public ZipPath getRoot() {
     return ROOT;
   }
 
-  @Override
   public ZipPath getName(int index) {
     checkArgument(index >= 0 && index < getNames().size());
     return ZipPath.create(getNames().get(index));
   }
 
-  @Override
-  public boolean startsWith(Path p) {
-    ZipPath path = (ZipPath) p;
-    if (path.getNameCount() > getNameCount()) {
+  public boolean startsWith(ZipPath p) {
+    if (p.getNameCount() > getNameCount()) {
       return false;
     }
 
     ImmutableList<String> names = getNames();
-    ImmutableList<String> otherNames = path.getNames();
-    for (int i = 0; i < path.getNameCount(); i++) {
+    ImmutableList<String> otherNames = p.getNames();
+    for (int i = 0; i < p.getNameCount(); i++) {
       if (!otherNames.get(i).equals(names.get(i))) {
         return false;
       }
@@ -169,21 +146,18 @@ public abstract class ZipPath implements Path {
     return true;
   }
 
-  @Override
   public boolean startsWith(String p) {
     return startsWith(ZipPath.create(p));
   }
 
-  @Override
-  public boolean endsWith(Path p) {
-    ZipPath path = (ZipPath) p;
-    if (path.getNameCount() > getNameCount()) {
+  public boolean endsWith(ZipPath p) {
+    if (p.getNameCount() > getNameCount()) {
       return false;
     }
 
     ImmutableList<String> names = getNames();
-    ImmutableList<String> otherNames = path.getNames();
-    for (int i = 0; i < path.getNameCount(); i++) {
+    ImmutableList<String> otherNames = p.getNames();
+    for (int i = 0; i < p.getNameCount(); i++) {
       if (!otherNames.get(otherNames.size() - i - 1).equals(names.get(names.size() - i - 1))) {
         return false;
       }
@@ -192,15 +166,14 @@ public abstract class ZipPath implements Path {
     return true;
   }
 
-  @Override
   public boolean endsWith(String p) {
     return endsWith(ZipPath.create(p));
   }
 
   @Override
-  public final int compareTo(Path other) {
+  public final int compareTo(ZipPath other) {
     return Comparators.lexicographical(Comparator.<String>naturalOrder())
-        .compare(getNames(), ((ZipPath) other).getNames());
+        .compare(getNames(), other.getNames());
   }
 
   /** Returns the path as used in the zip file. */
@@ -210,69 +183,8 @@ public abstract class ZipPath implements Path {
   }
 
   @Memoized
-  @Override
   public ZipPath getFileName() {
     checkArgument(getNameCount() > 0, "Root does not have a file name.");
     return getName(getNameCount() - 1);
-  }
-
-  @Override
-  public Iterator<Path> iterator() {
-    return getNames().stream().map(name -> (Path) ZipPath.create(name)).iterator();
-  }
-
-  @Override
-  @CheckReturnValue
-  public ZipPath normalize() {
-    // We don't support ".." or ".", so the current path is already normalized.
-    return this;
-  }
-
-  @Override
-  public ZipPath toRealPath(LinkOption... options) {
-    return this;
-  }
-
-  @Override
-  public ZipPath toAbsolutePath() {
-    return this;
-  }
-
-  @Override
-  public boolean isAbsolute() {
-    return true;
-  }
-
-  @Override
-  @CheckReturnValue
-  public ZipPath relativize(Path p) {
-    throw new UnsupportedOperationException();
-  }
-
-  @Override
-  public WatchKey register(WatchService watcher, WatchEvent.Kind<?>... events) throws IOException {
-    throw new UnsupportedOperationException();
-  }
-
-  @Override
-  public WatchKey register(
-      WatchService watcher, WatchEvent.Kind<?>[] events, WatchEvent.Modifier... modifiers)
-      throws IOException {
-    throw new UnsupportedOperationException();
-  }
-
-  @Override
-  public File toFile() {
-    throw new UnsupportedOperationException("Zip entries don't match to a file on disk.");
-  }
-
-  @Override
-  public URI toUri() {
-    throw new UnsupportedOperationException();
-  }
-
-  @Override
-  public FileSystem getFileSystem() {
-    throw new UnsupportedOperationException();
   }
 }

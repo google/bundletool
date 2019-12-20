@@ -85,8 +85,8 @@ public class ThrowableUtilsTest {
 
   @Test
   public void anyCauseOrSuppressedMatches_handlesCausalLoop() {
-    MutableThrowable throwable1 = new MutableThrowable();
-    MutableThrowable throwable2 = new MutableThrowable();
+    MutableException throwable1 = new MutableException();
+    MutableException throwable2 = new MutableException();
     throwable1.cause = throwable2;
     throwable2.cause = throwable1;
 
@@ -100,7 +100,7 @@ public class ThrowableUtilsTest {
     assertThat(exception).hasMessageThat().contains("causal chain detected");
   }
 
-  static class MutableThrowable extends Throwable {
+  static class MutableException extends Exception {
     Throwable cause;
 
     @Override

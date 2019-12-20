@@ -24,6 +24,7 @@ import static com.android.tools.build.bundletool.model.OptimizationDimension.TEX
 import static com.android.tools.build.bundletool.testing.Aapt2Helper.AAPT2_PATH;
 import static com.android.tools.build.bundletool.testing.FakeSystemEnvironmentProvider.ANDROID_HOME;
 import static com.android.tools.build.bundletool.testing.FakeSystemEnvironmentProvider.ANDROID_SERIAL;
+import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifest;
 import static com.android.tools.build.bundletool.testing.TestUtils.expectMissingRequiredBuilderPropertyException;
 import static com.android.tools.build.bundletool.testing.TestUtils.expectMissingRequiredFlagException;
 import static com.google.common.base.StandardSystemProperty.USER_HOME;
@@ -32,16 +33,21 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.mock;
 
+import com.android.bundle.Commands.BuildApksResult;
 import com.android.tools.build.bundletool.device.AdbServer;
 import com.android.tools.build.bundletool.flags.FlagParser;
 import com.android.tools.build.bundletool.flags.FlagParser.FlagParseException;
+import com.android.tools.build.bundletool.io.AppBundleSerializer;
 import com.android.tools.build.bundletool.model.Aapt2Command;
+import com.android.tools.build.bundletool.model.AppBundle;
 import com.android.tools.build.bundletool.model.SigningConfiguration;
 import com.android.tools.build.bundletool.model.exceptions.CommandExecutionException;
 import com.android.tools.build.bundletool.model.exceptions.ValidationException;
+import com.android.tools.build.bundletool.model.utils.ResultUtils;
 import com.android.tools.build.bundletool.model.utils.SystemEnvironmentProvider;
 import com.android.tools.build.bundletool.model.utils.files.FileUtils;
 import com.android.tools.build.bundletool.testing.Aapt2Helper;
+import com.android.tools.build.bundletool.testing.AppBundleBuilder;
 import com.android.tools.build.bundletool.testing.CertificateFactory;
 import com.android.tools.build.bundletool.testing.FakeSystemEnvironmentProvider;
 import com.google.common.collect.ImmutableList;
@@ -49,6 +55,7 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import java.io.ByteArrayOutputStream;
 import java.io.FileOutputStream;
+import java.io.IOException;
 import java.io.PrintStream;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -615,6 +622,27 @@ public class BuildApksCommandTest {
 
     assertThat(new String(output.toByteArray(), UTF_8))
         .doesNotContain("WARNING: The APKs won't be signed");
+  }
+
+  @Test
+  public void packageNameIsPropagatedToBuildResult() throws IOException {
+    Path testBundlePath = tmpDir.resolve("bundle");
+    Path testOutputFile = tmpDir.resolve("app.apks");
+    AppBundle appBundle =
+        new AppBundleBuilder()
+            .addModule("base", module -> module.setManifest(androidManifest("com.app")))
+            .build();
+    new AppBundleSerializer().writeToDisk(appBundle, testBundlePath);
+
+    BuildApksCommand command =
+        BuildApksCommand.builder()
+            .setBundlePath(testBundlePath)
+            .setOutputFile(testOutputFile)
+            .build();
+
+    Path apksArchive = command.execute();
+    BuildApksResult result = ResultUtils.readTableOfContents(apksArchive);
+    assertThat(result.getPackageName()).isEqualTo("com.app");
   }
 
   private static void createDebugKeystore(Path path) throws Exception {

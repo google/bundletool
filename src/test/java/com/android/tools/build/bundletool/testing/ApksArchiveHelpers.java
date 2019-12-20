@@ -186,7 +186,7 @@ public final class ApksArchiveHelpers {
   }
 
   public static ApkDescription createApkDescription(
-      ApkTargeting apkTargeting, Path apkPath, boolean isMasterSplit) {
+      ApkTargeting apkTargeting, ZipPath apkPath, boolean isMasterSplit) {
     return ApkDescription.newBuilder()
         .setPath(apkPath.toString())
         .setTargeting(apkTargeting)
@@ -216,7 +216,7 @@ public final class ApksArchiveHelpers {
 
   /** Creates an instant apk set with the given module name, ApkTargeting, and path for the apk. */
   public static ApkSet createInstantApkSet(
-      String moduleName, ApkTargeting apkTargeting, Path apkPath) {
+      String moduleName, ApkTargeting apkTargeting, ZipPath apkPath) {
     return ApkSet.newBuilder()
         .setModuleMetadata(
             ModuleMetadata.newBuilder()
@@ -231,7 +231,7 @@ public final class ApksArchiveHelpers {
         .build();
   }
 
-  public static ApkSet createStandaloneApkSet(ApkTargeting apkTargeting, Path apkPath) {
+  public static ApkSet createStandaloneApkSet(ApkTargeting apkTargeting, ZipPath apkPath) {
     // Note: Standalone APK is represented as a module named "base".
     return ApkSet.newBuilder()
         .setModuleMetadata(
@@ -245,7 +245,7 @@ public final class ApksArchiveHelpers {
         .build();
   }
 
-  public static ApkSet createSystemApkSet(ApkTargeting apkTargeting, Path apkPath) {
+  public static ApkSet createSystemApkSet(ApkTargeting apkTargeting, ZipPath apkPath) {
     // Note: System APK is represented as a module named "base".
     return ApkSet.newBuilder()
         .setModuleMetadata(
