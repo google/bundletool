@@ -234,6 +234,24 @@ public class BuildBundleCommandTest {
   }
 
   @Test
+  public void buildingViaFlagsAndBuilderHasSameResult_optionalOverwrite() throws Exception {
+    Path baseModulePath = buildSimpleModule("base");
+    BuildBundleCommand commandViaBuilder =
+        BuildBundleCommand.builder()
+            .setOutputPath(bundlePath)
+            .setModulesPaths(ImmutableList.of(baseModulePath))
+            .setOverwriteOutput(true)
+            .build();
+
+    BuildBundleCommand commandViaFlags =
+        BuildBundleCommand.fromFlags(
+            new FlagParser()
+                .parse("--output=" + bundlePath, "--modules=" + baseModulePath, "--overwrite"));
+
+    assertThat(commandViaBuilder).isEqualTo(commandViaFlags);
+  }
+
+  @Test
   public void validModule() throws Exception {
     XmlNode manifest = androidManifest(PKG_NAME, withHasCode(true));
     ResourceTable resourceTable =

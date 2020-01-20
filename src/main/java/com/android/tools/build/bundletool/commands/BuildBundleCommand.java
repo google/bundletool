@@ -65,6 +65,7 @@ public abstract class BuildBundleCommand {
   public static final String COMMAND_NAME = "build-bundle";
 
   private static final Flag<Path> OUTPUT_FLAG = Flag.path("output");
+  private static final Flag<Boolean> OVERWRITE_OUTPUT_FLAG = Flag.booleanFlag("overwrite");
   private static final Flag<Path> BUNDLE_CONFIG_FLAG = Flag.path("config");
   private static final Flag<ImmutableList<Path>> MODULES_FLAG = Flag.pathList("modules");
   private static final Flag<ImmutableMap<ZipPath, Path>> METADATA_FILES_FLAG =
@@ -72,6 +73,8 @@ public abstract class BuildBundleCommand {
   private static final Flag<Boolean> UNCOMPRESSED_FLAG = Flag.booleanFlag("uncompressed");
 
   public abstract Path getOutputPath();
+
+  public abstract boolean getOverwriteOutput();
 
   public abstract ImmutableList<Path> getModulesPaths();
 
@@ -84,14 +87,18 @@ public abstract class BuildBundleCommand {
   abstract boolean getUncompressedBundle();
 
   public static Builder builder() {
-    // By default, everything is compressed.
-    return new AutoValue_BuildBundleCommand.Builder().setUncompressedBundle(false);
+    // By default, everything is compressed, and we don't overwrite existing files.
+    return new AutoValue_BuildBundleCommand.Builder()
+        .setUncompressedBundle(false)
+        .setOverwriteOutput(false);
   }
 
   /** Builder for the {@link BuildBundleCommand}. */
   @AutoValue.Builder
   public abstract static class Builder {
     public abstract Builder setOutputPath(Path outputPath);
+
+    public abstract Builder setOverwriteOutput(boolean overwriteOutput);
 
     public abstract Builder setModulesPaths(ImmutableList<Path> modulesPaths);
 
@@ -170,6 +177,9 @@ public abstract class BuildBundleCommand {
             .setModulesPaths(MODULES_FLAG.getRequiredValue(flags));
 
     // Optional flags.
+    OVERWRITE_OUTPUT_FLAG
+        .getValue(flags)
+        .ifPresent(builder::setOverwriteOutput);
     BUNDLE_CONFIG_FLAG
         .getValue(flags)
         .ifPresent(path -> builder.setBundleConfig(parseBundleConfigJson(path)));
@@ -243,6 +253,10 @@ public abstract class BuildBundleCommand {
           AppBundle.buildFromModules(
               modulesWithTargeting.build(), bundleConfig, getBundleMetadata());
 
+      if (getOverwriteOutput()) {
+        Files.deleteIfExists(getOutputPath());
+      }
+
       new AppBundleSerializer(getUncompressedBundle()).writeToDisk(appBundle, getOutputPath());
     } catch (IOException e) {
       throw new UncheckedIOException(e);
@@ -256,7 +270,9 @@ public abstract class BuildBundleCommand {
               checkFileHasExtension("File", path, ".zip");
               checkFileExistsAndReadable(path);
             });
-    checkFileDoesNotExist(getOutputPath());
+    if (!getOverwriteOutput()) {
+      checkFileDoesNotExist(getOutputPath());
+    }
   }
 
   private static Optional<Assets> generateAssetsTargeting(BundleModule module) {
@@ -348,6 +364,12 @@ public abstract class BuildBundleCommand {
                 .setFlagName(OUTPUT_FLAG.getName())
                 .setExampleValue("bundle.aab")
                 .setDescription("Path to the where the Android App Bundle should be built.")
+                .build())
+        .addFlag(
+            FlagDescription.builder()
+                .setFlagName(OVERWRITE_OUTPUT_FLAG.getName())
+                .setOptional(true)
+                .setDescription("If set, any previous existing output will be overwritten.")
                 .build())
         .addFlag(
             FlagDescription.builder()
