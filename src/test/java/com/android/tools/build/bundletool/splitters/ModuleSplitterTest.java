@@ -1445,7 +1445,68 @@ public class ModuleSplitterTest {
             BUNDLETOOL_VERSION,
             ApkGenerationConfiguration.builder()
                 .setOptimizationDimensions(ImmutableSet.of(LANGUAGE))
-                .setMasterPinnedResources(ImmutableSet.of(ResourceId.create(0x7f010001)))
+                .setMasterPinnedResourceIds(ImmutableSet.of(ResourceId.create(0x7f010001)))
+                .build(),
+            lPlusVariantTargeting(),
+            ImmutableSet.of("base"));
+
+    ImmutableList<ModuleSplit> splits = moduleSplitter.splitModule();
+
+    Map<String, ModuleSplit> splitsBySuffix = Maps.uniqueIndex(splits, ModuleSplit::getSuffix);
+    assertThat(splitsBySuffix.keySet()).containsExactly("", "de", "ru");
+
+    assertThat(splitsBySuffix.get("").getResourceTable().get())
+        .containsResource("com.test.app:string/welcome_label")
+        .onlyWithConfigs(Configuration.getDefaultInstance(), locale("de"), locale("ru"));
+    assertThat(splitsBySuffix.get("de").getResourceTable().get())
+        .doesNotContainResource("com.test.app:string/welcome_label");
+    assertThat(splitsBySuffix.get("ru").getResourceTable().get())
+        .doesNotContainResource("com.test.app:string/welcome_label");
+
+    assertThat(splitsBySuffix.get("").getResourceTable().get())
+        .containsResource("com.test.app:string/goodbye_label")
+        .onlyWithConfigs(Configuration.getDefaultInstance());
+    assertThat(splitsBySuffix.get("de").getResourceTable().get())
+        .containsResource("com.test.app:string/goodbye_label")
+        .onlyWithConfigs(locale("de"));
+    assertThat(splitsBySuffix.get("ru").getResourceTable().get())
+        .containsResource("com.test.app:string/goodbye_label")
+        .onlyWithConfigs(locale("ru"));
+  }
+
+  @Test
+  public void wholeResourcePinning_langResourcePinnedByName() throws Exception {
+    BundleModule baseModule =
+        new BundleModuleBuilder("base")
+            .setResourceTable(
+                resourceTable(
+                    pkg(
+                        USER_PACKAGE_OFFSET,
+                        "com.test.app",
+                        type(
+                            0x01,
+                            "string",
+                            entry(
+                                0x0001,
+                                "welcome_label",
+                                value("Welcome", Configuration.getDefaultInstance()),
+                                value("Willkommen", locale("de")),
+                                value("Здравствуйте", locale("ru"))),
+                            entry(
+                                0x0002,
+                                "goodbye_label",
+                                value("Goodbye", Configuration.getDefaultInstance()),
+                                value("Auf Wiedersehen", locale("de")),
+                                value("До свидания", locale("ru")))))))
+            .setManifest(androidManifest("com.test.app"))
+            .build();
+    ModuleSplitter moduleSplitter =
+        new ModuleSplitter(
+            baseModule,
+            BUNDLETOOL_VERSION,
+            ApkGenerationConfiguration.builder()
+                .setOptimizationDimensions(ImmutableSet.of(LANGUAGE))
+                .setMasterPinnedResourceNames(ImmutableSet.of("welcome_label"))
                 .build(),
             lPlusVariantTargeting(),
             ImmutableSet.of("base"));

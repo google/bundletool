@@ -20,6 +20,9 @@ message BuildApksResult {
 
   // List of the created asset slices.
   repeated AssetSliceSet asset_slice_set = 3;
+
+  // Information about local testing mode.
+  LocalTestingInfo local_testing_info = 5;
 }
 
 // Variant is a group of APKs that covers a part of the device configuration
@@ -171,3 +174,13 @@ message SystemApkMetadata {
 
 // Holds data specific to APEX APKs.
 message ApexApkMetadata {}
+
+message LocalTestingInfo {
+  // Indicates if the bundle is built in local testing mode.
+  bool enabled = 1;
+  // The local testing path, as specified in the base manifest.
+  // This refers to the relative path on the external directory of the app where
+  // APKs will be pushed for local testing.
+  // Set only if local testing is enabled.
+  string local_testing_path = 2;
+}

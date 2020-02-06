@@ -35,6 +35,7 @@ import com.google.common.base.Splitter;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.Locale;
@@ -228,11 +229,17 @@ public class FakeDevice extends Device {
 
   @Override
   public void installApks(ImmutableList<Path> apks, InstallOptions installOptions) {
+    for (Path apk : apks) {
+      checkState(Files.exists(apk));
+    }
     installApksSideEffect.ifPresent(val -> val.apply(apks, installOptions));
   }
 
   @Override
   public void pushApks(ImmutableList<Path> apks, PushOptions pushOptions) {
+    for (Path apk : apks) {
+      checkState(Files.exists(apk));
+    }
     pushApksSideEffect.ifPresent(val -> val.apply(apks, pushOptions));
   }
 

@@ -206,8 +206,10 @@ public class ModuleSplitter {
   private SplittingPipeline createResourcesSplittingPipeline() {
     ImmutableList.Builder<ModuleSplitSplitter> resourceSplitters = ImmutableList.builder();
 
-    ImmutableSet<ResourceId> masterPinnedResources =
-        apkGenerationConfiguration.getMasterPinnedResources();
+    ImmutableSet<ResourceId> masterPinnedResourceIds =
+        apkGenerationConfiguration.getMasterPinnedResourceIds();
+    ImmutableSet<String> masterPinnedResourceNames =
+        apkGenerationConfiguration.getMasterPinnedResourceNames();
     ImmutableSet<ResourceId> baseManifestReachableResources =
         apkGenerationConfiguration.getBaseManifestReachableResources();
 
@@ -217,7 +219,7 @@ public class ModuleSplitter {
       resourceSplitters.add(
           new ScreenDensityResourcesSplitter(
               bundleVersion,
-              /* pinWholeResourceToMaster= */ masterPinnedResources::contains,
+              /* pinWholeResourceToMaster= */ masterPinnedResourceIds::contains,
               /* pinLowestBucketOfResourceToMaster= */ baseManifestReachableResources::contains));
     }
 
@@ -227,7 +229,8 @@ public class ModuleSplitter {
       Predicate<ResourceTableEntry> pinLangResourceToMaster =
           Predicates.or(
               // Resources that are unconditionally in the master split.
-              entry -> masterPinnedResources.contains(entry.getResourceId()),
+              entry -> masterPinnedResourceIds.contains(entry.getResourceId()),
+              entry -> masterPinnedResourceNames.contains(entry.getEntry().getName()),
               // Resources reachable from the AndroidManifest.xml should have at least one config
               // in the master split (ie. either the default config, or all configs).
               entry ->

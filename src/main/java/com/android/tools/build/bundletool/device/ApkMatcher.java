@@ -281,8 +281,7 @@ public class ApkMatcher {
   private ImmutableList<ZipPath> getMatchingApksFromAssetModules(BuildApksResult buildApksResult) {
     ImmutableList.Builder<ZipPath> matchedApksBuilder = ImmutableList.builder();
 
-    Predicate<String> assetModuleNameMatcher =
-        getInstallTimeAssetModuleNameMatcher(buildApksResult);
+    Predicate<String> assetModuleNameMatcher = getAssetModuleNameMatcher(buildApksResult);
 
     for (AssetSliceSet sliceSet : buildApksResult.getAssetSliceSetList()) {
       String moduleName = sliceSet.getAssetModuleMetadata().getName();
@@ -297,7 +296,11 @@ public class ApkMatcher {
     return matchedApksBuilder.build();
   }
 
-  private Predicate<String> getInstallTimeAssetModuleNameMatcher(BuildApksResult buildApksResult) {
+  private Predicate<String> getAssetModuleNameMatcher(BuildApksResult buildApksResult) {
+    if (requestedModuleNames.isPresent()) {
+      return requestedModuleNames.get()::contains;
+    }
+
     ImmutableSet<String> upfrontAssetModuleNames =
         buildApksResult.getAssetSliceSetList().stream()
             .filter(
@@ -309,8 +312,6 @@ public class ApkMatcher {
             .map(sliceSet -> sliceSet.getAssetModuleMetadata().getName())
             .collect(toImmutableSet());
 
-    return requestedModuleNames.isPresent()
-        ? Sets.intersection(upfrontAssetModuleNames, requestedModuleNames.get())::contains
-        : upfrontAssetModuleNames::contains;
+    return upfrontAssetModuleNames::contains;
   }
 }

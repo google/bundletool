@@ -26,7 +26,6 @@ import static com.google.common.collect.ImmutableSet.toImmutableSet;
 import com.android.bundle.Commands.AssetModuleMetadata;
 import com.android.bundle.Commands.AssetSliceSet;
 import com.android.bundle.Commands.BuildApksResult;
-import com.android.bundle.Commands.DeliveryType;
 import com.android.bundle.Devices.DeviceSpec;
 import com.android.tools.build.bundletool.commands.CommandHelp.CommandDescription;
 import com.android.tools.build.bundletool.commands.CommandHelp.FlagDescription;
@@ -169,26 +168,7 @@ public abstract class ExtractApksCommand {
 
     BuildApksResult toc = ResultUtils.readTableOfContents(getApksArchivePath());
     Optional<ImmutableSet<String>> requestedModuleNames =
-        getModules()
-            .map(
-                modules ->
-                    modules.contains(ALL_MODULES_SHORTCUT)
-                        ? Stream.concat(
-                                toc.getVariantList().stream()
-                                    .flatMap(variant -> variant.getApkSetList().stream())
-                                    .map(apkSet -> apkSet.getModuleMetadata().getName()),
-                                toc.getAssetSliceSetList().stream()
-                                    .filter(
-                                        sliceSet ->
-                                            sliceSet
-                                                .getAssetModuleMetadata()
-                                                .getDeliveryType()
-                                                .equals(DeliveryType.INSTALL_TIME))
-                                    .map(AssetSliceSet::getAssetModuleMetadata)
-                                    .map(AssetModuleMetadata::getName))
-                            .collect(toImmutableSet())
-                        : modules);
-    validateAssetModules(toc, requestedModuleNames);
+        getModules().map(modules -> resolveRequestedModules(modules, toc));
 
     ApkMatcher apkMatcher = new ApkMatcher(getDeviceSpec(), requestedModuleNames, getInstant());
     ImmutableList<ZipPath> matchedApks = apkMatcher.getMatchingApks(toc);
@@ -207,6 +187,20 @@ public abstract class ExtractApksCommand {
     }
   }
 
+  static ImmutableSet<String> resolveRequestedModules(
+      ImmutableSet<String> requestedModules, BuildApksResult toc) {
+    return requestedModules.contains(ALL_MODULES_SHORTCUT)
+        ? Stream.concat(
+                toc.getVariantList().stream()
+                    .flatMap(variant -> variant.getApkSetList().stream())
+                    .map(apkSet -> apkSet.getModuleMetadata().getName()),
+                toc.getAssetSliceSetList().stream()
+                    .map(AssetSliceSet::getAssetModuleMetadata)
+                    .map(AssetModuleMetadata::getName))
+            .collect(toImmutableSet())
+        : requestedModules;
+  }
+
   private void validateInput() {
     if (getModules().isPresent() && getModules().get().isEmpty()) {
       throw new ValidationException("The set of modules cannot be empty.");
@@ -220,33 +214,6 @@ public abstract class ExtractApksCommand {
       checkFileExistsAndReadable(getApksArchivePath().resolve(FileNames.TABLE_OF_CONTENTS_FILE));
     } else {
       checkFileExistsAndReadable(getApksArchivePath());
-    }
-  }
-
-  /** Check that none of the requested modules is an asset module that is not install-time. */
-  private static void validateAssetModules(
-      BuildApksResult toc, Optional<ImmutableSet<String>> requestedModuleNames) {
-    if (requestedModuleNames.isPresent()) {
-      ImmutableList<String> requestedNonInstallTimeAssetModules =
-          toc.getAssetSliceSetList().stream()
-              .filter(
-                  sliceSet ->
-                      !sliceSet
-                          .getAssetModuleMetadata()
-                          .getDeliveryType()
-                          .equals(DeliveryType.INSTALL_TIME))
-              .map(AssetSliceSet::getAssetModuleMetadata)
-              .map(AssetModuleMetadata::getName)
-              .filter(requestedModuleNames.get()::contains)
-              .collect(toImmutableList());
-      if (!requestedNonInstallTimeAssetModules.isEmpty()) {
-        throw ValidationException.builder()
-            .withMessage(
-                String.format(
-                    "The following requested asset packs do not have install time delivery: %s.",
-                    requestedNonInstallTimeAssetModules))
-            .build();
-      }
     }
   }
 

@@ -102,7 +102,7 @@ public abstract class Device {
     }
   }
 
-  /** Options related to APK installation. */
+  /** Options related to pushing files to the device. */
   @Immutable
   @AutoValue
   @AutoValue.CopyAnnotations
@@ -118,10 +118,10 @@ public abstract class Device {
     public static Builder builder() {
       return new AutoValue_Device_PushOptions.Builder()
           .setTimeout(DEFAULT_ADB_TIMEOUT)
-          .setClearDestinationPath(false);
+          .setClearDestinationPath(true);
     }
 
-    /** Builder for {@link InstallOptions}. */
+    /** Builder for {@link PushOptions}. */
     @AutoValue.Builder
     public abstract static class Builder {
       public abstract Builder setDestinationPath(String destinationPath);

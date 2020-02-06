@@ -34,6 +34,7 @@ import com.android.bundle.Commands.AssetSliceSet;
 import com.android.bundle.Commands.BuildApksResult;
 import com.android.bundle.Commands.DeliveryType;
 import com.android.bundle.Commands.InstantMetadata;
+import com.android.bundle.Commands.LocalTestingInfo;
 import com.android.bundle.Commands.Variant;
 import com.android.bundle.Config.Bundletool;
 import com.android.bundle.Devices.DeviceSpec;
@@ -96,7 +97,8 @@ public class ApkSerializerManager {
       GeneratedApks generatedApks,
       GeneratedAssetSlices generatedAssetSlices,
       ApkBuildMode apkBuildMode,
-      Optional<DeviceSpec> deviceSpec) {
+      Optional<DeviceSpec> deviceSpec,
+      LocalTestingInfo localTestingInfo) {
     ImmutableList<Variant> allVariantsWithTargeting =
         serializeApks(generatedApks, apkBuildMode, deviceSpec);
     ImmutableList<AssetSliceSet> allAssetSliceSets =
@@ -111,6 +113,7 @@ public class ApkSerializerManager {
                 Bundletool.newBuilder()
                     .setVersion(BundleToolVersion.getCurrentVersion().toString()))
             .addAllAssetSliceSet(allAssetSliceSets)
+            .setLocalTestingInfo(localTestingInfo)
             .build());
   }
 

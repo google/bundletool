@@ -1503,9 +1503,12 @@ public class ApkMatcherTest {
         .containsExactly(baseApk, installTimeMasterApk1, installTimeMasterApk2);
 
     assertThat(
-            new ApkMatcher(enDevice, Optional.of(ImmutableSet.of(installTimeModule1)), false)
+            new ApkMatcher(
+                    enDevice,
+                    Optional.of(ImmutableSet.of(installTimeModule1, onDemandModule)),
+                    false)
                 .getMatchingApks(buildApksResult))
-        .containsExactly(baseApk, installTimeMasterApk1, installTimeEnApk1);
+        .containsExactly(baseApk, installTimeMasterApk1, installTimeEnApk1, onDemandMasterApk);
   }
 
   private static BuildApksResult buildApksResult(Variant... variants) {

@@ -18,7 +18,9 @@ package com.android.tools.build.bundletool.model.targeting;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.collect.ImmutableList.toImmutableList;
+import static com.google.common.collect.MoreCollectors.toOptional;
 
+import com.android.bundle.Targeting.AssetsDirectoryTargeting;
 import com.android.tools.build.bundletool.model.ZipPath;
 import com.android.tools.build.bundletool.model.exceptions.ValidationException;
 import com.google.auto.value.AutoValue;
@@ -26,6 +28,7 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
 import com.google.errorprone.annotations.Immutable;
 import java.util.HashSet;
+import java.util.Optional;
 import java.util.Set;
 
 /**
@@ -68,6 +71,21 @@ public abstract class TargetedDirectory {
         .subpath(0, maxIndex + 1)
         .resolveSibling(getPathSegments().get(maxIndex).getName())
         .toString();
+  }
+
+  /**
+   * Returns the value of the targeting for the given dimension, if this dimension is targeted by
+   * this directory.
+   *
+   * @param dimension The dimension for which the targeting must be extracted.
+   * @return The targeting for the specified dimension, or an empty optional if not found.
+   */
+  public Optional<AssetsDirectoryTargeting> getTargeting(TargetingDimension dimension) {
+    // We're assuming that dimensions are not duplicated (see checkNoDuplicateDimensions).
+    return getPathSegments().stream()
+        .filter(segment -> segment.getTargetingDimension().equals(Optional.of(dimension)))
+        .map(segment -> segment.getTargeting())
+        .collect(toOptional());
   }
 
   /**

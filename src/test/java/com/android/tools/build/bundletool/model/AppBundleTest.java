@@ -429,8 +429,8 @@ public class AppBundleTest {
         .addFileWithContent(ZipPath.create("base/dex/classes.dex"), DUMMY_CONTENT)
         .addFileWithContent(ZipPath.create("base/assets/file.txt"), DUMMY_CONTENT)
         .addFileWithProtoContent(
-            ZipPath.create("remote_assets/manifest/AndroidManifest.xml"), ASSET_MODULE_MANIFEST)
-        .addFileWithContent(ZipPath.create("remote_assets/assets/file.txt"), DUMMY_CONTENT)
+            ZipPath.create("asset_module/manifest/AndroidManifest.xml"), ASSET_MODULE_MANIFEST)
+        .addFileWithContent(ZipPath.create("asset_module/assets/file.txt"), DUMMY_CONTENT)
         .writeTo(bundleFile);
 
     try (ZipFile appBundleZip = new ZipFile(bundleFile.toFile())) {
@@ -438,7 +438,7 @@ public class AppBundleTest {
       assertThat(appBundle.getFeatureModules().keySet())
           .containsExactly(BundleModuleName.create("base"));
       assertThat(appBundle.getAssetModules().keySet())
-          .containsExactly(BundleModuleName.create("remote_assets"));
+          .containsExactly(BundleModuleName.create("asset_module"));
     }
   }
 

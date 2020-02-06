@@ -62,8 +62,6 @@ public abstract class AndroidManifest {
 
   public static final String APPLICATION_ELEMENT_NAME = "application";
   public static final String META_DATA_ELEMENT_NAME = "meta-data";
-  public static final String SUPPORTS_GL_TEXTURE_ELEMENT_NAME = "supports-gl-texture";
-  public static final String USES_FEATURE_ELEMENT_NAME = "uses-feature";
   public static final String USES_SDK_ELEMENT_NAME = "uses-sdk";
   public static final String ACTIVITY_ELEMENT_NAME = "activity";
   public static final String SERVICE_ELEMENT_NAME = "service";
@@ -71,7 +69,6 @@ public abstract class AndroidManifest {
 
   public static final String DEBUGGABLE_ATTRIBUTE_NAME = "debuggable";
   public static final String EXTRACT_NATIVE_LIBS_ATTRIBUTE_NAME = "extractNativeLibs";
-  public static final String GL_VERSION_ATTRIBUTE_NAME = "glEsVersion";
   public static final String ICON_ATTRIBUTE_NAME = "icon";
   public static final String MAX_SDK_VERSION_ATTRIBUTE_NAME = "maxSdkVersion";
   public static final String MIN_SDK_VERSION_ATTRIBUTE_NAME = "minSdkVersion";
@@ -106,7 +103,6 @@ public abstract class AndroidManifest {
   public static final int VERSION_CODE_RESOURCE_ID = 0x0101021b;
   public static final int VERSION_NAME_RESOURCE_ID = 0x0101021c;
   public static final int IS_FEATURE_SPLIT_RESOURCE_ID = 0x0101055b;
-  public static final int GL_ES_VERSION_RESOURCE_ID = 0x01010281;
   public static final int TARGET_SANDBOX_VERSION_RESOURCE_ID = 0x0101054c;
   public static final int SPLIT_NAME_RESOURCE_ID = 0x01010549;
   public static final int INSTALL_LOCATION_RESOURCE_ID = 0x010102b7;

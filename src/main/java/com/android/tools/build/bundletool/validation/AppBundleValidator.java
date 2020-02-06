@@ -44,6 +44,7 @@ public class AppBundleValidator {
           // More specific file validations.
           new EntryClashValidator(),
           new AbiParityValidator(),
+          new TextureCompressionFormatParityValidator(),
           new DexFilesValidator(),
           new ApexBundleValidator(),
           // Targeting validations.

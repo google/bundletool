@@ -21,8 +21,10 @@ import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.ImmutableSet.toImmutableSet;
 
 import com.android.bundle.Commands.ApkDescription;
+import com.android.bundle.Commands.ApkSet;
 import com.android.bundle.Commands.BuildApksResult;
 import com.android.bundle.Commands.Variant;
+import com.android.tools.build.bundletool.model.BundleModuleName;
 import com.android.tools.build.bundletool.model.utils.files.BufferedIo;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
@@ -33,6 +35,7 @@ import java.io.InputStream;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 
@@ -159,6 +162,24 @@ public final class ResultUtils {
         .flatMap(
             apkDescription ->
                 apkDescription.getTargeting().getLanguageTargeting().getValueList().stream())
+        .collect(toImmutableSet());
+  }
+
+  /** Return the paths for all the base master splits in the given {@link BuildApksResult}. */
+  public static ImmutableSet<String> getAllBaseMasterSplitPaths(BuildApksResult toc) {
+    return splitApkVariants(toc).stream()
+        .map(Variant::getApkSetList)
+        .flatMap(List::stream)
+        .filter(
+            apkSet ->
+                apkSet
+                    .getModuleMetadata()
+                    .getName()
+                    .equals(BundleModuleName.BASE_MODULE_NAME.getName()))
+        .map(ApkSet::getApkDescriptionList)
+        .flatMap(List::stream)
+        .filter(apkDescription -> apkDescription.getSplitApkMetadata().getIsMasterSplit())
+        .map(ApkDescription::getPath)
         .collect(toImmutableSet());
   }
 

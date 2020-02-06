@@ -25,6 +25,7 @@ import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.ImmutableSet.toImmutableSet;
 
+import com.android.bundle.Commands.LocalTestingInfo;
 import com.android.bundle.Config.BundleConfig;
 import com.android.bundle.Config.Compression;
 import com.android.bundle.Config.SuffixStripping;
@@ -62,6 +63,8 @@ import com.android.tools.build.bundletool.model.version.Version;
 import com.android.tools.build.bundletool.optimizations.ApkOptimizations;
 import com.android.tools.build.bundletool.optimizations.OptimizationsMerger;
 import com.android.tools.build.bundletool.preprocessors.AppBundle64BitNativeLibrariesPreprocessor;
+import com.android.tools.build.bundletool.preprocessors.EntryCompressionPreprocessor;
+import com.android.tools.build.bundletool.preprocessors.LocalTestingPreprocessor;
 import com.android.tools.build.bundletool.splitters.ApkGenerationConfiguration;
 import com.android.tools.build.bundletool.splitters.AssetSlicesGenerator;
 import com.android.tools.build.bundletool.splitters.ResourceAnalyzer;
@@ -79,6 +82,7 @@ import java.util.Optional;
 import java.util.logging.Logger;
 import java.util.stream.Stream;
 import java.util.zip.ZipFile;
+import javax.annotation.CheckReturnValue;
 
 /** Executes the "build-apks" command. */
 final class BuildApksManager {
@@ -137,9 +141,7 @@ final class BuildApksManager {
     AppBundle appBundle = AppBundle.buildFromZip(bundleZip);
     bundleValidator.validate(appBundle);
 
-    appBundle =
-        new AppBundle64BitNativeLibrariesPreprocessor(command.getOutputPrintStream())
-            .preprocess(appBundle);
+    appBundle = applyPreprocessors(appBundle);
 
     ImmutableSet<BundleModule> requestedModules =
         command.getModules().isEmpty()
@@ -230,8 +232,13 @@ final class BuildApksManager {
             command.getApkListener().orElse(ApkListener.NO_OP),
             command.getApkModifier().orElse(ApkModifier.NO_OP),
             command.getFirstVariantNumber().orElse(0));
+
     apkSerializerManager.populateApkSetBuilder(
-        generatedApks, generatedAssetSlices.build(), command.getApkBuildMode(), deviceSpec);
+        generatedApks,
+        generatedAssetSlices.build(),
+        command.getApkBuildMode(),
+        deviceSpec,
+        getLocalTestingInfo(appBundle));
 
     if (command.getOverwriteOutput()) {
       Files.deleteIfExists(command.getOutputFile());
@@ -382,7 +389,10 @@ final class BuildApksManager {
                     installLocation.equals("auto") || installLocation.equals("preferExternal"))
             .orElse(false));
 
-    apkGenerationConfiguration.setMasterPinnedResources(appBundle.getMasterPinnedResources());
+    apkGenerationConfiguration.setMasterPinnedResourceIds(appBundle.getMasterPinnedResourceIds());
+
+    apkGenerationConfiguration.setMasterPinnedResourceNames(
+        appBundle.getMasterPinnedResourceNames());
 
     apkGenerationConfiguration.setSuffixStrippings(getSuffixStrippings(bundleConfig));
 
@@ -469,6 +479,30 @@ final class BuildApksManager {
         .getOptimizations()
         .getStandaloneConfig()
         .getStrip64BitLibraries();
+  }
+
+  @CheckReturnValue
+  private AppBundle applyPreprocessors(AppBundle bundle) {
+    bundle =
+        new AppBundle64BitNativeLibrariesPreprocessor(command.getOutputPrintStream())
+            .preprocess(bundle);
+    if (command.getLocalTestingMode()) {
+      bundle = new LocalTestingPreprocessor().preprocess(bundle);
+    }
+    bundle = new EntryCompressionPreprocessor().preprocess(bundle);
+    return bundle;
+  }
+
+  private static LocalTestingInfo getLocalTestingInfo(AppBundle bundle) {
+    LocalTestingInfo.Builder localTestingInfo = LocalTestingInfo.newBuilder();
+    bundle
+        .getBaseModule()
+        .getAndroidManifest()
+        .getMetadataValue(LocalTestingPreprocessor.METADATA_NAME)
+        .ifPresent(
+            localTestingPath ->
+                localTestingInfo.setEnabled(true).setLocalTestingPath(localTestingPath));
+    return localTestingInfo.build();
   }
 
   private static class ApksToGenerate {

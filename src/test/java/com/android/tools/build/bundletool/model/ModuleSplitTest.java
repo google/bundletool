@@ -20,6 +20,10 @@ import static com.android.tools.build.bundletool.model.AndroidManifest.ACTIVITY_
 import static com.android.tools.build.bundletool.model.AndroidManifest.ANDROID_NAMESPACE_URI;
 import static com.android.tools.build.bundletool.model.AndroidManifest.IS_FEATURE_SPLIT_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.NAME_RESOURCE_ID;
+import static com.android.tools.build.bundletool.model.SourceStamp.STAMP_CERT_SHA256_METADATA_KEY;
+import static com.android.tools.build.bundletool.model.SourceStamp.STAMP_SOURCE_METADATA_KEY;
+import static com.android.tools.build.bundletool.model.SourceStamp.STAMP_TYPE_METADATA_KEY;
+import static com.android.tools.build.bundletool.testing.CertificateFactory.buildSelfSignedCertificate;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifest;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withMainActivity;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withSplitNameActivity;
@@ -59,12 +63,19 @@ import com.android.bundle.Targeting.ScreenDensity.DensityAlias;
 import com.android.bundle.Targeting.ScreenDensityTargeting;
 import com.android.bundle.Targeting.TextureCompressionFormat.TextureCompressionFormatAlias;
 import com.android.bundle.Targeting.VariantTargeting;
+import com.android.tools.build.bundletool.model.SourceStamp.StampType;
+import com.android.tools.build.bundletool.model.utils.CertificateHelper;
 import com.android.tools.build.bundletool.model.utils.xmlproto.XmlProtoElement;
 import com.android.tools.build.bundletool.model.utils.xmlproto.XmlProtoNode;
 import com.android.tools.build.bundletool.testing.BundleModuleBuilder;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
+import java.security.KeyPair;
+import java.security.KeyPairGenerator;
+import java.security.PrivateKey;
+import java.security.cert.X509Certificate;
 import java.util.Arrays;
+import org.junit.BeforeClass;
 import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -77,13 +88,27 @@ public class ModuleSplitTest {
 
   private static final int VERSION_CODE_RESOURCE_ID = 0x0101021b;
 
+  private static SigningConfiguration stampSigningConfig;
+  private static String stampCertSha256;
+
+  @BeforeClass
+  public static void setUpClass() throws Exception {
+    KeyPair keyPair = KeyPairGenerator.getInstance("RSA").genKeyPair();
+    PrivateKey privateKey = keyPair.getPrivate();
+    X509Certificate certificate = buildSelfSignedCertificate(keyPair, "CN=ModuleSplitTest");
+    stampSigningConfig =
+        SigningConfiguration.builder()
+            .setPrivateKey(privateKey)
+            .setCertificates(ImmutableList.of(certificate))
+            .build();
+    stampCertSha256 = CertificateHelper.sha256AsHexString(certificate);
+  }
+
   @Test
   public void notPossibleToTargetMultipleDimensions() {
-    String fakeAssetPath = "testModule/assets/secret.txt";
     ModuleSplit.Builder builder =
         ModuleSplit.builder()
             .setModuleName(BundleModuleName.create("testModule"))
-            .setEntries(ImmutableList.of(InMemoryModuleEntry.ofFile(fakeAssetPath, DUMMY_CONTENT)))
             .setVariantTargeting(lPlusVariantTargeting())
             .setApkTargeting(
                 ApkTargeting.newBuilder()
@@ -102,12 +127,6 @@ public class ModuleSplitTest {
     ModuleSplit masterSplit =
         ModuleSplit.builder()
             .setModuleName(BundleModuleName.create("base"))
-            .setEntries(
-                fakeEntriesOf(
-                    "res/drawable-ldpi/image.jpg",
-                    "assets/labels.dat",
-                    "res/drawable-hdpi/image.jpg",
-                    "dex/classes.dex"))
             .setApkTargeting(ApkTargeting.getDefaultInstance())
             .setVariantTargeting(lPlusVariantTargeting())
             .setMasterSplit(true)
@@ -122,12 +141,6 @@ public class ModuleSplitTest {
     ModuleSplit masterSplit =
         ModuleSplit.builder()
             .setModuleName(BundleModuleName.create("moduleA"))
-            .setEntries(
-                fakeEntriesOf(
-                    "res/drawable-ldpi/image.jpg",
-                    "assets/labels.dat",
-                    "res/drawable-hdpi/image.jpg",
-                    "dex/classes.dex"))
             .setApkTargeting(ApkTargeting.getDefaultInstance())
             .setVariantTargeting(lPlusVariantTargeting())
             .setAndroidManifest(AndroidManifest.create(androidManifest("com.test.app")))
@@ -193,35 +206,11 @@ public class ModuleSplitTest {
     assertManifestHasGlTargeting(configManifest, 0x20000);
   }
 
-  @Ignore("Texture compression format is currently not being reflected in the manifest.")
-  @Test
-  public void textureCompressionFormatTargetingIsReflectedInManifest() throws Exception {
-    BundleModule module =
-        new BundleModuleBuilder("testModule")
-            .addFile("assets/dict.dat")
-            .setManifest(androidManifest("com.test.app"))
-            .build();
-    ModuleSplit split =
-        ModuleSplit.forModule(module)
-            .toBuilder()
-            .setApkTargeting(
-                apkTextureTargeting(
-                    textureCompressionTargeting(TextureCompressionFormatAlias.ETC1_RGB8)))
-            .setMasterSplit(false)
-            .build();
-
-    split = split.writeSplitIdInManifest(split.getSuffix());
-
-    XmlProtoNode configManifest = split.getAndroidManifest().getManifestRoot();
-    assertManifestHasSingleGlTexture(configManifest, "GL_OES_compressed_ETC1_RGB8_texture");
-  }
-
   @Test
   public void moduleResourceSplitSuffixAndName() {
     ModuleSplit resSplit =
         ModuleSplit.builder()
             .setModuleName(BundleModuleName.create("base"))
-            .setEntries(ImmutableList.of())
             .setVariantTargeting(lPlusVariantTargeting())
             .setApkTargeting(apkDensityTargeting(DensityAlias.HDPI))
             .setMasterSplit(false)
@@ -236,7 +225,6 @@ public class ModuleSplitTest {
     ModuleSplit resSplit =
         ModuleSplit.builder()
             .setModuleName(BundleModuleName.create("base"))
-            .setEntries(ImmutableList.of())
             .setVariantTargeting(lPlusVariantTargeting())
             .setApkTargeting(
                 apkGraphicsTargeting(graphicsApiTargeting(openGlVersionFrom(3, 1)))) // 3.1
@@ -252,7 +240,6 @@ public class ModuleSplitTest {
     ModuleSplit resSplit =
         ModuleSplit.builder()
             .setModuleName(BundleModuleName.create("base"))
-            .setEntries(ImmutableList.of())
             .setVariantTargeting(lPlusVariantTargeting())
             .setApkTargeting(
                 apkGraphicsTargeting(graphicsApiTargeting(vulkanVersionFrom(3, 1)))) // 3.1
@@ -268,7 +255,6 @@ public class ModuleSplitTest {
     ModuleSplit resSplit =
         ModuleSplit.builder()
             .setModuleName(BundleModuleName.create("base"))
-            .setEntries(ImmutableList.of())
             .setVariantTargeting(lPlusVariantTargeting())
             .setApkTargeting(
                 apkGraphicsTargeting(
@@ -289,7 +275,6 @@ public class ModuleSplitTest {
     ModuleSplit resSplit =
         ModuleSplit.builder()
             .setModuleName(BundleModuleName.create("base"))
-            .setEntries(ImmutableList.of())
             .setVariantTargeting(lPlusVariantTargeting())
             .setApkTargeting(
                 apkTextureTargeting(
@@ -308,7 +293,6 @@ public class ModuleSplitTest {
     ModuleSplit resSplit =
         ModuleSplit.builder()
             .setModuleName(BundleModuleName.create("base"))
-            .setEntries(ImmutableList.of())
             .setVariantTargeting(lPlusVariantTargeting())
             .setApkTargeting(
                 apkAbiTargeting(
@@ -330,7 +314,6 @@ public class ModuleSplitTest {
     ModuleSplit resSplit =
         ModuleSplit.builder()
             .setModuleName(BundleModuleName.create("base"))
-            .setEntries(ImmutableList.of())
             .setVariantTargeting(VariantTargeting.getDefaultInstance())
             .setApkTargeting(
                 apkMultiAbiTargeting(
@@ -352,7 +335,6 @@ public class ModuleSplitTest {
     ModuleSplit langSplit =
         ModuleSplit.builder()
             .setModuleName(BundleModuleName.create("base"))
-            .setEntries(ImmutableList.of())
             .setVariantTargeting(lPlusVariantTargeting())
             .setApkTargeting(apkLanguageTargeting(languageTargeting("es")))
             .setMasterSplit(false)
@@ -367,7 +349,6 @@ public class ModuleSplitTest {
     ModuleSplit langSplit =
         ModuleSplit.builder()
             .setModuleName(BundleModuleName.create("base"))
-            .setEntries(ImmutableList.of())
             .setVariantTargeting(lPlusVariantTargeting())
             .setApkTargeting(apkLanguageTargeting(alternativeLanguageTargeting("es")))
             .setMasterSplit(false)
@@ -382,7 +363,6 @@ public class ModuleSplitTest {
     ModuleSplit sanitizerSplit =
         ModuleSplit.builder()
             .setModuleName(BundleModuleName.create("base"))
-            .setEntries(ImmutableList.of())
             .setVariantTargeting(lPlusVariantTargeting())
             .setApkTargeting(apkSanitizerTargeting(SanitizerAlias.HWADDRESS))
             .setMasterSplit(false)
@@ -403,12 +383,6 @@ public class ModuleSplitTest {
     ModuleSplit masterSplit =
         ModuleSplit.builder()
             .setModuleName(BundleModuleName.create("base"))
-            .setEntries(
-                fakeEntriesOf(
-                    "res/drawable-ldpi/image.jpg",
-                    "assets/labels.dat",
-                    "res/drawable-hdpi/image.jpg",
-                    "dex/classes.dex"))
             .setApkTargeting(ApkTargeting.getDefaultInstance())
             .setVariantTargeting(lPlusVariantTargeting())
             .setMasterSplit(true)
@@ -442,12 +416,6 @@ public class ModuleSplitTest {
     ModuleSplit masterSplit =
         ModuleSplit.builder()
             .setModuleName(BundleModuleName.create("base"))
-            .setEntries(
-                fakeEntriesOf(
-                    "res/drawable-ldpi/image.jpg",
-                    "assets/labels.dat",
-                    "res/drawable-hdpi/image.jpg",
-                    "dex/classes.dex"))
             .setApkTargeting(ApkTargeting.getDefaultInstance())
             .setVariantTargeting(lPlusVariantTargeting())
             .setMasterSplit(true)
@@ -470,18 +438,63 @@ public class ModuleSplitTest {
             xmlAttribute(ANDROID_NAMESPACE_URI, "name", NAME_RESOURCE_ID, "MainActivity"));
   }
 
+  @Test
+  public void testMasterBaseSplit_containsStamp() throws Exception {
+    ModuleSplit masterSplit =
+        ModuleSplit.builder()
+            .setModuleName(BundleModuleName.create("base"))
+            .setApkTargeting(ApkTargeting.getDefaultInstance())
+            .setVariantTargeting(lPlusVariantTargeting())
+            .setAndroidManifest(AndroidManifest.create(androidManifest("com.test.app")))
+            .setMasterSplit(true)
+            .build();
+    SourceStamp sourceStamp =
+        SourceStamp.builder()
+            .setSource("test-source")
+            .setSigningConfiguration(stampSigningConfig)
+            .build();
+    StampType stampType = StampType.STAMP_TYPE_DEFAULT;
+
+    masterSplit = masterSplit.writeStampInManifest(sourceStamp, stampType);
+
+    assertThat(masterSplit.getAndroidManifest().getMetadataValue(STAMP_TYPE_METADATA_KEY))
+        .hasValue(stampType.toString());
+    assertThat(masterSplit.getAndroidManifest().getMetadataValue(STAMP_SOURCE_METADATA_KEY))
+        .hasValue(sourceStamp.getSource());
+    assertThat(masterSplit.getAndroidManifest().getMetadataValue(STAMP_CERT_SHA256_METADATA_KEY))
+        .hasValue(stampCertSha256);
+  }
+
+  @Test
+  public void testNonMasterBaseSplit_doesNotContainStamp() throws Exception {
+    ModuleSplit abiSplit =
+        ModuleSplit.builder()
+            .setModuleName(BundleModuleName.create("base"))
+            .setAndroidManifest(AndroidManifest.create(androidManifest("com.test.app")))
+            .setVariantTargeting(lPlusVariantTargeting())
+            .setApkTargeting(
+                apkAbiTargeting(ImmutableSet.of(AbiAlias.X86), ImmutableSet.of(AbiAlias.X86)))
+            .setMasterSplit(false)
+            .build();
+    SourceStamp sourceStamp =
+        SourceStamp.builder()
+            .setSource("test-source")
+            .setSigningConfiguration(stampSigningConfig)
+            .build();
+    StampType stampType = StampType.STAMP_TYPE_DEFAULT;
+
+    abiSplit = abiSplit.writeStampInManifest(sourceStamp, stampType);
+
+    assertThat(abiSplit.getAndroidManifest().getMetadataValue(STAMP_TYPE_METADATA_KEY)).isEmpty();
+    assertThat(abiSplit.getAndroidManifest().getMetadataValue(STAMP_SOURCE_METADATA_KEY)).isEmpty();
+    assertThat(abiSplit.getAndroidManifest().getMetadataValue(STAMP_CERT_SHA256_METADATA_KEY))
+        .isEmpty();
+  }
+
   private ImmutableList<ModuleEntry> fakeEntriesOf(String... entries) {
     return Arrays.stream(entries)
         .map(entry -> InMemoryModuleEntry.ofFile(entry, DUMMY_CONTENT))
         .collect(toImmutableList());
-  }
-
-  private static void assertManifestHasSingleGlTexture(
-      XmlProtoNode manifest, String textureString) {
-    XmlElement glTexture = manifest.getElement().getChildElement("supports-gl-texture").getProto();
-    assertThat(glTexture.getAttributeList()).hasSize(1);
-    assertThat(glTexture.getAttribute(0))
-        .isEqualTo(xmlAttribute(ANDROID_NAMESPACE_URI, "name", textureString));
   }
 
   private static void assertManifestHasGlTargeting(XmlProtoNode manifest, int expectedValue) {

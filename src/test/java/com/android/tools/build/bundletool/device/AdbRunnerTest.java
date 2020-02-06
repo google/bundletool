@@ -27,9 +27,14 @@ import com.android.tools.build.bundletool.model.exceptions.InstallationException
 import com.android.tools.build.bundletool.testing.FakeAdbServer;
 import com.android.tools.build.bundletool.testing.FakeDevice;
 import com.google.common.collect.ImmutableList;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.Duration;
+import org.junit.Before;
+import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.TemporaryFolder;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 
@@ -42,6 +47,15 @@ public class AdbRunnerTest {
           .setAllowReinstall(true)
           .setTimeout(Duration.ofMillis(100))
           .build();
+
+  @Rule public TemporaryFolder tmp = new TemporaryFolder();
+  private Path apkPath;
+
+  @Before
+  public void setUp() throws Exception {
+    apkPath = Paths.get(tmp.getRoot().toString(), "apkOne.apk");
+    Files.createFile(apkPath);
+  }
 
   @Test
   public void installApks_noDeviceId_noConnectedDevices_throws() {
@@ -56,8 +70,7 @@ public class AdbRunnerTest {
             () ->
                 adbRunner.run(
                     device ->
-                        device.installApks(
-                            ImmutableList.of(Paths.get("apkOne.apk")), DEFAULT_INSTALL_OPTIONS)));
+                        device.installApks(ImmutableList.of(apkPath), DEFAULT_INSTALL_OPTIONS)));
     assertThat(exception)
         .hasMessageThat()
         .contains("Expected to find one connected device, but found none.");
@@ -73,9 +86,7 @@ public class AdbRunnerTest {
     testAdbServer.init(Paths.get("/test/adb"));
     AdbRunner adbRunner = new AdbRunner(testAdbServer);
 
-    adbRunner.run(
-        device ->
-            device.installApks(ImmutableList.of(Paths.get("apkOne.apk")), DEFAULT_INSTALL_OPTIONS));
+    adbRunner.run(device -> device.installApks(ImmutableList.of(apkPath), DEFAULT_INSTALL_OPTIONS));
   }
 
   @Test
@@ -95,8 +106,7 @@ public class AdbRunnerTest {
             () ->
                 adbRunner.run(
                     device ->
-                        device.installApks(
-                            ImmutableList.of(Paths.get("apkOne.apk")), DEFAULT_INSTALL_OPTIONS)));
+                        device.installApks(ImmutableList.of(apkPath), DEFAULT_INSTALL_OPTIONS)));
     assertThat(exception)
         .hasMessageThat()
         .contains("Expected to find one connected device, but found 2.");
@@ -115,8 +125,7 @@ public class AdbRunnerTest {
             () ->
                 adbRunner.run(
                     device ->
-                        device.installApks(
-                            ImmutableList.of(Paths.get("apkOne.apk")), DEFAULT_INSTALL_OPTIONS),
+                        device.installApks(ImmutableList.of(apkPath), DEFAULT_INSTALL_OPTIONS),
                     "device1"));
     assertThat(exception)
         .hasMessageThat()
@@ -136,8 +145,7 @@ public class AdbRunnerTest {
     AdbRunner adbRunner = new AdbRunner(testAdbServer);
 
     adbRunner.run(
-        device ->
-            device.installApks(ImmutableList.of(Paths.get("apkOne.apk")), DEFAULT_INSTALL_OPTIONS),
+        device -> device.installApks(ImmutableList.of(apkPath), DEFAULT_INSTALL_OPTIONS),
         "device1");
   }
 
@@ -167,8 +175,7 @@ public class AdbRunnerTest {
             () ->
                 adbRunner.run(
                     device ->
-                        device.installApks(
-                            ImmutableList.of(Paths.get("apkOne.apk")), DEFAULT_INSTALL_OPTIONS),
+                        device.installApks(ImmutableList.of(apkPath), DEFAULT_INSTALL_OPTIONS),
                     "device2"));
     assertThat(exception)
         .hasMessageThat()
@@ -194,7 +201,7 @@ public class AdbRunnerTest {
     adbRunner.run(
         device ->
             device.installApks(
-                ImmutableList.of(Paths.get("apkOne.apk")),
+                ImmutableList.of(apkPath),
                 InstallOptions.builder().setAllowDowngrade(true).build()));
   }
 }

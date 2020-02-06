@@ -47,8 +47,11 @@ public abstract class ApkGenerationConfiguration {
    */
   public abstract ImmutableSet<Abi> getAbisForPlaceholderLibs();
 
-  /** Resources that are pinned to the master split. */
-  public abstract ImmutableSet<ResourceId> getMasterPinnedResources();
+  /** Resources IDs that are pinned to the master split. */
+  public abstract ImmutableSet<ResourceId> getMasterPinnedResourceIds();
+
+  /** Resource names that are pinned to the master split. */
+  public abstract ImmutableSet<String> getMasterPinnedResourceNames();
 
   /** Resources that are (transitively) reachable from AndroidManifest.xml of the base module. */
   public abstract ImmutableSet<ResourceId> getBaseManifestReachableResources();
@@ -72,7 +75,8 @@ public abstract class ApkGenerationConfiguration {
         .setInstallableOnExternalStorage(false)
         .setAbisForPlaceholderLibs(ImmutableSet.of())
         .setOptimizationDimensions(ImmutableSet.of())
-        .setMasterPinnedResources(ImmutableSet.of())
+        .setMasterPinnedResourceIds(ImmutableSet.of())
+        .setMasterPinnedResourceNames(ImmutableSet.of())
         .setBaseManifestReachableResources(ImmutableSet.of())
         .setSuffixStrippings(ImmutableMap.of());
   }
@@ -99,7 +103,9 @@ public abstract class ApkGenerationConfiguration {
 
     public abstract Builder setAbisForPlaceholderLibs(ImmutableSet<Abi> abis);
 
-    public abstract Builder setMasterPinnedResources(ImmutableSet<ResourceId> resourceIds);
+    public abstract Builder setMasterPinnedResourceIds(ImmutableSet<ResourceId> resourceIds);
+
+    public abstract Builder setMasterPinnedResourceNames(ImmutableSet<String> resourceNames);
 
     public abstract Builder setBaseManifestReachableResources(ImmutableSet<ResourceId> resourceIds);
 

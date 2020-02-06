@@ -98,7 +98,6 @@ import static com.android.tools.build.bundletool.testing.TargetingUtils.variantM
 import static com.android.tools.build.bundletool.testing.TargetingUtils.variantSdkTargeting;
 import static com.android.tools.build.bundletool.testing.TestUtils.filesUnderPath;
 import static com.android.tools.build.bundletool.testing.truth.zip.TruthZip.assertThat;
-import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.ImmutableMap.toImmutableMap;
 import static com.google.common.collect.ImmutableMultiset.toImmutableMultiset;
@@ -166,6 +165,7 @@ import com.android.tools.build.bundletool.model.exceptions.manifest.ManifestVers
 import com.android.tools.build.bundletool.model.utils.files.FilePreconditions;
 import com.android.tools.build.bundletool.model.version.BundleToolVersion;
 import com.android.tools.build.bundletool.model.version.Version;
+import com.android.tools.build.bundletool.preprocessors.LocalTestingPreprocessor;
 import com.android.tools.build.bundletool.testing.Aapt2Helper;
 import com.android.tools.build.bundletool.testing.ApkSetUtils;
 import com.android.tools.build.bundletool.testing.AppBundleBuilder;
@@ -186,6 +186,7 @@ import com.google.common.io.ByteStreams;
 import com.google.common.io.Closer;
 import com.google.common.util.concurrent.ListeningExecutorService;
 import com.google.common.util.concurrent.MoreExecutors;
+import com.google.protobuf.ExtensionRegistry;
 import com.google.protobuf.Int32Value;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
@@ -1369,8 +1370,7 @@ public class BuildApksManagerTest {
     Variant universalVariant = standaloneApkVariants(result).get(0);
     assertThat(apkDescriptions(universalVariant)).hasSize(1);
 
-    com.android.bundle.Commands.ApkDescription universalApk =
-        apkDescriptions(universalVariant).get(0);
+    ApkDescription universalApk = apkDescriptions(universalVariant).get(0);
 
     // All assets from "feature_tcf_assets" are included inside the APK
     File universalApkFile = extractFromApkSetFile(apkSetFile, universalApk.getPath(), outputDir);
@@ -1431,8 +1431,7 @@ public class BuildApksManagerTest {
     assertThat(universalVariant.getTargeting()).isEqualTo(UNRESTRICTED_VARIANT_TARGETING);
 
     assertThat(apkDescriptions(universalVariant)).hasSize(1);
-    com.android.bundle.Commands.ApkDescription universalApk =
-        apkDescriptions(universalVariant).get(0);
+    ApkDescription universalApk = apkDescriptions(universalVariant).get(0);
     assertThat(universalApk.getTargeting()).isEqualToDefaultInstance();
 
     File universalApkFile = extractFromApkSetFile(apkSetFile, universalApk.getPath(), outputDir);
@@ -2305,8 +2304,7 @@ public class BuildApksManagerTest {
 
     assertThat(standaloneApkVariants(result)).hasSize(1);
     assertThat(apkDescriptions(standaloneApkVariants(result))).hasSize(1);
-    com.android.bundle.Commands.ApkDescription shard =
-        apkDescriptions(standaloneApkVariants(result)).get(0);
+    ApkDescription shard = apkDescriptions(standaloneApkVariants(result)).get(0);
 
     assertThat(apkSetFile).hasFile(shard.getPath());
     try (ZipFile shardZip =
@@ -3553,7 +3551,7 @@ public class BuildApksManagerTest {
                 new ApkModifier() {
                   @Override
                   public AndroidManifest modifyManifest(
-                      AndroidManifest manifest, ApkDescription apkDescription) {
+                      AndroidManifest manifest, ApkModifier.ApkDescription apkDescription) {
                     return manifest
                         .toEditor()
                         .setVersionCode(1000 + apkDescription.getVariantNumber())
@@ -4127,7 +4125,7 @@ public class BuildApksManagerTest {
     try (ZipFile apkSet = new ZipFile(apkSetPath.toFile())) {
       BuildApksResult result = extractTocFromApkSetFile(apkSet, outputDir);
       ImmutableList<ApkDescription> apkDescriptions = apkDescriptions(result.getVariantList());
-      checkState(apkDescriptions.size() > 0);
+      assertThat(apkDescriptions).isNotEmpty();
       for (ApkDescription apkDescription : apkDescriptions) {
         ImmutableSet<String> filesInApk = filesInApk(apkDescription, apkSet);
         assertThat(filesInApk).contains("META-INF/CERT.RSA");
@@ -4166,7 +4164,7 @@ public class BuildApksManagerTest {
     try (ZipFile apkSet = new ZipFile(apkSetPath.toFile())) {
       BuildApksResult result = extractTocFromApkSetFile(apkSet, outputDir);
       ImmutableList<ApkDescription> apkDescriptions = apkDescriptions(result.getVariantList());
-      checkState(apkDescriptions.size() > 0);
+      assertThat(apkDescriptions).isNotEmpty();
       for (ApkDescription apkDescription : apkDescriptions) {
         ImmutableSet<String> filesInApk = filesInApk(apkDescription, apkSet);
         assertThat(filesInApk).contains("META-INF/CERT.RSA");
@@ -4205,11 +4203,146 @@ public class BuildApksManagerTest {
     try (ZipFile apkSet = new ZipFile(apkSetPath.toFile())) {
       BuildApksResult result = extractTocFromApkSetFile(apkSet, outputDir);
       ImmutableList<ApkDescription> apkDescriptions = apkDescriptions(result.getVariantList());
-      checkState(apkDescriptions.size() > 0);
+      assertThat(apkDescriptions).isNotEmpty();
       for (ApkDescription apkDescription : apkDescriptions) {
         ImmutableSet<String> filesInApk = filesInApk(apkDescription, apkSet);
         assertThat(filesInApk).doesNotContain("META-INF/CERT.RSA");
       }
+    }
+  }
+
+  @Test
+  public void localTestingMode_enabled_addsMetadata() throws Exception {
+    AppBundle appBundle = createAppBundleWithBaseAndFeatureModules("feature");
+    Path bundlePath = createAndStoreBundle(appBundle);
+
+    BuildApksCommand command =
+        BuildApksCommand.fromFlags(
+            new FlagParser()
+                .parse("--bundle=" + bundlePath, "--output=" + outputFilePath, "--local-testing"),
+            fakeAdbServer);
+
+    Path apkSetPath = execute(command);
+
+    try (ZipFile apkSet = new ZipFile(apkSetPath.toFile())) {
+      BuildApksResult result = extractTocFromApkSetFile(apkSet, outputDir);
+      assertThat(result.hasLocalTestingInfo()).isTrue();
+      assertThat(result.getLocalTestingInfo().getEnabled()).isTrue();
+      assertThat(result.getLocalTestingInfo().getLocalTestingPath()).isNotEmpty();
+      ImmutableList<ApkDescription> apkDescriptions = apkDescriptions(result.getVariantList());
+      assertThat(apkDescriptions).isNotEmpty();
+      assertThat(apkDescriptions.stream().map(ApkDescription::getPath))
+          .contains("splits/base-master.apk");
+      for (ApkDescription apkDescription : apkDescriptions) {
+        File apk = extractFromApkSetFile(apkSet, apkDescription.getPath(), outputDir);
+        // The local testing metadata is set if and only if the apk is the base master.
+        assertThat(
+                (apkDescription.hasSplitApkMetadata()
+                        && apkDescription.getSplitApkMetadata().getSplitId().isEmpty()
+                        && apkDescription.getSplitApkMetadata().getIsMasterSplit())
+                    || apkDescription.hasStandaloneApkMetadata())
+            .isEqualTo(
+                extractAndroidManifest(apk)
+                    .getMetadataValue(LocalTestingPreprocessor.METADATA_NAME)
+                    .isPresent());
+      }
+    }
+  }
+
+  @Test
+  public void localTestingMode_disabled_doesNotAddMetadata() throws Exception {
+    AppBundle appBundle = createAppBundleWithBaseAndFeatureModules("feature");
+    Path bundlePath = createAndStoreBundle(appBundle);
+
+    BuildApksCommand command =
+        BuildApksCommand.fromFlags(
+            new FlagParser().parse("--bundle=" + bundlePath, "--output=" + outputFilePath),
+            fakeAdbServer);
+
+    Path apkSetPath = execute(command);
+
+    try (ZipFile apkSet = new ZipFile(apkSetPath.toFile())) {
+      BuildApksResult result = extractTocFromApkSetFile(apkSet, outputDir);
+      assertThat(result.getLocalTestingInfo().getEnabled()).isFalse();
+      ImmutableList<ApkDescription> apkDescriptions = apkDescriptions(result.getVariantList());
+      assertThat(apkDescriptions).isNotEmpty();
+      for (ApkDescription apkDescription : apkDescriptions) {
+        File apk = extractFromApkSetFile(apkSet, apkDescription.getPath(), outputDir);
+        assertThat(
+                extractAndroidManifest(apk)
+                    .getMetadataValue(LocalTestingPreprocessor.METADATA_NAME))
+            .isEmpty();
+      }
+    }
+  }
+
+  @Test
+  public void buildApksCommand_overridesAssetModuleCompression() throws Exception {
+    byte[] dummyContent = new byte[100];
+
+    AppBundle appBundle =
+        new AppBundleBuilder()
+            .addModule(
+                "base",
+                builder ->
+                    builder
+                        .addFile("dex/classes.dex", dummyContent)
+                        .addFile("assets/images/image.jpg", dummyContent)
+                        .setManifest(
+                            androidManifest(
+                                "com.test.app", withMinSdkVersion(15), withMaxSdkVersion(27)))
+                        .setResourceTable(resourceTableWithTestLabel("Test feature")))
+            .addModule(
+                "asset_module",
+                builder ->
+                    builder
+                        .setManifest(
+                            androidManifestForAssetModule(
+                                "com.test.app", withInstallTimeDelivery()))
+                        .addFile("assets/textures/texture.etc", dummyContent))
+            .build();
+    Path bundlePath = createAndStoreBundle(appBundle);
+
+    BuildApksCommand command =
+        BuildApksCommand.builder()
+            .setBundlePath(bundlePath)
+            .setOutputFile(outputFilePath)
+            .setAapt2Command(aapt2Command)
+            .build();
+
+    Path apkSetFilePath = execute(command);
+    ZipFile apkSetFile = openZipFile(apkSetFilePath.toFile());
+    BuildApksResult result = extractTocFromApkSetFile(apkSetFile, outputDir);
+
+    // Standalone variant.
+    ImmutableList<Variant> standaloneVariants = standaloneApkVariants(result);
+    assertThat(standaloneVariants).hasSize(1);
+    Variant standaloneVariant = standaloneVariants.get(0);
+
+    assertThat(standaloneVariant.getApkSetList()).hasSize(1);
+    ApkSet standaloneApk = standaloneVariant.getApkSet(0);
+    assertThat(standaloneApk.getApkDescriptionList()).hasSize(1);
+    assertThat(apkSetFile).hasFile(standaloneApk.getApkDescription(0).getPath());
+
+    File standaloneApkFile =
+        extractFromApkSetFile(apkSetFile, standaloneApk.getApkDescription(0).getPath(), outputDir);
+
+    try (ZipFile apkZip = new ZipFile(standaloneApkFile)) {
+      assertThat(apkZip).hasFile("classes.dex").thatIsCompressed();
+      assertThat(apkZip).hasFile("assets/images/image.jpg").thatIsCompressed();
+      assertThat(apkZip).hasFile("assets/textures/texture.etc").thatIsUncompressed();
+    }
+
+    // L+ assets.
+    assertThat(result.getAssetSliceSetCount()).isEqualTo(1);
+    AssetSliceSet assetSlice = result.getAssetSliceSet(0);
+    assertThat(assetSlice.getApkDescriptionCount()).isEqualTo(1);
+
+    File apkFile =
+        extractFromApkSetFile(apkSetFile, assetSlice.getApkDescription(0).getPath(), outputDir);
+
+    try (ZipFile apkZip = new ZipFile(apkFile)) {
+      assertThat(apkZip).hasFile("assets/textures/texture.etc").thatIsUncompressed();
     }
   }
 
@@ -4296,15 +4429,20 @@ public class BuildApksManagerTest {
   }
 
   private int extractVersionCode(File apk) {
+    return extractAndroidManifest(apk)
+        .getVersionCode()
+        .orElseThrow(VersionCodeMissingException::new);
+  }
+
+  private AndroidManifest extractAndroidManifest(File apk) {
     Path protoApkPath = tmpDir.resolve("proto.apk");
     Aapt2Helper.convertBinaryApkToProtoApk(apk.toPath(), protoApkPath);
     try {
       try (ZipFile protoApk = new ZipFile(protoApkPath.toFile())) {
-        AndroidManifest androidManifest =
-            AndroidManifest.create(
-                XmlNode.parseFrom(
-                    protoApk.getInputStream(protoApk.getEntry("AndroidManifest.xml"))));
-        return androidManifest.getVersionCode().orElseThrow(VersionCodeMissingException::new);
+        return AndroidManifest.create(
+            XmlNode.parseFrom(
+                protoApk.getInputStream(protoApk.getEntry("AndroidManifest.xml")),
+                ExtensionRegistry.getEmptyRegistry()));
       } finally {
         Files.deleteIfExists(protoApkPath);
       }

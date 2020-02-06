@@ -59,6 +59,7 @@ public class BundleModulesValidator {
           // More specific file validations.
           new EntryClashValidator(),
           new AbiParityValidator(),
+          new TextureCompressionFormatParityValidator(),
           new DexFilesValidator(),
           new ApexBundleValidator(),
           // Other.

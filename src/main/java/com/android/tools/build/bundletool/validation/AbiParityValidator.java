@@ -27,7 +27,7 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import java.util.Set;
 
-/** Validates that all modules, that contain some native libraries, support the same set of ABIs. */
+/** Validates that all modules that contain some native libraries support the same set of ABIs. */
 public class AbiParityValidator extends SubValidator {
 
   @Override

@@ -38,6 +38,7 @@ import com.android.tools.build.bundletool.model.ApkModifier;
 import com.android.tools.build.bundletool.model.OptimizationDimension;
 import com.android.tools.build.bundletool.model.Password;
 import com.android.tools.build.bundletool.model.SigningConfiguration;
+import com.android.tools.build.bundletool.model.SourceStamp;
 import com.android.tools.build.bundletool.model.exceptions.CommandExecutionException;
 import com.android.tools.build.bundletool.model.exceptions.ValidationException;
 import com.android.tools.build.bundletool.model.utils.DefaultSystemEnvironmentProvider;
@@ -105,7 +106,9 @@ public abstract class BuildApksCommand {
       Flag.enumSet("optimize-for", OptimizationDimension.class);
   private static final Flag<Path> AAPT2_PATH_FLAG = Flag.path("aapt2");
   private static final Flag<Integer> MAX_THREADS_FLAG = Flag.positiveInteger("max-threads");
-  private static final Flag<ApkBuildMode> MODE_FLAG = Flag.enumFlag("mode", ApkBuildMode.class);
+  private static final Flag<ApkBuildMode> BUILD_MODE_FLAG =
+      Flag.enumFlag("mode", ApkBuildMode.class);
+  private static final Flag<Boolean> LOCAL_TESTING_MODE_FLAG = Flag.booleanFlag("local-testing");
 
   private static final Flag<Path> ADB_PATH_FLAG = Flag.path("adb");
   private static final Flag<Boolean> CONNECTED_DEVICE_FLAG = Flag.booleanFlag("connected-device");
@@ -118,8 +121,9 @@ public abstract class BuildApksCommand {
   // Signing-related flags: should match flags from apksig library.
   private static final Flag<Path> KEYSTORE_FLAG = Flag.path("ks");
   private static final Flag<String> KEY_ALIAS_FLAG = Flag.string("ks-key-alias");
-  private static final Flag<Password> KEYSTORE_PASSWORD = Flag.password("ks-pass");
-  private static final Flag<Password> KEY_PASSWORD = Flag.password("key-pass");
+  private static final Flag<Password> KEYSTORE_PASSWORD_FLAG = Flag.password("ks-pass");
+  private static final Flag<Password> KEY_PASSWORD_FLAG = Flag.password("key-pass");
+
 
   private static final String APK_SET_ARCHIVE_EXTENSION = "apks";
 
@@ -150,6 +154,8 @@ public abstract class BuildApksCommand {
 
   public abstract ApkBuildMode getApkBuildMode();
 
+  public abstract boolean getLocalTestingMode();
+
   public abstract Optional<Aapt2Command> getAapt2Command();
 
   public abstract Optional<SigningConfiguration> getSigningConfiguration();
@@ -175,10 +181,12 @@ public abstract class BuildApksCommand {
 
   public abstract Optional<PrintStream> getOutputPrintStream();
 
+
   public static Builder builder() {
     return new AutoValue_BuildApksCommand.Builder()
         .setOverwriteOutput(false)
         .setApkBuildMode(DEFAULT)
+        .setLocalTestingMode(false)
         .setGenerateOnlyForConnectedDevice(false)
         .setCreateApkSetArchive(true)
         .setOptimizationDimensions(ImmutableSet.of())
@@ -214,6 +222,13 @@ public abstract class BuildApksCommand {
      * <p>By default we generate split, standalone ans instant APKs.
      */
     public abstract Builder setApkBuildMode(ApkBuildMode mode);
+
+    /**
+     * Sets whether the APKs should be built in local testing mode.
+     *
+     * <p>The default is {@code false}.
+     */
+    public abstract Builder setLocalTestingMode(boolean enableLocalTesting);
 
     /**
      * Sets if the generated APK Set will contain APKs compatible only with the connected device.
@@ -315,6 +330,7 @@ public abstract class BuildApksCommand {
 
     /** For command line, sets the {@link PrintStream} to use for outputting the warnings. */
     public abstract Builder setOutputPrintStream(PrintStream outputPrintStream);
+
 
     abstract BuildApksCommand autoBuild();
 
@@ -436,7 +452,8 @@ public abstract class BuildApksCommand {
             aapt2Path ->
                 buildApksCommand.setAapt2Command(Aapt2Command.createFromExecutablePath(aapt2Path)));
 
-    MODE_FLAG.getValue(flags).ifPresent(buildApksCommand::setApkBuildMode);
+    BUILD_MODE_FLAG.getValue(flags).ifPresent(buildApksCommand::setApkBuildMode);
+    LOCAL_TESTING_MODE_FLAG.getValue(flags).ifPresent(buildApksCommand::setLocalTestingMode);
     MAX_THREADS_FLAG
         .getValue(flags)
         .ifPresent(
@@ -449,8 +466,8 @@ public abstract class BuildApksCommand {
     // Signing-related arguments.
     Optional<Path> keystorePath = KEYSTORE_FLAG.getValue(flags);
     Optional<String> keyAlias = KEY_ALIAS_FLAG.getValue(flags);
-    Optional<Password> keystorePassword = KEYSTORE_PASSWORD.getValue(flags);
-    Optional<Password> keyPassword = KEY_PASSWORD.getValue(flags);
+    Optional<Password> keystorePassword = KEYSTORE_PASSWORD_FLAG.getValue(flags);
+    Optional<Password> keyPassword = KEY_PASSWORD_FLAG.getValue(flags);
 
     if (keystorePath.isPresent() && keyAlias.isPresent()) {
       buildApksCommand.setSigningConfiguration(
@@ -505,7 +522,7 @@ public abstract class BuildApksCommand {
       buildApksCommand.setAdbPath(adbPath).setAdbServer(adbServer);
     }
 
-    ApkBuildMode apkBuildMode = MODE_FLAG.getValue(flags).orElse(DEFAULT);
+    ApkBuildMode apkBuildMode = BUILD_MODE_FLAG.getValue(flags).orElse(DEFAULT);
     boolean supportsPartialDeviceSpecs = apkBuildMode.isAnySystemMode();
 
     Function<Path, DeviceSpec> deviceSpecParser =
@@ -592,7 +609,7 @@ public abstract class BuildApksCommand {
                 .build())
         .addFlag(
             FlagDescription.builder()
-                .setFlagName(MODE_FLAG.getName())
+                .setFlagName(BUILD_MODE_FLAG.getName())
                 .setExampleValue(joinFlagOptions(ApkBuildMode.values()))
                 .setOptional(true)
                 .setDescription(
@@ -628,7 +645,7 @@ public abstract class BuildApksCommand {
                         + "Acceptable values are '%s'. This flag should be only be set with "
                         + "--%s=%s flag.",
                     joinFlagOptions(OptimizationDimension.values()),
-                    MODE_FLAG.getName(),
+                    BUILD_MODE_FLAG.getName(),
                     DEFAULT.getLowerCaseName())
                 .build())
         .addFlag(
@@ -652,7 +669,7 @@ public abstract class BuildApksCommand {
                 .build())
         .addFlag(
             FlagDescription.builder()
-                .setFlagName(KEYSTORE_PASSWORD.getName())
+                .setFlagName(KEYSTORE_PASSWORD_FLAG.getName())
                 .setExampleValue("[pass|file]:value")
                 .setOptional(true)
                 .setDescription(
@@ -664,7 +681,7 @@ public abstract class BuildApksCommand {
                 .build())
         .addFlag(
             FlagDescription.builder()
-                .setFlagName(KEY_PASSWORD.getName())
+                .setFlagName(KEY_PASSWORD_FLAG.getName())
                 .setExampleValue("key-password")
                 .setOptional(true)
                 .setDescription(
@@ -683,7 +700,7 @@ public abstract class BuildApksCommand {
                     "If set, will generate APK Set optimized for the connected device. The "
                         + "generated APK Set will only be installable on that specific class of "
                         + "devices. This flag should be only be set with --%s=%s flag.",
-                    MODE_FLAG.getName(), DEFAULT.getLowerCaseName())
+                    BUILD_MODE_FLAG.getName(), DEFAULT.getLowerCaseName())
                 .build())
         .addFlag(
             FlagDescription.builder()
@@ -716,7 +733,7 @@ public abstract class BuildApksCommand {
                         + "it will generate an APK Set optimized for the specified device spec. "
                         + "This flag should be only be set with --%s=%s flag.",
                     GetDeviceSpecCommand.COMMAND_NAME,
-                    MODE_FLAG.getName(),
+                    BUILD_MODE_FLAG.getName(),
                     DEFAULT.getLowerCaseName())
                 .build())
         .addFlag(
@@ -730,6 +747,18 @@ public abstract class BuildApksCommand {
                     UNIVERSAL.getLowerCaseName(),
                     SYSTEM.getLowerCaseName(),
                     SYSTEM_COMPRESSED.getLowerCaseName())
+                .build())
+        .addFlag(
+            FlagDescription.builder()
+                .setFlagName(LOCAL_TESTING_MODE_FLAG.getName())
+                .setOptional(true)
+                .setDescription(
+                    "If enabled, the APK set will be built in local testing mode, which includes"
+                        + " additional metadata in the output. When `bundletool %s` is later used"
+                        + " to install APKs from this set on a device, it will additionally push"
+                        + " all dynamic module splits and asset packs to a location that can be"
+                        + " accessed by the Play Core API.",
+                    InstallApksCommand.COMMAND_NAME)
                 .build())
         .build();
   }

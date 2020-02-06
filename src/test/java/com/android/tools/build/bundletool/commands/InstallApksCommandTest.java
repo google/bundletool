@@ -38,6 +38,7 @@ import static com.android.tools.build.bundletool.testing.TargetingUtils.sdkVersi
 import static com.android.tools.build.bundletool.testing.TargetingUtils.variantSdkTargeting;
 import static com.android.tools.build.bundletool.testing.TestUtils.expectMissingRequiredBuilderPropertyException;
 import static com.android.tools.build.bundletool.testing.TestUtils.expectMissingRequiredFlagException;
+import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.truth.Truth.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
@@ -45,6 +46,7 @@ import com.android.bundle.Commands.AssetModuleMetadata;
 import com.android.bundle.Commands.AssetSliceSet;
 import com.android.bundle.Commands.BuildApksResult;
 import com.android.bundle.Commands.DeliveryType;
+import com.android.bundle.Commands.LocalTestingInfo;
 import com.android.bundle.Config.Bundletool;
 import com.android.bundle.Devices.DeviceSpec;
 import com.android.bundle.Targeting.Abi.AbiAlias;
@@ -65,7 +67,6 @@ import com.android.tools.build.bundletool.testing.FakeSystemEnvironmentProvider;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
-import com.google.common.collect.Lists;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -86,6 +87,7 @@ import org.junit.runner.RunWith;
 public class InstallApksCommandTest {
 
   private static final String DEVICE_ID = "id1";
+  private static final String PKG_NAME = "com.example";
 
   @Rule public TemporaryFolder tmp = new TemporaryFolder();
 
@@ -220,7 +222,6 @@ public class InstallApksCommandTest {
     assertThat(fromBuilder).isEqualTo(fromFlags);
   }
 
-
   @Test
   public void fromFlagsEquivalentToBuilder_modules() throws Exception {
     Path apksFile = tmpDir.resolve("appbundle.apks");
@@ -244,7 +245,6 @@ public class InstallApksCommandTest {
 
     assertThat(fromBuilder).isEqualTo(fromFlags);
   }
-
 
   @Test
   public void missingApksFlag_fails() {
@@ -567,7 +567,7 @@ public class InstallApksCommandTest {
         .build()
         .execute();
 
-    assertThat(Lists.transform(installedApks, apkPath -> apkPath.getFileName().toString()))
+    assertThat(getFileNames(installedApks))
         .containsExactly("base-master.apk", "feature1-master.apk", "feature2-master.apk");
   }
 
@@ -626,7 +626,7 @@ public class InstallApksCommandTest {
         .build()
         .execute();
 
-    assertThat(Lists.transform(installedApks, apkPath -> apkPath.getFileName().toString()))
+    assertThat(getFileNames(installedApks))
         .containsExactly("base-master.apk", "feature1-master.apk", "feature2-master.apk");
   }
 
@@ -692,7 +692,7 @@ public class InstallApksCommandTest {
         .build()
         .execute();
 
-    assertThat(Lists.transform(installedApks, apkPath -> apkPath.getFileName().toString()))
+    assertThat(getFileNames(installedApks))
         .containsExactly(
             "base-master.apk",
             "feature1-master.apk",
@@ -703,55 +703,7 @@ public class InstallApksCommandTest {
 
   @Test
   @Theory
-  public void installModules_withPush(@FromDataPoints("apksInDirectory") boolean apksInDirectory)
-      throws Exception {
-    BuildApksResult tableOfContent =
-        BuildApksResult.newBuilder()
-            .setBundletool(
-                Bundletool.newBuilder()
-                    .setVersion(BundleToolVersion.getCurrentVersion().toString()))
-            .addVariant(
-                createVariant(
-                    VariantTargeting.getDefaultInstance(),
-                    createSplitApkSet(
-                        "base",
-                        createMasterApkDescription(
-                            ApkTargeting.getDefaultInstance(), ZipPath.create("base-master.apk"))),
-                    createSplitApkSet(
-                        "base",
-                        createApkDescription(
-                            apkLanguageTargeting("pl"),
-                            ZipPath.create("base-pl.apk"),
-                            /* isMasterSplit= */ false))))
-            .build();
-    Path apksFile = createApks(tableOfContent, apksInDirectory);
-    List<Path> installedApks = new ArrayList<>();
-    List<Path> pushedApks = new ArrayList<>();
-    FakeDevice fakeDevice =
-        FakeDevice.fromDeviceSpec(DEVICE_ID, DeviceState.ONLINE, lDeviceWithLocales("en-US"));
-    AdbServer adbServer =
-        new FakeAdbServer(/* hasInitialDeviceList= */ true, ImmutableList.of(fakeDevice));
-    fakeDevice.setInstallApksSideEffect((apks, installOptions) -> installedApks.addAll(apks));
-    fakeDevice.setPushApksSideEffect((apks, installOptions) -> pushedApks.addAll(apks));
-
-    InstallApksCommand.builder()
-        .setApksArchivePath(apksFile)
-        .setAdbPath(adbPath)
-        .setAdbServer(adbServer)
-        .setPushSplitsPath("/tmp/")
-        .build()
-        .execute();
-
-    assertThat(Lists.transform(installedApks, apkPath -> apkPath.getFileName().toString()))
-        .containsExactly("base-master.apk");
-
-    assertThat(Lists.transform(pushedApks, apkPath -> apkPath.getFileName().toString()))
-        .containsExactly("base-master.apk", "base-pl.apk");
-  }
-
-  @Test
-  @Theory
-  public void extractAssetModules(@FromDataPoints("apksInDirectory") boolean apksInDirectory)
+  public void installAssetModules(@FromDataPoints("apksInDirectory") boolean apksInDirectory)
       throws Exception {
     String installTimeModule1 = "installtime_assetmodule1";
     String installTimeModule2 = "installtime_assetmodule2";
@@ -822,9 +774,239 @@ public class InstallApksCommandTest {
         .build()
         .execute();
 
-    assertThat(Lists.transform(installedApks, apkPath -> apkPath.getFileName().toString()))
+    assertThat(getFileNames(installedApks))
         .containsExactly(
             baseApk.toString(), installTimeMasterApk1.toString(), installTimeEnApk1.toString());
+  }
+
+  @Test
+  @Theory
+  public void localTestingMode_defaultModules(
+      @FromDataPoints("apksInDirectory") boolean apksInDirectory) throws Exception {
+    String installTimeFeature = "installtime_feature";
+    String onDemandFeature = "ondemand_feature";
+    String installTimeAsset = "installtime_asset";
+    String onDemandAsset = "ondemand_asset";
+    ZipPath baseApk = ZipPath.create("base-master.apk");
+    ZipPath baseEnApk = ZipPath.create("base-en.apk");
+    ZipPath installTimeFeatureMasterApk = ZipPath.create(installTimeFeature + "-master.apk");
+    ZipPath installTimeFeatureEnApk = ZipPath.create(installTimeFeature + "-en.apk");
+    ZipPath installTimeFeaturePlApk = ZipPath.create(installTimeFeature + "-pl.apk");
+    ZipPath onDemandFeatureMasterApk = ZipPath.create(onDemandFeature + "-master.apk");
+    ZipPath installTimeAssetMasterApk = ZipPath.create(installTimeAsset + "-master.apk");
+    ZipPath installTimeAssetEnApk = ZipPath.create(installTimeAsset + "-en.apk");
+    ZipPath onDemandAssetMasterApk = ZipPath.create(onDemandAsset + "-master.apk");
+    BuildApksResult tableOfContent =
+        BuildApksResult.newBuilder()
+            .setPackageName(PKG_NAME)
+            .setBundletool(
+                Bundletool.newBuilder()
+                    .setVersion(BundleToolVersion.getCurrentVersion().toString()))
+            .addVariant(
+                createVariant(
+                    VariantTargeting.getDefaultInstance(),
+                    createSplitApkSet(
+                        "base",
+                        createMasterApkDescription(ApkTargeting.getDefaultInstance(), baseApk),
+                        createApkDescription(
+                            apkLanguageTargeting("en"), baseEnApk, /* isMasterSplit= */ false)),
+                    createSplitApkSet(
+                        installTimeFeature,
+                        createMasterApkDescription(
+                            ApkTargeting.getDefaultInstance(), installTimeFeatureMasterApk),
+                        createApkDescription(
+                            apkLanguageTargeting("en"),
+                            installTimeFeatureEnApk,
+                            /* isMasterSplit= */ false),
+                        createApkDescription(
+                            apkLanguageTargeting("pl"),
+                            installTimeFeaturePlApk,
+                            /* isMasterSplit= */ false)),
+                    createSplitApkSet(
+                        onDemandFeature,
+                        DeliveryType.ON_DEMAND,
+                        /* moduleDependencies= */ ImmutableList.of(),
+                        createMasterApkDescription(
+                            ApkTargeting.getDefaultInstance(), onDemandFeatureMasterApk))))
+            .addAssetSliceSet(
+                AssetSliceSet.newBuilder()
+                    .setAssetModuleMetadata(
+                        AssetModuleMetadata.newBuilder()
+                            .setName(installTimeAsset)
+                            .setDeliveryType(DeliveryType.INSTALL_TIME))
+                    .addApkDescription(
+                        splitApkDescription(
+                            ApkTargeting.getDefaultInstance(), installTimeAssetMasterApk))
+                    .addApkDescription(
+                        splitApkDescription(apkLanguageTargeting("en"), installTimeAssetEnApk)))
+            .addAssetSliceSet(
+                AssetSliceSet.newBuilder()
+                    .setAssetModuleMetadata(
+                        AssetModuleMetadata.newBuilder()
+                            .setName(onDemandAsset)
+                            .setDeliveryType(DeliveryType.ON_DEMAND))
+                    .addApkDescription(
+                        splitApkDescription(
+                            ApkTargeting.getDefaultInstance(), onDemandAssetMasterApk)))
+            .setLocalTestingInfo(
+                        LocalTestingInfo.newBuilder()
+                            .setEnabled(true)
+                            .setLocalTestingPath("local_testing")
+            .build())
+            .build();
+
+    Path apksFile = createApks(tableOfContent, apksInDirectory);
+
+    List<Path> installedApks = new ArrayList<>();
+    List<Path> pushedApks = new ArrayList<>();
+    FakeDevice fakeDevice =
+        FakeDevice.fromDeviceSpec(DEVICE_ID, DeviceState.ONLINE, lDeviceWithLocales("en-US"));
+    AdbServer adbServer =
+        new FakeAdbServer(/* hasInitialDeviceList= */ true, ImmutableList.of(fakeDevice));
+    fakeDevice.setInstallApksSideEffect((apks, installOptions) -> installedApks.addAll(apks));
+    fakeDevice.setPushApksSideEffect((apks, installOptions) -> pushedApks.addAll(apks));
+
+    InstallApksCommand.builder()
+        .setApksArchivePath(apksFile)
+        .setAdbPath(adbPath)
+        .setAdbServer(adbServer)
+        .build()
+        .execute();
+
+    // Base, install-time features and install-time assets.
+    assertThat(getFileNames(installedApks))
+        .containsExactly(
+            baseApk.toString(),
+            baseEnApk.toString(),
+            installTimeFeatureMasterApk.toString(),
+            installTimeFeatureEnApk.toString(),
+            installTimeAssetMasterApk.toString(),
+            installTimeAssetEnApk.toString());
+    // Base config splits, install-time and on-demand features and on-demand assets. All languages.
+    assertThat(getFileNames(pushedApks))
+        .containsExactly(
+            baseEnApk.toString(),
+            installTimeFeatureMasterApk.toString(),
+            installTimeFeatureEnApk.toString(),
+            installTimeFeaturePlApk.toString(),
+            onDemandFeatureMasterApk.toString(),
+            onDemandAssetMasterApk.toString());
+  }
+
+  @Test
+  @Theory
+  public void localTestingMode_allModules(
+      @FromDataPoints("apksInDirectory") boolean apksInDirectory) throws Exception {
+    String installTimeFeature = "installtime_feature";
+    String onDemandFeature = "ondemand_feature";
+    String installTimeAsset = "installtime_asset";
+    String onDemandAsset = "ondemand_asset";
+    ZipPath baseApk = ZipPath.create("base-master.apk");
+    ZipPath baseEnApk = ZipPath.create("base-en.apk");
+    ZipPath installTimeFeatureMasterApk = ZipPath.create(installTimeFeature + "-master.apk");
+    ZipPath installTimeFeatureEnApk = ZipPath.create(installTimeFeature + "-en.apk");
+    ZipPath installTimeFeaturePlApk = ZipPath.create(installTimeFeature + "-pl.apk");
+    ZipPath onDemandFeatureMasterApk = ZipPath.create(onDemandFeature + "-master.apk");
+    ZipPath installTimeAssetMasterApk = ZipPath.create(installTimeAsset + "-master.apk");
+    ZipPath installTimeAssetEnApk = ZipPath.create(installTimeAsset + "-en.apk");
+    ZipPath onDemandAssetMasterApk = ZipPath.create(onDemandAsset + "-master.apk");
+    BuildApksResult tableOfContent =
+        BuildApksResult.newBuilder()
+            .setPackageName(PKG_NAME)
+            .setBundletool(
+                Bundletool.newBuilder()
+                    .setVersion(BundleToolVersion.getCurrentVersion().toString()))
+            .addVariant(
+                createVariant(
+                    VariantTargeting.getDefaultInstance(),
+                    createSplitApkSet(
+                        "base",
+                        createMasterApkDescription(ApkTargeting.getDefaultInstance(), baseApk),
+                        createApkDescription(
+                            apkLanguageTargeting("en"), baseEnApk, /* isMasterSplit= */ false)),
+                    createSplitApkSet(
+                        installTimeFeature,
+                        createMasterApkDescription(
+                            ApkTargeting.getDefaultInstance(), installTimeFeatureMasterApk),
+                        createApkDescription(
+                            apkLanguageTargeting("en"),
+                            installTimeFeatureEnApk,
+                            /* isMasterSplit= */ false),
+                        createApkDescription(
+                            apkLanguageTargeting("pl"),
+                            installTimeFeaturePlApk,
+                            /* isMasterSplit= */ false)),
+                    createSplitApkSet(
+                        onDemandFeature,
+                        DeliveryType.ON_DEMAND,
+                        /* moduleDependencies= */ ImmutableList.of(),
+                        createMasterApkDescription(
+                            ApkTargeting.getDefaultInstance(), onDemandFeatureMasterApk))))
+            .addAssetSliceSet(
+                AssetSliceSet.newBuilder()
+                    .setAssetModuleMetadata(
+                        AssetModuleMetadata.newBuilder()
+                            .setName(installTimeAsset)
+                            .setDeliveryType(DeliveryType.INSTALL_TIME))
+                    .addApkDescription(
+                        splitApkDescription(
+                            ApkTargeting.getDefaultInstance(), installTimeAssetMasterApk))
+                    .addApkDescription(
+                        splitApkDescription(apkLanguageTargeting("en"), installTimeAssetEnApk)))
+            .addAssetSliceSet(
+                AssetSliceSet.newBuilder()
+                    .setAssetModuleMetadata(
+                        AssetModuleMetadata.newBuilder()
+                            .setName(onDemandAsset)
+                            .setDeliveryType(DeliveryType.ON_DEMAND))
+                    .addApkDescription(
+                        splitApkDescription(
+                            ApkTargeting.getDefaultInstance(), onDemandAssetMasterApk)))
+            .setLocalTestingInfo(
+                        LocalTestingInfo.newBuilder()
+                            .setEnabled(true)
+                            .setLocalTestingPath("local_testing")
+                            .build())
+            .build();
+
+    Path apksFile = createApks(tableOfContent, apksInDirectory);
+
+    List<Path> installedApks = new ArrayList<>();
+    List<Path> pushedApks = new ArrayList<>();
+    FakeDevice fakeDevice =
+        FakeDevice.fromDeviceSpec(DEVICE_ID, DeviceState.ONLINE, lDeviceWithLocales("en-US"));
+    AdbServer adbServer =
+        new FakeAdbServer(/* hasInitialDeviceList= */ true, ImmutableList.of(fakeDevice));
+    fakeDevice.setInstallApksSideEffect((apks, installOptions) -> installedApks.addAll(apks));
+    fakeDevice.setPushApksSideEffect((apks, installOptions) -> pushedApks.addAll(apks));
+
+    InstallApksCommand.builder()
+        .setApksArchivePath(apksFile)
+        .setAdbPath(adbPath)
+        .setAdbServer(adbServer)
+        .setModules(ImmutableSet.of("_ALL_"))
+        .build()
+        .execute();
+
+    // Base, install-time and on-demand features and install-time assets.
+    assertThat(getFileNames(installedApks))
+        .containsExactly(
+            baseApk.toString(),
+            baseEnApk.toString(),
+            installTimeFeatureMasterApk.toString(),
+            installTimeFeatureEnApk.toString(),
+            onDemandFeatureMasterApk.toString(),
+            installTimeAssetMasterApk.toString(),
+            installTimeAssetEnApk.toString());
+    // Base config splits, install-time and on-demand features and on-demand assets. All languages.
+    assertThat(getFileNames(pushedApks))
+        .containsExactly(
+            baseEnApk.toString(),
+            installTimeFeatureMasterApk.toString(),
+            installTimeFeatureEnApk.toString(),
+            installTimeFeaturePlApk.toString(),
+            onDemandFeatureMasterApk.toString(),
+            onDemandAssetMasterApk.toString());
   }
 
   @Test
@@ -869,5 +1051,9 @@ public class InstallApksCommandTest {
     } else {
       return createApksArchiveFile(buildApksResult, tmpDir.resolve("bundle.apks"));
     }
+  }
+
+  private static ImmutableList<String> getFileNames(List<Path> paths) {
+    return paths.stream().map(Path::getFileName).map(Path::toString).collect(toImmutableList());
   }
 }

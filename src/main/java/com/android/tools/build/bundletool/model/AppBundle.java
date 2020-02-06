@@ -84,9 +84,13 @@ public abstract class AppBundle {
             .map(ResourceId::create)
             .collect(toImmutableSet());
 
+    ImmutableSet<String> pinnedResourceNames =
+        ImmutableSet.copyOf(bundleConfig.getMasterResources().getResourceNamesList());
+
     return builder()
         .setModules(Maps.uniqueIndex(modules, BundleModule::getName))
-        .setMasterPinnedResources(pinnedResourceIds)
+        .setMasterPinnedResourceIds(pinnedResourceIds)
+        .setMasterPinnedResourceNames(pinnedResourceNames)
         .setBundleConfig(bundleConfig)
         .setBundleMetadata(bundleMetadata)
         .build();
@@ -94,8 +98,16 @@ public abstract class AppBundle {
 
   public abstract ImmutableMap<BundleModuleName, BundleModule> getModules();
 
-  /** Resources that must remain in the master split regardless of their targeting configuration. */
-  public abstract ImmutableSet<ResourceId> getMasterPinnedResources();
+  /**
+   * Resource IDs that must remain in the master split regardless of their targeting configuration.
+   */
+  public abstract ImmutableSet<ResourceId> getMasterPinnedResourceIds();
+
+  /**
+   * Resource names that must remain in the master split regardless of their targeting
+   * configuration.
+   */
+  public abstract ImmutableSet<String> getMasterPinnedResourceNames();
 
   public abstract BundleConfig getBundleConfig();
 
@@ -294,7 +306,9 @@ public abstract class AppBundle {
       return this;
     }
 
-    public abstract Builder setMasterPinnedResources(ImmutableSet<ResourceId> pinnedResourceIds);
+    public abstract Builder setMasterPinnedResourceIds(ImmutableSet<ResourceId> pinnedResourceIds);
+
+    public abstract Builder setMasterPinnedResourceNames(ImmutableSet<String> pinnedResourceNames);
 
     public abstract Builder setBundleConfig(BundleConfig bundleConfig);
 

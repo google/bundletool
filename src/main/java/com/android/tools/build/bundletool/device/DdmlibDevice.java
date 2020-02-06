@@ -34,7 +34,6 @@ import com.android.tools.build.bundletool.model.exceptions.InstallationException
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
 import com.google.errorprone.annotations.FormatMethod;
-import com.google.errorprone.annotations.FormatString;
 import java.io.File;
 import java.io.IOException;
 import java.io.PrintStream;
@@ -157,9 +156,8 @@ public class DdmlibDevice extends Device {
 
     try {
       // There are two different flows, depending on if the path is absolute or not...
-      if (!pushOptions.getDestinationPath().startsWith("/")) {
-        // Path is relative, so we're going to try to push it to the app's private dir
-        // For that, we will need the package name to use with "run-as" command
+      if (!splitsPath.startsWith("/")) {
+        // Path is relative, so we're going to try to push it to the app's external dir
         String packageName =
             pushOptions
                 .getPackageName()
@@ -168,63 +166,29 @@ public class DdmlibDevice extends Device {
                         new CommandExecutionException(
                             "PushOptions.packageName must be set for relative paths."));
 
-        // Some clean up first. Remove the destination dir if flag is set...
-        if (pushOptions.getClearDestinationPath()) {
-          commandExecutor.executeAsUserAndPrint(packageName, "rm -rf %s", splitsPath);
-        }
+        splitsPath = joinUnixPaths("/sdcard/Android/data/", packageName, "files", splitsPath);
+      }
+      // Now the path is absolute. We assume it's pointing to a location writeable by ADB shell.
+      // It shouldn't point to app's private directory.
 
-        // ...and recreate it, making sure the destination dir is empty.
-        // We don't want splits from previous runs in the directory.
-        // There isn't a nice way to test if dir is empty in shell, but rmdir will return error
-        commandExecutor.executeAsUserAndPrint(
-            packageName,
-            "mkdir -p %s && rmdir %s && mkdir -p %s",
-            splitsPath,
-            splitsPath,
-            splitsPath);
+      // Some clean up first. Remove the destination dir if flag is set...
+      if (pushOptions.getClearDestinationPath()) {
+        commandExecutor.executeAndPrint("rm -rf %s", splitsPath);
+      }
 
-        // The push command further down doesn't support "run-as", so we're going to push
-        // to a temporary folder, then copy the files to the final destination
-        String remoteTmpPath = joinUnixPaths("/data/local/tmp/", packageName);
-        commandExecutor.executeAndPrint("mkdir -p %s", remoteTmpPath);
-        for (Path apkPath : apks) {
-          String remoteTmpFilePath = joinUnixPaths(remoteTmpPath, apkPath.getFileName().toString());
-          device.pushFile(apkPath.toFile().getAbsolutePath(), remoteTmpFilePath);
+      // ... and recreate it, making sure the destination dir is empty.
+      // We don't want splits from previous runs in the directory.
+      // There isn't a nice way to test if dir is empty in shell, but rmdir will return error
+      commandExecutor.executeAndPrint(
+          "mkdir -p %s && rmdir %s && mkdir -p %s", splitsPath, splitsPath, splitsPath);
 
-          // Now we can copy ("cat" in case there is no "cp" on device) from tmp to splitsPath
-          // "sh -c" needed to wrap the whole "cat" call because of ">" redirect
-          commandExecutor.executeAsUserAndPrint(
-              packageName,
-              "cat %s > %s",
-              remoteTmpFilePath,
-              joinUnixPaths(splitsPath, apkPath.getFileName().toString()));
-          commandExecutor.executeAndPrint("rm %s", remoteTmpFilePath);
-          System.err.printf(
-              "Pushed \"%s\"%n", joinUnixPaths(splitsPath, apkPath.getFileName().toString()));
-        }
-      } else {
-        // Path is absolute. We assume it's pointing to a location writeable by ADB shell,
-        // which is explained in the bundletool help. It shouldn't point to app's private directory.
-
-        // Some clean up first. Remove the destination dir if flag is set...
-        if (pushOptions.getClearDestinationPath()) {
-          commandExecutor.executeAndPrint("rm -rf %s", splitsPath);
-        }
-
-        // ... and recreate it, making sure the destination dir is empty.
-        // We don't want splits from previous runs in the directory.
-        // There isn't a nice way to test if dir is empty in shell, but rmdir will return error
-        commandExecutor.executeAndPrint(
-            "mkdir -p %s && rmdir %s && mkdir -p %s", splitsPath, splitsPath, splitsPath);
-
-        // Try to push files normally. Will fail if ADB shell doesn't have permission to write.
-        for (Path path : apks) {
-          device.pushFile(
-              path.toFile().getAbsolutePath(),
-              joinUnixPaths(splitsPath, path.getFileName().toString()));
-          System.err.printf(
-              "Pushed \"%s\"%n", joinUnixPaths(splitsPath, path.getFileName().toString()));
-        }
+      // Try to push files normally. Will fail if ADB shell doesn't have permission to write.
+      for (Path path : apks) {
+        device.pushFile(
+            path.toFile().getAbsolutePath(),
+            joinUnixPaths(splitsPath, path.getFileName().toString()));
+        System.err.printf(
+            "Pushed \"%s\"%n", joinUnixPaths(splitsPath, path.getFileName().toString()));
       }
     } catch (IOException
         | TimeoutException
@@ -234,9 +198,8 @@ public class DdmlibDevice extends Device {
       throw CommandExecutionException.builder()
           .withCause(e)
           .withMessage(
-              "Pushing additional splits for offline testing of dynamic features failed. Your app"
-                  + " might still have been installed correctly, but you won't be able to test"
-                  + " with FakeSplitInstallManager.")
+              "Pushing additional splits for local testing failed. Your app might still have been"
+                  + " installed correctly, but you won't be able to test dynamic modules.")
           .build();
     }
   }
@@ -285,17 +248,6 @@ public class DdmlibDevice extends Device {
       if (!"OK".equals(lastOutputLine)) {
         throw new IOException("ADB command failed.");
       }
-    }
-
-    /** Runs the command as the user of the debuggable app with specified package name. */
-    @FormatMethod
-    private void executeAsUserAndPrint(
-        String packageName, @FormatString String command, String... args)
-        throws TimeoutException, AdbCommandRejectedException, ShellCommandUnresponsiveException,
-            IOException {
-      // "run-as packageName" lets us run with the permissions of the app to access its directory
-      // "sh -c 'cmd'" is needed to be able to use > redirects and && operator inside the cmd
-      executeAndPrint("run-as %s sh -c %s", packageName, formatCommandWithArgs(command, args));
     }
 
     /** Returns the string in single quotes, with any single quotes in the string escaped. */

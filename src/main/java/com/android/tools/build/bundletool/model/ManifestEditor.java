@@ -21,8 +21,6 @@ import static com.android.tools.build.bundletool.model.AndroidManifest.ANDROID_N
 import static com.android.tools.build.bundletool.model.AndroidManifest.APPLICATION_ELEMENT_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.EXTRACT_NATIVE_LIBS_ATTRIBUTE_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.EXTRACT_NATIVE_LIBS_RESOURCE_ID;
-import static com.android.tools.build.bundletool.model.AndroidManifest.GL_ES_VERSION_RESOURCE_ID;
-import static com.android.tools.build.bundletool.model.AndroidManifest.GL_VERSION_ATTRIBUTE_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.HAS_CODE_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.IS_FEATURE_SPLIT_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.IS_SPLIT_REQUIRED_ATTRIBUTE_NAME;
@@ -40,11 +38,9 @@ import static com.android.tools.build.bundletool.model.AndroidManifest.PROVIDER_
 import static com.android.tools.build.bundletool.model.AndroidManifest.RESOURCE_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.SERVICE_ELEMENT_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.SPLIT_NAME_RESOURCE_ID;
-import static com.android.tools.build.bundletool.model.AndroidManifest.SUPPORTS_GL_TEXTURE_ELEMENT_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.TARGET_SANDBOX_VERSION_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.TARGET_SDK_VERSION_ATTRIBUTE_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.TARGET_SDK_VERSION_RESOURCE_ID;
-import static com.android.tools.build.bundletool.model.AndroidManifest.USES_FEATURE_ELEMENT_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.USES_SDK_ELEMENT_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.VALUE_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.VERSION_CODE_RESOURCE_ID;
@@ -67,7 +63,6 @@ import javax.annotation.CheckReturnValue;
 /** Modifies the manifest in the protocol buffer format. */
 public class ManifestEditor {
 
-  private static final int OPEN_GL_VERSION_MULTIPLIER = 0x10000;
   private static final ImmutableList<String> SPLIT_NAME_ELEMENT_NAMES =
       ImmutableList.of(ACTIVITY_ELEMENT_NAME, SERVICE_ELEMENT_NAME, PROVIDER_ELEMENT_NAME);
 
@@ -189,7 +184,6 @@ public class ManifestEditor {
                 .addAttribute(valueAttribute));
     return this;
   }
-
 
   /**
    * Sets the 'android:extractNativeLibs' value in the {@code application} tag.

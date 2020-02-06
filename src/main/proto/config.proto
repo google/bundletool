@@ -28,8 +28,10 @@ message Compression {
 
 // Resources to keep in the master split.
 message MasterResources {
-  // Resource IDs to be kept in master splits.
+  // Resource IDs to be kept in master split.
   repeated int32 resource_ids = 1;
+  // Resource names to be kept in master split.
+  repeated string resource_names = 2;
 }
 
 message Optimizations {

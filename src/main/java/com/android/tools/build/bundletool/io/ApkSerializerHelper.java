@@ -16,7 +16,6 @@
 package com.android.tools.build.bundletool.io;
 
 import static com.android.tools.build.bundletool.model.BundleModule.APEX_DIRECTORY;
-import static com.android.tools.build.bundletool.model.BundleModule.ASSETS_DIRECTORY;
 import static com.android.tools.build.bundletool.model.BundleModule.DEX_DIRECTORY;
 import static com.android.tools.build.bundletool.model.BundleModule.MANIFEST_FILENAME;
 import static com.android.tools.build.bundletool.model.BundleModule.ROOT_DIRECTORY;
@@ -43,7 +42,6 @@ import com.android.tools.build.bundletool.model.Aapt2Command;
 import com.android.tools.build.bundletool.model.BundleModule.SpecialModuleEntry;
 import com.android.tools.build.bundletool.model.ModuleEntry;
 import com.android.tools.build.bundletool.model.ModuleSplit;
-import com.android.tools.build.bundletool.model.ModuleSplit.SplitType;
 import com.android.tools.build.bundletool.model.SigningConfiguration;
 import com.android.tools.build.bundletool.model.WearApkLocator;
 import com.android.tools.build.bundletool.model.ZipPath;
@@ -237,7 +235,6 @@ final class ApkSerializerHelper {
    */
   private Path writeProtoApk(ModuleSplit split, Path outputPath, Path tempDir) {
     boolean extractNativeLibs = split.getAndroidManifest().getExtractNativeLibsValue().orElse(true);
-    boolean isAssetSlice = split.getSplitType().equals(SplitType.ASSET_SLICE);
 
     // Embedded Wear 1.x APKs are supposed to be under res/raw/*
     Optional<ZipPath> wear1ApkPath = WearApkLocator.findEmbeddedWearApkPath(split);
@@ -253,7 +250,6 @@ final class ApkSerializerHelper {
           entryOptionForPath(
               pathInApk,
               /* uncompressNativeLibs= */ !extractNativeLibs,
-              /* splitIsAssetSlice= */ isAssetSlice,
               /* entryShouldCompress= */ entry.shouldCompress());
       if (signingConfig.isPresent()
           && wear1ApkPath.isPresent()
@@ -288,9 +284,8 @@ final class ApkSerializerHelper {
   private EntryOption[] entryOptionForPath(
       ZipPath path,
       boolean uncompressNativeLibs,
-      boolean splitIsAssetSlice,
       boolean entryShouldCompress) {
-    if (shouldCompress(path, uncompressNativeLibs, splitIsAssetSlice, entryShouldCompress)) {
+    if (shouldCompress(path, uncompressNativeLibs, entryShouldCompress)) {
       return new EntryOption[] {};
     } else {
       return new EntryOption[] {EntryOption.UNCOMPRESSED};
@@ -300,7 +295,6 @@ final class ApkSerializerHelper {
   private boolean shouldCompress(
       ZipPath path,
       boolean uncompressNativeLibs,
-      boolean splitIsAssetSlice,
       boolean entryShouldCompress) {
     if (uncompressedPathMatchers.stream()
         .anyMatch(pathMatcher -> pathMatcher.matches(path.toString()))) {
@@ -309,11 +303,6 @@ final class ApkSerializerHelper {
 
     // The Module entries with shouldCompress flag turned off should be uncompressed.
     if (!entryShouldCompress) {
-      return false;
-    }
-
-    // Asset entries from asset slices should be uncompressed.
-    if (splitIsAssetSlice && path.startsWith(ASSETS_DIRECTORY)) {
       return false;
     }
 
@@ -336,7 +325,6 @@ final class ApkSerializerHelper {
   /** Takes the given APK and adds the files that weren't processed by AAPT2. */
   private void addNonAapt2Files(ZFile zFile, ModuleSplit split) throws IOException {
     boolean extractNativeLibs = split.getAndroidManifest().getExtractNativeLibsValue().orElse(true);
-    boolean isAssetSlice = split.getSplitType().equals(SplitType.ASSET_SLICE);
 
     // Add the non-Aapt2 files.
     for (ModuleEntry entry : split.getEntries()) {
@@ -346,7 +334,7 @@ final class ApkSerializerHelper {
           zFile.add(
               pathInApk.toString(),
               entryInputStream,
-              shouldCompress(pathInApk, !extractNativeLibs, isAssetSlice, entry.shouldCompress()));
+              shouldCompress(pathInApk, !extractNativeLibs, entry.shouldCompress()));
         }
       }
     }

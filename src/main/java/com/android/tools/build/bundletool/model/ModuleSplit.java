@@ -22,6 +22,9 @@ import static com.android.tools.build.bundletool.model.BundleModule.DEX_DIRECTOR
 import static com.android.tools.build.bundletool.model.BundleModule.LIB_DIRECTORY;
 import static com.android.tools.build.bundletool.model.BundleModule.RESOURCES_DIRECTORY;
 import static com.android.tools.build.bundletool.model.BundleModule.ROOT_DIRECTORY;
+import static com.android.tools.build.bundletool.model.SourceStamp.STAMP_CERT_SHA256_METADATA_KEY;
+import static com.android.tools.build.bundletool.model.SourceStamp.STAMP_SOURCE_METADATA_KEY;
+import static com.android.tools.build.bundletool.model.SourceStamp.STAMP_TYPE_METADATA_KEY;
 import static com.android.tools.build.bundletool.model.utils.ResourcesUtils.SCREEN_DENSITY_TO_PROTO_VALUE_MAP;
 import static com.android.tools.build.bundletool.model.utils.TargetingNormalizer.normalizeApkTargeting;
 import static com.android.tools.build.bundletool.model.utils.TargetingNormalizer.normalizeVariantTargeting;
@@ -51,6 +54,8 @@ import com.android.bundle.Targeting.TextureCompressionFormatTargeting;
 import com.android.bundle.Targeting.VariantTargeting;
 import com.android.bundle.Targeting.VulkanVersion;
 import com.android.tools.build.bundletool.model.BundleModule.ModuleType;
+import com.android.tools.build.bundletool.model.SourceStamp.StampType;
+import com.android.tools.build.bundletool.model.utils.CertificateHelper;
 import com.android.tools.build.bundletool.model.utils.ResourcesUtils;
 import com.google.auto.value.AutoValue;
 import com.google.auto.value.extension.memoized.Memoized;
@@ -62,6 +67,9 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Multimap;
 import com.google.common.collect.Multimaps;
 import com.google.errorprone.annotations.Immutable;
+import java.security.NoSuchAlgorithmException;
+import java.security.cert.CertificateEncodingException;
+import java.security.cert.X509Certificate;
 import java.util.List;
 import java.util.Optional;
 import java.util.StringJoiner;
@@ -258,6 +266,27 @@ public abstract class ModuleSplit {
   public ModuleSplit removeUnknownSplitComponents(ImmutableSet<String> knownSplits) {
     AndroidManifest apkManifest =
         getAndroidManifest().toEditor().removeUnknownSplitComponents(knownSplits).save();
+    return toBuilder().setAndroidManifest(apkManifest).build();
+  }
+
+  /** Writes the source stamp in the split manifest. */
+  public ModuleSplit writeStampInManifest(SourceStamp sourceStamp, StampType stampType)
+      throws CertificateEncodingException, NoSuchAlgorithmException {
+    if (!isBaseModuleSplit() || !isMasterSplit()) {
+      return this;
+    }
+
+    ImmutableList<X509Certificate> certificates =
+        sourceStamp.getSigningConfiguration().getCertificates();
+    // Computing the hash of the leaf certificate only.
+    String stampCertificateSha256 = CertificateHelper.sha256AsHexString(certificates.get(0));
+    AndroidManifest apkManifest =
+        getAndroidManifest()
+            .toEditor()
+            .addMetaDataString(STAMP_SOURCE_METADATA_KEY, sourceStamp.getSource())
+            .addMetaDataString(STAMP_TYPE_METADATA_KEY, stampType.toString())
+            .addMetaDataString(STAMP_CERT_SHA256_METADATA_KEY, stampCertificateSha256)
+            .save();
     return toBuilder().setAndroidManifest(apkManifest).build();
   }
 
