@@ -28,7 +28,10 @@ import com.android.bundle.Files.TargetedAssetsDirectory;
 import com.android.bundle.Targeting.AssetsDirectoryTargeting;
 import com.android.bundle.Targeting.SdkVersion;
 import com.android.bundle.Targeting.SdkVersionTargeting;
+import com.android.bundle.Targeting.TextureCompressionFormat;
+import com.android.bundle.Targeting.TextureCompressionFormat.TextureCompressionFormatAlias;
 import com.android.bundle.Targeting.VariantTargeting;
+import com.android.tools.build.bundletool.model.BundleModule;
 import com.android.tools.build.bundletool.model.ModuleEntry;
 import com.android.tools.build.bundletool.model.ModuleSplit;
 import com.android.tools.build.bundletool.model.ZipPath;
@@ -40,6 +43,7 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Range;
 import com.google.common.collect.Sets;
+import java.util.Optional;
 
 /** Utility functions for Targeting proto. */
 public final class TargetingUtils {
@@ -263,6 +267,42 @@ public final class TargetingUtils {
         .setEntries(updatedEntries)
         .setAssetsConfig(updatedAssetsConfig.build())
         .build();
+  }
+
+  /**
+   * Extracts a set of all directories in the module Assets.
+   *
+   * <p>This is only useful when BundleModule assets config is not yet generated (which is the case
+   * when validators are run). Prefer using {@link BundleModule#getAssetsConfig} for all other
+   * cases.
+   */
+  public static ImmutableSet<TargetedDirectory> extractAssetsTargetedDirectories(
+      BundleModule module) {
+    return module
+        .findEntriesUnderPath(BundleModule.ASSETS_DIRECTORY)
+        .map(ModuleEntry::getPath)
+        .filter(path -> path.getNameCount() > 1)
+        .map(ZipPath::getParent)
+        .map(TargetedDirectory::parse)
+        .collect(toImmutableSet());
+  }
+
+  /**
+   * Extracts all the texture compression formats used in the targeted directories.
+   *
+   * <p>This is only useful when BundleModule assets config is not yet generated (which is the case
+   * when validators are run). Prefer using {@link BundleModule#getAssetsConfig} for all other
+   * cases.
+   */
+  public static ImmutableSet<TextureCompressionFormatAlias> extractTextureCompressionFormats(
+      ImmutableSet<TargetedDirectory> targetedDirectories) {
+    return targetedDirectories.stream()
+        .map(directory -> directory.getTargeting(TargetingDimension.TEXTURE_COMPRESSION_FORMAT))
+        .filter(Optional::isPresent)
+        .map(Optional::get)
+        .flatMap(targeting -> targeting.getTextureCompressionFormat().getValueList().stream())
+        .map(TextureCompressionFormat::getAlias)
+        .collect(toImmutableSet());
   }
 
   /**

@@ -86,6 +86,6 @@ public class AssetModuleSplitter {
 
   private ModuleSplit setAssetSliceManifest(ModuleSplit assetSlice) {
     String resolvedSuffix = suffixManager.createSuffix(assetSlice);
-    return assetSlice.writeSplitIdInManifest(resolvedSuffix);
+    return assetSlice.writeSplitIdInManifest(resolvedSuffix).setHasCodeInManifest(false);
   }
 }

@@ -173,7 +173,10 @@ message SystemApkMetadata {
 }
 
 // Holds data specific to APEX APKs.
-message ApexApkMetadata {}
+message ApexApkMetadata {
+  // Configuration for processing of APKs embedded in an APEX image.
+  repeated ApexEmbeddedApkConfig apex_embedded_apk_config = 1;
+}
 
 message LocalTestingInfo {
   // Indicates if the bundle is built in local testing mode.

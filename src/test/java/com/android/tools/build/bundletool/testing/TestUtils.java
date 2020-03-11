@@ -21,6 +21,7 @@ import static com.google.common.truth.Truth.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.android.tools.build.bundletool.flags.Flag.RequiredFlagNotSetException;
+import com.android.tools.build.bundletool.model.InMemoryModuleEntry;
 import com.android.tools.build.bundletool.model.InputStreamSupplier;
 import com.android.tools.build.bundletool.model.ModuleEntry;
 import com.android.tools.build.bundletool.model.ZipPath;
@@ -70,10 +71,7 @@ public final class TestUtils {
    * instances, preserving the order.
    */
   public static ImmutableList<String> extractPaths(Stream<ModuleEntry> entries) {
-    return entries
-        .map(ModuleEntry::getPath)
-        .map(ZipPath::toString)
-        .collect(toImmutableList());
+    return entries.map(ModuleEntry::getPath).map(ZipPath::toString).collect(toImmutableList());
   }
 
   /** Extracts paths of all files having the given path prefix. */
@@ -86,6 +84,19 @@ public final class TestUtils {
 
   public static byte[] getEntryContent(ModuleEntry entry) {
     return toByteArray(entry.getContentSupplier());
+  }
+
+  public static ModuleEntry createModuleEntryForFile(String filePath, byte[] content) {
+    return InMemoryModuleEntry.ofFile(filePath, content);
+  }
+
+  public static ModuleEntry createModuleEntryForFile(
+      String filePath, byte[] content, boolean shouldCompress) {
+    return InMemoryModuleEntry.ofFile(filePath, content, shouldCompress);
+  }
+
+  public static ModuleEntry createModuleEntryForDirectory(String filePath) {
+    return InMemoryModuleEntry.ofDirectory(filePath);
   }
 
   public static byte[] toByteArray(InputStreamSupplier inputStreamSupplier) {

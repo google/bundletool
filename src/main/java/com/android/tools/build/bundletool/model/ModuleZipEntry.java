@@ -64,7 +64,7 @@ public abstract class ModuleZipEntry extends ModuleEntry {
    * not match the compression method of the input ZipEntry.
    */
   @Override
-  public abstract boolean shouldCompress();
+  public abstract boolean getShouldCompress();
 
   @MustBeClosed
   @Override

@@ -38,16 +38,19 @@ import static com.android.tools.build.bundletool.model.AndroidManifest.MIN_SDK_V
 import static com.android.tools.build.bundletool.model.AndroidManifest.MODULE_TYPE_ASSET_VALUE;
 import static com.android.tools.build.bundletool.model.AndroidManifest.NAME_ATTRIBUTE_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.NAME_RESOURCE_ID;
+import static com.android.tools.build.bundletool.model.AndroidManifest.NATIVE_ACTIVITY_LIB_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.NO_NAMESPACE_URI;
 import static com.android.tools.build.bundletool.model.AndroidManifest.PROVIDER_ELEMENT_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.RESOURCE_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.SERVICE_ELEMENT_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.SPLIT_NAME_ATTRIBUTE_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.SPLIT_NAME_RESOURCE_ID;
+import static com.android.tools.build.bundletool.model.AndroidManifest.SUPPORTS_GL_TEXTURE_ELEMENT_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.TARGET_SANDBOX_VERSION_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.TARGET_SDK_VERSION_ATTRIBUTE_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.TARGET_SDK_VERSION_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.USES_SDK_ELEMENT_NAME;
+import static com.android.tools.build.bundletool.model.AndroidManifest.VALUE_ATTRIBUTE_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.VALUE_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.VERSION_CODE_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.VERSION_NAME_ATTRIBUTE_NAME;
@@ -72,6 +75,7 @@ import com.google.common.collect.ObjectArrays;
 import java.util.Arrays;
 import java.util.Optional;
 import java.util.function.Consumer;
+import java.util.function.Function;
 import javax.annotation.Nullable;
 
 /** Helper methods for proto based Android Manifest tests. */
@@ -349,6 +353,15 @@ public final class ManifestProtoUtils {
             .setValueAsBoolean(hasCode);
   }
 
+  public static ManifestMutator clearApplication() {
+    return manifestElement ->
+        manifestElement.removeChildrenElementsIf(
+            element ->
+                element.isElement()
+                    && element.getElement().getNamespaceUri().equals(NO_NAMESPACE_URI)
+                    && element.getElement().getName().equals(APPLICATION_ELEMENT_NAME));
+  }
+
   public static ManifestMutator clearHasCode() {
     return manifestElement ->
         manifestElement
@@ -536,6 +549,19 @@ public final class ManifestProtoUtils {
             .addAttribute(
                 XmlProtoAttributeBuilder.createAndroidAttribute(attributeName, resourceId)
                     .setValueAsString(value));
+  }
+
+  public static ManifestMutator withSupportsGlTexture(String... glExtensionStrings) {
+    return manifestElement ->
+        Arrays.stream(glExtensionStrings)
+            .forEach(
+                glExtensionString ->
+                    manifestElement.addChildElement(
+                        XmlProtoElementBuilder.create(SUPPORTS_GL_TEXTURE_ELEMENT_NAME)
+                            .addAttribute(
+                                XmlProtoAttributeBuilder.createAndroidAttribute(
+                                        NAME_ATTRIBUTE_NAME, NAME_RESOURCE_ID)
+                                    .setValueAsString(glExtensionString))));
   }
 
   public static ManifestMutator withoutVersionCode() {
@@ -780,7 +806,42 @@ public final class ManifestProtoUtils {
                             .setValueAsString(splitName)));
   }
 
+  public static ManifestMutator withActivity(
+      String name, Function<XmlProtoElementBuilder, XmlProtoElementBuilder> modifier) {
+    return manifestElement ->
+        manifestElement
+            .getOrCreateChildElement(APPLICATION_ELEMENT_NAME)
+            .addChildElement(
+                modifier.apply(
+                    XmlProtoElementBuilder.create(ACTIVITY_ELEMENT_NAME)
+                        .addAttribute(
+                            XmlProtoAttributeBuilder.createAndroidAttribute(
+                                    NAME_ATTRIBUTE_NAME, NAME_RESOURCE_ID)
+                                .setValueAsString(name))));
+  }
+
   public static ManifestMutator withMainActivity(String activityName) {
+    return withActivity(
+        activityName,
+        activity ->
+            activity.addChildElement(
+                XmlProtoElementBuilder.create("intent-filter")
+                    .addChildElement(
+                        XmlProtoElementBuilder.create("action")
+                            .addAttribute(
+                                XmlProtoAttributeBuilder.createAndroidAttribute(
+                                        NAME_ATTRIBUTE_NAME, NAME_RESOURCE_ID)
+                                    .setValueAsString("android.intent.action.MAIN"))
+                            .addChildElement(
+                                XmlProtoElementBuilder.create("category")
+                                    .addAttribute(
+                                        XmlProtoAttributeBuilder.createAndroidAttribute(
+                                                NAME_ATTRIBUTE_NAME, NAME_RESOURCE_ID)
+                                            .setValueAsString(
+                                                "android.intent.category.LAUNCHER"))))));
+  }
+
+  public static ManifestMutator withNativeActivity(String libName) {
     return manifestElement ->
         manifestElement
             .getOrCreateChildElement(APPLICATION_ELEMENT_NAME)
@@ -789,22 +850,17 @@ public final class ManifestProtoUtils {
                     .addAttribute(
                         XmlProtoAttributeBuilder.createAndroidAttribute(
                                 NAME_ATTRIBUTE_NAME, NAME_RESOURCE_ID)
-                            .setValueAsString(activityName))
+                            .setValueAsString("android.app.NativeActivity"))
                     .addChildElement(
-                        XmlProtoElementBuilder.create("intent-filter")
-                            .addChildElement(
-                                XmlProtoElementBuilder.create("action")
-                                    .addAttribute(
-                                        XmlProtoAttributeBuilder.createAndroidAttribute(
-                                                "name", NAME_RESOURCE_ID)
-                                            .setValueAsString("android.intent.action.MAIN"))
-                                    .addChildElement(
-                                        XmlProtoElementBuilder.create("category")
-                                            .addAttribute(
-                                                XmlProtoAttributeBuilder.createAndroidAttribute(
-                                                        "name", NAME_RESOURCE_ID)
-                                                    .setValueAsString(
-                                                        "android.intent.category.LAUNCHER"))))));
+                        XmlProtoElementBuilder.create(META_DATA_ELEMENT_NAME)
+                            .addAttribute(
+                                XmlProtoAttributeBuilder.createAndroidAttribute(
+                                        NAME_ATTRIBUTE_NAME, NAME_RESOURCE_ID)
+                                    .setValueAsString(NATIVE_ACTIVITY_LIB_NAME))
+                            .addAttribute(
+                                XmlProtoAttributeBuilder.createAndroidAttribute(
+                                        VALUE_ATTRIBUTE_NAME, VALUE_RESOURCE_ID)
+                                    .setValueAsString(libName))));
   }
 
   /** Defined solely for readability. */

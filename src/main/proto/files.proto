@@ -2,9 +2,10 @@ syntax = "proto3";
 
 package android.bundle;
 
-option java_package = "com.android.bundle";
-
+import "config.proto";
 import "targeting.proto";
+
+option java_package = "com.android.bundle";
 
 // Describes the assets in the App Bundle.
 message Assets {
@@ -24,6 +25,9 @@ message NativeLibraries {
 message ApexImages {
   // List of all the image files under "apex/".
   repeated TargetedApexImage image = 1;
+
+  // Configuration for processing of APKs embedded in an APEX image.
+  repeated ApexEmbeddedApkConfig apex_embedded_apk_config = 2;
 }
 
 // An assets directory in the module that contains targeting information.
@@ -57,6 +61,11 @@ message TargetedNativeDirectory {
 // image it contains.
 message TargetedApexImage {
   string path = 1;
+
+  // Path to binary protocol buffer file containing apex.proto.ApexBuildInfo
+  // with metadata about how the individual APEX filesystem image was built.
+  // May be empty if APEX build info was not provided for this image.
+  string build_info_path = 3;
 
   ApexImageTargeting targeting = 2;
 }

@@ -10,6 +10,7 @@ message BundleConfig {
   Compression compression = 3;
   // Resources to be always kept in the master split.
   MasterResources master_resources = 4;
+  ApexConfig apex_config = 5;
 }
 
 message Bundletool {
@@ -109,4 +110,19 @@ message SuffixStripping {
   // "assets/level1_textures" are present and the default suffix is empty,
   // then only "assets/level1_textures" will be used).
   string default_suffix = 2;
+}
+
+// Configuration for processing APEX bundles.
+// https://source.android.com/devices/tech/ota/apex
+message ApexConfig {
+  // Configuration for processing of APKs embedded in an APEX image.
+  repeated ApexEmbeddedApkConfig apex_embedded_apk_config = 1;
+}
+
+message ApexEmbeddedApkConfig {
+  // Android package name of the APK.
+  string package_name = 1;
+
+  // Path to the APK within the APEX system image.
+  string path = 2;
 }

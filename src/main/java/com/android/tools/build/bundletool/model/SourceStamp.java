@@ -30,12 +30,10 @@ import com.google.errorprone.annotations.Immutable;
 @AutoValue
 public abstract class SourceStamp {
 
-  public static final String LOCAL_SOURCE = "local-unstamped";
+  public static final String LOCAL_SOURCE = "local";
 
-  public static final String STAMP_SOURCE_METADATA_KEY = "com.google.android.stamp.source";
-  public static final String STAMP_TYPE_METADATA_KEY = "com.google.android.stamp.type";
-  public static final String STAMP_CERT_SHA256_METADATA_KEY =
-      "com.google.android.stamp.stamp-cert-sha256";
+  public static final String STAMP_SOURCE_METADATA_KEY = "com.android.stamp.source";
+  public static final String STAMP_TYPE_METADATA_KEY = "com.android.stamp.type";
 
   /** Returns the signing configuration used for signing the stamp. */
   public abstract SigningConfiguration getSigningConfiguration();
@@ -45,7 +43,7 @@ public abstract class SourceStamp {
    *
    * <p>For stores, it is their package names.
    *
-   * <p>For local stamps, it is "local-unstamped". Local stamps are unverifiable.
+   * <p>For local stamps, it is "local".
    */
   public abstract String getSource();
 

@@ -231,9 +231,7 @@ public abstract class BuildBundleCommand {
 
       // Read the Bundle Config file if provided by the developer.
       BundleConfig bundleConfig =
-          getBundleConfig()
-              .orElse(BundleConfig.getDefaultInstance())
-              .toBuilder()
+          getBundleConfig().orElse(BundleConfig.getDefaultInstance()).toBuilder()
               .setBundletool(
                   Bundletool.newBuilder()
                       .setVersion(BundleToolVersion.getCurrentVersion().toString()))
@@ -297,19 +295,30 @@ public abstract class BuildBundleCommand {
   }
 
   private static Optional<ApexImages> generateApexImagesTargeting(BundleModule module) {
-    // Validation ensures that files under "apex/" conform to the pattern
+    // Validation ensures that image files under "apex/" conform to the pattern
     // "apex/<abi1>.<abi2>...<abiN>.img".
     ImmutableList<ZipPath> apexImageFiles =
         module
             .findEntriesUnderPath(BundleModule.APEX_DIRECTORY)
             .map(ModuleEntry::getPath)
+            .filter(p -> p.toString().endsWith(BundleModule.APEX_IMAGE_SUFFIX))
             .collect(toImmutableList());
+
+    // Validation ensures if build info is present then we have one per image.
+    boolean hasBuildInfo =
+        module
+            .findEntriesUnderPath(BundleModule.APEX_DIRECTORY)
+            .map(ModuleEntry::getPath)
+            .anyMatch(p -> p.toString().endsWith(BundleModule.BUILD_INFO_SUFFIX));
 
     if (apexImageFiles.isEmpty()) {
       return Optional.empty();
     }
 
-    return Optional.of(new TargetingGenerator().generateTargetingForApexImages(apexImageFiles));
+    return Optional.of(
+        new TargetingGenerator()
+            .generateTargetingForApexImages(
+                module.getBundleConfig().getApexConfig(), apexImageFiles, hasBuildInfo));
   }
 
   private static BundleConfig parseBundleConfigJson(Path bundleConfigJsonPath) {

@@ -18,6 +18,7 @@ package com.android.tools.build.bundletool.model;
 import static com.android.tools.build.bundletool.model.WearApkLocator.WEAR_APK_1_0_METADATA_KEY;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifest;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withMetadataResource;
+import static com.android.tools.build.bundletool.testing.TestUtils.createModuleEntryForFile;
 import static com.google.common.truth.Truth.assertThat;
 import static com.google.common.truth.Truth8.assertThat;
 import static java.nio.charset.StandardCharsets.UTF_8;
@@ -168,7 +169,7 @@ public final class WearApkLocatorTest {
     // No description XML file in the entries.
     ImmutableList<ModuleEntry> entries =
         ImmutableList.of(
-            InMemoryModuleEntry.ofFile(
+            createModuleEntryForFile(
                 wearableApkPath.toString(), TestData.readBytes("testdata/apk/com.test.app.apk")));
 
     ModuleSplit moduleSplit = createModuleSplit(androidManifest, resourceTable, entries);
@@ -201,7 +202,7 @@ public final class WearApkLocatorTest {
     AndroidManifest androidManifest = buildAndroidManifestForWearApk(resourceTable);
     ImmutableList<ModuleEntry> entries =
         ImmutableList.of(
-            InMemoryModuleEntry.ofFile(
+            createModuleEntryForFile(
                 WEAR_DESC_XML_RES_PATH,
                 createWearableAppXmlDescription(XmlNode.getDefaultInstance()).toByteArray()));
 
@@ -223,7 +224,7 @@ public final class WearApkLocatorTest {
     AndroidManifest androidManifest = buildAndroidManifestForWearApk(resourceTable);
     ImmutableList<ModuleEntry> entries =
         ImmutableList.of(
-            InMemoryModuleEntry.ofFile(WEAR_DESC_XML_RES_PATH, "RandomText".getBytes(UTF_8)));
+            createModuleEntryForFile(WEAR_DESC_XML_RES_PATH, "RandomText".getBytes(UTF_8)));
 
     ModuleSplit moduleSplit = createModuleSplit(androidManifest, resourceTable, entries);
 
@@ -242,7 +243,7 @@ public final class WearApkLocatorTest {
     AndroidManifest androidManifest = buildAndroidManifestForWearApk(resourceTable);
     ImmutableList<ModuleEntry> entries =
         ImmutableList.of(
-            InMemoryModuleEntry.ofFile(
+            createModuleEntryForFile(
                 WEAR_DESC_XML_RES_PATH,
                 createEmbeddedWearableAppXmlDescription(WEAR_APK_RES_NAME).toByteArray()));
 
@@ -284,16 +285,16 @@ public final class WearApkLocatorTest {
 
   private ImmutableList<ModuleEntry> buildEntriesForEmbeddedWearApk(ZipPath wearableApkPath) {
     return ImmutableList.of(
-        InMemoryModuleEntry.ofFile(
+        createModuleEntryForFile(
             wearableApkPath.toString(), TestData.readBytes("testdata/apk/com.test.app.apk")),
-        InMemoryModuleEntry.ofFile(
+        createModuleEntryForFile(
             WEAR_DESC_XML_RES_PATH,
             createEmbeddedWearableAppXmlDescription(WEAR_APK_RES_NAME).toByteArray()));
   }
 
   private ImmutableList<ModuleEntry> buildEntriesForUnbundledWearApk() {
     return ImmutableList.of(
-        InMemoryModuleEntry.ofFile(
+        createModuleEntryForFile(
             WEAR_DESC_XML_RES_PATH, createUnbundledWearableAppXmlDescription().toByteArray()));
   }
 

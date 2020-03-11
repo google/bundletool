@@ -155,8 +155,10 @@ final class BuildApksManager {
     GeneratedApks.Builder generatedApksBuilder = GeneratedApks.builder();
     GeneratedAssetSlices.Builder generatedAssetSlices = GeneratedAssetSlices.builder();
 
+    boolean enableUniversalAsFallbackForSplits = false;
     ApksToGenerate apksToGenerate =
-        new ApksToGenerate(appBundle, command.getApkBuildMode(), deviceSpec);
+        new ApksToGenerate(
+            appBundle, command.getApkBuildMode(), enableUniversalAsFallbackForSplits, deviceSpec);
 
     // Split APKs
     if (apksToGenerate.generateSplitApks()) {
@@ -508,12 +510,17 @@ final class BuildApksManager {
   private static class ApksToGenerate {
     private final AppBundle appBundle;
     private final ApkBuildMode apkBuildMode;
+    private final boolean enableUniversalAsFallbackForSplits;
     private final Optional<DeviceSpec> deviceSpec;
 
     private ApksToGenerate(
-        AppBundle appBundle, ApkBuildMode apkBuildMode, Optional<DeviceSpec> deviceSpec) {
+        AppBundle appBundle,
+        ApkBuildMode apkBuildMode,
+        boolean enableUniversalAsFallbackForSplits,
+        Optional<DeviceSpec> deviceSpec) {
       this.appBundle = appBundle;
       this.apkBuildMode = apkBuildMode;
+      this.enableUniversalAsFallbackForSplits = enableUniversalAsFallbackForSplits;
       this.deviceSpec = deviceSpec;
       validate();
     }
@@ -598,7 +605,9 @@ final class BuildApksManager {
       if (appBundle.isApex()) {
         return false;
       }
-      return apkBuildMode.equals(ApkBuildMode.UNIVERSAL);
+      boolean shouldGenerateAsFallback =
+          enableUniversalAsFallbackForSplits && generateSplitApks() && !generateStandaloneApks();
+      return apkBuildMode.equals(ApkBuildMode.UNIVERSAL) || shouldGenerateAsFallback;
     }
 
     public boolean generateSystemApks() {

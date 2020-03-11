@@ -98,7 +98,7 @@ public class ModuleEntryTest {
       }
 
       @Override
-      public boolean shouldCompress() {
+      public boolean getShouldCompress() {
         return true;
       }
     };

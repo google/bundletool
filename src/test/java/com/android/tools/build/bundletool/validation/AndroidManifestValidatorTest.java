@@ -32,6 +32,7 @@ import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.with
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withOnDemandAttribute;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withOnDemandDelivery;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withSplitId;
+import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withSupportsGlTexture;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withTargetSandboxVersion;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withTargetSdkVersion;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withVersionCode;
@@ -933,5 +934,70 @@ public class AndroidManifestValidatorTest {
 
     AndroidManifestValidator validator = new AndroidManifestValidator();
     modules.forEach(validator::validateModule);
+  }
+
+  @Test
+  public void noSupportsGlTextureWithTcfs_ok() throws Exception {
+    ImmutableList<BundleModule> bundleModules =
+        ImmutableList.of(
+            new BundleModuleBuilder(BASE_MODULE_NAME)
+                .addFile("assets/textures#tcf_astc/level1.assets")
+                .setManifest(androidManifest("com.test", withVersionCode(2)))
+                .build(),
+            new BundleModuleBuilder("asset_module")
+                .addFile("assets/other_textures#tcf_astc/astc_file.assets")
+                .setManifest(androidManifestForAssetModule("com.test.app"))
+                .build());
+
+    new AndroidManifestValidator().validateAllModules(bundleModules);
+  }
+
+  @Test
+  public void supportsGlTextureWithoutTcfs_ok() throws Exception {
+    ImmutableList<BundleModule> bundleModules =
+        ImmutableList.of(
+            new BundleModuleBuilder(BASE_MODULE_NAME)
+                .addFile("assets/textures/level1.assets")
+                .setManifest(
+                    androidManifest(
+                        "com.test",
+                        withVersionCode(2),
+                        withSupportsGlTexture("GL_OES_compressed_ETC1_RGB8_texture")))
+                .build(),
+            new BundleModuleBuilder("asset_module")
+                .addFile("assets/other_textures/file.assets")
+                .setManifest(androidManifestForAssetModule("com.test.app"))
+                .build());
+
+    new AndroidManifestValidator().validateAllModules(bundleModules);
+  }
+
+  @Test
+  public void supportsGlTextureWithTcfs_throws() throws Exception {
+    ImmutableList<BundleModule> bundleModules =
+        ImmutableList.of(
+            new BundleModuleBuilder(BASE_MODULE_NAME)
+                .setManifest(
+                    androidManifest(
+                        "com.test",
+                        withVersionCode(2),
+                        withSupportsGlTexture("GL_OES_compressed_ETC1_RGB8_texture")))
+                .build(),
+            new BundleModuleBuilder("asset_module")
+                .addFile("assets/other_textures#tcf_astc/astc_file.assets")
+                .setManifest(androidManifestForAssetModule("com.test.app"))
+                .build());
+
+    ValidationException exception =
+        assertThrows(
+            ValidationException.class,
+            () -> new AndroidManifestValidator().validateAllModules(bundleModules));
+
+    assertThat(exception)
+        .hasMessageThat()
+        .contains(
+            "Modules cannot have supports-gl-texture in their manifest (found:"
+                + " [GL_OES_compressed_ETC1_RGB8_texture]) and"
+                + " texture targeted directories in modules (found: [ASTC]).");
   }
 }

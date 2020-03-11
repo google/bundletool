@@ -21,6 +21,7 @@ import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 
+import com.android.bundle.Config.ApexConfig;
 import com.android.bundle.Files.ApexImages;
 import com.android.bundle.Files.Assets;
 import com.android.bundle.Files.NativeLibraries;
@@ -36,6 +37,7 @@ import com.android.bundle.Targeting.NativeDirectoryTargeting;
 import com.android.bundle.Targeting.Sanitizer;
 import com.android.bundle.Targeting.Sanitizer.SanitizerAlias;
 import com.android.tools.build.bundletool.model.AbiName;
+import com.android.tools.build.bundletool.model.BundleModule;
 import com.android.tools.build.bundletool.model.ZipPath;
 import com.android.tools.build.bundletool.model.exceptions.ValidationException;
 import com.android.tools.build.bundletool.model.utils.TargetingProtoUtils;
@@ -203,19 +205,30 @@ public class TargetingGenerator {
    * Generates APEX targeting based on the names of the APEX image files.
    *
    * @param apexImageFiles names of all files under apex/, including the "apex/" prefix.
+   * @param hasBuildInfo if true then each APEX image file has a corresponding build info file.
    * @return Targeting for all APEX image files.
    */
-  public ApexImages generateTargetingForApexImages(Collection<ZipPath> apexImageFiles) {
+  public ApexImages generateTargetingForApexImages(
+      ApexConfig apexConfig, Collection<ZipPath> apexImageFiles, boolean hasBuildInfo) {
     ImmutableMap<ZipPath, MultiAbi> targetingByPath =
         Maps.toMap(apexImageFiles, path -> buildMultiAbi(path.getFileName().toString()));
 
-    ApexImages.Builder apexImages = ApexImages.newBuilder();
+    ApexImages.Builder apexImages =
+        ApexImages.newBuilder()
+            .addAllApexEmbeddedApkConfig(apexConfig.getApexEmbeddedApkConfigList());
     ImmutableSet<MultiAbi> allTargeting = ImmutableSet.copyOf(targetingByPath.values());
     targetingByPath.forEach(
         (imagePath, targeting) ->
             apexImages.addImage(
                 TargetedApexImage.newBuilder()
                     .setPath(imagePath.toString())
+                    .setBuildInfoPath(
+                        hasBuildInfo
+                            ? imagePath
+                                .toString()
+                                .replace(
+                                    BundleModule.APEX_IMAGE_SUFFIX, BundleModule.BUILD_INFO_SUFFIX)
+                            : "")
                     .setTargeting(buildApexTargetingWithAlternatives(targeting, allTargeting))));
     return apexImages.build();
   }

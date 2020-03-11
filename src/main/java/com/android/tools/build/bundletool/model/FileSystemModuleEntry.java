@@ -48,7 +48,7 @@ public abstract class FileSystemModuleEntry extends ModuleEntry {
   public abstract boolean isDirectory();
 
   @Override
-  public abstract boolean shouldCompress();
+  public abstract boolean getShouldCompress();
 
   abstract Path getFileSystemPath();
 

@@ -37,9 +37,11 @@ import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.with
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withInstantOnDemandDelivery;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withLegacyFusingAttribute;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withLegacyOnDemand;
+import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withMainActivity;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withMaxSdkCondition;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withMinSdkCondition;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withMinSdkVersion;
+import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withNativeActivity;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withOnDemandAttribute;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withOnDemandDelivery;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withTargetSandboxVersion;
@@ -942,6 +944,35 @@ public class AndroidManifestTest {
                     "manifest",
                     xmlNode(xmlElement("application", metadataWithValue("metadata-key", "123"))))));
     assertThat(androidManifest.getMetadataValue("metadata-key")).hasValue("123");
+  }
+
+  @Test
+  public void hasExplicitlyDefinedNativeActivities_noNativeActivities() {
+    AndroidManifest manifest = AndroidManifest.create(androidManifest("com.package.test"));
+
+    assertThat(manifest.hasExplicitlyDefinedNativeActivities()).isFalse();
+  }
+
+  @Test
+  public void hasExplicitlyDefinedNativeActivities_someNativeActivities() {
+    AndroidManifest manifest =
+        AndroidManifest.create(
+            androidManifest(
+                "com.package.test",
+                withNativeActivity("libA"),
+                withNativeActivity("libB"),
+                withNativeActivity("libA")));
+
+    assertThat(manifest.hasExplicitlyDefinedNativeActivities()).isTrue();
+  }
+
+  @Test
+  public void hasExplicitlyDefinedNativeActivities_someActivitiesButNotNative() {
+    AndroidManifest manifest =
+        AndroidManifest.create(
+            androidManifest("com.package.test", withMainActivity("com.package.test.MainActivity")));
+
+    assertThat(manifest.hasExplicitlyDefinedNativeActivities()).isFalse();
   }
 
   @Test

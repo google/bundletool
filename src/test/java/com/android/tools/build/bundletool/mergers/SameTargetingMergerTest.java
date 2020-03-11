@@ -29,6 +29,7 @@ import static com.android.tools.build.bundletool.testing.TargetingUtils.lPlusVar
 import static com.android.tools.build.bundletool.testing.TargetingUtils.nativeDirectoryTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.nativeLibraries;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.targetedNativeDirectory;
+import static com.android.tools.build.bundletool.testing.TestUtils.createModuleEntryForFile;
 import static com.android.tools.build.bundletool.testing.TestUtils.extractPaths;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.ImmutableSet.toImmutableSet;
@@ -44,7 +45,6 @@ import com.android.bundle.Targeting.ApkTargeting;
 import com.android.bundle.Targeting.VariantTargeting;
 import com.android.tools.build.bundletool.model.AndroidManifest;
 import com.android.tools.build.bundletool.model.BundleModuleName;
-import com.android.tools.build.bundletool.model.InMemoryModuleEntry;
 import com.android.tools.build.bundletool.model.ModuleSplit;
 import com.google.common.collect.ImmutableCollection;
 import com.google.common.collect.ImmutableList;
@@ -66,15 +66,14 @@ public class SameTargetingMergerTest {
     ModuleSplit moduleSplit =
         createModuleSplitBuilder()
             .setEntries(
-                ImmutableList.of(
-                    InMemoryModuleEntry.ofFile("assets/some_asset.txt", DUMMY_CONTENT)))
+                ImmutableList.of(createModuleEntryForFile("assets/some_asset.txt", DUMMY_CONTENT)))
             .setApkTargeting(ApkTargeting.getDefaultInstance())
             .build();
     ModuleSplit moduleSplit2 =
         createModuleSplitBuilder()
             .setEntries(
                 ImmutableList.of(
-                    InMemoryModuleEntry.ofFile("assets/some_other_asset.txt", DUMMY_CONTENT)))
+                    createModuleEntryForFile("assets/some_other_asset.txt", DUMMY_CONTENT)))
             .setApkTargeting(ApkTargeting.getDefaultInstance())
             .build();
 
@@ -99,7 +98,7 @@ public class SameTargetingMergerTest {
         createModuleSplitBuilder()
             .setEntries(
                 ImmutableList.of(
-                    InMemoryModuleEntry.ofFile("testModule/lib/x86/liba.so", DUMMY_CONTENT)))
+                    createModuleEntryForFile("testModule/lib/x86/liba.so", DUMMY_CONTENT)))
             .setMasterSplit(false)
             .setApkTargeting(apkAbiTargeting(ImmutableSet.of(AbiAlias.X86), abis))
             .build();
@@ -107,7 +106,7 @@ public class SameTargetingMergerTest {
         createModuleSplitBuilder()
             .setEntries(
                 ImmutableList.of(
-                    InMemoryModuleEntry.ofFile("testModule/lib/armv7-eabi/liba.so", DUMMY_CONTENT)))
+                    createModuleEntryForFile("testModule/lib/armv7-eabi/liba.so", DUMMY_CONTENT)))
             .setMasterSplit(false)
             .setApkTargeting(apkAbiTargeting(ImmutableSet.of(AbiAlias.ARMEABI), abis))
             .build();
@@ -115,7 +114,7 @@ public class SameTargetingMergerTest {
         createModuleSplitBuilder()
             .setEntries(
                 ImmutableList.of(
-                    InMemoryModuleEntry.ofFile("testModule/lib/mips/liba.so", DUMMY_CONTENT)))
+                    createModuleEntryForFile("testModule/lib/mips/liba.so", DUMMY_CONTENT)))
             .setMasterSplit(false)
             .setApkTargeting(apkAbiTargeting(ImmutableSet.of(AbiAlias.MIPS), abis))
             .build();
@@ -123,7 +122,7 @@ public class SameTargetingMergerTest {
         createModuleSplitBuilder()
             .setEntries(
                 ImmutableList.of(
-                    InMemoryModuleEntry.ofFile("testModule/lib/x86/libb.so", DUMMY_CONTENT)))
+                    createModuleEntryForFile("testModule/lib/x86/libb.so", DUMMY_CONTENT)))
             .setMasterSplit(false)
             .setApkTargeting(apkAbiTargeting(ImmutableSet.of(AbiAlias.X86), abis))
             .build();
@@ -131,7 +130,7 @@ public class SameTargetingMergerTest {
         createModuleSplitBuilder()
             .setEntries(
                 ImmutableList.of(
-                    InMemoryModuleEntry.ofFile("testModule/lib/armv7-eabi/libb.so", DUMMY_CONTENT)))
+                    createModuleEntryForFile("testModule/lib/armv7-eabi/libb.so", DUMMY_CONTENT)))
             .setMasterSplit(false)
             .setApkTargeting(apkAbiTargeting(ImmutableSet.of(AbiAlias.ARMEABI), abis))
             .build();
@@ -139,7 +138,7 @@ public class SameTargetingMergerTest {
         createModuleSplitBuilder()
             .setEntries(
                 ImmutableList.of(
-                    InMemoryModuleEntry.ofFile("testModule/lib/mips/libb.so", DUMMY_CONTENT)))
+                    createModuleEntryForFile("testModule/lib/mips/libb.so", DUMMY_CONTENT)))
             .setMasterSplit(false)
             .setApkTargeting(apkAbiTargeting(ImmutableSet.of(AbiAlias.MIPS), abis))
             .build();
@@ -202,8 +201,7 @@ public class SameTargetingMergerTest {
         createModuleSplitBuilder()
             .setEntries(
                 ImmutableList.of(
-                    InMemoryModuleEntry.ofFile(
-                        "testModule/res/drawable/image1.jpg", DUMMY_CONTENT)))
+                    createModuleEntryForFile("testModule/res/drawable/image1.jpg", DUMMY_CONTENT)))
             .setResourceTable(
                 resourceTable(
                     pkg(
@@ -215,8 +213,7 @@ public class SameTargetingMergerTest {
         createModuleSplitBuilder()
             .setEntries(
                 ImmutableList.of(
-                    InMemoryModuleEntry.ofFile(
-                        "testModule/res/drawable/image2.jpg", DUMMY_CONTENT)))
+                    createModuleEntryForFile("testModule/res/drawable/image2.jpg", DUMMY_CONTENT)))
             .setResourceTable(
                 resourceTable(
                     pkg(
@@ -326,7 +323,7 @@ public class SameTargetingMergerTest {
         createModuleSplitBuilder()
             .setEntries(
                 ImmutableList.of(
-                    InMemoryModuleEntry.ofFile("assets/some_assets/file.txt", DUMMY_CONTENT)))
+                    createModuleEntryForFile("assets/some_assets/file.txt", DUMMY_CONTENT)))
             .setApkTargeting(ApkTargeting.getDefaultInstance())
             .setAssetsConfig(
                 Assets.newBuilder()
@@ -338,7 +335,7 @@ public class SameTargetingMergerTest {
         createModuleSplitBuilder()
             .setEntries(
                 ImmutableList.of(
-                    InMemoryModuleEntry.ofFile("assets/some_other_assets/file.txt", DUMMY_CONTENT)))
+                    createModuleEntryForFile("assets/some_other_assets/file.txt", DUMMY_CONTENT)))
             .setApkTargeting(ApkTargeting.getDefaultInstance())
             .setAssetsConfig(
                 Assets.newBuilder()
@@ -369,7 +366,7 @@ public class SameTargetingMergerTest {
         createModuleSplitBuilder()
             .setEntries(
                 ImmutableList.of(
-                    InMemoryModuleEntry.ofFile("assets/some_assets/file.txt", DUMMY_CONTENT)))
+                    createModuleEntryForFile("assets/some_assets/file.txt", DUMMY_CONTENT)))
             .setApkTargeting(ApkTargeting.getDefaultInstance())
             .setAssetsConfig(
                 Assets.newBuilder()
@@ -384,8 +381,8 @@ public class SameTargetingMergerTest {
         createModuleSplitBuilder()
             .setEntries(
                 ImmutableList.of(
-                    InMemoryModuleEntry.ofFile("assets/some_assets/file.txt", DUMMY_CONTENT),
-                    InMemoryModuleEntry.ofFile("assets/some_other_assets/file.txt", DUMMY_CONTENT)))
+                    createModuleEntryForFile("assets/some_assets/file.txt", DUMMY_CONTENT),
+                    createModuleEntryForFile("assets/some_other_assets/file.txt", DUMMY_CONTENT)))
             .setApkTargeting(ApkTargeting.getDefaultInstance())
             .setAssetsConfig(
                 Assets.newBuilder()
@@ -419,7 +416,7 @@ public class SameTargetingMergerTest {
         createModuleSplitBuilder()
             .setEntries(
                 ImmutableList.of(
-                    InMemoryModuleEntry.ofFile("assets/some_assets/file.txt", DUMMY_CONTENT)))
+                    createModuleEntryForFile("assets/some_assets/file.txt", DUMMY_CONTENT)))
             .setApkTargeting(ApkTargeting.getDefaultInstance())
             .setAssetsConfig(
                 Assets.newBuilder()
@@ -434,7 +431,7 @@ public class SameTargetingMergerTest {
         createModuleSplitBuilder()
             .setEntries(
                 ImmutableList.of(
-                    InMemoryModuleEntry.ofFile("assets/some_assets/file.txt", DUMMY_CONTENT)))
+                    createModuleEntryForFile("assets/some_assets/file.txt", DUMMY_CONTENT)))
             .setApkTargeting(ApkTargeting.getDefaultInstance())
             .setAssetsConfig(
                 Assets.newBuilder()

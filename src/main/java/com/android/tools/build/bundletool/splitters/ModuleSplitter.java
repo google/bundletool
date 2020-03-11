@@ -123,6 +123,7 @@ public class ModuleSplitter {
     return runSplitters().stream()
         .map(this::addLPlusApkTargeting)
         .map(this::writeSplitIdInManifest)
+        .map(ModuleSplit::addApplicationElementIfMissingInManifest)
         .collect(toImmutableList());
   }
 

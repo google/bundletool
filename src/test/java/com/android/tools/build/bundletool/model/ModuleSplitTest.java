@@ -20,7 +20,6 @@ import static com.android.tools.build.bundletool.model.AndroidManifest.ACTIVITY_
 import static com.android.tools.build.bundletool.model.AndroidManifest.ANDROID_NAMESPACE_URI;
 import static com.android.tools.build.bundletool.model.AndroidManifest.IS_FEATURE_SPLIT_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.NAME_RESOURCE_ID;
-import static com.android.tools.build.bundletool.model.SourceStamp.STAMP_CERT_SHA256_METADATA_KEY;
 import static com.android.tools.build.bundletool.model.SourceStamp.STAMP_SOURCE_METADATA_KEY;
 import static com.android.tools.build.bundletool.model.SourceStamp.STAMP_TYPE_METADATA_KEY;
 import static com.android.tools.build.bundletool.testing.CertificateFactory.buildSelfSignedCertificate;
@@ -46,6 +45,7 @@ import static com.android.tools.build.bundletool.testing.TargetingUtils.multiAbi
 import static com.android.tools.build.bundletool.testing.TargetingUtils.openGlVersionFrom;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.textureCompressionTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.vulkanVersionFrom;
+import static com.android.tools.build.bundletool.testing.TestUtils.createModuleEntryForFile;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.truth.Truth8.assertThat;
 import static com.google.common.truth.extensions.proto.ProtoTruth.assertThat;
@@ -64,7 +64,6 @@ import com.android.bundle.Targeting.ScreenDensityTargeting;
 import com.android.bundle.Targeting.TextureCompressionFormat.TextureCompressionFormatAlias;
 import com.android.bundle.Targeting.VariantTargeting;
 import com.android.tools.build.bundletool.model.SourceStamp.StampType;
-import com.android.tools.build.bundletool.model.utils.CertificateHelper;
 import com.android.tools.build.bundletool.model.utils.xmlproto.XmlProtoElement;
 import com.android.tools.build.bundletool.model.utils.xmlproto.XmlProtoNode;
 import com.android.tools.build.bundletool.testing.BundleModuleBuilder;
@@ -89,7 +88,6 @@ public class ModuleSplitTest {
   private static final int VERSION_CODE_RESOURCE_ID = 0x0101021b;
 
   private static SigningConfiguration stampSigningConfig;
-  private static String stampCertSha256;
 
   @BeforeClass
   public static void setUpClass() throws Exception {
@@ -101,7 +99,6 @@ public class ModuleSplitTest {
             .setPrivateKey(privateKey)
             .setCertificates(ImmutableList.of(certificate))
             .build();
-    stampCertSha256 = CertificateHelper.sha256AsHexString(certificate);
   }
 
   @Test
@@ -461,8 +458,6 @@ public class ModuleSplitTest {
         .hasValue(stampType.toString());
     assertThat(masterSplit.getAndroidManifest().getMetadataValue(STAMP_SOURCE_METADATA_KEY))
         .hasValue(sourceStamp.getSource());
-    assertThat(masterSplit.getAndroidManifest().getMetadataValue(STAMP_CERT_SHA256_METADATA_KEY))
-        .hasValue(stampCertSha256);
   }
 
   @Test
@@ -487,13 +482,11 @@ public class ModuleSplitTest {
 
     assertThat(abiSplit.getAndroidManifest().getMetadataValue(STAMP_TYPE_METADATA_KEY)).isEmpty();
     assertThat(abiSplit.getAndroidManifest().getMetadataValue(STAMP_SOURCE_METADATA_KEY)).isEmpty();
-    assertThat(abiSplit.getAndroidManifest().getMetadataValue(STAMP_CERT_SHA256_METADATA_KEY))
-        .isEmpty();
   }
 
   private ImmutableList<ModuleEntry> fakeEntriesOf(String... entries) {
     return Arrays.stream(entries)
-        .map(entry -> InMemoryModuleEntry.ofFile(entry, DUMMY_CONTENT))
+        .map(entry -> createModuleEntryForFile(entry, DUMMY_CONTENT))
         .collect(toImmutableList());
   }
 

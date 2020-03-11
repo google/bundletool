@@ -46,6 +46,7 @@ import com.android.tools.build.bundletool.model.ShardedSystemSplits;
 import com.android.tools.build.bundletool.model.SuffixManager;
 import com.android.tools.build.bundletool.model.ZipPath;
 import com.android.tools.build.bundletool.model.exceptions.CommandExecutionException;
+import com.android.tools.build.bundletool.model.utils.Versions;
 import com.android.tools.build.bundletool.model.utils.files.BufferedIo;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ArrayListMultimap;
@@ -55,8 +56,10 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.ListMultimap;
+import com.google.common.collect.Multimap;
 import com.google.common.collect.SetMultimap;
 import com.google.common.collect.Sets;
+import com.google.common.collect.Streams;
 import com.google.common.io.ByteStreams;
 import java.io.IOException;
 import java.io.InputStream;
@@ -354,7 +357,10 @@ public class ModuleSplitsToShardMerger {
       // Don't merge if all dex files live inside a single module. If that module contains multiple
       // dex files, it should have been built with multi-dex support.
       return dexFilesToMergeByModule.values();
-
+    } else if (androidManifest.getEffectiveMinSdkVersion() >= Versions.ANDROID_L_API_VERSION) {
+      // When APK targets L+ devices we know the devices already have multi-dex support.
+      // In this case we can skip merging dexes and just rename original ones to be in order.
+      return renameDexFromAllModulesToSingleShard(dexFilesToMergeByModule);
     } else {
       ImmutableList<ModuleEntry> dexEntries =
           ImmutableList.copyOf(dexFilesToMergeByModule.values());
@@ -373,6 +379,32 @@ public class ModuleSplitsToShardMerger {
                       /* fileSystemPath= */ filePath))
           .collect(toImmutableList());
     }
+  }
+
+  private static ImmutableList<ModuleEntry> renameDexFromAllModulesToSingleShard(
+      Multimap<BundleModuleName, ModuleEntry> dexFilesToMergeByModule) {
+    // We don't need to rename classes*.dex in base module.
+    Stream<ModuleEntry> dexFilesFromBase = dexFilesToMergeByModule.get(BASE_MODULE_NAME).stream();
+
+    // Take Dex files from all other modules and rename them to be after base module dexes.
+    int dexFilesCountInBase = dexFilesToMergeByModule.get(BASE_MODULE_NAME).size();
+    Stream<ModuleEntry> dexFilesFromNotBase =
+        dexFilesToMergeByModule.keys().stream()
+            .distinct()
+            .filter(moduleName -> !BASE_MODULE_NAME.equals(moduleName))
+            .flatMap(moduleName -> dexFilesToMergeByModule.get(moduleName).stream());
+
+    Stream<ModuleEntry> renamedDexFiles =
+        Streams.mapWithIndex(
+            dexFilesFromNotBase,
+            (entry, index) ->
+                entry.setPath(
+                    DEX_DIRECTORY.resolve(
+                        dexFilesCountInBase + index == 0
+                            ? "classes.dex"
+                            : String.format("classes%d.dex", dexFilesCountInBase + index + 1))));
+
+    return Stream.concat(dexFilesFromBase, renamedDexFiles).collect(toImmutableList());
   }
 
   private ImmutableList<Path> mergeDexFiles(

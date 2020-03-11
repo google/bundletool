@@ -20,6 +20,8 @@ import com.google.common.io.MoreFiles;
 import com.google.common.io.RecursiveDeleteOption;
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.nio.file.DirectoryNotEmptyException;
+import java.nio.file.FileSystemException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import javax.annotation.Nullable;
@@ -53,8 +55,27 @@ public class TempDirectory implements AutoCloseable {
 
   @Override
   public void close() {
+    closeWithRetry(/* numAttempt= */ 1);
+  }
+
+  private void closeWithRetry(int numAttempt) {
     try {
       MoreFiles.deleteRecursively(dirPath, RecursiveDeleteOption.ALLOW_INSECURE);
+    } catch (FileSystemException e) {
+      // See https://github.com/google/bundletool/issues/61
+      // Retrying because Windows sometimes doesn't delete everything synchronously.
+      if (e.getCause() instanceof DirectoryNotEmptyException) {
+        if (numAttempt == 5) {
+          throw new UncheckedIOException(
+              "Unable to delete temporary directory after 5 attempts.", e);
+        }
+        try {
+          Thread.sleep(200L);
+        } catch (InterruptedException ex) {
+          Thread.currentThread().interrupt();
+        }
+        closeWithRetry(numAttempt + 1);
+      }
     } catch (IOException e) {
       throw new UncheckedIOException(e);
     }

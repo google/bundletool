@@ -463,35 +463,7 @@ public abstract class BuildApksCommand {
                     .setExecutorServiceCreatedByBundleTool(true));
     OPTIMIZE_FOR_FLAG.getValue(flags).ifPresent(buildApksCommand::setOptimizationDimensions);
 
-    // Signing-related arguments.
-    Optional<Path> keystorePath = KEYSTORE_FLAG.getValue(flags);
-    Optional<String> keyAlias = KEY_ALIAS_FLAG.getValue(flags);
-    Optional<Password> keystorePassword = KEYSTORE_PASSWORD_FLAG.getValue(flags);
-    Optional<Password> keyPassword = KEY_PASSWORD_FLAG.getValue(flags);
-
-    if (keystorePath.isPresent() && keyAlias.isPresent()) {
-      buildApksCommand.setSigningConfiguration(
-          SigningConfiguration.extractFromKeystore(
-              keystorePath.get(), keyAlias.get(), keystorePassword, keyPassword));
-    } else if (keystorePath.isPresent() && !keyAlias.isPresent()) {
-      throw new CommandExecutionException("Flag --ks-key-alias is required when --ks is set.");
-    } else if (!keystorePath.isPresent() && keyAlias.isPresent()) {
-      throw new CommandExecutionException("Flag --ks is required when --ks-key-alias is set.");
-    } else {
-      // Try to use debug keystore if present.
-      Optional<SigningConfiguration> debugConfig =
-          DebugKeystoreUtils.getDebugSigningConfiguration(systemEnvironmentProvider);
-      if (debugConfig.isPresent()) {
-        out.printf(
-            "INFO: The APKs will be signed with the debug keystore found at '%s'.%n",
-            DebugKeystoreUtils.DEBUG_KEYSTORE_CACHE.getUnchecked(systemEnvironmentProvider).get());
-        buildApksCommand.setSigningConfiguration(debugConfig.get());
-      } else {
-        out.println(
-            "WARNING: The APKs won't be signed and thus not installable unless you also pass a "
-                + "keystore via the flag --ks. See the command help for more information.");
-      }
-    }
+    populateSigningConfigurationFromFlags(buildApksCommand, flags, out, systemEnvironmentProvider);
 
     boolean connectedDeviceMode = CONNECTED_DEVICE_FLAG.getValue(flags).orElse(false);
     CONNECTED_DEVICE_FLAG
@@ -769,4 +741,41 @@ public abstract class BuildApksCommand {
         .map(String::toLowerCase)
         .collect(Collectors.joining("|"));
   }
+
+  private static void populateSigningConfigurationFromFlags(
+      Builder buildApksCommand,
+      ParsedFlags flags,
+      PrintStream out,
+      SystemEnvironmentProvider systemEnvironmentProvider) {
+    // Signing-related arguments.
+    Optional<Path> keystorePath = KEYSTORE_FLAG.getValue(flags);
+    Optional<String> keyAlias = KEY_ALIAS_FLAG.getValue(flags);
+    Optional<Password> keystorePassword = KEYSTORE_PASSWORD_FLAG.getValue(flags);
+    Optional<Password> keyPassword = KEY_PASSWORD_FLAG.getValue(flags);
+
+    if (keystorePath.isPresent() && keyAlias.isPresent()) {
+      buildApksCommand.setSigningConfiguration(
+          SigningConfiguration.extractFromKeystore(
+              keystorePath.get(), keyAlias.get(), keystorePassword, keyPassword));
+    } else if (keystorePath.isPresent() && !keyAlias.isPresent()) {
+      throw new CommandExecutionException("Flag --ks-key-alias is required when --ks is set.");
+    } else if (!keystorePath.isPresent() && keyAlias.isPresent()) {
+      throw new CommandExecutionException("Flag --ks is required when --ks-key-alias is set.");
+    } else {
+      // Try to use debug keystore if present.
+      Optional<SigningConfiguration> debugConfig =
+          DebugKeystoreUtils.getDebugSigningConfiguration(systemEnvironmentProvider);
+      if (debugConfig.isPresent()) {
+        out.printf(
+            "INFO: The APKs will be signed with the debug keystore found at '%s'.%n",
+            DebugKeystoreUtils.DEBUG_KEYSTORE_CACHE.getUnchecked(systemEnvironmentProvider).get());
+        buildApksCommand.setSigningConfiguration(debugConfig.get());
+      } else {
+        out.println(
+            "WARNING: The APKs won't be signed and thus not installable unless you also pass a "
+                + "keystore via the flag --ks. See the command help for more information.");
+      }
+    }
+  }
+
 }

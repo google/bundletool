@@ -17,8 +17,10 @@
 package com.android.tools.build.bundletool.splitters;
 
 import static com.android.tools.build.bundletool.model.utils.Versions.ANDROID_M_API_VERSION;
+import static com.android.tools.build.bundletool.model.utils.Versions.ANDROID_N_API_VERSION;
 import static com.android.tools.build.bundletool.model.utils.Versions.ANDROID_P_API_VERSION;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifest;
+import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withNativeActivity;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.nativeDirectoryTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.nativeLibraries;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.targetedNativeDirectory;
@@ -65,6 +67,22 @@ public class NativeLibsCompressionVariantGeneratorTest {
             .generate(createSingleLibraryModule("testModule", "x86", "lib/x86/libnoname.so"))
             .collect(toImmutableList());
     assertThat(splits).containsExactly(variantMinSdkTargeting(ANDROID_P_API_VERSION));
+  }
+
+  @Test
+  public void variantsWithNativeLibs_withNativeActivities() throws Exception {
+    NativeLibsCompressionVariantGenerator nativeLibsCompressionVariantGenerator =
+        new NativeLibsCompressionVariantGenerator(
+            ApkGenerationConfiguration.builder()
+                .setEnableNativeLibraryCompressionSplitter(true)
+                .build());
+    ImmutableCollection<VariantTargeting> splits =
+        nativeLibsCompressionVariantGenerator
+            .generate(
+                createSingleLibraryModule(
+                    "testModule", "x86", "lib/x86/libnoname.so", withNativeActivity("noname")))
+            .collect(toImmutableList());
+    assertThat(splits).containsExactly(variantMinSdkTargeting(ANDROID_N_API_VERSION));
   }
 
   @Test

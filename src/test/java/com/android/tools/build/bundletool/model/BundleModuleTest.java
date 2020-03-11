@@ -37,6 +37,7 @@ import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.with
 import static com.android.tools.build.bundletool.testing.TargetingUtils.mergeModuleTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.moduleFeatureTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.moduleMinSdkVersionTargeting;
+import static com.android.tools.build.bundletool.testing.TestUtils.createModuleEntryForFile;
 import static com.google.common.truth.Truth.assertThat;
 import static com.google.common.truth.Truth8.assertThat;
 import static com.google.common.truth.extensions.proto.ProtoTruth.assertThat;
@@ -92,7 +93,7 @@ public class BundleModuleTest {
 
     BundleModule bundleModule =
         createMinimalModuleBuilder()
-            .addEntry(InMemoryModuleEntry.ofFile("assets.pb", assetsConfig.toByteArray()))
+            .addEntry(createModuleEntryForFile("assets.pb", assetsConfig.toByteArray()))
             .build();
 
     assertThat(bundleModule.getAssetsConfig()).hasValue(assetsConfig);
@@ -106,7 +107,7 @@ public class BundleModuleTest {
         IOException.class,
         () ->
             createMinimalModuleBuilder()
-                .addEntry(InMemoryModuleEntry.ofFile("assets.pb", badAssetsFile)));
+                .addEntry(createModuleEntryForFile("assets.pb", badAssetsFile)));
   }
 
   @Test
@@ -125,7 +126,7 @@ public class BundleModuleTest {
 
     BundleModule bundleModule =
         createMinimalModuleBuilder()
-            .addEntry(InMemoryModuleEntry.ofFile("native.pb", nativeConfig.toByteArray()))
+            .addEntry(createModuleEntryForFile("native.pb", nativeConfig.toByteArray()))
             .build();
 
     assertThat(bundleModule.getNativeConfig()).hasValue(nativeConfig);
@@ -139,7 +140,7 @@ public class BundleModuleTest {
         IOException.class,
         () ->
             createMinimalModuleBuilder()
-                .addEntry(InMemoryModuleEntry.ofFile("native.pb", badNativeFile)));
+                .addEntry(createModuleEntryForFile("native.pb", badNativeFile)));
   }
 
   @Test
@@ -156,7 +157,7 @@ public class BundleModuleTest {
 
     BundleModule bundleModule =
         createMinimalModuleBuilder()
-            .addEntry(InMemoryModuleEntry.ofFile("resources.pb", resourceTable.toByteArray()))
+            .addEntry(createModuleEntryForFile("resources.pb", resourceTable.toByteArray()))
             .build();
 
     assertThat(bundleModule.getResourceTable()).hasValue(resourceTable);
@@ -170,7 +171,7 @@ public class BundleModuleTest {
         IOException.class,
         () ->
             createMinimalModuleBuilder()
-                .addEntry(InMemoryModuleEntry.ofFile("resources.pb", badResourcesFile)));
+                .addEntry(createModuleEntryForFile("resources.pb", badResourcesFile)));
   }
 
   @Test
@@ -195,8 +196,7 @@ public class BundleModuleTest {
             .setName(BundleModuleName.create("testModule"))
             .setBundleConfig(DEFAULT_BUNDLE_CONFIG)
             .addEntry(
-                InMemoryModuleEntry.ofFile(
-                    "manifest/AndroidManifest.xml", manifestXml.toByteArray()))
+                createModuleEntryForFile("manifest/AndroidManifest.xml", manifestXml.toByteArray()))
             .build();
 
     assertThat(bundleModule.getAndroidManifest().getManifestRoot().getProto())
@@ -214,7 +214,7 @@ public class BundleModuleTest {
         IOException.class,
         () ->
             minimalModuleWithoutManifest.addEntry(
-                InMemoryModuleEntry.ofFile("manifest/AndroidManifest.xml", badManifestFile)));
+                createModuleEntryForFile("manifest/AndroidManifest.xml", badManifestFile)));
   }
 
   @Test
@@ -233,7 +233,7 @@ public class BundleModuleTest {
 
     BundleModule bundleModule =
         createMinimalModuleBuilder()
-            .addEntry(InMemoryModuleEntry.ofFile("apex.pb", apexConfig.toByteArray()))
+            .addEntry(createModuleEntryForFile("apex.pb", apexConfig.toByteArray()))
             .build();
 
     assertThat(bundleModule.getApexConfig()).hasValue(apexConfig);
@@ -247,7 +247,7 @@ public class BundleModuleTest {
         IOException.class,
         () ->
             createMinimalModuleBuilder()
-                .addEntry(InMemoryModuleEntry.ofFile("apex.pb", badApexFile)));
+                .addEntry(createModuleEntryForFile("apex.pb", badApexFile)));
   }
 
   @Test
@@ -257,15 +257,15 @@ public class BundleModuleTest {
             .setName(BundleModuleName.create("testModule"))
             .setBundleConfig(DEFAULT_BUNDLE_CONFIG)
             .addEntry(
-                InMemoryModuleEntry.ofFile(
+                createModuleEntryForFile(
                     "manifest/AndroidManifest.xml", androidManifest("com.test.app").toByteArray()))
             .addEntry(
-                InMemoryModuleEntry.ofFile("assets.pb", Assets.getDefaultInstance().toByteArray()))
+                createModuleEntryForFile("assets.pb", Assets.getDefaultInstance().toByteArray()))
             .addEntry(
-                InMemoryModuleEntry.ofFile(
+                createModuleEntryForFile(
                     "native.pb", NativeLibraries.getDefaultInstance().toByteArray()))
             .addEntry(
-                InMemoryModuleEntry.ofFile(
+                createModuleEntryForFile(
                     "resources.pb", ResourceTable.getDefaultInstance().toByteArray()))
             .build();
 
@@ -301,9 +301,9 @@ public class BundleModuleTest {
   /** Tests that we skip directories that contain a directory that we want to find entries under. */
   @Test
   public void entriesUnderPath_withPrefixDirectory() throws Exception {
-    ModuleEntry entry1 = InMemoryModuleEntry.ofFile("dir1/entry1", DUMMY_CONTENT);
-    ModuleEntry entry2 = InMemoryModuleEntry.ofFile("dir1/entry2", DUMMY_CONTENT);
-    ModuleEntry entry3 = InMemoryModuleEntry.ofFile("dir1longer/entry3", DUMMY_CONTENT);
+    ModuleEntry entry1 = createModuleEntryForFile("dir1/entry1", DUMMY_CONTENT);
+    ModuleEntry entry2 = createModuleEntryForFile("dir1/entry2", DUMMY_CONTENT);
+    ModuleEntry entry3 = createModuleEntryForFile("dir1longer/entry3", DUMMY_CONTENT);
 
     BundleModule bundleModule =
         createMinimalModuleBuilder().addEntries(Arrays.asList(entry1, entry2, entry3)).build();
@@ -314,7 +314,7 @@ public class BundleModuleTest {
 
   @Test
   public void getEntry_existing_found() throws Exception {
-    ModuleEntry entry = InMemoryModuleEntry.ofFile("dir/entry", DUMMY_CONTENT);
+    ModuleEntry entry = createModuleEntryForFile("dir/entry", DUMMY_CONTENT);
 
     BundleModule bundleModule =
         createMinimalModuleBuilder().addEntries(Arrays.asList(entry)).build();
@@ -520,8 +520,8 @@ public class BundleModuleTest {
     BundleModule bundleModule =
         createMinimalModuleBuilder()
             .setAndroidManifestProto(androidManifest("com.test.app"))
-            .addEntry(InMemoryModuleEntry.ofFile("dex/classes.dex", DUMMY_CONTENT))
-            .addEntry(InMemoryModuleEntry.ofFile("res/raw/yuv2rgb.bc", DUMMY_CONTENT))
+            .addEntry(createModuleEntryForFile("dex/classes.dex", DUMMY_CONTENT))
+            .addEntry(createModuleEntryForFile("res/raw/yuv2rgb.bc", DUMMY_CONTENT))
             .build();
 
     assertThat(bundleModule.hasRenderscript32Bitcode()).isTrue();
@@ -532,7 +532,7 @@ public class BundleModuleTest {
     BundleModule bundleModule =
         createMinimalModuleBuilder()
             .setAndroidManifestProto(androidManifest("com.test.app"))
-            .addEntry(InMemoryModuleEntry.ofFile("dex/classes.dex", DUMMY_CONTENT))
+            .addEntry(createModuleEntryForFile("dex/classes.dex", DUMMY_CONTENT))
             .build();
 
     assertThat(bundleModule.hasRenderscript32Bitcode()).isFalse();

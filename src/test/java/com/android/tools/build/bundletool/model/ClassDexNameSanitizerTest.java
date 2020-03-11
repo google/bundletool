@@ -17,6 +17,7 @@ package com.android.tools.build.bundletool.model;
 
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifest;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withSplitId;
+import static com.android.tools.build.bundletool.testing.TestUtils.createModuleEntryForFile;
 import static com.google.common.truth.Truth.assertThat;
 
 import com.android.bundle.Config.BundleConfig;
@@ -36,7 +37,7 @@ public final class ClassDexNameSanitizerTest {
   public void singleDexFile_doesNotModifyAnything() throws Exception {
     BundleModule module =
         createBasicModule()
-            .addEntry(InMemoryModuleEntry.ofFile("dex/classes.dex", DUMMY_CONTENT))
+            .addEntry(createModuleEntryForFile("dex/classes.dex", DUMMY_CONTENT))
             .build();
 
     assertThat(new ClassesDexNameSanitizer().sanitize(module)).isEqualTo(module);
@@ -46,9 +47,9 @@ public final class ClassDexNameSanitizerTest {
   public void multipleDexFilesNamedProperly_doesNotModifyAnything() throws Exception {
     BundleModule module =
         createBasicModule()
-            .addEntry(InMemoryModuleEntry.ofFile("dex/classes.dex", new byte[] {0x1}))
-            .addEntry(InMemoryModuleEntry.ofFile("dex/classes2.dex", new byte[] {0x2}))
-            .addEntry(InMemoryModuleEntry.ofFile("dex/classes3.dex", new byte[] {0x3}))
+            .addEntry(createModuleEntryForFile("dex/classes.dex", new byte[] {0x1}))
+            .addEntry(createModuleEntryForFile("dex/classes2.dex", new byte[] {0x2}))
+            .addEntry(createModuleEntryForFile("dex/classes3.dex", new byte[] {0x3}))
             .build();
 
     assertThat(new ClassesDexNameSanitizer().sanitize(module)).isEqualTo(module);
@@ -58,16 +59,16 @@ public final class ClassDexNameSanitizerTest {
   public void multipleDexNamedWithWrongDexFile_renamesCorrectly() throws Exception {
     BundleModule beforeRename =
         createBasicModule()
-            .addEntry(InMemoryModuleEntry.ofFile("dex/classes.dex", new byte[] {0x1}))
-            .addEntry(InMemoryModuleEntry.ofFile("dex/classes1.dex", new byte[] {0x2}))
-            .addEntry(InMemoryModuleEntry.ofFile("dex/classes2.dex", new byte[] {0x3}))
+            .addEntry(createModuleEntryForFile("dex/classes.dex", new byte[] {0x1}))
+            .addEntry(createModuleEntryForFile("dex/classes1.dex", new byte[] {0x2}))
+            .addEntry(createModuleEntryForFile("dex/classes2.dex", new byte[] {0x3}))
             .build();
 
     BundleModule afterRename =
         createBasicModule()
-            .addEntry(InMemoryModuleEntry.ofFile("dex/classes.dex", new byte[] {0x1}))
-            .addEntry(InMemoryModuleEntry.ofFile("dex/classes2.dex", new byte[] {0x2}))
-            .addEntry(InMemoryModuleEntry.ofFile("dex/classes3.dex", new byte[] {0x3}))
+            .addEntry(createModuleEntryForFile("dex/classes.dex", new byte[] {0x1}))
+            .addEntry(createModuleEntryForFile("dex/classes2.dex", new byte[] {0x2}))
+            .addEntry(createModuleEntryForFile("dex/classes3.dex", new byte[] {0x3}))
             .build();
 
     assertThat(new ClassesDexNameSanitizer().sanitize(beforeRename)).isEqualTo(afterRename);
@@ -77,8 +78,8 @@ public final class ClassDexNameSanitizerTest {
     return BundleModule.builder()
         .setName(BundleModuleName.create("module"))
         .setBundleConfig(DEFAULT_BUNDLE_CONFIG)
-        .addEntry(InMemoryModuleEntry.ofFile("assets/hello", new byte[] {0xD, 0xE, 0xA, 0xD}))
-        .addEntry(InMemoryModuleEntry.ofFile("assets/world", new byte[] {0xB, 0xE, 0xE, 0xF}))
+        .addEntry(createModuleEntryForFile("assets/hello", new byte[] {0xD, 0xE, 0xA, 0xD}))
+        .addEntry(createModuleEntryForFile("assets/world", new byte[] {0xB, 0xE, 0xE, 0xF}))
         .setAndroidManifestProto(androidManifest("com.test.app", withSplitId("module")));
   }
 }

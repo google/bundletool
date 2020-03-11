@@ -32,6 +32,7 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 import java.util.List;
+import java.util.stream.Stream;
 
 /** Splits the APEX images in the module by ABI. */
 public class AbiApexImagesSplitter implements ModuleSplitSplitter {
@@ -60,12 +61,9 @@ public class AbiApexImagesSplitter implements ModuleSplitSplitter {
       ModuleEntry entry = apexPathToEntryMap.get(targetedApexImage.getPath());
       List<MultiAbi> targeting = targetedApexImage.getTargeting().getMultiAbi().getValueList();
       ModuleSplit.Builder splitBuilder =
-          moduleSplit
-              .toBuilder()
+          moduleSplit.toBuilder()
               .setApkTargeting(
-                  moduleSplit
-                      .getApkTargeting()
-                      .toBuilder()
+                  moduleSplit.getApkTargeting().toBuilder()
                       .setMultiAbiTargeting(
                           MultiAbiTargeting.newBuilder()
                               .addAllValue(targeting)
@@ -73,7 +71,11 @@ public class AbiApexImagesSplitter implements ModuleSplitSplitter {
                                   Sets.difference(allTargeting, ImmutableSet.copyOf(targeting))))
                       .build())
               .setMasterSplit(false)
-              .setEntries(ImmutableList.of(entry));
+              .setEntries(
+                  targetedApexImage.getBuildInfoPath().isEmpty()
+                      ? ImmutableList.of(entry)
+                      : ImmutableList.of(
+                          entry, apexPathToEntryMap.get(targetedApexImage.getBuildInfoPath())));
       splits.add(splitBuilder.build());
     }
 
@@ -84,8 +86,12 @@ public class AbiApexImagesSplitter implements ModuleSplitSplitter {
       List<TargetedApexImage> allTargetedImages, ModuleSplit moduleSplit) {
     ImmutableMap<String, ModuleEntry> pathToEntry =
         Maps.uniqueIndex(moduleSplit.getEntries(), entry -> entry.getPath().toString());
-    return allTargetedImages.stream()
-        .map(TargetedApexImage::getPath)
+
+    return Stream.concat(
+            allTargetedImages.stream().map(TargetedApexImage::getPath),
+            allTargetedImages.stream()
+                .map(TargetedApexImage::getBuildInfoPath)
+                .filter(p -> !p.isEmpty()))
         .collect(toImmutableMap(identity(), pathToEntry::get));
   }
 }

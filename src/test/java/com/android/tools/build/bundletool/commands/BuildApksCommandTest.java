@@ -41,6 +41,7 @@ import com.android.tools.build.bundletool.io.AppBundleSerializer;
 import com.android.tools.build.bundletool.model.Aapt2Command;
 import com.android.tools.build.bundletool.model.AppBundle;
 import com.android.tools.build.bundletool.model.SigningConfiguration;
+import com.android.tools.build.bundletool.model.SourceStamp;
 import com.android.tools.build.bundletool.model.exceptions.CommandExecutionException;
 import com.android.tools.build.bundletool.model.exceptions.ValidationException;
 import com.android.tools.build.bundletool.model.utils.ResultUtils;
@@ -54,6 +55,7 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import java.io.ByteArrayOutputStream;
+import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.PrintStream;
@@ -62,8 +64,11 @@ import java.nio.file.Paths;
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
 import java.security.KeyStore;
+import java.security.KeyStoreException;
+import java.security.NoSuchAlgorithmException;
 import java.security.PrivateKey;
 import java.security.cert.Certificate;
+import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
 import org.junit.Before;
 import org.junit.BeforeClass;
@@ -83,17 +88,27 @@ public class BuildApksCommandTest {
   private static final Path ADB_PATH =
       Paths.get("third_party/java/android/android_sdk_linux/platform-tools/adb.static");
   private static final String DEVICE_ID = "id1";
+  private static final String DEBUG_KEYSTORE_PASSWORD = "android";
+  private static final String DEBUG_KEY_PASSWORD = "android";
+  private static final String DEBUG_KEY_ALIAS = "AndroidDebugKey";
+  private static final String STAMP_SOURCE = "test-source";
+  private static final String STAMP_KEYSTORE_PASSWORD = "stamp-keystore-password";
+  private static final String STAMP_KEY_PASSWORD = "stamp-key-password";
+  private static final String STAMP_KEY_ALIAS = "stamp-key-alias";
 
   @Rule public final TemporaryFolder tmp = new TemporaryFolder();
 
   private static PrivateKey privateKey;
   private static X509Certificate certificate;
+  private static PrivateKey stampPrivateKey;
+  private static X509Certificate stampCertificate;
 
   private final Aapt2Command aapt2Command = Aapt2Helper.getAapt2Command();
   private final Path bundlePath = Paths.get("/path/to/bundle.aab");
   private final Path outputFilePath = Paths.get("/path/to/app.apks");
   private Path tmpDir;
   private Path keystorePath;
+  private Path stampKeystorePath;
 
   private final AdbServer fakeAdbServer = mock(AdbServer.class);
   private final SystemEnvironmentProvider systemEnvironmentProvider =
@@ -107,6 +122,12 @@ public class BuildApksCommandTest {
     KeyPair keyPair = KeyPairGenerator.getInstance("RSA").genKeyPair();
     privateKey = keyPair.getPrivate();
     certificate = CertificateFactory.buildSelfSignedCertificate(keyPair, "CN=BuildApksCommandTest");
+
+    // Stamp key.
+    KeyPair stampKeyPair = KeyPairGenerator.getInstance("RSA").genKeyPair();
+    stampPrivateKey = stampKeyPair.getPrivate();
+    stampCertificate =
+        CertificateFactory.buildSelfSignedCertificate(stampKeyPair, "CN=BuildApksCommandTest");
   }
 
   @Before
@@ -117,11 +138,34 @@ public class BuildApksCommandTest {
 
     // KeyStore.
     keystorePath = tmpDir.resolve("keystore.jks");
-    KeyStore keystore = KeyStore.getInstance("JKS");
-    keystore.load(/* stream= */ null, KEYSTORE_PASSWORD.toCharArray());
-    keystore.setKeyEntry(
-        KEY_ALIAS, privateKey, KEY_PASSWORD.toCharArray(), new Certificate[] {certificate});
-    keystore.store(new FileOutputStream(keystorePath.toFile()), KEYSTORE_PASSWORD.toCharArray());
+    createKeyStore(keystorePath, KEYSTORE_PASSWORD);
+    addKeyToKeyStore(
+        keystorePath, KEYSTORE_PASSWORD, KEY_ALIAS, KEY_PASSWORD, privateKey, certificate);
+    addKeyToKeyStore(
+        keystorePath,
+        KEYSTORE_PASSWORD,
+        STAMP_KEY_ALIAS,
+        STAMP_KEY_PASSWORD,
+        stampPrivateKey,
+        stampCertificate);
+
+    // Stamp KeyStore.
+    stampKeystorePath = tmpDir.resolve("stamp-keystore.jks");
+    createKeyStore(stampKeystorePath, STAMP_KEYSTORE_PASSWORD);
+    addKeyToKeyStore(
+        stampKeystorePath,
+        STAMP_KEYSTORE_PASSWORD,
+        STAMP_KEY_ALIAS,
+        STAMP_KEY_PASSWORD,
+        stampPrivateKey,
+        stampCertificate);
+    addKeyToKeyStore(
+        stampKeystorePath,
+        STAMP_KEYSTORE_PASSWORD,
+        KEY_ALIAS,
+        KEY_PASSWORD,
+        stampPrivateKey,
+        stampCertificate);
 
     fakeAdbServer.init(Paths.get("path/to/adb"));
   }
@@ -677,15 +721,45 @@ public class BuildApksCommandTest {
     assertThat(result.getPackageName()).isEqualTo("com.app");
   }
 
-  private static void createDebugKeystore(Path path) throws Exception {
+
+  private static void createKeyStore(Path keystorePath, String keystorePassword)
+      throws KeyStoreException, CertificateException, NoSuchAlgorithmException, IOException {
+    KeyStore keystore = KeyStore.getInstance("JKS");
+    keystore.load(/* stream= */ null, keystorePassword.toCharArray());
+    keystore.store(new FileOutputStream(keystorePath.toFile()), keystorePassword.toCharArray());
+  }
+
+  private static void addKeyToKeyStore(
+      Path keystorePath,
+      String keystorePassword,
+      String keyAlias,
+      String keyPassword,
+      PrivateKey privateKey,
+      X509Certificate certificate)
+      throws KeyStoreException, CertificateException, NoSuchAlgorithmException, IOException {
+    KeyStore keystore = KeyStore.getInstance("JKS");
+    keystore.load(new FileInputStream(keystorePath.toFile()), keystorePassword.toCharArray());
+    keystore.setKeyEntry(
+        keyAlias, privateKey, keyPassword.toCharArray(), new Certificate[] {certificate});
+    keystore.store(new FileOutputStream(keystorePath.toFile()), keystorePassword.toCharArray());
+  }
+
+  private static SigningConfiguration createDebugKeystore(Path path) throws Exception {
     KeyPair keyPair = KeyPairGenerator.getInstance("RSA").genKeyPair();
     PrivateKey privateKey = keyPair.getPrivate();
-    Certificate certificate =
+    X509Certificate certificate =
         CertificateFactory.buildSelfSignedCertificate(keyPair, "CN=Android Debug,O=Android,C=US");
     KeyStore keystore = KeyStore.getInstance("JKS");
-    keystore.load(/* stream= */ null, "android".toCharArray());
+    keystore.load(/* stream= */ null, DEBUG_KEYSTORE_PASSWORD.toCharArray());
     keystore.setKeyEntry(
-        "AndroidDebugKey", privateKey, "android".toCharArray(), new Certificate[] {certificate});
-    keystore.store(new FileOutputStream(path.toFile()), "android".toCharArray());
+        DEBUG_KEY_ALIAS,
+        privateKey,
+        DEBUG_KEY_PASSWORD.toCharArray(),
+        new Certificate[] {certificate});
+    keystore.store(new FileOutputStream(path.toFile()), DEBUG_KEYSTORE_PASSWORD.toCharArray());
+    return SigningConfiguration.builder()
+        .setPrivateKey(privateKey)
+        .setCertificates(ImmutableList.of(certificate))
+        .build();
   }
 }

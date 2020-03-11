@@ -22,10 +22,13 @@ import static com.android.tools.build.bundletool.model.AndroidManifest.VERSION_C
 import static com.android.tools.build.bundletool.model.BundleModule.ModuleDeliveryType.ALWAYS_INITIAL_INSTALL;
 import static com.android.tools.build.bundletool.model.BundleModule.ModuleDeliveryType.CONDITIONAL_INITIAL_INSTALL;
 import static com.android.tools.build.bundletool.model.BundleModule.ModuleDeliveryType.NO_INITIAL_INSTALL;
+import static com.android.tools.build.bundletool.model.targeting.TargetingUtils.extractAssetsTargetedDirectories;
+import static com.android.tools.build.bundletool.model.targeting.TargetingUtils.extractTextureCompressionFormats;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.ImmutableSet.toImmutableSet;
 
 import com.android.bundle.Targeting.ModuleTargeting;
+import com.android.bundle.Targeting.TextureCompressionFormat.TextureCompressionFormatAlias;
 import com.android.tools.build.bundletool.model.AndroidManifest;
 import com.android.tools.build.bundletool.model.BundleModule;
 import com.android.tools.build.bundletool.model.BundleModule.ModuleDeliveryType;
@@ -62,6 +65,7 @@ public class AndroidManifestValidator extends SubValidator {
     validateNoVersionCodeInAssetModules(modules);
     validateTargetSandboxVersion(modules);
     validateMinSdk(modules);
+    validateTcfTargetingNotMixedWithSupportsGlTexture(modules);
   }
 
   public void validateSameVersionCode(ImmutableList<BundleModule> modules) {
@@ -148,6 +152,34 @@ public class AndroidManifestValidator extends SubValidator {
           .withMessage(
               "Modules cannot have a minSdkVersion attribute with a value lower than "
                   + "the one from the base module.")
+          .build();
+    }
+  }
+
+  private static void validateTcfTargetingNotMixedWithSupportsGlTexture(
+      ImmutableList<BundleModule> modules) {
+    // Check for the existence of supports-gl-texture element(s).
+    ImmutableSet<String> supportsGlTextureStrings =
+        modules.stream()
+            .map(BundleModule::getAndroidManifest)
+            .flatMap(manifest -> manifest.getSupportsGlTextures().stream())
+            .collect(toImmutableSet());
+
+    // Extract texture compression formats from assets (like done when generating assets targeting).
+    ImmutableSet<TextureCompressionFormatAlias> allModuleTextureFormats =
+        modules.stream()
+            .flatMap(
+                module ->
+                    extractTextureCompressionFormats(extractAssetsTargetedDirectories(module))
+                        .stream())
+            .collect(toImmutableSet());
+
+    if (!supportsGlTextureStrings.isEmpty() && !allModuleTextureFormats.isEmpty()) {
+      throw ValidationException.builder()
+          .withMessage(
+              "Modules cannot have supports-gl-texture in their manifest (found: %s) and texture"
+                  + " targeted directories in modules (found: %s).",
+              supportsGlTextureStrings, allModuleTextureFormats)
           .build();
     }
   }

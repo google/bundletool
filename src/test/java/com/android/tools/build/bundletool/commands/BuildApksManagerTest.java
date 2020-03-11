@@ -38,6 +38,7 @@ import static com.android.tools.build.bundletool.model.utils.ResultUtils.splitAp
 import static com.android.tools.build.bundletool.model.utils.ResultUtils.standaloneApkVariants;
 import static com.android.tools.build.bundletool.model.utils.ResultUtils.systemApkVariants;
 import static com.android.tools.build.bundletool.model.utils.Versions.ANDROID_M_API_VERSION;
+import static com.android.tools.build.bundletool.model.utils.Versions.ANDROID_N_API_VERSION;
 import static com.android.tools.build.bundletool.model.utils.Versions.ANDROID_P_API_VERSION;
 import static com.android.tools.build.bundletool.model.utils.Versions.ANDROID_Q_API_VERSION;
 import static com.android.tools.build.bundletool.testing.Aapt2Helper.AAPT2_PATH;
@@ -54,6 +55,7 @@ import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.andr
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifestForAssetModule;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifestForFeature;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withAppIcon;
+import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withDelivery;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withFusingAttribute;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withInstallLocation;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withInstallTimeDelivery;
@@ -61,6 +63,7 @@ import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.with
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withInstantOnDemandDelivery;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withMaxSdkVersion;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withMinSdkVersion;
+import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withNativeActivity;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withOnDemandAttribute;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withOnDemandDelivery;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withTargetSdkVersion;
@@ -239,6 +242,12 @@ public class BuildApksManagerTest {
   private static final String APEX_MANIFEST_PATH = "root/apex_manifest.pb";
   private static final byte[] APEX_MANIFEST =
       ApexManifest.newBuilder().setName("com.test.app").build().toByteArray();
+
+  private static final SdkVersion L_SDK_VERSION = sdkVersionFrom(ANDROID_L_API_VERSION);
+  private static final SdkVersion M_SDK_VERSION = sdkVersionFrom(ANDROID_M_API_VERSION);
+  private static final SdkVersion N_SDK_VERSION = sdkVersionFrom(ANDROID_N_API_VERSION);
+  private static final SdkVersion P_SDK_VERSION = sdkVersionFrom(ANDROID_P_API_VERSION);
+  private static final SdkVersion Q_SDK_VERSION = sdkVersionFrom(ANDROID_Q_API_VERSION);
 
   @Rule public final TemporaryFolder tmp = new TemporaryFolder();
 
@@ -854,7 +863,6 @@ public class BuildApksManagerTest {
         .forEach(apkDescription -> assertThat(apkSetFile).hasFile(apkDescription.getPath()));
   }
 
-
   @Test
   public void bundleWithDirectoryZipEntries_throws() throws Exception {
     AppBundle tmpBundle =
@@ -941,9 +949,9 @@ public class BuildApksManagerTest {
     assertThat(splitApkVariants(result)).hasSize(1);
 
     Variant splitApksVariant = splitApkVariants(result).get(0);
-    assertThat(splitApksVariant.getTargeting())
-        .isEqualTo(variantSdkTargeting(sdkVersionFrom(ANDROID_L_API_VERSION)));
+    assertThat(splitApksVariant.getTargeting()).isEqualTo(variantSdkTargeting(L_SDK_VERSION));
   }
+
 
   @Test
   public void buildApksCommand_appTargetingPreL_buildsStandaloneApksOnly() throws Exception {
@@ -1746,7 +1754,7 @@ public class BuildApksManagerTest {
     Variant variant = splitApkVariants(result).get(0);
     assertThat(variant.hasTargeting()).isTrue();
     assertThat(variant.getTargeting().getSdkVersionTargeting().getValueList())
-        .containsExactly(sdkVersionFrom(ANDROID_L_API_VERSION));
+        .containsExactly(L_SDK_VERSION);
   }
 
   @Test
@@ -1817,7 +1825,7 @@ public class BuildApksManagerTest {
     Variant variant = splitApkVariants(result).get(0);
     assertThat(variant.hasTargeting()).isTrue();
     assertThat(variant.getTargeting().getSdkVersionTargeting().getValueList())
-        .containsExactly(sdkVersionFrom(21));
+        .containsExactly(L_SDK_VERSION);
   }
 
   @Test
@@ -1904,30 +1912,21 @@ public class BuildApksManagerTest {
             mergeVariantTargeting(
                 variantAbiTargeting(X86, ImmutableSet.of(X86_64, MIPS)),
                 variantSdkTargeting(
-                    LOWEST_SDK_VERSION,
-                    ImmutableSet.of(
-                        sdkVersionFrom(ANDROID_L_API_VERSION),
-                        sdkVersionFrom(ANDROID_M_API_VERSION)))));
+                    LOWEST_SDK_VERSION, ImmutableSet.of(L_SDK_VERSION, M_SDK_VERSION))));
     assertThat(standaloneVariantsByAbi.get(toAbi(X86_64)).getTargeting())
         .ignoringRepeatedFieldOrder()
         .isEqualTo(
             mergeVariantTargeting(
                 variantAbiTargeting(X86_64, ImmutableSet.of(X86, MIPS)),
                 variantSdkTargeting(
-                    LOWEST_SDK_VERSION,
-                    ImmutableSet.of(
-                        sdkVersionFrom(ANDROID_L_API_VERSION),
-                        sdkVersionFrom(ANDROID_M_API_VERSION)))));
+                    LOWEST_SDK_VERSION, ImmutableSet.of(L_SDK_VERSION, M_SDK_VERSION))));
     assertThat(standaloneVariantsByAbi.get(toAbi(MIPS)).getTargeting())
         .ignoringRepeatedFieldOrder()
         .isEqualTo(
             mergeVariantTargeting(
                 variantAbiTargeting(MIPS, ImmutableSet.of(X86, X86_64)),
                 variantSdkTargeting(
-                    LOWEST_SDK_VERSION,
-                    ImmutableSet.of(
-                        sdkVersionFrom(ANDROID_L_API_VERSION),
-                        sdkVersionFrom(ANDROID_M_API_VERSION)))));
+                    LOWEST_SDK_VERSION, ImmutableSet.of(L_SDK_VERSION, M_SDK_VERSION))));
     for (Variant variant : standaloneVariantsByAbi.values()) {
       assertThat(variant.getApkSetList()).hasSize(1);
       ApkSet apkSet = variant.getApkSet(0);
@@ -2476,27 +2475,17 @@ public class BuildApksManagerTest {
     assertThat(result.getVariantList()).hasSize(4);
 
     VariantTargeting lSplitVariantTargeting =
-        variantSdkTargeting(
-            sdkVersionFrom(ANDROID_L_API_VERSION),
-            ImmutableSet.of(LOWEST_SDK_VERSION, sdkVersionFrom(ANDROID_M_API_VERSION)));
+        variantSdkTargeting(L_SDK_VERSION, ImmutableSet.of(LOWEST_SDK_VERSION, M_SDK_VERSION));
     VariantTargeting mSplitVariantTargeting =
-        variantSdkTargeting(
-            sdkVersionFrom(ANDROID_M_API_VERSION),
-            ImmutableSet.of(LOWEST_SDK_VERSION, sdkVersionFrom(ANDROID_L_API_VERSION)));
+        variantSdkTargeting(M_SDK_VERSION, ImmutableSet.of(LOWEST_SDK_VERSION, L_SDK_VERSION));
     VariantTargeting standaloneX86VariantTargeting =
         mergeVariantTargeting(
             variantAbiTargeting(X86, ImmutableSet.of(X86_64)),
-            variantSdkTargeting(
-                LOWEST_SDK_VERSION,
-                ImmutableSet.of(
-                    sdkVersionFrom(ANDROID_L_API_VERSION), sdkVersionFrom(ANDROID_M_API_VERSION))));
+            variantSdkTargeting(LOWEST_SDK_VERSION, ImmutableSet.of(L_SDK_VERSION, M_SDK_VERSION)));
     VariantTargeting standaloneX64VariantTargeting =
         mergeVariantTargeting(
             variantAbiTargeting(X86_64, ImmutableSet.of(X86)),
-            variantSdkTargeting(
-                LOWEST_SDK_VERSION,
-                ImmutableSet.of(
-                    sdkVersionFrom(ANDROID_L_API_VERSION), sdkVersionFrom(ANDROID_M_API_VERSION))));
+            variantSdkTargeting(LOWEST_SDK_VERSION, ImmutableSet.of(L_SDK_VERSION, M_SDK_VERSION)));
 
     ImmutableMap<VariantTargeting, Variant> variantsByTargeting =
         Maps.uniqueIndex(result.getVariantList(), Variant::getTargeting);
@@ -3125,13 +3114,9 @@ public class BuildApksManagerTest {
         Maps.uniqueIndex(splitApkVariants(result), Variant::getTargeting);
 
     VariantTargeting lSplitVariantTargeting =
-        variantSdkTargeting(
-            sdkVersionFrom(ANDROID_L_API_VERSION),
-            ImmutableSet.of(LOWEST_SDK_VERSION, sdkVersionFrom(ANDROID_M_API_VERSION)));
+        variantSdkTargeting(L_SDK_VERSION, ImmutableSet.of(LOWEST_SDK_VERSION, M_SDK_VERSION));
     VariantTargeting mSplitVariantTargeting =
-        variantSdkTargeting(
-            sdkVersionFrom(ANDROID_M_API_VERSION),
-            ImmutableSet.of(LOWEST_SDK_VERSION, sdkVersionFrom(ANDROID_L_API_VERSION)));
+        variantSdkTargeting(M_SDK_VERSION, ImmutableSet.of(LOWEST_SDK_VERSION, L_SDK_VERSION));
 
     assertThat(splitVariantsByTargeting.keySet())
         .containsExactly(lSplitVariantTargeting, mSplitVariantTargeting);
@@ -3714,7 +3699,7 @@ public class BuildApksManagerTest {
     Variant variant = instantApkVariants(result).get(0);
     assertThat(variant.hasTargeting()).isTrue();
     assertThat(variant.getTargeting().getSdkVersionTargeting().getValueList())
-        .containsExactly(sdkVersionFrom(ANDROID_L_API_VERSION));
+        .containsExactly(L_SDK_VERSION);
   }
 
   @Test

@@ -34,6 +34,7 @@ import com.android.bundle.Files.ApexImages;
 import com.android.bundle.Files.Assets;
 import com.android.bundle.Files.NativeLibraries;
 import com.android.bundle.Targeting.ModuleTargeting;
+import com.android.tools.build.bundletool.model.exceptions.ValidationException;
 import com.android.tools.build.bundletool.model.utils.xmlproto.XmlProtoAttribute;
 import com.android.tools.build.bundletool.model.version.BundleToolVersion;
 import com.google.auto.value.AutoValue;
@@ -74,8 +75,12 @@ public abstract class BundleModule {
   /** The top-level directory of an App Bundle module that contains APEX image files. */
   public static final ZipPath APEX_DIRECTORY = ZipPath.create("apex");
 
+  public static final String APEX_IMAGE_SUFFIX = "img";
+  public static final String BUILD_INFO_SUFFIX = "build_info.pb";
+
   /** The file of an App Bundle module that contains the APEX manifest. */
   public static final ZipPath APEX_MANIFEST_PATH = ZipPath.create("root/apex_manifest.pb");
+
   public static final ZipPath APEX_MANIFEST_JSON_PATH = ZipPath.create("root/apex_manifest.json");
 
   /** The public key used to sign the apex */
@@ -197,7 +202,14 @@ public abstract class BundleModule {
 
   public boolean isIncludedInFusing() {
     // The following should never throw if the module/bundle has been validated.
-    return isBaseModule() || getAndroidManifest().getIsModuleIncludedInFusing().get();
+    return isBaseModule()
+        || getAndroidManifest()
+            .getIsModuleIncludedInFusing()
+            .orElseThrow(
+                () ->
+                    new ValidationException(
+                        "Unable to determine if module should be fused: missing <dist:fusing> tag"
+                            + " inside <dist:module> in AndroidManifest.xml"));
   }
 
   public boolean isInstantModule() {
@@ -234,8 +246,7 @@ public abstract class BundleModule {
       return moduleTargeting;
     }
 
-    return moduleTargeting
-        .toBuilder()
+    return moduleTargeting.toBuilder()
         .setSdkVersionTargeting(sdkVersionTargeting(sdkVersionFrom(minSdkVersion.get())))
         .build();
   }

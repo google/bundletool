@@ -16,6 +16,8 @@
 package com.android.tools.build.bundletool.io;
 
 import static com.android.tools.build.bundletool.model.BundleModule.APEX_DIRECTORY;
+import static com.android.tools.build.bundletool.model.BundleModule.APEX_IMAGE_SUFFIX;
+import static com.android.tools.build.bundletool.model.BundleModule.BUILD_INFO_SUFFIX;
 import static com.android.tools.build.bundletool.model.BundleModule.DEX_DIRECTORY;
 import static com.android.tools.build.bundletool.model.BundleModule.MANIFEST_FILENAME;
 import static com.android.tools.build.bundletool.model.BundleModule.ROOT_DIRECTORY;
@@ -250,7 +252,7 @@ final class ApkSerializerHelper {
           entryOptionForPath(
               pathInApk,
               /* uncompressNativeLibs= */ !extractNativeLibs,
-              /* entryShouldCompress= */ entry.shouldCompress());
+              /* entryShouldCompress= */ entry.getShouldCompress());
       if (signingConfig.isPresent()
           && wear1ApkPath.isPresent()
           && wear1ApkPath.get().equals(pathInApk)) {
@@ -282,9 +284,7 @@ final class ApkSerializerHelper {
   }
 
   private EntryOption[] entryOptionForPath(
-      ZipPath path,
-      boolean uncompressNativeLibs,
-      boolean entryShouldCompress) {
+      ZipPath path, boolean uncompressNativeLibs, boolean entryShouldCompress) {
     if (shouldCompress(path, uncompressNativeLibs, entryShouldCompress)) {
       return new EntryOption[] {};
     } else {
@@ -293,9 +293,7 @@ final class ApkSerializerHelper {
   }
 
   private boolean shouldCompress(
-      ZipPath path,
-      boolean uncompressNativeLibs,
-      boolean entryShouldCompress) {
+      ZipPath path, boolean uncompressNativeLibs, boolean entryShouldCompress) {
     if (uncompressedPathMatchers.stream()
         .anyMatch(pathMatcher -> pathMatcher.matches(path.toString()))) {
       return false;
@@ -334,7 +332,7 @@ final class ApkSerializerHelper {
           zFile.add(
               pathInApk.toString(),
               entryInputStream,
-              shouldCompress(pathInApk, !extractNativeLibs, entry.shouldCompress()));
+              shouldCompress(pathInApk, !extractNativeLibs, entry.getShouldCompress()));
         }
       }
     }
@@ -344,8 +342,8 @@ final class ApkSerializerHelper {
    * Transforms the entry path in the module to the final path in the module split.
    *
    * <p>The entries from root/, dex/, manifest/ directories will be moved to the top level of the
-   * split. Entries from apex/ will be moved to the top level and named "apex_payload.img". There
-   * should only be one such entry.
+   * split. Entries from apex/ will be moved to the top level and named "apex_payload.img" for
+   * images or "apex_build_info.pb" for APEX build info. There should only be one such entry.
    */
   private ZipPath toApkEntryPath(ZipPath pathInModule) {
     if (pathInModule.startsWith(DEX_DIRECTORY)) {
@@ -368,7 +366,16 @@ final class ApkSerializerHelper {
           pathInModule.getNameCount() >= 2,
           "Only files inside the apex directory are supported but found: %s",
           pathInModule);
-      return ZipPath.create("apex_payload.img");
+      checkArgument(
+          pathInModule.toString().endsWith(APEX_IMAGE_SUFFIX)
+              || pathInModule.toString().endsWith(BUILD_INFO_SUFFIX),
+          "Unexpected filename in apex directory: %s",
+          pathInModule);
+      if (pathInModule.toString().endsWith(APEX_IMAGE_SUFFIX)) {
+        return ZipPath.create("apex_payload.img");
+      } else {
+        return ZipPath.create("apex_build_info.pb");
+      }
     }
     return pathInModule;
   }

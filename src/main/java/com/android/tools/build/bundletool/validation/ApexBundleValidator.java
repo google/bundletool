@@ -112,12 +112,21 @@ public class ApexBundleValidator extends SubValidator {
     }
 
     ImmutableSet.Builder<String> apexImagesBuilder = ImmutableSet.builder();
+    ImmutableSet.Builder<String> apexBuildInfosBuilder = ImmutableSet.builder();
     ImmutableSet.Builder<String> apexFileNamesBuilder = ImmutableSet.builder();
     for (ModuleEntry entry : module.getEntries()) {
       ZipPath path = entry.getPath();
       if (path.startsWith(APEX_DIRECTORY)) {
-        apexImagesBuilder.add(path.toString());
-        apexFileNamesBuilder.add(path.getFileName().toString());
+        if (path.getFileName().toString().endsWith(BundleModule.APEX_IMAGE_SUFFIX)) {
+          apexImagesBuilder.add(path.toString());
+          apexFileNamesBuilder.add(path.getFileName().toString());
+        } else if (path.getFileName().toString().endsWith(BundleModule.BUILD_INFO_SUFFIX)) {
+          apexBuildInfosBuilder.add(path.toString());
+        } else {
+          throw ValidationException.builder()
+              .withMessage("Unexpected file in apex dirctory of bundle: '%s'.", entry.getPath())
+              .build();
+        }
       } else if (!ALLOWED_APEX_FILES_OUTSIDE_APEX_DIRECTORY.contains(path)) {
         throw ValidationException.builder()
             .withMessage("Unexpected file in APEX bundle: '%s'.", entry.getPath())
@@ -125,6 +134,7 @@ public class ApexBundleValidator extends SubValidator {
       }
     }
 
+    ImmutableSet<String> apexBuildInfos = apexBuildInfosBuilder.build();
     ImmutableSet<String> apexImages = apexImagesBuilder.build();
     ImmutableSet<ImmutableSet<AbiName>> allAbiNameSets =
         apexFileNamesBuilder.build().stream()
@@ -135,6 +145,17 @@ public class ApexBundleValidator extends SubValidator {
           .withMessage(
               "Every APEX image file must target a unique set of architectures, "
                   + "but found multiple files that target the same set of architectures.")
+          .build();
+    }
+
+    if (!apexBuildInfos.isEmpty()
+        && !apexBuildInfos.stream()
+            .map(f -> f.replace(BundleModule.BUILD_INFO_SUFFIX, BundleModule.APEX_IMAGE_SUFFIX))
+            .collect(toImmutableSet())
+            .equals(apexImages)) {
+      throw ValidationException.builder()
+          .withMessage(
+              "If APEX build info is provided then one must be provided for each APEX image file.")
           .build();
     }
 

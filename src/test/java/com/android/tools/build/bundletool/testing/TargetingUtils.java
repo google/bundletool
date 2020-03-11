@@ -185,6 +185,31 @@ public final class TargetingUtils {
     return TargetedApexImage.newBuilder().setPath(path).setTargeting(apexImageTargeting).build();
   }
 
+  /** Builds APEX targeted image from the image file path, build info path and its targeting. */
+  public static TargetedApexImage targetedApexImageWithBuildInfo(
+      String path, String buildInfoPath, ApexImageTargeting targeting) {
+    return TargetedApexImage.newBuilder()
+        .setPath(path)
+        .setBuildInfoPath(buildInfoPath)
+        .setTargeting(targeting)
+        .build();
+  }
+
+  /**
+   * Builds APEX targeted image from the image file path, build info path and its multi-Abi
+   * targeting.
+   */
+  public static TargetedApexImage targetedApexImageWithBuildInfo(
+      String path, String buildInfoPath, MultiAbiTargeting targeting) {
+    ApexImageTargeting apexImageTargeting =
+        ApexImageTargeting.newBuilder().setMultiAbi(targeting).build();
+    return TargetedApexImage.newBuilder()
+        .setPath(path)
+        .setBuildInfoPath(buildInfoPath)
+        .setTargeting(apexImageTargeting)
+        .build();
+  }
+
   /** Builds APEX image targeting (no alternatives) according to the Abi names. */
   public static ApexImageTargeting apexImageTargeting(String... architectures) {
     MultiAbi.Builder multiAbi = MultiAbi.newBuilder();

@@ -25,7 +25,6 @@ import static com.android.tools.build.bundletool.model.BundleModule.MANIFEST_DIR
 import static com.android.tools.build.bundletool.model.BundleModule.MANIFEST_FILENAME;
 import static com.android.tools.build.bundletool.model.BundleModule.RESOURCES_DIRECTORY;
 import static com.android.tools.build.bundletool.model.BundleModule.ROOT_DIRECTORY;
-import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.ImmutableSet.toImmutableSet;
 
@@ -122,7 +121,7 @@ public class BundleFilesValidator extends SubValidator {
         throw new InvalidApexImagePathException(APEX_DIRECTORY, file);
       }
 
-      if (!fileName.endsWith(".img")) {
+      if (!fileName.endsWith(".img") && !fileName.endsWith(".build_info.pb")) {
         throw new InvalidFileExtensionInDirectoryException(APEX_DIRECTORY, ".img", file);
       }
 
@@ -139,11 +138,12 @@ public class BundleFilesValidator extends SubValidator {
   }
 
   private static void validateMultiAbiFileName(ZipPath file) {
+    if (!file.toString().endsWith(".img")) {
+      return;
+    }
     ImmutableList<String> tokens =
         ImmutableList.copyOf(ABI_SPLITTER.splitToList(file.getFileName().toString()));
     int nAbis = tokens.size() - 1;
-    // This was validated above.
-    checkState(tokens.get(nAbis).equals("img"), "File under 'apex/' does not have suffix 'img'");
 
     ImmutableList<Optional<AbiName>> abis =
         // Do not include the suffix "img".

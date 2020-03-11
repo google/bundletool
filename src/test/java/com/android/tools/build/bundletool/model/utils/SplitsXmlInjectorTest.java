@@ -23,6 +23,7 @@ import static com.android.tools.build.bundletool.model.ModuleSplit.SplitType.STA
 import static com.android.tools.build.bundletool.model.ModuleSplit.SplitType.SYSTEM;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifest;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.languageTargeting;
+import static com.android.tools.build.bundletool.testing.TestUtils.createModuleEntryForFile;
 import static com.android.tools.build.bundletool.testing.truth.resources.TruthResourceTable.assertThat;
 import static com.google.common.collect.MoreCollectors.onlyElement;
 import static com.google.common.truth.Truth.assertThat;
@@ -38,7 +39,7 @@ import com.android.bundle.Targeting.VariantTargeting;
 import com.android.tools.build.bundletool.model.AndroidManifest;
 import com.android.tools.build.bundletool.model.BundleModuleName;
 import com.android.tools.build.bundletool.model.GeneratedApks;
-import com.android.tools.build.bundletool.model.InMemoryModuleEntry;
+import com.android.tools.build.bundletool.model.ModuleEntry;
 import com.android.tools.build.bundletool.model.ModuleSplit;
 import com.android.tools.build.bundletool.model.ModuleSplit.SplitType;
 import com.android.tools.build.bundletool.model.SplitsProtoXmlBuilder;
@@ -279,8 +280,8 @@ public class SplitsXmlInjectorTest {
 
   @Test
   public void process_fileExists() {
-    InMemoryModuleEntry existingInMemoryModuleEntry =
-        InMemoryModuleEntry.ofFile("res/xml/splits0.xml", "123".getBytes(UTF_8));
+    ModuleEntry existingModuleEntry =
+        createModuleEntryForFile("res/xml/splits0.xml", "123".getBytes(UTF_8));
 
     ModuleSplit baseMasterSplit =
         createModuleSplit(
@@ -290,7 +291,7 @@ public class SplitsXmlInjectorTest {
                 SPLIT,
                 /* languageTargeting= */ null)
             .toBuilder()
-            .setEntries(ImmutableList.of(existingInMemoryModuleEntry))
+            .setEntries(ImmutableList.of(existingModuleEntry))
             .build();
 
     ModuleSplit processedBaseMasterSplit =
@@ -300,7 +301,7 @@ public class SplitsXmlInjectorTest {
             .collect(onlyElement());
 
     assertThat(processedBaseMasterSplit.getEntries()).hasSize(2);
-    assertThat(processedBaseMasterSplit.getEntries()).contains(existingInMemoryModuleEntry);
+    assertThat(processedBaseMasterSplit.getEntries()).contains(existingModuleEntry);
     assertThat(processedBaseMasterSplit.getEntries().get(1).getPath().toString())
         .isEqualTo("res/xml/splits1.xml");
     assertThat(processedBaseMasterSplit.getResourceTable().get())

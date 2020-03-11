@@ -32,6 +32,8 @@ import static com.google.common.truth.Truth.assertThat;
 import static com.google.common.truth.extensions.proto.ProtoTruth.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
+import com.android.bundle.Config.ApexConfig;
+import com.android.bundle.Config.ApexEmbeddedApkConfig;
 import com.android.bundle.Files.ApexImages;
 import com.android.bundle.Files.Assets;
 import com.android.bundle.Files.NativeLibraries;
@@ -164,10 +166,25 @@ public class TargetingGeneratorTest {
             .collect(toImmutableList());
     checkState(allAbiFiles.size() > 1); // Otherwise this test is useless.
 
-    ApexImages apexImages = generator.generateTargetingForApexImages(allAbiFiles);
+    ApexImages apexImages =
+        generator.generateTargetingForApexImages(
+            ApexConfig.newBuilder()
+                .addApexEmbeddedApkConfig(
+                    ApexEmbeddedApkConfig.newBuilder()
+                        .setPackageName("com.example")
+                        .setPath("/Example.apk"))
+                .build(),
+            allAbiFiles,
+            /*hasBuildInfo=*/ true);
 
     List<TargetedApexImage> images = apexImages.getImageList();
     assertThat(images).hasSize(allAbiFiles.size());
+    assertThat(apexImages.getApexEmbeddedApkConfigList())
+        .containsExactly(
+            ApexEmbeddedApkConfig.newBuilder()
+                .setPackageName("com.example")
+                .setPath("/Example.apk")
+                .build());
   }
 
   @Test
@@ -177,7 +194,9 @@ public class TargetingGeneratorTest {
             ValidationException.class,
             () ->
                 generator.generateTargetingForApexImages(
-                    ImmutableList.of(ZipPath.create("x86.ARM64-v8a.img"))));
+                    ApexConfig.getDefaultInstance(),
+                    ImmutableList.of(ZipPath.create("x86.ARM64-v8a.img")),
+                    /*hasBuildInfo=*/ false));
 
     assertThat(exception)
         .hasMessageThat()
@@ -193,7 +212,9 @@ public class TargetingGeneratorTest {
             ValidationException.class,
             () ->
                 generator.generateTargetingForApexImages(
-                    ImmutableList.of(ZipPath.create("non_abi_name.img"))));
+                    ApexConfig.getDefaultInstance(),
+                    ImmutableList.of(ZipPath.create("non_abi_name.img")),
+                    /*hasBuildInfo=*/ false));
 
     assertThat(exception)
         .hasMessageThat()

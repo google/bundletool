@@ -16,14 +16,12 @@
 
 package com.android.tools.build.bundletool.validation;
 
-import static com.google.common.collect.ImmutableSet.toImmutableSet;
+import static com.android.tools.build.bundletool.model.targeting.TargetingUtils.extractAssetsTargetedDirectories;
+import static com.android.tools.build.bundletool.model.targeting.TargetingUtils.extractTextureCompressionFormats;
 
 import com.android.bundle.Targeting.AssetsDirectoryTargeting;
-import com.android.bundle.Targeting.TextureCompressionFormat;
 import com.android.bundle.Targeting.TextureCompressionFormat.TextureCompressionFormatAlias;
 import com.android.tools.build.bundletool.model.BundleModule;
-import com.android.tools.build.bundletool.model.ModuleEntry;
-import com.android.tools.build.bundletool.model.ZipPath;
 import com.android.tools.build.bundletool.model.exceptions.ValidationException;
 import com.android.tools.build.bundletool.model.targeting.TargetedDirectory;
 import com.android.tools.build.bundletool.model.targeting.TargetingDimension;
@@ -93,24 +91,11 @@ public class TextureCompressionFormatParityValidator extends SubValidator {
   private static SupportedTextureCompressionFormats getSupportedTextureCompressionFormats(
       BundleModule module) {
     // Extract targeted directories from entries (like done when generating assets targeting)
-    ImmutableSet<TargetedDirectory> targetedDirectories =
-        module
-            .findEntriesUnderPath(BundleModule.ASSETS_DIRECTORY)
-            .map(ModuleEntry::getPath)
-            .filter(path -> path.getNameCount() > 1)
-            .map(ZipPath::getParent)
-            .map(TargetedDirectory::parse)
-            .collect(toImmutableSet());
+    ImmutableSet<TargetedDirectory> targetedDirectories = extractAssetsTargetedDirectories(module);
 
     // Inspect the targetings to extract texture compression formats.
     ImmutableSet<TextureCompressionFormatAlias> formats =
-        targetedDirectories.stream()
-            .map(directory -> directory.getTargeting(TargetingDimension.TEXTURE_COMPRESSION_FORMAT))
-            .filter(Optional::isPresent)
-            .map(Optional::get)
-            .flatMap(targeting -> targeting.getTextureCompressionFormat().getValueList().stream())
-            .map(TextureCompressionFormat::getAlias)
-            .collect(toImmutableSet());
+        extractTextureCompressionFormats(targetedDirectories);
 
     // Check if one or more targeted directories have "fallback" sibling directories.
     boolean hasFallback =

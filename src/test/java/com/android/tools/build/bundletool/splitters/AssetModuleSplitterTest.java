@@ -80,6 +80,7 @@ public class AssetModuleSplitterTest {
     assertThat(masterSlice.getSplitType()).isEqualTo(SplitType.ASSET_SLICE);
     assertThat(masterSlice.isMasterSplit()).isTrue();
     assertThat(masterSlice.getAndroidManifest().getSplitId()).hasValue(MODULE_NAME);
+    assertThat(masterSlice.getAndroidManifest().getHasCode()).hasValue(false);
     assertThat(masterSlice.getApkTargeting()).isEqualToDefaultInstance();
     assertThat(extractPaths(masterSlice.getEntries()))
         .containsExactly("assets/image.jpg", "assets/image2.jpg");

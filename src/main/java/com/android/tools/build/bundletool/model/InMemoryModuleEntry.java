@@ -36,7 +36,7 @@ public abstract class InMemoryModuleEntry extends ModuleEntry {
   public abstract boolean isDirectory();
 
   @Override
-  public abstract boolean shouldCompress();
+  public abstract boolean getShouldCompress();
 
   @Override
   public InputStream getContent() {
@@ -49,22 +49,19 @@ public abstract class InMemoryModuleEntry extends ModuleEntry {
 
   public static InMemoryModuleEntry ofFile(ZipPath path, byte[] content) {
     return new AutoValue_InMemoryModuleEntry(
-        path, ByteString.copyFrom(content), /* isDirectory= */ false, /* shouldCompress= */ true);
+        path, ByteString.copyFrom(content), /* directory= */ false, /* shouldCompress= */ true);
   }
 
   public static InMemoryModuleEntry ofFile(String path, byte[] content, boolean shouldCompress) {
     return new AutoValue_InMemoryModuleEntry(
-        ZipPath.create(path),
-        ByteString.copyFrom(content),
-        /* isDirectory= */ false,
-        shouldCompress);
+        ZipPath.create(path), ByteString.copyFrom(content), /* directory= */ false, shouldCompress);
   }
 
   public static InMemoryModuleEntry ofDirectory(String path) {
     return new AutoValue_InMemoryModuleEntry(
         ZipPath.create(path),
         ByteString.copyFrom(new byte[0]),
-        /* isDirectory= */ true,
+        /* directory= */ true,
         /* shouldCompress= */ true);
   }
 }

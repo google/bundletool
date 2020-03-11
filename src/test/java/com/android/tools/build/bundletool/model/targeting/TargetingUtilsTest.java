@@ -34,6 +34,7 @@ import static com.android.tools.build.bundletool.testing.TargetingUtils.sdkVersi
 import static com.android.tools.build.bundletool.testing.TargetingUtils.sdkVersionTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.targetedAssetsDirectory;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.textureCompressionTargeting;
+import static com.android.tools.build.bundletool.testing.TestUtils.createModuleEntryForFile;
 import static com.google.common.truth.Truth.assertThat;
 import static com.google.common.truth.extensions.proto.ProtoTruth.assertThat;
 
@@ -46,7 +47,6 @@ import com.android.bundle.Targeting.TextureCompressionFormat.TextureCompressionF
 import com.android.bundle.Targeting.VariantTargeting;
 import com.android.tools.build.bundletool.model.AndroidManifest;
 import com.android.tools.build.bundletool.model.BundleModuleName;
-import com.android.tools.build.bundletool.model.InMemoryModuleEntry;
 import com.android.tools.build.bundletool.model.ModuleSplit;
 import com.android.tools.build.bundletool.model.ZipPath;
 import com.google.common.collect.ImmutableList;
@@ -238,11 +238,11 @@ public class TargetingUtilsTest {
             // Create entries for assets and their associated assets config with some targeting:
             .setEntries(
                 ImmutableList.of(
-                    InMemoryModuleEntry.ofFile(
+                    createModuleEntryForFile(
                         "assets/textures/untargeted_texture.dat", DUMMY_CONTENT),
-                    InMemoryModuleEntry.ofFile(
+                    createModuleEntryForFile(
                         "assets/textures#tcf_etc1/etc1_texture.dat", DUMMY_CONTENT),
-                    InMemoryModuleEntry.ofFile(
+                    createModuleEntryForFile(
                         "assets/textures#tcf_atc/atc_texture.dat", DUMMY_CONTENT)))
             .setAssetsConfig(
                 assets(

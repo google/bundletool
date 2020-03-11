@@ -29,7 +29,6 @@ import static com.android.tools.build.bundletool.testing.TargetingUtils.language
 import static com.android.tools.build.bundletool.testing.TargetingUtils.targetedAssetsDirectory;
 import static com.android.tools.build.bundletool.testing.TestUtils.extractPaths;
 import static com.google.common.truth.Truth.assertThat;
-import static com.google.common.truth.Truth8.assertThat;
 import static com.google.common.truth.extensions.proto.ProtoTruth.assertThat;
 
 import com.android.bundle.Targeting.ApkTargeting;
@@ -100,7 +99,7 @@ public class AssetSlicesGeneratorTest {
   }
 
   @Test
-  public void onDemandAssetModule_leavesVersionCodeEmpty() throws Exception {
+  public void onDemandAssetModule_addsVersionCode() throws Exception {
     AppBundle appBundle =
         createAppBundle(
             new BundleModuleBuilder("asset_module")
@@ -113,7 +112,12 @@ public class AssetSlicesGeneratorTest {
 
     assertThat(assetSlices).hasSize(1);
     ModuleSplit assetSlice = assetSlices.get(0);
-    assertThat(assetSlice.getAndroidManifest().getVersionCode()).isEmpty();
+    assertThat(
+            assetSlice
+                .getAndroidManifest()
+                .getVersionCode()
+                .orElseThrow(VersionCodeMissingException::new))
+        .isEqualTo(VERSION_CODE);
   }
 
 

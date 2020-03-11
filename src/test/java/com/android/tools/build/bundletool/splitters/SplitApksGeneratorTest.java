@@ -303,6 +303,6 @@ public class SplitApksGeneratorTest {
   }
 
   private static boolean isCompressed(ModuleSplit moduleSplit, String path) {
-    return moduleSplit.findEntry(path).get().shouldCompress();
+    return moduleSplit.findEntry(path).get().getShouldCompress();
   }
 }

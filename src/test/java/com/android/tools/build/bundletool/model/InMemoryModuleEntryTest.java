@@ -32,7 +32,7 @@ public class InMemoryModuleEntryTest {
     assertThat(moduleEntry.getPath().toString()).isEqualTo(PATH);
     assertThat(moduleEntry.getContentAsBytes().toByteArray()).isEqualTo(CONTENT);
     assertThat(moduleEntry.isDirectory()).isFalse();
-    assertThat(moduleEntry.shouldCompress()).isTrue();
+    assertThat(moduleEntry.getShouldCompress()).isTrue();
   }
 
   @Test
@@ -41,7 +41,7 @@ public class InMemoryModuleEntryTest {
         InMemoryModuleEntry.ofFile(PATH, CONTENT, /* shouldCompress = */ false);
     assertThat(moduleEntry.getPath().toString()).isEqualTo(PATH);
     assertThat(moduleEntry.getContentAsBytes().toByteArray()).isEqualTo(CONTENT);
-    assertThat(moduleEntry.shouldCompress()).isFalse();
+    assertThat(moduleEntry.getShouldCompress()).isFalse();
   }
 
   @Test
@@ -50,7 +50,7 @@ public class InMemoryModuleEntryTest {
         InMemoryModuleEntry.ofFile(PATH, CONTENT, /* shouldCompress = */ true);
     assertThat(moduleEntry.getPath().toString()).isEqualTo(PATH);
     assertThat(moduleEntry.getContentAsBytes().toByteArray()).isEqualTo(CONTENT);
-    assertThat(moduleEntry.shouldCompress()).isTrue();
+    assertThat(moduleEntry.getShouldCompress()).isTrue();
   }
 
   @Test

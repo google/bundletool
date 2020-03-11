@@ -20,6 +20,7 @@ import static com.android.tools.build.bundletool.model.version.VersionGuardedFea
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.collect.ImmutableList.toImmutableList;
+import static com.google.common.collect.Streams.stream;
 
 import com.android.aapt.Resources.XmlNode;
 import com.android.tools.build.bundletool.model.BundleModule.ModuleType;
@@ -66,6 +67,7 @@ public abstract class AndroidManifest {
   public static final String ACTIVITY_ELEMENT_NAME = "activity";
   public static final String SERVICE_ELEMENT_NAME = "service";
   public static final String PROVIDER_ELEMENT_NAME = "provider";
+  public static final String SUPPORTS_GL_TEXTURE_ELEMENT_NAME = "supports-gl-texture";
 
   public static final String DEBUGGABLE_ATTRIBUTE_NAME = "debuggable";
   public static final String EXTRACT_NATIVE_LIBS_ATTRIBUTE_NAME = "extractNativeLibs";
@@ -89,6 +91,9 @@ public abstract class AndroidManifest {
 
   public static final String MODULE_TYPE_FEATURE_VALUE = "feature";
   public static final String MODULE_TYPE_ASSET_VALUE = "asset-pack";
+
+  /** <meta-data> name that specifies native library for native activity */
+  public static final String NATIVE_ACTIVITY_LIB_NAME = "android.app.lib_name";
 
   public static final int DEBUGGABLE_RESOURCE_ID = 0x0101000f;
   public static final int EXTRACT_NATIVE_LIBS_RESOURCE_ID = 0x10104ea;
@@ -269,11 +274,31 @@ public abstract class AndroidManifest {
                     : attribute.getValueAsDecimalInteger());
   }
 
+  public ImmutableList<String> getSupportsGlTextures() {
+    return getManifestElement()
+        .getChildrenElements("supports-gl-texture")
+        .map(
+            supportsGlTextures ->
+                supportsGlTextures
+                    .getAndroidAttribute(NAME_RESOURCE_ID)
+                    .<ValidationException>orElseThrow(
+                        () ->
+                            new ValidationException(
+                                "<supports-gl-texture> element is missing the 'android:name'"
+                                    + " attribute.")))
+        .map(XmlProtoAttribute::getValueAsString)
+        .collect(toImmutableList());
+  }
+
   private static boolean isSdkCodename(String sdkVersion) {
     // Codename version can be of the form "[codename]" or "[codename].[fingerprint]".
     return !sdkVersion.isEmpty()
         && Range.closed('A', 'Z').contains(sdkVersion.charAt(0))
         && (sdkVersion.length() == 1 || '.' == sdkVersion.charAt(1));
+  }
+
+  public boolean hasApplicationElement() {
+    return getManifestElement().getOptionalChildElement(APPLICATION_ELEMENT_NAME).isPresent();
   }
 
   public Optional<Boolean> getHasCode() {
@@ -457,6 +482,21 @@ public abstract class AndroidManifest {
     return getManifestElement()
         .getAndroidAttribute(INSTALL_LOCATION_RESOURCE_ID)
         .map(XmlProtoAttribute::getValueAsString);
+  }
+
+  /**
+   * Returns whether the app explicitly defined native activities via searching for all activities
+   * that have 'android.app.lib_name' <meta-data>.
+   */
+  public boolean hasExplicitlyDefinedNativeActivities() {
+    return stream(getManifestElement().getOptionalChildElement(APPLICATION_ELEMENT_NAME))
+        .flatMap(app -> app.getChildrenElements(ACTIVITY_ELEMENT_NAME))
+        .flatMap(activity -> activity.getChildrenElements(META_DATA_ELEMENT_NAME))
+        .anyMatch(
+            meta ->
+                meta.getAndroidAttribute(NAME_RESOURCE_ID)
+                    .filter(name -> NATIVE_ACTIVITY_LIB_NAME.equals(name.getValueAsString()))
+                    .isPresent());
   }
 
   /**

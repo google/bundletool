@@ -128,7 +128,7 @@ public class DexCompressionSplitterTest {
   }
 
   private static boolean isCompressed(ModuleSplit moduleSplit, String path) {
-    return moduleSplit.findEntry(path).get().shouldCompress();
+    return moduleSplit.findEntry(path).get().getShouldCompress();
   }
 
   /** Creates a minimal module with single dex file. */

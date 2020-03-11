@@ -52,7 +52,7 @@ public class DelegatingModuleEntry extends ModuleEntry {
   }
 
   @Override
-  public boolean shouldCompress() {
-    return delegate.shouldCompress();
+  public boolean getShouldCompress() {
+    return delegate.getShouldCompress();
   }
 }

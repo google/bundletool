@@ -18,7 +18,9 @@ package com.android.tools.build.bundletool.splitters;
 
 import static com.android.tools.build.bundletool.model.ManifestMutator.withExtractNativeLibs;
 import static com.android.tools.build.bundletool.model.utils.Versions.ANDROID_M_API_VERSION;
+import static com.android.tools.build.bundletool.model.utils.Versions.ANDROID_N_API_VERSION;
 import static com.android.tools.build.bundletool.model.utils.Versions.ANDROID_P_API_VERSION;
+import static com.android.tools.build.bundletool.splitters.NativeLibrariesHelper.mayHaveNativeActivities;
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.ImmutableSet.toImmutableSet;
@@ -72,19 +74,7 @@ public final class NativeLibrariesCompressionSplitter implements ModuleSplitSpli
             .flatMap(directory -> moduleSplit.findEntriesUnderPath(directory.getPath()))
             .collect(toImmutableSet());
 
-    // If persistent app is not installable on external storage, only the split APKs targeting
-    // devices above Android M should be uncompressed. If the persistent app is installable on
-    // external storage only split APKs targeting device above Android P should be uncompressed (as
-    // uncompressed native libraries crashes with ASEC external storage and support for ASEC
-    // external storage is removed in Android P). Instant apps always support uncompressed native
-    // libraries (even on Android L), because they are not always executed by the Android platform.
-    boolean shouldCompress =
-        !apkGenerationConfiguration.isForInstantAppVariants()
-            && ((!apkGenerationConfiguration.isInstallableOnExternalStorage()
-                    && targetsPreM(moduleSplit))
-                || (apkGenerationConfiguration.isInstallableOnExternalStorage()
-                    && targetsPreP(moduleSplit)));
-
+    boolean shouldCompress = !supportUncompressedNativeLibs(moduleSplit);
     return ImmutableList.of(
         createModuleSplit(
             moduleSplit,
@@ -92,12 +82,37 @@ public final class NativeLibrariesCompressionSplitter implements ModuleSplitSpli
             /* extractNativeLibs= */ shouldCompress));
   }
 
-  private static boolean targetsPreM(ModuleSplit moduleSplit) {
-    return getSdkVersion(moduleSplit) < ANDROID_M_API_VERSION;
+  private boolean supportUncompressedNativeLibs(ModuleSplit moduleSplit) {
+    // Instant apps support uncompressed native libs since Android L.
+    if (apkGenerationConfiguration.isForInstantAppVariants()) {
+      return true;
+    }
+    // Persistent apps target at least Android P support uncompressed native libraries without any
+    // restrictions.
+    if (targetsAtLeast(ANDROID_P_API_VERSION, moduleSplit)) {
+      return true;
+    }
+
+    // Persistent apps target Android N+ can use uncompressed native libraries in case they are
+    // are not installable on external storage as uncompressed native libraries crash with ASEC
+    // external storage and support for ASEC external storage is removed in Android P.
+    if (targetsAtLeast(ANDROID_N_API_VERSION, moduleSplit)) {
+      return !apkGenerationConfiguration.isInstallableOnExternalStorage();
+    }
+
+    // Persistent apps with uncompressed libraries are supported on Android M if they are
+    // not installable on external storage and do not use native activities because native
+    // activities with uncompressed native libs crash on Android M b/145808311.
+    if (targetsAtLeast(ANDROID_M_API_VERSION, moduleSplit)) {
+      return !apkGenerationConfiguration.isInstallableOnExternalStorage()
+          && !mayHaveNativeActivities(moduleSplit);
+    }
+
+    return false;
   }
 
-  private static boolean targetsPreP(ModuleSplit moduleSplit) {
-    return getSdkVersion(moduleSplit) < ANDROID_P_API_VERSION;
+  private static boolean targetsAtLeast(int version, ModuleSplit moduleSplit) {
+    return getSdkVersion(moduleSplit) >= version;
   }
 
   private static int getSdkVersion(ModuleSplit moduleSplit) {

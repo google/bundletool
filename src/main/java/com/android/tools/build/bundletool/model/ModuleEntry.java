@@ -48,7 +48,7 @@ public abstract class ModuleEntry {
   /** Whether the entry is a directory. */
   public abstract boolean isDirectory();
 
-  public abstract boolean shouldCompress();
+  public abstract boolean getShouldCompress();
 
   @SuppressWarnings("MustBeClosedChecker") // InputStreamSupplier is annotated with @MustBeClosed
   public final InputStreamSupplier getContentSupplier() {
@@ -61,12 +61,12 @@ public abstract class ModuleEntry {
    */
   @CheckReturnValue
   public final ModuleEntry setCompression(boolean newShouldCompress) {
-    if (newShouldCompress == shouldCompress()) {
+    if (newShouldCompress == getShouldCompress()) {
       return this;
     }
     return new DelegatingModuleEntry(/* delegate= */ this) {
       @Override
-      public boolean shouldCompress() {
+      public boolean getShouldCompress() {
         return newShouldCompress;
       }
     };
@@ -103,7 +103,7 @@ public abstract class ModuleEntry {
       return false;
     }
 
-    if (entry1.shouldCompress() != entry2.shouldCompress()) {
+    if (entry1.getShouldCompress() != entry2.getShouldCompress()) {
       return false;
     }
 
@@ -128,6 +128,6 @@ public abstract class ModuleEntry {
   @Override
   public int hashCode() {
     // Deliberately omit the content for performance.
-    return Objects.hash(getPath(), shouldCompress(), isDirectory());
+    return Objects.hash(getPath(), getShouldCompress(), isDirectory());
   }
 }

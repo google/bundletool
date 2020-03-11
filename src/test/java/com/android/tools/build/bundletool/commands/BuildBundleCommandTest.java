@@ -33,6 +33,7 @@ import static com.android.tools.build.bundletool.testing.TargetingUtils.mergeAss
 import static com.android.tools.build.bundletool.testing.TargetingUtils.multiAbiTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.openGlVersionFrom;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.targetedApexImage;
+import static com.android.tools.build.bundletool.testing.TargetingUtils.targetedApexImageWithBuildInfo;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.textureCompressionTargeting;
 import static com.android.tools.build.bundletool.testing.TestUtils.expectMissingRequiredBuilderPropertyException;
 import static com.android.tools.build.bundletool.testing.TestUtils.expectMissingRequiredFlagException;
@@ -311,6 +312,80 @@ public class BuildBundleCommandTest {
       assertThat(bundle)
           .hasFile("base/apex/armeabi-v7a.img")
           .withContent("armeabi-v7a".getBytes(UTF_8));
+      assertThat(bundle).hasFile("base/root/apex_manifest.json").withContent(apexManifest);
+      assertThat(bundle).hasFile("base/apex.pb").withContent(apexConfig.toByteArray());
+    }
+  }
+
+  @Test
+  public void validApexModuleWithBuildInfo() throws Exception {
+    XmlNode manifest = androidManifest(PKG_NAME, withHasCode(false));
+    ImmutableSet<AbiAlias> targetedAbis = ImmutableSet.of(X86_64, X86, ARM64_V8A, ARMEABI_V7A);
+    ApexImages apexConfig =
+        apexImages(
+            targetedImageWithBuildInfoAndAlternatives(
+                "apex/x86_64.img", "apex/x86_64.build_info.pb", X86_64, targetedAbis),
+            targetedImageWithBuildInfoAndAlternatives(
+                "apex/x86.img", "apex/x86.build_info.pb", X86, targetedAbis),
+            targetedImageWithBuildInfoAndAlternatives(
+                "apex/arm64-v8a.img", "apex/arm64-v8a.build_info.pb", ARM64_V8A, targetedAbis),
+            targetedImageWithBuildInfoAndAlternatives(
+                "apex/armeabi-v7a.img",
+                "apex/armeabi-v7a.build_info.pb",
+                ARMEABI_V7A,
+                targetedAbis));
+    byte[] apexManifest = "{\"name\": \"com.test.app\"}".getBytes(UTF_8);
+    Path module =
+        new ZipBuilder()
+            .addFileWithContent(ZipPath.create("apex/x86_64.img"), "x86_64".getBytes(UTF_8))
+            .addFileWithContent(
+                ZipPath.create("apex/x86_64.build_info.pb"), "x86_64.build_info".getBytes(UTF_8))
+            .addFileWithContent(ZipPath.create("apex/x86.img"), "x86".getBytes(UTF_8))
+            .addFileWithContent(
+                ZipPath.create("apex/x86.build_info.pb"), "x86.build_info".getBytes(UTF_8))
+            .addFileWithContent(ZipPath.create("apex/arm64-v8a.img"), "arm64-v8a".getBytes(UTF_8))
+            .addFileWithContent(
+                ZipPath.create("apex/arm64-v8a.build_info.pb"),
+                "arm64-v8a.build_info".getBytes(UTF_8))
+            .addFileWithContent(
+                ZipPath.create("apex/armeabi-v7a.img"), "armeabi-v7a".getBytes(UTF_8))
+            .addFileWithContent(
+                ZipPath.create("apex/armeabi-v7a.build_info.pb"),
+                "armeabi-v7a.build_info".getBytes(UTF_8))
+            .addFileWithProtoContent(ZipPath.create("manifest/AndroidManifest.xml"), manifest)
+            .addFileWithContent(ZipPath.create("root/apex_manifest.json"), apexManifest)
+            .writeTo(tmpDir.resolve("base.zip"));
+
+    BuildBundleCommand.builder()
+        .setOutputPath(bundlePath)
+        .setModulesPaths(ImmutableList.of(module))
+        .build()
+        .execute();
+
+    try (ZipFile bundle = new ZipFile(bundlePath.toFile())) {
+      assertThat(bundle)
+          .hasFile("base/manifest/AndroidManifest.xml")
+          .withContent(manifest.toByteArray());
+      assertThat(bundle).hasFile("base/apex/x86_64.img").withContent("x86_64".getBytes(UTF_8));
+      assertThat(bundle)
+          .hasFile("base/apex/x86_64.build_info.pb")
+          .withContent("x86_64.build_info".getBytes(UTF_8));
+      assertThat(bundle).hasFile("base/apex/x86.img").withContent("x86".getBytes(UTF_8));
+      assertThat(bundle)
+          .hasFile("base/apex/x86.build_info.pb")
+          .withContent("x86.build_info".getBytes(UTF_8));
+      assertThat(bundle)
+          .hasFile("base/apex/arm64-v8a.img")
+          .withContent("arm64-v8a".getBytes(UTF_8));
+      assertThat(bundle)
+          .hasFile("base/apex/arm64-v8a.build_info.pb")
+          .withContent("arm64-v8a.build_info".getBytes(UTF_8));
+      assertThat(bundle)
+          .hasFile("base/apex/armeabi-v7a.img")
+          .withContent("armeabi-v7a".getBytes(UTF_8));
+      assertThat(bundle)
+          .hasFile("base/apex/armeabi-v7a.build_info.pb")
+          .withContent("armeabi-v7a.build_info".getBytes(UTF_8));
       assertThat(bundle).hasFile("base/root/apex_manifest.json").withContent(apexManifest);
       assertThat(bundle).hasFile("base/apex.pb").withContent(apexConfig.toByteArray());
     }
@@ -977,10 +1052,19 @@ public class BuildBundleCommandTest {
         .writeTo(tmpDir.resolve(fileName + ".zip"));
   }
 
-  private TargetedApexImage targetedImageWithAlternatives(
+  private static TargetedApexImage targetedImageWithAlternatives(
       String path, AbiAlias abi, ImmutableSet<AbiAlias> targetedAbis) {
     return targetedApexImage(
         path,
+        multiAbiTargeting(
+            abi, Sets.difference(targetedAbis, ImmutableSet.of(abi)).immutableCopy()));
+  }
+
+  private static TargetedApexImage targetedImageWithBuildInfoAndAlternatives(
+      String path, String buildInfoPath, AbiAlias abi, ImmutableSet<AbiAlias> targetedAbis) {
+    return targetedApexImageWithBuildInfo(
+        path,
+        buildInfoPath,
         multiAbiTargeting(
             abi, Sets.difference(targetedAbis, ImmutableSet.of(abi)).immutableCopy()));
   }

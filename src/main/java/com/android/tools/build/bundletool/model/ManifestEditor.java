@@ -240,6 +240,12 @@ public class ManifestEditor {
     return this;
   }
 
+  /** Adds an empty {@code <application>} element in the manifest if none is present. */
+  public ManifestEditor addApplicationElementIfMissing() {
+    manifestElement.getOrCreateChildElement(APPLICATION_ELEMENT_NAME);
+    return this;
+  }
+
   /**
    * Removes the {@code splitName} attribute from activities, services and providers.
    *
