@@ -16,6 +16,7 @@
 
 package com.android.tools.build.bundletool.model;
 
+import static com.android.tools.build.bundletool.testing.TestUtils.toByteArray;
 import static com.google.common.truth.Truth.assertThat;
 
 import java.io.ByteArrayInputStream;
@@ -27,80 +28,51 @@ import org.junit.runners.JUnit4;
 
 @RunWith(JUnit4.class)
 public class ModuleEntryTest {
-
   @Test
-  public void equals_differentPath() throws Exception {
-    ModuleEntry entry1 = createDirectoryEntry(ZipPath.create("a"));
-    ModuleEntry entry2 = createDirectoryEntry(ZipPath.create("b"));
+  public void builder() throws Exception {
+    ZipPath path = ZipPath.create("a");
+    byte[] content = new byte[] {'a'};
+    ModuleEntry entry = createEntry(path, content).toBuilder().setShouldCompress(false).build();
 
-    assertThat(entry1.equals(entry2)).isFalse();
+    assertThat(entry.getPath()).isEqualTo(path);
+    assertThat(entry.getShouldCompress()).isFalse();
+    assertThat(toByteArray(entry.getContentSupplier())).isEqualTo(content);
   }
 
   @Test
-  public void equals_differentType() throws Exception {
-    ModuleEntry entry1 = createDirectoryEntry(ZipPath.create("a"));
-    ModuleEntry entry2 = createFileEntry(ZipPath.create("a"), new byte[0]);
+  public void builder_defaults() throws Exception {
+    ModuleEntry entry = createEntry(ZipPath.create("a"), new byte[0]);
+    assertThat(entry.getShouldCompress()).isTrue();
+  }
+
+  @Test
+  public void equals_differentPath() throws Exception {
+    ModuleEntry entry1 = createEntry(ZipPath.create("a"), new byte[0]);
+    ModuleEntry entry2 = createEntry(ZipPath.create("b"), new byte[0]);
 
     assertThat(entry1.equals(entry2)).isFalse();
   }
 
   @Test
   public void equals_differentFileContents() throws Exception {
-    ModuleEntry entry1 = createFileEntry(ZipPath.create("a"), new byte[] {'a'});
-    ModuleEntry entry2 = createFileEntry(ZipPath.create("a"), new byte[] {'b'});
+    ModuleEntry entry1 = createEntry(ZipPath.create("a"), new byte[] {'a'});
+    ModuleEntry entry2 = createEntry(ZipPath.create("a"), new byte[] {'b'});
 
     assertThat(entry1.equals(entry2)).isFalse();
   }
 
   @Test
-  public void equals_sameDirectories() throws Exception {
-    ModuleEntry entry = createDirectoryEntry(ZipPath.create("a"));
-
-    assertThat(entry.equals(entry)).isTrue();
-  }
-
-  @Test
   public void equals_sameFiles() throws Exception {
-    ModuleEntry entry = createFileEntry(ZipPath.create("a"), new byte[] {'a'});
+    ModuleEntry entry = createEntry(ZipPath.create("a"), new byte[] {'a'});
 
     assertThat(entry.equals(entry)).isTrue();
   }
 
-  private static ModuleEntry createFileEntry(ZipPath path, byte[] content) throws Exception {
-    return createEntry(path, /* isDirectory= */ false, () -> new ByteArrayInputStream(content));
+  private static ModuleEntry createEntry(ZipPath path, byte[] content) throws Exception {
+    return createEntry(path, () -> new ByteArrayInputStream(content));
   }
 
-  private static ModuleEntry createDirectoryEntry(ZipPath path) throws Exception {
-    return createEntry(
-        path,
-        /* isDirectory= */ true,
-        () -> {
-          throw new RuntimeException("Why would you want content of a directory?");
-        });
-  }
-
-  private static ModuleEntry createEntry(
-      ZipPath path, boolean isDirectory, Supplier<InputStream> contentSupplier) {
-    return new ModuleEntry() {
-      @Override
-      public InputStream getContent() {
-        return contentSupplier.get();
-      }
-
-      @Override
-      public ZipPath getPath() {
-        return path;
-      }
-
-      @Override
-      public boolean isDirectory() {
-        return isDirectory;
-      }
-
-      @Override
-      public boolean getShouldCompress() {
-        return true;
-      }
-    };
+  private static ModuleEntry createEntry(ZipPath path, Supplier<InputStream> contentSupplier) {
+    return ModuleEntry.builder().setPath(path).setContentSupplier(contentSupplier::get).build();
   }
 }

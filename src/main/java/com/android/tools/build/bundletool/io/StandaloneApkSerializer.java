@@ -45,11 +45,13 @@ public class StandaloneApkSerializer {
       ApkPathManager apkPathManager,
       Aapt2Command aapt2Command,
       Optional<SigningConfiguration> signingConfig,
+      Optional<SigningConfiguration> stampSigningConfig,
       Version bundleVersion,
       Compression compression) {
     this.apkPathManager = apkPathManager;
     this.apkSerializerHelper =
-        new ApkSerializerHelper(aapt2Command, signingConfig, bundleVersion, compression);
+        new ApkSerializerHelper(
+            aapt2Command, signingConfig, stampSigningConfig, bundleVersion, compression);
   }
 
   public ApkDescription writeToDisk(ModuleSplit standaloneSplit, Path outputDirectory) {

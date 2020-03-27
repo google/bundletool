@@ -16,11 +16,15 @@
 
 package com.android.tools.build.bundletool.mergers;
 
+import static com.android.tools.build.bundletool.mergers.AndroidManifestMerger.fusingMerger;
+import static com.android.tools.build.bundletool.mergers.AndroidManifestMerger.manifestOverride;
+import static com.android.tools.build.bundletool.mergers.AndroidManifestMerger.useBaseModuleManifestMerger;
 import static com.android.tools.build.bundletool.mergers.MergingUtils.mergeTargetedAssetsDirectories;
 import static com.android.tools.build.bundletool.model.BundleMetadata.BUNDLETOOL_NAMESPACE;
 import static com.android.tools.build.bundletool.model.BundleMetadata.MAIN_DEX_LIST_FILE_NAME;
 import static com.android.tools.build.bundletool.model.BundleModule.DEX_DIRECTORY;
 import static com.android.tools.build.bundletool.model.BundleModuleName.BASE_MODULE_NAME;
+import static com.android.tools.build.bundletool.model.version.VersionGuardedFeature.FUSE_ACTIVITIES_FROM_FEATURE_MANIFESTS;
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.ImmutableSet.toImmutableSet;
@@ -37,8 +41,8 @@ import com.android.tools.build.bundletool.device.ApkMatcher;
 import com.android.tools.build.bundletool.model.AndroidManifest;
 import com.android.tools.build.bundletool.model.BundleMetadata;
 import com.android.tools.build.bundletool.model.BundleModuleName;
-import com.android.tools.build.bundletool.model.FileSystemModuleEntry;
 import com.android.tools.build.bundletool.model.InputStreamSupplier;
+import com.android.tools.build.bundletool.model.InputStreamSuppliers;
 import com.android.tools.build.bundletool.model.ModuleEntry;
 import com.android.tools.build.bundletool.model.ModuleSplit;
 import com.android.tools.build.bundletool.model.ModuleSplit.SplitType;
@@ -48,13 +52,13 @@ import com.android.tools.build.bundletool.model.ZipPath;
 import com.android.tools.build.bundletool.model.exceptions.CommandExecutionException;
 import com.android.tools.build.bundletool.model.utils.Versions;
 import com.android.tools.build.bundletool.model.utils.files.BufferedIo;
+import com.android.tools.build.bundletool.model.version.Version;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.HashMultimap;
 import com.google.common.collect.ImmutableCollection;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
-import com.google.common.collect.Iterables;
 import com.google.common.collect.ListMultimap;
 import com.google.common.collect.Multimap;
 import com.google.common.collect.SetMultimap;
@@ -72,7 +76,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.Set;
 import java.util.stream.Stream;
 
 /**
@@ -84,10 +87,12 @@ import java.util.stream.Stream;
 public class ModuleSplitsToShardMerger {
 
   private final DexMerger dexMerger;
+  private final Version bundleVersion;
   private final Path globalTempDir;
 
-  public ModuleSplitsToShardMerger(DexMerger dexMerger, Path globalTempDir) {
+  public ModuleSplitsToShardMerger(DexMerger dexMerger, Version bundleVersion, Path globalTempDir) {
     this.dexMerger = dexMerger;
+    this.bundleVersion = bundleVersion;
     this.globalTempDir = globalTempDir;
   }
 
@@ -189,7 +194,9 @@ public class ModuleSplitsToShardMerger {
         bundleMetadata,
         mergedDexCache,
         /* mergedSplitType= */ SplitType.STANDALONE,
-        /* mergedManifestOverride= */ Optional.empty());
+        FUSE_ACTIVITIES_FROM_FEATURE_MANIFESTS.enabledForVersion(bundleVersion)
+            ? fusingMerger()
+            : useBaseModuleManifestMerger());
   }
 
   private ModuleSplit mergeSingleShard(
@@ -197,7 +204,7 @@ public class ModuleSplitsToShardMerger {
       BundleMetadata bundleMetadata,
       Map<ImmutableSet<ModuleEntry>, ImmutableList<Path>> mergedDexCache,
       SplitType mergedSplitType,
-      Optional<AndroidManifest> mergedManifestOverride) {
+      AndroidManifestMerger manifestMerger) {
 
     ListMultimap<BundleModuleName, ModuleEntry> dexFilesToMergeByModule =
         ArrayListMultimap.create();
@@ -223,7 +230,7 @@ public class ModuleSplitsToShardMerger {
       androidManifestsToMergeByModule.put(split.getModuleName(), split.getAndroidManifest());
 
       for (ModuleEntry entry : split.getEntries()) {
-        if (entry.getPath().startsWith(DEX_DIRECTORY) && !entry.isDirectory()) {
+        if (entry.getPath().startsWith(DEX_DIRECTORY)) {
           // Dex files need to be merged later, globally for all splits.
           dexFilesToMergeByModule.put(split.getModuleName(), entry);
         } else {
@@ -239,10 +246,7 @@ public class ModuleSplitsToShardMerger {
               });
     }
 
-    AndroidManifest mergedAndroidManifest =
-        mergedManifestOverride.isPresent()
-            ? mergedManifestOverride.get()
-            : mergeAndroidManifests(androidManifestsToMergeByModule);
+    AndroidManifest mergedAndroidManifest = manifestMerger.merge(androidManifestsToMergeByModule);
 
     Collection<ModuleEntry> mergedDexFiles =
         mergeDexFilesAndCache(
@@ -340,13 +344,6 @@ public class ModuleSplitsToShardMerger {
     return shard.build();
   }
 
-  private AndroidManifest mergeAndroidManifests(
-      SetMultimap<BundleModuleName, AndroidManifest> manifestsToMergeByModule) {
-    // For now assume that all necessary information has been propagated to the base manifest when
-    // building the bundle. Actual manifest merging will be implemented later.
-    return getOnlyBaseAndroidManifest(manifestsToMergeByModule);
-  }
-
   private Collection<ModuleEntry> mergeDexFilesAndCache(
       ListMultimap<BundleModuleName, ModuleEntry> dexFilesToMergeByModule,
       BundleMetadata bundleMetadata,
@@ -374,9 +371,10 @@ public class ModuleSplitsToShardMerger {
       return mergedDexFiles.stream()
           .map(
               filePath ->
-                  FileSystemModuleEntry.ofFile(
-                      /* entryPath= */ DEX_DIRECTORY.resolve(filePath.getFileName().toString()),
-                      /* fileSystemPath= */ filePath))
+                  ModuleEntry.builder()
+                      .setPath(DEX_DIRECTORY.resolve(filePath.getFileName().toString()))
+                      .setContentSupplier(InputStreamSuppliers.fromFile(filePath))
+                      .build())
           .collect(toImmutableList());
     }
   }
@@ -398,11 +396,13 @@ public class ModuleSplitsToShardMerger {
         Streams.mapWithIndex(
             dexFilesFromNotBase,
             (entry, index) ->
-                entry.setPath(
-                    DEX_DIRECTORY.resolve(
-                        dexFilesCountInBase + index == 0
-                            ? "classes.dex"
-                            : String.format("classes%d.dex", dexFilesCountInBase + index + 1))));
+                entry.toBuilder()
+                    .setPath(
+                        DEX_DIRECTORY.resolve(
+                            dexFilesCountInBase + index == 0
+                                ? "classes.dex"
+                                : String.format("classes%d.dex", dexFilesCountInBase + index + 1)))
+                    .build());
 
     return Stream.concat(dexFilesFromBase, renamedDexFiles).collect(toImmutableList());
   }
@@ -502,20 +502,6 @@ public class ModuleSplitsToShardMerger {
     return Optional.of(mainDexListFile);
   }
 
-  private static AndroidManifest getOnlyBaseAndroidManifest(
-      SetMultimap<BundleModuleName, AndroidManifest> manifestsToMergeByModule) {
-    Set<AndroidManifest> baseManifests = manifestsToMergeByModule.get(BASE_MODULE_NAME);
-
-    if (baseManifests.size() != 1) {
-      throw CommandExecutionException.builder()
-          .withMessage(
-              "Expected exactly one base module manifest, but found %d.", baseManifests.size())
-          .build();
-    }
-
-    return Iterables.getOnlyElement(baseManifests);
-  }
-
   private static ImmutableList<String> getUniqueModuleNames(
       ImmutableCollection<ModuleSplit> splits) {
     return splits.stream()
@@ -567,7 +553,7 @@ public class ModuleSplitsToShardMerger {
         bundleMetadata,
         new HashMap<>(),
         /* mergedSplitType= */ SplitType.SPLIT,
-        /* mergedManifestOverride= */ Optional.of(baseMasterAndroidManifest));
+        manifestOverride(baseMasterAndroidManifest));
   }
 
   private static AndroidManifest getBaseMasterAndroidManifest(

@@ -23,7 +23,9 @@ import com.android.bundle.Config.BundleConfig;
 import com.android.bundle.Config.Bundletool;
 import com.android.tools.build.bundletool.model.BundleModule;
 import com.android.tools.build.bundletool.model.BundleModuleName;
-import com.android.tools.build.bundletool.model.ModuleZipEntry;
+import com.android.tools.build.bundletool.model.InputStreamSuppliers;
+import com.android.tools.build.bundletool.model.ModuleEntry;
+import com.android.tools.build.bundletool.model.ZipPath;
 import com.android.tools.build.bundletool.model.version.BundleToolVersion;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
@@ -99,7 +101,13 @@ public class BundleModulesValidator {
               .addEntries(
                   moduleZipFile.stream()
                       .filter(not(ZipEntry::isDirectory))
-                      .map(zipEntry -> ModuleZipEntry.fromModuleZipEntry(zipEntry, moduleZipFile))
+                      .map(
+                          zipEntry ->
+                              ModuleEntry.builder()
+                                  .setPath(ZipPath.create(zipEntry.getName()))
+                                  .setContentSupplier(
+                                      InputStreamSuppliers.fromZipEntry(zipEntry, moduleZipFile))
+                                  .build())
                       .collect(toImmutableList()))
               .build();
     } catch (IOException e) {

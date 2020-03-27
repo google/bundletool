@@ -19,20 +19,13 @@ package com.android.tools.build.bundletool.mergers;
 import static com.android.tools.build.bundletool.model.utils.Versions.ANDROID_K_API_VERSION;
 import static com.android.tools.build.bundletool.model.utils.Versions.ANDROID_L_API_VERSION;
 import static com.google.common.base.Preconditions.checkArgument;
-import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.collect.ImmutableList.toImmutableList;
-import static com.google.common.collect.ImmutableSet.toImmutableSet;
 import static com.google.common.truth.Truth.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.android.tools.build.bundletool.TestData;
 import com.android.tools.build.bundletool.model.exceptions.CommandExecutionException;
 import com.android.tools.build.bundletool.testing.FileUtils;
-import com.android.tools.r8.dex.ApplicationReader;
-import com.android.tools.r8.graph.DexApplication;
-import com.android.tools.r8.utils.AndroidApp;
-import com.android.tools.r8.utils.InternalOptions;
-import com.android.tools.r8.utils.Timing;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import java.io.File;
@@ -41,6 +34,10 @@ import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Optional;
+import org.jf.dexlib2.DexFileFactory;
+import org.jf.dexlib2.Opcodes;
+import org.jf.dexlib2.dexbacked.DexBackedClassDef;
+import org.jf.dexlib2.dexbacked.DexBackedDexFile;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
@@ -237,28 +234,16 @@ public class D8DexMergerTest {
     return listClassesInDexFiles(Arrays.asList(dexFiles));
   }
 
-  /**
-   * This method is inspired by {@link com.android.tools.r8.PrintClassList} which has no Java API at
-   * the time of writing these tests.
-   */
-  private static ImmutableSet<String> listClassesInDexFiles(Collection<Path> dexFiles)
+  private static ImmutableSet<String> listClassesInDexFiles(Collection<Path> dexPaths)
       throws Exception {
-
-    DexApplication dexApplication =
-        new ApplicationReader(
-                AndroidApp.builder().addProgramFiles(dexFiles).build(),
-                new InternalOptions(),
-                new Timing("irrelevant"))
-            .read();
-
-    ImmutableSet<String> classes =
-        dexApplication
-            .classes()
-            .stream()
-            .map(clazz -> clazz.type.toString())
-            .collect(toImmutableSet());
-    checkState(!classes.isEmpty());
-    return classes;
+    ImmutableSet.Builder<String> classes = ImmutableSet.builder();
+    for (Path dexPath : dexPaths) {
+      DexBackedDexFile dexFile = DexFileFactory.loadDexFile(dexPath.toFile(), Opcodes.getDefault());
+      for (DexBackedClassDef clazz : dexFile.getClasses()) {
+        classes.add(clazz.getType());
+      }
+    }
+    return classes.build();
   }
 
   private static ImmutableList<Path> listDirectory(Path dir) {

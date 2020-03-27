@@ -70,11 +70,7 @@ public class AppBundleSerializer {
 
       for (ModuleEntry entry : module.getEntries()) {
         ZipPath entryPath = moduleDir.resolve(entry.getPath());
-        if (entry.isDirectory()) {
-          zipBuilder.addDirectory(entryPath);
-        } else {
-          zipBuilder.addFile(entryPath, entry.getContentSupplier(), compression);
-        }
+        zipBuilder.addFile(entryPath, entry.getContentSupplier(), compression);
       }
 
       // Special module files are not represented as module entries (above).

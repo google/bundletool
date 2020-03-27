@@ -43,34 +43,6 @@ public class BundleValidationUtilsTest {
   }
 
   @Test
-  public void directoryContainsNoFiles_existsButEmpty() throws Exception {
-    BundleModule module =
-        new BundleModuleBuilder("testModule")
-            .addFile("assets/file.txt")
-            .addDirectory("lib")
-            .setManifest(androidManifest("com.test.app"))
-            .build();
-
-    boolean result = BundleValidationUtils.directoryContainsNoFiles(module, ZipPath.create("lib"));
-
-    assertThat(result).isTrue();
-  }
-
-  @Test
-  public void directoryContainsNoFiles_containsOnlyEmptyDirectory() throws Exception {
-    BundleModule module =
-        new BundleModuleBuilder("testModule")
-            .addFile("assets/file.txt")
-            .addDirectory("lib/sub-dir")
-            .setManifest(androidManifest("com.test.app"))
-            .build();
-
-    boolean result = BundleValidationUtils.directoryContainsNoFiles(module, ZipPath.create("lib"));
-
-    assertThat(result).isTrue();
-  }
-
-  @Test
   public void directoryContainsNoFiles_containsAFile() throws Exception {
     BundleModule module =
         new BundleModuleBuilder("testModule")

@@ -218,6 +218,10 @@ public abstract class AppBundle {
     Enumeration<? extends ZipEntry> entries = bundleFile.entries();
     while (entries.hasMoreElements()) {
       ZipEntry entry = entries.nextElement();
+      if (entry.isDirectory()) {
+        continue;
+      }
+
       Optional<BundleModuleName> moduleName = extractModuleName(entry);
       if (!moduleName.isPresent()) {
         continue;
@@ -228,7 +232,11 @@ public abstract class AppBundle {
               moduleName.get(),
               name -> BundleModule.builder().setName(name).setBundleConfig(bundleConfig));
       try {
-        moduleBuilder.addEntry(ModuleZipEntry.fromBundleZipEntry(entry, bundleFile));
+        moduleBuilder.addEntry(
+            ModuleEntry.builder()
+                .setPath(ZipUtils.convertBundleToModulePath(ZipPath.create(entry.getName())))
+                .setContentSupplier(InputStreamSuppliers.fromZipEntry(entry, bundleFile))
+                .build());
       } catch (IOException e) {
         throw ValidationException.builder()
             .withCause(e)

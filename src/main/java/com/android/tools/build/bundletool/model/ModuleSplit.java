@@ -65,6 +65,9 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Multimap;
 import com.google.common.collect.Multimaps;
 import com.google.errorprone.annotations.Immutable;
+import java.net.MalformedURLException;
+import java.net.URISyntaxException;
+import java.net.URL;
 import java.util.List;
 import java.util.Optional;
 import java.util.StringJoiner;
@@ -265,19 +268,40 @@ public abstract class ModuleSplit {
   }
 
   /** Writes the source stamp in the split manifest. */
-  public ModuleSplit writeStampInManifest(SourceStamp sourceStamp, StampType stampType) {
-    if (!isBaseModuleSplit() || !isMasterSplit()) {
+  public ModuleSplit writeSourceStampInManifest(String stampSource, StampType stampType) {
+    if (!isEligibleForSourceStamp()) {
       return this;
     }
 
-    // Computing the hash of the leaf certificate only.
+    checkStampSource(stampSource);
+
     AndroidManifest apkManifest =
         getAndroidManifest()
             .toEditor()
-            .addMetaDataString(STAMP_SOURCE_METADATA_KEY, sourceStamp.getSource())
+            .addMetaDataString(STAMP_SOURCE_METADATA_KEY, stampSource)
             .addMetaDataString(STAMP_TYPE_METADATA_KEY, stampType.toString())
             .save();
     return toBuilder().setAndroidManifest(apkManifest).build();
+  }
+
+  private boolean isEligibleForSourceStamp() {
+    switch (getSplitType()) {
+      case SPLIT:
+      case INSTANT:
+        return isBaseModuleSplit() && isMasterSplit();
+      case STANDALONE:
+        return true;
+      default:
+        return false;
+    }
+  }
+
+  private static void checkStampSource(String stampSource) {
+    try {
+      new URL(stampSource).toURI();
+    } catch (MalformedURLException | URISyntaxException e) {
+      throw new IllegalArgumentException("Invalid stamp source. Stamp sources should be URLs.", e);
+    }
   }
 
   /** Writes the final manifest that reflects the Split ID. */

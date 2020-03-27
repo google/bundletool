@@ -63,11 +63,9 @@ public abstract class SourceStamp {
 
   /** Type of stamp generated. */
   public enum StampType {
-    // Stamp generated for all APKs except universal APKs.
-    STAMP_TYPE_DEFAULT,
-    // Stamp generated for a universal APK.
-    STAMP_TYPE_UNIVERSAL,
-    // Stamp generated for a local APK, regardless of the APK type.
-    STAMP_TYPE_LOCAL,
+    // Stamp generated for APKs intended for distribution.
+    STAMP_TYPE_DISTRIBUTION_APK,
+    // Stamp generated for standalone APKs.
+    STAMP_TYPE_STANDALONE_APK,
   }
 }

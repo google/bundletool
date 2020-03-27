@@ -371,7 +371,7 @@ public abstract class BundleModule {
         try (InputStream inputStream = moduleEntry.getContent()) {
           specialEntry.get().addToModule(this, inputStream);
         }
-      } else if (!moduleEntry.isDirectory()) {
+      } else {
         entryMapBuilder().put(moduleEntry.getPath(), moduleEntry);
       }
 

@@ -118,7 +118,7 @@ public class AppBundleObfuscationPreprocessor implements AppBundlePreprocessor {
       ZipPath newPath =
           obfuscateZipPath(moduleEntry.getPath(), ImmutableMap.copyOf(resourceNameMapping));
       resourceNameMapping.put(moduleEntry.getPath().toString(), newPath.toString());
-      ModuleEntry newModuleEntry = moduleEntry.setPath(newPath);
+      ModuleEntry newModuleEntry = moduleEntry.toBuilder().setPath(newPath).build();
       obfuscatedEntries.add(newModuleEntry);
     }
     return obfuscatedEntries.build();

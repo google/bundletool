@@ -55,6 +55,7 @@ import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.andr
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifestForAssetModule;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifestForFeature;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withAppIcon;
+import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withCustomThemeActivity;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withDelivery;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withFusingAttribute;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withInstallLocation;
@@ -106,6 +107,7 @@ import static com.google.common.collect.ImmutableMap.toImmutableMap;
 import static com.google.common.collect.ImmutableMultiset.toImmutableMultiset;
 import static com.google.common.collect.ImmutableSet.toImmutableSet;
 import static com.google.common.collect.Iterables.getOnlyElement;
+import static com.google.common.collect.Maps.transformValues;
 import static com.google.common.collect.MoreCollectors.onlyElement;
 import static com.google.common.truth.Truth.assertThat;
 import static com.google.common.truth.Truth8.assertThat;
@@ -230,6 +232,7 @@ import org.junit.runner.RunWith;
 @RunWith(Theories.class)
 public class BuildApksManagerTest {
 
+  private static final String SIGNER_CONFIG_NAME = "BNDLTOOL";
   private static final int ANDROID_L_API_VERSION = 21;
   private static final String KEYSTORE_PASSWORD = "keystore-password";
   private static final String KEY_PASSWORD = "key-password";
@@ -1257,6 +1260,77 @@ public class BuildApksManagerTest {
       assertThat(filesUnderPath(universalApkZipFile, ZipPath.create("assets")))
           .containsExactly("assets/a.txt", "assets/b.txt");
     }
+  }
+
+  @Test
+  public void buildApksCommand_universal_mergeActivitiesFromFeatureManifest() throws Exception {
+    final int baseThemeRefId = 123;
+    final int featureThemeRefId = 4456;
+    AppBundle appBundle =
+        new AppBundleBuilder()
+            .addModule(
+                "base",
+                builder ->
+                    builder
+                        .setManifest(
+                            androidManifest(
+                                "com.test.app",
+                                withCustomThemeActivity("activity1", baseThemeRefId),
+                                withCustomThemeActivity("activity2", baseThemeRefId)))
+                        .setResourceTable(resourceTableWithTestLabel("Test feature")))
+            .addModule(
+                "feature",
+                builder ->
+                    builder.setManifest(
+                        androidManifestForFeature(
+                            "com.test.app.feature1",
+                            withFusingAttribute(true),
+                            withTitle("@string/test_label", TEST_LABEL_RESOURCE_ID),
+                            withCustomThemeActivity("activity1", featureThemeRefId))))
+            .addModule(
+                "not_fused",
+                builder ->
+                    builder.setManifest(
+                        androidManifestForFeature(
+                            "com.test.app.feature2",
+                            withFusingAttribute(false),
+                            withTitle("@string/test_label", TEST_LABEL_RESOURCE_ID),
+                            withCustomThemeActivity("activity2", featureThemeRefId))))
+            .build();
+    Path bundlePath = createAndStoreBundle(appBundle);
+
+    BuildApksCommand command =
+        BuildApksCommand.builder()
+            .setBundlePath(bundlePath)
+            .setOutputFile(outputFilePath)
+            .setApkBuildMode(UNIVERSAL)
+            .setAapt2Command(aapt2Command)
+            .build();
+
+    Path apkSetFilePath = execute(command);
+    ZipFile apkSetFile = openZipFile(apkSetFilePath.toFile());
+    BuildApksResult result = extractTocFromApkSetFile(apkSetFile, outputDir);
+
+    Variant universalVariant = standaloneApkVariants(result).get(0);
+    assertThat(apkDescriptions(universalVariant)).hasSize(1);
+    ApkDescription universalApk = apkDescriptions(universalVariant).get(0);
+
+    // Correct modules selected for merging.
+    assertThat(universalApk.getStandaloneApkMetadata().getFusedModuleNameList())
+        .containsExactly("base", "feature");
+    File universalApkFile = extractFromApkSetFile(apkSetFile, universalApk.getPath(), outputDir);
+
+    AndroidManifest manifest = extractAndroidManifest(universalApkFile);
+    Map<String, Integer> refIdByActivity =
+        transformValues(
+            manifest.getActivitiesByName(),
+            activity ->
+                activity
+                    .getAndroidAttribute(AndroidManifest.THEME_RESOURCE_ID)
+                    .get()
+                    .getValueAsRefId());
+    assertThat(refIdByActivity)
+        .containsExactly("activity1", featureThemeRefId, "activity2", baseThemeRefId);
   }
 
   @Test
@@ -4113,7 +4187,7 @@ public class BuildApksManagerTest {
       assertThat(apkDescriptions).isNotEmpty();
       for (ApkDescription apkDescription : apkDescriptions) {
         ImmutableSet<String> filesInApk = filesInApk(apkDescription, apkSet);
-        assertThat(filesInApk).contains("META-INF/CERT.RSA");
+        assertThat(filesInApk).contains(String.format("META-INF/%s.RSA", SIGNER_CONFIG_NAME));
       }
     }
   }
@@ -4152,7 +4226,7 @@ public class BuildApksManagerTest {
       assertThat(apkDescriptions).isNotEmpty();
       for (ApkDescription apkDescription : apkDescriptions) {
         ImmutableSet<String> filesInApk = filesInApk(apkDescription, apkSet);
-        assertThat(filesInApk).contains("META-INF/CERT.RSA");
+        assertThat(filesInApk).contains(String.format("META-INF/%s.RSA", SIGNER_CONFIG_NAME));
       }
     }
   }
@@ -4191,7 +4265,7 @@ public class BuildApksManagerTest {
       assertThat(apkDescriptions).isNotEmpty();
       for (ApkDescription apkDescription : apkDescriptions) {
         ImmutableSet<String> filesInApk = filesInApk(apkDescription, apkSet);
-        assertThat(filesInApk).doesNotContain("META-INF/CERT.RSA");
+        assertThat(filesInApk).doesNotContain(String.format("META-INF/%s.RSA", SIGNER_CONFIG_NAME));
       }
     }
   }

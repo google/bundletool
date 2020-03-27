@@ -19,6 +19,7 @@ package com.android.tools.build.bundletool.model.utils;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.truth.Truth.assertThat;
 import static java.util.stream.Collectors.toList;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.android.tools.build.bundletool.io.ZipBuilder;
 import com.android.tools.build.bundletool.model.ZipPath;
@@ -64,5 +65,31 @@ public class ZipUtilsTest {
     }
     Path zipPath = zipBuilder.writeTo(tmp.getRoot().toPath().resolve("output.jar"));
     return new ZipFile(zipPath.toFile());
+  }
+
+  @Test
+  public void convertBundleToModulePath_removesModuleDirectory() {
+    ZipPath path = ZipUtils.convertBundleToModulePath(ZipPath.create("/module1/resource1"));
+    assertThat(path.toString()).isEqualTo("resource1");
+  }
+
+  @Test
+  public void convertBundleToModulePath_pathPreservesAllDirectories() {
+    ZipPath path = ZipPath.create("/resource1");
+    assertThat(path.toString()).isEqualTo("resource1");
+  }
+
+  @Test
+  public void convertBundleToModulePath_pathTooShort_throws() {
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> ZipUtils.convertBundleToModulePath(ZipPath.create("AndroidManifest.xml")));
+  }
+
+  @Test
+  public void getPath_deepResourcePath() {
+    ZipPath path =
+        ZipUtils.convertBundleToModulePath(ZipPath.create("/module2/assets/en-gb/text.txt"));
+    assertThat(path.toString()).isEqualTo("assets/en-gb/text.txt");
   }
 }

@@ -60,6 +60,14 @@ public class AssetModuleSplitter {
 
   private SplittingPipeline createAssetsSplittingPipeline() {
     ImmutableList.Builder<ModuleSplitSplitter> assetsSplitters = ImmutableList.builder();
+    if (apkGenerationConfiguration
+        .getOptimizationDimensions()
+        .contains(OptimizationDimension.TEXTURE_COMPRESSION_FORMAT)) {
+      assetsSplitters.add(
+          TextureCompressionFormatAssetsSplitter.create(
+              apkGenerationConfiguration.shouldStripTargetingSuffix(
+                  OptimizationDimension.TEXTURE_COMPRESSION_FORMAT)));
+    }
     return new SplittingPipeline(assetsSplitters.build());
   }
 

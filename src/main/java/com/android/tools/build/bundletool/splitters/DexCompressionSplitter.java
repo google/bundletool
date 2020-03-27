@@ -65,7 +65,9 @@ public class DexCompressionSplitter implements ModuleSplitSplitter {
     return ImmutableList.<ModuleEntry>builder()
         .addAll(
             dexEntries.stream()
-                .map(moduleEntry -> moduleEntry.setCompression(shouldCompress))
+                .map(
+                    moduleEntry ->
+                        moduleEntry.toBuilder().setShouldCompress(shouldCompress).build())
                 .collect(toImmutableList()))
         .addAll(nonDexEntries)
         .build();

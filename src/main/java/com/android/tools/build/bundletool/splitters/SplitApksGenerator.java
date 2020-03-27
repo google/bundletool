@@ -24,9 +24,11 @@ import static com.google.common.collect.ImmutableSet.toImmutableSet;
 import com.android.bundle.Targeting.VariantTargeting;
 import com.android.tools.build.bundletool.model.BundleModule;
 import com.android.tools.build.bundletool.model.ModuleSplit;
+import com.android.tools.build.bundletool.model.SourceStamp.StampType;
 import com.android.tools.build.bundletool.model.version.Version;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
+import java.util.Optional;
 
 /** Generates split APKs. */
 public final class SplitApksGenerator {
@@ -34,14 +36,24 @@ public final class SplitApksGenerator {
   private final ImmutableList<BundleModule> modules;
   private final ApkGenerationConfiguration apkGenerationConfiguration;
   private final Version bundleVersion;
+  private final Optional<String> stampSource;
 
   public SplitApksGenerator(
       ImmutableList<BundleModule> modules,
       Version bundleVersion,
       ApkGenerationConfiguration apkGenerationConfiguration) {
+    this(modules, bundleVersion, apkGenerationConfiguration, /* stampSource= */ Optional.empty());
+  }
+
+  public SplitApksGenerator(
+      ImmutableList<BundleModule> modules,
+      Version bundleVersion,
+      ApkGenerationConfiguration apkGenerationConfiguration,
+      Optional<String> stampSource) {
     this.modules = checkNotNull(modules);
     this.bundleVersion = checkNotNull(bundleVersion);
     this.apkGenerationConfiguration = checkNotNull(apkGenerationConfiguration);
+    this.stampSource = stampSource;
   }
 
   public ImmutableList<ModuleSplit> generateSplits() {
@@ -68,8 +80,14 @@ public final class SplitApksGenerator {
 
     for (BundleModule module : modules) {
       ModuleSplitter moduleSplitter =
-          new ModuleSplitter(
-              module, bundleVersion, apkGenerationConfiguration, variantTargeting, allModuleNames);
+          ModuleSplitter.create(
+              module,
+              bundleVersion,
+              apkGenerationConfiguration,
+              variantTargeting,
+              allModuleNames,
+              stampSource,
+              StampType.STAMP_TYPE_DISTRIBUTION_APK);
       splits.addAll(moduleSplitter.splitModule());
     }
     return splits.build();

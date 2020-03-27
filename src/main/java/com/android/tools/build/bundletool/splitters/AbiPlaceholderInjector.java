@@ -21,7 +21,7 @@ import static com.google.common.collect.ImmutableList.toImmutableList;
 import com.android.bundle.Targeting.Abi;
 import com.android.tools.build.bundletool.model.AbiName;
 import com.android.tools.build.bundletool.model.BundleModule;
-import com.android.tools.build.bundletool.model.InMemoryModuleEntry;
+import com.android.tools.build.bundletool.model.InputStreamSuppliers;
 import com.android.tools.build.bundletool.model.ModuleEntry;
 import com.android.tools.build.bundletool.model.ModuleSplit;
 import com.google.common.collect.ImmutableList;
@@ -46,8 +46,7 @@ public class AbiPlaceholderInjector {
 
   /** Adds the placeholder native libraries to the {@link ModuleSplit}. */
   public ModuleSplit addPlaceholderNativeEntries(ModuleSplit moduleSplit) {
-    return moduleSplit
-        .toBuilder()
+    return moduleSplit.toBuilder()
         .setEntries(
             ImmutableList.<ModuleEntry>builder()
                 .addAll(moduleSplit.getEntries())
@@ -60,10 +59,12 @@ public class AbiPlaceholderInjector {
   }
 
   private static ModuleEntry createEntryForAbi(Abi abi) {
-    return InMemoryModuleEntry.ofFile(
-        BundleModule.LIB_DIRECTORY
-            .resolve(AbiName.fromProto(abi.getAlias()).getPlatformName())
-            .resolve("libplaceholder.so"),
-        new byte[0]);
+    return ModuleEntry.builder()
+        .setPath(
+            BundleModule.LIB_DIRECTORY
+                .resolve(AbiName.fromProto(abi.getAlias()).getPlatformName())
+                .resolve("libplaceholder.so"))
+        .setContentSupplier(InputStreamSuppliers.fromBytes(new byte[0]))
+        .build();
   }
 }

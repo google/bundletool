@@ -71,7 +71,6 @@ public class AssetsTargetingValidator extends SubValidator {
 
   private static ImmutableSet<ZipPath> getDirectoriesWithFiles(BundleModule module) {
     return module.getEntries().stream()
-        .filter(entry -> !entry.isDirectory())
         .map(entry -> entry.getPath().getParent())
         .collect(toImmutableSet());
   }

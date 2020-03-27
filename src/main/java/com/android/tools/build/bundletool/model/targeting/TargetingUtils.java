@@ -383,7 +383,7 @@ public final class TargetingUtils {
     TargetedDirectory newTargetedDirectory = targetedDirectory.removeTargeting(dimension);
 
     if (!newTargetedDirectory.equals(targetedDirectory)) {
-      return moduleEntry.setPath(newTargetedDirectory.toZipPath());
+      return moduleEntry.toBuilder().setPath(newTargetedDirectory.toZipPath()).build();
     }
 
     // Return the unmodified, immutable original object if no changes were applied.

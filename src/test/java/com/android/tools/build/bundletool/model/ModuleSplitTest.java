@@ -47,6 +47,7 @@ import static com.android.tools.build.bundletool.testing.TargetingUtils.textureC
 import static com.android.tools.build.bundletool.testing.TargetingUtils.vulkanVersionFrom;
 import static com.android.tools.build.bundletool.testing.TestUtils.createModuleEntryForFile;
 import static com.google.common.collect.ImmutableList.toImmutableList;
+import static com.google.common.truth.Truth.assertThat;
 import static com.google.common.truth.Truth8.assertThat;
 import static com.google.common.truth.extensions.proto.ProtoTruth.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -447,12 +448,12 @@ public class ModuleSplitTest {
             .build();
     SourceStamp sourceStamp =
         SourceStamp.builder()
-            .setSource("test-source")
+            .setSource("https://www.validsource.com")
             .setSigningConfiguration(stampSigningConfig)
             .build();
-    StampType stampType = StampType.STAMP_TYPE_DEFAULT;
+    StampType stampType = StampType.STAMP_TYPE_DISTRIBUTION_APK;
 
-    masterSplit = masterSplit.writeStampInManifest(sourceStamp, stampType);
+    masterSplit = masterSplit.writeSourceStampInManifest(sourceStamp.getSource(), stampType);
 
     assertThat(masterSplit.getAndroidManifest().getMetadataValue(STAMP_TYPE_METADATA_KEY))
         .hasValue(stampType.toString());
@@ -473,15 +474,41 @@ public class ModuleSplitTest {
             .build();
     SourceStamp sourceStamp =
         SourceStamp.builder()
-            .setSource("test-source")
+            .setSource("https://www.validsource.com")
             .setSigningConfiguration(stampSigningConfig)
             .build();
-    StampType stampType = StampType.STAMP_TYPE_DEFAULT;
+    StampType stampType = StampType.STAMP_TYPE_DISTRIBUTION_APK;
 
-    abiSplit = abiSplit.writeStampInManifest(sourceStamp, stampType);
+    abiSplit = abiSplit.writeSourceStampInManifest(sourceStamp.getSource(), stampType);
 
     assertThat(abiSplit.getAndroidManifest().getMetadataValue(STAMP_TYPE_METADATA_KEY)).isEmpty();
     assertThat(abiSplit.getAndroidManifest().getMetadataValue(STAMP_SOURCE_METADATA_KEY)).isEmpty();
+  }
+
+  @Test
+  public void testStampSource_invalidUrl() throws Exception {
+    ModuleSplit masterSplit =
+        ModuleSplit.builder()
+            .setModuleName(BundleModuleName.create("base"))
+            .setApkTargeting(ApkTargeting.getDefaultInstance())
+            .setVariantTargeting(lPlusVariantTargeting())
+            .setAndroidManifest(AndroidManifest.create(androidManifest("com.test.app")))
+            .setMasterSplit(true)
+            .build();
+    SourceStamp sourceStamp =
+        SourceStamp.builder()
+            .setSource("test-source")
+            .setSigningConfiguration(stampSigningConfig)
+            .build();
+    StampType stampType = StampType.STAMP_TYPE_DISTRIBUTION_APK;
+
+    Exception exception =
+        assertThrows(
+            IllegalArgumentException.class,
+            () -> masterSplit.writeSourceStampInManifest(sourceStamp.getSource(), stampType));
+    assertThat(exception)
+        .hasMessageThat()
+        .contains("Invalid stamp source. Stamp sources should be URLs.");
   }
 
   private ImmutableList<ModuleEntry> fakeEntriesOf(String... entries) {

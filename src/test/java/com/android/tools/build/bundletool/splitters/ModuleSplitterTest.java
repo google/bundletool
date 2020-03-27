@@ -29,6 +29,8 @@ import static com.android.tools.build.bundletool.model.OptimizationDimension.ABI
 import static com.android.tools.build.bundletool.model.OptimizationDimension.LANGUAGE;
 import static com.android.tools.build.bundletool.model.OptimizationDimension.SCREEN_DENSITY;
 import static com.android.tools.build.bundletool.model.OptimizationDimension.TEXTURE_COMPRESSION_FORMAT;
+import static com.android.tools.build.bundletool.model.SourceStamp.STAMP_SOURCE_METADATA_KEY;
+import static com.android.tools.build.bundletool.model.SourceStamp.STAMP_TYPE_METADATA_KEY;
 import static com.android.tools.build.bundletool.model.utils.Versions.ANDROID_L_API_VERSION;
 import static com.android.tools.build.bundletool.model.utils.Versions.ANDROID_M_API_VERSION;
 import static com.android.tools.build.bundletool.model.utils.Versions.ANDROID_Q_API_VERSION;
@@ -83,6 +85,7 @@ import static com.android.tools.build.bundletool.testing.truth.resources.TruthRe
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.ImmutableSet.toImmutableSet;
+import static com.google.common.collect.Iterables.getOnlyElement;
 import static com.google.common.truth.Truth.assertThat;
 import static com.google.common.truth.Truth8.assertThat;
 import static com.google.common.truth.extensions.proto.ProtoTruth.assertThat;
@@ -110,6 +113,7 @@ import com.android.tools.build.bundletool.model.ModuleSplit;
 import com.android.tools.build.bundletool.model.ModuleSplit.SplitType;
 import com.android.tools.build.bundletool.model.OptimizationDimension;
 import com.android.tools.build.bundletool.model.ResourceId;
+import com.android.tools.build.bundletool.model.SourceStamp.StampType;
 import com.android.tools.build.bundletool.model.ZipPath;
 import com.android.tools.build.bundletool.model.exceptions.CommandExecutionException;
 import com.android.tools.build.bundletool.model.utils.xmlproto.XmlProtoElement;
@@ -146,7 +150,7 @@ public class ModuleSplitterTest {
         new BundleModuleBuilder("testModule").setManifest(androidManifest("com.test.app")).build();
 
     ImmutableList<ModuleSplit> moduleSplits =
-        new ModuleSplitter(bundleModule, BUNDLETOOL_VERSION).splitModule();
+        ModuleSplitter.createForTest(bundleModule, BUNDLETOOL_VERSION).splitModule();
 
     assertThat(moduleSplits).hasSize(1);
     ModuleSplit masterSplit = moduleSplits.get(0);
@@ -746,7 +750,7 @@ public class ModuleSplitterTest {
             .build();
 
     ModuleSplitter moduleSplitter =
-        new ModuleSplitter(
+        ModuleSplitter.createNoStamp(
             testModule,
             BUNDLETOOL_VERSION,
             ApkGenerationConfiguration.builder()
@@ -784,7 +788,7 @@ public class ModuleSplitterTest {
             .build();
 
     ModuleSplitter moduleSplitter =
-        new ModuleSplitter(
+        ModuleSplitter.createNoStamp(
             testModule,
             BUNDLETOOL_VERSION,
             ApkGenerationConfiguration.builder()
@@ -856,7 +860,7 @@ public class ModuleSplitterTest {
             .build();
 
     ModuleSplitter moduleSplitter =
-        new ModuleSplitter(
+        ModuleSplitter.createNoStamp(
             testModule,
             BUNDLETOOL_VERSION,
             ApkGenerationConfiguration.builder().setEnableDexCompressionSplitter(true).build(),
@@ -881,7 +885,7 @@ public class ModuleSplitterTest {
             .build();
 
     ModuleSplitter moduleSplitter =
-        new ModuleSplitter(
+        ModuleSplitter.createNoStamp(
             testModule,
             BUNDLETOOL_VERSION,
             ApkGenerationConfiguration.builder().setEnableDexCompressionSplitter(true).build(),
@@ -1046,7 +1050,7 @@ public class ModuleSplitterTest {
     CommandExecutionException exception =
         assertThrows(
             CommandExecutionException.class,
-            () -> new ModuleSplitter(bundleModule, BUNDLETOOL_VERSION).splitModule());
+            () -> ModuleSplitter.createForTest(bundleModule, BUNDLETOOL_VERSION).splitModule());
 
     assertThat(exception)
         .hasMessageThat()
@@ -1083,7 +1087,7 @@ public class ModuleSplitterTest {
     BundleModule bundleModule =
         new BundleModuleBuilder("base").setManifest(androidManifest("com.test.app")).build();
 
-    ModuleSplitter moduleSplitter = new ModuleSplitter(bundleModule, BUNDLETOOL_VERSION);
+    ModuleSplitter moduleSplitter = ModuleSplitter.createForTest(bundleModule, BUNDLETOOL_VERSION);
     assetsSplit1 = moduleSplitter.writeSplitIdInManifest(assetsSplit1);
     assetsSplit2 = moduleSplitter.writeSplitIdInManifest(assetsSplit2);
 
@@ -1121,7 +1125,7 @@ public class ModuleSplitterTest {
     BundleModule bundleModule =
         new BundleModuleBuilder("base").setManifest(androidManifest("com.test.app")).build();
 
-    ModuleSplitter moduleSplitter = new ModuleSplitter(bundleModule, BUNDLETOOL_VERSION);
+    ModuleSplitter moduleSplitter = ModuleSplitter.createForTest(bundleModule, BUNDLETOOL_VERSION);
     assetsSplit1 = moduleSplitter.writeSplitIdInManifest(assetsSplit1);
     assetsSplit2 = moduleSplitter.writeSplitIdInManifest(assetsSplit2);
 
@@ -1139,7 +1143,7 @@ public class ModuleSplitterTest {
     BundleModule bundleModule = new BundleModuleBuilder("testModule").setManifest(manifest).build();
 
     ImmutableList<ModuleSplit> moduleSplits =
-        new ModuleSplitter(bundleModule, BUNDLETOOL_VERSION).splitModule();
+        ModuleSplitter.createForTest(bundleModule, BUNDLETOOL_VERSION).splitModule();
 
     assertThat(moduleSplits).hasSize(1);
     ModuleSplit masterSplit = moduleSplits.get(0);
@@ -1169,7 +1173,7 @@ public class ModuleSplitterTest {
     BundleModule bundleModule = new BundleModuleBuilder("testModule").setManifest(manifest).build();
 
     ImmutableList<ModuleSplit> moduleSplits =
-        new ModuleSplitter(
+        ModuleSplitter.createNoStamp(
                 bundleModule,
                 BUNDLETOOL_VERSION,
                 ApkGenerationConfiguration.builder().setForInstantAppVariants(true).build(),
@@ -1205,7 +1209,7 @@ public class ModuleSplitterTest {
     BundleModule bundleModule = new BundleModuleBuilder("testModule").setManifest(manifest).build();
 
     ImmutableList<ModuleSplit> moduleSplits =
-        new ModuleSplitter(bundleModule, BUNDLETOOL_VERSION).splitModule();
+        ModuleSplitter.createForTest(bundleModule, BUNDLETOOL_VERSION).splitModule();
 
     assertThat(moduleSplits).hasSize(1);
     ModuleSplit masterSplit = moduleSplits.get(0);
@@ -1229,7 +1233,7 @@ public class ModuleSplitterTest {
         new BundleModuleBuilder("onDemandModule").setManifest(manifest).build();
 
     ImmutableList<ModuleSplit> moduleSplits =
-        new ModuleSplitter(
+        ModuleSplitter.createNoStamp(
                 bundleModule,
                 BUNDLETOOL_VERSION,
                 ApkGenerationConfiguration.builder().setForInstantAppVariants(true).build(),
@@ -1263,7 +1267,7 @@ public class ModuleSplitterTest {
             .build();
 
     ImmutableList<ModuleSplit> moduleSplits =
-        new ModuleSplitter(
+        ModuleSplitter.createNoStamp(
                 bundleModule,
                 BUNDLETOOL_VERSION,
                 ApkGenerationConfiguration.builder().setForInstantAppVariants(true).build(),
@@ -1289,7 +1293,7 @@ public class ModuleSplitterTest {
             .build();
 
     ImmutableList<ModuleSplit> moduleSplits =
-        new ModuleSplitter(
+        ModuleSplitter.createNoStamp(
                 bundleModule,
                 BUNDLETOOL_VERSION,
                 ApkGenerationConfiguration.builder().setForInstantAppVariants(true).build(),
@@ -1315,7 +1319,7 @@ public class ModuleSplitterTest {
             .build();
 
     ImmutableList<ModuleSplit> moduleSplits =
-        new ModuleSplitter(
+        ModuleSplitter.createNoStamp(
                 bundleModule,
                 BUNDLETOOL_VERSION,
                 ApkGenerationConfiguration.builder().setForInstantAppVariants(true).build(),
@@ -1393,7 +1397,7 @@ public class ModuleSplitterTest {
             .build();
 
     ModuleSplitter moduleSplitter =
-        new ModuleSplitter(
+        ModuleSplitter.createNoStamp(
             baseModule,
             BUNDLETOOL_VERSION,
             ApkGenerationConfiguration.builder()
@@ -1421,7 +1425,7 @@ public class ModuleSplitterTest {
             .build();
 
     ModuleSplitter moduleSplitter =
-        new ModuleSplitter(
+        ModuleSplitter.createNoStamp(
             baseModule,
             BUNDLETOOL_VERSION,
             ApkGenerationConfiguration.builder()
@@ -1465,7 +1469,7 @@ public class ModuleSplitterTest {
             .setManifest(androidManifest("com.test.app"))
             .build();
     ModuleSplitter moduleSplitter =
-        new ModuleSplitter(
+        ModuleSplitter.createNoStamp(
             baseModule,
             BUNDLETOOL_VERSION,
             ApkGenerationConfiguration.builder()
@@ -1526,7 +1530,7 @@ public class ModuleSplitterTest {
             .setManifest(androidManifest("com.test.app"))
             .build();
     ModuleSplitter moduleSplitter =
-        new ModuleSplitter(
+        ModuleSplitter.createNoStamp(
             baseModule,
             BUNDLETOOL_VERSION,
             ApkGenerationConfiguration.builder()
@@ -1583,7 +1587,7 @@ public class ModuleSplitterTest {
                     "com.test.app", withMetadataResource("reference-to-resource", 0x7f010001)))
             .build();
     ModuleSplitter moduleSplitter =
-        new ModuleSplitter(
+        ModuleSplitter.createNoStamp(
             baseModule,
             BUNDLETOOL_VERSION,
             ApkGenerationConfiguration.builder()
@@ -1638,7 +1642,7 @@ public class ModuleSplitterTest {
                     "com.test.app", withMetadataResource("reference-to-resource", 0x7f010001)))
             .build();
     ModuleSplitter moduleSplitter =
-        new ModuleSplitter(
+        ModuleSplitter.createNoStamp(
             baseModule,
             BUNDLETOOL_VERSION,
             ApkGenerationConfiguration.builder()
@@ -1664,6 +1668,71 @@ public class ModuleSplitterTest {
         .doesNotContainResource("com.test.app:string/welcome_label");
   }
 
+  @Test
+  public void testModuleSplitter_baseSplit_addsStamp() throws Exception {
+    String stampSource = "https://www.validsource.com";
+    StampType stampType = StampType.STAMP_TYPE_DISTRIBUTION_APK;
+    BundleModule bundleModule =
+        new BundleModuleBuilder("base").setManifest(androidManifest("com.test.app")).build();
+    ModuleSplitter moduleSplitter =
+        ModuleSplitter.create(
+            bundleModule,
+            BUNDLETOOL_VERSION,
+            ApkGenerationConfiguration.getDefaultInstance(),
+            lPlusVariantTargeting(),
+            ImmutableSet.of("base"),
+            Optional.of(stampSource),
+            stampType);
+
+    List<ModuleSplit> splits = moduleSplitter.splitModule();
+
+    // Base split
+    assertThat(splits).hasSize(1);
+    ModuleSplit baseSplit = getOnlyElement(splits);
+    assertThat(baseSplit.getAndroidManifest().getMetadataValue(STAMP_TYPE_METADATA_KEY))
+        .hasValue(stampType.toString());
+    assertThat(baseSplit.getAndroidManifest().getMetadataValue(STAMP_SOURCE_METADATA_KEY))
+        .hasValue(stampSource);
+  }
+
+  @Test
+  public void testModuleSplitter_nativeSplit_addsNoStamp() throws Exception {
+    String stampSource = "https://www.validsource.com";
+    StampType stampType = StampType.STAMP_TYPE_DISTRIBUTION_APK;
+    NativeLibraries nativeConfig =
+        nativeLibraries(targetedNativeDirectory("lib/x86", nativeDirectoryTargeting("x86")));
+    BundleModule testModule =
+        new BundleModuleBuilder("testModule")
+            .setManifest(androidManifest("com.test.app"))
+            .setNativeConfig(nativeConfig)
+            .addFile("lib/x86/liba.so")
+            .build();
+    ModuleSplitter moduleSplitter =
+        ModuleSplitter.create(
+            testModule,
+            BUNDLETOOL_VERSION,
+            ApkGenerationConfiguration.builder()
+                .setOptimizationDimensions(ImmutableSet.of(ABI))
+                .setEnableNativeLibraryCompressionSplitter(true)
+                .build(),
+            lPlusVariantTargeting(),
+            ImmutableSet.of("testModule"),
+            Optional.of(stampSource),
+            stampType);
+
+    List<ModuleSplit> splits = moduleSplitter.splitModule();
+
+    // Base + x86 splits
+    assertThat(splits).hasSize(2);
+    ModuleSplit x86Split =
+        splits.stream()
+            .filter(split -> split.getApkTargeting().hasAbiTargeting())
+            .findFirst()
+            .get();
+    assertThat(x86Split.getAndroidManifest().getMetadataValue(STAMP_TYPE_METADATA_KEY)).isEmpty();
+    assertThat(x86Split.getAndroidManifest().getMetadataValue(STAMP_SOURCE_METADATA_KEY)).isEmpty();
+  }
+
   private ModuleSplit checkAndReturnTheOnlyMasterSplit(List<ModuleSplit> splits) {
     int masterSplitsFound = 0;
     ModuleSplit masterSplit = null;
@@ -1678,7 +1747,7 @@ public class ModuleSplitterTest {
   }
 
   private static ModuleSplitter createAbiAndDensitySplitter(BundleModule module) {
-    return new ModuleSplitter(
+    return ModuleSplitter.createNoStamp(
         module,
         BUNDLETOOL_VERSION,
         withOptimizationDimensions(ImmutableSet.of(ABI, SCREEN_DENSITY)),
@@ -1687,7 +1756,7 @@ public class ModuleSplitterTest {
   }
 
   private static ModuleSplitter createAbiDensityAndLanguageSplitter(BundleModule module) {
-    return new ModuleSplitter(
+    return ModuleSplitter.createNoStamp(
         module,
         BUNDLETOOL_VERSION,
         withOptimizationDimensions(ImmutableSet.of(ABI, SCREEN_DENSITY, LANGUAGE)),

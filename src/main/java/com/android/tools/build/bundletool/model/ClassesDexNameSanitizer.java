@@ -65,15 +65,14 @@ public class ClassesDexNameSanitizer {
                     .collect(toImmutableList()))
             .build();
 
-    return module
-        .toBuilder()
+    return module.toBuilder()
         .setEntryMap(newEntries.stream().collect(toImmutableMap(ModuleEntry::getPath, identity())))
         .build();
   }
 
   private static ModuleEntry sanitizeDexEntry(ModuleEntry dexEntry) {
     ZipPath sanitizedEntryPath = incrementClassesDexNumber(dexEntry.getPath());
-    return dexEntry.setPath(sanitizedEntryPath);
+    return dexEntry.toBuilder().setPath(sanitizedEntryPath).build();
   }
 
   /**

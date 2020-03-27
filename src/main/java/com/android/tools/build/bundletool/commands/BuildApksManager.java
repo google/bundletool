@@ -53,6 +53,7 @@ import com.android.tools.build.bundletool.model.GeneratedAssetSlices;
 import com.android.tools.build.bundletool.model.ModuleSplit;
 import com.android.tools.build.bundletool.model.OptimizationDimension;
 import com.android.tools.build.bundletool.model.SigningConfiguration;
+import com.android.tools.build.bundletool.model.SourceStamp;
 import com.android.tools.build.bundletool.model.exceptions.CommandExecutionException;
 import com.android.tools.build.bundletool.model.targeting.AlternativeVariantTargetingPopulator;
 import com.android.tools.build.bundletool.model.utils.SplitsXmlInjector;
@@ -118,7 +119,7 @@ final class BuildApksManager {
     }
 
     try (ZipFile bundleZip = new ZipFile(command.getBundlePath().toFile())) {
-      executeWithZip(bundleZip, deviceSpec);
+      executeWithZip(bundleZip, deviceSpec, command.getSourceStamp());
     } catch (IOException e) {
       throw new UncheckedIOException(
           String.format(
@@ -133,8 +134,10 @@ final class BuildApksManager {
     return command.getOutputFile();
   }
 
-  private void executeWithZip(ZipFile bundleZip, Optional<DeviceSpec> deviceSpec)
+  private void executeWithZip(
+      ZipFile bundleZip, Optional<DeviceSpec> deviceSpec, Optional<SourceStamp> sourceStamp)
       throws IOException {
+    Optional<String> stampSource = sourceStamp.map(SourceStamp::getSource);
     AppBundleValidator bundleValidator = AppBundleValidator.create(command.getExtraValidators());
 
     bundleValidator.validateFile(bundleZip);
@@ -162,17 +165,18 @@ final class BuildApksManager {
 
     // Split APKs
     if (apksToGenerate.generateSplitApks()) {
-      generatedApksBuilder.setSplitApks(generateSplitApks(appBundle));
+      generatedApksBuilder.setSplitApks(generateSplitApks(appBundle, stampSource));
     }
 
     // Instant APKs
     if (apksToGenerate.generateInstantApks()) {
-      generatedApksBuilder.setInstantApks(generateInstantApks(appBundle));
+      generatedApksBuilder.setInstantApks(generateInstantApks(appBundle, stampSource));
     }
 
     // Standalone APKs
     if (apksToGenerate.generateStandaloneApks()) {
-      generatedApksBuilder.setStandaloneApks(generateStandaloneApks(tempDir, appBundle));
+      generatedApksBuilder.setStandaloneApks(
+          generateStandaloneApks(tempDir, appBundle, stampSource));
     }
 
     // Universal APK
@@ -183,7 +187,12 @@ final class BuildApksManager {
               ? modulesToFuse(appBundle.getFeatureModules().values().asList())
               : requestedModules.asList();
       generatedApksBuilder.setStandaloneApks(
-          new ShardedApksGenerator(tempDir, bundleVersion, getSuffixStrippings(bundleConfig))
+          new ShardedApksGenerator(
+                  tempDir,
+                  bundleVersion,
+                  /* strip64BitLibrariesFromShards= */ false,
+                  getSuffixStrippings(bundleConfig),
+                  stampSource)
               .generateSplits(
                   modulesToFuse,
                   appBundle.getBundleMetadata(),
@@ -217,10 +226,13 @@ final class BuildApksManager {
       checkDeviceCompatibilityWithBundle(generatedApks, deviceSpec.get());
     }
 
+    Optional<SigningConfiguration> stampSigningConfiguration =
+        sourceStamp.map(SourceStamp::getSigningConfiguration);
     ApkSetBuilder apkSetBuilder =
         createApkSetBuilder(
             aapt2Command,
             command.getSigningConfiguration(),
+            stampSigningConfiguration,
             bundleVersion,
             bundleConfig.getCompression(),
             tempDir);
@@ -248,7 +260,8 @@ final class BuildApksManager {
     apkSetBuilder.writeTo(command.getOutputFile());
   }
 
-  private ImmutableList<ModuleSplit> generateStandaloneApks(Path tempDir, AppBundle appBundle) {
+  private ImmutableList<ModuleSplit> generateStandaloneApks(
+      Path tempDir, AppBundle appBundle, Optional<String> stampSource) {
     ImmutableList<BundleModule> allModules = getModulesForStandaloneApks(appBundle);
     Version bundleVersion = Version.of(appBundle.getBundleConfig().getBundletool().getVersion());
     ShardedApksGenerator shardedApksGenerator =
@@ -256,7 +269,8 @@ final class BuildApksManager {
             tempDir,
             bundleVersion,
             shouldStrip64BitLibrariesFromShards(appBundle),
-            getSuffixStrippings(appBundle.getBundleConfig()));
+            getSuffixStrippings(appBundle.getBundleConfig()),
+            stampSource);
     return appBundle.isApex()
         ? shardedApksGenerator.generateApexSplits(modulesToFuse(allModules))
         : shardedApksGenerator.generateSplits(
@@ -273,7 +287,8 @@ final class BuildApksManager {
     return assetSlicesGenerator.generateAssetSlices();
   }
 
-  private ImmutableList<ModuleSplit> generateInstantApks(AppBundle appBundle) {
+  private ImmutableList<ModuleSplit> generateInstantApks(
+      AppBundle appBundle, Optional<String> stampSource) {
     Version bundleVersion = Version.of(appBundle.getBundleConfig().getBundletool().getVersion());
     ImmutableList<BundleModule> allFeatureModules = appBundle.getFeatureModules().values().asList();
     ImmutableList<BundleModule> instantModules =
@@ -285,11 +300,13 @@ final class BuildApksManager {
             // only support one variant.
             .setEnableDexCompressionSplitter(false)
             .build();
-    return new SplitApksGenerator(instantModules, bundleVersion, instantApkGenerationConfiguration)
+    return new SplitApksGenerator(
+            instantModules, bundleVersion, instantApkGenerationConfiguration, stampSource)
         .generateSplits();
   }
 
-  private ImmutableList<ModuleSplit> generateSplitApks(AppBundle appBundle) throws IOException {
+  private ImmutableList<ModuleSplit> generateSplitApks(
+      AppBundle appBundle, Optional<String> stampSource) throws IOException {
     Version bundleVersion = Version.of(appBundle.getBundleConfig().getBundletool().getVersion());
     ApkGenerationConfiguration.Builder apkGenerationConfiguration =
         getCommonSplitApkGenerationConfiguration(appBundle);
@@ -303,7 +320,8 @@ final class BuildApksManager {
     }
 
     ImmutableList<BundleModule> featureModules = appBundle.getFeatureModules().values().asList();
-    return new SplitApksGenerator(featureModules, bundleVersion, apkGenerationConfiguration.build())
+    return new SplitApksGenerator(
+            featureModules, bundleVersion, apkGenerationConfiguration.build(), stampSource)
         .generateSplits();
   }
 
@@ -346,16 +364,27 @@ final class BuildApksManager {
   private ApkSetBuilder createApkSetBuilder(
       Aapt2Command aapt2Command,
       Optional<SigningConfiguration> signingConfiguration,
+      Optional<SigningConfiguration> stampSigningConfiguration,
       Version bundleVersion,
       Compression compression,
       Path tempDir) {
     ApkPathManager apkPathmanager = new ApkPathManager();
     SplitApkSerializer splitApkSerializer =
         new SplitApkSerializer(
-            apkPathmanager, aapt2Command, signingConfiguration, bundleVersion, compression);
+            apkPathmanager,
+            aapt2Command,
+            signingConfiguration,
+            stampSigningConfiguration,
+            bundleVersion,
+            compression);
     StandaloneApkSerializer standaloneApkSerializer =
         new StandaloneApkSerializer(
-            apkPathmanager, aapt2Command, signingConfiguration, bundleVersion, compression);
+            apkPathmanager,
+            aapt2Command,
+            signingConfiguration,
+            stampSigningConfiguration,
+            bundleVersion,
+            compression);
 
     if (!command.getCreateApkSetArchive()) {
       return ApkSetBuilderFactory.createApkSetWithoutArchiveBuilder(

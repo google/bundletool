@@ -33,7 +33,6 @@ import com.android.tools.build.bundletool.model.BundleModule;
 import com.android.tools.build.bundletool.model.exceptions.CommandExecutionException;
 import com.android.tools.build.bundletool.testing.BundleModuleBuilder;
 import com.google.common.collect.ImmutableList;
-import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
@@ -184,47 +183,5 @@ public class EntryClashValidatorTest {
     assertThat(exception)
         .hasMessageThat()
         .contains("Modules 'a' and 'b' contain entry 'assets/file.txt' with different content.");
-  }
-
-  @Test
-  public void entryNameCollision_directories_ok() throws Exception {
-    String dirName = "assets/dir";
-    BundleModule moduleA =
-        new BundleModuleBuilder("a")
-            .addDirectory(dirName)
-            .setManifest(androidManifest("com.test.app"))
-            .build();
-    BundleModule moduleB =
-        new BundleModuleBuilder("b")
-            .addDirectory(dirName)
-            .setManifest(androidManifest("com.test.app"))
-            .build();
-
-    new EntryClashValidator().validateAllModules(ImmutableList.of(moduleA, moduleB));
-  }
-
-  @Ignore("BundleModule#getEntries currently cannot contain directory entries.")
-  @Test
-  public void entryNameCollision_fileAndDirectoryOfSameName_throws() throws Exception {
-    String fileOrDirName = "assets/file-or-dir";
-    BundleModule moduleA =
-        new BundleModuleBuilder("a")
-            .addFile(fileOrDirName, new byte[1])
-            .setManifest(androidManifest("com.test.app"))
-            .build();
-    BundleModule moduleB =
-        new BundleModuleBuilder("b")
-            .addDirectory(fileOrDirName)
-            .setManifest(androidManifest("com.test.app"))
-            .build();
-
-    CommandExecutionException exception =
-        assertThrows(
-            CommandExecutionException.class,
-            () -> new EntryClashValidator().validateAllModules(ImmutableList.of(moduleA, moduleB)));
-
-    assertThat(exception)
-        .hasMessageThat()
-        .contains("Modules 'a' and 'b' contain entry 'assets/file-or-dir' with different content.");
   }
 }

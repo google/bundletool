@@ -124,6 +124,13 @@ public abstract class BuildApksCommand {
   private static final Flag<Password> KEYSTORE_PASSWORD_FLAG = Flag.password("ks-pass");
   private static final Flag<Password> KEY_PASSWORD_FLAG = Flag.password("key-pass");
 
+  // SourceStamp-related flags.
+  private static final Flag<Boolean> CREATE_STAMP_FLAG = Flag.booleanFlag("create-stamp");
+  private static final Flag<Path> STAMP_KEYSTORE_FLAG = Flag.path("stamp-ks");
+  private static final Flag<Password> STAMP_KEYSTORE_PASSWORD_FLAG = Flag.password("stamp-ks-pass");
+  private static final Flag<String> STAMP_KEY_ALIAS_FLAG = Flag.string("stamp-key-alias");
+  private static final Flag<Password> STAMP_KEY_PASSWORD_FLAG = Flag.password("stamp-key-pass");
+  private static final Flag<String> STAMP_SOURCE_FLAG = Flag.string("stamp-source");
 
   private static final String APK_SET_ARCHIVE_EXTENSION = "apks";
 
@@ -181,6 +188,7 @@ public abstract class BuildApksCommand {
 
   public abstract Optional<PrintStream> getOutputPrintStream();
 
+  public abstract Optional<SourceStamp> getSourceStamp();
 
   public static Builder builder() {
     return new AutoValue_BuildApksCommand.Builder()
@@ -331,6 +339,11 @@ public abstract class BuildApksCommand {
     /** For command line, sets the {@link PrintStream} to use for outputting the warnings. */
     public abstract Builder setOutputPrintStream(PrintStream outputPrintStream);
 
+    /**
+     * Provides a {@link SourceStamp} to be included in the
+     * generated APKs.
+     */
+    public abstract Builder setSourceStamp(SourceStamp sourceStamp);
 
     abstract BuildApksCommand autoBuild();
 
@@ -464,6 +477,7 @@ public abstract class BuildApksCommand {
     OPTIMIZE_FOR_FLAG.getValue(flags).ifPresent(buildApksCommand::setOptimizationDimensions);
 
     populateSigningConfigurationFromFlags(buildApksCommand, flags, out, systemEnvironmentProvider);
+    populateSourceStampFromFlags(buildApksCommand, flags, out, systemEnvironmentProvider);
 
     boolean connectedDeviceMode = CONNECTED_DEVICE_FLAG.getValue(flags).orElse(false);
     CONNECTED_DEVICE_FLAG
@@ -732,6 +746,71 @@ public abstract class BuildApksCommand {
                         + " accessed by the Play Core API.",
                     InstallApksCommand.COMMAND_NAME)
                 .build())
+        .addFlag(
+            FlagDescription.builder()
+                .setFlagName(CREATE_STAMP_FLAG.getName())
+                .setOptional(true)
+                .setDescription(
+                    "If set, a stamp will be generated and embedded in the generated APKs.")
+                .build())
+        .addFlag(
+            FlagDescription.builder()
+                .setFlagName(STAMP_KEYSTORE_FLAG.getName())
+                .setExampleValue("path/to/keystore")
+                .setOptional(true)
+                .setDescription(
+                    "Path to the stamp keystore that should be used to sign the APK contents hash."
+                        + " If not set, the '%s' keystore will be tried if present. Otherwise, the"
+                        + " default debug keystore will be used if it exists. If a default debug"
+                        + " keystore is not found, the stamp will fail to get generated. If"
+                        + " set, the flag '%s' must also be set.",
+                    KEYSTORE_FLAG, STAMP_KEY_ALIAS_FLAG)
+                .build())
+        .addFlag(
+            FlagDescription.builder()
+                .setFlagName(STAMP_KEYSTORE_PASSWORD_FLAG.getName())
+                .setExampleValue("[pass|file]:value")
+                .setOptional(true)
+                .setDescription(
+                    "Password of the stamp keystore to use to sign the APK contents hash. If"
+                        + " provided, must be prefixed with either 'pass:' (if the password is"
+                        + " passed in clear text, e.g. 'pass:qwerty') or 'file:' (if the password"
+                        + " is the first line of a file, e.g. 'file:/tmp/myPassword.txt'). If this"
+                        + " flag is not set, the password will be requested on the prompt.")
+                .build())
+        .addFlag(
+            FlagDescription.builder()
+                .setFlagName(STAMP_KEY_ALIAS_FLAG.getName())
+                .setExampleValue("stamp-key-alias")
+                .setOptional(true)
+                .setDescription(
+                    "Alias of the stamp key to use in the keystore to sign the APK contents hash."
+                        + " If not set, the '%s' key alias will be tried if present.",
+                    KEY_ALIAS_FLAG)
+                .build())
+        .addFlag(
+            FlagDescription.builder()
+                .setFlagName(STAMP_KEY_PASSWORD_FLAG.getName())
+                .setExampleValue("stamp-key-password")
+                .setOptional(true)
+                .setDescription(
+                    "Password of the stamp key in the keystore to use to sign the APK contents"
+                        + " hash. if provided, must be prefixed with either 'pass:' (if the"
+                        + " password is passed in clear text, e.g. 'pass:qwerty') or 'file:' (if"
+                        + " the password is the first line of a file, e.g."
+                        + " 'file:/tmp/myPassword.txt'). If this flag is not set, the keystore"
+                        + " password will be tried. If that fails, the password will be requested"
+                        + " on the prompt.")
+                .build())
+        .addFlag(
+            FlagDescription.builder()
+                .setFlagName(STAMP_SOURCE_FLAG.getName())
+                .setExampleValue("stamp-source")
+                .setOptional(true)
+                .setDescription(
+                    "Name of source generating the stamp. For stores, it is their package names."
+                        + " For locally generated stamp, it is 'local'.")
+                .build())
         .build();
   }
 
@@ -778,4 +857,81 @@ public abstract class BuildApksCommand {
     }
   }
 
+  private static void populateSourceStampFromFlags(
+      Builder buildApksCommand,
+      ParsedFlags flags,
+      PrintStream out,
+      SystemEnvironmentProvider systemEnvironmentProvider) {
+    boolean createStamp = CREATE_STAMP_FLAG.getValue(flags).orElse(false);
+    Optional<String> stampSource = STAMP_SOURCE_FLAG.getValue(flags);
+
+    if (!createStamp) {
+      return;
+    }
+
+    SourceStamp.Builder sourceStamp = SourceStamp.builder();
+
+    sourceStamp.setSigningConfiguration(
+        getStampSigningConfiguration(flags, out, systemEnvironmentProvider));
+    stampSource.ifPresent(sourceStamp::setSource);
+
+    buildApksCommand.setSourceStamp(sourceStamp.build());
+  }
+
+  private static SigningConfiguration getStampSigningConfiguration(
+      ParsedFlags flags, PrintStream out, SystemEnvironmentProvider systemEnvironmentProvider) {
+    // Signing-related flags.
+    Optional<Path> signingKeystorePath = KEYSTORE_FLAG.getValue(flags);
+    Optional<Password> signingKeystorePassword = KEYSTORE_PASSWORD_FLAG.getValue(flags);
+    Optional<String> signingKeyAlias = KEY_ALIAS_FLAG.getValue(flags);
+    Optional<Password> signingKeyPassword = KEY_PASSWORD_FLAG.getValue(flags);
+
+    // Stamp-related flags.
+    Optional<Path> stampKeystorePath = STAMP_KEYSTORE_FLAG.getValue(flags);
+    Optional<Password> stampKeystorePassword = STAMP_KEYSTORE_PASSWORD_FLAG.getValue(flags);
+    Optional<String> stampKeyAlias = STAMP_KEY_ALIAS_FLAG.getValue(flags);
+    Optional<Password> stampKeyPassword = STAMP_KEY_PASSWORD_FLAG.getValue(flags);
+
+    Path keystorePath = null;
+    Optional<Password> keystorePassword = Optional.empty();
+    if (stampKeystorePath.isPresent()) {
+      keystorePath = stampKeystorePath.get();
+      keystorePassword = stampKeystorePassword;
+    } else if (signingKeystorePath.isPresent()) {
+      keystorePath = signingKeystorePath.get();
+      keystorePassword = signingKeystorePassword;
+    }
+
+    if (keystorePath == null) {
+      // Try to use debug keystore if present.
+      Optional<SigningConfiguration> debugConfig =
+          DebugKeystoreUtils.getDebugSigningConfiguration(systemEnvironmentProvider);
+      if (debugConfig.isPresent()) {
+        out.printf(
+            "INFO: The stamp will be signed with the debug keystore found at '%s'.%n",
+            DebugKeystoreUtils.DEBUG_KEYSTORE_CACHE.getUnchecked(systemEnvironmentProvider).get());
+        return debugConfig.get();
+      } else {
+        throw new CommandExecutionException("No key was found to sign the stamp.");
+      }
+    }
+
+    String keyAlias = null;
+    Optional<Password> keyPassword = Optional.empty();
+    if (stampKeyAlias.isPresent()) {
+      keyAlias = stampKeyAlias.get();
+      keyPassword = stampKeyPassword;
+    } else if (signingKeyAlias.isPresent()) {
+      keyAlias = signingKeyAlias.get();
+      keyPassword = signingKeyPassword;
+    }
+
+    if (keyAlias == null) {
+      throw new CommandExecutionException(
+          "Flag --stamp-key-alias or --ks-key-alias are required when --stamp-ks or --ks are set.");
+    }
+
+    return SigningConfiguration.extractFromKeystore(
+        keystorePath, keyAlias, keystorePassword, keyPassword);
+  }
 }

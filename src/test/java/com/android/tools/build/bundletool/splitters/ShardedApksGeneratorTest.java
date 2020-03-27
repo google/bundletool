@@ -18,6 +18,8 @@ package com.android.tools.build.bundletool.splitters;
 
 import static com.android.bundle.Targeting.Abi.AbiAlias.X86;
 import static com.android.bundle.Targeting.Abi.AbiAlias.X86_64;
+import static com.android.tools.build.bundletool.model.SourceStamp.STAMP_SOURCE_METADATA_KEY;
+import static com.android.tools.build.bundletool.model.SourceStamp.STAMP_TYPE_METADATA_KEY;
 import static com.android.tools.build.bundletool.model.utils.ResourcesUtils.LDPI_VALUE;
 import static com.android.tools.build.bundletool.model.utils.ResourcesUtils.MDPI_VALUE;
 import static com.android.tools.build.bundletool.testing.DeviceFactory.abis;
@@ -43,6 +45,7 @@ import static com.android.tools.build.bundletool.testing.TargetingUtils.toScreen
 import static com.android.tools.build.bundletool.testing.TargetingUtils.variantMinSdkTargeting;
 import static com.android.tools.build.bundletool.testing.TestUtils.extractPaths;
 import static com.google.common.collect.ImmutableSet.toImmutableSet;
+import static com.google.common.collect.Iterables.getOnlyElement;
 import static com.google.common.truth.Truth.assertThat;
 import static com.google.common.truth.Truth8.assertThat;
 import static com.google.common.truth.extensions.proto.ProtoTruth.assertThat;
@@ -58,6 +61,7 @@ import com.android.tools.build.bundletool.model.BundleModule;
 import com.android.tools.build.bundletool.model.BundleModuleName;
 import com.android.tools.build.bundletool.model.ModuleSplit;
 import com.android.tools.build.bundletool.model.ModuleSplit.SplitType;
+import com.android.tools.build.bundletool.model.SourceStamp.StampType;
 import com.android.tools.build.bundletool.model.version.BundleToolVersion;
 import com.android.tools.build.bundletool.model.version.Version;
 import com.android.tools.build.bundletool.optimizations.ApkOptimizations;
@@ -471,6 +475,37 @@ public class ShardedApksGeneratorTest {
     assertThat(itBaseSplit.isMasterSplit()).isFalse();
     assertThat(extractPaths(itBaseSplit.getEntries()))
         .containsExactly("assets/vr/languages#lang_it/image.jpg");
+  }
+
+  @Test
+  public void testStandaloneApk_addsStamp() throws Exception {
+    String stampSource = "https://www.validsource.com";
+    ImmutableList<BundleModule> bundleModule =
+        ImmutableList.of(
+            new BundleModuleBuilder("base")
+                .addFile("assets/leftover.txt")
+                .setManifest(androidManifest("com.test.app"))
+                .build(),
+            new BundleModuleBuilder("vr")
+                .addFile("assets/test.txt")
+                .setManifest(androidManifestForFeature("com.test.app"))
+                .build());
+
+    ImmutableList<ModuleSplit> moduleSplits =
+        new ShardedApksGenerator(
+                tmpDir,
+                BUNDLETOOL_VERSION,
+                /* strip64BitLibrariesFromShards= */ false,
+                /* suffixStrippings= */ ImmutableMap.of(),
+                Optional.of(stampSource))
+            .generateSplits(bundleModule, DEFAULT_METADATA, DEFAULT_APK_OPTIMIZATIONS);
+
+    assertThat(moduleSplits).hasSize(1);
+    ModuleSplit moduleSplit = getOnlyElement(moduleSplits);
+    assertThat(moduleSplit.getAndroidManifest().getMetadataValue(STAMP_TYPE_METADATA_KEY))
+        .hasValue(StampType.STAMP_TYPE_STANDALONE_APK.toString());
+    assertThat(moduleSplit.getAndroidManifest().getMetadataValue(STAMP_SOURCE_METADATA_KEY))
+        .hasValue(stampSource);
   }
 
   private ImmutableList<ModuleSplit> generateModuleSplitsForStandalone(

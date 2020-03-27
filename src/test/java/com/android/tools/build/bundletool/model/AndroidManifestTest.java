@@ -30,6 +30,7 @@ import static com.android.tools.build.bundletool.model.BundleModule.ModuleType.A
 import static com.android.tools.build.bundletool.model.BundleModule.ModuleType.FEATURE_MODULE;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifest;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifestForAssetModule;
+import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withCustomThemeActivity;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withFastFollowDelivery;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withFusingAttribute;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withInstallTimeDelivery;
@@ -973,6 +974,21 @@ public class AndroidManifestTest {
             androidManifest("com.package.test", withMainActivity("com.package.test.MainActivity")));
 
     assertThat(manifest.hasExplicitlyDefinedNativeActivities()).isFalse();
+  }
+
+  @Test
+  public void getActivitiesByName() {
+    AndroidManifest manifest =
+        AndroidManifest.create(
+            androidManifest(
+                "com.package.test",
+                withNativeActivity("libA"),
+                withMainActivity("main"),
+                withCustomThemeActivity("activity1", 123)));
+
+    assertThat(manifest.getActivitiesByName()).hasSize(3);
+    assertThat(manifest.getActivitiesByName().keySet())
+        .containsExactly("main", "activity1", "android.app.NativeActivity");
   }
 
   @Test

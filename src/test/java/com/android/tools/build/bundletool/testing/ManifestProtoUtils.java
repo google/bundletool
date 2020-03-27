@@ -49,6 +49,8 @@ import static com.android.tools.build.bundletool.model.AndroidManifest.SUPPORTS_
 import static com.android.tools.build.bundletool.model.AndroidManifest.TARGET_SANDBOX_VERSION_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.TARGET_SDK_VERSION_ATTRIBUTE_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.TARGET_SDK_VERSION_RESOURCE_ID;
+import static com.android.tools.build.bundletool.model.AndroidManifest.THEME_ATTRIBUTE_NAME;
+import static com.android.tools.build.bundletool.model.AndroidManifest.THEME_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.USES_SDK_ELEMENT_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.VALUE_ATTRIBUTE_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.VALUE_RESOURCE_ID;
@@ -818,6 +820,17 @@ public final class ManifestProtoUtils {
                             XmlProtoAttributeBuilder.createAndroidAttribute(
                                     NAME_ATTRIBUTE_NAME, NAME_RESOURCE_ID)
                                 .setValueAsString(name))));
+  }
+
+  public static ManifestMutator withCustomThemeActivity(String name, int themeRefId) {
+    return withActivity(
+        name,
+        activityBuilder -> {
+          activityBuilder
+              .getOrCreateAndroidAttribute(THEME_ATTRIBUTE_NAME, THEME_RESOURCE_ID)
+              .setValueAsRefId(themeRefId);
+          return activityBuilder;
+        });
   }
 
   public static ManifestMutator withMainActivity(String activityName) {

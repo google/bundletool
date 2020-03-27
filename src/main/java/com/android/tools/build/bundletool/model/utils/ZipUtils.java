@@ -95,6 +95,17 @@ public final class ZipUtils {
     return gzipSizeIncrements.build();
   }
 
+  /**
+   * Converts a path relative to the bundle zip root to one relative to the module path.
+   *
+   * <p>In the bundle zip, top-level directories denote module names (eg.
+   * "module_name/res/drawable.icon"), hence 1 path name needs to be skipped when resolving relative
+   * path of a module entry.
+   */
+  public static ZipPath convertBundleToModulePath(ZipPath bundlePath) {
+    return bundlePath.subpath(1, bundlePath.getNameCount());
+  }
+
   // Not meant to be instantiated.
   private ZipUtils() {}
 }

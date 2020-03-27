@@ -20,7 +20,9 @@ import static com.android.tools.build.bundletool.model.version.VersionGuardedFea
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.collect.ImmutableList.toImmutableList;
+import static com.google.common.collect.ImmutableMap.toImmutableMap;
 import static com.google.common.collect.Streams.stream;
+import static java.util.function.Function.identity;
 
 import com.android.aapt.Resources.XmlNode;
 import com.android.tools.build.bundletool.model.BundleModule.ModuleType;
@@ -38,6 +40,7 @@ import com.google.auto.value.extension.memoized.Memoized;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Splitter;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Range;
 import com.google.errorprone.annotations.Immutable;
 import java.util.Optional;
@@ -79,6 +82,7 @@ public abstract class AndroidManifest {
   public static final String VALUE_ATTRIBUTE_NAME = "value";
   public static final String CODE_ATTRIBUTE_NAME = "code";
   public static final String EXCLUDE_ATTRIBUTE_NAME = "exclude";
+  public static final String THEME_ATTRIBUTE_NAME = "theme";
   public static final String COUNTRY_ELEMENT_NAME = "country";
   public static final String CONDITION_DEVICE_FEATURE_NAME = "device-feature";
   public static final String CONDITION_MIN_SDK_VERSION_NAME = "min-sdk";
@@ -112,6 +116,7 @@ public abstract class AndroidManifest {
   public static final int SPLIT_NAME_RESOURCE_ID = 0x01010549;
   public static final int INSTALL_LOCATION_RESOURCE_ID = 0x010102b7;
   public static final int IS_SPLIT_REQUIRED_RESOURCE_ID = 0x01010591;
+  public static final int THEME_RESOURCE_ID = 0x01010000;
 
   // Matches the value of android.os.Build.VERSION_CODES.CUR_DEVELOPMENT, used when turning
   // a manifest attribute which references a prerelease API version (e.g., "Q") into an integer.
@@ -233,6 +238,16 @@ public abstract class AndroidManifest {
         .getOptionalChildElement(APPLICATION_ELEMENT_NAME)
         .flatMap(app -> app.getAndroidAttribute(DEBUGGABLE_RESOURCE_ID))
         .map(attr -> attr.getValueAsBoolean());
+  }
+
+  public ImmutableMap<String, XmlProtoElement> getActivitiesByName() {
+    return stream(getManifestElement().getOptionalChildElement(APPLICATION_ELEMENT_NAME))
+        .flatMap(app -> app.getChildrenElements(ACTIVITY_ELEMENT_NAME))
+        .filter(activity -> activity.getAndroidAttribute(NAME_RESOURCE_ID).isPresent())
+        .collect(
+            toImmutableMap(
+                activity -> activity.getAndroidAttribute(NAME_RESOURCE_ID).get().getValueAsString(),
+                identity()));
   }
 
   public Optional<Integer> getMinSdkVersion() {

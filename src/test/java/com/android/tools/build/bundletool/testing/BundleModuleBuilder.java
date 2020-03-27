@@ -26,8 +26,9 @@ import com.android.bundle.Files.Assets;
 import com.android.bundle.Files.NativeLibraries;
 import com.android.tools.build.bundletool.model.BundleModule;
 import com.android.tools.build.bundletool.model.BundleModuleName;
-import com.android.tools.build.bundletool.model.InMemoryModuleEntry;
+import com.android.tools.build.bundletool.model.InputStreamSuppliers;
 import com.android.tools.build.bundletool.model.ModuleEntry;
+import com.android.tools.build.bundletool.model.ZipPath;
 import com.android.tools.build.bundletool.model.utils.xmlproto.XmlProtoNode;
 import com.android.tools.build.bundletool.model.utils.xmlproto.XmlProtoNodeBuilder;
 import com.google.common.collect.ImmutableSet;
@@ -55,17 +56,16 @@ public class BundleModuleBuilder {
   }
 
   public BundleModuleBuilder addFile(String relativePath, byte[] content) {
-    entries.add(InMemoryModuleEntry.ofFile(relativePath, content));
+    entries.add(
+        ModuleEntry.builder()
+            .setPath(ZipPath.create(relativePath))
+            .setContentSupplier(InputStreamSuppliers.fromBytes(content))
+            .build());
     return this;
   }
 
   public BundleModuleBuilder addFile(String relativePath) {
     return addFile(relativePath, new byte[1]);
-  }
-
-  public BundleModuleBuilder addDirectory(String relativePath) {
-    entries.add(InMemoryModuleEntry.ofDirectory(relativePath));
-    return this;
   }
 
   public BundleModuleBuilder setNativeConfig(NativeLibraries nativeConfig) {

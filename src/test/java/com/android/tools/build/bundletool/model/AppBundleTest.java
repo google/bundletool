@@ -76,7 +76,7 @@ public class AppBundleTest {
           .containsExactly(BundleModuleName.create("base"));
     }
   }
-  
+
   @Test
   public void testMultipleModules() throws Exception {
     createBasicZipBuilder(BUNDLE_CONFIG)
@@ -193,29 +193,6 @@ public class AppBundleTest {
       assertThat(appBundle.getFeatureModules().keySet())
           .containsExactly(BundleModuleName.create("base"));
     }
-  }
-
-  @Test
-  public void bundleModules_noDirectoryZipEntries() throws Exception {
-    AppBundle appBundle =
-        new AppBundleBuilder()
-            .addModule(
-                "base",
-                moduleBuilder ->
-                    moduleBuilder
-                        .addDirectory("dex")
-                        .addFile("dex/classes.dex", DUMMY_CONTENT)
-                        .addDirectory("assets")
-                        .addFile("assets/file.dat", DUMMY_CONTENT)
-                        .addDirectory("manifest")
-                        .addFile("manifest/AndroidManifest.xml", MANIFEST.toByteArray()))
-            .build();
-
-    assertThat(
-            appBundle.getBaseModule().getEntries().stream()
-                .filter(ModuleEntry::isDirectory)
-                .collect(toImmutableList()))
-        .isEmpty();
   }
 
   @Test

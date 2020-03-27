@@ -21,8 +21,16 @@ apply plugin: "maven"
 repositories {
     jcenter()
     google()
-    maven {
+    // We need to add this custom format repo because we use r8 version which is
+    // not available in gMaven yet. This repo can be removed once new version is
+    // uploaded to gMaven.
+    // Shrunk version of r8 is available there by the following path:
+    // https://storage.googleapis.com/r8-releases/raw/[revision]/r8lib.jar
+    ivy {
         url "https://storage.googleapis.com/r8-releases/raw"
+        patternLayout {
+            artifact "[revision]/[artifact]lib.[ext]"
+        }
     }
 }
 
@@ -66,6 +74,9 @@ dependencies {
     testCompile "org.junit.vintage:junit-vintage-engine:5.2.0"
     testRuntime "org.junit.jupiter:junit-jupiter-engine:5.2.0"
     testCompile "org.junit.platform:junit-platform-runner:1.2.0"
+    testCompile("org.smali:dexlib2:2.3.4") {
+        exclude group: "com.google.guava", module: "guava"
+    }
 }
 
 def osName = System.getProperty("os.name").toLowerCase()

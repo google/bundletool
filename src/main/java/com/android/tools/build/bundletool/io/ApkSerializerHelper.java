@@ -33,7 +33,6 @@ import com.android.apksig.ApkSigner;
 import com.android.apksig.ApkSigner.SignerConfig;
 import com.android.apksig.apk.ApkFormatException;
 import com.android.bundle.Config.Compression;
-import com.android.tools.build.apkzlib.sign.SigningOptions;
 import com.android.tools.build.apkzlib.zfile.ZFiles;
 import com.android.tools.build.apkzlib.zip.AlignmentRule;
 import com.android.tools.build.apkzlib.zip.AlignmentRules;
@@ -117,16 +116,19 @@ final class ApkSerializerHelper {
   private final Aapt2Command aapt2Command;
   private final Version bundleVersion;
   private final Optional<SigningConfiguration> signingConfig;
+  private final Optional<SigningConfiguration> stampSigningConfig;
   private final ImmutableList<PathMatcher> uncompressedPathMatchers;
 
   ApkSerializerHelper(
       Aapt2Command aapt2Command,
       Optional<SigningConfiguration> signingConfig,
+      Optional<SigningConfiguration> stampSigningConfig,
       Version bundleVersion,
       Compression compression) {
     this.aapt2Command = aapt2Command;
     this.bundleVersion = bundleVersion;
     this.signingConfig = signingConfig;
+    this.stampSigningConfig = stampSigningConfig;
 
     this.uncompressedPathMatchers =
         compression.getUncompressedGlobList().stream()
@@ -154,34 +156,17 @@ final class ApkSerializerHelper {
     aapt2Command.convertApkProtoToBinary(partialProtoApk, binaryApk);
     checkState(Files.exists(binaryApk), "No APK created by aapt2 convert command.");
 
-    boolean signWithV1 =
-        split.getAndroidManifest().getEffectiveMinSdkVersion() < Versions.ANDROID_N_API_VERSION
-            || !VersionGuardedFeature.NO_V1_SIGNING_WHEN_POSSIBLE.enabledForVersion(bundleVersion);
-
     // Create a new APK that includes files processed by aapt2 and the other ones.
-    int minSdkVersion = split.getAndroidManifest().getEffectiveMinSdkVersion();
-    com.google.common.base.Optional<SigningOptions> signingOptions =
-        signingConfig
-            .map(
-                config ->
-                    com.google.common.base.Optional.of(
-                        SigningOptions.builder()
-                            .setKey(config.getPrivateKey())
-                            .setCertificates(config.getCertificates())
-                            .setV1SigningEnabled(signWithV1)
-                            .setV2SigningEnabled(true)
-                            .setMinSdkVersion(minSdkVersion)
-                            .build()))
-            .orElse(com.google.common.base.Optional.absent());
+    Path unsignedApkPath = tempDir.resolve("apk-unsigned.apk");
     try (ZFile zOutputApk =
             ZFiles.apk(
-                outputPath.toFile(),
+                unsignedApkPath.toFile(),
                 createZFileOptions(tempDir)
                     .setAlignmentRule(APK_ALIGNMENT_RULE)
                     .setCoverEmptySpaceUsingExtraField(true)
                     // Clear timestamps on zip entries to minimize diffs between APKs.
                     .setNoTimestamps(true),
-                signingOptions,
+                /* signingOptions= */ com.google.common.base.Optional.absent(),
                 BUILT_BY,
                 CREATED_BY);
         ZFile zAapt2Files =
@@ -195,7 +180,29 @@ final class ApkSerializerHelper {
       zOutputApk.sortZipContents();
     } catch (IOException e) {
       throw new UncheckedIOException(
-          String.format("Failed to write APK file '%s'.", outputPath), e);
+          String.format("Failed to write APK file '%s'.", unsignedApkPath), e);
+    }
+
+    // Sign APK.
+    boolean signWithV1 =
+        split.getAndroidManifest().getEffectiveMinSdkVersion() < Versions.ANDROID_N_API_VERSION
+            || !VersionGuardedFeature.NO_V1_SIGNING_WHEN_POSSIBLE.enabledForVersion(bundleVersion);
+    int minSdkVersion = split.getAndroidManifest().getEffectiveMinSdkVersion();
+    if (signingConfig.isPresent()) {
+      signApk(
+          unsignedApkPath,
+          outputPath,
+          signingConfig.get(),
+          stampSigningConfig,
+          signWithV1,
+          minSdkVersion);
+    } else {
+      try {
+        Files.move(unsignedApkPath, outputPath);
+      } catch (IOException e) {
+        throw new UncheckedIOException(
+            String.format("Failed to write APK file '%s'.", outputPath), e);
+      }
     }
   }
 
@@ -425,5 +432,37 @@ final class ApkSerializerHelper {
   private static ZFileOptions createZFileOptions(Path tempDir) {
     ZFileOptions options = new ZFileOptions();
     return options;
+  }
+
+  private static void signApk(
+      Path inputApkPath,
+      Path outputApkPath,
+      SigningConfiguration signingConfiguration,
+      Optional<SigningConfiguration> stampSigningConfiguration,
+      boolean signWithV1,
+      int minSdkVersion) {
+    try {
+      SignerConfig signerConfig =
+          new SignerConfig.Builder(
+                  SIGNER_CONFIG_NAME,
+                  signingConfiguration.getPrivateKey(),
+                  signingConfiguration.getCertificates())
+              .build();
+      ApkSigner.Builder apkSigner =
+          new ApkSigner.Builder(ImmutableList.of(signerConfig))
+              .setInputApk(inputApkPath.toFile())
+              .setV1SigningEnabled(signWithV1)
+              .setV2SigningEnabled(true)
+              .setOtherSignersSignaturesPreserved(false)
+              .setMinSdkVersion(minSdkVersion)
+              .setOutputApk(outputApkPath.toFile());
+      apkSigner.build().sign();
+    } catch (IOException
+        | ApkFormatException
+        | NoSuchAlgorithmException
+        | InvalidKeyException
+        | SignatureException e) {
+      throw new ValidationException("Unable to sign APK.", e);
+    }
   }
 }

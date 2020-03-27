@@ -91,7 +91,7 @@ public class BuildApksCommandTest {
   private static final String DEBUG_KEYSTORE_PASSWORD = "android";
   private static final String DEBUG_KEY_PASSWORD = "android";
   private static final String DEBUG_KEY_ALIAS = "AndroidDebugKey";
-  private static final String STAMP_SOURCE = "test-source";
+  private static final String STAMP_SOURCE = "https://www.validsource.com";
   private static final String STAMP_KEYSTORE_PASSWORD = "stamp-keystore-password";
   private static final String STAMP_KEY_PASSWORD = "stamp-key-password";
   private static final String STAMP_KEY_ALIAS = "stamp-key-alias";
@@ -721,6 +721,355 @@ public class BuildApksCommandTest {
     assertThat(result.getPackageName()).isEqualTo("com.app");
   }
 
+  @Test
+  public void buildingViaFlagsAndBuilderHasSameResult_noStamp() throws Exception {
+    ByteArrayOutputStream output = new ByteArrayOutputStream();
+    BuildApksCommand commandViaFlags =
+        BuildApksCommand.fromFlags(
+            new FlagParser()
+                .parse(
+                    "--bundle=" + bundlePath,
+                    "--output=" + outputFilePath,
+                    "--aapt2=" + AAPT2_PATH,
+                    "--create-stamp=" + false),
+            new PrintStream(output),
+            systemEnvironmentProvider,
+            fakeAdbServer);
+
+    BuildApksCommand.Builder commandViaBuilder =
+        BuildApksCommand.builder()
+            .setBundlePath(bundlePath)
+            .setOutputFile(outputFilePath)
+            // Must copy instance of the internal executor service.
+            .setAapt2Command(commandViaFlags.getAapt2Command().get())
+            .setExecutorServiceInternal(commandViaFlags.getExecutorService())
+            .setExecutorServiceCreatedByBundleTool(true)
+            .setOutputPrintStream(commandViaFlags.getOutputPrintStream().get());
+    DebugKeystoreUtils.getDebugSigningConfiguration(systemEnvironmentProvider)
+        .ifPresent(commandViaBuilder::setSigningConfiguration);
+
+    assertThat(commandViaBuilder.build()).isEqualTo(commandViaFlags);
+  }
+
+  @Test
+  public void buildingViaFlagsAndBuilderHasSameResult_stamp_sameSigningKey() throws Exception {
+    BuildApksCommand commandViaFlags =
+        BuildApksCommand.fromFlags(
+            new FlagParser()
+                .parse(
+                    "--bundle=" + bundlePath,
+                    "--output=" + outputFilePath,
+                    "--aapt2=" + AAPT2_PATH,
+                    // Optional values.
+                    "--ks=" + keystorePath,
+                    "--ks-key-alias=" + KEY_ALIAS,
+                    "--ks-pass=pass:" + KEYSTORE_PASSWORD,
+                    "--key-pass=pass:" + KEY_PASSWORD,
+                    "--create-stamp=" + true),
+            fakeAdbServer);
+    SigningConfiguration signingConfiguration =
+        SigningConfiguration.builder()
+            .setPrivateKey(privateKey)
+            .setCertificates(ImmutableList.of(certificate))
+            .build();
+
+    BuildApksCommand commandViaBuilder =
+        BuildApksCommand.builder()
+            .setBundlePath(bundlePath)
+            .setOutputFile(outputFilePath)
+            // Optional values.
+            .setSigningConfiguration(signingConfiguration)
+            // Stamp
+            .setSourceStamp(
+                SourceStamp.builder().setSigningConfiguration(signingConfiguration).build())
+            // Must copy instance of the internal executor service.
+            .setAapt2Command(commandViaFlags.getAapt2Command().get())
+            .setExecutorServiceInternal(commandViaFlags.getExecutorService())
+            .setExecutorServiceCreatedByBundleTool(true)
+            .setOutputPrintStream(commandViaFlags.getOutputPrintStream().get())
+            .build();
+
+    assertThat(commandViaBuilder).isEqualTo(commandViaFlags);
+  }
+
+  @Test
+  public void buildingViaFlagsAndBuilderHasSameResult_stamp_separateKeystore() throws Exception {
+    ByteArrayOutputStream output = new ByteArrayOutputStream();
+    BuildApksCommand commandViaFlags =
+        BuildApksCommand.fromFlags(
+            new FlagParser()
+                .parse(
+                    "--bundle=" + bundlePath,
+                    "--output=" + outputFilePath,
+                    "--aapt2=" + AAPT2_PATH,
+                    "--ks=" + keystorePath,
+                    "--ks-key-alias=" + KEY_ALIAS,
+                    "--ks-pass=pass:" + KEYSTORE_PASSWORD,
+                    "--key-pass=pass:" + KEY_PASSWORD,
+                    "--create-stamp=" + true,
+                    "--stamp-ks=" + stampKeystorePath,
+                    "--stamp-ks-pass=pass:" + STAMP_KEYSTORE_PASSWORD),
+            new PrintStream(output),
+            systemEnvironmentProvider,
+            fakeAdbServer);
+    SigningConfiguration signingConfiguration =
+        SigningConfiguration.builder()
+            .setPrivateKey(privateKey)
+            .setCertificates(ImmutableList.of(certificate))
+            .build();
+    SigningConfiguration stampSigningConfiguration =
+        SigningConfiguration.builder()
+            .setPrivateKey(stampPrivateKey)
+            .setCertificates(ImmutableList.of(stampCertificate))
+            .build();
+
+    BuildApksCommand.Builder commandViaBuilder =
+        BuildApksCommand.builder()
+            .setBundlePath(bundlePath)
+            .setOutputFile(outputFilePath)
+            .setSigningConfiguration(signingConfiguration)
+            // Stamp
+            .setSourceStamp(
+                SourceStamp.builder().setSigningConfiguration(stampSigningConfiguration).build())
+            // Must copy instance of the internal executor service.
+            .setAapt2Command(commandViaFlags.getAapt2Command().get())
+            .setExecutorServiceInternal(commandViaFlags.getExecutorService())
+            .setExecutorServiceCreatedByBundleTool(true)
+            .setOutputPrintStream(commandViaFlags.getOutputPrintStream().get());
+    DebugKeystoreUtils.getDebugSigningConfiguration(systemEnvironmentProvider)
+        .ifPresent(commandViaBuilder::setSigningConfiguration);
+
+    assertThat(commandViaBuilder.build()).isEqualTo(commandViaFlags);
+  }
+
+  @Test
+  public void buildingViaFlagsAndBuilderHasSameResult_stamp_separateKeyAlias() throws Exception {
+    ByteArrayOutputStream output = new ByteArrayOutputStream();
+    BuildApksCommand commandViaFlags =
+        BuildApksCommand.fromFlags(
+            new FlagParser()
+                .parse(
+                    "--bundle=" + bundlePath,
+                    "--output=" + outputFilePath,
+                    "--aapt2=" + AAPT2_PATH,
+                    "--ks=" + keystorePath,
+                    "--ks-key-alias=" + KEY_ALIAS,
+                    "--ks-pass=pass:" + KEYSTORE_PASSWORD,
+                    "--key-pass=pass:" + KEY_PASSWORD,
+                    "--create-stamp=" + true,
+                    "--stamp-key-alias=" + STAMP_KEY_ALIAS,
+                    "--stamp-key-pass=pass:" + STAMP_KEY_PASSWORD),
+            new PrintStream(output),
+            systemEnvironmentProvider,
+            fakeAdbServer);
+    SigningConfiguration signingConfiguration =
+        SigningConfiguration.builder()
+            .setPrivateKey(privateKey)
+            .setCertificates(ImmutableList.of(certificate))
+            .build();
+    SigningConfiguration stampSigningConfiguration =
+        SigningConfiguration.builder()
+            .setPrivateKey(stampPrivateKey)
+            .setCertificates(ImmutableList.of(stampCertificate))
+            .build();
+
+    BuildApksCommand.Builder commandViaBuilder =
+        BuildApksCommand.builder()
+            .setBundlePath(bundlePath)
+            .setOutputFile(outputFilePath)
+            .setSigningConfiguration(signingConfiguration)
+            // Stamp
+            .setSourceStamp(
+                SourceStamp.builder().setSigningConfiguration(stampSigningConfiguration).build())
+            // Must copy instance of the internal executor service.
+            .setAapt2Command(commandViaFlags.getAapt2Command().get())
+            .setExecutorServiceInternal(commandViaFlags.getExecutorService())
+            .setExecutorServiceCreatedByBundleTool(true)
+            .setOutputPrintStream(commandViaFlags.getOutputPrintStream().get());
+    DebugKeystoreUtils.getDebugSigningConfiguration(systemEnvironmentProvider)
+        .ifPresent(commandViaBuilder::setSigningConfiguration);
+
+    assertThat(commandViaBuilder.build()).isEqualTo(commandViaFlags);
+  }
+
+  @Test
+  public void buildingViaFlagsAndBuilderHasSameResult_stamp_separateKeystoreAndKeyAlias()
+      throws Exception {
+    ByteArrayOutputStream output = new ByteArrayOutputStream();
+    BuildApksCommand commandViaFlags =
+        BuildApksCommand.fromFlags(
+            new FlagParser()
+                .parse(
+                    "--bundle=" + bundlePath,
+                    "--output=" + outputFilePath,
+                    "--aapt2=" + AAPT2_PATH,
+                    "--create-stamp=" + true,
+                    "--stamp-ks=" + stampKeystorePath,
+                    "--stamp-key-alias=" + STAMP_KEY_ALIAS,
+                    "--stamp-ks-pass=pass:" + STAMP_KEYSTORE_PASSWORD,
+                    "--stamp-key-pass=pass:" + STAMP_KEY_PASSWORD),
+            new PrintStream(output),
+            systemEnvironmentProvider,
+            fakeAdbServer);
+    SigningConfiguration stampSigningConfiguration =
+        SigningConfiguration.builder()
+            .setPrivateKey(stampPrivateKey)
+            .setCertificates(ImmutableList.of(stampCertificate))
+            .build();
+
+    BuildApksCommand.Builder commandViaBuilder =
+        BuildApksCommand.builder()
+            .setBundlePath(bundlePath)
+            .setOutputFile(outputFilePath)
+            // Stamp
+            .setSourceStamp(
+                SourceStamp.builder().setSigningConfiguration(stampSigningConfiguration).build())
+            // Must copy instance of the internal executor service.
+            .setAapt2Command(commandViaFlags.getAapt2Command().get())
+            .setExecutorServiceInternal(commandViaFlags.getExecutorService())
+            .setExecutorServiceCreatedByBundleTool(true)
+            .setOutputPrintStream(commandViaFlags.getOutputPrintStream().get());
+    DebugKeystoreUtils.getDebugSigningConfiguration(systemEnvironmentProvider)
+        .ifPresent(commandViaBuilder::setSigningConfiguration);
+
+    assertThat(commandViaBuilder.build()).isEqualTo(commandViaFlags);
+  }
+
+  @Test
+  public void buildingViaFlagsAndBuilderHasSameResult_stamp_debugKey() throws Exception {
+    Path debugKeystorePath = tmpDir.resolve(".android").resolve("debug.keystore");
+    FileUtils.createParentDirectories(debugKeystorePath);
+    SigningConfiguration signingConfiguration = createDebugKeystore(debugKeystorePath);
+    SystemEnvironmentProvider provider =
+        new FakeSystemEnvironmentProvider(
+            /* variables= */ ImmutableMap.of(
+                ANDROID_HOME, "/android/home", ANDROID_SERIAL, DEVICE_ID),
+            /* properties= */ ImmutableMap.of(USER_HOME.key(), tmpDir.toString()));
+    ByteArrayOutputStream output = new ByteArrayOutputStream();
+    BuildApksCommand commandViaFlags =
+        BuildApksCommand.fromFlags(
+            new FlagParser()
+                .parse(
+                    "--bundle=" + bundlePath,
+                    "--output=" + outputFilePath,
+                    "--aapt2=" + AAPT2_PATH,
+                    "--create-stamp=" + true),
+            new PrintStream(output),
+            provider,
+            fakeAdbServer);
+
+    BuildApksCommand.Builder commandViaBuilder =
+        BuildApksCommand.builder()
+            .setBundlePath(bundlePath)
+            .setOutputFile(outputFilePath)
+            // Optional values.
+            .setSigningConfiguration(signingConfiguration)
+            // Stamp
+            .setSourceStamp(
+                SourceStamp.builder().setSigningConfiguration(signingConfiguration).build())
+            // Must copy instance of the internal executor service.
+            .setAapt2Command(commandViaFlags.getAapt2Command().get())
+            .setExecutorServiceInternal(commandViaFlags.getExecutorService())
+            .setExecutorServiceCreatedByBundleTool(true)
+            .setOutputPrintStream(commandViaFlags.getOutputPrintStream().get());
+
+    assertThat(commandViaBuilder.build()).isEqualTo(commandViaFlags);
+  }
+
+  @Test
+  public void stampKeystoreFlags_noKeystore_fails() throws Exception {
+    SystemEnvironmentProvider provider =
+        new FakeSystemEnvironmentProvider(
+            /* variables= */ ImmutableMap.of(
+                ANDROID_HOME, "/android/home", ANDROID_SERIAL, DEVICE_ID),
+            /* properties= */ ImmutableMap.of(USER_HOME.key(), "/"));
+    ByteArrayOutputStream output = new ByteArrayOutputStream();
+
+    CommandExecutionException e =
+        assertThrows(
+            CommandExecutionException.class,
+            () ->
+                BuildApksCommand.fromFlags(
+                    new FlagParser()
+                        .parse(
+                            "--bundle=" + bundlePath,
+                            "--output=" + outputFilePath,
+                            "--aapt2=" + AAPT2_PATH,
+                            "--create-stamp=" + true),
+                    new PrintStream(output),
+                    provider,
+                    fakeAdbServer));
+
+    assertThat(e).hasMessageThat().isEqualTo("No key was found to sign the stamp.");
+  }
+
+  @Test
+  public void stampKeystoreFlags_noKeyAlias_fails() {
+    CommandExecutionException e =
+        assertThrows(
+            CommandExecutionException.class,
+            () ->
+                BuildApksCommand.fromFlags(
+                    new FlagParser()
+                        .parse(
+                            "--bundle=" + bundlePath,
+                            "--output=" + outputFilePath,
+                            "--aapt2=" + AAPT2_PATH,
+                            "--create-stamp=" + true,
+                            "--stamp-ks=" + keystorePath),
+                    fakeAdbServer));
+
+    assertThat(e)
+        .hasMessageThat()
+        .isEqualTo(
+            "Flag --stamp-key-alias or --ks-key-alias are required when --stamp-ks or --ks are"
+                + " set.");
+  }
+
+  @Test
+  public void buildingViaFlagsAndBuilderHasSameResult_stamp_source() throws Exception {
+    BuildApksCommand commandViaFlags =
+        BuildApksCommand.fromFlags(
+            new FlagParser()
+                .parse(
+                    "--bundle=" + bundlePath,
+                    "--output=" + outputFilePath,
+                    "--aapt2=" + AAPT2_PATH,
+                    // Optional values.
+                    "--ks=" + keystorePath,
+                    "--ks-key-alias=" + KEY_ALIAS,
+                    "--ks-pass=pass:" + KEYSTORE_PASSWORD,
+                    "--key-pass=pass:" + KEY_PASSWORD,
+                    "--create-stamp=" + true,
+                    "--stamp-source=" + STAMP_SOURCE),
+            fakeAdbServer);
+    SigningConfiguration signingConfiguration =
+        SigningConfiguration.builder()
+            .setPrivateKey(privateKey)
+            .setCertificates(ImmutableList.of(certificate))
+            .build();
+
+    BuildApksCommand commandViaBuilder =
+        BuildApksCommand.builder()
+            .setBundlePath(bundlePath)
+            .setOutputFile(outputFilePath)
+            // Optional values.
+            .setSigningConfiguration(signingConfiguration)
+            // Stamp
+            .setSourceStamp(
+                SourceStamp.builder()
+                    .setSigningConfiguration(signingConfiguration)
+                    .setSource(STAMP_SOURCE)
+                    .build())
+            // Must copy instance of the internal executor service.
+            .setAapt2Command(commandViaFlags.getAapt2Command().get())
+            .setExecutorServiceInternal(commandViaFlags.getExecutorService())
+            .setExecutorServiceCreatedByBundleTool(true)
+            .setOutputPrintStream(commandViaFlags.getOutputPrintStream().get())
+            .build();
+
+    assertThat(commandViaBuilder).isEqualTo(commandViaFlags);
+  }
 
   private static void createKeyStore(Path keystorePath, String keystorePassword)
       throws KeyStoreException, CertificateException, NoSuchAlgorithmException, IOException {

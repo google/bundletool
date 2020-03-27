@@ -127,6 +127,7 @@ public abstract class ApkOptimizations {
     return ApkOptimizations.builder()
         .setSplitDimensions(
             ImmutableSet.of(
+                OptimizationDimension.TEXTURE_COMPRESSION_FORMAT,
                 LANGUAGE))
         .setStandaloneDimensions(ImmutableSet.of())
         .build();

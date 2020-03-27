@@ -21,8 +21,8 @@ import static com.google.common.truth.Truth.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.android.tools.build.bundletool.flags.Flag.RequiredFlagNotSetException;
-import com.android.tools.build.bundletool.model.InMemoryModuleEntry;
 import com.android.tools.build.bundletool.model.InputStreamSupplier;
+import com.android.tools.build.bundletool.model.InputStreamSuppliers;
 import com.android.tools.build.bundletool.model.ModuleEntry;
 import com.android.tools.build.bundletool.model.ZipPath;
 import com.google.common.collect.ImmutableList;
@@ -87,16 +87,10 @@ public final class TestUtils {
   }
 
   public static ModuleEntry createModuleEntryForFile(String filePath, byte[] content) {
-    return InMemoryModuleEntry.ofFile(filePath, content);
-  }
-
-  public static ModuleEntry createModuleEntryForFile(
-      String filePath, byte[] content, boolean shouldCompress) {
-    return InMemoryModuleEntry.ofFile(filePath, content, shouldCompress);
-  }
-
-  public static ModuleEntry createModuleEntryForDirectory(String filePath) {
-    return InMemoryModuleEntry.ofDirectory(filePath);
+    return ModuleEntry.builder()
+        .setPath(ZipPath.create(filePath))
+        .setContentSupplier(InputStreamSuppliers.fromBytes(content))
+        .build();
   }
 
   public static byte[] toByteArray(InputStreamSupplier inputStreamSupplier) {

@@ -37,6 +37,7 @@ import com.android.tools.build.bundletool.model.ModuleSplit.SplitType;
 import com.android.tools.build.bundletool.model.OptimizationDimension;
 import com.android.tools.build.bundletool.model.ResourceId;
 import com.android.tools.build.bundletool.model.ResourceTableEntry;
+import com.android.tools.build.bundletool.model.SourceStamp.StampType;
 import com.android.tools.build.bundletool.model.SuffixManager;
 import com.android.tools.build.bundletool.model.exceptions.CommandExecutionException;
 import com.android.tools.build.bundletool.model.version.Version;
@@ -65,25 +66,65 @@ public class ModuleSplitter {
   private final Version bundleVersion;
   private final ApkGenerationConfiguration apkGenerationConfiguration;
   private final VariantTargeting variantTargeting;
+  private final Optional<String> stampSource;
+  private final StampType stampType;
 
   private final AbiPlaceholderInjector abiPlaceholderInjector;
 
   @VisibleForTesting
-  ModuleSplitter(BundleModule module, Version bundleVersion) {
-    this(
+  public static ModuleSplitter createForTest(BundleModule module, Version bundleVersion) {
+    return new ModuleSplitter(
         module,
         bundleVersion,
         ApkGenerationConfiguration.getDefaultInstance(),
         lPlusVariantTargeting(),
-        /* allModuleNames= */ ImmutableSet.of());
+        /* allModuleNames= */ ImmutableSet.of(),
+        /* stampSource= */ Optional.empty(),
+        /* stampType= */ null);
   }
 
-  public ModuleSplitter(
+  public static ModuleSplitter createNoStamp(
       BundleModule module,
       Version bundleVersion,
       ApkGenerationConfiguration apkGenerationConfiguration,
       VariantTargeting variantTargeting,
       ImmutableSet<String> allModuleNames) {
+    return new ModuleSplitter(
+        module,
+        bundleVersion,
+        apkGenerationConfiguration,
+        variantTargeting,
+        allModuleNames,
+        /* stampSource= */ Optional.empty(),
+        /* stampType= */ null);
+  }
+
+  public static ModuleSplitter create(
+      BundleModule module,
+      Version bundleVersion,
+      ApkGenerationConfiguration apkGenerationConfiguration,
+      VariantTargeting variantTargeting,
+      ImmutableSet<String> allModuleNames,
+      Optional<String> stampSource,
+      StampType stampType) {
+    return new ModuleSplitter(
+        module,
+        bundleVersion,
+        apkGenerationConfiguration,
+        variantTargeting,
+        allModuleNames,
+        stampSource,
+        stampType);
+  }
+
+  private ModuleSplitter(
+      BundleModule module,
+      Version bundleVersion,
+      ApkGenerationConfiguration apkGenerationConfiguration,
+      VariantTargeting variantTargeting,
+      ImmutableSet<String> allModuleNames,
+      Optional<String> stampSource,
+      StampType stampType) {
     this.module = checkNotNull(module);
     this.bundleVersion = checkNotNull(bundleVersion);
     this.apkGenerationConfiguration = checkNotNull(apkGenerationConfiguration);
@@ -91,6 +132,8 @@ public class ModuleSplitter {
     this.abiPlaceholderInjector =
         new AbiPlaceholderInjector(apkGenerationConfiguration.getAbisForPlaceholderLibs());
     this.allModuleNames = allModuleNames;
+    this.stampSource = stampSource;
+    this.stampType = stampType;
   }
 
   public ImmutableList<ModuleSplit> splitModule() {
@@ -120,11 +163,18 @@ public class ModuleSplitter {
 
   /** Common modifications to both the instant and installed splits. */
   private ImmutableList<ModuleSplit> splitModuleInternal() {
-    return runSplitters().stream()
-        .map(this::addLPlusApkTargeting)
-        .map(this::writeSplitIdInManifest)
-        .map(ModuleSplit::addApplicationElementIfMissingInManifest)
-        .collect(toImmutableList());
+    ImmutableList<ModuleSplit> moduleSplits =
+        runSplitters().stream()
+            .map(this::addLPlusApkTargeting)
+            .map(this::writeSplitIdInManifest)
+            .map(ModuleSplit::addApplicationElementIfMissingInManifest)
+            .collect(toImmutableList());
+    if (stampSource.isPresent()) {
+      return moduleSplits.stream()
+          .map(moduleSplit -> moduleSplit.writeSourceStampInManifest(stampSource.get(), stampType))
+          .collect(toImmutableList());
+    }
+    return moduleSplits;
   }
 
   private ImmutableList<ModuleSplit> runSplitters() {
@@ -301,8 +351,8 @@ public class ModuleSplitter {
         .contains(OptimizationDimension.TEXTURE_COMPRESSION_FORMAT)) {
       assetsSplitters.add(
           TextureCompressionFormatAssetsSplitter.create(
-              false
-              ));
+              apkGenerationConfiguration.shouldStripTargetingSuffix(
+                  OptimizationDimension.TEXTURE_COMPRESSION_FORMAT)));
     }
     return new SplittingPipeline(assetsSplitters.build());
   }

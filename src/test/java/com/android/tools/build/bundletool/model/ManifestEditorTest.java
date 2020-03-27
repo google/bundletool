@@ -17,6 +17,7 @@
 package com.android.tools.build.bundletool.model;
 
 import static com.android.tools.build.bundletool.model.AndroidManifest.ACTIVITY_ELEMENT_NAME;
+import static com.android.tools.build.bundletool.model.AndroidManifest.APPLICATION_ELEMENT_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.HAS_CODE_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.IS_FEATURE_SPLIT_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.IS_SPLIT_REQUIRED_ATTRIBUTE_NAME;
@@ -31,9 +32,12 @@ import static com.android.tools.build.bundletool.model.AndroidManifest.SPLIT_NAM
 import static com.android.tools.build.bundletool.model.AndroidManifest.SPLIT_NAME_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.TARGET_SANDBOX_VERSION_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.TARGET_SDK_VERSION_RESOURCE_ID;
+import static com.android.tools.build.bundletool.model.AndroidManifest.THEME_ATTRIBUTE_NAME;
+import static com.android.tools.build.bundletool.model.AndroidManifest.THEME_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.VALUE_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.VERSION_CODE_RESOURCE_ID;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifest;
+import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withCustomThemeActivity;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withMainActivity;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withOnDemandAttribute;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withSplitNameActivity;
@@ -55,10 +59,13 @@ import com.android.aapt.Resources.XmlNode;
 import com.android.tools.build.bundletool.TestData;
 import com.android.tools.build.bundletool.model.utils.xmlproto.XmlProtoAttribute;
 import com.android.tools.build.bundletool.model.utils.xmlproto.XmlProtoElement;
+import com.android.tools.build.bundletool.model.utils.xmlproto.XmlProtoElementBuilder;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.protobuf.TextFormat;
+import java.util.Map;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
@@ -727,6 +734,49 @@ public class ManifestEditorTest {
         androidManifest.toEditor().addMetaDataResourceId("hello", 123).save();
 
     assertThat(editedManifest.getMetadataResourceId("hello")).hasValue(123);
+  }
+
+  @Test
+  public void replaceActivities() {
+    AndroidManifest manifest =
+        AndroidManifest.create(
+            androidManifest(
+                "com.app",
+                withMainActivity("main"),
+                withCustomThemeActivity("activity", 1),
+                withSplitNameService("some-name", "1")));
+
+    XmlProtoElementBuilder activityToReplace = XmlProtoElementBuilder.create("activity");
+    activityToReplace
+        .getOrCreateAndroidAttribute(THEME_ATTRIBUTE_NAME, THEME_RESOURCE_ID)
+        .setValueAsRefId(123);
+    activityToReplace
+        .getOrCreateAndroidAttribute(NAME_ATTRIBUTE_NAME, NAME_RESOURCE_ID)
+        .setValueAsString("activity");
+
+    XmlProtoElementBuilder activityToAdd = XmlProtoElementBuilder.create("activity");
+    activityToAdd
+        .getOrCreateAndroidAttribute(NAME_ATTRIBUTE_NAME, NAME_RESOURCE_ID)
+        .setValueAsString("some-name");
+
+    AndroidManifest replacedActivities =
+        manifest
+            .toEditor()
+            .addOrReplaceActivities(
+                ImmutableMap.of(
+                    "activity", activityToReplace.build(), "some-name", activityToAdd.build()))
+            .save();
+
+    Map<String, XmlProtoElement> activities = replacedActivities.getActivitiesByName();
+    assertThat(activities.keySet()).containsExactly("main", "activity", "some-name");
+    assertThat(activities.get("activity")).isEqualTo(activityToReplace.build());
+    assertThat(activities.get("some-name")).isEqualTo(activityToAdd.build());
+    assertThat(
+            replacedActivities
+                .getManifestElement()
+                .getChildElement(APPLICATION_ELEMENT_NAME)
+                .getChildrenElements(SERVICE_ELEMENT_NAME))
+        .hasSize(1);
   }
 
   private static void assertOnlyMetadataElement(

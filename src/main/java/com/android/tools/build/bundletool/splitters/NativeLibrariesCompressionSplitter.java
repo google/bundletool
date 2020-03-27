@@ -134,9 +134,10 @@ public final class NativeLibrariesCompressionSplitter implements ModuleSplitSpli
 
     return ImmutableList.<ModuleEntry>builder()
         .addAll(
-            libraryEntries
-                .stream()
-                .map(moduleEntry -> moduleEntry.setCompression(shouldCompress))
+            libraryEntries.stream()
+                .map(
+                    moduleEntry ->
+                        moduleEntry.toBuilder().setShouldCompress(shouldCompress).build())
                 .collect(toImmutableList()))
         .addAll(nonLibraryEntries)
         .build();

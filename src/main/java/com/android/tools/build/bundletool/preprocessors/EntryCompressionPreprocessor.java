@@ -54,9 +54,9 @@ public class EntryCompressionPreprocessor implements AppBundlePreprocessor {
               module.getEntries().stream()
                   .map(
                       entry ->
-                          entry.getPath().startsWith(ASSETS_DIRECTORY)
-                              ? entry.setCompression(false)
-                              : entry)
+                          entry.toBuilder()
+                              .setShouldCompress(!entry.getPath().startsWith(ASSETS_DIRECTORY))
+                              .build())
                   .collect(toImmutableList()))
           .build();
     }

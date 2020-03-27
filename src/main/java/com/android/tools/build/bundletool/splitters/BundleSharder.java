@@ -72,7 +72,7 @@ public class BundleSharder {
       Version bundleVersion,
       BundleSharderConfiguration bundleSharderConfiguration) {
     this.bundleVersion = bundleVersion;
-    this.merger = new ModuleSplitsToShardMerger(new D8DexMerger(), globalTempDir);
+    this.merger = new ModuleSplitsToShardMerger(new D8DexMerger(), bundleVersion, globalTempDir);
     this.bundleSharderConfiguration = bundleSharderConfiguration;
   }
 
@@ -182,6 +182,8 @@ public class BundleSharder {
 
     ImmutableList<ModuleSplit> unmergedSplits = rawSplits.build();
 
+    // Apply optional suffix stripping for dimensions
+    unmergedSplits = applySuffixStripping(unmergedSplits);
 
     // Merge splits with the same targeting and make a single master split.
     ImmutableList<ModuleSplit> mergedSplits = new SameTargetingMerger().merge(unmergedSplits);

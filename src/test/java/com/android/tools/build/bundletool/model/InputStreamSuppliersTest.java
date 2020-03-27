@@ -16,72 +16,89 @@
 
 package com.android.tools.build.bundletool.model;
 
+import static com.android.tools.build.bundletool.testing.TestUtils.toByteArray;
 import static com.google.common.truth.Truth.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.MockitoAnnotations.initMocks;
 
-import com.android.tools.build.bundletool.testing.TestUtils;
-import java.io.UncheckedIOException;
 import java.nio.file.Files;
+import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipFile;
+import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
+import org.mockito.Mock;
 
 @RunWith(JUnit4.class)
-public class FileSystemModuleEntryTest {
+public class InputStreamSuppliersTest {
 
   @Rule public TemporaryFolder tmp = new TemporaryFolder();
 
+  @Before
+  public void setUp() {
+    initMocks(this);
+  }
+
   @Test
-  public void ofFile_existingFile_ok() throws Exception {
+  public void fromFile_existingFile_ok() throws Exception {
     byte[] fileData = {'h', 'e', 'l', 'l', 'o'};
     Path filePath = tmp.newFile("file.txt").toPath();
     Files.write(filePath, fileData);
 
-    FileSystemModuleEntry entry =
-        FileSystemModuleEntry.ofFile(ZipPath.create("assets/file.txt"), filePath);
+    InputStreamSupplier inputStreamSupplier = InputStreamSuppliers.fromFile(filePath);
 
-    assertThat(entry.getPath()).isEqualTo(ZipPath.create("assets/file.txt"));
-    assertThat(entry.isDirectory()).isFalse();
-    assertThat(TestUtils.getEntryContent(entry)).isEqualTo(fileData);
+    assertThat(toByteArray(inputStreamSupplier::get)).isEqualTo(fileData);
   }
 
   @Test
-  public void ofFile_nonExistingFile_throws() throws Exception {
+  public void fromFile_nonExistingFile_throws() throws Exception {
     Path nonExistentFile = tmp.getRoot().toPath().resolve("imaginary.txt");
 
     IllegalArgumentException exception =
         assertThrows(
-            IllegalArgumentException.class,
-            () -> FileSystemModuleEntry.ofFile(ZipPath.create("assets/file.txt"), nonExistentFile));
+            IllegalArgumentException.class, () -> InputStreamSuppliers.fromFile(nonExistentFile));
 
     assertThat(exception).hasMessageThat().contains("be an existing regular file");
   }
 
   @Test
-  public void ofFile_directory_throws() throws Exception {
+  public void fromFile_directory_throws() throws Exception {
     Path directory = tmp.getRoot().toPath();
 
     IllegalArgumentException exception =
         assertThrows(
-            IllegalArgumentException.class,
-            () -> FileSystemModuleEntry.ofFile(ZipPath.create("assets/file.txt"), directory));
+            IllegalArgumentException.class, () -> InputStreamSuppliers.fromFile(directory));
 
     assertThat(exception).hasMessageThat().contains("be an existing regular file");
   }
 
   @Test
-  public void getContent_fileDeleted_throws() throws Exception {
+  public void fromFile_fileDeleted_throws() throws Exception {
     Path filePath = tmp.newFile("file.txt").toPath();
 
-    FileSystemModuleEntry entry =
-        FileSystemModuleEntry.ofFile(ZipPath.create("assets/file.txt"), filePath);
+    InputStreamSupplier inputStreamSupplier = InputStreamSuppliers.fromFile(filePath);
     Files.delete(filePath);
-    UncheckedIOException exception =
-        assertThrows(UncheckedIOException.class, () -> entry.getContent());
+    assertThrows(NoSuchFileException.class, inputStreamSupplier::get);
+  }
 
-    assertThat(exception).hasMessageThat().contains("Error while reading file");
+  @Test
+  public void fromBytes() throws Exception {
+    final byte[] content = {1, 34, 123};
+    InputStreamSupplier inputStreamSupplier = InputStreamSuppliers.fromBytes(content);
+    assertThat(toByteArray(inputStreamSupplier::get)).isEqualTo(content);
+  }
+
+  @Mock ZipFile zipFile;
+
+  @Test
+  public void fromZipEntry_pathTooShort_throws() {
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> InputStreamSuppliers.fromZipEntry(new ZipEntry(""), zipFile));
   }
 }

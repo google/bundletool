@@ -61,7 +61,14 @@ public enum VersionGuardedFeature {
    * scheme was introduced in Android N. This reduces the size of apps by removing a few files under
    * META-INF.
    */
-  NO_V1_SIGNING_WHEN_POSSIBLE("0.11.0");
+  NO_V1_SIGNING_WHEN_POSSIBLE("0.11.0"),
+
+  /**
+   * Fuse activities from feature module AndroinManifest instead of relying on activities that are
+   * merged from features to base module by Gradle plugin
+   * (https://github.com/google/bundletool/issues/68).
+   */
+  FUSE_ACTIVITIES_FROM_FEATURE_MANIFESTS("0.13.4");
 
   /** Version from which the given feature should be enabled by default. */
   private final Version enabledSinceVersion;
