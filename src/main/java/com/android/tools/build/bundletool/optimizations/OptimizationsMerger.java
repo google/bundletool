@@ -80,7 +80,7 @@ public final class OptimizationsMerger {
     // Until we get rid of OptimizationsOverride flag, it takes precedence over anything else.
     ImmutableSet<OptimizationDimension> splitDimensions =
         getEffectiveSplitDimensions(
-            defaultOptimizations, requestedOptimizations, optimizationsOverride);
+            defaultOptimizations, requestedOptimizations, ImmutableSet.of());
 
     ImmutableSet<OptimizationDimension> standaloneDimensions =
         getEffectiveStandaloneDimensions(

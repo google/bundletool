@@ -103,7 +103,7 @@ public abstract class BuildApksCommand {
   private static final Flag<Path> OUTPUT_FILE_FLAG = Flag.path("output");
   private static final Flag<Boolean> OVERWRITE_OUTPUT_FLAG = Flag.booleanFlag("overwrite");
   private static final Flag<ImmutableSet<OptimizationDimension>> OPTIMIZE_FOR_FLAG =
-      Flag.enumSet("optimize-for", OptimizationDimension.class);
+      Flag.enumSet("standalone-dim", OptimizationDimension.class);
   private static final Flag<Path> AAPT2_PATH_FLAG = Flag.path("aapt2");
   private static final Flag<Integer> MAX_THREADS_FLAG = Flag.positiveInteger("max-threads");
   private static final Flag<ApkBuildMode> BUILD_MODE_FLAG =
