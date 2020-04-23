@@ -19,7 +19,9 @@ package com.android.tools.build.bundletool.device;
 import com.android.ddmlib.AdbCommandRejectedException;
 import com.android.ddmlib.IDevice.DeviceState;
 import com.android.ddmlib.IShellOutputReceiver;
+import com.android.ddmlib.InstallException;
 import com.android.ddmlib.ShellCommandUnresponsiveException;
+import com.android.ddmlib.SyncException;
 import com.android.ddmlib.TimeoutException;
 import com.android.sdklib.AndroidVersion;
 import com.google.auto.value.AutoValue;
@@ -64,6 +66,11 @@ public abstract class Device {
   public abstract void installApks(ImmutableList<Path> apks, InstallOptions installOptions);
 
   public abstract void pushApks(ImmutableList<Path> apks, PushOptions installOptions);
+
+  public abstract Path syncPackageToDevice(Path localFilePath)
+      throws TimeoutException, AdbCommandRejectedException, SyncException, IOException;
+
+  public abstract void removeRemotePackage(Path remoteFilePath) throws InstallException;
 
   /** Options related to APK installation. */
   @Immutable

@@ -16,7 +16,6 @@
 
 package com.android.tools.build.bundletool.size;
 
-import static com.android.tools.build.bundletool.model.utils.ZipUtils.calculateGZipSizeForEntries;
 import static com.android.tools.build.bundletool.size.SizeUtils.addSizes;
 import static com.android.tools.build.bundletool.size.SizeUtils.sizes;
 import static com.android.tools.build.bundletool.size.SizeUtils.subtractSizes;
@@ -26,11 +25,13 @@ import static com.google.common.collect.ImmutableMap.toImmutableMap;
 import com.android.bundle.SizesOuterClass.Breakdown;
 import com.android.bundle.SizesOuterClass.Sizes;
 import com.android.tools.build.bundletool.model.InputStreamSupplier;
+import com.android.tools.build.bundletool.model.InputStreamSuppliers;
 import com.android.tools.build.bundletool.model.utils.ZipUtils;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Streams;
 import java.io.BufferedInputStream;
+import java.io.Closeable;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -39,11 +40,17 @@ import java.nio.file.Path;
 import java.util.AbstractMap;
 import java.util.Map;
 import java.util.stream.Collectors;
+import java.util.zip.Deflater;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 
 /** Calculates a breakdown of a single APK. */
 public class ApkBreakdownGenerator {
+
+  // Each time we add an entry to the deflater a syncronization entry is added.
+  // This would not be present when we acually compress the APK for serving, it's just an artifact
+  // of flushing after each file.
+  static final int DEFLATER_SYNC_OVERHEAD_BYTES = 5;
 
   public static Breakdown calculateBreakdown(Path apkPath) throws IOException {
     try (ZipFile apk = new ZipFile(apkPath.toFile())) {
@@ -110,9 +117,7 @@ public class ApkBreakdownGenerator {
 
     ImmutableList<InputStreamSupplier> streams =
         zipFile.stream()
-            .map(
-                zipStreamEntry ->
-                    (InputStreamSupplier) () -> zipFile.getInputStream(zipStreamEntry))
+            .map(zipStreamEntry -> InputStreamSuppliers.fromZipEntry(zipStreamEntry, zipFile))
             .collect(toImmutableList());
 
     ImmutableList<Long> downloadSizes = calculateGZipSizeForEntries(streams);
@@ -121,4 +126,50 @@ public class ApkBreakdownGenerator {
         .collect(
             toImmutableMap(entry -> entry.getKey().getName(), AbstractMap.SimpleEntry::getValue));
   }
+
+  /**
+   * Given a list of {@link InputStreamSupplier} passes those streams through a {@link
+   * GZIPOutputStream} and computes the GZIP size increments attributed to each stream.
+   */
+  public static ImmutableList<Long> calculateGZipSizeForEntries(
+      ImmutableList<InputStreamSupplier> streams) throws IOException {
+    ImmutableList.Builder<Long> gzipSizeIncrements = ImmutableList.builder();
+
+    Deflater deflater = new Deflater(Deflater.DEFAULT_COMPRESSION, /* noWrap */ true);
+
+    try (Closeable unused = () -> deflater.end()) {
+      // matches the {@code ByteStreams} buffer size
+      byte[] inputBuffer = new byte[8192];
+
+      // Worse case overestimate for the max size deflation should result it.
+      // (most of the time deflation should result in a smaller output, but there are cases
+      // where it can be larger).
+      byte[] outputBuffer = new byte[2 * inputBuffer.length];
+
+      for (InputStreamSupplier stream : streams) {
+        try (InputStream is = stream.get()) {
+          long gzipSize = 0;
+          while (true) {
+            int r = is.read(inputBuffer);
+            if (r == -1) {
+              // We need to use syncFlush which is slower but allows us to accurately count GZIP
+              // bytes. See {@link Deflater#SYNC_FLUSH}. Sync-flush flushes all deflater's pending
+              // output upon calling flush().
+              gzipSize +=
+                  deflater.deflate(outputBuffer, 0, outputBuffer.length, Deflater.SYNC_FLUSH);
+              gzipSizeIncrements.add(Math.max(0, gzipSize - DEFLATER_SYNC_OVERHEAD_BYTES));
+              break;
+            }
+            deflater.setInput(inputBuffer, 0, r);
+            while (!deflater.needsInput()) {
+              gzipSize += deflater.deflate(outputBuffer, 0, outputBuffer.length, Deflater.NO_FLUSH);
+            }
+          }
+        }
+      }
+    }
+    return gzipSizeIncrements.build();
+  }
+
+  private ApkBreakdownGenerator() {}
 }

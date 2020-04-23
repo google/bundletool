@@ -22,5 +22,9 @@ message DeviceSpec {
   // Screen dpi.
   uint32 screen_density = 5;
 
+  // getprop ro.build.version.sdk
   uint32 sdk_version = 6;
+
+  // getprop ro.build.version.codename
+  string codename = 7;
 }

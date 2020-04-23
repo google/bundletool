@@ -43,6 +43,7 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMultimap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Sets;
+import java.util.Collection;
 import java.util.HashSet;
 import java.util.Optional;
 import java.util.Set;
@@ -121,7 +122,8 @@ public class ApkMatcher {
                 matchingVariant.get(), Version.of(buildApksResult.getBundletool().getVersion()))
             : ImmutableList.of();
 
-    ImmutableList<ZipPath> assetModuleApks = getMatchingApksFromAssetModules(buildApksResult);
+    ImmutableList<ZipPath> assetModuleApks =
+        getMatchingApksFromAssetModules(buildApksResult.getAssetSliceSetList());
 
     return ImmutableList.<ZipPath>builder().addAll(variantApks).addAll(assetModuleApks).build();
   }
@@ -278,12 +280,13 @@ public class ApkMatcher {
     matcher.checkDeviceCompatible(matcher.getTargetingValue(apkTargeting));
   }
 
-  private ImmutableList<ZipPath> getMatchingApksFromAssetModules(BuildApksResult buildApksResult) {
+  public ImmutableList<ZipPath> getMatchingApksFromAssetModules(
+      Collection<AssetSliceSet> assetModules) {
     ImmutableList.Builder<ZipPath> matchedApksBuilder = ImmutableList.builder();
 
-    Predicate<String> assetModuleNameMatcher = getAssetModuleNameMatcher(buildApksResult);
+    Predicate<String> assetModuleNameMatcher = getAssetModuleNameMatcher(assetModules);
 
-    for (AssetSliceSet sliceSet : buildApksResult.getAssetSliceSetList()) {
+    for (AssetSliceSet sliceSet : assetModules) {
       String moduleName = sliceSet.getAssetModuleMetadata().getName();
       for (ApkDescription apkDescription : sliceSet.getApkDescriptionList()) {
         ApkTargeting apkTargeting = apkDescription.getTargeting();
@@ -296,13 +299,13 @@ public class ApkMatcher {
     return matchedApksBuilder.build();
   }
 
-  private Predicate<String> getAssetModuleNameMatcher(BuildApksResult buildApksResult) {
+  private Predicate<String> getAssetModuleNameMatcher(Collection<AssetSliceSet> assetModules) {
     if (requestedModuleNames.isPresent()) {
       return requestedModuleNames.get()::contains;
     }
 
     ImmutableSet<String> upfrontAssetModuleNames =
-        buildApksResult.getAssetSliceSetList().stream()
+        assetModules.stream()
             .filter(
                 sliceSet ->
                     sliceSet

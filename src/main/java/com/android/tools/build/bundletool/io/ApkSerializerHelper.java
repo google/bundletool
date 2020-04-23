@@ -21,6 +21,7 @@ import static com.android.tools.build.bundletool.model.BundleModule.BUILD_INFO_S
 import static com.android.tools.build.bundletool.model.BundleModule.DEX_DIRECTORY;
 import static com.android.tools.build.bundletool.model.BundleModule.MANIFEST_FILENAME;
 import static com.android.tools.build.bundletool.model.BundleModule.ROOT_DIRECTORY;
+import static com.android.tools.build.bundletool.model.utils.files.BufferedIo.inputStream;
 import static com.android.tools.build.bundletool.model.utils.files.FilePreconditions.checkFileDoesNotExist;
 import static com.android.tools.build.bundletool.model.utils.files.FilePreconditions.checkFileHasExtension;
 import static com.android.tools.build.bundletool.model.utils.files.FileUtils.createParentDirectories;
@@ -261,11 +262,10 @@ final class ApkSerializerHelper {
               /* uncompressNativeLibs= */ !extractNativeLibs,
               /* entryShouldCompress= */ entry.getShouldCompress());
       if (signingConfig.isPresent()
-          && wear1ApkPath.isPresent()
-          && wear1ApkPath.get().equals(pathInApk)) {
-        // Sign the Wear 1.x embedded APK if there is one.
-        Path signedWearApk = signWearApk(entry, signingConfig.get(), tempDir);
-        zipBuilder.addFileFromDisk(pathInApk, signedWearApk.toFile(), entryOptions);
+          && (entry.getShouldSign() || wear1ApkPath.map(pathInApk::equals).orElse(false))) {
+        // Sign the embedded APK
+        Path signedApk = signEmbeddedApk(entry, signingConfig.get(), tempDir);
+        zipBuilder.addFileFromDisk(pathInApk, signedApk.toFile(), entryOptions);
       } else {
         zipBuilder.addFile(pathInApk, entry.getContentSupplier(), entryOptions);
       }
@@ -335,13 +335,28 @@ final class ApkSerializerHelper {
     for (ModuleEntry entry : split.getEntries()) {
       ZipPath pathInApk = toApkEntryPath(entry.getPath());
       if (!FILES_FOR_AAPT2.apply(pathInApk)) {
-        try (InputStream entryInputStream = entry.getContent()) {
-          zFile.add(
-              pathInApk.toString(),
-              entryInputStream,
-              shouldCompress(pathInApk, !extractNativeLibs, entry.getShouldCompress()));
+        boolean shouldCompress =
+            shouldCompress(pathInApk, !extractNativeLibs, entry.getShouldCompress());
+        if (signingConfig.isPresent() && entry.getShouldSign()) {
+          // Unlike ZipBuilder, ZFile copies the source stream immediately
+          try (TempDirectory signingDir = new TempDirectory()) {
+            // Sign the embedded APK
+            Path signedApk = signEmbeddedApk(entry, signingConfig.get(), signingDir.getPath());
+            try (InputStream inputStream = inputStream(signedApk)) {
+              zFile.add(pathInApk.toString(), inputStream, shouldCompress);
+            }
+          }
+        } else {
+          addFile(zFile, pathInApk, entry, shouldCompress);
         }
       }
+    }
+  }
+
+  void addFile(ZFile zFile, ZipPath pathInApk, ModuleEntry entry, boolean shouldCompress)
+      throws IOException {
+    try (InputStream entryInputStream = entry.getContent()) {
+      zFile.add(pathInApk.toString(), entryInputStream, shouldCompress);
     }
   }
 
@@ -388,13 +403,14 @@ final class ApkSerializerHelper {
   }
 
   /**
-   * Signs the Wear APK.
+   * Signs an embedded APK.
    *
-   * @return the Path on disk to the signed APK.
+   * @return the Path on disk to the signed APK (guaranteed to be unique under {@code tempDir}).
    */
-  private static Path signWearApk(
-      ModuleEntry wearApkEntry, SigningConfiguration signingConfig, Path tempDir) {
-    try {
+  private static Path signEmbeddedApk(
+      ModuleEntry apkEntry, SigningConfiguration signingConfig, Path tempDir) {
+    ZipPath targetPath = apkEntry.getPath();
+    try (TempDirectory unsignedDir = new TempDirectory()) {
       SignerConfig signerConfig =
           new SignerConfig.Builder(
                   SIGNER_CONFIG_NAME,
@@ -403,29 +419,31 @@ final class ApkSerializerHelper {
               .build();
 
       // Input
-      Path unsignedApk = tempDir.resolve("wear-unsigned.apk");
-      try (InputStream entryContent = wearApkEntry.getContent()) {
+      Path unsignedApk = unsignedDir.getPath().resolve("unsigned.apk");
+      try (InputStream entryContent = apkEntry.getContent()) {
         Files.copy(entryContent, unsignedApk);
       }
 
       // Output
-      Path signedApk = tempDir.resolve("wear-signed.apk");
-
+      Path signedApk = Files.createTempDirectory(tempDir, "signing-").resolve("signed.apk");
       ApkSigner apkSigner =
           new ApkSigner.Builder(ImmutableList.of(signerConfig))
               .setInputApk(unsignedApk.toFile())
               .setOutputApk(signedApk.toFile())
               .build();
       apkSigner.sign();
-
       return signedApk;
     } catch (ApkFormatException
         | NoSuchAlgorithmException
         | InvalidKeyException
         | SignatureException e) {
-      throw new ValidationException("Unable to sign the embedded Wear APK.", e);
+      throw ValidationException.builder()
+          .withCause(e)
+          .withMessage("Unable to sign the embedded APK '%s'.", targetPath)
+          .build();
     } catch (IOException e) {
-      throw new UncheckedIOException("Unable to sign the embedded Wear APK.", e);
+      throw new UncheckedIOException(
+          String.format("Unable to sign the embedded APK '%s'.", targetPath), e);
     }
   }
 
@@ -462,7 +480,7 @@ final class ApkSerializerHelper {
         | NoSuchAlgorithmException
         | InvalidKeyException
         | SignatureException e) {
-      throw new ValidationException("Unable to sign APK.", e);
+      throw ValidationException.builder().withCause(e).withMessage("Unable to sign APK.").build();
     }
   }
 }

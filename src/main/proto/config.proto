@@ -11,6 +11,8 @@ message BundleConfig {
   // Resources to be always kept in the master split.
   MasterResources master_resources = 4;
   ApexConfig apex_config = 5;
+  // APKs to be signed with the same key as generated APKs.
+  repeated UnsignedEmbeddedApkConfig unsigned_embedded_apk_config = 6;
 }
 
 message Bundletool {
@@ -125,4 +127,10 @@ message ApexEmbeddedApkConfig {
 
   // Path to the APK within the APEX system image.
   string path = 2;
+}
+
+message UnsignedEmbeddedApkConfig {
+  // Path to the APK inside the module (e.g. if the path inside the bundle
+  // is split/assets/example.apk, this will be assets/example.apk).
+  string path = 1;
 }

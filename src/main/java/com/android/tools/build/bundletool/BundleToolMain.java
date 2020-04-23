@@ -23,6 +23,7 @@ import com.android.tools.build.bundletool.commands.ExtractApksCommand;
 import com.android.tools.build.bundletool.commands.GetDeviceSpecCommand;
 import com.android.tools.build.bundletool.commands.GetSizeCommand;
 import com.android.tools.build.bundletool.commands.InstallApksCommand;
+import com.android.tools.build.bundletool.commands.InstallMultiApksCommand;
 import com.android.tools.build.bundletool.commands.ValidateBundleCommand;
 import com.android.tools.build.bundletool.commands.VersionCommand;
 import com.android.tools.build.bundletool.device.AdbServer;
@@ -88,6 +89,11 @@ public class BundleToolMain {
             InstallApksCommand.fromFlags(flags, adbServer).execute();
           }
           break;
+        case InstallMultiApksCommand.COMMAND_NAME:
+          try (AdbServer adbServer = DdmlibAdbServer.getInstance()) {
+            InstallMultiApksCommand.fromFlags(flags, adbServer).execute();
+          }
+          break;
         case ValidateBundleCommand.COMMAND_NAME:
           ValidateBundleCommand.fromFlags(flags).execute();
           break;
@@ -134,6 +140,7 @@ public class BundleToolMain {
             ExtractApksCommand.help(),
             GetDeviceSpecCommand.help(),
             InstallApksCommand.help(),
+            InstallMultiApksCommand.help(),
             ValidateBundleCommand.help(),
             DumpCommand.help(),
             GetSizeCommand.help(),
@@ -164,6 +171,9 @@ public class BundleToolMain {
         break;
       case InstallApksCommand.COMMAND_NAME:
         commandHelp = InstallApksCommand.help();
+        break;
+      case InstallMultiApksCommand.COMMAND_NAME:
+        commandHelp = InstallMultiApksCommand.help();
         break;
       case ValidateBundleCommand.COMMAND_NAME:
         commandHelp = ValidateBundleCommand.help();

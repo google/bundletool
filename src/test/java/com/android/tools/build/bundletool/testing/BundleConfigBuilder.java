@@ -20,6 +20,7 @@ import com.android.bundle.Config.BundleConfig;
 import com.android.bundle.Config.Bundletool;
 import com.android.bundle.Config.SplitDimension;
 import com.android.bundle.Config.SuffixStripping;
+import com.android.bundle.Config.UnsignedEmbeddedApkConfig;
 import com.android.tools.build.bundletool.model.version.BundleToolVersion;
 
 /** Helper to create {@link BundleConfig} instances in tests. */
@@ -105,6 +106,11 @@ public class BundleConfigBuilder {
         .getOptimizationsBuilder()
         .getStandaloneConfigBuilder()
         .addSplitDimension(standaloneDimension);
+    return this;
+  }
+
+  public BundleConfigBuilder addUnsignedEmbeddedApkConfig(String path) {
+    builder.addUnsignedEmbeddedApkConfig(UnsignedEmbeddedApkConfig.newBuilder().setPath(path));
     return this;
   }
 

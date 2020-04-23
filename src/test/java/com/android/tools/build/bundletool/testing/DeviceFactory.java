@@ -31,9 +31,24 @@ import java.util.Arrays;
 /** Factory to create {@link DeviceSpec} instances. */
 public final class DeviceFactory {
 
-  public static DeviceSpec deviceWithSdk(int sdkVersion) {
+  public static DeviceSpec deviceWithSdkAndCodename(int sdkVersion, String codename) {
     return mergeSpecs(
-        sdkVersion(sdkVersion), abis("arm64-v8a"), density(DensityAlias.MDPI), locales("en-US"));
+        sdkVersion(sdkVersion, codename),
+        abis("arm64-v8a"),
+        density(DensityAlias.MDPI),
+        locales("en-US"));
+  }
+
+  public static DeviceSpec deviceWithSdk(int sdkVersion) {
+    return deviceWithSdkAndCodename(sdkVersion, "REL");
+  }
+
+  public static DeviceSpec qDeviceWithLocales(String... locales) {
+    return mergeSpecs(
+        sdkVersion(Versions.ANDROID_Q_API_VERSION),
+        abis("arm64-v8a"),
+        density(DensityAlias.MDPI),
+        locales(locales));
   }
 
   public static DeviceSpec lDeviceWithLocales(String... locales) {
@@ -104,6 +119,10 @@ public final class DeviceFactory {
 
   public static DeviceSpec sdkVersion(int sdkVersion) {
     return DeviceSpec.newBuilder().setSdkVersion(sdkVersion).build();
+  }
+
+  public static DeviceSpec sdkVersion(int sdkVersion, String codename) {
+    return DeviceSpec.newBuilder().setSdkVersion(sdkVersion).setCodename(codename).build();
   }
 
   public static DeviceSpec deviceFeatures(String... features) {

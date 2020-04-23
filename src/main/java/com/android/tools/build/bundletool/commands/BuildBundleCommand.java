@@ -316,9 +316,7 @@ public abstract class BuildBundleCommand {
     }
 
     return Optional.of(
-        new TargetingGenerator()
-            .generateTargetingForApexImages(
-                module.getBundleConfig().getApexConfig(), apexImageFiles, hasBuildInfo));
+        new TargetingGenerator().generateTargetingForApexImages(apexImageFiles, hasBuildInfo));
   }
 
   private static BundleConfig parseBundleConfigJson(Path bundleConfigJsonPath) {

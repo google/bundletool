@@ -19,17 +19,21 @@ package com.android.tools.build.bundletool.commands;
 import static com.android.tools.build.bundletool.commands.GetSizeCommand.GetSizeSubcommand.STRING_TO_SUBCOMMAND;
 import static com.android.tools.build.bundletool.commands.GetSizeCommand.GetSizeSubcommand.TOTAL;
 import static com.android.tools.build.bundletool.model.utils.ApkSizeUtils.getCompressedSizeByApkPaths;
+import static com.android.tools.build.bundletool.model.utils.ApkSizeUtils.getVariantCompressedSizeByApkPaths;
 import static com.android.tools.build.bundletool.model.utils.CollectorUtils.combineMaps;
 import static com.android.tools.build.bundletool.model.utils.GetSizeCsvUtils.getSizeTotalOutputInCsv;
 import static com.android.tools.build.bundletool.model.utils.files.FilePreconditions.checkFileExistsAndReadable;
+import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.ImmutableMap.toImmutableMap;
 import static java.util.function.Function.identity;
 
+import com.android.bundle.Commands.ApkDescription;
 import com.android.bundle.Commands.BuildApksResult;
 import com.android.bundle.Commands.Variant;
 import com.android.bundle.Devices.DeviceSpec;
 import com.android.tools.build.bundletool.commands.CommandHelp.CommandDescription;
 import com.android.tools.build.bundletool.commands.CommandHelp.FlagDescription;
+import com.android.tools.build.bundletool.device.AssetModuleSizeAggregator;
 import com.android.tools.build.bundletool.device.DeviceSpecParser;
 import com.android.tools.build.bundletool.device.VariantMatcher;
 import com.android.tools.build.bundletool.device.VariantTotalSizeAggregator;
@@ -40,6 +44,7 @@ import com.android.tools.build.bundletool.model.GetSizeRequest;
 import com.android.tools.build.bundletool.model.GetSizeRequest.Dimension;
 import com.android.tools.build.bundletool.model.SizeConfiguration;
 import com.android.tools.build.bundletool.model.exceptions.ValidationException;
+import com.android.tools.build.bundletool.model.utils.ConfigurationSizesMerger;
 import com.android.tools.build.bundletool.model.utils.ResultUtils;
 import com.android.tools.build.bundletool.model.utils.files.FilePreconditions;
 import com.android.tools.build.bundletool.model.version.Version;
@@ -220,20 +225,37 @@ public abstract class GetSizeCommand implements GetSizeRequest {
 
     ImmutableList<Variant> variants =
         new VariantMatcher(getDeviceSpec(), getInstant()).getAllMatchingVariants(buildApksResult);
-    ImmutableMap<String, Long> compressedSizeByApkPaths =
-        getCompressedSizeByApkPaths(variants, getApksArchivePath());
+    ImmutableMap<String, Long> variantCompressedSizeByApkPaths =
+        getVariantCompressedSizeByApkPaths(variants, getApksArchivePath());
+
+    ImmutableList<String> assetModuleApks =
+        buildApksResult.getAssetSliceSetList().stream()
+            .flatMap(module -> module.getApkDescriptionList().stream())
+            .map(ApkDescription::getPath)
+            .collect(toImmutableList());
+    ImmutableMap<String, Long> assetModuleCompressedSizeByApkPaths =
+        getCompressedSizeByApkPaths(assetModuleApks, getApksArchivePath());
 
     ImmutableMap<SizeConfiguration, Long> minSizeConfigurationMap = ImmutableMap.of();
     ImmutableMap<SizeConfiguration, Long> maxSizeConfigurationMap = ImmutableMap.of();
 
     for (Variant variant : variants) {
-      ConfigurationSizes configurationSizes =
+      ConfigurationSizes variantConfigurationSizes =
           new VariantTotalSizeAggregator(
-                  compressedSizeByApkPaths,
+                  variantCompressedSizeByApkPaths,
                   Version.of(buildApksResult.getBundletool().getVersion()),
                   variant,
                   this)
               .getSize();
+      ConfigurationSizes assetModuleConfigurationSizes =
+          new AssetModuleSizeAggregator(
+                  buildApksResult.getAssetSliceSetList(),
+                  variant.getTargeting(),
+                  assetModuleCompressedSizeByApkPaths,
+                  this)
+              .getSize();
+      ConfigurationSizes configurationSizes =
+          ConfigurationSizesMerger.merge(variantConfigurationSizes, assetModuleConfigurationSizes);
       minSizeConfigurationMap =
           combineMaps(
               minSizeConfigurationMap, configurationSizes.getMinSizeConfigurationMap(), Math::min);

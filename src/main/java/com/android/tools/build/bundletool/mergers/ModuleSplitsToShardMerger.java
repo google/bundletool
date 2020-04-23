@@ -311,7 +311,10 @@ public class ModuleSplitsToShardMerger {
             /* mergedSplitType= */ SplitType.STANDALONE);
 
     // Add the APEX config as it's used to identify APEX APKs.
-    return shard.toBuilder().setApexConfig(splitsOfShard.get(0).getApexConfig().get()).build();
+    return shard.toBuilder()
+        .setApexConfig(splitsOfShard.get(0).getApexConfig().get())
+        .setApexEmbeddedApkConfigs(splitsOfShard.get(0).getApexEmbeddedApkConfigs())
+        .build();
   }
 
   private ModuleSplit buildShard(

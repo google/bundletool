@@ -261,7 +261,8 @@ public class BundleSharder {
           new ScreenDensityResourcesSplitter(
               bundleVersion,
               /* pinWholeResourceToMaster= */ Predicates.alwaysFalse(),
-              /* pinLowestBucketOfResourceToMaster= */ Predicates.alwaysFalse()));
+              /* pinLowestBucketOfResourceToMaster= */ Predicates.alwaysFalse(),
+              /* pinLowestBucketOfStylesToMaster= */ false));
     }
 
     if (shardingDimensions.contains(OptimizationDimension.LANGUAGE)

@@ -21,7 +21,6 @@ import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 
-import com.android.bundle.Config.ApexConfig;
 import com.android.bundle.Files.ApexImages;
 import com.android.bundle.Files.Assets;
 import com.android.bundle.Files.NativeLibraries;
@@ -209,13 +208,11 @@ public class TargetingGenerator {
    * @return Targeting for all APEX image files.
    */
   public ApexImages generateTargetingForApexImages(
-      ApexConfig apexConfig, Collection<ZipPath> apexImageFiles, boolean hasBuildInfo) {
+      Collection<ZipPath> apexImageFiles, boolean hasBuildInfo) {
     ImmutableMap<ZipPath, MultiAbi> targetingByPath =
         Maps.toMap(apexImageFiles, path -> buildMultiAbi(path.getFileName().toString()));
 
-    ApexImages.Builder apexImages =
-        ApexImages.newBuilder()
-            .addAllApexEmbeddedApkConfig(apexConfig.getApexEmbeddedApkConfigList());
+    ApexImages.Builder apexImages = ApexImages.newBuilder();
     ImmutableSet<MultiAbi> allTargeting = ImmutableSet.copyOf(targetingByPath.values());
     targetingByPath.forEach(
         (imagePath, targeting) ->

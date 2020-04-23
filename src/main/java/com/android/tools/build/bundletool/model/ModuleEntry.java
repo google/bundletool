@@ -17,6 +17,7 @@ package com.android.tools.build.bundletool.model;
 
 import com.android.tools.build.bundletool.model.utils.files.FileUtils;
 import com.google.auto.value.AutoValue;
+import com.google.common.io.ByteSource;
 import com.google.errorprone.annotations.Immutable;
 import com.google.errorprone.annotations.MustBeClosed;
 import java.io.IOException;
@@ -51,8 +52,15 @@ public abstract class ModuleEntry {
   /** Returns whether entry should be compressed in generated archives. */
   public abstract boolean getShouldCompress();
 
+  /** Returns whether entry is an embedded APK that should be signed by the output APK key. */
+  public abstract boolean getShouldSign();
+
   /** Returns data source for this entry. */
   public abstract InputStreamSupplier getContentSupplier();
+
+  public ByteSource asByteSource() {
+    return getContentSupplier().asByteSource();
+  }
 
   /** Checks whether the given entries are identical. */
   @Override
@@ -76,6 +84,10 @@ public abstract class ModuleEntry {
       return false;
     }
 
+    if (entry1.getShouldSign() != entry2.getShouldSign()) {
+      return false;
+    }
+
     try (InputStream inputStream1 = entry1.getContent();
         InputStream inputStream2 = entry2.getContent()) {
       return FileUtils.equalContent(inputStream1, inputStream2);
@@ -96,7 +108,7 @@ public abstract class ModuleEntry {
   public abstract Builder toBuilder();
 
   public static Builder builder() {
-    return new AutoValue_ModuleEntry.Builder().setShouldCompress(true);
+    return new AutoValue_ModuleEntry.Builder().setShouldCompress(true).setShouldSign(false);
   }
 
   /** Builder for {@code ModuleEntry}. */
@@ -105,6 +117,8 @@ public abstract class ModuleEntry {
     public abstract Builder setPath(ZipPath path);
 
     public abstract Builder setShouldCompress(boolean shouldCompress);
+
+    public abstract Builder setShouldSign(boolean shouldSign);
 
     /**
      * Sets the data source for this entry.

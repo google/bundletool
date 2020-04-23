@@ -16,6 +16,7 @@
 
 package com.android.tools.build.bundletool.commands;
 
+import static com.android.tools.build.bundletool.commands.CommandUtils.ANDROID_SERIAL_VARIABLE;
 import static com.android.tools.build.bundletool.model.utils.SdkToolsLocator.ANDROID_HOME_VARIABLE;
 import static com.android.tools.build.bundletool.model.utils.SdkToolsLocator.SYSTEM_PATH_VARIABLE;
 import static java.nio.charset.StandardCharsets.UTF_8;
@@ -27,10 +28,8 @@ import com.android.tools.build.bundletool.device.AdbServer;
 import com.android.tools.build.bundletool.device.DeviceAnalyzer;
 import com.android.tools.build.bundletool.flags.Flag;
 import com.android.tools.build.bundletool.flags.ParsedFlags;
-import com.android.tools.build.bundletool.model.exceptions.CommandExecutionException;
 import com.android.tools.build.bundletool.model.exceptions.ValidationException;
 import com.android.tools.build.bundletool.model.utils.DefaultSystemEnvironmentProvider;
-import com.android.tools.build.bundletool.model.utils.SdkToolsLocator;
 import com.android.tools.build.bundletool.model.utils.SystemEnvironmentProvider;
 import com.android.tools.build.bundletool.model.utils.files.FilePreconditions;
 import com.google.auto.value.AutoValue;
@@ -55,8 +54,6 @@ public abstract class GetDeviceSpecCommand {
   private static final Flag<String> DEVICE_ID_FLAG = Flag.string("device-id");
   private static final Flag<Path> OUTPUT_FLAG = Flag.path("output");
   private static final Flag<Boolean> OVERWRITE_OUTPUT_FLAG = Flag.booleanFlag("overwrite");
-
-  private static final String ANDROID_SERIAL_VARIABLE = "ANDROID_SERIAL";
 
   private static final SystemEnvironmentProvider DEFAULT_PROVIDER =
       new DefaultSystemEnvironmentProvider();
@@ -123,25 +120,11 @@ public abstract class GetDeviceSpecCommand {
     GetDeviceSpecCommand.Builder builder =
         builder().setAdbServer(adbServer).setOutputPath(OUTPUT_FLAG.getRequiredValue(flags));
 
-    Optional<String> deviceSerialName = DEVICE_ID_FLAG.getValue(flags);
-    if (!deviceSerialName.isPresent()) {
-      deviceSerialName = systemEnvironmentProvider.getVariable(ANDROID_SERIAL_VARIABLE);
-    }
+    Optional<String> deviceSerialName =
+        CommandUtils.getDeviceSerialName(flags, DEVICE_ID_FLAG, systemEnvironmentProvider);
     deviceSerialName.ifPresent(builder::setDeviceId);
 
-    Path adbPath =
-        ADB_PATH_FLAG
-            .getValue(flags)
-            .orElseGet(
-                () ->
-                    new SdkToolsLocator()
-                        .locateAdb(systemEnvironmentProvider)
-                        .orElseThrow(
-                            () ->
-                                new CommandExecutionException(
-                                    "Unable to determine the location of ADB. Please set the --adb "
-                                        + "flag or define ANDROID_HOME or PATH environment "
-                                        + "variable.")));
+    Path adbPath = CommandUtils.getAdbPath(flags, ADB_PATH_FLAG, systemEnvironmentProvider);
     builder.setAdbPath(adbPath);
 
     OVERWRITE_OUTPUT_FLAG.getValue(flags).ifPresent(builder::setOverwriteOutput);

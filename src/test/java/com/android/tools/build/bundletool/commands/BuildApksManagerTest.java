@@ -1412,10 +1412,9 @@ public class BuildApksManagerTest {
                 "base",
                 builder ->
                     builder
-                        .setManifest(androidManifest("com.test.app"))
-                        .setResourceTable(resourceTableWithTestLabel("Test feature")))
+                        .setManifest(androidManifest("com.test.app")))
             .addModule(
-                "feature_tcf_assets",
+                "tcf_assets",
                 builder ->
                     builder
                         .addFile("assets/textures#tcf_atc/texture.dat")
@@ -1430,9 +1429,8 @@ public class BuildApksManagerTest {
                                     assetsDirectoryTargeting(
                                         textureCompressionTargeting(ETC1_RGB8)))))
                         .setManifest(
-                            androidManifestForFeature(
-                                "com.test.app",
-                                withTitle("@string/test_label", TEST_LABEL_RESOURCE_ID))))
+                            androidManifestForAssetModule(
+                                "com.test.app", withInstallTimeDelivery())))
             .build();
     Path bundlePath = createAndStoreBundle(appBundle);
 
@@ -1454,7 +1452,7 @@ public class BuildApksManagerTest {
 
     ApkDescription universalApk = apkDescriptions(universalVariant).get(0);
 
-    // All assets from "feature_tcf_assets" are included inside the APK
+    // All assets from "tcf_assets" are included inside the APK
     File universalApkFile = extractFromApkSetFile(apkSetFile, universalApk.getPath(), outputDir);
     try (ZipFile universalApkZipFile = new ZipFile(universalApkFile)) {
       assertThat(filesUnderPath(universalApkZipFile, ASSETS_DIRECTORY))
@@ -1463,6 +1461,78 @@ public class BuildApksManagerTest {
     }
   }
 
+  @Test
+  public void buildApksCommand_universal_generatesSingleApkWithSuffixStrippedTcfAssets()
+      throws Exception {
+    AppBundle appBundle =
+        new AppBundleBuilder()
+            .addModule(
+                "base",
+                builder ->
+                    builder
+                        .setManifest(androidManifest("com.test.app")))
+            .addModule(
+                "tcf_assets",
+                builder ->
+                    builder
+                        .addFile("assets/textures#tcf_atc/texture.dat")
+                        .addFile("assets/textures#tcf_etc1/texture.dat")
+                        .setAssetsConfig(
+                            assets(
+                                targetedAssetsDirectory(
+                                    "assets/textures#tcf_atc",
+                                    assetsDirectoryTargeting(textureCompressionTargeting(ATC))),
+                                targetedAssetsDirectory(
+                                    "assets/textures#tcf_etc1",
+                                    assetsDirectoryTargeting(
+                                        textureCompressionTargeting(ETC1_RGB8)))))
+                        .setManifest(
+                            androidManifestForAssetModule(
+                                "com.test.app", withInstallTimeDelivery())))
+            .setBundleConfig(
+                BundleConfigBuilder.create()
+                    .addSplitDimension(
+                        Value.TEXTURE_COMPRESSION_FORMAT,
+                        /* negate= */ false,
+                        /* stripSuffix= */ true,
+                        /* defaultSuffix= */ "etc1")
+                    .build())
+            .build();
+    Path bundlePath = createAndStoreBundle(appBundle);
+
+    BuildApksCommand command =
+        BuildApksCommand.builder()
+            .setBundlePath(bundlePath)
+            .setOutputFile(outputFilePath)
+            .setApkBuildMode(UNIVERSAL)
+            .setAapt2Command(aapt2Command)
+            .build();
+
+    Path apkSetFilePath = execute(command);
+    ZipFile apkSetFile = openZipFile(apkSetFilePath.toFile());
+    BuildApksResult result = extractTocFromApkSetFile(apkSetFile, outputDir);
+    assertThat(standaloneApkVariants(result)).hasSize(1);
+
+    Variant universalVariant = standaloneApkVariants(result).get(0);
+    assertThat(apkDescriptions(universalVariant)).hasSize(1);
+
+    ApkDescription universalApk = apkDescriptions(universalVariant).get(0);
+
+    // Only assets from "tcf_assets" which are etc1 should be included,
+    // and the targeting suffix stripped.
+    File universalApkFile = extractFromApkSetFile(apkSetFile, universalApk.getPath(), outputDir);
+    try (ZipFile universalApkZipFile = new ZipFile(universalApkFile)) {
+      assertThat(filesUnderPath(universalApkZipFile, ASSETS_DIRECTORY))
+          .containsExactly("assets/textures/texture.dat");
+    }
+
+    // Check that targeting was applied to both the APK and the variant
+    assertThat(
+            universalVariant.getTargeting().getTextureCompressionFormatTargeting().getValueList())
+        .containsExactly(textureCompressionFormat(ETC1_RGB8));
+    assertThat(universalApk.getTargeting().getTextureCompressionFormatTargeting().getValueList())
+        .containsExactly(textureCompressionFormat(ETC1_RGB8));
+  }
 
   @Test
   public void buildApksCommand_universal_strip64BitLibraries_doesNotStrip() throws Exception {
@@ -1520,6 +1590,67 @@ public class BuildApksManagerTest {
     try (ZipFile universalApkZipFile = new ZipFile(universalApkFile)) {
       assertThat(filesUnderPath(universalApkZipFile, ZipPath.create("lib")))
           .containsExactly("lib/x86/libsome.so", "lib/x86_64/libsome.so");
+    }
+  }
+
+  @Test
+  public void buildApksCommand_universal_withAssetModules() throws Exception {
+    AppBundle appBundle =
+        new AppBundleBuilder()
+            .addModule(
+                "base",
+                builder ->
+                    builder
+                        .addFile("lib/x86/libsome.so")
+                        .setManifest(androidManifest("com.test.app")))
+            .addModule(
+                "upfront_asset_module",
+                builder ->
+                    builder
+                        .addFile("assets/upfront_asset.jpg")
+                        .setManifest(
+                            androidManifestForAssetModule(
+                                "com.test.app", withInstallTimeDelivery())))
+            .addModule(
+                "on_demand_asset_module",
+                builder ->
+                    builder
+                        .addFile("assets/on_demand_asset.jpg")
+                        .setManifest(
+                            androidManifestForAssetModule("com.test.app", withOnDemandDelivery())))
+            .build();
+    Path bundlePath = createAndStoreBundle(appBundle);
+
+    BuildApksCommand command =
+        BuildApksCommand.builder()
+            .setBundlePath(bundlePath)
+            .setOutputFile(outputFilePath)
+            .setApkBuildMode(UNIVERSAL)
+            .setAapt2Command(aapt2Command)
+            .build();
+
+    Path apkSetFilePath = execute(command);
+    ZipFile apkSetFile = openZipFile(apkSetFilePath.toFile());
+    BuildApksResult result = extractTocFromApkSetFile(apkSetFile, outputDir);
+
+    assertThat(result.getVariantList()).hasSize(1);
+    assertThat(splitApkVariants(result)).isEmpty();
+    assertThat(standaloneApkVariants(result)).hasSize(1);
+
+    Variant universalVariant = standaloneApkVariants(result).get(0);
+    assertThat(universalVariant.getTargeting()).isEqualTo(UNRESTRICTED_VARIANT_TARGETING);
+
+    assertThat(apkDescriptions(universalVariant)).hasSize(1);
+    ApkDescription universalApk = apkDescriptions(universalVariant).get(0);
+    assertThat(universalApk.getTargeting()).isEqualToDefaultInstance();
+
+    File universalApkFile = extractFromApkSetFile(apkSetFile, universalApk.getPath(), outputDir);
+    try (ZipFile universalApkZipFile = new ZipFile(universalApkFile)) {
+      assertThat(filesUnderPath(universalApkZipFile, ZipPath.create("lib")))
+          .containsExactly("lib/x86/libsome.so");
+      assertThat(filesUnderPath(universalApkZipFile, ZipPath.create("assets")))
+          .containsExactly(
+              "assets/upfront_asset.jpg");
     }
   }
 

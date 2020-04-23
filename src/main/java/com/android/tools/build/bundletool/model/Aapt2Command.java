@@ -17,8 +17,11 @@
 package com.android.tools.build.bundletool.model;
 
 import com.android.tools.build.bundletool.model.utils.files.BufferedIo;
+import com.google.common.collect.ImmutableList;
+import com.google.common.io.CharStreams;
 import java.io.BufferedReader;
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.concurrent.TimeUnit;
@@ -27,6 +30,11 @@ import java.util.concurrent.TimeUnit;
 public interface Aapt2Command {
 
   void convertApkProtoToBinary(Path protoApk, Path binaryApk);
+
+  /** Dumps the badging information of an .apk/.apex file, returning a String per line of out. */
+  default ImmutableList<String> dumpBadging(Path apkPath) {
+    throw new UnsupportedOperationException("Not implemented");
+  }
 
   static Aapt2Command createFromExecutablePath(Path aapt2Path) {
     return new Aapt2Command() {
@@ -42,6 +50,12 @@ public interface Aapt2Command {
                 binaryApk.toString(),
                 protoApk.toString());
       }
+
+      @Override
+      public ImmutableList<String> dumpBadging(Path apkPath) {
+        return new CommandExecutor()
+            .executeAndCapture(aapt2Path.toString(), "dump", "badging", apkPath.toString());
+      }
     };
   }
 
@@ -50,6 +64,14 @@ public interface Aapt2Command {
     private static final int TIMEOUT_AAPT2_COMMANDS_SECONDS = 5 * 60; // 5 minutes.
 
     public void execute(String... command) {
+      executeImpl(command);
+    }
+
+    public ImmutableList<String> executeAndCapture(String... command) {
+      return captureOutput(executeImpl(command));
+    }
+
+    private static Process executeImpl(String... command) {
       try {
         Process process = new ProcessBuilder(command).redirectErrorStream(true).start();
         if (!process.waitFor(TIMEOUT_AAPT2_COMMANDS_SECONDS, TimeUnit.SECONDS)) {
@@ -63,8 +85,17 @@ public interface Aapt2Command {
                   "Command '%s' didn't terminate successfully (exit code: %d). Check the logs.",
                   Arrays.toString(command), process.exitValue()));
         }
+        return process;
       } catch (IOException | InterruptedException e) {
         throw new Aapt2Exception("Error when executing command: " + Arrays.toString(command), e);
+      }
+    }
+
+    private static ImmutableList<String> captureOutput(Process process) {
+      try (BufferedReader outputReader = BufferedIo.reader(process.getInputStream())) {
+        return ImmutableList.copyOf(CharStreams.readLines(outputReader));
+      } catch (IOException e) {
+        throw new UncheckedIOException(e);
       }
     }
 

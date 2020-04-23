@@ -26,6 +26,8 @@ import static com.google.common.collect.ImmutableList.toImmutableList;
 import com.android.bundle.Commands.ApexApkMetadata;
 import com.android.bundle.Commands.ApkDescription;
 import com.android.bundle.Commands.ApkSet;
+import com.android.bundle.Commands.AssetModuleMetadata;
+import com.android.bundle.Commands.AssetSliceSet;
 import com.android.bundle.Commands.BuildApksResult;
 import com.android.bundle.Commands.DeliveryType;
 import com.android.bundle.Commands.ModuleMetadata;
@@ -261,7 +263,16 @@ public final class ApksArchiveHelpers {
         .build();
   }
 
-  private static Stream<ApkDescription> apkDescriptionStream(BuildApksResult buildApksResult) {
+  public static AssetSliceSet createAssetSliceSet(
+      String moduleName, DeliveryType deliveryType, ApkDescription... apkDescriptions) {
+    return AssetSliceSet.newBuilder()
+        .setAssetModuleMetadata(
+            AssetModuleMetadata.newBuilder().setName(moduleName).setDeliveryType(deliveryType))
+        .addAllApkDescription(Arrays.asList(apkDescriptions))
+        .build();
+  }
+  
+  public static Stream<ApkDescription> apkDescriptionStream(BuildApksResult buildApksResult) {
     return Stream.concat(
         buildApksResult.getVariantList().stream()
             .flatMap(variant -> variant.getApkSetList().stream())
@@ -269,4 +280,6 @@ public final class ApksArchiveHelpers {
         buildApksResult.getAssetSliceSetList().stream()
             .flatMap(assetSliceSet -> assetSliceSet.getApkDescriptionList().stream()));
   }
+
+  private ApksArchiveHelpers() {}
 }

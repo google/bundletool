@@ -34,6 +34,7 @@ import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.MoreCollectors.toOptional;
 
 import com.android.aapt.Resources.ResourceTable;
+import com.android.bundle.Config.ApexEmbeddedApkConfig;
 import com.android.bundle.Files.ApexImages;
 import com.android.bundle.Files.Assets;
 import com.android.bundle.Files.NativeLibraries;
@@ -133,6 +134,8 @@ public abstract class ModuleSplit {
 
   /** The module APEX configuration - what system images it contains and with what targeting. */
   public abstract Optional<ApexImages> getApexConfig();
+
+  public abstract ImmutableList<ApexEmbeddedApkConfig> getApexEmbeddedApkConfigs();
 
   public abstract Builder toBuilder();
 
@@ -248,8 +251,7 @@ public abstract class ModuleSplit {
   public static ImmutableList<ModuleEntry> filterResourceEntries(
       ImmutableList<ModuleEntry> entries, ResourceTable resourceTable) {
     ImmutableSet<ZipPath> referencedPaths = ResourcesUtils.getAllFileReferences(resourceTable);
-    return entries
-        .stream()
+    return entries.stream()
         .filter(entry -> referencedPaths.contains(entry.getPath()))
         .collect(toImmutableList());
   }
@@ -363,7 +365,8 @@ public abstract class ModuleSplit {
   public static Builder builder() {
     return new AutoValue_ModuleSplit.Builder()
         .setEntries(ImmutableList.of())
-        .setSplitType(SplitType.SPLIT);
+        .setSplitType(SplitType.SPLIT)
+        .setApexEmbeddedApkConfigs(ImmutableList.of());
   }
 
   /**
@@ -515,6 +518,9 @@ public abstract class ModuleSplit {
             .setMasterSplit(true)
             .setSplitType(getSplitTypeFromModuleType(bundleModule.getModuleType()))
             .setApkTargeting(ApkTargeting.getDefaultInstance())
+            .setApexEmbeddedApkConfigs(
+                ImmutableList.copyOf(
+                    bundleModule.getBundleConfig().getApexConfig().getApexEmbeddedApkConfigList()))
             .setVariantTargeting(variantTargeting);
 
     bundleModule.getNativeConfig().ifPresent(splitBuilder::setNativeConfig);
@@ -602,6 +608,9 @@ public abstract class ModuleSplit {
      * Sets the module APEX configuration - what system images it contains and with what targeting.
      */
     public abstract Builder setApexConfig(ApexImages apexConfig);
+
+    public abstract Builder setApexEmbeddedApkConfigs(
+        ImmutableList<ApexEmbeddedApkConfig> apexEmbeddedApkConfigs);
 
     protected abstract ApkTargeting getApkTargeting();
 

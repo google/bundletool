@@ -20,6 +20,7 @@ import static com.android.tools.build.bundletool.commands.BuildApksCommand.ApkBu
 import static com.android.tools.build.bundletool.commands.BuildApksCommand.ApkBuildMode.SYSTEM;
 import static com.android.tools.build.bundletool.commands.BuildApksCommand.ApkBuildMode.SYSTEM_COMPRESSED;
 import static com.android.tools.build.bundletool.commands.BuildApksCommand.ApkBuildMode.UNIVERSAL;
+import static com.android.tools.build.bundletool.commands.CommandUtils.ANDROID_SERIAL_VARIABLE;
 import static com.android.tools.build.bundletool.model.utils.SdkToolsLocator.ANDROID_HOME_VARIABLE;
 import static com.android.tools.build.bundletool.model.utils.SdkToolsLocator.SYSTEM_PATH_VARIABLE;
 import static com.google.common.base.Preconditions.checkArgument;
@@ -42,7 +43,6 @@ import com.android.tools.build.bundletool.model.SourceStamp;
 import com.android.tools.build.bundletool.model.exceptions.CommandExecutionException;
 import com.android.tools.build.bundletool.model.exceptions.ValidationException;
 import com.android.tools.build.bundletool.model.utils.DefaultSystemEnvironmentProvider;
-import com.android.tools.build.bundletool.model.utils.SdkToolsLocator;
 import com.android.tools.build.bundletool.model.utils.SystemEnvironmentProvider;
 import com.android.tools.build.bundletool.splitters.DexCompressionSplitter;
 import com.android.tools.build.bundletool.splitters.NativeLibrariesCompressionSplitter;
@@ -113,7 +113,6 @@ public abstract class BuildApksCommand {
   private static final Flag<Path> ADB_PATH_FLAG = Flag.path("adb");
   private static final Flag<Boolean> CONNECTED_DEVICE_FLAG = Flag.booleanFlag("connected-device");
   private static final Flag<String> DEVICE_ID_FLAG = Flag.string("device-id");
-  private static final String ANDROID_SERIAL_VARIABLE = "ANDROID_SERIAL";
   private static final Flag<ImmutableSet<String>> MODULES_FLAG = Flag.stringSet("modules");
 
   private static final Flag<Path> DEVICE_SPEC_FLAG = Flag.path("device-spec");
@@ -492,19 +491,8 @@ public abstract class BuildApksCommand {
 
     // Applied only when --connected-device flag is set, because we don't want to fail command
     // if ADB cannot be found in a normal mode.
-    Optional<Path> adbPathFromFlag = ADB_PATH_FLAG.getValue(flags);
     if (connectedDeviceMode) {
-      Path adbPath =
-          adbPathFromFlag.orElseGet(
-              () ->
-                  new SdkToolsLocator()
-                      .locateAdb(systemEnvironmentProvider)
-                      .orElseThrow(
-                          () ->
-                              new CommandExecutionException(
-                                  "Unable to determine the location of ADB. Please set the --adb "
-                                      + "flag or define ANDROID_HOME or PATH environment "
-                                      + "variable.")));
+      Path adbPath = CommandUtils.getAdbPath(flags, ADB_PATH_FLAG, systemEnvironmentProvider);
       buildApksCommand.setAdbPath(adbPath).setAdbServer(adbServer);
     }
 
@@ -531,20 +519,9 @@ public abstract class BuildApksCommand {
   public Path execute() {
     try (TempDirectory tempDir = new TempDirectory()) {
       Aapt2Command aapt2 =
-          getAapt2Command().orElseGet(() -> extractAapt2FromJar(tempDir.getPath()));
+          getAapt2Command().orElseGet(() -> CommandUtils.extractAapt2FromJar(tempDir.getPath()));
       return new BuildApksManager(this, aapt2, tempDir.getPath()).execute();
     }
-  }
-
-  private static Aapt2Command extractAapt2FromJar(Path tempDir) {
-    return new SdkToolsLocator()
-        .extractAapt2(tempDir)
-        .map(Aapt2Command::createFromExecutablePath)
-        .orElseThrow(
-            () ->
-                new CommandExecutionException(
-                    "Could not extract aapt2: consider updating bundletool to a more recent "
-                        + "version or providing the path to aapt2 using the flag --aapt2."));
   }
 
   /**

@@ -16,7 +16,9 @@
 
 package com.android.tools.build.bundletool.size;
 
+import static com.google.common.truth.Truth.assertThat;
 import static com.google.common.truth.extensions.proto.ProtoTruth.assertThat;
+import static java.nio.charset.StandardCharsets.UTF_8;
 
 import com.android.bundle.SizesOuterClass.Breakdown;
 import com.android.bundle.SizesOuterClass.Sizes;
@@ -25,9 +27,12 @@ import com.android.tools.build.bundletool.io.ZipBuilder.EntryOption;
 import com.android.tools.build.bundletool.model.ZipPath;
 import com.google.auto.value.AutoValue;
 import com.google.common.io.ByteStreams;
+import com.google.common.primitives.Bytes;
 import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.zip.Deflater;
 import java.util.zip.GZIPOutputStream;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
@@ -42,8 +47,6 @@ import org.junit.runners.JUnit4;
 @RunWith(JUnit4.class)
 public class ApkBreakdownGeneratorTest {
 
-  private static final byte[] BYTES = new byte[256];
-
   @Rule public final TemporaryFolder tmp = new TemporaryFolder();
 
   private Path tmpDir;
@@ -55,28 +58,33 @@ public class ApkBreakdownGeneratorTest {
 
   @Test
   public void computesBreakdown_resources() throws Exception {
+    byte[] resources = "I am a resouce table for an android app".getBytes(UTF_8);
+
     ZipEntryInfo entry =
         ZipEntryInfo.builder()
             .setName("resources.arsc")
-            .setContent(BYTES)
+            .setContent(resources)
             .setCompress(false)
             .build();
     Path archive = createZipArchiveWith(entry);
 
     long archiveSize = Files.size(archive);
     long downloadedArchiveSize = gzipOverArchive(Files.readAllBytes(archive)).length;
+    long resourcesDownloadSize = compress(resources);
 
     Breakdown breakdown = ApkBreakdownGenerator.calculateBreakdown(archive);
     assertThat(breakdown)
         .ignoringRepeatedFieldOrder()
         .isEqualTo(
-            emptyBreakdownProto()
-                .toBuilder()
-                .setResources(Sizes.newBuilder().setDiskSize(256).setDownloadSize(10))
+            emptyBreakdownProto().toBuilder()
+                .setResources(
+                    Sizes.newBuilder()
+                        .setDiskSize(resources.length)
+                        .setDownloadSize(resourcesDownloadSize))
                 .setOther(
                     Sizes.newBuilder()
-                        .setDiskSize(archiveSize - 256)
-                        .setDownloadSize(downloadedArchiveSize - 10))
+                        .setDiskSize(archiveSize - resources.length)
+                        .setDownloadSize(downloadedArchiveSize - resourcesDownloadSize))
                 .setTotal(
                     Sizes.newBuilder()
                         .setDiskSize(archiveSize)
@@ -86,36 +94,50 @@ public class ApkBreakdownGeneratorTest {
 
   @Test
   public void computesBreakdown_resourcesMultiple() throws Exception {
+    byte[] resourceTable = "I am a resouce table for an android app".getBytes(UTF_8);
+    byte[] aResource = "I am a resource in an apk file".getBytes(UTF_8);
     ZipEntryInfo compressedEntry =
         ZipEntryInfo.builder()
             .setName("res/raw/song01.ogg")
-            .setContent(BYTES)
+            .setContent(aResource)
             .setCompress(true)
             .build();
-    ZipEntryInfo resourceTable =
+    ZipEntryInfo resourceTableEntry =
         ZipEntryInfo.builder()
             .setName("resources.arsc")
-            .setContent(BYTES)
+            .setContent(resourceTable)
             .setCompress(false)
             .build();
-    long compressedEntrySize = getCompressedSize(compressedEntry);
-    Path archive = createZipArchiveWith(resourceTable, compressedEntry);
+    Path archive = createZipArchiveWith(resourceTableEntry, compressedEntry);
     long archiveSize = Files.size(archive);
+
+    // Because of the way we compress each entry with a flush between each compression we can't
+    // calculate this without just repeating the prod code.
+    // However we do know that it should be larger than compressing both entries in one batch
+    // but smaller than compressing the entries independently.
+    long resourcesDownloadSize = 57;
+    assertThat(resourcesDownloadSize)
+        .isGreaterThan(compress(Bytes.concat(resourceTable, aResource)));
+    assertThat(resourcesDownloadSize).isLessThan(compress(resourceTable) + compress(aResource));
+
+    long resourcesDiskSize =
+        getCompressedSize(compressedEntry) + getCompressedSize(resourceTableEntry);
     long downloadedArchiveSize = gzipOverArchive(Files.readAllBytes(archive)).length;
 
     Breakdown breakdown = ApkBreakdownGenerator.calculateBreakdown(archive);
     assertThat(breakdown)
         .ignoringRepeatedFieldOrder()
         .isEqualTo(
-            emptyBreakdownProto()
-                .toBuilder()
+            emptyBreakdownProto().toBuilder()
                 .setResources(
-                    Sizes.newBuilder().setDiskSize(256 + compressedEntrySize).setDownloadSize(18))
+                    Sizes.newBuilder()
+                        .setDiskSize(resourcesDiskSize)
+                        .setDownloadSize(resourcesDownloadSize))
                 // Expecting the zip/gzip overheads to be accounted for in OTHER.
                 .setOther(
                     Sizes.newBuilder()
-                        .setDiskSize(archiveSize - (256 + compressedEntrySize))
-                        .setDownloadSize(downloadedArchiveSize - 18))
+                        .setDiskSize(archiveSize - resourcesDiskSize)
+                        .setDownloadSize(downloadedArchiveSize - resourcesDownloadSize))
                 .setTotal(
                     Sizes.newBuilder()
                         .setDiskSize(archiveSize)
@@ -125,23 +147,25 @@ public class ApkBreakdownGeneratorTest {
 
   @Test
   public void computesBreakdown_dex() throws Exception {
+    byte[] dex = "this is the contents of a dex file".getBytes(UTF_8);
+
     ZipEntryInfo dexEntry =
-        ZipEntryInfo.builder().setName("classes.dex").setContent(BYTES).setCompress(false).build();
+        ZipEntryInfo.builder().setName("classes.dex").setContent(dex).setCompress(false).build();
     Path archive = createZipArchiveWith(dexEntry);
     long archiveSize = Files.size(archive);
     long downloadedArchiveSize = gzipOverArchive(Files.readAllBytes(archive)).length;
+    long dexDownloadSize = compress(dex);
 
     Breakdown breakdown = ApkBreakdownGenerator.calculateBreakdown(archive);
     assertThat(breakdown)
         .ignoringRepeatedFieldOrder()
         .isEqualTo(
-            emptyBreakdownProto()
-                .toBuilder()
-                .setDex(Sizes.newBuilder().setDiskSize(256).setDownloadSize(10))
+            emptyBreakdownProto().toBuilder()
+                .setDex(Sizes.newBuilder().setDiskSize(dex.length).setDownloadSize(dexDownloadSize))
                 .setOther(
                     Sizes.newBuilder()
-                        .setDiskSize(archiveSize - 256)
-                        .setDownloadSize(downloadedArchiveSize - 10))
+                        .setDiskSize(archiveSize - dex.length)
+                        .setDownloadSize(downloadedArchiveSize - dexDownloadSize))
                 .setTotal(
                     Sizes.newBuilder()
                         .setDiskSize(archiveSize)
@@ -151,28 +175,32 @@ public class ApkBreakdownGeneratorTest {
 
   @Test
   public void computesBreakdown_assets() throws Exception {
+    byte[] assets = "this is a game asset".getBytes(UTF_8);
     ZipEntryInfo assetsEntry =
         ZipEntryInfo.builder()
             .setName("assets/intro.mp4")
-            .setContent(BYTES)
+            .setContent(assets)
             .setCompress(false)
             .build();
     Path archive = createZipArchiveWith(assetsEntry);
     long archiveSize = Files.size(archive);
     long downloadedArchiveSize = gzipOverArchive(Files.readAllBytes(archive)).length;
+    long assetsDownloadSize = compress(assets);
 
     Breakdown breakdown = ApkBreakdownGenerator.calculateBreakdown(archive);
     assertThat(breakdown)
         .ignoringRepeatedFieldOrder()
         .isEqualTo(
-            emptyBreakdownProto()
-                .toBuilder()
-                .setAssets(Sizes.newBuilder().setDiskSize(256).setDownloadSize(10))
+            emptyBreakdownProto().toBuilder()
+                .setAssets(
+                    Sizes.newBuilder()
+                        .setDiskSize(assets.length)
+                        .setDownloadSize(assetsDownloadSize))
                 // Expecting the zip/gzip overheads to be accounted for in OTHER.
                 .setOther(
                     Sizes.newBuilder()
-                        .setDiskSize(archiveSize - 256)
-                        .setDownloadSize(downloadedArchiveSize - 10))
+                        .setDiskSize(archiveSize - assets.length)
+                        .setDownloadSize(downloadedArchiveSize - assetsDownloadSize))
                 .setTotal(
                     Sizes.newBuilder()
                         .setDiskSize(archiveSize)
@@ -182,27 +210,30 @@ public class ApkBreakdownGeneratorTest {
 
   @Test
   public void computesBreakdown_nativeLibs() throws Exception {
+    byte[] nativeLib = "this is a native lib".getBytes(UTF_8);
     ZipEntryInfo nativeLibEntry =
         ZipEntryInfo.builder()
             .setName("lib/arm64-v8a/libcrashalytics.so")
-            .setContent(BYTES)
+            .setContent(nativeLib)
             .setCompress(false)
             .build();
     Path archive = createZipArchiveWith(nativeLibEntry);
     long archiveSize = Files.size(archive);
     long downloadedArchiveSize = gzipOverArchive(Files.readAllBytes(archive)).length;
-
+    long nativeLibDownloadSize = compress(nativeLib);
     Breakdown breakdown = ApkBreakdownGenerator.calculateBreakdown(archive);
     assertThat(breakdown)
         .ignoringRepeatedFieldOrder()
         .isEqualTo(
-            emptyBreakdownProto()
-                .toBuilder()
-                .setNativeLibs(Sizes.newBuilder().setDiskSize(256).setDownloadSize(10))
+            emptyBreakdownProto().toBuilder()
+                .setNativeLibs(
+                    Sizes.newBuilder()
+                        .setDiskSize(nativeLib.length)
+                        .setDownloadSize(nativeLibDownloadSize))
                 .setOther(
                     Sizes.newBuilder()
-                        .setDiskSize(archiveSize - 256)
-                        .setDownloadSize(downloadedArchiveSize - 10))
+                        .setDiskSize(archiveSize - nativeLib.length)
+                        .setDownloadSize(downloadedArchiveSize - nativeLibDownloadSize))
                 .setTotal(
                     Sizes.newBuilder()
                         .setDiskSize(archiveSize)
@@ -212,10 +243,11 @@ public class ApkBreakdownGeneratorTest {
 
   @Test
   public void computesBreakdown_other() throws Exception {
+    byte[] other = "this is a random datafile".getBytes(UTF_8);
     ZipEntryInfo otherEntry =
         ZipEntryInfo.builder()
             .setName("org/hamcrest/something.cfg")
-            .setContent(BYTES)
+            .setContent(other)
             .setCompress(false)
             .build();
     Path archive = createZipArchiveWith(otherEntry);
@@ -239,6 +271,14 @@ public class ApkBreakdownGeneratorTest {
                 .build());
   }
 
+  @Test
+  public void checkDeflaterSyncOverheadCorrect() throws Exception {
+    Deflater deflater = new Deflater(Deflater.DEFAULT_COMPRESSION, /* noWrap */ true);
+    byte[] output = new byte[100];
+    assertThat(deflater.deflate(output, 0, output.length, Deflater.SYNC_FLUSH))
+        .isEqualTo(ApkBreakdownGenerator.DEFLATER_SYNC_OVERHEAD_BYTES);
+  }
+
   private static byte[] gzipOverArchive(byte[] archive) throws Exception {
     ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
     try (GZIPOutputStream gzipOutputStream = new GZIPOutputStream(outputStream)) {
@@ -251,11 +291,15 @@ public class ApkBreakdownGeneratorTest {
     if (!entry.getCompress()) {
       return entry.getContent().length;
     }
-    ZipEntry zipEntry = new ZipEntry(entry.getName());
+    return compress(entry.getContent());
+  }
+
+  private static long compress(byte[] data) throws IOException {
+    ZipEntry zipEntry = new ZipEntry("entry");
     try (ZipOutputStream zos = new ZipOutputStream(ByteStreams.nullOutputStream())) {
       zipEntry.setMethod(ZipEntry.DEFLATED);
       zos.putNextEntry(zipEntry);
-      zos.write(entry.getContent());
+      zos.write(data);
       zos.closeEntry();
     }
     return zipEntry.getCompressedSize();

@@ -69,31 +69,38 @@ public class ScreenDensityResourcesSplitter extends SplitterForOneTargetingDimen
           DensityAlias.XXXHDPI,
           DensityAlias.TVDPI);
 
+  private static final String STYLE_TYPE_NAME = "style";
+
   private final ImmutableSet<DensityAlias> densityBuckets;
   private final Version bundleVersion;
   private final Predicate<ResourceId> pinWholeResourceToMaster;
   private final Predicate<ResourceId> pinLowestBucketOfResourceToMaster;
+  private final boolean pinLowestBucketOfStylesToMaster;
 
   public ScreenDensityResourcesSplitter(
       Version bundleVersion,
       Predicate<ResourceId> pinWholeResourceToMaster,
-      Predicate<ResourceId> pinLowestBucketOfResourceToMaster) {
+      Predicate<ResourceId> pinLowestBucketOfResourceToMaster,
+      boolean pinLowestBucketOfStylesToMaster) {
     this(
         DEFAULT_DENSITY_BUCKETS,
         bundleVersion,
         pinWholeResourceToMaster,
-        pinLowestBucketOfResourceToMaster);
+        pinLowestBucketOfResourceToMaster,
+        pinLowestBucketOfStylesToMaster);
   }
 
   public ScreenDensityResourcesSplitter(
       ImmutableSet<DensityAlias> densityBuckets,
       Version bundleVersion,
       Predicate<ResourceId> pinWholeResourceToMaster,
-      Predicate<ResourceId> pinLowestBucketOfResourceToMaster) {
+      Predicate<ResourceId> pinLowestBucketOfResourceToMaster,
+      boolean pinLowestBucketOfStylesToMaster) {
     this.densityBuckets = densityBuckets;
     this.bundleVersion = bundleVersion;
     this.pinWholeResourceToMaster = pinWholeResourceToMaster;
     this.pinLowestBucketOfResourceToMaster = pinLowestBucketOfResourceToMaster;
+    this.pinLowestBucketOfStylesToMaster = pinLowestBucketOfStylesToMaster;
   }
 
   @Override
@@ -245,7 +252,7 @@ public class ScreenDensityResourcesSplitter extends SplitterForOneTargetingDimen
     Predicate<ConfigValue> pinConfigToMaster;
     if (pinWholeResourceToMaster.test(tableEntry.getResourceId())) {
       pinConfigToMaster = anyConfig -> true;
-    } else if (pinLowestBucketOfResourceToMaster.test(tableEntry.getResourceId())) {
+    } else if (pinLowestBucketToMaster(tableEntry)) {
       ImmutableSet<ConfigValue> lowDensityConfigsPinnedToMaster =
           pickBestDensityForEachGroup(densityGroups, getLowestDensity(densityBuckets))
               .collect(toImmutableSet());
@@ -259,6 +266,11 @@ public class ScreenDensityResourcesSplitter extends SplitterForOneTargetingDimen
             .filter(config -> !pinConfigToMaster.test(config))
             .collect(toImmutableList());
     return initialEntry.toBuilder().clearConfigValue().addAllConfigValue(valuesToKeep).build();
+  }
+
+  private boolean pinLowestBucketToMaster(ResourceTableEntry entry) {
+    return pinLowestBucketOfResourceToMaster.test(entry.getResourceId())
+        || (pinLowestBucketOfStylesToMaster && STYLE_TYPE_NAME.equals(entry.getType().getName()));
   }
 
   /** For each density group, it picks the best match for a given desired densityAlias. */

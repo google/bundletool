@@ -38,7 +38,7 @@ public class ApkSizeUtils {
    * Returns a map of APK Paths inside the APK Set with the sizes, for all APKs in variants
    * provided.
    */
-  public static ImmutableMap<String, Long> getCompressedSizeByApkPaths(
+  public static ImmutableMap<String, Long> getVariantCompressedSizeByApkPaths(
       ImmutableList<Variant> variants, Path apksArchive) {
     ImmutableList<String> apkPaths =
         variants.stream()
@@ -47,6 +47,11 @@ public class ApkSizeUtils {
             .map(ApkDescription::getPath)
             .distinct()
             .collect(toImmutableList());
+    return getCompressedSizeByApkPaths(apkPaths, apksArchive);
+  }
+
+  public static ImmutableMap<String, Long> getCompressedSizeByApkPaths(
+      ImmutableList<String> apkPaths, Path apksArchive) {
     ImmutableMap.Builder<String, Long> sizeByApkPath = ImmutableMap.builder();
     try (ZipFile apksZip = new ZipFile(apksArchive.toFile())) {
       for (String apkPath : apkPaths) {
@@ -64,4 +69,6 @@ public class ApkSizeUtils {
     }
     return sizeByApkPath.build();
   }
+
+  private ApkSizeUtils() {}
 }

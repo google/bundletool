@@ -92,7 +92,14 @@ public class BundleFilesValidatorTest {
 
   @Test
   public void validateLibFile_valid_success() throws Exception {
-    ZipPath libFile = ZipPath.create("lib/x86/libX.so");
+    ZipPath libFile = ZipPath.create("lib/x86/foo.so");
+
+    new BundleFilesValidator().validateModuleFile(libFile);
+  }
+
+  @Test
+  public void validateWrapSh_valid_success() throws Exception {
+    ZipPath libFile = ZipPath.create("lib/x86/wrap.sh");
 
     new BundleFilesValidator().validateModuleFile(libFile);
   }

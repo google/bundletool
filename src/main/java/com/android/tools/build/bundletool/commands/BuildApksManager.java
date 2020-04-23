@@ -64,6 +64,7 @@ import com.android.tools.build.bundletool.model.version.Version;
 import com.android.tools.build.bundletool.optimizations.ApkOptimizations;
 import com.android.tools.build.bundletool.optimizations.OptimizationsMerger;
 import com.android.tools.build.bundletool.preprocessors.AppBundle64BitNativeLibrariesPreprocessor;
+import com.android.tools.build.bundletool.preprocessors.EmbeddedApkSigningPreprocessor;
 import com.android.tools.build.bundletool.preprocessors.EntryCompressionPreprocessor;
 import com.android.tools.build.bundletool.preprocessors.LocalTestingPreprocessor;
 import com.android.tools.build.bundletool.splitters.ApkGenerationConfiguration;
@@ -184,7 +185,7 @@ final class BuildApksManager {
       // Note: Universal APK is a special type of standalone, with no optimization dimensions.
       ImmutableList<BundleModule> modulesToFuse =
           requestedModules.isEmpty()
-              ? modulesToFuse(appBundle.getFeatureModules().values().asList())
+              ? modulesToFuse(getModulesForStandaloneApks(appBundle))
               : requestedModules.asList();
       generatedApksBuilder.setStandaloneApks(
           new ShardedApksGenerator(
@@ -521,6 +522,7 @@ final class BuildApksManager {
       bundle = new LocalTestingPreprocessor().preprocess(bundle);
     }
     bundle = new EntryCompressionPreprocessor().preprocess(bundle);
+    bundle = new EmbeddedApkSigningPreprocessor().preprocess(bundle);
     return bundle;
   }
 

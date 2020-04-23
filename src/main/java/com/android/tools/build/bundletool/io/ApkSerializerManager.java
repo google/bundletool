@@ -185,7 +185,8 @@ public class ApkSerializerManager {
                 collectingAndThen(
                     toImmutableMap(
                         identity(),
-                        split -> executorService.submit(() -> apkSerializer.serialize(split))),
+                        (ModuleSplit split) ->
+                            executorService.submit(() -> apkSerializer.serialize(split))),
                     ConcurrencyUtils::waitForAll));
 
     // Build the result proto.

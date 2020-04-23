@@ -68,7 +68,18 @@ public enum VersionGuardedFeature {
    * merged from features to base module by Gradle plugin
    * (https://github.com/google/bundletool/issues/68).
    */
-  FUSE_ACTIVITIES_FROM_FEATURE_MANIFESTS("0.13.4");
+  FUSE_ACTIVITIES_FROM_FEATURE_MANIFESTS("0.13.4"),
+
+  /**
+   * Requires to put bucket with the lowest density for each style into master split. This allows to
+   * fix crashes on Android pre P devices which are unable to use styles that are defined only in
+   * config splits without having any value in master one.
+   *
+   * <p>When a style is available in master split it can be overridden by config splits for specific
+   * density that's why having only the lowest density value in master split and every other value
+   * in config splits is enough (https://github.com/google/bundletool/issues/128).
+   */
+  PIN_LOWEST_DENSITY_OF_EACH_STYLE_TO_MASTER("0.14.0");
 
   /** Version from which the given feature should be enabled by default. */
   private final Version enabledSinceVersion;

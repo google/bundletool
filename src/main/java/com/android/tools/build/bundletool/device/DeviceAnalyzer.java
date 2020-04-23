@@ -55,6 +55,7 @@ public class DeviceAnalyzer {
       // device.getVersion().getApiLevel() returns 1 in case of failure.
       int deviceSdkVersion = device.getVersion().getApiLevel();
       checkState(deviceSdkVersion > 1, "Error retrieving device SDK version. Please try again.");
+      String codename = device.getVersion().getCodename();
       int deviceDensity = device.getDensity();
       checkState(deviceDensity > 0, "Error retrieving device density. Please try again.");
       ImmutableList<String> deviceFeatures = device.getDeviceFeatures();
@@ -73,14 +74,17 @@ public class DeviceAnalyzer {
       }
       checkState(!supportedAbis.isEmpty(), "Error retrieving device ABIs. Please try again.");
 
-      return DeviceSpec.newBuilder()
+      DeviceSpec.Builder builder = DeviceSpec.newBuilder()
           .setSdkVersion(deviceSdkVersion)
           .addAllSupportedAbis(supportedAbis)
           .addAllSupportedLocales(deviceLocales)
           .setScreenDensity(deviceDensity)
           .addAllDeviceFeatures(deviceFeatures)
-          .addAllGlExtensions(glExtensions)
-          .build();
+          .addAllGlExtensions(glExtensions);
+      if (codename != null) {
+        builder.setCodename(codename);
+      }
+      return builder.build();
     } catch (TimeoutException e) {
       throw CommandExecutionException.builder()
           .withCause(e)
@@ -112,7 +116,8 @@ public class DeviceAnalyzer {
         });
   }
 
-  private Device getAndValidateDevice(Optional<String> deviceId) throws TimeoutException {
+  /** Gets and validates the connected device. */
+  public Device getAndValidateDevice(Optional<String> deviceId) throws TimeoutException {
     Device device =
         getTargetDevice(deviceId)
             .orElseThrow(

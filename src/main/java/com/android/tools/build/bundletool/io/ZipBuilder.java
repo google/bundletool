@@ -124,7 +124,10 @@ public final class ZipBuilder {
    * <p>Will throw an exception if the path is already taken.
    */
   public ZipBuilder addFileWithContent(ZipPath toPath, byte[] content, EntryOption... options) {
-    return addFile(toPath, () -> new ByteArrayInputStream(content), options);
+    return addFile(
+        toPath,
+        new InputStreamSupplier(() -> new ByteArrayInputStream(content), content.length),
+        options);
   }
 
   /**
@@ -144,7 +147,7 @@ public final class ZipBuilder {
    */
   public ZipBuilder addFileWithProtoContent(
       ZipPath toPath, MessageLite protoMsg, EntryOption... options) {
-    return addFile(toPath, () -> new ByteArrayInputStream(protoMsg.toByteArray()), options);
+    return addFileWithContent(toPath, protoMsg.toByteArray(), options);
   }
 
   /**

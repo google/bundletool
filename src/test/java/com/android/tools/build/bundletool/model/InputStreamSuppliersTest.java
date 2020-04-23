@@ -16,7 +16,6 @@
 
 package com.android.tools.build.bundletool.model;
 
-import static com.android.tools.build.bundletool.testing.TestUtils.toByteArray;
 import static com.google.common.truth.Truth.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.MockitoAnnotations.initMocks;
@@ -52,7 +51,7 @@ public class InputStreamSuppliersTest {
 
     InputStreamSupplier inputStreamSupplier = InputStreamSuppliers.fromFile(filePath);
 
-    assertThat(toByteArray(inputStreamSupplier::get)).isEqualTo(fileData);
+    assertThat(inputStreamSupplier.asByteSource().read()).isEqualTo(fileData);
   }
 
   @Test
@@ -90,7 +89,7 @@ public class InputStreamSuppliersTest {
   public void fromBytes() throws Exception {
     final byte[] content = {1, 34, 123};
     InputStreamSupplier inputStreamSupplier = InputStreamSuppliers.fromBytes(content);
-    assertThat(toByteArray(inputStreamSupplier::get)).isEqualTo(content);
+    assertThat(inputStreamSupplier.asByteSource().read()).isEqualTo(content);
   }
 
   @Mock ZipFile zipFile;

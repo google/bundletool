@@ -98,8 +98,7 @@ public class StandaloneApkSerializer {
     if (standaloneSplit.isApex()) {
       apkDescription.setApexApkMetadata(
           ApexApkMetadata.newBuilder()
-              .addAllApexEmbeddedApkConfig(
-                  standaloneSplit.getApexConfig().get().getApexEmbeddedApkConfigList())
+              .addAllApexEmbeddedApkConfig(standaloneSplit.getApexEmbeddedApkConfigs())
               .build());
     } else {
       apkDescription.setStandaloneApkMetadata(

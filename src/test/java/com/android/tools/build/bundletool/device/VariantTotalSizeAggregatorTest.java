@@ -655,7 +655,6 @@ public class VariantTotalSizeAggregatorTest {
                 .setAbi("armeabi-v7a")
                 .setScreenDensity("XHDPI")
                 .setSdkVersion("1-20")
-                .setLocale("")
                 .build(),
             20L);
   }

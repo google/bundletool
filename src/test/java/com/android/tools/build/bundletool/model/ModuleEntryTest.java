@@ -19,9 +19,6 @@ package com.android.tools.build.bundletool.model;
 import static com.android.tools.build.bundletool.testing.TestUtils.toByteArray;
 import static com.google.common.truth.Truth.assertThat;
 
-import java.io.ByteArrayInputStream;
-import java.io.InputStream;
-import java.util.function.Supplier;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
@@ -54,6 +51,22 @@ public class ModuleEntryTest {
   }
 
   @Test
+  public void equals_differentShouldCompress() throws Exception {
+    ModuleEntry entry1 = createEntry(ZipPath.create("a"), new byte[0]);
+    ModuleEntry entry2 = entry1.toBuilder().setShouldCompress(!entry1.getShouldCompress()).build();
+
+    assertThat(entry1.equals(entry2)).isFalse();
+  }
+
+  @Test
+  public void equals_differentShouldSign() throws Exception {
+    ModuleEntry entry1 = createEntry(ZipPath.create("a"), new byte[0]);
+    ModuleEntry entry2 = entry1.toBuilder().setShouldSign(!entry1.getShouldSign()).build();
+
+    assertThat(entry1.equals(entry2)).isFalse();
+  }
+
+  @Test
   public void equals_differentFileContents() throws Exception {
     ModuleEntry entry1 = createEntry(ZipPath.create("a"), new byte[] {'a'});
     ModuleEntry entry2 = createEntry(ZipPath.create("a"), new byte[] {'b'});
@@ -69,10 +82,10 @@ public class ModuleEntryTest {
   }
 
   private static ModuleEntry createEntry(ZipPath path, byte[] content) throws Exception {
-    return createEntry(path, () -> new ByteArrayInputStream(content));
+    return createEntry(path, InputStreamSuppliers.fromBytes(content));
   }
 
-  private static ModuleEntry createEntry(ZipPath path, Supplier<InputStream> contentSupplier) {
-    return ModuleEntry.builder().setPath(path).setContentSupplier(contentSupplier::get).build();
+  private static ModuleEntry createEntry(ZipPath path, InputStreamSupplier contentSupplier) {
+    return ModuleEntry.builder().setPath(path).setContentSupplier(contentSupplier).build();
   }
 }

@@ -46,7 +46,8 @@ public final class InputStreamSuppliers {
   /** Create an in-memory {@link InputStreamSupplier} from {@code contents}. */
   public static InputStreamSupplier fromBytes(byte[] contents) {
     final byte[] contentsCopy = Arrays.copyOf(contents, contents.length);
-    return () -> new ByteArrayInputStream(contentsCopy);
+    return new InputStreamSupplier(
+        () -> new ByteArrayInputStream(contentsCopy), contentsCopy.length);
   }
 
   /**

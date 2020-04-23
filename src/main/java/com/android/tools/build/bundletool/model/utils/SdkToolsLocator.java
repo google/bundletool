@@ -30,6 +30,7 @@ import java.net.URL;
 import java.nio.file.FileSystem;
 import java.nio.file.FileSystems;
 import java.nio.file.Files;
+import java.nio.file.InvalidPathException;
 import java.nio.file.NoSuchFileException;
 import java.nio.file.NotDirectoryException;
 import java.nio.file.Path;
@@ -245,7 +246,7 @@ public final class SdkToolsLocator {
         if (binaryInDir.isPresent()) {
           return binaryInDir;
         }
-      } catch (NoSuchFileException | NotDirectoryException tolerate) {
+      } catch (NoSuchFileException | NotDirectoryException | InvalidPathException tolerate) {
         // Tolerate invalid PATH entries.
       } catch (IOException e) {
         throw CommandExecutionException.builder()

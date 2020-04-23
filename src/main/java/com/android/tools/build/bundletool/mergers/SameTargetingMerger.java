@@ -21,6 +21,7 @@ import static com.android.tools.build.bundletool.mergers.MergingUtils.mergeTarge
 import static com.google.common.base.Preconditions.checkArgument;
 
 import com.android.aapt.Resources.ResourceTable;
+import com.android.bundle.Config.ApexEmbeddedApkConfig;
 import com.android.bundle.Files.ApexImages;
 import com.android.bundle.Files.Assets;
 import com.android.bundle.Files.NativeLibraries;
@@ -67,6 +68,7 @@ public class SameTargetingMerger implements ModuleSplitMerger {
     NativeLibraries mergedNativeConfig = null;
     Map<String, TargetedAssetsDirectory> mergedAssetsConfig = new HashMap<>();
     ApexImages mergedApexConfig = null;
+    ImmutableList<ApexEmbeddedApkConfig> mergedApexEmbeddedApkConfigs = null;
     BundleModuleName mergedModuleName = null;
     Boolean mergedIsMasterSplit = null;
     VariantTargeting mergedVariantTargeting = null;
@@ -103,6 +105,12 @@ public class SameTargetingMerger implements ModuleSplitMerger {
                         new IllegalStateException(
                             "Encountered two distinct apex configs while merging."));
       }
+      mergedApexEmbeddedApkConfigs =
+          getSameValueOrNonNull(mergedApexEmbeddedApkConfigs, split.getApexEmbeddedApkConfigs())
+              .orElseThrow(
+                  () ->
+                      new IllegalStateException(
+                          "Encountered two distinct apex embedded apk configs while merging."));
       mergedModuleName =
           getSameValueOrNonNull(mergedModuleName, split.getModuleName())
               .orElseThrow(
@@ -148,6 +156,9 @@ public class SameTargetingMerger implements ModuleSplitMerger {
     }
     if (mergedApexConfig != null) {
       builder.setApexConfig(mergedApexConfig);
+    }
+    if (mergedApexEmbeddedApkConfigs != null) {
+      builder.setApexEmbeddedApkConfigs(mergedApexEmbeddedApkConfigs);
     }
     if (mergedModuleName != null) {
       builder.setModuleName(mergedModuleName);

@@ -16,10 +16,13 @@
 
 package com.android.tools.build.bundletool.model;
 
+import com.google.common.base.Optional;
+import com.google.common.io.ByteSource;
 import com.google.errorprone.annotations.Immutable;
 import com.google.errorprone.annotations.MustBeClosed;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.UncheckedIOException;
 
 /**
  * A repeatable action returning fresh instances of {@link InputStream}.
@@ -30,7 +33,51 @@ import java.io.InputStream;
  * <p>All subclasses must be immutable, and return the same {@link InputStream} at each invocation.
  */
 @Immutable
-public interface InputStreamSupplier {
+public final class InputStreamSupplier {
+
+  private final SupplierWithIO<InputStream> inputSupplier;
+  private final SupplierWithIO<Long> sizeSupplier;
+
+  public InputStreamSupplier(
+      SupplierWithIO<InputStream> inputSupplier, SupplierWithIO<Long> sizeSupplier) {
+    this.inputSupplier = inputSupplier;
+    this.sizeSupplier = sizeSupplier;
+  }
+
+  public InputStreamSupplier(SupplierWithIO<InputStream> inputSupplier, long size) {
+    this(inputSupplier, () -> size);
+  }
+
   @MustBeClosed
-  InputStream get() throws IOException;
+  public InputStream get() throws IOException {
+    return inputSupplier.get();
+  }
+
+  public long sizeBytes() throws IOException {
+    return sizeSupplier.get();
+  }
+
+  public ByteSource asByteSource() {
+    return new ByteSource() {
+      @Override
+      public InputStream openStream() throws IOException {
+        return inputSupplier.get();
+      }
+
+      @Override
+      public Optional<Long> sizeIfKnown() {
+        try {
+          return Optional.of(sizeSupplier.get());
+        } catch (IOException e) {
+          throw new UncheckedIOException(e);
+        }
+      }
+    };
+  }
+
+  /** A version of {@code Supplier} that can throw an IOException. */
+  @Immutable
+  public interface SupplierWithIO<T> {
+    T get() throws IOException;
+  }
 }

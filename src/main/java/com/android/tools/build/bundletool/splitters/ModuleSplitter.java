@@ -18,6 +18,7 @@ package com.android.tools.build.bundletool.splitters;
 
 import static com.android.tools.build.bundletool.model.utils.TargetingProtoUtils.lPlusVariantTargeting;
 import static com.android.tools.build.bundletool.model.utils.Versions.ANDROID_L_API_VERSION;
+import static com.android.tools.build.bundletool.model.version.VersionGuardedFeature.PIN_LOWEST_DENSITY_OF_EACH_STYLE_TO_MASTER;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.collect.ImmutableList.toImmutableList;
@@ -271,7 +272,8 @@ public class ModuleSplitter {
           new ScreenDensityResourcesSplitter(
               bundleVersion,
               /* pinWholeResourceToMaster= */ masterPinnedResourceIds::contains,
-              /* pinLowestBucketOfResourceToMaster= */ baseManifestReachableResources::contains));
+              /* pinLowestBucketOfResourceToMaster= */ baseManifestReachableResources::contains,
+              PIN_LOWEST_DENSITY_OF_EACH_STYLE_TO_MASTER.enabledForVersion(bundleVersion)));
     }
 
     if (apkGenerationConfiguration

@@ -28,12 +28,24 @@ import java.util.stream.Stream;
 
 /** A {@link TargetingDimensionMatcher} that provides matching on SDK version. */
 public final class SdkVersionMatcher extends TargetingDimensionMatcher<SdkVersionTargeting> {
+  private static final String RELEASE_CODENAME = "REL";
+  private static final int PRE_RELEASE_SDK = 10_000;
 
+  // Most recently supported release SDK version, even on pre-release devices
+  // e.g. pre-releases R devices report codename "R" and sdk version 29 (Q release SDK)
   private final int deviceSdkVersion;
+  // RELEASE_CODENAME for released devices, or a codename on pre-release devices
+  private final String deviceCodename;
 
   public SdkVersionMatcher(DeviceSpec deviceSpec) {
     super(deviceSpec);
     deviceSdkVersion = deviceSpec.getSdkVersion();
+    // Default to release device if no codename is specified.
+    if (deviceSpec.getCodename().isEmpty()) {
+      deviceCodename = RELEASE_CODENAME;
+    } else {
+      deviceCodename = deviceSpec.getCodename();
+    }
   }
 
   @Override
@@ -75,7 +87,16 @@ public final class SdkVersionMatcher extends TargetingDimensionMatcher<SdkVersio
     return candidate.hasMin() && candidate.getMin().getValue() > contestedValue.getMin().getValue();
   }
 
+  private boolean isPreReleaseDevice() {
+    return !deviceCodename.equals(RELEASE_CODENAME);
+  }
+
   private boolean matchesDeviceSdk(SdkVersion value, int deviceSdkVersion) {
+    // If the device is pre release and the APK was compiled with pre release SDK allow install
+    if (isPreReleaseDevice() && value.hasMin() && value.getMin().getValue() == PRE_RELEASE_SDK) {
+      return true;
+    }
+
     return !value.hasMin() || value.getMin().getValue() <= deviceSdkVersion;
   }
 

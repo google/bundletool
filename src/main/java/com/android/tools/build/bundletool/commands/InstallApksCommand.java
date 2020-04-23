@@ -16,6 +16,7 @@
 
 package com.android.tools.build.bundletool.commands;
 
+import static com.android.tools.build.bundletool.commands.CommandUtils.ANDROID_SERIAL_VARIABLE;
 import static com.android.tools.build.bundletool.model.utils.SdkToolsLocator.ANDROID_HOME_VARIABLE;
 import static com.android.tools.build.bundletool.model.utils.SdkToolsLocator.SYSTEM_PATH_VARIABLE;
 import static com.android.tools.build.bundletool.model.utils.files.FilePreconditions.checkDirectoryExists;
@@ -42,7 +43,6 @@ import com.android.tools.build.bundletool.io.TempDirectory;
 import com.android.tools.build.bundletool.model.exceptions.CommandExecutionException;
 import com.android.tools.build.bundletool.model.utils.DefaultSystemEnvironmentProvider;
 import com.android.tools.build.bundletool.model.utils.ResultUtils;
-import com.android.tools.build.bundletool.model.utils.SdkToolsLocator;
 import com.android.tools.build.bundletool.model.utils.SystemEnvironmentProvider;
 import com.google.auto.value.AutoValue;
 import com.google.common.collect.ImmutableList;
@@ -64,8 +64,6 @@ public abstract class InstallApksCommand {
   private static final Flag<ImmutableSet<String>> MODULES_FLAG = Flag.stringSet("modules");
   private static final Flag<Boolean> ALLOW_DOWNGRADE_FLAG = Flag.booleanFlag("allow-downgrade");
   private static final Flag<Boolean> ALLOW_TEST_ONLY_FLAG = Flag.booleanFlag("allow-test-only");
-
-  private static final String ANDROID_SERIAL_VARIABLE = "ANDROID_SERIAL";
 
   private static final SystemEnvironmentProvider DEFAULT_PROVIDER =
       new DefaultSystemEnvironmentProvider();
@@ -118,24 +116,10 @@ public abstract class InstallApksCommand {
   public static InstallApksCommand fromFlags(
       ParsedFlags flags, SystemEnvironmentProvider systemEnvironmentProvider, AdbServer adbServer) {
     Path apksArchivePath = APKS_ARCHIVE_FILE_FLAG.getRequiredValue(flags);
-    Path adbPath =
-        ADB_PATH_FLAG
-            .getValue(flags)
-            .orElseGet(
-                () ->
-                    new SdkToolsLocator()
-                        .locateAdb(systemEnvironmentProvider)
-                        .orElseThrow(
-                            () ->
-                                new CommandExecutionException(
-                                    "Unable to determine the location of ADB. Please set the --adb "
-                                        + "flag or define ANDROID_HOME or PATH environment "
-                                        + "variable.")));
+    Path adbPath = CommandUtils.getAdbPath(flags, ADB_PATH_FLAG, systemEnvironmentProvider);
 
-    Optional<String> deviceSerialName = DEVICE_ID_FLAG.getValue(flags);
-    if (!deviceSerialName.isPresent()) {
-      deviceSerialName = systemEnvironmentProvider.getVariable(ANDROID_SERIAL_VARIABLE);
-    }
+    Optional<String> deviceSerialName =
+        CommandUtils.getDeviceSerialName(flags, DEVICE_ID_FLAG, systemEnvironmentProvider);
 
     Optional<ImmutableSet<String>> modules = MODULES_FLAG.getValue(flags);
     Optional<Boolean> allowDowngrade = ALLOW_DOWNGRADE_FLAG.getValue(flags);

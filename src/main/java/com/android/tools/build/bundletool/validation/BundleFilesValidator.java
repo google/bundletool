@@ -93,7 +93,8 @@ public class BundleFilesValidator extends SubValidator {
         throw new InvalidNativeLibraryPathException(LIB_DIRECTORY, file);
       }
 
-      if (!fileName.endsWith(".so")) {
+      // See https://developer.android.com/ndk/guides/wrap-script#packaging_wrapsh
+      if (!fileName.endsWith(".so") && !fileName.equals("wrap.sh")) {
         throw new InvalidFileExtensionInDirectoryException(LIB_DIRECTORY, ".so", file);
       }
 

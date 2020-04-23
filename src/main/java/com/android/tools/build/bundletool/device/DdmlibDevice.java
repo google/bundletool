@@ -38,6 +38,7 @@ import java.io.File;
 import java.io.IOException;
 import java.io.PrintStream;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.Arrays;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
@@ -202,6 +203,17 @@ public class DdmlibDevice extends Device {
                   + " installed correctly, but you won't be able to test dynamic modules.")
           .build();
     }
+  }
+
+  @Override
+  public Path syncPackageToDevice(Path localFilePath)
+      throws TimeoutException, AdbCommandRejectedException, SyncException, IOException {
+    return Paths.get(device.syncPackageToDevice(localFilePath.toFile().getAbsolutePath()));
+  }
+
+  @Override
+  public void removeRemotePackage(Path remoteFilePath) throws InstallException {
+    device.removeRemotePackage(remoteFilePath.toString());
   }
 
   static class RemoteCommandExecutor {

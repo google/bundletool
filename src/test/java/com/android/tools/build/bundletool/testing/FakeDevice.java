@@ -37,6 +37,7 @@ import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
@@ -221,7 +222,10 @@ public class FakeDevice extends Device {
       throws TimeoutException, AdbCommandRejectedException, ShellCommandUnresponsiveException,
           IOException {
 
-    checkState(commandInjections.containsKey(command));
+    checkState(
+        commandInjections.containsKey(command),
+        "Command %s not found in command injections.",
+        command);
     byte[] data = commandInjections.get(command).onExecute().getBytes(UTF_8);
     receiver.addOutput(data, 0, data.length);
     receiver.flush();
@@ -242,6 +246,15 @@ public class FakeDevice extends Device {
     }
     pushApksSideEffect.ifPresent(val -> val.apply(apks, pushOptions));
   }
+
+  @Override
+  public Path syncPackageToDevice(Path localFilePath) {
+    checkState(Files.exists(localFilePath));
+    return Paths.get("/temp", localFilePath.getFileName().toString());
+  }
+
+  @Override
+  public void removeRemotePackage(Path remoteFilePath) {}
 
   public void setInstallApksSideEffect(SideEffect<InstallOptions> sideEffect) {
     installApksSideEffect = Optional.of(sideEffect);

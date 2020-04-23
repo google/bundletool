@@ -19,7 +19,6 @@ package com.android.tools.build.bundletool.model;
 import static com.google.common.truth.Truth.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
-import java.io.ByteArrayInputStream;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
@@ -27,7 +26,7 @@ import org.junit.runners.JUnit4;
 @RunWith(JUnit4.class)
 public class BundleMetadataTest {
 
-  private static final InputStreamSupplier DUMMY_DATA = () -> new ByteArrayInputStream(new byte[0]);
+  private static final InputStreamSupplier DUMMY_DATA = InputStreamSuppliers.fromBytes(new byte[0]);
 
   @Test
   public void addFile_plainNamespacedDirectory() throws Exception {

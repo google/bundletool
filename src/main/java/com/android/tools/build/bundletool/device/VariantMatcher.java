@@ -17,6 +17,7 @@
 package com.android.tools.build.bundletool.device;
 
 import static com.google.common.collect.ImmutableList.toImmutableList;
+import static com.google.common.collect.MoreCollectors.toOptional;
 
 import com.android.bundle.Commands.ApkDescription;
 import com.android.bundle.Commands.BuildApksResult;
@@ -24,7 +25,6 @@ import com.android.bundle.Commands.Variant;
 import com.android.bundle.Devices.DeviceSpec;
 import com.android.bundle.Targeting.VariantTargeting;
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.MoreCollectors;
 import java.util.Optional;
 import java.util.function.Supplier;
 import java.util.stream.Stream;
@@ -95,7 +95,7 @@ public class VariantMatcher {
    * @throws IllegalArgumentException if multiple variants are matched.
    */
   public Optional<Variant> getMatchingVariant(BuildApksResult buildApksResult) {
-    return getAllMatchingVariants(buildApksResult).stream().collect(MoreCollectors.toOptional());
+    return getAllMatchingVariants(buildApksResult).stream().collect(toOptional());
   }
 
   public void checkCompatibleWithVariant(Variant variant) {

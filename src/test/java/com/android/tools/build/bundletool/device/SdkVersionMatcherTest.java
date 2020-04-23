@@ -17,6 +17,7 @@
 package com.android.tools.build.bundletool.device;
 
 import static com.android.tools.build.bundletool.testing.DeviceFactory.deviceWithSdk;
+import static com.android.tools.build.bundletool.testing.DeviceFactory.deviceWithSdkAndCodename;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.sdkVersionFrom;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.sdkVersionTargeting;
 import static com.google.common.truth.Truth.assertThat;
@@ -119,5 +120,30 @@ public class SdkVersionMatcherTest {
                     sdkVersionFrom(27),
                     ImmutableSet.of(sdkVersionFrom(23), SdkVersion.getDefaultInstance()))))
         .isFalse();
+  }
+
+  @Test
+  public void preReleaseAppReleaseDevice_fails() {
+    SdkVersionMatcher sdkMatcher = new SdkVersionMatcher(deviceWithSdk(29));
+
+    Throwable exception;
+    exception =
+        assertThrows(
+            IncompatibleDeviceException.class,
+            () ->
+                sdkMatcher.checkDeviceCompatible(
+                    sdkVersionTargeting(sdkVersionFrom(10_000), ImmutableSet.of())));
+    assertThat(exception)
+        .hasMessageThat()
+        .contains("The app doesn't support SDK version of the device: (29).");
+  }
+
+  @Test
+  public void preReleaseAppPreReleaseDevice_succeeds() {
+    SdkVersionMatcher sdkMatcher = new SdkVersionMatcher(deviceWithSdkAndCodename(29, "R"));
+
+    assertThat(
+        sdkMatcher.matchesTargeting(sdkVersionTargeting(sdkVersionFrom(10_000), ImmutableSet.of())))
+        .isTrue();
   }
 }

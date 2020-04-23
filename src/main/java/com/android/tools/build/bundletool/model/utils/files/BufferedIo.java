@@ -62,13 +62,13 @@ public final class BufferedIo {
 
   @SuppressWarnings("MustBeClosedChecker") // InputStreamSupplier is annotated with @MustBeClosed
   public static InputStreamSupplier inputStreamSupplier(Path file) {
-    return () -> inputStream(file);
+    return new InputStreamSupplier(() -> inputStream(file), () -> Files.size(file));
   }
 
   @SuppressWarnings("MustBeClosedChecker") // InputStreamSupplier is annotated with @MustBeClosed
   public static InputStreamSupplier inputStreamSupplier(
       @WillNotClose ZipFile zipFile, ZipEntry zipEntry) {
-    return () -> inputStream(zipFile, zipEntry);
+    return new InputStreamSupplier(() -> inputStream(zipFile, zipEntry), () -> zipEntry.getSize());
   }
 
   @MustBeClosed
