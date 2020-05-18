@@ -55,7 +55,7 @@ public class EntryCompressionPreprocessor implements AppBundlePreprocessor {
                   .map(
                       entry ->
                           entry.toBuilder()
-                              .setShouldCompress(!entry.getPath().startsWith(ASSETS_DIRECTORY))
+                              .setForceUncompressed(entry.getPath().startsWith(ASSETS_DIRECTORY))
                               .build())
                   .collect(toImmutableList()))
           .build();

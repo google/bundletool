@@ -29,17 +29,17 @@ public class ModuleEntryTest {
   public void builder() throws Exception {
     ZipPath path = ZipPath.create("a");
     byte[] content = new byte[] {'a'};
-    ModuleEntry entry = createEntry(path, content).toBuilder().setShouldCompress(false).build();
+    ModuleEntry entry = createEntry(path, content).toBuilder().setForceUncompressed(true).build();
 
     assertThat(entry.getPath()).isEqualTo(path);
-    assertThat(entry.getShouldCompress()).isFalse();
+    assertThat(entry.getForceUncompressed()).isTrue();
     assertThat(toByteArray(entry.getContentSupplier())).isEqualTo(content);
   }
 
   @Test
   public void builder_defaults() throws Exception {
     ModuleEntry entry = createEntry(ZipPath.create("a"), new byte[0]);
-    assertThat(entry.getShouldCompress()).isTrue();
+    assertThat(entry.getForceUncompressed()).isFalse();
   }
 
   @Test
@@ -53,7 +53,8 @@ public class ModuleEntryTest {
   @Test
   public void equals_differentShouldCompress() throws Exception {
     ModuleEntry entry1 = createEntry(ZipPath.create("a"), new byte[0]);
-    ModuleEntry entry2 = entry1.toBuilder().setShouldCompress(!entry1.getShouldCompress()).build();
+    ModuleEntry entry2 =
+        entry1.toBuilder().setForceUncompressed(!entry1.getForceUncompressed()).build();
 
     assertThat(entry1.equals(entry2)).isFalse();
   }

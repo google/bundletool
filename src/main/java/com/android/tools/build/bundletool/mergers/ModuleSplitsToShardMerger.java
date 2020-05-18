@@ -382,7 +382,7 @@ public class ModuleSplitsToShardMerger {
     }
   }
 
-  private static ImmutableList<ModuleEntry> renameDexFromAllModulesToSingleShard(
+  static ImmutableList<ModuleEntry> renameDexFromAllModulesToSingleShard(
       Multimap<BundleModuleName, ModuleEntry> dexFilesToMergeByModule) {
     // We don't need to rename classes*.dex in base module.
     Stream<ModuleEntry> dexFilesFromBase = dexFilesToMergeByModule.get(BASE_MODULE_NAME).stream();

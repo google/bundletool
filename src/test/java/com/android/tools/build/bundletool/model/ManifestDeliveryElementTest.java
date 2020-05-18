@@ -23,6 +23,7 @@ import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.with
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withFeatureConditionHexVersion;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withFusingAttribute;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withInstallTimeDelivery;
+import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withInstallTimePermanentElement;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withInstantInstallTimeDelivery;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withInstantOnDemandDelivery;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withMaxSdkCondition;
@@ -41,6 +42,7 @@ import com.android.tools.build.bundletool.model.utils.xmlproto.XmlProtoAttribute
 import com.android.tools.build.bundletool.model.utils.xmlproto.XmlProtoElement;
 import com.android.tools.build.bundletool.model.utils.xmlproto.XmlProtoElementBuilder;
 import com.android.tools.build.bundletool.model.utils.xmlproto.XmlProtoNode;
+import com.android.tools.build.bundletool.model.version.Version;
 import com.google.common.collect.ImmutableList;
 import java.util.Optional;
 import org.junit.Test;
@@ -52,6 +54,7 @@ public class ManifestDeliveryElementTest {
 
   private static final String DISTRIBUTION_NAMESPACE_URI =
       "http://schemas.android.com/apk/distribution";
+  private static final Version VERSION = Version.of("1.0.0");
 
   @Test
   public void emptyDeliveryElement_notWellFormed() {
@@ -694,6 +697,72 @@ public class ManifestDeliveryElementTest {
     assertThat(exception)
         .hasMessageThat()
         .contains("Multiple '<dist:user-countries>' conditions are not supported.");
+  }
+
+  @Test
+  public void onDemandModule_notInstallTimePermanent() {
+    Optional<ManifestDeliveryElement> deliveryElement =
+        ManifestDeliveryElement.fromManifestRootNode(
+            androidManifest("com.test.app", withOnDemandDelivery()),
+            /* isFastFollowAllowed= */ false);
+
+    assertThat(deliveryElement).isPresent();
+    assertThat(deliveryElement.get().isInstallTimePermanent(VERSION)).isFalse();
+  }
+
+  @Test
+  public void fastFollowDelivery_notInstallTimePermanent() {
+    Optional<ManifestDeliveryElement> deliveryElement =
+        ManifestDeliveryElement.fromManifestRootNode(
+            androidManifest("com.test.app", withFastFollowDelivery()),
+            /* isFastFollowAllowed= */ true);
+
+    assertThat(deliveryElement).isPresent();
+    assertThat(deliveryElement.get().isInstallTimePermanent(VERSION)).isFalse();
+  }
+
+  @Test
+  public void installTimeModule_installTimePermanentImplicit_newBundleToolVersion() {
+    Optional<ManifestDeliveryElement> deliveryElement =
+        ManifestDeliveryElement.fromManifestRootNode(
+            androidManifest("com.test.app", withInstallTimeDelivery()),
+            /* isFastFollowAllowed= */ false);
+
+    assertThat(deliveryElement).isPresent();
+    assertThat(deliveryElement.get().isInstallTimePermanent(VERSION)).isTrue();
+  }
+
+  @Test
+  public void installTimeModule_installTimePermanentImplicit_oldBundleToolVersion() {
+    Optional<ManifestDeliveryElement> deliveryElement =
+        ManifestDeliveryElement.fromManifestRootNode(
+            androidManifest("com.test.app", withInstallTimeDelivery()),
+            /* isFastFollowAllowed= */ false);
+
+    assertThat(deliveryElement).isPresent();
+    assertThat(deliveryElement.get().isInstallTimePermanent(Version.of("0.14.0"))).isFalse();
+  }
+
+  @Test
+  public void installTimeModule_installTimePermanentOn() {
+    Optional<ManifestDeliveryElement> deliveryElement =
+        ManifestDeliveryElement.fromManifestRootNode(
+            androidManifest("com.test.app", withInstallTimePermanentElement(true)),
+            /* isFastFollowAllowed= */ false);
+
+    assertThat(deliveryElement).isPresent();
+    assertThat(deliveryElement.get().isInstallTimePermanent(VERSION)).isTrue();
+  }
+
+  @Test
+  public void installTimeModule_installTimePermanentOff() {
+    Optional<ManifestDeliveryElement> deliveryElement =
+        ManifestDeliveryElement.fromManifestRootNode(
+            androidManifest("com.test.app", withInstallTimePermanentElement(false)),
+            /* isFastFollowAllowed= */ false);
+
+    assertThat(deliveryElement).isPresent();
+    assertThat(deliveryElement.get().isInstallTimePermanent(VERSION)).isFalse();
   }
 
   private static XmlNode createAndroidManifestWithDeliveryElement(

@@ -205,7 +205,16 @@ public abstract class BuildBundleCommand {
       }
       ImmutableList<ZipFile> moduleZipFiles = moduleZipFilesBuilder.build();
 
-      ImmutableList<BundleModule> modules = new BundleModulesValidator().validate(moduleZipFiles);
+      // Read the Bundle Config file if provided by the developer.
+      BundleConfig bundleConfig =
+          getBundleConfig().orElse(BundleConfig.getDefaultInstance()).toBuilder()
+              .setBundletool(
+                  Bundletool.newBuilder()
+                      .setVersion(BundleToolVersion.getCurrentVersion().toString()))
+              .build();
+
+      ImmutableList<BundleModule> modules =
+          new BundleModulesValidator().validate(moduleZipFiles, bundleConfig);
       checkState(
           moduleZipFiles.size() == modules.size(),
           "Incorrect number of modules parsed (%s != %s).",
@@ -228,14 +237,6 @@ public abstract class BuildBundleCommand {
 
         modulesWithTargeting.add(moduleWithTargeting.build());
       }
-
-      // Read the Bundle Config file if provided by the developer.
-      BundleConfig bundleConfig =
-          getBundleConfig().orElse(BundleConfig.getDefaultInstance()).toBuilder()
-              .setBundletool(
-                  Bundletool.newBuilder()
-                      .setVersion(BundleToolVersion.getCurrentVersion().toString()))
-              .build();
 
       AppBundle appBundle =
           AppBundle.buildFromModules(

@@ -18,21 +18,45 @@ package com.android.tools.build.bundletool.device;
 
 import static com.google.common.collect.ImmutableSet.toImmutableSet;
 
+import com.google.auto.value.AutoValue;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
-/** Parses the output of the "pm list packages" ADB shell command. */
+/** Parses the output of the "pm list packages --show-versioncode" ADB shell command. */
 public final class PackagesParser {
 
+  private static final Pattern PACKAGE_AND_VERSION =
+      Pattern.compile("package:(?<package>.+?) versionCode:(?<version>\\d+)");
+
   /** Parses output of "pm list packages". */
-  public ImmutableSet<String> parse(ImmutableList<String> listPackagesOutput) {
+  public ImmutableSet<InstalledPackageInfo> parse(ImmutableList<String> listPackagesOutput) {
     // The command lists the packages in the form
-    // package:com.google.a
-    // package:com.google.b
+    // package:com.google.a versionCode:123
+    // package:com.google.b versionCode:456
     // ...
     return listPackagesOutput.stream()
-        .filter(packageLine -> packageLine.contains("package:"))
-        .map(packageLine -> packageLine.replace("package:", "").trim())
+        .map(PACKAGE_AND_VERSION::matcher)
+        .filter(Matcher::matches)
+        .map(PackagesParser::processMatch)
         .collect(toImmutableSet());
+  }
+
+  private static InstalledPackageInfo processMatch(Matcher matcher) {
+    return InstalledPackageInfo.create(
+        matcher.group("package"), Long.parseLong(matcher.group("version")));
+  }
+
+  /** Represents an installed package and its version code. */
+  @AutoValue
+  public abstract static class InstalledPackageInfo {
+    static InstalledPackageInfo create(String packageName, long versionCode) {
+      return new AutoValue_PackagesParser_InstalledPackageInfo(packageName, versionCode);
+    }
+
+    public abstract String getPackageName();
+
+    public abstract long getVersionCode();
   }
 }

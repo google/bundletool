@@ -27,6 +27,7 @@ import static com.android.tools.build.bundletool.testing.DeviceFactory.qDeviceWi
 import static com.android.tools.build.bundletool.testing.FakeSystemEnvironmentProvider.ANDROID_HOME;
 import static com.android.tools.build.bundletool.testing.FakeSystemEnvironmentProvider.ANDROID_SERIAL;
 import static com.google.common.collect.ImmutableList.toImmutableList;
+import static com.google.common.collect.ImmutableMap.toImmutableMap;
 import static com.google.common.truth.Truth.assertThat;
 import static com.google.common.truth.Truth8.assertThat;
 import static java.util.stream.Collectors.joining;
@@ -63,6 +64,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Supplier;
 import org.junit.Before;
@@ -228,46 +230,64 @@ public class InstallMultiApksCommandTest {
     Path zipBundle = bundleBuilder.writeTo(tmpDir.resolve("bundle.zip"));
 
     InstallMultiApksCommand command =
-        InstallMultiApksCommand.fromFlags(
-            new FlagParser().parse("--apks-zip=" + zipBundle),
-            systemEnvironmentProvider,
-            fakeServerOneDevice(device));
+        InstallMultiApksCommand.builder()
+            .setAdbServer(fakeServerOneDevice(device))
+            .setDeviceId(DEVICE_ID)
+            .setAdbPath(adbPath)
+            .setApksArchiveZipPath(zipBundle)
+            .setAapt2Command(
+                createFakeAapt2Command(
+                    ImmutableMap.of(
+                        PKG_NAME_1, 1L,
+                        PKG_NAME_2, 2L)))
+            .build();
 
     // EXPECT
-    // 1) parent session creation
+    // 1) Get existing packages.
+    device.injectShellCommandOutput("pm list packages --show-versioncode", () -> "");
+    device.injectShellCommandOutput("pm list packages --apex-only --show-versioncode", () -> "");
+    // 2) parent session creation
     device.injectShellCommandOutput(
         "pm install-create --multi-package --staged", () -> "Success: blah blah [1111111]");
-    // 2) child session creation
+    // 3) child session creation
     AtomicInteger childSessionCounter = new AtomicInteger();
     device.injectShellCommandOutput(
         "pm install-create --staged",
         () -> "Success: blah blah [" + childSessionCounter.getAndIncrement() + "]");
-    // 3) apk writes
+    // 4) apk writes
     device.injectShellCommandOutput(
-        String.format("pm install-write 0 com.example.a_0 %s", pushedFileName("base-master.apk")),
+        String.format(
+            "pm install-write 0 com.example.a_0 %s",
+            pushedFileName(PKG_NAME_1 + "base-master.apk")),
         () -> "Success");
     device.injectShellCommandOutput(
         String.format(
-            "pm install-write 0 com.example.a_1 %s", pushedFileName("feature1-master.apk")),
+            "pm install-write 0 com.example.a_1 %s",
+            pushedFileName(PKG_NAME_1 + "feature1-master.apk")),
         () -> "Success");
     device.injectShellCommandOutput(
         String.format(
-            "pm install-write 0 com.example.a_2 %s", pushedFileName("feature2-master.apk")),
-        () -> "Success");
-    device.injectShellCommandOutput(
-        String.format("pm install-write 1 com.example.b_0 %s", pushedFileName("base-master.apk")),
-        () -> "Success");
-    device.injectShellCommandOutput(
-        String.format(
-            "pm install-write 1 com.example.b_1 %s", pushedFileName("feature1-master.apk")),
+            "pm install-write 0 com.example.a_2 %s",
+            pushedFileName(PKG_NAME_1 + "feature2-master.apk")),
         () -> "Success");
     device.injectShellCommandOutput(
         String.format(
-            "pm install-write 1 com.example.b_2 %s", pushedFileName("feature2-master.apk")),
+            "pm install-write 1 com.example.b_0 %s",
+            pushedFileName(PKG_NAME_2 + "base-master.apk")),
         () -> "Success");
-    // 4) Adding child to parent
+    device.injectShellCommandOutput(
+        String.format(
+            "pm install-write 1 com.example.b_1 %s",
+            pushedFileName(PKG_NAME_2 + "feature1-master.apk")),
+        () -> "Success");
+    device.injectShellCommandOutput(
+        String.format(
+            "pm install-write 1 com.example.b_2 %s",
+            pushedFileName(PKG_NAME_2 + "feature2-master.apk")),
+        () -> "Success");
+    // 5) Adding child to parent
     device.injectShellCommandOutput("pm install-add-session 1111111 0 1", () -> "Success");
-    // 5) Commit.
+    // 6) Commit.
     device.injectShellCommandOutput("pm install-commit 1111111", () -> "Success");
     command.execute();
   }
@@ -286,16 +306,24 @@ public class InstallMultiApksCommandTest {
     Path zipBundle = bundleBuilder.writeTo(tmpDir.resolve("bundle.zip"));
 
     InstallMultiApksCommand command =
-        InstallMultiApksCommand.fromFlags(
-            new FlagParser().parse("--apks-zip=" + zipBundle),
-            systemEnvironmentProvider,
-            fakeServerOneDevice(device));
+        InstallMultiApksCommand.builder()
+            .setAdbServer(fakeServerOneDevice(device))
+            .setDeviceId(DEVICE_ID)
+            .setAdbPath(adbPath)
+            .setApksArchiveZipPath(zipBundle)
+            .setAapt2Command(
+                createFakeAapt2Command(
+                    ImmutableMap.of(
+                        PKG_NAME_1, 1L,
+                        PKG_NAME_2, 2L)))
+            .build();
 
     // GIVEN the success message on the parent session includes empty lines.
     device.injectShellCommandOutput(
         "pm install-create --multi-package --staged", () -> "Success: blah blah [1111111]\n\n");
 
     // EXPECT processing to continue normally.
+    givenEmptyListPackages(device);
     givenChildSessionCreate(device);
     givenInstallWrites(device, 0, PKG_NAME_1, tableOfContent1);
     givenInstallWrites(device, 1, PKG_NAME_2, tableOfContent2);
@@ -318,14 +346,24 @@ public class InstallMultiApksCommandTest {
 
     // GIVEN only one of the packages is installed on the device...
     device.injectShellCommandOutput(
-        "pm list packages", () -> String.format("package:%s\njunk_to_ignore", PKG_NAME_1));
+        "pm list packages --show-versioncode",
+        () -> String.format("package:%s versionCode:1\njunk_to_ignore", PKG_NAME_1));
+    device.injectShellCommandOutput("pm list packages --apex-only --show-versioncode", () -> "");
 
     // GIVEN the --update-only flag is set on the command...
     InstallMultiApksCommand command =
-        InstallMultiApksCommand.fromFlags(
-            new FlagParser().parse("--apks-zip=" + zipBundle, "--update-only"),
-            systemEnvironmentProvider,
-            fakeServerOneDevice(device));
+        InstallMultiApksCommand.builder()
+            .setAdbServer(fakeServerOneDevice(device))
+            .setUpdateOnly(true)
+            .setDeviceId(DEVICE_ID)
+            .setAdbPath(adbPath)
+            .setApksArchiveZipPath(zipBundle)
+            .setAapt2Command(
+                createFakeAapt2Command(
+                    ImmutableMap.of(
+                        PKG_NAME_1, 2L,
+                        PKG_NAME_2, 2L)))
+            .build();
 
     givenParentSessionCreation(device);
     givenChildSessionCreate(device);
@@ -337,42 +375,58 @@ public class InstallMultiApksCommandTest {
   }
 
   @Test
-  public void execute_installNewPackages() throws Exception {
-    // GIVEN a zip file containing fake .apks files for multiple packages.
+  public void execute_updateOnly_apex() throws Exception {
+    // GIVEN a zip file containing fake .apks files for multiple packages, one of which is an
+    // apex.
     BuildApksResult tableOfContent1 = fakeTableOfContents(PKG_NAME_1);
     Path package1Apks = createApksArchiveFile(tableOfContent1, tmpDir.resolve("package1.apks"));
-    BuildApksResult tableOfContent2 = fakeTableOfContents(PKG_NAME_2);
-    Path package2Apks = createApksArchiveFile(tableOfContent2, tmpDir.resolve("package2.apks"));
+    BuildApksResult apexTableOfContents =
+        BuildApksResult.newBuilder()
+            .setPackageName(PKG_NAME_2)
+            .setBundletool(
+                Bundletool.newBuilder()
+                    .setVersion(BundleToolVersion.getCurrentVersion().toString()))
+            .addVariant(
+                apexVariant(
+                    VariantTargeting.getDefaultInstance(),
+                    ApkTargeting.getDefaultInstance(),
+                    ZipPath.create(PKG_NAME_2 + "base.apex")))
+            .build();
+    Path package2Apks = createApksArchiveFile(apexTableOfContents, tmpDir.resolve("package2.apks"));
     ZipBuilder bundleBuilder = new ZipBuilder();
     bundleBuilder
         .addFileFromDisk(ZipPath.create("package1.apks"), package1Apks.toFile())
         .addFileFromDisk(ZipPath.create("package2.apks"), package2Apks.toFile());
     Path zipBundle = bundleBuilder.writeTo(tmpDir.resolve("bundle.zip"));
 
-    // GIVEN the --update-only flag is not set.
+    // GIVEN only one of the packages is installed on the device...
+    device.injectShellCommandOutput("pm list packages --show-versioncode", () -> "");
+    device.injectShellCommandOutput(
+        "pm list packages --apex-only --show-versioncode",
+        () -> String.format("package:%s versionCode:1\njunk_to_ignore", PKG_NAME_2));
+
+    // GIVEN the --update-only flag is set on the command...
     InstallMultiApksCommand command =
-        InstallMultiApksCommand.fromFlags(
-            new FlagParser().parse("--apks-zip=" + zipBundle),
-            systemEnvironmentProvider,
-            fakeServerOneDevice(device));
+        InstallMultiApksCommand.builder()
+            .setAdbServer(fakeServerOneDevice(device))
+            .setUpdateOnly(true)
+            .setDeviceId(DEVICE_ID)
+            .setAdbPath(adbPath)
+            .setApksArchiveZipPath(zipBundle)
+            .setAapt2Command(
+                createFakeAapt2Command(
+                    ImmutableMap.of(
+                        PKG_NAME_1, 2L,
+                        PKG_NAME_2, 2L)))
+            .build();
 
     givenParentSessionCreation(device);
-    givenChildSessionCreate(device);
-    givenInstallAddAndCommit(device, ImmutableList.of(0, 1));
-
-    // EXPECT
-    // both packages to be installed.
-    givenInstallWrites(device, 0, PKG_NAME_1, tableOfContent1);
-    givenInstallWrites(device, 1, PKG_NAME_2, tableOfContent2);
-
-    // ACT
-    // Make sure the package list was not retrieved since the --update-only flag was not set.
     device.injectShellCommandOutput(
-        "pm list packages",
-        () -> {
-          throw new IllegalStateException("Package list should not be called");
-        });
+        "pm install-create --staged --apex", () -> "Success: blah blah [0]");
+    givenInstallAddAndCommit(device, ImmutableList.of(0));
 
+    // EXPECT only one of the packages
+    givenInstallWrites(device, 0, PKG_NAME_2, apexTableOfContents);
     command.execute();
   }
 
@@ -391,11 +445,20 @@ public class InstallMultiApksCommandTest {
 
     // GIVEN a command with --no-commit
     InstallMultiApksCommand command =
-        InstallMultiApksCommand.fromFlags(
-            new FlagParser().parse("--apks-zip=" + zipBundle, "--no-commit"),
-            systemEnvironmentProvider,
-            fakeServerOneDevice(device));
+        InstallMultiApksCommand.builder()
+            .setAdbServer(fakeServerOneDevice(device))
+            .setDeviceId(DEVICE_ID)
+            .setAdbPath(adbPath)
+            .setApksArchiveZipPath(zipBundle)
+            .setNoCommitMode(true)
+            .setAapt2Command(
+                createFakeAapt2Command(
+                    ImmutableMap.of(
+                        PKG_NAME_1, 1L,
+                        PKG_NAME_2, 2L)))
+            .build();
 
+    givenEmptyListPackages(device);
     givenParentSessionCreation(device);
     givenChildSessionCreate(device);
     givenInstallWrites(device, 0, PKG_NAME_1, tableOfContent1);
@@ -422,14 +485,22 @@ public class InstallMultiApksCommandTest {
     Path zipBundle = bundleBuilder.writeTo(tmpDir.resolve("bundle.zip"));
 
     // GIVEN only no packages are installed on the device...
-    device.injectShellCommandOutput("pm list packages", () -> "");
+    givenEmptyListPackages(device);
 
     // GIVEN the --update-only flag is used to restrict to previously installed packages.
     InstallMultiApksCommand command =
-        InstallMultiApksCommand.fromFlags(
-            new FlagParser().parse("--apks-zip=" + zipBundle, "--update-only"),
-            systemEnvironmentProvider,
-            fakeServerOneDevice(device));
+        InstallMultiApksCommand.builder()
+            .setAdbServer(fakeServerOneDevice(device))
+            .setDeviceId(DEVICE_ID)
+            .setAdbPath(adbPath)
+            .setApksArchiveZipPath(zipBundle)
+            .setUpdateOnly(true)
+            .setAapt2Command(
+                createFakeAapt2Command(
+                    ImmutableMap.of(
+                        PKG_NAME_1, 1L,
+                        PKG_NAME_2, 2L)))
+            .build();
 
     // EXPECT no further commands to be executed.
     command.execute();
@@ -455,17 +526,23 @@ public class InstallMultiApksCommandTest {
                                 .build())
                         .build(),
                     ApkTargeting.getDefaultInstance(),
-                    ZipPath.create("base.apex")))
+                    ZipPath.create(PKG_NAME_1 + "base.apex")))
             .build();
     Path package1Apks = createApksArchiveFile(apexTableOfContents, tmpDir.resolve("package1.apks"));
 
     InstallMultiApksCommand command =
-        InstallMultiApksCommand.fromFlags(
-            new FlagParser().parse("--apks=" + package1Apks),
-            systemEnvironmentProvider,
-            fakeServerOneDevice(device));
+        InstallMultiApksCommand.builder()
+            .setAdbServer(fakeServerOneDevice(device))
+            .setDeviceId(DEVICE_ID)
+            .setAdbPath(adbPath)
+            .setApksArchivePaths(ImmutableList.of(package1Apks))
+            .setAapt2Command(createFakeAapt2Command(ImmutableMap.of(PKG_NAME_1, 1L)))
+            .build();
 
-    // THEN the command executes without triggering any shell commands.
+    // EXPECT to check the existing list of packages...
+    givenEmptyListPackages(device);
+
+    // THEN the command executes without triggering any other shell commands.
     command.execute();
   }
 
@@ -484,7 +561,7 @@ public class InstallMultiApksCommandTest {
                 apexVariant(
                     VariantTargeting.getDefaultInstance(),
                     ApkTargeting.getDefaultInstance(),
-                    ZipPath.create("base.apex")))
+                    ZipPath.create(PKG_NAME_2 + "base.apex")))
             .build();
     Path package2Apks = createApksArchiveFile(apexTableOfContents, tmpDir.resolve("package2.apks"));
     ZipBuilder bundleBuilder = new ZipBuilder();
@@ -494,11 +571,19 @@ public class InstallMultiApksCommandTest {
     Path zipBundle = bundleBuilder.writeTo(tmpDir.resolve("bundle.zip"));
 
     InstallMultiApksCommand command =
-        InstallMultiApksCommand.fromFlags(
-            new FlagParser().parse("--apks-zip=" + zipBundle),
-            systemEnvironmentProvider,
-            fakeServerOneDevice(device));
+        InstallMultiApksCommand.builder()
+            .setAdbServer(fakeServerOneDevice(device))
+            .setDeviceId(DEVICE_ID)
+            .setAdbPath(adbPath)
+            .setApksArchiveZipPath(zipBundle)
+            .setAapt2Command(
+                createFakeAapt2Command(
+                    ImmutableMap.of(
+                        PKG_NAME_1, 1L,
+                        PKG_NAME_2, 2L)))
+            .build();
 
+    givenEmptyListPackages(device);
     givenParentSessionCreation(device);
     givenChildSessionCreate(device);
     givenInstallWrites(device, 0, PKG_NAME_1, tableOfContent1);
@@ -509,65 +594,32 @@ public class InstallMultiApksCommandTest {
     device.injectShellCommandOutput(
         "pm install-create --staged --apex", () -> "Success: blah blah [1]");
     device.injectShellCommandOutput(
-        String.format("pm install-write 1 com.example.b_0 %s", pushedFileName("base.apex")),
+        String.format(
+            "pm install-write 1 com.example.b_0 %s", pushedFileName(PKG_NAME_2 + "base.apex")),
         () -> "Success");
     command.execute();
   }
 
   @Test
-  public void execute_packageNameMissing_fallBackOnAapt2() throws Exception {
-    // GIVEN a fake .apks file without a package name.
-    BuildApksResult tableOfContents1 =
-        fakeTableOfContents(PKG_NAME_1).toBuilder().clearPackageName().build();
-    Path apksPath = createApksArchiveFile(tableOfContents1, tmpDir.resolve("package1.apks"));
-
-    // GIVEN a command with a fake aapt2 command...
-    Aapt2Command aapt2Command =
-        createFakeAapt2Command(
-            () ->
-                ImmutableList.of(
-                    String.format(
-                        "package: name='%s' versionCode='292200000' versionName=''"
-                            + " platformBuildVersionName='' platformBuildVersionCode=''"
-                            + " compileSdkVersion='29' compileSdkVersionCodename='10'",
-                        PKG_NAME_1),
-                    "application: label='' icon=''",
-                    "sdkVersion:'29'",
-                    "maxSdkVersion:'29'",
-                    ""));
-
-    InstallMultiApksCommand command =
-        InstallMultiApksCommand.builder()
-            .setAdbServer(fakeServerOneDevice(device))
-            .setDeviceId(DEVICE_ID)
-            .setAdbPath(adbPath)
-            .addApksArchivePath(apksPath)
-            .setAapt2Command(aapt2Command)
-            .build();
-
-    // EXPECT the command to execute successfully.
-    givenParentSessionCreation(device);
-    givenChildSessionCreate(device);
-    givenInstallWrites(device, 0, PKG_NAME_1, tableOfContents1);
-    givenInstallAddAndCommit(device, ImmutableList.of(0));
-    command.execute();
-  }
-
-  @Test
   public void execute_packageNameMissing_aapt2Failure() throws Exception {
-    // GIVEN a fake .apks file without a package name, and another with a package name...
-    BuildApksResult tableOfContents1 =
-        fakeTableOfContents(PKG_NAME_1).toBuilder().clearPackageName().build();
+    // GIVEN fake .apks files, one of which will fail on the aapt2 command...
+    BuildApksResult tableOfContents1 = fakeTableOfContents(PKG_NAME_1);
     Path apksPath1 = createApksArchiveFile(tableOfContents1, tmpDir.resolve("package1.apks"));
     BuildApksResult tableOfContents2 = fakeTableOfContents(PKG_NAME_2);
     Path apksPath2 = createApksArchiveFile(tableOfContents2, tmpDir.resolve("package2.apks"));
 
-    // GIVEN a command with a fake aapt2 command that will fail with an IncompatibleDeviceException.
+    // GIVEN a fake aapt2 command that will fail with an IncompatibleDeviceException.
     Aapt2Command aapt2Command =
-        createFakeAapt2Command(
-            () -> {
-              throw new IncompatibleDeviceException("Invalid device");
-            });
+        createFakeAapt2CommandFromSupplier(
+            ImmutableMap.of(
+                PKG_NAME_1,
+                    () -> {
+                      throw new IncompatibleDeviceException("incompatible device");
+                    },
+                PKG_NAME_2,
+                    () ->
+                        ImmutableList.of(
+                            String.format("package: name='%s' versionCode='%d' ", PKG_NAME_2, 2))));
 
     InstallMultiApksCommand command =
         InstallMultiApksCommand.builder()
@@ -579,10 +631,78 @@ public class InstallMultiApksCommandTest {
             .build();
 
     // EXPECT the command to skip the incompatible package.
+    givenEmptyListPackages(device);
     givenParentSessionCreation(device);
     givenChildSessionCreate(device);
     givenInstallWrites(device, 0, PKG_NAME_2, tableOfContents2);
     givenInstallAddAndCommit(device, ImmutableList.of(0));
+    command.execute();
+  }
+
+  @Test
+  public void execute_includeEqualVersionInstalled() throws Exception {
+    // GIVEN fake .apks files, one of which will have an equal version already installed...
+    BuildApksResult tableOfContents1 = fakeTableOfContents(PKG_NAME_1);
+    Path apksPath1 = createApksArchiveFile(tableOfContents1, tmpDir.resolve("package1.apks"));
+    BuildApksResult tableOfContents2 = fakeTableOfContents(PKG_NAME_2);
+    Path apksPath2 = createApksArchiveFile(tableOfContents2, tmpDir.resolve("package2.apks"));
+
+    InstallMultiApksCommand command =
+        InstallMultiApksCommand.builder()
+            .setAdbServer(fakeServerOneDevice(device))
+            .setDeviceId(DEVICE_ID)
+            .setAdbPath(adbPath)
+            .setApksArchivePaths(ImmutableList.of(apksPath1, apksPath2))
+            .setAapt2Command(
+                createFakeAapt2Command(ImmutableMap.of(PKG_NAME_1, 1L, PKG_NAME_2, 2L)))
+            .build();
+
+    device.injectShellCommandOutput(
+        "pm list packages --show-versioncode",
+        () ->
+            String.format(
+                "package:%s versionCode:1\npackage:%s versionCode:1", PKG_NAME_1, PKG_NAME_2));
+    device.injectShellCommandOutput("pm list packages --apex-only --show-versioncode", () -> "");
+
+    // EXPECT only the higher version package to be installed.
+    givenParentSessionCreation(device);
+    givenChildSessionCreate(device);
+    givenInstallAddAndCommit(device, ImmutableList.of(0, 1));
+    givenInstallWrites(device, 0, PKG_NAME_1, tableOfContents1);
+    givenInstallWrites(device, 1, PKG_NAME_2, tableOfContents2);
+    command.execute();
+  }
+
+  @Test
+  public void execute_skipHigherVersionInstalled() throws Exception {
+    // GIVEN fake .apks files, one of which will have an higher version already installed...
+    BuildApksResult tableOfContents1 = fakeTableOfContents(PKG_NAME_1);
+    Path apksPath1 = createApksArchiveFile(tableOfContents1, tmpDir.resolve("package1.apks"));
+    BuildApksResult tableOfContents2 = fakeTableOfContents(PKG_NAME_2);
+    Path apksPath2 = createApksArchiveFile(tableOfContents2, tmpDir.resolve("package2.apks"));
+
+    InstallMultiApksCommand command =
+        InstallMultiApksCommand.builder()
+            .setAdbServer(fakeServerOneDevice(device))
+            .setDeviceId(DEVICE_ID)
+            .setAdbPath(adbPath)
+            .setApksArchivePaths(ImmutableList.of(apksPath1, apksPath2))
+            .setAapt2Command(
+                createFakeAapt2Command(ImmutableMap.of(PKG_NAME_1, 1L, PKG_NAME_2, 2L)))
+            .build();
+
+    device.injectShellCommandOutput(
+        "pm list packages --show-versioncode",
+        () ->
+            String.format(
+                "package:%s versionCode:3\npackage:%s versionCode:1", PKG_NAME_1, PKG_NAME_2));
+    device.injectShellCommandOutput("pm list packages --apex-only --show-versioncode", () -> "");
+
+    // EXPECT only the higher version package to be installed.
+    givenParentSessionCreation(device);
+    givenChildSessionCreate(device);
+    givenInstallAddAndCommit(device, ImmutableList.of(0));
+    givenInstallWrites(device, 0, PKG_NAME_2, tableOfContents2);
     command.execute();
   }
 
@@ -599,18 +719,23 @@ public class InstallMultiApksCommandTest {
                 apexVariant(
                     VariantTargeting.getDefaultInstance(),
                     ApkTargeting.getDefaultInstance(),
-                    ZipPath.create("base.apex")))
+                    ZipPath.create(PKG_NAME_1 + "base.apex")))
             .build();
     Path apksPath = createApksArchiveFile(apexTableOfContents, tmpDir.resolve("package1.apks"));
 
     // GIVEN an install command with the --enable-rollback flag...
     InstallMultiApksCommand command =
-        InstallMultiApksCommand.fromFlags(
-            new FlagParser().parse("--apks=" + apksPath, "--enable-rollback"),
-            systemEnvironmentProvider,
-            fakeServerOneDevice(device));
+        InstallMultiApksCommand.builder()
+            .setAdbServer(fakeServerOneDevice(device))
+            .setDeviceId(DEVICE_ID)
+            .setAdbPath(adbPath)
+            .setEnableRollback(true)
+            .setApksArchivePaths(ImmutableList.of(apksPath))
+            .setAapt2Command(createFakeAapt2Command(ImmutableMap.of(PKG_NAME_1, 1L)))
+            .build();
 
-    givenInstallWrites(device, 0, PKG_NAME_1, ImmutableList.of("base.apex"));
+    givenEmptyListPackages(device);
+    givenInstallWrites(device, 0, PKG_NAME_1, ImmutableList.of(PKG_NAME_1 + "base.apex"));
     givenInstallAddAndCommit(device, ImmutableList.of(0));
 
     // EXPECT
@@ -634,20 +759,26 @@ public class InstallMultiApksCommandTest {
     Path package2Apks = createApksArchiveFile(tableOfContent2, tmpDir.resolve("package2.apks"));
 
     InstallMultiApksCommand command =
-        InstallMultiApksCommand.fromFlags(
-            new FlagParser().parse(String.format("--apks=%s,%s", package1Apks, package2Apks)),
-            systemEnvironmentProvider,
-            fakeServerOneDevice(device));
+        InstallMultiApksCommand.builder()
+            .setAdbServer(fakeServerOneDevice(device))
+            .setDeviceId(DEVICE_ID)
+            .setAdbPath(adbPath)
+            .setApksArchivePaths(ImmutableList.of(package1Apks, package2Apks))
+            .setAapt2Command(
+                createFakeAapt2Command(ImmutableMap.of(PKG_NAME_1, 1L, PKG_NAME_2, 2L)))
+            .build();
 
+    givenEmptyListPackages(device);
     givenParentSessionCreation(device);
     givenChildSessionCreate(device);
-    givenInstallWrites(device, 0, PKG_NAME_1, ImmutableList.of("base-master.apk"));
+    givenInstallWrites(device, 0, PKG_NAME_1, ImmutableList.of(PKG_NAME_1 + "base-master.apk"));
 
     // ACT
     // Simulate a timeout exception.
     device.injectShellCommandOutput(
         String.format(
-            "pm install-write 0 com.example.a_1 %s", pushedFileName("feature1-master.apk")),
+            "pm install-write 0 com.example.a_1 %s",
+            pushedFileName(PKG_NAME_1 + "feature1-master.apk")),
         () -> {
           throw new TimeoutException("Timeout");
         });
@@ -667,11 +798,15 @@ public class InstallMultiApksCommandTest {
     Path package1Apks = createApksArchiveFile(tableOfContent1, tmpDir.resolve("package1.apks"));
 
     InstallMultiApksCommand command =
-        InstallMultiApksCommand.fromFlags(
-            new FlagParser().parse("--apks=" + package1Apks),
-            systemEnvironmentProvider,
-            fakeServerOneDevice(device));
+        InstallMultiApksCommand.builder()
+            .setAdbServer(fakeServerOneDevice(device))
+            .setDeviceId(DEVICE_ID)
+            .setAdbPath(adbPath)
+            .setApksArchivePaths(ImmutableList.of(package1Apks))
+            .setAapt2Command(createFakeAapt2Command(ImmutableMap.of(PKG_NAME_1, 1L)))
+            .build();
 
+    givenEmptyListPackages(device);
     givenParentSessionCreation(device);
 
     // ACT
@@ -692,11 +827,15 @@ public class InstallMultiApksCommandTest {
     Path package1Apks = createApksArchiveFile(tableOfContent1, tmpDir.resolve("package1.apks"));
 
     InstallMultiApksCommand command =
-        InstallMultiApksCommand.fromFlags(
-            new FlagParser().parse("--apks=" + package1Apks),
-            systemEnvironmentProvider,
-            fakeServerOneDevice(device));
+        InstallMultiApksCommand.builder()
+            .setAdbServer(fakeServerOneDevice(device))
+            .setDeviceId(DEVICE_ID)
+            .setAdbPath(adbPath)
+            .setApksArchivePaths(ImmutableList.of(package1Apks))
+            .setAapt2Command(createFakeAapt2Command(ImmutableMap.of(PKG_NAME_1, 1L)))
+            .build();
 
+    givenEmptyListPackages(device);
     givenParentSessionCreation(device);
 
     // ACT
@@ -717,11 +856,15 @@ public class InstallMultiApksCommandTest {
     Path package1Apks = createApksArchiveFile(tableOfContent1, tmpDir.resolve("package1.apks"));
 
     InstallMultiApksCommand command =
-        InstallMultiApksCommand.fromFlags(
-            new FlagParser().parse("--apks=" + package1Apks),
-            systemEnvironmentProvider,
-            fakeServerOneDevice(device));
+        InstallMultiApksCommand.builder()
+            .setAdbServer(fakeServerOneDevice(device))
+            .setDeviceId(DEVICE_ID)
+            .setAdbPath(adbPath)
+            .setApksArchivePaths(ImmutableList.of(package1Apks))
+            .setAapt2Command(createFakeAapt2Command(ImmutableMap.of(PKG_NAME_1, 1L)))
+            .build();
 
+    givenEmptyListPackages(device);
     givenParentSessionCreation(device);
     givenChildSessionCreate(device);
     givenInstallWrites(device, 0, PKG_NAME_1, tableOfContent1);
@@ -748,15 +891,18 @@ public class InstallMultiApksCommandTest {
                 createSplitApkSet(
                     "base",
                     createMasterApkDescription(
-                        ApkTargeting.getDefaultInstance(), ZipPath.create("base-master.apk"))),
+                        ApkTargeting.getDefaultInstance(),
+                        ZipPath.create(packageName + "base-master.apk"))),
                 createSplitApkSet(
                     "feature1",
                     createMasterApkDescription(
-                        ApkTargeting.getDefaultInstance(), ZipPath.create("feature1-master.apk"))),
+                        ApkTargeting.getDefaultInstance(),
+                        ZipPath.create(packageName + "feature1-master.apk"))),
                 createSplitApkSet(
                     "feature2",
                     createMasterApkDescription(
-                        ApkTargeting.getDefaultInstance(), ZipPath.create("feature2-master.apk")))))
+                        ApkTargeting.getDefaultInstance(),
+                        ZipPath.create(packageName + "feature2-master.apk")))))
         .build();
   }
 
@@ -820,6 +966,11 @@ public class InstallMultiApksCommandTest {
         String.format("pm install-commit %d", PARENT_SESSION_ID), () -> "Success");
   }
 
+  private static void givenEmptyListPackages(FakeDevice device) {
+    device.injectShellCommandOutput("pm list packages --show-versioncode", () -> "");
+    device.injectShellCommandOutput("pm list packages --apex-only --show-versioncode", () -> "");
+  }
+
   private static void givenChildSessionCreate(FakeDevice device) {
     AtomicInteger childSessionCounter = new AtomicInteger();
     device.injectShellCommandOutput(
@@ -827,8 +978,22 @@ public class InstallMultiApksCommandTest {
         () -> "Success: blah blah [" + childSessionCounter.getAndIncrement() + "]");
   }
 
-  private static Aapt2Command createFakeAapt2Command(
-      Supplier<ImmutableList<String>> dumpBadgingSupplier) {
+  private static Aapt2Command createFakeAapt2Command(ImmutableMap<String, Long> packageVersionMap) {
+    return createFakeAapt2CommandFromSupplier(
+        packageVersionMap.entrySet().stream()
+            .collect(
+                toImmutableMap(
+                    Map.Entry::getKey,
+                    entry ->
+                        () ->
+                            ImmutableList.of(
+                                String.format(
+                                    "package: name='%s' versionCode='%d' ",
+                                    entry.getKey(), entry.getValue())))));
+  }
+
+  private static Aapt2Command createFakeAapt2CommandFromSupplier(
+      ImmutableMap<String, Supplier<ImmutableList<String>>> packageSupplierMap) {
     return new Aapt2Command() {
       @Override
       public void convertApkProtoToBinary(Path protoApk, Path binaryApk) {
@@ -837,7 +1002,11 @@ public class InstallMultiApksCommandTest {
 
       @Override
       public ImmutableList<String> dumpBadging(Path apkPath) {
-        return dumpBadgingSupplier.get();
+        return packageSupplierMap.keySet().stream()
+            .filter(packageName -> apkPath.toString().contains(packageName))
+            .findFirst()
+            .map(packageName -> packageSupplierMap.get(packageName).get())
+            .orElse(ImmutableList.of());
       }
     };
   }

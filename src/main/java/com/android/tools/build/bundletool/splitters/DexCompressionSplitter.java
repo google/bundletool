@@ -47,15 +47,15 @@ public class DexCompressionSplitter implements ModuleSplitSplitter {
       return ImmutableList.of(moduleSplit);
     }
 
-    // Only APKs targeting devices below Android Q should be compressed.
-    boolean shouldCompress = targetsPreQ(moduleSplit);
+    // Only APKs targeting devices below Android Q should have dex entries compressed.
+    boolean forceUncompressed = targetsAtLeastQ(moduleSplit);
     return ImmutableList.of(
         createModuleSplit(
-            moduleSplit, mergeAndSetCompression(dexEntries, moduleSplit, shouldCompress)));
+            moduleSplit, mergeAndSetCompression(dexEntries, moduleSplit, forceUncompressed)));
   }
 
   private static ImmutableList<ModuleEntry> mergeAndSetCompression(
-      ImmutableSet<ModuleEntry> dexEntries, ModuleSplit moduleSplit, boolean shouldCompress) {
+      ImmutableSet<ModuleEntry> dexEntries, ModuleSplit moduleSplit, boolean forceUncompressed) {
 
     ImmutableSet<ModuleEntry> nonDexEntries =
         moduleSplit.getEntries().stream()
@@ -67,20 +67,20 @@ public class DexCompressionSplitter implements ModuleSplitSplitter {
             dexEntries.stream()
                 .map(
                     moduleEntry ->
-                        moduleEntry.toBuilder().setShouldCompress(shouldCompress).build())
+                        moduleEntry.toBuilder().setForceUncompressed(forceUncompressed).build())
                 .collect(toImmutableList()))
         .addAll(nonDexEntries)
         .build();
   }
 
-  private static boolean targetsPreQ(ModuleSplit moduleSplit) {
+  private static boolean targetsAtLeastQ(ModuleSplit moduleSplit) {
     int sdkVersion =
         Iterables.getOnlyElement(
                 moduleSplit.getVariantTargeting().getSdkVersionTargeting().getValueList())
             .getMin()
             .getValue();
 
-    return sdkVersion < ANDROID_Q_API_VERSION;
+    return sdkVersion >= ANDROID_Q_API_VERSION;
   }
 
   private static ModuleSplit createModuleSplit(

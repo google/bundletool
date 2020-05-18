@@ -54,7 +54,7 @@ public class DexCompressionSplitterTest {
 
     assertThat(extractPaths(moduleSplit.getEntries())).containsExactly("dex/classes.dex");
     assertThat(moduleSplit.isMasterSplit()).isTrue();
-    assertThat(isCompressed(moduleSplit, "dex/classes.dex")).isFalse();
+    assertThat(getForceUncompressed(moduleSplit, "dex/classes.dex")).isTrue();
     assertThat(moduleSplit.getApkTargeting()).isEqualToDefaultInstance();
   }
 
@@ -100,9 +100,9 @@ public class DexCompressionSplitterTest {
         .containsExactly("lib/x86_64/libsome.so", "assets/leftover.txt", "dex/classes.dex");
     assertThat(moduleSplit.isMasterSplit()).isTrue();
 
-    assertThat(isCompressed(moduleSplit, "dex/classes.dex")).isFalse();
-    assertThat(isCompressed(moduleSplit, "lib/x86_64/libsome.so")).isTrue();
-    assertThat(isCompressed(moduleSplit, "assets/leftover.txt")).isTrue();
+    assertThat(getForceUncompressed(moduleSplit, "dex/classes.dex")).isTrue();
+    assertThat(getForceUncompressed(moduleSplit, "lib/x86_64/libsome.so")).isFalse();
+    assertThat(getForceUncompressed(moduleSplit, "assets/leftover.txt")).isFalse();
 
     assertThat(moduleSplit.getApkTargeting()).isEqualToDefaultInstance();
   }
@@ -123,12 +123,12 @@ public class DexCompressionSplitterTest {
         .isEqualTo(variantSdkTargeting(ANDROID_P_API_VERSION));
 
     assertThat(extractPaths(moduleSplit.getEntries())).containsExactly("dex/classes.dex");
-    assertThat(isCompressed(moduleSplit, "dex/classes.dex")).isTrue();
+    assertThat(getForceUncompressed(moduleSplit, "dex/classes.dex")).isFalse();
     assertThat(splits.asList().get(0)).isEqualTo(moduleSplit);
   }
 
-  private static boolean isCompressed(ModuleSplit moduleSplit, String path) {
-    return moduleSplit.findEntry(path).get().getShouldCompress();
+  private static boolean getForceUncompressed(ModuleSplit moduleSplit, String path) {
+    return moduleSplit.findEntry(path).get().getForceUncompressed();
   }
 
   /** Creates a minimal module with single dex file. */

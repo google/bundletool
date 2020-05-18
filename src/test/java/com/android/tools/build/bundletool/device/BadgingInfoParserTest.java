@@ -19,6 +19,7 @@ package com.android.tools.build.bundletool.device;
 import static com.google.common.truth.Truth.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
+import com.android.tools.build.bundletool.device.BadgingInfoParser.BadgingInfo;
 import com.android.tools.build.bundletool.model.exceptions.ParseException;
 import com.google.common.collect.ImmutableList;
 import org.junit.Test;
@@ -26,7 +27,7 @@ import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 
 @RunWith(JUnit4.class)
-public class BadgingPackageNameParserTest {
+public class BadgingInfoParserTest {
 
   @Test
   public void parse_matchingCase() {
@@ -42,10 +43,11 @@ public class BadgingPackageNameParserTest {
             "");
 
     // WHEN parsed
-    String packageName = BadgingPackageNameParser.parse(input);
+    BadgingInfo packageName = BadgingInfoParser.parse(input);
 
     // THEN the correct package name is returned.
-    assertThat(packageName).isEqualTo("com.google.android.media.swcodec");
+    assertThat(packageName)
+        .isEqualTo(BadgingInfo.create("com.google.android.media.swcodec", 292200000));
   }
 
   @Test
@@ -56,8 +58,7 @@ public class BadgingPackageNameParserTest {
             "application: label='' icon=''", "sdkVersion:'29'", "maxSdkVersion:'29'", "");
 
     // WHEN parsed
-    ParseException e =
-        assertThrows(ParseException.class, () -> BadgingPackageNameParser.parse(input));
+    ParseException e = assertThrows(ParseException.class, () -> BadgingInfoParser.parse(input));
 
     // THEN an IllegalArgumentException is thrown.
     assertThat(e).hasMessageThat().contains("line not found in badging");
@@ -75,10 +76,9 @@ public class BadgingPackageNameParserTest {
             "");
 
     // WHEN parsed
-    ParseException e =
-        assertThrows(ParseException.class, () -> BadgingPackageNameParser.parse(input));
+    ParseException e = assertThrows(ParseException.class, () -> BadgingInfoParser.parse(input));
 
     // THEN an IllegalArgumentException is thrown.
-    assertThat(e).hasMessageThat().contains("'name=' not found in package line");
+    assertThat(e).hasMessageThat().contains("'name=' and 'versionCode=' not found in package line");
   }
 }

@@ -772,7 +772,7 @@ public class ModuleSplitterTest {
             .filter(split -> split.getApkTargeting().hasAbiTargeting())
             .findFirst()
             .get();
-    assertThat(x86Split.findEntry("lib/x86/liba.so").get().getShouldCompress()).isTrue();
+    assertThat(x86Split.findEntry("lib/x86/liba.so").get().getForceUncompressed()).isFalse();
   }
 
   @Test
@@ -810,7 +810,7 @@ public class ModuleSplitterTest {
             .filter(split -> split.getApkTargeting().hasAbiTargeting())
             .findFirst()
             .get();
-    assertThat(x86Split.findEntry("lib/x86/liba.so").get().getShouldCompress()).isFalse();
+    assertThat(x86Split.findEntry("lib/x86/liba.so").get().getForceUncompressed()).isTrue();
   }
 
   @Test
@@ -873,7 +873,7 @@ public class ModuleSplitterTest {
     assertThat(moduleSplit.getSplitType()).isEqualTo(SplitType.SPLIT);
     assertThat(moduleSplit.getVariantTargeting())
         .isEqualTo(variantMinSdkTargeting(ANDROID_Q_API_VERSION));
-    assertThat(moduleSplit.findEntry("dex/classes.dex").get().getShouldCompress()).isFalse();
+    assertThat(moduleSplit.findEntry("dex/classes.dex").get().getForceUncompressed()).isTrue();
   }
 
   @Test
@@ -898,7 +898,7 @@ public class ModuleSplitterTest {
     assertThat(moduleSplit.getSplitType()).isEqualTo(SplitType.SPLIT);
     assertThat(moduleSplit.getVariantTargeting())
         .isEqualTo(variantMinSdkTargeting(ANDROID_L_API_VERSION));
-    assertThat(moduleSplit.findEntry("dex/classes.dex").get().getShouldCompress()).isTrue();
+    assertThat(moduleSplit.findEntry("dex/classes.dex").get().getForceUncompressed()).isFalse();
   }
 
   @Test

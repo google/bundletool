@@ -143,6 +143,14 @@ public final class SdkToolsLocatorTest {
               /* executableExtension */ ".exe"
             },
             {
+              /* osName */ "Windows ('c:\\adb' dir)",
+              /* osConfiguration */ Configuration.windows(),
+              /* pathSeparator */ ";",
+              /* systemPath */ "C:\\nonexistent;C:\\adb;\"invalid-path",
+              /* goodPathDir */ "C:\\adb",
+              /* executableExtension */ ".exe"
+            },
+            {
               /* osName */ "OS X",
               /* osConfiguration */ Configuration.osX(),
               /* pathSeparator */ ":",

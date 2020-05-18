@@ -41,6 +41,7 @@ import static com.android.tools.build.bundletool.testing.DeviceFactory.abis;
 import static com.android.tools.build.bundletool.testing.DeviceFactory.density;
 import static com.android.tools.build.bundletool.testing.DeviceFactory.deviceFeatures;
 import static com.android.tools.build.bundletool.testing.DeviceFactory.deviceWithSdk;
+import static com.android.tools.build.bundletool.testing.DeviceFactory.lDevice;
 import static com.android.tools.build.bundletool.testing.DeviceFactory.lDeviceWithAbis;
 import static com.android.tools.build.bundletool.testing.DeviceFactory.lDeviceWithDensity;
 import static com.android.tools.build.bundletool.testing.DeviceFactory.lDeviceWithGlExtensions;
@@ -853,6 +854,22 @@ public class ApkMatcherTest {
   }
 
   @Test
+  public void textureVariant_fallback() {
+    ZipPath apk = ZipPath.create("master-other_tcf.apk");
+    BuildApksResult buildApksResult =
+        buildApksResult(
+            createVariant(
+                mergeVariantTargeting(
+                    variantSdkTargeting(sdkVersionFrom(Versions.ANDROID_L_API_VERSION)),
+                    variantTextureTargeting(ImmutableSet.of(), ImmutableSet.of(ATC))),
+                splitApkSet(
+                    /* moduleName= */ "base",
+                    splitApkDescription(ApkTargeting.getDefaultInstance(), apk))));
+
+    assertThat(new ApkMatcher(lDevice()).getMatchingApks(buildApksResult)).containsExactly(apk);
+  }
+
+  @Test
   public void textureVariant_preL_incompatibleDevice() {
     ZipPath apk = ZipPath.create("master-etc1_rgb8.apk");
     BuildApksResult buildApksResult =
@@ -930,6 +947,18 @@ public class ApkMatcherTest {
         .containsExactly(apk);
   }
 
+  @Test
+  public void apkMatch_textureSplit_fallback() {
+    ZipPath apk = ZipPath.create("master-other_tcf.apk");
+    BuildApksResult buildApksResult =
+        buildApksResult(
+            oneApkSplitApkVariant(
+                variantSdkTargeting(sdkVersionFrom(Versions.ANDROID_L_API_VERSION)),
+                apkTextureTargeting(ImmutableSet.of(), ImmutableSet.of(ATC, PVRTC)),
+                apk));
+
+    assertThat(new ApkMatcher(lDevice()).getMatchingApks(buildApksResult)).containsExactly(apk);
+  }
   // Module name filtering.
 
   @Test

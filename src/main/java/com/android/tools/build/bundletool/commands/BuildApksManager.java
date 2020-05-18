@@ -41,6 +41,7 @@ import com.android.tools.build.bundletool.io.ApkSetBuilderFactory;
 import com.android.tools.build.bundletool.io.ApkSetBuilderFactory.ApkSetBuilder;
 import com.android.tools.build.bundletool.io.SplitApkSerializer;
 import com.android.tools.build.bundletool.io.StandaloneApkSerializer;
+import com.android.tools.build.bundletool.mergers.BundleModuleMerger;
 import com.android.tools.build.bundletool.model.Aapt2Command;
 import com.android.tools.build.bundletool.model.ApkListener;
 import com.android.tools.build.bundletool.model.ApkModifier;
@@ -160,13 +161,18 @@ final class BuildApksManager {
     GeneratedAssetSlices.Builder generatedAssetSlices = GeneratedAssetSlices.builder();
 
     boolean enableUniversalAsFallbackForSplits = false;
+    boolean enableInstallTimePermanentModules = false;
     ApksToGenerate apksToGenerate =
         new ApksToGenerate(
             appBundle, command.getApkBuildMode(), enableUniversalAsFallbackForSplits, deviceSpec);
 
     // Split APKs
     if (apksToGenerate.generateSplitApks()) {
-      generatedApksBuilder.setSplitApks(generateSplitApks(appBundle, stampSource));
+      AppBundle mergedAppBundle =
+          BundleModuleMerger.mergePermanentInstallTimeModules(
+              appBundle, enableInstallTimePermanentModules);
+      bundleValidator.validate(mergedAppBundle);
+      generatedApksBuilder.setSplitApks(generateSplitApks(mergedAppBundle, stampSource));
     }
 
     // Instant APKs

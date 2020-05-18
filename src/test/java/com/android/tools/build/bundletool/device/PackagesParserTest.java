@@ -18,6 +18,7 @@ package com.android.tools.build.bundletool.device;
 
 import static com.google.common.truth.Truth.assertThat;
 
+import com.android.tools.build.bundletool.device.PackagesParser.InstalledPackageInfo;
 import com.google.common.collect.ImmutableList;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -25,19 +26,19 @@ import org.junit.runners.JUnit4;
 
 @RunWith(JUnit4.class)
 public class PackagesParserTest {
-  static final ImmutableList<String> LIST_PACKAGES_OUTPUT =
+  private static final ImmutableList<String> LIST_PACKAGES_OUTPUT =
       ImmutableList.of(
-          "package:com.android.bluetooth",
+          "package:com.android.bluetooth versionCode:123",
           "",
-          "package:com.android.providers.contacts",
-          "package:com.android.theme.icon.roundedrect");
+          "package:com.android.providers.contacts versionCode:4",
+          "package:com.android.theme.icon.roundedrect versionCode:56");
 
   @Test
   public void listPackagesOutput() {
     assertThat(new PackagesParser().parse(LIST_PACKAGES_OUTPUT))
         .containsExactly(
-            "com.android.bluetooth",
-            "com.android.providers.contacts",
-            "com.android.theme.icon.roundedrect");
+            InstalledPackageInfo.create("com.android.bluetooth", 123),
+            InstalledPackageInfo.create("com.android.providers.contacts", 4),
+            InstalledPackageInfo.create("com.android.theme.icon.roundedrect", 56));
   }
 }

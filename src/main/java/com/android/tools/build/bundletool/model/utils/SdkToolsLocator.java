@@ -240,7 +240,10 @@ public final class SdkToolsLocator {
           Files.find(
               fileSystem.getPath(pathDir),
               /* maxDepth= */ 1,
-              (path, attributes) -> binPathMatcher.matches(path) && Files.isExecutable(path))) {
+              (path, attributes) ->
+                  binPathMatcher.matches(path)
+                      && Files.isExecutable(path)
+                      && Files.isRegularFile(path))) {
 
         Optional<Path> binaryInDir = pathStream.findFirst();
         if (binaryInDir.isPresent()) {

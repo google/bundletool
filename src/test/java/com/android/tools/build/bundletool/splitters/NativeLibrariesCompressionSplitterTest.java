@@ -72,7 +72,7 @@ public class NativeLibrariesCompressionSplitterTest {
 
     assertThat(extractPaths(moduleSplit.getEntries())).containsExactly("lib/x86/libnoname.so");
     assertThat(moduleSplit.isMasterSplit()).isTrue();
-    assertThat(getShouldCompress(moduleSplit, "lib/x86/libnoname.so")).isFalse();
+    assertThat(getForceUncompressed(moduleSplit, "lib/x86/libnoname.so")).isTrue();
     assertThat(moduleSplit.getApkTargeting()).isEqualToDefaultInstance();
     assertThat(
             compareManifestMutators(
@@ -99,7 +99,7 @@ public class NativeLibrariesCompressionSplitterTest {
 
     assertThat(extractPaths(moduleSplit.getEntries())).containsExactly("lib/x86/libnoname.so");
     assertThat(moduleSplit.isMasterSplit()).isTrue();
-    assertThat(getShouldCompress(moduleSplit, "lib/x86/libnoname.so")).isTrue();
+    assertThat(getForceUncompressed(moduleSplit, "lib/x86/libnoname.so")).isFalse();
     assertThat(moduleSplit.getApkTargeting()).isEqualToDefaultInstance();
   }
 
@@ -114,7 +114,7 @@ public class NativeLibrariesCompressionSplitterTest {
                 variantSdkTargeting(ANDROID_M_API_VERSION)));
 
     ModuleSplit moduleSplit = Iterables.getOnlyElement(splits);
-    assertThat(getShouldCompress(moduleSplit, "lib/x86/libmain.so")).isTrue();
+    assertThat(getForceUncompressed(moduleSplit, "lib/x86/libmain.so")).isFalse();
   }
 
   @Test
@@ -133,7 +133,7 @@ public class NativeLibrariesCompressionSplitterTest {
 
     assertThat(moduleSplit.getVariantTargeting())
         .isEqualTo(variantSdkTargeting(ANDROID_N_API_VERSION));
-    assertThat(getShouldCompress(moduleSplit, "lib/x86/libnoname.so")).isFalse();
+    assertThat(getForceUncompressed(moduleSplit, "lib/x86/libnoname.so")).isTrue();
   }
 
   @Test
@@ -155,7 +155,7 @@ public class NativeLibrariesCompressionSplitterTest {
 
     assertThat(extractPaths(moduleSplit.getEntries())).containsExactly("lib/x86/libnoname.so");
     assertThat(moduleSplit.isMasterSplit()).isTrue();
-    assertThat(getShouldCompress(moduleSplit, "lib/x86/libnoname.so")).isFalse();
+    assertThat(getForceUncompressed(moduleSplit, "lib/x86/libnoname.so")).isTrue();
     assertThat(moduleSplit.getApkTargeting()).isEqualToDefaultInstance();
     assertThat(
             compareManifestMutators(
@@ -185,7 +185,7 @@ public class NativeLibrariesCompressionSplitterTest {
 
     assertThat(extractPaths(moduleSplit.getEntries())).containsExactly("dex/classes.dex");
     assertThat(moduleSplit.isMasterSplit()).isTrue();
-    assertThat(getShouldCompress(moduleSplit, "dex/classes.dex")).isTrue();
+    assertThat(getForceUncompressed(moduleSplit, "dex/classes.dex")).isFalse();
     assertThat(moduleSplit.getApkTargeting()).isEqualToDefaultInstance();
   }
 
@@ -222,11 +222,12 @@ public class NativeLibrariesCompressionSplitterTest {
         .containsExactly("lib/x86_64/libsome.so", "assets/leftover.txt", "dex/classes.dex");
     assertThat(moduleSplit.isMasterSplit()).isTrue();
 
-    assertThat(getEntry(moduleSplit.getEntries(), "lib/x86_64/libsome.so").getShouldCompress())
-        .isFalse();
-    assertThat(getEntry(moduleSplit.getEntries(), "assets/leftover.txt").getShouldCompress())
+    assertThat(getEntry(moduleSplit.getEntries(), "lib/x86_64/libsome.so").getForceUncompressed())
         .isTrue();
-    assertThat(getEntry(moduleSplit.getEntries(), "dex/classes.dex").getShouldCompress()).isTrue();
+    assertThat(getEntry(moduleSplit.getEntries(), "assets/leftover.txt").getForceUncompressed())
+        .isFalse();
+    assertThat(getEntry(moduleSplit.getEntries(), "dex/classes.dex").getForceUncompressed())
+        .isFalse();
 
     assertThat(moduleSplit.getApkTargeting()).isEqualToDefaultInstance();
     assertThat(
@@ -252,7 +253,7 @@ public class NativeLibrariesCompressionSplitterTest {
 
     assertThat(extractPaths(moduleSplit.getEntries())).containsExactly("lib/x86/libnoname.so");
     assertThat(moduleSplit.isMasterSplit()).isTrue();
-    assertThat(getShouldCompress(moduleSplit, "lib/x86/libnoname.so")).isTrue();
+    assertThat(getForceUncompressed(moduleSplit, "lib/x86/libnoname.so")).isFalse();
     assertThat(moduleSplit.getApkTargeting()).isEqualToDefaultInstance();
     assertThat(
             compareManifestMutators(
@@ -279,7 +280,7 @@ public class NativeLibrariesCompressionSplitterTest {
 
     assertThat(extractPaths(moduleSplit.getEntries())).containsExactly("lib/x86/libnoname.so");
     assertThat(moduleSplit.isMasterSplit()).isTrue();
-    assertThat(getShouldCompress(moduleSplit, "lib/x86/libnoname.so")).isTrue();
+    assertThat(getForceUncompressed(moduleSplit, "lib/x86/libnoname.so")).isFalse();
     assertThat(moduleSplit.getApkTargeting()).isEqualToDefaultInstance();
     assertThat(
             compareManifestMutators(
@@ -307,7 +308,7 @@ public class NativeLibrariesCompressionSplitterTest {
     assertThat(extractPaths(moduleSplit.getEntries())).containsExactly("lib/x86/libnoname.so");
     assertThat(moduleSplit.isMasterSplit()).isTrue();
     assertThat(moduleSplit.getApkTargeting()).isEqualToDefaultInstance();
-    assertThat(getShouldCompress(moduleSplit, "lib/x86/libnoname.so")).isFalse();
+    assertThat(getForceUncompressed(moduleSplit, "lib/x86/libnoname.so")).isTrue();
     assertThat(
             compareManifestMutators(
                 moduleSplit.getMasterManifestMutators(), withExtractNativeLibs(false)))
@@ -335,8 +336,8 @@ public class NativeLibrariesCompressionSplitterTest {
         .build();
   }
 
-  private static boolean getShouldCompress(ModuleSplit moduleSplit, String path) {
-    return moduleSplit.findEntry(path).get().getShouldCompress();
+  private static boolean getForceUncompressed(ModuleSplit moduleSplit, String path) {
+    return moduleSplit.findEntry(path).get().getForceUncompressed();
   }
 
   /**

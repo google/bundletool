@@ -35,7 +35,7 @@ public final class CertificateHelper {
     }
   }
 
-  private static byte[] getSha256Bytes(byte[] input) throws NoSuchAlgorithmException {
+  public static byte[] getSha256Bytes(byte[] input) throws NoSuchAlgorithmException {
     MessageDigest messageDigest = MessageDigest.getInstance("SHA-256");
     messageDigest.update(input);
     return messageDigest.digest();

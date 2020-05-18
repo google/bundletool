@@ -17,7 +17,6 @@
 package com.android.tools.build.bundletool.commands;
 
 import static com.android.tools.build.bundletool.commands.CommandUtils.ANDROID_SERIAL_VARIABLE;
-import static com.android.tools.build.bundletool.model.utils.ResultUtils.readTableOfContents;
 import static com.android.tools.build.bundletool.model.utils.SdkToolsLocator.ANDROID_HOME_VARIABLE;
 import static com.android.tools.build.bundletool.model.utils.SdkToolsLocator.SYSTEM_PATH_VARIABLE;
 import static com.android.tools.build.bundletool.model.utils.files.FilePreconditions.checkFileExistsAndExecutable;
@@ -25,22 +24,24 @@ import static com.android.tools.build.bundletool.model.utils.files.FilePrecondit
 import static com.android.tools.build.bundletool.model.utils.files.FilePreconditions.checkFileHasExtension;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.ImmutableListMultimap.toImmutableListMultimap;
+import static com.google.common.collect.ImmutableMap.toImmutableMap;
 import static com.google.common.collect.Streams.stream;
 import static java.util.function.Function.identity;
 
-import com.android.bundle.Commands.BuildApksResult;
 import com.android.bundle.Devices.DeviceSpec;
 import com.android.tools.build.bundletool.commands.CommandHelp.CommandDescription;
 import com.android.tools.build.bundletool.commands.CommandHelp.FlagDescription;
 import com.android.tools.build.bundletool.device.AdbServer;
 import com.android.tools.build.bundletool.device.AdbShellCommandTask;
-import com.android.tools.build.bundletool.device.BadgingPackageNameParser;
+import com.android.tools.build.bundletool.device.BadgingInfoParser;
+import com.android.tools.build.bundletool.device.BadgingInfoParser.BadgingInfo;
 import com.android.tools.build.bundletool.device.Device;
 import com.android.tools.build.bundletool.device.DeviceAnalyzer;
 import com.android.tools.build.bundletool.device.IncompatibleDeviceException;
 import com.android.tools.build.bundletool.device.MultiPackagesInstaller;
 import com.android.tools.build.bundletool.device.MultiPackagesInstaller.InstallableApk;
 import com.android.tools.build.bundletool.device.PackagesParser;
+import com.android.tools.build.bundletool.device.PackagesParser.InstalledPackageInfo;
 import com.android.tools.build.bundletool.flags.Flag;
 import com.android.tools.build.bundletool.flags.ParsedFlags;
 import com.android.tools.build.bundletool.io.TempDirectory;
@@ -54,7 +55,7 @@ import com.google.auto.value.AutoValue;
 import com.google.common.base.Suppliers;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableListMultimap;
-import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.io.ByteStreams;
 import com.google.errorprone.annotations.CanIgnoreReturnValue;
 import java.io.IOException;
@@ -206,8 +207,8 @@ public abstract class InstallMultiApksCommand {
       Supplier<Aapt2Command> aapt2CommandSupplier =
           Suppliers.memoize(() -> getOrExtractAapt2Command(aapt2Dir));
 
-      ImmutableSet<String> existingPackages =
-          getUpdateOnly() ? listPackagesInstalledOnDevice(device) : ImmutableSet.of();
+      ImmutableMap<String, InstalledPackageInfo> existingPackages =
+          getPackagesInstalledOnDevice(device);
 
       ImmutableListMultimap<String, InstallableApk> apkToInstallByPackage =
           getActualApksPaths(tempDirectory).stream()
@@ -215,7 +216,7 @@ public abstract class InstallMultiApksCommand {
                   apksArchivePath ->
                       stream(
                           apksWithPackageName(apksArchivePath, deviceSpec, aapt2CommandSupplier)))
-              .filter(apk -> !getUpdateOnly() || isInstalled(apk, existingPackages))
+              .filter(apk -> shouldInstall(apk, existingPackages))
               .flatMap(apks -> extractApkListFromApks(deviceSpec, apks, tempDirectory).stream())
               .collect(toImmutableListMultimap(InstallableApk::getPackageName, identity()));
 
@@ -227,33 +228,70 @@ public abstract class InstallMultiApksCommand {
     }
   }
 
-  private static boolean isInstalled(InstallableApk apk, ImmutableSet<String> existingPackages) {
-    boolean exist = existingPackages.contains(apk.getPackageName());
-    if (!exist) {
+  /**
+   * The package should be installed if:
+   *
+   * <ul>
+   *   <li>If it is not already present on the device and --update-only is not set, or
+   *   <li>The installable version has a equal or higher version code than the one already
+   *       installed.
+   * </ul>
+   */
+  private boolean shouldInstall(
+      InstallableApk apk, ImmutableMap<String, InstalledPackageInfo> existingPackages) {
+    if (getUpdateOnly() && !existingPackages.containsKey(apk.getPackageName())) {
       logger.info(
           String.format(
               "Package '%s' not present on device, skipping due to --%s.",
               apk.getPackageName(), UPDATE_ONLY_FLAG.getName()));
+      return false;
     }
-    return exist;
+
+    if (!existingPackages.containsKey(apk.getPackageName())) {
+      return true;
+    }
+
+    InstalledPackageInfo existingPackage = existingPackages.get(apk.getPackageName());
+
+    if (existingPackage.getVersionCode() <= apk.getVersionCode()) {
+      return true;
+    }
+
+    // If the user is attempting to install a mixture of lower and higher version .apks, that
+    // likely indicates something is wrong.
+    logger.warning(
+        String.format(
+            "A higher version of package '%s' (%d vs %d) is already present on device,"
+                + " skipping.",
+            apk.getPackageName(), apk.getVersionCode(), existingPackage.getVersionCode()));
+
+    return false;
   }
 
-  private static ImmutableSet<String> listPackagesInstalledOnDevice(Device device) {
+  private static ImmutableMap<String, InstalledPackageInfo> getPackagesInstalledOnDevice(
+      Device device) {
+    // List standard packages (excluding apex)
     ImmutableList<String> listPackagesOutput =
-        new AdbShellCommandTask(device, "pm list packages").execute();
-    return new PackagesParser().parse(listPackagesOutput);
+        new AdbShellCommandTask(device, "pm list packages --show-versioncode").execute();
+    // List .apex packages.
+    ImmutableList<String> listApexPackagesOutput =
+        new AdbShellCommandTask(device, "pm list packages --apex-only --show-versioncode")
+            .execute();
+
+    return new PackagesParser()
+            .parse(
+                ImmutableList.<String>builder()
+                    .addAll(listPackagesOutput)
+                    .addAll(listApexPackagesOutput)
+                    .build())
+            .stream()
+            .collect(
+                toImmutableMap(
+                    InstalledPackageInfo::getPackageName,
+                    installedPackageInfo -> installedPackageInfo));
   }
 
   private static Optional<InstallableApk> apksWithPackageName(
-      Path apkArchivePath, DeviceSpec deviceSpec, Supplier<Aapt2Command> aapt2CommandSupplier) {
-    BuildApksResult toc = readTableOfContents(apkArchivePath);
-    if (toc.getPackageName().isEmpty()) {
-      return getApksWithPackageNameFromAapt2(apkArchivePath, deviceSpec, aapt2CommandSupplier);
-    }
-    return Optional.of(InstallableApk.create(apkArchivePath, toc.getPackageName()));
-  }
-
-  private static Optional<InstallableApk> getApksWithPackageNameFromAapt2(
       Path apksArchivePath, DeviceSpec deviceSpec, Supplier<Aapt2Command> aapt2CommandSupplier) {
     try (TempDirectory tempDirectory = new TempDirectory()) {
       // Any of the extracted .apk/.apex files will work.
@@ -266,9 +304,11 @@ public abstract class InstallMultiApksCommand {
               .execute()
               .get(0);
 
-      String packageName =
-          BadgingPackageNameParser.parse(aapt2CommandSupplier.get().dumpBadging(extractedFile));
-      return Optional.of(InstallableApk.create(apksArchivePath, packageName));
+      BadgingInfo badgingInfo =
+          BadgingInfoParser.parse(aapt2CommandSupplier.get().dumpBadging(extractedFile));
+      return Optional.of(
+          InstallableApk.create(
+              apksArchivePath, badgingInfo.getPackageName(), badgingInfo.getVersionCode()));
     } catch (IncompatibleDeviceException e) {
       logger.warning(
           String.format(
@@ -310,7 +350,10 @@ public abstract class InstallMultiApksCommand {
               .setOutputDirectory(output);
 
       return extractApksCommand.build().execute().stream()
-          .map(path -> InstallableApk.create(path, apksArchive.getPackageName()))
+          .map(
+              path ->
+                  InstallableApk.create(
+                      path, apksArchive.getPackageName(), apksArchive.getVersionCode()))
           .collect(toImmutableList());
     } catch (IncompatibleDeviceException e) {
       logger.warning(

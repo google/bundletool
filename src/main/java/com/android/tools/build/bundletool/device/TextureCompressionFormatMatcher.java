@@ -105,6 +105,7 @@ public class TextureCompressionFormatMatcher
 
   @Override
   public boolean matchesTargeting(TextureCompressionFormatTargeting targeting) {
+    // If there is no targeting, by definition the targeting is matched.
     if (targeting.equals(TextureCompressionFormatTargeting.getDefaultInstance())) {
       return true;
     }
@@ -131,13 +132,25 @@ public class TextureCompressionFormatMatcher
     for (TextureCompressionFormatAlias textureCompressionFormatAlias :
         orderedSupportedTextureCompressionFormats) {
       if (values.contains(textureCompressionFormatAlias)) {
+        // This is an appropriate targeting, there is no better alternative
+        // (because of the ordering).
         return true;
       }
       if (alternatives.contains(textureCompressionFormatAlias)) {
+        // A better alternative exists.
         return false;
       }
     }
 
+    // If no value is specified but alternative TCFs exist, it means we're inspecting a
+    // fallback for other TCFs. None of the alternatives were matched, which means that
+    // this targeting is the best that exists.
+    if (values.isEmpty() && !alternatives.isEmpty()) {
+      return true;
+    }
+
+    // Neither values nor alternatives were matched, and this is not a fallback
+    // targeting.
     return false;
   }
 
@@ -148,7 +161,16 @@ public class TextureCompressionFormatMatcher
 
   @Override
   protected void checkDeviceCompatibleInternal(TextureCompressionFormatTargeting targeting) {
+    // If there is no targeting, by definition the device is compatible with it.
     if (targeting.equals(TextureCompressionFormatTargeting.getDefaultInstance())) {
+      return;
+    }
+
+    // If no value is specified but alternative TCFs exist, it means we're inspecting a
+    // fallback for other TCFs. By definition of a fallback, the device is compatible with it.
+    boolean isFallback =
+        targeting.getValueList().isEmpty() && !targeting.getAlternativesList().isEmpty();
+    if (isFallback) {
       return;
     }
 

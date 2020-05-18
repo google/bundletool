@@ -49,6 +49,8 @@ public class ApkBreakdownGeneratorTest {
 
   @Rule public final TemporaryFolder tmp = new TemporaryFolder();
 
+  private final ApkBreakdownGenerator apkBreakdownGenerator = new ApkBreakdownGenerator();
+
   private Path tmpDir;
 
   @Before
@@ -72,7 +74,7 @@ public class ApkBreakdownGeneratorTest {
     long downloadedArchiveSize = gzipOverArchive(Files.readAllBytes(archive)).length;
     long resourcesDownloadSize = compress(resources);
 
-    Breakdown breakdown = ApkBreakdownGenerator.calculateBreakdown(archive);
+    Breakdown breakdown = apkBreakdownGenerator.calculateBreakdown(archive);
     assertThat(breakdown)
         .ignoringRepeatedFieldOrder()
         .isEqualTo(
@@ -124,7 +126,7 @@ public class ApkBreakdownGeneratorTest {
         getCompressedSize(compressedEntry) + getCompressedSize(resourceTableEntry);
     long downloadedArchiveSize = gzipOverArchive(Files.readAllBytes(archive)).length;
 
-    Breakdown breakdown = ApkBreakdownGenerator.calculateBreakdown(archive);
+    Breakdown breakdown = apkBreakdownGenerator.calculateBreakdown(archive);
     assertThat(breakdown)
         .ignoringRepeatedFieldOrder()
         .isEqualTo(
@@ -156,7 +158,7 @@ public class ApkBreakdownGeneratorTest {
     long downloadedArchiveSize = gzipOverArchive(Files.readAllBytes(archive)).length;
     long dexDownloadSize = compress(dex);
 
-    Breakdown breakdown = ApkBreakdownGenerator.calculateBreakdown(archive);
+    Breakdown breakdown = apkBreakdownGenerator.calculateBreakdown(archive);
     assertThat(breakdown)
         .ignoringRepeatedFieldOrder()
         .isEqualTo(
@@ -187,7 +189,7 @@ public class ApkBreakdownGeneratorTest {
     long downloadedArchiveSize = gzipOverArchive(Files.readAllBytes(archive)).length;
     long assetsDownloadSize = compress(assets);
 
-    Breakdown breakdown = ApkBreakdownGenerator.calculateBreakdown(archive);
+    Breakdown breakdown = apkBreakdownGenerator.calculateBreakdown(archive);
     assertThat(breakdown)
         .ignoringRepeatedFieldOrder()
         .isEqualTo(
@@ -221,7 +223,7 @@ public class ApkBreakdownGeneratorTest {
     long archiveSize = Files.size(archive);
     long downloadedArchiveSize = gzipOverArchive(Files.readAllBytes(archive)).length;
     long nativeLibDownloadSize = compress(nativeLib);
-    Breakdown breakdown = ApkBreakdownGenerator.calculateBreakdown(archive);
+    Breakdown breakdown = apkBreakdownGenerator.calculateBreakdown(archive);
     assertThat(breakdown)
         .ignoringRepeatedFieldOrder()
         .isEqualTo(
@@ -254,7 +256,7 @@ public class ApkBreakdownGeneratorTest {
     long archiveSize = Files.size(archive);
     long downloadedArchiveSize = gzipOverArchive(Files.readAllBytes(archive)).length;
 
-    Breakdown breakdown = ApkBreakdownGenerator.calculateBreakdown(archive);
+    Breakdown breakdown = apkBreakdownGenerator.calculateBreakdown(archive);
     assertThat(breakdown)
         .ignoringRepeatedFieldOrder()
         .isEqualTo(
@@ -276,7 +278,7 @@ public class ApkBreakdownGeneratorTest {
     Deflater deflater = new Deflater(Deflater.DEFAULT_COMPRESSION, /* noWrap */ true);
     byte[] output = new byte[100];
     assertThat(deflater.deflate(output, 0, output.length, Deflater.SYNC_FLUSH))
-        .isEqualTo(ApkBreakdownGenerator.DEFLATER_SYNC_OVERHEAD_BYTES);
+        .isEqualTo(ApkCompressedSizeCalculator.DEFLATER_SYNC_OVERHEAD_BYTES);
   }
 
   private static byte[] gzipOverArchive(byte[] archive) throws Exception {

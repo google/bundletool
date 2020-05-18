@@ -131,7 +131,7 @@ public class SplitApksGeneratorTest {
     assertThat(baseLModule.getSplitType()).isEqualTo(SplitType.SPLIT);
     assertThat(extractPaths(baseLModule.getEntries()))
         .containsExactly("assets/leftover.txt", "lib/x86_64/libsome.so");
-    assertThat(isCompressed(baseLModule, "lib/x86_64/libsome.so")).isTrue();
+    assertThat(getForceUncompressed(baseLModule, "lib/x86_64/libsome.so")).isFalse();
 
     ModuleSplit testLModule = getModuleSplit(moduleSplits, lVariantTargeting, "test");
     assertThat(testLModule.getSplitType()).isEqualTo(SplitType.SPLIT);
@@ -141,7 +141,7 @@ public class SplitApksGeneratorTest {
     assertThat(baseMModule.getSplitType()).isEqualTo(SplitType.SPLIT);
     assertThat(extractPaths(baseMModule.getEntries()))
         .containsExactly("assets/leftover.txt", "lib/x86_64/libsome.so");
-    assertThat(isCompressed(baseMModule, "lib/x86_64/libsome.so")).isFalse();
+    assertThat(getForceUncompressed(baseMModule, "lib/x86_64/libsome.so")).isTrue();
 
     ModuleSplit testMModule = getModuleSplit(moduleSplits, mVariantTargeting, "test");
     assertThat(testMModule.getSplitType()).isEqualTo(SplitType.SPLIT);
@@ -205,37 +205,37 @@ public class SplitApksGeneratorTest {
     assertThat(baseLModule.getSplitType()).isEqualTo(SplitType.SPLIT);
     assertThat(extractPaths(baseLModule.getEntries()))
         .containsExactly("assets/leftover.txt", "lib/x86_64/libsome.so");
-    assertThat(isCompressed(baseLModule, "lib/x86_64/libsome.so")).isTrue();
+    assertThat(getForceUncompressed(baseLModule, "lib/x86_64/libsome.so")).isFalse();
 
     ModuleSplit testLModule = getModuleSplit(moduleSplits, lVariantTargeting, "test");
     assertThat(testLModule.getSplitType()).isEqualTo(SplitType.SPLIT);
     assertThat(extractPaths(testLModule.getEntries()))
         .containsExactly("assets/test.txt", "dex/classes.dex");
-    assertThat(isCompressed(testLModule, "dex/classes.dex")).isTrue();
+    assertThat(getForceUncompressed(testLModule, "dex/classes.dex")).isFalse();
 
     ModuleSplit baseMModule = getModuleSplit(moduleSplits, mVariantTargeting, "base");
     assertThat(baseMModule.getSplitType()).isEqualTo(SplitType.SPLIT);
     assertThat(extractPaths(baseMModule.getEntries()))
         .containsExactly("assets/leftover.txt", "lib/x86_64/libsome.so");
-    assertThat(isCompressed(baseMModule, "lib/x86_64/libsome.so")).isFalse();
+    assertThat(getForceUncompressed(baseMModule, "lib/x86_64/libsome.so")).isTrue();
 
     ModuleSplit testMModule = getModuleSplit(moduleSplits, mVariantTargeting, "test");
     assertThat(testMModule.getSplitType()).isEqualTo(SplitType.SPLIT);
     assertThat(extractPaths(testMModule.getEntries()))
         .containsExactly("assets/test.txt", "dex/classes.dex");
-    assertThat(isCompressed(testMModule, "dex/classes.dex")).isTrue();
+    assertThat(getForceUncompressed(testMModule, "dex/classes.dex")).isFalse();
 
     ModuleSplit basePModule = getModuleSplit(moduleSplits, qVariantTargeting, "base");
     assertThat(basePModule.getSplitType()).isEqualTo(SplitType.SPLIT);
     assertThat(extractPaths(basePModule.getEntries()))
         .containsExactly("assets/leftover.txt", "lib/x86_64/libsome.so");
-    assertThat(isCompressed(basePModule, "lib/x86_64/libsome.so")).isFalse();
+    assertThat(getForceUncompressed(basePModule, "lib/x86_64/libsome.so")).isTrue();
 
     ModuleSplit testPModule = getModuleSplit(moduleSplits, qVariantTargeting, "test");
     assertThat(testPModule.getSplitType()).isEqualTo(SplitType.SPLIT);
     assertThat(extractPaths(testPModule.getEntries()))
         .containsExactly("assets/test.txt", "dex/classes.dex");
-    assertThat(isCompressed(testPModule, "dex/classes.dex")).isFalse();
+    assertThat(getForceUncompressed(testPModule, "dex/classes.dex")).isTrue();
   }
 
   @Test
@@ -281,14 +281,14 @@ public class SplitApksGeneratorTest {
     assertThat(extractPaths(baseModule.getEntries()))
         .containsExactly("assets/leftover.txt", "lib/x86_64/libsome.so");
     assertThat(baseModule.getVariantTargeting()).isEqualTo(lPlusVariantTargeting());
-    assertThat(isCompressed(baseModule, "lib/x86_64/libsome.so")).isFalse();
+    assertThat(getForceUncompressed(baseModule, "lib/x86_64/libsome.so")).isTrue();
 
     ModuleSplit testModule = moduleSplitMap.get("test");
     assertThat(testModule.getSplitType()).isEqualTo(SplitType.INSTANT);
     assertThat(extractPaths(testModule.getEntries()))
         .containsExactly("assets/test.txt", "dex/classes.dex");
     assertThat(testModule.getVariantTargeting()).isEqualTo(lPlusVariantTargeting());
-    assertThat(isCompressed(testModule, "dex/classes.dex")).isTrue();
+    assertThat(getForceUncompressed(testModule, "dex/classes.dex")).isFalse();
   }
 
   private static ModuleSplit getModuleSplit(
@@ -302,7 +302,7 @@ public class SplitApksGeneratorTest {
         .get();
   }
 
-  private static boolean isCompressed(ModuleSplit moduleSplit, String path) {
-    return moduleSplit.findEntry(path).get().getShouldCompress();
+  private static boolean getForceUncompressed(ModuleSplit moduleSplit, String path) {
+    return moduleSplit.findEntry(path).get().getForceUncompressed();
   }
 }

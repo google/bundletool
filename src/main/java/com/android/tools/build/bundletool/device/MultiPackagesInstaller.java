@@ -74,7 +74,9 @@ public final class MultiPackagesInstaller {
       abandonSession = noCommit;
     } finally {
       finalizeParentSession(parentSessionId, abandonSession);
-      logger.info(String.format("Install %s", abandonSession ? "abandoned" : "committed"));
+      logger.info(
+          String.format(
+              "Install %s [%d]", abandonSession ? "abandoned" : "committed", parentSessionId));
     }
   }
 
@@ -173,13 +175,15 @@ public final class MultiPackagesInstaller {
   @AutoValue
   public abstract static class InstallableApk {
 
-    public static InstallableApk create(Path path, String packageName) {
-      return new AutoValue_MultiPackagesInstaller_InstallableApk(path, packageName);
+    public static InstallableApk create(Path path, String packageName, long versionCode) {
+      return new AutoValue_MultiPackagesInstaller_InstallableApk(path, packageName, versionCode);
     }
 
     public abstract Path getPath();
 
     public abstract String getPackageName();
+
+    public abstract long getVersionCode();
 
     InstallableApk() {}
   }

@@ -20,13 +20,11 @@ import static com.google.common.base.Predicates.not;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 
 import com.android.bundle.Config.BundleConfig;
-import com.android.bundle.Config.Bundletool;
 import com.android.tools.build.bundletool.model.BundleModule;
 import com.android.tools.build.bundletool.model.BundleModuleName;
 import com.android.tools.build.bundletool.model.InputStreamSuppliers;
 import com.android.tools.build.bundletool.model.ModuleEntry;
 import com.android.tools.build.bundletool.model.ZipPath;
-import com.android.tools.build.bundletool.model.version.BundleToolVersion;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
 import java.io.IOException;
@@ -70,26 +68,23 @@ public class BundleModulesValidator {
           new ResourceTableValidator(),
           new AssetModuleFilesValidator());
 
-  private static final BundleConfig EMPTY_CONFIG_WITH_CURRENT_VERSION =
-      BundleConfig.newBuilder()
-          .setBundletool(
-              Bundletool.newBuilder().setVersion(BundleToolVersion.getCurrentVersion().toString()))
-          .build();
-
-  public ImmutableList<BundleModule> validate(ImmutableList<ZipFile> moduleZips) {
+  public ImmutableList<BundleModule> validate(
+      ImmutableList<ZipFile> moduleZips, BundleConfig bundleConfig) {
     for (ZipFile moduleZip : moduleZips) {
       new ValidatorRunner(MODULE_FILE_SUB_VALIDATORS).validateModuleZipFile(moduleZip);
     }
 
     ImmutableList<BundleModule> modules =
-        moduleZips.stream().map(this::toBundleModule).collect(toImmutableList());
+        moduleZips.stream()
+            .map(module -> toBundleModule(module, bundleConfig))
+            .collect(toImmutableList());
 
     new ValidatorRunner(MODULES_SUB_VALIDATORS).validateBundleModules(modules);
 
     return modules;
   }
 
-  private BundleModule toBundleModule(ZipFile moduleZipFile) {
+  private BundleModule toBundleModule(ZipFile moduleZipFile, BundleConfig bundleConfig) {
     BundleModule bundleModule;
     try {
       bundleModule =
@@ -97,7 +92,7 @@ public class BundleModulesValidator {
               // Assigning a temporary name because the real one will be extracted from the
               // manifest, but this requires the BundleModule to be built.
               .setName(BundleModuleName.create("TEMPORARY_MODULE_NAME"))
-              .setBundleConfig(EMPTY_CONFIG_WITH_CURRENT_VERSION)
+              .setBundleConfig(bundleConfig)
               .addEntries(
                   moduleZipFile.stream()
                       .filter(not(ZipEntry::isDirectory))

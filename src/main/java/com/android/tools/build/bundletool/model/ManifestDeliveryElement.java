@@ -26,6 +26,7 @@ import static com.android.tools.build.bundletool.model.AndroidManifest.DISTRIBUT
 import static com.android.tools.build.bundletool.model.AndroidManifest.EXCLUDE_ATTRIBUTE_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.NAME_ATTRIBUTE_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.VALUE_ATTRIBUTE_NAME;
+import static com.android.tools.build.bundletool.model.version.VersionGuardedFeature.MERGE_INSTALL_TIME_MODULES_INTO_BASE;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static java.util.stream.Collectors.counting;
 import static java.util.stream.Collectors.groupingBy;
@@ -35,6 +36,7 @@ import com.android.tools.build.bundletool.model.exceptions.ValidationException;
 import com.android.tools.build.bundletool.model.utils.xmlproto.XmlProtoAttribute;
 import com.android.tools.build.bundletool.model.utils.xmlproto.XmlProtoElement;
 import com.android.tools.build.bundletool.model.utils.xmlproto.XmlProtoNode;
+import com.android.tools.build.bundletool.model.version.Version;
 import com.google.auto.value.AutoValue;
 import com.google.auto.value.extension.memoized.Memoized;
 import com.google.common.annotations.VisibleForTesting;
@@ -55,6 +57,8 @@ public abstract class ManifestDeliveryElement {
   private static final String VERSION_ATTRIBUTE_NAME = "version";
   private static final ImmutableList<String> KNOWN_DELIVERY_MODES =
       ImmutableList.of("install-time", "on-demand", "fast-follow");
+  private static final ImmutableList<String> KNOWN_INSTALL_TIME_ATTRIBUTES =
+      ImmutableList.of("conditions", "permanent");
   private static final ImmutableList<String> CONDITIONS_ALLOWED_ONLY_ONCE =
       ImmutableList.of(
           CONDITION_MIN_SDK_VERSION_NAME,
@@ -99,6 +103,27 @@ public abstract class ManifestDeliveryElement {
     return getDeliveryElement()
         .getOptionalChildElement(DISTRIBUTION_NAMESPACE_URI, "install-time")
         .isPresent();
+  }
+
+  public boolean isInstallTimePermanent(Version bundleToolVersion) {
+    if (hasOnDemandElement() || hasFastFollowElement()) {
+      return false;
+    }
+    return getDeliveryElement()
+        .getOptionalChildElement(DISTRIBUTION_NAMESPACE_URI, "install-time")
+        .map(
+            installTime ->
+                installTime
+                    .getOptionalChildElement(DISTRIBUTION_NAMESPACE_URI, "permanent")
+                    .map(
+                        permanent ->
+                            permanent
+                                .getAttribute(DISTRIBUTION_NAMESPACE_URI, "value")
+                                .map(XmlProtoAttribute::getValueAsBoolean)
+                                .get())
+                    .orElse(
+                        MERGE_INSTALL_TIME_MODULES_INTO_BASE.enabledForVersion(bundleToolVersion)))
+        .orElse(false);
   }
 
   /**
@@ -249,7 +274,7 @@ public abstract class ManifestDeliveryElement {
                     .getChildrenElements(
                         child ->
                             !(child.getNamespaceUri().equals(DISTRIBUTION_NAMESPACE_URI)
-                                && child.getName().equals("conditions")))
+                                && KNOWN_INSTALL_TIME_ATTRIBUTES.contains(child.getName())))
                     .findAny());
 
     if (offendingElement.isPresent()) {

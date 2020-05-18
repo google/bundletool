@@ -17,18 +17,20 @@
 package com.android.tools.build.bundletool.device;
 
 import com.android.tools.build.bundletool.model.exceptions.ParseException;
+import com.google.auto.value.AutoValue;
 import com.google.common.collect.ImmutableList;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-/** Parses the Package Name from the output of "aapt2 dump badging". */
-public final class BadgingPackageNameParser {
+/** Parses the Package Name and version code from the output of "aapt2 dump badging". */
+public final class BadgingInfoParser {
 
-  private static final Pattern PACKAGE_NAME_PATTERN = Pattern.compile(".*? name='(.*?)'.*");
+  private static final Pattern PACKAGE_NAME_PATTERN =
+      Pattern.compile(".*? name='(?<name>.*?)' versionCode='(?<version>\\d+?)' .*");
 
-  private BadgingPackageNameParser() {}
+  private BadgingInfoParser() {}
 
-  public static String parse(ImmutableList<String> badgingOutput) {
+  public static BadgingInfo parse(ImmutableList<String> badgingOutput) {
     String packageLine =
         badgingOutput.stream()
             .filter(line -> line.trim().startsWith("package:"))
@@ -41,8 +43,21 @@ public final class BadgingPackageNameParser {
                             String.join("\n", badgingOutput))));
     Matcher matcher = PACKAGE_NAME_PATTERN.matcher(packageLine);
     if (!matcher.matches()) {
-      throw new ParseException(String.format("'name=' not found in package line: %s", packageLine));
+      throw new ParseException(
+          String.format("'name=' and 'versionCode=' not found in package line: %s", packageLine));
     }
-    return matcher.group(1);
+    return BadgingInfo.create(matcher.group("name"), Long.parseLong(matcher.group("version")));
+  }
+
+  /** Represents the badging info of an .apk/.apex file. */
+  @AutoValue
+  public abstract static class BadgingInfo {
+    static BadgingInfo create(String packageName, long versionCode) {
+      return new AutoValue_BadgingInfoParser_BadgingInfo(packageName, versionCode);
+    }
+
+    public abstract String getPackageName();
+
+    public abstract long getVersionCode();
   }
 }

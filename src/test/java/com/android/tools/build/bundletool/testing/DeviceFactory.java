@@ -51,6 +51,10 @@ public final class DeviceFactory {
         locales(locales));
   }
 
+  public static DeviceSpec lDevice() {
+    return deviceWithSdk(Versions.ANDROID_L_API_VERSION);
+  }
+
   public static DeviceSpec lDeviceWithLocales(String... locales) {
     return mergeSpecs(
         sdkVersion(Versions.ANDROID_L_API_VERSION),

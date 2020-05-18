@@ -15,6 +15,7 @@
  */
 package com.android.tools.build.bundletool.model;
 
+import com.android.tools.build.bundletool.model.BundleModule.SpecialModuleEntry;
 import com.android.tools.build.bundletool.model.utils.files.FileUtils;
 import com.google.auto.value.AutoValue;
 import com.google.common.io.ByteSource;
@@ -49,8 +50,8 @@ public abstract class ModuleEntry {
   /** Path of the entry inside the module. */
   public abstract ZipPath getPath();
 
-  /** Returns whether entry should be compressed in generated archives. */
-  public abstract boolean getShouldCompress();
+  /** Returns whether entry should always be left uncompressed in generated archives. */
+  public abstract boolean getForceUncompressed();
 
   /** Returns whether entry is an embedded APK that should be signed by the output APK key. */
   public abstract boolean getShouldSign();
@@ -80,7 +81,7 @@ public abstract class ModuleEntry {
       return false;
     }
 
-    if (entry1.getShouldCompress() != entry2.getShouldCompress()) {
+    if (entry1.getForceUncompressed() != entry2.getForceUncompressed()) {
       return false;
     }
 
@@ -102,13 +103,17 @@ public abstract class ModuleEntry {
   @Override
   public final int hashCode() {
     // Deliberately omit the content for performance.
-    return Objects.hash(getPath(), getShouldCompress());
+    return Objects.hash(getPath(), getForceUncompressed());
+  }
+
+  public boolean isSpecialEntry() {
+    return SpecialModuleEntry.getSpecialEntry(getPath()).isPresent();
   }
 
   public abstract Builder toBuilder();
 
   public static Builder builder() {
-    return new AutoValue_ModuleEntry.Builder().setShouldCompress(true).setShouldSign(false);
+    return new AutoValue_ModuleEntry.Builder().setForceUncompressed(false).setShouldSign(false);
   }
 
   /** Builder for {@code ModuleEntry}. */
@@ -116,7 +121,7 @@ public abstract class ModuleEntry {
   public abstract static class Builder {
     public abstract Builder setPath(ZipPath path);
 
-    public abstract Builder setShouldCompress(boolean shouldCompress);
+    public abstract Builder setForceUncompressed(boolean forcedUncompressed);
 
     public abstract Builder setShouldSign(boolean shouldSign);
 

@@ -74,12 +74,12 @@ public final class NativeLibrariesCompressionSplitter implements ModuleSplitSpli
             .flatMap(directory -> moduleSplit.findEntriesUnderPath(directory.getPath()))
             .collect(toImmutableSet());
 
-    boolean shouldCompress = !supportUncompressedNativeLibs(moduleSplit);
+    boolean forceUncompressed = supportUncompressedNativeLibs(moduleSplit);
     return ImmutableList.of(
         createModuleSplit(
             moduleSplit,
-            mergeAndSetCompression(libraryEntries, moduleSplit, shouldCompress),
-            /* extractNativeLibs= */ shouldCompress));
+            mergeAndSetCompression(libraryEntries, moduleSplit, forceUncompressed),
+            /* extractNativeLibs= */ !forceUncompressed));
   }
 
   private boolean supportUncompressedNativeLibs(ModuleSplit moduleSplit) {
@@ -123,7 +123,9 @@ public final class NativeLibrariesCompressionSplitter implements ModuleSplitSpli
   }
 
   private ImmutableList<ModuleEntry> mergeAndSetCompression(
-      ImmutableSet<ModuleEntry> libraryEntries, ModuleSplit moduleSplit, boolean shouldCompress) {
+      ImmutableSet<ModuleEntry> libraryEntries,
+      ModuleSplit moduleSplit,
+      boolean forceUncompressed) {
 
     ImmutableSet<ModuleEntry> nonLibraryEntries =
         moduleSplit
@@ -137,7 +139,7 @@ public final class NativeLibrariesCompressionSplitter implements ModuleSplitSpli
             libraryEntries.stream()
                 .map(
                     moduleEntry ->
-                        moduleEntry.toBuilder().setShouldCompress(shouldCompress).build())
+                        moduleEntry.toBuilder().setForceUncompressed(forceUncompressed).build())
                 .collect(toImmutableList()))
         .addAll(nonLibraryEntries)
         .build();

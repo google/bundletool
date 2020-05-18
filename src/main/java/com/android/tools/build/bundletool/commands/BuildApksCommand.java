@@ -331,7 +331,7 @@ public abstract class BuildApksCommand {
      * Provides the lowest variant number to use.
      *
      * <p>By default, variants are numbered from 0 to {@code variantNum - 1}. By setting a value
-     * here, the variants will be numbered from {@code lowestVariantNumber} and up.
+     * here, the variants will be numbered from {@code firstVariantNumber} and up.
      */
     public abstract Builder setFirstVariantNumber(int firstVariantNumber);
 
@@ -729,55 +729,6 @@ public abstract class BuildApksCommand {
                 .setOptional(true)
                 .setDescription(
                     "If set, a stamp will be generated and embedded in the generated APKs.")
-                .build())
-        .addFlag(
-            FlagDescription.builder()
-                .setFlagName(STAMP_KEYSTORE_FLAG.getName())
-                .setExampleValue("path/to/keystore")
-                .setOptional(true)
-                .setDescription(
-                    "Path to the stamp keystore that should be used to sign the APK contents hash."
-                        + " If not set, the '%s' keystore will be tried if present. Otherwise, the"
-                        + " default debug keystore will be used if it exists. If a default debug"
-                        + " keystore is not found, the stamp will fail to get generated. If"
-                        + " set, the flag '%s' must also be set.",
-                    KEYSTORE_FLAG, STAMP_KEY_ALIAS_FLAG)
-                .build())
-        .addFlag(
-            FlagDescription.builder()
-                .setFlagName(STAMP_KEYSTORE_PASSWORD_FLAG.getName())
-                .setExampleValue("[pass|file]:value")
-                .setOptional(true)
-                .setDescription(
-                    "Password of the stamp keystore to use to sign the APK contents hash. If"
-                        + " provided, must be prefixed with either 'pass:' (if the password is"
-                        + " passed in clear text, e.g. 'pass:qwerty') or 'file:' (if the password"
-                        + " is the first line of a file, e.g. 'file:/tmp/myPassword.txt'). If this"
-                        + " flag is not set, the password will be requested on the prompt.")
-                .build())
-        .addFlag(
-            FlagDescription.builder()
-                .setFlagName(STAMP_KEY_ALIAS_FLAG.getName())
-                .setExampleValue("stamp-key-alias")
-                .setOptional(true)
-                .setDescription(
-                    "Alias of the stamp key to use in the keystore to sign the APK contents hash."
-                        + " If not set, the '%s' key alias will be tried if present.",
-                    KEY_ALIAS_FLAG)
-                .build())
-        .addFlag(
-            FlagDescription.builder()
-                .setFlagName(STAMP_KEY_PASSWORD_FLAG.getName())
-                .setExampleValue("stamp-key-password")
-                .setOptional(true)
-                .setDescription(
-                    "Password of the stamp key in the keystore to use to sign the APK contents"
-                        + " hash. if provided, must be prefixed with either 'pass:' (if the"
-                        + " password is passed in clear text, e.g. 'pass:qwerty') or 'file:' (if"
-                        + " the password is the first line of a file, e.g."
-                        + " 'file:/tmp/myPassword.txt'). If this flag is not set, the keystore"
-                        + " password will be tried. If that fails, the password will be requested"
-                        + " on the prompt.")
                 .build())
         .addFlag(
             FlagDescription.builder()

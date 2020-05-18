@@ -260,7 +260,7 @@ final class ApkSerializerHelper {
           entryOptionForPath(
               pathInApk,
               /* uncompressNativeLibs= */ !extractNativeLibs,
-              /* entryShouldCompress= */ entry.getShouldCompress());
+              /* forceUncompressed= */ entry.getForceUncompressed());
       if (signingConfig.isPresent()
           && (entry.getShouldSign() || wear1ApkPath.map(pathInApk::equals).orElse(false))) {
         // Sign the embedded APK
@@ -291,8 +291,8 @@ final class ApkSerializerHelper {
   }
 
   private EntryOption[] entryOptionForPath(
-      ZipPath path, boolean uncompressNativeLibs, boolean entryShouldCompress) {
-    if (shouldCompress(path, uncompressNativeLibs, entryShouldCompress)) {
+      ZipPath path, boolean uncompressNativeLibs, boolean forceUncompressed) {
+    if (shouldCompress(path, uncompressNativeLibs, forceUncompressed)) {
       return new EntryOption[] {};
     } else {
       return new EntryOption[] {EntryOption.UNCOMPRESSED};
@@ -300,14 +300,13 @@ final class ApkSerializerHelper {
   }
 
   private boolean shouldCompress(
-      ZipPath path, boolean uncompressNativeLibs, boolean entryShouldCompress) {
+      ZipPath path, boolean uncompressNativeLibs, boolean forceUncompressed) {
     if (uncompressedPathMatchers.stream()
         .anyMatch(pathMatcher -> pathMatcher.matches(path.toString()))) {
       return false;
     }
 
-    // The Module entries with shouldCompress flag turned off should be uncompressed.
-    if (!entryShouldCompress) {
+    if (forceUncompressed) {
       return false;
     }
 
@@ -336,7 +335,7 @@ final class ApkSerializerHelper {
       ZipPath pathInApk = toApkEntryPath(entry.getPath());
       if (!FILES_FOR_AAPT2.apply(pathInApk)) {
         boolean shouldCompress =
-            shouldCompress(pathInApk, !extractNativeLibs, entry.getShouldCompress());
+            shouldCompress(pathInApk, !extractNativeLibs, entry.getForceUncompressed());
         if (signingConfig.isPresent() && entry.getShouldSign()) {
           // Unlike ZipBuilder, ZFile copies the source stream immediately
           try (TempDirectory signingDir = new TempDirectory()) {

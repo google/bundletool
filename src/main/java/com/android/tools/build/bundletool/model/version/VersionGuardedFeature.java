@@ -79,7 +79,13 @@ public enum VersionGuardedFeature {
    * density that's why having only the lowest density value in master split and every other value
    * in config splits is enough (https://github.com/google/bundletool/issues/128).
    */
-  PIN_LOWEST_DENSITY_OF_EACH_STYLE_TO_MASTER("0.14.0");
+  PIN_LOWEST_DENSITY_OF_EACH_STYLE_TO_MASTER("0.14.0"),
+
+  /**
+   * Install time modules will be merged into base unless explicitly turned off via <dist:permanent
+   * dist:value="false" /> in "install-time" attribute.
+   */
+  MERGE_INSTALL_TIME_MODULES_INTO_BASE("1.0.0");
 
   /** Version from which the given feature should be enabled by default. */
   private final Version enabledSinceVersion;
