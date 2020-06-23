@@ -51,7 +51,7 @@ import com.android.bundle.Targeting.Abi.AbiAlias;
 import com.android.bundle.Targeting.ApkTargeting;
 import com.android.bundle.Targeting.MultiAbiTargeting;
 import com.android.tools.build.bundletool.model.ZipPath;
-import com.android.tools.build.bundletool.model.exceptions.CommandExecutionException;
+import com.android.tools.build.bundletool.model.exceptions.IncompatibleDeviceException;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import org.junit.Test;
@@ -218,9 +218,9 @@ public class VariantMatcherTest {
             .addAllVariant(ImmutableList.of(x86Variant, x64X86Variant))
             .build();
 
-    CommandExecutionException e =
+    IncompatibleDeviceException e =
         assertThrows(
-            CommandExecutionException.class,
+            IncompatibleDeviceException.class,
             () ->
                 new VariantMatcher(abis("x86_64", "armeabi-v7a"))
                     .getAllMatchingVariants(buildApksResult));

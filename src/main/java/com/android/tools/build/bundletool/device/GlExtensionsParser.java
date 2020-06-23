@@ -16,7 +16,7 @@
 
 package com.android.tools.build.bundletool.device;
 
-import com.android.tools.build.bundletool.model.exceptions.ParseException;
+import com.android.tools.build.bundletool.model.exceptions.AdbOutputParseException;
 import com.google.common.base.Splitter;
 import com.google.common.collect.ImmutableList;
 
@@ -66,8 +66,8 @@ public class GlExtensionsParser {
     }
 
     if (!parsingState.equals(ParsingState.FOUND_GL_EXTENSIONS)) {
-      throw ParseException.builder()
-          .withMessage(
+      throw AdbOutputParseException.builder()
+          .withInternalMessage(
               "Unexpected output of 'dumpsys SurfaceFlinger' command: no GL extensions found.")
           .build();
     }

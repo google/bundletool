@@ -30,7 +30,7 @@ import com.android.aapt.Resources.ResourceTable;
 import com.android.aapt.Resources.XmlNode;
 import com.android.bundle.Config.BundleConfig;
 import com.android.tools.build.bundletool.model.BundleModule;
-import com.android.tools.build.bundletool.model.exceptions.ValidationException;
+import com.android.tools.build.bundletool.model.exceptions.InvalidBundleException;
 import com.android.tools.build.bundletool.testing.BundleConfigBuilder;
 import com.android.tools.build.bundletool.testing.BundleModuleBuilder;
 import com.google.common.collect.ImmutableList;
@@ -58,9 +58,9 @@ public class ModuleTitleValidatorTest {
             module("base", androidManifest(PKG_NAME)),
             module("demand", androidManifest(PKG_NAME, withOnDemandAttribute(true))));
 
-    ValidationException exception =
+    InvalidBundleException exception =
         assertThrows(
-            ValidationException.class,
+            InvalidBundleException.class,
             () -> new ModuleTitleValidator().validateAllModules(allModules));
 
     assertThat(exception)
@@ -103,9 +103,9 @@ public class ModuleTitleValidatorTest {
                     withOnDemandAttribute(true),
                     withTitle("@string/test_label", TEST_LABEL_RESOURCE_ID))));
 
-    ValidationException exception =
+    InvalidBundleException exception =
         assertThrows(
-            ValidationException.class,
+            InvalidBundleException.class,
             () -> new ModuleTitleValidator().validateAllModules(allModules));
 
     assertThat(exception).hasMessageThat().contains("is missing in the base resource table");
@@ -117,9 +117,9 @@ public class ModuleTitleValidatorTest {
         ImmutableList.of(
             module("base", androidManifest(PKG_NAME)),
             module("conditional", androidManifest(PKG_NAME, withMinSdkCondition(21))));
-    ValidationException exception =
+    InvalidBundleException exception =
         assertThrows(
-            ValidationException.class,
+            InvalidBundleException.class,
             () -> new ModuleTitleValidator().validateAllModules(allModules));
 
     assertThat(exception)
@@ -164,14 +164,26 @@ public class ModuleTitleValidatorTest {
                 androidManifestForAssetModule(
                     PKG_NAME, withTitle("test_label", TEST_LABEL_RESOURCE_ID))));
 
-    ValidationException exception =
+    InvalidBundleException exception =
         assertThrows(
-            ValidationException.class,
+            InvalidBundleException.class,
             () -> new ModuleTitleValidator().validateAllModules(allModules));
 
     assertThat(exception)
         .hasMessageThat()
         .matches("Module titles not supported in asset packs, but found in 'asset'.");
+  }
+
+  @Test
+  public void validateAllModules_assetOnly_ok() throws Exception {
+    BundleModule module =
+        new BundleModuleBuilder(
+                "asset",
+                BundleConfig.newBuilder().setType(BundleConfig.BundleType.ASSET_ONLY).build())
+            .setManifest(androidManifestForAssetModule("com.app"))
+            .build();
+
+    new ModuleTitleValidator().validateAllModules(ImmutableList.of(module));
   }
 
   private static BundleModule module(String moduleName, XmlNode manifest) throws IOException {

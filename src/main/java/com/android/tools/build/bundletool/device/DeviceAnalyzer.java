@@ -74,13 +74,14 @@ public class DeviceAnalyzer {
       }
       checkState(!supportedAbis.isEmpty(), "Error retrieving device ABIs. Please try again.");
 
-      DeviceSpec.Builder builder = DeviceSpec.newBuilder()
-          .setSdkVersion(deviceSdkVersion)
-          .addAllSupportedAbis(supportedAbis)
-          .addAllSupportedLocales(deviceLocales)
-          .setScreenDensity(deviceDensity)
-          .addAllDeviceFeatures(deviceFeatures)
-          .addAllGlExtensions(glExtensions);
+      DeviceSpec.Builder builder =
+          DeviceSpec.newBuilder()
+              .setSdkVersion(deviceSdkVersion)
+              .addAllSupportedAbis(supportedAbis)
+              .addAllSupportedLocales(deviceLocales)
+              .setScreenDensity(deviceDensity)
+              .addAllDeviceFeatures(deviceFeatures)
+              .addAllGlExtensions(glExtensions);
       if (codename != null) {
         builder.setCodename(codename);
       }
@@ -88,7 +89,7 @@ public class DeviceAnalyzer {
     } catch (TimeoutException e) {
       throw CommandExecutionException.builder()
           .withCause(e)
-          .withMessage("Timed out while waiting for ADB.")
+          .withInternalMessage("Timed out while waiting for ADB.")
           .build();
     }
   }
@@ -123,18 +124,18 @@ public class DeviceAnalyzer {
             .orElseThrow(
                 () ->
                     CommandExecutionException.builder()
-                        .withMessage("Unable to find the requested device.")
+                        .withInternalMessage("Unable to find the requested device.")
                         .build());
 
     if (device.getState().equals(DeviceState.UNAUTHORIZED)) {
       throw CommandExecutionException.builder()
-          .withMessage(
+          .withInternalMessage(
               "Device found but not authorized for connecting. "
                   + "Please allow USB debugging on the device.")
           .build();
     } else if (!device.getState().equals(DeviceState.ONLINE)) {
       throw CommandExecutionException.builder()
-          .withMessage(
+          .withInternalMessage(
               "Unable to connect to the device (device state: '%s').", device.getState().name())
           .build();
     }
@@ -144,17 +145,19 @@ public class DeviceAnalyzer {
   private Optional<Device> getTargetDevice(Optional<String> deviceId) throws TimeoutException {
     ImmutableList<Device> devices = adb.getDevices();
     if (devices.isEmpty()) {
-      throw new CommandExecutionException("No connected devices found.");
+      throw CommandExecutionException.builder()
+          .withInternalMessage("No connected devices found.")
+          .build();
     }
     if (deviceId.isPresent()) {
-      return devices
-          .stream()
+      return devices.stream()
           .filter(device -> device.getSerialNumber().equals(deviceId.get()))
           .findFirst();
     } else {
       if (devices.size() > 1) {
-        throw new CommandExecutionException(
-            "More than one device connected, please provide --device-id.");
+        throw CommandExecutionException.builder()
+            .withInternalMessage("More than one device connected, please provide --device-id.")
+            .build();
       }
       return Optional.of(devices.get(0));
     }

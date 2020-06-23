@@ -34,8 +34,7 @@ import com.android.bundle.Devices.DeviceSpec;
 import com.android.bundle.Targeting.ApkTargeting;
 import com.android.tools.build.bundletool.model.ModuleSplit;
 import com.android.tools.build.bundletool.model.ZipPath;
-import com.android.tools.build.bundletool.model.exceptions.CommandExecutionException;
-import com.android.tools.build.bundletool.model.exceptions.ValidationException;
+import com.android.tools.build.bundletool.model.exceptions.InvalidCommandException;
 import com.android.tools.build.bundletool.model.version.Version;
 import com.google.common.base.Predicate;
 import com.google.common.base.Predicates;
@@ -193,8 +192,8 @@ public class ApkMatcher {
                   .collect(toImmutableSet()));
       Set<String> unknownModules = Sets.difference(requestedModuleNames.get(), availableModules);
       if (!unknownModules.isEmpty()) {
-        throw ValidationException.builder()
-            .withMessage(
+        throw InvalidCommandException.builder()
+            .withInternalMessage(
                 "The APK Set archive does not contain the following modules: %s", unknownModules)
             .build();
       }
@@ -234,8 +233,8 @@ public class ApkMatcher {
       return matchesTargeting && moduleNameMatcher.test(moduleName);
     } else {
       if (matchesTargeting && requestedModuleNames.isPresent()) {
-        throw CommandExecutionException.builder()
-            .withMessage("Cannot restrict modules when the device matches a non-split APK.")
+        throw InvalidCommandException.builder()
+            .withInternalMessage("Cannot restrict modules when the device matches a non-split APK.")
             .build();
       }
       return matchesTargeting;

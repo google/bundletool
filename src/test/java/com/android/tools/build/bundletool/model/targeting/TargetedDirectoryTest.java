@@ -27,7 +27,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import com.android.bundle.Targeting.AssetsDirectoryTargeting;
 import com.android.bundle.Targeting.TextureCompressionFormat.TextureCompressionFormatAlias;
 import com.android.tools.build.bundletool.model.ZipPath;
-import com.android.tools.build.bundletool.model.exceptions.ValidationException;
+import com.android.tools.build.bundletool.model.exceptions.InvalidBundleException;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
@@ -116,20 +116,20 @@ public class TargetedDirectoryTest {
   @Test
   public void badDirectoryName_noValue_throws() {
     assertThrows(
-        ValidationException.class,
+        InvalidBundleException.class,
         () -> TargetedDirectory.parse(ZipPath.create("assets/world/gfx#opengl")));
     assertThrows(
-        ValidationException.class,
+        InvalidBundleException.class,
         () -> TargetedDirectory.parse(ZipPath.create("assets/world/gfx#opengl/texture#tcf_atc")));
   }
 
   @Test
   public void badDirectoryName_noKey_throws() {
     assertThrows(
-        ValidationException.class,
+        InvalidBundleException.class,
         () -> TargetedDirectory.parse(ZipPath.create("assets/world/gfx#")));
     assertThrows(
-        ValidationException.class,
+        InvalidBundleException.class,
         () -> TargetedDirectory.parse(ZipPath.create("assets/world#/gfx")));
   }
 
@@ -158,15 +158,15 @@ public class TargetedDirectoryTest {
   @Test
   public void duplicateDimensionsOnPath_throws() {
     assertThrows(
-        ValidationException.class,
+        InvalidBundleException.class,
         () -> TargetedDirectory.parse(ZipPath.create("assets/world/gfx#tcf_etc1/texture#tcf_atc")));
     assertThrows(
-        ValidationException.class,
+        InvalidBundleException.class,
         () ->
             TargetedDirectory.parse(
                 ZipPath.create("assets/world/gfx#opengl_1.0/refine#opengl_3.0")));
     assertThrows(
-        ValidationException.class,
+        InvalidBundleException.class,
         () ->
             TargetedDirectory.parse(
                 ZipPath.create("assets/world/gfx#tcf_etc1/other/gl#opengl_2.0/texture#tcf_atc")));

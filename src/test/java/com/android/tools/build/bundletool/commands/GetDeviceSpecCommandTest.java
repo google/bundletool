@@ -34,7 +34,7 @@ import com.android.bundle.Devices.DeviceSpec;
 import com.android.ddmlib.IDevice.DeviceState;
 import com.android.tools.build.bundletool.device.AdbServer;
 import com.android.tools.build.bundletool.flags.FlagParser;
-import com.android.tools.build.bundletool.model.exceptions.ValidationException;
+import com.android.tools.build.bundletool.model.exceptions.InvalidCommandException;
 import com.android.tools.build.bundletool.model.utils.SystemEnvironmentProvider;
 import com.android.tools.build.bundletool.model.utils.files.BufferedIo;
 import com.android.tools.build.bundletool.testing.FakeAdbServer;
@@ -217,7 +217,7 @@ public class GetDeviceSpecCommandTest {
     // We set up a fake ADB server because the real one won't work on Forge.
     Throwable exception =
         assertThrows(
-            ValidationException.class,
+            InvalidCommandException.class,
             () ->
                 GetDeviceSpecCommand.builder()
                     .setAdbPath(adbPath)

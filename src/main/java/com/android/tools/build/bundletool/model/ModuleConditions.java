@@ -20,7 +20,7 @@ import com.android.bundle.Targeting.DeviceFeature;
 import com.android.bundle.Targeting.DeviceFeatureTargeting;
 import com.android.bundle.Targeting.ModuleTargeting;
 import com.android.bundle.Targeting.UserCountriesTargeting;
-import com.android.tools.build.bundletool.model.exceptions.ValidationException;
+import com.android.tools.build.bundletool.model.exceptions.InvalidBundleException;
 import com.android.tools.build.bundletool.model.utils.TargetingProtoUtils;
 import com.google.auto.value.AutoValue;
 import com.google.common.collect.ImmutableList;
@@ -120,8 +120,8 @@ public abstract class ModuleConditions {
       Set<String> featureNames = new HashSet<>();
       for (DeviceFeatureCondition condition : moduleConditions.getDeviceFeatureConditions()) {
         if (!featureNames.add(condition.getFeatureName())) {
-          throw ValidationException.builder()
-              .withMessage(
+          throw InvalidBundleException.builder()
+              .withUserMessage(
                   "The device feature condition on '%s' is present more than once.",
                   condition.getFeatureName())
               .build();

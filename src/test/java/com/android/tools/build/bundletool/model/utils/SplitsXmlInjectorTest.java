@@ -44,7 +44,6 @@ import com.android.tools.build.bundletool.model.ModuleSplit;
 import com.android.tools.build.bundletool.model.ModuleSplit.SplitType;
 import com.android.tools.build.bundletool.model.SplitsProtoXmlBuilder;
 import com.android.tools.build.bundletool.testing.ResourceTableBuilder;
-import com.android.tools.build.bundletool.testing.TestUtils;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import javax.annotation.Nullable;
@@ -162,9 +161,7 @@ public class SplitsXmlInjectorTest {
             .addLanguageMapping(BASE_MODULE_NAME, "ru", "config.ru")
             .addLanguageMapping(BASE_MODULE_NAME, "fr", "config.fr")
             .build();
-    assertThat(
-            XmlNode.parseFrom(
-                TestUtils.getEntryContent(processedBaseMasterSplit.getEntries().get(0))))
+    assertThat(XmlNode.parseFrom(processedBaseMasterSplit.getEntries().get(0).getContent().read()))
         .ignoringRepeatedFieldOrder()
         .isEqualTo(expectedSplitsProtoXml);
   }
@@ -229,9 +226,7 @@ public class SplitsXmlInjectorTest {
             .addLanguageMapping(BASE_MODULE_NAME, "fr", "config.fr")
             .addLanguageMapping(BASE_MODULE_NAME, "es", "")
             .build();
-    assertThat(
-            XmlNode.parseFrom(
-                TestUtils.getEntryContent(processedBaseMasterSplit.getEntries().get(0))))
+    assertThat(XmlNode.parseFrom(processedBaseMasterSplit.getEntries().get(0).getContent().read()))
         .ignoringRepeatedFieldOrder()
         .isEqualTo(expectedSplitsProtoXml);
   }
@@ -272,8 +267,7 @@ public class SplitsXmlInjectorTest {
             .addLanguageMapping(BASE_MODULE_NAME, "ru", "")
             .addLanguageMapping(BASE_MODULE_NAME, "fr", "")
             .build();
-    assertThat(
-            XmlNode.parseFrom(TestUtils.getEntryContent(processedStandalone.getEntries().get(0))))
+    assertThat(XmlNode.parseFrom(processedStandalone.getEntries().get(0).getContent().read()))
         .ignoringRepeatedFieldOrder()
         .isEqualTo(expectedSplitsProtoXml);
   }

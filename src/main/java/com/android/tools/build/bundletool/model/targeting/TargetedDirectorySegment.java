@@ -23,7 +23,7 @@ import com.android.bundle.Targeting.AssetsDirectoryTargeting;
 import com.android.bundle.Targeting.GraphicsApi;
 import com.android.bundle.Targeting.GraphicsApiTargeting;
 import com.android.bundle.Targeting.LanguageTargeting;
-import com.android.tools.build.bundletool.model.exceptions.ValidationException;
+import com.android.tools.build.bundletool.model.exceptions.InvalidBundleException;
 import com.android.tools.build.bundletool.model.utils.GraphicsApiUtils;
 import com.android.tools.build.bundletool.model.utils.TextureCompressionUtils;
 import com.google.auto.value.AutoValue;
@@ -116,8 +116,8 @@ public abstract class TargetedDirectorySegment {
       return TargetedDirectorySegment.create(
           matcher.group("base"), matcher.group("key"), matcher.group("value"));
     }
-    throw ValidationException.builder()
-        .withMessage(
+    throw InvalidBundleException.builder()
+        .withUserMessage(
             "Cannot tokenize targeted directory '%s'. "
                 + "Expecting either '<name>' or '<name>#<key>_<value>' format.",
             directorySegment)
@@ -202,8 +202,8 @@ public abstract class TargetedDirectorySegment {
   private static AssetsDirectoryTargeting toAssetsDirectoryTargeting(
       String name, String key, String value) {
     if (!KEY_TO_DIMENSION.containsKey(key)) {
-      throw ValidationException.builder()
-          .withMessage("Directory '%s' contains unsupported key '%s'.", name, key)
+      throw InvalidBundleException.builder()
+          .withUserMessage("Directory '%s' contains unsupported key '%s'.", name, key)
           .build();
     }
 
@@ -215,7 +215,9 @@ public abstract class TargetedDirectorySegment {
       case TEXTURE_COMPRESSION_FORMAT:
         return parseTextureCompressionFormat(name, value);
       default:
-        throw ValidationException.builder().withMessage("Unrecognized key: '%s'.", key).build();
+        throw InvalidBundleException.builder()
+            .withUserMessage("Unrecognized key: '%s'.", key)
+            .build();
     }
   }
 
@@ -226,8 +228,8 @@ public abstract class TargetedDirectorySegment {
       case OPENGL_KEY:
         matcher = OPENGL_VALUE_PATTERN.matcher(value);
         if (!matcher.matches()) {
-          throw ValidationException.builder()
-              .withMessage(
+          throw InvalidBundleException.builder()
+              .withUserMessage(
                   "Could not parse OpenGL version '%s' for the directory '%s'.", value, name)
               .build();
         }
@@ -239,8 +241,8 @@ public abstract class TargetedDirectorySegment {
       case VULKAN_KEY:
         matcher = VULKAN_VALUE_PATTERN.matcher(value);
         if (!matcher.matches()) {
-          throw ValidationException.builder()
-              .withMessage(
+          throw InvalidBundleException.builder()
+              .withUserMessage(
                   "Could not parse Vulkan version '%s' for the directory '%s'.", value, name)
               .build();
         }
@@ -250,7 +252,8 @@ public abstract class TargetedDirectorySegment {
         break;
 
       default:
-        throw new ValidationException("Not a valid graphics API identifier: " + key);
+        throw InvalidBundleException.createWithUserMessage(
+            "Not a valid graphics API identifier: " + key);
     }
 
     return AssetsDirectoryTargeting.newBuilder().setGraphicsApi(graphicsApiTargeting).build();
@@ -286,8 +289,8 @@ public abstract class TargetedDirectorySegment {
 
   private static AssetsDirectoryTargeting parseTextureCompressionFormat(String name, String value) {
     if (!TextureCompressionUtils.TEXTURE_TO_TARGETING.containsKey(value)) {
-      throw ValidationException.builder()
-          .withMessage(
+      throw InvalidBundleException.builder()
+          .withUserMessage(
               "Unrecognized value of the texture compression format targeting '%s' for directory "
                   + "'%s'.",
               value, name)
@@ -301,8 +304,8 @@ public abstract class TargetedDirectorySegment {
   private static AssetsDirectoryTargeting parseLanguage(String name, String value) {
     Matcher matcher = LANGUAGE_CODE_PATTERN.matcher(value);
     if (!matcher.matches()) {
-      throw ValidationException.builder()
-          .withMessage(
+      throw InvalidBundleException.builder()
+          .withUserMessage(
               "Expected 2- or 3-character language directory but got '%s' for directory '%s'.",
               value, name)
           .build();

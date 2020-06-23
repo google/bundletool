@@ -38,7 +38,7 @@ import com.android.tools.build.bundletool.model.BundleModule;
 import com.android.tools.build.bundletool.model.ModuleEntry;
 import com.android.tools.build.bundletool.model.ZipPath;
 import com.android.tools.build.bundletool.model.exceptions.CommandExecutionException;
-import com.android.tools.build.bundletool.model.exceptions.ValidationException;
+import com.android.tools.build.bundletool.model.exceptions.InvalidCommandException;
 import com.android.tools.build.bundletool.model.targeting.TargetingGenerator;
 import com.android.tools.build.bundletool.model.utils.files.BufferedIo;
 import com.android.tools.build.bundletool.model.version.BundleToolVersion;
@@ -65,6 +65,7 @@ public abstract class BuildBundleCommand {
   public static final String COMMAND_NAME = "build-bundle";
 
   private static final Flag<Path> OUTPUT_FLAG = Flag.path("output");
+  private static final Flag<Boolean> OVERWRITE_OUTPUT_FLAG = Flag.booleanFlag("overwrite");
   private static final Flag<Path> BUNDLE_CONFIG_FLAG = Flag.path("config");
   private static final Flag<ImmutableList<Path>> MODULES_FLAG = Flag.pathList("modules");
   private static final Flag<ImmutableMap<ZipPath, Path>> METADATA_FILES_FLAG =
@@ -72,6 +73,8 @@ public abstract class BuildBundleCommand {
   private static final Flag<Boolean> UNCOMPRESSED_FLAG = Flag.booleanFlag("uncompressed");
 
   public abstract Path getOutputPath();
+
+  public abstract boolean getOverwriteOutput();
 
   public abstract ImmutableList<Path> getModulesPaths();
 
@@ -84,14 +87,19 @@ public abstract class BuildBundleCommand {
   abstract boolean getUncompressedBundle();
 
   public static Builder builder() {
-    // By default, everything is compressed.
-    return new AutoValue_BuildBundleCommand.Builder().setUncompressedBundle(false);
+    // By default, everything is compressed, and we don't overwrite existing files.
+    return new AutoValue_BuildBundleCommand.Builder()
+        .setUncompressedBundle(false)
+        .setOverwriteOutput(false);
   }
 
   /** Builder for the {@link BuildBundleCommand}. */
   @AutoValue.Builder
   public abstract static class Builder {
     public abstract Builder setOutputPath(Path outputPath);
+
+    /** Sets whether to write over the previous file if it already exists. */
+    public abstract Builder setOverwriteOutput(boolean overwriteOutput);
 
     public abstract Builder setModulesPaths(ImmutableList<Path> modulesPaths);
 
@@ -133,11 +141,12 @@ public abstract class BuildBundleCommand {
 
     void addMetadataFileInternal(ZipPath metadataPath, Path file) {
       if (!Files.exists(file)) {
-        throw ValidationException.builder()
-            .withMessage("Metadata file '%s' does not exist.", file)
+        throw InvalidCommandException.builder()
+            .withInternalMessage("Metadata file '%s' does not exist.", file)
             .build();
       }
-      bundleMetadataBuilder().addFile(metadataPath, BufferedIo.inputStreamSupplier(file));
+      bundleMetadataBuilder()
+          .addFile(metadataPath, com.google.common.io.Files.asByteSource(file.toFile()));
     }
 
     /**
@@ -170,6 +179,7 @@ public abstract class BuildBundleCommand {
             .setModulesPaths(MODULES_FLAG.getRequiredValue(flags));
 
     // Optional flags.
+    OVERWRITE_OUTPUT_FLAG.getValue(flags).ifPresent(builder::setOverwriteOutput);
     BUNDLE_CONFIG_FLAG
         .getValue(flags)
         .ifPresent(path -> builder.setBundleConfig(parseBundleConfigJson(path)));
@@ -194,12 +204,12 @@ public abstract class BuildBundleCommand {
         } catch (ZipException e) {
           throw CommandExecutionException.builder()
               .withCause(e)
-              .withMessage("File '%s' does not seem to be a valid ZIP file.", modulePath)
+              .withInternalMessage("File '%s' does not seem to be a valid ZIP file.", modulePath)
               .build();
         } catch (IOException e) {
           throw CommandExecutionException.builder()
               .withCause(e)
-              .withMessage("Unable to read file '%s'.", modulePath)
+              .withInternalMessage("Unable to read file '%s'.", modulePath)
               .build();
         }
       }
@@ -242,6 +252,10 @@ public abstract class BuildBundleCommand {
           AppBundle.buildFromModules(
               modulesWithTargeting.build(), bundleConfig, getBundleMetadata());
 
+      if (getOverwriteOutput()) {
+        Files.deleteIfExists(getOutputPath());
+      }
+
       new AppBundleSerializer(getUncompressedBundle()).writeToDisk(appBundle, getOutputPath());
     } catch (IOException e) {
       throw new UncheckedIOException(e);
@@ -255,7 +269,9 @@ public abstract class BuildBundleCommand {
               checkFileHasExtension("File", path, ".zip");
               checkFileExistsAndReadable(path);
             });
-    checkFileDoesNotExist(getOutputPath());
+    if (!getOverwriteOutput()) {
+      checkFileDoesNotExist(getOutputPath());
+    }
   }
 
   private static Optional<Assets> generateAssetsTargeting(BundleModule module) {
@@ -325,14 +341,15 @@ public abstract class BuildBundleCommand {
     try (Reader bundleConfigReader = BufferedIo.reader(bundleConfigJsonPath)) {
       JsonFormat.parser().merge(bundleConfigReader, bundleConfig);
     } catch (InvalidProtocolBufferException e) {
-      throw CommandExecutionException.builder()
+      throw InvalidCommandException.builder()
           .withCause(e)
-          .withMessage("The file '%s' is not a valid BundleConfig JSON file.", bundleConfigJsonPath)
+          .withInternalMessage(
+              "The file '%s' is not a valid BundleConfig JSON file.", bundleConfigJsonPath)
           .build();
     } catch (IOException e) {
-      throw CommandExecutionException.builder()
+      throw InvalidCommandException.builder()
           .withCause(e)
-          .withMessage(
+          .withInternalMessage(
               "An error occurred while trying to read the file '%s'.", bundleConfigJsonPath)
           .build();
     }
@@ -356,6 +373,12 @@ public abstract class BuildBundleCommand {
                 .setFlagName(OUTPUT_FLAG.getName())
                 .setExampleValue("bundle.aab")
                 .setDescription("Path to the where the Android App Bundle should be built.")
+                .build())
+        .addFlag(
+            FlagDescription.builder()
+                .setFlagName(OVERWRITE_OUTPUT_FLAG.getName())
+                .setOptional(true)
+                .setDescription("If set, any previous existing output will be overwritten.")
                 .build())
         .addFlag(
             FlagDescription.builder()

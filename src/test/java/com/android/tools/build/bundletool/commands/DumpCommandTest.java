@@ -24,7 +24,7 @@ import com.android.tools.build.bundletool.commands.DumpCommand.DumpTarget;
 import com.android.tools.build.bundletool.flags.FlagParser;
 import com.android.tools.build.bundletool.io.AppBundleSerializer;
 import com.android.tools.build.bundletool.model.AppBundle;
-import com.android.tools.build.bundletool.model.exceptions.ValidationException;
+import com.android.tools.build.bundletool.model.exceptions.InvalidCommandException;
 import com.android.tools.build.bundletool.testing.AppBundleBuilder;
 import java.io.IOException;
 import java.nio.file.Path;
@@ -183,14 +183,14 @@ public final class DumpCommandTest {
             .setBundlePath(Paths.get("/tmp/random-file"))
             .build();
 
-    assertThrows(IllegalArgumentException.class, () -> command.execute());
+    assertThrows(IllegalArgumentException.class, command::execute);
   }
 
   @Test
   public void dumpInvalidTarget() {
-    ValidationException exception =
+    InvalidCommandException exception =
         assertThrows(
-            ValidationException.class,
+            InvalidCommandException.class,
             () ->
                 DumpCommand.fromFlags(
                     new FlagParser().parse("dump", "blah", "--bundle=" + bundlePath)));
@@ -210,8 +210,8 @@ public final class DumpCommandTest {
             .setDumpTarget(DumpTarget.RESOURCES)
             .setXPathExpression("/manifest/@nothing-that-exists")
             .build();
-    ValidationException exception =
-        assertThrows(ValidationException.class, () -> dumpCommand.execute());
+    InvalidCommandException exception =
+        assertThrows(InvalidCommandException.class, dumpCommand::execute);
     assertThat(exception)
         .hasMessageThat()
         .contains("Cannot pass an XPath expression when dumping resources.");
@@ -228,8 +228,8 @@ public final class DumpCommandTest {
             .setResourceId(0x12345678)
             .setResourceName("drawable/icon")
             .build();
-    ValidationException exception =
-        assertThrows(ValidationException.class, () -> dumpCommand.execute());
+    InvalidCommandException exception =
+        assertThrows(InvalidCommandException.class, dumpCommand::execute);
     assertThat(exception)
         .hasMessageThat()
         .contains("Cannot pass both resource ID and resource name.");
@@ -245,11 +245,11 @@ public final class DumpCommandTest {
             .setDumpTarget(DumpTarget.MANIFEST)
             .setResourceId(0x12345678)
             .build();
-    ValidationException exception =
-        assertThrows(ValidationException.class, () -> dumpCommand.execute());
+    InvalidCommandException exception =
+        assertThrows(InvalidCommandException.class, dumpCommand::execute);
     assertThat(exception)
         .hasMessageThat()
-        .contains("The --resource flag can only be passed when dumping resources.");
+        .contains("The resource name/id can only be passed when dumping resources.");
   }
 
   @Test
@@ -262,9 +262,9 @@ public final class DumpCommandTest {
             .setDumpTarget(DumpTarget.RESOURCES)
             .setModuleName("base")
             .build();
-    ValidationException exception =
-        assertThrows(ValidationException.class, () -> dumpCommand.execute());
-    assertThat(exception).hasMessageThat().contains("The --module flag is unnecessary");
+    InvalidCommandException exception =
+        assertThrows(InvalidCommandException.class, dumpCommand::execute);
+    assertThat(exception).hasMessageThat().contains("The module is unnecessary");
   }
 
   @Test
@@ -277,11 +277,11 @@ public final class DumpCommandTest {
             .setDumpTarget(DumpTarget.MANIFEST)
             .setPrintValues(true)
             .build();
-    ValidationException exception =
-        assertThrows(ValidationException.class, () -> dumpCommand.execute());
+    InvalidCommandException exception =
+        assertThrows(InvalidCommandException.class, dumpCommand::execute);
     assertThat(exception)
         .hasMessageThat()
-        .contains("The --values flag can only be passed when dumping resources.");
+        .contains("Printing resource values can only be requested when dumping resources.");
   }
 
   private static void createBundle(Path bundlePath) throws IOException {

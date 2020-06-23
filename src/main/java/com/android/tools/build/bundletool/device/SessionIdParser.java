@@ -16,7 +16,7 @@
 
 package com.android.tools.build.bundletool.device;
 
-import com.android.tools.build.bundletool.model.exceptions.ParseException;
+import com.android.tools.build.bundletool.model.exceptions.AdbOutputParseException;
 import com.google.common.collect.ImmutableList;
 import com.google.common.primitives.Ints;
 import java.util.Optional;
@@ -29,9 +29,10 @@ class SessionIdParser {
     Optional<String> successLine =
         installCreateOutput.stream().filter(s -> s.startsWith("Success")).findFirst();
     if (!successLine.isPresent()) {
-      throw new ParseException(
-          String.format(
-              "adb: failed to parse session id from output\nDetails:%s", installCreateOutput));
+      throw AdbOutputParseException.builder()
+          .withInternalMessage(
+              "adb: failed to parse session id from output\nDetails:%s", installCreateOutput)
+          .build();
     }
     return parseSessionIdFromOutput(successLine.get());
   }
@@ -40,13 +41,15 @@ class SessionIdParser {
     int startIndex = output.indexOf("[");
     int endIndex = output.indexOf("]", startIndex);
     if (startIndex == -1 || endIndex == -1) {
-      throw new ParseException(
-          String.format("adb: failed to parse session id from output\nDetails:%s", output));
+      throw AdbOutputParseException.builder()
+          .withInternalMessage("adb: failed to parse session id from output\nDetails:%s", output)
+          .build();
     }
     Integer sessionId = Ints.tryParse(output.substring(startIndex + 1, endIndex));
     if (sessionId == null) {
-      throw new ParseException(
-          String.format("adb: session id should be integer\nDetails:%s", output));
+      throw AdbOutputParseException.builder()
+          .withInternalMessage("adb: session id should be integer\nDetails:%s", output)
+          .build();
     }
     return sessionId;
   }

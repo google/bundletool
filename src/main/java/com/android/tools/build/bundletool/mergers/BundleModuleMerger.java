@@ -24,6 +24,7 @@ import static com.google.common.collect.ImmutableSet.toImmutableSet;
 import static com.google.common.collect.Multimaps.toMultimap;
 
 import com.android.aapt.Resources.ResourceTable;
+import com.android.bundle.Config.BundleConfig;
 import com.android.bundle.Files.ApexImages;
 import com.android.bundle.Files.Assets;
 import com.android.bundle.Files.NativeLibraries;
@@ -33,7 +34,7 @@ import com.android.tools.build.bundletool.model.BundleModule;
 import com.android.tools.build.bundletool.model.BundleModuleName;
 import com.android.tools.build.bundletool.model.ModuleEntry;
 import com.android.tools.build.bundletool.model.ZipPath;
-import com.android.tools.build.bundletool.model.exceptions.ValidationException;
+import com.android.tools.build.bundletool.model.exceptions.InvalidBundleException;
 import com.android.tools.build.bundletool.model.version.BundleToolVersion;
 import com.android.tools.build.bundletool.model.version.Version;
 import com.google.common.collect.HashMultimap;
@@ -51,35 +52,19 @@ import java.util.stream.Stream;
 public class BundleModuleMerger {
 
   /**
-   * Merge install-time modules into base module, unless they have {@code <dist:permanent
-   * dist:value="false" />} in install-time attribute.
+   * Merge install-time modules into base module, unless they have {@code <dist:removable
+   * dist:value="true" />} in install-time attribute.
    */
-  public static AppBundle mergePermanentInstallTimeModules(
+  public static AppBundle mergeNonRemovableInstallTimeModules(
       AppBundle appBundle, boolean overrideBundleToolVersion) throws IOException {
     ImmutableSet<BundleModule> bundleModulesToFuse =
         Stream.concat(
                 Stream.of(appBundle.getBaseModule()),
-                appBundle.getModules().values().stream()
+                appBundle.getFeatureModules().values().stream()
                     .filter(
                         module ->
-                            module
-                                .getAndroidManifest()
-                                .getManifestDeliveryElement()
-                                .map(
-                                    manifestDeliveryElement -> {
-                                      Version bundleToolVersion =
-                                          BundleToolVersion.getVersionFromBundleConfig(
-                                              appBundle.getBundleConfig());
-                                      // Only override for bundletool version < 1.0.0
-                                      if (overrideBundleToolVersion
-                                          && !MERGE_INSTALL_TIME_MODULES_INTO_BASE
-                                              .enabledForVersion(bundleToolVersion)) {
-                                        return manifestDeliveryElement.hasInstallTimeElement();
-                                      }
-                                      return manifestDeliveryElement.isInstallTimePermanent(
-                                          bundleToolVersion);
-                                    })
-                                .orElse(false)))
+                            shouldMerge(
+                                module, appBundle.getBundleConfig(), overrideBundleToolVersion)))
             .collect(toImmutableSet());
 
     // If only base module should be fused there is nothing to do.
@@ -116,6 +101,26 @@ public class BundleModuleMerger {
         .build();
   }
 
+  private static boolean shouldMerge(
+      BundleModule module, BundleConfig bundleConfig, boolean overrideBundleToolVersion) {
+    return module
+        .getAndroidManifest()
+        .getManifestDeliveryElement()
+        .map(
+            manifestDeliveryElement -> {
+              Version bundleToolVersion =
+                  BundleToolVersion.getVersionFromBundleConfig(bundleConfig);
+              // Only override for bundletool version < 1.0.0
+              if (overrideBundleToolVersion
+                  && !MERGE_INSTALL_TIME_MODULES_INTO_BASE.enabledForVersion(bundleToolVersion)) {
+                return manifestDeliveryElement.hasInstallTimeElement()
+                    && !manifestDeliveryElement.hasModuleConditions();
+              }
+              return !manifestDeliveryElement.isInstallTimeRemovable(bundleToolVersion);
+            })
+        .orElse(false);
+  }
+
   private static ImmutableSet<ModuleEntry> getAllEntriesExceptDexAndSpecial(
       Set<BundleModule> bundleModulesToFuse) {
     Map<ZipPath, ModuleEntry> mergedEntriesByPath = new HashMap<>();
@@ -129,10 +134,11 @@ public class BundleModuleMerger {
               ModuleEntry existingModuleEntry =
                   mergedEntriesByPath.putIfAbsent(moduleEntry.getPath(), moduleEntry);
               if (existingModuleEntry != null && !existingModuleEntry.equals(moduleEntry)) {
-                throw new ValidationException(
-                    String.format(
+                throw InvalidBundleException.builder()
+                    .withUserMessage(
                         "Existing module entry '%s' with different contents.",
-                        moduleEntry.getPath()));
+                        moduleEntry.getPath())
+                    .build();
               }
             });
     return ImmutableSet.copyOf(mergedEntriesByPath.values());

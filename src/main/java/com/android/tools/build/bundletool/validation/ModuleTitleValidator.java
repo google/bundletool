@@ -24,7 +24,7 @@ import com.android.aapt.Resources.ResourceTable;
 import com.android.tools.build.bundletool.model.BundleModule;
 import com.android.tools.build.bundletool.model.BundleModule.ModuleDeliveryType;
 import com.android.tools.build.bundletool.model.BundleModule.ModuleType;
-import com.android.tools.build.bundletool.model.exceptions.ValidationException;
+import com.android.tools.build.bundletool.model.exceptions.InvalidBundleException;
 import com.android.tools.build.bundletool.model.version.BundleToolVersion;
 import com.android.tools.build.bundletool.model.version.Version;
 import com.google.common.collect.ImmutableList;
@@ -40,6 +40,9 @@ public class ModuleTitleValidator extends SubValidator {
   }
 
   private static void checkModuleTitles(ImmutableList<BundleModule> modules) {
+    if (BundleValidationUtils.isAssetOnlyBundle(modules)) {
+      return;
+    }
 
     BundleModule baseModule = modules.stream().filter(BundleModule::isBaseModule).findFirst().get();
 
@@ -60,8 +63,8 @@ public class ModuleTitleValidator extends SubValidator {
     for (BundleModule module : modules) {
       if (module.getModuleType().equals(ModuleType.ASSET_MODULE)) {
         if (module.getAndroidManifest().getTitleRefId().isPresent()) {
-          throw ValidationException.builder()
-              .withMessage(
+          throw InvalidBundleException.builder()
+              .withUserMessage(
                   "Module titles not supported in asset packs, but found in '%s'.",
                   module.getName())
               .build();
@@ -70,14 +73,14 @@ public class ModuleTitleValidator extends SubValidator {
         Optional<Integer> titleRefId = module.getAndroidManifest().getTitleRefId();
 
         if (!titleRefId.isPresent()) {
-          throw ValidationException.builder()
-              .withMessage(
+          throw InvalidBundleException.builder()
+              .withUserMessage(
                   "Mandatory title is missing in manifest for module '%s'.", module.getName())
               .build();
         }
         if (!stringResourceIds.contains(titleRefId.get())) {
-          throw ValidationException.builder()
-              .withMessage(
+          throw InvalidBundleException.builder()
+              .withUserMessage(
                   "Title for module '%s' is missing in the base resource table.", module.getName())
               .build();
         }

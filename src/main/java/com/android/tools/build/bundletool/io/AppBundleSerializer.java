@@ -23,9 +23,9 @@ import com.android.tools.build.bundletool.io.ZipBuilder.EntryOption;
 import com.android.tools.build.bundletool.model.AppBundle;
 import com.android.tools.build.bundletool.model.BundleModule;
 import com.android.tools.build.bundletool.model.BundleModule.SpecialModuleEntry;
-import com.android.tools.build.bundletool.model.InputStreamSupplier;
 import com.android.tools.build.bundletool.model.ModuleEntry;
 import com.android.tools.build.bundletool.model.ZipPath;
+import com.google.common.io.ByteSource;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.Map.Entry;
@@ -56,8 +56,8 @@ public class AppBundleSerializer {
 
     // APEX bundles do not have metadata files.
     if (bundle.getFeatureModules().isEmpty() || !bundle.isApex()) {
-      for (Entry<ZipPath, InputStreamSupplier> metadataEntry :
-          bundle.getBundleMetadata().getFileDataMap().entrySet()) {
+      for (Entry<ZipPath, ByteSource> metadataEntry :
+          bundle.getBundleMetadata().getFileContentMap().entrySet()) {
         zipBuilder.addFile(
             METADATA_DIRECTORY.resolve(metadataEntry.getKey()),
             metadataEntry.getValue(),
@@ -70,7 +70,7 @@ public class AppBundleSerializer {
 
       for (ModuleEntry entry : module.getEntries()) {
         ZipPath entryPath = moduleDir.resolve(entry.getPath());
-        zipBuilder.addFile(entryPath, entry.getContentSupplier(), compression);
+        zipBuilder.addFile(entryPath, entry.getContent(), compression);
       }
 
       // Special module files are not represented as module entries (above).

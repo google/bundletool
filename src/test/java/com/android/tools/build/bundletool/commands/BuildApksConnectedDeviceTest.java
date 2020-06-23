@@ -42,12 +42,12 @@ import com.android.bundle.Commands.Variant;
 import com.android.bundle.Targeting.ScreenDensity.DensityAlias;
 import com.android.ddmlib.IDevice.DeviceState;
 import com.android.tools.build.bundletool.device.AdbServer;
-import com.android.tools.build.bundletool.device.IncompatibleDeviceException;
 import com.android.tools.build.bundletool.flags.FlagParser;
 import com.android.tools.build.bundletool.io.AppBundleSerializer;
 import com.android.tools.build.bundletool.model.AppBundle;
 import com.android.tools.build.bundletool.model.exceptions.CommandExecutionException;
-import com.android.tools.build.bundletool.model.exceptions.ValidationException;
+import com.android.tools.build.bundletool.model.exceptions.IncompatibleDeviceException;
+import com.android.tools.build.bundletool.model.exceptions.InvalidCommandException;
 import com.android.tools.build.bundletool.model.utils.SystemEnvironmentProvider;
 import com.android.tools.build.bundletool.testing.AppBundleBuilder;
 import com.android.tools.build.bundletool.testing.FakeAdbServer;
@@ -222,7 +222,7 @@ public class BuildApksConnectedDeviceTest {
             .setAdbPath(sdkDirPath.resolve("platform-tools").resolve("adb"))
             .setAdbServer(fakeAdbServer);
 
-    Throwable exception = assertThrows(ValidationException.class, () -> command.build());
+    Throwable exception = assertThrows(InvalidCommandException.class, command::build);
     assertThat(exception)
         .hasMessageThat()
         .contains(
@@ -249,7 +249,7 @@ public class BuildApksConnectedDeviceTest {
             .setAdbServer(fakeAdbServer)
             .build();
 
-    Throwable exception = assertThrows(CommandExecutionException.class, () -> command.execute());
+    Throwable exception = assertThrows(IncompatibleDeviceException.class, command::execute);
     assertThat(exception)
         .hasMessageThat()
         .contains(
@@ -281,7 +281,7 @@ public class BuildApksConnectedDeviceTest {
             .setAdbServer(fakeAdbServer)
             .build();
 
-    Throwable exception = assertThrows(CommandExecutionException.class, () -> command.execute());
+    Throwable exception = assertThrows(IncompatibleDeviceException.class, command::execute);
     assertThat(exception)
         .hasMessageThat()
         .contains("App Bundle targets L+ devices, but the device has SDK version lower than L.");
@@ -340,7 +340,7 @@ public class BuildApksConnectedDeviceTest {
             .setAdbServer(fakeAdbServer)
             .build();
 
-    Throwable exception = assertThrows(CommandExecutionException.class, () -> command.execute());
+    Throwable exception = assertThrows(IncompatibleDeviceException.class, command::execute);
     assertThat(exception)
         .hasMessageThat()
         .contains(
@@ -373,7 +373,7 @@ public class BuildApksConnectedDeviceTest {
             .setAdbServer(fakeAdbServer)
             .build();
 
-    Throwable exception = assertThrows(IncompatibleDeviceException.class, () -> command.execute());
+    Throwable exception = assertThrows(IncompatibleDeviceException.class, command::execute);
     assertThat(exception)
         .hasMessageThat()
         .contains("Max SDK version of the App Bundle is lower than SDK version of the device");

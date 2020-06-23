@@ -18,7 +18,6 @@ package com.android.tools.build.bundletool.model.utils.files;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 
-import com.android.tools.build.bundletool.model.InputStreamSupplier;
 import com.google.errorprone.annotations.MustBeClosed;
 import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
@@ -31,10 +30,7 @@ import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.zip.ZipEntry;
-import java.util.zip.ZipFile;
 import javax.annotation.WillCloseWhenClosed;
-import javax.annotation.WillNotClose;
 
 /** Utilities for efficient I/O. */
 public final class BufferedIo {
@@ -52,23 +48,6 @@ public final class BufferedIo {
   @MustBeClosed
   public static InputStream inputStream(Path file) throws IOException {
     return makeBuffered(Files.newInputStream(file));
-  }
-
-  @MustBeClosed
-  public static InputStream inputStream(@WillNotClose ZipFile zipFile, ZipEntry zipEntry)
-      throws IOException {
-    return makeBuffered(zipFile.getInputStream(zipEntry));
-  }
-
-  @SuppressWarnings("MustBeClosedChecker") // InputStreamSupplier is annotated with @MustBeClosed
-  public static InputStreamSupplier inputStreamSupplier(Path file) {
-    return new InputStreamSupplier(() -> inputStream(file), () -> Files.size(file));
-  }
-
-  @SuppressWarnings("MustBeClosedChecker") // InputStreamSupplier is annotated with @MustBeClosed
-  public static InputStreamSupplier inputStreamSupplier(
-      @WillNotClose ZipFile zipFile, ZipEntry zipEntry) {
-    return new InputStreamSupplier(() -> inputStream(zipFile, zipEntry), () -> zipEntry.getSize());
   }
 
   @MustBeClosed

@@ -26,13 +26,13 @@ import static com.android.tools.build.bundletool.model.AndroidManifest.DISTRIBUT
 import static com.android.tools.build.bundletool.model.AndroidManifest.EXCLUDE_ATTRIBUTE_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.NAME_ATTRIBUTE_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.VALUE_ATTRIBUTE_NAME;
+import static com.android.tools.build.bundletool.model.utils.CollectorUtils.groupingByDeterministic;
 import static com.android.tools.build.bundletool.model.version.VersionGuardedFeature.MERGE_INSTALL_TIME_MODULES_INTO_BASE;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static java.util.stream.Collectors.counting;
-import static java.util.stream.Collectors.groupingBy;
 
 import com.android.aapt.Resources.XmlNode;
-import com.android.tools.build.bundletool.model.exceptions.ValidationException;
+import com.android.tools.build.bundletool.model.exceptions.InvalidBundleException;
 import com.android.tools.build.bundletool.model.utils.xmlproto.XmlProtoAttribute;
 import com.android.tools.build.bundletool.model.utils.xmlproto.XmlProtoElement;
 import com.android.tools.build.bundletool.model.utils.xmlproto.XmlProtoNode;
@@ -41,9 +41,9 @@ import com.google.auto.value.AutoValue;
 import com.google.auto.value.extension.memoized.Memoized;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 import com.google.errorprone.annotations.Immutable;
 import java.util.LinkedHashSet;
-import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -58,7 +58,7 @@ public abstract class ManifestDeliveryElement {
   private static final ImmutableList<String> KNOWN_DELIVERY_MODES =
       ImmutableList.of("install-time", "on-demand", "fast-follow");
   private static final ImmutableList<String> KNOWN_INSTALL_TIME_ATTRIBUTES =
-      ImmutableList.of("conditions", "permanent");
+      ImmutableList.of("conditions", "removable");
   private static final ImmutableList<String> CONDITIONS_ALLOWED_ONLY_ONCE =
       ImmutableList.of(
           CONDITION_MIN_SDK_VERSION_NAME,
@@ -105,25 +105,34 @@ public abstract class ManifestDeliveryElement {
         .isPresent();
   }
 
-  public boolean isInstallTimePermanent(Version bundleToolVersion) {
-    if (hasOnDemandElement() || hasFastFollowElement()) {
-      return false;
+  public boolean isInstallTimeRemovable(Version bundleToolVersion) {
+    if (hasOnDemandElement() || hasFastFollowElement() || hasModuleConditions()) {
+      return true;
     }
+    return getInstallTimeRemovableValue()
+        .orElse(!MERGE_INSTALL_TIME_MODULES_INTO_BASE.enabledForVersion(bundleToolVersion));
+  }
+
+  /**
+   * Returns "removable" attribute value of "install-time" element.
+   *
+   * <p>Unconditional install-time modules in bundles built via bundletool version >= 1.0.0 are
+   * non-removable by default. Use {@link #isInstallTimeRemovable(Version)} to check if a module is
+   * removable.
+   */
+  public Optional<Boolean> getInstallTimeRemovableValue() {
     return getDeliveryElement()
         .getOptionalChildElement(DISTRIBUTION_NAMESPACE_URI, "install-time")
-        .map(
+        .flatMap(
             installTime ->
                 installTime
-                    .getOptionalChildElement(DISTRIBUTION_NAMESPACE_URI, "permanent")
+                    .getOptionalChildElement(DISTRIBUTION_NAMESPACE_URI, "removable")
                     .map(
-                        permanent ->
-                            permanent
+                        removable ->
+                            removable
                                 .getAttribute(DISTRIBUTION_NAMESPACE_URI, "value")
                                 .map(XmlProtoAttribute::getValueAsBoolean)
-                                .get())
-                    .orElse(
-                        MERGE_INSTALL_TIME_MODULES_INTO_BASE.enabledForVersion(bundleToolVersion)))
-        .orElse(false);
+                                .get()));
   }
 
   /**
@@ -131,18 +140,19 @@ public abstract class ManifestDeliveryElement {
    *
    * <p>We support <dist:min-sdk-version>, <dist:device-feature> and <dist:user-countries>
    * conditions today. Any other conditions types are not supported and will result in {@link
-   * ValidationException}.
+   * InvalidBundleException}.
    */
   @Memoized
   public ModuleConditions getModuleConditions() {
     ImmutableList<XmlProtoElement> conditionElements = getModuleConditionElements();
 
-    Map<String, Long> conditionCounts =
-        conditionElements.stream().collect(groupingBy(XmlProtoElement::getName, counting()));
+    ImmutableMap<String, Long> conditionCounts =
+        conditionElements.stream()
+            .collect(groupingByDeterministic(XmlProtoElement::getName, counting()));
     for (String conditionName : CONDITIONS_ALLOWED_ONLY_ONCE) {
       if (conditionCounts.getOrDefault(conditionName, 0L) > 1) {
-        throw ValidationException.builder()
-            .withMessage("Multiple '<dist:%s>' conditions are not supported.", conditionName)
+        throw InvalidBundleException.builder()
+            .withUserMessage("Multiple '<dist:%s>' conditions are not supported.", conditionName)
             .build();
       }
     }
@@ -150,8 +160,8 @@ public abstract class ManifestDeliveryElement {
     ModuleConditions.Builder moduleConditions = ModuleConditions.builder();
     for (XmlProtoElement conditionElement : conditionElements) {
       if (!conditionElement.getNamespaceUri().equals(DISTRIBUTION_NAMESPACE_URI)) {
-        throw ValidationException.builder()
-            .withMessage(
+        throw InvalidBundleException.builder()
+            .withUserMessage(
                 "Invalid namespace found in the module condition element. "
                     + "Expected '%s'; found '%s'.",
                 DISTRIBUTION_NAMESPACE_URI, conditionElement.getNamespaceUri())
@@ -171,8 +181,9 @@ public abstract class ManifestDeliveryElement {
           moduleConditions.setUserCountriesCondition(parseUserCountriesCondition(conditionElement));
           break;
         default:
-          throw new ValidationException(
-              String.format("Unrecognized module condition: '%s'", conditionElement.getName()));
+          throw InvalidBundleException.builder()
+              .withUserMessage("Unrecognized module condition: '%s'", conditionElement.getName())
+              .build();
       }
     }
 
@@ -182,8 +193,8 @@ public abstract class ManifestDeliveryElement {
         && processedModuleConditions.getMaxSdkVersion().isPresent()) {
       if (processedModuleConditions.getMinSdkVersion().get()
           > processedModuleConditions.getMaxSdkVersion().get()) {
-        throw ValidationException.builder()
-            .withMessage(
+        throw InvalidBundleException.builder()
+            .withUserMessage(
                 "Illegal SDK-based conditional module targeting (min SDK must be less than or"
                     + " equal to max SD). Provided min and max values, respectively, are %s and %s",
                 processedModuleConditions.getMinSdkVersion(),
@@ -200,8 +211,8 @@ public abstract class ManifestDeliveryElement {
     for (XmlProtoElement countryElement :
         conditionElement.getChildrenElements().collect(toImmutableList())) {
       if (!countryElement.getName().equals(COUNTRY_ELEMENT_NAME)) {
-        throw ValidationException.builder()
-            .withMessage(
+        throw InvalidBundleException.builder()
+            .withUserMessage(
                 "Expected only <dist:country> elements inside <dist:user-countries>, but found %s",
                 printElement(conditionElement))
             .build();
@@ -213,8 +224,8 @@ public abstract class ManifestDeliveryElement {
               .map(String::toUpperCase)
               .orElseThrow(
                   () ->
-                      ValidationException.builder()
-                          .withMessage(
+                      InvalidBundleException.builder()
+                          .withUserMessage(
                               "<dist:country> element is expected to have 'dist:code' attribute "
                                   + "but found none.")
                           .build()));
@@ -255,8 +266,8 @@ public abstract class ManifestDeliveryElement {
             .findAny();
 
     if (offendingElement.isPresent()) {
-      throw ValidationException.builder()
-          .withMessage(
+      throw InvalidBundleException.builder()
+          .withUserMessage(
               "Expected <dist:delivery> element to contain only %s elements but found: %s",
               allowedDeliveryModes.stream()
                   .map(name -> String.format("<dist:%s>", name))
@@ -278,8 +289,8 @@ public abstract class ManifestDeliveryElement {
                     .findAny());
 
     if (offendingElement.isPresent()) {
-      throw ValidationException.builder()
-          .withMessage(
+      throw InvalidBundleException.builder()
+          .withUserMessage(
               "Expected <dist:install-time> element to contain only <dist:conditions> "
                   + "element but found: %s.",
               printElement(offendingElement.get()))
@@ -291,8 +302,8 @@ public abstract class ManifestDeliveryElement {
     Optional<XmlProtoElement> offendingChild =
         onDemandElement.flatMap(element -> element.getChildrenElements().findAny());
     if (offendingChild.isPresent()) {
-      throw ValidationException.builder()
-          .withMessage(
+      throw InvalidBundleException.builder()
+          .withUserMessage(
               "Expected <dist:on-demand> element to have no child elements but found: %s.",
               printElement(offendingChild.get()))
           .build();
@@ -303,8 +314,8 @@ public abstract class ManifestDeliveryElement {
     Optional<XmlProtoElement> offendingChild =
         fastFollowElement.flatMap(element -> element.getChildrenElements().findAny());
     if (offendingChild.isPresent()) {
-      throw ValidationException.builder()
-          .withMessage(
+      throw InvalidBundleException.builder()
+          .withUserMessage(
               "Expected <dist:fast-follow> element to have no child elements but found: %s.",
               printElement(offendingChild.get()))
           .build();
@@ -328,7 +339,7 @@ public abstract class ManifestDeliveryElement {
             .getAttribute(DISTRIBUTION_NAMESPACE_URI, NAME_ATTRIBUTE_NAME)
             .orElseThrow(
                 () ->
-                    new ValidationException(
+                    InvalidBundleException.createWithUserMessage(
                         "Missing required 'dist:name' attribute in the 'device-feature' condition "
                             + "element."))
             .getValueAsString(),
@@ -342,7 +353,7 @@ public abstract class ManifestDeliveryElement {
         .getAttribute(DISTRIBUTION_NAMESPACE_URI, VALUE_ATTRIBUTE_NAME)
         .orElseThrow(
             () ->
-                new ValidationException(
+                InvalidBundleException.createWithUserMessage(
                     "Missing required 'dist:value' attribute in the 'min-sdk' condition element."))
         .getValueAsDecimalInteger();
   }
@@ -352,7 +363,7 @@ public abstract class ManifestDeliveryElement {
         .getAttribute(DISTRIBUTION_NAMESPACE_URI, VALUE_ATTRIBUTE_NAME)
         .orElseThrow(
             () ->
-                new ValidationException(
+                InvalidBundleException.createWithUserMessage(
                     "Missing required 'dist:value' attribute in the 'max-sdk' condition element."))
         .getValueAsDecimalInteger();
   }

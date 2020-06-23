@@ -24,6 +24,7 @@ import com.android.bundle.Targeting.ModuleTargeting;
 import com.android.bundle.Targeting.SdkVersion;
 import com.android.bundle.Targeting.SdkVersionTargeting;
 import com.android.bundle.Targeting.VariantTargeting;
+import com.android.tools.build.bundletool.model.exceptions.IncompatibleDeviceException;
 import java.util.stream.Stream;
 
 /** A {@link TargetingDimensionMatcher} that provides matching on SDK version. */
@@ -126,7 +127,7 @@ public final class SdkVersionMatcher extends TargetingDimensionMatcher<SdkVersio
 
     if (!anyMatch) {
       throw IncompatibleDeviceException.builder()
-          .withMessage(
+          .withUserMessage(
               "The app doesn't support SDK version of the device: (%d).",
               getDeviceSpec().getSdkVersion())
           .build();

@@ -15,11 +15,12 @@
  */
 package com.android.tools.build.bundletool.model.utils.xmlproto;
 
-import com.android.tools.build.bundletool.model.exceptions.ValidationException;
+import com.google.errorprone.annotations.FormatMethod;
 
 /** Exception thrown when an error occurs on reading or writing the XML Proto format. */
-public class XmlProtoException extends ValidationException {
+public class XmlProtoException extends RuntimeException {
 
+  @FormatMethod
   XmlProtoException(String message, Object... args) {
     super(String.format(message, args));
   }

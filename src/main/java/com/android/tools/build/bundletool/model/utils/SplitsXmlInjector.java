@@ -25,7 +25,6 @@ import com.android.aapt.Resources.Item;
 import com.android.aapt.Resources.Value;
 import com.android.aapt.Resources.XmlNode;
 import com.android.tools.build.bundletool.model.GeneratedApks;
-import com.android.tools.build.bundletool.model.InputStreamSuppliers;
 import com.android.tools.build.bundletool.model.ModuleEntry;
 import com.android.tools.build.bundletool.model.ModuleSplit;
 import com.android.tools.build.bundletool.model.ResourceId;
@@ -33,6 +32,7 @@ import com.android.tools.build.bundletool.model.ResourceInjector;
 import com.android.tools.build.bundletool.model.SplitsProtoXmlBuilder;
 import com.android.tools.build.bundletool.model.ZipPath;
 import com.google.common.collect.ImmutableList;
+import com.google.common.io.ByteSource;
 import java.util.Collection;
 import java.util.stream.Stream;
 
@@ -130,7 +130,7 @@ public class SplitsXmlInjector {
                 .add(
                     ModuleEntry.builder()
                         .setPath(resourcePath)
-                        .setContentSupplier(InputStreamSuppliers.fromBytes(xmlNode.toByteArray()))
+                        .setContent(ByteSource.wrap(xmlNode.toByteArray()))
                         .build())
                 .build())
         .setAndroidManifest(

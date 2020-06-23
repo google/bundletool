@@ -45,13 +45,14 @@ import com.android.ddmlib.IDevice.DeviceState;
 import com.android.ddmlib.TimeoutException;
 import com.android.tools.build.bundletool.device.AdbServer;
 import com.android.tools.build.bundletool.device.Device;
-import com.android.tools.build.bundletool.device.IncompatibleDeviceException;
 import com.android.tools.build.bundletool.flags.FlagParser;
 import com.android.tools.build.bundletool.io.ZipBuilder;
 import com.android.tools.build.bundletool.model.Aapt2Command;
 import com.android.tools.build.bundletool.model.ZipPath;
+import com.android.tools.build.bundletool.model.exceptions.AdbOutputParseException;
 import com.android.tools.build.bundletool.model.exceptions.CommandExecutionException;
-import com.android.tools.build.bundletool.model.exceptions.ParseException;
+import com.android.tools.build.bundletool.model.exceptions.IncompatibleDeviceException;
+import com.android.tools.build.bundletool.model.exceptions.InvalidCommandException;
 import com.android.tools.build.bundletool.model.utils.SystemEnvironmentProvider;
 import com.android.tools.build.bundletool.model.version.BundleToolVersion;
 import com.android.tools.build.bundletool.testing.FakeAdbServer;
@@ -189,9 +190,9 @@ public class InstallMultiApksCommandTest {
     Path apkFile2 = apkDir.resolve("file2.apks");
     Path zipFile = tmpDir.resolve("container.zip");
 
-    CommandExecutionException e =
+    InvalidCommandException e =
         assertThrows(
-            CommandExecutionException.class,
+            InvalidCommandException.class,
             () ->
                 InstallMultiApksCommand.fromFlags(
                     new FlagParser()
@@ -205,9 +206,9 @@ public class InstallMultiApksCommandTest {
 
   @Test
   public void fromFlags_missingApksOption() {
-    CommandExecutionException e =
+    InvalidCommandException e =
         assertThrows(
-            CommandExecutionException.class,
+            InvalidCommandException.class,
             () ->
                 InstallMultiApksCommand.fromFlags(
                     new FlagParser().parse(),
@@ -614,7 +615,9 @@ public class InstallMultiApksCommandTest {
             ImmutableMap.of(
                 PKG_NAME_1,
                     () -> {
-                      throw new IncompatibleDeviceException("incompatible device");
+                      throw IncompatibleDeviceException.builder()
+                          .withUserMessage("incompatible device")
+                          .build();
                     },
                 PKG_NAME_2,
                     () ->
@@ -816,7 +819,7 @@ public class InstallMultiApksCommandTest {
     // EXPECT
     // Abandon the parent session.
     device.injectShellCommandOutput("pm install-abandon 1111111", () -> "Success");
-    ParseException e = assertThrows(ParseException.class, command::execute);
+    AdbOutputParseException e = assertThrows(AdbOutputParseException.class, command::execute);
     assertThat(e).hasMessageThat().contains("failed to parse session id from output");
   }
 

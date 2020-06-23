@@ -27,7 +27,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.android.aapt.Resources.ResourceTable;
 import com.android.tools.build.bundletool.model.BundleModule;
-import com.android.tools.build.bundletool.model.exceptions.ValidationException;
+import com.android.tools.build.bundletool.model.exceptions.InvalidBundleException;
 import com.android.tools.build.bundletool.testing.BundleModuleBuilder;
 import com.android.tools.build.bundletool.testing.ResourceTableBuilder;
 import com.google.common.collect.ImmutableList;
@@ -77,9 +77,10 @@ public class ResourceTableValidatorTest {
             .setManifest(androidManifest("com.test.app"))
             .build();
 
-    ValidationException exception =
+    InvalidBundleException exception =
         assertThrows(
-            ValidationException.class, () -> new ResourceTableValidator().validateModule(module));
+            InvalidBundleException.class,
+            () -> new ResourceTableValidator().validateModule(module));
 
     assertThat(exception)
         .hasMessageThat()
@@ -95,9 +96,10 @@ public class ResourceTableValidatorTest {
             .setManifest(androidManifest("com.test.app"))
             .build();
 
-    ValidationException exception =
+    InvalidBundleException exception =
         assertThrows(
-            ValidationException.class, () -> new ResourceTableValidator().validateModule(module));
+            InvalidBundleException.class,
+            () -> new ResourceTableValidator().validateModule(module));
 
     assertThat(exception)
         .hasMessageThat()
@@ -114,9 +116,10 @@ public class ResourceTableValidatorTest {
             .setManifest(androidManifest("com.test.app"))
             .build();
 
-    ValidationException exception =
+    InvalidBundleException exception =
         assertThrows(
-            ValidationException.class, () -> new ResourceTableValidator().validateModule(module));
+            InvalidBundleException.class,
+            () -> new ResourceTableValidator().validateModule(module));
 
     assertThat(exception)
         .hasMessageThat()
@@ -136,9 +139,10 @@ public class ResourceTableValidatorTest {
             .setManifest(androidManifest("com.test.app"))
             .build();
 
-    ValidationException exception =
+    InvalidBundleException exception =
         assertThrows(
-            ValidationException.class, () -> new ResourceTableValidator().validateModule(module));
+            InvalidBundleException.class,
+            () -> new ResourceTableValidator().validateModule(module));
 
     assertThat(exception)
         .hasMessageThat()
@@ -158,9 +162,9 @@ public class ResourceTableValidatorTest {
             .setManifest(androidManifest("com.test.app"))
             .build();
 
-    ValidationException exception =
+    InvalidBundleException exception =
         assertThrows(
-            ValidationException.class,
+            InvalidBundleException.class,
             () -> new ResourceTableValidator().checkResourceIdsAreUnique(ImmutableList.of(module)));
 
     assertThat(exception).hasMessageThat().contains("Duplicate resource");
@@ -189,9 +193,9 @@ public class ResourceTableValidatorTest {
             .setManifest(androidManifest("com.test.app"))
             .build();
 
-    ValidationException exception =
+    InvalidBundleException exception =
         assertThrows(
-            ValidationException.class,
+            InvalidBundleException.class,
             () ->
                 new ResourceTableValidator()
                     .checkResourceIdsAreUnique(ImmutableList.of(firstModule, secondModule)));

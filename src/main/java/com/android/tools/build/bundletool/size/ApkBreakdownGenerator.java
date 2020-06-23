@@ -16,6 +16,7 @@
 
 package com.android.tools.build.bundletool.size;
 
+import static com.android.tools.build.bundletool.model.utils.CollectorUtils.groupingByDeterministic;
 import static com.android.tools.build.bundletool.size.SizeUtils.addSizes;
 import static com.android.tools.build.bundletool.size.SizeUtils.sizes;
 import static com.android.tools.build.bundletool.size.SizeUtils.subtractSizes;
@@ -24,17 +25,14 @@ import static com.google.common.collect.ImmutableMap.toImmutableMap;
 
 import com.android.bundle.SizesOuterClass.Breakdown;
 import com.android.bundle.SizesOuterClass.Sizes;
-import com.android.tools.build.bundletool.model.InputStreamSupplier;
-import com.android.tools.build.bundletool.model.InputStreamSuppliers;
+import com.android.tools.build.bundletool.model.utils.GZipUtils;
 import com.android.tools.build.bundletool.model.utils.ZipUtils;
 import com.android.tools.build.bundletool.size.ApkCompressedSizeCalculator.JavaUtilZipDeflater;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Streams;
-import java.io.BufferedInputStream;
-import java.io.FileInputStream;
+import com.google.common.io.ByteSource;
 import java.io.IOException;
-import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.AbstractMap;
@@ -63,20 +61,16 @@ public final class ApkBreakdownGenerator {
       ImmutableMap<ApkComponent, Long> downloadSizeByComponent =
           downloadSizeByEntry.entrySet().stream()
               .collect(
-                  Collectors.collectingAndThen(
-                      Collectors.groupingBy(
+                      groupingByDeterministic(
                           entry -> ApkComponent.fromEntryName(entry.getKey()),
-                          Collectors.summingLong(Map.Entry<String, Long>::getValue)),
-                      ImmutableMap::copyOf));
+                          Collectors.summingLong(Map.Entry<String, Long>::getValue)));
 
       ImmutableMap<ApkComponent, Long> diskSizeByComponent =
           apk.stream()
               .collect(
-                  Collectors.collectingAndThen(
-                      Collectors.groupingBy(
-                          zipEntry -> ApkComponent.fromEntryName(zipEntry.getName()),
-                          Collectors.summingLong(ZipEntry::getCompressedSize)),
-                      ImmutableMap::copyOf));
+                  groupingByDeterministic(
+                      zipEntry -> ApkComponent.fromEntryName(zipEntry.getName()),
+                      Collectors.summingLong(ZipEntry::getCompressedSize)));
 
       Sizes actualTotalSize = calculateActualTotals(apkPath);
       Sizes zipOverheads =
@@ -103,10 +97,7 @@ public final class ApkBreakdownGenerator {
   }
 
   private static Sizes calculateActualTotals(Path apkPath) throws IOException {
-    try (InputStream inputStream = new FileInputStream(apkPath.toFile());
-        BufferedInputStream bufferedStream = new BufferedInputStream(inputStream)) {
-      return sizes(Files.size(apkPath), ZipUtils.calculateGzipCompressedSize(bufferedStream));
-    }
+    return sizes(Files.size(apkPath), GZipUtils.calculateGzipCompressedSize(apkPath));
   }
 
   private static Sizes getSizes(
@@ -119,9 +110,9 @@ public final class ApkBreakdownGenerator {
   private ImmutableMap<String, Long> calculateDownloadSizePerEntry(ZipFile zipFile)
       throws IOException {
 
-    ImmutableList<InputStreamSupplier> streams =
+    ImmutableList<ByteSource> streams =
         zipFile.stream()
-            .map(zipStreamEntry -> InputStreamSuppliers.fromZipEntry(zipStreamEntry, zipFile))
+            .map(zipStreamEntry -> ZipUtils.asByteSource(zipFile, zipStreamEntry))
             .collect(toImmutableList());
 
     ImmutableList<Long> downloadSizes =

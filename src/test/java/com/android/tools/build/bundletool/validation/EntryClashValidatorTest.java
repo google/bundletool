@@ -30,7 +30,7 @@ import com.android.bundle.Files.NativeLibraries;
 import com.android.bundle.Files.TargetedAssetsDirectory;
 import com.android.bundle.Files.TargetedNativeDirectory;
 import com.android.tools.build.bundletool.model.BundleModule;
-import com.android.tools.build.bundletool.model.exceptions.CommandExecutionException;
+import com.android.tools.build.bundletool.model.exceptions.InvalidBundleException;
 import com.android.tools.build.bundletool.testing.BundleModuleBuilder;
 import com.google.common.collect.ImmutableList;
 import org.junit.Test;
@@ -175,9 +175,9 @@ public class EntryClashValidatorTest {
             .setManifest(androidManifest("com.test.app"))
             .build();
 
-    CommandExecutionException exception =
+    InvalidBundleException exception =
         assertThrows(
-            CommandExecutionException.class,
+            InvalidBundleException.class,
             () -> new EntryClashValidator().validateAllModules(ImmutableList.of(moduleA, moduleB)));
 
     assertThat(exception)

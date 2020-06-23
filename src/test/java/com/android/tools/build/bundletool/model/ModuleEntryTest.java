@@ -16,9 +16,9 @@
 
 package com.android.tools.build.bundletool.model;
 
-import static com.android.tools.build.bundletool.testing.TestUtils.toByteArray;
 import static com.google.common.truth.Truth.assertThat;
 
+import com.google.common.io.ByteSource;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
@@ -33,7 +33,7 @@ public class ModuleEntryTest {
 
     assertThat(entry.getPath()).isEqualTo(path);
     assertThat(entry.getForceUncompressed()).isTrue();
-    assertThat(toByteArray(entry.getContentSupplier())).isEqualTo(content);
+    assertThat(entry.getContent().read()).isEqualTo(content);
   }
 
   @Test
@@ -83,10 +83,6 @@ public class ModuleEntryTest {
   }
 
   private static ModuleEntry createEntry(ZipPath path, byte[] content) throws Exception {
-    return createEntry(path, InputStreamSuppliers.fromBytes(content));
-  }
-
-  private static ModuleEntry createEntry(ZipPath path, InputStreamSupplier contentSupplier) {
-    return ModuleEntry.builder().setPath(path).setContentSupplier(contentSupplier).build();
+    return ModuleEntry.builder().setPath(path).setContent(ByteSource.wrap(content)).build();
   }
 }

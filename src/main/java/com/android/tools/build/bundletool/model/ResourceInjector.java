@@ -113,7 +113,9 @@ public class ResourceInjector {
     int highestEntryId =
         entryList.stream().mapToInt(entry -> entry.getEntryId().getId()).max().orElse(-1);
     if (highestEntryId >= ResourceId.MAX_ENTRY_ID) {
-      throw new CommandExecutionException("No free entry id left in the resource table.");
+      throw CommandExecutionException.builder()
+          .withInternalMessage("No free entry id left in the resource table.")
+          .build();
     }
     return highestEntryId + 1;
   }
@@ -122,7 +124,9 @@ public class ResourceInjector {
     int highestTypeId =
         typeList.stream().mapToInt(type -> type.getTypeId().getId()).max().orElse(0);
     if (highestTypeId >= ResourceId.MAX_TYPE_ID) {
-      throw new CommandExecutionException("No free type id left in the resource table.");
+      throw CommandExecutionException.builder()
+          .withInternalMessage("No free type id left in the resource table.")
+          .build();
     }
     return highestTypeId + 1;
   }

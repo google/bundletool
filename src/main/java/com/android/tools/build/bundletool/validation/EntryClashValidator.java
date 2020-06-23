@@ -21,7 +21,7 @@ import static com.android.tools.build.bundletool.model.BundleModule.DEX_DIRECTOR
 import com.android.tools.build.bundletool.model.BundleModule;
 import com.android.tools.build.bundletool.model.ModuleEntry;
 import com.android.tools.build.bundletool.model.ZipPath;
-import com.android.tools.build.bundletool.model.exceptions.ValidationException;
+import com.android.tools.build.bundletool.model.exceptions.InvalidBundleException;
 import com.google.common.collect.ImmutableList;
 import java.util.HashMap;
 import java.util.Map;
@@ -59,8 +59,8 @@ public class EntryClashValidator extends SubValidator {
     ModuleEntry entry1 = module1.getEntry(path).get();
     ModuleEntry entry2 = module2.getEntry(path).get();
     if (!entry1.equals(entry2)) {
-      throw ValidationException.builder()
-          .withMessage(
+      throw InvalidBundleException.builder()
+          .withUserMessage(
               "Modules '%s' and '%s' contain entry '%s' with different content.",
               module1.getName(), module2.getName(), path)
           .build();

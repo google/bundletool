@@ -16,7 +16,7 @@
 
 package com.android.tools.build.bundletool.device;
 
-import com.android.tools.build.bundletool.model.exceptions.ParseException;
+import com.android.tools.build.bundletool.model.exceptions.AdbOutputParseException;
 import com.google.common.collect.ImmutableList;
 import java.util.Optional;
 
@@ -27,7 +27,9 @@ class AdbCommandOutputValidator {
   public static void validateSuccess(ImmutableList<String> output, String command) {
     Optional<String> successLine = output.stream().filter(s -> s.startsWith("Success")).findFirst();
     if (!successLine.isPresent()) {
-      throw new ParseException(String.format("adb failed: %s\nDetails:%s", command, output));
+      throw AdbOutputParseException.builder()
+          .withInternalMessage("adb failed: %s\nDetails:%s", command, output)
+          .build();
     }
   }
 

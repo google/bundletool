@@ -181,7 +181,7 @@ public class ModuleSplitter {
   private ImmutableList<ModuleSplit> runSplitters() {
     if (targetsOnlyPreL(module)) {
       throw CommandExecutionException.builder()
-          .withMessage(
+          .withInternalMessage(
               "Cannot split module '%s' because it does not target devices on Android L or above.",
               module.getName())
           .build();

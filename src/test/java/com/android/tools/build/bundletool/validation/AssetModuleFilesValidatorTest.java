@@ -30,7 +30,7 @@ import com.android.bundle.Files.ApexImages;
 import com.android.bundle.Files.NativeLibraries;
 import com.android.bundle.Files.TargetedApexImage;
 import com.android.tools.build.bundletool.model.BundleModule;
-import com.android.tools.build.bundletool.model.exceptions.ValidationException;
+import com.android.tools.build.bundletool.model.exceptions.InvalidBundleException;
 import com.android.tools.build.bundletool.testing.BundleModuleBuilder;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -59,9 +59,9 @@ public final class AssetModuleFilesValidatorTest {
             .setManifest(androidManifestForAssetModule(PKG_NAME))
             .setResourceTable(ResourceTable.getDefaultInstance())
             .build();
-    ValidationException exception =
+    InvalidBundleException exception =
         assertThrows(
-            ValidationException.class,
+            InvalidBundleException.class,
             () -> new AssetModuleFilesValidator().validateModule(module));
     assertThat(exception)
         .hasMessageThat()
@@ -75,9 +75,9 @@ public final class AssetModuleFilesValidatorTest {
             .setManifest(androidManifestForAssetModule(PKG_NAME))
             .addFile("dex/classes.dex")
             .build();
-    ValidationException exception =
+    InvalidBundleException exception =
         assertThrows(
-            ValidationException.class,
+            InvalidBundleException.class,
             () -> new AssetModuleFilesValidator().validateModule(module));
     assertThat(exception)
         .hasMessageThat()
@@ -94,9 +94,9 @@ public final class AssetModuleFilesValidatorTest {
             .addFile("assets/kitten.jpg")
             .addFile("root/groot.jpg")
             .build();
-    ValidationException exception =
+    InvalidBundleException exception =
         assertThrows(
-            ValidationException.class,
+            InvalidBundleException.class,
             () -> new AssetModuleFilesValidator().validateModule(module));
     assertThat(exception)
         .hasMessageThat()
@@ -114,9 +114,9 @@ public final class AssetModuleFilesValidatorTest {
             .setManifest(androidManifestForAssetModule(PKG_NAME))
             .setNativeConfig(config)
             .build();
-    ValidationException exception =
+    InvalidBundleException exception =
         assertThrows(
-            ValidationException.class,
+            InvalidBundleException.class,
             () -> new AssetModuleFilesValidator().validateModule(module));
     assertThat(exception)
         .hasMessageThat()
@@ -134,9 +134,9 @@ public final class AssetModuleFilesValidatorTest {
             .setManifest(androidManifestForAssetModule(PKG_NAME))
             .setApexConfig(apexConfig)
             .build();
-    ValidationException exception =
+    InvalidBundleException exception =
         assertThrows(
-            ValidationException.class,
+            InvalidBundleException.class,
             () -> new AssetModuleFilesValidator().validateModule(module));
     assertThat(exception)
         .hasMessageThat()

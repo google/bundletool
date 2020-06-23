@@ -16,12 +16,17 @@
 package com.android.tools.build.bundletool.testing;
 
 import com.android.tools.build.bundletool.model.Aapt2Command;
-import com.google.common.collect.ObjectArrays;
+import com.android.tools.build.bundletool.model.CommandExecutor;
+import com.android.tools.build.bundletool.model.CommandExecutor.CommandOptions;
+import com.google.common.collect.ImmutableList;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.time.Duration;
 
 /** Helper for tests using aapt2. */
 public final class Aapt2Helper {
+
+  private static final Duration AAPT_TIMEOUT = Duration.ofMinutes(5);
 
   public static final String AAPT2_PATH =
       System.getenv("AAPT2_PATH");
@@ -36,7 +41,10 @@ public final class Aapt2Helper {
   }
 
   private static void runAapt2(String... command) {
-    new Aapt2Command.CommandExecutor().execute(ObjectArrays.concat(AAPT2_PATH, command));
+    new CommandExecutor()
+        .execute(
+            ImmutableList.<String>builder().add(AAPT2_PATH).add(command).build(),
+            CommandOptions.builder().setTimeout(AAPT_TIMEOUT).build());
   }
 
   private Aapt2Helper() {}

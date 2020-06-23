@@ -79,7 +79,6 @@ import com.android.tools.build.bundletool.model.ShardedSystemSplits;
 import com.android.tools.build.bundletool.model.exceptions.CommandExecutionException;
 import com.android.tools.build.bundletool.model.utils.Versions;
 import com.android.tools.build.bundletool.model.version.Version;
-import com.android.tools.build.bundletool.testing.TestUtils;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
@@ -1088,9 +1087,9 @@ public class ModuleSplitsToShardMergerTest {
     return new HashMap<>();
   }
 
-  private static byte[] dexData(ModuleSplit module, String entryPath) {
+  private static byte[] dexData(ModuleSplit module, String entryPath) throws Exception {
     ModuleEntry mergedDexEntry = module.findEntry(entryPath).get();
-    return TestUtils.getEntryContent(mergedDexEntry);
+    return mergedDexEntry.getContent().read();
   }
 
   private static void assertSingleEntryStandaloneShard(ModuleSplit shard, String entry) {

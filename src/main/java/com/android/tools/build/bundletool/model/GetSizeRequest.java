@@ -29,6 +29,7 @@ public interface GetSizeRequest {
     ABI,
     SCREEN_DENSITY,
     LANGUAGE,
+    TEXTURE_COMPRESSION_FORMAT,
     ALL
   }
 

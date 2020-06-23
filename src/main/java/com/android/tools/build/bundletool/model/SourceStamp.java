@@ -30,7 +30,7 @@ import com.google.errorprone.annotations.Immutable;
 @AutoValue
 public abstract class SourceStamp {
 
-  public static final String LOCAL_SOURCE = "local";
+  public static final String LOCAL_SOURCE = "http://localhost";
 
   public static final String STAMP_SOURCE_METADATA_KEY = "com.android.stamp.source";
   public static final String STAMP_TYPE_METADATA_KEY = "com.android.stamp.type";
@@ -43,7 +43,7 @@ public abstract class SourceStamp {
    *
    * <p>For stores, it is their package names.
    *
-   * <p>For local stamps, it is "local".
+   * <p>For local stamps, it is "http://localhost".
    */
   public abstract String getSource();
 

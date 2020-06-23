@@ -42,8 +42,7 @@ import com.android.tools.build.bundletool.model.Aapt2Command;
 import com.android.tools.build.bundletool.model.AppBundle;
 import com.android.tools.build.bundletool.model.SigningConfiguration;
 import com.android.tools.build.bundletool.model.SourceStamp;
-import com.android.tools.build.bundletool.model.exceptions.CommandExecutionException;
-import com.android.tools.build.bundletool.model.exceptions.ValidationException;
+import com.android.tools.build.bundletool.model.exceptions.InvalidCommandException;
 import com.android.tools.build.bundletool.model.utils.ResultUtils;
 import com.android.tools.build.bundletool.model.utils.SystemEnvironmentProvider;
 import com.android.tools.build.bundletool.model.utils.files.FileUtils;
@@ -507,9 +506,9 @@ public class BuildApksCommandTest {
 
   @Test
   public void optimizationDimensionsWithUniversal_throws() throws Exception {
-    CommandExecutionException builderException =
+    InvalidCommandException builderException =
         assertThrows(
-            CommandExecutionException.class,
+            InvalidCommandException.class,
             () ->
                 BuildApksCommand.builder()
                     .setBundlePath(bundlePath)
@@ -522,9 +521,9 @@ public class BuildApksCommandTest {
         .hasMessageThat()
         .contains("Optimization dimension can be only set when running with 'default' mode flag.");
 
-    ValidationException flagsException =
+    InvalidCommandException flagsException =
         assertThrows(
-            ValidationException.class,
+            InvalidCommandException.class,
             () ->
                 BuildApksCommand.fromFlags(
                     new FlagParser()
@@ -541,9 +540,9 @@ public class BuildApksCommandTest {
 
   @Test
   public void modulesFlagWithDefault_throws() throws Exception {
-    ValidationException builderException =
+    InvalidCommandException builderException =
         assertThrows(
-            ValidationException.class,
+            InvalidCommandException.class,
             () ->
                 BuildApksCommand.builder()
                     .setBundlePath(bundlePath)
@@ -598,9 +597,9 @@ public class BuildApksCommandTest {
 
   @Test
   public void keyStoreFlags_keyAliasNotSet() {
-    CommandExecutionException e =
+    InvalidCommandException e =
         assertThrows(
-            CommandExecutionException.class,
+            InvalidCommandException.class,
             () ->
                 BuildApksCommand.fromFlags(
                     new FlagParser()
@@ -615,9 +614,9 @@ public class BuildApksCommandTest {
 
   @Test
   public void keyStoreFlags_keyStoreNotSet() {
-    CommandExecutionException e =
+    InvalidCommandException e =
         assertThrows(
-            CommandExecutionException.class,
+            InvalidCommandException.class,
             () ->
                 BuildApksCommand.fromFlags(
                     new FlagParser()
@@ -985,9 +984,9 @@ public class BuildApksCommandTest {
             /* properties= */ ImmutableMap.of(USER_HOME.key(), "/"));
     ByteArrayOutputStream output = new ByteArrayOutputStream();
 
-    CommandExecutionException e =
+    InvalidCommandException e =
         assertThrows(
-            CommandExecutionException.class,
+            InvalidCommandException.class,
             () ->
                 BuildApksCommand.fromFlags(
                     new FlagParser()
@@ -1005,9 +1004,9 @@ public class BuildApksCommandTest {
 
   @Test
   public void stampKeystoreFlags_noKeyAlias_fails() {
-    CommandExecutionException e =
+    InvalidCommandException e =
         assertThrows(
-            CommandExecutionException.class,
+            InvalidCommandException.class,
             () ->
                 BuildApksCommand.fromFlags(
                     new FlagParser()

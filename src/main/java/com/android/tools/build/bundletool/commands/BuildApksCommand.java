@@ -40,8 +40,7 @@ import com.android.tools.build.bundletool.model.OptimizationDimension;
 import com.android.tools.build.bundletool.model.Password;
 import com.android.tools.build.bundletool.model.SigningConfiguration;
 import com.android.tools.build.bundletool.model.SourceStamp;
-import com.android.tools.build.bundletool.model.exceptions.CommandExecutionException;
-import com.android.tools.build.bundletool.model.exceptions.ValidationException;
+import com.android.tools.build.bundletool.model.exceptions.InvalidCommandException;
 import com.android.tools.build.bundletool.model.utils.DefaultSystemEnvironmentProvider;
 import com.android.tools.build.bundletool.model.utils.SystemEnvironmentProvider;
 import com.android.tools.build.bundletool.splitters.DexCompressionSplitter;
@@ -188,6 +187,8 @@ public abstract class BuildApksCommand {
   public abstract Optional<PrintStream> getOutputPrintStream();
 
   public abstract Optional<SourceStamp> getSourceStamp();
+
+  public abstract Optional<Long> getAssetModulesVersionOverride();
 
   public static Builder builder() {
     return new AutoValue_BuildApksCommand.Builder()
@@ -338,11 +339,11 @@ public abstract class BuildApksCommand {
     /** For command line, sets the {@link PrintStream} to use for outputting the warnings. */
     public abstract Builder setOutputPrintStream(PrintStream outputPrintStream);
 
-    /**
-     * Provides a {@link SourceStamp} to be included in the
-     * generated APKs.
-     */
+    /** Provides a {@link SourceStamp} to be included in the generated APKs. */
     public abstract Builder setSourceStamp(SourceStamp sourceStamp);
+
+    /** If present, will replace the version of the asset modules with the provided value. */
+    public abstract Builder setAssetModulesVersionOverride(long value);
 
     abstract BuildApksCommand autoBuild();
 
@@ -355,18 +356,20 @@ public abstract class BuildApksCommand {
       BuildApksCommand command = autoBuild();
       if (!command.getOptimizationDimensions().isEmpty()
           && !command.getApkBuildMode().equals(DEFAULT)) {
-        throw new ValidationException(
-            String.format(
+        throw InvalidCommandException.builder()
+            .withInternalMessage(
                 "Optimization dimension can be only set when running with '%s' mode flag.",
-                DEFAULT.getLowerCaseName()));
+                DEFAULT.getLowerCaseName())
+            .build();
       }
 
       if (command.getGenerateOnlyForConnectedDevice()
           && !command.getApkBuildMode().equals(DEFAULT)) {
-        throw new ValidationException(
-            String.format(
+        throw InvalidCommandException.builder()
+            .withInternalMessage(
                 "Optimizing for connected device only possible when running with '%s' mode flag.",
-                DEFAULT.getLowerCaseName()));
+                DEFAULT.getLowerCaseName())
+            .build();
       }
 
       if (command.getDeviceSpec().isPresent()) {
@@ -376,19 +379,21 @@ public abstract class BuildApksCommand {
 
         switch (command.getApkBuildMode()) {
           case UNIVERSAL:
-            throw new ValidationException(
-                String.format(
-                    "Optimizing for device spec not possible when running with '%s' mode flag.",
-                    UNIVERSAL.getLowerCaseName()));
+            throw InvalidCommandException.builder()
+                .withInternalMessage(
+                    "Optimizing for device spec is not possible when running with '%s' mode flag.",
+                    UNIVERSAL.getLowerCaseName())
+                .build();
           case SYSTEM:
           case SYSTEM_COMPRESSED:
             DeviceSpec deviceSpec = command.getDeviceSpec().get();
             if (deviceSpec.getScreenDensity() == 0 || deviceSpec.getSupportedAbisList().isEmpty()) {
-              throw new ValidationException(
-                  String.format(
+              throw InvalidCommandException.builder()
+                  .withInternalMessage(
                       "Device spec must have screen density and ABIs set when running with "
                           + "'%s' or '%s' mode flag. ",
-                      SYSTEM.getLowerCaseName(), SYSTEM_COMPRESSED.getLowerCaseName()));
+                      SYSTEM.getLowerCaseName(), SYSTEM_COMPRESSED.getLowerCaseName())
+                  .build();
             }
             break;
           case DEFAULT:
@@ -397,8 +402,8 @@ public abstract class BuildApksCommand {
         }
       } else {
         if (command.getApkBuildMode().isAnySystemMode()) {
-          throw ValidationException.builder()
-              .withMessage(
+          throw InvalidCommandException.builder()
+              .withInternalMessage(
                   "Device spec must always be set when running with '%s' or '%s' mode flag.",
                   SYSTEM.getLowerCaseName(), SYSTEM_COMPRESSED.getLowerCaseName())
               .build();
@@ -406,20 +411,23 @@ public abstract class BuildApksCommand {
       }
 
       if (command.getGenerateOnlyForConnectedDevice() && command.getDeviceSpec().isPresent()) {
-        throw new ValidationException(
-            "Cannot optimize for the device spec and connected device at the same time.");
+        throw InvalidCommandException.builder()
+            .withInternalMessage(
+                "Cannot optimize for the device spec and connected device at the same time.")
+            .build();
       }
 
       if (command.getDeviceId().isPresent() && !command.getGenerateOnlyForConnectedDevice()) {
-        throw new ValidationException(
-            "Setting --device-id requires using the --connected-device flag.");
+        throw InvalidCommandException.builder()
+            .withInternalMessage("Setting --device-id requires using the --connected-device flag.")
+            .build();
       }
 
       if (command.getCreateApkSetArchive()) {
         if (!APK_SET_ARCHIVE_EXTENSION.equals(
             MoreFiles.getFileExtension(command.getOutputFile()))) {
-          throw ValidationException.builder()
-              .withMessage(
+          throw InvalidCommandException.builder()
+              .withInternalMessage(
                   "Flag --output should be the path where to generate the APK Set. "
                       + "Its extension must be '.apks'.")
               .build();
@@ -429,8 +437,8 @@ public abstract class BuildApksCommand {
       if (!command.getModules().isEmpty()
           && !command.getApkBuildMode().isAnySystemMode()
           && !command.getApkBuildMode().equals(UNIVERSAL)) {
-        throw ValidationException.builder()
-            .withMessage(
+        throw InvalidCommandException.builder()
+            .withInternalMessage(
                 "Modules can be only set when running with '%s', '%s' or '%s' mode flag.",
                 UNIVERSAL.getLowerCaseName(),
                 SYSTEM.getLowerCaseName(),
@@ -765,9 +773,13 @@ public abstract class BuildApksCommand {
           SigningConfiguration.extractFromKeystore(
               keystorePath.get(), keyAlias.get(), keystorePassword, keyPassword));
     } else if (keystorePath.isPresent() && !keyAlias.isPresent()) {
-      throw new CommandExecutionException("Flag --ks-key-alias is required when --ks is set.");
+      throw InvalidCommandException.builder()
+          .withInternalMessage("Flag --ks-key-alias is required when --ks is set.")
+          .build();
     } else if (!keystorePath.isPresent() && keyAlias.isPresent()) {
-      throw new CommandExecutionException("Flag --ks is required when --ks-key-alias is set.");
+      throw InvalidCommandException.builder()
+          .withInternalMessage("Flag --ks is required when --ks-key-alias is set.")
+          .build();
     } else {
       // Try to use debug keystore if present.
       Optional<SigningConfiguration> debugConfig =
@@ -840,7 +852,9 @@ public abstract class BuildApksCommand {
             DebugKeystoreUtils.DEBUG_KEYSTORE_CACHE.getUnchecked(systemEnvironmentProvider).get());
         return debugConfig.get();
       } else {
-        throw new CommandExecutionException("No key was found to sign the stamp.");
+        throw InvalidCommandException.builder()
+            .withInternalMessage("No key was found to sign the stamp.")
+            .build();
       }
     }
 
@@ -855,8 +869,11 @@ public abstract class BuildApksCommand {
     }
 
     if (keyAlias == null) {
-      throw new CommandExecutionException(
-          "Flag --stamp-key-alias or --ks-key-alias are required when --stamp-ks or --ks are set.");
+      throw InvalidCommandException.builder()
+          .withInternalMessage(
+              "Flag --stamp-key-alias or --ks-key-alias are required when --stamp-ks or --ks are"
+                  + " set.")
+          .build();
     }
 
     return SigningConfiguration.extractFromKeystore(

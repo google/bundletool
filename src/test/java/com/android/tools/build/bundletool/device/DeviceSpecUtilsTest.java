@@ -35,6 +35,9 @@ import static com.android.tools.build.bundletool.testing.TargetingUtils.language
 import static com.android.tools.build.bundletool.testing.TargetingUtils.screenDensityTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.sdkVersionFrom;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.sdkVersionTargeting;
+import static com.android.tools.build.bundletool.testing.TargetingUtils.textureCompressionTargeting;
+import static com.google.common.truth.Truth.assertThat;
+import static com.google.common.truth.Truth8.assertThat;
 import static com.google.common.truth.extensions.proto.ProtoTruth.assertThat;
 
 import com.android.bundle.Devices.DeviceSpec;
@@ -42,6 +45,8 @@ import com.android.bundle.Targeting.AbiTargeting;
 import com.android.bundle.Targeting.LanguageTargeting;
 import com.android.bundle.Targeting.ScreenDensityTargeting;
 import com.android.bundle.Targeting.SdkVersionTargeting;
+import com.android.bundle.Targeting.TextureCompressionFormat.TextureCompressionFormatAlias;
+import com.android.bundle.Targeting.TextureCompressionFormatTargeting;
 import com.android.tools.build.bundletool.device.DeviceSpecUtils.DeviceSpecFromTargetingBuilder;
 import com.google.common.collect.ImmutableSet;
 import org.junit.Test;
@@ -128,6 +133,58 @@ public class DeviceSpecUtilsTest {
                 .setSupportedLocales(languageTargeting("fr"))
                 .build())
         .isEqualTo(locales("fr"));
+  }
+
+  @Test
+  public void deviceSpecFromTargetingBuilder_setSupportedTextureCompressionFormats_toDefaultInstance() {
+    assertThat(
+        new DeviceSpecFromTargetingBuilder(DeviceSpec.getDefaultInstance())
+            .setSupportedTextureCompressionFormats(
+                TextureCompressionFormatTargeting.getDefaultInstance())
+            .build())
+        .isEqualToDefaultInstance();
+  }
+
+  @Test
+  public void deviceSpecFromTargetingBuilder_setSupportedTextureCompressionFormats() {
+    DeviceSpec deviceSpec =
+        new DeviceSpecFromTargetingBuilder(DeviceSpec.getDefaultInstance())
+            .setSupportedTextureCompressionFormats(
+                textureCompressionTargeting(
+                    /* values= */ ImmutableSet.of(
+                        TextureCompressionFormatAlias.ETC2, TextureCompressionFormatAlias.ASTC),
+                    /* alternatives= */ ImmutableSet.of()))
+            .build();
+
+    assertThat(deviceSpec.getGlExtensionsList())
+        .containsExactly("GL_KHR_texture_compression_astc_ldr");
+    assertThat(deviceSpec.getDeviceFeaturesList()).containsExactly("reqGlEsVersion=0x30000");
+  }
+
+  @Test
+  public void getGlEsVersion() {
+    DeviceSpec deviceSpec =
+        new DeviceSpecFromTargetingBuilder(DeviceSpec.getDefaultInstance())
+            .setSupportedTextureCompressionFormats(
+                textureCompressionTargeting(TextureCompressionFormatAlias.ETC2))
+            .build();
+
+    assertThat(DeviceSpecUtils.getGlEsVersion(deviceSpec)).hasValue(0x30000);
+  }
+
+  @Test
+  public void getDeviceSupportedTextureCompressionFormats() {
+    DeviceSpec deviceSpec =
+        new DeviceSpecFromTargetingBuilder(DeviceSpec.getDefaultInstance())
+            .setSupportedTextureCompressionFormats(
+                textureCompressionTargeting(
+                    /* values= */ ImmutableSet.of(
+                        TextureCompressionFormatAlias.ETC2, TextureCompressionFormatAlias.ASTC),
+                    /* alternatives= */ ImmutableSet.of()))
+            .build();
+
+    assertThat(DeviceSpecUtils.getDeviceSupportedTextureCompressionFormats(deviceSpec))
+        .containsExactly(TextureCompressionFormatAlias.ETC2, TextureCompressionFormatAlias.ASTC);
   }
 
   @Test

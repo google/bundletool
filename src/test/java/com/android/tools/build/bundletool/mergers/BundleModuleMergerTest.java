@@ -19,8 +19,10 @@ package com.android.tools.build.bundletool.mergers;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifest;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifestForAssetModule;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifestForFeature;
+import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withFeatureCondition;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withInstallTimeDelivery;
-import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withInstallTimePermanentElement;
+import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withInstallTimeRemovableElement;
+import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withMinSdkVersion;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withOnDemandDelivery;
 import static com.google.common.truth.Truth.assertThat;
 import static com.google.common.truth.Truth8.assertThat;
@@ -33,7 +35,7 @@ import com.android.tools.build.bundletool.io.ZipBuilder;
 import com.android.tools.build.bundletool.model.AppBundle;
 import com.android.tools.build.bundletool.model.BundleModuleName;
 import com.android.tools.build.bundletool.model.ZipPath;
-import com.android.tools.build.bundletool.model.exceptions.ValidationException;
+import com.android.tools.build.bundletool.model.exceptions.InvalidBundleException;
 import com.android.tools.build.bundletool.testing.BundleConfigBuilder;
 import com.google.common.truth.Correspondence;
 import java.io.File;
@@ -84,7 +86,7 @@ public class BundleModuleMergerTest {
 
     try (ZipFile appBundleZip = new ZipFile(bundleFile.toFile())) {
       AppBundle appBundle =
-          BundleModuleMerger.mergePermanentInstallTimeModules(
+          BundleModuleMerger.mergeNonRemovableInstallTimeModules(
               AppBundle.buildFromZip(appBundleZip), /* overrideBundleToolVersion = */ false);
       assertThat(appBundle.getFeatureModules().keySet())
           .comparingElementsUsing(equalsBundleModuleName())
@@ -112,7 +114,7 @@ public class BundleModuleMergerTest {
 
     try (ZipFile appBundleZip = new ZipFile(bundleFile.toFile())) {
       AppBundle appBundle =
-          BundleModuleMerger.mergePermanentInstallTimeModules(
+          BundleModuleMerger.mergeNonRemovableInstallTimeModules(
               AppBundle.buildFromZip(appBundleZip), /* overrideBundleToolVersion = */ false);
       assertThat(appBundle.getFeatureModules().keySet())
           .comparingElementsUsing(equalsBundleModuleName())
@@ -138,11 +140,11 @@ public class BundleModuleMergerTest {
         .writeTo(bundleFile);
 
     try (ZipFile appBundleZip = new ZipFile(bundleFile.toFile())) {
-      ValidationException exception =
+      InvalidBundleException exception =
           assertThrows(
-              ValidationException.class,
+              InvalidBundleException.class,
               () ->
-                  BundleModuleMerger.mergePermanentInstallTimeModules(
+                  BundleModuleMerger.mergeNonRemovableInstallTimeModules(
                       AppBundle.buildFromZip(appBundleZip),
                       /* overrideBundleToolVersion = */ false));
       assertThat(exception)
@@ -167,7 +169,7 @@ public class BundleModuleMergerTest {
 
     try (ZipFile appBundleZip = new ZipFile(bundleFile.toFile())) {
       AppBundle appBundle =
-          BundleModuleMerger.mergePermanentInstallTimeModules(
+          BundleModuleMerger.mergeNonRemovableInstallTimeModules(
               AppBundle.buildFromZip(appBundleZip), /* overrideBundleToolVersion = */ false);
       assertThat(appBundle.getFeatureModules().keySet())
           .comparingElementsUsing(equalsBundleModuleName())
@@ -190,7 +192,7 @@ public class BundleModuleMergerTest {
 
     try (ZipFile appBundleZip = new ZipFile(bundleFile.toFile())) {
       AppBundle appBundle =
-          BundleModuleMerger.mergePermanentInstallTimeModules(
+          BundleModuleMerger.mergeNonRemovableInstallTimeModules(
               AppBundle.buildFromZip(appBundleZip), /* overrideBundleToolVersion = */ true);
 
       assertThat(appBundle.getFeatureModules().keySet())
@@ -199,8 +201,48 @@ public class BundleModuleMergerTest {
     }
   }
 
+  // Override ignored for bundles built by bundletool version >= 1.0.0. Allows developers to
+  // selectively merge modules.
   @Test
-  public void testMultipleModulesWithInstallTime_implicitMergingAssetModules() throws Exception {
+  public void testMultipleModulesWithInstallTime_bundleToolVersionOverrideIgnored()
+      throws Exception {
+    XmlNode installTimeModuleManifest =
+        androidManifestForFeature("com.test.app.detail", withInstallTimeDelivery());
+    XmlNode installTimeNonRemovableModuleManifest =
+        androidManifestForFeature("com.test.app.detail", withInstallTimeRemovableElement(false));
+    XmlNode installTimeRemovableModuleManifest =
+        androidManifestForFeature("com.test.app.detail", withInstallTimeRemovableElement(true));
+    createBasicZipBuilder(BUNDLE_CONFIG_1_0_0)
+        .addFileWithProtoContent(ZipPath.create("base/manifest/AndroidManifest.xml"), MANIFEST)
+        .addFileWithContent(ZipPath.create("base/dex/classes.dex"), DUMMY_CONTENT)
+        .addFileWithContent(ZipPath.create("base/assets/baseAssetfile.txt"), DUMMY_CONTENT)
+        // merged by default
+        .addFileWithProtoContent(
+            ZipPath.create("detail/manifest/AndroidManifest.xml"), installTimeModuleManifest)
+        .addFileWithContent(ZipPath.create("detail/assets/detailsAssetfile.txt"), DUMMY_CONTENT)
+        .addFileWithProtoContent(
+            ZipPath.create("detail2/manifest/AndroidManifest.xml"),
+            installTimeNonRemovableModuleManifest)
+        .addFileWithContent(ZipPath.create("detail2/assets/detailsAssetfile.txt"), DUMMY_CONTENT)
+        .addFileWithProtoContent(
+            ZipPath.create("detail3/manifest/AndroidManifest.xml"),
+            installTimeRemovableModuleManifest)
+        .addFileWithContent(ZipPath.create("detail3/assets/detailsAssetfile.txt"), DUMMY_CONTENT)
+        .writeTo(bundleFile);
+
+    try (ZipFile appBundleZip = new ZipFile(bundleFile.toFile())) {
+      AppBundle appBundle =
+          BundleModuleMerger.mergeNonRemovableInstallTimeModules(
+              AppBundle.buildFromZip(appBundleZip), /* overrideBundleToolVersion = */ true);
+
+      assertThat(appBundle.getFeatureModules().keySet())
+          .comparingElementsUsing(equalsBundleModuleName())
+          .containsExactly("base", "detail3");
+    }
+  }
+
+  @Test
+  public void testMultipleModulesWithInstallTime_notMergingAssetModules() throws Exception {
     XmlNode assetModuleManifest =
         androidManifestForAssetModule("com.test.app.detail", withInstallTimeDelivery());
     createBasicZipBuilder(BUNDLE_CONFIG_1_0_0)
@@ -214,10 +256,12 @@ public class BundleModuleMergerTest {
 
     try (ZipFile appBundleZip = new ZipFile(bundleFile.toFile())) {
       AppBundle appBundle =
-          BundleModuleMerger.mergePermanentInstallTimeModules(
+          BundleModuleMerger.mergeNonRemovableInstallTimeModules(
               AppBundle.buildFromZip(appBundleZip), /* overrideBundleToolVersion = */ false);
 
-      assertThat(appBundle.getAssetModules()).isEmpty();
+      assertThat(appBundle.getAssetModules().keySet())
+          .comparingElementsUsing(equalsBundleModuleName())
+          .containsExactly("detail");
       assertThat(appBundle.getFeatureModules().keySet())
           .comparingElementsUsing(equalsBundleModuleName())
           .containsExactly("base");
@@ -227,7 +271,7 @@ public class BundleModuleMergerTest {
   @Test
   public void testMultipleModulesWithInstallTime_explicitMerging() throws Exception {
     XmlNode installTimeModuleManifest =
-        androidManifestForFeature("com.test.app.detail", withInstallTimePermanentElement(true));
+        androidManifestForFeature("com.test.app.detail", withInstallTimeRemovableElement(false));
     createBasicZipBuilder(BUNDLE_CONFIG_1_0_0)
         .addFileWithProtoContent(ZipPath.create("base/manifest/AndroidManifest.xml"), MANIFEST)
         .addFileWithContent(ZipPath.create("base/dex/classes.dex"), DUMMY_CONTENT)
@@ -240,7 +284,7 @@ public class BundleModuleMergerTest {
     try (ZipFile appBundleZip = new ZipFile(bundleFile.toFile())) {
       AppBundle appBundlePreMerge = AppBundle.buildFromZip(appBundleZip);
       AppBundle appBundlePostMerge =
-          BundleModuleMerger.mergePermanentInstallTimeModules(
+          BundleModuleMerger.mergeNonRemovableInstallTimeModules(
               appBundlePreMerge, /* overrideBundleToolVersion = */ false);
 
       assertThat(
@@ -260,7 +304,7 @@ public class BundleModuleMergerTest {
   @Test
   public void testMultipleModulesWithInstallTime_mergingOptedOut() throws Exception {
     XmlNode installTimeModuleManifest =
-        androidManifestForFeature("com.test.app.detail", withInstallTimePermanentElement(false));
+        androidManifestForFeature("com.test.app.detail", withInstallTimeRemovableElement(true));
     createBasicZipBuilder(BUNDLE_CONFIG_1_0_0)
         .addFileWithProtoContent(ZipPath.create("base/manifest/AndroidManifest.xml"), MANIFEST)
         .addFileWithContent(ZipPath.create("base/dex/classes.dex"), DUMMY_CONTENT)
@@ -272,7 +316,7 @@ public class BundleModuleMergerTest {
 
     try (ZipFile appBundleZip = new ZipFile(bundleFile.toFile())) {
       AppBundle appBundle =
-          BundleModuleMerger.mergePermanentInstallTimeModules(
+          BundleModuleMerger.mergeNonRemovableInstallTimeModules(
               AppBundle.buildFromZip(appBundleZip), /* overrideBundleToolVersion = */ false);
 
       assertThat(appBundle.getFeatureModules().keySet())
@@ -283,20 +327,45 @@ public class BundleModuleMergerTest {
 
   @Test
   public void testDoNotMergeIfNotInstallTime() throws Exception {
-    XmlNode installTimeModuleManifest =
+    XmlNode onDemandModuleManifest =
         androidManifestForFeature("com.test.app.detail", withOnDemandDelivery());
     createBasicZipBuilder(BUNDLE_CONFIG_1_0_0)
         .addFileWithProtoContent(ZipPath.create("base/manifest/AndroidManifest.xml"), MANIFEST)
         .addFileWithContent(ZipPath.create("base/dex/classes.dex"), DUMMY_CONTENT)
         .addFileWithContent(ZipPath.create("base/assets/baseAssetfile.txt"), DUMMY_CONTENT)
         .addFileWithProtoContent(
-            ZipPath.create("detail/manifest/AndroidManifest.xml"), installTimeModuleManifest)
+            ZipPath.create("detail/manifest/AndroidManifest.xml"), onDemandModuleManifest)
         .addFileWithContent(ZipPath.create("detail/assets/detailsAssetfile.txt"), DUMMY_CONTENT)
         .writeTo(bundleFile);
 
     try (ZipFile appBundleZip = new ZipFile(bundleFile.toFile())) {
       AppBundle appBundle =
-          BundleModuleMerger.mergePermanentInstallTimeModules(
+          BundleModuleMerger.mergeNonRemovableInstallTimeModules(
+              AppBundle.buildFromZip(appBundleZip), /* overrideBundleToolVersion = */ false);
+
+      assertThat(appBundle.getFeatureModules().keySet())
+          .comparingElementsUsing(equalsBundleModuleName())
+          .containsExactly("base", "detail");
+    }
+  }
+
+  @Test
+  public void testDoNotMergeIfConditionalModule() throws Exception {
+    XmlNode conditionalModuleManifest =
+        androidManifest(
+            "com.test.app.detail", withMinSdkVersion(24), withFeatureCondition("android.feature"));
+    createBasicZipBuilder(BUNDLE_CONFIG_1_0_0)
+        .addFileWithProtoContent(ZipPath.create("base/manifest/AndroidManifest.xml"), MANIFEST)
+        .addFileWithContent(ZipPath.create("base/dex/classes.dex"), DUMMY_CONTENT)
+        .addFileWithContent(ZipPath.create("base/assets/baseAssetfile.txt"), DUMMY_CONTENT)
+        .addFileWithProtoContent(
+            ZipPath.create("detail/manifest/AndroidManifest.xml"), conditionalModuleManifest)
+        .addFileWithContent(ZipPath.create("detail/assets/detailsAssetfile.txt"), DUMMY_CONTENT)
+        .writeTo(bundleFile);
+
+    try (ZipFile appBundleZip = new ZipFile(bundleFile.toFile())) {
+      AppBundle appBundle =
+          BundleModuleMerger.mergeNonRemovableInstallTimeModules(
               AppBundle.buildFromZip(appBundleZip), /* overrideBundleToolVersion = */ false);
 
       assertThat(appBundle.getFeatureModules().keySet())
@@ -322,7 +391,7 @@ public class BundleModuleMergerTest {
     try (ZipFile appBundleZip = new ZipFile(bundleFile.toFile())) {
       AppBundle appBundlePreMerge = AppBundle.buildFromZip(appBundleZip);
       AppBundle appBundlePostMerge =
-          BundleModuleMerger.mergePermanentInstallTimeModules(
+          BundleModuleMerger.mergeNonRemovableInstallTimeModules(
               appBundlePreMerge, /* overrideBundleToolVersion = */ false);
       assertThat(appBundlePostMerge.getModules().keySet().stream().map(BundleModuleName::getName))
           .containsExactly("base");
@@ -354,7 +423,7 @@ public class BundleModuleMergerTest {
     try (ZipFile appBundleZip = new ZipFile(bundleFile.toFile())) {
       AppBundle appBundlePreMerge = AppBundle.buildFromZip(appBundleZip);
       AppBundle appBundlePostMerge =
-          BundleModuleMerger.mergePermanentInstallTimeModules(
+          BundleModuleMerger.mergeNonRemovableInstallTimeModules(
               appBundlePreMerge, /* overrideBundleToolVersion = */ false);
 
       assertThat(appBundlePostMerge.getModules().keySet().stream().map(BundleModuleName::getName))

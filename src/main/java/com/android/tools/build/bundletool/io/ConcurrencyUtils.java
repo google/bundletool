@@ -51,10 +51,9 @@ final class ConcurrencyUtils {
       if (e.getCause() instanceof IOException) {
         throw new UncheckedIOException(e.getCause().getMessage(), (IOException) e.getCause());
       } else if (e.getCause() instanceof UncheckedIOException) {
-        throw new UncheckedIOException(
-            e.getCause().getMessage(), ((UncheckedIOException) e.getCause()).getCause());
+        throw (UncheckedIOException) e.getCause();
       } else if (e.getCause() instanceof CommandExecutionException) {
-        throw new CommandExecutionException(e.getCause().getMessage(), e.getCause());
+        throw (CommandExecutionException) e.getCause();
       } else {
         throw new RuntimeException(e.getMessage(), e);
       }

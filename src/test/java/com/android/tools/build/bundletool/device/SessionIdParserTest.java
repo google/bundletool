@@ -19,7 +19,7 @@ package com.android.tools.build.bundletool.device;
 import static com.google.common.truth.Truth.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
-import com.android.tools.build.bundletool.model.exceptions.ParseException;
+import com.android.tools.build.bundletool.model.exceptions.AdbOutputParseException;
 import com.google.common.collect.ImmutableList;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -51,15 +51,17 @@ public class SessionIdParserTest {
 
   @Test
   public void sessionNotCreatedOutput() {
-    ParseException exception =
-        assertThrows(ParseException.class, () -> sessionIdParser.parse(SESSION_NOT_CREATED_OUTPUT));
+    AdbOutputParseException exception =
+        assertThrows(
+            AdbOutputParseException.class, () -> sessionIdParser.parse(SESSION_NOT_CREATED_OUTPUT));
     assertThat(exception).hasMessageThat().contains("failed to parse session id from output");
   }
 
   @Test
   public void noSessionIdOutput() {
-    ParseException exception =
-        assertThrows(ParseException.class, () -> sessionIdParser.parse(NO_SESSION_ID_OUTPUT));
+    AdbOutputParseException exception =
+        assertThrows(
+            AdbOutputParseException.class, () -> sessionIdParser.parse(NO_SESSION_ID_OUTPUT));
     assertThat(exception).hasMessageThat().contains("session id should be integer");
   }
 }

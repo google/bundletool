@@ -19,6 +19,7 @@ package com.android.tools.build.bundletool.model;
 import static com.google.common.truth.Truth.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
+import com.google.common.io.ByteSource;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
@@ -26,7 +27,7 @@ import org.junit.runners.JUnit4;
 @RunWith(JUnit4.class)
 public class BundleMetadataTest {
 
-  private static final InputStreamSupplier DUMMY_DATA = InputStreamSuppliers.fromBytes(new byte[0]);
+  private static final ByteSource DUMMY_DATA = ByteSource.wrap(new byte[0]);
 
   @Test
   public void addFile_plainNamespacedDirectory() throws Exception {
@@ -35,7 +36,7 @@ public class BundleMetadataTest {
             .addFile(/* namespacedDir= */ "com.namespace", /* fileName= */ "filename", DUMMY_DATA)
             .build();
 
-    assertThat(metadata.getFileDataMap().keySet())
+    assertThat(metadata.getFileContentMap().keySet())
         .containsExactly(ZipPath.create("com.namespace/filename"));
   }
 
@@ -49,7 +50,7 @@ public class BundleMetadataTest {
                 DUMMY_DATA)
             .build();
 
-    assertThat(metadata.getFileDataMap().keySet())
+    assertThat(metadata.getFileContentMap().keySet())
         .containsExactly(ZipPath.create("com.namespace/dir/sub-dir/filename"));
   }
 

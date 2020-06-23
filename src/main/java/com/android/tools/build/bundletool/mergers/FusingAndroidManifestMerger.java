@@ -45,7 +45,7 @@ public class FusingAndroidManifestMerger implements AndroidManifestMerger {
   public AndroidManifest merge(SetMultimap<BundleModuleName, AndroidManifest> manifests) {
     if (!manifests.containsKey(BASE_MODULE_NAME)) {
       throw CommandExecutionException.builder()
-          .withMessage("Expected to have base module.")
+          .withInternalMessage("Expected to have base module.")
           .build();
     }
     return merge(ensureOneManifestPerModule(manifests));
@@ -74,7 +74,7 @@ public class FusingAndroidManifestMerger implements AndroidManifestMerger {
       Set<AndroidManifest> moduleManifests = manifests.get(moduleName);
       if (moduleManifests.size() != 1) {
         throw CommandExecutionException.builder()
-            .withMessage(
+            .withInternalMessage(
                 "Expected exactly one %s module manifest, but found %d.",
                 moduleName.getName(), moduleManifests.size())
             .build();

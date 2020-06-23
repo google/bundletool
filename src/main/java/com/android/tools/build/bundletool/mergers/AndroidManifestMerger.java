@@ -45,7 +45,7 @@ public interface AndroidManifestMerger {
       Set<AndroidManifest> baseManifests = manifests.get(BASE_MODULE_NAME);
       if (baseManifests.size() != 1) {
         throw CommandExecutionException.builder()
-            .withMessage(
+            .withInternalMessage(
                 "Expected exactly one base module manifest, but found %d.", baseManifests.size())
             .build();
       }

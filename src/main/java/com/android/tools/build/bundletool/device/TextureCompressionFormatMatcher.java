@@ -16,10 +16,9 @@
 
 package com.android.tools.build.bundletool.device;
 
+import static com.android.tools.build.bundletool.device.DeviceSpecUtils.getDeviceSupportedTextureCompressionFormats;
 import static com.android.tools.build.bundletool.model.targeting.TargetingComparators.sortTextureCompressionFormat;
-import static com.android.tools.build.bundletool.model.utils.TextureCompressionUtils.textureCompressionFormat;
 import static com.google.common.base.Preconditions.checkArgument;
-import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.ImmutableSet.toImmutableSet;
 
 import com.android.bundle.Devices.DeviceSpec;
@@ -28,15 +27,13 @@ import com.android.bundle.Targeting.TextureCompressionFormat;
 import com.android.bundle.Targeting.TextureCompressionFormat.TextureCompressionFormatAlias;
 import com.android.bundle.Targeting.TextureCompressionFormatTargeting;
 import com.android.bundle.Targeting.VariantTargeting;
-import com.android.tools.build.bundletool.model.utils.TextureCompressionUtils;
+import com.android.tools.build.bundletool.model.exceptions.IncompatibleDeviceException;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.ImmutableSortedSet;
 import com.google.common.collect.Sets;
 import com.google.common.collect.Sets.SetView;
 import com.google.common.collect.Streams;
-import java.util.Optional;
-import java.util.stream.Stream;
 
 /**
  * A {@link TargetingDimensionMatcher} that provides matching on texture compression format.
@@ -46,7 +43,6 @@ import java.util.stream.Stream;
  */
 public class TextureCompressionFormatMatcher
     extends TargetingDimensionMatcher<TextureCompressionFormatTargeting> {
-  private static final String GL_ES_VERSION_FEATURE_PREFIX = "reqGlEsVersion=";
   private final ImmutableList<String> deviceGlExtensions;
   private final ImmutableSet<TextureCompressionFormatAlias>
       deviceSupportedTextureCompressionFormats;
@@ -55,42 +51,8 @@ public class TextureCompressionFormatMatcher
     super(deviceSpec);
     this.deviceGlExtensions = ImmutableList.copyOf(deviceSpec.getGlExtensionsList());
 
-    ImmutableSet<TextureCompressionFormatAlias> glExtensionSupportedFormats =
-        this.deviceGlExtensions.stream()
-            .map(glExtension -> textureCompressionFormat(glExtension))
-            .filter(Optional::isPresent)
-            .map(Optional::get)
-            .collect(toImmutableSet());
-    ImmutableList<TextureCompressionFormatAlias> glVersionSupportedFormats =
-        deviceSpec.getDeviceFeaturesList().stream()
-            .flatMap(
-                deviceFeature -> {
-                  if (!deviceFeature.startsWith(GL_ES_VERSION_FEATURE_PREFIX)) {
-                    return Stream.of();
-                  }
-
-                  try {
-                    int glVersion =
-                        Integer.decode(
-                            deviceFeature.substring(GL_ES_VERSION_FEATURE_PREFIX.length()));
-                    return TextureCompressionUtils.textureCompressionFormatsForGl(glVersion)
-                        .stream();
-                  } catch (NumberFormatException e) {
-                    System.out.println(
-                        "WARNING: the OpenGL ES version in the device spec is not a valid number. "
-                            + " It will be considered as missing for texture compression format"
-                            + " matching with the device.");
-                  }
-
-                  return Stream.of();
-                })
-            .collect(toImmutableList());
-
     this.deviceSupportedTextureCompressionFormats =
-        ImmutableSet.<TextureCompressionFormatAlias>builder()
-            .addAll(glExtensionSupportedFormats)
-            .addAll(glVersionSupportedFormats)
-            .build();
+        getDeviceSupportedTextureCompressionFormats(deviceSpec);
   }
 
   @Override
@@ -185,7 +147,7 @@ public class TextureCompressionFormatMatcher
 
     if (intersection.isEmpty()) {
       throw IncompatibleDeviceException.builder()
-          .withMessage(
+          .withUserMessage(
               "The app doesn't support texture compression formats of the device. "
                   + "Device formats: %s, app formats: %s.",
               this.deviceSupportedTextureCompressionFormats, valuesAndAlternativesSet)

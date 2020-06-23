@@ -24,6 +24,7 @@ import com.android.bundle.Targeting.AbiTargeting;
 import com.android.bundle.Targeting.LanguageTargeting;
 import com.android.bundle.Targeting.ScreenDensityTargeting;
 import com.android.bundle.Targeting.SdkVersionTargeting;
+import com.android.bundle.Targeting.TextureCompressionFormatTargeting;
 import com.android.bundle.Targeting.VariantTargeting;
 import com.android.tools.build.bundletool.model.ConfigurationSizes;
 import com.android.tools.build.bundletool.model.GetSizeRequest;
@@ -77,12 +78,17 @@ public class AssetModuleSizeAggregator extends AbstractSizeAggregator {
         variantTargeting.hasScreenDensityTargeting()
             ? ImmutableSet.of(variantTargeting.getScreenDensityTargeting())
             : getAllScreenDensityTargetings(apkDescriptions);
+    ImmutableSet<TextureCompressionFormatTargeting> textureCompressionFormatTargetingOptions =
+        variantTargeting.hasTextureCompressionFormatTargeting()
+            ? ImmutableSet.of(variantTargeting.getTextureCompressionFormatTargeting())
+            : getAllTextureCompressionFormatTargetings(apkDescriptions);
 
     return getSizesPerConfiguration(
         sdkVersionTargetingOptions,
         abiTargetingOptions,
         languageTargetingOptions,
-        screenDensityTargetingOptions);
+        screenDensityTargetingOptions,
+        textureCompressionFormatTargetingOptions);
   }
 
   @Override
@@ -90,14 +96,16 @@ public class AssetModuleSizeAggregator extends AbstractSizeAggregator {
       SdkVersionTargeting sdkVersionTargeting,
       AbiTargeting abiTargeting,
       ScreenDensityTargeting screenDensityTargeting,
-      LanguageTargeting languageTargeting) {
+      LanguageTargeting languageTargeting,
+      TextureCompressionFormatTargeting textureTargeting) {
     return new ApkMatcher(
             getDeviceSpec(
                 getSizeRequest.getDeviceSpec(),
                 sdkVersionTargeting,
                 abiTargeting,
                 screenDensityTargeting,
-                languageTargeting),
+                languageTargeting,
+                textureTargeting),
             getSizeRequest.getModules(),
             getSizeRequest.getInstant())
         .getMatchingApksFromAssetModules(assetModules);

@@ -15,7 +15,9 @@
  */
 package com.android.tools.build.bundletool.model.version;
 
-import com.android.tools.build.bundletool.model.exceptions.ValidationException;
+import static com.google.common.base.Preconditions.checkArgument;
+
+import com.android.tools.build.bundletool.model.exceptions.InvalidBundleException;
 import com.google.auto.value.AutoValue;
 import com.google.common.collect.ComparisonChain;
 import com.google.common.collect.Ordering;
@@ -58,18 +60,15 @@ public abstract class Version implements Comparable<Version> {
   /**
    * Builds a custom version instance.
    *
-   * @throws ValidationException if the version cannot be parsed
+   * @throws InvalidBundleException if the version cannot be parsed
    */
   public static Version of(String version) {
     Matcher matcher = VERSION_REGEXP.matcher(version);
-    if (!matcher.matches()) {
-      throw ValidationException.builder()
-          .withMessage(
-              "Version must match the format '<major>.<minor>.<revision>[-<qualifier>]', but "
-                  + "found '%s'.",
-              version)
-          .build();
-    }
+    checkArgument(
+        matcher.matches(),
+        "Version must match the format '<major>.<minor>.<revision>[-<qualifier>]', but "
+            + "found '%s'.",
+        version);
 
     return Version.builder()
         .setFullVersion(version)

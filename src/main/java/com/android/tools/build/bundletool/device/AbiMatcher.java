@@ -26,7 +26,7 @@ import com.android.bundle.Targeting.AbiTargeting;
 import com.android.bundle.Targeting.ApkTargeting;
 import com.android.bundle.Targeting.VariantTargeting;
 import com.android.tools.build.bundletool.model.AbiName;
-import com.android.tools.build.bundletool.model.exceptions.ValidationException;
+import com.android.tools.build.bundletool.model.exceptions.IncompatibleDeviceException;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Sets;
 import com.google.common.collect.Sets.SetView;
@@ -65,8 +65,8 @@ public final class AbiMatcher extends TargetingDimensionMatcher<AbiTargeting> {
           AbiName.fromPlatformName(abi)
               .orElseThrow(
                   () ->
-                      ValidationException.builder()
-                          .withMessage("Unrecognized ABI '%s' in device spec.", abi)
+                      IncompatibleDeviceException.builder()
+                          .withUserMessage("Unrecognized ABI '%s' in device spec.", abi)
                           .build())
               .toProto();
       if (valuesList.contains(abiAlias)) {
@@ -108,7 +108,7 @@ public final class AbiMatcher extends TargetingDimensionMatcher<AbiTargeting> {
 
     if (intersection.isEmpty()) {
       throw IncompatibleDeviceException.builder()
-          .withMessage(
+          .withUserMessage(
               "The app doesn't support ABI architectures of the device. "
                   + "Device ABIs: %s, app ABIs: %s.",
               getDeviceSpec().getSupportedAbisList(), valuesAndAlternativesSet)

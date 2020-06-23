@@ -88,8 +88,8 @@ import com.android.tools.build.bundletool.model.BundleModuleName;
 import com.android.tools.build.bundletool.model.ModuleSplit;
 import com.android.tools.build.bundletool.model.ModuleSplit.SplitType;
 import com.android.tools.build.bundletool.model.ZipPath;
-import com.android.tools.build.bundletool.model.exceptions.CommandExecutionException;
-import com.android.tools.build.bundletool.model.exceptions.ValidationException;
+import com.android.tools.build.bundletool.model.exceptions.IncompatibleDeviceException;
+import com.android.tools.build.bundletool.model.exceptions.InvalidCommandException;
 import com.android.tools.build.bundletool.model.utils.Versions;
 import com.android.tools.build.bundletool.model.version.BundleToolVersion;
 import com.google.common.collect.ImmutableList;
@@ -216,7 +216,7 @@ public class ApkMatcherTest {
     // The device of SDK 19 is incompatible with the app.
     Throwable exception =
         assertThrows(
-            CommandExecutionException.class,
+            IncompatibleDeviceException.class,
             () -> new ApkMatcher(deviceWithSdk(19)).getMatchingApks(buildApksResult));
     assertThat(exception)
         .hasMessageThat()
@@ -249,7 +249,7 @@ public class ApkMatcherTest {
 
     Throwable exception =
         assertThrows(
-            CommandExecutionException.class,
+            IncompatibleDeviceException.class,
             () -> new ApkMatcher(deviceWithSdk(19)).getMatchingApks(buildApksResult));
     assertThat(exception)
         .hasMessageThat()
@@ -492,9 +492,9 @@ public class ApkMatcherTest {
             .addVariant(multiAbiTargetingApexVariant(x64X86Targeting, x64X86Apk))
             .build();
 
-    CommandExecutionException e =
+    IncompatibleDeviceException e =
         assertThrows(
-            CommandExecutionException.class,
+            IncompatibleDeviceException.class,
             () -> new ApkMatcher(abis("x86_64", "armeabi-v7a")).getMatchingApks(buildApksResult));
     assertThat(e)
         .hasMessageThat()
@@ -986,9 +986,9 @@ public class ApkMatcherTest {
 
     Optional<ImmutableSet<String>> unknownModuleOnly =
         Optional.of(ImmutableSet.of("unknown_module"));
-    ValidationException exception =
+    InvalidCommandException exception =
         assertThrows(
-            ValidationException.class,
+            InvalidCommandException.class,
             () ->
                 new ApkMatcher(device, unknownModuleOnly, NOT_MATCH_INSTANT)
                     .getMatchingApks(buildApksResult));
@@ -1050,9 +1050,9 @@ public class ApkMatcherTest {
 
     Optional<ImmutableSet<String>> unknownModuleOnly =
         Optional.of(ImmutableSet.of("unknown_module"));
-    ValidationException exception =
+    InvalidCommandException exception =
         assertThrows(
-            ValidationException.class,
+            InvalidCommandException.class,
             () ->
                 new ApkMatcher(device, unknownModuleOnly, MATCH_INSTANT)
                     .getMatchingApks(buildApksResult));
@@ -1074,9 +1074,9 @@ public class ApkMatcherTest {
     assertThat(new ApkMatcher(x86Device).getMatchingApks(buildApksResult)).containsExactly(apk);
 
     Optional<ImmutableSet<String>> baseModuleOnly = Optional.of(ImmutableSet.of("base"));
-    CommandExecutionException exception =
+    InvalidCommandException exception =
         assertThrows(
-            CommandExecutionException.class,
+            InvalidCommandException.class,
             () ->
                 new ApkMatcher(x86Device, baseModuleOnly, NOT_MATCH_INSTANT)
                     .getMatchingApks(buildApksResult));
@@ -1430,7 +1430,7 @@ public class ApkMatcherTest {
         mergeSpecs(sdkVersion(19), abis("mips"), density(MDPI), locales("en"));
     Throwable exception =
         assertThrows(
-            CommandExecutionException.class,
+            IncompatibleDeviceException.class,
             () -> new ApkMatcher(preLMipsDevice).getMatchingApks(buildApksResult));
     assertThat(exception)
         .hasMessageThat()
@@ -1456,8 +1456,10 @@ public class ApkMatcherTest {
             .setVariantTargeting(variantSdkTargeting(21))
             .build();
 
-    Throwable exception = assertThrows(CommandExecutionException.class,
-        () -> new ApkMatcher(mipsDevice).matchesModuleSplitByTargeting(moduleSplit));
+    Throwable exception =
+        assertThrows(
+            IncompatibleDeviceException.class,
+            () -> new ApkMatcher(mipsDevice).matchesModuleSplitByTargeting(moduleSplit));
     assertThat(exception)
         .hasMessageThat()
         .contains(

@@ -28,7 +28,7 @@ import static com.google.common.truth.extensions.proto.ProtoTruth.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.android.bundle.Targeting.TextureCompressionFormat.TextureCompressionFormatAlias;
-import com.android.tools.build.bundletool.model.exceptions.ValidationException;
+import com.android.tools.build.bundletool.model.exceptions.InvalidBundleException;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
@@ -56,9 +56,9 @@ public class TargetedDirectorySegmentTest {
   @Test
   public void testTargeting_openGl_bad_version() {
     assertThrows(
-        ValidationException.class, () -> TargetedDirectorySegment.parse("test#opengl_2.3.3"));
+        InvalidBundleException.class, () -> TargetedDirectorySegment.parse("test#opengl_2.3.3"));
     assertThrows(
-        ValidationException.class, () -> TargetedDirectorySegment.parse("test#opengl_x.y"));
+        InvalidBundleException.class, () -> TargetedDirectorySegment.parse("test#opengl_x.y"));
   }
 
   @Test
@@ -73,9 +73,9 @@ public class TargetedDirectorySegmentTest {
   @Test
   public void testTargeting_vulkan_bad_version() {
     assertThrows(
-        ValidationException.class, () -> TargetedDirectorySegment.parse("test#vulkan_2.3.3"));
+        InvalidBundleException.class, () -> TargetedDirectorySegment.parse("test#vulkan_2.3.3"));
     assertThrows(
-        ValidationException.class, () -> TargetedDirectorySegment.parse("test#vulkan_x.y"));
+        InvalidBundleException.class, () -> TargetedDirectorySegment.parse("test#vulkan_x.y"));
   }
 
   @Test
@@ -200,25 +200,28 @@ public class TargetedDirectorySegmentTest {
 
   @Test
   public void testTargeting_tcf_badValue() {
-    assertThrows(ValidationException.class, () -> TargetedDirectorySegment.parse("test#tcf_else"));
+    assertThrows(
+        InvalidBundleException.class, () -> TargetedDirectorySegment.parse("test#tcf_else"));
   }
 
   @Test
   public void testTargeting_badKey() {
     assertThrows(
-        ValidationException.class, () -> TargetedDirectorySegment.parse("test#unsupported_else"));
+        InvalidBundleException.class,
+        () -> TargetedDirectorySegment.parse("test#unsupported_else"));
   }
 
   @Test
   public void testFailsParsing_missingKey() {
-    assertThrows(ValidationException.class, () -> TargetedDirectorySegment.parse("bad#"));
-    assertThrows(ValidationException.class, () -> TargetedDirectorySegment.parse("bad#_2.0"));
+    assertThrows(InvalidBundleException.class, () -> TargetedDirectorySegment.parse("bad#"));
+    assertThrows(InvalidBundleException.class, () -> TargetedDirectorySegment.parse("bad#_2.0"));
   }
 
   @Test
   public void testFailsParsing_missingValue() {
-    assertThrows(ValidationException.class, () -> TargetedDirectorySegment.parse("bad#opengl"));
-    assertThrows(ValidationException.class, () -> TargetedDirectorySegment.parse("bad###opengl#"));
+    assertThrows(InvalidBundleException.class, () -> TargetedDirectorySegment.parse("bad#opengl"));
+    assertThrows(
+        InvalidBundleException.class, () -> TargetedDirectorySegment.parse("bad###opengl#"));
   }
 
   @Test
@@ -248,7 +251,8 @@ public class TargetedDirectorySegmentTest {
 
   @Test
   public void testTargeting_languageFourChars_throws() {
-    assertThrows(ValidationException.class, () -> TargetedDirectorySegment.parse("bad#lang_filo"));
+    assertThrows(
+        InvalidBundleException.class, () -> TargetedDirectorySegment.parse("bad#lang_filo"));
   }
 
   @Test

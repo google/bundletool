@@ -22,7 +22,7 @@ import static com.google.common.collect.ImmutableList.toImmutableList;
 import com.android.tools.build.bundletool.model.AppBundle;
 import com.android.tools.build.bundletool.model.BundleModule;
 import com.android.tools.build.bundletool.model.ModuleSplit;
-import com.android.tools.build.bundletool.model.exceptions.manifest.ManifestVersionException.VersionCodeMissingException;
+import com.android.tools.build.bundletool.model.exceptions.InvalidVersionCodeException;
 import com.google.common.collect.ImmutableList;
 
 /**
@@ -48,7 +48,7 @@ public class AssetSlicesGenerator {
             .getBaseModule()
             .getAndroidManifest()
             .getVersionCode()
-            .orElseThrow(VersionCodeMissingException::new);
+            .orElseThrow(InvalidVersionCodeException::createMissingVersionCodeException);
 
     for (BundleModule module : appBundle.getAssetModules().values()) {
       AssetModuleSplitter moduleSplitter =

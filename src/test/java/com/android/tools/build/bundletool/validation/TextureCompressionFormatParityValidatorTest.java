@@ -21,7 +21,7 @@ import static com.google.common.truth.Truth.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.android.tools.build.bundletool.model.BundleModule;
-import com.android.tools.build.bundletool.model.exceptions.ValidationException;
+import com.android.tools.build.bundletool.model.exceptions.InvalidBundleException;
 import com.android.tools.build.bundletool.testing.BundleModuleBuilder;
 import com.google.common.collect.ImmutableList;
 import org.junit.Test;
@@ -147,9 +147,9 @@ public class TextureCompressionFormatParityValidatorTest {
             .setManifest(androidManifest("com.test.app"))
             .build();
 
-    ValidationException exception =
+    InvalidBundleException exception =
         assertThrows(
-            ValidationException.class,
+            InvalidBundleException.class,
             () ->
                 new TextureCompressionFormatParityValidator()
                     .validateAllModules(ImmutableList.of(moduleA, moduleB)));
@@ -176,9 +176,9 @@ public class TextureCompressionFormatParityValidatorTest {
             .setManifest(androidManifest("com.test.app"))
             .build();
 
-    ValidationException exception =
+    InvalidBundleException exception =
         assertThrows(
-            ValidationException.class,
+            InvalidBundleException.class,
             () ->
                 new TextureCompressionFormatParityValidator()
                     .validateAllModules(ImmutableList.of(moduleA, moduleB)));

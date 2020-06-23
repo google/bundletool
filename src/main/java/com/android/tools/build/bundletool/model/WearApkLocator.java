@@ -21,7 +21,7 @@ import com.android.aapt.Resources.ConfigValue;
 import com.android.aapt.Resources.Entry;
 import com.android.aapt.Resources.ResourceTable;
 import com.android.aapt.Resources.XmlNode;
-import com.android.tools.build.bundletool.model.exceptions.ValidationException;
+import com.android.tools.build.bundletool.model.exceptions.InvalidBundleException;
 import com.android.tools.build.bundletool.model.utils.ResourcesUtils;
 import com.android.tools.build.bundletool.model.utils.xmlproto.XmlProtoElement;
 import com.android.tools.build.bundletool.model.utils.xmlproto.XmlProtoNode;
@@ -68,8 +68,8 @@ public final class WearApkLocator {
     embeddedWearApkPath.ifPresent(
         path -> {
           if (!split.findEntry(path).isPresent()) {
-            throw ValidationException.builder()
-                .withMessage("Wear APK expected at location '%s' but was not found.", path)
+            throw InvalidBundleException.builder()
+                .withUserMessage("Wear APK expected at location '%s' but was not found.", path)
                 .build();
           }
         });
@@ -82,8 +82,8 @@ public final class WearApkLocator {
     return ResourcesUtils.lookupEntryByResourceId(resourceTable, resourceId)
         .orElseThrow(
             () ->
-                ValidationException.builder()
-                    .withMessage(
+                InvalidBundleException.builder()
+                    .withUserMessage(
                         "Resource 0x%08x is referenced in the manifest in the '%s' metadata, but "
                             + "was not found in the resource table.",
                         resourceId, WEAR_APK_1_0_METADATA_KEY)
@@ -94,14 +94,16 @@ public final class WearApkLocator {
     checkState(entry.getConfigValueCount() > 0, "Resource table entry without value: %s", entry);
 
     if (entry.getConfigValueCount() > 1) {
-      throw new ValidationException("More than one embedded Wear APK is not supported.");
+      throw InvalidBundleException.createWithUserMessage(
+          "More than one embedded Wear APK is not supported.");
     }
 
     ConfigValue configValue = Iterables.getOnlyElement(entry.getConfigValueList());
     String xmlDescriptionPath = configValue.getValue().getItem().getFile().getPath();
 
     if (xmlDescriptionPath.isEmpty()) {
-      throw new ValidationException("No XML description file path found for Wear APK.");
+      throw InvalidBundleException.createWithUserMessage(
+          "No XML description file path found for Wear APK.");
     }
 
     return xmlDescriptionPath;
@@ -112,8 +114,8 @@ public final class WearApkLocator {
         .findEntry(xmlDescPath)
         .orElseThrow(
             () ->
-                ValidationException.builder()
-                    .withMessage(
+                InvalidBundleException.builder()
+                    .withUserMessage(
                         "Wear APK XML description file expected at '%s' but was not found.",
                         xmlDescPath)
                     .build());
@@ -128,12 +130,12 @@ public final class WearApkLocator {
    */
   private static Optional<String> extractWearApkName(ModuleEntry wearApkDescriptionXmlEntry) {
     XmlProtoNode root;
-    try (InputStream content = wearApkDescriptionXmlEntry.getContent()) {
+    try (InputStream content = wearApkDescriptionXmlEntry.getContent().openStream()) {
       root = new XmlProtoNode(XmlNode.parseFrom(content));
     } catch (InvalidProtocolBufferException e) {
-      throw ValidationException.builder()
+      throw InvalidBundleException.builder()
           .withCause(e)
-          .withMessage(
+          .withUserMessage(
               "The wear APK description file '%s' could not be parsed.",
               wearApkDescriptionXmlEntry.getPath())
           .build();
@@ -154,8 +156,8 @@ public final class WearApkLocator {
     Optional<XmlProtoElement> rawPathResId =
         root.getElement().getOptionalChildElement("rawPathResId");
     if (!rawPathResId.isPresent()) {
-      throw ValidationException.builder()
-          .withMessage(
+      throw InvalidBundleException.builder()
+          .withUserMessage(
               "The wear APK description file '%s' does not contain 'unbundled' or 'rawPathResId'.",
               wearApkDescriptionXmlEntry.getPath())
           .build();

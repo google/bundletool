@@ -38,7 +38,7 @@ import com.android.bundle.Targeting.LanguageTargeting;
 import com.android.bundle.Targeting.TextureCompressionFormat.TextureCompressionFormatAlias;
 import com.android.bundle.Targeting.TextureCompressionFormatTargeting;
 import com.android.tools.build.bundletool.model.BundleModule;
-import com.android.tools.build.bundletool.model.exceptions.ValidationException;
+import com.android.tools.build.bundletool.model.exceptions.InvalidBundleException;
 import com.android.tools.build.bundletool.testing.BundleModuleBuilder;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -99,9 +99,10 @@ public class AssetsTargetingValidatorTest {
             .setManifest(androidManifest("com.test.app"))
             .build();
 
-    ValidationException e =
+    InvalidBundleException e =
         assertThrows(
-            ValidationException.class, () -> new AssetsTargetingValidator().validateModule(module));
+            InvalidBundleException.class,
+            () -> new AssetsTargetingValidator().validateModule(module));
 
     assertThat(e).hasMessageThat().contains("directory must start with 'assets/'");
   }
@@ -119,9 +120,10 @@ public class AssetsTargetingValidatorTest {
             .setManifest(androidManifest("com.test.app"))
             .build();
 
-    ValidationException e =
+    InvalidBundleException e =
         assertThrows(
-            ValidationException.class, () -> new AssetsTargetingValidator().validateModule(module));
+            InvalidBundleException.class,
+            () -> new AssetsTargetingValidator().validateModule(module));
 
     assertThat(e).hasMessageThat().contains("Targeted directory 'assets/dir#opengl_3.0' is empty.");
   }
@@ -152,9 +154,10 @@ public class AssetsTargetingValidatorTest {
             .setManifest(androidManifestForAssetModule("com.test.app"))
             .build();
 
-    ValidationException e =
+    InvalidBundleException e =
         assertThrows(
-            ValidationException.class, () -> new AssetsTargetingValidator().validateModule(module));
+            InvalidBundleException.class,
+            () -> new AssetsTargetingValidator().validateModule(module));
 
     assertThat(e)
         .hasMessageThat()
@@ -178,9 +181,10 @@ public class AssetsTargetingValidatorTest {
             .setManifest(androidManifestForAssetModule("com.test.app"))
             .build();
 
-    ValidationException e =
+    InvalidBundleException e =
         assertThrows(
-            ValidationException.class, () -> new AssetsTargetingValidator().validateModule(module));
+            InvalidBundleException.class,
+            () -> new AssetsTargetingValidator().validateModule(module));
 
     assertThat(e).hasMessageThat().contains("set but empty ABI targeting");
   }
@@ -201,9 +205,10 @@ public class AssetsTargetingValidatorTest {
             .setManifest(androidManifestForAssetModule("com.test.app"))
             .build();
 
-    ValidationException e =
+    InvalidBundleException e =
         assertThrows(
-            ValidationException.class, () -> new AssetsTargetingValidator().validateModule(module));
+            InvalidBundleException.class,
+            () -> new AssetsTargetingValidator().validateModule(module));
 
     assertThat(e).hasMessageThat().contains("set but empty Graphics API targeting");
   }
@@ -224,9 +229,10 @@ public class AssetsTargetingValidatorTest {
             .setManifest(androidManifestForAssetModule("com.test.app"))
             .build();
 
-    ValidationException e =
+    InvalidBundleException e =
         assertThrows(
-            ValidationException.class, () -> new AssetsTargetingValidator().validateModule(module));
+            InvalidBundleException.class,
+            () -> new AssetsTargetingValidator().validateModule(module));
 
     assertThat(e).hasMessageThat().contains("set but empty Graphics API targeting");
   }
@@ -247,9 +253,10 @@ public class AssetsTargetingValidatorTest {
             .setManifest(androidManifestForAssetModule("com.test.app"))
             .build();
 
-    ValidationException e =
+    InvalidBundleException e =
         assertThrows(
-            ValidationException.class, () -> new AssetsTargetingValidator().validateModule(module));
+            InvalidBundleException.class,
+            () -> new AssetsTargetingValidator().validateModule(module));
 
     assertThat(e).hasMessageThat().contains("set but empty language targeting");
   }
@@ -271,9 +278,10 @@ public class AssetsTargetingValidatorTest {
             .setManifest(androidManifestForAssetModule("com.test.app"))
             .build();
 
-    ValidationException e =
+    InvalidBundleException e =
         assertThrows(
-            ValidationException.class, () -> new AssetsTargetingValidator().validateModule(module));
+            InvalidBundleException.class,
+            () -> new AssetsTargetingValidator().validateModule(module));
 
     assertThat(e).hasMessageThat().contains("set but empty Texture Compression Format targeting");
   }

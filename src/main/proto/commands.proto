@@ -23,6 +23,9 @@ message BuildApksResult {
 
   // Information about local testing mode.
   LocalTestingInfo local_testing_info = 5;
+
+  // Asset modules metadata for asset only bundles.
+  AssetModulesInfo asset_modules_info = 6;
 }
 
 // Variant is a group of APKs that covers a part of the device configuration
@@ -186,4 +189,15 @@ message LocalTestingInfo {
   // APKs will be pushed for local testing.
   // Set only if local testing is enabled.
   string local_testing_path = 2;
+}
+
+// Holds metadata for asset only bundles.
+message AssetModulesInfo {
+  // App versionCodes that will be updated with these asset modules.
+  // Only relevant for asset-only bundles.
+  repeated int64 app_version = 1;
+
+  // Version tag for the asset upload.
+  // Only relevant for asset-only bundles.
+  string asset_version_tag = 2;
 }

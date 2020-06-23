@@ -25,7 +25,7 @@ import com.android.tools.build.bundletool.flags.Flag;
 import com.android.tools.build.bundletool.flags.ParsedFlags;
 import com.android.tools.build.bundletool.model.BundleModuleName;
 import com.android.tools.build.bundletool.model.ResourceTableEntry;
-import com.android.tools.build.bundletool.model.exceptions.ValidationException;
+import com.android.tools.build.bundletool.model.exceptions.InvalidCommandException;
 import com.google.auto.value.AutoValue;
 import com.google.common.collect.ImmutableMap;
 import java.io.PrintStream;
@@ -145,7 +145,7 @@ public abstract class DumpCommand {
       case CONFIG:
         new DumpManager(getOutputStream(), getBundlePath()).printBundleConfig();
         break;
-    
+
       case MANIFEST:
         BundleModuleName moduleName =
             getModuleName().map(BundleModuleName::create).orElse(BundleModuleName.BASE_MODULE_NAME);
@@ -164,23 +164,33 @@ public abstract class DumpCommand {
     checkFileExistsAndReadable(getBundlePath());
 
     if (getResourceId().isPresent() && getResourceName().isPresent()) {
-      throw new ValidationException("Cannot pass both resource ID and resource name. Pick one!");
+      throw InvalidCommandException.builder()
+          .withInternalMessage("Cannot pass both resource ID and resource name. Pick one!")
+          .build();
     }
     if (getDumpTarget().equals(DumpTarget.RESOURCES) && getXPathExpression().isPresent()) {
-      throw new ValidationException("Cannot pass an XPath expression when dumping resources.");
+      throw InvalidCommandException.builder()
+          .withInternalMessage("Cannot pass an XPath expression when dumping resources.")
+          .build();
     }
     if (getDumpTarget().equals(DumpTarget.RESOURCES) && getModuleName().isPresent()) {
-      throw new ValidationException(
-          "The --module flag is unnecessary as the 'dump resources' by default searches across all "
-              + "modules.");
+      throw InvalidCommandException.builder()
+          .withInternalMessage(
+              "The module is unnecessary as the 'dump resources' by default searches across"
+                  + " all modules.")
+          .build();
     }
     if (!getDumpTarget().equals(DumpTarget.RESOURCES)
         && (getResourceId().isPresent() || getResourceName().isPresent())) {
-      throw new ValidationException(
-          "The --resource flag can only be passed when dumping resources.");
+      throw InvalidCommandException.builder()
+          .withInternalMessage("The resource name/id can only be passed when dumping resources.")
+          .build();
     }
     if (!getDumpTarget().equals(DumpTarget.RESOURCES) && getPrintValues().isPresent()) {
-      throw new ValidationException("The --values flag can only be passed when dumping resources.");
+      throw InvalidCommandException.builder()
+          .withInternalMessage(
+              "Printing resource values can only be requested when dumping resources.")
+          .build();
     }
   }
 
@@ -188,7 +198,11 @@ public abstract class DumpCommand {
     String subCommand =
         flags
             .getSubCommand()
-            .orElseThrow(() -> new ValidationException("Target of the dump not found."));
+            .orElseThrow(
+                () ->
+                    InvalidCommandException.builder()
+                        .withInternalMessage("Target of the dump not found.")
+                        .build());
 
     return DumpTarget.fromString(subCommand);
   }
@@ -202,8 +216,10 @@ public abstract class DumpCommand {
       String resourceName = getResourceName().get();
       Matcher matcher = RESOURCE_NAME_PATTERN.matcher(resourceName);
       if (!matcher.matches()) {
-        throw new ValidationException(
-            "Resource name must match the format '<type>/<name>', e.g. 'drawable/icon'.");
+        throw InvalidCommandException.builder()
+            .withInternalMessage(
+                "Resource name must match the format '<type>/<name>', e.g. 'drawable/icon'.")
+            .build();
       }
       return entry ->
           entry.getType().getName().equals(matcher.group("type"))
@@ -237,8 +253,8 @@ public abstract class DumpCommand {
     public static DumpTarget fromString(String subCommand) {
       DumpTarget dumpTarget = SUBCOMMAND_TO_TARGET.get(subCommand);
       if (dumpTarget == null) {
-        throw ValidationException.builder()
-            .withMessage(
+        throw InvalidCommandException.builder()
+            .withInternalMessage(
                 "Unrecognized dump target: '%s'. Accepted values are: %s",
                 subCommand, SUBCOMMAND_TO_TARGET.keySet())
             .build();

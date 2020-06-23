@@ -61,7 +61,7 @@ import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.with
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withFusingAttribute;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withInstallLocation;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withInstallTimeDelivery;
-import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withInstallTimePermanentElement;
+import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withInstallTimeRemovableElement;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withInstant;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withInstantOnDemandDelivery;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withMaxSdkVersion;
@@ -168,9 +168,8 @@ import com.android.tools.build.bundletool.model.AppBundle;
 import com.android.tools.build.bundletool.model.SigningConfiguration;
 import com.android.tools.build.bundletool.model.SourceStamp;
 import com.android.tools.build.bundletool.model.ZipPath;
-import com.android.tools.build.bundletool.model.exceptions.CommandExecutionException;
-import com.android.tools.build.bundletool.model.exceptions.ValidationException;
-import com.android.tools.build.bundletool.model.exceptions.manifest.ManifestVersionException.VersionCodeMissingException;
+import com.android.tools.build.bundletool.model.exceptions.InvalidBundleException;
+import com.android.tools.build.bundletool.model.exceptions.InvalidVersionCodeException;
 import com.android.tools.build.bundletool.model.utils.CertificateHelper;
 import com.android.tools.build.bundletool.model.utils.files.FilePreconditions;
 import com.android.tools.build.bundletool.model.version.BundleToolVersion;
@@ -898,7 +897,8 @@ public class BuildApksManagerTest {
             .setAapt2Command(aapt2Command)
             .build();
 
-    ValidationException exception = assertThrows(ValidationException.class, () -> execute(command));
+    InvalidBundleException exception =
+        assertThrows(InvalidBundleException.class, () -> execute(command));
 
     assertThat(exception)
         .hasMessageThat()
@@ -1077,7 +1077,7 @@ public class BuildApksManagerTest {
                     "--aapt2=" + AAPT2_PATH),
             fakeAdbServer);
 
-    Throwable exception = assertThrows(CommandExecutionException.class, () -> execute(command));
+    Throwable exception = assertThrows(InvalidBundleException.class, () -> execute(command));
     assertThat(exception)
         .hasMessageThat()
         .contains("maxSdkVersion (20) is less than minimum sdk allowed for instant apps (21).");
@@ -3011,66 +3011,6 @@ public class BuildApksManagerTest {
   }
 
   @Test
-  public void buildApksCommand_inconsistentAbis_discarded() throws Exception {
-    AppBundle appBundle =
-        new AppBundleBuilder()
-            .addModule(
-                "base",
-                module ->
-                    module
-                        .addFile("lib/x86/lib1.so")
-                        .addFile("lib/x86/lib2.so")
-                        .addFile("lib/x86/lib3.so")
-                        .addFile("lib/x86_64/lib1.so")
-                        .addFile("lib/x86_64/lib2.so")
-                        .addFile("lib/mips/lib1.so")
-                        .setManifest(androidManifest("com.app"))
-                        .setNativeConfig(
-                            nativeLibraries(
-                                targetedNativeDirectory("lib/x86", nativeDirectoryTargeting(X86)),
-                                targetedNativeDirectory(
-                                    "lib/x86_64", nativeDirectoryTargeting(X86_64)),
-                                targetedNativeDirectory(
-                                    "lib/mips", nativeDirectoryTargeting(MIPS)))))
-            // The inconsistent ABIs are discarded up until 0.3.0.
-            .setBundleConfig(BundleConfigBuilder.create().setVersion("0.3.0").build())
-            .build();
-    Path bundlePath = createAndStoreBundle(appBundle);
-
-    BuildApksCommand command =
-        BuildApksCommand.builder()
-            .setBundlePath(bundlePath)
-            .setOutputFile(outputFilePath)
-            .setAapt2Command(aapt2Command)
-            .setOptimizationDimensions(ImmutableSet.of(ABI))
-            .build();
-
-    Path apkSetFilePath = execute(command);
-    ZipFile apkSetFile = openZipFile(apkSetFilePath.toFile());
-    BuildApksResult result = extractTocFromApkSetFile(apkSetFile, outputDir);
-
-    // The x86_64 and mips splits should not get generated.
-    ImmutableMap<AbiTargeting, ApkDescription> splitApksByAbiTargeting =
-        Maps.uniqueIndex(
-            apkDescriptions(splitApkVariants(result)),
-            apkDesc -> apkDesc.getTargeting().getAbiTargeting());
-    assertThat(splitApksByAbiTargeting.keySet())
-        .containsExactly(AbiTargeting.getDefaultInstance(), abiTargeting(X86));
-
-    // x86_64- and mips-specific files should be discarded in the standalone APK.
-    ImmutableList<ApkDescription> standaloneApks = apkDescriptions(standaloneApkVariants(result));
-    assertThat(standaloneApks).hasSize(1);
-    assertThat(standaloneApks.get(0).getTargeting().getAbiTargeting())
-        .isEqualTo(abiTargeting(X86, ImmutableSet.of()));
-    File standaloneApkFile =
-        extractFromApkSetFile(apkSetFile, standaloneApks.get(0).getPath(), outputDir);
-    try (ZipFile standaloneApkZipFile = new ZipFile(standaloneApkFile)) {
-      assertThat(filesUnderPath(standaloneApkZipFile, ZipPath.create("lib")))
-          .containsExactly("lib/x86/lib1.so", "lib/x86/lib2.so", "lib/x86/lib3.so");
-    }
-  }
-
-  @Test
   public void buildApksCommand_apkNotificationMessageKeyApexBundle() throws Exception {
     ApexImages apexConfig =
         apexImages(
@@ -3654,7 +3594,7 @@ public class BuildApksManagerTest {
                                 "com.test.app",
                                 withInstallTimeDelivery(),
                                 withFusingAttribute(true),
-                                withInstallTimePermanentElement(false))))
+                                withInstallTimeRemovableElement(true))))
             .setBundleConfig(BundleConfigBuilder.create().setVersion("1.0.0").build())
             .build();
     Path bundlePath = createAndStoreBundle(appBundle);
@@ -4446,8 +4386,7 @@ public class BuildApksManagerTest {
             .setAapt2Command(aapt2Command)
             .build();
 
-    CommandExecutionException exception =
-        assertThrows(CommandExecutionException.class, () -> command.execute());
+    InvalidBundleException exception = assertThrows(InvalidBundleException.class, command::execute);
     assertThat(exception)
         .hasMessageThat()
         .contains(
@@ -4666,7 +4605,7 @@ public class BuildApksManagerTest {
         new SubValidator() {
           @Override
           public void validateBundle(AppBundle bundle) {
-            throw new ValidationException("Custom validator");
+            throw InvalidBundleException.builder().withUserMessage("Custom validator").build();
           }
         };
     BuildApksCommand command =
@@ -4677,7 +4616,7 @@ public class BuildApksManagerTest {
             .setExtraValidators(ImmutableList.of(extraValidator))
             .build();
 
-    Exception e = assertThrows(ValidationException.class, () -> execute(command));
+    Exception e = assertThrows(InvalidBundleException.class, () -> execute(command));
     assertThat(e).hasMessageThat().contains("Custom validator");
   }
 
@@ -5019,7 +4958,7 @@ public class BuildApksManagerTest {
   private int extractVersionCode(File apk) {
     return extractAndroidManifest(apk)
         .getVersionCode()
-        .orElseThrow(VersionCodeMissingException::new);
+        .orElseThrow(InvalidVersionCodeException::createMissingVersionCodeException);
   }
 
   private AndroidManifest extractAndroidManifest(File apk) {

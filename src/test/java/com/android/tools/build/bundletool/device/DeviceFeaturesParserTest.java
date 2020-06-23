@@ -19,7 +19,7 @@ package com.android.tools.build.bundletool.device;
 import static com.google.common.truth.Truth.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
-import com.android.tools.build.bundletool.model.exceptions.ParseException;
+import com.android.tools.build.bundletool.model.exceptions.AdbOutputParseException;
 import com.google.common.collect.ImmutableList;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -62,7 +62,7 @@ public class DeviceFeaturesParserTest {
         ImmutableList.of("", "feature:android.hardware.camera.any", "some bad line");
     Throwable exception =
         assertThrows(
-            ParseException.class,
+            AdbOutputParseException.class,
             () -> new DeviceFeaturesParser().parse(packageManagerCommandOutput));
     assertThat(exception)
         .hasMessageThat()

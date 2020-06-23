@@ -59,7 +59,7 @@ public abstract class AdbServer implements Closeable {
     } catch (InterruptedException e) {
       throw CommandExecutionException.builder()
           .withCause(e)
-          .withMessage("Interrupted while waiting for ADB.")
+          .withInternalMessage("Interrupted while waiting for ADB.")
           .build();
     }
   }

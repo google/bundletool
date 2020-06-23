@@ -17,6 +17,8 @@
 package com.android.tools.build.bundletool.device;
 
 import static com.android.tools.build.bundletool.model.utils.TargetingProtoUtils.getScreenDensityDpi;
+import static com.android.tools.build.bundletool.model.utils.TextureCompressionUtils.TEXTURE_COMPRESSION_FORMAT_TO_MANIFEST_VALUE;
+import static com.google.common.collect.ImmutableSet.toImmutableSet;
 
 import com.android.bundle.Devices.DeviceSpec;
 import com.android.bundle.Targeting.AbiTargeting;
@@ -24,11 +26,20 @@ import com.android.bundle.Targeting.DeviceFeatureTargeting;
 import com.android.bundle.Targeting.LanguageTargeting;
 import com.android.bundle.Targeting.ScreenDensityTargeting;
 import com.android.bundle.Targeting.SdkVersionTargeting;
+import com.android.bundle.Targeting.TextureCompressionFormat;
+import com.android.bundle.Targeting.TextureCompressionFormat.TextureCompressionFormatAlias;
+import com.android.bundle.Targeting.TextureCompressionFormatTargeting;
 import com.android.tools.build.bundletool.model.AbiName;
+import com.android.tools.build.bundletool.model.utils.TextureCompressionUtils;
+import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
+import com.google.common.collect.Streams;
+import java.util.Optional;
 
 /** Utils for {@link DeviceSpec}. */
 public final class DeviceSpecUtils {
+  private static final String GL_ES_VERSION_FEATURE_PREFIX = "reqGlEsVersion=";
 
   public static boolean isAbiMissing(DeviceSpec deviceSpec) {
     return deviceSpec.getSupportedAbisList().isEmpty();
@@ -44,6 +55,46 @@ public final class DeviceSpecUtils {
 
   public static boolean isLocalesMissing(DeviceSpec deviceSpec) {
     return deviceSpec.getSupportedLocalesList().isEmpty();
+  }
+
+  public static boolean isTextureCompressionFormatMissing(DeviceSpec deviceSpec) {
+    return deviceSpec.getGlExtensionsList().isEmpty() && !getGlEsVersion(deviceSpec).isPresent();
+  }
+
+  /** Extracts the GL ES version, if any, form the device features. */
+  public static Optional<Integer> getGlEsVersion(DeviceSpec deviceSpec) {
+    try {
+      return deviceSpec.getDeviceFeaturesList().stream()
+          .filter(deviceFeature -> deviceFeature.startsWith(GL_ES_VERSION_FEATURE_PREFIX))
+          .map(
+              deviceFeature ->
+                  Integer.decode(deviceFeature.substring(GL_ES_VERSION_FEATURE_PREFIX.length())))
+          .max(Integer::compareTo);
+    } catch (NumberFormatException e) {
+      System.err.println(
+          "WARNING: the OpenGL ES version in the device spec is not a valid number. It will be"
+              + " considered as missing for texture compression format matching with the device.");
+    }
+    return Optional.empty();
+  }
+
+  /** Extracts all the texture compression formats supported by the device. */
+  public static ImmutableSet<TextureCompressionFormatAlias>
+      getDeviceSupportedTextureCompressionFormats(DeviceSpec deviceSpec) {
+    ImmutableSet<TextureCompressionFormatAlias> glExtensionSupportedFormats =
+        deviceSpec.getGlExtensionsList().stream()
+            .map(TextureCompressionUtils::textureCompressionFormat)
+            .flatMap(Streams::stream)
+            .collect(toImmutableSet());
+    ImmutableList<TextureCompressionFormatAlias> glVersionSupportedFormats =
+        DeviceSpecUtils.getGlEsVersion(deviceSpec)
+            .map(TextureCompressionUtils::textureCompressionFormatsForGl)
+            .orElse(ImmutableList.of());
+
+    return ImmutableSet.<TextureCompressionFormatAlias>builder()
+        .addAll(glExtensionSupportedFormats)
+        .addAll(glVersionSupportedFormats)
+        .build();
   }
 
   /** Utils for building {@link DeviceSpec} from targetings. */
@@ -79,6 +130,27 @@ public final class DeviceSpecUtils {
     DeviceSpecFromTargetingBuilder setSupportedLocales(LanguageTargeting languageTargeting) {
       if (!languageTargeting.equals(LanguageTargeting.getDefaultInstance())) {
         deviceSpec.addSupportedLocales(Iterables.getOnlyElement(languageTargeting.getValueList()));
+      }
+      return this;
+    }
+
+    DeviceSpecFromTargetingBuilder setSupportedTextureCompressionFormats(
+        TextureCompressionFormatTargeting textureTargeting) {
+      if (!textureTargeting.equals(TextureCompressionFormatTargeting.getDefaultInstance())) {
+        deviceSpec.addAllGlExtensions(
+            textureTargeting.getValueList().stream()
+                .map(TextureCompressionFormat::getAlias)
+                .filter(TEXTURE_COMPRESSION_FORMAT_TO_MANIFEST_VALUE::containsKey)
+                .map(TEXTURE_COMPRESSION_FORMAT_TO_MANIFEST_VALUE::get)
+                .collect(toImmutableSet()));
+        textureTargeting.getValueList().stream()
+            .map(TextureCompressionUtils::getMinGlEsVersionRequired)
+            .flatMap(Streams::stream)
+            .max(Integer::compareTo)
+            .map(
+                glEsVersion ->
+                    GL_ES_VERSION_FEATURE_PREFIX + "0x" + Integer.toHexString(glEsVersion))
+            .ifPresent(deviceSpec::addDeviceFeatures);
       }
       return this;
     }

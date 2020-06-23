@@ -22,7 +22,6 @@ import com.android.tools.build.bundletool.model.ZipPath;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSortedSet;
 import java.io.IOException;
-import java.io.InputStream;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -82,24 +81,6 @@ public final class FileUtils {
       }
     }
     return walkOrderedSet.build().asList();
-  }
-
-  /**
-   * Compares byte contents of the two {@link InputStream} instances for equality, returning as soon
-   * as a difference is found.
-   */
-  public static boolean equalContent(InputStream is1, InputStream is2) throws IOException {
-    try (InputStream bufferedInputStream1 = BufferedIo.makeBuffered(is1);
-        InputStream bufferedInputStream2 = BufferedIo.makeBuffered(is2)) {
-
-      int c1 = 0;
-      int c2 = 0;
-      while (c1 != -1 && c2 != -1 && c1 == c2) {
-        c1 = bufferedInputStream1.read();
-        c2 = bufferedInputStream2.read();
-      }
-      return c1 == c2;
-    }
   }
 
   // Not meant to be instantiated.

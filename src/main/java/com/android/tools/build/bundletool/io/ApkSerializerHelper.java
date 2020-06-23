@@ -47,7 +47,8 @@ import com.android.tools.build.bundletool.model.ModuleSplit;
 import com.android.tools.build.bundletool.model.SigningConfiguration;
 import com.android.tools.build.bundletool.model.WearApkLocator;
 import com.android.tools.build.bundletool.model.ZipPath;
-import com.android.tools.build.bundletool.model.exceptions.ValidationException;
+import com.android.tools.build.bundletool.model.exceptions.CommandExecutionException;
+import com.android.tools.build.bundletool.model.utils.GZipUtils;
 import com.android.tools.build.bundletool.model.utils.PathMatcher;
 import com.android.tools.build.bundletool.model.utils.Versions;
 import com.android.tools.build.bundletool.model.utils.files.FileUtils;
@@ -57,9 +58,6 @@ import com.google.common.base.Predicate;
 import com.google.common.base.Predicates;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
-import com.google.common.io.ByteStreams;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
@@ -70,7 +68,6 @@ import java.security.NoSuchAlgorithmException;
 import java.security.SignatureException;
 import java.util.Optional;
 import java.util.regex.Pattern;
-import java.util.zip.GZIPOutputStream;
 
 /** Serializes APKs to Proto or Binary format. */
 final class ApkSerializerHelper {
@@ -220,10 +217,8 @@ final class ApkSerializerHelper {
     checkFileDoesNotExist(outputApkGzipPath);
     createParentDirectories(outputApkGzipPath);
 
-    try (FileInputStream fileInputStream = new FileInputStream(apkPath.toFile());
-        GZIPOutputStream gzipOutputStream =
-            new GZIPOutputStream(new FileOutputStream(outputApkGzipPath.toFile()))) {
-      ByteStreams.copy(fileInputStream, gzipOutputStream);
+    try {
+      GZipUtils.compress(apkPath, outputApkGzipPath);
     } catch (IOException e) {
       throw new UncheckedIOException(
           String.format(
@@ -267,7 +262,7 @@ final class ApkSerializerHelper {
         Path signedApk = signEmbeddedApk(entry, signingConfig.get(), tempDir);
         zipBuilder.addFileFromDisk(pathInApk, signedApk.toFile(), entryOptions);
       } else {
-        zipBuilder.addFile(pathInApk, entry.getContentSupplier(), entryOptions);
+        zipBuilder.addFile(pathInApk, entry.getContent(), entryOptions);
       }
     }
 
@@ -354,7 +349,7 @@ final class ApkSerializerHelper {
 
   void addFile(ZFile zFile, ZipPath pathInApk, ModuleEntry entry, boolean shouldCompress)
       throws IOException {
-    try (InputStream entryInputStream = entry.getContent()) {
+    try (InputStream entryInputStream = entry.getContent().openStream()) {
       zFile.add(pathInApk.toString(), entryInputStream, shouldCompress);
     }
   }
@@ -419,7 +414,7 @@ final class ApkSerializerHelper {
 
       // Input
       Path unsignedApk = unsignedDir.getPath().resolve("unsigned.apk");
-      try (InputStream entryContent = apkEntry.getContent()) {
+      try (InputStream entryContent = apkEntry.getContent().openStream()) {
         Files.copy(entryContent, unsignedApk);
       }
 
@@ -436,9 +431,9 @@ final class ApkSerializerHelper {
         | NoSuchAlgorithmException
         | InvalidKeyException
         | SignatureException e) {
-      throw ValidationException.builder()
+      throw CommandExecutionException.builder()
           .withCause(e)
-          .withMessage("Unable to sign the embedded APK '%s'.", targetPath)
+          .withInternalMessage("Unable to sign the embedded APK '%s'.", targetPath)
           .build();
     } catch (IOException e) {
       throw new UncheckedIOException(
@@ -479,7 +474,10 @@ final class ApkSerializerHelper {
         | NoSuchAlgorithmException
         | InvalidKeyException
         | SignatureException e) {
-      throw ValidationException.builder().withCause(e).withMessage("Unable to sign APK.").build();
+      throw CommandExecutionException.builder()
+          .withCause(e)
+          .withInternalMessage("Unable to sign APK.")
+          .build();
     }
   }
 }

@@ -31,14 +31,13 @@ import com.android.tools.build.bundletool.commands.CommandHelp.CommandDescriptio
 import com.android.tools.build.bundletool.commands.CommandHelp.FlagDescription;
 import com.android.tools.build.bundletool.device.ApkMatcher;
 import com.android.tools.build.bundletool.device.DeviceSpecParser;
-import com.android.tools.build.bundletool.device.IncompatibleDeviceException;
 import com.android.tools.build.bundletool.flags.Flag;
 import com.android.tools.build.bundletool.flags.ParsedFlags;
 import com.android.tools.build.bundletool.model.ZipPath;
-import com.android.tools.build.bundletool.model.exceptions.ValidationException;
+import com.android.tools.build.bundletool.model.exceptions.IncompatibleDeviceException;
+import com.android.tools.build.bundletool.model.exceptions.InvalidCommandException;
 import com.android.tools.build.bundletool.model.utils.FileNames;
 import com.android.tools.build.bundletool.model.utils.ResultUtils;
-import com.android.tools.build.bundletool.model.utils.files.BufferedIo;
 import com.android.tools.build.bundletool.model.utils.files.FileUtils;
 import com.google.auto.value.AutoValue;
 import com.google.common.annotations.VisibleForTesting;
@@ -174,7 +173,9 @@ public abstract class ExtractApksCommand {
     ImmutableList<ZipPath> matchedApks = apkMatcher.getMatchingApks(toc);
 
     if (matchedApks.isEmpty()) {
-      throw new IncompatibleDeviceException("No compatible APKs found for the device.");
+      throw IncompatibleDeviceException.builder()
+          .withUserMessage("No compatible APKs found for the device.")
+          .build();
     }
 
 
@@ -203,7 +204,9 @@ public abstract class ExtractApksCommand {
 
   private void validateInput() {
     if (getModules().isPresent() && getModules().get().isEmpty()) {
-      throw new ValidationException("The set of modules cannot be empty.");
+      throw InvalidCommandException.builder()
+          .withInternalMessage("The set of modules cannot be empty.")
+          .build();
     }
 
     if (Files.isDirectory(getApksArchivePath())) {
@@ -237,8 +240,8 @@ public abstract class ExtractApksCommand {
         ZipEntry entry = apksArchive.getEntry(matchedApk.toString());
         checkNotNull(entry);
         Path extractedApkPath = outputDirectoryPath.resolve(matchedApk.getFileName().toString());
-        try (InputStream inputStream = BufferedIo.inputStream(apksArchive, entry);
-            OutputStream outputApk = BufferedIo.outputStream(extractedApkPath)) {
+        try (InputStream inputStream = apksArchive.getInputStream(entry);
+            OutputStream outputApk = Files.newOutputStream(extractedApkPath)) {
           ByteStreams.copy(inputStream, outputApk);
           builder.add(extractedApkPath);
         } catch (IOException e) {

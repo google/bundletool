@@ -16,6 +16,7 @@
 package com.android.tools.build.bundletool.io;
 
 import static com.android.tools.build.bundletool.io.ConcurrencyUtils.waitForAll;
+import static com.android.tools.build.bundletool.model.utils.CollectorUtils.groupingByDeterministic;
 import static com.android.tools.build.bundletool.model.utils.CollectorUtils.groupingBySortedKeys;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
@@ -24,7 +25,6 @@ import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.ImmutableMap.toImmutableMap;
 import static java.util.function.Function.identity;
 import static java.util.stream.Collectors.collectingAndThen;
-import static java.util.stream.Collectors.groupingBy;
 import static java.util.stream.Collectors.mapping;
 
 import com.android.bundle.Commands.ApkDescription;
@@ -55,6 +55,7 @@ import com.android.tools.build.bundletool.model.ManifestDeliveryElement;
 import com.android.tools.build.bundletool.model.ModuleSplit;
 import com.android.tools.build.bundletool.model.ModuleSplit.SplitType;
 import com.android.tools.build.bundletool.model.VariantKey;
+import com.android.tools.build.bundletool.model.ZipPath;
 import com.android.tools.build.bundletool.model.version.BundleToolVersion;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
@@ -71,6 +72,7 @@ import java.util.function.Predicate;
 /** Creates parts of table of contents and writes out APKs. */
 public class ApkSerializerManager {
 
+  private final ApkPathManager apkPathManager;
   private final ListeningExecutorService executorService;
   private final ApkListener apkListener;
   private final ApkModifier apkModifier;
@@ -87,6 +89,7 @@ public class ApkSerializerManager {
       int firstVariantNumber) {
     this.appBundle = appBundle;
     this.apkSetBuilder = apkSetBuilder;
+    this.apkPathManager = new ApkPathManager();
     this.executorService = executorService;
     this.apkListener = apkListener;
     this.apkModifier = apkModifier;
@@ -185,8 +188,11 @@ public class ApkSerializerManager {
                 collectingAndThen(
                     toImmutableMap(
                         identity(),
-                        (ModuleSplit split) ->
-                            executorService.submit(() -> apkSerializer.serialize(split))),
+                        (ModuleSplit split) -> {
+                          ZipPath apkPath = apkPathManager.getApkPath(split);
+                          return executorService.submit(
+                              () -> apkSerializer.serialize(split, apkPath));
+                        }),
                     ConcurrencyUtils::waitForAll));
 
     // Build the result proto.
@@ -233,11 +239,14 @@ public class ApkSerializerManager {
         generatedAssetSlices.getAssetSlices().stream()
             .filter(deviceFilter)
             .collect(
-                groupingBy(
+                groupingByDeterministic(
                     ModuleSplit::getModuleName,
                     mapping(
-                        assetSlice ->
-                            executorService.submit(() -> apkSerializer.serialize(assetSlice)),
+                        assetSlice -> {
+                          ZipPath apkPath = apkPathManager.getApkPath(assetSlice);
+                          return executorService.submit(
+                              () -> apkSerializer.serialize(assetSlice, apkPath));
+                        },
                         toImmutableList())))
             .entrySet()
             .stream()
@@ -371,33 +380,33 @@ public class ApkSerializerManager {
       this.apkBuildMode = apkBuildMode;
     }
 
-    public ImmutableList<ApkDescription> serialize(ModuleSplit split) {
+    public ImmutableList<ApkDescription> serialize(ModuleSplit split, ZipPath apkPath) {
       ImmutableList<ApkDescription> apkDescriptions;
       switch (split.getSplitType()) {
         case INSTANT:
-          apkDescriptions = ImmutableList.of(apkSetBuilder.addInstantApk(split));
+          apkDescriptions = ImmutableList.of(apkSetBuilder.addInstantApk(split, apkPath));
           break;
         case SPLIT:
-          apkDescriptions = ImmutableList.of(apkSetBuilder.addSplitApk(split));
+          apkDescriptions = ImmutableList.of(apkSetBuilder.addSplitApk(split, apkPath));
           break;
         case SYSTEM:
           if (split.isBaseModuleSplit() && split.isMasterSplit()) {
             apkDescriptions =
                 apkBuildMode.equals(ApkBuildMode.SYSTEM_COMPRESSED)
-                    ? apkSetBuilder.addCompressedSystemApks(split)
-                    : ImmutableList.of(apkSetBuilder.addSystemApk(split));
+                    ? apkSetBuilder.addCompressedSystemApks(split, apkPath)
+                    : ImmutableList.of(apkSetBuilder.addSystemApk(split, apkPath));
           } else {
-            apkDescriptions = ImmutableList.of(apkSetBuilder.addSplitApk(split));
+            apkDescriptions = ImmutableList.of(apkSetBuilder.addSplitApk(split, apkPath));
           }
           break;
         case STANDALONE:
           apkDescriptions =
               apkBuildMode.equals(ApkBuildMode.UNIVERSAL)
                   ? ImmutableList.of(apkSetBuilder.addStandaloneUniversalApk(split))
-                  : ImmutableList.of(apkSetBuilder.addStandaloneApk(split));
+                  : ImmutableList.of(apkSetBuilder.addStandaloneApk(split, apkPath));
           break;
         case ASSET_SLICE:
-          apkDescriptions = ImmutableList.of(apkSetBuilder.addAssetSliceApk(split));
+          apkDescriptions = ImmutableList.of(apkSetBuilder.addAssetSliceApk(split, apkPath));
           break;
         default:
           throw new IllegalStateException("Unexpected splitType: " + split.getSplitType());

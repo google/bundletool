@@ -34,7 +34,12 @@ import java.util.stream.Stream;
 public final class GetSizeCsvUtils {
 
   private static final Ordering<Dimension> DIMENSIONS_COMPARATOR =
-      Ordering.explicit(Dimension.SDK, Dimension.ABI, Dimension.SCREEN_DENSITY, Dimension.LANGUAGE);
+      Ordering.explicit(
+          Dimension.SDK,
+          Dimension.ABI,
+          Dimension.SCREEN_DENSITY,
+          Dimension.LANGUAGE,
+          Dimension.TEXTURE_COMPRESSION_FORMAT);
 
   public static String getSizeTotalOutputInCsv(
       ConfigurationSizes configurationSizes, ImmutableSet<Dimension> dimensions) {
@@ -79,7 +84,8 @@ public final class GetSizeCsvUtils {
             Dimension.ABI, sizeConfiguration::getAbi,
             Dimension.SDK, sizeConfiguration::getSdkVersion,
             Dimension.LANGUAGE, sizeConfiguration::getLocale,
-            Dimension.SCREEN_DENSITY, sizeConfiguration::getScreenDensity);
+            Dimension.SCREEN_DENSITY, sizeConfiguration::getScreenDensity,
+            Dimension.TEXTURE_COMPRESSION_FORMAT, sizeConfiguration::getTextureCompressionFormat);
 
     return Stream.concat(
             dimensions.stream()

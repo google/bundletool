@@ -20,7 +20,7 @@ import static com.google.common.truth.Truth.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.android.tools.build.bundletool.device.BadgingInfoParser.BadgingInfo;
-import com.android.tools.build.bundletool.model.exceptions.ParseException;
+import com.android.tools.build.bundletool.model.exceptions.AdbOutputParseException;
 import com.google.common.collect.ImmutableList;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -58,7 +58,8 @@ public class BadgingInfoParserTest {
             "application: label='' icon=''", "sdkVersion:'29'", "maxSdkVersion:'29'", "");
 
     // WHEN parsed
-    ParseException e = assertThrows(ParseException.class, () -> BadgingInfoParser.parse(input));
+    AdbOutputParseException e =
+        assertThrows(AdbOutputParseException.class, () -> BadgingInfoParser.parse(input));
 
     // THEN an IllegalArgumentException is thrown.
     assertThat(e).hasMessageThat().contains("line not found in badging");
@@ -76,7 +77,8 @@ public class BadgingInfoParserTest {
             "");
 
     // WHEN parsed
-    ParseException e = assertThrows(ParseException.class, () -> BadgingInfoParser.parse(input));
+    AdbOutputParseException e =
+        assertThrows(AdbOutputParseException.class, () -> BadgingInfoParser.parse(input));
 
     // THEN an IllegalArgumentException is thrown.
     assertThat(e).hasMessageThat().contains("'name=' and 'versionCode=' not found in package line");

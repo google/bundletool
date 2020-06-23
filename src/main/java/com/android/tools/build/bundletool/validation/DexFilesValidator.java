@@ -22,7 +22,7 @@ import static com.google.common.collect.ImmutableList.toImmutableList;
 
 import com.android.tools.build.bundletool.model.BundleModule;
 import com.android.tools.build.bundletool.model.BundleModule.ModuleType;
-import com.android.tools.build.bundletool.model.exceptions.ValidationException;
+import com.android.tools.build.bundletool.model.exceptions.InvalidBundleException;
 import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableList;
 import java.util.Comparator;
@@ -71,8 +71,8 @@ public class DexFilesValidator extends SubValidator {
       // invalid "classes1.dex").
       String expectedDexFileName = dexFileNameForIndex(dexIndex);
       if (!dexFileName.equals(expectedDexFileName)) {
-        throw ValidationException.builder()
-            .withMessage(
+        throw InvalidBundleException.builder()
+            .withUserMessage(
                 "Invalid dex file indices, expecting file '%s' but found '%s'.",
                 expectedDexFileName, dexFileName)
             .build();
@@ -85,8 +85,8 @@ public class DexFilesValidator extends SubValidator {
     boolean hasCode = module.getAndroidManifest().getEffectiveHasCode();
     boolean isAssetModule = module.getModuleType().equals(ModuleType.ASSET_MODULE);
     if (orderedDexFiles.isEmpty() && hasCode && !isAssetModule) {
-      throw ValidationException.builder()
-          .withMessage(
+      throw InvalidBundleException.builder()
+          .withUserMessage(
               "Module '%s' has no dex files but the attribute 'hasCode' is not set to false "
                   + "in the AndroidManifest.xml.",
               module.getName())

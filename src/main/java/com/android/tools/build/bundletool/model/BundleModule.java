@@ -34,7 +34,7 @@ import com.android.bundle.Files.ApexImages;
 import com.android.bundle.Files.Assets;
 import com.android.bundle.Files.NativeLibraries;
 import com.android.bundle.Targeting.ModuleTargeting;
-import com.android.tools.build.bundletool.model.exceptions.ValidationException;
+import com.android.tools.build.bundletool.model.exceptions.InvalidBundleException;
 import com.android.tools.build.bundletool.model.utils.xmlproto.XmlProtoAttribute;
 import com.android.tools.build.bundletool.model.version.BundleToolVersion;
 import com.google.auto.value.AutoValue;
@@ -207,7 +207,7 @@ public abstract class BundleModule {
             .getIsModuleIncludedInFusing()
             .orElseThrow(
                 () ->
-                    new ValidationException(
+                    InvalidBundleException.createWithUserMessage(
                         "Unable to determine if module should be fused: missing <dist:fusing> tag"
                             + " inside <dist:module> in AndroidManifest.xml"));
   }
@@ -368,7 +368,7 @@ public abstract class BundleModule {
       Optional<SpecialModuleEntry> specialEntry =
           SpecialModuleEntry.getSpecialEntry(moduleEntry.getPath());
       if (specialEntry.isPresent()) {
-        try (InputStream inputStream = moduleEntry.getContent()) {
+        try (InputStream inputStream = moduleEntry.getContent().openStream()) {
           specialEntry.get().addToModule(this, inputStream);
         }
       } else {

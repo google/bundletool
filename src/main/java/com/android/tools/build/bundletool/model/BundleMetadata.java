@@ -20,13 +20,17 @@ import static com.google.common.base.Preconditions.checkArgument;
 
 import com.google.auto.value.AutoValue;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.Maps;
+import com.google.common.io.ByteSource;
 import com.google.errorprone.annotations.Immutable;
+import java.util.Map;
 import java.util.Optional;
 
 /** Holder of the App Bundle metadata. */
 @Immutable
 @AutoValue
 @AutoValue.CopyAnnotations
+@SuppressWarnings("Immutable")
 public abstract class BundleMetadata {
 
   /** Namespaced directory where files used by BundleTool are stored. */
@@ -38,19 +42,41 @@ public abstract class BundleMetadata {
    * Returns the raw metadata map.
    *
    * <p>Keys are in format {@code <namespaced-dir>/<file-name>}.
+   *
+   * @deprecated Use {@link #getFileContentMap()} instead.
    */
-  public abstract ImmutableMap<ZipPath, InputStreamSupplier> getFileDataMap();
+  @Deprecated
+  public Map<ZipPath, InputStreamSupplier> getFileDataMap() {
+    return Maps.transformValues(getFileContentMap(), InputStreamSupplier::fromByteSource);
+  }
+
+  /**
+   * Returns the raw metadata map.
+   *
+   * <p>Keys are in format {@code <namespaced-dir>/<file-name>}.
+   */
+  public abstract ImmutableMap<ZipPath, ByteSource> getFileContentMap();
 
   public static Builder builder() {
     return new AutoValue_BundleMetadata.Builder();
   }
 
-  /** Gets contents of metadata file {@code <namespaced-dir>/<file-name>}, if it exists. */
+  /**
+   * Gets contents of metadata file {@code <namespaced-dir>/<file-name>}, if it exists.
+   *
+   * @deprecated Use {@link #getFileAsByteSource(String, String)} instead.
+   */
+  @Deprecated
   public Optional<InputStreamSupplier> getFileData(String namespacedDir, String fileName) {
-    return Optional.ofNullable(getFileDataMap().get(toMetadataPath(namespacedDir, fileName)));
+    return getFileAsByteSource(namespacedDir, fileName).map(InputStreamSupplier::fromByteSource);
   }
 
-  /** Converts the arguments to a valid key for {@link #getFileDataMap()}. */
+  /** Gets contents of metadata file {@code <namespaced-dir>/<file-name>}, if it exists. */
+  public Optional<ByteSource> getFileAsByteSource(String namespacedDir, String fileName) {
+    return Optional.ofNullable(getFileContentMap().get(toMetadataPath(namespacedDir, fileName)));
+  }
+
+  /** Converts the arguments to a valid key for {@link #getFileContentMap()}. */
   private static ZipPath toMetadataPath(String namespacedDir, String fileName) {
     return checkMetadataPath(ZipPath.create(namespacedDir).resolve(fileName));
   }
@@ -70,12 +96,11 @@ public abstract class BundleMetadata {
   @AutoValue.Builder
   public abstract static class Builder {
 
-    abstract ImmutableMap.Builder<ZipPath, InputStreamSupplier> fileDataMapBuilder();
+    abstract ImmutableMap.Builder<ZipPath, ByteSource> fileContentMapBuilder();
 
     /** Adds metadata file {@code <namespaced-dir>/<file-name>}. */
-    public Builder addFile(
-        String namespacedDir, String fileName, InputStreamSupplier dataSupplier) {
-      return addFile(toMetadataPath(namespacedDir, fileName), dataSupplier);
+    public Builder addFile(String namespacedDir, String fileName, ByteSource content) {
+      return addFile(toMetadataPath(namespacedDir, fileName), content);
     }
 
     /**
@@ -83,8 +108,8 @@ public abstract class BundleMetadata {
      *
      * @param path path of the file inside the bundle metadata directory
      */
-    public Builder addFile(ZipPath path, InputStreamSupplier dataSupplier) {
-      fileDataMapBuilder().put(checkMetadataPath(path), dataSupplier);
+    public Builder addFile(ZipPath path, ByteSource content) {
+      fileContentMapBuilder().put(checkMetadataPath(path), content);
       return this;
     }
 

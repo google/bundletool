@@ -23,6 +23,7 @@ import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.with
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withFeatureCondition;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withFusingAttribute;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withInstallTimeDelivery;
+import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withInstallTimeRemovableElement;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withInstant;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withInstantInstallTimeDelivery;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withInstantOnDemandDelivery;
@@ -39,14 +40,9 @@ import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.with
 import static com.google.common.truth.Truth.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
+import com.android.bundle.Config.BundleConfig;
 import com.android.tools.build.bundletool.model.BundleModule;
-import com.android.tools.build.bundletool.model.exceptions.ValidationException;
-import com.android.tools.build.bundletool.model.exceptions.manifest.ManifestDuplicateAttributeException;
-import com.android.tools.build.bundletool.model.exceptions.manifest.ManifestSdkTargetingException.MaxSdkInvalidException;
-import com.android.tools.build.bundletool.model.exceptions.manifest.ManifestSdkTargetingException.MaxSdkLessThanMinInstantSdk;
-import com.android.tools.build.bundletool.model.exceptions.manifest.ManifestSdkTargetingException.MinSdkGreaterThanMaxSdkException;
-import com.android.tools.build.bundletool.model.exceptions.manifest.ManifestSdkTargetingException.MinSdkInvalidException;
-import com.android.tools.build.bundletool.model.exceptions.manifest.ManifestVersionCodeConflictException;
+import com.android.tools.build.bundletool.model.exceptions.InvalidBundleException;
 import com.android.tools.build.bundletool.model.utils.xmlproto.XmlProtoAttributeBuilder;
 import com.android.tools.build.bundletool.testing.BundleModuleBuilder;
 import com.android.tools.build.bundletool.testing.ManifestProtoUtils.ManifestMutator;
@@ -71,9 +67,10 @@ public class AndroidManifestValidatorTest {
   public void base_withFusingConfigFalse_throws() throws Exception {
     BundleModule module = baseModule(withFusingAttribute(false));
 
-    ValidationException exception =
+    InvalidBundleException exception =
         assertThrows(
-            ValidationException.class, () -> new AndroidManifestValidator().validateModule(module));
+            InvalidBundleException.class,
+            () -> new AndroidManifestValidator().validateModule(module));
 
     assertThat(exception)
         .hasMessageThat()
@@ -141,9 +138,10 @@ public class AndroidManifestValidatorTest {
             .setManifest(androidManifest(PKG_NAME, withOnDemandAttribute(true)))
             .build();
 
-    ValidationException exception =
+    InvalidBundleException exception =
         assertThrows(
-            ValidationException.class, () -> new AndroidManifestValidator().validateModule(module));
+            InvalidBundleException.class,
+            () -> new AndroidManifestValidator().validateModule(module));
 
     assertThat(exception)
         .hasMessageThat()
@@ -195,9 +193,10 @@ public class AndroidManifestValidatorTest {
             .setManifest(androidManifest(PKG_NAME, withOnDemandAttribute(true)))
             .build();
 
-    ValidationException exception =
+    InvalidBundleException exception =
         assertThrows(
-            ValidationException.class, () -> new AndroidManifestValidator().validateModule(module));
+            InvalidBundleException.class,
+            () -> new AndroidManifestValidator().validateModule(module));
     assertThat(exception)
         .hasMessageThat()
         .contains("The base module cannot be marked on-demand since it will always be served.");
@@ -210,9 +209,10 @@ public class AndroidManifestValidatorTest {
             .setManifest(androidManifest(PKG_NAME, withOnDemandDelivery()))
             .build();
 
-    ValidationException exception =
+    InvalidBundleException exception =
         assertThrows(
-            ValidationException.class, () -> new AndroidManifestValidator().validateModule(module));
+            InvalidBundleException.class,
+            () -> new AndroidManifestValidator().validateModule(module));
     assertThat(exception)
         .hasMessageThat()
         .contains("The base module cannot be marked on-demand since it will always be served.");
@@ -225,9 +225,10 @@ public class AndroidManifestValidatorTest {
             .setManifest(androidManifest(PKG_NAME, withFeatureCondition("com.android.feature")))
             .build();
 
-    ValidationException exception =
+    InvalidBundleException exception =
         assertThrows(
-            ValidationException.class, () -> new AndroidManifestValidator().validateModule(module));
+            InvalidBundleException.class,
+            () -> new AndroidManifestValidator().validateModule(module));
     assertThat(exception).hasMessageThat().contains("The base module cannot have conditions");
   }
 
@@ -236,9 +237,10 @@ public class AndroidManifestValidatorTest {
     BundleModule module =
         new BundleModuleBuilder(FEATURE_MODULE_NAME).setManifest(androidManifest(PKG_NAME)).build();
 
-    ValidationException exception =
+    InvalidBundleException exception =
         assertThrows(
-            ValidationException.class, () -> new AndroidManifestValidator().validateModule(module));
+            InvalidBundleException.class,
+            () -> new AndroidManifestValidator().validateModule(module));
     assertThat(exception)
         .hasMessageThat()
         .contains(
@@ -330,9 +332,10 @@ public class AndroidManifestValidatorTest {
                     withFusingAttribute(true)))
             .build();
 
-    ValidationException exception =
+    InvalidBundleException exception =
         assertThrows(
-            ValidationException.class, () -> new AndroidManifestValidator().validateModule(module));
+            InvalidBundleException.class,
+            () -> new AndroidManifestValidator().validateModule(module));
     assertThat(exception)
         .hasMessageThat()
         .contains(
@@ -401,9 +404,9 @@ public class AndroidManifestValidatorTest {
   public void withHighTargetSandboxVersionCode_throws() throws Exception {
     BundleModule module = baseModule(withTargetSandboxVersion(3));
 
-    ValidationException e =
+    InvalidBundleException e =
         assertThrows(
-            ValidationException.class,
+            InvalidBundleException.class,
             () -> new AndroidManifestValidator().validateAllModules(ImmutableList.of(module)));
 
     assertThat(e).hasMessageThat().contains("cannot have a value greater than 2, but found 3");
@@ -417,9 +420,9 @@ public class AndroidManifestValidatorTest {
             .setManifest(androidManifest(PKG_NAME, withMinSdkVersion(19)))
             .build();
 
-    ValidationException e =
+    InvalidBundleException e =
         assertThrows(
-            ValidationException.class,
+            InvalidBundleException.class,
             () ->
                 new AndroidManifestValidator().validateAllModules(ImmutableList.of(base, module)));
 
@@ -471,9 +474,9 @@ public class AndroidManifestValidatorTest {
   public void withNegativeMinSdk_throws() throws Exception {
     BundleModule module = baseModule(withMinSdkVersion(-1));
 
-    MinSdkInvalidException e =
+    InvalidBundleException e =
         assertThrows(
-            MinSdkInvalidException.class,
+            InvalidBundleException.class,
             () -> new AndroidManifestValidator().validateModule(module));
 
     assertThat(e).hasMessageThat().isEqualTo("minSdkVersion must be nonnegative, found: (-1).");
@@ -483,9 +486,9 @@ public class AndroidManifestValidatorTest {
   public void withNegativeMaxSdk_throws() throws Exception {
     BundleModule module = baseModule(withMaxSdkVersion(-1));
 
-    MaxSdkInvalidException e =
+    InvalidBundleException e =
         assertThrows(
-            MaxSdkInvalidException.class,
+            InvalidBundleException.class,
             () -> new AndroidManifestValidator().validateModule(module));
 
     assertThat(e).hasMessageThat().isEqualTo("maxSdkVersion must be nonnegative, found: (-1).");
@@ -502,9 +505,9 @@ public class AndroidManifestValidatorTest {
   public void withMinSdkEqualMaxSdk_throws() throws Exception {
     BundleModule module = baseModule(withMaxSdkVersion(4), withMinSdkVersion(5));
 
-    MinSdkGreaterThanMaxSdkException e =
+    InvalidBundleException e =
         assertThrows(
-            MinSdkGreaterThanMaxSdkException.class,
+            InvalidBundleException.class,
             () -> new AndroidManifestValidator().validateModule(module));
 
     assertThat(e)
@@ -525,9 +528,9 @@ public class AndroidManifestValidatorTest {
                     withMaxSdkVersion(18)))
             .build();
 
-    MaxSdkLessThanMinInstantSdk e =
+    InvalidBundleException e =
         assertThrows(
-            MaxSdkLessThanMinInstantSdk.class,
+            InvalidBundleException.class,
             () -> new AndroidManifestValidator().validateModule(module));
 
     assertThat(e)
@@ -577,9 +580,9 @@ public class AndroidManifestValidatorTest {
                     withSecondSplitId("modulesplitname2")))
             .build();
 
-    ManifestDuplicateAttributeException e =
+    InvalidBundleException e =
         assertThrows(
-            ManifestDuplicateAttributeException.class,
+            InvalidBundleException.class,
             () -> new AndroidManifestValidator().validateModule(module));
 
     assertThat(e).hasMessageThat().contains("attribute 'split' cannot be declared more than once");
@@ -644,7 +647,7 @@ public class AndroidManifestValidatorTest {
 
     Throwable exception =
         assertThrows(
-            ValidationException.class,
+            InvalidBundleException.class,
             () ->
                 new AndroidManifestValidator()
                     .validateAllModules(ImmutableList.of(baseModule(), featureModule)));
@@ -679,13 +682,13 @@ public class AndroidManifestValidatorTest {
                 .setManifest(androidManifest("com.test", withVersionCode(3)))
                 .build());
 
-    ManifestVersionCodeConflictException exception =
+    InvalidBundleException exception =
         assertThrows(
-            ManifestVersionCodeConflictException.class,
+            InvalidBundleException.class,
             () -> new AndroidManifestValidator().validateAllModules(bundleModules));
     assertThat(exception)
         .hasMessageThat()
-        .contains("App Bundle modules should have the same version code but found [2,3]");
+        .contains("App Bundle modules should have the same version code but found [2, 3]");
   }
 
   @Test
@@ -699,9 +702,9 @@ public class AndroidManifestValidatorTest {
                 .setManifest(androidManifest("com.test", withTargetSandboxVersion(2)))
                 .build());
 
-    ValidationException exception =
+    InvalidBundleException exception =
         assertThrows(
-            ValidationException.class,
+            InvalidBundleException.class,
             () -> new AndroidManifestValidator().validateAllModules(bundleModules));
     assertThat(exception)
         .hasMessageThat()
@@ -728,7 +731,8 @@ public class AndroidManifestValidatorTest {
 
     Throwable exception =
         assertThrows(
-            ValidationException.class, () -> new AndroidManifestValidator().validateModule(module));
+            InvalidBundleException.class,
+            () -> new AndroidManifestValidator().validateModule(module));
     assertThat(exception)
         .hasMessageThat()
         .matches("Unexpected element declaration in manifest of asset pack 'asset_module'.");
@@ -747,9 +751,10 @@ public class AndroidManifestValidatorTest {
             .setManifest(androidManifestForAssetModule("com.test.app", sdkMutator))
             .build();
 
-    ValidationException exception =
+    InvalidBundleException exception =
         assertThrows(
-            ValidationException.class, () -> new AndroidManifestValidator().validateModule(module));
+            InvalidBundleException.class,
+            () -> new AndroidManifestValidator().validateModule(module));
     assertThat(exception)
         .hasMessageThat()
         .matches("Unexpected element declaration in manifest of asset pack 'asset_module'.");
@@ -781,7 +786,7 @@ public class AndroidManifestValidatorTest {
 
     Throwable exception =
         assertThrows(
-            ValidationException.class,
+            InvalidBundleException.class,
             () -> new AndroidManifestValidator().validateAllModules(bundleModules));
     assertThat(exception)
         .hasMessageThat()
@@ -802,7 +807,7 @@ public class AndroidManifestValidatorTest {
 
     Throwable exception =
         assertThrows(
-            ValidationException.class,
+            InvalidBundleException.class,
             () -> new AndroidManifestValidator().validateModule(featureModule));
     assertThat(exception)
         .hasMessageThat()
@@ -837,12 +842,13 @@ public class AndroidManifestValidatorTest {
 
     Throwable exception =
         assertThrows(
-            ValidationException.class,
+            InvalidBundleException.class,
             () -> new AndroidManifestValidator().validateModule(featureModule));
     assertThat(exception)
         .hasMessageThat()
-        .contains("The <dist:instant-delivery> element and dist:instant attribute cannot be used"
-            + " together (module: 'asset_module').");
+        .contains(
+            "The <dist:instant-delivery> element and dist:instant attribute cannot be used"
+                + " together (module: 'asset_module').");
   }
 
   @Test
@@ -851,9 +857,10 @@ public class AndroidManifestValidatorTest {
         new BundleModuleBuilder("assetmodule")
             .setManifest(androidManifestForAssetModule(PKG_NAME, withFeatureCondition("camera")))
             .build();
-    ValidationException exception =
+    InvalidBundleException exception =
         assertThrows(
-            ValidationException.class, () -> new AndroidManifestValidator().validateModule(module));
+            InvalidBundleException.class,
+            () -> new AndroidManifestValidator().validateModule(module));
     assertThat(exception)
         .hasMessageThat()
         .matches(
@@ -881,9 +888,10 @@ public class AndroidManifestValidatorTest {
                     PKG_NAME, withInstallTimeDelivery(), withInstantOnDemandDelivery()))
             .build();
 
-    ValidationException exception =
+    InvalidBundleException exception =
         assertThrows(
-            ValidationException.class, () -> new AndroidManifestValidator().validateModule(module));
+            InvalidBundleException.class,
+            () -> new AndroidManifestValidator().validateModule(module));
     assertThat(exception)
         .hasMessageThat()
         .startsWith(
@@ -899,9 +907,10 @@ public class AndroidManifestValidatorTest {
                     PKG_NAME, withOnDemandDelivery(), withInstantInstallTimeDelivery()))
             .build();
 
-    ValidationException exception =
+    InvalidBundleException exception =
         assertThrows(
-            ValidationException.class, () -> new AndroidManifestValidator().validateModule(module));
+            InvalidBundleException.class,
+            () -> new AndroidManifestValidator().validateModule(module));
     assertThat(exception)
         .hasMessageThat()
         .startsWith("Instant delivery cannot be install-time (module 'assetmodule').");
@@ -988,9 +997,9 @@ public class AndroidManifestValidatorTest {
                 .setManifest(androidManifestForAssetModule("com.test.app"))
                 .build());
 
-    ValidationException exception =
+    InvalidBundleException exception =
         assertThrows(
-            ValidationException.class,
+            InvalidBundleException.class,
             () -> new AndroidManifestValidator().validateAllModules(bundleModules));
 
     assertThat(exception)
@@ -999,5 +1008,81 @@ public class AndroidManifestValidatorTest {
             "Modules cannot have supports-gl-texture in their manifest (found:"
                 + " [GL_OES_compressed_ETC1_RGB8_texture]) and"
                 + " texture targeted directories in modules (found: [ASTC]).");
+  }
+
+  @Test
+  public void installTimeModuleNonRemovable_ok() throws Exception {
+    ImmutableList<BundleModule> bundleModules =
+        ImmutableList.of(
+            new BundleModuleBuilder(BASE_MODULE_NAME)
+                .addFile("assets/textures#tcf_astc/level1.assets")
+                .setManifest(androidManifest("com.test"))
+                .build(),
+            new BundleModuleBuilder("asset_module")
+                .addFile("assets/other_textures#tcf_astc/astc_file.assets")
+                .setManifest(
+                    androidManifestForAssetModule(
+                        "com.test.app", withInstallTimeRemovableElement(false)))
+                .build());
+    new AndroidManifestValidator().validateAllModules(bundleModules);
+  }
+
+  @Test
+  public void conditionalModuleNonRemovable_throws() throws Exception {
+    ImmutableList<BundleModule> bundleModules =
+        ImmutableList.of(
+            new BundleModuleBuilder(BASE_MODULE_NAME)
+                .addFile("assets/textures#tcf_astc/level1.assets")
+                .setManifest(androidManifest("com.test"))
+                .build(),
+            new BundleModuleBuilder("asset_module")
+                .addFile("assets/other_textures#tcf_astc/astc_file.assets")
+                .setManifest(
+                    androidManifestForAssetModule(
+                        "com.test.app",
+                        withInstallTimeRemovableElement(false),
+                        withMinSdkVersion(24),
+                        withFeatureCondition("android.feature")))
+                .build());
+
+    InvalidBundleException exception =
+        assertThrows(
+            InvalidBundleException.class,
+            () -> new AndroidManifestValidator().validateAllModules(bundleModules));
+    assertThat(exception)
+        .hasMessageThat()
+        .contains("Conditional modules cannot be set to non-removable.");
+  }
+
+  @Test
+  public void conditionalModuleRemovableNotSet() throws Exception {
+    ImmutableList<BundleModule> bundleModules =
+        ImmutableList.of(
+            new BundleModuleBuilder(BASE_MODULE_NAME)
+                .addFile("assets/textures#tcf_astc/level1.assets")
+                .setManifest(androidManifest("com.test"))
+                .build(),
+            new BundleModuleBuilder("asset_module")
+                .addFile("assets/other_textures#tcf_astc/astc_file.assets")
+                .setManifest(
+                    androidManifestForAssetModule(
+                        "com.test.app",
+                        withMinSdkVersion(24),
+                        withFeatureCondition("android.feature")))
+                .build());
+
+    new AndroidManifestValidator().validateAllModules(bundleModules);
+  }
+
+  @Test
+  public void assetOnly_ok() throws Exception {
+    BundleModule module =
+        new BundleModuleBuilder(
+                BASE_MODULE_NAME,
+                BundleConfig.newBuilder().setType(BundleConfig.BundleType.ASSET_ONLY).build())
+            .setManifest(androidManifestForAssetModule(PKG_NAME))
+            .build();
+
+    new AndroidManifestValidator().validateAllModules(ImmutableList.of(module));
   }
 }

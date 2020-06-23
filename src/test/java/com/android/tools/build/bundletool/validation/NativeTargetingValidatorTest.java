@@ -29,7 +29,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.android.bundle.Files.NativeLibraries;
 import com.android.tools.build.bundletool.model.BundleModule;
-import com.android.tools.build.bundletool.model.exceptions.ValidationException;
+import com.android.tools.build.bundletool.model.exceptions.InvalidBundleException;
 import com.android.tools.build.bundletool.testing.BundleModuleBuilder;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -68,9 +68,10 @@ public class NativeTargetingValidatorTest {
             .setManifest(androidManifest("com.test.app"))
             .build();
 
-    ValidationException e =
+    InvalidBundleException e =
         assertThrows(
-            ValidationException.class, () -> new NativeTargetingValidator().validateModule(module));
+            InvalidBundleException.class,
+            () -> new NativeTargetingValidator().validateModule(module));
 
     assertThat(e)
         .hasMessageThat()
@@ -90,9 +91,10 @@ public class NativeTargetingValidatorTest {
             .setManifest(androidManifest("com.test.app"))
             .build();
 
-    ValidationException e =
+    InvalidBundleException e =
         assertThrows(
-            ValidationException.class, () -> new NativeTargetingValidator().validateModule(module));
+            InvalidBundleException.class,
+            () -> new NativeTargetingValidator().validateModule(module));
 
     assertThat(e).hasMessageThat().contains("directory must be in format 'lib/<directory>'");
   }
@@ -107,9 +109,10 @@ public class NativeTargetingValidatorTest {
             .setManifest(androidManifest("com.test.app"))
             .build();
 
-    ValidationException e =
+    InvalidBundleException e =
         assertThrows(
-            ValidationException.class, () -> new NativeTargetingValidator().validateModule(module));
+            InvalidBundleException.class,
+            () -> new NativeTargetingValidator().validateModule(module));
 
     assertThat(e).hasMessageThat().contains("directory must be in format 'lib/<directory>'");
   }
@@ -129,9 +132,10 @@ public class NativeTargetingValidatorTest {
             .setManifest(androidManifest("com.test.app"))
             .build();
 
-    ValidationException e =
+    InvalidBundleException e =
         assertThrows(
-            ValidationException.class, () -> new NativeTargetingValidator().validateModule(module));
+            InvalidBundleException.class,
+            () -> new NativeTargetingValidator().validateModule(module));
 
     assertThat(e).hasMessageThat().contains("Targeted directory 'lib/mips' is empty.");
   }
@@ -150,9 +154,10 @@ public class NativeTargetingValidatorTest {
             .setManifest(androidManifest("com.test.app"))
             .build();
 
-    ValidationException e =
+    InvalidBundleException e =
         assertThrows(
-            ValidationException.class, () -> new NativeTargetingValidator().validateModule(module));
+            InvalidBundleException.class,
+            () -> new NativeTargetingValidator().validateModule(module));
 
     assertThat(e).hasMessageThat()
         .contains("Following native directories are not targeted: [lib/x86, lib/x86_64]");

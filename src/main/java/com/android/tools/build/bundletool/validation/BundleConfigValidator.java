@@ -26,7 +26,7 @@ import com.android.tools.build.bundletool.model.AppBundle;
 import com.android.tools.build.bundletool.model.BundleModule;
 import com.android.tools.build.bundletool.model.ResourceId;
 import com.android.tools.build.bundletool.model.ResourceTableEntry;
-import com.android.tools.build.bundletool.model.exceptions.ValidationException;
+import com.android.tools.build.bundletool.model.exceptions.InvalidBundleException;
 import com.android.tools.build.bundletool.model.utils.PathMatcher;
 import com.android.tools.build.bundletool.model.utils.PathMatcher.GlobPatternSyntaxException;
 import com.android.tools.build.bundletool.model.utils.ResourcesUtils;
@@ -61,17 +61,17 @@ public final class BundleConfigValidator extends SubValidator {
   private void validateCompression(Compression compression) {
     for (String pattern : compression.getUncompressedGlobList()) {
       if (FORBIDDEN_CHARS_IN_GLOB.stream().anyMatch(pattern::contains)) {
-        throw ValidationException.builder()
-            .withMessage("Invalid uncompressed glob: '%s'.", pattern)
+        throw InvalidBundleException.builder()
+            .withUserMessage("Invalid uncompressed glob: '%s'.", pattern)
             .build();
       }
 
       try {
         PathMatcher.createFromGlob(pattern);
       } catch (GlobPatternSyntaxException e) {
-        throw ValidationException.builder()
+        throw InvalidBundleException.builder()
             .withCause(e)
-            .withMessage("Invalid uncompressed glob: '%s'.", pattern)
+            .withUserMessage("Invalid uncompressed glob: '%s'.", pattern)
             .build();
       }
     }
@@ -87,16 +87,17 @@ public final class BundleConfigValidator extends SubValidator {
         .anyMatch(
             dimension ->
                 dimension.getValue().equals(Value.UNRECOGNIZED) && !dimension.getNegate())) {
-      throw ValidationException.builder()
-          .withMessage(
+      throw InvalidBundleException.builder()
+          .withUserMessage(
               "BundleConfig.pb contains an unrecognized split dimension. Update bundletool?")
           .build();
     }
 
     if (splitDimensions.stream().map(SplitDimension::getValueValue).distinct().count()
         != splitDimensions.size()) {
-      throw ValidationException.builder()
-          .withMessage("BundleConfig.pb contains duplicate split dimensions: %s", splitDimensions)
+      throw InvalidBundleException.builder()
+          .withUserMessage(
+              "BundleConfig.pb contains duplicate split dimensions: %s", splitDimensions)
           .build();
     }
 
@@ -106,8 +107,8 @@ public final class BundleConfigValidator extends SubValidator {
                 dimension.hasSuffixStripping()
                     && dimension.getSuffixStripping().getEnabled()
                     && !dimension.getValue().equals(Value.TEXTURE_COMPRESSION_FORMAT))) {
-      throw ValidationException.builder()
-          .withMessage(
+      throw InvalidBundleException.builder()
+          .withUserMessage(
               "Suffix stripping was enabled for an unsupported dimension. Only"
                   + " TEXTURE_COMPRESSION_FORMAT is supported.")
           .build();
@@ -126,8 +127,8 @@ public final class BundleConfigValidator extends SubValidator {
               ImmutableSet<String> supportedTextures =
                   TextureCompressionUtils.TEXTURE_TO_TARGETING.keySet();
 
-              throw ValidationException.builder()
-                  .withMessage(
+              throw InvalidBundleException.builder()
+                  .withUserMessage(
                       "The default texture compression format chosen for suffix stripping (\"%s\") "
                           + "is not valid. Supported formats are: %s.",
                       dimension.getSuffixStripping().getDefaultSuffix(),
@@ -139,10 +140,10 @@ public final class BundleConfigValidator extends SubValidator {
   private void validateVersion(BundleConfig bundleConfig) {
     try {
       BundleToolVersion.getVersionFromBundleConfig(bundleConfig);
-    } catch (ValidationException e) {
-      throw ValidationException.builder()
+    } catch (IllegalArgumentException e) {
+      throw InvalidBundleException.builder()
           .withCause(e)
-          .withMessage("Invalid version in the BundleConfig.pb file.")
+          .withUserMessage("Invalid version in the BundleConfig.pb file.")
           .build();
     }
   }
@@ -167,8 +168,8 @@ public final class BundleConfigValidator extends SubValidator {
     SetView<Integer> undefinedResources = Sets.difference(resourcesToBePinned, allResourceIds);
 
     if (!undefinedResources.isEmpty()) {
-      throw ValidationException.builder()
-          .withMessage(
+      throw InvalidBundleException.builder()
+          .withUserMessage(
               "Error in BundleConfig. The Master Resources list contains resource IDs not defined "
                   + "in any module. For example: 0x%08x",
               undefinedResources.iterator().next())

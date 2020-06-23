@@ -47,24 +47,21 @@ import java.util.Optional;
 /** Serializes standalone APKs to disk. */
 public class StandaloneApkSerializer {
 
-  private final ApkPathManager apkPathManager;
   private final ApkSerializerHelper apkSerializerHelper;
 
   public StandaloneApkSerializer(
-      ApkPathManager apkPathManager,
       Aapt2Command aapt2Command,
       Optional<SigningConfiguration> signingConfig,
       Optional<SigningConfiguration> stampSigningConfig,
       Version bundleVersion,
       Compression compression) {
-    this.apkPathManager = apkPathManager;
     this.apkSerializerHelper =
         new ApkSerializerHelper(
             aapt2Command, signingConfig, stampSigningConfig, bundleVersion, compression);
   }
 
-  public ApkDescription writeToDisk(ModuleSplit standaloneSplit, Path outputDirectory) {
-    ZipPath apkPath = apkPathManager.getApkPath(standaloneSplit);
+  public ApkDescription writeToDisk(
+      ModuleSplit standaloneSplit, Path outputDirectory, ZipPath apkPath) {
     return writeToDiskInternal(standaloneSplit, outputDirectory, apkPath);
   }
 
@@ -72,17 +69,22 @@ public class StandaloneApkSerializer {
     return writeToDiskInternal(standaloneSplit, outputDirectory, ZipPath.create("universal.apk"));
   }
 
-  public ApkDescription writeSystemApkToDisk(ModuleSplit systemSplit, Path outputDirectory) {
-    return writeSystemApkToDiskInternal(systemSplit, outputDirectory, SystemApkType.SYSTEM);
+  public ApkDescription writeSystemApkToDisk(
+      ModuleSplit systemSplit, Path outputDirectory, ZipPath apkPath) {
+    return writeSystemApkToDiskInternal(
+        systemSplit, outputDirectory, SystemApkType.SYSTEM, apkPath);
   }
   /**
    * Writes an compressed system APK and stub system APK containing just android manifest to disk.
    */
   public ImmutableList<ApkDescription> writeCompressedSystemApksToDisk(
-      ModuleSplit systemSplit, Path outputDirectory) {
+      ModuleSplit systemSplit, Path outputDirectory, ZipPath apkPath) {
     ApkDescription stubApkDescription =
         writeSystemApkToDiskInternal(
-            splitWithOnlyManifest(systemSplit), outputDirectory, SystemApkType.SYSTEM_STUB);
+            splitWithOnlyManifest(systemSplit),
+            outputDirectory,
+            SystemApkType.SYSTEM_STUB,
+            apkPath);
     ZipPath compressedApkPath =
         ZipPath.create(getCompressedApkPathFromStubApkPath(stubApkDescription.getPath()));
     apkSerializerHelper.writeCompressedApkToZipFile(
@@ -119,8 +121,10 @@ public class StandaloneApkSerializer {
   }
 
   private ApkDescription writeSystemApkToDiskInternal(
-      ModuleSplit systemSplit, Path outputDirectory, SystemApkMetadata.SystemApkType apkType) {
-    ZipPath apkPath = apkPathManager.getApkPath(systemSplit);
+      ModuleSplit systemSplit,
+      Path outputDirectory,
+      SystemApkMetadata.SystemApkType apkType,
+      ZipPath apkPath) {
     apkSerializerHelper.writeToZipFile(systemSplit, outputDirectory.resolve(apkPath.toString()));
     return createSystemApkDescription(systemSplit, apkPath, apkType);
   }

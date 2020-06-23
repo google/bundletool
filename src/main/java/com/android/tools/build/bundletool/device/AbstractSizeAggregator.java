@@ -16,14 +16,19 @@
 
 package com.android.tools.build.bundletool.device;
 
+import static com.android.tools.build.bundletool.device.DeviceSpecUtils.getDeviceSupportedTextureCompressionFormats;
 import static com.android.tools.build.bundletool.device.DeviceSpecUtils.isAbiMissing;
 import static com.android.tools.build.bundletool.device.DeviceSpecUtils.isLocalesMissing;
 import static com.android.tools.build.bundletool.device.DeviceSpecUtils.isScreenDensityMissing;
 import static com.android.tools.build.bundletool.device.DeviceSpecUtils.isSdkVersionMissing;
+import static com.android.tools.build.bundletool.device.DeviceSpecUtils.isTextureCompressionFormatMissing;
 import static com.android.tools.build.bundletool.model.GetSizeRequest.Dimension.ABI;
 import static com.android.tools.build.bundletool.model.GetSizeRequest.Dimension.LANGUAGE;
 import static com.android.tools.build.bundletool.model.GetSizeRequest.Dimension.SCREEN_DENSITY;
 import static com.android.tools.build.bundletool.model.GetSizeRequest.Dimension.SDK;
+import static com.android.tools.build.bundletool.model.GetSizeRequest.Dimension.TEXTURE_COMPRESSION_FORMAT;
+import static com.android.tools.build.bundletool.model.utils.TextureCompressionUtils.TARGETING_TO_TEXTURE;
+import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.ImmutableSet.toImmutableSet;
 
 import com.android.bundle.Commands.ApkDescription;
@@ -33,6 +38,7 @@ import com.android.bundle.Targeting.ApkTargeting;
 import com.android.bundle.Targeting.LanguageTargeting;
 import com.android.bundle.Targeting.ScreenDensityTargeting;
 import com.android.bundle.Targeting.SdkVersionTargeting;
+import com.android.bundle.Targeting.TextureCompressionFormatTargeting;
 import com.android.tools.build.bundletool.commands.GetSizeCommand;
 import com.android.tools.build.bundletool.device.DeviceSpecUtils.DeviceSpecFromTargetingBuilder;
 import com.android.tools.build.bundletool.model.ConfigurationSizes;
@@ -75,7 +81,8 @@ public abstract class AbstractSizeAggregator {
       SdkVersionTargeting sdkVersionTargeting,
       AbiTargeting abiTargeting,
       ScreenDensityTargeting screenDensityTargeting,
-      LanguageTargeting languageTargeting);
+      LanguageTargeting languageTargeting,
+      TextureCompressionFormatTargeting textureTargeting);
 
   protected ImmutableSet<SdkVersionTargeting> getAllSdkVersionTargetings(
       ImmutableList<ApkDescription> apkDescriptions) {
@@ -158,11 +165,33 @@ public abstract class AbstractSizeAggregator {
         : languageTargetingOptions.build();
   }
 
+  protected ImmutableSet<TextureCompressionFormatTargeting>
+      getAllTextureCompressionFormatTargetings(ImmutableList<ApkDescription> apkDescriptions) {
+    ImmutableSet<TextureCompressionFormatTargeting> textureCompressionFormatTargetingOptions;
+
+    if (isTextureCompressionFormatMissing(getSizeRequest.getDeviceSpec())) {
+      textureCompressionFormatTargetingOptions =
+          apkDescriptions.stream()
+              .map(ApkDescription::getTargeting)
+              .filter(ApkTargeting::hasTextureCompressionFormatTargeting)
+              .map(ApkTargeting::getTextureCompressionFormatTargeting)
+              .collect(toImmutableSet());
+    } else {
+      textureCompressionFormatTargetingOptions = ImmutableSet.of();
+    }
+    // Adding default targeting (if targetings are empty) to help computing the cartesian product
+    // across all targetings.
+    return textureCompressionFormatTargetingOptions.isEmpty()
+        ? ImmutableSet.of(TextureCompressionFormatTargeting.getDefaultInstance())
+        : textureCompressionFormatTargetingOptions;
+  }
+
   protected ConfigurationSizes getSizesPerConfiguration(
       ImmutableSet<SdkVersionTargeting> sdkTargetingOptions,
       ImmutableSet<AbiTargeting> abiTargetingOptions,
       ImmutableSet<LanguageTargeting> languageTargetingOptions,
-      ImmutableSet<ScreenDensityTargeting> screenDensityTargetingOptions) {
+      ImmutableSet<ScreenDensityTargeting> screenDensityTargetingOptions,
+      ImmutableSet<TextureCompressionFormatTargeting> textureCompressionFormatTargetingOptions) {
     Map<SizeConfiguration, Long> minSizeByConfiguration = new HashMap<>();
     Map<SizeConfiguration, Long> maxSizeByConfiguration = new HashMap<>();
 
@@ -170,26 +199,31 @@ public abstract class AbstractSizeAggregator {
       for (AbiTargeting abiTargeting : abiTargetingOptions) {
         for (ScreenDensityTargeting screenDensityTargeting : screenDensityTargetingOptions) {
           for (LanguageTargeting languageTargeting : languageTargetingOptions) {
+            for (TextureCompressionFormatTargeting textureCompressionFormatTargeting :
+                textureCompressionFormatTargetingOptions) {
 
-            SizeConfiguration configuration =
-                mergeWithDeviceSpec(
-                    getSizeConfiguration(
-                        sdkVersionTargeting,
-                        abiTargeting,
-                        screenDensityTargeting,
-                        languageTargeting),
-                    getSizeRequest.getDeviceSpec());
+              SizeConfiguration configuration =
+                  mergeWithDeviceSpec(
+                      getSizeConfiguration(
+                          sdkVersionTargeting,
+                          abiTargeting,
+                          screenDensityTargeting,
+                          languageTargeting,
+                          textureCompressionFormatTargeting),
+                      getSizeRequest.getDeviceSpec());
 
-            long compressedSize =
-                getCompressedSize(
-                    getMatchingApks(
-                        sdkVersionTargeting,
-                        abiTargeting,
-                        screenDensityTargeting,
-                        languageTargeting));
+              long compressedSize =
+                  getCompressedSize(
+                      getMatchingApks(
+                          sdkVersionTargeting,
+                          abiTargeting,
+                          screenDensityTargeting,
+                          languageTargeting,
+                          textureCompressionFormatTargeting));
 
-            minSizeByConfiguration.merge(configuration, compressedSize, Math::min);
-            maxSizeByConfiguration.merge(configuration, compressedSize, Math::max);
+              minSizeByConfiguration.merge(configuration, compressedSize, Math::min);
+              maxSizeByConfiguration.merge(configuration, compressedSize, Math::max);
+            }
           }
         }
       }
@@ -204,7 +238,8 @@ public abstract class AbstractSizeAggregator {
       SdkVersionTargeting sdkVersionTargeting,
       AbiTargeting abiTargeting,
       ScreenDensityTargeting screenDensityTargeting,
-      LanguageTargeting languageTargeting) {
+      LanguageTargeting languageTargeting,
+      TextureCompressionFormatTargeting textureCompressionFormatTargeting) {
 
     ImmutableSet<Dimension> dimensions = getSizeRequest.getDimensions();
     SizeConfiguration.Builder sizeConfiguration = SizeConfiguration.builder();
@@ -226,6 +261,11 @@ public abstract class AbstractSizeAggregator {
       SizeConfiguration.getLocaleName(languageTargeting).ifPresent(sizeConfiguration::setLocale);
     }
 
+    if (dimensions.contains(TEXTURE_COMPRESSION_FORMAT)) {
+      SizeConfiguration.getTextureCompressionFormatName(textureCompressionFormatTargeting)
+          .ifPresent(sizeConfiguration::setTextureCompressionFormat);
+    }
+
     return sizeConfiguration.build();
   }
 
@@ -234,13 +274,15 @@ public abstract class AbstractSizeAggregator {
       SdkVersionTargeting sdkVersionTargeting,
       AbiTargeting abiTargeting,
       ScreenDensityTargeting screenDensityTargeting,
-      LanguageTargeting languageTargeting) {
+      LanguageTargeting languageTargeting,
+      TextureCompressionFormatTargeting textureTargeting) {
 
     return new DeviceSpecFromTargetingBuilder(deviceSpec)
         .setSdkVersion(sdkVersionTargeting)
         .setSupportedAbis(abiTargeting)
         .setScreenDensity(screenDensityTargeting)
         .setSupportedLocales(languageTargeting)
+        .setSupportedTextureCompressionFormats(textureTargeting)
         .build();
   }
 
@@ -263,6 +305,15 @@ public abstract class AbstractSizeAggregator {
 
     if (dimensions.contains(SDK) && !isSdkVersionMissing(deviceSpec)) {
       mergedSizeConfiguration.setSdkVersion(String.format("%d", deviceSpec.getSdkVersion()));
+    }
+
+    if (dimensions.contains(TEXTURE_COMPRESSION_FORMAT)
+        && !isTextureCompressionFormatMissing(deviceSpec)) {
+      mergedSizeConfiguration.setTextureCompressionFormat(
+          COMMA_JOINER.join(
+              getDeviceSupportedTextureCompressionFormats(deviceSpec).stream()
+                  .map(TARGETING_TO_TEXTURE::get)
+                  .collect(toImmutableList())));
     }
 
     return mergedSizeConfiguration.build();

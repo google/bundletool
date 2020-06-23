@@ -17,6 +17,7 @@
 package com.android.tools.build.bundletool.splitters;
 
 import static com.android.tools.build.bundletool.model.ManifestMutator.withSplitsRequired;
+import static com.android.tools.build.bundletool.model.utils.CollectorUtils.groupingByDeterministic;
 import static com.android.tools.build.bundletool.model.utils.ResourcesUtils.DEFAULT_DENSITY_VALUE;
 import static com.android.tools.build.bundletool.model.utils.ResourcesUtils.MIPMAP_TYPE;
 import static com.android.tools.build.bundletool.model.utils.ResourcesUtils.getLowestDensity;
@@ -25,7 +26,6 @@ import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.ImmutableSet.toImmutableSet;
-import static java.util.stream.Collectors.groupingBy;
 
 import com.android.aapt.ConfigurationOuterClass.Configuration;
 import com.android.aapt.Resources.ConfigValue;
@@ -44,13 +44,13 @@ import com.android.tools.build.bundletool.model.utils.ResourcesUtils;
 import com.android.tools.build.bundletool.model.version.Version;
 import com.google.common.collect.ImmutableCollection;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableMultimap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.Predicate;
@@ -230,19 +230,21 @@ public class ScreenDensityResourcesSplitter extends SplitterForOneTargetingDimen
   private Entry filterEntryForDensity(ResourceTableEntry tableEntry, DensityAlias targetDensity) {
     Entry initialEntry = tableEntry.getEntry();
     // Groups together configs that only differ on density.
-    Map<Configuration, List<ConfigValue>> configValuesByConfiguration =
+    ImmutableMap<Configuration, ? extends List<ConfigValue>> configValuesByConfiguration =
         initialEntry.getConfigValueList().stream()
             .filter(
                 configValue ->
                     RESOURCES_WITH_NO_ALTERNATIVES_IN_MASTER_SPLIT.enabledForVersion(bundleVersion)
                         || configValue.getConfig().getDensity() != DEFAULT_DENSITY_VALUE)
-            .collect(groupingBy(configValue -> clearDensity(configValue.getConfig())));
+            .collect(groupingByDeterministic(configValue -> clearDensity(configValue.getConfig())));
 
     // Filter out configs that don't have alternatives on density. These configurations can go in
     // the master split.
     if (RESOURCES_WITH_NO_ALTERNATIVES_IN_MASTER_SPLIT.enabledForVersion(bundleVersion)) {
       configValuesByConfiguration =
-          Maps.filterValues(configValuesByConfiguration, configValues -> configValues.size() > 1);
+          ImmutableMap.copyOf(
+              Maps.filterValues(
+                  configValuesByConfiguration, configValues -> configValues.size() > 1));
     }
 
     ImmutableList<List<ConfigValue>> densityGroups =

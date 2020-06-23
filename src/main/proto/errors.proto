@@ -4,25 +4,35 @@ package android.bundle;
 
 option java_package = "com.android.bundle";
 
+// Next ID: 30
 message BundleToolError {
-
   // The exception message that the bundle tool outputs.
   // NOTE: this may not be safe to show to users since it might
   // include server paths and configuration.
   string exception_message = 1;
 
-  // Next id: 28
+  // The exception message that can be exposed to third party developers.
+  string user_message = 28;
+
+  // Type of error.
+  ErrorType error_type = 29;
+
+  // Deprecated - will be removed once fully migrate to error_type +
+  // user_message
   oneof custom_error {
     ManifestMissingVersionCodeError manifest_missing_version_code = 2;
     ManifestInvalidVersionCodeError manifest_invalid_version_code = 3;
 
-    ManifestBaseModuleExcludedFromFusingError manifest_fusing_base_module_excluded = 4;
-    ManifestModuleFusingConfigurationMissingError manifest_fusing_configuration_missing = 5;
+    ManifestBaseModuleExcludedFromFusingError
+        manifest_fusing_base_module_excluded = 4;
+    ManifestModuleFusingConfigurationMissingError
+        manifest_fusing_configuration_missing = 5;
     ManifestFusingMissingIncludeAttributeError
         manifest_fusing_missing_include_attribute = 21;
 
     ManifestMaxSdkInvalidError manifest_max_sdk_invalid = 22;
-    ManifestMaxSdkLessThanMinInstantSdkError manifest_max_sdk_less_than_min_instant_sdk = 23;
+    ManifestMaxSdkLessThanMinInstantSdkError
+        manifest_max_sdk_less_than_min_instant_sdk = 23;
     ManifestMinSdkInvalidError manifest_min_sdk_invalid = 19;
     ManifestMinSdkGreaterThanMaxSdkError manifest_min_sdk_greater_than_max = 20;
     ManifestDuplicateAttributeError manifest_duplicate_attribute = 25;
@@ -53,6 +63,22 @@ message BundleToolError {
     ResourceTableUnreferencedFilesError resouce_table_unreferenced_files = 17;
     ResourceTableMissingError resource_table_missing = 24;
   }
+
+  enum ErrorType {
+    UNDEFINED = 0;
+    // Indicates invalid bundle.
+    INVALID_BUNDLE_ERROR = 1;
+    // Indicates bundle with invalid version code in AndroidManifest.xml.
+    INVALID_VERSION_CODE_ERROR = 2;
+    // Indicates that command is incompatible with requested device.
+    INCOMPATIBLE_DEVICE_ERROR = 3;
+    // Indicates invalid device spec provided to command.
+    INVALID_DEVICE_SPEC_ERROR = 4;
+    // Indicates that command is invalid, like options mismatch.
+    INVALID_COMMAND_ERROR = 5;
+    // Indicates that something happened during command execution.
+    COMMAND_EXECUTION_ERROR = 6;
+  }
 }
 
 message ManifestMaxSdkInvalidError {
@@ -72,14 +98,11 @@ message ManifestMinSdkGreaterThanMaxSdkError {
   int32 max_sdk = 2;
 }
 
-message ManifestMissingVersionCodeError {
-}
+message ManifestMissingVersionCodeError {}
 
-message ManifestInvalidVersionCodeError {
-}
+message ManifestInvalidVersionCodeError {}
 
-message ManifestBaseModuleExcludedFromFusingError {
-}
+message ManifestBaseModuleExcludedFromFusingError {}
 
 message ManifestModuleFusingConfigurationMissingError {
   string module_name = 1;

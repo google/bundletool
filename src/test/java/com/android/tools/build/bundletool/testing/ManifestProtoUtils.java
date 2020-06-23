@@ -420,13 +420,13 @@ public final class ManifestProtoUtils {
             .getOrCreateChildElement(DISTRIBUTION_NAMESPACE_URI, "delivery");
   }
 
-  public static ManifestMutator withInstallTimePermanentElement(boolean value) {
+  public static ManifestMutator withInstallTimeRemovableElement(boolean value) {
     return manifestElement ->
         manifestElement
             .getOrCreateChildElement(DISTRIBUTION_NAMESPACE_URI, "module")
             .getOrCreateChildElement(DISTRIBUTION_NAMESPACE_URI, "delivery")
             .getOrCreateChildElement(DISTRIBUTION_NAMESPACE_URI, "install-time")
-            .getOrCreateChildElement(DISTRIBUTION_NAMESPACE_URI, "permanent")
+            .getOrCreateChildElement(DISTRIBUTION_NAMESPACE_URI, "removable")
             .getOrCreateAttribute(DISTRIBUTION_NAMESPACE_URI, "value")
             .setValueAsBoolean(value);
   }

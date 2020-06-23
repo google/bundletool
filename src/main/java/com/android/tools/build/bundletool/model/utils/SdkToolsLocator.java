@@ -104,9 +104,14 @@ public final class SdkToolsLocator {
         }
       }
     } catch (NoSuchElementException e) {
-      throw new CommandExecutionException("Unable to locate aapt2 inside jar.", e);
+      throw CommandExecutionException.builder()
+          .withInternalMessage("Unable to locate aapt2 inside jar.")
+          .build();
     } catch (IOException | URISyntaxException e) {
-      throw new CommandExecutionException("Unable to extract aapt2 from jar.", e);
+      throw CommandExecutionException.builder()
+          .withInternalMessage("Unable to extract aapt2 from jar.")
+          .withCause(e)
+          .build();
     }
 
     // Sanity check.
@@ -116,10 +121,12 @@ public final class SdkToolsLocator {
     try {
       aapt2.toFile().setExecutable(true);
     } catch (SecurityException e) {
-      throw new CommandExecutionException(
-          "Unable to make aapt2 executable. This may be a permission issue. If it persists, "
-              + "consider passing the path to aapt2 using the flag --aapt2.",
-          e);
+      throw CommandExecutionException.builder()
+          .withInternalMessage(
+              "Unable to make aapt2 executable. This may be a permission issue. If it persists, "
+                  + "consider passing the path to aapt2 using the flag --aapt2.")
+          .withCause(e)
+          .build();
     }
 
     return Optional.of(aapt2);
@@ -218,7 +225,7 @@ public final class SdkToolsLocator {
     } catch (IOException e) {
       throw CommandExecutionException.builder()
           .withCause(e)
-          .withMessage("Error while trying to locate adb in SDK dir '%s'.", sdkDir)
+          .withInternalMessage("Error while trying to locate adb in SDK dir '%s'.", sdkDir)
           .build();
     }
   }
@@ -254,7 +261,7 @@ public final class SdkToolsLocator {
       } catch (IOException e) {
         throw CommandExecutionException.builder()
             .withCause(e)
-            .withMessage(
+            .withInternalMessage(
                 "Error while trying to locate adb on system PATH in directory '%s'.", pathDir)
             .build();
       }

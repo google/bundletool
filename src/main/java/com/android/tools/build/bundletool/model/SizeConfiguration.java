@@ -25,6 +25,8 @@ import com.android.bundle.Targeting.LanguageTargeting;
 import com.android.bundle.Targeting.ScreenDensity;
 import com.android.bundle.Targeting.ScreenDensityTargeting;
 import com.android.bundle.Targeting.SdkVersionTargeting;
+import com.android.bundle.Targeting.TextureCompressionFormatTargeting;
+import com.android.tools.build.bundletool.model.utils.TextureCompressionUtils;
 import com.google.auto.value.AutoValue;
 import com.google.common.collect.Iterables;
 import com.google.errorprone.annotations.Immutable;
@@ -46,6 +48,8 @@ public abstract class SizeConfiguration {
   public abstract Optional<String> getScreenDensity();
 
   public abstract Optional<String> getSdkVersion();
+
+  public abstract Optional<String> getTextureCompressionFormat();
 
   public abstract Builder toBuilder();
 
@@ -95,6 +99,16 @@ public abstract class SizeConfiguration {
             : Integer.toString(screenDensity.getDensityDpi()));
   }
 
+  public static Optional<String> getTextureCompressionFormatName(
+      TextureCompressionFormatTargeting textureCompressionFormatTargeting) {
+    if (textureCompressionFormatTargeting.getValueList().isEmpty()) {
+      return Optional.empty();
+    }
+    return Optional.of(
+        TextureCompressionUtils.TARGETING_TO_TEXTURE.get(
+            Iterables.getOnlyElement(textureCompressionFormatTargeting.getValueList()).getAlias()));
+  }
+
   /** Builder for the {@link SizeConfiguration}. */
   @AutoValue.Builder
   public abstract static class Builder {
@@ -105,6 +119,8 @@ public abstract class SizeConfiguration {
     public abstract Builder setScreenDensity(String screenDensity);
 
     public abstract Builder setSdkVersion(String sdkVersion);
+
+    public abstract Builder setTextureCompressionFormat(String textureCompressionFormat);
 
     public abstract SizeConfiguration build();
   }

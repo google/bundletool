@@ -18,9 +18,6 @@ package com.android.tools.build.bundletool.model.version;
 /** Features that are enabled only from a certain Bundletool version. */
 public enum VersionGuardedFeature {
 
-  /** ABI sanitizer no longer applied. */
-  ABI_SANITIZER_DISABLED("0.3.1"),
-
   /** The namespace on the "include" attribute in the AndroidManifest.xml is required. */
   NAMESPACE_ON_INCLUDE_ATTRIBUTE_REQUIRED("0.3.4"),
 

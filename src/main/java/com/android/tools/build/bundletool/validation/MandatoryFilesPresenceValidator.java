@@ -22,8 +22,7 @@ import static com.google.common.collect.ImmutableSet.toImmutableSet;
 import com.android.tools.build.bundletool.model.AppBundle;
 import com.android.tools.build.bundletool.model.BundleModule.SpecialModuleEntry;
 import com.android.tools.build.bundletool.model.ZipPath;
-import com.android.tools.build.bundletool.model.exceptions.BundleFileTypesException.MandatoryBundleFileMissingException;
-import com.android.tools.build.bundletool.model.exceptions.BundleFileTypesException.MandatoryModuleFileMissingException;
+import com.android.tools.build.bundletool.model.exceptions.InvalidBundleException;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.io.Files;
 import java.util.Collections;
@@ -64,8 +63,11 @@ public class MandatoryFilesPresenceValidator extends SubValidator {
 
   private static void checkBundleHasBundleConfig(ZipFile bundleFile) {
     if (bundleFile.getEntry(AppBundle.BUNDLE_CONFIG_FILE_NAME) == null) {
-      throw new MandatoryBundleFileMissingException(
-          ZipPath.create(AppBundle.BUNDLE_CONFIG_FILE_NAME));
+      throw InvalidBundleException.builder()
+          .withUserMessage(
+              "The archive doesn't seem to be an App Bundle, it is missing required file '%s'.",
+              AppBundle.BUNDLE_CONFIG_FILE_NAME)
+          .build();
     }
   }
 
@@ -76,8 +78,11 @@ public class MandatoryFilesPresenceValidator extends SubValidator {
         moduleBaseDir.resolve(SpecialModuleEntry.ANDROID_MANIFEST.getPath());
 
     if (zipFile.getEntry(moduleManifestPath.toString()) == null) {
-      throw new MandatoryModuleFileMissingException(
-          moduleName, SpecialModuleEntry.ANDROID_MANIFEST.getPath());
+      throw InvalidBundleException.builder()
+          .withUserMessage(
+              "Module '%s' is missing mandatory file '%s'.",
+              moduleName, SpecialModuleEntry.ANDROID_MANIFEST.getPath())
+          .build();
     }
   }
 }

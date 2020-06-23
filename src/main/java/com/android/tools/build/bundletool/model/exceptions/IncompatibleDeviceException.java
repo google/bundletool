@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2019 The Android Open Source Project
+ * Copyright (C) 2020 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,15 +13,18 @@
  * See the License for the specific language governing permissions and
  * limitations under the License
  */
-
 package com.android.tools.build.bundletool.model.exceptions;
 
-import java.util.zip.ZipException;
+import com.android.bundle.Errors.BundleToolError.ErrorType;
 
-/** Thrown when bundletool validation detects that the bundle is not in the valid zip format */
-public class BundleInvalidZipException extends ValidationException {
+/** Indicates that command is incompatible with requested device. */
+public class IncompatibleDeviceException extends BundleToolException {
 
-  public BundleInvalidZipException(ZipException cause) {
-    super("Bundle is not a valid zip file", cause);
+  private IncompatibleDeviceException(String userMessage, String internalMessage, Throwable cause) {
+    super(ErrorType.INCOMPATIBLE_DEVICE_ERROR, userMessage, internalMessage, cause);
+  }
+
+  public static UserExceptionBuilder<IncompatibleDeviceException> builder() {
+    return new UserExceptionBuilder<>(IncompatibleDeviceException::new);
   }
 }

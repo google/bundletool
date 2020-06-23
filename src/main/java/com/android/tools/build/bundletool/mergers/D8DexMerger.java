@@ -90,12 +90,17 @@ public class D8DexMerger implements DexMerger {
     // the time of writing this code it is suppressed exception of the root cause.
     if (ThrowableUtils.anyInCausalChainOrSuppressedMatches(
         d8Exception, t -> t.getMessage() != null && t.getMessage().contains(DEX_OVERFLOW_MSG))) {
-      return new CommandExecutionException(
-          "Dex merging failed because the result does not fit into a single dex file and"
-              + " multidex is not supported by the input.",
-          d8Exception);
+      return CommandExecutionException.builder()
+          .withInternalMessage(
+              "Dex merging failed because the result does not fit into a single dex file and"
+                  + " multidex is not supported by the input.")
+          .withCause(d8Exception)
+          .build();
     } else {
-      return new CommandExecutionException("Dex merging failed.", d8Exception);
+      return CommandExecutionException.builder()
+          .withInternalMessage("Dex merging failed.")
+          .withCause(d8Exception)
+          .build();
     }
   }
 }

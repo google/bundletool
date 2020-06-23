@@ -31,14 +31,7 @@ import static com.google.common.collect.ImmutableSet.toImmutableSet;
 import com.android.tools.build.bundletool.model.AbiName;
 import com.android.tools.build.bundletool.model.BundleModule.SpecialModuleEntry;
 import com.android.tools.build.bundletool.model.ZipPath;
-import com.android.tools.build.bundletool.model.exceptions.BundleFileTypesException.FileUsesReservedNameException;
-import com.android.tools.build.bundletool.model.exceptions.BundleFileTypesException.InvalidApexImagePathException;
-import com.android.tools.build.bundletool.model.exceptions.BundleFileTypesException.InvalidFileExtensionInDirectoryException;
-import com.android.tools.build.bundletool.model.exceptions.BundleFileTypesException.InvalidFileNameInDirectoryException;
-import com.android.tools.build.bundletool.model.exceptions.BundleFileTypesException.InvalidNativeArchitectureNameException;
-import com.android.tools.build.bundletool.model.exceptions.BundleFileTypesException.InvalidNativeLibraryPathException;
-import com.android.tools.build.bundletool.model.exceptions.BundleFileTypesException.UnknownFileOrDirectoryFoundInModuleException;
-import com.android.tools.build.bundletool.model.exceptions.ValidationException;
+import com.android.tools.build.bundletool.model.exceptions.InvalidBundleException;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import java.util.Optional;
@@ -73,39 +66,57 @@ public class BundleFilesValidator extends SubValidator {
 
     } else if (file.startsWith(DEX_DIRECTORY)) {
       if (!fileName.endsWith(".dex")) {
-        throw new InvalidFileExtensionInDirectoryException(DEX_DIRECTORY, ".dex", file);
+        throw InvalidBundleException.builder()
+            .withUserMessage(
+                "Files under %s/ must have %s extension, found '%s'.", DEX_DIRECTORY, ".dex", file)
+            .build();
       }
       if (!CLASSES_DEX_PATTERN.matcher(fileName).matches()) {
-        throw ValidationException.builder()
-            .withMessage(
+        throw InvalidBundleException.builder()
+            .withUserMessage(
                 "Files under %s/ must match the 'classes[0-9]*.dex' pattern, found '%s'.",
                 DEX_DIRECTORY, file)
             .build();
       }
       if (file.getNameCount() != 2) {
-        throw ValidationException.builder()
-            .withMessage(
+        throw InvalidBundleException.builder()
+            .withUserMessage(
                 "The %s/ directory cannot contain directories, found '%s'.", DEX_DIRECTORY, file)
             .build();
       }
     } else if (file.startsWith(LIB_DIRECTORY)) {
       if (file.getNameCount() != 3) {
-        throw new InvalidNativeLibraryPathException(LIB_DIRECTORY, file);
+        throw InvalidBundleException.builder()
+            .withUserMessage(
+                "Native library files need to have paths in form '%s/<single-directory>/<file>.so'"
+                    + " but found '%s'.",
+                LIB_DIRECTORY, file)
+            .build();
       }
 
       // See https://developer.android.com/ndk/guides/wrap-script#packaging_wrapsh
       if (!fileName.endsWith(".so") && !fileName.equals("wrap.sh")) {
-        throw new InvalidFileExtensionInDirectoryException(LIB_DIRECTORY, ".so", file);
+        throw InvalidBundleException.builder()
+            .withUserMessage(
+                "Files under %s/ must have %s extension, found '%s'.", LIB_DIRECTORY, ".so", file)
+            .build();
       }
 
       String subDirName = file.getName(1).toString();
       if (!AbiName.fromLibSubDirName(subDirName).isPresent()) {
-        throw InvalidNativeArchitectureNameException.createForDirectory(file.subpath(0, 2));
+        throw InvalidBundleException.builder()
+            .withUserMessage(
+                "Unrecognized native architecture for directory '%s'.", file.subpath(0, 2))
+            .build();
       }
 
     } else if (file.startsWith(MANIFEST_DIRECTORY)) {
       if (!fileName.equals("AndroidManifest.xml")) {
-        throw new InvalidFileNameInDirectoryException(MANIFEST_FILENAME, MANIFEST_DIRECTORY, file);
+        throw InvalidBundleException.builder()
+            .withUserMessage(
+                "Only '%s' is accepted under directory '%s/' but found file '%s'.",
+                MANIFEST_FILENAME, MANIFEST_DIRECTORY, file)
+            .build();
       }
 
     } else if (file.startsWith(RESOURCES_DIRECTORY)) {
@@ -114,22 +125,35 @@ public class BundleFilesValidator extends SubValidator {
     } else if (file.startsWith(ROOT_DIRECTORY)) {
       ZipPath nameUnderRoot = file.getName(1);
       if (isReservedRootApkEntry(nameUnderRoot)) {
-        throw new FileUsesReservedNameException(file, nameUnderRoot);
+        throw InvalidBundleException.builder()
+            .withUserMessage(
+                "File '%s' uses reserved file or directory name '%s'.", file, nameUnderRoot)
+            .build();
       }
 
     } else if (file.startsWith(APEX_DIRECTORY)) {
       if (file.getNameCount() != 2) {
-        throw new InvalidApexImagePathException(APEX_DIRECTORY, file);
+        throw InvalidBundleException.builder()
+            .withUserMessage(
+                "APEX image files need to have paths in form '%s/<file>.img' but found '%s'.",
+                APEX_DIRECTORY, file)
+            .build();
       }
 
       if (!fileName.endsWith(".img") && !fileName.endsWith(".build_info.pb")) {
-        throw new InvalidFileExtensionInDirectoryException(APEX_DIRECTORY, ".img", file);
+        throw InvalidBundleException.builder()
+            .withUserMessage(
+                "Files under %s/ must have %s extension, found '%s'.", APEX_DIRECTORY, ".img", file)
+            .build();
       }
 
       validateMultiAbiFileName(file);
 
     } else {
-      throw new UnknownFileOrDirectoryFoundInModuleException(file);
+      throw InvalidBundleException.builder()
+          .withUserMessage(
+              "Module files can be only in pre-defined directories, but found '%s'.", file)
+          .build();
     }
   }
 
@@ -150,13 +174,15 @@ public class BundleFilesValidator extends SubValidator {
         // Do not include the suffix "img".
         tokens.stream().limit(nAbis).map(AbiName::fromPlatformName).collect(toImmutableList());
     if (!abis.stream().allMatch(Optional::isPresent)) {
-      throw InvalidNativeArchitectureNameException.createForFile(file);
+      throw InvalidBundleException.builder()
+          .withUserMessage("Unrecognized native architecture for file '%s'.", file)
+          .build();
     }
 
     ImmutableSet<AbiName> uniqueAbis = abis.stream().map(Optional::get).collect(toImmutableSet());
     if (uniqueAbis.size() != nAbis) {
-      throw ValidationException.builder()
-          .withMessage("Repeating architectures in APEX system image file '%s'.", file)
+      throw InvalidBundleException.builder()
+          .withUserMessage("Repeating architectures in APEX system image file '%s'.", file)
           .build();
     }
   }

@@ -16,14 +16,15 @@
 package com.android.tools.build.bundletool.model;
 
 import com.android.tools.build.bundletool.model.BundleModule.SpecialModuleEntry;
-import com.android.tools.build.bundletool.model.utils.files.FileUtils;
 import com.google.auto.value.AutoValue;
 import com.google.common.io.ByteSource;
+import com.google.common.io.Files;
+import com.google.common.io.MoreFiles;
 import com.google.errorprone.annotations.Immutable;
-import com.google.errorprone.annotations.MustBeClosed;
+import java.io.File;
 import java.io.IOException;
-import java.io.InputStream;
 import java.io.UncheckedIOException;
+import java.nio.file.Path;
 import java.util.Objects;
 
 /**
@@ -35,17 +36,8 @@ import java.util.Objects;
 @Immutable
 @AutoValue
 @AutoValue.CopyAnnotations
+@SuppressWarnings("Immutable")
 public abstract class ModuleEntry {
-
-  /** Returns the content of the entry as a stream of bytes. */
-  @MustBeClosed
-  public final InputStream getContent() {
-    try {
-      return getContentSupplier().get();
-    } catch (IOException e) {
-      throw new UncheckedIOException(e);
-    }
-  }
 
   /** Path of the entry inside the module. */
   public abstract ZipPath getPath();
@@ -57,10 +49,18 @@ public abstract class ModuleEntry {
   public abstract boolean getShouldSign();
 
   /** Returns data source for this entry. */
-  public abstract InputStreamSupplier getContentSupplier();
+  public abstract ByteSource getContent();
 
+  /** @deprecated Use {@link #getContent()} instead. */
+  @Deprecated
+  public InputStreamSupplier getContentSupplier() {
+    return InputStreamSupplier.fromByteSource(getContent());
+  }
+
+  /** @deprecated Use {@link #getContent()} instead. */
+  @Deprecated
   public ByteSource asByteSource() {
-    return getContentSupplier().asByteSource();
+    return getContent();
   }
 
   /** Checks whether the given entries are identical. */
@@ -89,9 +89,8 @@ public abstract class ModuleEntry {
       return false;
     }
 
-    try (InputStream inputStream1 = entry1.getContent();
-        InputStream inputStream2 = entry2.getContent()) {
-      return FileUtils.equalContent(inputStream1, inputStream2);
+    try {
+      return entry1.getContent().contentEquals(entry2.getContent());
     } catch (IOException e) {
       throw new UncheckedIOException(
           String.format(
@@ -125,14 +124,21 @@ public abstract class ModuleEntry {
 
     public abstract Builder setShouldSign(boolean shouldSign);
 
-    /**
-     * Sets the data source for this entry.
-     *
-     * <p>Strongly consider a {@link java.io.BufferedInputStream} for efficiency.
-     *
-     * @see InputStreamSuppliers
-     */
-    public abstract Builder setContentSupplier(InputStreamSupplier contentSupplier);
+    public abstract Builder setContent(ByteSource content);
+
+    public Builder setContent(Path path) {
+      return setContent(MoreFiles.asByteSource(path));
+    }
+
+    public Builder setContent(File file) {
+      return setContent(Files.asByteSource(file));
+    }
+
+    /** @deprecated Use {@link #setContent(ByteSource)} instead. */
+    @Deprecated
+    public Builder setContentSupplier(InputStreamSupplier contentSupplier) {
+      return setContent(contentSupplier.asByteSource());
+    }
 
     public abstract ModuleEntry build();
   }

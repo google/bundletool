@@ -239,9 +239,11 @@ public abstract class InstallApksCommand {
   private void pushSplits(ImmutableList<Path> splits, BuildApksResult toc, AdbRunner adbRunner) {
     String packageName = toc.getPackageName();
     if (packageName.isEmpty()) {
-      throw new CommandExecutionException(
-          "Unable to determine the package name of the base APK. If your APK set was produced"
-              + " using an older version of bundletool, please regenerate it.");
+      throw CommandExecutionException.builder()
+          .withInternalMessage(
+              "Unable to determine the package name of the base APK. If your APK set was produced"
+                  + " using an older version of bundletool, please regenerate it.")
+          .build();
     }
     Device.PushOptions.Builder pushOptions =
         Device.PushOptions.builder()

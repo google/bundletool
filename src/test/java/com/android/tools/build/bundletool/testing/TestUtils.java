@@ -21,15 +21,10 @@ import static com.google.common.truth.Truth.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.android.tools.build.bundletool.flags.Flag.RequiredFlagNotSetException;
-import com.android.tools.build.bundletool.model.InputStreamSupplier;
-import com.android.tools.build.bundletool.model.InputStreamSuppliers;
 import com.android.tools.build.bundletool.model.ModuleEntry;
 import com.android.tools.build.bundletool.model.ZipPath;
 import com.google.common.collect.ImmutableList;
-import com.google.common.io.ByteStreams;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.UncheckedIOException;
+import com.google.common.io.ByteSource;
 import java.util.stream.Stream;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
@@ -82,22 +77,10 @@ public final class TestUtils {
         .collect(toImmutableList());
   }
 
-  public static byte[] getEntryContent(ModuleEntry entry) {
-    return toByteArray(entry.getContentSupplier());
-  }
-
   public static ModuleEntry createModuleEntryForFile(String filePath, byte[] content) {
     return ModuleEntry.builder()
         .setPath(ZipPath.create(filePath))
-        .setContentSupplier(InputStreamSuppliers.fromBytes(content))
+        .setContent(ByteSource.wrap(content))
         .build();
-  }
-
-  public static byte[] toByteArray(InputStreamSupplier inputStreamSupplier) {
-    try (InputStream entryContent = inputStreamSupplier.get()) {
-      return ByteStreams.toByteArray(entryContent);
-    } catch (IOException e) {
-      throw new UncheckedIOException(e);
-    }
   }
 }

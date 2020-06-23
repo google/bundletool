@@ -27,6 +27,7 @@ import static com.android.tools.build.bundletool.model.BundleModule.APEX_MANIFES
 import static com.android.tools.build.bundletool.model.BundleModule.APEX_NOTICE_PATH;
 import static com.android.tools.build.bundletool.model.BundleModule.APEX_PUBKEY_PATH;
 import static com.google.common.collect.ImmutableSet.toImmutableSet;
+import static java.nio.charset.StandardCharsets.UTF_8;
 
 import com.android.apex.ApexManifestProto.ApexManifest;
 import com.android.bundle.Files.ApexImages;
@@ -35,8 +36,7 @@ import com.android.tools.build.bundletool.model.AbiName;
 import com.android.tools.build.bundletool.model.BundleModule;
 import com.android.tools.build.bundletool.model.ModuleEntry;
 import com.android.tools.build.bundletool.model.ZipPath;
-import com.android.tools.build.bundletool.model.exceptions.ValidationException;
-import com.android.tools.build.bundletool.model.utils.files.BufferedIo;
+import com.android.tools.build.bundletool.model.exceptions.InvalidBundleException;
 import com.google.common.base.Joiner;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
@@ -78,14 +78,14 @@ public class ApexBundleValidator extends SubValidator {
     }
 
     if (numberOfApexModules > 1) {
-      throw ValidationException.builder()
-          .withMessage("Multiple APEX modules are not allowed, found %d.", numberOfApexModules)
+      throw InvalidBundleException.builder()
+          .withUserMessage("Multiple APEX modules are not allowed, found %d.", numberOfApexModules)
           .build();
     }
 
     if (modules.size() > 1) {
-      throw ValidationException.builder()
-          .withMessage("APEX bundles must only contain one module, found %d.", modules.size())
+      throw InvalidBundleException.builder()
+          .withUserMessage("APEX bundles must only contain one module, found %d.", modules.size())
           .build();
     }
   }
@@ -102,8 +102,8 @@ public class ApexBundleValidator extends SubValidator {
     } else {
       apexManifest = module.getEntry(APEX_MANIFEST_JSON_PATH);
       if (!apexManifest.isPresent()) {
-        throw ValidationException.builder()
-            .withMessage(
+        throw InvalidBundleException.builder()
+            .withUserMessage(
                 "Missing expected file in APEX bundle: '%s' or '%s'.",
                 APEX_MANIFEST_PATH, APEX_MANIFEST_JSON_PATH)
             .build();
@@ -123,13 +123,14 @@ public class ApexBundleValidator extends SubValidator {
         } else if (path.getFileName().toString().endsWith(BundleModule.BUILD_INFO_SUFFIX)) {
           apexBuildInfosBuilder.add(path.toString());
         } else {
-          throw ValidationException.builder()
-              .withMessage("Unexpected file in apex dirctory of bundle: '%s'.", entry.getPath())
+          throw InvalidBundleException.builder()
+              .withUserMessage(
+                  "Unexpected file in apex directory of bundle: '%s'.", entry.getPath())
               .build();
         }
       } else if (!ALLOWED_APEX_FILES_OUTSIDE_APEX_DIRECTORY.contains(path)) {
-        throw ValidationException.builder()
-            .withMessage("Unexpected file in APEX bundle: '%s'.", entry.getPath())
+        throw InvalidBundleException.builder()
+            .withUserMessage("Unexpected file in APEX bundle: '%s'.", entry.getPath())
             .build();
       }
     }
@@ -141,8 +142,8 @@ public class ApexBundleValidator extends SubValidator {
             .map(ApexBundleValidator::abiNamesFromFile)
             .collect(toImmutableSet());
     if (allAbiNameSets.size() != apexImages.size()) {
-      throw ValidationException.builder()
-          .withMessage(
+      throw InvalidBundleException.builder()
+          .withUserMessage(
               "Every APEX image file must target a unique set of architectures, "
                   + "but found multiple files that target the same set of architectures.")
           .build();
@@ -153,16 +154,16 @@ public class ApexBundleValidator extends SubValidator {
             .map(f -> f.replace(BundleModule.BUILD_INFO_SUFFIX, BundleModule.APEX_IMAGE_SUFFIX))
             .collect(toImmutableSet())
             .equals(apexImages)) {
-      throw ValidationException.builder()
-          .withMessage(
+      throw InvalidBundleException.builder()
+          .withUserMessage(
               "If APEX build info is provided then one must be provided for each APEX image file.")
           .build();
     }
 
     if (REQUIRED_ONE_OF_ABI_SETS.stream()
         .anyMatch(one_of -> one_of.stream().noneMatch(allAbiNameSets::contains))) {
-      throw ValidationException.builder()
-          .withMessage(
+      throw InvalidBundleException.builder()
+          .withUserMessage(
               "APEX bundle must contain one of %s.",
               Joiner.on(" and one of ").join(REQUIRED_ONE_OF_ABI_SETS))
           .build();
@@ -190,32 +191,32 @@ public class ApexBundleValidator extends SubValidator {
     ImmutableSet<String> untargetedImages =
         Sets.difference(allImages, targetedImages).immutableCopy();
     if (!untargetedImages.isEmpty()) {
-      throw ValidationException.builder()
-          .withMessage("Found APEX image files that are not targeted: %s", untargetedImages)
+      throw InvalidBundleException.builder()
+          .withUserMessage("Found APEX image files that are not targeted: %s", untargetedImages)
           .build();
     }
 
     ImmutableSet<String> missingTargetedImages =
         Sets.difference(targetedImages, allImages).immutableCopy();
     if (!missingTargetedImages.isEmpty()) {
-      throw ValidationException.builder()
-          .withMessage("Targeted APEX image files are missing: %s", missingTargetedImages)
+      throw InvalidBundleException.builder()
+          .withUserMessage("Targeted APEX image files are missing: %s", missingTargetedImages)
           .build();
     }
   }
 
   private static void validateApexManifest(ModuleEntry entry) {
-    try (InputStream inputStream = entry.getContent()) {
+    try (InputStream inputStream = entry.getContent().openStream()) {
       ApexManifest apexManifest =
           ApexManifest.parseFrom(inputStream, ExtensionRegistry.getEmptyRegistry());
       if (apexManifest.getName().isEmpty()) {
-        throw ValidationException.builder()
-            .withMessage("APEX manifest must have a package name.")
+        throw InvalidBundleException.builder()
+            .withUserMessage("APEX manifest must have a package name.")
             .build();
       }
     } catch (InvalidProtocolBufferException e) {
-      throw ValidationException.builder()
-          .withMessage("Couldn't parse APEX manifest")
+      throw InvalidBundleException.builder()
+          .withUserMessage("Couldn't parse APEX manifest")
           .withCause(e)
           .build();
     } catch (IOException e) {
@@ -224,13 +225,12 @@ public class ApexBundleValidator extends SubValidator {
   }
 
   private static void validateApexManifestJson(ModuleEntry entry) {
-    try (InputStream inputStream = entry.getContent();
-        BufferedReader reader = BufferedIo.reader(inputStream)) {
+    try (BufferedReader reader = entry.getContent().asCharSource(UTF_8).openBufferedStream()) {
       JsonObject json = new JsonParser().parse(reader).getAsJsonObject();
       JsonElement element = json.get("name");
       if (element == null || element.getAsString().isEmpty()) {
-        throw ValidationException.builder()
-            .withMessage("APEX manifest must have a package name.")
+        throw InvalidBundleException.builder()
+            .withUserMessage("APEX manifest must have a package name.")
             .build();
       }
     } catch (IOException e) {

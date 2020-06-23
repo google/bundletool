@@ -31,8 +31,11 @@ import java.io.UncheckedIOException;
  * byte data.
  *
  * <p>All subclasses must be immutable, and return the same {@link InputStream} at each invocation.
+ *
+ * @deprecated All users should move over to use {@link ByteSource} exclusively.
  */
 @Immutable
+@Deprecated
 public final class InputStreamSupplier {
 
   private final SupplierWithIO<InputStream> inputSupplier;
@@ -46,6 +49,10 @@ public final class InputStreamSupplier {
 
   public InputStreamSupplier(SupplierWithIO<InputStream> inputSupplier, long size) {
     this(inputSupplier, () -> size);
+  }
+
+  public static InputStreamSupplier fromByteSource(ByteSource content) {
+    return new InputStreamSupplier(content::openStream, content::size);
   }
 
   @MustBeClosed

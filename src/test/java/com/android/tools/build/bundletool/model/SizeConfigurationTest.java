@@ -21,15 +21,20 @@ import static com.android.bundle.Targeting.Abi.AbiAlias.X86;
 import static com.android.bundle.Targeting.Abi.AbiAlias.X86_64;
 import static com.android.bundle.Targeting.ScreenDensity.DensityAlias.HDPI;
 import static com.android.bundle.Targeting.ScreenDensity.DensityAlias.LDPI;
+import static com.android.bundle.Targeting.TextureCompressionFormat.TextureCompressionFormatAlias.ASTC;
+import static com.android.bundle.Targeting.TextureCompressionFormat.TextureCompressionFormatAlias.ETC2;
+import static com.android.bundle.Targeting.TextureCompressionFormat.TextureCompressionFormatAlias.PVRTC;
 import static com.android.tools.build.bundletool.model.SizeConfiguration.getAbiName;
 import static com.android.tools.build.bundletool.model.SizeConfiguration.getLocaleName;
 import static com.android.tools.build.bundletool.model.SizeConfiguration.getScreenDensityName;
 import static com.android.tools.build.bundletool.model.SizeConfiguration.getSdkName;
+import static com.android.tools.build.bundletool.model.SizeConfiguration.getTextureCompressionFormatName;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.abiTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.languageTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.screenDensityTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.sdkVersionFrom;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.sdkVersionTargeting;
+import static com.android.tools.build.bundletool.testing.TargetingUtils.textureCompressionTargeting;
 import static com.google.common.truth.Truth8.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
@@ -37,6 +42,7 @@ import com.android.bundle.Targeting.AbiTargeting;
 import com.android.bundle.Targeting.LanguageTargeting;
 import com.android.bundle.Targeting.ScreenDensityTargeting;
 import com.android.bundle.Targeting.SdkVersionTargeting;
+import com.android.bundle.Targeting.TextureCompressionFormatTargeting;
 import com.google.common.collect.ImmutableSet;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -114,5 +120,29 @@ public class SizeConfigurationTest {
         () ->
             getScreenDensityName(
                 screenDensityTargeting(ImmutableSet.of(HDPI, LDPI), ImmutableSet.of())));
+  }
+
+  @Test
+  public void getAbi_defaultTextureCompressionFormatTargeting() {
+    assertThat(
+            getTextureCompressionFormatName(TextureCompressionFormatTargeting.getDefaultInstance()))
+        .isEmpty();
+  }
+
+  @Test
+  public void getTextureCompressionFormat_singleTextureCompressionFormatTargeting() {
+    assertThat(getTextureCompressionFormatName(textureCompressionTargeting(ASTC))).hasValue("astc");
+    assertThat(getTextureCompressionFormatName(textureCompressionTargeting(ETC2))).hasValue("etc2");
+    assertThat(getTextureCompressionFormatName(textureCompressionTargeting(PVRTC)))
+        .hasValue("pvrtc");
+  }
+
+  @Test
+  public void getTextureCompressionFormat_multipleTextureCompressionFormatTargeting_throws() {
+    assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            getTextureCompressionFormatName(
+                textureCompressionTargeting(ImmutableSet.of(ASTC, ETC2), ImmutableSet.of())));
   }
 }

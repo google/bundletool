@@ -78,7 +78,9 @@ public class DdmlibAdbServer extends AdbServer {
     this.adb = AndroidDebugBridge.createBridge(pathToAdb.toString(), /* forceNewBridge= */ false);
 
     if (adb == null) {
-      throw new CommandExecutionException("Failed to start ADB server.");
+      throw CommandExecutionException.builder()
+          .withInternalMessage("Failed to start ADB server.")
+          .build();
     }
 
     this.pathToAdb = pathToAdb;

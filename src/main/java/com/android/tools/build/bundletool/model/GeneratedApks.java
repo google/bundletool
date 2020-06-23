@@ -16,17 +16,16 @@
 
 package com.android.tools.build.bundletool.model;
 
+import static com.android.tools.build.bundletool.model.utils.CollectorUtils.groupingByDeterministic;
 import static com.android.tools.build.bundletool.model.utils.CollectorUtils.groupingBySortedKeys;
-import static com.google.common.collect.ImmutableList.toImmutableList;
-import static java.util.stream.Collectors.groupingBy;
 
 import com.android.tools.build.bundletool.model.ModuleSplit.SplitType;
 import com.google.auto.value.AutoValue;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableListMultimap;
+import com.google.common.collect.ImmutableMap;
 import com.google.errorprone.annotations.Immutable;
 import java.util.List;
-import java.util.Map;
 import java.util.function.Function;
 import java.util.stream.Stream;
 
@@ -72,8 +71,8 @@ public abstract class GeneratedApks {
 
   /** Creates a GeneratedApk instance from a list of module splits. */
   public static GeneratedApks fromModuleSplits(ImmutableList<ModuleSplit> moduleSplits) {
-    Map<SplitType, ImmutableList<ModuleSplit>> groups =
-        moduleSplits.stream().collect(groupingBy(ModuleSplit::getSplitType, toImmutableList()));
+    ImmutableMap<SplitType, ImmutableList<ModuleSplit>> groups =
+        moduleSplits.stream().collect(groupingByDeterministic(ModuleSplit::getSplitType));
     return builder()
         .setInstantApks(groups.getOrDefault(SplitType.INSTANT, ImmutableList.of()))
         .setSplitApks(groups.getOrDefault(SplitType.SPLIT, ImmutableList.of()))

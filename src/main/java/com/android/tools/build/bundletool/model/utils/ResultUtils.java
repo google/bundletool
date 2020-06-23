@@ -25,13 +25,10 @@ import com.android.bundle.Commands.ApkSet;
 import com.android.bundle.Commands.BuildApksResult;
 import com.android.bundle.Commands.Variant;
 import com.android.tools.build.bundletool.model.BundleModuleName;
-import com.android.tools.build.bundletool.model.utils.files.BufferedIo;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Streams;
-import java.io.FileInputStream;
 import java.io.IOException;
-import java.io.InputStream;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -57,19 +54,16 @@ public final class ResultUtils {
 
   private static BuildApksResult readTableOfContentFromApksArchive(Path apksArchivePath)
       throws IOException {
-    try (ZipFile apksArchive = new ZipFile(apksArchivePath.toFile());
-        InputStream tocStream =
-            BufferedIo.inputStream(apksArchive, new ZipEntry(TABLE_OF_CONTENTS_FILE))) {
-      return BuildApksResult.parseFrom(tocStream);
+    try (ZipFile apksArchive = new ZipFile(apksArchivePath.toFile())) {
+      return BuildApksResult.parseFrom(
+          ZipUtils.asByteSource(apksArchive, new ZipEntry(TABLE_OF_CONTENTS_FILE)).read());
     }
   }
 
   private static BuildApksResult readTableOfContentFromApksDirectory(Path apksDirectoryPath)
       throws IOException {
-    try (FileInputStream fileInputStream =
-        new FileInputStream(apksDirectoryPath.resolve(TABLE_OF_CONTENTS_FILE).toFile())) {
-      return BuildApksResult.parseFrom(fileInputStream);
-    }
+    return BuildApksResult.parseFrom(
+        Files.readAllBytes(apksDirectoryPath.resolve(TABLE_OF_CONTENTS_FILE)));
   }
 
   public static ImmutableList<Variant> splitApkVariants(BuildApksResult result) {

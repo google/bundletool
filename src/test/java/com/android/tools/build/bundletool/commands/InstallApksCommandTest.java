@@ -58,7 +58,7 @@ import com.android.tools.build.bundletool.device.AdbServer;
 import com.android.tools.build.bundletool.flags.FlagParser;
 import com.android.tools.build.bundletool.model.ZipPath;
 import com.android.tools.build.bundletool.model.exceptions.CommandExecutionException;
-import com.android.tools.build.bundletool.model.exceptions.InstallationException;
+import com.android.tools.build.bundletool.model.exceptions.IncompatibleDeviceException;
 import com.android.tools.build.bundletool.model.utils.SystemEnvironmentProvider;
 import com.android.tools.build.bundletool.model.version.BundleToolVersion;
 import com.android.tools.build.bundletool.testing.FakeAdbServer;
@@ -361,7 +361,9 @@ public class InstallApksCommandTest {
         new FakeAdbServer(/* hasInitialDeviceList= */ true, ImmutableList.of(fakeDevice));
     fakeDevice.setInstallApksSideEffect(
         (apks, installOptions) -> {
-          throw InstallationException.builder().withMessage("Sample error message").build();
+          throw CommandExecutionException.builder()
+              .withInternalMessage("Sample error message")
+              .build();
         });
 
     InstallApksCommand command =
@@ -371,7 +373,7 @@ public class InstallApksCommandTest {
             .setAdbServer(adbServer)
             .build();
 
-    Throwable exception = assertThrows(InstallationException.class, () -> command.execute());
+    Throwable exception = assertThrows(CommandExecutionException.class, command::execute);
     assertThat(exception).hasMessageThat().contains("Sample error message");
   }
 
@@ -398,7 +400,7 @@ public class InstallApksCommandTest {
             .setAdbServer(adbServer)
             .build();
 
-    Throwable exception = assertThrows(CommandExecutionException.class, () -> command.execute());
+    Throwable exception = assertThrows(IncompatibleDeviceException.class, command::execute);
     assertThat(exception)
         .hasMessageThat()
         .contains("The app doesn't support SDK version of the device: (19).");
@@ -441,7 +443,7 @@ public class InstallApksCommandTest {
             .setAdbServer(adbServer)
             .build();
 
-    Throwable exception = assertThrows(CommandExecutionException.class, () -> command.execute());
+    Throwable exception = assertThrows(IncompatibleDeviceException.class, command::execute);
     assertThat(exception)
         .hasMessageThat()
         .contains(
@@ -849,10 +851,10 @@ public class InstallApksCommandTest {
                         splitApkDescription(
                             ApkTargeting.getDefaultInstance(), onDemandAssetMasterApk)))
             .setLocalTestingInfo(
-                        LocalTestingInfo.newBuilder()
-                            .setEnabled(true)
-                            .setLocalTestingPath("local_testing")
-            .build())
+                LocalTestingInfo.newBuilder()
+                    .setEnabled(true)
+                    .setLocalTestingPath("local_testing")
+                    .build())
             .build();
 
     Path apksFile = createApks(tableOfContent, apksInDirectory);
@@ -963,10 +965,10 @@ public class InstallApksCommandTest {
                         splitApkDescription(
                             ApkTargeting.getDefaultInstance(), onDemandAssetMasterApk)))
             .setLocalTestingInfo(
-                        LocalTestingInfo.newBuilder()
-                            .setEnabled(true)
-                            .setLocalTestingPath("local_testing")
-                            .build())
+                LocalTestingInfo.newBuilder()
+                    .setEnabled(true)
+                    .setLocalTestingPath("local_testing")
+                    .build())
             .build();
 
     Path apksFile = createApks(tableOfContent, apksInDirectory);

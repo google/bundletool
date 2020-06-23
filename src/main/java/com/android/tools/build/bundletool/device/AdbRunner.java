@@ -43,12 +43,13 @@ public class AdbRunner {
       run(deviceAction, Predicates.alwaysTrue());
     } catch (TooManyDevicesMatchedException e) {
       throw CommandExecutionException.builder()
-          .withMessage("Expected to find one connected device, but found %d.", e.getMatchedNumber())
+          .withInternalMessage(
+              "Expected to find one connected device, but found %d.", e.getMatchedNumber())
           .withCause(e)
           .build();
     } catch (DeviceNotFoundException e) {
       throw CommandExecutionException.builder()
-          .withMessage("Expected to find one connected device, but found none.")
+          .withInternalMessage("Expected to find one connected device, but found none.")
           .withCause(e)
           .build();
     }
@@ -60,7 +61,8 @@ public class AdbRunner {
       run(deviceAction, device -> device.getSerialNumber().equals(deviceId));
     } catch (DeviceNotFoundException e) {
       throw CommandExecutionException.builder()
-          .withMessage("Expected to find one connected device with serial number '%s'.", deviceId)
+          .withInternalMessage(
+              "Expected to find one connected device with serial number '%s'.", deviceId)
           .withCause(e)
           .build();
     }
@@ -81,7 +83,7 @@ public class AdbRunner {
     } catch (TimeoutException e) {
       throw CommandExecutionException.builder()
           .withCause(e)
-          .withMessage("Timed out while waiting for ADB.")
+          .withInternalMessage("Timed out while waiting for ADB.")
           .build();
     }
   }

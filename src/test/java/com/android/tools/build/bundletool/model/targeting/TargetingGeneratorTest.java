@@ -44,7 +44,7 @@ import com.android.bundle.Targeting.Sanitizer.SanitizerAlias;
 import com.android.bundle.Targeting.TextureCompressionFormat.TextureCompressionFormatAlias;
 import com.android.tools.build.bundletool.model.AbiName;
 import com.android.tools.build.bundletool.model.ZipPath;
-import com.android.tools.build.bundletool.model.exceptions.ValidationException;
+import com.android.tools.build.bundletool.model.exceptions.InvalidBundleException;
 import com.google.common.base.Joiner;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
@@ -122,9 +122,9 @@ public class TargetingGeneratorTest {
   @Test
   public void generateTargetingForNativeLibraries_abiBaseNamesDisallowed() throws Exception {
     String directoryName = "lib/ARM64-v8a";
-    ValidationException exception =
+    InvalidBundleException exception =
         assertThrows(
-            ValidationException.class,
+            InvalidBundleException.class,
             () -> generator.generateTargetingForNativeLibraries(ImmutableList.of(directoryName)));
 
     assertThat(exception)
@@ -136,9 +136,9 @@ public class TargetingGeneratorTest {
 
   @Test
   public void generateTargetingForNativeLibraries_baseNameNotAnAbi_throws() throws Exception {
-    ValidationException exception =
+    InvalidBundleException exception =
         assertThrows(
-            ValidationException.class,
+            InvalidBundleException.class,
             () ->
                 generator.generateTargetingForNativeLibraries(
                     ImmutableList.of("lib/non_abi_name")));
@@ -175,9 +175,9 @@ public class TargetingGeneratorTest {
 
   @Test
   public void generateTargetingForApexImages_abiBaseNamesDisallowed() throws Exception {
-    ValidationException exception =
+    InvalidBundleException exception =
         assertThrows(
-            ValidationException.class,
+            InvalidBundleException.class,
             () ->
                 generator.generateTargetingForApexImages(
                     ImmutableList.of(ZipPath.create("x86.ARM64-v8a.img")),
@@ -192,13 +192,12 @@ public class TargetingGeneratorTest {
 
   @Test
   public void generateTargetingForApexImages_baseNameNotAnAbi_throws() throws Exception {
-    ValidationException exception =
+    InvalidBundleException exception =
         assertThrows(
-            ValidationException.class,
+            InvalidBundleException.class,
             () ->
                 generator.generateTargetingForApexImages(
-                    ImmutableList.of(ZipPath.create("non_abi_name.img")),
-                    /*hasBuildInfo=*/ false));
+                    ImmutableList.of(ZipPath.create("non_abi_name.img")), /*hasBuildInfo=*/ false));
 
     assertThat(exception)
         .hasMessageThat()
@@ -245,7 +244,7 @@ public class TargetingGeneratorTest {
   public void generateTargetingForAssets_typeMismatch_leaf() throws Exception {
     Throwable t =
         assertThrows(
-            ValidationException.class,
+            InvalidBundleException.class,
             () ->
                 new TargetingGenerator()
                     .generateTargetingForAssets(
@@ -264,7 +263,7 @@ public class TargetingGeneratorTest {
   public void generateTargetingForAssets_typeMismatch_midPath() throws Exception {
     Throwable t =
         assertThrows(
-            ValidationException.class,
+            InvalidBundleException.class,
             () ->
                 new TargetingGenerator()
                     .generateTargetingForAssets(
@@ -553,7 +552,7 @@ public class TargetingGeneratorTest {
   public void generateTargetingForAssets_badLanguageTargetingThrows() {
     Throwable exception =
         assertThrows(
-            ValidationException.class,
+            InvalidBundleException.class,
             () -> {
               new TargetingGenerator()
                   .generateTargetingForAssets(
@@ -622,7 +621,7 @@ public class TargetingGeneratorTest {
   public void duplicateTargetingDimensions_throws() throws Exception {
     Throwable t =
         assertThrows(
-            ValidationException.class,
+            InvalidBundleException.class,
             () ->
                 new TargetingGenerator()
                     .generateTargetingForAssets(

@@ -62,8 +62,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.android.aapt.Resources.XmlNode;
 import com.android.tools.build.bundletool.TestData;
-import com.android.tools.build.bundletool.model.exceptions.ValidationException;
-import com.android.tools.build.bundletool.model.exceptions.manifest.ManifestFusingException.FusingMissingIncludeAttribute;
+import com.android.tools.build.bundletool.model.exceptions.InvalidBundleException;
 import com.android.tools.build.bundletool.model.utils.xmlproto.UnexpectedAttributeTypeException;
 import com.android.tools.build.bundletool.model.utils.xmlproto.XmlProtoNode;
 import com.android.tools.build.bundletool.model.version.Version;
@@ -200,8 +199,8 @@ public class AndroidManifestTest {
   public void getUsesSplits_missingNameAttribute_throws() {
     AndroidManifest androidManifest =
         AndroidManifest.create(xmlNode(xmlElement("manifest", xmlNode(xmlElement("uses-split")))));
-    ValidationException exception =
-        assertThrows(ValidationException.class, () -> androidManifest.getUsesSplits());
+    InvalidBundleException exception =
+        assertThrows(InvalidBundleException.class, androidManifest::getUsesSplits);
     assertThat(exception)
         .hasMessageThat()
         .contains("<uses-split> element is missing the 'android:name' attribute");
@@ -578,8 +577,8 @@ public class AndroidManifestTest {
         AndroidManifest.create(
             androidManifest("com.test.app", withTypeAttribute("invalid-attribute")));
 
-    ValidationException exception =
-        assertThrows(ValidationException.class, () -> manifest.getModuleType());
+    InvalidBundleException exception =
+        assertThrows(InvalidBundleException.class, manifest::getModuleType);
     assertThat(exception)
         .hasMessageThat()
         .contains("Found invalid type attribute invalid-attribute for <module> element.");
@@ -622,8 +621,7 @@ public class AndroidManifestTest {
     AndroidManifest androidManifest =
         AndroidManifest.create(
             androidManifest("com.test.app", withLegacyFusingAttribute(false)), BUNDLE_TOOL_0_3_4);
-    assertThrows(
-        FusingMissingIncludeAttribute.class, () -> androidManifest.getIsModuleIncludedInFusing());
+    assertThrows(InvalidBundleException.class, androidManifest::getIsModuleIncludedInFusing);
   }
 
   @Test
@@ -668,10 +666,8 @@ public class AndroidManifestTest {
                             "module",
                             xmlNode(xmlElement(DISTRIBUTION_NAMESPACE_URI, "fusing")))))),
             BUNDLE_TOOL_0_3_4);
-    FusingMissingIncludeAttribute exception =
-        assertThrows(
-            FusingMissingIncludeAttribute.class,
-            () -> androidManifest.getIsModuleIncludedInFusing());
+    InvalidBundleException exception =
+        assertThrows(InvalidBundleException.class, androidManifest::getIsModuleIncludedInFusing);
     assertThat(exception)
         .hasMessageThat()
         .contains("<fusing> element is missing the 'include' attribute");
@@ -690,10 +686,8 @@ public class AndroidManifestTest {
                             "module",
                             xmlNode(xmlElement(DISTRIBUTION_NAMESPACE_URI, "fusing")))))),
             BUNDLE_TOOL_0_3_3);
-    FusingMissingIncludeAttribute exception =
-        assertThrows(
-            FusingMissingIncludeAttribute.class,
-            () -> androidManifest.getIsModuleIncludedInFusing());
+    InvalidBundleException exception =
+        assertThrows(InvalidBundleException.class, androidManifest::getIsModuleIncludedInFusing);
     assertThat(exception)
         .hasMessageThat()
         .contains("<fusing> element is missing the 'include' attribute");
@@ -714,10 +708,8 @@ public class AndroidManifestTest {
                             "module",
                             xmlNode(xmlElement(DISTRIBUTION_NAMESPACE_URI, "fusing")))))),
             BUNDLE_TOOL_0_3_4);
-    FusingMissingIncludeAttribute exception =
-        assertThrows(
-            FusingMissingIncludeAttribute.class,
-            () -> androidManifest.getIsModuleIncludedInFusing());
+    InvalidBundleException exception =
+        assertThrows(InvalidBundleException.class, androidManifest::getIsModuleIncludedInFusing);
     assertThat(exception)
         .hasMessageThat()
         .isEqualTo("<fusing> element is missing the 'include' attribute (split: 'feature1').");
@@ -737,10 +729,8 @@ public class AndroidManifestTest {
                             "module",
                             xmlNode(xmlElement(DISTRIBUTION_NAMESPACE_URI, "fusing")))))),
             BUNDLE_TOOL_0_3_3);
-    FusingMissingIncludeAttribute exception =
-        assertThrows(
-            FusingMissingIncludeAttribute.class,
-            () -> androidManifest.getIsModuleIncludedInFusing());
+    InvalidBundleException exception =
+        assertThrows(InvalidBundleException.class, androidManifest::getIsModuleIncludedInFusing);
     assertThat(exception)
         .hasMessageThat()
         .isEqualTo("<fusing> element is missing the 'include' attribute (split: 'feature1').");
@@ -798,8 +788,8 @@ public class AndroidManifestTest {
                             metadataWithValue("com.android.dynamic.apk.fused.modules", "value1"),
                             metadataWithValue(
                                 "com.android.dynamic.apk.fused.modules", "value2"))))));
-    ValidationException exception =
-        assertThrows(ValidationException.class, () -> androidManifest.getFusedModuleNames());
+    InvalidBundleException exception =
+        assertThrows(InvalidBundleException.class, androidManifest::getFusedModuleNames);
     assertThat(exception).hasMessageThat().contains("multiple <meta-data> elements for key");
   }
 
@@ -927,9 +917,10 @@ public class AndroidManifestTest {
                     "manifest",
                     xmlNode(xmlElement("application", metadataWithValue("metadata-key", "123"))))));
 
-    ValidationException exception =
+    InvalidBundleException exception =
         assertThrows(
-            ValidationException.class, () -> androidManifest.getMetadataResourceId("metadata-key"));
+            InvalidBundleException.class,
+            () -> androidManifest.getMetadataResourceId("metadata-key"));
     assertThat(exception)
         .hasMessageThat()
         .contains(

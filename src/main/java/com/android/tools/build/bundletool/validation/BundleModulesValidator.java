@@ -22,9 +22,9 @@ import static com.google.common.collect.ImmutableList.toImmutableList;
 import com.android.bundle.Config.BundleConfig;
 import com.android.tools.build.bundletool.model.BundleModule;
 import com.android.tools.build.bundletool.model.BundleModuleName;
-import com.android.tools.build.bundletool.model.InputStreamSuppliers;
 import com.android.tools.build.bundletool.model.ModuleEntry;
 import com.android.tools.build.bundletool.model.ZipPath;
+import com.android.tools.build.bundletool.model.utils.ZipUtils;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
 import java.io.IOException;
@@ -62,6 +62,7 @@ public class BundleModulesValidator {
           new TextureCompressionFormatParityValidator(),
           new DexFilesValidator(),
           new ApexBundleValidator(),
+          new AssetBundleValidator(),
           // Other.
           new ModuleDependencyValidator(),
           new ModuleTitleValidator(),
@@ -100,8 +101,7 @@ public class BundleModulesValidator {
                           zipEntry ->
                               ModuleEntry.builder()
                                   .setPath(ZipPath.create(zipEntry.getName()))
-                                  .setContentSupplier(
-                                      InputStreamSuppliers.fromZipEntry(zipEntry, moduleZipFile))
+                                  .setContent(ZipUtils.asByteSource(moduleZipFile, zipEntry))
                                   .build())
                       .collect(toImmutableList()))
               .build();

@@ -26,7 +26,7 @@ import com.android.bundle.Targeting.AssetsDirectoryTargeting;
 import com.android.tools.build.bundletool.model.BundleModule;
 import com.android.tools.build.bundletool.model.BundleModule.ModuleType;
 import com.android.tools.build.bundletool.model.ZipPath;
-import com.android.tools.build.bundletool.model.exceptions.ValidationException;
+import com.android.tools.build.bundletool.model.exceptions.InvalidBundleException;
 import com.google.common.collect.ImmutableSet;
 
 /** Validates targeting of assets. */
@@ -44,15 +44,15 @@ public class AssetsTargetingValidator extends SubValidator {
       ZipPath path = ZipPath.create(targetedDirectory.getPath());
 
       if (!path.startsWith(ASSETS_DIRECTORY)) {
-        throw ValidationException.builder()
-            .withMessage(
+        throw InvalidBundleException.builder()
+            .withUserMessage(
                 "Path of targeted assets directory must start with 'assets/' but found '%s'.", path)
             .build();
       }
 
       if (!assetDirsWithFiles.contains(path)) {
-        throw ValidationException.builder()
-            .withMessage("Targeted directory '%s' is empty.", path)
+        throw InvalidBundleException.builder()
+            .withUserMessage("Targeted directory '%s' is empty.", path)
             .build();
       }
 
@@ -61,8 +61,8 @@ public class AssetsTargetingValidator extends SubValidator {
 
     if (module.getModuleType().equals(ModuleType.ASSET_MODULE)
         && assets.getDirectoryList().stream().anyMatch(dir -> dir.getTargeting().hasLanguage())) {
-      throw ValidationException.builder()
-          .withMessage(
+      throw InvalidBundleException.builder()
+          .withUserMessage(
               "Language targeting for asset packs is not supported, but found in module %s.",
               module.getName().getName())
           .build();

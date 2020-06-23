@@ -21,7 +21,7 @@ import static com.google.common.collect.ImmutableSet.toImmutableSet;
 import com.android.bundle.Targeting.Abi.AbiAlias;
 import com.android.tools.build.bundletool.model.AbiName;
 import com.android.tools.build.bundletool.model.BundleModule;
-import com.android.tools.build.bundletool.model.exceptions.ValidationException;
+import com.android.tools.build.bundletool.model.exceptions.InvalidBundleException;
 import com.android.tools.build.bundletool.model.targeting.TargetedDirectorySegment;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
@@ -45,8 +45,8 @@ public class AbiParityValidator extends SubValidator {
         referentialModule = module;
         referentialAbis = moduleAbis;
       } else if (!referentialAbis.equals(moduleAbis)) {
-        throw ValidationException.builder()
-            .withMessage(
+        throw InvalidBundleException.builder()
+            .withUserMessage(
                 "All modules with native libraries must support the same set of ABIs, but"
                     + " module '%s' supports '%s' and module '%s' supports '%s'.",
                 referentialModule.getName(), referentialAbis, module.getName(), moduleAbis)

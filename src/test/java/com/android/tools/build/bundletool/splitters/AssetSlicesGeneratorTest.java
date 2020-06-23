@@ -29,6 +29,7 @@ import static com.android.tools.build.bundletool.testing.TargetingUtils.language
 import static com.android.tools.build.bundletool.testing.TargetingUtils.targetedAssetsDirectory;
 import static com.android.tools.build.bundletool.testing.TestUtils.extractPaths;
 import static com.google.common.truth.Truth.assertThat;
+import static com.google.common.truth.Truth8.assertThat;
 import static com.google.common.truth.extensions.proto.ProtoTruth.assertThat;
 
 import com.android.bundle.Targeting.ApkTargeting;
@@ -36,7 +37,6 @@ import com.android.tools.build.bundletool.model.AppBundle;
 import com.android.tools.build.bundletool.model.BundleModule;
 import com.android.tools.build.bundletool.model.ModuleSplit;
 import com.android.tools.build.bundletool.model.ModuleSplit.SplitType;
-import com.android.tools.build.bundletool.model.exceptions.manifest.ManifestVersionException.VersionCodeMissingException;
 import com.android.tools.build.bundletool.testing.AppBundleBuilder;
 import com.android.tools.build.bundletool.testing.BundleModuleBuilder;
 import com.google.common.collect.ImmutableList;
@@ -90,12 +90,7 @@ public class AssetSlicesGeneratorTest {
 
     assertThat(assetSlices).hasSize(1);
     ModuleSplit assetSlice = assetSlices.get(0);
-    assertThat(
-            assetSlice
-                .getAndroidManifest()
-                .getVersionCode()
-                .orElseThrow(VersionCodeMissingException::new))
-        .isEqualTo(VERSION_CODE);
+    assertThat(assetSlice.getAndroidManifest().getVersionCode()).hasValue(VERSION_CODE);
   }
 
   @Test
@@ -112,12 +107,7 @@ public class AssetSlicesGeneratorTest {
 
     assertThat(assetSlices).hasSize(1);
     ModuleSplit assetSlice = assetSlices.get(0);
-    assertThat(
-            assetSlice
-                .getAndroidManifest()
-                .getVersionCode()
-                .orElseThrow(VersionCodeMissingException::new))
-        .isEqualTo(VERSION_CODE);
+    assertThat(assetSlice.getAndroidManifest().getVersionCode()).hasValue(VERSION_CODE);
   }
 
 

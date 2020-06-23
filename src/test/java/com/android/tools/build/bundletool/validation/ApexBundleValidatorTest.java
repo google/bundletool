@@ -24,7 +24,7 @@ import com.android.apex.ApexManifestProto.ApexManifest;
 import com.android.bundle.Files.ApexImages;
 import com.android.bundle.Files.TargetedApexImage;
 import com.android.tools.build.bundletool.model.BundleModule;
-import com.android.tools.build.bundletool.model.exceptions.ValidationException;
+import com.android.tools.build.bundletool.model.exceptions.InvalidBundleException;
 import com.android.tools.build.bundletool.testing.BundleModuleBuilder;
 import com.google.common.collect.ImmutableList;
 import java.io.IOException;
@@ -67,9 +67,10 @@ public class ApexBundleValidatorTest {
             .addFile("root/unexpected.txt")
             .build();
 
-    ValidationException exception =
+    InvalidBundleException exception =
         assertThrows(
-            ValidationException.class, () -> new ApexBundleValidator().validateModule(apexModule));
+            InvalidBundleException.class,
+            () -> new ApexBundleValidator().validateModule(apexModule));
 
     assertThat(exception).hasMessageThat().contains("Unexpected file in APEX bundle");
   }
@@ -86,9 +87,10 @@ public class ApexBundleValidatorTest {
             .addFile("apex/arm64-v8a.img")
             .build();
 
-    ValidationException exception =
+    InvalidBundleException exception =
         assertThrows(
-            ValidationException.class, () -> new ApexBundleValidator().validateModule(apexModule));
+            InvalidBundleException.class,
+            () -> new ApexBundleValidator().validateModule(apexModule));
 
     assertThat(exception).hasMessageThat().contains("Missing expected file in APEX bundle");
   }
@@ -106,9 +108,10 @@ public class ApexBundleValidatorTest {
             .addFile("apex/arm64-v8a.img")
             .build();
 
-    ValidationException exception =
+    InvalidBundleException exception =
         assertThrows(
-            ValidationException.class, () -> new ApexBundleValidator().validateModule(apexModule));
+            InvalidBundleException.class,
+            () -> new ApexBundleValidator().validateModule(apexModule));
 
     assertThat(exception).hasMessageThat().contains("APEX manifest must have a package name");
   }
@@ -127,9 +130,10 @@ public class ApexBundleValidatorTest {
             .addFile("apex/x86_64.x86.img")
             .build();
 
-    ValidationException exception =
+    InvalidBundleException exception =
         assertThrows(
-            ValidationException.class, () -> new ApexBundleValidator().validateModule(apexModule));
+            InvalidBundleException.class,
+            () -> new ApexBundleValidator().validateModule(apexModule));
 
     assertThat(exception).hasMessageThat().contains("Found APEX image files that are not targeted");
   }
@@ -153,9 +157,10 @@ public class ApexBundleValidatorTest {
             // x86_64.x86 missing.
             .build();
 
-    ValidationException exception =
+    InvalidBundleException exception =
         assertThrows(
-            ValidationException.class, () -> new ApexBundleValidator().validateModule(apexModule));
+            InvalidBundleException.class,
+            () -> new ApexBundleValidator().validateModule(apexModule));
 
     assertThat(exception).hasMessageThat().contains("Targeted APEX image files are missing");
   }
@@ -180,9 +185,10 @@ public class ApexBundleValidatorTest {
             .addFile("apex/x86_64.x86.armeabi-v7a.img")
             .build();
 
-    ValidationException exception =
+    InvalidBundleException exception =
         assertThrows(
-            ValidationException.class, () -> new ApexBundleValidator().validateModule(apexModule));
+            InvalidBundleException.class,
+            () -> new ApexBundleValidator().validateModule(apexModule));
 
     assertThat(exception)
         .hasMessageThat()
@@ -212,9 +218,10 @@ public class ApexBundleValidatorTest {
             .addFile("apex/x86_64.armeabi-v7a.img")
             .build();
 
-    ValidationException exception =
+    InvalidBundleException exception =
         assertThrows(
-            ValidationException.class, () -> new ApexBundleValidator().validateModule(apexModule));
+            InvalidBundleException.class,
+            () -> new ApexBundleValidator().validateModule(apexModule));
 
     assertThat(exception).hasMessageThat().contains("APEX bundle must contain one of");
   }
@@ -268,9 +275,10 @@ public class ApexBundleValidatorTest {
             .addFile("apex/x86_64.armeabi-v7a.img")
             .build();
 
-    ValidationException exception =
+    InvalidBundleException exception =
         assertThrows(
-            ValidationException.class, () -> new ApexBundleValidator().validateModule(apexModule));
+            InvalidBundleException.class,
+            () -> new ApexBundleValidator().validateModule(apexModule));
 
     assertThat(exception).hasMessageThat().contains("APEX bundle must contain one of");
   }
@@ -286,9 +294,9 @@ public class ApexBundleValidatorTest {
   public void validateAllModules_multipleApexModules_throws() throws Exception {
     BundleModule apexModule = validApexModule();
 
-    ValidationException exception =
+    InvalidBundleException exception =
         assertThrows(
-            ValidationException.class,
+            InvalidBundleException.class,
             () ->
                 new ApexBundleValidator()
                     .validateAllModules(ImmutableList.of(apexModule, apexModule)));
@@ -304,9 +312,9 @@ public class ApexBundleValidatorTest {
     BundleModule anotherModule =
         new BundleModuleBuilder("anotherModule").setManifest(androidManifest(PKG_NAME)).build();
 
-    ValidationException exception =
+    InvalidBundleException exception =
         assertThrows(
-            ValidationException.class,
+            InvalidBundleException.class,
             () ->
                 new ApexBundleValidator()
                     .validateAllModules(ImmutableList.of(apexModule, anotherModule)));

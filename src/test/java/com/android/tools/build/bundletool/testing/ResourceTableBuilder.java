@@ -17,7 +17,7 @@ package com.android.tools.build.bundletool.testing;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
-import static java.util.stream.Collectors.toMap;
+import static com.google.common.collect.ImmutableMap.toImmutableMap;
 
 import com.android.aapt.ConfigurationOuterClass.Configuration;
 import com.android.aapt.Resources;
@@ -34,10 +34,9 @@ import com.android.aapt.Resources.TypeId;
 import com.android.aapt.Resources.Value;
 import com.android.aapt.Resources.Visibility;
 import com.android.aapt.Resources.Visibility.Level;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.io.Files;
 import java.util.Arrays;
-import java.util.LinkedHashMap;
-import java.util.Map;
 import java.util.Optional;
 import java.util.function.Function;
 
@@ -83,7 +82,7 @@ public final class ResourceTableBuilder {
 
   /** Use empty string for default locale. */
   public ResourceTableBuilder addStringResourceForMultipleLocales(
-      String resourceName, Map<String, String> stringByLocale) {
+      String resourceName, ImmutableMap<String, String> stringByLocale) {
     return addResourceForMultipleConfigs(
         "string",
         resourceName,
@@ -106,7 +105,7 @@ public final class ResourceTableBuilder {
   public ResourceTableBuilder addFileResourceForMultipleConfigs(
       String resourceType,
       String resourceName,
-      Map<Configuration, String> filePathByConfiguration) {
+      ImmutableMap<Configuration, String> filePathByConfiguration) {
     return addResourceForMultipleConfigs(
         resourceType,
         resourceName,
@@ -125,7 +124,7 @@ public final class ResourceTableBuilder {
 
   /** Use 0 for default density. */
   public ResourceTableBuilder addMipmapResourceForMultipleDensities(
-      String resourceName, Map<Integer, String> filePathByDensity) {
+      String resourceName, ImmutableMap<Integer, String> filePathByDensity) {
     return addFileResourceForMultipleDensities("mipmap", resourceName, filePathByDensity);
   }
 
@@ -135,18 +134,18 @@ public final class ResourceTableBuilder {
 
   /** Use 0 for default density. */
   public ResourceTableBuilder addDrawableResourceForMultipleDensities(
-      String resourceName, Map<Integer, String> filePathByDensity) {
+      String resourceName, ImmutableMap<Integer, String> filePathByDensity) {
     return addFileResourceForMultipleDensities("drawable", resourceName, filePathByDensity);
   }
 
   private ResourceTableBuilder addFileResourceForMultipleDensities(
-      String resourceType, String resourceName, Map<Integer, String> filePathByDensity) {
+      String resourceType, String resourceName, ImmutableMap<Integer, String> filePathByDensity) {
     return addFileResourceForMultipleConfigs(
         resourceType,
         resourceName,
         filePathByDensity.entrySet().stream()
             .collect(
-                toMap(
+                toImmutableMap(
                     entry ->
                         entry.getKey() == 0
                             ? Configuration.getDefaultInstance()
@@ -154,14 +153,13 @@ public final class ResourceTableBuilder {
                     entry -> entry.getValue(),
                     (u, v) -> {
                       throw new IllegalStateException("Duplicate key: " + u);
-                    },
-                    LinkedHashMap::new)));
+                    })));
   }
 
   private <K, V> ResourceTableBuilder addResourceForMultipleConfigs(
       String resourceType,
       String resourceName,
-      Map<K, V> sourceMap,
+      ImmutableMap<K, V> sourceMap,
       Function<K, Configuration> configMaker,
       Function<V, Value> valueMaker) {
     ConfigValue[] configValues =

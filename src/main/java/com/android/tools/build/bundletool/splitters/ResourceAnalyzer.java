@@ -33,7 +33,7 @@ import com.android.tools.build.bundletool.model.BundleModule;
 import com.android.tools.build.bundletool.model.ResourceId;
 import com.android.tools.build.bundletool.model.ResourceTableEntry;
 import com.android.tools.build.bundletool.model.ZipPath;
-import com.android.tools.build.bundletool.model.exceptions.ValidationException;
+import com.android.tools.build.bundletool.model.exceptions.CommandExecutionException;
 import com.android.tools.build.bundletool.model.utils.ResourcesUtils;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
@@ -139,12 +139,12 @@ public class ResourceAnalyzer {
           return ImmutableSet.of();
         }
         ZipPath xmlResourcePath = ZipPath.create(fileRef.getPath());
-        try (InputStream is = module.getEntry(xmlResourcePath).get().getContent()) {
+        try (InputStream is = module.getEntry(xmlResourcePath).get().getContent().openStream()) {
           XmlNode xmlRoot = XmlNode.parseFrom(is);
           return findAllReferencedAppResources(xmlRoot, module);
         } catch (InvalidProtocolBufferException e) {
-          throw ValidationException.builder()
-              .withMessage("Error parsing XML file '%s'.", xmlResourcePath)
+          throw CommandExecutionException.builder()
+              .withInternalMessage("Error parsing XML file '%s'.", xmlResourcePath)
               .withCause(e)
               .build();
         } catch (IOException e) {

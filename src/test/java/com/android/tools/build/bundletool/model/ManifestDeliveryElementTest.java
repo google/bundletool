@@ -23,7 +23,7 @@ import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.with
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withFeatureConditionHexVersion;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withFusingAttribute;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withInstallTimeDelivery;
-import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withInstallTimePermanentElement;
+import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withInstallTimeRemovableElement;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withInstantInstallTimeDelivery;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withInstantOnDemandDelivery;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withMaxSdkCondition;
@@ -37,7 +37,7 @@ import static com.google.common.truth.Truth8.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.android.aapt.Resources.XmlNode;
-import com.android.tools.build.bundletool.model.exceptions.ValidationException;
+import com.android.tools.build.bundletool.model.exceptions.InvalidBundleException;
 import com.android.tools.build.bundletool.model.utils.xmlproto.XmlProtoAttributeBuilder;
 import com.android.tools.build.bundletool.model.utils.xmlproto.XmlProtoElement;
 import com.android.tools.build.bundletool.model.utils.xmlproto.XmlProtoElementBuilder;
@@ -212,7 +212,8 @@ public class ManifestDeliveryElementTest {
             /* isFastFollowAllowed= */ false);
 
     Throwable exception =
-        assertThrows(ValidationException.class, () -> deliveryElement.get().getModuleConditions());
+        assertThrows(
+            InvalidBundleException.class, () -> deliveryElement.get().getModuleConditions());
 
     assertThat(exception)
         .hasMessageThat()
@@ -269,7 +270,8 @@ public class ManifestDeliveryElementTest {
 
     Throwable exception =
         assertThrows(
-            ValidationException.class, () -> manifestDeliveryElement.get().getModuleConditions());
+            InvalidBundleException.class,
+            () -> manifestDeliveryElement.get().getModuleConditions());
     assertThat(exception)
         .hasMessageThat()
         .contains("Unrecognized module condition: 'unsupportedCondition'");
@@ -293,7 +295,8 @@ public class ManifestDeliveryElementTest {
 
     Throwable exception =
         assertThrows(
-            ValidationException.class, () -> manifestDeliveryElement.get().getModuleConditions());
+            InvalidBundleException.class,
+            () -> manifestDeliveryElement.get().getModuleConditions());
     assertThat(exception)
         .hasMessageThat()
         .contains(
@@ -316,7 +319,8 @@ public class ManifestDeliveryElementTest {
 
     Throwable exception =
         assertThrows(
-            ValidationException.class, () -> manifestDeliveryElement.get().getModuleConditions());
+            InvalidBundleException.class,
+            () -> manifestDeliveryElement.get().getModuleConditions());
     assertThat(exception)
         .hasMessageThat()
         .contains("Missing required 'dist:value' attribute in the 'min-sdk' condition element.");
@@ -330,8 +334,8 @@ public class ManifestDeliveryElementTest {
             /* isFastFollowAllowed= */ false);
     assertThat(element).isPresent();
 
-    ValidationException exception =
-        assertThrows(ValidationException.class, () -> element.get().getModuleConditions());
+    InvalidBundleException exception =
+        assertThrows(InvalidBundleException.class, () -> element.get().getModuleConditions());
     assertThat(exception)
         .hasMessageThat()
         .contains("Multiple '<dist:min-sdk>' conditions are not supported.");
@@ -348,9 +352,9 @@ public class ManifestDeliveryElementTest {
                             XmlProtoElementBuilder.create(
                                 DISTRIBUTION_NAMESPACE_URI, "condtions"))));
 
-    ValidationException exception =
+    InvalidBundleException exception =
         assertThrows(
-            ValidationException.class,
+            InvalidBundleException.class,
             () ->
                 ManifestDeliveryElement.fromManifestRootNode(
                     nodeWithTypo, /* isFastFollowAllowed= */ false));
@@ -371,9 +375,9 @@ public class ManifestDeliveryElementTest {
                 .addChildElement(
                     XmlProtoElementBuilder.create(DISTRIBUTION_NAMESPACE_URI, "instal-time")));
 
-    ValidationException exception =
+    InvalidBundleException exception =
         assertThrows(
-            ValidationException.class,
+            InvalidBundleException.class,
             () ->
                 ManifestDeliveryElement.fromManifestRootNode(
                     nodeWithTypo, /* isFastFollowAllowed= */ false));
@@ -394,9 +398,9 @@ public class ManifestDeliveryElementTest {
                 .addChildElement(
                     XmlProtoElementBuilder.create(DISTRIBUTION_NAMESPACE_URI, "instal-time")));
 
-    ValidationException exception =
+    InvalidBundleException exception =
         assertThrows(
-            ValidationException.class,
+            InvalidBundleException.class,
             () ->
                 ManifestDeliveryElement.fromManifestRootNode(
                     nodeWithTypo, /* isFastFollowAllowed= */ true));
@@ -420,9 +424,9 @@ public class ManifestDeliveryElementTest {
                             XmlProtoElementBuilder.create(
                                 DISTRIBUTION_NAMESPACE_URI, "conditions"))));
 
-    ValidationException exception =
+    InvalidBundleException exception =
         assertThrows(
-            ValidationException.class,
+            InvalidBundleException.class,
             () ->
                 ManifestDeliveryElement.fromManifestRootNode(
                     nodeWithTypo, /* isFastFollowAllowed= */ true));
@@ -446,9 +450,9 @@ public class ManifestDeliveryElementTest {
                             XmlProtoElementBuilder.create(
                                 DISTRIBUTION_NAMESPACE_URI, "conditions"))));
 
-    ValidationException exception =
+    InvalidBundleException exception =
         assertThrows(
-            ValidationException.class,
+            InvalidBundleException.class,
             () ->
                 ManifestDeliveryElement.fromManifestRootNode(
                     nodeWithTypo, /* isFastFollowAllowed= */ false));
@@ -468,9 +472,9 @@ public class ManifestDeliveryElementTest {
             XmlProtoElementBuilder.create(DISTRIBUTION_NAMESPACE_URI, "delivery")
                 .addChildElement(XmlProtoElementBuilder.create("on-demand")));
 
-    ValidationException exception =
+    InvalidBundleException exception =
         assertThrows(
-            ValidationException.class,
+            InvalidBundleException.class,
             () ->
                 ManifestDeliveryElement.fromManifestRootNode(
                     nodeWithTypo, /* isFastFollowAllowed= */ false));
@@ -489,9 +493,9 @@ public class ManifestDeliveryElementTest {
             XmlProtoElementBuilder.create(DISTRIBUTION_NAMESPACE_URI, "delivery")
                 .addChildElement(XmlProtoElementBuilder.create("install-time")));
 
-    ValidationException exception =
+    InvalidBundleException exception =
         assertThrows(
-            ValidationException.class,
+            InvalidBundleException.class,
             () ->
                 ManifestDeliveryElement.fromManifestRootNode(
                     nodeWithTypo, /* isFastFollowAllowed= */ false));
@@ -513,9 +517,9 @@ public class ManifestDeliveryElementTest {
                     XmlProtoElementBuilder.create(DISTRIBUTION_NAMESPACE_URI, "install-time")
                         .addChildElement(XmlProtoElementBuilder.create("conditions"))));
 
-    ValidationException exception =
+    InvalidBundleException exception =
         assertThrows(
-            ValidationException.class,
+            InvalidBundleException.class,
             () ->
                 ManifestDeliveryElement.fromManifestRootNode(
                     nodeWithTypo, /* isFastFollowAllowed= */ false));
@@ -543,9 +547,9 @@ public class ManifestDeliveryElementTest {
                                             XmlProtoAttributeBuilder.create("value")
                                                 .setValueAsDecimalInteger(21))))));
 
-    ValidationException exception =
+    InvalidBundleException exception =
         assertThrows(
-            ValidationException.class,
+            InvalidBundleException.class,
             () ->
                 ManifestDeliveryElement.fromManifestRootNode(
                         nodeWithTypo, /* isFastFollowAllowed= */ false)
@@ -573,9 +577,9 @@ public class ManifestDeliveryElementTest {
                                             XmlProtoAttributeBuilder.create("name")
                                                 .setValueAsString("android.hardware.feature"))))));
 
-    ValidationException exception =
+    InvalidBundleException exception =
         assertThrows(
-            ValidationException.class,
+            InvalidBundleException.class,
             () ->
                 ManifestDeliveryElement.fromManifestRootNode(
                         nodeWithTypo, /* isFastFollowAllowed= */ false)
@@ -646,9 +650,9 @@ public class ManifestDeliveryElementTest {
         ManifestDeliveryElement.fromManifestRootNode(manifest, /* isFastFollowAllowed= */ false);
     assertThat(deliveryElement).isPresent();
 
-    ValidationException exception =
+    InvalidBundleException exception =
         assertThrows(
-            ValidationException.class,
+            InvalidBundleException.class,
             () -> deliveryElement.get().getModuleConditions().getUserCountriesCondition());
 
     assertThat(exception)
@@ -671,9 +675,9 @@ public class ManifestDeliveryElementTest {
         ManifestDeliveryElement.fromManifestRootNode(manifest, /* isFastFollowAllowed= */ false);
     assertThat(deliveryElement).isPresent();
 
-    ValidationException exception =
+    InvalidBundleException exception =
         assertThrows(
-            ValidationException.class,
+            InvalidBundleException.class,
             () -> deliveryElement.get().getModuleConditions().getUserCountriesCondition());
 
     assertThat(exception)
@@ -692,77 +696,89 @@ public class ManifestDeliveryElementTest {
             /* isFastFollowAllowed= */ false);
     assertThat(element).isPresent();
 
-    ValidationException exception =
-        assertThrows(ValidationException.class, () -> element.get().getModuleConditions());
+    InvalidBundleException exception =
+        assertThrows(InvalidBundleException.class, () -> element.get().getModuleConditions());
     assertThat(exception)
         .hasMessageThat()
         .contains("Multiple '<dist:user-countries>' conditions are not supported.");
   }
 
   @Test
-  public void onDemandModule_notInstallTimePermanent() {
+  public void onDemandModule_removable() {
     Optional<ManifestDeliveryElement> deliveryElement =
         ManifestDeliveryElement.fromManifestRootNode(
             androidManifest("com.test.app", withOnDemandDelivery()),
             /* isFastFollowAllowed= */ false);
 
     assertThat(deliveryElement).isPresent();
-    assertThat(deliveryElement.get().isInstallTimePermanent(VERSION)).isFalse();
+    assertThat(deliveryElement.get().isInstallTimeRemovable(VERSION)).isTrue();
   }
 
   @Test
-  public void fastFollowDelivery_notInstallTimePermanent() {
+  public void fastFollowDelivery_removable() {
     Optional<ManifestDeliveryElement> deliveryElement =
         ManifestDeliveryElement.fromManifestRootNode(
             androidManifest("com.test.app", withFastFollowDelivery()),
             /* isFastFollowAllowed= */ true);
 
     assertThat(deliveryElement).isPresent();
-    assertThat(deliveryElement.get().isInstallTimePermanent(VERSION)).isFalse();
+    assertThat(deliveryElement.get().isInstallTimeRemovable(VERSION)).isTrue();
   }
 
   @Test
-  public void installTimeModule_installTimePermanentImplicit_newBundleToolVersion() {
+  public void conditionalModule_removable() {
+    Optional<ManifestDeliveryElement> deliveryElement =
+        ManifestDeliveryElement.fromManifestRootNode(
+            androidManifest(
+                "com.test.app", withMinSdkVersion(24), withFeatureCondition("android.feature")),
+            /* isFastFollowAllowed= */ true);
+
+    assertThat(deliveryElement).isPresent();
+    assertThat(deliveryElement.get().isInstallTimeRemovable(VERSION)).isTrue();
+  }
+
+  @Test
+  public void installTimeModule_nonRemovableImplicit_newBundleToolVersion() {
     Optional<ManifestDeliveryElement> deliveryElement =
         ManifestDeliveryElement.fromManifestRootNode(
             androidManifest("com.test.app", withInstallTimeDelivery()),
             /* isFastFollowAllowed= */ false);
 
     assertThat(deliveryElement).isPresent();
-    assertThat(deliveryElement.get().isInstallTimePermanent(VERSION)).isTrue();
+    assertThat(deliveryElement.get().isInstallTimeRemovable(VERSION)).isFalse();
   }
 
   @Test
-  public void installTimeModule_installTimePermanentImplicit_oldBundleToolVersion() {
+  public void installTimeModule_removableImplicit_oldBundleToolVersion() {
     Optional<ManifestDeliveryElement> deliveryElement =
         ManifestDeliveryElement.fromManifestRootNode(
             androidManifest("com.test.app", withInstallTimeDelivery()),
             /* isFastFollowAllowed= */ false);
 
     assertThat(deliveryElement).isPresent();
-    assertThat(deliveryElement.get().isInstallTimePermanent(Version.of("0.14.0"))).isFalse();
+    assertThat(deliveryElement.get().isInstallTimeRemovable(Version.of("0.14.0"))).isTrue();
   }
 
   @Test
-  public void installTimeModule_installTimePermanentOn() {
+  public void installTimeModule_nonRemovable() {
     Optional<ManifestDeliveryElement> deliveryElement =
         ManifestDeliveryElement.fromManifestRootNode(
-            androidManifest("com.test.app", withInstallTimePermanentElement(true)),
+            androidManifest("com.test.app", withInstallTimeRemovableElement(false)),
             /* isFastFollowAllowed= */ false);
 
     assertThat(deliveryElement).isPresent();
-    assertThat(deliveryElement.get().isInstallTimePermanent(VERSION)).isTrue();
+    assertThat(deliveryElement.get().isInstallTimeRemovable(VERSION)).isFalse();
   }
 
   @Test
-  public void installTimeModule_installTimePermanentOff() {
+  public void installTimeModule_removable() {
     Optional<ManifestDeliveryElement> deliveryElement =
         ManifestDeliveryElement.fromManifestRootNode(
-            androidManifest("com.test.app", withInstallTimePermanentElement(false)),
+            androidManifest("com.test.app", withInstallTimeRemovableElement(true)),
             /* isFastFollowAllowed= */ false);
 
     assertThat(deliveryElement).isPresent();
-    assertThat(deliveryElement.get().isInstallTimePermanent(VERSION)).isFalse();
+    assertThat(deliveryElement.get().isInstallTimeRemovable(VERSION)).isTrue();
   }
 
   private static XmlNode createAndroidManifestWithDeliveryElement(

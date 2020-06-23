@@ -27,8 +27,8 @@ import com.android.tools.build.bundletool.model.BundleModule.SpecialModuleEntry;
 import com.android.tools.build.bundletool.model.BundleModuleName;
 import com.android.tools.build.bundletool.model.ResourceTableEntry;
 import com.android.tools.build.bundletool.model.ZipPath;
-import com.android.tools.build.bundletool.model.exceptions.BundleInvalidZipException;
-import com.android.tools.build.bundletool.model.exceptions.ValidationException;
+import com.android.tools.build.bundletool.model.exceptions.InvalidBundleException;
+import com.android.tools.build.bundletool.model.exceptions.InvalidCommandException;
 import com.android.tools.build.bundletool.model.utils.ResourcesUtils;
 import com.android.tools.build.bundletool.model.utils.ZipUtils;
 import com.android.tools.build.bundletool.model.utils.xmlproto.XmlProtoNode;
@@ -88,7 +88,10 @@ final class DumpManager {
         XPathResult xPathResult = XPathResolver.resolve(document, compiledXPathExpression);
         output = xPathResult.toString();
       } catch (XPathExpressionException e) {
-        throw new ValidationException("Error in the XPath expression: " + xPathExpression, e);
+        throw InvalidCommandException.builder()
+            .withInternalMessage("Error in the XPath expression: " + xPathExpression)
+            .withCause(e)
+            .build();
       }
     } else {
       output = XmlUtils.documentToString(document);
@@ -107,7 +110,7 @@ final class DumpManager {
               .map(path -> extractAndParse(zipFile, path, ResourceTable::parseFrom))
               .collect(toImmutableList());
     } catch (IOException e) {
-      throw new ValidationException("Error occurred when reading the bundle.", e);
+      throw new UncheckedIOException("Error occurred when reading the bundle.", e);
     }
 
     ImmutableListMultimap<String, ResourceTableEntry> entriesByPackageName =
@@ -129,7 +132,7 @@ final class DumpManager {
           extractAndParse(zipFile, ZipPath.create("BundleConfig.pb"), BundleConfig::parseFrom);
       printStream.println(JsonFormat.printer().print(bundleConfig));
     } catch (IOException e) {
-      throw new ValidationException("Error occurred when reading the bundle.", e);
+      throw new UncheckedIOException("Error occurred when reading the bundle.", e);
     }
   }
 
@@ -162,7 +165,10 @@ final class DumpManager {
     try (ZipFile zipFile = new ZipFile(bundlePath.toFile())) {
       return extractAndParse(zipFile, filePath, protoParser);
     } catch (ZipException e) {
-      throw new BundleInvalidZipException(e);
+      throw InvalidBundleException.builder()
+          .withUserMessage("Bundle is not a valid zip file.")
+          .withCause(e)
+          .build();
     } catch (IOException e) {
       throw new UncheckedIOException("Error occurred when trying to open the bundle.", e);
     }
@@ -172,16 +178,16 @@ final class DumpManager {
       ZipFile zipFile, ZipPath filePath, ProtoParser<T> protoParser) {
     ZipEntry fileEntry = zipFile.getEntry(filePath.toString());
     if (fileEntry == null) {
-      throw ValidationException.builder().withMessage("File '%s' not found.", filePath).build();
+      throw InvalidBundleException.builder()
+          .withUserMessage("File '%s' not found.", filePath)
+          .build();
     }
 
     try (InputStream inputStream = zipFile.getInputStream(fileEntry)) {
       return protoParser.parse(inputStream);
     } catch (IOException e) {
-      throw ValidationException.builder()
-          .withMessage("Error occurred when trying to read file '%s' from bundle.", filePath)
-          .withCause(e)
-          .build();
+      throw new UncheckedIOException(
+          "Error occurred when trying to read file '" + filePath + "' from bundle.", e);
     }
   }
 

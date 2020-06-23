@@ -16,21 +16,25 @@
 
 package com.android.tools.build.bundletool.validation;
 
+import static com.google.common.collect.MoreCollectors.toOptional;
+
+import com.android.bundle.Config.BundleConfig;
 import com.android.bundle.Targeting.AbiTargeting;
 import com.android.bundle.Targeting.GraphicsApiTargeting;
 import com.android.bundle.Targeting.LanguageTargeting;
 import com.android.bundle.Targeting.TextureCompressionFormatTargeting;
 import com.android.tools.build.bundletool.model.BundleModule;
 import com.android.tools.build.bundletool.model.ZipPath;
-import com.android.tools.build.bundletool.model.exceptions.ValidationException;
+import com.android.tools.build.bundletool.model.exceptions.InvalidBundleException;
+import com.google.common.collect.ImmutableList;
 
 /** Misc bundle validation functions. */
 public final class BundleValidationUtils {
 
   public static void checkHasValuesOrAlternatives(AbiTargeting targeting, String directoryPath) {
     if (targeting.getValueCount() == 0 && targeting.getAlternativesCount() == 0) {
-      throw ValidationException.builder()
-          .withMessage("Directory '%s' has set but empty ABI targeting.", directoryPath)
+      throw InvalidBundleException.builder()
+          .withUserMessage("Directory '%s' has set but empty ABI targeting.", directoryPath)
           .build();
     }
   }
@@ -38,8 +42,9 @@ public final class BundleValidationUtils {
   public static void checkHasValuesOrAlternatives(
       GraphicsApiTargeting targeting, String directoryPath) {
     if (targeting.getValueCount() == 0 && targeting.getAlternativesCount() == 0) {
-      throw ValidationException.builder()
-          .withMessage("Directory '%s' has set but empty Graphics API targeting.", directoryPath)
+      throw InvalidBundleException.builder()
+          .withUserMessage(
+              "Directory '%s' has set but empty Graphics API targeting.", directoryPath)
           .build();
     }
   }
@@ -47,8 +52,8 @@ public final class BundleValidationUtils {
   public static void checkHasValuesOrAlternatives(
       LanguageTargeting targeting, String directoryPath) {
     if (targeting.getValueCount() == 0 && targeting.getAlternativesCount() == 0) {
-      throw ValidationException.builder()
-          .withMessage("Directory '%s' has set but empty language targeting.", directoryPath)
+      throw InvalidBundleException.builder()
+          .withUserMessage("Directory '%s' has set but empty language targeting.", directoryPath)
           .build();
     }
   }
@@ -56,8 +61,8 @@ public final class BundleValidationUtils {
   public static void checkHasValuesOrAlternatives(
       TextureCompressionFormatTargeting targeting, String directoryPath) {
     if (targeting.getValueCount() == 0 && targeting.getAlternativesCount() == 0) {
-      throw ValidationException.builder()
-          .withMessage(
+      throw InvalidBundleException.builder()
+          .withUserMessage(
               "Directory '%s' has set but empty Texture Compression Format targeting.",
               directoryPath)
           .build();
@@ -67,6 +72,19 @@ public final class BundleValidationUtils {
   /** Checks whether directory inside the specified module contains any files. */
   public static boolean directoryContainsNoFiles(BundleModule module, ZipPath dir) {
     return module.findEntriesUnderPath(dir).count() == 0;
+  }
+
+  public static boolean isAssetOnlyBundle(ImmutableList<BundleModule> modules) {
+    return modules.stream()
+        .map(BundleModule::getBundleConfig)
+        // All modules are assumed to be part of the same bundle, with identical BundleConfig.
+        .distinct()
+        .collect(toOptional())
+        .orElseThrow(
+            () ->
+                InvalidBundleException.builder().withUserMessage("Bundle without modules.").build())
+        .getType()
+        .equals(BundleConfig.BundleType.ASSET_ONLY);
   }
 
   // Do not instantiate.

@@ -28,7 +28,7 @@ import static com.google.common.truth.extensions.proto.ProtoTruth.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.android.bundle.Targeting.ModuleTargeting;
-import com.android.tools.build.bundletool.model.exceptions.ValidationException;
+import com.android.tools.build.bundletool.model.exceptions.InvalidBundleException;
 import com.google.common.collect.ImmutableList;
 import java.util.Optional;
 import org.junit.Test;
@@ -47,7 +47,7 @@ public class ModuleConditionsTest {
     builder.addDeviceFeatureCondition(
         DeviceFeatureCondition.create("com.android.feature", /* version= */ Optional.of(2)));
 
-    ValidationException exception = assertThrows(ValidationException.class, () -> builder.build());
+    InvalidBundleException exception = assertThrows(InvalidBundleException.class, builder::build);
 
     assertThat(exception)
         .hasMessageThat()

@@ -15,7 +15,7 @@
  */
 package com.android.tools.build.bundletool.xml;
 
-import com.android.tools.build.bundletool.model.exceptions.ValidationException;
+import com.android.tools.build.bundletool.model.exceptions.CommandExecutionException;
 import com.google.common.collect.ImmutableMap;
 import java.util.StringJoiner;
 import javax.xml.xpath.XPathConstants;
@@ -33,7 +33,10 @@ public final class XPathResolver {
       NodeList nodeList = (NodeList) xPathExpression.evaluate(node, XPathConstants.NODESET);
       return new XPathResult(nodeList);
     } catch (XPathExpressionException e) {
-      throw new ValidationException("Error evaluating the XPath expression.", e);
+      throw CommandExecutionException.builder()
+          .withInternalMessage("Error evaluating the XPath expression.")
+          .withCause(e)
+          .build();
     }
   }
 

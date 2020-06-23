@@ -34,45 +34,46 @@ import java.util.function.BiFunction;
 /** Serializes split APKs on disk. */
 public class SplitApkSerializer {
 
-  private final ApkPathManager apkPathManager;
   private final ApkSerializerHelper apkSerializerHelper;
 
   public SplitApkSerializer(
-      ApkPathManager apkPathManager,
       Aapt2Command aapt2Command,
       Optional<SigningConfiguration> signingConfig,
       Optional<SigningConfiguration> stampSigningConfig,
       Version bundleVersion,
       Compression compression) {
-    this.apkPathManager = apkPathManager;
     this.apkSerializerHelper =
         new ApkSerializerHelper(
             aapt2Command, signingConfig, stampSigningConfig, bundleVersion, compression);
   }
 
   /** Writes the installable split to disk. */
-  public ApkDescription writeSplitToDisk(ModuleSplit split, Path outputDirectory) {
-    return writeToDisk(split, outputDirectory, ApkDescription.Builder::setSplitApkMetadata);
+  public ApkDescription writeSplitToDisk(ModuleSplit split, Path outputDirectory, ZipPath apkPath) {
+    return writeToDisk(
+        split, outputDirectory, ApkDescription.Builder::setSplitApkMetadata, apkPath);
   }
 
   /** Writes the instant split to disk. */
-  public ApkDescription writeInstantSplitToDisk(ModuleSplit split, Path outputDirectory) {
-    return writeToDisk(split, outputDirectory, ApkDescription.Builder::setInstantApkMetadata);
+  public ApkDescription writeInstantSplitToDisk(
+      ModuleSplit split, Path outputDirectory, ZipPath apkPath) {
+    return writeToDisk(
+        split, outputDirectory, ApkDescription.Builder::setInstantApkMetadata, apkPath);
   }
 
   /** Writes the asset slice to disk. */
-  public ApkDescription writeAssetSliceToDisk(ModuleSplit split, Path outputDirectory) {
-    return writeToDisk(split, outputDirectory, ApkDescription.Builder::setAssetSliceMetadata);
+  public ApkDescription writeAssetSliceToDisk(
+      ModuleSplit split, Path outputDirectory, ZipPath apkPath) {
+    return writeToDisk(
+        split, outputDirectory, ApkDescription.Builder::setAssetSliceMetadata, apkPath);
   }
 
   /** Writes the given split to the path subdirectory in the APK Set. */
   private ApkDescription writeToDisk(
       ModuleSplit split,
       Path outputDirectory,
-      BiFunction<ApkDescription.Builder, SplitApkMetadata, ApkDescription.Builder> setApkMetadata) {
+      BiFunction<ApkDescription.Builder, SplitApkMetadata, ApkDescription.Builder> setApkMetadata,
+      ZipPath apkPath) {
     checkState(isDirectory(outputDirectory), "Output directory does not exist.");
-
-    ZipPath apkPath = apkPathManager.getApkPath(split);
 
     apkSerializerHelper.writeToZipFile(split, outputDirectory.resolve(apkPath.toString()));
     ApkDescription.Builder builder =

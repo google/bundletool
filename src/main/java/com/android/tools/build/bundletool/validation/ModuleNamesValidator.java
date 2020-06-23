@@ -18,7 +18,7 @@ package com.android.tools.build.bundletool.validation;
 import com.android.tools.build.bundletool.model.BundleModule;
 import com.android.tools.build.bundletool.model.BundleModule.ModuleType;
 import com.android.tools.build.bundletool.model.BundleModuleName;
-import com.android.tools.build.bundletool.model.exceptions.ValidationException;
+import com.android.tools.build.bundletool.model.exceptions.InvalidBundleException;
 import com.google.common.collect.ImmutableList;
 import java.util.HashSet;
 import java.util.Optional;
@@ -44,23 +44,25 @@ final class ModuleNamesValidator extends SubValidator {
 
       if (moduleName.equals(BundleModuleName.BASE_MODULE_NAME)) {
         if (splitId.isPresent()) {
-          throw new ValidationException(
-              "The base module should not have the 'split' attribute set in the "
-                  + "AndroidManifest.xml");
+          throw InvalidBundleException.builder()
+              .withUserMessage(
+                  "The base module should not have the 'split' attribute set in the "
+                      + "AndroidManifest.xml")
+              .build();
         }
       } else {
         if (splitId.isPresent()) {
           if (!splitId.get().equals(moduleName.getName())) {
-            throw ValidationException.builder()
-                .withMessage(
+            throw InvalidBundleException.builder()
+                .withUserMessage(
                     "The 'split' attribute in the AndroidManifest.xml of modules must be the name "
                         + "of the module, but has the value '%s' in module '%s'",
                     splitId.get(), moduleName)
                 .build();
           }
         } else {
-          throw ValidationException.builder()
-              .withMessage(
+          throw InvalidBundleException.builder()
+              .withUserMessage(
                   "No 'split' attribute found in the AndroidManifest.xml of module '%s'.",
                   moduleName)
               .build();
@@ -70,25 +72,30 @@ final class ModuleNamesValidator extends SubValidator {
       boolean alreadyPresent = !moduleNames.add(moduleName);
       if (alreadyPresent) {
         if (splitId.isPresent()) {
-          throw ValidationException.builder()
-              .withMessage(
+          throw InvalidBundleException.builder()
+              .withUserMessage(
                   "More than one module have the 'split' attribute set to '%s' in the "
                       + "AndroidManifest.xml.",
                   splitId.get())
               .build();
         } else if (isFeatureModule) {
-          throw new ValidationException(
-              "More than one module was found without the 'split' attribute set in the "
-                  + "AndroidManifest.xml. Ensure that all the dynamic features have the 'split' "
-                  + "attribute correctly set in the AndroidManifest.xml.");
+          throw InvalidBundleException.builder()
+              .withUserMessage(
+                  "More than one module was found without the 'split' attribute set in the"
+                      + " AndroidManifest.xml. Ensure that all the dynamic features have the"
+                      + " 'split' attribute correctly set in the AndroidManifest.xml.")
+              .build();
         }
       }
     }
 
-    if (!moduleNames.contains(BundleModuleName.BASE_MODULE_NAME)) {
-      throw new ValidationException(
-          "No base module found. At least one module must not have a 'split' attribute set in the "
-              + "AndroidManifest.xml.");
+    if (!BundleValidationUtils.isAssetOnlyBundle(modules)
+        && !moduleNames.contains(BundleModuleName.BASE_MODULE_NAME)) {
+      throw InvalidBundleException.builder()
+          .withUserMessage(
+              "No base module found. At least one module must not have a 'split' attribute set in"
+                  + " the AndroidManifest.xml.")
+          .build();
     }
   }
 }

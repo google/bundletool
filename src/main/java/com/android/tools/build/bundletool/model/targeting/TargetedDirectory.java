@@ -22,7 +22,7 @@ import static com.google.common.collect.MoreCollectors.toOptional;
 
 import com.android.bundle.Targeting.AssetsDirectoryTargeting;
 import com.android.tools.build.bundletool.model.ZipPath;
-import com.android.tools.build.bundletool.model.exceptions.ValidationException;
+import com.android.tools.build.bundletool.model.exceptions.InvalidBundleException;
 import com.google.auto.value.AutoValue;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
@@ -141,8 +141,8 @@ public abstract class TargetedDirectory {
         TargetingDimension lastSegmentDimension =
             targetedDirectorySegment.getTargetingDimension().get();
         if (coveredDimensions.contains(lastSegmentDimension)) {
-          throw ValidationException.builder()
-              .withMessage(
+          throw InvalidBundleException.builder()
+              .withUserMessage(
                   "Duplicate targeting dimension '%s' on path '%s'.",
                   lastSegmentDimension, directoryPath)
               .build();

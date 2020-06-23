@@ -25,7 +25,7 @@ import com.android.bundle.Config.SplitDimension;
 import com.android.bundle.Config.SplitDimension.Value;
 import com.android.bundle.Config.SuffixStripping;
 import com.android.tools.build.bundletool.model.AppBundle;
-import com.android.tools.build.bundletool.model.exceptions.ValidationException;
+import com.android.tools.build.bundletool.model.exceptions.InvalidBundleException;
 import com.android.tools.build.bundletool.model.utils.ResourcesUtils;
 import com.android.tools.build.bundletool.model.version.BundleToolVersion;
 import com.android.tools.build.bundletool.testing.AppBundleBuilder;
@@ -59,9 +59,10 @@ public final class BundleConfigValidatorTest {
         createAppBundle(
             BundleConfigBuilder.create().clearCompression().addUncompressedGlob("res/raw\\"));
 
-    ValidationException e =
+    InvalidBundleException e =
         assertThrows(
-            ValidationException.class, () -> new BundleConfigValidator().validateBundle(appBundle));
+            InvalidBundleException.class,
+            () -> new BundleConfigValidator().validateBundle(appBundle));
     assertThat(e).hasMessageThat().contains("Invalid uncompressed glob: 'res/raw\\'.");
   }
 
@@ -73,9 +74,10 @@ public final class BundleConfigValidatorTest {
                 .clearCompression()
                 .addUncompressedGlob("res\\\\raw\\\\**"));
 
-    ValidationException e =
+    InvalidBundleException e =
         assertThrows(
-            ValidationException.class, () -> new BundleConfigValidator().validateBundle(appBundle));
+            InvalidBundleException.class,
+            () -> new BundleConfigValidator().validateBundle(appBundle));
     assertThat(e).hasMessageThat().contains("Invalid uncompressed glob: 'res\\\\raw\\\\**'.");
   }
 
@@ -87,9 +89,10 @@ public final class BundleConfigValidatorTest {
                 .clearCompression()
                 .addUncompressedGlob("res/raw/**\nassets/raw/**"));
 
-    ValidationException e =
+    InvalidBundleException e =
         assertThrows(
-            ValidationException.class, () -> new BundleConfigValidator().validateBundle(appBundle));
+            InvalidBundleException.class,
+            () -> new BundleConfigValidator().validateBundle(appBundle));
     assertThat(e)
         .hasMessageThat()
         .contains("Invalid uncompressed glob: 'res/raw/**\nassets/raw/**'.");
@@ -116,9 +119,10 @@ public final class BundleConfigValidatorTest {
                 .addSplitDimension(SplitDimension.Value.ABI)
                 .addSplitDimension(SplitDimension.Value.ABI));
 
-    ValidationException exception =
+    InvalidBundleException exception =
         assertThrows(
-            ValidationException.class, () -> new BundleConfigValidator().validateBundle(appBundle));
+            InvalidBundleException.class,
+            () -> new BundleConfigValidator().validateBundle(appBundle));
     assertThat(exception).hasMessageThat().contains("duplicate split dimensions:");
   }
 
@@ -144,9 +148,10 @@ public final class BundleConfigValidatorTest {
                 .clearOptimizations()
                 .addSplitDimension(SplitDimension.newBuilder().setValueValue(1234).build()));
 
-    ValidationException exception =
+    InvalidBundleException exception =
         assertThrows(
-            ValidationException.class, () -> new BundleConfigValidator().validateBundle(appBundle));
+            InvalidBundleException.class,
+            () -> new BundleConfigValidator().validateBundle(appBundle));
     assertThat(exception)
         .hasMessageThat()
         .contains("BundleConfig.pb contains an unrecognized split dimension.");
@@ -195,9 +200,10 @@ public final class BundleConfigValidatorTest {
                         .setSuffixStripping(SuffixStripping.newBuilder().setEnabled(true))
                         .build()));
 
-    ValidationException exception =
+    InvalidBundleException exception =
         assertThrows(
-            ValidationException.class, () -> new BundleConfigValidator().validateBundle(appBundle));
+            InvalidBundleException.class,
+            () -> new BundleConfigValidator().validateBundle(appBundle));
     assertThat(exception)
         .hasMessageThat()
         .contains(
@@ -236,9 +242,10 @@ public final class BundleConfigValidatorTest {
                                 .setDefaultSuffix("unrecognized_tcf"))
                         .build()));
 
-    ValidationException exception =
+    InvalidBundleException exception =
         assertThrows(
-            ValidationException.class, () -> new BundleConfigValidator().validateBundle(appBundle));
+            InvalidBundleException.class,
+            () -> new BundleConfigValidator().validateBundle(appBundle));
     assertThat(exception)
         .hasMessageThat()
         .contains(
@@ -255,9 +262,10 @@ public final class BundleConfigValidatorTest {
                 .addSplitDimension(SplitDimension.Value.ABI, /* negate= */ false)
                 .addSplitDimension(SplitDimension.Value.ABI, /* negate= */ true));
 
-    ValidationException exception =
+    InvalidBundleException exception =
         assertThrows(
-            ValidationException.class, () -> new BundleConfigValidator().validateBundle(appBundle));
+            InvalidBundleException.class,
+            () -> new BundleConfigValidator().validateBundle(appBundle));
     assertThat(exception).hasMessageThat().contains("duplicate split dimensions");
   }
 
@@ -279,9 +287,10 @@ public final class BundleConfigValidatorTest {
   public void version_invalid_throws() throws Exception {
     AppBundle appBundle = createAppBundle(BundleConfigBuilder.create().setVersion("blah"));
 
-    ValidationException e =
+    InvalidBundleException e =
         assertThrows(
-            ValidationException.class, () -> new BundleConfigValidator().validateBundle(appBundle));
+            InvalidBundleException.class,
+            () -> new BundleConfigValidator().validateBundle(appBundle));
     assertThat(e).hasMessageThat().contains("Invalid version");
   }
 
@@ -333,9 +342,10 @@ public final class BundleConfigValidatorTest {
                         .setManifest(androidManifest("com.test.app")))
             .build();
 
-    ValidationException e =
+    InvalidBundleException e =
         assertThrows(
-            ValidationException.class, () -> new BundleConfigValidator().validateBundle(appBundle));
+            InvalidBundleException.class,
+            () -> new BundleConfigValidator().validateBundle(appBundle));
     assertThat(e)
         .hasMessageThat()
         .contains(

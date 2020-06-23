@@ -24,7 +24,7 @@ import com.android.bundle.Files.TargetedNativeDirectory;
 import com.android.bundle.Targeting.NativeDirectoryTargeting;
 import com.android.tools.build.bundletool.model.BundleModule;
 import com.android.tools.build.bundletool.model.ZipPath;
-import com.android.tools.build.bundletool.model.exceptions.ValidationException;
+import com.android.tools.build.bundletool.model.exceptions.InvalidBundleException;
 import com.google.common.collect.Sets;
 import com.google.common.collect.Sets.SetView;
 
@@ -42,16 +42,16 @@ public class NativeTargetingValidator extends SubValidator {
       NativeDirectoryTargeting targeting = targetedDirectory.getTargeting();
 
       if (!targeting.hasAbi()) {
-        throw ValidationException.builder()
-            .withMessage(
+        throw InvalidBundleException.builder()
+            .withUserMessage(
                 "Targeted native directory '%s' does not have the ABI dimension set.",
                 targetedDirectory.getPath())
             .build();
       }
 
       if (!path.startsWith(LIB_DIRECTORY) || path.getNameCount() != 2) {
-        throw ValidationException.builder()
-            .withMessage(
+        throw InvalidBundleException.builder()
+            .withUserMessage(
                 "Path of targeted native directory must be in format 'lib/<directory>' but "
                     + "found '%s'.",
                 path)
@@ -59,22 +59,25 @@ public class NativeTargetingValidator extends SubValidator {
       }
 
       if (BundleValidationUtils.directoryContainsNoFiles(module, path)) {
-        throw ValidationException.builder()
-            .withMessage("Targeted directory '%s' is empty.", path)
+        throw InvalidBundleException.builder()
+            .withUserMessage("Targeted directory '%s' is empty.", path)
             .build();
       }
     }
 
-    SetView<String> libDirsWithoutTargeting = Sets.difference(
-        module.findEntriesUnderPath(LIB_DIRECTORY)
-            .map(libFile -> libFile.getPath().subpath(0, 2).toString())
-            .collect(toImmutableSet()),
-        nativeLibraries.getDirectoryList().stream()
-            .map(TargetedNativeDirectory::getPath)
-            .collect(toImmutableSet()));
+    SetView<String> libDirsWithoutTargeting =
+        Sets.difference(
+            module
+                .findEntriesUnderPath(LIB_DIRECTORY)
+                .map(libFile -> libFile.getPath().subpath(0, 2).toString())
+                .collect(toImmutableSet()),
+            nativeLibraries.getDirectoryList().stream()
+                .map(TargetedNativeDirectory::getPath)
+                .collect(toImmutableSet()));
     if (!libDirsWithoutTargeting.isEmpty()) {
-      throw ValidationException.builder()
-          .withMessage("Following native directories are not targeted: %s", libDirsWithoutTargeting)
+      throw InvalidBundleException.builder()
+          .withUserMessage(
+              "Following native directories are not targeted: %s", libDirsWithoutTargeting)
           .build();
     }
   }

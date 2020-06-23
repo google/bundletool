@@ -56,7 +56,9 @@ public final class SplitsProtoXmlBuilder {
   public SplitsProtoXmlBuilder addLanguageMapping(
       BundleModuleName module, String language, String splitId) {
     if (splitsByModuleAndLanguage.contains(module.getNameForSplitId(), language)) {
-      throw new CommandExecutionException("Multiple module->language mapping assign.");
+      throw CommandExecutionException.builder()
+          .withInternalMessage("Multiple modules are assigned to the '%s' language.", language)
+          .build();
     }
     splitsByModuleAndLanguage.put(module.getNameForSplitId(), language, splitId);
     return this;

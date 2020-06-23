@@ -40,10 +40,12 @@ final class CommandUtils {
                     .locateAdb(systemEnvironmentProvider)
                     .orElseThrow(
                         () ->
-                            new CommandExecutionException(
-                                "Unable to determine the location of ADB. Please set the --adb "
-                                    + "flag or define ANDROID_HOME or PATH environment "
-                                    + "variable.")));
+                            CommandExecutionException.builder()
+                                .withInternalMessage(
+                                    "Unable to determine the location of ADB. Please set the --adb "
+                                        + "flag or define ANDROID_HOME or PATH environment "
+                                        + "variable.")
+                                .build()));
   }
 
   static Optional<String> getDeviceSerialName(
@@ -63,8 +65,10 @@ final class CommandUtils {
         .map(Aapt2Command::createFromExecutablePath)
         .orElseThrow(
             () ->
-                new CommandExecutionException(
-                    "Could not extract aapt2: consider updating bundletool to a more recent "
-                        + "version or providing the path to aapt2 using the flag --aapt2."));
+                CommandExecutionException.builder()
+                    .withInternalMessage(
+                        "Could not extract aapt2: consider updating bundletool to a more recent "
+                            + "version or providing the path to aapt2 using the flag --aapt2.")
+                    .build());
   }
 }

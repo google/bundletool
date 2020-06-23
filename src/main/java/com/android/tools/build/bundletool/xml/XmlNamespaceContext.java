@@ -17,7 +17,7 @@ package com.android.tools.build.bundletool.xml;
 
 import static com.google.common.collect.ImmutableMap.toImmutableMap;
 
-import com.android.tools.build.bundletool.model.exceptions.ValidationException;
+import com.android.tools.build.bundletool.model.exceptions.CommandExecutionException;
 import com.android.tools.build.bundletool.model.utils.xmlproto.XmlProtoElement;
 import com.android.tools.build.bundletool.model.utils.xmlproto.XmlProtoNamespace;
 import com.android.tools.build.bundletool.model.utils.xmlproto.XmlProtoNode;
@@ -59,8 +59,8 @@ public final class XmlNamespaceContext implements NamespaceContext {
       namespaceUri = XmlUtils.COMMON_NAMESPACE_PREFIXES.inverse().get(prefix);
     }
     if (namespaceUri == null) {
-      throw ValidationException.builder()
-          .withMessage("Namespace prefix '%s' not found.", prefix)
+      throw CommandExecutionException.builder()
+          .withInternalMessage("Namespace prefix '%s' not found.", prefix)
           .build();
     }
     return namespaceUri;

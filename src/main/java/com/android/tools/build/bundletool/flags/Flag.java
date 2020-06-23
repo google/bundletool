@@ -32,7 +32,7 @@ import com.google.common.base.Splitter;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
-import com.google.common.io.Files;
+import com.google.common.io.MoreFiles;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Path;
@@ -352,7 +352,7 @@ public abstract class Flag<T> {
 
     private static String readPasswordFromFile(Path passwordFile) {
       try {
-        return Files.asCharSource(passwordFile.toFile(), UTF_8).readFirstLine();
+        return MoreFiles.asCharSource(passwordFile, UTF_8).readFirstLine();
       } catch (IOException e) {
         throw new UncheckedIOException(
             String.format("Unable to read password from file '%s'.", passwordFile), e);

@@ -92,7 +92,7 @@ public abstract class SigningConfiguration {
     } catch (KeyStoreException e) {
       throw CommandExecutionException.builder()
           .withCause(e)
-          .withMessage("Unable to build a keystore instance: " + e.getMessage())
+          .withInternalMessage("Unable to build a keystore instance: " + e.getMessage())
           .build();
     }
 
@@ -113,7 +113,10 @@ public abstract class SigningConfiguration {
         keystore.load(keystoreInputStream, keystorePassword.getPassword());
       } catch (IOException e) {
         if (e.getCause() instanceof UnrecoverableKeyException) {
-          throw new CommandExecutionException("Incorrect keystore password.");
+          throw CommandExecutionException.builder()
+              .withInternalMessage("Incorrect keystore password.")
+              .withCause(e)
+              .build();
         }
         throw e;
       }
@@ -124,7 +127,10 @@ public abstract class SigningConfiguration {
           return readSigningConfigFromLoadedKeyStore(
               keystore, keyAlias, optionalKeyPassword.get().getValue().getPassword());
         } catch (UnrecoverableKeyException e) {
-          throw new CommandExecutionException("Incorrect key password.", e);
+          throw CommandExecutionException.builder()
+              .withInternalMessage("Incorrect key password.")
+              .withCause(e)
+              .build();
         }
       }
 
@@ -140,13 +146,17 @@ public abstract class SigningConfiguration {
                   System.console().readPassword("Enter password for key '%s': ", keyAlias));
           return readSigningConfigFromLoadedKeyStore(keystore, keyAlias, keyPassword.getPassword());
         } catch (UnrecoverableKeyException e) {
-          throw new CommandExecutionException("Incorrect key password.", e);
+          throw CommandExecutionException.builder()
+              .withInternalMessage("Incorrect key password.")
+              .withCause(e)
+              .build();
         }
       }
     } catch (IOException | NoSuchAlgorithmException | KeyStoreException | CertificateException e) {
       throw CommandExecutionException.builder()
           .withCause(e)
-          .withMessage("Error while loading private key and certificates from the keystore.")
+          .withInternalMessage(
+              "Error while loading private key and certificates from the keystore.")
           .build();
     } finally {
       // Destroy the passwords.
@@ -170,7 +180,7 @@ public abstract class SigningConfiguration {
     Certificate[] certChain = keystore.getCertificateChain(keyAlias);
     if (certChain == null) {
       throw CommandExecutionException.builder()
-          .withMessage("No key found with alias '%s' in keystore.", keyAlias)
+          .withInternalMessage("No key found with alias '%s' in keystore.", keyAlias)
           .build();
     }
 

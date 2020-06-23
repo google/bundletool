@@ -23,9 +23,11 @@ import static com.google.common.truth.Truth.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.android.bundle.Config.BundleConfig;
+import com.android.bundle.Config.BundleConfig.BundleType;
 import com.android.tools.build.bundletool.model.BundleModule;
 import com.android.tools.build.bundletool.model.BundleModuleName;
-import com.android.tools.build.bundletool.model.exceptions.ValidationException;
+import com.android.tools.build.bundletool.model.exceptions.InvalidBundleException;
+import com.android.tools.build.bundletool.testing.BundleModuleBuilder;
 import com.google.common.collect.ImmutableList;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -58,9 +60,9 @@ public final class ModuleNamesValidatorTest {
     BundleModule base2 =
         buildBundleModule("base").setAndroidManifestProto(androidManifest("com.app")).build();
 
-    ValidationException expected =
+    InvalidBundleException expected =
         assertThrows(
-            ValidationException.class,
+            InvalidBundleException.class,
             () -> new ModuleNamesValidator().validateAllModules(ImmutableList.of(base1, base2)));
     assertThat(expected)
         .hasMessageThat()
@@ -94,9 +96,9 @@ public final class ModuleNamesValidatorTest {
             .setAndroidManifestProto(androidManifest("com.app", withSplitId("feature")))
             .build();
 
-    ValidationException expected =
+    InvalidBundleException expected =
         assertThrows(
-            ValidationException.class,
+            InvalidBundleException.class,
             () ->
                 new ModuleNamesValidator()
                     .validateAllModules(ImmutableList.of(base, feature1, feature2)));
@@ -112,9 +114,9 @@ public final class ModuleNamesValidatorTest {
             .setAndroidManifestProto(androidManifest("com.app", withSplitId("base")))
             .build();
 
-    ValidationException expected =
+    InvalidBundleException expected =
         assertThrows(
-            ValidationException.class,
+            InvalidBundleException.class,
             () -> new ModuleNamesValidator().validateAllModules(ImmutableList.of(base)));
     assertThat(expected)
         .hasMessageThat()
@@ -130,9 +132,9 @@ public final class ModuleNamesValidatorTest {
         buildBundleModule("module")
             .setAndroidManifestProto(androidManifest("com.app", withSplitId("feature")))
             .build();
-    ValidationException expected =
+    InvalidBundleException expected =
         assertThrows(
-            ValidationException.class,
+            InvalidBundleException.class,
             () -> new ModuleNamesValidator().validateAllModules(ImmutableList.of(base, feature)));
     assertThat(expected)
         .hasMessageThat()
@@ -148,11 +150,22 @@ public final class ModuleNamesValidatorTest {
             .setAndroidManifestProto(androidManifest("com.app", withSplitId("feature")))
             .build();
 
-    ValidationException expected =
+    InvalidBundleException expected =
         assertThrows(
-            ValidationException.class,
+            InvalidBundleException.class,
             () -> new ModuleNamesValidator().validateAllModules(ImmutableList.of(feature)));
     assertThat(expected).hasMessageThat().contains("No base module found.");
+  }
+
+  @Test
+  public void assetOnly_ok() throws Exception {
+    BundleModule module =
+        new BundleModuleBuilder(
+                "asset", BundleConfig.newBuilder().setType(BundleType.ASSET_ONLY).build())
+            .setManifest(androidManifestForAssetModule("com.app"))
+            .build();
+
+    new ModuleNamesValidator().validateAllModules(ImmutableList.of(module));
   }
 
   private static BundleModule.Builder buildBundleModule(String moduleName) {

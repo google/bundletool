@@ -21,7 +21,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.android.tools.build.bundletool.io.ZipBuilder;
 import com.android.tools.build.bundletool.model.ZipPath;
-import com.android.tools.build.bundletool.model.exceptions.ValidationException;
+import com.android.tools.build.bundletool.model.exceptions.InvalidBundleException;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -59,9 +59,9 @@ public class BundleZipValidatorTest {
       // Sanity check.
       assertThat(entries).hasSize(1);
 
-      ValidationException exception =
+      InvalidBundleException exception =
           assertThrows(
-              ValidationException.class,
+              InvalidBundleException.class,
               () -> new BundleZipValidator().validateBundleZipEntry(bundleZip, entries.get(0)));
 
       assertThat(exception).hasMessageThat().contains("zip file contains directory zip entry");

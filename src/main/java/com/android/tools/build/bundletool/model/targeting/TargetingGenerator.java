@@ -38,7 +38,7 @@ import com.android.bundle.Targeting.Sanitizer.SanitizerAlias;
 import com.android.tools.build.bundletool.model.AbiName;
 import com.android.tools.build.bundletool.model.BundleModule;
 import com.android.tools.build.bundletool.model.ZipPath;
-import com.android.tools.build.bundletool.model.exceptions.ValidationException;
+import com.android.tools.build.bundletool.model.exceptions.InvalidBundleException;
 import com.android.tools.build.bundletool.model.utils.TargetingProtoUtils;
 import com.android.tools.build.bundletool.model.utils.files.FileUtils;
 import com.google.common.base.Ascii;
@@ -150,8 +150,8 @@ public class TargetingGenerator {
               .distinct()
               .collect(toImmutableList());
       if (distinctDimensions.size() > 1) {
-        throw ValidationException.builder()
-            .withMessage(
+        throw InvalidBundleException.builder()
+            .withUserMessage(
                 "Expected at most one dimension type used for targeting of '%s'. "
                     + "However, the following dimensions were used: %s.",
                 baseName, joinDimensions(distinctDimensions))
@@ -269,15 +269,15 @@ public class TargetingGenerator {
     if (!abiName.isPresent()) {
       Optional<AbiName> abiNameLowerCase = AbiName.fromLibSubDirName(token.toLowerCase());
       if (abiNameLowerCase.isPresent()) {
-        throw ValidationException.builder()
-            .withMessage(
+        throw InvalidBundleException.builder()
+            .withUserMessage(
                 "Expecting ABI name in file or directory '%s', but found '%s' "
                     + "which is not recognized. Did you mean '%s'?",
                 forFileOrDirectory, token, Ascii.toLowerCase(token))
             .build();
       }
-      throw ValidationException.builder()
-          .withMessage(
+      throw InvalidBundleException.builder()
+          .withUserMessage(
               "Expecting ABI name in file or directory '%s', but found '%s' "
                   + "which is not recognized.",
               forFileOrDirectory, token)

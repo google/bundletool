@@ -24,7 +24,7 @@ import static com.google.common.truth.Truth.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.android.tools.build.bundletool.model.BundleModule;
-import com.android.tools.build.bundletool.model.exceptions.ValidationException;
+import com.android.tools.build.bundletool.model.exceptions.InvalidBundleException;
 import com.android.tools.build.bundletool.testing.BundleModuleBuilder;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -54,9 +54,9 @@ public class DexFilesValidatorTest {
                 androidManifest("com.test.app", clearHasCode()).toByteArray())
             .build();
 
-    ValidationException exception =
+    InvalidBundleException exception =
         assertThrows(
-            ValidationException.class, () -> new DexFilesValidator().validateModule(module));
+            InvalidBundleException.class, () -> new DexFilesValidator().validateModule(module));
 
     assertThat(exception)
         .hasMessageThat()
@@ -74,9 +74,9 @@ public class DexFilesValidatorTest {
                 androidManifest("com.test.app", withHasCode(true)).toByteArray())
             .build();
 
-    ValidationException exception =
+    InvalidBundleException exception =
         assertThrows(
-            ValidationException.class, () -> new DexFilesValidator().validateModule(module));
+            InvalidBundleException.class, () -> new DexFilesValidator().validateModule(module));
 
     assertThat(exception)
         .hasMessageThat()
@@ -133,9 +133,9 @@ public class DexFilesValidatorTest {
             .setManifest(androidManifest("com.test.app"))
             .build();
 
-    ValidationException exception =
+    InvalidBundleException exception =
         assertThrows(
-            ValidationException.class, () -> new DexFilesValidator().validateModule(module));
+            InvalidBundleException.class, () -> new DexFilesValidator().validateModule(module));
 
     assertThat(exception)
         .hasMessageThat()
@@ -166,9 +166,9 @@ public class DexFilesValidatorTest {
             .setManifest(androidManifest("com.test.app"))
             .build();
 
-    ValidationException exception =
+    InvalidBundleException exception =
         assertThrows(
-            ValidationException.class, () -> new DexFilesValidator().validateModule(module));
+            InvalidBundleException.class, () -> new DexFilesValidator().validateModule(module));
 
     assertThat(exception)
         .hasMessageThat()
@@ -183,9 +183,9 @@ public class DexFilesValidatorTest {
             .setManifest(androidManifest("com.test.app"))
             .build();
 
-    ValidationException exception =
+    InvalidBundleException exception =
         assertThrows(
-            ValidationException.class, () -> new DexFilesValidator().validateModule(module));
+            InvalidBundleException.class, () -> new DexFilesValidator().validateModule(module));
 
     assertThat(exception)
         .hasMessageThat()
@@ -202,9 +202,9 @@ public class DexFilesValidatorTest {
             .setManifest(androidManifest("com.test.app"))
             .build();
 
-    ValidationException exception =
+    InvalidBundleException exception =
         assertThrows(
-            ValidationException.class, () -> new DexFilesValidator().validateModule(module));
+            InvalidBundleException.class, () -> new DexFilesValidator().validateModule(module));
 
     assertThat(exception)
         .hasMessageThat()

@@ -16,79 +16,16 @@
 
 package com.android.tools.build.bundletool.model.exceptions;
 
-import static com.google.common.base.Preconditions.checkNotNull;
-
-import com.android.bundle.Errors.BundleToolError;
-import com.google.errorprone.annotations.FormatMethod;
-import com.google.errorprone.annotations.FormatString;
-import javax.annotation.CheckReturnValue;
-import javax.annotation.Nullable;
+import com.android.bundle.Errors.BundleToolError.ErrorType;
 
 /** Error indicating something went wrong during executing the command. */
-public class CommandExecutionException extends RuntimeException {
+public class CommandExecutionException extends BundleToolException {
 
-  public CommandExecutionException(String message) {
-    super(message);
+  public CommandExecutionException(String userMessage, String internalMessage, Throwable cause) {
+    super(ErrorType.COMMAND_EXECUTION_ERROR, userMessage, internalMessage, cause);
   }
 
-  public CommandExecutionException(String message, Throwable cause) {
-    super(message, cause);
-  }
-
-  public CommandExecutionException(Throwable cause) {
-    super(cause);
-  }
-
-  public BundleToolError toProto() {
-    BundleToolError.Builder builder =
-        BundleToolError.newBuilder().setExceptionMessage(getMessage());
-    customizeProto(builder);
-    return builder.build();
-  }
-
-  protected void customizeProto(BundleToolError.Builder builder) {}
-
-  public static Builder builder() {
-    return new Builder();
-  }
-
-  /** Builder for the {@link CommandExecutionException} */
-  public static class Builder {
-
-    @Nullable protected Throwable cause;
-    @Nullable protected String message;
-
-    public Builder withCause(Throwable cause) {
-      this.cause = cause;
-      return this;
-    }
-
-    public Builder withMessage(String message) {
-      this.message = message;
-      return this;
-    }
-
-    @FormatMethod
-    public Builder withMessage(@FormatString String message, Object... args) {
-      this.message = String.format(checkNotNull(message), args);
-      return this;
-    }
-
-    @CheckReturnValue
-    public CommandExecutionException build() {
-      if (message != null) {
-        if (cause != null) {
-          return new CommandExecutionException(message, cause);
-        } else {
-          return new CommandExecutionException(message);
-        }
-      } else {
-        if (cause != null) {
-          return new CommandExecutionException(cause);
-        } else {
-          return new CommandExecutionException("");
-        }
-      }
-    }
+  public static InternalExceptionBuilder<? extends CommandExecutionException> builder() {
+    return new InternalExceptionBuilder<>(CommandExecutionException::new);
   }
 }

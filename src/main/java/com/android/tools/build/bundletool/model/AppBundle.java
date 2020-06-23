@@ -16,7 +16,7 @@
 
 package com.android.tools.build.bundletool.model;
 
-import static com.android.tools.build.bundletool.model.version.VersionGuardedFeature.ABI_SANITIZER_DISABLED;
+import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.ImmutableMap.toImmutableMap;
 import static com.google.common.collect.ImmutableSet.toImmutableSet;
@@ -27,11 +27,8 @@ import com.android.bundle.Files.TargetedNativeDirectory;
 import com.android.bundle.Targeting.Abi;
 import com.android.bundle.Targeting.NativeDirectoryTargeting;
 import com.android.tools.build.bundletool.model.BundleModule.ModuleType;
-import com.android.tools.build.bundletool.model.exceptions.CommandExecutionException;
-import com.android.tools.build.bundletool.model.exceptions.ValidationException;
+import com.android.tools.build.bundletool.model.exceptions.InvalidBundleException;
 import com.android.tools.build.bundletool.model.utils.ZipUtils;
-import com.android.tools.build.bundletool.model.utils.files.BufferedIo;
-import com.android.tools.build.bundletool.model.version.BundleToolVersion;
 import com.android.tools.build.bundletool.model.version.Version;
 import com.google.auto.value.AutoValue;
 import com.google.common.collect.ImmutableList;
@@ -41,7 +38,7 @@ import com.google.common.collect.Maps;
 import com.google.errorprone.annotations.Immutable;
 import com.google.protobuf.InvalidProtocolBufferException;
 import java.io.IOException;
-import java.io.InputStream;
+import java.io.UncheckedIOException;
 import java.util.Collection;
 import java.util.Enumeration;
 import java.util.HashMap;
@@ -70,7 +67,7 @@ public abstract class AppBundle {
   public static AppBundle buildFromZip(ZipFile bundleFile) {
     BundleConfig bundleConfig = readBundleConfig(bundleFile);
     return buildFromModules(
-        sanitize(extractModules(bundleFile, bundleConfig), bundleConfig),
+        sanitize(extractModules(bundleFile, bundleConfig)),
         bundleConfig,
         readBundleMetadata(bundleFile));
   }
@@ -131,11 +128,7 @@ public abstract class AppBundle {
 
   public BundleModule getModule(BundleModuleName moduleName) {
     BundleModule module = getModules().get(moduleName);
-    if (module == null) {
-      throw CommandExecutionException.builder()
-          .withMessage("Module '%s' not found.", moduleName)
-          .build();
-    }
+    checkState(module != null, "Module '%s' not found.", moduleName);
     return module;
   }
 
@@ -235,15 +228,14 @@ public abstract class AppBundle {
         moduleBuilder.addEntry(
             ModuleEntry.builder()
                 .setPath(ZipUtils.convertBundleToModulePath(ZipPath.create(entry.getName())))
-                .setContentSupplier(InputStreamSuppliers.fromZipEntry(entry, bundleFile))
+                .setContent(ZipUtils.asByteSource(bundleFile, entry))
                 .build());
       } catch (IOException e) {
-        throw ValidationException.builder()
-            .withCause(e)
-            .withMessage(
+        throw new UncheckedIOException(
+            String.format(
                 "Error processing zip entry '%s' of module '%s'.",
-                entry.getName(), moduleName.get())
-            .build();
+                entry.getName(), moduleName.get()),
+            e);
       }
     }
     return moduleBuilders.values().stream()
@@ -254,23 +246,21 @@ public abstract class AppBundle {
   private static BundleConfig readBundleConfig(ZipFile bundleFile) {
     ZipEntry bundleConfigEntry = bundleFile.getEntry(BUNDLE_CONFIG_FILE_NAME);
     if (bundleConfigEntry == null) {
-      throw ValidationException.builder()
-          .withMessage("File '%s' was not found.", BUNDLE_CONFIG_FILE_NAME)
+      throw InvalidBundleException.builder()
+          .withUserMessage("File '%s' was not found.", BUNDLE_CONFIG_FILE_NAME)
           .build();
     }
 
-    try (InputStream is = BufferedIo.inputStream(bundleFile, bundleConfigEntry)) {
-      return BundleConfig.parseFrom(is);
+    try {
+      return BundleConfig.parseFrom(ZipUtils.asByteSource(bundleFile, bundleConfigEntry).read());
     } catch (InvalidProtocolBufferException e) {
-      throw ValidationException.builder()
+      throw InvalidBundleException.builder()
           .withCause(e)
-          .withMessage("Bundle config '%s' could not be parsed.", BUNDLE_CONFIG_FILE_NAME)
+          .withUserMessage("Bundle config '%s' could not be parsed.", BUNDLE_CONFIG_FILE_NAME)
           .build();
     } catch (IOException e) {
-      throw CommandExecutionException.builder()
-          .withCause(e)
-          .withMessage("Error reading file '%s'.", BUNDLE_CONFIG_FILE_NAME)
-          .build();
+      throw new UncheckedIOException(
+          String.format("Error reading file '%s'.", BUNDLE_CONFIG_FILE_NAME), e);
     }
   }
 
@@ -283,19 +273,14 @@ public abstract class AppBundle {
               ZipPath bundlePath = ZipPath.create(zipEntry.getName());
               // Strip the top-level metadata directory.
               ZipPath metadataPath = bundlePath.subpath(1, bundlePath.getNameCount());
-              metadata.addFile(metadataPath, BufferedIo.inputStreamSupplier(bundleFile, zipEntry));
+              metadata.addFile(metadataPath, ZipUtils.asByteSource(bundleFile, zipEntry));
             });
     return metadata.build();
   }
 
   @CheckReturnValue
   private static ImmutableList<BundleModule> sanitize(
-      ImmutableList<BundleModule> modules, BundleConfig bundleConfig) {
-    Version bundleVersion = BundleToolVersion.getVersionFromBundleConfig(bundleConfig);
-    if (!ABI_SANITIZER_DISABLED.enabledForVersion(bundleVersion)) {
-      // This is a temporary fix to cope with inconsistent ABIs.
-      modules = modules.stream().map(new ModuleAbiSanitizer()::sanitize).collect(toImmutableList());
-    }
+      ImmutableList<BundleModule> modules) {
     // This is a temporary fix to work around a bug in gradle that creates a file named classes1.dex
     modules =
         modules.stream().map(new ClassesDexNameSanitizer()::sanitize).collect(toImmutableList());

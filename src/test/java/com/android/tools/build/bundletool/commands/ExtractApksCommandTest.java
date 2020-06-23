@@ -71,8 +71,9 @@ import com.android.bundle.Targeting.VariantTargeting;
 import com.android.tools.build.bundletool.TestData;
 import com.android.tools.build.bundletool.flags.FlagParser;
 import com.android.tools.build.bundletool.model.ZipPath;
-import com.android.tools.build.bundletool.model.exceptions.CommandExecutionException;
-import com.android.tools.build.bundletool.model.exceptions.ValidationException;
+import com.android.tools.build.bundletool.model.exceptions.IncompatibleDeviceException;
+import com.android.tools.build.bundletool.model.exceptions.InvalidCommandException;
+import com.android.tools.build.bundletool.model.exceptions.InvalidDeviceSpecException;
 import com.android.tools.build.bundletool.model.version.BundleToolVersion;
 import com.google.common.base.Splitter;
 import com.google.common.collect.ImmutableList;
@@ -224,7 +225,7 @@ public class ExtractApksCommandTest {
                     "--apks=" + apksArchiveFile,
                     "--modules=unknown_module"));
 
-    Throwable exception = assertThrows(ValidationException.class, () -> command.execute());
+    Throwable exception = assertThrows(InvalidCommandException.class, command::execute);
 
     assertThat(exception)
         .hasMessageThat()
@@ -241,7 +242,7 @@ public class ExtractApksCommandTest {
                 .parse(
                     "--device-spec=" + deviceSpecFile, "--apks=" + apksArchiveFile, "--modules="));
 
-    Throwable exception = assertThrows(ValidationException.class, () -> command.execute());
+    Throwable exception = assertThrows(InvalidCommandException.class, command::execute);
 
     assertThat(exception).hasMessageThat().contains("The set of modules cannot be empty.");
   }
@@ -276,14 +277,13 @@ public class ExtractApksCommandTest {
 
     Throwable exception =
         assertThrows(
-            CommandExecutionException.class,
+            InvalidDeviceSpecException.class,
             () ->
                 ExtractApksCommand.fromFlags(
                     new FlagParser()
                         .parse("--device-spec=" + deviceSpecFile, "--apks=" + apksArchiveFile)));
 
     assertThat(exception).hasMessageThat().contains("Expected .json extension for the device spec");
-    assertThat(exception).hasMessageThat().contains("bad_filename.dat");
   }
 
   @Test
@@ -295,7 +295,7 @@ public class ExtractApksCommandTest {
 
     Throwable exception =
         assertThrows(
-            ValidationException.class,
+            InvalidDeviceSpecException.class,
             () ->
                 ExtractApksCommand.builder()
                     .setApksArchivePath(apksArchiveFile)
@@ -672,7 +672,8 @@ public class ExtractApksCommandTest {
         ExtractApksCommand.builder().setApksArchivePath(apksPath).setDeviceSpec(abis("x86"));
 
     Throwable exception =
-        assertThrows(CommandExecutionException.class, () -> extractedApksCommand.build().execute());
+        assertThrows(
+            IncompatibleDeviceException.class, () -> extractedApksCommand.build().execute());
     assertThat(exception)
         .hasMessageThat()
         .contains(
@@ -763,7 +764,7 @@ public class ExtractApksCommandTest {
             .setDeviceSpec(deviceSpec)
             .build();
 
-    Throwable exception = assertThrows(CommandExecutionException.class, () -> command.execute());
+    Throwable exception = assertThrows(IncompatibleDeviceException.class, command::execute);
     assertThat(exception)
         .hasMessageThat()
         .contains("The app doesn't support SDK version of the device: (19).");
@@ -801,7 +802,7 @@ public class ExtractApksCommandTest {
             .setDeviceSpec(deviceSpec)
             .build();
 
-    Throwable exception = assertThrows(CommandExecutionException.class, () -> command.execute());
+    Throwable exception = assertThrows(IncompatibleDeviceException.class, command::execute);
     assertThat(exception)
         .hasMessageThat()
         .contains(
@@ -1154,9 +1155,9 @@ public class ExtractApksCommandTest {
 
     DeviceSpec deviceSpec = deviceWithSdk(21);
 
-    CommandExecutionException exception =
+    IncompatibleDeviceException exception =
         assertThrows(
-            CommandExecutionException.class,
+            IncompatibleDeviceException.class,
             () ->
                 ExtractApksCommand.builder()
                     .setApksArchivePath(apksArchiveFile)
@@ -1190,9 +1191,9 @@ public class ExtractApksCommandTest {
 
     DeviceSpec deviceSpec = deviceWithSdk(26);
 
-    CommandExecutionException exception =
+    IncompatibleDeviceException exception =
         assertThrows(
-            CommandExecutionException.class,
+            IncompatibleDeviceException.class,
             () ->
                 ExtractApksCommand.builder()
                     .setApksArchivePath(apksArchiveFile)

@@ -20,7 +20,7 @@ import static com.android.tools.build.bundletool.model.BundleModuleName.isValid;
 import static com.google.common.truth.Truth.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
-import com.android.tools.build.bundletool.model.BundleModuleName.InvalidBundleModuleNameException;
+import com.android.tools.build.bundletool.model.exceptions.InvalidBundleException;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
@@ -105,8 +105,7 @@ public class BundleModuleNameTest {
 
   @Test
   public void testThrowsWhenInvalid() throws Exception {
-    assertThrows(
-        InvalidBundleModuleNameException.class, () -> BundleModuleName.create("!!invalid!!"));
+    assertThrows(InvalidBundleException.class, () -> BundleModuleName.create("!!invalid!!"));
   }
 
   @Test

@@ -16,7 +16,6 @@
 
 package com.android.tools.build.bundletool.model.utils;
 
-import static com.android.tools.build.bundletool.model.utils.ZipUtils.calculateGzipCompressedSize;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 
@@ -25,7 +24,6 @@ import com.android.bundle.Commands.Variant;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
-import java.io.InputStream;
 import java.io.UncheckedIOException;
 import java.nio.file.Path;
 import java.util.zip.ZipEntry;
@@ -58,10 +56,11 @@ public class ApkSizeUtils {
         ZipEntry entry = checkNotNull(apksZip.getEntry(apkPath));
         // It's possible that the compressed size is larger than the uncompressed one, but the
         // smallest APK is the one that is actually served.
-        try (InputStream inputStream = apksZip.getInputStream(entry)) {
-          long size = Math.min(entry.getSize(), calculateGzipCompressedSize(inputStream));
-          sizeByApkPath.put(apkPath, size);
-        }
+        long size =
+            Math.min(
+                entry.getSize(),
+                GZipUtils.calculateGzipCompressedSize(ZipUtils.asByteSource(apksZip, entry)));
+        sizeByApkPath.put(apkPath, size);
       }
     } catch (IOException e) {
       throw new UncheckedIOException(

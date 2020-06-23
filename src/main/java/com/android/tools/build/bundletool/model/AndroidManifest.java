@@ -26,8 +26,7 @@ import static java.util.function.Function.identity;
 
 import com.android.aapt.Resources.XmlNode;
 import com.android.tools.build.bundletool.model.BundleModule.ModuleType;
-import com.android.tools.build.bundletool.model.exceptions.ValidationException;
-import com.android.tools.build.bundletool.model.exceptions.manifest.ManifestFusingException.FusingMissingIncludeAttribute;
+import com.android.tools.build.bundletool.model.exceptions.InvalidBundleException;
 import com.android.tools.build.bundletool.model.utils.xmlproto.XmlProtoAttribute;
 import com.android.tools.build.bundletool.model.utils.xmlproto.XmlProtoElement;
 import com.android.tools.build.bundletool.model.utils.xmlproto.XmlProtoElementBuilder;
@@ -296,9 +295,9 @@ public abstract class AndroidManifest {
             supportsGlTextures ->
                 supportsGlTextures
                     .getAndroidAttribute(NAME_RESOURCE_ID)
-                    .<ValidationException>orElseThrow(
+                    .orElseThrow(
                         () ->
-                            new ValidationException(
+                            InvalidBundleException.createWithUserMessage(
                                 "<supports-gl-texture> element is missing the 'android:name'"
                                     + " attribute.")))
         .map(XmlProtoAttribute::getValueAsString)
@@ -340,8 +339,8 @@ public abstract class AndroidManifest {
       case MODULE_TYPE_ASSET_VALUE:
         return ModuleType.ASSET_MODULE;
       default:
-        throw ValidationException.builder()
-            .withMessage("Found invalid type attribute %s for <module> element.", value)
+        throw InvalidBundleException.builder()
+            .withUserMessage("Found invalid type attribute %s for <module> element.", value)
             .build();
     }
   }
@@ -371,11 +370,11 @@ public abstract class AndroidManifest {
                   getBundleToolVersion())) {
                 return fusing
                     .getAttribute(DISTRIBUTION_NAMESPACE_URI, "include")
-                    .orElseThrow(() -> new FusingMissingIncludeAttribute(getSplitId()));
+                    .orElseThrow(this::createFusingMissingIncludeAttributeException);
               } else {
                 return fusing
                     .getAttributeIgnoringNamespace("include")
-                    .orElseThrow(() -> new FusingMissingIncludeAttribute(getSplitId()));
+                    .orElseThrow(this::createFusingMissingIncludeAttributeException);
               }
             })
         .map(XmlProtoAttribute::getValueAsBoolean);
@@ -390,7 +389,10 @@ public abstract class AndroidManifest {
   public String getPackageName() {
     return getManifestElement()
         .getAttribute("package")
-        .orElseThrow(() -> new ValidationException("Package name not found in the manifest."))
+        .orElseThrow(
+            () ->
+                InvalidBundleException.createWithUserMessage(
+                    "Package name not found in the manifest."))
         .getValueAsString();
   }
 
@@ -423,9 +425,9 @@ public abstract class AndroidManifest {
             usesSplit ->
                 usesSplit
                     .getAndroidAttribute(NAME_RESOURCE_ID)
-                    .<ValidationException>orElseThrow(
+                    .orElseThrow(
                         () ->
-                            new ValidationException(
+                            InvalidBundleException.createWithUserMessage(
                                 "<uses-split> element is missing the 'android:name' attribute.")))
         .map(XmlProtoAttribute::getValueAsString)
         .collect(toImmutableList());
@@ -463,8 +465,8 @@ public abstract class AndroidManifest {
   public Optional<Boolean> isInstantModule() {
     if (getInstantManifestDeliveryElement().isPresent()) {
       if (!getModuleType().equals(ModuleType.ASSET_MODULE)) {
-        throw ValidationException.builder()
-            .withMessage("Instant-delivery element is only supported for asset packs.")
+        throw InvalidBundleException.builder()
+            .withUserMessage("Instant-delivery element is only supported for asset packs.")
             .build();
       }
       return getInstantManifestDeliveryElement().map(ManifestDeliveryElement::isWellFormed);
@@ -545,8 +547,8 @@ public abstract class AndroidManifest {
                     .getAndroidAttribute(VALUE_RESOURCE_ID)
                     .orElseThrow(
                         () ->
-                            ValidationException.builder()
-                                .withMessage(
+                            InvalidBundleException.builder()
+                                .withUserMessage(
                                     "Missing expected attribute 'android:value' for <meta-data> "
                                         + "element '%s'.",
                                     metadataName)
@@ -562,8 +564,8 @@ public abstract class AndroidManifest {
                     .getAndroidAttribute(RESOURCE_RESOURCE_ID)
                     .orElseThrow(
                         () ->
-                            ValidationException.builder()
-                                .withMessage(
+                            InvalidBundleException.builder()
+                                .withUserMessage(
                                     "Missing expected attribute 'android:resource' for <meta-data> "
                                         + "element '%s'.",
                                     metadataName)
@@ -595,8 +597,8 @@ public abstract class AndroidManifest {
       case 1:
         return Optional.of(metadataElements.get(0));
       default:
-        throw ValidationException.builder()
-            .withMessage(
+        throw InvalidBundleException.builder()
+            .withUserMessage(
                 "Found multiple <meta-data> elements for key '%s', expected at most one.", name)
             .build();
     }
@@ -608,6 +610,14 @@ public abstract class AndroidManifest {
         .getOptionalChildElement(APPLICATION_ELEMENT_NAME)
         .map(applicationElement -> applicationElement.getChildrenElements(META_DATA_ELEMENT_NAME))
         .orElse(Stream.of());
+  }
+
+  private InvalidBundleException createFusingMissingIncludeAttributeException() {
+    return InvalidBundleException.builder()
+        .withUserMessage(
+            "<fusing> element is missing the 'include' attribute%s.",
+            getSplitId().map(id -> " (split: '" + id + "')").orElse("base"))
+        .build();
   }
 
   public ManifestEditor toEditor() {

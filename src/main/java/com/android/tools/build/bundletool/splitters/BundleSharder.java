@@ -318,7 +318,7 @@ public class BundleSharder {
         "Density splits are expected to cover the same densities.");
     if (!sameTargetedUniverse(abiSplits, split -> abiUniverse(split.getApkTargeting()))) {
       throw CommandExecutionException.builder()
-          .withMessage(
+          .withInternalMessage(
               "Modules for standalone APKs must cover the same ABIs when optimizing for ABI.")
           .build();
     }

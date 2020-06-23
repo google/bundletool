@@ -22,7 +22,6 @@ import static com.android.tools.build.bundletool.testing.TargetingUtils.nativeDi
 import static com.android.tools.build.bundletool.testing.TargetingUtils.nativeLibraries;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.targetedNativeDirectory;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.toAbi;
-import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.truth.Truth.assertThat;
 import static com.google.common.truth.Truth8.assertThat;
 import static com.google.common.truth.extensions.proto.ProtoTruth.assertThat;
@@ -34,7 +33,7 @@ import com.android.bundle.Targeting.Abi.AbiAlias;
 import com.android.tools.build.bundletool.io.ZipBuilder;
 import com.android.tools.build.bundletool.testing.AppBundleBuilder;
 import com.android.tools.build.bundletool.testing.BundleConfigBuilder;
-import com.android.tools.build.bundletool.testing.TestUtils;
+import com.google.common.io.ByteSource;
 import java.nio.file.Path;
 import java.util.Optional;
 import java.util.zip.ZipFile;
@@ -143,26 +142,27 @@ public class AppBundleTest {
     try (ZipFile appBundleZip = new ZipFile(bundleFile.toFile())) {
       AppBundle appBundle = AppBundle.buildFromZip(appBundleZip);
 
-      Optional<InputStreamSupplier> existingMetadataFile =
+      Optional<ByteSource> existingMetadataFile =
           appBundle
               .getBundleMetadata()
-              .getFileData(/* namespacedDir= */ "some.namespace", /* fileName= */ "metadata1");
+              .getFileAsByteSource(
+                  /* namespacedDir= */ "some.namespace", /* fileName= */ "metadata1");
       assertThat(existingMetadataFile).isPresent();
-      assertThat(TestUtils.toByteArray(existingMetadataFile.get())).isEqualTo(new byte[] {0x01});
+      assertThat(existingMetadataFile.get().read()).isEqualTo(new byte[] {0x01});
 
-      Optional<InputStreamSupplier> existingMetadataFileInSubDir =
+      Optional<ByteSource> existingMetadataFileInSubDir =
           appBundle
               .getBundleMetadata()
-              .getFileData(
+              .getFileAsByteSource(
                   /* namespacedDir= */ "some.namespace/sub-dir", /* fileName= */ "metadata2");
       assertThat(existingMetadataFileInSubDir).isPresent();
-      assertThat(TestUtils.toByteArray(existingMetadataFileInSubDir.get()))
-          .isEqualTo(new byte[] {0x02});
+      assertThat(existingMetadataFileInSubDir.get().read()).isEqualTo(new byte[] {0x02});
 
-      Optional<InputStreamSupplier> nonExistingMetadataFile =
+      Optional<ByteSource> nonExistingMetadataFile =
           appBundle
               .getBundleMetadata()
-              .getFileData(/* namespacedDir= */ "unknown.namespace", /* fileName= */ "blah");
+              .getFileAsByteSource(
+                  /* namespacedDir= */ "unknown.namespace", /* fileName= */ "blah");
       assertThat(nonExistingMetadataFile).isEmpty();
     }
   }
@@ -202,52 +202,6 @@ public class AppBundleTest {
     try (ZipFile appBundleZip = new ZipFile(bundleFile.toFile())) {
       AppBundle appBundle = AppBundle.buildFromZip(appBundleZip);
       assertThat(appBundle.getBundleConfig()).isEqualTo(BUNDLE_CONFIG);
-    }
-  }
-
-  @Test
-  public void abiModuleSanitizerInvocation_calledBefore_0_3_1() throws Exception {
-    createBasicZipBuilderWithManifest(BundleConfigBuilder.create().setVersion("0.3.0").build())
-        .addFileWithContent(ZipPath.create("base/lib/x86/libfoo.so"), DUMMY_CONTENT)
-        .addFileWithContent(ZipPath.create("base/lib/armeabi/libfoo.so"), DUMMY_CONTENT)
-        .addFileWithContent(ZipPath.create("base/lib/armeabi/libbar.so"), DUMMY_CONTENT)
-        .writeTo(bundleFile);
-
-    try (ZipFile appBundleZip = new ZipFile(bundleFile.toFile())) {
-      AppBundle appBundle = AppBundle.buildFromZip(appBundleZip);
-
-      assertThat(
-              appBundle
-                  .getBaseModule()
-                  .findEntriesUnderPath(ZipPath.create("lib"))
-                  .map(ModuleEntry::getPath)
-                  .collect(toImmutableList()))
-          .containsExactly(
-              ZipPath.create("lib/armeabi/libfoo.so"), ZipPath.create("lib/armeabi/libbar.so"));
-    }
-  }
-
-  @Test
-  public void abiModuleSanitizerInvocation_notCalledAfter_0_3_1() throws Exception {
-    createBasicZipBuilderWithManifest(BundleConfigBuilder.create().setVersion("0.3.1").build())
-        .addFileWithContent(ZipPath.create("base/lib/x86/libfoo.so"), DUMMY_CONTENT)
-        .addFileWithContent(ZipPath.create("base/lib/armeabi/libfoo.so"), DUMMY_CONTENT)
-        .addFileWithContent(ZipPath.create("base/lib/armeabi/libbar.so"), DUMMY_CONTENT)
-        .writeTo(bundleFile);
-
-    try (ZipFile appBundleZip = new ZipFile(bundleFile.toFile())) {
-      AppBundle appBundle = AppBundle.buildFromZip(appBundleZip);
-
-      assertThat(
-              appBundle
-                  .getBaseModule()
-                  .findEntriesUnderPath(ZipPath.create("lib"))
-                  .map(ModuleEntry::getPath)
-                  .collect(toImmutableList()))
-          .containsExactly(
-              ZipPath.create("lib/x86/libfoo.so"),
-              ZipPath.create("lib/armeabi/libfoo.so"),
-              ZipPath.create("lib/armeabi/libbar.so"));
     }
   }
 

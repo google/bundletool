@@ -26,10 +26,11 @@ import static com.android.bundle.Targeting.Abi.AbiAlias.X86_64;
 import static com.android.bundle.Targeting.ScreenDensity.DensityAlias.HDPI;
 import static com.android.bundle.Targeting.ScreenDensity.DensityAlias.LDPI;
 import static com.android.bundle.Targeting.ScreenDensity.DensityAlias.MDPI;
+import static com.android.bundle.Targeting.TextureCompressionFormat.TextureCompressionFormatAlias.ASTC;
+import static com.android.bundle.Targeting.TextureCompressionFormat.TextureCompressionFormatAlias.ETC2;
 import static com.android.tools.build.bundletool.commands.GetSizeCommand.SUPPORTED_DIMENSIONS;
 import static com.android.tools.build.bundletool.model.GetSizeRequest.Dimension.ALL;
 import static com.android.tools.build.bundletool.model.utils.CsvFormatter.CRLF;
-import static com.android.tools.build.bundletool.model.utils.ZipUtils.calculateGzipCompressedSize;
 import static com.android.tools.build.bundletool.testing.ApksArchiveHelpers.createApkDescription;
 import static com.android.tools.build.bundletool.testing.ApksArchiveHelpers.createApksArchiveFile;
 import static com.android.tools.build.bundletool.testing.ApksArchiveHelpers.createAssetSliceSet;
@@ -44,6 +45,7 @@ import static com.android.tools.build.bundletool.testing.TargetingUtils.apkAbiTa
 import static com.android.tools.build.bundletool.testing.TargetingUtils.apkDensityTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.apkLanguageTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.apkSdkTargeting;
+import static com.android.tools.build.bundletool.testing.TargetingUtils.apkTextureTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.lPlusVariantTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.mergeApkTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.mergeVariantTargeting;
@@ -76,18 +78,18 @@ import com.android.tools.build.bundletool.model.ConfigurationSizes;
 import com.android.tools.build.bundletool.model.GetSizeRequest.Dimension;
 import com.android.tools.build.bundletool.model.SizeConfiguration;
 import com.android.tools.build.bundletool.model.ZipPath;
-import com.android.tools.build.bundletool.model.exceptions.CommandExecutionException;
-import com.android.tools.build.bundletool.model.exceptions.ValidationException;
+import com.android.tools.build.bundletool.model.exceptions.InvalidCommandException;
+import com.android.tools.build.bundletool.model.exceptions.InvalidDeviceSpecException;
+import com.android.tools.build.bundletool.model.utils.GZipUtils;
 import com.android.tools.build.bundletool.model.version.BundleToolVersion;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Sets;
+import com.google.common.io.ByteSource;
 import com.google.common.io.ByteStreams;
 import com.google.protobuf.util.JsonFormat;
-import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.FileOutputStream;
-import java.io.InputStream;
 import java.io.PrintStream;
 import java.io.Reader;
 import java.nio.file.Path;
@@ -114,9 +116,7 @@ public final class GetSizeCommandTest {
   @Before
   public void setUp() throws Exception {
     tmpDir = tmp.getRoot().toPath();
-    try (InputStream myInputStream = new ByteArrayInputStream(DUMMY_BYTES)) {
-      compressedApkSize = calculateGzipCompressedSize(myInputStream);
-    }
+    compressedApkSize = GZipUtils.calculateGzipCompressedSize(ByteSource.wrap(DUMMY_BYTES));
   }
 
   @Test
@@ -199,10 +199,9 @@ public final class GetSizeCommandTest {
                 "--device-spec=" + deviceSpecFile,
                 "--apks=" + apksArchiveFile);
     Throwable exception =
-        assertThrows(CommandExecutionException.class, () -> GetSizeCommand.fromFlags(flags));
+        assertThrows(InvalidDeviceSpecException.class, () -> GetSizeCommand.fromFlags(flags));
 
     assertThat(exception).hasMessageThat().contains("Expected .json extension for the device spec");
-    assertThat(exception).hasMessageThat().contains("bad_filename.dat");
   }
 
   @Test
@@ -221,7 +220,7 @@ public final class GetSizeCommandTest {
 
     ParsedFlags flags = new FlagParser().parse("get-size", "full", "--apks=" + apksArchiveFile);
     Throwable exception =
-        assertThrows(ValidationException.class, () -> GetSizeCommand.fromFlags(flags));
+        assertThrows(InvalidCommandException.class, () -> GetSizeCommand.fromFlags(flags));
 
     assertThat(exception).hasMessageThat().contains("Unrecognized get-size command target:");
     assertThat(exception).hasMessageThat().contains("full");
@@ -1067,12 +1066,12 @@ public final class GetSizeCommandTest {
             createMasterApkDescription(
                 ApkTargeting.getDefaultInstance(), ZipPath.create("asset1-master.apk")),
             createApkDescription(
-                apkDensityTargeting(LDPI, ImmutableSet.of(MDPI)),
-                ZipPath.create("asset1-ldpi.apk"),
+                apkTextureTargeting(ETC2, ImmutableSet.of(ASTC)),
+                ZipPath.create("asset1-tcf_etc2.apk"),
                 /* isMasterSplit= */ false),
             createApkDescription(
-                apkDensityTargeting(MDPI, ImmutableSet.of(LDPI)),
-                ZipPath.create("asset1-mdpi.apk"),
+                apkTextureTargeting(ASTC, ImmutableSet.of(ETC2)),
+                ZipPath.create("asset1-tcf_astc.apk"),
                 /* isMasterSplit= */ false));
     // Only install-time asset modules are counted towards the size.
     AssetSliceSet ignoredOnDemandAssetModule =
@@ -1098,26 +1097,27 @@ public final class GetSizeCommandTest {
     GetSizeCommand.builder()
         .setGetSizeSubCommand(GetSizeSubcommand.TOTAL)
         .setApksArchivePath(apksArchiveFile)
-        .setDimensions(ImmutableSet.of(Dimension.ABI, Dimension.SCREEN_DENSITY, Dimension.SDK))
+        .setDimensions(
+            ImmutableSet.of(Dimension.ABI, Dimension.TEXTURE_COMPRESSION_FORMAT, Dimension.SDK))
         .build()
         .getSizeTotal(new PrintStream(outputStream));
 
     assertThat(new String(outputStream.toByteArray(), UTF_8).split(CRLF))
         .asList()
         .containsExactly(
-            "SDK,ABI,SCREEN_DENSITY,MIN,MAX",
+            "SDK,ABI,TEXTURE_COMPRESSION_FORMAT,MIN,MAX",
             String.format(
                 "%s,%s,%s,%d,%d",
-                "21-", "x86_64", "MDPI", 4 * compressedApkSize, 4 * compressedApkSize),
+                "21-", "x86_64", "astc", 4 * compressedApkSize, 4 * compressedApkSize),
             String.format(
                 "%s,%s,%s,%d,%d",
-                "21-", "x86_64", "LDPI", 4 * compressedApkSize, 4 * compressedApkSize),
+                "21-", "x86_64", "etc2", 4 * compressedApkSize, 4 * compressedApkSize),
             String.format(
                 "%s,%s,%s,%d,%d",
-                "21-", "x86", "MDPI", 4 * compressedApkSize, 4 * compressedApkSize),
+                "21-", "x86", "astc", 4 * compressedApkSize, 4 * compressedApkSize),
             String.format(
                 "%s,%s,%s,%d,%d",
-                "21-", "x86", "LDPI", 4 * compressedApkSize, 4 * compressedApkSize));
+                "21-", "x86", "etc2", 4 * compressedApkSize, 4 * compressedApkSize));
   }
 
   @Test
@@ -1145,12 +1145,12 @@ public final class GetSizeCommandTest {
             createMasterApkDescription(
                 ApkTargeting.getDefaultInstance(), ZipPath.create("asset1-master.apk")),
             createApkDescription(
-                apkDensityTargeting(LDPI, ImmutableSet.of(MDPI)),
-                ZipPath.create("asset1-ldpi.apk"),
+                apkTextureTargeting(ETC2, ImmutableSet.of(ASTC)),
+                ZipPath.create("asset1-tcf_etc2.apk"),
                 /* isMasterSplit= */ false),
             createApkDescription(
-                apkDensityTargeting(MDPI, ImmutableSet.of(LDPI)),
-                ZipPath.create("asset1-mdpi.apk"),
+                apkTextureTargeting(ASTC, ImmutableSet.of(ETC2)),
+                ZipPath.create("asset1-tcf_astc.apk"),
                 /* isMasterSplit= */ false));
     BuildApksResult tableOfContentsProto =
         BuildApksResult.newBuilder()
@@ -1168,23 +1168,24 @@ public final class GetSizeCommandTest {
     GetSizeCommand.builder()
         .setGetSizeSubCommand(GetSizeSubcommand.TOTAL)
         .setApksArchivePath(apksArchiveFile)
-        .setDimensions(ImmutableSet.of(Dimension.ABI, Dimension.SCREEN_DENSITY, Dimension.SDK))
+        .setDimensions(
+            ImmutableSet.of(Dimension.ABI, Dimension.TEXTURE_COMPRESSION_FORMAT, Dimension.SDK))
         .setDeviceSpec(
             DeviceSpec.newBuilder()
                 .setSdkVersion(25)
                 .addSupportedAbis("x86")
-                .setScreenDensity(125)
+                .addGlExtensions("GL_KHR_texture_compression_astc_ldr")
                 .build())
         .build()
         .getSizeTotal(new PrintStream(outputStream));
 
     assertThat(new String(outputStream.toByteArray(), UTF_8))
         .isEqualTo(
-            "SDK,ABI,SCREEN_DENSITY,MIN,MAX"
+            "SDK,ABI,TEXTURE_COMPRESSION_FORMAT,MIN,MAX"
                 + CRLF
                 + String.format(
                     "%s,%s,%s,%d,%d",
-                    "25", "x86", "125", 4 * compressedApkSize, 4 * compressedApkSize)
+                    "25", "x86", "astc", 4 * compressedApkSize, 4 * compressedApkSize)
                 + CRLF);
   }
 
@@ -1213,15 +1214,15 @@ public final class GetSizeCommandTest {
                 apkSdkTargeting(sdkVersionFrom(21)), ZipPath.create("asset1-master.apk")),
             createApkDescription(
                 mergeApkTargeting(
-                    apkDensityTargeting(LDPI, ImmutableSet.of(MDPI)),
+                    apkTextureTargeting(ETC2, ImmutableSet.of(ASTC)),
                     apkSdkTargeting(sdkVersionFrom(21))),
-                ZipPath.create("asset1-ldpi.apk"),
+                ZipPath.create("asset1-tcf_etc2.apk"),
                 /* isMasterSplit= */ false),
             createApkDescription(
                 mergeApkTargeting(
-                    apkDensityTargeting(MDPI, ImmutableSet.of(LDPI)),
+                    apkTextureTargeting(ASTC, ImmutableSet.of(ETC2)),
                     apkSdkTargeting(sdkVersionFrom(21))),
-                ZipPath.create("asset1-mdpi.apk"),
+                ZipPath.create("asset1-tcf_astc.apk"),
                 /* isMasterSplit= */ false));
     BuildApksResult tableOfContentsProto =
         BuildApksResult.newBuilder()
@@ -1240,22 +1241,23 @@ public final class GetSizeCommandTest {
     GetSizeCommand.builder()
         .setGetSizeSubCommand(GetSizeSubcommand.TOTAL)
         .setApksArchivePath(apksArchiveFile)
-        .setDimensions(ImmutableSet.of(Dimension.SCREEN_DENSITY, Dimension.ABI, Dimension.SDK))
+        .setDimensions(
+            ImmutableSet.of(Dimension.TEXTURE_COMPRESSION_FORMAT, Dimension.ABI, Dimension.SDK))
         .build()
         .getSizeTotal(new PrintStream(outputStream));
 
     assertThat(new String(outputStream.toByteArray(), UTF_8).split(CRLF))
         .asList()
         .containsExactly(
-            "SDK,ABI,SCREEN_DENSITY,MIN,MAX",
+            "SDK,ABI,TEXTURE_COMPRESSION_FORMAT,MIN,MAX",
             String.format(
-                "%s,,%s,%d,%d", "21-", "LDPI", 3 * compressedApkSize, 3 * compressedApkSize),
+                "%s,,%s,%d,%d", "21-", "etc2", 3 * compressedApkSize, 3 * compressedApkSize),
             String.format(
-                "%s,,%s,%d,%d", "21-", "MDPI", 3 * compressedApkSize, 3 * compressedApkSize),
+                "%s,,%s,%d,%d", "21-", "astc", 3 * compressedApkSize, 3 * compressedApkSize),
             String.format(
-                "%s,,%s,%d,%d", "24-", "LDPI", 3 * compressedApkSize, 3 * compressedApkSize),
+                "%s,,%s,%d,%d", "24-", "etc2", 3 * compressedApkSize, 3 * compressedApkSize),
             String.format(
-                "%s,,%s,%d,%d", "24-", "MDPI", 3 * compressedApkSize, 3 * compressedApkSize));
+                "%s,,%s,%d,%d", "24-", "astc", 3 * compressedApkSize, 3 * compressedApkSize));
   }
 
   /** Copies the testdata resource into the temporary directory. */

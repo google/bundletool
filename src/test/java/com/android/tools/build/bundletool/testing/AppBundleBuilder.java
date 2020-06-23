@@ -19,8 +19,8 @@ import com.android.bundle.Config.BundleConfig;
 import com.android.tools.build.bundletool.model.AppBundle;
 import com.android.tools.build.bundletool.model.BundleMetadata;
 import com.android.tools.build.bundletool.model.BundleModule;
-import com.android.tools.build.bundletool.model.utils.files.BufferedIo;
 import com.google.common.collect.ImmutableList;
+import com.google.common.io.Files;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.function.Consumer;
@@ -57,7 +57,7 @@ public class AppBundleBuilder {
   }
 
   public AppBundleBuilder addMetadataFile(String namespacedDir, String fileName, Path file) {
-    metadata.addFile(namespacedDir, fileName, BufferedIo.inputStreamSupplier(file));
+    metadata.addFile(namespacedDir, fileName, Files.asByteSource(file.toFile()));
     return this;
   }
 

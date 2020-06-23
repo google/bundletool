@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2017 The Android Open Source Project
+ * Copyright (C) 2020 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,18 +15,16 @@
  */
 package com.android.tools.build.bundletool.model.exceptions;
 
-/** Exception thrown when parsing XML goes wrong. */
-public class XmlParsingException extends ValidationException {
+import com.android.bundle.Errors.BundleToolError.ErrorType;
 
-  public XmlParsingException(String message) {
-    super(message);
+/** Indicates that command is invalid, like options mismatch. */
+public class InvalidCommandException extends BundleToolException {
+
+  private InvalidCommandException(String userMessage, String internalMessage, Throwable cause) {
+    super(ErrorType.INVALID_COMMAND_ERROR, userMessage, internalMessage, cause);
   }
 
-  public XmlParsingException(String message, Throwable cause) {
-    super(message, cause);
-  }
-
-  public XmlParsingException(Throwable cause) {
-    super(cause);
+  public static InternalExceptionBuilder<InvalidCommandException> builder() {
+    return new InternalExceptionBuilder<>(InvalidCommandException::new);
   }
 }

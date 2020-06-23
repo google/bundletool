@@ -22,7 +22,7 @@ import static com.android.tools.build.bundletool.model.targeting.TargetingUtils.
 import com.android.bundle.Targeting.AssetsDirectoryTargeting;
 import com.android.bundle.Targeting.TextureCompressionFormat.TextureCompressionFormatAlias;
 import com.android.tools.build.bundletool.model.BundleModule;
-import com.android.tools.build.bundletool.model.exceptions.ValidationException;
+import com.android.tools.build.bundletool.model.exceptions.InvalidBundleException;
 import com.android.tools.build.bundletool.model.targeting.TargetedDirectory;
 import com.android.tools.build.bundletool.model.targeting.TargetingDimension;
 import com.google.auto.value.AutoValue;
@@ -75,8 +75,8 @@ public class TextureCompressionFormatParityValidator extends SubValidator {
         referentialModule = module;
         referentialTextureCompressionFormats = moduleTextureCompressionFormats;
       } else if (!referentialTextureCompressionFormats.equals(moduleTextureCompressionFormats)) {
-        throw ValidationException.builder()
-            .withMessage(
+        throw InvalidBundleException.builder()
+            .withUserMessage(
                 "All modules with targeted textures must have the same set of texture formats, but"
                     + " module '%s' has formats %s and module '%s' has formats %s.",
                 referentialModule.getName(),

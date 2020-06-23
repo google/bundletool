@@ -16,7 +16,7 @@
 
 package com.android.tools.build.bundletool.model;
 
-import com.android.tools.build.bundletool.model.exceptions.ValidationException;
+import com.android.tools.build.bundletool.model.exceptions.InvalidBundleException;
 import com.google.auto.value.AutoValue;
 import com.google.errorprone.annotations.Immutable;
 import java.util.Comparator;
@@ -41,9 +41,11 @@ public abstract class BundleModuleName implements Comparable<BundleModuleName> {
     return MODULE_NAME_FORMAT.matcher(name).matches();
   }
 
-  public static BundleModuleName create(String name) throws InvalidBundleModuleNameException {
+  public static BundleModuleName create(String name) {
     if (!isValid(name)) {
-      throw new InvalidBundleModuleNameException(name);
+      throw InvalidBundleException.builder()
+          .withUserMessage("Module names with special characters not supported: %s", name)
+          .build();
     }
     return new AutoValue_BundleModuleName(name);
   }
@@ -61,12 +63,6 @@ public abstract class BundleModuleName implements Comparable<BundleModuleName> {
   @Override
   public final String toString() {
     return getName();
-  }
-
-  static class InvalidBundleModuleNameException extends ValidationException {
-    InvalidBundleModuleNameException(String name) {
-      super("Module names with special characters not supported: " + name);
-    }
   }
 
   @Override

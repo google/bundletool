@@ -16,7 +16,7 @@
 
 package com.android.tools.build.bundletool.device;
 
-import com.android.tools.build.bundletool.model.exceptions.ParseException;
+import com.android.tools.build.bundletool.model.exceptions.AdbOutputParseException;
 import com.google.auto.value.AutoValue;
 import com.google.common.collect.ImmutableList;
 import java.util.regex.Matcher;
@@ -37,14 +37,17 @@ public final class BadgingInfoParser {
             .findFirst()
             .orElseThrow(
                 () ->
-                    new ParseException(
-                        String.format(
+                    AdbOutputParseException.builder()
+                        .withInternalMessage(
                             "'package:' line not found in badging output\n: %s",
-                            String.join("\n", badgingOutput))));
+                            String.join("\n", badgingOutput))
+                        .build());
     Matcher matcher = PACKAGE_NAME_PATTERN.matcher(packageLine);
     if (!matcher.matches()) {
-      throw new ParseException(
-          String.format("'name=' and 'versionCode=' not found in package line: %s", packageLine));
+      throw AdbOutputParseException.builder()
+          .withInternalMessage(
+              "'name=' and 'versionCode=' not found in package line: %s", packageLine)
+          .build();
     }
     return BadgingInfo.create(matcher.group("name"), Long.parseLong(matcher.group("version")));
   }

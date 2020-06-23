@@ -21,7 +21,7 @@ import static com.google.common.truth.Truth.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.android.tools.build.bundletool.model.BundleModule;
-import com.android.tools.build.bundletool.model.exceptions.ValidationException;
+import com.android.tools.build.bundletool.model.exceptions.InvalidBundleException;
 import com.android.tools.build.bundletool.testing.BundleModuleBuilder;
 import com.google.common.collect.ImmutableList;
 import org.junit.Test;
@@ -94,9 +94,9 @@ public class AbiParityValidatorTest {
             .setManifest(androidManifest("com.test.app"))
             .build();
 
-    ValidationException exception =
+    InvalidBundleException exception =
         assertThrows(
-            ValidationException.class,
+            InvalidBundleException.class,
             () -> new AbiParityValidator().validateAllModules(ImmutableList.of(moduleA, moduleB)));
 
     assertThat(exception).hasMessageThat().contains("must support the same set of ABIs");

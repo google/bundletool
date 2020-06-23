@@ -55,7 +55,7 @@ public final class VariantGenerator {
   public ImmutableSet<VariantTargeting> generateVariants() {
     if (targetsOnlyPreL(module)) {
       throw CommandExecutionException.builder()
-          .withMessage(
+          .withInternalMessage(
               "Cannot generate variants '%s' because it does not target devices on Android "
                   + "L or above.",
               module.getName())

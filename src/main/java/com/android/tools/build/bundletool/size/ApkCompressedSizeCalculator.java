@@ -16,11 +16,12 @@
 
 package com.android.tools.build.bundletool.size;
 
-import com.android.tools.build.bundletool.model.InputStreamSupplier;
 import com.google.common.collect.ImmutableList;
+import com.google.common.io.ByteSource;
 import java.io.Closeable;
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.List;
 import java.util.function.Supplier;
 import java.util.zip.Deflater;
 
@@ -40,10 +41,9 @@ final class ApkCompressedSizeCalculator {
   }
 
   /**
-   * Given a list of {@link InputStreamSupplier} passes those streams through a {@link
-   * GZIPOutputStream} and computes the GZIP size increments attributed to each stream.
+   * Given a list of {@link ByteSource} computes the GZIP size increments attributed to each stream.
    */
-  public ImmutableList<Long> calculateGZipSizeForEntries(ImmutableList<InputStreamSupplier> streams)
+  public ImmutableList<Long> calculateGZipSizeForEntries(List<ByteSource> byteSources)
       throws IOException {
     ImmutableList.Builder<Long> gzipSizeIncrements = ImmutableList.builder();
 
@@ -51,8 +51,8 @@ final class ApkCompressedSizeCalculator {
       // matches the {@code ByteStreams} buffer size
       byte[] inputBuffer = new byte[INPUT_BUFFER_SIZE];
 
-      for (InputStreamSupplier stream : streams) {
-        try (InputStream is = stream.get()) {
+      for (ByteSource byteSource : byteSources) {
+        try (InputStream is = byteSource.openStream()) {
           while (true) {
             int r = is.read(inputBuffer);
             if (r == -1) {

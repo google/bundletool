@@ -30,7 +30,6 @@ import com.android.ddmlib.SyncException;
 import com.android.ddmlib.TimeoutException;
 import com.android.sdklib.AndroidVersion;
 import com.android.tools.build.bundletool.model.exceptions.CommandExecutionException;
-import com.android.tools.build.bundletool.model.exceptions.InstallationException;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
 import com.google.errorprone.annotations.FormatMethod;
@@ -140,9 +139,9 @@ public class DdmlibDevice extends Device {
             extraArgs.build().toArray(new String[0]));
       }
     } catch (InstallException e) {
-      throw InstallationException.builder()
+      throw CommandExecutionException.builder()
           .withCause(e)
-          .withMessage("Installation of the app failed.")
+          .withInternalMessage("Installation of the app failed.")
           .build();
     }
   }
@@ -164,8 +163,10 @@ public class DdmlibDevice extends Device {
                 .getPackageName()
                 .orElseThrow(
                     () ->
-                        new CommandExecutionException(
-                            "PushOptions.packageName must be set for relative paths."));
+                        CommandExecutionException.builder()
+                            .withInternalMessage(
+                                "PushOptions.packageName must be set for relative paths.")
+                            .build());
 
         splitsPath = joinUnixPaths("/sdcard/Android/data/", packageName, "files", splitsPath);
       }
@@ -198,7 +199,7 @@ public class DdmlibDevice extends Device {
         | ShellCommandUnresponsiveException e) {
       throw CommandExecutionException.builder()
           .withCause(e)
-          .withMessage(
+          .withInternalMessage(
               "Pushing additional splits for local testing failed. Your app might still have been"
                   + " installed correctly, but you won't be able to test dynamic modules.")
           .build();

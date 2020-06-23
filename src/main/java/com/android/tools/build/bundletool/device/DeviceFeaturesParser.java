@@ -16,7 +16,7 @@
 
 package com.android.tools.build.bundletool.device;
 
-import com.android.tools.build.bundletool.model.exceptions.ParseException;
+import com.android.tools.build.bundletool.model.exceptions.AdbOutputParseException;
 import com.google.common.collect.ImmutableList;
 
 /** Parses the output of the "pm list features" ADB shell command. */
@@ -37,8 +37,8 @@ public class DeviceFeaturesParser {
         continue;
       }
       if (!line.startsWith(EXPECTED_LINE_PREFIX)) {
-        throw ParseException.builder()
-            .withMessage("Unexpected output of 'pm list features' command: '%s'", line)
+        throw AdbOutputParseException.builder()
+            .withInternalMessage("Unexpected output of 'pm list features' command: '%s'", line)
             .build();
       }
       // Skip "feature:" in the output.

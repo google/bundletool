@@ -21,7 +21,6 @@ import static com.android.tools.build.bundletool.model.utils.files.FilePrecondit
 import static com.android.tools.build.bundletool.model.utils.files.FilePreconditions.checkFileExistsAndReadable;
 import static com.android.tools.build.bundletool.model.version.VersionGuardedFeature.RESOURCES_REFERENCED_IN_MANIFEST_TO_MASTER_SPLIT;
 import static com.google.common.base.Preconditions.checkArgument;
-import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.ImmutableSet.toImmutableSet;
 
@@ -34,8 +33,6 @@ import com.android.tools.build.bundletool.commands.BuildApksCommand.ApkBuildMode
 import com.android.tools.build.bundletool.device.AdbServer;
 import com.android.tools.build.bundletool.device.ApkMatcher;
 import com.android.tools.build.bundletool.device.DeviceAnalyzer;
-import com.android.tools.build.bundletool.device.IncompatibleDeviceException;
-import com.android.tools.build.bundletool.io.ApkPathManager;
 import com.android.tools.build.bundletool.io.ApkSerializerManager;
 import com.android.tools.build.bundletool.io.ApkSetBuilderFactory;
 import com.android.tools.build.bundletool.io.ApkSetBuilderFactory.ApkSetBuilder;
@@ -55,7 +52,8 @@ import com.android.tools.build.bundletool.model.ModuleSplit;
 import com.android.tools.build.bundletool.model.OptimizationDimension;
 import com.android.tools.build.bundletool.model.SigningConfiguration;
 import com.android.tools.build.bundletool.model.SourceStamp;
-import com.android.tools.build.bundletool.model.exceptions.CommandExecutionException;
+import com.android.tools.build.bundletool.model.exceptions.IncompatibleDeviceException;
+import com.android.tools.build.bundletool.model.exceptions.InvalidCommandException;
 import com.android.tools.build.bundletool.model.targeting.AlternativeVariantTargetingPopulator;
 import com.android.tools.build.bundletool.model.utils.SplitsXmlInjector;
 import com.android.tools.build.bundletool.model.utils.Versions;
@@ -161,7 +159,7 @@ final class BuildApksManager {
     GeneratedAssetSlices.Builder generatedAssetSlices = GeneratedAssetSlices.builder();
 
     boolean enableUniversalAsFallbackForSplits = false;
-    boolean enableInstallTimePermanentModules = false;
+    boolean enableInstallTimeNonRemovableModules = false;
     ApksToGenerate apksToGenerate =
         new ApksToGenerate(
             appBundle, command.getApkBuildMode(), enableUniversalAsFallbackForSplits, deviceSpec);
@@ -169,8 +167,8 @@ final class BuildApksManager {
     // Split APKs
     if (apksToGenerate.generateSplitApks()) {
       AppBundle mergedAppBundle =
-          BundleModuleMerger.mergePermanentInstallTimeModules(
-              appBundle, enableInstallTimePermanentModules);
+          BundleModuleMerger.mergeNonRemovableInstallTimeModules(
+              appBundle, enableInstallTimeNonRemovableModules);
       bundleValidator.validate(mergedAppBundle);
       generatedApksBuilder.setSplitApks(generateSplitApks(mergedAppBundle, stampSource));
     }
@@ -375,10 +373,8 @@ final class BuildApksManager {
       Version bundleVersion,
       Compression compression,
       Path tempDir) {
-    ApkPathManager apkPathmanager = new ApkPathManager();
     SplitApkSerializer splitApkSerializer =
         new SplitApkSerializer(
-            apkPathmanager,
             aapt2Command,
             signingConfiguration,
             stampSigningConfiguration,
@@ -386,7 +382,6 @@ final class BuildApksManager {
             compression);
     StandaloneApkSerializer standaloneApkSerializer =
         new StandaloneApkSerializer(
-            apkPathmanager,
             aapt2Command,
             signingConfiguration,
             stampSigningConfiguration,
@@ -564,7 +559,9 @@ final class BuildApksManager {
 
     private void validate() {
       if (appBundle.isApex() && apkBuildMode.equals(ApkBuildMode.UNIVERSAL)) {
-        throw new CommandExecutionException("APEX bundles do not support universal apks.");
+        throw InvalidCommandException.builder()
+            .withInternalMessage("APEX bundles do not support universal apks.")
+            .build();
       }
 
       if (deviceSpec.isPresent()) {
@@ -576,31 +573,39 @@ final class BuildApksManager {
             || apkBuildMode.equals(ApkBuildMode.PERSISTENT))) {
           if (deviceSdk >= Versions.ANDROID_L_API_VERSION) {
             if (!generateSplitApks()) {
-              throw new IncompatibleDeviceException(
-                  "App Bundle targets pre-L devices, but the device has SDK version higher "
-                      + "or equal to L.");
+              throw IncompatibleDeviceException.builder()
+                  .withUserMessage(
+                      "App Bundle targets pre-L devices, but the device has SDK version higher "
+                          + "or equal to L.")
+                  .build();
             }
           } else {
             if (!generateStandaloneApks()) {
-              throw new IncompatibleDeviceException(
-                  "App Bundle targets L+ devices, but the device has SDK version lower than L.");
+              throw IncompatibleDeviceException.builder()
+                  .withUserMessage(
+                      "App Bundle targets L+ devices, but the device has SDK version lower than L.")
+                  .build();
             }
           }
         }
 
         if (appMaxSdk.isPresent() && deviceSdk > appMaxSdk.get()) {
-          throw new IncompatibleDeviceException(
-              "Max SDK version of the App Bundle is lower than SDK version of the device");
+          throw IncompatibleDeviceException.builder()
+              .withUserMessage(
+                  "Max SDK version of the App Bundle is lower than SDK version of the device")
+              .build();
         }
       }
 
-      checkState(
+      boolean generatesAtLeastOneApk =
           generateStandaloneApks()
               || generateSplitApks()
               || generateInstantApks()
               || generateUniversalApk()
-              || generateSystemApks(),
-          "No APKs to generate.");
+              || generateSystemApks();
+      if (!generatesAtLeastOneApk) {
+        throw InvalidCommandException.builder().withInternalMessage("No APKs to generate.").build();
+      }
     }
 
     public boolean generateSplitApks() {

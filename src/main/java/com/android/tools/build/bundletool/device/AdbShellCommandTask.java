@@ -65,28 +65,28 @@ public class AdbShellCommandTask {
       return outputLines.build();
     } catch (IOException e) {
       throw CommandExecutionException.builder()
-          .withMessage(
+          .withInternalMessage(
               "I/O error while executing 'adb shell %s' on device '%s'.",
               command, device.getSerialNumber())
           .withCause(e)
           .build();
     } catch (TimeoutException e) {
       throw CommandExecutionException.builder()
-          .withMessage(
+          .withInternalMessage(
               "Timeout while executing 'adb shell %s' on device '%s'.",
               command, device.getSerialNumber())
           .withCause(e)
           .build();
     } catch (ShellCommandUnresponsiveException e) {
       throw CommandExecutionException.builder()
-          .withMessage(
+          .withInternalMessage(
               "Unresponsive shell command while executing 'adb shell %s' on device '%s'.",
               command, device.getSerialNumber())
           .withCause(e)
           .build();
     } catch (AdbCommandRejectedException e) {
       throw CommandExecutionException.builder()
-          .withMessage(
+          .withInternalMessage(
               "Rejected 'adb shell %s' command on device '%s'.", command, device.getSerialNumber())
           .withCause(e)
           .build();

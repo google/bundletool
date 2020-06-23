@@ -27,7 +27,7 @@ import com.android.tools.build.bundletool.model.AndroidManifest;
 import com.android.tools.build.bundletool.model.AppBundle;
 import com.android.tools.build.bundletool.model.BundleModule;
 import com.android.tools.build.bundletool.model.BundleModuleName;
-import com.android.tools.build.bundletool.model.exceptions.ValidationException;
+import com.android.tools.build.bundletool.model.exceptions.InvalidBundleException;
 import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMultimap;
@@ -93,8 +93,8 @@ public final class ModuleDependenciesUtils {
       // Check that module does not declare explicit dependency on the "base" module
       // (whose split ID actually is empty instead of "base" anyway).
       if (moduleDependenciesMap.containsEntry(moduleName, BASE_MODULE_NAME.getName())) {
-        throw ValidationException.builder()
-            .withMessage(
+        throw InvalidBundleException.builder()
+            .withUserMessage(
                 "Module '%s' declares dependency on the '%s' module, which is implicit.",
                 moduleName, BASE_MODULE_NAME)
             .build();

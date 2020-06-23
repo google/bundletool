@@ -21,8 +21,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.android.tools.build.bundletool.io.ZipBuilder;
 import com.android.tools.build.bundletool.model.ZipPath;
-import com.android.tools.build.bundletool.model.exceptions.BundleFileTypesException.MandatoryBundleFileMissingException;
-import com.android.tools.build.bundletool.model.exceptions.BundleFileTypesException.MandatoryModuleFileMissingException;
+import com.android.tools.build.bundletool.model.exceptions.InvalidBundleException;
 import java.nio.file.Path;
 import java.util.zip.ZipFile;
 import org.junit.Before;
@@ -53,9 +52,9 @@ public class MandatoryFilesPresenceValidatorTest {
             .writeTo(tempFolder.resolve("base.zip"));
 
     try (ZipFile moduleZip = new ZipFile(modulePath.toFile())) {
-      MandatoryModuleFileMissingException exception =
+      InvalidBundleException exception =
           assertThrows(
-              MandatoryModuleFileMissingException.class,
+              InvalidBundleException.class,
               () -> new MandatoryFilesPresenceValidator().validateModuleZipFile(moduleZip));
 
       assertThat(exception)
@@ -84,9 +83,9 @@ public class MandatoryFilesPresenceValidatorTest {
             .writeTo(tempFolder.resolve("bundle.aab"));
 
     try (ZipFile bundleZip = new ZipFile(bundlePath.toFile())) {
-      MandatoryBundleFileMissingException exception =
+      InvalidBundleException exception =
           assertThrows(
-              MandatoryBundleFileMissingException.class,
+              InvalidBundleException.class,
               () -> new MandatoryFilesPresenceValidator().validateBundleZipFile(bundleZip));
 
       assertThat(exception).hasMessageThat().contains("missing required file 'BundleConfig.pb'");
@@ -102,9 +101,9 @@ public class MandatoryFilesPresenceValidatorTest {
             .writeTo(tempFolder.resolve("bundle.aab"));
 
     try (ZipFile bundleZip = new ZipFile(bundlePath.toFile())) {
-      MandatoryModuleFileMissingException exception =
+      InvalidBundleException exception =
           assertThrows(
-              MandatoryModuleFileMissingException.class,
+              InvalidBundleException.class,
               () -> new MandatoryFilesPresenceValidator().validateBundleZipFile(bundleZip));
 
       assertThat(exception)

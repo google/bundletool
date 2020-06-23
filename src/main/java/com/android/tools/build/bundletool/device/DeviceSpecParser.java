@@ -17,7 +17,7 @@
 package com.android.tools.build.bundletool.device;
 
 import com.android.bundle.Devices.DeviceSpec;
-import com.android.tools.build.bundletool.model.exceptions.ValidationException;
+import com.android.tools.build.bundletool.model.exceptions.InvalidDeviceSpecException;
 import com.android.tools.build.bundletool.model.utils.files.BufferedIo;
 import com.google.common.io.MoreFiles;
 import com.google.protobuf.util.JsonFormat;
@@ -53,10 +53,8 @@ public class DeviceSpecParser {
 
   private static DeviceSpec parseDeviceSpecInternal(Path deviceSpecFile, boolean canSkipFields) {
     if (!JSON_EXTENSION.equals(MoreFiles.getFileExtension(deviceSpecFile))) {
-      throw ValidationException.builder()
-          .withMessage(
-              "Expected .json extension for the device spec file but found '%s'.",
-              deviceSpecFile.getFileName())
+      throw InvalidDeviceSpecException.builder()
+          .withUserMessage("Expected .json extension for the device spec file.")
           .build();
     }
     try (Reader deviceSpecReader = BufferedIo.reader(deviceSpecFile)) {
@@ -78,16 +76,16 @@ public class DeviceSpecParser {
 
   public static void validateDeviceSpec(DeviceSpec deviceSpec, boolean canSkipFields) {
     if (deviceSpec.getSdkVersion() < 0 || (!canSkipFields && deviceSpec.getSdkVersion() == 0)) {
-      throw ValidationException.builder()
-          .withMessage(
+      throw InvalidDeviceSpecException.builder()
+          .withUserMessage(
               "Device spec SDK version (%d) should be set to a strictly positive number.",
               deviceSpec.getSdkVersion())
           .build();
     }
     if (deviceSpec.getScreenDensity() < 0
         || (!canSkipFields && deviceSpec.getScreenDensity() == 0)) {
-      throw ValidationException.builder()
-          .withMessage(
+      throw InvalidDeviceSpecException.builder()
+          .withUserMessage(
               "Device spec screen density (%d) should be set to a strictly positive number.",
               deviceSpec.getScreenDensity())
           .build();
@@ -95,10 +93,14 @@ public class DeviceSpecParser {
 
     if (!canSkipFields) {
       if (deviceSpec.getSupportedAbisList().isEmpty()) {
-        throw new ValidationException("Device spec supported ABI list is empty.");
+        throw InvalidDeviceSpecException.builder()
+            .withUserMessage("Device spec supported ABI list is empty.")
+            .build();
       }
       if (deviceSpec.getSupportedLocalesList().isEmpty()) {
-        throw new ValidationException("Device spec supported locales list is empty.");
+        throw InvalidDeviceSpecException.builder()
+            .withUserMessage("Device spec supported locales list is empty.")
+            .build();
       }
     }
   }

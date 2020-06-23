@@ -21,14 +21,7 @@ import static com.google.common.truth.Truth.assertWithMessage;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.android.tools.build.bundletool.model.ZipPath;
-import com.android.tools.build.bundletool.model.exceptions.BundleFileTypesException.FileUsesReservedNameException;
-import com.android.tools.build.bundletool.model.exceptions.BundleFileTypesException.InvalidApexImagePathException;
-import com.android.tools.build.bundletool.model.exceptions.BundleFileTypesException.InvalidFileExtensionInDirectoryException;
-import com.android.tools.build.bundletool.model.exceptions.BundleFileTypesException.InvalidFileNameInDirectoryException;
-import com.android.tools.build.bundletool.model.exceptions.BundleFileTypesException.InvalidNativeArchitectureNameException;
-import com.android.tools.build.bundletool.model.exceptions.BundleFileTypesException.InvalidNativeLibraryPathException;
-import com.android.tools.build.bundletool.model.exceptions.BundleFileTypesException.UnknownFileOrDirectoryFoundInModuleException;
-import com.android.tools.build.bundletool.model.exceptions.ValidationException;
+import com.android.tools.build.bundletool.model.exceptions.InvalidBundleException;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
@@ -54,9 +47,9 @@ public class BundleFilesValidatorTest {
   public void validateDexFile_nonDexExtension_throws() throws Exception {
     ZipPath nonDexFile = ZipPath.create("dex/classes.dat");
 
-    InvalidFileExtensionInDirectoryException e =
+    InvalidBundleException e =
         assertThrows(
-            InvalidFileExtensionInDirectoryException.class,
+            InvalidBundleException.class,
             () -> new BundleFilesValidator().validateModuleFile(nonDexFile));
 
     assertThat(e)
@@ -68,9 +61,9 @@ public class BundleFilesValidatorTest {
   public void validateDexFile_badFileName_throws() throws Exception {
     ZipPath nonDexFile = ZipPath.create("dex/bad-name.dex");
 
-    ValidationException e =
+    InvalidBundleException e =
         assertThrows(
-            ValidationException.class,
+            InvalidBundleException.class,
             () -> new BundleFilesValidator().validateModuleFile(nonDexFile));
 
     assertThat(e)
@@ -82,9 +75,9 @@ public class BundleFilesValidatorTest {
   public void validateDexFile_badDirectoryStructure_throws() throws Exception {
     ZipPath nonDexFile = ZipPath.create("dex/extra-dir/classes.dex");
 
-    ValidationException e =
+    InvalidBundleException e =
         assertThrows(
-            ValidationException.class,
+            InvalidBundleException.class,
             () -> new BundleFilesValidator().validateModuleFile(nonDexFile));
 
     assertThat(e).hasMessageThat().contains("The dex/ directory cannot contain directories");
@@ -108,9 +101,9 @@ public class BundleFilesValidatorTest {
   public void validateLibFile_directoryStructureTooShallow_throws() throws Exception {
     ZipPath libFileDirectlyInLib = ZipPath.create("lib/libX.so");
 
-    InvalidNativeLibraryPathException e =
+    InvalidBundleException e =
         assertThrows(
-            InvalidNativeLibraryPathException.class,
+            InvalidBundleException.class,
             () -> new BundleFilesValidator().validateModuleFile(libFileDirectlyInLib));
 
     assertThat(e).hasMessageThat().contains("paths in form 'lib/<single-directory>/<file>.so'");
@@ -120,9 +113,9 @@ public class BundleFilesValidatorTest {
   public void validateLibFile_directoryStructureTooDeep_throws() throws Exception {
     ZipPath libFileTooDeep = ZipPath.create("lib/x86/other-dir/libX.so");
 
-    InvalidNativeLibraryPathException e =
+    InvalidBundleException e =
         assertThrows(
-            InvalidNativeLibraryPathException.class,
+            InvalidBundleException.class,
             () -> new BundleFilesValidator().validateModuleFile(libFileTooDeep));
 
     assertThat(e).hasMessageThat().contains("paths in form 'lib/<single-directory>/<file>.so'");
@@ -132,9 +125,9 @@ public class BundleFilesValidatorTest {
   public void validateLibFile_nonSoExtension_throws() throws Exception {
     ZipPath nonSoFile = ZipPath.create("lib/x86/libX.dat");
 
-    InvalidFileExtensionInDirectoryException e =
+    InvalidBundleException e =
         assertThrows(
-            InvalidFileExtensionInDirectoryException.class,
+            InvalidBundleException.class,
             () -> new BundleFilesValidator().validateModuleFile(nonSoFile));
 
     assertThat(e).hasMessageThat().contains("Files under lib/ must have .so extension");
@@ -144,9 +137,9 @@ public class BundleFilesValidatorTest {
   public void validateLibFile_unknownAbi_throws() throws Exception {
     ZipPath unknownAbiPath = ZipPath.create("lib/sparc/libX.so");
 
-    InvalidNativeArchitectureNameException e =
+    InvalidBundleException e =
         assertThrows(
-            InvalidNativeArchitectureNameException.class,
+            InvalidBundleException.class,
             () -> new BundleFilesValidator().validateModuleFile(unknownAbiPath));
 
     assertThat(e).hasMessageThat().contains("Unrecognized native architecture for directory");
@@ -172,9 +165,9 @@ public class BundleFilesValidatorTest {
   public void validateManifestDirectory_otherFile_throws() throws Exception {
     ZipPath nonPbFile = ZipPath.create("manifest/AndroidManifest.dat");
 
-    InvalidFileNameInDirectoryException e =
+    InvalidBundleException e =
         assertThrows(
-            InvalidFileNameInDirectoryException.class,
+            InvalidBundleException.class,
             () -> new BundleFilesValidator().validateModuleFile(nonPbFile));
 
     assertThat(e)
@@ -220,9 +213,9 @@ public class BundleFilesValidatorTest {
     for (String restrictedFile : restrictedFiles) {
       ZipPath rootFile = ZipPath.create("root/" + restrictedFile);
 
-      FileUsesReservedNameException e =
+      InvalidBundleException e =
           assertThrows(
-              FileUsesReservedNameException.class,
+              InvalidBundleException.class,
               () -> new BundleFilesValidator().validateModuleFile(rootFile));
 
       assertWithMessage("restrictedFile='%s'", restrictedFile)
@@ -241,9 +234,9 @@ public class BundleFilesValidatorTest {
         }) {
       ZipPath rootFile = ZipPath.create("root/" + restrictedDir + "/file");
 
-      FileUsesReservedNameException e =
+      InvalidBundleException e =
           assertThrows(
-              FileUsesReservedNameException.class,
+              InvalidBundleException.class,
               () -> new BundleFilesValidator().validateModuleFile(rootFile));
 
       assertWithMessage("restrictedDir='%s'", restrictedDir)
@@ -271,9 +264,9 @@ public class BundleFilesValidatorTest {
   public void validateApexFile_directoryStructureTooDeep_throws() throws Exception {
     ZipPath apexFileTooDeep = ZipPath.create("apex/some-dir/x86.img");
 
-    InvalidApexImagePathException e =
+    InvalidBundleException e =
         assertThrows(
-            InvalidApexImagePathException.class,
+            InvalidBundleException.class,
             () -> new BundleFilesValidator().validateModuleFile(apexFileTooDeep));
 
     assertThat(e).hasMessageThat().contains("paths in form 'apex/<file>.img'");
@@ -283,9 +276,9 @@ public class BundleFilesValidatorTest {
   public void validateApexFile_nonImgExtension_throws() throws Exception {
     ZipPath nonImgFile = ZipPath.create("apex/x86.dat");
 
-    InvalidFileExtensionInDirectoryException e =
+    InvalidBundleException e =
         assertThrows(
-            InvalidFileExtensionInDirectoryException.class,
+            InvalidBundleException.class,
             () -> new BundleFilesValidator().validateModuleFile(nonImgFile));
 
     assertThat(e).hasMessageThat().contains("Files under apex/ must have .img extension");
@@ -295,9 +288,9 @@ public class BundleFilesValidatorTest {
   public void validateApexFile_unknownAbi_throws() throws Exception {
     ZipPath nonImgFile = ZipPath.create("apex/sparc.img");
 
-    InvalidNativeArchitectureNameException e =
+    InvalidBundleException e =
         assertThrows(
-            InvalidNativeArchitectureNameException.class,
+            InvalidBundleException.class,
             () -> new BundleFilesValidator().validateModuleFile(nonImgFile));
 
     assertThat(e).hasMessageThat().contains("Unrecognized native architecture for file");
@@ -307,9 +300,9 @@ public class BundleFilesValidatorTest {
   public void validateApexFile_unknownMultipleAbi_throws() throws Exception {
     ZipPath nonImgFile = ZipPath.create("apex/x86.sparc.img");
 
-    InvalidNativeArchitectureNameException e =
+    InvalidBundleException e =
         assertThrows(
-            InvalidNativeArchitectureNameException.class,
+            InvalidBundleException.class,
             () -> new BundleFilesValidator().validateModuleFile(nonImgFile));
 
     assertThat(e).hasMessageThat().contains("Unrecognized native architecture for file");
@@ -319,9 +312,9 @@ public class BundleFilesValidatorTest {
   public void validateApexFile_repeatingAbis_throws() throws Exception {
     ZipPath repeatingAbisFile = ZipPath.create("apex/x86.x86_64.x86.img");
 
-    ValidationException e =
+    InvalidBundleException e =
         assertThrows(
-            ValidationException.class,
+            InvalidBundleException.class,
             () -> new BundleFilesValidator().validateModuleFile(repeatingAbisFile));
 
     assertThat(e).hasMessageThat().contains("Repeating architectures in APEX system image file");
@@ -331,9 +324,9 @@ public class BundleFilesValidatorTest {
   public void validateOtherFile_inModuleRoot_throws() throws Exception {
     ZipPath otherFile = ZipPath.create("in-root.txt");
 
-    UnknownFileOrDirectoryFoundInModuleException e =
+    InvalidBundleException e =
         assertThrows(
-            UnknownFileOrDirectoryFoundInModuleException.class,
+            InvalidBundleException.class,
             () -> new BundleFilesValidator().validateModuleFile(otherFile));
 
     assertThat(e).hasMessageThat().contains("Module files can be only in pre-defined directories");
@@ -343,9 +336,9 @@ public class BundleFilesValidatorTest {
   public void validateOtherFile_inUnknownDirectory_throws() throws Exception {
     ZipPath otherFile = ZipPath.create("unrecognized/path.txt");
 
-    UnknownFileOrDirectoryFoundInModuleException e =
+    InvalidBundleException e =
         assertThrows(
-            UnknownFileOrDirectoryFoundInModuleException.class,
+            InvalidBundleException.class,
             () -> new BundleFilesValidator().validateModuleFile(otherFile));
 
     assertThat(e).hasMessageThat().contains("Module files can be only in pre-defined directories");

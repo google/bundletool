@@ -127,7 +127,7 @@ final class MergingUtils {
             .build();
     if (!targetingWithoutAbiDensityLanguageAndTcf.equals(ApkTargeting.getDefaultInstance())) {
       throw CommandExecutionException.builder()
-          .withMessage(
+          .withInternalMessage(
               "Expecting only ABI, screen density, language and texture compression format"
                   + " targeting, got '%s'.",
               targeting)

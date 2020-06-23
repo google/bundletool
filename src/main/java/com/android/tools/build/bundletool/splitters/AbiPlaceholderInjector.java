@@ -21,11 +21,11 @@ import static com.google.common.collect.ImmutableList.toImmutableList;
 import com.android.bundle.Targeting.Abi;
 import com.android.tools.build.bundletool.model.AbiName;
 import com.android.tools.build.bundletool.model.BundleModule;
-import com.android.tools.build.bundletool.model.InputStreamSuppliers;
 import com.android.tools.build.bundletool.model.ModuleEntry;
 import com.android.tools.build.bundletool.model.ModuleSplit;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
+import com.google.common.io.ByteSource;
 
 /**
  * Responsible for setting ABI placeholder libraries for modules with no native code.
@@ -64,7 +64,7 @@ public class AbiPlaceholderInjector {
             BundleModule.LIB_DIRECTORY
                 .resolve(AbiName.fromProto(abi.getAlias()).getPlatformName())
                 .resolve("libplaceholder.so"))
-        .setContentSupplier(InputStreamSuppliers.fromBytes(new byte[0]))
+        .setContent(ByteSource.wrap(new byte[0]))
         .build();
   }
 }

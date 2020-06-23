@@ -54,8 +54,8 @@ import com.android.tools.build.bundletool.device.AdbServer;
 import com.android.tools.build.bundletool.flags.FlagParser;
 import com.android.tools.build.bundletool.io.AppBundleSerializer;
 import com.android.tools.build.bundletool.model.AppBundle;
-import com.android.tools.build.bundletool.model.exceptions.CommandExecutionException;
-import com.android.tools.build.bundletool.model.exceptions.ValidationException;
+import com.android.tools.build.bundletool.model.exceptions.IncompatibleDeviceException;
+import com.android.tools.build.bundletool.model.exceptions.InvalidCommandException;
 import com.android.tools.build.bundletool.model.utils.SystemEnvironmentProvider;
 import com.android.tools.build.bundletool.testing.AppBundleBuilder;
 import com.android.tools.build.bundletool.testing.FakeAdbServer;
@@ -184,11 +184,11 @@ public class BuildApksDeviceSpecTest {
             .setDeviceSpec(deviceSpec)
             .setApkBuildMode(UNIVERSAL);
 
-    Throwable exception = assertThrows(ValidationException.class, () -> command.build());
+    Throwable exception = assertThrows(InvalidCommandException.class, command::build);
     assertThat(exception)
         .hasMessageThat()
         .contains(
-            "Optimizing for device spec not possible when running with 'universal' mode flag.");
+            "Optimizing for device spec is not possible when running with 'universal' mode flag.");
   }
 
   @DataPoints("systemApkBuildModes")
@@ -211,7 +211,7 @@ public class BuildApksDeviceSpecTest {
             .setOutputFile(outputFilePath)
             .setApkBuildMode(systemApkBuildMode);
 
-    Throwable exception = assertThrows(ValidationException.class, () -> command.build());
+    Throwable exception = assertThrows(InvalidCommandException.class, command::build);
     assertThat(exception)
         .hasMessageThat()
         .contains(
@@ -260,7 +260,7 @@ public class BuildApksDeviceSpecTest {
             .setDeviceSpec(deviceSpec)
             .setApkBuildMode(systemApkBuildMode);
 
-    Throwable exception = assertThrows(ValidationException.class, () -> command.build());
+    Throwable exception = assertThrows(InvalidCommandException.class, command::build);
     assertThat(exception)
         .hasMessageThat()
         .contains(
@@ -287,7 +287,7 @@ public class BuildApksDeviceSpecTest {
             .setDeviceSpec(deviceSpec)
             .setApkBuildMode(systemApkBuildMode);
 
-    Throwable exception = assertThrows(ValidationException.class, () -> command.build());
+    Throwable exception = assertThrows(InvalidCommandException.class, command::build);
     assertThat(exception)
         .hasMessageThat()
         .contains(
@@ -312,7 +312,7 @@ public class BuildApksDeviceSpecTest {
             .setDeviceSpec(deviceSpec)
             .setGenerateOnlyForConnectedDevice(true);
 
-    Throwable exception = assertThrows(ValidationException.class, () -> command.build());
+    Throwable exception = assertThrows(InvalidCommandException.class, command::build);
     assertThat(exception)
         .hasMessageThat()
         .contains("Cannot optimize for the device spec and connected device at the same time.");
@@ -390,7 +390,7 @@ public class BuildApksDeviceSpecTest {
             .setDeviceSpec(deviceSpec)
             .build();
 
-    Throwable exception = assertThrows(CommandExecutionException.class, () -> command.execute());
+    Throwable exception = assertThrows(IncompatibleDeviceException.class, command::execute);
     assertThat(exception)
         .hasMessageThat()
         .contains(
@@ -414,7 +414,8 @@ public class BuildApksDeviceSpecTest {
             .setDeviceSpec(deviceSpec)
             .build();
 
-    Throwable exception = assertThrows(CommandExecutionException.class, () -> command.execute());
+    IncompatibleDeviceException exception =
+        assertThrows(IncompatibleDeviceException.class, command::execute);
     assertThat(exception)
         .hasMessageThat()
         .contains("App Bundle targets L+ devices, but the device has SDK version lower than L.");
@@ -436,7 +437,7 @@ public class BuildApksDeviceSpecTest {
             .setDeviceSpec(deviceSpec)
             .build();
 
-    Throwable exception = assertThrows(CommandExecutionException.class, () -> command.execute());
+    Throwable exception = assertThrows(IncompatibleDeviceException.class, command::execute);
     assertThat(exception).hasMessageThat().contains("");
   }
 
@@ -456,7 +457,7 @@ public class BuildApksDeviceSpecTest {
             .setDeviceSpec(deviceSpec)
             .build();
 
-    Throwable exception = assertThrows(CommandExecutionException.class, () -> command.execute());
+    Throwable exception = assertThrows(IncompatibleDeviceException.class, command::execute);
     assertThat(exception)
         .hasMessageThat()
         .contains(
@@ -481,7 +482,7 @@ public class BuildApksDeviceSpecTest {
             .setDeviceSpec(deviceSpec)
             .build();
 
-    Throwable exception = assertThrows(CommandExecutionException.class, () -> command.execute());
+    Throwable exception = assertThrows(IncompatibleDeviceException.class, command::execute);
     assertThat(exception)
         .hasMessageThat()
         .contains("Max SDK version of the App Bundle is lower than SDK version of the device");

@@ -21,7 +21,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.android.bundle.Devices.DeviceSpec;
 import com.android.tools.build.bundletool.TestData;
-import com.android.tools.build.bundletool.model.exceptions.ValidationException;
+import com.android.tools.build.bundletool.model.exceptions.InvalidDeviceSpecException;
 import java.nio.file.Paths;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -57,7 +57,7 @@ public class DeviceSpecParserTest {
   public void wrongFileExtension_throws() throws Exception {
     Throwable exception =
         assertThrows(
-            ValidationException.class,
+            InvalidDeviceSpecException.class,
             () -> DeviceSpecParser.parseDeviceSpec(Paths.get("device_spec.wrong_extension")));
     assertThat(exception)
         .hasMessageThat()
@@ -68,7 +68,7 @@ public class DeviceSpecParserTest {
   public void rejectsNegativeDensity() throws Exception {
     Throwable exception =
         assertThrows(
-            ValidationException.class,
+            InvalidDeviceSpecException.class,
             () ->
                 DeviceSpecParser.parseDeviceSpec(
                     TestData.openReader("testdata/device/invalid_spec_density_negative.json")));
@@ -79,7 +79,7 @@ public class DeviceSpecParserTest {
   public void rejectsSdkLevelZero() throws Exception {
     Throwable exception =
         assertThrows(
-            ValidationException.class,
+            InvalidDeviceSpecException.class,
             () ->
                 DeviceSpecParser.parseDeviceSpec(
                     TestData.openReader("testdata/device/invalid_spec_sdk_zero.json")));
@@ -90,7 +90,7 @@ public class DeviceSpecParserTest {
   public void rejectsEmptyLocaleList() throws Exception {
     Throwable exception =
         assertThrows(
-            ValidationException.class,
+            InvalidDeviceSpecException.class,
             () ->
                 DeviceSpecParser.parseDeviceSpec(
                     TestData.openReader("testdata/device/invalid_spec_locales_empty.json")));
@@ -145,7 +145,7 @@ public class DeviceSpecParserTest {
   public void parsePartialDeviceSpec_rejectsNegativeDensity() throws Exception {
     Throwable exception =
         assertThrows(
-            ValidationException.class,
+            InvalidDeviceSpecException.class,
             () ->
                 DeviceSpecParser.parsePartialDeviceSpec(
                     TestData.openReader("testdata/device/invalid_spec_density_negative.json")));

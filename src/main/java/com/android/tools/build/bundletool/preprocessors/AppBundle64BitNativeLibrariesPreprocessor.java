@@ -27,7 +27,7 @@ import com.android.tools.build.bundletool.model.AbiName;
 import com.android.tools.build.bundletool.model.AppBundle;
 import com.android.tools.build.bundletool.model.BundleModule;
 import com.android.tools.build.bundletool.model.ModuleEntry;
-import com.android.tools.build.bundletool.model.exceptions.CommandExecutionException;
+import com.android.tools.build.bundletool.model.exceptions.InvalidBundleException;
 import com.google.common.collect.ImmutableCollection;
 import com.google.common.collect.ImmutableSet;
 import java.io.PrintStream;
@@ -83,8 +83,8 @@ public class AppBundle64BitNativeLibrariesPreprocessor implements AppBundlePrepr
       return module;
     }
     if (dirsToRemove.size() == nativeConfig.get().getDirectoryCount()) {
-      throw CommandExecutionException.builder()
-          .withMessage(
+      throw InvalidBundleException.builder()
+          .withUserMessage(
               "Usage of 64-bit native libraries is disabled by the presence of a "
                   + "renderscript file, but App Bundle contains only 64-bit native libraries.")
           .build();

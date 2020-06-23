@@ -15,14 +15,17 @@
  */
 package com.android.tools.build.bundletool.model.utils;
 
+import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.ImmutableMap.toImmutableMap;
 import static java.util.function.Function.identity;
 
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableListMultimap;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.MultimapBuilder;
 import com.google.common.collect.Multimaps;
 import com.google.common.collect.Streams;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.function.BinaryOperator;
@@ -60,6 +63,20 @@ public final class CollectorUtils {
         Multimaps.toMultimap(
             keyFunction, valueFunction, MultimapBuilder.treeKeys().arrayListValues()::<K, V>build),
         ImmutableListMultimap::copyOf);
+  }
+
+  public static <T, K> Collector<T, ?, ImmutableMap<K, ImmutableList<T>>> groupingByDeterministic(
+      Function<? super T, ? extends K> keyFunction) {
+    return Collectors.collectingAndThen(
+        Collectors.groupingBy(keyFunction, LinkedHashMap::new, toImmutableList()),
+        ImmutableMap::copyOf);
+  }
+
+  public static <T, K, D, A> Collector<T, ?, ImmutableMap<K, D>> groupingByDeterministic(
+      Function<? super T, ? extends K> keyFunction, Collector<? super T, A, D> valueCollector) {
+    return Collectors.collectingAndThen(
+        Collectors.groupingBy(keyFunction, LinkedHashMap::new, valueCollector),
+        ImmutableMap::copyOf);
   }
 
   /**

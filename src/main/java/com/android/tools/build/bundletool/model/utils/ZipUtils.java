@@ -17,20 +17,19 @@
 package com.android.tools.build.bundletool.model.utils;
 
 import static com.android.tools.build.bundletool.model.utils.files.FilePreconditions.checkFileExistsAndReadable;
+import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Predicates.not;
 
 import com.android.tools.build.bundletool.model.ZipPath;
-import com.google.common.io.ByteStreams;
-import com.google.common.io.CountingOutputStream;
+import com.google.common.base.Optional;
+import com.google.common.io.ByteSource;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
 import java.nio.file.Path;
 import java.util.stream.Stream;
-import java.util.zip.GZIPOutputStream;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
-import javax.annotation.WillNotClose;
 
 /** Misc utilities for working with zip files. */
 public final class ZipUtils {
@@ -52,17 +51,6 @@ public final class ZipUtils {
     }
   }
 
-  /** Calculates the GZip compressed size in bytes of the target {@code stream}. */
-  public static long calculateGzipCompressedSize(@WillNotClose InputStream stream)
-      throws IOException {
-    CountingOutputStream countingOutputStream =
-        new CountingOutputStream(ByteStreams.nullOutputStream());
-    try (GZIPOutputStream compressedStream = new GZIPOutputStream(countingOutputStream)) {
-      ByteStreams.copy(stream, compressedStream);
-    }
-    return countingOutputStream.getCount();
-  }
-
   /**
    * Converts a path relative to the bundle zip root to one relative to the module path.
    *
@@ -72,6 +60,39 @@ public final class ZipUtils {
    */
   public static ZipPath convertBundleToModulePath(ZipPath bundlePath) {
     return bundlePath.subpath(1, bundlePath.getNameCount());
+  }
+
+  /**
+   * Returns a new {@link ByteSource} for reading the contents of the given entry in the given zip
+   * file.
+   */
+  public static ByteSource asByteSource(ZipFile file, ZipEntry entry) {
+    return new ZipEntryByteSource(file, entry);
+  }
+
+  private static final class ZipEntryByteSource extends ByteSource {
+    private final ZipFile file;
+    private final ZipEntry entry;
+
+    ZipEntryByteSource(ZipFile file, ZipEntry entry) {
+      this.file = checkNotNull(file);
+      this.entry = checkNotNull(entry);
+    }
+
+    @Override
+    public InputStream openStream() throws IOException {
+      return file.getInputStream(entry);
+    }
+
+    @Override
+    public Optional<Long> sizeIfKnown() {
+      return entry.getSize() == -1 ? Optional.absent() : Optional.of(entry.getSize());
+    }
+
+    @Override
+    public String toString() {
+      return "ZipUtils.asByteSource(" + file + ", " + entry + ")";
+    }
   }
 
   // Not meant to be instantiated.

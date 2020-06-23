@@ -68,7 +68,7 @@ public final class TextureCompressionUtils {
           .put(TextureCompressionFormatAlias.THREE_DC, "3dc")
           .build();
 
-  /** Return the texture compression format associated to the GL extension, if any. */
+  /** Returns the texture compression format associated to the GL extension, if any. */
   public static Optional<TextureCompressionFormatAlias> textureCompressionFormat(
       String glExtension) {
     return Optional.ofNullable(
@@ -82,7 +82,7 @@ public final class TextureCompressionUtils {
         .build();
   }
 
-  /** Return the texture compression formats supported by the given OpenGL version. */
+  /** Returns the texture compression formats supported by the given OpenGL version. */
   public static ImmutableList<TextureCompressionFormatAlias> textureCompressionFormatsForGl(
       int glVersion) {
     // OpenGL ES 3.0 mandates the support for ETC2
@@ -92,6 +92,17 @@ public final class TextureCompressionUtils {
     }
 
     return ImmutableList.of();
+  }
+
+  /**
+   * Returns the minimum required GL ES version for a particular format, or empty if there are no
+   * requirements.
+   */
+  public static Optional<Integer> getMinGlEsVersionRequired(TextureCompressionFormat tcf) {
+    if (tcf.getAlias().equals(TextureCompressionFormatAlias.ETC2)) {
+      return Optional.of(0x30000);
+    }
+    return Optional.empty();
   }
 
   // Do not instantiate.

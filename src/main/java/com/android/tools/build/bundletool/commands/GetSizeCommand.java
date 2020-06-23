@@ -17,7 +17,6 @@
 package com.android.tools.build.bundletool.commands;
 
 import static com.android.tools.build.bundletool.commands.GetSizeCommand.GetSizeSubcommand.STRING_TO_SUBCOMMAND;
-import static com.android.tools.build.bundletool.commands.GetSizeCommand.GetSizeSubcommand.TOTAL;
 import static com.android.tools.build.bundletool.model.utils.ApkSizeUtils.getCompressedSizeByApkPaths;
 import static com.android.tools.build.bundletool.model.utils.ApkSizeUtils.getVariantCompressedSizeByApkPaths;
 import static com.android.tools.build.bundletool.model.utils.CollectorUtils.combineMaps;
@@ -41,9 +40,8 @@ import com.android.tools.build.bundletool.flags.Flag;
 import com.android.tools.build.bundletool.flags.ParsedFlags;
 import com.android.tools.build.bundletool.model.ConfigurationSizes;
 import com.android.tools.build.bundletool.model.GetSizeRequest;
-import com.android.tools.build.bundletool.model.GetSizeRequest.Dimension;
 import com.android.tools.build.bundletool.model.SizeConfiguration;
-import com.android.tools.build.bundletool.model.exceptions.ValidationException;
+import com.android.tools.build.bundletool.model.exceptions.InvalidCommandException;
 import com.android.tools.build.bundletool.model.utils.ConfigurationSizesMerger;
 import com.android.tools.build.bundletool.model.utils.ResultUtils;
 import com.android.tools.build.bundletool.model.utils.files.FilePreconditions;
@@ -87,8 +85,8 @@ public abstract class GetSizeCommand implements GetSizeRequest {
     public static GetSizeSubcommand fromString(String subCommand) {
       GetSizeSubcommand result = STRING_TO_SUBCOMMAND.get(subCommand);
       if (result == null) {
-        throw ValidationException.builder()
-            .withMessage(
+        throw InvalidCommandException.builder()
+            .withInternalMessage(
                 "Unrecognized get-size command target: '%s'. Accepted values are: %s",
                 subCommand, STRING_TO_SUBCOMMAND.keySet())
             .build();
@@ -107,7 +105,12 @@ public abstract class GetSizeCommand implements GetSizeRequest {
 
   @VisibleForTesting
   static final ImmutableSet<Dimension> SUPPORTED_DIMENSIONS =
-      ImmutableSet.of(Dimension.SDK, Dimension.ABI, Dimension.LANGUAGE, Dimension.SCREEN_DENSITY);
+      ImmutableSet.of(
+          Dimension.SDK,
+          Dimension.ABI,
+          Dimension.LANGUAGE,
+          Dimension.SCREEN_DENSITY,
+          Dimension.TEXTURE_COMPRESSION_FORMAT);
 
   public abstract Path getApksArchivePath();
 
@@ -202,7 +205,10 @@ public abstract class GetSizeCommand implements GetSizeRequest {
         flags
             .getSubCommand()
             .orElseThrow(
-                () -> new ValidationException("Target of the get-size command not found."));
+                () ->
+                    InvalidCommandException.builder()
+                        .withInternalMessage("Target of the get-size command not found.")
+                        .build());
 
     return GetSizeSubcommand.fromString(subCommand);
   }

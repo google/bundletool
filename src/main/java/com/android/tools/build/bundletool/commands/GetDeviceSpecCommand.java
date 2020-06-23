@@ -28,7 +28,7 @@ import com.android.tools.build.bundletool.device.AdbServer;
 import com.android.tools.build.bundletool.device.DeviceAnalyzer;
 import com.android.tools.build.bundletool.flags.Flag;
 import com.android.tools.build.bundletool.flags.ParsedFlags;
-import com.android.tools.build.bundletool.model.exceptions.ValidationException;
+import com.android.tools.build.bundletool.model.exceptions.InvalidCommandException;
 import com.android.tools.build.bundletool.model.utils.DefaultSystemEnvironmentProvider;
 import com.android.tools.build.bundletool.model.utils.SystemEnvironmentProvider;
 import com.android.tools.build.bundletool.model.utils.files.FilePreconditions;
@@ -100,8 +100,8 @@ public abstract class GetDeviceSpecCommand {
       GetDeviceSpecCommand command = autoBuild();
 
       if (!JSON_EXTENSION.equals(MoreFiles.getFileExtension(command.getOutputPath()))) {
-        throw ValidationException.builder()
-            .withMessage(
+        throw InvalidCommandException.builder()
+            .withInternalMessage(
                 "Flag --output should be the path where to generate the device spec file. "
                     + "Its extension must be '.json'.")
             .build();

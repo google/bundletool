@@ -23,7 +23,7 @@ import com.android.tools.build.bundletool.model.AppBundle;
 import com.android.tools.build.bundletool.model.BundleModule;
 import com.android.tools.build.bundletool.model.ModuleEntry;
 import com.android.tools.build.bundletool.model.ZipPath;
-import com.android.tools.build.bundletool.model.exceptions.ValidationException;
+import com.android.tools.build.bundletool.model.exceptions.InvalidBundleException;
 import com.google.common.collect.ImmutableCollection;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
@@ -51,8 +51,8 @@ public class EmbeddedApkSigningPreprocessor implements AppBundlePreprocessor {
 
     Set<ZipPath> missingApks = Sets.difference(unsignedEmbeddedApkPaths, foundApkPaths.build());
     if (!missingApks.isEmpty()) {
-      throw ValidationException.builder()
-          .withMessage(
+      throw InvalidBundleException.builder()
+          .withUserMessage(
               "Unsigned embedded APKs specified in bundle config but missing from bundle: %s",
               missingApks)
           .build();

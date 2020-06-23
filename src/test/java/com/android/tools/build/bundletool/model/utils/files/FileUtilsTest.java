@@ -17,10 +17,8 @@
 package com.android.tools.build.bundletool.model.utils.files;
 
 import static com.google.common.truth.Truth.assertThat;
-import static java.nio.charset.StandardCharsets.UTF_8;
 
 import com.android.tools.build.bundletool.model.ZipPath;
-import java.io.ByteArrayInputStream;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Arrays;
@@ -60,56 +58,6 @@ public class FileUtilsTest {
     List<Path> parents = FileUtils.getDistinctParentPaths(Arrays.asList(file1, file2, file3));
 
     assertThat(parents).containsExactly(dir);
-  }
-
-  @Test
-  public void equalContent_emptyStreams() throws Exception {
-    String data = "";
-
-    boolean equal =
-        FileUtils.equalContent(
-            new ByteArrayInputStream(data.getBytes(UTF_8)),
-            new ByteArrayInputStream(data.getBytes(UTF_8)));
-
-    assertThat(equal).isTrue();
-  }
-
-  @Test
-  public void equalContent_sameLengthAndContent() throws Exception {
-    String data = "abc";
-
-    boolean equal =
-        FileUtils.equalContent(
-            new ByteArrayInputStream(data.getBytes(UTF_8)),
-            new ByteArrayInputStream(data.getBytes(UTF_8)));
-
-    assertThat(equal).isTrue();
-  }
-
-  @Test
-  public void equalContent_sameLengthAndDifferentContent() throws Exception {
-    String data1 = "abX";
-    String data2 = "abY";
-
-    boolean equal =
-        FileUtils.equalContent(
-            new ByteArrayInputStream(data1.getBytes(UTF_8)),
-            new ByteArrayInputStream(data2.getBytes(UTF_8)));
-
-    assertThat(equal).isFalse();
-  }
-
-  @Test
-  public void equalContent_differentLength() throws Exception {
-    String data1 = "ab";
-    String data2 = "abc";
-
-    boolean equal =
-        FileUtils.equalContent(
-            new ByteArrayInputStream(data1.getBytes(UTF_8)),
-            new ByteArrayInputStream(data2.getBytes(UTF_8)));
-
-    assertThat(equal).isFalse();
   }
 
   @Test

@@ -117,7 +117,7 @@ public final class MultiPackagesInstaller {
       return device.syncPackageToDevice(apk);
     } catch (TimeoutException | AdbCommandRejectedException | SyncException | IOException e) {
       throw CommandExecutionException.builder()
-          .withMessage("Sync APK to device has failed")
+          .withInternalMessage("Sync APK to device has failed")
           .withCause(e)
           .build();
     }
@@ -128,7 +128,7 @@ public final class MultiPackagesInstaller {
       device.removeRemotePackage(remoteApk);
     } catch (InstallException e) {
       throw CommandExecutionException.builder()
-          .withMessage("Package removal has failed")
+          .withInternalMessage("Package removal has failed")
           .withCause(e)
           .build();
     }

@@ -24,9 +24,8 @@ public class UnexpectedAttributeTypeException extends XmlProtoException {
 
   UnexpectedAttributeTypeException(XmlAttributeOrBuilder attribute, String expectedType) {
     super(
-        String.format(
-            "Attribute '%s' expected to have type '%s' but found:\n %s",
-            attribute.getName(), expectedType, attribute));
+        "Attribute '%s' expected to have type '%s' but found:\n %s",
+        attribute.getName(), expectedType, attribute);
     this.attribute = attribute;
     this.expectedType = expectedType;
   }

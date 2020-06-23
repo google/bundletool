@@ -37,7 +37,6 @@ import com.android.tools.build.bundletool.device.BadgingInfoParser;
 import com.android.tools.build.bundletool.device.BadgingInfoParser.BadgingInfo;
 import com.android.tools.build.bundletool.device.Device;
 import com.android.tools.build.bundletool.device.DeviceAnalyzer;
-import com.android.tools.build.bundletool.device.IncompatibleDeviceException;
 import com.android.tools.build.bundletool.device.MultiPackagesInstaller;
 import com.android.tools.build.bundletool.device.MultiPackagesInstaller.InstallableApk;
 import com.android.tools.build.bundletool.device.PackagesParser;
@@ -47,10 +46,10 @@ import com.android.tools.build.bundletool.flags.ParsedFlags;
 import com.android.tools.build.bundletool.io.TempDirectory;
 import com.android.tools.build.bundletool.model.Aapt2Command;
 import com.android.tools.build.bundletool.model.ZipPath;
-import com.android.tools.build.bundletool.model.exceptions.CommandExecutionException;
+import com.android.tools.build.bundletool.model.exceptions.IncompatibleDeviceException;
+import com.android.tools.build.bundletool.model.exceptions.InvalidCommandException;
 import com.android.tools.build.bundletool.model.utils.DefaultSystemEnvironmentProvider;
 import com.android.tools.build.bundletool.model.utils.SystemEnvironmentProvider;
-import com.android.tools.build.bundletool.model.utils.files.BufferedIo;
 import com.google.auto.value.AutoValue;
 import com.google.common.base.Suppliers;
 import com.google.common.collect.ImmutableList;
@@ -61,6 +60,7 @@ import com.google.errorprone.annotations.CanIgnoreReturnValue;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Locale;
@@ -178,7 +178,9 @@ public abstract class InstallMultiApksCommand {
     Optional<ImmutableList<Path>> apksPaths = APKS_ARCHIVES_FLAG.getValue(flags);
     Optional<Path> apksArchiveZip = APKS_ARCHIVE_ZIP_FLAG.getValue(flags);
     if (apksPaths.isPresent() == apksArchiveZip.isPresent()) {
-      throw new CommandExecutionException("Exactly one of --apks or --apks-zip must be set.");
+      throw InvalidCommandException.builder()
+          .withInternalMessage("Exactly one of --apks or --apks-zip must be set.")
+          .build();
     }
     apksPaths.ifPresent(command::setApksArchivePaths);
     apksArchiveZip.ifPresent(command::setApksArchiveZipPath);
@@ -362,13 +364,7 @@ public abstract class InstallMultiApksCommand {
               apksArchive.getPackageName(), deviceSpec.getSdkVersion()));
       return ImmutableList.of();
     } catch (IOException e) {
-      throw CommandExecutionException.builder()
-          .withMessage(
-              String.format(
-                  "Temp directory to extract files for package '%s' can't be created",
-                  apksArchive.getPackageName()))
-          .withCause(e)
-          .build();
+      throw new UncheckedIOException(e);
     }
   }
 
@@ -400,8 +396,8 @@ public abstract class InstallMultiApksCommand {
         Path extractedApksPath =
             zipExtractedSubDirectory.resolve(
                 ZipPath.create(apksToExtract.getName()).getFileName().toString());
-        try (InputStream inputStream = BufferedIo.inputStream(apksArchiveContainer, apksToExtract);
-            OutputStream outputApks = BufferedIo.outputStream(extractedApksPath)) {
+        try (InputStream inputStream = apksArchiveContainer.getInputStream(apksToExtract);
+            OutputStream outputApks = Files.newOutputStream(extractedApksPath)) {
           ByteStreams.copy(inputStream, outputApks);
           extractedApks.add(extractedApksPath);
         }

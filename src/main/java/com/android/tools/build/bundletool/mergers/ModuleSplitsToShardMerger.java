@@ -24,12 +24,12 @@ import static com.android.tools.build.bundletool.model.BundleMetadata.BUNDLETOOL
 import static com.android.tools.build.bundletool.model.BundleMetadata.MAIN_DEX_LIST_FILE_NAME;
 import static com.android.tools.build.bundletool.model.BundleModule.DEX_DIRECTORY;
 import static com.android.tools.build.bundletool.model.BundleModuleName.BASE_MODULE_NAME;
+import static com.android.tools.build.bundletool.model.utils.CollectorUtils.groupingByDeterministic;
 import static com.android.tools.build.bundletool.model.version.VersionGuardedFeature.FUSE_ACTIVITIES_FROM_FEATURE_MANIFESTS;
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.ImmutableSet.toImmutableSet;
 import static com.google.common.collect.MoreCollectors.onlyElement;
-import static java.util.stream.Collectors.groupingBy;
 
 import com.android.aapt.Resources.ResourceTable;
 import com.android.bundle.Devices.DeviceSpec;
@@ -41,8 +41,6 @@ import com.android.tools.build.bundletool.device.ApkMatcher;
 import com.android.tools.build.bundletool.model.AndroidManifest;
 import com.android.tools.build.bundletool.model.BundleMetadata;
 import com.android.tools.build.bundletool.model.BundleModuleName;
-import com.android.tools.build.bundletool.model.InputStreamSupplier;
-import com.android.tools.build.bundletool.model.InputStreamSuppliers;
 import com.android.tools.build.bundletool.model.ModuleEntry;
 import com.android.tools.build.bundletool.model.ModuleSplit;
 import com.android.tools.build.bundletool.model.ModuleSplit.SplitType;
@@ -51,7 +49,6 @@ import com.android.tools.build.bundletool.model.SuffixManager;
 import com.android.tools.build.bundletool.model.ZipPath;
 import com.android.tools.build.bundletool.model.exceptions.CommandExecutionException;
 import com.android.tools.build.bundletool.model.utils.Versions;
-import com.android.tools.build.bundletool.model.utils.files.BufferedIo;
 import com.android.tools.build.bundletool.model.version.Version;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ArrayListMultimap;
@@ -64,10 +61,9 @@ import com.google.common.collect.Multimap;
 import com.google.common.collect.SetMultimap;
 import com.google.common.collect.Sets;
 import com.google.common.collect.Streams;
-import com.google.common.io.ByteStreams;
+import com.google.common.io.ByteSource;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
@@ -158,21 +154,19 @@ public class ModuleSplitsToShardMerger {
     // generate a single split for each language.
     ImmutableSet<ModuleSplit> nonMatchedLanguageSplitsForFusedModules =
         Sets.difference(splitsOfFusedModules, splitsForTheSystemApk).stream()
-            .collect(groupingBy(ModuleSplit::getApkTargeting))
+            .collect(groupingByDeterministic(ModuleSplit::getApkTargeting))
             .values()
             .stream()
             .map(
                 languageSplits ->
                     mergeNonMatchedLanguageSplitsForSystemApks(
-                        ImmutableList.copyOf(languageSplits),
-                        bundleMetadata,
-                        baseMasterAndroidManifest))
+                        languageSplits, bundleMetadata, baseMasterAndroidManifest))
             .collect(toImmutableSet());
 
     // Write split id for splits not fused.
     ImmutableList<ModuleSplit> otherSplits =
         Sets.union(nonMatchedLanguageSplitsForFusedModules, splitsOfNonFusedModules).stream()
-            .collect(groupingBy(ModuleSplit::getModuleName))
+            .collect(groupingByDeterministic(ModuleSplit::getModuleName))
             .values()
             .stream()
             .flatMap(ModuleSplitsToShardMerger::writeSplitIdInManifestHavingSameModule)
@@ -376,7 +370,7 @@ public class ModuleSplitsToShardMerger {
               filePath ->
                   ModuleEntry.builder()
                       .setPath(DEX_DIRECTORY.resolve(filePath.getFileName().toString()))
-                      .setContentSupplier(InputStreamSuppliers.fromFile(filePath))
+                      .setContent(filePath)
                       .build())
           .collect(toImmutableList());
     }
@@ -441,7 +435,7 @@ public class ModuleSplitsToShardMerger {
     } catch (IOException e) {
       throw CommandExecutionException.builder()
           .withCause(e)
-          .withMessage("I/O error while merging dex files.")
+          .withInternalMessage("I/O error while merging dex files.")
           .build();
     }
   }
@@ -469,7 +463,7 @@ public class ModuleSplitsToShardMerger {
       } catch (CommandExecutionException | IllegalStateException e) {
         throw CommandExecutionException.builder()
             .withCause(e)
-            .withMessage(
+            .withInternalMessage(
                 "Failed to merge with resource table of module '%s'.", split.getModuleName())
             .build();
       }
@@ -483,7 +477,8 @@ public class ModuleSplitsToShardMerger {
     } catch (CommandExecutionException | IllegalStateException e) {
       throw CommandExecutionException.builder()
           .withCause(e)
-          .withMessage("Failed to merge with targeting of module '%s'.", split.getModuleName())
+          .withInternalMessage(
+              "Failed to merge with targeting of module '%s'.", split.getModuleName())
           .build();
     }
   }
@@ -491,18 +486,18 @@ public class ModuleSplitsToShardMerger {
   private Optional<Path> writeMainDexListFileIfPresent(BundleMetadata bundleMetadata)
       throws IOException {
 
-    Optional<InputStreamSupplier> mainDexListFileData =
-        bundleMetadata.getFileData(BUNDLETOOL_NAMESPACE, MAIN_DEX_LIST_FILE_NAME);
+    Optional<ByteSource> mainDexListFile =
+        bundleMetadata.getFileAsByteSource(BUNDLETOOL_NAMESPACE, MAIN_DEX_LIST_FILE_NAME);
 
-    if (!mainDexListFileData.isPresent()) {
+    if (!mainDexListFile.isPresent()) {
       return Optional.empty();
     }
 
-    Path mainDexListFile = Files.createTempFile(globalTempDir, "mainDexList", ".txt");
-    try (InputStream inputStream = mainDexListFileData.get().get()) {
-      Files.copy(inputStream, mainDexListFile, StandardCopyOption.REPLACE_EXISTING);
+    Path mainDexListFilePath = Files.createTempFile(globalTempDir, "mainDexList", ".txt");
+    try (InputStream inputStream = mainDexListFile.get().openStream()) {
+      Files.copy(inputStream, mainDexListFilePath, StandardCopyOption.REPLACE_EXISTING);
     }
-    return Optional.of(mainDexListFile);
+    return Optional.of(mainDexListFilePath);
   }
 
   private static ImmutableList<String> getUniqueModuleNames(
@@ -530,14 +525,13 @@ public class ModuleSplitsToShardMerger {
   }
 
   private static void writeModuleEntryToFile(ModuleEntry entry, Path toFile) throws IOException {
-    try (InputStream is = entry.getContent();
-        OutputStream os = BufferedIo.outputStream(toFile)) {
-      ByteStreams.copy(is, os);
+    try (InputStream is = entry.getContent().openStream()) {
+      Files.copy(is, toFile);
     }
   }
 
   private static Stream<ModuleSplit> writeSplitIdInManifestHavingSameModule(
-      List<ModuleSplit> splits) {
+      ImmutableList<ModuleSplit> splits) {
     checkState(splits.stream().map(ModuleSplit::getModuleName).distinct().count() == 1);
     SuffixManager suffixManager = new SuffixManager();
     return splits.stream()

@@ -38,6 +38,7 @@ import static com.android.tools.build.bundletool.testing.TargetingUtils.textureC
 import static com.android.tools.build.bundletool.testing.TestUtils.expectMissingRequiredBuilderPropertyException;
 import static com.android.tools.build.bundletool.testing.TestUtils.expectMissingRequiredFlagException;
 import static com.android.tools.build.bundletool.testing.truth.zip.TruthZip.assertThat;
+import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.truth.Truth.assertThat;
 import static com.google.common.truth.Truth.assertWithMessage;
 import static com.google.common.truth.Truth8.assertThat;
@@ -64,8 +65,8 @@ import com.android.tools.build.bundletool.flags.FlagParser;
 import com.android.tools.build.bundletool.io.ZipBuilder;
 import com.android.tools.build.bundletool.model.AppBundle;
 import com.android.tools.build.bundletool.model.ZipPath;
-import com.android.tools.build.bundletool.model.exceptions.CommandExecutionException;
-import com.android.tools.build.bundletool.model.exceptions.ValidationException;
+import com.android.tools.build.bundletool.model.exceptions.InvalidBundleException;
+import com.android.tools.build.bundletool.model.exceptions.InvalidCommandException;
 import com.android.tools.build.bundletool.model.version.BundleToolVersion;
 import com.android.tools.build.bundletool.testing.BundleConfigBuilder;
 import com.android.tools.build.bundletool.testing.ManifestProtoUtils.ManifestMutator;
@@ -210,10 +211,11 @@ public class BuildBundleCommandTest {
                     "--metadata-file=com.some.namespace/metadata-A.txt:" + metadataFileAPath,
                     "--metadata-file=com.some.namespace/metadata-B.txt:" + metadataFileBPath));
 
-    // Cannot compare the command objects directly, because the InputStreamSupplier instances in
+    // Cannot compare the command objects directly, because the ByteSource instances in
     // BundleMetadata would not compare equal.
-    assertThat(commandViaBuilder.getBundleMetadata().getFileDataMap().keySet())
-        .containsExactlyElementsIn(commandViaFlags.getBundleMetadata().getFileDataMap().keySet());
+    assertThat(commandViaBuilder.getBundleMetadata().getFileContentMap().keySet())
+        .containsExactlyElementsIn(
+            commandViaFlags.getBundleMetadata().getFileContentMap().keySet());
   }
 
   @Test
@@ -230,6 +232,24 @@ public class BuildBundleCommandTest {
         BuildBundleCommand.fromFlags(
             new FlagParser()
                 .parse("--output=" + bundlePath, "--modules=" + baseModulePath, "--uncompressed"));
+
+    assertThat(commandViaBuilder).isEqualTo(commandViaFlags);
+  }
+
+  @Test
+  public void buildingViaFlagsAndBuilderHasSameResult_optionalOverwrite() throws Exception {
+    Path baseModulePath = buildSimpleModule("base");
+    BuildBundleCommand commandViaBuilder =
+        BuildBundleCommand.builder()
+            .setOutputPath(bundlePath)
+            .setModulesPaths(ImmutableList.of(baseModulePath))
+            .setOverwriteOutput(true)
+            .build();
+
+    BuildBundleCommand commandViaFlags =
+        BuildBundleCommand.fromFlags(
+            new FlagParser()
+                .parse("--output=" + bundlePath, "--modules=" + baseModulePath, "--overwrite"));
 
     assertThat(commandViaBuilder).isEqualTo(commandViaFlags);
   }
@@ -558,7 +578,7 @@ public class BuildBundleCommandTest {
 
     Exception e =
         assertThrows(
-            CommandExecutionException.class,
+            InvalidCommandException.class,
             () ->
                 BuildBundleCommand.fromFlags(
                     new FlagParser()
@@ -748,9 +768,9 @@ public class BuildBundleCommandTest {
     Path moduleFeature1 = buildSimpleModule("feature");
     Path moduleFeature2 = buildSimpleModule("feature", /* fileName= */ "feature2");
 
-    ValidationException exception =
+    InvalidBundleException exception =
         assertThrows(
-            ValidationException.class,
+            InvalidBundleException.class,
             () ->
                 BuildBundleCommand.builder()
                     .setOutputPath(bundlePath)
@@ -768,9 +788,9 @@ public class BuildBundleCommandTest {
     Path baseModulePath = buildSimpleModule("base");
     Path nonExistentFilePath = tmpDir.resolve("metadata.txt");
 
-    ValidationException exceptionViaApi =
+    InvalidCommandException exceptionViaApi =
         assertThrows(
-            ValidationException.class,
+            InvalidCommandException.class,
             () ->
                 BuildBundleCommand.builder()
                     .setOutputPath(bundlePath)
@@ -780,9 +800,9 @@ public class BuildBundleCommandTest {
                     .execute());
     assertThat(exceptionViaApi).hasMessageThat().matches("Metadata file .* does not exist.");
 
-    ValidationException exceptionViaFlags =
+    InvalidCommandException exceptionViaFlags =
         assertThrows(
-            ValidationException.class,
+            InvalidCommandException.class,
             () ->
                 BuildBundleCommand.fromFlags(
                     new FlagParser()
@@ -880,8 +900,7 @@ public class BuildBundleCommandTest {
             .setModulesPaths(ImmutableList.of(module))
             .build();
 
-    ValidationException exception =
-        assertThrows(ValidationException.class, () -> command.execute());
+    InvalidBundleException exception = assertThrows(InvalidBundleException.class, command::execute);
 
     assertThat(exception)
         .hasMessageThat()
@@ -935,8 +954,7 @@ public class BuildBundleCommandTest {
                 ImmutableList.of(baseModulePath, module1Path, module2Path, module3Path))
             .build();
 
-    ValidationException exception =
-        assertThrows(ValidationException.class, () -> command.execute());
+    InvalidBundleException exception = assertThrows(InvalidBundleException.class, command::execute);
 
     assertThat(exception).hasMessageThat().contains("Found cyclic dependency between modules");
   }
@@ -963,8 +981,7 @@ public class BuildBundleCommandTest {
             .setModulesPaths(ImmutableList.of(module))
             .build();
 
-    ValidationException exception =
-        assertThrows(ValidationException.class, () -> command.execute());
+    InvalidBundleException exception = assertThrows(InvalidBundleException.class, command::execute);
 
     assertThat(exception).hasMessageThat().contains("contains references to non-existing files");
   }
@@ -1025,6 +1042,40 @@ public class BuildBundleCommandTest {
             .isEqualTo(ZipEntry.STORED);
       }
     }
+  }
+
+  @Test
+  public void overwriteFlagNotSetRejectsCommandIfOutputAlreadyExists() throws Exception {
+    // Create the output.
+    Files.createFile(bundlePath);
+
+    Path module = createSimpleBaseModule();
+    Exception expected =
+        assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                BuildBundleCommand.builder()
+                    .setModulesPaths(ImmutableList.of(module))
+                    .setOutputPath(bundlePath)
+                    .build()
+                    .execute());
+    assertThat(expected).hasMessageThat().matches("File .* already exists.");
+  }
+
+  @Test
+  public void overwriteFlagSetOverritesOutput() throws Exception {
+    // Create an empty file output.
+    Files.createFile(bundlePath);
+    checkState(Files.size(bundlePath) == 0);
+
+    Path module = createSimpleBaseModule();
+    BuildBundleCommand.builder()
+        .setModulesPaths(ImmutableList.of(module))
+        .setOverwriteOutput(true)
+        .setOutputPath(bundlePath)
+        .build()
+        .execute();
+    assertThat(Files.size(bundlePath)).isGreaterThan(0L);
   }
 
   private Path createSimpleBaseModule() throws IOException {
