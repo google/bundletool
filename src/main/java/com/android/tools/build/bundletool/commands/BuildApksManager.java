@@ -247,6 +247,7 @@ final class BuildApksManager {
         new ApkSerializerManager(
             appBundle,
             apkSetBuilder,
+            command.getVerboseMode(),
             command.getExecutorService(),
             command.getApkListener().orElse(ApkListener.NO_OP),
             command.getApkModifier().orElse(ApkModifier.NO_OP),

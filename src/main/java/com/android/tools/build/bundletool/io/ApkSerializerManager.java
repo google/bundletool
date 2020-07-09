@@ -63,6 +63,9 @@ import com.google.common.collect.ImmutableListMultimap;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Multimap;
 import com.google.common.util.concurrent.ListeningExecutorService;
+
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.Collection;
 import java.util.Map.Entry;
 import java.util.Optional;
@@ -79,10 +82,12 @@ public class ApkSerializerManager {
   private final int firstVariantNumber;
   private final AppBundle appBundle;
   private final ApkSetBuilder apkSetBuilder;
+  private final Boolean verboseMode;
 
   public ApkSerializerManager(
       AppBundle appBundle,
       ApkSetBuilder apkSetBuilder,
+      Boolean verboseMode,
       ListeningExecutorService executorService,
       ApkListener apkListener,
       ApkModifier apkModifier,
@@ -91,6 +96,7 @@ public class ApkSerializerManager {
     this.apkSetBuilder = apkSetBuilder;
     this.apkPathManager = new ApkPathManager();
     this.executorService = executorService;
+    this.verboseMode = verboseMode;
     this.apkListener = apkListener;
     this.apkModifier = apkModifier;
     this.firstVariantNumber = firstVariantNumber;
@@ -188,11 +194,27 @@ public class ApkSerializerManager {
                 collectingAndThen(
                     toImmutableMap(
                         identity(),
-                        (ModuleSplit split) -> {
-                          ZipPath apkPath = apkPathManager.getApkPath(split);
-                          return executorService.submit(
-                              () -> apkSerializer.serialize(split, apkPath));
-                        }),
+                            (ModuleSplit split) -> {
+                              ZipPath apkPath = apkPathManager.getApkPath(split);
+                              DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+                              if (verboseMode) {
+                                System.out.printf(
+                                        "INFO: [%s] Starting writing '%s' of type '%s' to the disk.%n",
+                                        LocalDateTime.now().format(formatter),
+                                        apkPath.toString(), split.getSplitType().toString());
+                              }
+                              return executorService.submit(
+                                      () ->  {
+                                        ImmutableList<ApkDescription> list = apkSerializer.serialize(split, apkPath);
+                                        if (verboseMode) {
+                                          System.out.printf(
+                                                  "INFO: [%s] '%s' of type '%s' was written to the disk.%n",
+                                                  LocalDateTime.now().format(formatter),
+                                                  apkPath.toString(), split.getSplitType().toString());
+                                        }
+                                        return list;
+                                      });
+                            }),
                     ConcurrencyUtils::waitForAll));
 
     // Build the result proto.

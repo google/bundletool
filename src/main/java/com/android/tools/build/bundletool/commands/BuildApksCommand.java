@@ -116,6 +116,8 @@ public abstract class BuildApksCommand {
 
   private static final Flag<Path> DEVICE_SPEC_FLAG = Flag.path("device-spec");
 
+  private static final Flag<Boolean> VERBOSE_MODE_FLAG = Flag.booleanFlag("verbose");
+
   // Signing-related flags: should match flags from apksig library.
   private static final Flag<Path> KEYSTORE_FLAG = Flag.path("ks");
   private static final Flag<String> KEY_ALIAS_FLAG = Flag.string("ks-key-alias");
@@ -161,6 +163,8 @@ public abstract class BuildApksCommand {
 
   public abstract boolean getLocalTestingMode();
 
+  public abstract boolean getVerboseMode();
+
   public abstract Optional<Aapt2Command> getAapt2Command();
 
   public abstract Optional<SigningConfiguration> getSigningConfiguration();
@@ -197,6 +201,7 @@ public abstract class BuildApksCommand {
         .setLocalTestingMode(false)
         .setGenerateOnlyForConnectedDevice(false)
         .setCreateApkSetArchive(true)
+        .setVerboseMode(false)
         .setOptimizationDimensions(ImmutableSet.of())
         .setModules(ImmutableSet.of())
         .setExtraValidators(ImmutableList.of());
@@ -253,6 +258,12 @@ public abstract class BuildApksCommand {
       // Parse as partial and fully validate later.
       return setDeviceSpec(DeviceSpecParser.parsePartialDeviceSpec(deviceSpecFile));
     }
+
+    /**
+     * Sets whether verbose information about what is happening during the execution of the
+     * command will be displayed.
+     */
+    public abstract Builder setVerboseMode(boolean enableVerbose);
 
     /**
      * Sets the device serial number. Required if more than one device including emulators is
@@ -519,6 +530,8 @@ public abstract class BuildApksCommand {
 
     MODULES_FLAG.getValue(flags).ifPresent(buildApksCommand::setModules);
 
+    VERBOSE_MODE_FLAG.getValue(flags).ifPresent(buildApksCommand::setVerboseMode);
+
     flags.checkNoUnknownFlags();
 
     return buildApksCommand.build();
@@ -731,6 +744,15 @@ public abstract class BuildApksCommand {
                         + " accessed by the Play Core API.",
                     InstallApksCommand.COMMAND_NAME)
                 .build())
+        .addFlag(
+                FlagDescription.builder()
+                        .setFlagName(VERBOSE_MODE_FLAG.getName())
+                        .setOptional(true)
+                        .setDescription(
+                                "If enabled, verbose information about what is happening " +
+                                        "during the execution of the command will be displayed.",
+                                InstallApksCommand.COMMAND_NAME)
+                        .build())
         .addFlag(
             FlagDescription.builder()
                 .setFlagName(CREATE_STAMP_FLAG.getName())
