@@ -88,10 +88,10 @@ public class ApkSerializerManager {
   public ApkSerializerManager(
       AppBundle appBundle,
       ApkSetBuilder apkSetBuilder,
-      boolean verbose,
       ListeningExecutorService executorService,
       ApkListener apkListener,
       ApkModifier apkModifier,
+      boolean verbose,
       int firstVariantNumber) {
     this.appBundle = appBundle;
     this.apkSetBuilder = apkSetBuilder;
