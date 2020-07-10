@@ -260,8 +260,8 @@ public abstract class BuildApksCommand {
     }
 
     /**
-     * Sets whether verbose information about what is happening during the execution of the
-     * command will be displayed.
+     * Sets whether to display verbose information about what is happening during the command
+     * execution.
      */
     public abstract Builder setVerbose(boolean enableVerbose);
 
@@ -750,7 +750,7 @@ public abstract class BuildApksCommand {
                         .setOptional(true)
                         .setDescription(
                                 "If enabled, verbose information about what is happening " +
-                                        "during the execution of the command will be displayed.",
+                                        "during the command execution will be displayed.",
                                 InstallApksCommand.COMMAND_NAME)
                         .build())
         .addFlag(
