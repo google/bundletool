@@ -116,7 +116,7 @@ public abstract class BuildApksCommand {
 
   private static final Flag<Path> DEVICE_SPEC_FLAG = Flag.path("device-spec");
 
-  private static final Flag<Boolean> VERBOSE_MODE_FLAG = Flag.booleanFlag("verbose");
+  private static final Flag<Boolean> VERBOSE_FLAG = Flag.booleanFlag("verbose");
 
   // Signing-related flags: should match flags from apksig library.
   private static final Flag<Path> KEYSTORE_FLAG = Flag.path("ks");
@@ -163,7 +163,7 @@ public abstract class BuildApksCommand {
 
   public abstract boolean getLocalTestingMode();
 
-  public abstract boolean getVerboseMode();
+  public abstract boolean getVerbose();
 
   public abstract Optional<Aapt2Command> getAapt2Command();
 
@@ -201,7 +201,7 @@ public abstract class BuildApksCommand {
         .setLocalTestingMode(false)
         .setGenerateOnlyForConnectedDevice(false)
         .setCreateApkSetArchive(true)
-        .setVerboseMode(false)
+        .setVerbose(false)
         .setOptimizationDimensions(ImmutableSet.of())
         .setModules(ImmutableSet.of())
         .setExtraValidators(ImmutableList.of());
@@ -263,7 +263,7 @@ public abstract class BuildApksCommand {
      * Sets whether verbose information about what is happening during the execution of the
      * command will be displayed.
      */
-    public abstract Builder setVerboseMode(boolean enableVerbose);
+    public abstract Builder setVerbose(boolean enableVerbose);
 
     /**
      * Sets the device serial number. Required if more than one device including emulators is
@@ -530,7 +530,7 @@ public abstract class BuildApksCommand {
 
     MODULES_FLAG.getValue(flags).ifPresent(buildApksCommand::setModules);
 
-    VERBOSE_MODE_FLAG.getValue(flags).ifPresent(buildApksCommand::setVerboseMode);
+    VERBOSE_FLAG.getValue(flags).ifPresent(buildApksCommand::setVerbose);
 
     flags.checkNoUnknownFlags();
 
@@ -746,7 +746,7 @@ public abstract class BuildApksCommand {
                 .build())
         .addFlag(
                 FlagDescription.builder()
-                        .setFlagName(VERBOSE_MODE_FLAG.getName())
+                        .setFlagName(VERBOSE_FLAG.getName())
                         .setOptional(true)
                         .setDescription(
                                 "If enabled, verbose information about what is happening " +

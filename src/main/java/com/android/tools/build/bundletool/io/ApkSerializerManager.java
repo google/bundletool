@@ -82,12 +82,13 @@ public class ApkSerializerManager {
   private final int firstVariantNumber;
   private final AppBundle appBundle;
   private final ApkSetBuilder apkSetBuilder;
-  private final Boolean verboseMode;
+
+  private final boolean verbose;
 
   public ApkSerializerManager(
       AppBundle appBundle,
       ApkSetBuilder apkSetBuilder,
-      Boolean verboseMode,
+      boolean verbose,
       ListeningExecutorService executorService,
       ApkListener apkListener,
       ApkModifier apkModifier,
@@ -96,7 +97,7 @@ public class ApkSerializerManager {
     this.apkSetBuilder = apkSetBuilder;
     this.apkPathManager = new ApkPathManager();
     this.executorService = executorService;
-    this.verboseMode = verboseMode;
+    this.verbose = verbose;
     this.apkListener = apkListener;
     this.apkModifier = apkModifier;
     this.firstVariantNumber = firstVariantNumber;
@@ -194,27 +195,16 @@ public class ApkSerializerManager {
                 collectingAndThen(
                     toImmutableMap(
                         identity(),
-                            (ModuleSplit split) -> {
-                              ZipPath apkPath = apkPathManager.getApkPath(split);
-                              DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
-                              if (verboseMode) {
-                                System.out.printf(
-                                        "INFO: [%s] Starting writing '%s' of type '%s' to the disk.%n",
-                                        LocalDateTime.now().format(formatter),
-                                        apkPath.toString(), split.getSplitType().toString());
-                              }
-                              return executorService.submit(
-                                      () ->  {
-                                        ImmutableList<ApkDescription> list = apkSerializer.serialize(split, apkPath);
-                                        if (verboseMode) {
-                                          System.out.printf(
-                                                  "INFO: [%s] '%s' of type '%s' was written to the disk.%n",
-                                                  LocalDateTime.now().format(formatter),
-                                                  apkPath.toString(), split.getSplitType().toString());
-                                        }
-                                        return list;
-                                      });
-                            }),
+                        (ModuleSplit split) -> {
+                          ZipPath apkPath = apkPathManager.getApkPath(split);
+                          return executorService.submit(
+                              () -> {
+                                ImmutableList<ApkDescription> list =
+                                    apkSerializer.serialize(split, apkPath);
+                                logVerboseInfo(split, apkPath);
+                                return list;
+                              });
+                        }),
                     ConcurrencyUtils::waitForAll));
 
     // Build the result proto.
@@ -267,7 +257,12 @@ public class ApkSerializerManager {
                         assetSlice -> {
                           ZipPath apkPath = apkPathManager.getApkPath(assetSlice);
                           return executorService.submit(
-                              () -> apkSerializer.serialize(assetSlice, apkPath));
+                              () -> {
+                                ImmutableList<ApkDescription> list =
+                                    apkSerializer.serialize(assetSlice, apkPath);
+                                logVerboseInfo(assetSlice, apkPath);
+                                return list;
+                              });
                         },
                         toImmutableList())))
             .entrySet()
@@ -285,6 +280,17 @@ public class ApkSerializerManager {
                     .addAllApkDescription(entry.getValue())
                     .build())
         .collect(toImmutableList());
+  }
+
+  private void logVerboseInfo(ModuleSplit split, ZipPath apkPath) {
+    DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+    if (verbose) {
+      System.out.printf(
+          "INFO: [%s] '%s' of type '%s' was written to the disk.%n",
+          LocalDateTime.now().format(formatter),
+          apkPath.toString(),
+          split.getSplitType().toString());
+    }
   }
 
   private AssetModuleMetadata getAssetModuleMetadata(BundleModule module) {
