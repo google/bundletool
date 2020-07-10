@@ -179,7 +179,6 @@ public abstract class BuildApksCommand {
 
   public abstract boolean getCreateApkSetArchive();
 
-
   public abstract Optional<ApkListener> getApkListener();
 
   public abstract Optional<ApkModifier> getApkModifier();
@@ -318,7 +317,6 @@ public abstract class BuildApksCommand {
      * command will return the directory where the APK files were copied to.
      */
     public abstract Builder setCreateApkSetArchive(boolean value);
-
 
     /**
      * Provides an {@link ApkListener} that will be notified at defined stages of APK creation.
@@ -745,14 +743,14 @@ public abstract class BuildApksCommand {
                     InstallApksCommand.COMMAND_NAME)
                 .build())
         .addFlag(
-                FlagDescription.builder()
-                        .setFlagName(VERBOSE_FLAG.getName())
-                        .setOptional(true)
-                        .setDescription(
-                                "If enabled, verbose information about what is happening " +
-                                        "during the command execution will be displayed.",
-                                InstallApksCommand.COMMAND_NAME)
-                        .build())
+            FlagDescription.builder()
+                .setFlagName(VERBOSE_FLAG.getName())
+                .setOptional(true)
+                .setDescription(
+                    "If enabled, verbose information about what is happening "
+                        + "during the command execution will be displayed.",
+                    InstallApksCommand.COMMAND_NAME)
+                .build())
         .addFlag(
             FlagDescription.builder()
                 .setFlagName(CREATE_STAMP_FLAG.getName())
