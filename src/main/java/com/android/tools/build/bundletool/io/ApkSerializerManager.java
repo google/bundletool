@@ -63,8 +63,8 @@ import com.google.common.collect.ImmutableListMultimap;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Multimap;
 import com.google.common.util.concurrent.ListeningExecutorService;
-
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.Collection;
 import java.util.Map.Entry;
@@ -74,6 +74,9 @@ import java.util.function.Predicate;
 
 /** Creates parts of table of contents and writes out APKs. */
 public class ApkSerializerManager {
+
+  private static final DateTimeFormatter DATE_TIME_FORMATTER =
+      DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
   private final ApkPathManager apkPathManager;
   private final ListeningExecutorService executorService;
@@ -97,9 +100,9 @@ public class ApkSerializerManager {
     this.apkSetBuilder = apkSetBuilder;
     this.apkPathManager = new ApkPathManager();
     this.executorService = executorService;
-    this.verbose = verbose;
     this.apkListener = apkListener;
     this.apkModifier = apkModifier;
+    this.verbose = verbose;
     this.firstVariantNumber = firstVariantNumber;
   }
 
@@ -198,12 +201,7 @@ public class ApkSerializerManager {
                         (ModuleSplit split) -> {
                           ZipPath apkPath = apkPathManager.getApkPath(split);
                           return executorService.submit(
-                              () -> {
-                                ImmutableList<ApkDescription> list =
-                                    apkSerializer.serialize(split, apkPath);
-                                logVerboseInfo(split, apkPath);
-                                return list;
-                              });
+                              () -> apkSerializer.serialize(split, apkPath));
                         }),
                     ConcurrencyUtils::waitForAll));
 
@@ -257,12 +255,7 @@ public class ApkSerializerManager {
                         assetSlice -> {
                           ZipPath apkPath = apkPathManager.getApkPath(assetSlice);
                           return executorService.submit(
-                              () -> {
-                                ImmutableList<ApkDescription> list =
-                                    apkSerializer.serialize(assetSlice, apkPath);
-                                logVerboseInfo(assetSlice, apkPath);
-                                return list;
-                              });
+                              () -> apkSerializer.serialize(assetSlice, apkPath));
                         },
                         toImmutableList())))
             .entrySet()
@@ -280,17 +273,6 @@ public class ApkSerializerManager {
                     .addAllApkDescription(entry.getValue())
                     .build())
         .collect(toImmutableList());
-  }
-
-  private void logVerboseInfo(ModuleSplit split, ZipPath apkPath) {
-    DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
-    if (verbose) {
-      System.out.printf(
-          "INFO: [%s] '%s' of type '%s' was written to the disk.%n",
-          LocalDateTime.now().format(formatter),
-          apkPath.toString(),
-          split.getSplitType().toString());
-    }
   }
 
   private AssetModuleMetadata getAssetModuleMetadata(BundleModule module) {
@@ -442,6 +424,15 @@ public class ApkSerializerManager {
 
       // Notify apk listener.
       apkDescriptions.forEach(apkListener::onApkFinalized);
+
+      if (verbose) {
+        System.out.printf(
+            "INFO: [%s] '%s' of type '%s' was written to the disk.%n",
+            LocalDateTime.now(ZoneId.systemDefault()).format(DATE_TIME_FORMATTER),
+            apkPath,
+            split.getSplitType());
+      }
+
       return apkDescriptions;
     }
   }

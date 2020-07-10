@@ -747,9 +747,8 @@ public abstract class BuildApksCommand {
                 .setFlagName(VERBOSE_FLAG.getName())
                 .setOptional(true)
                 .setDescription(
-                    "If enabled, verbose information about what is happening "
-                        + "during the command execution will be displayed.",
-                    InstallApksCommand.COMMAND_NAME)
+                    "If set, prints extra information about the command execution "
+                        + "in the standard output.")
                 .build())
         .addFlag(
             FlagDescription.builder()
