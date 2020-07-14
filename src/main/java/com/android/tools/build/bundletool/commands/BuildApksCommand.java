@@ -116,6 +116,8 @@ public abstract class BuildApksCommand {
 
   private static final Flag<Path> DEVICE_SPEC_FLAG = Flag.path("device-spec");
 
+  private static final Flag<Boolean> VERBOSE_FLAG = Flag.booleanFlag("verbose");
+
   // Signing-related flags: should match flags from apksig library.
   private static final Flag<Path> KEYSTORE_FLAG = Flag.path("ks");
   private static final Flag<String> KEY_ALIAS_FLAG = Flag.string("ks-key-alias");
@@ -161,6 +163,8 @@ public abstract class BuildApksCommand {
 
   public abstract boolean getLocalTestingMode();
 
+  public abstract boolean getVerbose();
+
   public abstract Optional<Aapt2Command> getAapt2Command();
 
   public abstract Optional<SigningConfiguration> getSigningConfiguration();
@@ -174,7 +178,6 @@ public abstract class BuildApksCommand {
   abstract boolean isExecutorServiceCreatedByBundleTool();
 
   public abstract boolean getCreateApkSetArchive();
-
 
   public abstract Optional<ApkListener> getApkListener();
 
@@ -197,6 +200,7 @@ public abstract class BuildApksCommand {
         .setLocalTestingMode(false)
         .setGenerateOnlyForConnectedDevice(false)
         .setCreateApkSetArchive(true)
+        .setVerbose(false)
         .setOptimizationDimensions(ImmutableSet.of())
         .setModules(ImmutableSet.of())
         .setExtraValidators(ImmutableList.of());
@@ -255,6 +259,12 @@ public abstract class BuildApksCommand {
     }
 
     /**
+     * Sets whether to display verbose information about what is happening during the command
+     * execution.
+     */
+    public abstract Builder setVerbose(boolean enableVerbose);
+
+    /**
      * Sets the device serial number. Required if more than one device including emulators is
      * connected.
      */
@@ -307,7 +317,6 @@ public abstract class BuildApksCommand {
      * command will return the directory where the APK files were copied to.
      */
     public abstract Builder setCreateApkSetArchive(boolean value);
-
 
     /**
      * Provides an {@link ApkListener} that will be notified at defined stages of APK creation.
@@ -518,6 +527,8 @@ public abstract class BuildApksCommand {
         .ifPresent(buildApksCommand::setDeviceSpec);
 
     MODULES_FLAG.getValue(flags).ifPresent(buildApksCommand::setModules);
+
+    VERBOSE_FLAG.getValue(flags).ifPresent(buildApksCommand::setVerbose);
 
     flags.checkNoUnknownFlags();
 
@@ -730,6 +741,14 @@ public abstract class BuildApksCommand {
                         + " all dynamic module splits and asset packs to a location that can be"
                         + " accessed by the Play Core API.",
                     InstallApksCommand.COMMAND_NAME)
+                .build())
+        .addFlag(
+            FlagDescription.builder()
+                .setFlagName(VERBOSE_FLAG.getName())
+                .setOptional(true)
+                .setDescription(
+                    "If set, prints extra information about the command execution "
+                        + "in the standard output.")
                 .build())
         .addFlag(
             FlagDescription.builder()

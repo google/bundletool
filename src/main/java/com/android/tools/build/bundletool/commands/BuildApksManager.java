@@ -250,6 +250,7 @@ final class BuildApksManager {
             command.getExecutorService(),
             command.getApkListener().orElse(ApkListener.NO_OP),
             command.getApkModifier().orElse(ApkModifier.NO_OP),
+            command.getVerbose(),
             command.getFirstVariantNumber().orElse(0));
 
     apkSerializerManager.populateApkSetBuilder(

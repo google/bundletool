@@ -63,6 +63,9 @@ import com.google.common.collect.ImmutableListMultimap;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Multimap;
 import com.google.common.util.concurrent.ListeningExecutorService;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.util.Collection;
 import java.util.Map.Entry;
 import java.util.Optional;
@@ -72,6 +75,9 @@ import java.util.function.Predicate;
 /** Creates parts of table of contents and writes out APKs. */
 public class ApkSerializerManager {
 
+  private static final DateTimeFormatter DATE_TIME_FORMATTER =
+      DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+
   private final ApkPathManager apkPathManager;
   private final ListeningExecutorService executorService;
   private final ApkListener apkListener;
@@ -80,12 +86,15 @@ public class ApkSerializerManager {
   private final AppBundle appBundle;
   private final ApkSetBuilder apkSetBuilder;
 
+  private final boolean verbose;
+
   public ApkSerializerManager(
       AppBundle appBundle,
       ApkSetBuilder apkSetBuilder,
       ListeningExecutorService executorService,
       ApkListener apkListener,
       ApkModifier apkModifier,
+      boolean verbose,
       int firstVariantNumber) {
     this.appBundle = appBundle;
     this.apkSetBuilder = apkSetBuilder;
@@ -93,6 +102,7 @@ public class ApkSerializerManager {
     this.executorService = executorService;
     this.apkListener = apkListener;
     this.apkModifier = apkModifier;
+    this.verbose = verbose;
     this.firstVariantNumber = firstVariantNumber;
   }
 
@@ -414,6 +424,15 @@ public class ApkSerializerManager {
 
       // Notify apk listener.
       apkDescriptions.forEach(apkListener::onApkFinalized);
+
+      if (verbose) {
+        System.out.printf(
+            "INFO: [%s] '%s' of type '%s' was written to the disk.%n",
+            LocalDateTime.now(ZoneId.systemDefault()).format(DATE_TIME_FORMATTER),
+            apkPath,
+            split.getSplitType());
+      }
+
       return apkDescriptions;
     }
   }
