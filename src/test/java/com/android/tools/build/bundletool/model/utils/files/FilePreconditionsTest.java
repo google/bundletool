@@ -22,6 +22,7 @@ import static com.android.tools.build.bundletool.model.utils.files.FilePrecondit
 import static com.android.tools.build.bundletool.model.utils.files.FilePreconditions.checkFileExistsAndReadable;
 import static com.android.tools.build.bundletool.model.utils.files.FilePreconditions.checkFileHasExtension;
 import static com.google.common.truth.Truth.assertThat;
+import static org.junit.Assume.assumeFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.android.tools.build.bundletool.model.utils.OsPlatform;
@@ -70,9 +71,7 @@ public class FilePreconditionsTest {
   @Test
   public void checkFileExistsAndReadable_nonReadable_fail() throws Exception {
     // "File.setReadable(false)" does not work on Windows.
-    if (OsPlatform.getCurrentPlatform().equals(OsPlatform.WINDOWS)) {
-      return;
-    }
+    assumeFalse(OsPlatform.getCurrentPlatform().equals(OsPlatform.WINDOWS));
 
     File unreadableFile = tmp.newFile();
     unreadableFile.setReadable(false);
