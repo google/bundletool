@@ -17,6 +17,7 @@
 package com.android.tools.build.bundletool.validation;
 
 import com.android.tools.build.bundletool.model.BundleModule;
+import com.android.tools.build.bundletool.model.BundleModule.ModuleDeliveryType;
 import com.android.tools.build.bundletool.model.BundleModule.ModuleType;
 import com.android.tools.build.bundletool.model.exceptions.InvalidBundleException;
 import com.google.common.collect.ImmutableList;
@@ -27,6 +28,7 @@ public class AssetBundleValidator extends SubValidator {
   @Override
   public void validateAllModules(ImmutableList<BundleModule> modules) {
     checkAssetOnlyBundleHasOnlyAssetModules(modules);
+    checkAssetOnlyBundleHasOnlyOptionalAssetModules(modules);
   }
 
   private static void checkAssetOnlyBundleHasOnlyAssetModules(ImmutableList<BundleModule> modules) {
@@ -38,7 +40,24 @@ public class AssetBundleValidator extends SubValidator {
               module -> {
                 throw InvalidBundleException.builder()
                     .withUserMessage(
-                        "Asset only bundle contains a module that is not an asset module: %s.",
+                        "Asset only bundle contains a module that is not an asset module '%s'.",
+                        module.getName())
+                    .build();
+              });
+    }
+  }
+
+  private static void checkAssetOnlyBundleHasOnlyOptionalAssetModules(
+      ImmutableList<BundleModule> modules) {
+    if (BundleValidationUtils.isAssetOnlyBundle(modules)) {
+      modules.stream()
+          .filter(module -> !module.getDeliveryType().equals(ModuleDeliveryType.NO_INITIAL_INSTALL))
+          .findFirst()
+          .ifPresent(
+              module -> {
+                throw InvalidBundleException.builder()
+                    .withUserMessage(
+                        "Asset-only bundle contains an install-time asset module '%s'.",
                         module.getName())
                     .build();
               });

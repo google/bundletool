@@ -20,8 +20,12 @@ import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.andr
 import static com.google.common.truth.Truth.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
+import com.android.bundle.Config.SplitDimension.Value;
+import com.android.tools.build.bundletool.model.AppBundle;
 import com.android.tools.build.bundletool.model.BundleModule;
 import com.android.tools.build.bundletool.model.exceptions.InvalidBundleException;
+import com.android.tools.build.bundletool.testing.AppBundleBuilder;
+import com.android.tools.build.bundletool.testing.BundleConfigBuilder;
 import com.android.tools.build.bundletool.testing.BundleModuleBuilder;
 import com.google.common.collect.ImmutableList;
 import org.junit.Test;
@@ -37,13 +41,15 @@ public class TextureCompressionFormatParityValidatorTest {
         new BundleModuleBuilder("a").setManifest(androidManifest("com.test.app")).build();
     BundleModule moduleB =
         new BundleModuleBuilder("b").setManifest(androidManifest("com.test.app")).build();
+    AppBundle appBundle = new AppBundleBuilder().addModule(moduleA).addModule(moduleB).build();
 
+    new TextureCompressionFormatParityValidator().validateBundle(appBundle);
     new TextureCompressionFormatParityValidator()
         .validateAllModules(ImmutableList.of(moduleA, moduleB));
   }
 
   @Test
-  public void sameTCFs_ok() throws Exception {
+  public void sameTCFsWithProperDefaultSuffix_ok() throws Exception {
     BundleModule moduleA =
         new BundleModuleBuilder("a")
             .addFile("assets/textures#tcf_astc/level1.assets")
@@ -56,9 +62,107 @@ public class TextureCompressionFormatParityValidatorTest {
             .addFile("assets/other_textures#tcf_etc2/etc2_file.assets")
             .setManifest(androidManifest("com.test.app"))
             .build();
+    AppBundle appBundle =
+        new AppBundleBuilder()
+            .addModule(moduleA)
+            .addModule(moduleB)
+            .setBundleConfig(
+                BundleConfigBuilder.create()
+                    .addSplitDimension(
+                        Value.TEXTURE_COMPRESSION_FORMAT,
+                        /* negate= */ false,
+                        /* stripSuffix= */ false,
+                        /* defaultSuffix= */ "astc")
+                    .build())
+            .build();
 
+    new TextureCompressionFormatParityValidator().validateBundle(appBundle);
     new TextureCompressionFormatParityValidator()
         .validateAllModules(ImmutableList.of(moduleA, moduleB));
+  }
+
+  @Test
+  public void tcfsWithNoFallbackAndNoConfig_throws() throws Exception {
+    BundleModule moduleA =
+        new BundleModuleBuilder("a")
+            .addFile("assets/textures#tcf_astc/level1.assets")
+            .addFile("assets/textures#tcf_etc2/level1.assets")
+            .setManifest(androidManifest("com.test.app"))
+            .build();
+    BundleModule moduleB =
+        new BundleModuleBuilder("b")
+            .addFile("assets/other_textures#tcf_astc/astc_file.assets")
+            .addFile("assets/other_textures#tcf_etc2/etc2_file.assets")
+            .setManifest(androidManifest("com.test.app"))
+            .build();
+    AppBundle appBundle =
+        new AppBundleBuilder()
+            .addModule(moduleA)
+            .addModule(moduleB)
+            .setBundleConfig(
+                BundleConfigBuilder.create()
+                    .addSplitDimension(Value.TEXTURE_COMPRESSION_FORMAT, /* negate= */ false)
+                    .build())
+            .build();
+
+    InvalidBundleException exception =
+        assertThrows(
+            InvalidBundleException.class,
+            () -> new TextureCompressionFormatParityValidator().validateBundle(appBundle));
+
+    assertThat(exception)
+        .hasMessageThat()
+        .contains(
+            "When a standalone or universal APK is built, the fallback texture folders (folders"
+                + " without #tcf suffixes) will be used, but module 'a' has no such folders."
+                + " Instead, it has folder(s) targeted for formats [ASTC, ETC2] (without fallback"
+                + " directories). Either add missing folders or change the configuration for the"
+                + " TEXTURE_COMPRESSION_FORMAT optimization to specify a default suffix"
+                + " corresponding to the format to use in the standalone and universal APKs.");
+  }
+
+  @Test
+  public void tcfsWithNoMatchingDefaultSuffix_throws() throws Exception {
+    BundleModule moduleA =
+        new BundleModuleBuilder("a")
+            .addFile("assets/textures#tcf_astc/level1.assets")
+            .addFile("assets/textures#tcf_etc2/level1.assets")
+            .setManifest(androidManifest("com.test.app"))
+            .build();
+    BundleModule moduleB =
+        new BundleModuleBuilder("b")
+            .addFile("assets/other_textures#tcf_astc/astc_file.assets")
+            .addFile("assets/other_textures#tcf_etc2/etc2_file.assets")
+            .setManifest(androidManifest("com.test.app"))
+            .build();
+    AppBundle appBundle =
+        new AppBundleBuilder()
+            .addModule(moduleA)
+            .addModule(moduleB)
+            .setBundleConfig(
+                BundleConfigBuilder.create()
+                    .addSplitDimension(
+                        Value.TEXTURE_COMPRESSION_FORMAT,
+                        /* negate= */ false,
+                        /* stripSuffix= */ true,
+                        /* defaultSuffix= */ "etc1")
+                    .build())
+            .build();
+
+    InvalidBundleException exception =
+        assertThrows(
+            InvalidBundleException.class,
+            () -> new TextureCompressionFormatParityValidator().validateBundle(appBundle));
+
+    assertThat(exception)
+        .hasMessageThat()
+        .contains(
+            "When a standalone or universal APK is built, the texture folders for format"
+                + " 'ETC1_RGB8' will be used, but module 'a' has no such folders. Instead, it has"
+                + " folder(s) targeted for formats [ASTC, ETC2] (without fallback directories)."
+                + " Either add missing folders or change the configuration for the"
+                + " TEXTURE_COMPRESSION_FORMAT optimization to specify a default suffix"
+                + " corresponding to the format to use in the standalone and universal APKs.");
   }
 
   @Test
@@ -77,7 +181,9 @@ public class TextureCompressionFormatParityValidatorTest {
             .addFile("assets/other_textures/fallback_file.assets")
             .setManifest(androidManifest("com.test.app"))
             .build();
+    AppBundle appBundle = new AppBundleBuilder().addModule(moduleA).addModule(moduleB).build();
 
+    new TextureCompressionFormatParityValidator().validateBundle(appBundle);
     new TextureCompressionFormatParityValidator()
         .validateAllModules(ImmutableList.of(moduleA, moduleB));
   }
@@ -101,7 +207,22 @@ public class TextureCompressionFormatParityValidatorTest {
             .addFile("assets/untargeted_textures/level3.assets")
             .setManifest(androidManifest("com.test.app"))
             .build();
+    AppBundle appBundle =
+        new AppBundleBuilder()
+            .addModule(moduleA)
+            .addModule(moduleB)
+            .addModule(moduleC)
+            .setBundleConfig(
+                BundleConfigBuilder.create()
+                    .addSplitDimension(
+                        Value.TEXTURE_COMPRESSION_FORMAT,
+                        /* negate= */ false,
+                        /* stripSuffix= */ false,
+                        /* defaultSuffix= */ "astc")
+                    .build())
+            .build();
 
+    new TextureCompressionFormatParityValidator().validateBundle(appBundle);
     new TextureCompressionFormatParityValidator()
         .validateAllModules(ImmutableList.of(moduleA, moduleB, moduleC));
   }
@@ -127,9 +248,11 @@ public class TextureCompressionFormatParityValidatorTest {
             .addFile("assets/untargeted_textures/level3.assets")
             .setManifest(androidManifest("com.test.app"))
             .build();
+    AppBundle appBundle = new AppBundleBuilder().addModule(moduleA).addModule(moduleB).build();
 
     new TextureCompressionFormatParityValidator()
         .validateAllModules(ImmutableList.of(moduleA, moduleB, moduleC));
+    new TextureCompressionFormatParityValidator().validateBundle(appBundle);
   }
 
   @Test

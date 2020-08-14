@@ -18,6 +18,8 @@ package com.android.tools.build.bundletool.validation;
 
 import static com.android.tools.build.bundletool.model.BundleModuleName.BASE_MODULE_NAME;
 import static com.android.tools.build.bundletool.model.utils.ModuleDependenciesUtils.buildAdjacencyMap;
+import static com.google.common.collect.ImmutableList.toImmutableList;
+import static java.util.stream.Collectors.joining;
 
 import com.android.tools.build.bundletool.model.BundleModule;
 import com.android.tools.build.bundletool.model.BundleModule.ModuleDeliveryType;
@@ -51,7 +53,6 @@ public class ModuleDependencyValidator extends SubValidator {
     Multimap<String, String> moduleDependenciesMap = buildAdjacencyMap(modules);
     ImmutableMap<String, BundleModule> modulesByName =
         Maps.uniqueIndex(modules, module -> module.getName().getName());
-
     if (BundleValidationUtils.isAssetOnlyBundle(modules)) {
       checkAssetModulesHaveNoDependencies(moduleDependenciesMap, modulesByName);
     } else {
@@ -64,6 +65,10 @@ public class ModuleDependencyValidator extends SubValidator {
       checkValidModuleDeliveryTypeDependencies(moduleDependenciesMap, modulesByName);
       checkMinSdkIsCompatibleWithDependencies(moduleDependenciesMap, modulesByName);
       checkAssetModulesHaveNoDependencies(moduleDependenciesMap, modulesByName);
+      BundleModule baseModule = BundleValidationUtils.expectBaseModule(modules);
+      if (baseModule.getAndroidManifest().getIsolatedSplits().orElse(false)) {
+        checkIsolatedSplitsModuleDependencies(moduleDependenciesMap);
+      }
     }
   }
 
@@ -289,6 +294,25 @@ public class ModuleDependencyValidator extends SubValidator {
             .withUserMessage(
                 "Instant module '%s' cannot depend on a module '%s' that is not instant.",
                 moduleName, moduleDepName)
+            .build();
+      }
+    }
+  }
+
+  /** Isolated splits may only depend on a single parent module. */
+  private static void checkIsolatedSplitsModuleDependencies(
+      Multimap<String, String> moduleDependenciesMap) {
+    for (String moduleName : moduleDependenciesMap.keySet()) {
+      Collection<String> nonBaseDependencies =
+          moduleDependenciesMap.get(moduleName).stream()
+              .filter(name -> !BASE_MODULE_NAME.getName().equals(name))
+              .collect(toImmutableList());
+      if (nonBaseDependencies.size() > 1) {
+        throw InvalidBundleException.builder()
+            .withUserMessage(
+                "Isolated module '%s' cannot depend on more than one other module, "
+                    + "but it depends on [%s].",
+                moduleName, nonBaseDependencies.stream().collect(joining(", ")))
             .build();
       }
     }

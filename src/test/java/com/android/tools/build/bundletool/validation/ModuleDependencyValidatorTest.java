@@ -21,6 +21,7 @@ import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.andr
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withFeatureCondition;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withInstallTimeDelivery;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withInstant;
+import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withIsolatedSplits;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withMinSdkVersion;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withOnDemandAttribute;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withOnDemandDelivery;
@@ -617,5 +618,52 @@ public class ModuleDependencyValidatorTest {
                 androidManifest(PKG_NAME, withInstant(true), withUsesSplit("feature1"))));
 
     new ModuleDependencyValidator().validateAllModules(allModules);
+  }
+
+  @Test
+  public void validateAllModules_isolatedSplitsWithSingleModuleDependency_succeeds()
+      throws Exception {
+    ImmutableList<BundleModule> allModules =
+        ImmutableList.of(
+            module("base", androidManifest(PKG_NAME, withInstant(true), withIsolatedSplits(true))),
+            module("feature1", androidManifest(PKG_NAME, withInstant(true))),
+            module(
+                "feature2",
+                androidManifest(PKG_NAME, withInstant(true), withUsesSplit("feature1"))),
+            module(
+                "feature3",
+                androidManifest(PKG_NAME, withInstant(true), withUsesSplit("feature1"))));
+
+    new ModuleDependencyValidator().validateAllModules(allModules);
+  }
+
+  @Test
+  public void validateAllModules_isolatedSplitsWithMultipleModuleDependencies_throws()
+      throws Exception {
+    ImmutableList<BundleModule> allModules =
+        ImmutableList.of(
+            module("base", androidManifest(PKG_NAME, withInstant(true), withIsolatedSplits(true))),
+            module("feature1", androidManifest(PKG_NAME, withInstant(true))),
+            module(
+                "feature2",
+                androidManifest(PKG_NAME, withInstant(true), withUsesSplit("feature1"))),
+            module(
+                "feature3",
+                androidManifest(
+                    PKG_NAME,
+                    withInstant(true),
+                    withUsesSplit("feature1"),
+                    withUsesSplit("feature2"))));
+
+    InvalidBundleException exception =
+        assertThrows(
+            InvalidBundleException.class,
+            () -> new ModuleDependencyValidator().validateAllModules(allModules));
+
+    assertThat(exception)
+        .hasMessageThat()
+        .contains(
+            "Isolated module 'feature3' cannot depend on more than one other module, "
+                + "but it depends on [feature1, feature2].");
   }
 }

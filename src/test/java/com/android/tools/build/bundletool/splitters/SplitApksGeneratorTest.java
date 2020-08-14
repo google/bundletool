@@ -32,15 +32,19 @@ import static com.google.common.truth.extensions.proto.ProtoTruth.assertThat;
 
 import com.android.bundle.Targeting.Abi.AbiAlias;
 import com.android.bundle.Targeting.VariantTargeting;
+import com.android.tools.build.bundletool.commands.BuildApksModule;
+import com.android.tools.build.bundletool.commands.CommandScoped;
 import com.android.tools.build.bundletool.model.BundleModule;
 import com.android.tools.build.bundletool.model.ModuleSplit;
 import com.android.tools.build.bundletool.model.ModuleSplit.SplitType;
-import com.android.tools.build.bundletool.model.version.BundleToolVersion;
-import com.android.tools.build.bundletool.model.version.Version;
 import com.android.tools.build.bundletool.testing.BundleModuleBuilder;
+import com.android.tools.build.bundletool.testing.TestModule;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
+import dagger.Component;
+import javax.inject.Inject;
+import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
@@ -48,11 +52,15 @@ import org.junit.runners.JUnit4;
 @RunWith(JUnit4.class)
 public class SplitApksGeneratorTest {
 
-  private static final Version BUNDLETOOL_VERSION = BundleToolVersion.getCurrentVersion();
+  @Inject SplitApksGenerator splitApksGenerator;
+
+  @Before
+  public void setUp() {
+    TestComponent.useTestModule(this, TestModule.builder().build());
+  }
 
   @Test
   public void simpleMultipleModules() throws Exception {
-
     ImmutableList<BundleModule> bundleModule =
         ImmutableList.of(
             new BundleModuleBuilder("base")
@@ -65,9 +73,8 @@ public class SplitApksGeneratorTest {
                 .build());
 
     ImmutableList<ModuleSplit> moduleSplits =
-        new SplitApksGenerator(
-                bundleModule, BUNDLETOOL_VERSION, ApkGenerationConfiguration.getDefaultInstance())
-            .generateSplits();
+        splitApksGenerator.generateSplits(
+            bundleModule, ApkGenerationConfiguration.getDefaultInstance());
 
     assertThat(moduleSplits).hasSize(2);
     ImmutableMap<String, ModuleSplit> moduleSplitMap =
@@ -86,7 +93,6 @@ public class SplitApksGeneratorTest {
 
   @Test
   public void multipleModules_withOnlyBaseModuleWithNativeLibraries() throws Exception {
-
     ImmutableList<BundleModule> bundleModule =
         ImmutableList.of(
             new BundleModuleBuilder("base")
@@ -104,22 +110,20 @@ public class SplitApksGeneratorTest {
                 .build());
 
     ImmutableList<ModuleSplit> moduleSplits =
-        new SplitApksGenerator(
-                bundleModule,
-                BUNDLETOOL_VERSION,
-                ApkGenerationConfiguration.builder()
-                    .setEnableNativeLibraryCompressionSplitter(true)
-                    .build())
-            .generateSplits();
+        splitApksGenerator.generateSplits(
+            bundleModule,
+            ApkGenerationConfiguration.builder()
+                .setEnableNativeLibraryCompressionSplitter(true)
+                .build());
 
     VariantTargeting lVariantTargeting =
         variantMinSdkTargeting(
             /* minSdkVersion= */ ANDROID_L_API_VERSION,
-            /* alternativeSdkVersions= */ ANDROID_M_API_VERSION);
+            /* alternativeSdkVersions...= */ ANDROID_M_API_VERSION);
     VariantTargeting mVariantTargeting =
         variantMinSdkTargeting(
             /* minSdkVersion= */ ANDROID_M_API_VERSION,
-            /* alternativeSdkVersions= */ ANDROID_L_API_VERSION);
+            /* alternativeSdkVersions...= */ ANDROID_L_API_VERSION);
 
     // 2 splits for L and M variants.
     assertThat(moduleSplits).hasSize(4);
@@ -151,7 +155,6 @@ public class SplitApksGeneratorTest {
   @Test
   public void multipleModules_withOnlyBaseModuleWithNativeLibrariesOtherModuleWithDexFiles()
       throws Exception {
-
     ImmutableList<BundleModule> bundleModule =
         ImmutableList.of(
             new BundleModuleBuilder("base")
@@ -170,29 +173,27 @@ public class SplitApksGeneratorTest {
                 .build());
 
     ImmutableList<ModuleSplit> moduleSplits =
-        new SplitApksGenerator(
-                bundleModule,
-                BUNDLETOOL_VERSION,
-                ApkGenerationConfiguration.builder()
-                    .setEnableNativeLibraryCompressionSplitter(true)
-                    .setEnableDexCompressionSplitter(true)
-                    .build())
-            .generateSplits();
+        splitApksGenerator.generateSplits(
+            bundleModule,
+            ApkGenerationConfiguration.builder()
+                .setEnableNativeLibraryCompressionSplitter(true)
+                .setEnableDexCompressionSplitter(true)
+                .build());
 
     VariantTargeting lVariantTargeting =
         variantMinSdkTargeting(
             /* minSdkVersion= */ ANDROID_L_API_VERSION,
-            /* alternativeSdkVersions= */ ANDROID_M_API_VERSION,
+            /* alternativeSdkVersions...= */ ANDROID_M_API_VERSION,
             ANDROID_Q_API_VERSION);
     VariantTargeting mVariantTargeting =
         variantMinSdkTargeting(
             /* minSdkVersion= */ ANDROID_M_API_VERSION,
-            /* alternativeSdkVersions= */ ANDROID_L_API_VERSION,
+            /* alternativeSdkVersions...= */ ANDROID_L_API_VERSION,
             ANDROID_Q_API_VERSION);
     VariantTargeting qVariantTargeting =
         variantMinSdkTargeting(
             /* minSdkVersion= */ ANDROID_Q_API_VERSION,
-            /* alternativeSdkVersions= */ ANDROID_L_API_VERSION,
+            /* alternativeSdkVersions...= */ ANDROID_L_API_VERSION,
             ANDROID_M_API_VERSION);
 
     // 2 splits for L, M, P variants.
@@ -242,7 +243,6 @@ public class SplitApksGeneratorTest {
   public void
       multipleModules_withinstantAppOnlyBaseModuleWithNativeLibrariesOtherModuleWithDexFiles()
           throws Exception {
-
     ImmutableList<BundleModule> bundleModule =
         ImmutableList.of(
             new BundleModuleBuilder("base")
@@ -261,15 +261,13 @@ public class SplitApksGeneratorTest {
                 .build());
 
     ImmutableList<ModuleSplit> moduleSplits =
-        new SplitApksGenerator(
-                bundleModule,
-                BUNDLETOOL_VERSION,
-                ApkGenerationConfiguration.builder()
-                    .setEnableNativeLibraryCompressionSplitter(true)
-                    .setEnableDexCompressionSplitter(true)
-                    .setForInstantAppVariants(true)
-                    .build())
-            .generateSplits();
+        splitApksGenerator.generateSplits(
+            bundleModule,
+            ApkGenerationConfiguration.builder()
+                .setEnableNativeLibraryCompressionSplitter(true)
+                .setEnableDexCompressionSplitter(true)
+                .setForInstantAppVariants(true)
+                .build());
 
     // 2 splits for L variant
     assertThat(moduleSplits).hasSize(2);
@@ -304,5 +302,18 @@ public class SplitApksGeneratorTest {
 
   private static boolean getForceUncompressed(ModuleSplit moduleSplit, String path) {
     return moduleSplit.findEntry(path).get().getForceUncompressed();
+  }
+
+  @CommandScoped
+  @Component(modules = {BuildApksModule.class, TestModule.class})
+  interface TestComponent {
+    void inject(SplitApksGeneratorTest test);
+
+    static void useTestModule(SplitApksGeneratorTest testInstance, TestModule testModule) {
+      DaggerSplitApksGeneratorTest_TestComponent.builder()
+          .testModule(testModule)
+          .build()
+          .inject(testInstance);
+    }
   }
 }

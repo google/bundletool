@@ -17,6 +17,7 @@
 package com.android.tools.build.bundletool.model.targeting;
 
 import static com.android.tools.build.bundletool.testing.TargetingUtils.assetsDirectoryTargeting;
+import static com.android.tools.build.bundletool.testing.TargetingUtils.deviceTierTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.graphicsApiTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.languageTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.openGlVersionFrom;
@@ -212,6 +213,15 @@ public class TargetedDirectorySegmentTest {
   }
 
   @Test
+  public void testTargeting_deviceTier() {
+    TargetedDirectorySegment segment = TargetedDirectorySegment.parse("test#tier_low");
+    assertThat(segment.getName()).isEqualTo("test");
+    assertThat(segment.getTargetingDimension()).hasValue(TargetingDimension.DEVICE_TIER);
+    assertThat(segment.getTargeting())
+        .isEqualTo(assetsDirectoryTargeting(deviceTierTargeting("low")));
+  }
+
+  @Test
   public void testFailsParsing_missingKey() {
     assertThrows(InvalidBundleException.class, () -> TargetedDirectorySegment.parse("bad#"));
     assertThrows(InvalidBundleException.class, () -> TargetedDirectorySegment.parse("bad#_2.0"));
@@ -302,5 +312,17 @@ public class TargetedDirectorySegmentTest {
   public void testTargeting_language_toPathIdempotent() {
     TargetedDirectorySegment segment = TargetedDirectorySegment.parse("test#lang_fr");
     assertThat(segment.toPathSegment()).isEqualTo("test#lang_fr");
+  }
+
+  @Test
+  public void testTargeting_deviceTier_toPathIdempotent() {
+    TargetedDirectorySegment segment = TargetedDirectorySegment.parse("test#tier_high");
+    assertThat(segment.toPathSegment()).isEqualTo("test#tier_high");
+
+    segment = TargetedDirectorySegment.parse("test#tier_medium");
+    assertThat(segment.toPathSegment()).isEqualTo("test#tier_medium");
+
+    segment = TargetedDirectorySegment.parse("test#tier_low");
+    assertThat(segment.toPathSegment()).isEqualTo("test#tier_low");
   }
 }

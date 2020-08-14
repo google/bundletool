@@ -21,7 +21,6 @@ import com.android.tools.build.bundletool.model.BundleMetadata;
 import com.android.tools.build.bundletool.model.BundleModule;
 import com.google.common.collect.ImmutableList;
 import com.google.common.io.Files;
-import java.io.IOException;
 import java.nio.file.Path;
 import java.util.function.Consumer;
 import java.util.zip.ZipFile;
@@ -43,8 +42,7 @@ public class AppBundleBuilder {
 
   private BundleConfig bundleConfig = DEFAULT_BUNDLE_CONFIG;
 
-  public AppBundleBuilder addModule(String name, Consumer<BundleModuleBuilder> operations)
-      throws IOException {
+  public AppBundleBuilder addModule(String name, Consumer<BundleModuleBuilder> operations) {
     BundleModuleBuilder moduleBuilder = new BundleModuleBuilder(name);
     operations.accept(moduleBuilder);
     modules.add(moduleBuilder.build());

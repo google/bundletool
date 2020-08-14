@@ -33,6 +33,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import javax.inject.Inject;
 
 /**
  * Merger of the optimizations instructions supplied by the developer (in the BundleConfig) and the
@@ -46,6 +47,9 @@ public final class OptimizationsMerger {
               SplitDimension.Value.class,
               OptimizationDimension.class,
               /* ignoreValues= */ ImmutableSet.of(UNRECOGNIZED, UNSPECIFIED_VALUE));
+
+  @Inject
+  public OptimizationsMerger() {}
 
   /**
    * Merges the optimizations instructions supplied by the developer (in the BundleConfig) and the

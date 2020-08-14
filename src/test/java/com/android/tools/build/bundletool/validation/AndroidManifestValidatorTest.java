@@ -27,6 +27,7 @@ import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.with
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withInstant;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withInstantInstallTimeDelivery;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withInstantOnDemandDelivery;
+import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withIsolatedSplits;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withMaxSdkVersion;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withMinSdkCondition;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withMinSdkVersion;
@@ -43,6 +44,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import com.android.bundle.Config.BundleConfig;
 import com.android.tools.build.bundletool.model.BundleModule;
 import com.android.tools.build.bundletool.model.exceptions.InvalidBundleException;
+import com.android.tools.build.bundletool.model.utils.Versions;
 import com.android.tools.build.bundletool.model.utils.xmlproto.XmlProtoAttributeBuilder;
 import com.android.tools.build.bundletool.testing.BundleModuleBuilder;
 import com.android.tools.build.bundletool.testing.ManifestProtoUtils.ManifestMutator;
@@ -513,6 +515,111 @@ public class AndroidManifestValidatorTest {
     assertThat(e)
         .hasMessageThat()
         .isEqualTo("minSdkVersion (5) is greater than maxSdkVersion (4).");
+  }
+
+  @Test
+  public void isolatedSplits_withMinSdkLessThanO_throws() throws Exception {
+    BundleModule module =
+        new BundleModuleBuilder(BASE_MODULE_NAME)
+            .setManifest(
+                androidManifest(
+                    PKG_NAME,
+                    withIsolatedSplits(true),
+                    withMinSdkVersion(Versions.ANDROID_N_API_VERSION)))
+            .build();
+
+    InvalidBundleException e =
+        assertThrows(
+            InvalidBundleException.class,
+            () -> AndroidManifestValidator.validateIsolatedSplits(ImmutableList.of(module)));
+
+    assertThat(e)
+        .hasMessageThat()
+        .isEqualTo("minSdk (24) is less than minimum sdk allowed for isolated splits (26).");
+  }
+
+  @Test
+  public void isolatedSplits_withMinSdkGreaterThanO_ok() throws Exception {
+    BundleModule module =
+        new BundleModuleBuilder(BASE_MODULE_NAME)
+            .setManifest(
+                androidManifest(
+                    PKG_NAME,
+                    withIsolatedSplits(true),
+                    withMinSdkVersion(Versions.ANDROID_O_API_VERSION)))
+            .build();
+
+    AndroidManifestValidator.validateIsolatedSplits(ImmutableList.of(module));
+  }
+
+  @Test
+  public void isolatedSplits_withFeatureModuleIncludedInFusing_throws() throws Exception {
+    BundleModule baseModule =
+        new BundleModuleBuilder(BASE_MODULE_NAME)
+            .setManifest(
+                androidManifest(
+                    PKG_NAME,
+                    withIsolatedSplits(true),
+                    withMinSdkVersion(Versions.ANDROID_O_API_VERSION)))
+            .build();
+    BundleModule featureModule =
+        new BundleModuleBuilder("featureModule")
+            .setManifest(androidManifest(PKG_NAME, withFusingAttribute(true)))
+            .build();
+
+    InvalidBundleException e =
+        assertThrows(
+            InvalidBundleException.class,
+            () ->
+                AndroidManifestValidator.validateIsolatedSplits(
+                    ImmutableList.of(baseModule, featureModule)));
+
+    assertThat(e)
+        .hasMessageThat()
+        .isEqualTo("Isolated split modules must be excluded from fusing.");
+  }
+
+  @Test
+  public void isolatedSplits_withFeatureModuleNotExcludedFromFusing_throws() throws Exception {
+    BundleModule baseModule =
+        new BundleModuleBuilder(BASE_MODULE_NAME)
+            .setManifest(
+                androidManifest(
+                    PKG_NAME,
+                    withIsolatedSplits(true),
+                    withMinSdkVersion(Versions.ANDROID_O_API_VERSION)))
+            .build();
+    BundleModule featureModule =
+        new BundleModuleBuilder("featureModule").setManifest(androidManifest(PKG_NAME)).build();
+
+    InvalidBundleException e =
+        assertThrows(
+            InvalidBundleException.class,
+            () ->
+                AndroidManifestValidator.validateIsolatedSplits(
+                    ImmutableList.of(baseModule, featureModule)));
+
+    assertThat(e)
+        .hasMessageThat()
+        .isEqualTo("Isolated split modules must be excluded from fusing.");
+  }
+
+  @Test
+  public void isolatedSplits_withFeatureModuleNotIncludedInFusing_ok() throws Exception {
+    BundleModule baseModule =
+        new BundleModuleBuilder(BASE_MODULE_NAME)
+            .setManifest(
+                androidManifest(
+                    PKG_NAME,
+                    withIsolatedSplits(true),
+                    withMinSdkVersion(Versions.ANDROID_O_API_VERSION)))
+            .build();
+    BundleModule featureModule =
+        new BundleModuleBuilder("featureModule")
+            .setManifest(androidManifest(PKG_NAME, withFusingAttribute(false)))
+            .build();
+
+    AndroidManifestValidator.validateIsolatedSplits(ImmutableList.of(baseModule, featureModule));
   }
 
   @Test

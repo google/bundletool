@@ -35,6 +35,31 @@ message Compression {
   // the name of the modules, and using forward slash ("/") as a name separator.
   // Examples: "res/raw/**", "assets/**/*.uncompressed", etc.
   repeated string uncompressed_glob = 1;
+
+  enum AssetModuleCompression {
+    UNSPECIFIED = 0;
+    // Assets are left uncompressed in the generated asset module.
+    UNCOMPRESSED = 1;
+    // Assets are compressed in the generated asset module.
+    // This option can be overridden at a finer granularity by specifying
+    // files or folders to keep uncompressed in `uncompressed_glob`.
+    // This option should only be used if the app is able to handle compressed
+    // asset module content at runtime (some runtime APIs may misbehave).
+    COMPRESSED = 2;
+  }
+
+  // Default compression strategy for install-time asset modules.
+  // If the compression strategy indicates to compress a file and the same file
+  // matches one of the `uncompressed_glob` values, the `uncompressed_glob`
+  // takes precedence (the file is left uncompressed in the generated APK).
+  //
+  // If unspecified, asset module content is left uncompressed in the
+  // generated asset modules.
+  //
+  // Note: this flag only configures the compression strategy for install-time
+  // asset modules; the content of on-demand and fast-follow asset modules is
+  // always kept uncompressed.
+  AssetModuleCompression install_time_asset_module_default_compression = 2;
 }
 
 // Resources to keep in the master split.
@@ -86,6 +111,7 @@ message SplitDimension {
     SCREEN_DENSITY = 2;
     LANGUAGE = 3;
     TEXTURE_COMPRESSION_FORMAT = 4;
+    DEVICE_TIER = 6;
   }
   Value value = 1;
 
@@ -100,8 +126,8 @@ message SplitDimension {
 
 message SuffixStripping {
   // If set to 'true', indicates that the targeting suffix should be removed
-  // from assets paths for this dimension when splits (or asset slices) are
-  // generated.
+  // from assets paths for this dimension when splits (e.g: "asset packs") or
+  // standalone/universal APKs are generated.
   // This only applies to assets.
   // For example a folder with path "assets/level1_textures#tcf_etc1"
   // would be outputted to "assets/level1_textures". File contents are
@@ -109,9 +135,9 @@ message SuffixStripping {
   bool enabled = 1;
 
   // The default suffix to be used for the cases where separate slices can't
-  // be generated for this dimension. In the case of standalone/universal APKs
-  // generation, stripping the suffix can lead to file name collisions. This
-  // default suffix defines the directories to retain. The others are
+  // be generated for this dimension - typically for standalone or universal
+  // APKs.
+  // This default suffix defines the directories to retain. The others are
   // discarded: standalone/universal APKs will contain only directories
   // targeted at this value for the dimension.
   //

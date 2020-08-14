@@ -96,10 +96,7 @@ public class ModuleSplitTest {
     PrivateKey privateKey = keyPair.getPrivate();
     X509Certificate certificate = buildSelfSignedCertificate(keyPair, "CN=ModuleSplitTest");
     stampSigningConfig =
-        SigningConfiguration.builder()
-            .setPrivateKey(privateKey)
-            .setCertificates(ImmutableList.of(certificate))
-            .build();
+        SigningConfiguration.builder().setSignerConfig(privateKey, certificate).build();
   }
 
   @Test

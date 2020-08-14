@@ -19,7 +19,6 @@ package com.android.tools.build.bundletool.io;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
 
-import com.android.tools.build.bundletool.model.InputStreamSupplier;
 import com.android.tools.build.bundletool.model.ZipPath;
 import com.android.tools.build.bundletool.model.utils.ZipUtils;
 import com.android.tools.build.bundletool.model.utils.files.BufferedIo;
@@ -167,21 +166,6 @@ public final class ZipBuilder {
             ? new EntryOption[] {EntryOption.UNCOMPRESSED}
             : new EntryOption[0];
     return addFileFromZip(toPath, fromZipFile, zipEntry, entryOption);
-  }
-
-  /**
-   * Lazily adds a file in the zip at the given location with the content of the {@code
-   * inputStreamSupplier}.
-   *
-   * <p>Note that the input stream needs to remain available until the method {@link #writeTo(Path)}
-   * has been invoked.
-   *
-   * @deprecated Use {@link #addFile(ZipPath, ByteSource, EntryOption...)} instead.
-   */
-  @Deprecated
-  public ZipBuilder addFile(
-      ZipPath toPath, InputStreamSupplier inputStreamSupplier, EntryOption... options) {
-    return addFile(toPath, inputStreamSupplier.asByteSource(), options);
   }
 
   /**

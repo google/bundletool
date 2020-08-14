@@ -15,6 +15,8 @@
  */
 package com.android.tools.build.bundletool.validation;
 
+import static com.android.tools.build.bundletool.model.targeting.TargetingUtils.containsDeviceTierTargeting;
+import static com.android.tools.build.bundletool.model.targeting.TargetingUtils.extractAssetsTargetedDirectories;
 import static com.google.common.collect.ImmutableSet.toImmutableSet;
 
 import com.android.bundle.Config.BundleConfig;
@@ -56,6 +58,7 @@ public final class BundleConfigValidator extends SubValidator {
     validateCompression(bundleConfig.getCompression());
     validateOptimizations(bundleConfig.getOptimizations());
     validateMasterResources(bundleConfig, bundle);
+    validateDefaultDeviceTier(bundleConfig, bundle);
   }
 
   private void validateCompression(Compression compression) {
@@ -175,5 +178,29 @@ public final class BundleConfigValidator extends SubValidator {
               undefinedResources.iterator().next())
           .build();
     }
+  }
+
+  private static void validateDefaultDeviceTier(BundleConfig bundleConfig, AppBundle bundle) {
+    boolean defaultDeviceTierSpecified =
+        bundleConfig.getOptimizations().getSplitsConfig().getSplitDimensionList().stream()
+            .filter(splitDimension -> splitDimension.getValue().equals(Value.DEVICE_TIER))
+            .map(splitDimension -> splitDimension.getSuffixStripping().getDefaultSuffix())
+            .anyMatch(suffix -> !suffix.isEmpty());
+    bundle
+        .getModules()
+        .values()
+        .forEach(
+            module -> {
+              boolean containsDeviceTierTargetedAssets =
+                  containsDeviceTierTargeting(extractAssetsTargetedDirectories(module));
+              if (containsDeviceTierTargetedAssets && !defaultDeviceTierSpecified) {
+                throw InvalidBundleException.builder()
+                    .withUserMessage(
+                        "Module '%s' contains assets targeted by device tier but default device"
+                            + " tier value has not been specified for the bundle.",
+                        module.getName())
+                    .build();
+              }
+            });
   }
 }

@@ -20,6 +20,7 @@ import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
 
 import com.android.bundle.Targeting.AssetsDirectoryTargeting;
+import com.android.bundle.Targeting.DeviceTierTargeting;
 import com.android.bundle.Targeting.GraphicsApi;
 import com.android.bundle.Targeting.GraphicsApiTargeting;
 import com.android.bundle.Targeting.LanguageTargeting;
@@ -53,6 +54,7 @@ public abstract class TargetedDirectorySegment {
   private static final String VULKAN_KEY = "vulkan";
   private static final String LANG_KEY = "lang";
   private static final String TCF_KEY = "tcf";
+  private static final String DEVICE_TIER_KEY = "tier";
 
   private static final ImmutableMap<String, TargetingDimension> KEY_TO_DIMENSION =
       ImmutableMap.<String, TargetingDimension>builder()
@@ -60,6 +62,7 @@ public abstract class TargetedDirectorySegment {
           .put(VULKAN_KEY, TargetingDimension.GRAPHICS_API)
           .put(LANG_KEY, TargetingDimension.LANGUAGE)
           .put(TCF_KEY, TargetingDimension.TEXTURE_COMPRESSION_FORMAT)
+          .put(DEVICE_TIER_KEY, TargetingDimension.DEVICE_TIER)
           .build();
   private static final ImmutableSetMultimap<TargetingDimension, String> DIMENSION_TO_KEY =
       KEY_TO_DIMENSION.asMultimap().inverse();
@@ -172,6 +175,8 @@ public abstract class TargetedDirectorySegment {
       return getGraphicsApiKey(targeting);
     } else if (targeting.hasTextureCompressionFormat()) {
       return Optional.of(TCF_KEY);
+    } else if (targeting.hasDeviceTier()) {
+      return Optional.of(DEVICE_TIER_KEY);
     }
 
     return Optional.empty();
@@ -193,6 +198,8 @@ public abstract class TargetedDirectorySegment {
               Iterables.getOnlyElement(targeting.getTextureCompressionFormat().getValueList())
                   .getAlias(),
               null));
+    } else if (targeting.hasDeviceTier()) {
+      return Optional.of(Iterables.getOnlyElement(targeting.getDeviceTier().getValueList()));
     }
 
     return Optional.empty();
@@ -214,6 +221,10 @@ public abstract class TargetedDirectorySegment {
         return parseLanguage(name, value);
       case TEXTURE_COMPRESSION_FORMAT:
         return parseTextureCompressionFormat(name, value);
+      case DEVICE_TIER:
+        return AssetsDirectoryTargeting.newBuilder()
+            .setDeviceTier(DeviceTierTargeting.newBuilder().addValue(value).build())
+            .build();
       default:
         throw InvalidBundleException.builder()
             .withUserMessage("Unrecognized key: '%s'.", key)

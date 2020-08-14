@@ -16,8 +16,8 @@
 package com.android.tools.build.bundletool.testing;
 
 import com.android.tools.build.bundletool.model.Aapt2Command;
-import com.android.tools.build.bundletool.model.CommandExecutor;
 import com.android.tools.build.bundletool.model.CommandExecutor.CommandOptions;
+import com.android.tools.build.bundletool.model.DefaultCommandExecutor;
 import com.google.common.collect.ImmutableList;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -41,7 +41,7 @@ public final class Aapt2Helper {
   }
 
   private static void runAapt2(String... command) {
-    new CommandExecutor()
+    new DefaultCommandExecutor()
         .execute(
             ImmutableList.<String>builder().add(AAPT2_PATH).add(command).build(),
             CommandOptions.builder().setTimeout(AAPT_TIMEOUT).build());

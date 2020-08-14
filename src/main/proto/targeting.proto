@@ -144,6 +144,7 @@ message AssetsDirectoryTargeting {
   GraphicsApiTargeting graphics_api = 2;
   TextureCompressionFormatTargeting texture_compression_format = 3;
   LanguageTargeting language = 4;
+  DeviceTierTargeting device_tier = 5;
 }
 
 // Targeting specific for directories under lib/.
@@ -218,4 +219,9 @@ message SanitizerTargeting {
 // that convention.
 message DeviceFeatureTargeting {
   DeviceFeature required_feature = 1;
+}
+
+message DeviceTierTargeting {
+  repeated string value = 1;
+  repeated string alternatives = 2;
 }

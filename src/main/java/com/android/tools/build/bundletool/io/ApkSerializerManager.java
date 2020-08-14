@@ -19,7 +19,6 @@ import static com.android.tools.build.bundletool.io.ConcurrencyUtils.waitForAll;
 import static com.android.tools.build.bundletool.model.utils.CollectorUtils.groupingByDeterministic;
 import static com.android.tools.build.bundletool.model.utils.CollectorUtils.groupingBySortedKeys;
 import static com.google.common.base.Preconditions.checkArgument;
-import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.base.Predicates.alwaysTrue;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.ImmutableMap.toImmutableMap;
@@ -30,16 +29,20 @@ import static java.util.stream.Collectors.mapping;
 import com.android.bundle.Commands.ApkDescription;
 import com.android.bundle.Commands.ApkSet;
 import com.android.bundle.Commands.AssetModuleMetadata;
+import com.android.bundle.Commands.AssetModulesInfo;
 import com.android.bundle.Commands.AssetSliceSet;
 import com.android.bundle.Commands.BuildApksResult;
 import com.android.bundle.Commands.DeliveryType;
 import com.android.bundle.Commands.InstantMetadata;
 import com.android.bundle.Commands.LocalTestingInfo;
 import com.android.bundle.Commands.Variant;
+import com.android.bundle.Config.AssetModulesConfig;
 import com.android.bundle.Config.Bundletool;
 import com.android.bundle.Devices.DeviceSpec;
 import com.android.bundle.Targeting.VariantTargeting;
 import com.android.tools.build.bundletool.commands.BuildApksCommand.ApkBuildMode;
+import com.android.tools.build.bundletool.commands.BuildApksModule.FirstVariantNumber;
+import com.android.tools.build.bundletool.commands.BuildApksModule.VerboseLogs;
 import com.android.tools.build.bundletool.device.ApkMatcher;
 import com.android.tools.build.bundletool.io.ApkSetBuilderFactory.ApkSetBuilder;
 import com.android.tools.build.bundletool.model.AndroidManifest;
@@ -71,83 +74,94 @@ import java.util.Map.Entry;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Predicate;
+import javax.inject.Inject;
 
 /** Creates parts of table of contents and writes out APKs. */
 public class ApkSerializerManager {
 
-  private static final DateTimeFormatter DATE_TIME_FORMATTER =
+  private static final DateTimeFormatter DATE_FORMATTER =
       DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
-  private final ApkPathManager apkPathManager;
-  private final ListeningExecutorService executorService;
+  private final AppBundle appBundle;
   private final ApkListener apkListener;
   private final ApkModifier apkModifier;
+  private final ListeningExecutorService executorService;
   private final int firstVariantNumber;
-  private final AppBundle appBundle;
-  private final ApkSetBuilder apkSetBuilder;
-
   private final boolean verbose;
 
+  private final ApkPathManager apkPathManager;
+
+  @Inject
   public ApkSerializerManager(
       AppBundle appBundle,
-      ApkSetBuilder apkSetBuilder,
+      Optional<ApkListener> apkListener,
+      Optional<ApkModifier> apkModifier,
       ListeningExecutorService executorService,
-      ApkListener apkListener,
-      ApkModifier apkModifier,
-      boolean verbose,
-      int firstVariantNumber) {
+      @FirstVariantNumber Optional<Integer> firstVariantNumber,
+      @VerboseLogs boolean verbose,
+      ApkPathManager apkPathManager) {
     this.appBundle = appBundle;
-    this.apkSetBuilder = apkSetBuilder;
-    this.apkPathManager = new ApkPathManager();
+    this.apkListener = apkListener.orElse(ApkListener.NO_OP);
+    this.apkModifier = apkModifier.orElse(ApkModifier.NO_OP);
     this.executorService = executorService;
-    this.apkListener = apkListener;
-    this.apkModifier = apkModifier;
+    this.firstVariantNumber = firstVariantNumber.orElse(0);
     this.verbose = verbose;
-    this.firstVariantNumber = firstVariantNumber;
+    this.apkPathManager = apkPathManager;
   }
 
   public void populateApkSetBuilder(
+      ApkSetBuilder apkSetBuilder,
       GeneratedApks generatedApks,
       GeneratedAssetSlices generatedAssetSlices,
       ApkBuildMode apkBuildMode,
       Optional<DeviceSpec> deviceSpec,
       LocalTestingInfo localTestingInfo) {
     ImmutableList<Variant> allVariantsWithTargeting =
-        serializeApks(generatedApks, apkBuildMode, deviceSpec);
+        serializeApks(apkSetBuilder, generatedApks, apkBuildMode, deviceSpec);
     ImmutableList<AssetSliceSet> allAssetSliceSets =
-        serializeAssetSlices(generatedAssetSlices, apkBuildMode, deviceSpec);
-
+        serializeAssetSlices(apkSetBuilder, generatedAssetSlices, apkBuildMode, deviceSpec);
     // Finalize the output archive.
-    apkSetBuilder.setTableOfContentsFile(
+    BuildApksResult.Builder apksResult =
         BuildApksResult.newBuilder()
-            .setPackageName(appBundle.getBaseModule().getAndroidManifest().getPackageName())
+            .setPackageName(appBundle.getPackageName())
             .addAllVariant(allVariantsWithTargeting)
             .setBundletool(
                 Bundletool.newBuilder()
                     .setVersion(BundleToolVersion.getCurrentVersion().toString()))
             .addAllAssetSliceSet(allAssetSliceSets)
-            .setLocalTestingInfo(localTestingInfo)
-            .build());
+            .setLocalTestingInfo(localTestingInfo);
+    if (appBundle.getBundleConfig().hasAssetModulesConfig()) {
+      apksResult.setAssetModulesInfo(
+          getAssetModulesInfo(appBundle.getBundleConfig().getAssetModulesConfig()));
+    }
+    apkSetBuilder.setTableOfContentsFile(apksResult.build());
   }
 
   @VisibleForTesting
   ImmutableList<Variant> serializeApksForDevice(
-      GeneratedApks generatedApks, DeviceSpec deviceSpec, ApkBuildMode apkBuildMode) {
-    return serializeApks(generatedApks, apkBuildMode, Optional.of(deviceSpec));
+      ApkSetBuilder apkSetBuilder,
+      GeneratedApks generatedApks,
+      DeviceSpec deviceSpec,
+      ApkBuildMode apkBuildMode) {
+    return serializeApks(apkSetBuilder, generatedApks, apkBuildMode, Optional.of(deviceSpec));
   }
 
   @VisibleForTesting
-  ImmutableList<Variant> serializeApks(GeneratedApks generatedApks) {
-    return serializeApks(generatedApks, ApkBuildMode.DEFAULT);
+  ImmutableList<Variant> serializeApks(ApkSetBuilder apkSetBuilder, GeneratedApks generatedApks) {
+    return serializeApks(apkSetBuilder, generatedApks, ApkBuildMode.DEFAULT);
   }
 
   @VisibleForTesting
-  ImmutableList<Variant> serializeApks(GeneratedApks generatedApks, ApkBuildMode apkBuildMode) {
-    return serializeApks(generatedApks, apkBuildMode, Optional.empty());
+  ImmutableList<Variant> serializeApks(
+      ApkSetBuilder apkSetBuilder, GeneratedApks generatedApks, ApkBuildMode apkBuildMode) {
+    return serializeApks(apkSetBuilder, generatedApks, apkBuildMode, Optional.empty());
   }
 
   private ImmutableList<Variant> serializeApks(
-      GeneratedApks generatedApks, ApkBuildMode apkBuildMode, Optional<DeviceSpec> deviceSpec) {
+      ApkSetBuilder apkSetBuilder,
+      GeneratedApks generatedApks,
+      ApkBuildMode apkBuildMode,
+      Optional<DeviceSpec> deviceSpec) {
     validateInput(generatedApks, apkBuildMode);
 
     // Running with system APK mode generates a fused APK and additional unmatched language splits.
@@ -185,8 +199,6 @@ public class ApkSerializerManager {
                             modifyApk(
                                 entry.getValue(), variantNumberByVariantKey.get(entry.getKey())))));
 
-    checkState(!finalSplitsByVariant.isEmpty(), "Internal error: No variants were generated.");
-
     // After variant targeting of APKs are cleared, there might be duplicate APKs
     // which are removed and the distinct APKs are then serialized in parallel.
     // Note: Only serializing compressed system APK produces multiple ApkDescriptions,
@@ -201,7 +213,7 @@ public class ApkSerializerManager {
                         (ModuleSplit split) -> {
                           ZipPath apkPath = apkPathManager.getApkPath(split);
                           return executorService.submit(
-                              () -> apkSerializer.serialize(split, apkPath));
+                              () -> apkSerializer.serialize(apkSetBuilder, split, apkPath));
                         }),
                     ConcurrencyUtils::waitForAll));
 
@@ -234,6 +246,7 @@ public class ApkSerializerManager {
 
   @VisibleForTesting
   ImmutableList<AssetSliceSet> serializeAssetSlices(
+      ApkSetBuilder apkSetBuilder,
       GeneratedAssetSlices generatedAssetSlices,
       ApkBuildMode apkBuildMode,
       Optional<DeviceSpec> deviceSpec) {
@@ -255,7 +268,7 @@ public class ApkSerializerManager {
                         assetSlice -> {
                           ZipPath apkPath = apkPathManager.getApkPath(assetSlice);
                           return executorService.submit(
-                              () -> apkSerializer.serialize(assetSlice, apkPath));
+                              () -> apkSerializer.serialize(apkSetBuilder, assetSlice, apkPath));
                         },
                         toImmutableList())))
             .entrySet()
@@ -371,6 +384,13 @@ public class ApkSerializerManager {
         .build();
   }
 
+  private static AssetModulesInfo getAssetModulesInfo(AssetModulesConfig assetModulesConfig) {
+    return AssetModulesInfo.newBuilder()
+        .addAllAppVersion(assetModulesConfig.getAppVersionList())
+        .setAssetVersionTag(assetModulesConfig.getAssetVersionTag())
+        .build();
+  }
+
   private static DeliveryType getDeliveryType(ManifestDeliveryElement deliveryElement) {
     if (deliveryElement.hasOnDemandElement()) {
       return DeliveryType.ON_DEMAND;
@@ -390,7 +410,8 @@ public class ApkSerializerManager {
       this.apkBuildMode = apkBuildMode;
     }
 
-    public ImmutableList<ApkDescription> serialize(ModuleSplit split, ZipPath apkPath) {
+    public ImmutableList<ApkDescription> serialize(
+        ApkSetBuilder apkSetBuilder, ModuleSplit split, ZipPath apkPath) {
       ImmutableList<ApkDescription> apkDescriptions;
       switch (split.getSplitType()) {
         case INSTANT:
@@ -427,8 +448,8 @@ public class ApkSerializerManager {
 
       if (verbose) {
         System.out.printf(
-            "INFO: [%s] '%s' of type '%s' was written to the disk.%n",
-            LocalDateTime.now(ZoneId.systemDefault()).format(DATE_TIME_FORMATTER),
+            "INFO: [%s] '%s' of type '%s' was written to disk.%n",
+            LocalDateTime.now(ZoneId.systemDefault()).format(DATE_FORMATTER),
             apkPath,
             split.getSplitType());
       }

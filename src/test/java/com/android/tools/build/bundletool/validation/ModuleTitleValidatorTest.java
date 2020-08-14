@@ -18,6 +18,7 @@ package com.android.tools.build.bundletool.validation;
 
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifest;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifestForAssetModule;
+import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withIsolatedSplits;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withMinSdkCondition;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withOnDemandAttribute;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withTitle;
@@ -66,6 +67,16 @@ public class ModuleTitleValidatorTest {
     assertThat(exception)
         .hasMessageThat()
         .contains("Mandatory title is missing in manifest for module 'demand'");
+  }
+
+  @Test
+  public void validateAllModules_isolatedSplits_onDemandModuleMissingTitle_succeeds()
+      throws Exception {
+    ImmutableList<BundleModule> allModules =
+        ImmutableList.of(
+            module("base", androidManifest(PKG_NAME, withIsolatedSplits(true))),
+            module("demand", androidManifest(PKG_NAME, withOnDemandAttribute(true))));
+    new ModuleTitleValidator().validateAllModules(allModules);
   }
 
   @Test

@@ -109,6 +109,7 @@ public abstract class AndroidManifest {
   public static final int VALUE_RESOURCE_ID = 0x01010024;
   public static final int RESOURCE_RESOURCE_ID = 0x01010025;
   public static final int VERSION_CODE_RESOURCE_ID = 0x0101021b;
+  public static final int VERSION_CODE_MAJOR_RESOURCE_ID = 0x01010576;
   public static final int VERSION_NAME_RESOURCE_ID = 0x0101021c;
   public static final int IS_FEATURE_SPLIT_RESOURCE_ID = 0x0101055b;
   public static final int TARGET_SANDBOX_VERSION_RESOURCE_ID = 0x0101054c;
@@ -116,6 +117,7 @@ public abstract class AndroidManifest {
   public static final int INSTALL_LOCATION_RESOURCE_ID = 0x010102b7;
   public static final int IS_SPLIT_REQUIRED_RESOURCE_ID = 0x01010591;
   public static final int THEME_RESOURCE_ID = 0x01010000;
+  public static final int ISOLATED_SPLITS_ID = 0x0101054b;
 
   // Matches the value of android.os.Build.VERSION_CODES.CUR_DEVELOPMENT, used when turning
   // a manifest attribute which references a prerelease API version (e.g., "Q") into an integer.
@@ -405,6 +407,13 @@ public abstract class AndroidManifest {
     return getManifestElement()
         .getAndroidAttribute(VERSION_CODE_RESOURCE_ID)
         .map(XmlProtoAttribute::getValueAsDecimalInteger);
+  }
+
+  /** Returns the value of isolatedSplits attribute. */
+  public Optional<Boolean> getIsolatedSplits() {
+    return getManifestElement()
+        .getAndroidAttribute(ISOLATED_SPLITS_ID)
+        .map(XmlProtoAttribute::getValueAsBoolean);
   }
 
   public Optional<String> getSplitId() {

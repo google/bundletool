@@ -20,10 +20,8 @@ import static com.google.common.base.Preconditions.checkArgument;
 
 import com.google.auto.value.AutoValue;
 import com.google.common.collect.ImmutableMap;
-import com.google.common.collect.Maps;
 import com.google.common.io.ByteSource;
 import com.google.errorprone.annotations.Immutable;
-import java.util.Map;
 import java.util.Optional;
 
 /** Holder of the App Bundle metadata. */
@@ -42,33 +40,11 @@ public abstract class BundleMetadata {
    * Returns the raw metadata map.
    *
    * <p>Keys are in format {@code <namespaced-dir>/<file-name>}.
-   *
-   * @deprecated Use {@link #getFileContentMap()} instead.
-   */
-  @Deprecated
-  public Map<ZipPath, InputStreamSupplier> getFileDataMap() {
-    return Maps.transformValues(getFileContentMap(), InputStreamSupplier::fromByteSource);
-  }
-
-  /**
-   * Returns the raw metadata map.
-   *
-   * <p>Keys are in format {@code <namespaced-dir>/<file-name>}.
    */
   public abstract ImmutableMap<ZipPath, ByteSource> getFileContentMap();
 
   public static Builder builder() {
     return new AutoValue_BundleMetadata.Builder();
-  }
-
-  /**
-   * Gets contents of metadata file {@code <namespaced-dir>/<file-name>}, if it exists.
-   *
-   * @deprecated Use {@link #getFileAsByteSource(String, String)} instead.
-   */
-  @Deprecated
-  public Optional<InputStreamSupplier> getFileData(String namespacedDir, String fileName) {
-    return getFileAsByteSource(namespacedDir, fileName).map(InputStreamSupplier::fromByteSource);
   }
 
   /** Gets contents of metadata file {@code <namespaced-dir>/<file-name>}, if it exists. */

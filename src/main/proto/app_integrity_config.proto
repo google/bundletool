@@ -6,13 +6,16 @@ option java_package = "com.android.bundle";
 
 // Specifies integrity protection options that should be applied to an app
 // bundle.
-// Next tag: 6.
+// Next tag: 7.
 message AppIntegrityConfig {
   bool enabled = 1;
   LicenseCheck license_check = 2;
   InstallerCheck installer_check = 3;
-  DebuggerCheck debugger_check = 4;
+  DebuggerCheck debugger_check_deprecated = 4 [deprecated = true];
   EmulatorCheck emulator_check = 5;
+  // Optional. If present, java/kotlin code will be obfuscated according to the
+  // config.
+  DexProtectionConfig dex_protection_config = 6;
 }
 
 // Next tag: 4.
@@ -31,6 +34,7 @@ message InstallerCheck {
 
 // Next tag: 2
 message DebuggerCheck {
+  option deprecated = true;
   bool enabled = 1;
 }
 
@@ -48,4 +52,24 @@ message Policy {
     WARN_THEN_DISABLE = 3;
   }
   Action action = 1;
+}
+
+// Configuration of java-related obfuscation.
+message DexProtectionConfig {
+  bool enabled = 1;
+  // Either fully qualified method reference e.g.
+  // `java.lang.MyClass#myMethod(int,float,java.lang.String)`, or a partially
+  // qualified reference e.g. `java.lang.MyClass#myMethod`.
+  repeated string method_to_obfuscate = 2;
+
+  // Describes how to look for methods to obfuscate.
+  enum TargetingMode {
+    TARGETING_MODE_UNSPECIFIED = 0;
+    // We'll try to automatically find methods for obfuscation, in addition to
+    // the methods specified in this config.
+    TARGETING_MODE_AUTOMATIC = 1;
+    // Only methods spefied in this config will be considered for obfuscation.
+    TARGETING_MODE_PROPOSED_ONLY = 2;
+  }
+  TargetingMode targeting_mode = 3;
 }

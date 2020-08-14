@@ -29,6 +29,7 @@ import static com.android.tools.build.bundletool.model.AndroidManifest.ICON_ATTR
 import static com.android.tools.build.bundletool.model.AndroidManifest.ICON_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.INSTALL_LOCATION_ATTRIBUTE_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.INSTALL_LOCATION_RESOURCE_ID;
+import static com.android.tools.build.bundletool.model.AndroidManifest.ISOLATED_SPLITS_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.MAX_SDK_VERSION_ATTRIBUTE_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.MAX_SDK_VERSION_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.META_DATA_ELEMENT_NAME;
@@ -575,6 +576,13 @@ public final class ManifestProtoUtils {
                                 XmlProtoAttributeBuilder.createAndroidAttribute(
                                         NAME_ATTRIBUTE_NAME, NAME_RESOURCE_ID)
                                     .setValueAsString(glExtensionString))));
+  }
+
+  public static ManifestMutator withIsolatedSplits(boolean value) {
+    return manifestElement ->
+        manifestElement
+            .getOrCreateAndroidAttribute("isolatedSplits", ISOLATED_SPLITS_ID)
+            .setValueAsBoolean(value);
   }
 
   public static ManifestMutator withoutVersionCode() {

@@ -94,6 +94,8 @@ import com.android.bundle.Targeting.LanguageTargeting;
 import com.android.bundle.Targeting.ScreenDensity.DensityAlias;
 import com.android.bundle.Targeting.TextureCompressionFormat.TextureCompressionFormatAlias;
 import com.android.bundle.Targeting.VariantTargeting;
+import com.android.tools.build.bundletool.commands.BuildApksModule;
+import com.android.tools.build.bundletool.commands.CommandScoped;
 import com.android.tools.build.bundletool.model.BundleMetadata;
 import com.android.tools.build.bundletool.model.BundleModule;
 import com.android.tools.build.bundletool.model.BundleModuleName;
@@ -102,9 +104,9 @@ import com.android.tools.build.bundletool.model.ModuleSplit.SplitType;
 import com.android.tools.build.bundletool.model.OptimizationDimension;
 import com.android.tools.build.bundletool.model.ShardedSystemSplits;
 import com.android.tools.build.bundletool.model.utils.xmlproto.XmlProtoElement;
-import com.android.tools.build.bundletool.model.version.BundleToolVersion;
 import com.android.tools.build.bundletool.testing.BundleModuleBuilder;
 import com.android.tools.build.bundletool.testing.ResourceTableBuilder;
+import com.android.tools.build.bundletool.testing.TestModule;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
@@ -112,9 +114,9 @@ import com.google.common.collect.Iterables;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 import com.google.protobuf.Message;
-import java.nio.file.Path;
-import java.nio.file.Paths;
+import dagger.Component;
 import java.util.Optional;
+import javax.inject.Inject;
 import org.junit.Before;
 import org.junit.Ignore;
 import org.junit.Test;
@@ -167,17 +169,11 @@ public class BundleSharderTest {
   private static final BundleModuleName FEATURE_MODULE_NAME = BundleModuleName.create("feature");
   private static final BundleModuleName VR_MODULE_NAME = BundleModuleName.create("vr");
 
-  private BundleSharder bundleSharder;
-  private Path tmpDir;
+  @Inject BundleSharder bundleSharder;
 
   @Before
   public void setUp() {
-    tmpDir = Paths.get("real/directory/not/needed/in/this/test");
-    bundleSharder =
-        new BundleSharder(
-            tmpDir,
-            BundleToolVersion.getCurrentVersion(),
-            BundleSharderConfiguration.getDefaultInstance());
+    TestComponent.useTestModule(this, TestModule.builder().build());
   }
 
   @Test
@@ -209,15 +205,12 @@ public class BundleSharderTest {
                     .build())
             .build();
 
-    BundleSharder bundleSharder =
-        new BundleSharder(
-            tmpDir,
-            BundleToolVersion.getCurrentVersion(),
-            BundleSharderConfiguration.getDefaultInstance());
-
     ImmutableList<ModuleSplit> shards =
         bundleSharder.shardBundle(
-            ImmutableList.of(bundleModule), ImmutableSet.of(), DEFAULT_METADATA);
+            ImmutableList.of(bundleModule),
+            ImmutableSet.of(),
+            DEFAULT_METADATA,
+            BundleSharderConfiguration.getDefaultInstance());
 
     assertThat(shards).hasSize(1);
     ModuleSplit fatShard = shards.get(0);
@@ -260,15 +253,12 @@ public class BundleSharderTest {
                                 ImmutableSet.of(TextureCompressionFormatAlias.ETC1_RGB8))))))
             .build();
 
-    BundleSharder bundleSharder =
-        new BundleSharder(
-            tmpDir,
-            BundleToolVersion.getCurrentVersion(),
-            BundleSharderConfiguration.getDefaultInstance());
-
     ImmutableList<ModuleSplit> shards =
         bundleSharder.shardBundle(
-            ImmutableList.of(bundleModule), ImmutableSet.of(), DEFAULT_METADATA);
+            ImmutableList.of(bundleModule),
+            ImmutableSet.of(),
+            DEFAULT_METADATA,
+            BundleSharderConfiguration.getDefaultInstance());
 
     assertThat(shards).hasSize(1);
     assertThat(extractPaths(shards.get(0).getEntries()))
@@ -309,15 +299,12 @@ public class BundleSharderTest {
                     .build())
             .build();
 
-    BundleSharder bundleSharder =
-        new BundleSharder(
-            tmpDir,
-            BundleToolVersion.getCurrentVersion(),
-            BundleSharderConfiguration.builder().setStrip64BitLibrariesFromShards(true).build());
-
     ImmutableList<ModuleSplit> shards =
         bundleSharder.shardBundle(
-            ImmutableList.of(bundleModule), ImmutableSet.of(), DEFAULT_METADATA);
+            ImmutableList.of(bundleModule),
+            ImmutableSet.of(),
+            DEFAULT_METADATA,
+            BundleSharderConfiguration.builder().setStrip64BitLibrariesFromShards(true).build());
 
     assertThat(shards).hasSize(1);
     ModuleSplit fatShard = shards.get(0);
@@ -353,7 +340,10 @@ public class BundleSharderTest {
 
     ImmutableList<ModuleSplit> shards =
         bundleSharder.shardBundle(
-            ImmutableList.of(bundleModule), ImmutableSet.of(), DEFAULT_METADATA);
+            ImmutableList.of(bundleModule),
+            ImmutableSet.of(),
+            DEFAULT_METADATA,
+            BundleSharderConfiguration.getDefaultInstance());
 
     assertThat(shards).hasSize(1);
     ModuleSplit fatShard = shards.get(0);
@@ -385,11 +375,6 @@ public class BundleSharderTest {
   @Theory
   public void shardByAbi_havingNoNativeTargeting_producesOneApk(
       @FromDataPoints("deviceSpecs") Optional<DeviceSpec> deviceSpec) throws Exception {
-    bundleSharder =
-        new BundleSharder(
-            tmpDir,
-            BundleToolVersion.getCurrentVersion(),
-            BundleSharderConfiguration.builder().setDeviceSpec(deviceSpec).build());
     BundleModule bundleModule =
         new BundleModuleBuilder("base")
             .addFile("assets/file.txt")
@@ -420,7 +405,8 @@ public class BundleSharderTest {
               /* modules= */ ImmutableList.of(bundleModule),
               /* modulesToFuse= */ ImmutableSet.of(BASE_MODULE_NAME),
               ImmutableSet.of(OptimizationDimension.ABI),
-              DEFAULT_METADATA);
+              DEFAULT_METADATA,
+              BundleSharderConfiguration.builder().setDeviceSpec(deviceSpec).build());
       assertThat(shardedSystemSplits.getAdditionalSplits()).isEmpty();
       shards = ImmutableList.of(shardedSystemSplits.getSystemImageSplit());
     } else {
@@ -428,7 +414,8 @@ public class BundleSharderTest {
           bundleSharder.shardBundle(
               ImmutableList.of(bundleModule),
               ImmutableSet.of(OptimizationDimension.ABI),
-              DEFAULT_METADATA);
+              DEFAULT_METADATA,
+              BundleSharderConfiguration.builder().setDeviceSpec(deviceSpec).build());
     }
 
     assertThat(shards).hasSize(1);
@@ -452,11 +439,6 @@ public class BundleSharderTest {
   @Theory
   public void shardByAbi_havingSingleAbi_producesOneApk(
       @FromDataPoints("deviceSpecs") Optional<DeviceSpec> deviceSpec) throws Exception {
-    bundleSharder =
-        new BundleSharder(
-            tmpDir,
-            BundleToolVersion.getCurrentVersion(),
-            BundleSharderConfiguration.builder().setDeviceSpec(deviceSpec).build());
     BundleModule bundleModule =
         new BundleModuleBuilder("base")
             .addFile("assets/file.txt")
@@ -489,7 +471,8 @@ public class BundleSharderTest {
               /* modules= */ ImmutableList.of(bundleModule),
               /* modulesToFuse= */ ImmutableSet.of(BASE_MODULE_NAME),
               ImmutableSet.of(OptimizationDimension.ABI),
-              DEFAULT_METADATA);
+              DEFAULT_METADATA,
+              BundleSharderConfiguration.builder().setDeviceSpec(deviceSpec).build());
       assertThat(shardedSystemSplits.getAdditionalSplits()).isEmpty();
       shards = ImmutableList.of(shardedSystemSplits.getSystemImageSplit());
     } else {
@@ -497,7 +480,8 @@ public class BundleSharderTest {
           bundleSharder.shardBundle(
               ImmutableList.of(bundleModule),
               ImmutableSet.of(OptimizationDimension.ABI),
-              DEFAULT_METADATA);
+              DEFAULT_METADATA,
+              BundleSharderConfiguration.builder().setDeviceSpec(deviceSpec).build());
     }
 
     assertThat(shards).hasSize(1);
@@ -552,7 +536,8 @@ public class BundleSharderTest {
         bundleSharder.shardBundle(
             ImmutableList.of(bundleModule),
             ImmutableSet.of(OptimizationDimension.ABI),
-            DEFAULT_METADATA);
+            DEFAULT_METADATA,
+            BundleSharderConfiguration.getDefaultInstance());
 
     assertThat(shards).hasSize(3);
     assertThat(shards.stream().map(ModuleSplit::getSplitType).distinct().collect(toImmutableSet()))
@@ -595,19 +580,6 @@ public class BundleSharderTest {
 
   @Test
   public void shardByAbi_havingManyAbisForSystemShards_producesSingleApk() throws Exception {
-    bundleSharder =
-        new BundleSharder(
-            tmpDir,
-            BundleToolVersion.getCurrentVersion(),
-            BundleSharderConfiguration.builder()
-                .setDeviceSpec(
-                    Optional.of(
-                        mergeSpecs(
-                            sdkVersion(28),
-                            abis("armeabi"),
-                            density(DensityAlias.MDPI),
-                            locales("en-US"))))
-                .build());
     BundleModule bundleModule =
         new BundleModuleBuilder("base")
             .addFile("assets/file.txt")
@@ -642,7 +614,15 @@ public class BundleSharderTest {
             /* modules= */ ImmutableList.of(bundleModule),
             /* modulesToFuse= */ ImmutableSet.of(BASE_MODULE_NAME),
             ImmutableSet.of(OptimizationDimension.ABI),
-            DEFAULT_METADATA);
+            DEFAULT_METADATA,
+            BundleSharderConfiguration.builder()
+                .setDeviceSpec(
+                    mergeSpecs(
+                        sdkVersion(28),
+                        abis("armeabi"),
+                        density(DensityAlias.MDPI),
+                        locales("en-US")))
+                .build());
 
     ModuleSplit armeabiShard = shards.getSystemImageSplit();
     assertThat(armeabiShard.getApkTargeting())
@@ -662,20 +642,6 @@ public class BundleSharderTest {
 
   @Test
   public void shardByAbi_havingManyModulesWithLanguagesForSystemShards() throws Exception {
-    bundleSharder =
-        new BundleSharder(
-            tmpDir,
-            BundleToolVersion.getCurrentVersion(),
-            BundleSharderConfiguration.builder()
-                .setDeviceSpec(
-                    Optional.of(
-                        mergeSpecs(
-                            sdkVersion(28),
-                            abis("armeabi"),
-                            density(DensityAlias.MDPI),
-                            locales("es"))))
-                .build());
-
     BundleModule baseModule =
         new BundleModuleBuilder("base")
             .addFile("assets/languages#lang_es/image.jpg")
@@ -719,7 +685,12 @@ public class BundleSharderTest {
                 OptimizationDimension.ABI,
                 OptimizationDimension.LANGUAGE,
                 OptimizationDimension.SCREEN_DENSITY),
-            DEFAULT_METADATA);
+            DEFAULT_METADATA,
+            BundleSharderConfiguration.builder()
+                .setDeviceSpec(
+                    mergeSpecs(
+                        sdkVersion(28), abis("armeabi"), density(DensityAlias.MDPI), locales("es")))
+                .build());
 
     ModuleSplit fusedShard = shards.getSystemImageSplit();
     assertThat(fusedShard.isBaseModuleSplit()).isTrue();
@@ -757,17 +728,12 @@ public class BundleSharderTest {
                     targetedNativeDirectory("lib/x86_64", nativeDirectoryTargeting(X86_64))))
             .build();
 
-    BundleSharder bundleSharder =
-        new BundleSharder(
-            tmpDir,
-            BundleToolVersion.getCurrentVersion(),
-            BundleSharderConfiguration.builder().setStrip64BitLibrariesFromShards(true).build());
-
     ImmutableList<ModuleSplit> shards =
         bundleSharder.shardBundle(
             ImmutableList.of(bundleModule),
             ImmutableSet.of(OptimizationDimension.ABI),
-            DEFAULT_METADATA);
+            DEFAULT_METADATA,
+            BundleSharderConfiguration.builder().setStrip64BitLibrariesFromShards(true).build());
 
     assertThat(shards).hasSize(1);
     ModuleSplit shard = shards.get(0);
@@ -809,7 +775,8 @@ public class BundleSharderTest {
         bundleSharder.shardBundle(
             ImmutableList.of(bundleModule),
             ImmutableSet.of(OptimizationDimension.ABI),
-            DEFAULT_METADATA);
+            DEFAULT_METADATA,
+            BundleSharderConfiguration.getDefaultInstance());
 
     assertThat(shards).hasSize(1);
     ModuleSplit fatShard = shards.get(0);
@@ -853,7 +820,8 @@ public class BundleSharderTest {
             .setApexConfig(apexConfig)
             .build();
 
-    ImmutableList<ModuleSplit> shards = bundleSharder.shardApexBundle(apexModule);
+    ImmutableList<ModuleSplit> shards =
+        bundleSharder.shardApexBundle(apexModule, BundleSharderConfiguration.getDefaultInstance());
 
     assertThat(shards).hasSize(6);
     assertThat(shards.stream().map(ModuleSplit::getSplitType).distinct().collect(toImmutableSet()))
@@ -917,7 +885,8 @@ public class BundleSharderTest {
         bundleSharder.shardBundle(
             ImmutableList.of(bundleModule),
             ImmutableSet.of(OptimizationDimension.SCREEN_DENSITY),
-            DEFAULT_METADATA);
+            DEFAULT_METADATA,
+            BundleSharderConfiguration.getDefaultInstance());
 
     assertThat(shards).hasSize(1);
     ModuleSplit shard = shards.get(0);
@@ -961,7 +930,8 @@ public class BundleSharderTest {
         bundleSharder.shardBundle(
             ImmutableList.of(bundleModule),
             ImmutableSet.of(OptimizationDimension.SCREEN_DENSITY),
-            DEFAULT_METADATA);
+            DEFAULT_METADATA,
+            BundleSharderConfiguration.getDefaultInstance());
 
     assertThat(shards).hasSize(1);
     ModuleSplit shard = shards.get(0);
@@ -1010,7 +980,8 @@ public class BundleSharderTest {
         bundleSharder.shardBundle(
             ImmutableList.of(bundleModule),
             ImmutableSet.of(OptimizationDimension.SCREEN_DENSITY),
-            DEFAULT_METADATA);
+            DEFAULT_METADATA,
+            BundleSharderConfiguration.getDefaultInstance());
 
     assertThat(shards).hasSize(1);
     ModuleSplit shard = shards.get(0);
@@ -1035,11 +1006,6 @@ public class BundleSharderTest {
   @Theory
   public void shardByAbiAndDensity_havingNoAbiAndNoResources_producesOneApk(
       @FromDataPoints("deviceSpecs") Optional<DeviceSpec> deviceSpec) throws Exception {
-    bundleSharder =
-        new BundleSharder(
-            tmpDir,
-            BundleToolVersion.getCurrentVersion(),
-            BundleSharderConfiguration.builder().setDeviceSpec(deviceSpec).build());
     BundleModule bundleModule =
         new BundleModuleBuilder("base")
             .addFile("assets/file.txt")
@@ -1055,7 +1021,8 @@ public class BundleSharderTest {
               /* modules= */ ImmutableList.of(bundleModule),
               /* modulesToFuse= */ ImmutableSet.of(BASE_MODULE_NAME),
               ImmutableSet.of(OptimizationDimension.ABI, OptimizationDimension.SCREEN_DENSITY),
-              DEFAULT_METADATA);
+              DEFAULT_METADATA,
+              BundleSharderConfiguration.builder().setDeviceSpec(deviceSpec).build());
       assertThat(shardedSystemSplits.getAdditionalSplits()).isEmpty();
       shards = ImmutableList.of(shardedSystemSplits.getSystemImageSplit());
     } else {
@@ -1063,7 +1030,8 @@ public class BundleSharderTest {
           bundleSharder.shardBundle(
               ImmutableList.of(bundleModule),
               ImmutableSet.of(OptimizationDimension.ABI, OptimizationDimension.SCREEN_DENSITY),
-              DEFAULT_METADATA);
+              DEFAULT_METADATA,
+              BundleSharderConfiguration.builder().setDeviceSpec(deviceSpec).build());
     }
 
     assertThat(shards).hasSize(1);
@@ -1108,7 +1076,8 @@ public class BundleSharderTest {
         bundleSharder.shardBundle(
             ImmutableList.of(bundleModule),
             ImmutableSet.of(OptimizationDimension.ABI, OptimizationDimension.SCREEN_DENSITY),
-            DEFAULT_METADATA);
+            DEFAULT_METADATA,
+            BundleSharderConfiguration.getDefaultInstance());
 
     // 7 shards: {x86} x {LDPI, MDPI, ..., XXXHDPI}.
     assertThat(shards).hasSize(7);
@@ -1156,19 +1125,6 @@ public class BundleSharderTest {
   public void
       shardByAbiAndDensity_havingOneAbiAndSomeDensityResourceWithDeviceSpec_producesSingleApk()
           throws Exception {
-    bundleSharder =
-        new BundleSharder(
-            tmpDir,
-            BundleToolVersion.getCurrentVersion(),
-            BundleSharderConfiguration.builder()
-                .setDeviceSpec(
-                    Optional.of(
-                        mergeSpecs(
-                            sdkVersion(28),
-                            abis("x86"),
-                            density(DensityAlias.MDPI),
-                            locales("en-US"))))
-                .build());
     BundleModule bundleModule =
         new BundleModuleBuilder("base")
             .addFile("assets/file.txt")
@@ -1198,7 +1154,12 @@ public class BundleSharderTest {
             /* modules= */ ImmutableList.of(bundleModule),
             /* modulesToFuse= */ ImmutableSet.of(BASE_MODULE_NAME),
             ImmutableSet.of(OptimizationDimension.ABI, OptimizationDimension.SCREEN_DENSITY),
-            DEFAULT_METADATA);
+            DEFAULT_METADATA,
+            BundleSharderConfiguration.builder()
+                .setDeviceSpec(
+                    mergeSpecs(
+                        sdkVersion(28), abis("x86"), density(DensityAlias.MDPI), locales("en-US")))
+                .build());
 
     assertThat(shards.getAdditionalSplits()).isEmpty();
 
@@ -1226,19 +1187,6 @@ public class BundleSharderTest {
   @Test
   public void shardByAbiAndDensity_havingOneAbiAndOneDensityMultipleLanguageResourceWithDeviceSpec()
       throws Exception {
-    bundleSharder =
-        new BundleSharder(
-            tmpDir,
-            BundleToolVersion.getCurrentVersion(),
-            BundleSharderConfiguration.builder()
-                .setDeviceSpec(
-                    Optional.of(
-                        mergeSpecs(
-                            sdkVersion(28),
-                            abis("x86"),
-                            density(DensityAlias.MDPI),
-                            locales("fr"))))
-                .build());
     BundleModule bundleModule =
         new BundleModuleBuilder("base")
             .addFile("dex/classes.dex")
@@ -1275,7 +1223,12 @@ public class BundleSharderTest {
                 OptimizationDimension.ABI,
                 OptimizationDimension.SCREEN_DENSITY,
                 OptimizationDimension.LANGUAGE),
-            DEFAULT_METADATA);
+            DEFAULT_METADATA,
+            BundleSharderConfiguration.builder()
+                .setDeviceSpec(
+                    mergeSpecs(
+                        sdkVersion(28), abis("x86"), density(DensityAlias.MDPI), locales("fr")))
+                .build());
 
     // shard {x86} x {MDPI} x {fr}
     ModuleSplit fatShard = shards.getSystemImageSplit();
@@ -1316,19 +1269,6 @@ public class BundleSharderTest {
   public void
       shardByAbiAndDensity_multipleLanguageResourceAndDeviceSpecMissingLanguage_fallsBackToDefault()
           throws Exception {
-    bundleSharder =
-        new BundleSharder(
-            tmpDir,
-            BundleToolVersion.getCurrentVersion(),
-            BundleSharderConfiguration.builder()
-                .setDeviceSpec(
-                    Optional.of(
-                        mergeSpecs(
-                            sdkVersion(28),
-                            abis("x86"),
-                            density(DensityAlias.MDPI),
-                            locales("de"))))
-                .build());
     BundleModule bundleModule =
         new BundleModuleBuilder("base")
             .addFile("dex/classes.dex")
@@ -1369,7 +1309,12 @@ public class BundleSharderTest {
                 OptimizationDimension.ABI,
                 OptimizationDimension.SCREEN_DENSITY,
                 OptimizationDimension.LANGUAGE),
-            DEFAULT_METADATA);
+            DEFAULT_METADATA,
+            BundleSharderConfiguration.builder()
+                .setDeviceSpec(
+                    mergeSpecs(
+                        sdkVersion(28), abis("x86"), density(DensityAlias.MDPI), locales("de")))
+                .build());
 
     ModuleSplit fatShard = shards.getSystemImageSplit();
     assertThat(fatShard.getApkTargeting())
@@ -1395,8 +1340,7 @@ public class BundleSharderTest {
 
     ImmutableMap<LanguageTargeting, ModuleSplit> splitLanguageTargetingMap =
         Maps.uniqueIndex(
-            shards.getAdditionalSplits(),
-            split -> split.getApkTargeting().getLanguageTargeting());
+            shards.getAdditionalSplits(), split -> split.getApkTargeting().getLanguageTargeting());
 
     assertThat(splitLanguageTargetingMap.keySet())
         .containsExactly(languageTargeting("es"), languageTargeting("fr"));
@@ -1462,7 +1406,8 @@ public class BundleSharderTest {
         bundleSharder.shardBundle(
             ImmutableList.of(bundleModule),
             ImmutableSet.of(OptimizationDimension.ABI, OptimizationDimension.SCREEN_DENSITY),
-            DEFAULT_METADATA);
+            DEFAULT_METADATA,
+            BundleSharderConfiguration.getDefaultInstance());
 
     assertThat(shards).hasSize(3 * 7);
     assertThat(shards.stream().map(ModuleSplit::getSplitType).distinct().collect(toImmutableSet()))
@@ -1576,11 +1521,6 @@ public class BundleSharderTest {
   @Theory
   public void manyModulesShardByNoDimension_producesFatApk(
       @FromDataPoints("deviceSpecs") Optional<DeviceSpec> deviceSpec) throws Exception {
-    bundleSharder =
-        new BundleSharder(
-            tmpDir,
-            BundleToolVersion.getCurrentVersion(),
-            BundleSharderConfiguration.builder().setDeviceSpec(deviceSpec).build());
     BundleModule baseModule =
         new BundleModuleBuilder("base")
             .addFile("lib/x86_64/libtest1.so")
@@ -1631,14 +1571,18 @@ public class BundleSharderTest {
               /* modules= */ ImmutableList.of(baseModule, featureModule),
               /* modulesToFuse= */ ImmutableSet.of(BASE_MODULE_NAME, FEATURE_MODULE_NAME),
               ImmutableSet.of(),
-              DEFAULT_METADATA);
+              DEFAULT_METADATA,
+              BundleSharderConfiguration.builder().setDeviceSpec(deviceSpec).build());
       assertThat(shardedSystemSplits.getAdditionalSplits()).isEmpty();
       shards = ImmutableList.of(shardedSystemSplits.getSystemImageSplit());
 
     } else {
       shards =
           bundleSharder.shardBundle(
-              ImmutableList.of(baseModule, featureModule), ImmutableSet.of(), DEFAULT_METADATA);
+              ImmutableList.of(baseModule, featureModule),
+              ImmutableSet.of(),
+              DEFAULT_METADATA,
+              BundleSharderConfiguration.builder().setDeviceSpec(deviceSpec).build());
     }
 
     assertThat(shards).hasSize(1);
@@ -1687,7 +1631,8 @@ public class BundleSharderTest {
         bundleSharder.shardBundle(
             ImmutableList.of(baseModule, featureModule1, featureModule2),
             ImmutableSet.of(OptimizationDimension.ABI),
-            DEFAULT_METADATA);
+            DEFAULT_METADATA,
+            BundleSharderConfiguration.getDefaultInstance());
 
     assertThat(shards).hasSize(1);
     ModuleSplit shard = shards.get(0);
@@ -1732,7 +1677,8 @@ public class BundleSharderTest {
         bundleSharder.shardBundle(
             ImmutableList.of(baseModule, featureModule1, featureModule2),
             ImmutableSet.of(OptimizationDimension.ABI),
-            DEFAULT_METADATA);
+            DEFAULT_METADATA,
+            BundleSharderConfiguration.getDefaultInstance());
 
     assertThat(shards).hasSize(2);
     assertThat(shards.stream().map(ModuleSplit::getSplitType).distinct().collect(toImmutableSet()))
@@ -1775,7 +1721,8 @@ public class BundleSharderTest {
         bundleSharder.shardBundle(
             ImmutableList.of(baseModule, featureModule),
             ImmutableSet.of(OptimizationDimension.SCREEN_DENSITY),
-            DEFAULT_METADATA);
+            DEFAULT_METADATA,
+            BundleSharderConfiguration.getDefaultInstance());
 
     assertThat(shards).hasSize(1);
     ModuleSplit fatShard = shards.get(0);
@@ -1790,11 +1737,6 @@ public class BundleSharderTest {
   @Theory
   public void manyModulesShardByDensity_havingOnlyOneDensityResource_producesSingleApk(
       @FromDataPoints("deviceSpecs") Optional<DeviceSpec> deviceSpec) throws Exception {
-    bundleSharder =
-        new BundleSharder(
-            tmpDir,
-            BundleToolVersion.getCurrentVersion(),
-            BundleSharderConfiguration.builder().setDeviceSpec(deviceSpec).build());
     BundleModule baseModule =
         new BundleModuleBuilder("base")
             .addFile("res/drawable-hdpi/image.jpg")
@@ -1837,7 +1779,8 @@ public class BundleSharderTest {
               /* modules= */ ImmutableList.of(baseModule, featureModule),
               /* modulesToFuse= */ ImmutableSet.of(BASE_MODULE_NAME, FEATURE_MODULE_NAME),
               ImmutableSet.of(OptimizationDimension.SCREEN_DENSITY),
-              DEFAULT_METADATA);
+              DEFAULT_METADATA,
+              BundleSharderConfiguration.builder().setDeviceSpec(deviceSpec).build());
       assertThat(shardedSystemSplits.getAdditionalSplits()).isEmpty();
       shards = ImmutableList.of(shardedSystemSplits.getSystemImageSplit());
     } else {
@@ -1845,7 +1788,8 @@ public class BundleSharderTest {
           bundleSharder.shardBundle(
               ImmutableList.of(baseModule, featureModule),
               ImmutableSet.of(OptimizationDimension.SCREEN_DENSITY),
-              DEFAULT_METADATA);
+              DEFAULT_METADATA,
+              BundleSharderConfiguration.builder().setDeviceSpec(deviceSpec).build());
     }
 
     assertThat(shards).hasSize(1);
@@ -1880,7 +1824,8 @@ public class BundleSharderTest {
         bundleSharder.shardBundle(
             ImmutableList.of(baseModule, featureModule),
             ImmutableSet.of(OptimizationDimension.ABI, OptimizationDimension.SCREEN_DENSITY),
-            DEFAULT_METADATA);
+            DEFAULT_METADATA,
+            BundleSharderConfiguration.getDefaultInstance());
 
     assertThat(shards).hasSize(1);
     ModuleSplit fatShard = shards.get(0);
@@ -1929,7 +1874,8 @@ public class BundleSharderTest {
         bundleSharder.shardBundle(
             ImmutableList.of(baseModule, featureModule),
             ImmutableSet.of(OptimizationDimension.ABI, OptimizationDimension.SCREEN_DENSITY),
-            DEFAULT_METADATA);
+            DEFAULT_METADATA,
+            BundleSharderConfiguration.getDefaultInstance());
 
     assertThat(shards).hasSize(2 * 7);
     assertThat(shards.stream().map(ModuleSplit::getSplitType).distinct().collect(toImmutableSet()))
@@ -2035,15 +1981,6 @@ public class BundleSharderTest {
   public void
       manyModulesShardByAbiAndDensity_havingManyAbisAndSomeResourceWithDeviceSpec_producesSingleApk()
           throws Exception {
-    bundleSharder =
-        new BundleSharder(
-            tmpDir,
-            BundleToolVersion.getCurrentVersion(),
-            BundleSharderConfiguration.builder()
-                .setDeviceSpec(
-                    Optional.of(
-                        mergeSpecs(abis("x86"), density(DensityAlias.MDPI), locales("en-US"))))
-                .build());
     BundleModule baseModule =
         new BundleModuleBuilder("base")
             .addFile("assets/file.txt")
@@ -2080,7 +2017,11 @@ public class BundleSharderTest {
             /* modules= */ ImmutableList.of(baseModule, featureModule),
             /* modulesToFuse= */ ImmutableSet.of(BASE_MODULE_NAME, FEATURE_MODULE_NAME),
             ImmutableSet.of(OptimizationDimension.ABI, OptimizationDimension.SCREEN_DENSITY),
-            DEFAULT_METADATA);
+            DEFAULT_METADATA,
+            BundleSharderConfiguration.builder()
+                .setDeviceSpec(
+                    mergeSpecs(abis("x86"), density(DensityAlias.MDPI), locales("en-US")))
+                .build());
 
     ModuleSplit fatShard = shards.getSystemImageSplit();
     assertThat(fatShard.getApkTargeting().getAbiTargeting())
@@ -2118,7 +2059,8 @@ public class BundleSharderTest {
         bundleSharder.shardBundle(
             ImmutableList.of(baseModule, assetModule),
             ImmutableSet.of(OptimizationDimension.ABI, OptimizationDimension.SCREEN_DENSITY),
-            DEFAULT_METADATA);
+            DEFAULT_METADATA,
+            BundleSharderConfiguration.getDefaultInstance());
 
     assertThat(shards).hasSize(1);
     ModuleSplit fatShard = shards.get(0);
@@ -2127,5 +2069,18 @@ public class BundleSharderTest {
     assertThat(fatShard.getSplitType()).isEqualTo(SplitType.STANDALONE);
     assertThat(extractPaths(fatShard.getEntries()))
         .containsExactly("assets/file.txt", "dex/classes.dex", "root/license.dat");
+  }
+
+  @CommandScoped
+  @Component(modules = {BuildApksModule.class, TestModule.class})
+  interface TestComponent {
+    void inject(BundleSharderTest test);
+
+    static void useTestModule(BundleSharderTest testInstance, TestModule testModule) {
+      DaggerBundleSharderTest_TestComponent.builder()
+          .testModule(testModule)
+          .build()
+          .inject(testInstance);
+    }
   }
 }

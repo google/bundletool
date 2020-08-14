@@ -24,11 +24,11 @@ import com.android.bundle.Targeting.VariantTargeting;
 import com.android.tools.build.bundletool.model.BundleModule;
 import com.android.tools.build.bundletool.model.exceptions.CommandExecutionException;
 import com.android.tools.build.bundletool.model.targeting.TargetingUtils;
-import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import java.util.Optional;
 import java.util.stream.Stream;
+import javax.inject.Inject;
 
 /**
  * Generates all variant targetings that would be created from the {@link BundleModule}.
@@ -38,21 +38,15 @@ import java.util.stream.Stream;
  */
 public final class VariantGenerator {
 
-  private final BundleModule module;
-  private final ApkGenerationConfiguration apkGenerationConfiguration;
+  @Inject
+  VariantGenerator() {}
 
-  @VisibleForTesting
-  VariantGenerator(BundleModule module) {
-    this(module, ApkGenerationConfiguration.getDefaultInstance());
+  public ImmutableSet<VariantTargeting> generateVariants(BundleModule module) {
+   return generateVariants(module, ApkGenerationConfiguration.getDefaultInstance());
   }
 
-  public VariantGenerator(
+  public ImmutableSet<VariantTargeting> generateVariants(
       BundleModule module, ApkGenerationConfiguration apkGenerationConfiguration) {
-    this.module = module;
-    this.apkGenerationConfiguration = apkGenerationConfiguration;
-  }
-
-  public ImmutableSet<VariantTargeting> generateVariants() {
     if (targetsOnlyPreL(module)) {
       throw CommandExecutionException.builder()
           .withInternalMessage(
@@ -63,19 +57,21 @@ public final class VariantGenerator {
     }
 
     ImmutableSet<VariantTargeting> splitVariants =
-        getVariantGenerators().stream()
+        getVariantGenerators(apkGenerationConfiguration).stream()
             .flatMap(generator -> generator.generate(module))
             .collect(toImmutableSet());
 
     return TargetingUtils.cropVariantsWithAppSdkRange(
         splitVariants, module.getAndroidManifest().getSdkRange());
-  };
+  }
 
-  private ImmutableList<BundleModuleVariantGenerator> getVariantGenerators() {
+  private static ImmutableList<BundleModuleVariantGenerator> getVariantGenerators(
+      ApkGenerationConfiguration apkGenerationConfiguration) {
     return ImmutableList.of(
-        apkGenerationConfiguration -> Stream.of(lPlusVariantTargeting()),
+        unused -> Stream.of(lPlusVariantTargeting()),
         new NativeLibsCompressionVariantGenerator(apkGenerationConfiguration),
-        new DexCompressionVariantGenerator(apkGenerationConfiguration));
+        new DexCompressionVariantGenerator(apkGenerationConfiguration),
+        new SigningConfigurationVariantGenerator(apkGenerationConfiguration));
   }
 
   private static boolean targetsOnlyPreL(BundleModule module) {

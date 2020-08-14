@@ -35,6 +35,7 @@ import static com.android.tools.build.bundletool.model.AndroidManifest.TARGET_SD
 import static com.android.tools.build.bundletool.model.AndroidManifest.THEME_ATTRIBUTE_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.THEME_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.VALUE_RESOURCE_ID;
+import static com.android.tools.build.bundletool.model.AndroidManifest.VERSION_CODE_MAJOR_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.VERSION_CODE_RESOURCE_ID;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifest;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withCustomThemeActivity;
@@ -417,6 +418,63 @@ public class ManifestEditorTest {
         .containsExactly(
             xmlDecimalIntegerAttribute(
                 ANDROID_NAMESPACE_URI, "versionCode", VERSION_CODE_RESOURCE_ID, 123));
+  }
+
+  @Test
+  public void setLongVersionCode() {
+    AndroidManifest androidManifest =
+        AndroidManifest.create(xmlNode(xmlElement("manifest", xmlNode(xmlElement("application")))));
+    AndroidManifest editedManifest =
+        androidManifest.toEditor().setLongVersionCode(0x12300000234L).save();
+
+    XmlNode manifestRoot = editedManifest.getManifestRoot().getProto();
+    assertThat(manifestRoot.hasElement()).isTrue();
+    XmlElement manifestElement = manifestRoot.getElement();
+    assertThat(manifestElement.getName()).isEqualTo("manifest");
+    assertThat(manifestElement.getAttributeList())
+        .containsExactly(
+            xmlDecimalIntegerAttribute(
+                ANDROID_NAMESPACE_URI, "versionCode", VERSION_CODE_RESOURCE_ID, 0x234),
+            xmlDecimalIntegerAttribute(
+                ANDROID_NAMESPACE_URI, "versionCodeMajor", VERSION_CODE_MAJOR_RESOURCE_ID, 0x123));
+  }
+
+  @Test
+  public void setLongVersionCode_fitsIn32Bits_versionCodeMajorNotSet() {
+    AndroidManifest androidManifest =
+        AndroidManifest.create(xmlNode(xmlElement("manifest", xmlNode(xmlElement("application")))));
+    AndroidManifest editedManifest = androidManifest.toEditor().setLongVersionCode(123).save();
+
+    XmlNode manifestRoot = editedManifest.getManifestRoot().getProto();
+    assertThat(manifestRoot.hasElement()).isTrue();
+    XmlElement manifestElement = manifestRoot.getElement();
+    assertThat(manifestElement.getName()).isEqualTo("manifest");
+    assertThat(manifestElement.getAttributeList())
+        .containsExactly(
+            xmlDecimalIntegerAttribute(
+                ANDROID_NAMESPACE_URI, "versionCode", VERSION_CODE_RESOURCE_ID, 123));
+  }
+
+  @Test
+  public void setLongVersionCode_fitsIn32Bits_highBitTrue() {
+    AndroidManifest androidManifest =
+        AndroidManifest.create(xmlNode(xmlElement("manifest", xmlNode(xmlElement("application")))));
+    AndroidManifest editedManifest =
+        androidManifest.toEditor().setLongVersionCode(0xff112233ff445566L).save();
+
+    XmlNode manifestRoot = editedManifest.getManifestRoot().getProto();
+    assertThat(manifestRoot.hasElement()).isTrue();
+    XmlElement manifestElement = manifestRoot.getElement();
+    assertThat(manifestElement.getName()).isEqualTo("manifest");
+    assertThat(manifestElement.getAttributeList())
+        .containsExactly(
+            xmlDecimalIntegerAttribute(
+                ANDROID_NAMESPACE_URI, "versionCode", VERSION_CODE_RESOURCE_ID, 0xff445566),
+            xmlDecimalIntegerAttribute(
+                ANDROID_NAMESPACE_URI,
+                "versionCodeMajor",
+                VERSION_CODE_MAJOR_RESOURCE_ID,
+                0xff112233));
   }
 
   @Test

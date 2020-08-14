@@ -25,39 +25,29 @@ import com.android.bundle.Commands.SplitApkMetadata;
 import com.android.bundle.Commands.StandaloneApkMetadata;
 import com.android.bundle.Commands.SystemApkMetadata;
 import com.android.bundle.Commands.SystemApkMetadata.SystemApkType;
-import com.android.bundle.Config.Compression;
 import com.android.bundle.Files.NativeLibraries;
 import com.android.bundle.Files.TargetedNativeDirectory;
 import com.android.bundle.Targeting.Abi;
 import com.android.bundle.Targeting.NativeDirectoryTargeting;
-import com.android.tools.build.bundletool.model.Aapt2Command;
 import com.android.tools.build.bundletool.model.ModuleSplit;
-import com.android.tools.build.bundletool.model.SigningConfiguration;
 import com.android.tools.build.bundletool.model.ZipPath;
 import com.android.tools.build.bundletool.model.targeting.TargetingGenerator;
-import com.android.tools.build.bundletool.model.version.Version;
 import com.android.tools.build.bundletool.splitters.AbiPlaceholderInjector;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import java.nio.file.Path;
 import java.util.Collection;
-import java.util.Optional;
+import javax.inject.Inject;
 
 /** Serializes standalone APKs to disk. */
 public class StandaloneApkSerializer {
 
   private final ApkSerializerHelper apkSerializerHelper;
 
-  public StandaloneApkSerializer(
-      Aapt2Command aapt2Command,
-      Optional<SigningConfiguration> signingConfig,
-      Optional<SigningConfiguration> stampSigningConfig,
-      Version bundleVersion,
-      Compression compression) {
-    this.apkSerializerHelper =
-        new ApkSerializerHelper(
-            aapt2Command, signingConfig, stampSigningConfig, bundleVersion, compression);
+  @Inject
+  public StandaloneApkSerializer(ApkSerializerHelper apkSerializerHelper) {
+    this.apkSerializerHelper = apkSerializerHelper;
   }
 
   public ApkDescription writeToDisk(

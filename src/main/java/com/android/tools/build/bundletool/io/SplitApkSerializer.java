@@ -21,30 +21,20 @@ import static java.nio.file.Files.isDirectory;
 
 import com.android.bundle.Commands.ApkDescription;
 import com.android.bundle.Commands.SplitApkMetadata;
-import com.android.bundle.Config.Compression;
-import com.android.tools.build.bundletool.model.Aapt2Command;
 import com.android.tools.build.bundletool.model.ModuleSplit;
-import com.android.tools.build.bundletool.model.SigningConfiguration;
 import com.android.tools.build.bundletool.model.ZipPath;
-import com.android.tools.build.bundletool.model.version.Version;
 import java.nio.file.Path;
-import java.util.Optional;
 import java.util.function.BiFunction;
+import javax.inject.Inject;
 
 /** Serializes split APKs on disk. */
 public class SplitApkSerializer {
 
   private final ApkSerializerHelper apkSerializerHelper;
 
-  public SplitApkSerializer(
-      Aapt2Command aapt2Command,
-      Optional<SigningConfiguration> signingConfig,
-      Optional<SigningConfiguration> stampSigningConfig,
-      Version bundleVersion,
-      Compression compression) {
-    this.apkSerializerHelper =
-        new ApkSerializerHelper(
-            aapt2Command, signingConfig, stampSigningConfig, bundleVersion, compression);
+  @Inject
+  public SplitApkSerializer(ApkSerializerHelper apkSerializerHelper) {
+    this.apkSerializerHelper = apkSerializerHelper;
   }
 
   /** Writes the installable split to disk. */

@@ -20,9 +20,11 @@ import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.ImmutableMap.toImmutableMap;
 import static com.google.common.collect.ImmutableSet.toImmutableSet;
+import static com.google.common.collect.MoreCollectors.onlyElement;
 import static java.util.function.Function.identity;
 
 import com.android.bundle.Config.BundleConfig;
+import com.android.bundle.Config.BundleConfig.BundleType;
 import com.android.bundle.Files.TargetedNativeDirectory;
 import com.android.bundle.Targeting.Abi;
 import com.android.bundle.Targeting.NativeDirectoryTargeting;
@@ -126,6 +128,16 @@ public abstract class AppBundle {
     return getModule(BundleModuleName.BASE_MODULE_NAME);
   }
 
+  public String getPackageName() {
+    if (isAssetOnly()) {
+      return getModules().values().stream()
+          .map(module -> module.getAndroidManifest().getPackageName())
+          .distinct()
+          .collect(onlyElement());
+    }
+    return getBaseModule().getAndroidManifest().getPackageName();
+  }
+
   public BundleModule getModule(BundleModuleName moduleName) {
     BundleModule module = getModules().get(moduleName);
     checkState(module != null, "Module '%s' not found.", moduleName);
@@ -196,7 +208,11 @@ public abstract class AppBundle {
   }
 
   public boolean isApex() {
-    return getBaseModule().getApexConfig().isPresent();
+    return !isAssetOnly() && getBaseModule().getApexConfig().isPresent();
+  }
+
+  public boolean isAssetOnly() {
+    return getBundleConfig().getType().equals(BundleType.ASSET_ONLY);
   }
 
   public abstract Builder toBuilder();
@@ -224,19 +240,12 @@ public abstract class AppBundle {
           moduleBuilders.computeIfAbsent(
               moduleName.get(),
               name -> BundleModule.builder().setName(name).setBundleConfig(bundleConfig));
-      try {
-        moduleBuilder.addEntry(
-            ModuleEntry.builder()
-                .setPath(ZipUtils.convertBundleToModulePath(ZipPath.create(entry.getName())))
-                .setContent(ZipUtils.asByteSource(bundleFile, entry))
-                .build());
-      } catch (IOException e) {
-        throw new UncheckedIOException(
-            String.format(
-                "Error processing zip entry '%s' of module '%s'.",
-                entry.getName(), moduleName.get()),
-            e);
-      }
+
+      moduleBuilder.addEntry(
+          ModuleEntry.builder()
+              .setPath(ZipUtils.convertBundleToModulePath(ZipPath.create(entry.getName())))
+              .setContent(ZipUtils.asByteSource(bundleFile, entry))
+              .build());
     }
     return moduleBuilders.values().stream()
         .map(module -> module.build())
@@ -279,8 +288,7 @@ public abstract class AppBundle {
   }
 
   @CheckReturnValue
-  private static ImmutableList<BundleModule> sanitize(
-      ImmutableList<BundleModule> modules) {
+  private static ImmutableList<BundleModule> sanitize(ImmutableList<BundleModule> modules) {
     // This is a temporary fix to work around a bug in gradle that creates a file named classes1.dex
     modules =
         modules.stream().map(new ClassesDexNameSanitizer()::sanitize).collect(toImmutableList());

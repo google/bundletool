@@ -32,7 +32,6 @@ import com.android.tools.build.bundletool.model.utils.xmlproto.XmlProtoNode;
 import com.android.tools.build.bundletool.model.utils.xmlproto.XmlProtoNodeBuilder;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.io.ByteSource;
-import java.io.IOException;
 
 /** Builder to build a {@link BundleModule}. */
 public class BundleModuleBuilder {
@@ -93,7 +92,7 @@ public class BundleModuleBuilder {
     return this;
   }
 
-  public BundleModule build() throws IOException {
+  public BundleModule build() {
     if (androidManifest != null) {
       XmlProtoNodeBuilder manifestBuilder = new XmlProtoNode(androidManifest).toBuilder();
       boolean hasCode =

@@ -21,9 +21,10 @@ import static com.google.common.collect.ImmutableList.toImmutableList;
 
 import com.android.tools.build.bundletool.model.AppBundle;
 import com.android.tools.build.bundletool.model.BundleModule;
+import com.android.tools.build.bundletool.model.BundleModule.ModuleDeliveryType;
 import com.android.tools.build.bundletool.model.ModuleSplit;
-import com.android.tools.build.bundletool.model.exceptions.InvalidVersionCodeException;
 import com.google.common.collect.ImmutableList;
+import java.util.Optional;
 
 /**
  * Generates asset slices from asset modules.
@@ -34,37 +35,57 @@ public class AssetSlicesGenerator {
 
   private final AppBundle appBundle;
   private final ApkGenerationConfiguration apkGenerationConfiguration;
+  private final Optional<Long> assetModulesVersionOverride;
 
   public AssetSlicesGenerator(
-      AppBundle appBundle, ApkGenerationConfiguration apkGenerationConfiguration) {
+      AppBundle appBundle,
+      ApkGenerationConfiguration apkGenerationConfiguration,
+      Optional<Long> assetModulesVersionOverride) {
     this.appBundle = checkNotNull(appBundle);
     this.apkGenerationConfiguration = checkNotNull(apkGenerationConfiguration);
+    this.assetModulesVersionOverride = assetModulesVersionOverride;
   }
 
   public ImmutableList<ModuleSplit> generateAssetSlices() {
     ImmutableList.Builder<ModuleSplit> splits = ImmutableList.builder();
-    int versionCode =
-        appBundle
-            .getBaseModule()
-            .getAndroidManifest()
-            .getVersionCode()
-            .orElseThrow(InvalidVersionCodeException::createMissingVersionCodeException);
+    Optional<Long> appVersionCode =
+        appBundle.isAssetOnly()
+            ? Optional.empty()
+            : Optional.of(
+                (long) appBundle.getBaseModule().getAndroidManifest().getVersionCode().get());
+    Optional<Long> nonUpfrontAssetModulesVersionCode =
+        assetModulesVersionOverride.isPresent() ? assetModulesVersionOverride : appVersionCode;
 
     for (BundleModule module : appBundle.getAssetModules().values()) {
       AssetModuleSplitter moduleSplitter =
           new AssetModuleSplitter(module, apkGenerationConfiguration);
       splits.addAll(
           moduleSplitter.splitModule().stream()
-              .map(split -> addVersionCode(split, versionCode))
+              .map(
+                  split ->
+                      addVersionCode(
+                          split,
+                          // Install-time assets module don't support separate versioning and
+                          // reuse app's version code.
+                          module.getDeliveryType().equals(ModuleDeliveryType.NO_INITIAL_INSTALL)
+                              ? nonUpfrontAssetModulesVersionCode
+                              : appVersionCode))
               .collect(toImmutableList()));
     }
     return splits.build();
   }
 
-  public static ModuleSplit addVersionCode(ModuleSplit moduleSplit, int versionCode) {
+  private static ModuleSplit addVersionCode(ModuleSplit moduleSplit, Optional<Long> versionCode) {
+    if (!versionCode.isPresent()) {
+      return moduleSplit;
+    }
     return moduleSplit.toBuilder()
         .setAndroidManifest(
-            moduleSplit.getAndroidManifest().toEditor().setVersionCode(versionCode).save())
+            moduleSplit
+                .getAndroidManifest()
+                .toEditor()
+                .setLongVersionCode(versionCode.get())
+                .save())
         .build();
   }
 }

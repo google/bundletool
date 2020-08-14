@@ -128,7 +128,8 @@ public final class DeviceSpecUtils {
     }
 
     DeviceSpecFromTargetingBuilder setSupportedLocales(LanguageTargeting languageTargeting) {
-      if (!languageTargeting.equals(LanguageTargeting.getDefaultInstance())) {
+      if (!languageTargeting.equals(LanguageTargeting.getDefaultInstance())
+          && languageTargeting.getValueCount() > 0) {
         deviceSpec.addSupportedLocales(Iterables.getOnlyElement(languageTargeting.getValueList()));
       }
       return this;

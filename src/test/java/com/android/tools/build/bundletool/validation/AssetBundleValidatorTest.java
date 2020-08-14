@@ -18,6 +18,8 @@ package com.android.tools.build.bundletool.validation;
 
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifest;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifestForAssetModule;
+import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withInstallTimeDelivery;
+import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withOnDemandDelivery;
 import static com.google.common.truth.Truth.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
@@ -49,7 +51,8 @@ public class AssetBundleValidatorTest {
   public void validateAllModules_assetOnlyWithBase_throws() throws Exception {
     ImmutableList<BundleModule> allModules =
         ImmutableList.of(
-            assetOnlyModule("asset", androidManifestForAssetModule(PKG_NAME)),
+            assetOnlyModule(
+                "asset", androidManifestForAssetModule(PKG_NAME, withOnDemandDelivery())),
             assetOnlyModule("base", androidManifest(PKG_NAME)));
 
     InvalidBundleException exception =
@@ -59,6 +62,22 @@ public class AssetBundleValidatorTest {
     assertThat(exception)
         .hasMessageThat()
         .contains("Asset only bundle contains a module that is not an asset module");
+  }
+
+  @Test
+  public void validateAllModules_assetOnlyWithInstallTime_throws() throws Exception {
+    ImmutableList<BundleModule> allModules =
+        ImmutableList.of(
+            assetOnlyModule(
+                "asset", androidManifestForAssetModule(PKG_NAME, withInstallTimeDelivery())));
+
+    InvalidBundleException exception =
+        assertThrows(
+            InvalidBundleException.class,
+            () -> new AssetBundleValidator().validateAllModules(allModules));
+    assertThat(exception)
+        .hasMessageThat()
+        .contains("Asset-only bundle contains an install-time asset module");
   }
 
   private static BundleModule assetOnlyModule(String moduleName, XmlNode manifest)

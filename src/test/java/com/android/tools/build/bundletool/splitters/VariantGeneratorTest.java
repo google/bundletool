@@ -18,6 +18,7 @@ package com.android.tools.build.bundletool.splitters;
 
 import static com.android.tools.build.bundletool.model.utils.Versions.ANDROID_M_API_VERSION;
 import static com.android.tools.build.bundletool.model.utils.Versions.ANDROID_Q_API_VERSION;
+import static com.android.tools.build.bundletool.model.utils.Versions.ANDROID_R_API_VERSION;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifest;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withMaxSdkVersion;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withMinSdkVersion;
@@ -54,7 +55,7 @@ public class VariantGeneratorTest {
     CommandExecutionException exception =
         assertThrows(
             CommandExecutionException.class,
-            () -> new VariantGenerator(bundleModule).generateVariants());
+            () -> new VariantGenerator().generateVariants(bundleModule));
 
     assertThat(exception)
         .hasMessageThat()
@@ -63,51 +64,51 @@ public class VariantGeneratorTest {
 
   @Test
   public void variantsWithNativeLibsDexFiles_allOptimizationsDisabled() throws Exception {
-    VariantGenerator variantGenerator = new VariantGenerator(createSingleLibraryDexModule());
+    VariantGenerator variantGenerator = new VariantGenerator();
 
-    ImmutableCollection<VariantTargeting> splits = variantGenerator.generateVariants();
+    ImmutableCollection<VariantTargeting> splits =
+        variantGenerator.generateVariants(createSingleLibraryDexModule());
     assertThat(splits).containsExactly(lPlusVariantTargeting());
   }
 
   @Test
   public void variantsWithNativeLibsDexFiles_withNativeLibsOptimization() throws Exception {
 
-    VariantGenerator variantGenerator =
-        new VariantGenerator(
+    VariantGenerator variantGenerator = new VariantGenerator();
+
+    ImmutableCollection<VariantTargeting> splits =
+        variantGenerator.generateVariants(
             createSingleLibraryDexModule(),
             ApkGenerationConfiguration.builder()
                 .setEnableNativeLibraryCompressionSplitter(true)
                 .build());
-
-    ImmutableCollection<VariantTargeting> splits = variantGenerator.generateVariants();
     assertThat(splits)
         .containsExactly(lPlusVariantTargeting(), variantMinSdkTargeting(ANDROID_M_API_VERSION));
   }
 
   @Test
   public void variantsWithNativeLibsDexFiles_withDexOptimization() throws Exception {
-    VariantGenerator variantGenerator =
-        new VariantGenerator(
+    VariantGenerator variantGenerator = new VariantGenerator();
+
+    ImmutableCollection<VariantTargeting> splits =
+        variantGenerator.generateVariants(
             createSingleLibraryDexModule(),
             ApkGenerationConfiguration.builder().setEnableDexCompressionSplitter(true).build());
-
-    ImmutableCollection<VariantTargeting> splits = variantGenerator.generateVariants();
     assertThat(splits)
         .containsExactly(lPlusVariantTargeting(), variantMinSdkTargeting(ANDROID_Q_API_VERSION));
   }
 
   @Test
   public void variantsWithNativeLibsDexFiles_withNativeLibsAndDexOptimization() throws Exception {
+    VariantGenerator variantGenerator = new VariantGenerator();
 
-    VariantGenerator variantGenerator =
-        new VariantGenerator(
+    ImmutableCollection<VariantTargeting> splits =
+        variantGenerator.generateVariants(
             createSingleLibraryDexModule(),
             ApkGenerationConfiguration.builder()
                 .setEnableDexCompressionSplitter(true)
                 .setEnableNativeLibraryCompressionSplitter(true)
                 .build());
-
-    ImmutableCollection<VariantTargeting> splits = variantGenerator.generateVariants();
     assertThat(splits)
         .containsExactly(
             lPlusVariantTargeting(),
@@ -117,16 +118,15 @@ public class VariantGeneratorTest {
 
   @Test
   public void variantsWithAllOptimizations_minSdkAffectsLPlusVariant() throws Exception {
+    VariantGenerator variantGenerator = new VariantGenerator();
 
-    VariantGenerator variantGenerator =
-        new VariantGenerator(
+    ImmutableCollection<VariantTargeting> splits =
+        variantGenerator.generateVariants(
             createSingleLibraryDexModuleMinSdk(22),
             ApkGenerationConfiguration.builder()
                 .setEnableDexCompressionSplitter(true)
                 .setEnableNativeLibraryCompressionSplitter(true)
                 .build());
-
-    ImmutableCollection<VariantTargeting> splits = variantGenerator.generateVariants();
     assertThat(splits)
         .containsExactly(
             variantMinSdkTargeting(22),
@@ -136,16 +136,15 @@ public class VariantGeneratorTest {
 
   @Test
   public void variantsWithAllOptimizations_minSdkRemovesLPlusVariant() throws Exception {
+    VariantGenerator variantGenerator = new VariantGenerator();
 
-    VariantGenerator variantGenerator =
-        new VariantGenerator(
+    ImmutableCollection<VariantTargeting> splits =
+        variantGenerator.generateVariants(
             createSingleLibraryDexModuleMinSdk(ANDROID_M_API_VERSION),
             ApkGenerationConfiguration.builder()
                 .setEnableDexCompressionSplitter(true)
                 .setEnableNativeLibraryCompressionSplitter(true)
                 .build());
-
-    ImmutableCollection<VariantTargeting> splits = variantGenerator.generateVariants();
     assertThat(splits)
         .containsExactly(
             variantMinSdkTargeting(ANDROID_M_API_VERSION),
@@ -154,31 +153,31 @@ public class VariantGeneratorTest {
 
   @Test
   public void variantsWithAllOptimizations_maxSdkRemovesDexVariant() throws Exception {
-    VariantGenerator variantGenerator =
-        new VariantGenerator(
+    VariantGenerator variantGenerator = new VariantGenerator();
+
+    ImmutableCollection<VariantTargeting> splits =
+        variantGenerator.generateVariants(
             createSingleLibraryDexModuleMaxSdk(ANDROID_Q_API_VERSION - 1),
             ApkGenerationConfiguration.builder()
                 .setEnableDexCompressionSplitter(true)
                 .setEnableNativeLibraryCompressionSplitter(true)
                 .build());
-
-    ImmutableCollection<VariantTargeting> splits = variantGenerator.generateVariants();
     assertThat(splits)
         .containsExactly(lPlusVariantTargeting(), variantMinSdkTargeting(ANDROID_M_API_VERSION));
   }
 
   @Test
   public void variantsWithAllOptimizations_sdkRangeCropsVariants() throws Exception {
-    VariantGenerator variantGenerator =
-        new VariantGenerator(
+    VariantGenerator variantGenerator = new VariantGenerator();
+
+    ImmutableCollection<VariantTargeting> splits =
+        variantGenerator.generateVariants(
             createSingleLibraryDexModuleSdkRange(
                 ANDROID_M_API_VERSION - 1, ANDROID_M_API_VERSION + 1),
             ApkGenerationConfiguration.builder()
                 .setEnableDexCompressionSplitter(true)
                 .setEnableNativeLibraryCompressionSplitter(true)
                 .build());
-
-    ImmutableCollection<VariantTargeting> splits = variantGenerator.generateVariants();
     assertThat(splits)
         .containsExactly(
             variantMinSdkTargeting(ANDROID_M_API_VERSION - 1),
@@ -189,29 +188,74 @@ public class VariantGeneratorTest {
   public void variantsWithNativeLibsDexFiles_withInstantModule_allOptimizationsDisabled()
       throws Exception {
 
-    VariantGenerator variantGenerator =
-        new VariantGenerator(
+    VariantGenerator variantGenerator = new VariantGenerator();
+
+    ImmutableCollection<VariantTargeting> splits =
+        variantGenerator.generateVariants(
             createSingleLibraryDexModule(),
             ApkGenerationConfiguration.builder().setForInstantAppVariants(true).build());
-
-    ImmutableCollection<VariantTargeting> splits = variantGenerator.generateVariants();
     assertThat(splits).containsExactly(lPlusVariantTargeting());
   }
 
   @Test
   public void variantsWithNativeLibsDexFiles_withInstantModule_withNativeLibsAndDexOptimization()
       throws Exception {
+    VariantGenerator variantGenerator = new VariantGenerator();
 
-    VariantGenerator variantGenerator =
-        new VariantGenerator(
+    ImmutableCollection<VariantTargeting> splits =
+        variantGenerator.generateVariants(
             createSingleLibraryDexModule(),
             ApkGenerationConfiguration.builder()
                 .setForInstantAppVariants(true)
                 .setEnableDexCompressionSplitter(true)
                 .setEnableNativeLibraryCompressionSplitter(true)
                 .build());
+    assertThat(splits).containsExactly(lPlusVariantTargeting());
+  }
 
-    ImmutableCollection<VariantTargeting> splits = variantGenerator.generateVariants();
+  @Test
+  public void variantsWithV3SigningRestrictedToRPlus() throws Exception {
+    BundleModule bundleModule =
+        new BundleModuleBuilder("testModule").setManifest(androidManifest("com.test.app")).build();
+
+    VariantGenerator variantGenerator = new VariantGenerator();
+    ImmutableCollection<VariantTargeting> splits =
+        variantGenerator.generateVariants(
+            bundleModule,
+            ApkGenerationConfiguration.builder().setRestrictV3SigningToRPlus(true).build());
+    assertThat(splits)
+        .containsExactly(lPlusVariantTargeting(), variantMinSdkTargeting(ANDROID_R_API_VERSION));
+  }
+
+  @Test
+  public void variantsWithV3SigningRestrictedToRPlus_minSdkAffectsRPlusVariant() throws Exception {
+    BundleModule bundleModule =
+        new BundleModuleBuilder("testModule")
+            .setManifest(
+                androidManifest("com.test.app", withMinSdkVersion(ANDROID_R_API_VERSION + 1)))
+            .build();
+
+    VariantGenerator variantGenerator = new VariantGenerator();
+    ImmutableCollection<VariantTargeting> splits =
+        variantGenerator.generateVariants(
+            bundleModule,
+            ApkGenerationConfiguration.builder().setRestrictV3SigningToRPlus(true).build());
+    assertThat(splits).containsExactly(variantMinSdkTargeting(ANDROID_R_API_VERSION + 1));
+  }
+
+  @Test
+  public void variantsWithV3SigningRestrictedToRPlus_maxSdkRemovesRPlusVariant() throws Exception {
+    BundleModule bundleModule =
+        new BundleModuleBuilder("testModule")
+            .setManifest(
+                androidManifest("com.test.app", withMaxSdkVersion(ANDROID_R_API_VERSION - 1)))
+            .build();
+
+    VariantGenerator variantGenerator = new VariantGenerator();
+    ImmutableCollection<VariantTargeting> splits =
+        variantGenerator.generateVariants(
+            bundleModule,
+            ApkGenerationConfiguration.builder().setRestrictV3SigningToRPlus(true).build());
     assertThat(splits).containsExactly(lPlusVariantTargeting());
   }
 

@@ -69,6 +69,7 @@ import com.android.bundle.Files.TargetedAssetsDirectory;
 import com.android.bundle.Targeting.ApkTargeting;
 import com.android.bundle.Targeting.ScreenDensity.DensityAlias;
 import com.android.tools.build.bundletool.TestData;
+import com.android.tools.build.bundletool.io.TempDirectory;
 import com.android.tools.build.bundletool.model.AndroidManifest;
 import com.android.tools.build.bundletool.model.BundleMetadata;
 import com.android.tools.build.bundletool.model.BundleModuleName;
@@ -113,13 +114,13 @@ public class ModuleSplitsToShardMergerTest {
   private static final BundleMetadata NO_MAIN_DEX_LIST = BundleMetadata.builder().build();
 
   @Rule public TemporaryFolder tmp = new TemporaryFolder();
-  private Path tmpDir;
+  private TempDirectory tmpDir;
 
   private final DexMerger d8DexMerger = new D8DexMerger();
 
   @Before
   public void setUp() {
-    tmpDir = tmp.getRoot().toPath();
+    tmpDir = new TempDirectory();
   }
 
   @Test
@@ -134,7 +135,7 @@ public class ModuleSplitsToShardMergerTest {
             .build();
 
     ImmutableList<ModuleSplit> shards =
-        new ModuleSplitsToShardMerger(d8DexMerger, getCurrentVersion(), tmpDir)
+        new ModuleSplitsToShardMerger(getCurrentVersion(), tmpDir, d8DexMerger)
             .merge(ImmutableList.of(ImmutableList.of(masterSplit, x86Split)), NO_MAIN_DEX_LIST);
 
     ModuleSplit shard = getOnlyElement(shards);
@@ -161,7 +162,7 @@ public class ModuleSplitsToShardMergerTest {
             .build();
 
     ImmutableList<ModuleSplit> shards =
-        new ModuleSplitsToShardMerger(d8DexMerger, getCurrentVersion(), tmpDir)
+        new ModuleSplitsToShardMerger(getCurrentVersion(), tmpDir, d8DexMerger)
             .merge(
                 ImmutableList.of(
                     ImmutableList.of(masterSplit, x86Split),
@@ -205,7 +206,7 @@ public class ModuleSplitsToShardMergerTest {
             .build();
 
     ShardedSystemSplits shards =
-        new ModuleSplitsToShardMerger(d8DexMerger, getCurrentVersion(), tmpDir)
+        new ModuleSplitsToShardMerger(getCurrentVersion(), tmpDir, d8DexMerger)
             .mergeSystemShard(
                 ImmutableList.of(masterSplit, x86Split, esSplit, frSplit),
                 ImmutableSet.of(BundleModuleName.create("base")),
@@ -284,7 +285,7 @@ public class ModuleSplitsToShardMergerTest {
             .build();
 
     ShardedSystemSplits shards =
-        new ModuleSplitsToShardMerger(d8DexMerger, getCurrentVersion(), tmpDir)
+        new ModuleSplitsToShardMerger(getCurrentVersion(), tmpDir, d8DexMerger)
             .mergeSystemShard(
                 ImmutableList.of(masterSplit, esSplit, frSplit, esVrSplit, frVrSplit, itVrSplit),
                 ImmutableSet.of(BundleModuleName.create("base"), BundleModuleName.create("vr")),
@@ -328,7 +329,7 @@ public class ModuleSplitsToShardMergerTest {
             .build();
 
     ModuleSplit merged =
-        new ModuleSplitsToShardMerger(d8DexMerger, getCurrentVersion(), tmpDir)
+        new ModuleSplitsToShardMerger(getCurrentVersion(), tmpDir, d8DexMerger)
             .mergeSingleShard(
                 ImmutableList.of(baseModuleSplit, featureModuleSplit),
                 NO_MAIN_DEX_LIST,
@@ -371,7 +372,7 @@ public class ModuleSplitsToShardMergerTest {
             .build();
 
     ModuleSplit merged =
-        new ModuleSplitsToShardMerger(d8DexMerger, getCurrentVersion(), tmpDir)
+        new ModuleSplitsToShardMerger(getCurrentVersion(), tmpDir, d8DexMerger)
             .mergeSingleShard(
                 ImmutableList.of(baseModuleSplit, featureModuleSplit),
                 NO_MAIN_DEX_LIST,
@@ -424,7 +425,7 @@ public class ModuleSplitsToShardMergerTest {
             .build();
 
     ModuleSplit merged =
-        new ModuleSplitsToShardMerger(d8DexMerger, getCurrentVersion(), tmpDir)
+        new ModuleSplitsToShardMerger(getCurrentVersion(), tmpDir, d8DexMerger)
             .mergeSingleShard(
                 ImmutableList.of(baseModuleSplit, featureModuleSplit),
                 NO_MAIN_DEX_LIST,
@@ -474,7 +475,7 @@ public class ModuleSplitsToShardMergerTest {
         assertThrows(
             IllegalStateException.class,
             () ->
-                new ModuleSplitsToShardMerger(d8DexMerger, getCurrentVersion(), tmpDir)
+                new ModuleSplitsToShardMerger(getCurrentVersion(), tmpDir, d8DexMerger)
                     .mergeSingleShard(
                         ImmutableList.of(split1, split2), NO_MAIN_DEX_LIST, createCache()));
 
@@ -498,7 +499,7 @@ public class ModuleSplitsToShardMergerTest {
         createModuleSplitBuilder().setModuleName(BundleModuleName.create("feature")).build();
 
     ModuleSplit merged =
-        new ModuleSplitsToShardMerger(d8DexMerger, getCurrentVersion(), tmpDir)
+        new ModuleSplitsToShardMerger(getCurrentVersion(), tmpDir, d8DexMerger)
             .mergeSingleShard(
                 ImmutableList.of(baseSplit, featureSplit), NO_MAIN_DEX_LIST, dexMergingCache);
 
@@ -528,7 +529,7 @@ public class ModuleSplitsToShardMergerTest {
             .build();
 
     ModuleSplit merged =
-        new ModuleSplitsToShardMerger(d8DexMerger, getCurrentVersion(), tmpDir)
+        new ModuleSplitsToShardMerger(getCurrentVersion(), tmpDir, d8DexMerger)
             .mergeSingleShard(
                 ImmutableList.of(baseSplit, featureSplit), NO_MAIN_DEX_LIST, dexMergingCache);
 
@@ -543,7 +544,8 @@ public class ModuleSplitsToShardMergerTest {
     ImmutableSet<ModuleEntry> cacheKey = getOnlyElement(dexMergingCache.keySet());
     assertThat(cacheKey).containsExactly(dexEntry1, dexEntry2);
     ImmutableList<Path> cacheValue = getOnlyElement(dexMergingCache.values());
-    assertThat(cacheValue.stream().allMatch(cachedFile -> cachedFile.startsWith(tmpDir))).isTrue();
+    assertThat(cacheValue.stream().allMatch(cachedFile -> cachedFile.startsWith(tmpDir.getPath())))
+        .isTrue();
   }
 
   @Test
@@ -567,7 +569,7 @@ public class ModuleSplitsToShardMergerTest {
             .build();
 
     ModuleSplit merged =
-        new ModuleSplitsToShardMerger(d8DexMerger, getCurrentVersion(), tmpDir)
+        new ModuleSplitsToShardMerger(getCurrentVersion(), tmpDir, d8DexMerger)
             .mergeSingleShard(
                 ImmutableList.of(baseSplit, featureSplit), NO_MAIN_DEX_LIST, dexMergingCache);
 
@@ -601,7 +603,7 @@ public class ModuleSplitsToShardMergerTest {
             .build();
 
     ModuleSplit merged =
-        new ModuleSplitsToShardMerger(d8DexMerger, getCurrentVersion(), tmpDir)
+        new ModuleSplitsToShardMerger(getCurrentVersion(), tmpDir, d8DexMerger)
             .mergeSingleShard(
                 ImmutableList.of(baseSplit, featureSplit), NO_MAIN_DEX_LIST, dexMergingCache);
 
@@ -630,7 +632,7 @@ public class ModuleSplitsToShardMergerTest {
             .build();
 
     ModuleSplit merged =
-        new ModuleSplitsToShardMerger(d8DexMerger, getCurrentVersion(), tmpDir)
+        new ModuleSplitsToShardMerger(getCurrentVersion(), tmpDir, d8DexMerger)
             .mergeSingleShard(ImmutableList.of(split1, split2), NO_MAIN_DEX_LIST, createCache());
 
     assertThat(merged.getApkTargeting())
@@ -659,7 +661,7 @@ public class ModuleSplitsToShardMergerTest {
             .build();
 
     ModuleSplit merged =
-        new ModuleSplitsToShardMerger(d8DexMerger, getCurrentVersion(), tmpDir)
+        new ModuleSplitsToShardMerger(getCurrentVersion(), tmpDir, d8DexMerger)
             .mergeSingleShard(
                 ImmutableList.of(split1, split2, split3), NO_MAIN_DEX_LIST, createCache());
 
@@ -695,7 +697,7 @@ public class ModuleSplitsToShardMergerTest {
             .build();
 
     ModuleSplit merged =
-        new ModuleSplitsToShardMerger(d8DexMerger, getCurrentVersion(), tmpDir)
+        new ModuleSplitsToShardMerger(getCurrentVersion(), tmpDir, d8DexMerger)
             .mergeSingleShard(
                 ImmutableList.of(splitStrings, splitDrawables), NO_MAIN_DEX_LIST, createCache());
 
@@ -730,7 +732,7 @@ public class ModuleSplitsToShardMergerTest {
             .build();
 
     ModuleSplit shard =
-        new ModuleSplitsToShardMerger(d8DexMerger, getCurrentVersion(), tmpDir)
+        new ModuleSplitsToShardMerger(getCurrentVersion(), tmpDir, d8DexMerger)
             .mergeSingleShard(ImmutableList.of(split1, split2), NO_MAIN_DEX_LIST, createCache());
 
     assertThat(shard.getAndroidManifest().getPackageName()).isEqualTo("com.test.app1");
@@ -763,7 +765,7 @@ public class ModuleSplitsToShardMergerTest {
             .build();
 
     ModuleSplit shard =
-        new ModuleSplitsToShardMerger(d8DexMerger, Version.of("0.11.0"), tmpDir)
+        new ModuleSplitsToShardMerger(Version.of("0.11.0"), tmpDir, d8DexMerger)
             .mergeSingleShard(ImmutableList.of(split1, split2), NO_MAIN_DEX_LIST, createCache());
 
     assertThat(shard.getAndroidManifest().getPackageName()).isEqualTo("com.test.app1");
@@ -791,7 +793,7 @@ public class ModuleSplitsToShardMergerTest {
         assertThrows(
             CommandExecutionException.class,
             () ->
-                new ModuleSplitsToShardMerger(d8DexMerger, getCurrentVersion(), tmpDir)
+                new ModuleSplitsToShardMerger(getCurrentVersion(), tmpDir, d8DexMerger)
                     .mergeSingleShard(
                         ImmutableList.of(split1, split2), NO_MAIN_DEX_LIST, createCache()));
 
@@ -818,7 +820,7 @@ public class ModuleSplitsToShardMergerTest {
         assertThrows(
             CommandExecutionException.class,
             () ->
-                new ModuleSplitsToShardMerger(d8DexMerger, getCurrentVersion(), tmpDir)
+                new ModuleSplitsToShardMerger(getCurrentVersion(), tmpDir, d8DexMerger)
                     .mergeSingleShard(
                         ImmutableList.of(split1, split2), NO_MAIN_DEX_LIST, createCache()));
 
@@ -839,10 +841,10 @@ public class ModuleSplitsToShardMergerTest {
         createModuleSplitBuilder().setNativeConfig(NativeLibraries.getDefaultInstance()).build();
 
     // We don't care about the merged result, just that the merging succeeds.
-    new ModuleSplitsToShardMerger(d8DexMerger, getCurrentVersion(), tmpDir)
+    new ModuleSplitsToShardMerger(getCurrentVersion(), tmpDir, d8DexMerger)
         .mergeSingleShard(
             ImmutableList.of(splitNonDefault, splitDefault), NO_MAIN_DEX_LIST, createCache());
-    new ModuleSplitsToShardMerger(d8DexMerger, getCurrentVersion(), tmpDir)
+    new ModuleSplitsToShardMerger(getCurrentVersion(), tmpDir, d8DexMerger)
         .mergeSingleShard(
             ImmutableList.of(splitDefault, splitNonDefault), NO_MAIN_DEX_LIST, createCache());
   }
@@ -854,7 +856,7 @@ public class ModuleSplitsToShardMergerTest {
     ModuleSplit split2 =
         createModuleSplitBuilder().setModuleName(BundleModuleName.create("module2")).build();
 
-    new ModuleSplitsToShardMerger(d8DexMerger, getCurrentVersion(), tmpDir)
+    new ModuleSplitsToShardMerger(getCurrentVersion(), tmpDir, d8DexMerger)
         .mergeSingleShard(ImmutableList.of(split1, split2), NO_MAIN_DEX_LIST, createCache());
   }
 
@@ -863,7 +865,7 @@ public class ModuleSplitsToShardMergerTest {
     ModuleSplit split1 = createModuleSplitBuilder().setMasterSplit(true).build();
     ModuleSplit split2 = createModuleSplitBuilder().setMasterSplit(false).build();
 
-    new ModuleSplitsToShardMerger(d8DexMerger, getCurrentVersion(), tmpDir)
+    new ModuleSplitsToShardMerger(getCurrentVersion(), tmpDir, d8DexMerger)
         .mergeSingleShard(ImmutableList.of(split1, split2), NO_MAIN_DEX_LIST, createCache());
   }
 
@@ -875,7 +877,7 @@ public class ModuleSplitsToShardMergerTest {
         createModuleSplitBuilder().setModuleName(BundleModuleName.create("feature")).build();
 
     ModuleSplit merged =
-        new ModuleSplitsToShardMerger(d8DexMerger, getCurrentVersion(), tmpDir)
+        new ModuleSplitsToShardMerger(getCurrentVersion(), tmpDir, d8DexMerger)
             .mergeSingleShard(
                 ImmutableList.of(baseModuleSplit, featureModuleSplit),
                 NO_MAIN_DEX_LIST,
@@ -904,7 +906,7 @@ public class ModuleSplitsToShardMergerTest {
             .build();
     DexMerger spyDexMerger = Mockito.spy(d8DexMerger);
 
-    new ModuleSplitsToShardMerger(spyDexMerger, getCurrentVersion(), tmpDir)
+    new ModuleSplitsToShardMerger(getCurrentVersion(), tmpDir, spyDexMerger)
         .mergeSingleShard(
             ImmutableList.of(baseModuleSplit, featureModuleSplit), NO_MAIN_DEX_LIST, createCache());
 
@@ -932,7 +934,7 @@ public class ModuleSplitsToShardMergerTest {
             .build();
     DexMerger spyDexMerger = Mockito.spy(d8DexMerger);
 
-    new ModuleSplitsToShardMerger(spyDexMerger, getCurrentVersion(), tmpDir)
+    new ModuleSplitsToShardMerger(getCurrentVersion(), tmpDir, spyDexMerger)
         .mergeSingleShard(
             ImmutableList.of(baseModuleSplit, featureModuleSplit), NO_MAIN_DEX_LIST, createCache());
 
@@ -960,7 +962,7 @@ public class ModuleSplitsToShardMergerTest {
             .build();
     DexMerger spyDexMerger = Mockito.spy(d8DexMerger);
 
-    new ModuleSplitsToShardMerger(spyDexMerger, getCurrentVersion(), tmpDir)
+    new ModuleSplitsToShardMerger(getCurrentVersion(), tmpDir, spyDexMerger)
         .mergeSingleShard(
             ImmutableList.of(baseModuleSplit, featureModuleSplit), NO_MAIN_DEX_LIST, createCache());
 
@@ -982,7 +984,7 @@ public class ModuleSplitsToShardMergerTest {
             .build();
 
     ImmutableList<ModuleSplit> shards =
-        new ModuleSplitsToShardMerger(d8DexMerger, getCurrentVersion(), tmpDir)
+        new ModuleSplitsToShardMerger(getCurrentVersion(), tmpDir, d8DexMerger)
             .mergeApex(ImmutableList.of(ImmutableList.of(masterSplit, x86Split)));
 
     ModuleSplit x86Shard = getOnlyElement(shards);
@@ -1011,7 +1013,7 @@ public class ModuleSplitsToShardMergerTest {
             .build();
 
     ImmutableList<ModuleSplit> shards =
-        new ModuleSplitsToShardMerger(d8DexMerger, getCurrentVersion(), tmpDir)
+        new ModuleSplitsToShardMerger(getCurrentVersion(), tmpDir, d8DexMerger)
             .mergeApex(
                 ImmutableList.of(
                     ImmutableList.of(masterSplit, x86Split),
@@ -1058,7 +1060,7 @@ public class ModuleSplitsToShardMergerTest {
             .build();
 
     ImmutableList<ModuleSplit> shards =
-        new ModuleSplitsToShardMerger(d8DexMerger, getCurrentVersion(), tmpDir)
+        new ModuleSplitsToShardMerger(getCurrentVersion(), tmpDir, d8DexMerger)
             .mergeApex(
                 ImmutableList.of(
                     ImmutableList.of(masterSplit, doubleAbiSplit),

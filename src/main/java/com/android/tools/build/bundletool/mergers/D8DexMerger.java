@@ -32,12 +32,16 @@ import java.io.File;
 import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.Optional;
+import javax.inject.Inject;
 
 /** Merges dex files using D8. */
 public class D8DexMerger implements DexMerger {
 
   private static final String DEX_OVERFLOW_MSG =
       "Cannot fit requested classes in a single dex file";
+
+  @Inject
+  D8DexMerger() {}
 
   @Override
   public ImmutableList<Path> merge(

@@ -58,7 +58,7 @@ import com.android.bundle.Targeting.ModuleTargeting;
 import com.android.tools.build.bundletool.model.BundleModule.ModuleDeliveryType;
 import com.android.tools.build.bundletool.model.BundleModule.ModuleType;
 import com.android.tools.build.bundletool.testing.BundleConfigBuilder;
-import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.util.Arrays;
 import org.junit.Before;
 import org.junit.Test;
@@ -104,7 +104,7 @@ public class BundleModuleTest {
     byte[] badAssetsFile = new byte[] {'b', 'a', 'd'};
 
     assertThrows(
-        IOException.class,
+        UncheckedIOException.class,
         () ->
             createMinimalModuleBuilder()
                 .addEntry(createModuleEntryForFile("assets.pb", badAssetsFile)));
@@ -137,7 +137,7 @@ public class BundleModuleTest {
     byte[] badNativeFile = new byte[] {'b', 'a', 'd'};
 
     assertThrows(
-        IOException.class,
+        UncheckedIOException.class,
         () ->
             createMinimalModuleBuilder()
                 .addEntry(createModuleEntryForFile("native.pb", badNativeFile)));
@@ -168,7 +168,7 @@ public class BundleModuleTest {
     byte[] badResourcesFile = new byte[] {'b', 'a', 'd'};
 
     assertThrows(
-        IOException.class,
+        UncheckedIOException.class,
         () ->
             createMinimalModuleBuilder()
                 .addEntry(createModuleEntryForFile("resources.pb", badResourcesFile)));
@@ -207,11 +207,10 @@ public class BundleModuleTest {
   public void incorrectProtoManifest_throws() throws Exception {
     byte[] badManifestFile = new byte[] {'b', 'a', 'd'};
     BundleModule.Builder minimalModuleWithoutManifest =
-        BundleModule.builder()
-            .setName(BundleModuleName.create("testModule"));
+        BundleModule.builder().setName(BundleModuleName.create("testModule"));
 
     assertThrows(
-        IOException.class,
+        UncheckedIOException.class,
         () ->
             minimalModuleWithoutManifest.addEntry(
                 createModuleEntryForFile("manifest/AndroidManifest.xml", badManifestFile)));
@@ -244,7 +243,7 @@ public class BundleModuleTest {
     byte[] badApexFile = new byte[] {'b', 'a', 'd'};
 
     assertThrows(
-        IOException.class,
+        UncheckedIOException.class,
         () ->
             createMinimalModuleBuilder()
                 .addEntry(createModuleEntryForFile("apex.pb", badApexFile)));

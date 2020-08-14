@@ -35,8 +35,7 @@ public abstract class BundleSharderConfiguration {
   public abstract Optional<DeviceSpec> getDeviceSpec();
 
   /** The configuration of the suffixes for the different dimensions. */
-  public abstract ImmutableMap<OptimizationDimension, SuffixStripping>
-      getSuffixStrippings();
+  public abstract ImmutableMap<OptimizationDimension, SuffixStripping> getSuffixStrippings();
 
   public abstract Builder toBuilder();
 
@@ -59,6 +58,8 @@ public abstract class BundleSharderConfiguration {
   public abstract static class Builder {
 
     public abstract Builder setStrip64BitLibrariesFromShards(boolean strip64BitLibrariesFromShards);
+
+    public abstract Builder setDeviceSpec(DeviceSpec deviceSpec);
 
     public abstract Builder setDeviceSpec(Optional<DeviceSpec> deviceSpec);
 

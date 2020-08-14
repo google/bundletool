@@ -16,6 +16,8 @@
 package com.android.tools.build.bundletool.model;
 
 import static com.google.common.base.Preconditions.checkState;
+import static com.google.common.base.Predicates.not;
+import static com.google.common.collect.ImmutableList.toImmutableList;
 
 import com.android.aapt.Resources.ConfigValue;
 import com.android.aapt.Resources.Entry;
@@ -25,6 +27,8 @@ import com.android.tools.build.bundletool.model.exceptions.InvalidBundleExceptio
 import com.android.tools.build.bundletool.model.utils.ResourcesUtils;
 import com.android.tools.build.bundletool.model.utils.xmlproto.XmlProtoElement;
 import com.android.tools.build.bundletool.model.utils.xmlproto.XmlProtoNode;
+import com.google.common.collect.ImmutableCollection;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
 import com.google.protobuf.InvalidProtocolBufferException;
 import java.io.IOException;
@@ -42,30 +46,41 @@ public final class WearApkLocator {
   static final String WEAR_APK_1_0_METADATA_KEY = "com.google.android.wearable.beta.app";
 
   /**
-   * Locates the placement of the embedded Wear 1.x APK if present.
+   * Locates the placement of the embedded Wear 1.x APKs if present.
    *
    * <p>Follows the instructions from
    * https://developer.android.com/training/wearables/apps/packaging#PackageManually
    */
-  public static Optional<ZipPath> findEmbeddedWearApkPath(ModuleSplit split) {
+  public static ImmutableCollection<ZipPath> findEmbeddedWearApkPaths(ModuleSplit split) {
     if (!split.getResourceTable().isPresent()) {
-      return Optional.empty();
+      return ImmutableList.of();
     }
 
     ResourceTable resourceTable = split.getResourceTable().get();
     AndroidManifest manifest = split.getAndroidManifest();
 
-    Optional<ZipPath> embeddedWearApkPath =
+    ImmutableCollection<ZipPath> embeddedWearApkPaths =
         manifest
             .getMetadataResourceId(WEAR_APK_1_0_METADATA_KEY)
             .map(resourceId -> findXmlDescriptionResourceEntry(resourceTable, resourceId))
             .map(entry -> getXmlDescriptionPath(entry))
             .map(xmlDescriptionPath -> findXmlDescriptionZipEntry(split, xmlDescriptionPath))
             .flatMap(xmlDescriptionEntry -> extractWearApkName(xmlDescriptionEntry))
-            .map(apkName -> ZipPath.create(String.format("res/raw/%s.apk", apkName)));
+            .flatMap(
+                resourceName ->
+                    ResourcesUtils.lookupEntryByResourceTypeAndName(
+                        resourceTable, /* resourceType= */ "raw", /* resourceName= */ resourceName))
+            .map(
+                entry ->
+                    entry.getConfigValueList().stream()
+                        .map(configValue -> configValue.getValue().getItem().getFile().getPath())
+                        .filter(not(String::isEmpty))
+                        .map(ZipPath::create)
+                        .collect(toImmutableList()))
+            .orElse(ImmutableList.of());
 
     // Sanity check to ensure that the path we return actually points to an existing entry.
-    embeddedWearApkPath.ifPresent(
+    embeddedWearApkPaths.forEach(
         path -> {
           if (!split.findEntry(path).isPresent()) {
             throw InvalidBundleException.builder()
@@ -74,7 +89,7 @@ public final class WearApkLocator {
           }
         });
 
-    return embeddedWearApkPath;
+    return embeddedWearApkPaths;
   }
 
   private static Entry findXmlDescriptionResourceEntry(

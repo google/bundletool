@@ -27,8 +27,6 @@ import com.android.tools.build.bundletool.model.ZipPath;
 import com.android.tools.build.bundletool.model.utils.ZipUtils;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
-import java.io.IOException;
-import java.io.UncheckedIOException;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 
@@ -86,29 +84,23 @@ public class BundleModulesValidator {
   }
 
   private BundleModule toBundleModule(ZipFile moduleZipFile, BundleConfig bundleConfig) {
-    BundleModule bundleModule;
-    try {
-      bundleModule =
-          BundleModule.builder()
-              // Assigning a temporary name because the real one will be extracted from the
-              // manifest, but this requires the BundleModule to be built.
-              .setName(BundleModuleName.create("TEMPORARY_MODULE_NAME"))
-              .setBundleConfig(bundleConfig)
-              .addEntries(
-                  moduleZipFile.stream()
-                      .filter(not(ZipEntry::isDirectory))
-                      .map(
-                          zipEntry ->
-                              ModuleEntry.builder()
-                                  .setPath(ZipPath.create(zipEntry.getName()))
-                                  .setContent(ZipUtils.asByteSource(moduleZipFile, zipEntry))
-                                  .build())
-                      .collect(toImmutableList()))
-              .build();
-    } catch (IOException e) {
-      throw new UncheckedIOException(
-          String.format("Error reading module zip file '%s'.", moduleZipFile.getName()), e);
-    }
+    BundleModule bundleModule =
+        BundleModule.builder()
+            // Assigning a temporary name because the real one will be extracted from the
+            // manifest, but this requires the BundleModule to be built.
+            .setName(BundleModuleName.create("TEMPORARY_MODULE_NAME"))
+            .setBundleConfig(bundleConfig)
+            .addEntries(
+                moduleZipFile.stream()
+                    .filter(not(ZipEntry::isDirectory))
+                    .map(
+                        zipEntry ->
+                            ModuleEntry.builder()
+                                .setPath(ZipPath.create(zipEntry.getName()))
+                                .setContent(ZipUtils.asByteSource(moduleZipFile, zipEntry))
+                                .build())
+                    .collect(toImmutableList()))
+            .build();
 
     BundleModuleName actualModuleName =
         bundleModule

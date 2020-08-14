@@ -16,15 +16,18 @@
 
 package com.android.tools.build.bundletool.splitters;
 
+import static com.android.tools.build.bundletool.commands.BuildApksCommand.ApkBuildMode.UNIVERSAL;
 import static com.android.tools.build.bundletool.model.utils.TargetingProtoUtils.sdkVersionFrom;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.Iterables.getOnlyElement;
 
+import com.android.bundle.Config.BundleConfig;
 import com.android.bundle.Config.SuffixStripping;
 import com.android.bundle.Devices.DeviceSpec;
 import com.android.bundle.Targeting.ApkTargeting;
 import com.android.bundle.Targeting.SdkVersionTargeting;
 import com.android.bundle.Targeting.VariantTargeting;
+import com.android.tools.build.bundletool.commands.BuildApksCommand.ApkBuildMode;
 import com.android.tools.build.bundletool.model.BundleMetadata;
 import com.android.tools.build.bundletool.model.BundleModule;
 import com.android.tools.build.bundletool.model.BundleModuleName;
@@ -32,14 +35,14 @@ import com.android.tools.build.bundletool.model.ModuleSplit;
 import com.android.tools.build.bundletool.model.ModuleSplit.SplitType;
 import com.android.tools.build.bundletool.model.OptimizationDimension;
 import com.android.tools.build.bundletool.model.ShardedSystemSplits;
+import com.android.tools.build.bundletool.model.SourceStamp;
 import com.android.tools.build.bundletool.model.SourceStamp.StampType;
-import com.android.tools.build.bundletool.model.version.Version;
 import com.android.tools.build.bundletool.optimizations.ApkOptimizations;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
-import java.nio.file.Path;
 import java.util.Optional;
+import javax.inject.Inject;
 
 /**
  * Generates APKs sharded by ABI and screen density.
@@ -48,66 +51,55 @@ import java.util.Optional;
  */
 public final class ShardedApksGenerator {
 
-  private final Path tempDir;
-  private final Version bundleVersion;
-  private final boolean strip64BitLibrariesFromShards;
+  private final BundleConfig bundleConfig;
+  private final BundleMetadata bundleMetadata;
+  private final ApkBuildMode apkBuildMode;
   private final ImmutableMap<OptimizationDimension, SuffixStripping> suffixStrippings;
-  private final Optional<String> stampSource;
+  private final Optional<SourceStamp> stampSource;
+  private final BundleSharder bundleSharder;
 
+  @Inject
   public ShardedApksGenerator(
-      Path tempDir, Version bundleVersion, boolean strip64BitLibrariesFromShards) {
-    this(tempDir, bundleVersion, strip64BitLibrariesFromShards, ImmutableMap.of());
-  }
-
-  public ShardedApksGenerator(
-      Path tempDir,
-      Version bundleVersion,
-      boolean strip64BitLibrariesFromShards,
-      ImmutableMap<OptimizationDimension, SuffixStripping> suffixStrippings) {
-    this(
-        tempDir,
-        bundleVersion,
-        strip64BitLibrariesFromShards,
-        suffixStrippings,
-        /* stampSource= */ Optional.empty());
-  }
-
-  public ShardedApksGenerator(
-      Path tempDir,
-      Version bundleVersion,
-      boolean strip64BitLibrariesFromShards,
+      BundleConfig bundleConfig,
+      BundleMetadata bundleMetadata,
+      ApkBuildMode apkBuildMode,
       ImmutableMap<OptimizationDimension, SuffixStripping> suffixStrippings,
-      Optional<String> stampSource) {
-    this.tempDir = tempDir;
-    this.bundleVersion = bundleVersion;
-    this.strip64BitLibrariesFromShards = strip64BitLibrariesFromShards;
+      Optional<SourceStamp> stampSource,
+      BundleSharder bundleSharder) {
+    this.bundleConfig = bundleConfig;
+    this.bundleMetadata = bundleMetadata;
+    this.apkBuildMode = apkBuildMode;
     this.suffixStrippings = suffixStrippings;
     this.stampSource = stampSource;
+    this.bundleSharder = bundleSharder;
   }
 
   public ImmutableList<ModuleSplit> generateSplits(
-      ImmutableList<BundleModule> modules,
-      BundleMetadata bundleMetadata,
-      ApkOptimizations apkOptimizations) {
+      ImmutableList<BundleModule> modules, ApkOptimizations apkOptimizations) {
+    boolean strip64BitLibraries =
+        bundleConfig.getOptimizations().getStandaloneConfig().getStrip64BitLibraries()
+            && !apkBuildMode.equals(UNIVERSAL);
     BundleSharderConfiguration configuration =
         BundleSharderConfiguration.builder()
-            .setStrip64BitLibrariesFromShards(strip64BitLibrariesFromShards)
+            .setStrip64BitLibrariesFromShards(strip64BitLibraries)
             .setSuffixStrippings(suffixStrippings)
             .build();
 
-    BundleSharder bundleSharder = new BundleSharder(tempDir, bundleVersion, configuration);
     ImmutableList<ModuleSplit> moduleSplits =
         ImmutableList.copyOf(
             setVariantTargetingAndSplitType(
                 bundleSharder.shardBundle(
-                    modules, apkOptimizations.getStandaloneDimensions(), bundleMetadata),
+                    modules,
+                    apkOptimizations.getStandaloneDimensions(),
+                    bundleMetadata,
+                    configuration),
                 SplitType.STANDALONE));
     if (stampSource.isPresent()) {
       return moduleSplits.stream()
           .map(
               moduleSplit ->
                   moduleSplit.writeSourceStampInManifest(
-                      stampSource.get(), StampType.STAMP_TYPE_STANDALONE_APK))
+                      stampSource.get().getSource(), StampType.STAMP_TYPE_STANDALONE_APK))
           .collect(toImmutableList());
     }
     return moduleSplits;
@@ -116,20 +108,23 @@ public final class ShardedApksGenerator {
   public ImmutableList<ModuleSplit> generateSystemSplits(
       ImmutableList<BundleModule> modules,
       ImmutableSet<BundleModuleName> modulesToFuse,
-      BundleMetadata bundleMetadata,
       ApkOptimizations apkOptimizations,
       Optional<DeviceSpec> deviceSpec) {
     BundleSharderConfiguration configuration =
         BundleSharderConfiguration.builder()
-            .setStrip64BitLibrariesFromShards(strip64BitLibrariesFromShards)
+            .setStrip64BitLibrariesFromShards(
+                bundleConfig.getOptimizations().getStandaloneConfig().getStrip64BitLibraries())
             .setSuffixStrippings(suffixStrippings)
             .setDeviceSpec(deviceSpec)
             .build();
 
-    BundleSharder bundleSharder = new BundleSharder(tempDir, bundleVersion, configuration);
     ShardedSystemSplits shardedApks =
         bundleSharder.shardForSystemApps(
-            modules, modulesToFuse, apkOptimizations.getSplitDimensions(), bundleMetadata);
+            modules,
+            modulesToFuse,
+            apkOptimizations.getSplitDimensions(),
+            bundleMetadata,
+            configuration);
 
     ModuleSplit fusedApk =
         setVariantTargetingAndSplitType(shardedApks.getSystemImageSplit(), SplitType.SYSTEM)
@@ -153,13 +148,13 @@ public final class ShardedApksGenerator {
   public ImmutableList<ModuleSplit> generateApexSplits(ImmutableList<BundleModule> modules) {
     BundleSharderConfiguration configuration =
         BundleSharderConfiguration.builder()
-            .setStrip64BitLibrariesFromShards(strip64BitLibrariesFromShards)
+            .setStrip64BitLibrariesFromShards(
+                bundleConfig.getOptimizations().getStandaloneConfig().getStrip64BitLibraries())
             .setSuffixStrippings(suffixStrippings)
             .build();
 
-    BundleSharder bundleSharder = new BundleSharder(tempDir, bundleVersion, configuration);
     ImmutableList<ModuleSplit> shardedApexApks =
-        bundleSharder.shardApexBundle(getOnlyElement(modules));
+        bundleSharder.shardApexBundle(getOnlyElement(modules), configuration);
 
     return setVariantTargetingAndSplitType(shardedApexApks, SplitType.STANDALONE);
   }

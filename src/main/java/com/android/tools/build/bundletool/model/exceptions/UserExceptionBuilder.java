@@ -17,6 +17,7 @@
 package com.android.tools.build.bundletool.model.exceptions;
 
 import static com.google.common.base.Preconditions.checkNotNull;
+import static com.google.common.base.Strings.nullToEmpty;
 
 import com.google.errorprone.annotations.FormatMethod;
 import com.google.errorprone.annotations.FormatString;
@@ -51,7 +52,7 @@ public class UserExceptionBuilder<T extends BundleToolException> {
 
   @CheckReturnValue
   public T build() {
-    String effectiveUserMessage = userMessage == null ? userMessage : "";
+    String effectiveUserMessage = nullToEmpty(userMessage);
     String effectiveInternalMessage =
         userMessage == null ? (cause == null ? "" : cause.toString()) : userMessage;
     return this.creator.create(effectiveUserMessage, effectiveInternalMessage, cause);

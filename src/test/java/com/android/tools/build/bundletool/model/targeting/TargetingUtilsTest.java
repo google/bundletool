@@ -18,6 +18,7 @@ package com.android.tools.build.bundletool.model.targeting;
 
 import static com.android.bundle.Targeting.TextureCompressionFormat.TextureCompressionFormatAlias.ATC;
 import static com.android.bundle.Targeting.TextureCompressionFormat.TextureCompressionFormatAlias.ETC1_RGB8;
+import static com.android.tools.build.bundletool.model.targeting.TargetingUtils.containsDeviceTierTargeting;
 import static com.android.tools.build.bundletool.model.targeting.TargetingUtils.excludeAssetsTargetingOtherValue;
 import static com.android.tools.build.bundletool.model.targeting.TargetingUtils.getMaxSdk;
 import static com.android.tools.build.bundletool.model.targeting.TargetingUtils.getMinSdk;
@@ -26,6 +27,7 @@ import static com.android.tools.build.bundletool.testing.TargetingUtils.abiTarge
 import static com.android.tools.build.bundletool.testing.TargetingUtils.alternativeTextureCompressionTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.assets;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.assetsDirectoryTargeting;
+import static com.android.tools.build.bundletool.testing.TargetingUtils.deviceTierTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.graphicsApiTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.languageTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.mergeAssetsTargeting;
@@ -98,6 +100,14 @@ public class TargetingUtilsTest {
             TargetingUtils.getTargetingDimensions(
                 assetsDirectoryTargeting(abiTargeting(AbiAlias.ARM64_V8A))))
         .containsExactly(TargetingDimension.ABI);
+  }
+
+  @Test
+  public void getDimensions_deviceTier() {
+    assertThat(
+            TargetingUtils.getTargetingDimensions(
+                assetsDirectoryTargeting(deviceTierTargeting("low"))))
+        .containsExactly(TargetingDimension.DEVICE_TIER);
   }
 
   @Test
@@ -270,6 +280,26 @@ public class TargetingUtilsTest {
     assertThat(assetsRemovedSplit.getAssetsConfig().get().getDirectoryCount()).isEqualTo(1);
     assertThat(assetsRemovedSplit.getAssetsConfig().get().getDirectory(0).getPath())
         .isEqualTo("assets/textures#tcf_etc1");
+  }
+
+  @Test
+  public void containsDeviceTierTargeting_noDeviceTierTargeting() {
+    assertThat(
+            containsDeviceTierTargeting(
+                ImmutableSet.of(
+                    TargetedDirectory.parse(ZipPath.create("assets/world/texture#tcf_etc1")),
+                    TargetedDirectory.parse(ZipPath.create("assets/world/texture#tcf_astc")))))
+        .isFalse();
+  }
+
+  @Test
+  public void containsDeviceTierTargeting_withDeviceTierTargeting() {
+    assertThat(
+            containsDeviceTierTargeting(
+                ImmutableSet.of(
+                    TargetedDirectory.parse(ZipPath.create("assets/world/texture#tier_medium")),
+                    TargetedDirectory.parse(ZipPath.create("assets/world/texture#tier_high")))))
+        .isTrue();
   }
 
   private static VariantTargeting variantTargetingFromSdkVersion(SdkVersion values) {

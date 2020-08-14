@@ -37,7 +37,7 @@ public interface Aapt2Command {
 
       @Override
       public void convertApkProtoToBinary(Path protoApk, Path binaryApk) {
-        new CommandExecutor()
+        new DefaultCommandExecutor()
             .execute(
                 ImmutableList.of(
                     aapt2Path.toString(),
@@ -52,7 +52,7 @@ public interface Aapt2Command {
 
       @Override
       public ImmutableList<String> dumpBadging(Path apkPath) {
-        return new CommandExecutor()
+        return new DefaultCommandExecutor()
             .executeAndCapture(
                 ImmutableList.of(aapt2Path.toString(), "dump", "badging", apkPath.toString()),
                 CommandOptions.builder().setTimeout(timeoutMillis).build());

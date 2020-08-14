@@ -173,7 +173,8 @@ public class FlagTest {
   public void passwordFlag_noPrefix_throws() {
     Flag<Password> flag = Flag.password("testFlag");
     ParsedFlags parsedFlags = new FlagParser().parse("--testFlag=hello");
-    Throwable exception = assertThrows(FlagParseException.class, () -> flag.getValue(parsedFlags));
+    Throwable exception =
+        assertThrows(IllegalArgumentException.class, () -> flag.getValue(parsedFlags));
     assertThat(exception)
         .hasMessageThat()
         .contains("Passwords must be prefixed with \"pass:\" or \"file:\"");

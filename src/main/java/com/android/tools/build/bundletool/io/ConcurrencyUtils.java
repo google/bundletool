@@ -16,7 +16,7 @@
 
 package com.android.tools.build.bundletool.io;
 
-import com.android.tools.build.bundletool.model.exceptions.CommandExecutionException;
+import com.android.tools.build.bundletool.model.exceptions.BundleToolException;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.util.concurrent.Futures;
@@ -52,8 +52,8 @@ final class ConcurrencyUtils {
         throw new UncheckedIOException(e.getCause().getMessage(), (IOException) e.getCause());
       } else if (e.getCause() instanceof UncheckedIOException) {
         throw (UncheckedIOException) e.getCause();
-      } else if (e.getCause() instanceof CommandExecutionException) {
-        throw (CommandExecutionException) e.getCause();
+      } else if (e.getCause() instanceof BundleToolException) {
+        throw (BundleToolException) e.getCause();
       } else {
         throw new RuntimeException(e.getMessage(), e);
       }

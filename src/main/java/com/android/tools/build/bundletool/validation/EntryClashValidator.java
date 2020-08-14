@@ -22,6 +22,7 @@ import com.android.tools.build.bundletool.model.BundleModule;
 import com.android.tools.build.bundletool.model.ModuleEntry;
 import com.android.tools.build.bundletool.model.ZipPath;
 import com.android.tools.build.bundletool.model.exceptions.InvalidBundleException;
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
 import java.util.HashMap;
 import java.util.Map;
@@ -40,6 +41,20 @@ public class EntryClashValidator extends SubValidator {
 
   @Override
   public void validateAllModules(ImmutableList<BundleModule> modules) {
+    if (!BundleValidationUtils.isAssetOnlyBundle(modules)) {
+      BundleModule baseModule = BundleValidationUtils.expectBaseModule(modules);
+      boolean isolatedSplits = baseModule.getAndroidManifest().getIsolatedSplits().orElse(false);
+      if (isolatedSplits) {
+        // For isolated splits, resources are loaded into separate asset
+        // manager instances.
+        return;
+      }
+    }
+    checkEntryClashes(modules);
+  }
+
+  @VisibleForTesting
+  static void checkEntryClashes(ImmutableList<BundleModule> modules) {
     Map<ZipPath, BundleModule> usedPaths = new HashMap<>();
     for (BundleModule module : modules) {
       for (ModuleEntry entry : module.getEntries()) {

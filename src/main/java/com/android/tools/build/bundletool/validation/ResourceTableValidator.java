@@ -103,11 +103,26 @@ public class ResourceTableValidator extends SubValidator {
 
   @Override
   public void validateAllModules(ImmutableList<BundleModule> modules) {
-    checkResourceIdsAreUnique(modules);
+    if (!BundleValidationUtils.isAssetOnlyBundle(modules)) {
+      checkResourceIds(modules);
+    }
   }
 
   @VisibleForTesting
-  void checkResourceIdsAreUnique(ImmutableList<BundleModule> modules) {
+  void checkResourceIds(ImmutableList<BundleModule> modules) {
+    BundleModule baseModule = BundleValidationUtils.expectBaseModule(modules);
+    if (baseModule.getAndroidManifest().getIsolatedSplits().orElse(false)) {
+      // If splits are isolated, it's ok to have inter-module duplication, but we still need to
+      // check for uniqueness within each module.
+      for (BundleModule module : modules) {
+        checkResourceIdsAreUnique(ImmutableList.of(module));
+      }
+    } else {
+      checkResourceIdsAreUnique(modules);
+    }
+  }
+
+  private static void checkResourceIdsAreUnique(ImmutableList<BundleModule> modules) {
     HashSet<ResourceId> usedResourceIds = newHashSet();
     for (BundleModule module : modules) {
       ResourceTable resourceTable =

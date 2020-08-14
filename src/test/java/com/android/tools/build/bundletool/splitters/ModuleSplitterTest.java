@@ -116,6 +116,7 @@ import com.android.tools.build.bundletool.model.ResourceId;
 import com.android.tools.build.bundletool.model.SourceStamp.StampType;
 import com.android.tools.build.bundletool.model.ZipPath;
 import com.android.tools.build.bundletool.model.exceptions.CommandExecutionException;
+import com.android.tools.build.bundletool.model.utils.Versions;
 import com.android.tools.build.bundletool.model.utils.xmlproto.XmlProtoElement;
 import com.android.tools.build.bundletool.model.version.BundleToolVersion;
 import com.android.tools.build.bundletool.model.version.Version;
@@ -158,6 +159,63 @@ public class ModuleSplitterTest {
     assertThat(masterSplit.getVariantTargeting()).isEqualTo(lPlusVariantTargeting());
     assertThat(masterSplit.isMasterSplit()).isTrue();
     assertThat(masterSplit.getApkTargeting()).isEqualTo(apkMinSdkTargeting(21));
+  }
+
+  @Test
+  public void rPlusSigningConfigWithRPlusVariant_minSdkVersionInOutputTargetingGetsSetToR()
+      throws Exception {
+    BundleModule testModule =
+        new BundleModuleBuilder("testModule").setManifest(androidManifest("com.test.app")).build();
+
+    ImmutableList<ModuleSplit> moduleSplits =
+        ModuleSplitter.createNoStamp(
+                testModule,
+                BUNDLETOOL_VERSION,
+                ApkGenerationConfiguration.builder().setRestrictV3SigningToRPlus(true).build(),
+                variantMinSdkTargeting(Versions.ANDROID_R_API_VERSION),
+                ImmutableSet.of("testModule"))
+            .splitModule();
+
+    assertThat(moduleSplits.stream().map(ModuleSplit::getApkTargeting).distinct())
+        .containsExactly(apkMinSdkTargeting(Versions.ANDROID_R_API_VERSION));
+  }
+
+  @Test
+  public void rPlusSigningConfigWithDefaultVariant_minSdkVersionInOutputTargetingNotSetToR()
+      throws Exception {
+    BundleModule testModule =
+        new BundleModuleBuilder("testModule").setManifest(androidManifest("com.test.app")).build();
+
+    ImmutableList<ModuleSplit> moduleSplits =
+        ModuleSplitter.createNoStamp(
+                testModule,
+                BUNDLETOOL_VERSION,
+                ApkGenerationConfiguration.builder().setRestrictV3SigningToRPlus(true).build(),
+                VariantTargeting.getDefaultInstance(),
+                ImmutableSet.of("testModule"))
+            .splitModule();
+
+    assertThat(moduleSplits.stream().map(ModuleSplit::getApkTargeting))
+        .doesNotContain(apkMinSdkTargeting(Versions.ANDROID_R_API_VERSION));
+  }
+
+  @Test
+  public void defaultSigningConfigWithRPlusVariant_minSdkVersionInOutputTargetingNotSetToR()
+      throws Exception {
+    BundleModule testModule =
+        new BundleModuleBuilder("testModule").setManifest(androidManifest("com.test.app")).build();
+
+    ImmutableList<ModuleSplit> moduleSplits =
+        ModuleSplitter.createNoStamp(
+                testModule,
+                BUNDLETOOL_VERSION,
+                ApkGenerationConfiguration.getDefaultInstance(),
+                variantMinSdkTargeting(Versions.ANDROID_R_API_VERSION),
+                ImmutableSet.of("testModule"))
+            .splitModule();
+
+    assertThat(moduleSplits.stream().map(ModuleSplit::getApkTargeting))
+        .doesNotContain(apkMinSdkTargeting(Versions.ANDROID_R_API_VERSION));
   }
 
   @Test

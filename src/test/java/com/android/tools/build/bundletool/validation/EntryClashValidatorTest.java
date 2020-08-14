@@ -17,6 +17,7 @@
 package com.android.tools.build.bundletool.validation;
 
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifest;
+import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withIsolatedSplits;
 import static com.google.common.truth.Truth.assertThat;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -61,7 +62,7 @@ public class EntryClashValidatorTest {
             .setManifest(androidManifest("com.test.app"))
             .build();
 
-    new EntryClashValidator().validateAllModules(ImmutableList.of(moduleA, moduleB));
+    EntryClashValidator.checkEntryClashes(ImmutableList.of(moduleA, moduleB));
   }
 
   @Test
@@ -80,7 +81,7 @@ public class EntryClashValidatorTest {
             .setManifest(androidManifest("com.test.app"))
             .build();
 
-    new EntryClashValidator().validateAllModules(ImmutableList.of(moduleA, moduleB));
+    EntryClashValidator.checkEntryClashes(ImmutableList.of(moduleA, moduleB));
   }
 
   @Test
@@ -93,7 +94,7 @@ public class EntryClashValidatorTest {
     BundleModule moduleA = new BundleModuleBuilder("a").addFile(filePath, fileContentA).build();
     BundleModule moduleB = new BundleModuleBuilder("b").addFile(filePath, fileContentB).build();
 
-    new EntryClashValidator().validateAllModules(ImmutableList.of(moduleA, moduleB));
+    EntryClashValidator.checkEntryClashes(ImmutableList.of(moduleA, moduleB));
   }
 
   @Test
@@ -117,7 +118,7 @@ public class EntryClashValidatorTest {
             .setManifest(androidManifest("com.test.app"))
             .build();
 
-    new EntryClashValidator().validateAllModules(ImmutableList.of(moduleA, moduleB));
+    EntryClashValidator.checkEntryClashes(ImmutableList.of(moduleA, moduleB));
   }
 
   @Test
@@ -138,7 +139,7 @@ public class EntryClashValidatorTest {
             .setManifest(androidManifest("com.test.app"))
             .build();
 
-    new EntryClashValidator().validateAllModules(ImmutableList.of(moduleA, moduleB));
+    EntryClashValidator.checkEntryClashes(ImmutableList.of(moduleA, moduleB));
   }
 
   @Test
@@ -156,7 +157,7 @@ public class EntryClashValidatorTest {
             .setManifest(androidManifest("com.test.app"))
             .build();
 
-    new EntryClashValidator().validateAllModules(ImmutableList.of(moduleA, moduleB));
+    EntryClashValidator.checkEntryClashes(ImmutableList.of(moduleA, moduleB));
   }
 
   @Test
@@ -178,10 +179,28 @@ public class EntryClashValidatorTest {
     InvalidBundleException exception =
         assertThrows(
             InvalidBundleException.class,
-            () -> new EntryClashValidator().validateAllModules(ImmutableList.of(moduleA, moduleB)));
+            () -> EntryClashValidator.checkEntryClashes(ImmutableList.of(moduleA, moduleB)));
 
     assertThat(exception)
         .hasMessageThat()
         .contains("Modules 'a' and 'b' contain entry 'assets/file.txt' with different content.");
+  }
+
+  @Test
+  public void entryNameCollision_filesWithDifferentContent_isolatedSplits_ok() throws Exception {
+    String fileName = "assets/file.txt";
+    byte[] fileContentA = {'a'};
+    byte[] fileContentB = {'b'};
+    BundleModule moduleA =
+        new BundleModuleBuilder("base")
+            .addFile(fileName, fileContentA)
+            .setManifest(androidManifest("com.test.app", withIsolatedSplits(true)))
+            .build();
+    BundleModule moduleB =
+        new BundleModuleBuilder("b")
+            .addFile(fileName, fileContentB)
+            .setManifest(androidManifest("com.test.app"))
+            .build();
+    new EntryClashValidator().validateAllModules(ImmutableList.of(moduleA, moduleB));
   }
 }

@@ -200,6 +200,17 @@ public final class ResourcesUtils {
         .collect(toOptional());
   }
 
+  public static Optional<Entry> lookupEntryByResourceTypeAndName(
+      ResourceTable resourceTable, String resourceType, String resourceName) {
+    return entries(resourceTable)
+        .filter(
+            entry ->
+                entry.getType().getName().equals(resourceType)
+                    && entry.getEntry().getName().equals(resourceName))
+        .map(ResourceTableEntry::getEntry)
+        .collect(toOptional());
+  }
+
   /** Returns all languages present in given resource table. */
   public static ImmutableSet<String> getAllLanguages(ResourceTable table) {
     return configValues(table)

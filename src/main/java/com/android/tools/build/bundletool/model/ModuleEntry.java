@@ -51,18 +51,6 @@ public abstract class ModuleEntry {
   /** Returns data source for this entry. */
   public abstract ByteSource getContent();
 
-  /** @deprecated Use {@link #getContent()} instead. */
-  @Deprecated
-  public InputStreamSupplier getContentSupplier() {
-    return InputStreamSupplier.fromByteSource(getContent());
-  }
-
-  /** @deprecated Use {@link #getContent()} instead. */
-  @Deprecated
-  public ByteSource asByteSource() {
-    return getContent();
-  }
-
   /** Checks whether the given entries are identical. */
   @Override
   public final boolean equals(Object obj2) {
@@ -132,12 +120,6 @@ public abstract class ModuleEntry {
 
     public Builder setContent(File file) {
       return setContent(Files.asByteSource(file));
-    }
-
-    /** @deprecated Use {@link #setContent(ByteSource)} instead. */
-    @Deprecated
-    public Builder setContentSupplier(InputStreamSupplier contentSupplier) {
-      return setContent(contentSupplier.asByteSource());
     }
 
     public abstract ModuleEntry build();

@@ -16,35 +16,26 @@
 
 package com.android.tools.build.bundletool.flags;
 
-import static com.android.tools.build.bundletool.model.utils.files.FilePreconditions.checkFileExistsAndReadable;
 import static com.google.common.base.Predicates.not;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.ImmutableMap.toImmutableMap;
 import static com.google.common.collect.ImmutableSet.toImmutableSet;
-import static java.nio.charset.StandardCharsets.UTF_8;
 
 import com.android.tools.build.bundletool.flags.FlagParser.FlagParseException;
 import com.android.tools.build.bundletool.model.Password;
 import com.android.tools.build.bundletool.model.ZipPath;
-import com.android.tools.build.bundletool.model.utils.OsPlatform;
+import com.android.tools.build.bundletool.model.utils.files.FileUtils;
 import com.google.common.base.MoreObjects;
 import com.google.common.base.Splitter;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
-import com.google.common.io.MoreFiles;
-import java.io.IOException;
-import java.io.UncheckedIOException;
 import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.security.KeyStore.PasswordProtection;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.function.Predicate;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 /**
@@ -55,7 +46,6 @@ import java.util.stream.Collectors;
 public abstract class Flag<T> {
 
   private static final Splitter KEY_VALUE_SPLITTER = Splitter.on(':').limit(2);
-  private static final Pattern HOME_DIRECTORY_ALIAS = Pattern.compile("^~");
 
   /** Boolean flag holding a single value. */
   public static Flag<Boolean> booleanFlag(String name) {
@@ -333,30 +323,7 @@ public abstract class Flag<T> {
 
     @Override
     protected Password parse(String value) {
-      return createFromFlagValue(value);
-    }
-
-    private static Password createFromFlagValue(String flagValue) {
-      if (flagValue.startsWith("pass:")) {
-        return new Password(
-            () -> new PasswordProtection(flagValue.substring("pass:".length()).toCharArray()));
-      } else if (flagValue.startsWith("file:")) {
-        Path passwordFile = Paths.get(flagValue.substring("file:".length()));
-        checkFileExistsAndReadable(passwordFile);
-        return new Password(
-            () -> new PasswordProtection(readPasswordFromFile(passwordFile).toCharArray()));
-      }
-
-      throw new FlagParseException("Passwords must be prefixed with \"pass:\" or \"file:\".");
-    }
-
-    private static String readPasswordFromFile(Path passwordFile) {
-      try {
-        return MoreFiles.asCharSource(passwordFile, UTF_8).readFirstLine();
-      } catch (IOException e) {
-        throw new UncheckedIOException(
-            String.format("Unable to read password from file '%s'.", passwordFile), e);
-      }
+      return Password.createFromStringValue(value);
     }
   }
 
@@ -368,13 +335,7 @@ public abstract class Flag<T> {
 
     @Override
     protected Path parse(String value) {
-      if (!OsPlatform.getCurrentPlatform().equals(OsPlatform.WINDOWS)) {
-        value =
-            HOME_DIRECTORY_ALIAS
-                .matcher(value)
-                .replaceFirst(Matcher.quoteReplacement(System.getProperty("user.home")));
-      }
-      return Paths.get(value);
+      return FileUtils.getPath(value);
     }
   }
 

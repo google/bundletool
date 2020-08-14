@@ -16,9 +16,12 @@
 
 package com.android.tools.build.bundletool.model.utils.files;
 
+import static com.google.common.base.StandardSystemProperty.OS_NAME;
+import static com.google.common.base.StandardSystemProperty.USER_HOME;
 import static com.google.common.truth.Truth.assertThat;
 
 import com.android.tools.build.bundletool.model.ZipPath;
+import com.android.tools.build.bundletool.model.utils.OsPlatform;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Arrays;
@@ -99,5 +102,53 @@ public class FileUtilsTest {
   public void getExtension_fileInDirectoryDoubleExtension() {
     assertThat(FileUtils.getFileExtension(ZipPath.create("directory/file.pb.json")))
         .isEqualTo("json");
+  }
+
+  @Test
+  public void getPath() {
+    assertThat((Object) FileUtils.getPath("/my/path")).isEqualTo(Paths.get("/my/path"));
+  }
+
+  @Test
+    public void getPath_tildeInPathStart_linux() {
+    String currentSystem = OS_NAME.value();
+    try {
+      System.setProperty("os.name", "Linux");
+      assertThat(OsPlatform.getCurrentPlatform()).isEqualTo(OsPlatform.LINUX);
+      assertThat((Object) FileUtils.getPath("~/my/path"))
+          .isEqualTo(Paths.get(USER_HOME.value(), "/my/path"));
+    } finally {
+      System.setProperty("os.name", currentSystem);
+    }
+  }
+
+  @Test
+    public void getPath_tildeInPathStart_macos() {
+    String currentSystem = OS_NAME.value();
+    try {
+      System.setProperty("os.name", "Mac OS X");
+      assertThat(OsPlatform.getCurrentPlatform()).isEqualTo(OsPlatform.MACOS);
+      assertThat((Object) FileUtils.getPath("~/my/path"))
+          .isEqualTo(Paths.get(USER_HOME.value(), "/my/path"));
+    } finally {
+      System.setProperty("os.name", currentSystem);
+    }
+  }
+
+  @Test
+  public void getPath_tildeInPathMiddle_nonWindows() {
+    assertThat((Object) FileUtils.getPath("/my/~/path")).isEqualTo(Paths.get("/my/~/path"));
+  }
+
+  @Test
+    public void getPath_tildeInPath_windows() {
+    String currentSystem = OS_NAME.value();
+    try {
+      System.setProperty("os.name", "Windows");
+      assertThat(OsPlatform.getCurrentPlatform()).isEqualTo(OsPlatform.WINDOWS);
+      assertThat((Object) FileUtils.getPath("~\\my\\path")).isEqualTo(Paths.get("~\\my\\path"));
+    } finally {
+      System.setProperty("os.name", currentSystem);
+    }
   }
 }

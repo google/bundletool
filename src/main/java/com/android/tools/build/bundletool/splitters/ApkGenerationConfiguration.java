@@ -65,6 +65,9 @@ public abstract class ApkGenerationConfiguration {
         && getSuffixStrippings().get(dimension).getEnabled();
   }
 
+  /** Whether v3 signing should be restricted to R+ variant targeting. */
+  public abstract boolean getRestrictV3SigningToRPlus();
+
   public abstract Builder toBuilder();
 
   public static Builder builder() {
@@ -78,7 +81,8 @@ public abstract class ApkGenerationConfiguration {
         .setMasterPinnedResourceIds(ImmutableSet.of())
         .setMasterPinnedResourceNames(ImmutableSet.of())
         .setBaseManifestReachableResources(ImmutableSet.of())
-        .setSuffixStrippings(ImmutableMap.of());
+        .setSuffixStrippings(ImmutableMap.of())
+        .setRestrictV3SigningToRPlus(false);
   }
 
   public static ApkGenerationConfiguration getDefaultInstance() {
@@ -111,6 +115,8 @@ public abstract class ApkGenerationConfiguration {
 
     public abstract Builder setSuffixStrippings(
         ImmutableMap<OptimizationDimension, SuffixStripping> suffixStripping);
+
+    public abstract Builder setRestrictV3SigningToRPlus(boolean restrictV3SigningToRPlus);
 
     public abstract ApkGenerationConfiguration build();
   }

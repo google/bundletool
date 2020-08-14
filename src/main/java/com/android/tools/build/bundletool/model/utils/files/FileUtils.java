@@ -16,20 +16,27 @@
 
 package com.android.tools.build.bundletool.model.utils.files;
 
+import static com.google.common.base.StandardSystemProperty.USER_HOME;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 
 import com.android.tools.build.bundletool.model.ZipPath;
+import com.android.tools.build.bundletool.model.utils.OsPlatform;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSortedSet;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.Collection;
 import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /** Misc utilities for working with files. */
 public final class FileUtils {
+
+  private static final Pattern HOME_DIRECTORY_ALIAS = Pattern.compile("^~");
 
   /** Creates the parent directories of the given path. */
   public static void createParentDirectories(Path path) {
@@ -81,6 +88,17 @@ public final class FileUtils {
       }
     }
     return walkOrderedSet.build().asList();
+  }
+
+  /** Converts a path string to a {@code Path}. */
+  public static Path getPath(String path) {
+    if (!OsPlatform.getCurrentPlatform().equals(OsPlatform.WINDOWS)) {
+      path =
+          HOME_DIRECTORY_ALIAS
+              .matcher(path)
+              .replaceFirst(Matcher.quoteReplacement(USER_HOME.value()));
+    }
+    return Paths.get(path);
   }
 
   // Not meant to be instantiated.

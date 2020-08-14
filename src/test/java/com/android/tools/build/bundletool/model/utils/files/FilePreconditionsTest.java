@@ -22,8 +22,8 @@ import static com.android.tools.build.bundletool.model.utils.files.FilePrecondit
 import static com.android.tools.build.bundletool.model.utils.files.FilePreconditions.checkFileExistsAndReadable;
 import static com.android.tools.build.bundletool.model.utils.files.FilePreconditions.checkFileHasExtension;
 import static com.google.common.truth.Truth.assertThat;
-import static org.junit.Assume.assumeFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.Assume.assumeFalse;
 
 import com.android.tools.build.bundletool.model.utils.OsPlatform;
 import java.io.File;

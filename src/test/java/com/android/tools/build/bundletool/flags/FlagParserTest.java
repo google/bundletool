@@ -264,9 +264,9 @@ public class FlagParserTest {
   public void passwordFlag_inClearInCommandLineWithoutPassPrefix_throws() throws Exception {
     ParsedFlags fp = new FlagParser().parse("command", "--pwdFlag=hello");
 
-    FlagParseException exception =
+    Throwable exception =
         assertThrows(
-            FlagParseException.class,
+            IllegalArgumentException.class,
             () -> Flag.password("pwdFlag").getRequiredValue(fp).getValue());
     assertThat(exception).hasMessageThat().contains("Passwords must be prefixed with \"pass:\"");
   }

@@ -25,6 +25,7 @@ import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Set;
 import javax.annotation.concurrent.GuardedBy;
+import javax.inject.Inject;
 
 /**
  * Associates {@link ModuleSplit} with a file name ensuring there will be no path conflicts in the
@@ -53,6 +54,9 @@ public class ApkPathManager {
   /** Paths of APKs that have already been allocated. */
   @GuardedBy("this")
   private final Set<ZipPath> usedPaths = new HashSet<>();
+
+  @Inject
+  ApkPathManager() {}
 
   /**
    * Returns a unique file path for the given ModuleSplit.

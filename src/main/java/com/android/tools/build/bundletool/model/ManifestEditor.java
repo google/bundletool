@@ -43,6 +43,7 @@ import static com.android.tools.build.bundletool.model.AndroidManifest.TARGET_SD
 import static com.android.tools.build.bundletool.model.AndroidManifest.TARGET_SDK_VERSION_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.USES_SDK_ELEMENT_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.VALUE_RESOURCE_ID;
+import static com.android.tools.build.bundletool.model.AndroidManifest.VERSION_CODE_MAJOR_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.VERSION_CODE_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.VERSION_NAME_ATTRIBUTE_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.VERSION_NAME_RESOURCE_ID;
@@ -134,6 +135,18 @@ public class ManifestEditor {
     manifestElement
         .getOrCreateAndroidAttribute("versionCode", VERSION_CODE_RESOURCE_ID)
         .setValueAsDecimalInteger(versionCode);
+    return this;
+  }
+
+  /** Sets higher 32 bits to versionCodeMajor and lower bits to versionCode. */
+  public ManifestEditor setLongVersionCode(long versionCode) {
+    setVersionCode((int) versionCode);
+    int versionCodeMajor = (int) (versionCode >> 32);
+    if (versionCodeMajor != 0) {
+      manifestElement
+          .getOrCreateAndroidAttribute("versionCodeMajor", VERSION_CODE_MAJOR_RESOURCE_ID)
+          .setValueAsDecimalInteger(versionCodeMajor);
+    }
     return this;
   }
 

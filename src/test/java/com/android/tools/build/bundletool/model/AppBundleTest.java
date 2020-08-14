@@ -29,6 +29,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.android.aapt.Resources.XmlNode;
 import com.android.bundle.Config.BundleConfig;
+import com.android.bundle.Config.BundleConfig.BundleType;
 import com.android.bundle.Targeting.Abi.AbiAlias;
 import com.android.tools.build.bundletool.io.ZipBuilder;
 import com.android.tools.build.bundletool.testing.AppBundleBuilder;
@@ -49,10 +50,10 @@ import org.junit.runners.JUnit4;
 public class AppBundleTest {
 
   private static final byte[] DUMMY_CONTENT = new byte[1];
+  private static final String PACKAGE_NAME = "com.test.app.detail";
   private static final BundleConfig BUNDLE_CONFIG = BundleConfigBuilder.create().build();
-  public static final XmlNode MANIFEST = androidManifest("com.test.app.detail");
-  public static final XmlNode ASSET_MODULE_MANIFEST =
-      androidManifestForAssetModule("com.test.app.detail");
+  public static final XmlNode MANIFEST = androidManifest(PACKAGE_NAME);
+  public static final XmlNode ASSET_MODULE_MANIFEST = androidManifestForAssetModule(PACKAGE_NAME);
 
   @Rule public TemporaryFolder tmp = new TemporaryFolder();
 
@@ -371,6 +372,35 @@ public class AppBundleTest {
       assertThat(appBundle.getAssetModules().keySet())
           .containsExactly(BundleModuleName.create("asset_module"));
     }
+  }
+
+  @Test
+  public void getPackageName() throws Exception {
+    AppBundle appBundle =
+        new AppBundleBuilder()
+            .addModule("base", baseModule -> baseModule.setManifest(MANIFEST))
+            .build();
+    assertThat(appBundle.getPackageName()).isEqualTo(PACKAGE_NAME);
+  }
+
+  @Test
+  public void getPackageName_assetOnly() throws Exception {
+    AppBundle appBundle =
+        new AppBundleBuilder()
+            .setBundleConfig(BundleConfig.newBuilder().setType(BundleType.ASSET_ONLY).build())
+            .addModule("asset1", baseModule -> baseModule.setManifest(ASSET_MODULE_MANIFEST))
+            .build();
+    assertThat(appBundle.getPackageName()).isEqualTo(PACKAGE_NAME);
+  }
+
+  @Test
+  public void isAssetOnly() throws Exception {
+    AppBundle appBundle =
+        new AppBundleBuilder()
+            .setBundleConfig(BundleConfig.newBuilder().setType(BundleType.ASSET_ONLY).build())
+            .addModule("asset1", baseModule -> baseModule.setManifest(ASSET_MODULE_MANIFEST))
+            .build();
+    assertThat(appBundle.isAssetOnly()).isTrue();
   }
 
   private static ZipBuilder createBasicZipBuilder(BundleConfig config) {

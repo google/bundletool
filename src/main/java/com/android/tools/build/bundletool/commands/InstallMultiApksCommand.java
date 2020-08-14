@@ -26,7 +26,6 @@ import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.ImmutableListMultimap.toImmutableListMultimap;
 import static com.google.common.collect.ImmutableMap.toImmutableMap;
 import static com.google.common.collect.Streams.stream;
-import static java.util.function.Function.identity;
 
 import com.android.bundle.Devices.DeviceSpec;
 import com.android.tools.build.bundletool.commands.CommandHelp.CommandDescription;
@@ -37,14 +36,13 @@ import com.android.tools.build.bundletool.device.BadgingInfoParser;
 import com.android.tools.build.bundletool.device.BadgingInfoParser.BadgingInfo;
 import com.android.tools.build.bundletool.device.Device;
 import com.android.tools.build.bundletool.device.DeviceAnalyzer;
-import com.android.tools.build.bundletool.device.MultiPackagesInstaller;
-import com.android.tools.build.bundletool.device.MultiPackagesInstaller.InstallableApk;
 import com.android.tools.build.bundletool.device.PackagesParser;
 import com.android.tools.build.bundletool.device.PackagesParser.InstalledPackageInfo;
 import com.android.tools.build.bundletool.flags.Flag;
 import com.android.tools.build.bundletool.flags.ParsedFlags;
 import com.android.tools.build.bundletool.io.TempDirectory;
 import com.android.tools.build.bundletool.model.Aapt2Command;
+import com.android.tools.build.bundletool.model.AdbCommand;
 import com.android.tools.build.bundletool.model.ZipPath;
 import com.android.tools.build.bundletool.model.exceptions.IncompatibleDeviceException;
 import com.android.tools.build.bundletool.model.exceptions.InvalidCommandException;
@@ -88,7 +86,6 @@ public abstract class InstallMultiApksCommand {
   private static final Flag<String> DEVICE_ID_FLAG = Flag.string("device-id");
   private static final Flag<Boolean> ENABLE_ROLLBACK_FLAG = Flag.booleanFlag("enable-rollback");
   private static final Flag<Boolean> UPDATE_ONLY_FLAG = Flag.booleanFlag("update-only");
-  private static final Flag<Boolean> NO_COMMIT_FLAG = Flag.booleanFlag("no-commit");
   private static final Flag<Path> AAPT2_PATH_FLAG = Flag.path("aapt2");
 
   private static final SystemEnvironmentProvider DEFAULT_PROVIDER =
@@ -97,6 +94,12 @@ public abstract class InstallMultiApksCommand {
   abstract Path getAdbPath();
 
   abstract Optional<Aapt2Command> getAapt2Command();
+
+  abstract Optional<AdbCommand> getAdbCommand();
+
+  private AdbCommand getOrCreateAdbCommand() {
+    return getAdbCommand().orElse(AdbCommand.create(getAdbPath()));
+  }
 
   abstract ImmutableList<Path> getApksArchivePaths();
 
@@ -108,14 +111,11 @@ public abstract class InstallMultiApksCommand {
 
   abstract boolean getUpdateOnly();
 
-  abstract boolean getNoCommitMode();
-
   abstract AdbServer getAdbServer();
 
   public static Builder builder() {
     return new AutoValue_InstallMultiApksCommand.Builder()
         .setEnableRollback(false)
-        .setNoCommitMode(false)
         .setUpdateOnly(false);
   }
 
@@ -127,6 +127,8 @@ public abstract class InstallMultiApksCommand {
     @CanIgnoreReturnValue
     abstract Builder setAapt2Command(Aapt2Command value);
 
+    abstract Builder setAdbCommand(AdbCommand value);
+
     @CanIgnoreReturnValue
     abstract Builder setApksArchivePaths(ImmutableList<Path> paths);
 
@@ -135,6 +137,7 @@ public abstract class InstallMultiApksCommand {
     @CanIgnoreReturnValue
     abstract Builder setApksArchiveZipPath(Path value);
 
+    @SuppressWarnings("unused")
     @CanIgnoreReturnValue
     Builder addApksArchivePath(Path value) {
       apksArchivePathsBuilder().add(value);
@@ -147,8 +150,6 @@ public abstract class InstallMultiApksCommand {
     abstract Builder setEnableRollback(boolean value);
 
     abstract Builder setUpdateOnly(boolean value);
-
-    abstract Builder setNoCommitMode(boolean value);
 
     /** The caller is responsible for the lifecycle of the {@link AdbServer}. */
     abstract Builder setAdbServer(AdbServer adbServer);
@@ -169,11 +170,11 @@ public abstract class InstallMultiApksCommand {
         .ifPresent(command::setDeviceId);
     ENABLE_ROLLBACK_FLAG.getValue(flags).ifPresent(command::setEnableRollback);
     UPDATE_ONLY_FLAG.getValue(flags).ifPresent(command::setUpdateOnly);
-    NO_COMMIT_FLAG.getValue(flags).ifPresent(command::setNoCommitMode);
     AAPT2_PATH_FLAG
         .getValue(flags)
         .ifPresent(
             aapt2Path -> command.setAapt2Command(Aapt2Command.createFromExecutablePath(aapt2Path)));
+
 
     Optional<ImmutableList<Path>> apksPaths = APKS_ARCHIVES_FLAG.getValue(flags);
     Optional<Path> apksArchiveZip = APKS_ARCHIVE_ZIP_FLAG.getValue(flags);
@@ -201,9 +202,6 @@ public abstract class InstallMultiApksCommand {
       DeviceSpec deviceSpec = deviceAnalyzer.getDeviceSpec(getDeviceId());
       Device device = deviceAnalyzer.getAndValidateDevice(getDeviceId());
 
-      MultiPackagesInstaller installer =
-          new MultiPackagesInstaller(device, getEnableRollback(), getNoCommitMode());
-
       Path aapt2Dir = tempDirectory.getPath().resolve("aapt2");
       Files.createDirectory(aapt2Dir);
       Supplier<Aapt2Command> aapt2CommandSupplier =
@@ -212,7 +210,7 @@ public abstract class InstallMultiApksCommand {
       ImmutableMap<String, InstalledPackageInfo> existingPackages =
           getPackagesInstalledOnDevice(device);
 
-      ImmutableListMultimap<String, InstallableApk> apkToInstallByPackage =
+      ImmutableList<InstallableApk> apksToInstall =
           getActualApksPaths(tempDirectory).stream()
               .flatMap(
                   apksArchivePath ->
@@ -220,13 +218,23 @@ public abstract class InstallMultiApksCommand {
                           apksWithPackageName(apksArchivePath, deviceSpec, aapt2CommandSupplier)))
               .filter(apk -> shouldInstall(apk, existingPackages))
               .flatMap(apks -> extractApkListFromApks(deviceSpec, apks, tempDirectory).stream())
-              .collect(toImmutableListMultimap(InstallableApk::getPackageName, identity()));
+              .collect(toImmutableList());
+      ImmutableListMultimap<String, String> apkToInstallByPackage =
+          apksToInstall.stream()
+              .collect(
+                  toImmutableListMultimap(
+                      InstallableApk::getPackageName,
+                      installableApk -> installableApk.getPath().toAbsolutePath().toString()));
 
-      if (apkToInstallByPackage.isEmpty()) {
+      if (apksToInstall.isEmpty()) {
         logger.warning("No packages found to install! Exiting...");
         return;
       }
-      installer.install(apkToInstallByPackage);
+
+      AdbCommand adbCommand = getOrCreateAdbCommand();
+      ImmutableList<String> commandResults =
+          adbCommand.installMultiPackage(apkToInstallByPackage, getEnableRollback(), getDeviceId());
+      logger.info(String.format("Output:\n%s", String.join("\n", commandResults)));
     }
   }
 
@@ -478,14 +486,6 @@ public abstract class InstallMultiApksCommand {
                 .build())
         .addFlag(
             FlagDescription.builder()
-                .setFlagName(NO_COMMIT_FLAG.getName())
-                .setOptional(true)
-                .setDescription(
-                    "Run the full install commands, but abandon the install session instead of"
-                        + " committing it.")
-                .build())
-        .addFlag(
-            FlagDescription.builder()
                 .setFlagName(AAPT2_PATH_FLAG.getName())
                 .setExampleValue("path/to/aapt2")
                 .setOptional(true)
@@ -500,5 +500,22 @@ public abstract class InstallMultiApksCommand {
       return getAapt2Command().get();
     }
     return CommandUtils.extractAapt2FromJar(tempDirectoryForJarCommand);
+  }
+
+  /** Represents pair of APK path and package name of this APK. */
+  @AutoValue
+  public abstract static class InstallableApk {
+
+    public static InstallableApk create(Path path, String packageName, long versionCode) {
+      return new AutoValue_InstallMultiApksCommand_InstallableApk(path, packageName, versionCode);
+    }
+
+    public abstract Path getPath();
+
+    public abstract String getPackageName();
+
+    public abstract long getVersionCode();
+
+    InstallableApk() {}
   }
 }

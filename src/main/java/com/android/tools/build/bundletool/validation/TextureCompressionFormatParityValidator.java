@@ -18,21 +18,36 @@ package com.android.tools.build.bundletool.validation;
 
 import static com.android.tools.build.bundletool.model.targeting.TargetingUtils.extractAssetsTargetedDirectories;
 import static com.android.tools.build.bundletool.model.targeting.TargetingUtils.extractTextureCompressionFormats;
+import static com.google.common.collect.MoreCollectors.toOptional;
 
+import com.android.bundle.Config.BundleConfig;
+import com.android.bundle.Config.Optimizations;
+import com.android.bundle.Config.SplitDimension;
+import com.android.bundle.Config.SplitDimension.Value;
 import com.android.bundle.Targeting.AssetsDirectoryTargeting;
 import com.android.bundle.Targeting.TextureCompressionFormat.TextureCompressionFormatAlias;
+import com.android.bundle.Targeting.TextureCompressionFormatTargeting;
+import com.android.tools.build.bundletool.model.AppBundle;
 import com.android.tools.build.bundletool.model.BundleModule;
 import com.android.tools.build.bundletool.model.exceptions.InvalidBundleException;
 import com.android.tools.build.bundletool.model.targeting.TargetedDirectory;
 import com.android.tools.build.bundletool.model.targeting.TargetingDimension;
+import com.android.tools.build.bundletool.model.utils.TextureCompressionUtils;
 import com.google.auto.value.AutoValue;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
+import java.util.List;
 import java.util.Optional;
 
 /**
- * Validate that all modules that contain directories with targeted texture formats support the same
- * set of texture formats (including "fallback" directories for untargeted textures).
+ * Validate that all modules that contain directories with targeted texture formats:
+ *
+ * <ul>
+ *   <li>Support the same set of texture formats (including "fallback" directories for untargeted
+ *       textures).
+ *   <li>Default texture format in the bundle configuration is included in all modules with TCF
+ *       targeting.
+ * </ul>
  */
 public class TextureCompressionFormatParityValidator extends SubValidator {
 
@@ -60,7 +75,90 @@ public class TextureCompressionFormatParityValidator extends SubValidator {
   }
 
   @Override
+  public void validateBundle(AppBundle bundle) {
+    BundleConfig bundleConfig = bundle.getBundleConfig();
+    Optimizations optimizations = bundleConfig.getOptimizations();
+    List<SplitDimension> splitDimensions = optimizations.getSplitsConfig().getSplitDimensionList();
+
+    Optional<String> tcfDefaultSuffix =
+        splitDimensions.stream()
+            .filter(dimension -> dimension.getValue().equals(Value.TEXTURE_COMPRESSION_FORMAT))
+            .map(dimension -> dimension.getSuffixStripping().getDefaultSuffix())
+            .collect(toOptional());
+
+    if (tcfDefaultSuffix.isPresent()) {
+      // Get the default texture compression format targeting, or an empty optional if fallback
+      // must be used.
+      Optional<TextureCompressionFormatTargeting> defaultTextureCompressionFormat =
+          Optional.ofNullable(
+              TextureCompressionUtils.TEXTURE_TO_TARGETING.get(tcfDefaultSuffix.get()));
+
+      validateFormatSupportedByAllModules(bundle, defaultTextureCompressionFormat);
+    }
+  }
+
+  @Override
   public void validateAllModules(ImmutableList<BundleModule> modules) {
+    validateAllModulesSupportSameFormats(modules);
+  }
+
+  /** Ensure the specified texture format is included in all modules. */
+  private static void validateFormatSupportedByAllModules(
+      AppBundle bundle,
+      Optional<TextureCompressionFormatTargeting> defaultTextureCompressionFormat) {
+    bundle
+        .getModules()
+        .values()
+        .forEach(
+            module -> {
+              SupportedTextureCompressionFormats moduleTextureCompressionFormats =
+                  getSupportedTextureCompressionFormats(module);
+
+              if (moduleTextureCompressionFormats.getFormats().isEmpty()) {
+                return;
+              }
+
+              if (!defaultTextureCompressionFormat.isPresent()) {
+                if (!moduleTextureCompressionFormats.getHasFallback()) {
+                  throw InvalidBundleException.builder()
+                      .withUserMessage(
+                          "When a standalone or universal APK is built, the fallback texture"
+                              + " folders (folders without #tcf suffixes) will be used, but module"
+                              + " '%s' has no such folders. Instead, it has folder(s) targeted for"
+                              + " formats %s. Either add missing folders or change the"
+                              + " configuration for the TEXTURE_COMPRESSION_FORMAT optimization to"
+                              + " specify a default suffix corresponding to the format to use in"
+                              + " the standalone and universal APKs.",
+                          module.getName(), moduleTextureCompressionFormats)
+                      .build();
+                }
+              } else {
+                TextureCompressionFormatAlias defaultTextureCompressionFormatAlias =
+                    defaultTextureCompressionFormat.get().getValue(0).getAlias();
+
+                if (!moduleTextureCompressionFormats
+                    .getFormats()
+                    .contains(defaultTextureCompressionFormatAlias)) {
+                  throw InvalidBundleException.builder()
+                      .withUserMessage(
+                          "When a standalone or universal APK is built, the texture folders for"
+                              + " format '%s' will be used, but module '%s' has no such folders."
+                              + " Instead, it has folder(s) targeted for formats %s. Either add"
+                              + " missing folders or change the configuration for the"
+                              + " TEXTURE_COMPRESSION_FORMAT optimization to specify a default"
+                              + " suffix corresponding to the format to use in the standalone and"
+                              + " universal APKs.",
+                          defaultTextureCompressionFormatAlias,
+                          module.getName(),
+                          moduleTextureCompressionFormats)
+                      .build();
+                }
+              }
+            });
+  }
+
+  /** Ensure the textutre formats are consistent across all modules. */
+  private static void validateAllModulesSupportSameFormats(ImmutableList<BundleModule> modules) {
     BundleModule referentialModule = null;
     SupportedTextureCompressionFormats referentialTextureCompressionFormats = null;
     for (BundleModule module : modules) {

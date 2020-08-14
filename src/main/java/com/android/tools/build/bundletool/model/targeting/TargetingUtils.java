@@ -64,6 +64,9 @@ public final class TargetingUtils {
     if (targeting.hasLanguage()) {
       dimensions.add(TargetingDimension.LANGUAGE);
     }
+    if (targeting.hasDeviceTier()) {
+      dimensions.add(TargetingDimension.DEVICE_TIER);
+    }
     return dimensions.build();
   }
 
@@ -305,9 +308,17 @@ public final class TargetingUtils {
         .collect(toImmutableSet());
   }
 
+  /** Checks if any of the targeted directories utilize device tier targeting. */
+  public static boolean containsDeviceTierTargeting(
+      ImmutableSet<TargetedDirectory> targetedDirectories) {
+    return targetedDirectories.stream()
+        .map(directory -> directory.getTargeting(TargetingDimension.DEVICE_TIER))
+        .anyMatch(Optional::isPresent);
+  }
+
   /**
-   * Update the module to remove the specified targeting from the assets: both the assets in
-   * assets config and the associated entries having the specified targeting will be updated.
+   * Update the module to remove the specified targeting from the assets: both the assets in assets
+   * config and the associated entries having the specified targeting will be updated.
    */
   public static ModuleSplit excludeAssetsTargetingOtherValue(
       ModuleSplit moduleSplit, TargetingDimension dimension, String value) {

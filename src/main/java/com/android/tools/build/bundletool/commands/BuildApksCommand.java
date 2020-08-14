@@ -23,8 +23,15 @@ import static com.android.tools.build.bundletool.commands.BuildApksCommand.ApkBu
 import static com.android.tools.build.bundletool.commands.CommandUtils.ANDROID_SERIAL_VARIABLE;
 import static com.android.tools.build.bundletool.model.utils.SdkToolsLocator.ANDROID_HOME_VARIABLE;
 import static com.android.tools.build.bundletool.model.utils.SdkToolsLocator.SYSTEM_PATH_VARIABLE;
+import static com.android.tools.build.bundletool.model.utils.files.FilePreconditions.checkFileDoesNotExist;
+import static com.android.tools.build.bundletool.model.utils.files.FilePreconditions.checkFileExistsAndExecutable;
+import static com.android.tools.build.bundletool.model.utils.files.FilePreconditions.checkFileExistsAndReadable;
 import static com.google.common.base.Preconditions.checkArgument;
 
+import com.android.apksig.SigningCertificateLineage;
+import com.android.apksig.apk.ApkFormatException;
+import com.android.apksig.util.DataSource;
+import com.android.apksig.util.DataSources;
 import com.android.bundle.Devices.DeviceSpec;
 import com.android.tools.build.bundletool.commands.CommandHelp.CommandDescription;
 import com.android.tools.build.bundletool.commands.CommandHelp.FlagDescription;
@@ -36,13 +43,18 @@ import com.android.tools.build.bundletool.io.TempDirectory;
 import com.android.tools.build.bundletool.model.Aapt2Command;
 import com.android.tools.build.bundletool.model.ApkListener;
 import com.android.tools.build.bundletool.model.ApkModifier;
+import com.android.tools.build.bundletool.model.KeystoreProperties;
 import com.android.tools.build.bundletool.model.OptimizationDimension;
 import com.android.tools.build.bundletool.model.Password;
+import com.android.tools.build.bundletool.model.SignerConfig;
 import com.android.tools.build.bundletool.model.SigningConfiguration;
 import com.android.tools.build.bundletool.model.SourceStamp;
+import com.android.tools.build.bundletool.model.exceptions.CommandExecutionException;
+import com.android.tools.build.bundletool.model.exceptions.InvalidBundleException;
 import com.android.tools.build.bundletool.model.exceptions.InvalidCommandException;
 import com.android.tools.build.bundletool.model.utils.DefaultSystemEnvironmentProvider;
 import com.android.tools.build.bundletool.model.utils.SystemEnvironmentProvider;
+import com.android.tools.build.bundletool.model.utils.files.FileUtils;
 import com.android.tools.build.bundletool.splitters.DexCompressionSplitter;
 import com.android.tools.build.bundletool.splitters.NativeLibrariesCompressionSplitter;
 import com.android.tools.build.bundletool.validation.SubValidator;
@@ -54,12 +66,21 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.io.MoreFiles;
 import com.google.common.util.concurrent.ListeningExecutorService;
 import com.google.common.util.concurrent.MoreExecutors;
+import java.io.File;
+import java.io.IOException;
 import java.io.PrintStream;
+import java.io.RandomAccessFile;
+import java.io.UncheckedIOException;
+import java.nio.ByteOrder;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.Optional;
 import java.util.concurrent.Executors;
+import java.util.logging.Logger;
 import java.util.stream.Collectors;
+import java.util.zip.ZipException;
+import java.util.zip.ZipFile;
 
 /** Command to generate APKs from an Android App Bundle. */
 @AutoValue
@@ -68,6 +89,8 @@ public abstract class BuildApksCommand {
   private static final int DEFAULT_THREAD_POOL_SIZE = 4;
 
   public static final String COMMAND_NAME = "build-apks";
+
+  private static final Logger logger = Logger.getLogger(BuildApksCommand.class.getName());
 
   /** Modes to run {@link BuildApksCommand} against to generate APKs. */
   public enum ApkBuildMode {
@@ -132,10 +155,14 @@ public abstract class BuildApksCommand {
   private static final Flag<Password> STAMP_KEY_PASSWORD_FLAG = Flag.password("stamp-key-pass");
   private static final Flag<String> STAMP_SOURCE_FLAG = Flag.string("stamp-source");
 
+
   private static final String APK_SET_ARCHIVE_EXTENSION = "apks";
 
   private static final SystemEnvironmentProvider DEFAULT_PROVIDER =
       new DefaultSystemEnvironmentProvider();
+
+  // Number embedded at the beginning of a zip file to indicate its file format.
+  private static final int ZIP_MAGIC = 0x04034b50;
 
   public abstract Path getBundlePath();
 
@@ -178,6 +205,7 @@ public abstract class BuildApksCommand {
   abstract boolean isExecutorServiceCreatedByBundleTool();
 
   public abstract boolean getCreateApkSetArchive();
+
 
   public abstract Optional<ApkListener> getApkListener();
 
@@ -317,6 +345,7 @@ public abstract class BuildApksCommand {
      * command will return the directory where the APK files were copied to.
      */
     public abstract Builder setCreateApkSetArchive(boolean value);
+
 
     /**
      * Provides an {@link ApkListener} that will be notified at defined stages of APK creation.
@@ -525,9 +554,7 @@ public abstract class BuildApksCommand {
         .getValue(flags)
         .map(deviceSpecParser)
         .ifPresent(buildApksCommand::setDeviceSpec);
-
     MODULES_FLAG.getValue(flags).ifPresent(buildApksCommand::setModules);
-
     VERBOSE_FLAG.getValue(flags).ifPresent(buildApksCommand::setVerbose);
 
     flags.checkNoUnknownFlags();
@@ -536,10 +563,55 @@ public abstract class BuildApksCommand {
   }
 
   public Path execute() {
-    try (TempDirectory tempDir = new TempDirectory()) {
-      Aapt2Command aapt2 =
-          getAapt2Command().orElseGet(() -> CommandUtils.extractAapt2FromJar(tempDir.getPath()));
-      return new BuildApksManager(this, aapt2, tempDir.getPath()).execute();
+    validateInput();
+
+    Path outputDirectory = getCreateApkSetArchive() ? getOutputFile().getParent() : getOutputFile();
+    if (outputDirectory != null && Files.notExists(outputDirectory)) {
+      logger.info("Output directory '" + outputDirectory + "' does not exist, creating it.");
+      FileUtils.createDirectories(outputDirectory);
+    }
+
+    try (TempDirectory tempDir = new TempDirectory();
+        ZipFile bundleZip = new ZipFile(getBundlePath().toFile())) {
+      BuildApksManager buildApksManager =
+          DaggerBuildApksManagerComponent.builder()
+              .setBuildApksCommand(this)
+              .setTempDirectory(tempDir)
+              .setBundleZip(bundleZip)
+              .build()
+              .create();
+      buildApksManager.execute();
+    } catch (ZipException e) {
+      throw InvalidBundleException.builder()
+          .withCause(e)
+          .withUserMessage("The App Bundle is not a valid zip file.")
+          .build();
+    } catch (IOException e) {
+      throw new UncheckedIOException("An error occurred when processing the App Bundle.", e);
+    } finally {
+      if (isExecutorServiceCreatedByBundleTool()) {
+        getExecutorService().shutdown();
+      }
+    }
+
+    return getOutputFile();
+  }
+
+  private void validateInput() {
+    checkFileExistsAndReadable(getBundlePath());
+
+    if (getCreateApkSetArchive() && !getOverwriteOutput()) {
+      checkFileDoesNotExist(getOutputFile());
+    }
+
+    if (getGenerateOnlyForConnectedDevice()) {
+      checkArgument(
+          getAdbServer().isPresent(),
+          "Property 'adbServer' is required when 'generateOnlyForConnectedDevice' is true.");
+      checkArgument(
+          getAdbPath().isPresent(),
+          "Property 'adbPath' is required when 'generateOnlyForConnectedDevice' is true.");
+      checkFileExistsAndExecutable(getAdbPath().get());
     }
   }
 
@@ -747,8 +819,8 @@ public abstract class BuildApksCommand {
                 .setFlagName(VERBOSE_FLAG.getName())
                 .setOptional(true)
                 .setDescription(
-                    "If set, prints extra information about the command execution "
-                        + "in the standard output.")
+                    "If set, prints extra information about the command execution in the standard"
+                        + " output.")
                 .build())
         .addFlag(
             FlagDescription.builder()
@@ -788,9 +860,12 @@ public abstract class BuildApksCommand {
     Optional<Password> keyPassword = KEY_PASSWORD_FLAG.getValue(flags);
 
     if (keystorePath.isPresent() && keyAlias.isPresent()) {
-      buildApksCommand.setSigningConfiguration(
-          SigningConfiguration.extractFromKeystore(
-              keystorePath.get(), keyAlias.get(), keystorePassword, keyPassword));
+      SignerConfig signerConfig =
+          SignerConfig.extractFromKeystore(
+              keystorePath.get(), keyAlias.get(), keystorePassword, keyPassword);
+      SigningConfiguration.Builder builder =
+          SigningConfiguration.builder().setSignerConfig(signerConfig);
+      buildApksCommand.setSigningConfiguration(builder.build());
     } else if (keystorePath.isPresent() && !keyAlias.isPresent()) {
       throw InvalidCommandException.builder()
           .withInternalMessage("Flag --ks-key-alias is required when --ks is set.")
@@ -815,6 +890,7 @@ public abstract class BuildApksCommand {
       }
     }
   }
+
 
   private static void populateSourceStampFromFlags(
       Builder buildApksCommand,

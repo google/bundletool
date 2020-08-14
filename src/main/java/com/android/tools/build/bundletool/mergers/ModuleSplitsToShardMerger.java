@@ -38,6 +38,7 @@ import com.android.bundle.Files.TargetedAssetsDirectory;
 import com.android.bundle.Targeting.ApkTargeting;
 import com.android.bundle.Targeting.VariantTargeting;
 import com.android.tools.build.bundletool.device.ApkMatcher;
+import com.android.tools.build.bundletool.io.TempDirectory;
 import com.android.tools.build.bundletool.model.AndroidManifest;
 import com.android.tools.build.bundletool.model.BundleMetadata;
 import com.android.tools.build.bundletool.model.BundleModuleName;
@@ -73,6 +74,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Stream;
+import javax.inject.Inject;
 
 /**
  * Merges given module splits into standalone APKs.
@@ -82,14 +84,16 @@ import java.util.stream.Stream;
  */
 public class ModuleSplitsToShardMerger {
 
+  private final Version bundletoolVersion;
+  private final TempDirectory globalTempDir;
   private final DexMerger dexMerger;
-  private final Version bundleVersion;
-  private final Path globalTempDir;
 
-  public ModuleSplitsToShardMerger(DexMerger dexMerger, Version bundleVersion, Path globalTempDir) {
-    this.dexMerger = dexMerger;
-    this.bundleVersion = bundleVersion;
+  @Inject
+  public ModuleSplitsToShardMerger(
+      Version bundletoolVersion, TempDirectory globalTempDir, DexMerger dexMerger) {
+    this.bundletoolVersion = bundletoolVersion;
     this.globalTempDir = globalTempDir;
+    this.dexMerger = dexMerger;
   }
 
   /**
@@ -188,7 +192,7 @@ public class ModuleSplitsToShardMerger {
         bundleMetadata,
         mergedDexCache,
         /* mergedSplitType= */ SplitType.STANDALONE,
-        FUSE_ACTIVITIES_FROM_FEATURE_MANIFESTS.enabledForVersion(bundleVersion)
+        FUSE_ACTIVITIES_FROM_FEATURE_MANIFESTS.enabledForVersion(bundletoolVersion)
             ? fusingMerger()
             : useBaseModuleManifestMerger());
   }
@@ -409,10 +413,10 @@ public class ModuleSplitsToShardMerger {
       BundleMetadata bundleMetadata,
       AndroidManifest androidManifest) {
     try {
-      Path dexOriginalDir = Files.createTempDirectory(globalTempDir, "dex-merging-in");
+      Path dexOriginalDir = Files.createTempDirectory(globalTempDir.getPath(), "dex-merging-in");
       // The merged dex files will be written to a sub-directory of the global temp directory
       // that exists throughout execution of a bundletool command.
-      Path dexMergedDir = Files.createTempDirectory(globalTempDir, "dex-merging-out");
+      Path dexMergedDir = Files.createTempDirectory(globalTempDir.getPath(), "dex-merging-out");
 
       // The dex merger requires the main dex list represented as a file.
       Optional<Path> mainDexListFile = writeMainDexListFileIfPresent(bundleMetadata);
@@ -493,7 +497,7 @@ public class ModuleSplitsToShardMerger {
       return Optional.empty();
     }
 
-    Path mainDexListFilePath = Files.createTempFile(globalTempDir, "mainDexList", ".txt");
+    Path mainDexListFilePath = Files.createTempFile(globalTempDir.getPath(), "mainDexList", ".txt");
     try (InputStream inputStream = mainDexListFile.get().openStream()) {
       Files.copy(inputStream, mainDexListFilePath, StandardCopyOption.REPLACE_EXISTING);
     }

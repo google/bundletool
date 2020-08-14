@@ -46,6 +46,7 @@ import com.google.common.collect.ImmutableMap;
 import com.google.errorprone.annotations.Immutable;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.UncheckedIOException;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Optional;
@@ -349,7 +350,7 @@ public abstract class BundleModule {
     }
 
     /** @see #addEntry(ModuleEntry) */
-    public Builder addEntries(Collection<ModuleEntry> entries) throws IOException {
+    public Builder addEntries(Collection<ModuleEntry> entries) {
       for (ModuleEntry entry : entries) {
         addEntry(entry);
       }
@@ -364,12 +365,14 @@ public abstract class BundleModule {
      *
      * @throws IOException when the entry cannot be read or has invalid contents
      */
-    public Builder addEntry(ModuleEntry moduleEntry) throws IOException {
+    public Builder addEntry(ModuleEntry moduleEntry) {
       Optional<SpecialModuleEntry> specialEntry =
           SpecialModuleEntry.getSpecialEntry(moduleEntry.getPath());
       if (specialEntry.isPresent()) {
         try (InputStream inputStream = moduleEntry.getContent().openStream()) {
           specialEntry.get().addToModule(this, inputStream);
+        } catch (IOException e) {
+          throw new UncheckedIOException(e);
         }
       } else {
         entryMapBuilder().put(moduleEntry.getPath(), moduleEntry);

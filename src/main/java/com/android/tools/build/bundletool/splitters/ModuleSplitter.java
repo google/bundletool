@@ -16,8 +16,11 @@
 
 package com.android.tools.build.bundletool.splitters;
 
+import static com.android.tools.build.bundletool.model.targeting.TargetingUtils.getMinSdk;
 import static com.android.tools.build.bundletool.model.utils.TargetingProtoUtils.lPlusVariantTargeting;
+import static com.android.tools.build.bundletool.model.utils.TargetingProtoUtils.sdkVersionFrom;
 import static com.android.tools.build.bundletool.model.utils.Versions.ANDROID_L_API_VERSION;
+import static com.android.tools.build.bundletool.model.utils.Versions.ANDROID_R_API_VERSION;
 import static com.android.tools.build.bundletool.model.version.VersionGuardedFeature.PIN_LOWEST_DENSITY_OF_EACH_STYLE_TO_MASTER;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Preconditions.checkState;
@@ -166,6 +169,7 @@ public class ModuleSplitter {
   private ImmutableList<ModuleSplit> splitModuleInternal() {
     ImmutableList<ModuleSplit> moduleSplits =
         runSplitters().stream()
+            .map(this::addApkTargetingForSigningConfiguration)
             .map(this::addLPlusApkTargeting)
             .map(this::writeSplitIdInManifest)
             .map(ModuleSplit::addApplicationElementIfMissingInManifest)
@@ -399,6 +403,27 @@ public class ModuleSplitter {
                                 .setMin(Int32Value.newBuilder().setValue(ANDROID_L_API_VERSION))))
                 .build())
         .build();
+  }
+
+  /**
+   * Adds R+ targeting to the {@link ApkTargeting} of a module split if (a) the configuration is set
+   * to restrict v3 signing to R+, and (b) the variant is targeted at R+. If SDK targeting already
+   * exists and is greater than R+, then it is not overridden.
+   */
+  private ModuleSplit addApkTargetingForSigningConfiguration(ModuleSplit split) {
+    if (apkGenerationConfiguration.getRestrictV3SigningToRPlus()
+        && getMinSdk(variantTargeting.getSdkVersionTargeting()) >= ANDROID_R_API_VERSION
+        && getMinSdk(split.getApkTargeting().getSdkVersionTargeting()) < ANDROID_R_API_VERSION) {
+      return split.toBuilder()
+          .setApkTargeting(
+              split.getApkTargeting().toBuilder()
+                  .setSdkVersionTargeting(
+                      SdkVersionTargeting.newBuilder()
+                          .addValue(sdkVersionFrom(ANDROID_R_API_VERSION)))
+                  .build())
+          .build();
+    }
+    return split;
   }
 
   private static boolean hasDefaultConfig(ResourceTableEntry entry) {

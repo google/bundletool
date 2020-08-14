@@ -35,6 +35,7 @@ import com.android.bundle.Targeting.ApkTargeting;
 import com.android.bundle.Targeting.AssetsDirectoryTargeting;
 import com.android.bundle.Targeting.DeviceFeature;
 import com.android.bundle.Targeting.DeviceFeatureTargeting;
+import com.android.bundle.Targeting.DeviceTierTargeting;
 import com.android.bundle.Targeting.GraphicsApi;
 import com.android.bundle.Targeting.GraphicsApiTargeting;
 import com.android.bundle.Targeting.LanguageTargeting;
@@ -119,6 +120,11 @@ public final class TargetingUtils {
   public static AssetsDirectoryTargeting assetsDirectoryTargeting(
       LanguageTargeting languageTargeting) {
     return AssetsDirectoryTargeting.newBuilder().setLanguage(languageTargeting).build();
+  }
+
+  public static AssetsDirectoryTargeting assetsDirectoryTargeting(
+      DeviceTierTargeting deviceTierTargeting) {
+    return AssetsDirectoryTargeting.newBuilder().setDeviceTier(deviceTierTargeting).build();
   }
 
   // Native.pb helper methods.
@@ -872,6 +878,12 @@ public final class TargetingUtils {
   public static TextureCompressionFormatTargeting alternativeTextureCompressionTargeting(
       TextureCompressionFormatAlias... alternatives) {
     return textureCompressionTargeting(ImmutableSet.of(), ImmutableSet.copyOf(alternatives));
+  }
+
+  // Device Tier targeting.
+
+  public static DeviceTierTargeting deviceTierTargeting(String tier) {
+    return DeviceTierTargeting.newBuilder().addValue(tier).build();
   }
 
   // Device Feature targeting.

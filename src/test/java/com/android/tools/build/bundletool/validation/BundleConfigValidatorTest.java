@@ -30,6 +30,7 @@ import com.android.tools.build.bundletool.model.utils.ResourcesUtils;
 import com.android.tools.build.bundletool.model.version.BundleToolVersion;
 import com.android.tools.build.bundletool.testing.AppBundleBuilder;
 import com.android.tools.build.bundletool.testing.BundleConfigBuilder;
+import com.android.tools.build.bundletool.testing.BundleModuleBuilder;
 import com.android.tools.build.bundletool.testing.ResourceTableBuilder;
 import java.io.IOException;
 import org.junit.Test;
@@ -267,6 +268,60 @@ public final class BundleConfigValidatorTest {
             InvalidBundleException.class,
             () -> new BundleConfigValidator().validateBundle(appBundle));
     assertThat(exception).hasMessageThat().contains("duplicate split dimensions");
+  }
+
+  @Test
+  public void optimizations_defaultDeviceTier_untargeted_unspecified() throws Exception {
+    AppBundleBuilder appBundleBuilder =
+        new AppBundleBuilder()
+            .addModule(
+                new BundleModuleBuilder("a")
+                    .addFile("assets/textures#tcf_astc/level1.assets")
+                    .addFile("assets/textures#tcf_astc/level1.assets")
+                    .setManifest(androidManifest("com.test.app"))
+                    .build());
+
+    new BundleConfigValidator().validateBundle(appBundleBuilder.build());
+  }
+
+  @Test
+  public void optimizations_defaultDeviceTier_targeted_specified() throws Exception {
+    AppBundleBuilder appBundleBuilder =
+        new AppBundleBuilder()
+            .setBundleConfig(
+                BundleConfigBuilder.create()
+                    .addSplitDimension(Value.DEVICE_TIER, false, false, "medium")
+                    .build())
+            .addModule(
+                new BundleModuleBuilder("a")
+                    .addFile("assets/textures#tier_medium/level1.assets")
+                    .addFile("assets/textures#tier_high/level1.assets")
+                    .setManifest(androidManifest("com.test.app"))
+                    .build());
+
+    new BundleConfigValidator().validateBundle(appBundleBuilder.build());
+  }
+
+  @Test
+  public void optimizations_defaultDeviceTier_targeted_unspecified_throws() throws Exception {
+    AppBundleBuilder appBundleBuilder =
+        new AppBundleBuilder()
+            .addModule(
+                new BundleModuleBuilder("a")
+                    .addFile("assets/textures#tier_medium/level1.assets")
+                    .addFile("assets/textures#tier_high/level1.assets")
+                    .setManifest(androidManifest("com.test.app"))
+                    .build());
+
+    InvalidBundleException e =
+        assertThrows(
+            InvalidBundleException.class,
+            () -> new BundleConfigValidator().validateBundle(appBundleBuilder.build()));
+    assertThat(e)
+        .hasMessageThat()
+        .contains(
+            "Module 'a' contains assets targeted by device tier but default device tier value has"
+                + " not been specified for the bundle.");
   }
 
   @Test

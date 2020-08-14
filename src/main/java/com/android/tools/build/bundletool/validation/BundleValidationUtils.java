@@ -87,6 +87,18 @@ public final class BundleValidationUtils {
         .equals(BundleConfig.BundleType.ASSET_ONLY);
   }
 
+  public static BundleModule expectBaseModule(ImmutableList<BundleModule> modules) {
+    return modules.stream()
+        .filter(BundleModule::isBaseModule)
+        .findFirst()
+        .orElseThrow(BundleValidationUtils::createNoBaseModuleException);
+  }
+
+  public static InvalidBundleException createNoBaseModuleException() {
+    return InvalidBundleException.createWithUserMessage(
+        "App Bundle does not contain a mandatory 'base' module.");
+  }
+
   // Do not instantiate.
   private BundleValidationUtils() {}
 }

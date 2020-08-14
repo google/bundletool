@@ -44,7 +44,8 @@ public class ModuleTitleValidator extends SubValidator {
       return;
     }
 
-    BundleModule baseModule = modules.stream().filter(BundleModule::isBaseModule).findFirst().get();
+    BundleModule baseModule = BundleValidationUtils.expectBaseModule(modules);
+    boolean isolatedSplits = baseModule.getAndroidManifest().getIsolatedSplits().orElse(false);
 
     // For bundles built using older versions we haven't strictly enforced module Title Validation.
     Version bundleVersion =
@@ -71,7 +72,11 @@ public class ModuleTitleValidator extends SubValidator {
         }
       } else if (!module.getDeliveryType().equals(ModuleDeliveryType.ALWAYS_INITIAL_INSTALL)) {
         Optional<Integer> titleRefId = module.getAndroidManifest().getTitleRefId();
-
+        if (isolatedSplits) {
+          // Isolated splits may be built independently from the base split, and can't include
+          // references into the base split resource table.
+          return;
+        }
         if (!titleRefId.isPresent()) {
           throw InvalidBundleException.builder()
               .withUserMessage(
