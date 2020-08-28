@@ -39,7 +39,6 @@ import com.android.tools.build.bundletool.model.ModuleConditions;
 import com.android.tools.build.bundletool.model.exceptions.InvalidBundleException;
 import com.android.tools.build.bundletool.model.exceptions.InvalidVersionCodeException;
 import com.android.tools.build.bundletool.model.utils.xmlproto.XmlProtoAttribute;
-import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Joiner;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMultimap;
@@ -50,7 +49,6 @@ import java.util.Optional;
 /** Validates {@code AndroidManifest.xml} file of each module. */
 public class AndroidManifestValidator extends SubValidator {
   private static final int MIN_INSTANT_SDK_VERSION = 21;
-  private static final int MIN_ISOLATED_SPLITS_VERSION = 26;
   private static final Joiner COMMA_JOINER = Joiner.on(',');
 
   @Override
@@ -63,7 +61,6 @@ public class AndroidManifestValidator extends SubValidator {
     if (!BundleValidationUtils.isAssetOnlyBundle(modules)) {
       validateInstant(modules);
       validateMinSdk(modules);
-      validateIsolatedSplits(modules);
     }
   }
 
@@ -159,33 +156,6 @@ public class AndroidManifestValidator extends SubValidator {
               "Modules cannot have a minSdkVersion attribute with a value lower than "
                   + "the one from the base module.")
           .build();
-    }
-  }
-
-  @VisibleForTesting
-  static void validateIsolatedSplits(ImmutableList<BundleModule> modules) {
-    BundleModule baseModule = BundleValidationUtils.expectBaseModule(modules);
-    int baseMinSdk = baseModule.getAndroidManifest().getEffectiveMinSdkVersion();
-    boolean isIsolatedSplits = baseModule.getAndroidManifest().getIsolatedSplits().orElse(false);
-    if (isIsolatedSplits) {
-      if (baseMinSdk < MIN_ISOLATED_SPLITS_VERSION) {
-        throw InvalidBundleException.builder()
-            .withUserMessage(
-                "minSdk (%s) is less than minimum sdk allowed for isolated splits (%s).",
-                baseMinSdk, MIN_ISOLATED_SPLITS_VERSION)
-            .build();
-      }
-      for (BundleModule module : modules) {
-        if (!module.isBaseModule()) {
-          Optional<Boolean> includedInFusingByManifest =
-              module.getAndroidManifest().getIsModuleIncludedInFusing();
-          if (!includedInFusingByManifest.isPresent() || includedInFusingByManifest.get()) {
-            throw InvalidBundleException.builder()
-                .withUserMessage("Isolated split modules must be excluded from fusing.")
-                .build();
-          }
-        }
-      }
     }
   }
 

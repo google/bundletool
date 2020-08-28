@@ -22,7 +22,6 @@ import static com.android.tools.build.bundletool.model.ManifestMutator.withSplit
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifest;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.compareManifestMutators;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.apkAbiTargeting;
-import static com.android.tools.build.bundletool.testing.TargetingUtils.lPlusVariantTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.nativeDirectoryTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.nativeLibraries;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.targetedNativeDirectory;
@@ -59,7 +58,6 @@ public class AbiNativeLibrariesSplitterTest {
     assertThat(splits).hasSize(1);
     ModuleSplit x86Split = splits.asList().get(0);
     assertThat(x86Split.getApkTargeting()).isEqualTo(apkAbiTargeting(X86));
-    assertThat(x86Split.getVariantTargeting()).isEqualTo(lPlusVariantTargeting());
     assertThat(extractPaths(x86Split.getEntries())).containsExactly("lib/x86/libnoname.so");
   }
 
@@ -98,7 +96,6 @@ public class AbiNativeLibrariesSplitterTest {
           .equals(apkAbiTargeting(ImmutableSet.of(X86_64), ImmutableSet.of(X86)))) {
         assertThat(extractPaths(split.getEntries())).containsExactly("lib/x86_64/libtest.so");
       }
-      assertThat(split.getVariantTargeting()).isEqualTo(lPlusVariantTargeting());
     }
   }
 
@@ -234,5 +231,4 @@ public class AbiNativeLibrariesSplitterTest {
     return createSingleLibraryModule(
         moduleName, architecture, "lib/" + architecture + "/libnoname.so");
   }
-
 }

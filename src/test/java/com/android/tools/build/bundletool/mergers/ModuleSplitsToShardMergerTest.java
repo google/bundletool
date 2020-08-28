@@ -18,12 +18,8 @@ package com.android.tools.build.bundletool.mergers;
 
 import static com.android.bundle.Targeting.Abi.AbiAlias.MIPS;
 import static com.android.bundle.Targeting.Abi.AbiAlias.X86;
-import static com.android.bundle.Targeting.Abi.AbiAlias.X86_64;
 import static com.android.tools.build.bundletool.model.AndroidManifest.THEME_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.version.BundleToolVersion.getCurrentVersion;
-import static com.android.tools.build.bundletool.testing.DeviceFactory.abis;
-import static com.android.tools.build.bundletool.testing.DeviceFactory.locales;
-import static com.android.tools.build.bundletool.testing.DeviceFactory.mergeSpecs;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifest;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withCustomThemeActivity;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withDebuggableAttribute;
@@ -39,9 +35,7 @@ import static com.android.tools.build.bundletool.testing.ResourcesTableFactory.v
 import static com.android.tools.build.bundletool.testing.TargetingUtils.apkAbiTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.apkDensityTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.apkLanguageTargeting;
-import static com.android.tools.build.bundletool.testing.TargetingUtils.apkMultiAbiTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.lPlusVariantTargeting;
-import static com.android.tools.build.bundletool.testing.TargetingUtils.languageTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.mergeApkTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.nativeDirectoryTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.nativeLibraries;
@@ -62,7 +56,6 @@ import static org.mockito.Mockito.verifyNoMoreInteractions;
 
 import com.android.aapt.ConfigurationOuterClass.Configuration;
 import com.android.aapt.Resources.Type;
-import com.android.bundle.Files.ApexImages;
 import com.android.bundle.Files.Assets;
 import com.android.bundle.Files.NativeLibraries;
 import com.android.bundle.Files.TargetedAssetsDirectory;
@@ -76,14 +69,11 @@ import com.android.tools.build.bundletool.model.BundleModuleName;
 import com.android.tools.build.bundletool.model.ModuleEntry;
 import com.android.tools.build.bundletool.model.ModuleSplit;
 import com.android.tools.build.bundletool.model.ModuleSplit.SplitType;
-import com.android.tools.build.bundletool.model.ShardedSystemSplits;
 import com.android.tools.build.bundletool.model.exceptions.CommandExecutionException;
 import com.android.tools.build.bundletool.model.utils.Versions;
 import com.android.tools.build.bundletool.model.version.Version;
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
-import com.google.common.collect.Iterables;
 import com.google.common.collect.Maps;
 import java.nio.file.Path;
 import java.util.HashMap;
@@ -124,196 +114,6 @@ public class ModuleSplitsToShardMergerTest {
   }
 
   @Test
-  public void merge_oneSetOfSplits_producesSingleShard() throws Exception {
-    ModuleSplit masterSplit = createModuleSplitBuilder().setMasterSplit(true).build();
-    ModuleSplit x86Split =
-        createModuleSplitBuilder()
-            .setEntries(
-                ImmutableList.of(createModuleEntryForFile("lib/x86/libtest.so", DUMMY_CONTENT)))
-            .setMasterSplit(false)
-            .setApkTargeting(apkAbiTargeting(X86))
-            .build();
-
-    ImmutableList<ModuleSplit> shards =
-        new ModuleSplitsToShardMerger(getCurrentVersion(), tmpDir, d8DexMerger)
-            .merge(ImmutableList.of(ImmutableList.of(masterSplit, x86Split)), NO_MAIN_DEX_LIST);
-
-    ModuleSplit shard = getOnlyElement(shards);
-    assertThat(shard.getApkTargeting()).isEqualTo(apkAbiTargeting(X86));
-    assertSingleEntryStandaloneShard(shard, "lib/x86/libtest.so");
-  }
-
-  @Test
-  public void merge_twoSetsOfSplits_producesTwoShards() throws Exception {
-    ModuleSplit masterSplit = createModuleSplitBuilder().setMasterSplit(true).build();
-    ModuleSplit x86Split =
-        createModuleSplitBuilder()
-            .setEntries(
-                ImmutableList.of(createModuleEntryForFile("lib/x86/libtest.so", DUMMY_CONTENT)))
-            .setMasterSplit(false)
-            .setApkTargeting(apkAbiTargeting(X86))
-            .build();
-    ModuleSplit mipsSplit =
-        createModuleSplitBuilder()
-            .setEntries(
-                ImmutableList.of(createModuleEntryForFile("lib/mips/libtest.so", DUMMY_CONTENT)))
-            .setMasterSplit(false)
-            .setApkTargeting(apkAbiTargeting(MIPS))
-            .build();
-
-    ImmutableList<ModuleSplit> shards =
-        new ModuleSplitsToShardMerger(getCurrentVersion(), tmpDir, d8DexMerger)
-            .merge(
-                ImmutableList.of(
-                    ImmutableList.of(masterSplit, x86Split),
-                    ImmutableList.of(masterSplit, mipsSplit)),
-                NO_MAIN_DEX_LIST);
-
-    assertThat(shards).hasSize(2);
-    ImmutableMap<ApkTargeting, ModuleSplit> shardsByTargeting =
-        Maps.uniqueIndex(shards, ModuleSplit::getApkTargeting);
-    assertSingleEntryStandaloneShard(
-        shardsByTargeting.get(apkAbiTargeting(X86)), "lib/x86/libtest.so");
-    assertSingleEntryStandaloneShard(
-        shardsByTargeting.get(apkAbiTargeting(MIPS)), "lib/mips/libtest.so");
-  }
-
-  @Test
-  public void mergeSystemShard_oneSetsOfSplits_producesOneShard() throws Exception {
-    ModuleSplit masterSplit = createModuleSplitBuilder().setMasterSplit(true).build();
-    ModuleSplit x86Split =
-        createModuleSplitBuilder()
-            .setEntries(
-                ImmutableList.of(createModuleEntryForFile("lib/x86/libtest.so", DUMMY_CONTENT)))
-            .setMasterSplit(false)
-            .setApkTargeting(apkAbiTargeting(X86))
-            .build();
-    ModuleSplit esSplit =
-        createModuleSplitBuilder()
-            .setEntries(
-                ImmutableList.of(
-                    createModuleEntryForFile("assets/i18n#lang_es/strings.pak", DUMMY_CONTENT)))
-            .setApkTargeting(apkLanguageTargeting(languageTargeting("es")))
-            .setMasterSplit(false)
-            .build();
-    ModuleSplit frSplit =
-        createModuleSplitBuilder()
-            .setEntries(
-                ImmutableList.of(
-                    createModuleEntryForFile("assets/i18n#lang_fr/strings.pak", DUMMY_CONTENT)))
-            .setApkTargeting(apkLanguageTargeting(languageTargeting("fr")))
-            .setMasterSplit(false)
-            .build();
-
-    ShardedSystemSplits shards =
-        new ModuleSplitsToShardMerger(getCurrentVersion(), tmpDir, d8DexMerger)
-            .mergeSystemShard(
-                ImmutableList.of(masterSplit, x86Split, esSplit, frSplit),
-                ImmutableSet.of(BundleModuleName.create("base")),
-                NO_MAIN_DEX_LIST,
-                mergeSpecs(abis("x86"), locales("es")));
-
-    ModuleSplit fusedSplit = shards.getSystemImageSplit();
-
-    assertThat(extractPaths(fusedSplit.getEntries()))
-        .containsExactly("lib/x86/libtest.so", "assets/i18n#lang_es/strings.pak");
-    assertThat(fusedSplit.getApkTargeting())
-        .isEqualTo(mergeApkTargeting(apkAbiTargeting(X86), apkLanguageTargeting("es")));
-    assertThat(fusedSplit.getVariantTargeting()).isEqualToDefaultInstance();
-    assertThat(fusedSplit.getSplitType()).isEqualTo(SplitType.STANDALONE);
-    assertThat(fusedSplit.isBaseModuleSplit()).isTrue();
-    assertThat(fusedSplit.getResourceTable()).isEmpty();
-    assertThat(fusedSplit.getAndroidManifest().getSplitId()).isEmpty();
-
-    ModuleSplit frLangSplit = Iterables.getOnlyElement(shards.getAdditionalSplits());
-
-    assertThat(extractPaths(frLangSplit.getEntries()))
-        .containsExactly("assets/i18n#lang_fr/strings.pak");
-    assertThat(frLangSplit.getApkTargeting()).isEqualTo(apkLanguageTargeting("fr"));
-    assertThat(frLangSplit.getSplitType()).isEqualTo(SplitType.SPLIT);
-    assertThat(frLangSplit.isMasterSplit()).isFalse();
-    assertThat(frLangSplit.getResourceTable()).isEmpty();
-    assertThat(frLangSplit.getAndroidManifest().getSplitId()).hasValue("config.fr");
-  }
-
-  @Test
-  public void mergeSystemShard_multipleModules_producesOneShard() throws Exception {
-    ModuleSplit masterSplit = createModuleSplitBuilder().setMasterSplit(true).build();
-    ModuleSplit esSplit =
-        createModuleSplitBuilder()
-            .setEntries(
-                ImmutableList.of(
-                    createModuleEntryForFile("assets/i18n#lang_es/strings.pak", DUMMY_CONTENT)))
-            .setApkTargeting(apkLanguageTargeting(languageTargeting("es")))
-            .setMasterSplit(false)
-            .build();
-    ModuleSplit frSplit =
-        createModuleSplitBuilder()
-            .setEntries(
-                ImmutableList.of(
-                    createModuleEntryForFile("assets/i18n#lang_fr/strings.pak", DUMMY_CONTENT)))
-            .setApkTargeting(apkLanguageTargeting(languageTargeting("fr")))
-            .setMasterSplit(false)
-            .build();
-
-    ModuleSplit esVrSplit =
-        createModuleSplitBuilder()
-            .setModuleName(BundleModuleName.create("vr"))
-            .setEntries(
-                ImmutableList.of(
-                    createModuleEntryForFile("assets/vr/i18n#lang_es/strings.pak", DUMMY_CONTENT)))
-            .setApkTargeting(apkLanguageTargeting(languageTargeting("es")))
-            .setMasterSplit(false)
-            .build();
-    ModuleSplit frVrSplit =
-        createModuleSplitBuilder()
-            .setModuleName(BundleModuleName.create("vr"))
-            .setEntries(
-                ImmutableList.of(
-                    createModuleEntryForFile("assets/vr/i18n#lang_fr/strings.pak", DUMMY_CONTENT)))
-            .setApkTargeting(apkLanguageTargeting(languageTargeting("fr")))
-            .setMasterSplit(false)
-            .build();
-    ModuleSplit itVrSplit =
-        createModuleSplitBuilder()
-            .setModuleName(BundleModuleName.create("vr"))
-            .setEntries(
-                ImmutableList.of(
-                    createModuleEntryForFile("assets/vr/i18n#lang_it/strings.pak", DUMMY_CONTENT)))
-            .setApkTargeting(apkLanguageTargeting(languageTargeting("it")))
-            .setMasterSplit(false)
-            .build();
-
-    ShardedSystemSplits shards =
-        new ModuleSplitsToShardMerger(getCurrentVersion(), tmpDir, d8DexMerger)
-            .mergeSystemShard(
-                ImmutableList.of(masterSplit, esSplit, frSplit, esVrSplit, frVrSplit, itVrSplit),
-                ImmutableSet.of(BundleModuleName.create("base"), BundleModuleName.create("vr")),
-                NO_MAIN_DEX_LIST,
-                mergeSpecs(abis("x86"), locales("fr")));
-
-    ModuleSplit fusedShard = shards.getSystemImageSplit();
-    assertThat(fusedShard.isBaseModuleSplit()).isTrue();
-
-    assertThat(extractPaths(fusedShard.getEntries()))
-        .containsExactly("assets/i18n#lang_fr/strings.pak", "assets/vr/i18n#lang_fr/strings.pak");
-
-    // es-base, it-base splits.
-    ImmutableList<ModuleSplit> langSplits = shards.getAdditionalSplits();
-    assertThat(langSplits).hasSize(2);
-
-    ImmutableMap<String, ModuleSplit> langSplitsNameMap =
-        Maps.uniqueIndex(langSplits, split -> split.getAndroidManifest().getSplitId().orElse(""));
-
-    assertThat(langSplitsNameMap.keySet()).containsExactly("config.es", "config.it");
-
-    assertThat(extractPaths(langSplitsNameMap.get("config.es").getEntries()))
-        .containsExactly("assets/i18n#lang_es/strings.pak", "assets/vr/i18n#lang_es/strings.pak");
-    assertThat(extractPaths(langSplitsNameMap.get("config.it").getEntries()))
-        .containsExactly("assets/vr/i18n#lang_it/strings.pak");
-  }
-
-  @Test
   public void mergeSingleShard_twoModulesTwoSplits() throws Exception {
     ModuleSplit baseModuleSplit =
         createModuleSplitBuilder()
@@ -329,11 +129,8 @@ public class ModuleSplitsToShardMergerTest {
             .build();
 
     ModuleSplit merged =
-        new ModuleSplitsToShardMerger(getCurrentVersion(), tmpDir, d8DexMerger)
-            .mergeSingleShard(
-                ImmutableList.of(baseModuleSplit, featureModuleSplit),
-                NO_MAIN_DEX_LIST,
-                createCache());
+        new ModuleSplitsToShardMerger(getCurrentVersion(), tmpDir, d8DexMerger, NO_MAIN_DEX_LIST)
+            .mergeSingleShard(ImmutableList.of(baseModuleSplit, featureModuleSplit), createCache());
 
     assertThat(extractPaths(merged.getEntries()))
         .containsExactly("assets/some_asset.txt", "assets/some_other_asset.txt");
@@ -372,11 +169,8 @@ public class ModuleSplitsToShardMergerTest {
             .build();
 
     ModuleSplit merged =
-        new ModuleSplitsToShardMerger(getCurrentVersion(), tmpDir, d8DexMerger)
-            .mergeSingleShard(
-                ImmutableList.of(baseModuleSplit, featureModuleSplit),
-                NO_MAIN_DEX_LIST,
-                createCache());
+        new ModuleSplitsToShardMerger(getCurrentVersion(), tmpDir, d8DexMerger, NO_MAIN_DEX_LIST)
+            .mergeSingleShard(ImmutableList.of(baseModuleSplit, featureModuleSplit), createCache());
 
     assertThat(extractPaths(merged.getEntries()))
         .containsExactly("assets/some_assets/file.txt", "assets/some_other_assets/file.txt");
@@ -425,11 +219,8 @@ public class ModuleSplitsToShardMergerTest {
             .build();
 
     ModuleSplit merged =
-        new ModuleSplitsToShardMerger(getCurrentVersion(), tmpDir, d8DexMerger)
-            .mergeSingleShard(
-                ImmutableList.of(baseModuleSplit, featureModuleSplit),
-                NO_MAIN_DEX_LIST,
-                createCache());
+        new ModuleSplitsToShardMerger(getCurrentVersion(), tmpDir, d8DexMerger, NO_MAIN_DEX_LIST)
+            .mergeSingleShard(ImmutableList.of(baseModuleSplit, featureModuleSplit), createCache());
 
     assertThat(extractPaths(merged.getEntries()))
         .containsExactly("assets/some_assets/file.txt", "assets/some_other_assets/file.txt");
@@ -475,9 +266,9 @@ public class ModuleSplitsToShardMergerTest {
         assertThrows(
             IllegalStateException.class,
             () ->
-                new ModuleSplitsToShardMerger(getCurrentVersion(), tmpDir, d8DexMerger)
-                    .mergeSingleShard(
-                        ImmutableList.of(split1, split2), NO_MAIN_DEX_LIST, createCache()));
+                new ModuleSplitsToShardMerger(
+                        getCurrentVersion(), tmpDir, d8DexMerger, NO_MAIN_DEX_LIST)
+                    .mergeSingleShard(ImmutableList.of(split1, split2), createCache()));
 
     assertThat(exception)
         .hasMessageThat()
@@ -499,9 +290,8 @@ public class ModuleSplitsToShardMergerTest {
         createModuleSplitBuilder().setModuleName(BundleModuleName.create("feature")).build();
 
     ModuleSplit merged =
-        new ModuleSplitsToShardMerger(getCurrentVersion(), tmpDir, d8DexMerger)
-            .mergeSingleShard(
-                ImmutableList.of(baseSplit, featureSplit), NO_MAIN_DEX_LIST, dexMergingCache);
+        new ModuleSplitsToShardMerger(getCurrentVersion(), tmpDir, d8DexMerger, NO_MAIN_DEX_LIST)
+            .mergeSingleShard(ImmutableList.of(baseSplit, featureSplit), dexMergingCache);
 
     assertThat(extractPaths(merged.getEntries()))
         .containsExactly("dex/classes.dex", "dex/classes2.dex");
@@ -529,9 +319,8 @@ public class ModuleSplitsToShardMergerTest {
             .build();
 
     ModuleSplit merged =
-        new ModuleSplitsToShardMerger(getCurrentVersion(), tmpDir, d8DexMerger)
-            .mergeSingleShard(
-                ImmutableList.of(baseSplit, featureSplit), NO_MAIN_DEX_LIST, dexMergingCache);
+        new ModuleSplitsToShardMerger(getCurrentVersion(), tmpDir, d8DexMerger, NO_MAIN_DEX_LIST)
+            .mergeSingleShard(ImmutableList.of(baseSplit, featureSplit), dexMergingCache);
 
     assertThat(extractPaths(merged.getEntries())).containsExactly("dex/classes.dex");
 
@@ -569,9 +358,8 @@ public class ModuleSplitsToShardMergerTest {
             .build();
 
     ModuleSplit merged =
-        new ModuleSplitsToShardMerger(getCurrentVersion(), tmpDir, d8DexMerger)
-            .mergeSingleShard(
-                ImmutableList.of(baseSplit, featureSplit), NO_MAIN_DEX_LIST, dexMergingCache);
+        new ModuleSplitsToShardMerger(getCurrentVersion(), tmpDir, d8DexMerger, NO_MAIN_DEX_LIST)
+            .mergeSingleShard(ImmutableList.of(baseSplit, featureSplit), dexMergingCache);
 
     assertThat(extractPaths(merged.getEntries()))
         .containsExactly("dex/classes.dex", "dex/classes2.dex", "dex/classes3.dex");
@@ -603,9 +391,8 @@ public class ModuleSplitsToShardMergerTest {
             .build();
 
     ModuleSplit merged =
-        new ModuleSplitsToShardMerger(getCurrentVersion(), tmpDir, d8DexMerger)
-            .mergeSingleShard(
-                ImmutableList.of(baseSplit, featureSplit), NO_MAIN_DEX_LIST, dexMergingCache);
+        new ModuleSplitsToShardMerger(getCurrentVersion(), tmpDir, d8DexMerger, NO_MAIN_DEX_LIST)
+            .mergeSingleShard(ImmutableList.of(baseSplit, featureSplit), dexMergingCache);
 
     assertThat(extractPaths(merged.getEntries()))
         .containsExactly("dex/classes.dex", "dex/classes2.dex");
@@ -632,8 +419,8 @@ public class ModuleSplitsToShardMergerTest {
             .build();
 
     ModuleSplit merged =
-        new ModuleSplitsToShardMerger(getCurrentVersion(), tmpDir, d8DexMerger)
-            .mergeSingleShard(ImmutableList.of(split1, split2), NO_MAIN_DEX_LIST, createCache());
+        new ModuleSplitsToShardMerger(getCurrentVersion(), tmpDir, d8DexMerger, NO_MAIN_DEX_LIST)
+            .mergeSingleShard(ImmutableList.of(split1, split2), createCache());
 
     assertThat(merged.getApkTargeting())
         .isEqualTo(mergeApkTargeting(apkAbiTargeting(X86), apkDensityTargeting(DensityAlias.HDPI)));
@@ -661,9 +448,8 @@ public class ModuleSplitsToShardMergerTest {
             .build();
 
     ModuleSplit merged =
-        new ModuleSplitsToShardMerger(getCurrentVersion(), tmpDir, d8DexMerger)
-            .mergeSingleShard(
-                ImmutableList.of(split1, split2, split3), NO_MAIN_DEX_LIST, createCache());
+        new ModuleSplitsToShardMerger(getCurrentVersion(), tmpDir, d8DexMerger, NO_MAIN_DEX_LIST)
+            .mergeSingleShard(ImmutableList.of(split1, split2, split3), createCache());
 
     assertThat(merged.getApkTargeting())
         .isEqualTo(
@@ -697,9 +483,8 @@ public class ModuleSplitsToShardMergerTest {
             .build();
 
     ModuleSplit merged =
-        new ModuleSplitsToShardMerger(getCurrentVersion(), tmpDir, d8DexMerger)
-            .mergeSingleShard(
-                ImmutableList.of(splitStrings, splitDrawables), NO_MAIN_DEX_LIST, createCache());
+        new ModuleSplitsToShardMerger(getCurrentVersion(), tmpDir, d8DexMerger, NO_MAIN_DEX_LIST)
+            .mergeSingleShard(ImmutableList.of(splitStrings, splitDrawables), createCache());
 
     assertThat(merged.getResourceTable().get())
         .ignoringRepeatedFieldOrder()
@@ -732,8 +517,8 @@ public class ModuleSplitsToShardMergerTest {
             .build();
 
     ModuleSplit shard =
-        new ModuleSplitsToShardMerger(getCurrentVersion(), tmpDir, d8DexMerger)
-            .mergeSingleShard(ImmutableList.of(split1, split2), NO_MAIN_DEX_LIST, createCache());
+        new ModuleSplitsToShardMerger(getCurrentVersion(), tmpDir, d8DexMerger, NO_MAIN_DEX_LIST)
+            .mergeSingleShard(ImmutableList.of(split1, split2), createCache());
 
     assertThat(shard.getAndroidManifest().getPackageName()).isEqualTo("com.test.app1");
     assertThat(extractActivityThemeRefIds(shard.getAndroidManifest()))
@@ -765,8 +550,8 @@ public class ModuleSplitsToShardMergerTest {
             .build();
 
     ModuleSplit shard =
-        new ModuleSplitsToShardMerger(Version.of("0.11.0"), tmpDir, d8DexMerger)
-            .mergeSingleShard(ImmutableList.of(split1, split2), NO_MAIN_DEX_LIST, createCache());
+        new ModuleSplitsToShardMerger(Version.of("0.11.0"), tmpDir, d8DexMerger, NO_MAIN_DEX_LIST)
+            .mergeSingleShard(ImmutableList.of(split1, split2), createCache());
 
     assertThat(shard.getAndroidManifest().getPackageName()).isEqualTo("com.test.app1");
     assertThat(extractActivityThemeRefIds(shard.getAndroidManifest()))
@@ -793,9 +578,9 @@ public class ModuleSplitsToShardMergerTest {
         assertThrows(
             CommandExecutionException.class,
             () ->
-                new ModuleSplitsToShardMerger(getCurrentVersion(), tmpDir, d8DexMerger)
-                    .mergeSingleShard(
-                        ImmutableList.of(split1, split2), NO_MAIN_DEX_LIST, createCache()));
+                new ModuleSplitsToShardMerger(
+                        getCurrentVersion(), tmpDir, d8DexMerger, NO_MAIN_DEX_LIST)
+                    .mergeSingleShard(ImmutableList.of(split1, split2), createCache()));
 
     assertThat(exception).hasMessageThat().contains("Expected to have base module");
   }
@@ -820,9 +605,9 @@ public class ModuleSplitsToShardMergerTest {
         assertThrows(
             CommandExecutionException.class,
             () ->
-                new ModuleSplitsToShardMerger(getCurrentVersion(), tmpDir, d8DexMerger)
-                    .mergeSingleShard(
-                        ImmutableList.of(split1, split2), NO_MAIN_DEX_LIST, createCache()));
+                new ModuleSplitsToShardMerger(
+                        getCurrentVersion(), tmpDir, d8DexMerger, NO_MAIN_DEX_LIST)
+                    .mergeSingleShard(ImmutableList.of(split1, split2), createCache()));
 
     assertThat(exception)
         .hasMessageThat()
@@ -841,12 +626,10 @@ public class ModuleSplitsToShardMergerTest {
         createModuleSplitBuilder().setNativeConfig(NativeLibraries.getDefaultInstance()).build();
 
     // We don't care about the merged result, just that the merging succeeds.
-    new ModuleSplitsToShardMerger(getCurrentVersion(), tmpDir, d8DexMerger)
-        .mergeSingleShard(
-            ImmutableList.of(splitNonDefault, splitDefault), NO_MAIN_DEX_LIST, createCache());
-    new ModuleSplitsToShardMerger(getCurrentVersion(), tmpDir, d8DexMerger)
-        .mergeSingleShard(
-            ImmutableList.of(splitDefault, splitNonDefault), NO_MAIN_DEX_LIST, createCache());
+    new ModuleSplitsToShardMerger(getCurrentVersion(), tmpDir, d8DexMerger, NO_MAIN_DEX_LIST)
+        .mergeSingleShard(ImmutableList.of(splitNonDefault, splitDefault), createCache());
+    new ModuleSplitsToShardMerger(getCurrentVersion(), tmpDir, d8DexMerger, NO_MAIN_DEX_LIST)
+        .mergeSingleShard(ImmutableList.of(splitDefault, splitNonDefault), createCache());
   }
 
   @Test
@@ -856,8 +639,8 @@ public class ModuleSplitsToShardMergerTest {
     ModuleSplit split2 =
         createModuleSplitBuilder().setModuleName(BundleModuleName.create("module2")).build();
 
-    new ModuleSplitsToShardMerger(getCurrentVersion(), tmpDir, d8DexMerger)
-        .mergeSingleShard(ImmutableList.of(split1, split2), NO_MAIN_DEX_LIST, createCache());
+    new ModuleSplitsToShardMerger(getCurrentVersion(), tmpDir, d8DexMerger, NO_MAIN_DEX_LIST)
+        .mergeSingleShard(ImmutableList.of(split1, split2), createCache());
   }
 
   @Test
@@ -865,8 +648,8 @@ public class ModuleSplitsToShardMergerTest {
     ModuleSplit split1 = createModuleSplitBuilder().setMasterSplit(true).build();
     ModuleSplit split2 = createModuleSplitBuilder().setMasterSplit(false).build();
 
-    new ModuleSplitsToShardMerger(getCurrentVersion(), tmpDir, d8DexMerger)
-        .mergeSingleShard(ImmutableList.of(split1, split2), NO_MAIN_DEX_LIST, createCache());
+    new ModuleSplitsToShardMerger(getCurrentVersion(), tmpDir, d8DexMerger, NO_MAIN_DEX_LIST)
+        .mergeSingleShard(ImmutableList.of(split1, split2), createCache());
   }
 
   @Test
@@ -877,11 +660,8 @@ public class ModuleSplitsToShardMergerTest {
         createModuleSplitBuilder().setModuleName(BundleModuleName.create("feature")).build();
 
     ModuleSplit merged =
-        new ModuleSplitsToShardMerger(getCurrentVersion(), tmpDir, d8DexMerger)
-            .mergeSingleShard(
-                ImmutableList.of(baseModuleSplit, featureModuleSplit),
-                NO_MAIN_DEX_LIST,
-                createCache());
+        new ModuleSplitsToShardMerger(getCurrentVersion(), tmpDir, d8DexMerger, NO_MAIN_DEX_LIST)
+            .mergeSingleShard(ImmutableList.of(baseModuleSplit, featureModuleSplit), createCache());
 
     assertThat(merged.getAndroidManifest().getFusedModuleNames())
         .containsExactly("base", "feature");
@@ -906,9 +686,8 @@ public class ModuleSplitsToShardMergerTest {
             .build();
     DexMerger spyDexMerger = Mockito.spy(d8DexMerger);
 
-    new ModuleSplitsToShardMerger(getCurrentVersion(), tmpDir, spyDexMerger)
-        .mergeSingleShard(
-            ImmutableList.of(baseModuleSplit, featureModuleSplit), NO_MAIN_DEX_LIST, createCache());
+    new ModuleSplitsToShardMerger(getCurrentVersion(), tmpDir, spyDexMerger, NO_MAIN_DEX_LIST)
+        .mergeSingleShard(ImmutableList.of(baseModuleSplit, featureModuleSplit), createCache());
 
     verify(spyDexMerger).merge(any(), any(), any(), /* isDebuggable= */ eq(false), anyInt());
     verifyNoMoreInteractions(spyDexMerger);
@@ -934,9 +713,8 @@ public class ModuleSplitsToShardMergerTest {
             .build();
     DexMerger spyDexMerger = Mockito.spy(d8DexMerger);
 
-    new ModuleSplitsToShardMerger(getCurrentVersion(), tmpDir, spyDexMerger)
-        .mergeSingleShard(
-            ImmutableList.of(baseModuleSplit, featureModuleSplit), NO_MAIN_DEX_LIST, createCache());
+    new ModuleSplitsToShardMerger(getCurrentVersion(), tmpDir, spyDexMerger, NO_MAIN_DEX_LIST)
+        .mergeSingleShard(ImmutableList.of(baseModuleSplit, featureModuleSplit), createCache());
 
     verify(spyDexMerger).merge(any(), any(), any(), anyBoolean(), /* minSdkVersion= */ eq(20));
     verifyNoMoreInteractions(spyDexMerger);
@@ -962,116 +740,11 @@ public class ModuleSplitsToShardMergerTest {
             .build();
     DexMerger spyDexMerger = Mockito.spy(d8DexMerger);
 
-    new ModuleSplitsToShardMerger(getCurrentVersion(), tmpDir, spyDexMerger)
-        .mergeSingleShard(
-            ImmutableList.of(baseModuleSplit, featureModuleSplit), NO_MAIN_DEX_LIST, createCache());
+    new ModuleSplitsToShardMerger(getCurrentVersion(), tmpDir, spyDexMerger, NO_MAIN_DEX_LIST)
+        .mergeSingleShard(ImmutableList.of(baseModuleSplit, featureModuleSplit), createCache());
 
     verify(spyDexMerger).merge(any(), any(), any(), /* isDebuggable= */ eq(true), anyInt());
     verifyNoMoreInteractions(spyDexMerger);
-  }
-
-  @Test
-  public void mergeApex_oneSetOfSplits_producesOneShard() throws Exception {
-    ApexImages apexConfig = ApexImages.getDefaultInstance();
-    ModuleSplit masterSplit =
-        createModuleSplitBuilder().setMasterSplit(true).setApexConfig(apexConfig).build();
-    ModuleSplit x86Split =
-        createModuleSplitBuilder()
-            .setEntries(ImmutableList.of(createModuleEntryForFile("apex/x86.img", DUMMY_CONTENT)))
-            .setMasterSplit(false)
-            .setApexConfig(apexConfig)
-            .setApkTargeting(apkMultiAbiTargeting(X86))
-            .build();
-
-    ImmutableList<ModuleSplit> shards =
-        new ModuleSplitsToShardMerger(getCurrentVersion(), tmpDir, d8DexMerger)
-            .mergeApex(ImmutableList.of(ImmutableList.of(masterSplit, x86Split)));
-
-    ModuleSplit x86Shard = getOnlyElement(shards);
-    assertThat(x86Shard.getApkTargeting()).isEqualTo(apkMultiAbiTargeting(X86));
-    assertSingleEntryStandaloneShard(x86Shard, "apex/x86.img");
-  }
-
-  @Test
-  public void mergeApex_twoSetsOfSplits_producesTwoShards() throws Exception {
-    ApexImages apexConfig = ApexImages.getDefaultInstance();
-    ModuleSplit masterSplit =
-        createModuleSplitBuilder().setMasterSplit(true).setApexConfig(apexConfig).build();
-    ModuleSplit x86Split =
-        createModuleSplitBuilder()
-            .setEntries(ImmutableList.of(createModuleEntryForFile("apex/x86.img", DUMMY_CONTENT)))
-            .setMasterSplit(false)
-            .setApexConfig(apexConfig)
-            .setApkTargeting(apkMultiAbiTargeting(X86))
-            .build();
-    ModuleSplit mipsSplit =
-        createModuleSplitBuilder()
-            .setEntries(ImmutableList.of(createModuleEntryForFile("apex/mips.img", DUMMY_CONTENT)))
-            .setMasterSplit(false)
-            .setApexConfig(apexConfig)
-            .setApkTargeting(apkMultiAbiTargeting(MIPS))
-            .build();
-
-    ImmutableList<ModuleSplit> shards =
-        new ModuleSplitsToShardMerger(getCurrentVersion(), tmpDir, d8DexMerger)
-            .mergeApex(
-                ImmutableList.of(
-                    ImmutableList.of(masterSplit, x86Split),
-                    ImmutableList.of(masterSplit, mipsSplit)));
-
-    assertThat(shards).hasSize(2);
-    ImmutableMap<ApkTargeting, ModuleSplit> shardsByTargeting =
-        Maps.uniqueIndex(shards, ModuleSplit::getApkTargeting);
-
-    assertSingleEntryStandaloneShard(
-        shardsByTargeting.get(apkMultiAbiTargeting(X86)), "apex/x86.img");
-    assertSingleEntryStandaloneShard(
-        shardsByTargeting.get(apkMultiAbiTargeting(MIPS)), "apex/mips.img");
-  }
-
-  @Test
-  public void mergeApex_twoSetsOfSplits_multipleAbi_producesTwoShards() throws Exception {
-    ApexImages apexConfig = ApexImages.getDefaultInstance();
-    ApkTargeting singleAbiTargeting =
-        apkMultiAbiTargeting(
-            ImmutableSet.of(ImmutableSet.of(X86_64)),
-            ImmutableSet.of(ImmutableSet.of(X86, X86_64)));
-    ApkTargeting doubleAbiTargeting =
-        apkMultiAbiTargeting(
-            ImmutableSet.of(ImmutableSet.of(X86, X86_64)),
-            ImmutableSet.of(ImmutableSet.of(X86_64)));
-    ModuleSplit masterSplit =
-        createModuleSplitBuilder().setMasterSplit(true).setApexConfig(apexConfig).build();
-    ModuleSplit singleAbiSplit =
-        createModuleSplitBuilder()
-            .setEntries(
-                ImmutableList.of(createModuleEntryForFile("apex/x86_64.img", DUMMY_CONTENT)))
-            .setMasterSplit(false)
-            .setApexConfig(apexConfig)
-            .setApkTargeting(singleAbiTargeting)
-            .build();
-    ModuleSplit doubleAbiSplit =
-        createModuleSplitBuilder()
-            .setEntries(
-                ImmutableList.of(createModuleEntryForFile("apex/x86_64.x86.img", DUMMY_CONTENT)))
-            .setMasterSplit(false)
-            .setApexConfig(apexConfig)
-            .setApkTargeting(doubleAbiTargeting)
-            .build();
-
-    ImmutableList<ModuleSplit> shards =
-        new ModuleSplitsToShardMerger(getCurrentVersion(), tmpDir, d8DexMerger)
-            .mergeApex(
-                ImmutableList.of(
-                    ImmutableList.of(masterSplit, doubleAbiSplit),
-                    ImmutableList.of(masterSplit, singleAbiSplit)));
-
-    assertThat(shards).hasSize(2);
-    ImmutableMap<ApkTargeting, ModuleSplit> shardsByTargeting =
-        Maps.uniqueIndex(shards, ModuleSplit::getApkTargeting);
-    assertSingleEntryStandaloneShard(shardsByTargeting.get(singleAbiTargeting), "apex/x86_64.img");
-    assertSingleEntryStandaloneShard(
-        shardsByTargeting.get(doubleAbiTargeting), "apex/x86_64.x86.img");
   }
 
   /** Creates {@link ModuleSplit.Builder} with fields pre-populated to default values. */
@@ -1092,12 +765,6 @@ public class ModuleSplitsToShardMergerTest {
   private static byte[] dexData(ModuleSplit module, String entryPath) throws Exception {
     ModuleEntry mergedDexEntry = module.findEntry(entryPath).get();
     return mergedDexEntry.getContent().read();
-  }
-
-  private static void assertSingleEntryStandaloneShard(ModuleSplit shard, String entry) {
-    assertThat(shard.getVariantTargeting()).isEqualToDefaultInstance();
-    assertThat(shard.getSplitType()).isEqualTo(SplitType.STANDALONE);
-    assertThat(extractPaths(shard.getEntries())).containsExactly(entry);
   }
 
   private static Map<String, Integer> extractActivityThemeRefIds(AndroidManifest manifest) {

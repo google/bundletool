@@ -28,7 +28,7 @@ public final class SplittingPipeline {
 
   private final ImmutableList<ModuleSplitSplitter> splitters;
 
-  SplittingPipeline(ImmutableList<ModuleSplitSplitter> splitters) {
+  public SplittingPipeline(ImmutableList<ModuleSplitSplitter> splitters) {
     this.splitters = splitters;
   }
 

@@ -16,9 +16,7 @@
 
 package com.android.tools.build.bundletool.model.exceptions;
 
-import com.android.bundle.Errors.BundleToolError;
 import com.android.bundle.Errors.BundleToolError.ErrorType;
-import com.android.bundle.Errors.ManifestMissingVersionCodeError;
 
 /** Indicates bundle with invalid version code (another error type for Play Console) */
 public class InvalidVersionCodeException extends InvalidBundleException {
@@ -26,7 +24,6 @@ public class InvalidVersionCodeException extends InvalidBundleException {
   private InvalidVersionCodeException(String message) {
     super(ErrorType.INVALID_VERSION_CODE_ERROR, message, message, null);
   }
-
 
   public static InvalidVersionCodeException createMissingVersionCodeException() {
     return new InvalidVersionCodeException("Version code not found in manifest.");

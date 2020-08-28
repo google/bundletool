@@ -21,6 +21,7 @@ import com.android.tools.build.bundletool.model.AndroidManifest;
 import com.android.tools.build.bundletool.model.AppBundle;
 import com.android.tools.build.bundletool.model.BundleModule;
 import com.google.common.annotations.VisibleForTesting;
+import javax.inject.Inject;
 
 /**
  * Preprocessor that injects local testing metadata into the base module's manifest.
@@ -30,6 +31,9 @@ import com.google.common.annotations.VisibleForTesting;
 public class LocalTestingPreprocessor implements AppBundlePreprocessor {
   public static final String METADATA_NAME = "local_testing_dir";
   @VisibleForTesting static final String METADATA_VALUE = "local_testing";
+
+  @Inject
+  LocalTestingPreprocessor() {}
 
   @Override
   public AppBundle preprocess(AppBundle bundle) {

@@ -25,6 +25,7 @@ import static com.google.common.collect.ImmutableSet.toImmutableSet;
 
 import com.android.bundle.Files.Assets;
 import com.android.bundle.Files.TargetedAssetsDirectory;
+import com.android.bundle.Targeting.ApkTargeting;
 import com.android.bundle.Targeting.AssetsDirectoryTargeting;
 import com.android.bundle.Targeting.SdkVersion;
 import com.android.bundle.Targeting.SdkVersionTargeting;
@@ -89,8 +90,7 @@ public final class TargetingUtils {
                 .map(variantTargeting -> variantTargeting.getSdkVersionTargeting())
                 .collect(toImmutableList()));
 
-    return sdkVersionTargetings
-        .stream()
+    return sdkVersionTargetings.stream()
         .map(
             sdkVersionTargeting ->
                 VariantTargeting.newBuilder().setSdkVersionTargeting(sdkVersionTargeting).build())
@@ -147,8 +147,7 @@ public final class TargetingUtils {
         sdkVersionTargeting -> checkState(sdkVersionTargeting.getValueList().size() == 1));
 
     ImmutableList<Integer> minSdkValues =
-        sdkVersionTargetings
-            .stream()
+        sdkVersionTargetings.stream()
             .map(sdkVersionTargeting -> sdkVersionTargeting.getValue(0).getMin().getValue())
             .distinct()
             .sorted()
@@ -157,8 +156,7 @@ public final class TargetingUtils {
     ImmutableSet<SdkVersion> sdkVersions =
         minSdkValues.stream().map(TargetingProtoUtils::sdkVersionFrom).collect(toImmutableSet());
 
-    return sdkVersions
-        .stream()
+    return sdkVersions.stream()
         .map(
             sdkVersion ->
                 sdkVersionTargeting(
@@ -179,9 +177,7 @@ public final class TargetingUtils {
   public static int getMaxSdk(SdkVersionTargeting sdkVersionTargeting) {
     int minSdk = getMinSdk(sdkVersionTargeting);
     int alternativeMinSdk =
-        sdkVersionTargeting
-            .getAlternativesList()
-            .stream()
+        sdkVersionTargeting.getAlternativesList().stream()
             .mapToInt(alternativeSdk -> alternativeSdk.getMin().getValue())
             .filter(sdkValue -> minSdk < sdkValue)
             .min()
@@ -195,6 +191,29 @@ public final class TargetingUtils {
         .setSdkVersionTargeting(
             SdkVersionTargeting.newBuilder().addValue(TargetingProtoUtils.sdkVersionFrom(minSdk)))
         .build();
+  }
+
+  public static VariantTargeting standaloneApkVariantTargeting(ModuleSplit standaloneApk) {
+    ApkTargeting apkTargeting = standaloneApk.getApkTargeting();
+
+    VariantTargeting.Builder variantTargeting =
+        sdkVariantTargeting(standaloneApk.getAndroidManifest().getEffectiveMinSdkVersion())
+            .toBuilder();
+    if (apkTargeting.hasAbiTargeting()) {
+      variantTargeting.setAbiTargeting(apkTargeting.getAbiTargeting());
+    }
+    if (apkTargeting.hasScreenDensityTargeting()) {
+      variantTargeting.setScreenDensityTargeting(apkTargeting.getScreenDensityTargeting());
+    }
+    if (apkTargeting.hasMultiAbiTargeting()) {
+      variantTargeting.setMultiAbiTargeting(apkTargeting.getMultiAbiTargeting());
+    }
+    if (apkTargeting.hasTextureCompressionFormatTargeting()) {
+      variantTargeting.setTextureCompressionFormatTargeting(
+          apkTargeting.getTextureCompressionFormatTargeting());
+    }
+
+    return variantTargeting.build();
   }
 
   /**
@@ -241,8 +260,7 @@ public final class TargetingUtils {
     Assets.Builder updatedAssetsConfig = assetsConfig.toBuilder().clearDirectory();
     ImmutableList<ModuleEntry> updatedEntries = moduleSplit.getEntries();
 
-    for (TargetedAssetsDirectory targetedAssetsDirectory :
-        assetsConfig.getDirectoryList()) {
+    for (TargetedAssetsDirectory targetedAssetsDirectory : assetsConfig.getDirectoryList()) {
       TargetedAssetsDirectory updatedTargetedAssetsDirectory =
           removeAssetsTargetingFromDirectory(targetedAssetsDirectory, dimension);
 
@@ -331,8 +349,7 @@ public final class TargetingUtils {
     Assets.Builder updatedAssetsConfig = assetsConfig.toBuilder().clearDirectory();
     ImmutableList<ModuleEntry> updatedEntries = moduleSplit.getEntries();
 
-    for (TargetedAssetsDirectory targetedAssetsDirectory :
-        assetsConfig.getDirectoryList()) {
+    for (TargetedAssetsDirectory targetedAssetsDirectory : assetsConfig.getDirectoryList()) {
       ZipPath directoryPath = ZipPath.create(targetedAssetsDirectory.getPath());
 
       // Check if the directory is targeted at this dimension, but for another value.

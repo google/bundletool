@@ -45,6 +45,8 @@ public abstract class SigningConfiguration {
     return signerConfig;
   }
 
+  public abstract Builder toBuilder();
+
   public static Builder builder() {
     return new AutoValue_SigningConfiguration.Builder().setRestrictV3SigningToRPlus(false);
   }

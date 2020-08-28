@@ -29,6 +29,9 @@ import com.android.bundle.Targeting.ScreenDensity;
 import com.android.bundle.Targeting.ScreenDensity.DensityAlias;
 import com.android.tools.build.bundletool.model.ResourceTableEntry;
 import com.android.tools.build.bundletool.model.ZipPath;
+import com.google.common.cache.CacheBuilder;
+import com.google.common.cache.CacheLoader;
+import com.google.common.cache.LoadingCache;
 import com.google.common.collect.ImmutableBiMap;
 import com.google.common.collect.ImmutableCollection;
 import com.google.common.collect.ImmutableMap;
@@ -42,6 +45,16 @@ import java.util.stream.Stream;
 
 /** Helpers related to APK resources qualifiers. */
 public final class ResourcesUtils {
+
+  private static final LoadingCache<String, String> localeToLanguageCache =
+      CacheBuilder.newBuilder()
+          .build(
+              new CacheLoader<String, String>() {
+                @Override
+                public String load(String locale) {
+                  return Locale.forLanguageTag(locale).getLanguage();
+                }
+              });
 
   public static final ImmutableBiMap<String, DensityAlias> SCREEN_DENSITY_TO_PROTO_VALUE_MAP =
       ImmutableBiMap.<String, DensityAlias>builder()
@@ -189,7 +202,7 @@ public final class ResourcesUtils {
    * @return a two character language code conforming to ISO-639-1.
    */
   public static String convertLocaleToLanguage(String locale) {
-    return Locale.forLanguageTag(locale).getLanguage();
+    return localeToLanguageCache.getUnchecked(locale);
   }
 
   public static Optional<Entry> lookupEntryByResourceId(
@@ -215,6 +228,7 @@ public final class ResourcesUtils {
   public static ImmutableSet<String> getAllLanguages(ResourceTable table) {
     return configValues(table)
         .map(configValue -> configValue.getConfig().getLocale())
+        .distinct()
         .map(ResourcesUtils::convertLocaleToLanguage)
         .collect(toImmutableSet());
   }

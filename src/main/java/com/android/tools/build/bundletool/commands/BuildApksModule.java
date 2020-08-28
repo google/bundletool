@@ -31,6 +31,7 @@ import com.android.tools.build.bundletool.optimizations.OptimizationsMerger;
 import com.google.common.util.concurrent.ListeningExecutorService;
 import dagger.Module;
 import dagger.Provides;
+import java.io.PrintStream;
 import java.lang.annotation.Retention;
 import java.util.Optional;
 import javax.inject.Qualifier;
@@ -97,6 +98,12 @@ public final class BuildApksModule {
   @Provides
   static Optional<Integer> provideFirstVariantNumber(BuildApksCommand command) {
     return command.getFirstVariantNumber();
+  }
+
+  @CommandScoped
+  @Provides
+  static Optional<PrintStream> provideOutputPrintStream(BuildApksCommand command) {
+    return command.getOutputPrintStream();
   }
 
   @CommandScoped

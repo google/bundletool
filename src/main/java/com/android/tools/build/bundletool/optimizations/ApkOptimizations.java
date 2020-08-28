@@ -76,7 +76,9 @@ public abstract class ApkOptimizations {
 
   public abstract ImmutableSet<OptimizationDimension> getStandaloneDimensions();
 
-  static Builder builder() {
+  public abstract Builder toBuilder();
+
+  public static Builder builder() {
     return new AutoValue_ApkOptimizations.Builder()
         .setUncompressNativeLibraries(false)
         .setUncompressDexFiles(false);
@@ -84,17 +86,17 @@ public abstract class ApkOptimizations {
 
   /** Builder for the {@link ApkOptimizations} class. */
   @AutoValue.Builder
-  abstract static class Builder {
-    abstract Builder setSplitDimensions(ImmutableSet<OptimizationDimension> splitDimensions);
+  public abstract static class Builder {
+    public abstract Builder setSplitDimensions(ImmutableSet<OptimizationDimension> splitDimensions);
 
-    abstract Builder setUncompressNativeLibraries(boolean enable);
+    public abstract Builder setUncompressNativeLibraries(boolean enable);
 
-    abstract Builder setUncompressDexFiles(boolean enable);
+    public abstract Builder setUncompressDexFiles(boolean enable);
 
-    abstract Builder setStandaloneDimensions(
+    public abstract Builder setStandaloneDimensions(
         ImmutableSet<OptimizationDimension> standaloneDimensions);
 
-    abstract ApkOptimizations build();
+    public abstract ApkOptimizations build();
   }
 
   /**

@@ -300,39 +300,6 @@ public class AppBundleTest {
   }
 
   @Test
-  public void renderscript_bcFilesPresent() throws Exception {
-    AppBundle appBundle =
-        new AppBundleBuilder()
-            .addModule(
-                "base",
-                baseModule ->
-                    baseModule.setManifest(MANIFEST).addFile("dex/classes.dex", DUMMY_CONTENT))
-            .addModule(
-                "detail",
-                module -> module.setManifest(MANIFEST).addFile("res/raw/script.bc", DUMMY_CONTENT))
-            .build();
-
-    assertThat(appBundle.has32BitRenderscriptCode()).isTrue();
-  }
-
-  @Test
-  public void renderscript_bcFilesAbsent() throws Exception {
-    AppBundle appBundle =
-        new AppBundleBuilder()
-            .addModule(
-                "base",
-                baseModule ->
-                    baseModule.setManifest(MANIFEST).addFile("dex/classes.dex", DUMMY_CONTENT))
-            .addModule(
-                "detail",
-                module ->
-                    module.setManifest(MANIFEST).addFile("assets/language.pak", DUMMY_CONTENT))
-            .build();
-
-    assertThat(appBundle.has32BitRenderscriptCode()).isFalse();
-  }
-
-  @Test
   public void baseAndAssetModule_fromModules_areSeparated() throws Exception {
     AppBundle appBundle =
         new AppBundleBuilder()

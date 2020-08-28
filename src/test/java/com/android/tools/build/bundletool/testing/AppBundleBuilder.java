@@ -49,6 +49,14 @@ public class AppBundleBuilder {
     return this;
   }
 
+  public AppBundleBuilder addModule(
+      String name, BundleConfig bundleConfig, Consumer<BundleModuleBuilder> operations) {
+    BundleModuleBuilder moduleBuilder = new BundleModuleBuilder(name, bundleConfig);
+    operations.accept(moduleBuilder);
+    modules.add(moduleBuilder.build());
+    return this;
+  }
+
   public AppBundleBuilder addModule(BundleModule bundleModule) {
     modules.add(bundleModule);
     return this;

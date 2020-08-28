@@ -79,7 +79,6 @@ import static com.android.tools.build.bundletool.testing.ResourcesTableFactory.T
 import static com.android.tools.build.bundletool.testing.ResourcesTableFactory.USER_PACKAGE_OFFSET;
 import static com.android.tools.build.bundletool.testing.ResourcesTableFactory.locale;
 import static com.android.tools.build.bundletool.testing.ResourcesTableFactory.resourceTableWithTestLabel;
-import static com.android.tools.build.bundletool.testing.TargetingUtils.abiTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.alternativeLanguageTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.alternativeTextureCompressionTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.apexImageTargeting;
@@ -115,7 +114,6 @@ import static com.google.common.collect.MoreCollectors.onlyElement;
 import static com.google.common.truth.Truth.assertThat;
 import static com.google.common.truth.Truth8.assertThat;
 import static com.google.common.truth.extensions.proto.ProtoTruth.assertThat;
-import static java.nio.charset.StandardCharsets.UTF_8;
 import static junit.framework.TestCase.fail;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -147,7 +145,6 @@ import com.android.bundle.Config.StandaloneConfig;
 import com.android.bundle.Files.ApexImages;
 import com.android.bundle.Targeting.Abi;
 import com.android.bundle.Targeting.Abi.AbiAlias;
-import com.android.bundle.Targeting.AbiTargeting;
 import com.android.bundle.Targeting.ApkTargeting;
 import com.android.bundle.Targeting.AssetsDirectoryTargeting;
 import com.android.bundle.Targeting.LanguageTargeting;
@@ -160,22 +157,20 @@ import com.android.bundle.Targeting.TextureCompressionFormatTargeting;
 import com.android.bundle.Targeting.VariantTargeting;
 import com.android.tools.build.bundletool.TestData;
 import com.android.tools.build.bundletool.commands.BuildApksCommand.ApkBuildMode;
+import com.android.tools.build.bundletool.commands.BuildApksCommand.SystemApkOption;
 import com.android.tools.build.bundletool.device.AdbServer;
 import com.android.tools.build.bundletool.io.AppBundleSerializer;
-import com.android.tools.build.bundletool.io.ZipBuilder;
 import com.android.tools.build.bundletool.model.AndroidManifest;
 import com.android.tools.build.bundletool.model.ApkModifier;
 import com.android.tools.build.bundletool.model.AppBundle;
 import com.android.tools.build.bundletool.model.SigningConfiguration;
 import com.android.tools.build.bundletool.model.SourceStamp;
 import com.android.tools.build.bundletool.model.ZipPath;
-import com.android.tools.build.bundletool.model.exceptions.InvalidBundleException;
 import com.android.tools.build.bundletool.model.exceptions.InvalidVersionCodeException;
 import com.android.tools.build.bundletool.model.utils.CertificateHelper;
 import com.android.tools.build.bundletool.model.utils.files.FilePreconditions;
 import com.android.tools.build.bundletool.model.version.BundleToolVersion;
 import com.android.tools.build.bundletool.model.version.Version;
-import com.android.tools.build.bundletool.preprocessors.LocalTestingPreprocessor;
 import com.android.tools.build.bundletool.testing.Aapt2Helper;
 import com.android.tools.build.bundletool.testing.ApkSetUtils;
 import com.android.tools.build.bundletool.testing.AppBundleBuilder;
@@ -186,7 +181,6 @@ import com.android.tools.build.bundletool.testing.FileUtils;
 import com.android.tools.build.bundletool.testing.ResourceTableBuilder;
 import com.android.tools.build.bundletool.testing.TestModule;
 import com.android.tools.build.bundletool.testing.truth.zip.TruthZip;
-import com.android.tools.build.bundletool.validation.SubValidator;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableMultiset;
@@ -201,11 +195,9 @@ import com.google.common.util.concurrent.MoreExecutors;
 import com.google.protobuf.ExtensionRegistry;
 import com.google.protobuf.Int32Value;
 import dagger.Component;
-import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.io.PrintStream;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -830,34 +822,6 @@ public class BuildApksManagerTest {
   }
 
   @Test
-  public void bundleWithDirectoryZipEntries_throws() throws Exception {
-    AppBundle tmpBundle =
-        new AppBundleBuilder()
-            .addModule("base", module -> module.setManifest(androidManifest("com.app")))
-            .build();
-    Path tmpBundlePath = createAndStoreBundle(tmpBundle);
-
-    // Copy the valid bundle, only add a directory zip entry.
-    Path bundlePath;
-    try (ZipFile tmpBundleZip = openZipFile(tmpBundlePath.toFile())) {
-      bundlePath =
-          new ZipBuilder()
-              .copyAllContentsFromZip(ZipPath.create(""), tmpBundleZip)
-              .addDirectory(ZipPath.create("directory-entries-are-forbidden"))
-              .writeTo(tmpDir.resolve("bundle-with-dir.aab"));
-    }
-
-    TestComponent.useTestModule(this, TestModule.builder().withBundlePath(bundlePath).build());
-
-    InvalidBundleException exception =
-        assertThrows(InvalidBundleException.class, () -> buildApksManager.execute());
-
-    assertThat(exception)
-        .hasMessageThat()
-        .contains("zip file contains directory zip entry 'directory-entries-are-forbidden/'");
-  }
-
-  @Test
   public void buildApksCommand_appTargetingAllSdks_buildsSplitAndStandaloneApks() throws Exception {
     AppBundle appBundle =
         new AppBundleBuilder()
@@ -975,26 +939,6 @@ public class BuildApksManagerTest {
     assertThat(splitApkVariants(result)).hasSize(1);
     assertThat(splitApkVariants(result).get(0).getTargeting())
         .isEqualTo(variantSdkTargeting(/* minSdkVersion= */ 21, ImmutableSet.of(26)));
-  }
-
-  @Test
-  public void buildApksCommand_appTargetingPreL_failsGeneratingInstant() throws Exception {
-    AppBundle appBundle =
-        new AppBundleBuilder()
-            .addModule(
-                "base",
-                builder ->
-                    builder.setManifest(
-                        androidManifest("com.app", withInstant(true), withMaxSdkVersion(20))))
-            .build();
-    TestComponent.useTestModule(
-        this, TestModule.builder().withAppBundle(appBundle).withOutputPath(outputFilePath).build());
-
-    Throwable exception =
-        assertThrows(InvalidBundleException.class, () -> buildApksManager.execute());
-    assertThat(exception)
-        .hasMessageThat()
-        .contains("maxSdkVersion (20) is less than minimum sdk allowed for instant apps (21).");
   }
 
   @Test
@@ -2203,6 +2147,73 @@ public class BuildApksManagerTest {
     apkSet
         .getApkDescriptionList()
         .forEach(apkDescription -> assertThat(apkSetFile).hasFile(apkDescription.getPath()));
+  }
+
+  @Test
+  public void buildApksCommand_system_uncompressedOptions() throws Exception {
+    byte[] data = TestData.readBytes("testdata/dex/classes.dex");
+    AppBundle appBundle =
+        new AppBundleBuilder()
+            .addModule(
+                "base",
+                builder ->
+                    builder
+                        .addFile("dex/classes.dex", data)
+                        .addFile("lib/x86/libsome.so", data)
+                        .addFile("res/raw/some.bin", data)
+                        .setResourceTable(
+                            new ResourceTableBuilder()
+                                .addPackage("com.test.app")
+                                .addFileResource("raw", "some", "res/raw/some.bin")
+                                .build())
+                        .setNativeConfig(
+                            nativeLibraries(
+                                targetedNativeDirectory("lib/x86", nativeDirectoryTargeting(X86))))
+                        .setManifest(androidManifest("com.test.app")))
+            .setBundleConfig(
+                BundleConfigBuilder.create()
+                    .addSplitDimension(Value.ABI)
+                    .setUncompressDexFiles(true)
+                    .setUncompressNativeLibraries(true)
+                    .build())
+            .build();
+    TestComponent.useTestModule(
+        this,
+        TestModule.builder()
+            .withAppBundle(appBundle)
+            .withOutputPath(outputFilePath)
+            .withApkBuildMode(SYSTEM)
+            .withDeviceSpec(
+                mergeSpecs(
+                    sdkVersion(28), abis("x86"), density(DensityAlias.MDPI), locales("en-US")))
+            .withCustomBuildApksCommandSetter(
+                builder ->
+                    builder.setSystemApkOptions(
+                        ImmutableSet.of(
+                            SystemApkOption.UNCOMPRESSED_DEX_FILES,
+                            SystemApkOption.UNCOMPRESSED_NATIVE_LIBRARIES)))
+            .build());
+
+    buildApksManager.execute();
+
+    ZipFile apkSetFile = openZipFile(outputFilePath.toFile());
+    BuildApksResult result = extractTocFromApkSetFile(apkSetFile, outputDir);
+
+    assertThat(result.getVariantList()).hasSize(1);
+    assertThat(systemApkVariants(result)).hasSize(1);
+
+    Variant systemVariant = systemApkVariants(result).get(0);
+    try (ZipFile systemApkFile =
+        new ZipFile(
+            extractFromApkSetFile(
+                apkSetFile,
+                systemVariant.getApkSet(0).getApkDescriptionList().get(0).getPath(),
+                outputDir))) {
+      assertThat(systemApkFile).hasFile("lib/x86/libsome.so").thatIsUncompressed();
+      assertThat(systemApkFile).hasFile("classes.dex").thatIsUncompressed();
+      assertThat(systemApkFile).hasFile("res/raw/some.bin").thatIsCompressed();
+      assertThat(systemApkFile).hasFile("AndroidManifest.xml").thatIsCompressed();
+    }
   }
 
   @Test
@@ -3434,7 +3445,7 @@ public class BuildApksManagerTest {
                                 "com.test.app",
                                 withOnDemandDelivery(),
                                 withInstantOnDemandDelivery()))
-                        .addFile("assets/images/image.jpg"))
+                        .addFile("assets/images/image2.jpg"))
             .build();
     TestComponent.useTestModule(
         this, TestModule.builder().withAppBundle(appBundle).withOutputPath(outputFilePath).build());
@@ -4213,109 +4224,6 @@ public class BuildApksManagerTest {
             "assets/textures#tcf_atc/texture.dat", "assets/textures#tcf_etc1/texture.dat");
   }
 
-  @Test
-  public void splits_textureFallbackNotPresentInAssetPacks() throws Exception {
-    AppBundle appBundle =
-        new AppBundleBuilder()
-            .addModule(
-                "base",
-                builder ->
-                    builder
-                        .setManifest(androidManifest("com.test.app"))
-                        .setResourceTable(resourceTableWithTestLabel("Test feature")))
-            .addModule(
-                "feature_tcf_assets",
-                builder ->
-                    builder
-                        .addFile("assets/textures#tcf_atc/atc_texture.dat")
-                        .addFile("assets/textures#tcf_etc1/etc1_texture.dat")
-                        .setAssetsConfig(
-                            assets(
-                                targetedAssetsDirectory(
-                                    "assets/textures#tcf_atc",
-                                    assetsDirectoryTargeting(textureCompressionTargeting(ATC))),
-                                targetedAssetsDirectory(
-                                    "assets/textures#tcf_etc1",
-                                    assetsDirectoryTargeting(
-                                        textureCompressionTargeting(ETC1_RGB8)))))
-                        .setManifest(
-                            androidManifestForFeature(
-                                "com.test.app",
-                                withTitle("@string/test_label", TEST_LABEL_RESOURCE_ID))))
-            .setBundleConfig(
-                BundleConfigBuilder.create()
-                    .addSplitDimension(Value.TEXTURE_COMPRESSION_FORMAT, /* negate= */ false)
-                    .build())
-            .build();
-    TestComponent.useTestModule(
-        this, TestModule.builder().withAppBundle(appBundle).withOutputPath(outputFilePath).build());
-
-    // Splitting by texture compression format is activated, but the textures in
-    // one module don't include a fallback folder, used for standalone and universal
-    // APKs, so we'll consider the bundle invalid:
-    InvalidBundleException exception =
-        assertThrows(InvalidBundleException.class, () -> buildApksManager.execute());
-    assertThat(exception)
-        .hasMessageThat()
-        .contains(
-            "the fallback texture folders (folders without #tcf suffixes) will be used, but module"
-                + " 'feature_tcf_assets' has no such folders.");
-  }
-
-  @Test
-  public void splits_textureDefaultSuffixNotPresentInAssetPacks() throws Exception {
-    AppBundle appBundle =
-        new AppBundleBuilder()
-            .addModule(
-                "base",
-                builder ->
-                    builder
-                        .setManifest(androidManifest("com.test.app"))
-                        .setResourceTable(resourceTableWithTestLabel("Test feature")))
-            .addModule(
-                "feature_tcf_assets",
-                builder ->
-                    builder
-                        .addFile("assets/textures/untargeted_texture.dat")
-                        .addFile("assets/textures#tcf_etc1/etc1_texture.dat")
-                        .setAssetsConfig(
-                            assets(
-                                targetedAssetsDirectory(
-                                    "assets/textures",
-                                    assetsDirectoryTargeting(
-                                        alternativeTextureCompressionTargeting(ETC1_RGB8))),
-                                targetedAssetsDirectory(
-                                    "assets/textures#tcf_etc1",
-                                    assetsDirectoryTargeting(
-                                        textureCompressionTargeting(ETC1_RGB8)))))
-                        .setManifest(
-                            androidManifestForFeature(
-                                "com.test.app",
-                                withTitle("@string/test_label", TEST_LABEL_RESOURCE_ID))))
-            .setBundleConfig(
-                BundleConfigBuilder.create()
-                    .addSplitDimension(
-                        Value.TEXTURE_COMPRESSION_FORMAT,
-                        /* negate= */ false,
-                        /* stripSuffix= */ false,
-                        /* defaultSuffix= */ "astc")
-                    .build())
-            .build();
-    TestComponent.useTestModule(
-        this, TestModule.builder().withAppBundle(appBundle).withOutputPath(outputFilePath).build());
-
-    // ASTC format is not present in one module with TCF targeting, so we'll
-    // consider the bundle invalid as the configuration specified that this is the default
-    // format to use for generating standalone or universal APKs.
-    InvalidBundleException exception =
-        assertThrows(InvalidBundleException.class, () -> buildApksManager.execute());
-    assertThat(exception)
-        .hasMessageThat()
-        .contains(
-            "the texture folders for format 'ASTC' will be used, but module 'feature_tcf_assets'"
-                + " has no such folders");
-  }
-
   private Path createAppBundleWithBaseModuleWithTextureTargeting(
       boolean tcfSplittingEnabled, boolean stripTargetingSuffixEnabled) throws Exception {
     AppBundle appBundle =
@@ -4685,103 +4593,6 @@ public class BuildApksManagerTest {
   }
 
   @Test
-  public void renderscript32Bit_warningMessageDisplayed() throws Exception {
-    ByteArrayOutputStream output = new ByteArrayOutputStream();
-    AppBundle appBundle =
-        new AppBundleBuilder()
-            .addModule(
-                "base",
-                builder ->
-                    builder
-                        .addFile("dex/classes.dex")
-                        .addFile("assets/script.bc")
-                        .setManifest(androidManifest("com.test.app")))
-            .build();
-    TestComponent.useTestModule(
-        this,
-        TestModule.builder()
-            .withAppBundle(appBundle)
-            .withOutputPrintStream(new PrintStream(output))
-            .build());
-
-    buildApksManager.execute();
-
-    assertThat(new String(output.toByteArray(), UTF_8))
-        .contains("WARNING: App Bundle contains 32-bit RenderScript bitcode file (.bc)");
-  }
-
-  @Test
-  public void renderscript32Bit_64BitStandaloneAndSplitApksFilteredOut() throws Exception {
-    AppBundle appBundle =
-        new AppBundleBuilder()
-            .addModule(
-                "base",
-                builder ->
-                    builder
-                        .addFile("dex/classes.dex")
-                        .addFile("assets/script.bc")
-                        .addFile("lib/armeabi-v7a/libfoo.so")
-                        .addFile("lib/arm64-v8a/libfoo.so")
-                        .setManifest(androidManifest("com.test.app", withMinSdkVersion(14)))
-                        .setNativeConfig(
-                            nativeLibraries(
-                                targetedNativeDirectory(
-                                    "lib/armeabi-v7a", nativeDirectoryTargeting(ARMEABI_V7A)),
-                                targetedNativeDirectory(
-                                    "lib/arm64-v8a", nativeDirectoryTargeting(ARM64_V8A)))))
-            .setBundleConfig(
-                BundleConfigBuilder.create().setUncompressNativeLibraries(false).build())
-            .build();
-    TestComponent.useTestModule(
-        this, TestModule.builder().withAppBundle(appBundle).withOutputPath(outputFilePath).build());
-
-    buildApksManager.execute();
-
-    ZipFile apkSetFile = openZipFile(outputFilePath.toFile());
-    BuildApksResult result = extractTocFromApkSetFile(apkSetFile, outputDir);
-    assertThat(standaloneApkVariants(result)).hasSize(1);
-    assertThat(standaloneApkVariants(result).get(0).getTargeting().getAbiTargeting())
-        .isEqualTo(abiTargeting(ARMEABI_V7A));
-    assertThat(splitApkVariants(result)).hasSize(1);
-    ImmutableSet<AbiTargeting> abiTargetings =
-        splitApkVariants(result).get(0).getApkSetList().stream()
-            .map(ApkSet::getApkDescriptionList)
-            .flatMap(list -> list.stream().map(ApkDescription::getTargeting))
-            .map(ApkTargeting::getAbiTargeting)
-            .collect(toImmutableSet());
-    assertThat(abiTargetings)
-        .containsExactly(AbiTargeting.getDefaultInstance(), abiTargeting(ARMEABI_V7A));
-  }
-
-  @Test
-  public void renderscript32Bit_64BitLibsOnly_throws() throws Exception {
-    AppBundle appBundle =
-        new AppBundleBuilder()
-            .addModule(
-                "base",
-                builder ->
-                    builder
-                        .addFile("dex/classes.dex")
-                        .addFile("assets/script.bc")
-                        .addFile("lib/arm64-v8a/libfoo.so")
-                        .setManifest(androidManifest("com.test.app", withMinSdkVersion(14)))
-                        .setNativeConfig(
-                            nativeLibraries(
-                                targetedNativeDirectory(
-                                    "lib/arm64-v8a", nativeDirectoryTargeting(ARM64_V8A)))))
-            .build();
-    TestComponent.useTestModule(this, TestModule.builder().withAppBundle(appBundle).build());
-
-    InvalidBundleException exception =
-        assertThrows(InvalidBundleException.class, () -> buildApksManager.execute());
-    assertThat(exception)
-        .hasMessageThat()
-        .contains(
-            "Usage of 64-bit native libraries is disabled by the presence of a "
-                + "renderscript file, but App Bundle contains only 64-bit native libraries.");
-  }
-
-  @Test
   public void pinningOfManifestReachableResources_enabledSince_0_8_1() throws Exception {
     AppBundle appBundle =
         new AppBundleBuilder()
@@ -4970,27 +4781,6 @@ public class BuildApksManagerTest {
   }
 
   @Test
-  public void extraValidator_runsValidation() throws Exception {
-    SubValidator extraValidator =
-        new SubValidator() {
-          @Override
-          public void validateBundle(AppBundle bundle) {
-            throw InvalidBundleException.builder().withUserMessage("Custom validator").build();
-          }
-        };
-
-    TestComponent.useTestModule(
-        this,
-        TestModule.builder()
-            .withCustomBuildApksCommandSetter(
-                command -> command.setExtraValidators(ImmutableList.of(extraValidator)))
-            .build());
-
-    Exception e = assertThrows(InvalidBundleException.class, () -> buildApksManager.execute());
-    assertThat(e).hasMessageThat().contains("Custom validator");
-  }
-
-  @Test
   public void allApksSignedWithV1_minSdkLessThan24() throws Exception {
     AppBundle appBundle =
         new AppBundleBuilder()
@@ -5091,132 +4881,6 @@ public class BuildApksManagerTest {
         ImmutableSet<String> filesInApk = filesInApk(apkDescription, apkSet);
         assertThat(filesInApk).doesNotContain(String.format("META-INF/%s.RSA", SIGNER_CONFIG_NAME));
       }
-    }
-  }
-
-  @Test
-  public void localTestingMode_enabled_addsMetadata() throws Exception {
-    AppBundle appBundle = createAppBundleWithBaseAndFeatureModules("feature");
-    TestComponent.useTestModule(
-        this,
-        TestModule.builder()
-            .withOutputPath(outputFilePath)
-            .withAppBundle(appBundle)
-            .withLocalTestingEnabled(true)
-            .build());
-
-    buildApksManager.execute();
-
-    try (ZipFile apkSet = new ZipFile(outputFilePath.toFile())) {
-      BuildApksResult result = extractTocFromApkSetFile(apkSet, outputDir);
-      assertThat(result.hasLocalTestingInfo()).isTrue();
-      assertThat(result.getLocalTestingInfo().getEnabled()).isTrue();
-      assertThat(result.getLocalTestingInfo().getLocalTestingPath()).isNotEmpty();
-      ImmutableList<ApkDescription> apkDescriptions = apkDescriptions(result.getVariantList());
-      assertThat(apkDescriptions).isNotEmpty();
-      assertThat(apkDescriptions.stream().map(ApkDescription::getPath))
-          .contains("splits/base-master.apk");
-      for (ApkDescription apkDescription : apkDescriptions) {
-        File apk = extractFromApkSetFile(apkSet, apkDescription.getPath(), outputDir);
-        // The local testing metadata is set if and only if the apk is the base master.
-        assertThat(
-                (apkDescription.hasSplitApkMetadata()
-                        && apkDescription.getSplitApkMetadata().getSplitId().isEmpty()
-                        && apkDescription.getSplitApkMetadata().getIsMasterSplit())
-                    || apkDescription.hasStandaloneApkMetadata())
-            .isEqualTo(
-                extractAndroidManifest(apk)
-                    .getMetadataValue(LocalTestingPreprocessor.METADATA_NAME)
-                    .isPresent());
-      }
-    }
-  }
-
-  @Test
-  public void localTestingMode_disabled_doesNotAddMetadata() throws Exception {
-    AppBundle appBundle = createAppBundleWithBaseAndFeatureModules("feature");
-    TestComponent.useTestModule(
-        this, TestModule.builder().withOutputPath(outputFilePath).withAppBundle(appBundle).build());
-
-    buildApksManager.execute();
-
-    try (ZipFile apkSet = new ZipFile(outputFilePath.toFile())) {
-      BuildApksResult result = extractTocFromApkSetFile(apkSet, outputDir);
-      assertThat(result.getLocalTestingInfo().getEnabled()).isFalse();
-      ImmutableList<ApkDescription> apkDescriptions = apkDescriptions(result.getVariantList());
-      assertThat(apkDescriptions).isNotEmpty();
-      for (ApkDescription apkDescription : apkDescriptions) {
-        File apk = extractFromApkSetFile(apkSet, apkDescription.getPath(), outputDir);
-        assertThat(
-                extractAndroidManifest(apk)
-                    .getMetadataValue(LocalTestingPreprocessor.METADATA_NAME))
-            .isEmpty();
-      }
-    }
-  }
-
-  @Test
-  public void buildApksCommand_overridesAssetModuleCompression() throws Exception {
-    byte[] dummyContent = new byte[100];
-
-    AppBundle appBundle =
-        new AppBundleBuilder()
-            .addModule(
-                "base",
-                builder ->
-                    builder
-                        .addFile("dex/classes.dex", dummyContent)
-                        .addFile("assets/images/image.jpg", dummyContent)
-                        .setManifest(
-                            androidManifest(
-                                "com.test.app", withMinSdkVersion(15), withMaxSdkVersion(27)))
-                        .setResourceTable(resourceTableWithTestLabel("Test feature")))
-            .addModule(
-                "asset_module",
-                builder ->
-                    builder
-                        .setManifest(
-                            androidManifestForAssetModule(
-                                "com.test.app", withInstallTimeDelivery()))
-                        .addFile("assets/textures/texture.etc", dummyContent))
-            .build();
-    TestComponent.useTestModule(
-        this, TestModule.builder().withOutputPath(outputFilePath).withAppBundle(appBundle).build());
-
-    buildApksManager.execute();
-
-    ZipFile apkSetFile = openZipFile(outputFilePath.toFile());
-    BuildApksResult result = extractTocFromApkSetFile(apkSetFile, outputDir);
-
-    // Standalone variant.
-    ImmutableList<Variant> standaloneVariants = standaloneApkVariants(result);
-    assertThat(standaloneVariants).hasSize(1);
-    Variant standaloneVariant = standaloneVariants.get(0);
-
-    assertThat(standaloneVariant.getApkSetList()).hasSize(1);
-    ApkSet standaloneApk = standaloneVariant.getApkSet(0);
-    assertThat(standaloneApk.getApkDescriptionList()).hasSize(1);
-    assertThat(apkSetFile).hasFile(standaloneApk.getApkDescription(0).getPath());
-
-    File standaloneApkFile =
-        extractFromApkSetFile(apkSetFile, standaloneApk.getApkDescription(0).getPath(), outputDir);
-
-    try (ZipFile apkZip = new ZipFile(standaloneApkFile)) {
-      assertThat(apkZip).hasFile("classes.dex").thatIsCompressed();
-      assertThat(apkZip).hasFile("assets/images/image.jpg").thatIsCompressed();
-      assertThat(apkZip).hasFile("assets/textures/texture.etc").thatIsUncompressed();
-    }
-
-    // L+ assets.
-    assertThat(result.getAssetSliceSetCount()).isEqualTo(1);
-    AssetSliceSet assetSlice = result.getAssetSliceSet(0);
-    assertThat(assetSlice.getApkDescriptionCount()).isEqualTo(1);
-
-    File apkFile =
-        extractFromApkSetFile(apkSetFile, assetSlice.getApkDescription(0).getPath(), outputDir);
-
-    try (ZipFile apkZip = new ZipFile(apkFile)) {
-      assertThat(apkZip).hasFile("assets/textures/texture.etc").thatIsUncompressed();
     }
   }
 

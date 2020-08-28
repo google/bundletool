@@ -199,8 +199,11 @@ public abstract class AndroidManifest {
         new ManifestEditor(createMinimalManifestTag(), BundleToolVersion.getCurrentVersion())
             .setPackage(packageName)
             .setSplitId(splitId)
-            .setConfigForSplit(featureSplitId)
             .setHasCode(false);
+
+    if (!featureSplitId.isEmpty()) {
+      editor.setConfigForSplit(featureSplitId);
+    }
 
     versionCode.ifPresent(editor::setVersionCode);
     extractNativeLibs.ifPresent(editor::setExtractNativeLibsValue);

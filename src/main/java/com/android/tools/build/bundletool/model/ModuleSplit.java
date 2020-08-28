@@ -27,7 +27,6 @@ import static com.android.tools.build.bundletool.model.SourceStamp.STAMP_TYPE_ME
 import static com.android.tools.build.bundletool.model.utils.ResourcesUtils.SCREEN_DENSITY_TO_PROTO_VALUE_MAP;
 import static com.android.tools.build.bundletool.model.utils.TargetingNormalizer.normalizeApkTargeting;
 import static com.android.tools.build.bundletool.model.utils.TargetingNormalizer.normalizeVariantTargeting;
-import static com.android.tools.build.bundletool.model.utils.TargetingProtoUtils.lPlusVariantTargeting;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.collect.ImmutableList.toImmutableList;
@@ -372,15 +371,15 @@ public abstract class ModuleSplit {
   /**
    * Creates a {@link ModuleSplit} with all entries from the {@link BundleModule} valid directories.
    *
-   * <p>The generated ModuleSplit has empty APK targeting and default L+ variant targeting.
+   * <p>The generated ModuleSplit has an empty APK targeting and an empty variant targeting.
    */
   public static ModuleSplit forModule(BundleModule bundleModule) {
-    return forModule(bundleModule, lPlusVariantTargeting());
+    return forModule(bundleModule, VariantTargeting.getDefaultInstance());
   }
 
   /**
    * Creates a {@link ModuleSplit} with all entries from the {@link BundleModule} valid directories
-   * with empty APK targeting and given variant targeting.
+   * with an empty APK targeting and the given variant targeting.
    */
   public static ModuleSplit forModule(
       BundleModule bundleModule, VariantTargeting variantTargeting) {
@@ -389,16 +388,16 @@ public abstract class ModuleSplit {
   }
 
   /**
-   * Creates a {@link ModuleSplit} only with the resources entries with empty APK targeting and
-   * default L+ variant targeting.
+   * Creates a {@link ModuleSplit} only with the resources entries with an empty APK targeting and
+   * an empty variant targeting.
    */
   public static ModuleSplit forResources(BundleModule bundleModule) {
-    return forResources(bundleModule, lPlusVariantTargeting());
+    return forResources(bundleModule, VariantTargeting.getDefaultInstance());
   }
 
   /**
-   * Creates a {@link ModuleSplit} only with the resources entries with empty APK targeting and
-   * given variant targeting.
+   * Creates a {@link ModuleSplit} only with the resources entries with an empty APK targeting and
+   * the given variant targeting.
    */
   public static ModuleSplit forResources(
       BundleModule bundleModule, VariantTargeting variantTargeting) {
@@ -410,16 +409,16 @@ public abstract class ModuleSplit {
   }
 
   /**
-   * Creates a {@link ModuleSplit} only with the assets entries with empty APK targeting and default
-   * L+ variant targeting.
+   * Creates a {@link ModuleSplit} only with the assets entries with an empty APK targeting and an
+   * empty variant targeting.
    */
   public static ModuleSplit forAssets(BundleModule bundleModule) {
-    return forAssets(bundleModule, lPlusVariantTargeting());
+    return forAssets(bundleModule, VariantTargeting.getDefaultInstance());
   }
 
   /**
-   * Creates a {@link ModuleSplit} only with the assets entries with empty APK targeting and given
-   * variant targeting.
+   * Creates a {@link ModuleSplit} only with the assets entries with an empty APK targeting and the
+   * given variant targeting.
    */
   public static ModuleSplit forAssets(
       BundleModule bundleModule, VariantTargeting variantTargeting) {
@@ -431,16 +430,16 @@ public abstract class ModuleSplit {
   }
 
   /**
-   * Creates a {@link ModuleSplit} only with the native library entries with empty APK targeting and
-   * default L+ variant targeting.
+   * Creates a {@link ModuleSplit} only with the native library entries with an empty APK targeting
+   * and an empty variant targeting.
    */
   public static ModuleSplit forNativeLibraries(BundleModule bundleModule) {
-    return forNativeLibraries(bundleModule, lPlusVariantTargeting());
+    return forNativeLibraries(bundleModule, VariantTargeting.getDefaultInstance());
   }
 
   /**
-   * Creates a {@link ModuleSplit} only with the native library entries with empty APK targeting and
-   * given variant targeting.
+   * Creates a {@link ModuleSplit} only with the native library entries with an empty APK targeting
+   * and the given variant targeting.
    */
   public static ModuleSplit forNativeLibraries(
       BundleModule bundleModule, VariantTargeting variantTargeting) {
@@ -452,15 +451,15 @@ public abstract class ModuleSplit {
   }
 
   /**
-   * Creates a {@link ModuleSplit} only with the dex files with empty APK targeting and default L+
+   * Creates a {@link ModuleSplit} only with the dex files with an empty APK targeting and an empty
    * variant targeting.
    */
   public static ModuleSplit forDex(BundleModule bundleModule) {
-    return forDex(bundleModule, lPlusVariantTargeting());
+    return forDex(bundleModule, VariantTargeting.getDefaultInstance());
   }
 
   /**
-   * Creates a {@link ModuleSplit} only with the dex files with empty APK targeting and given
+   * Creates a {@link ModuleSplit} only with the dex files with an empty APK targeting and the given
    * variant targeting.
    */
   public static ModuleSplit forDex(BundleModule bundleModule, VariantTargeting variantTargeting) {
@@ -472,7 +471,7 @@ public abstract class ModuleSplit {
   }
 
   public static ModuleSplit forRoot(BundleModule bundleModule) {
-    return forRoot(bundleModule, lPlusVariantTargeting());
+    return forRoot(bundleModule, VariantTargeting.getDefaultInstance());
   }
 
   public static ModuleSplit forRoot(BundleModule bundleModule, VariantTargeting variantTargeting) {
@@ -484,20 +483,24 @@ public abstract class ModuleSplit {
   }
 
   /**
-   * Creates a {@link ModuleSplit} only with the apex image entries with empty APK targeting and
-   * default L+ variant targeting.
+   * Creates a {@link ModuleSplit} only with the apex image entries with an empty APK targeting and
+   * an empty variant targeting.
    */
   public static ModuleSplit forApex(BundleModule bundleModule) {
+    return forApex(bundleModule, VariantTargeting.getDefaultInstance());
+  }
+
+  public static ModuleSplit forApex(BundleModule bundleModule, VariantTargeting variantTargeting) {
     return fromBundleModule(
         bundleModule,
         entry -> entry.getPath().startsWith(APEX_DIRECTORY),
         /* setResourceTable= */ false,
-        lPlusVariantTargeting());
+        variantTargeting);
   }
 
   /**
    * Creates a {@link ModuleSplit} with entries from the Bundle Module satisfying the predicate with
-   * a given variant targeting.
+   * the given variant targeting.
    *
    * <p>The created instance is not standalone thus its variant targets L+ devices initially.
    */

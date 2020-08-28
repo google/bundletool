@@ -22,6 +22,8 @@ import static com.android.tools.build.bundletool.model.utils.TargetingProtoUtils
 import static com.android.tools.build.bundletool.model.utils.TargetingProtoUtils.densityValues;
 import static com.android.tools.build.bundletool.model.utils.TargetingProtoUtils.languageUniverse;
 import static com.android.tools.build.bundletool.model.utils.TargetingProtoUtils.languageValues;
+import static com.android.tools.build.bundletool.model.utils.TargetingProtoUtils.multiAbiUniverse;
+import static com.android.tools.build.bundletool.model.utils.TargetingProtoUtils.multiAbiValues;
 import static com.android.tools.build.bundletool.model.utils.TargetingProtoUtils.textureCompressionFormatUniverse;
 import static com.android.tools.build.bundletool.model.utils.TargetingProtoUtils.textureCompressionFormatValues;
 import static com.google.common.base.Preconditions.checkNotNull;
@@ -31,6 +33,8 @@ import com.android.bundle.Targeting.Abi;
 import com.android.bundle.Targeting.AbiTargeting;
 import com.android.bundle.Targeting.ApkTargeting;
 import com.android.bundle.Targeting.LanguageTargeting;
+import com.android.bundle.Targeting.MultiAbi;
+import com.android.bundle.Targeting.MultiAbiTargeting;
 import com.android.bundle.Targeting.ScreenDensity;
 import com.android.bundle.Targeting.ScreenDensityTargeting;
 import com.android.bundle.Targeting.TextureCompressionFormat;
@@ -83,6 +87,9 @@ final class MergingUtils {
     if (targeting1.hasAbiTargeting() || targeting2.hasAbiTargeting()) {
       merged.setAbiTargeting(mergeAbiTargetingsOf(targeting1, targeting2));
     }
+    if (targeting1.hasMultiAbiTargeting() || targeting2.hasMultiAbiTargeting()) {
+      merged.setMultiAbiTargeting(mergeMultiAbiTargetingsOf(targeting1, targeting2));
+    }
     if (targeting1.hasScreenDensityTargeting() || targeting2.hasScreenDensityTargeting()) {
       merged.setScreenDensityTargeting(mergeDensityTargetingsOf(targeting1, targeting2));
     }
@@ -121,6 +128,7 @@ final class MergingUtils {
     ApkTargeting targetingWithoutAbiDensityLanguageAndTcf =
         targeting.toBuilder()
             .clearAbiTargeting()
+            .clearMultiAbiTargeting()
             .clearScreenDensityTargeting()
             .clearLanguageTargeting()
             .clearTextureCompressionFormatTargeting()
@@ -140,6 +148,16 @@ final class MergingUtils {
     Set<Abi> universe = Sets.union(abiUniverse(targeting1), abiUniverse(targeting2));
     Set<Abi> values = Sets.union(abiValues(targeting1), abiValues(targeting2));
     return AbiTargeting.newBuilder()
+        .addAllValue(values)
+        .addAllAlternatives(Sets.difference(universe, values))
+        .build();
+  }
+
+  private static MultiAbiTargeting mergeMultiAbiTargetingsOf(
+      ApkTargeting targeting1, ApkTargeting targeting2) {
+    Set<MultiAbi> universe = Sets.union(multiAbiUniverse(targeting1), multiAbiUniverse(targeting2));
+    Set<MultiAbi> values = Sets.union(multiAbiValues(targeting1), multiAbiValues(targeting2));
+    return MultiAbiTargeting.newBuilder()
         .addAllValue(values)
         .addAllAlternatives(Sets.difference(universe, values))
         .build();

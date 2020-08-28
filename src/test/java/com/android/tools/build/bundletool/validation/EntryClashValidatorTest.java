@@ -17,6 +17,7 @@
 package com.android.tools.build.bundletool.validation;
 
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifest;
+import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifestForAssetModule;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withIsolatedSplits;
 import static com.google.common.truth.Truth.assertThat;
 import static java.nio.charset.StandardCharsets.UTF_8;
@@ -144,7 +145,7 @@ public class EntryClashValidatorTest {
 
   @Test
   public void entryNameCollision_filesWithSameContent_ok() throws Exception {
-    String filePath = "assets/file.txt";
+    String filePath = "res/file.txt";
     byte[] sharedData = "same across modules".getBytes(UTF_8);
     BundleModule moduleA =
         new BundleModuleBuilder("a")
@@ -202,5 +203,31 @@ public class EntryClashValidatorTest {
             .setManifest(androidManifest("com.test.app"))
             .build();
     new EntryClashValidator().validateAllModules(ImmutableList.of(moduleA, moduleB));
+  }
+
+  @Test
+  public void entryNameCollision_theSameFileBetweenBaseAndAssetModule_throws() throws Exception {
+    String fileName = "assets/file.txt";
+    byte[] fileContentA = {'a'};
+    BundleModule baseModule =
+        new BundleModuleBuilder("base")
+            .addFile(fileName, fileContentA)
+            .setManifest(androidManifest("com.test.app"))
+            .build();
+    BundleModule assetModule =
+        new BundleModuleBuilder("assets1")
+            .addFile(fileName, fileContentA)
+            .setManifest(androidManifestForAssetModule("com.test.app"))
+            .build();
+
+    InvalidBundleException exception =
+        assertThrows(
+            InvalidBundleException.class,
+            () ->
+                new EntryClashValidator()
+                    .validateAllModules(ImmutableList.of(baseModule, assetModule)));
+    assertThat(exception)
+        .hasMessageThat()
+        .isEqualTo("Both modules 'base' and 'assets1' contain asset entry 'assets/file.txt'.");
   }
 }

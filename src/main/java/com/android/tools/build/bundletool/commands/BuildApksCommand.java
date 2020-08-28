@@ -43,6 +43,7 @@ import com.android.tools.build.bundletool.io.TempDirectory;
 import com.android.tools.build.bundletool.model.Aapt2Command;
 import com.android.tools.build.bundletool.model.ApkListener;
 import com.android.tools.build.bundletool.model.ApkModifier;
+import com.android.tools.build.bundletool.model.AppBundle;
 import com.android.tools.build.bundletool.model.KeystoreProperties;
 import com.android.tools.build.bundletool.model.OptimizationDimension;
 import com.android.tools.build.bundletool.model.Password;
@@ -55,8 +56,11 @@ import com.android.tools.build.bundletool.model.exceptions.InvalidCommandExcepti
 import com.android.tools.build.bundletool.model.utils.DefaultSystemEnvironmentProvider;
 import com.android.tools.build.bundletool.model.utils.SystemEnvironmentProvider;
 import com.android.tools.build.bundletool.model.utils.files.FileUtils;
+import com.android.tools.build.bundletool.preprocessors.AppBundlePreprocessorManager;
+import com.android.tools.build.bundletool.preprocessors.DaggerAppBundlePreprocessorComponent;
 import com.android.tools.build.bundletool.splitters.DexCompressionSplitter;
 import com.android.tools.build.bundletool.splitters.NativeLibrariesCompressionSplitter;
+import com.android.tools.build.bundletool.validation.AppBundleValidator;
 import com.android.tools.build.bundletool.validation.SubValidator;
 import com.google.auto.value.AutoValue;
 import com.google.common.base.Ascii;
@@ -121,6 +125,12 @@ public abstract class BuildApksCommand {
     }
   }
 
+  /** Options to customize generated system APKs. */
+  public enum SystemApkOption {
+    UNCOMPRESSED_NATIVE_LIBRARIES,
+    UNCOMPRESSED_DEX_FILES;
+  }
+
   private static final Flag<Path> BUNDLE_LOCATION_FLAG = Flag.path("bundle");
   private static final Flag<Path> OUTPUT_FILE_FLAG = Flag.path("output");
   private static final Flag<Boolean> OVERWRITE_OUTPUT_FLAG = Flag.booleanFlag("overwrite");
@@ -138,6 +148,8 @@ public abstract class BuildApksCommand {
   private static final Flag<ImmutableSet<String>> MODULES_FLAG = Flag.stringSet("modules");
 
   private static final Flag<Path> DEVICE_SPEC_FLAG = Flag.path("device-spec");
+  private static final Flag<ImmutableSet<SystemApkOption>> SYSTEM_APK_OPTIONS =
+      Flag.enumSet("system-apk-options", SystemApkOption.class);
 
   private static final Flag<Boolean> VERBOSE_FLAG = Flag.booleanFlag("verbose");
 
@@ -175,6 +187,8 @@ public abstract class BuildApksCommand {
   public abstract ImmutableSet<String> getModules();
 
   public abstract Optional<DeviceSpec> getDeviceSpec();
+
+  public abstract ImmutableSet<SystemApkOption> getSystemApkOptions();
 
   public abstract boolean getGenerateOnlyForConnectedDevice();
 
@@ -231,7 +245,8 @@ public abstract class BuildApksCommand {
         .setVerbose(false)
         .setOptimizationDimensions(ImmutableSet.of())
         .setModules(ImmutableSet.of())
-        .setExtraValidators(ImmutableList.of());
+        .setExtraValidators(ImmutableList.of())
+        .setSystemApkOptions(ImmutableSet.of());
   }
 
   /** Builder for the {@link BuildApksCommand}. */
@@ -285,6 +300,9 @@ public abstract class BuildApksCommand {
       // Parse as partial and fully validate later.
       return setDeviceSpec(DeviceSpecParser.parsePartialDeviceSpec(deviceSpecFile));
     }
+
+    /** Sets options to generated APKs in system mode. */
+    public abstract Builder setSystemApkOptions(ImmutableSet<SystemApkOption> options);
 
     /**
      * Sets whether to display verbose information about what is happening during the command
@@ -550,6 +568,15 @@ public abstract class BuildApksCommand {
             ? DeviceSpecParser::parsePartialDeviceSpec
             : DeviceSpecParser::parseDeviceSpec;
 
+    Optional<ImmutableSet<SystemApkOption>> systemApkOptions = SYSTEM_APK_OPTIONS.getValue(flags);
+    if (systemApkOptions.isPresent() && !apkBuildMode.isAnySystemMode()) {
+      throw InvalidCommandException.builder()
+          .withInternalMessage(
+              "'%s' flag is available in system mode only.", SYSTEM_APK_OPTIONS.getName())
+          .build();
+    }
+    systemApkOptions.ifPresent(buildApksCommand::setSystemApkOptions);
+
     DEVICE_SPEC_FLAG
         .getValue(flags)
         .map(deviceSpecParser)
@@ -573,11 +600,25 @@ public abstract class BuildApksCommand {
 
     try (TempDirectory tempDir = new TempDirectory();
         ZipFile bundleZip = new ZipFile(getBundlePath().toFile())) {
+      AppBundleValidator bundleValidator = AppBundleValidator.create(getExtraValidators());
+      bundleValidator.validateFile(bundleZip);
+
+      AppBundle appBundle = AppBundle.buildFromZip(bundleZip);
+      bundleValidator.validate(appBundle);
+
+      AppBundlePreprocessorManager appBundlePreprocessorManager =
+          DaggerAppBundlePreprocessorComponent.builder()
+              .setBuildApksCommand(this)
+              .setBundleZip(bundleZip)
+              .build()
+              .create();
+      AppBundle preprocessedAppBundle = appBundlePreprocessorManager.processAppBundle(appBundle);
+
       BuildApksManager buildApksManager =
           DaggerBuildApksManagerComponent.builder()
               .setBuildApksCommand(this)
               .setTempDirectory(tempDir)
-              .setBundleZip(bundleZip)
+              .setAppBundle(preprocessedAppBundle)
               .build()
               .create();
       buildApksManager.execute();

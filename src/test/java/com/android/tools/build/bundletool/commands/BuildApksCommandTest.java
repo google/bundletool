@@ -17,11 +17,17 @@
 package com.android.tools.build.bundletool.commands;
 
 import static com.android.tools.build.bundletool.commands.BuildApksCommand.ApkBuildMode.DEFAULT;
+import static com.android.tools.build.bundletool.commands.BuildApksCommand.ApkBuildMode.SYSTEM;
 import static com.android.tools.build.bundletool.commands.BuildApksCommand.ApkBuildMode.UNIVERSAL;
+import static com.android.tools.build.bundletool.commands.BuildApksCommand.SystemApkOption.UNCOMPRESSED_NATIVE_LIBRARIES;
 import static com.android.tools.build.bundletool.model.OptimizationDimension.ABI;
 import static com.android.tools.build.bundletool.model.OptimizationDimension.SCREEN_DENSITY;
 import static com.android.tools.build.bundletool.model.OptimizationDimension.TEXTURE_COMPRESSION_FORMAT;
 import static com.android.tools.build.bundletool.testing.Aapt2Helper.AAPT2_PATH;
+import static com.android.tools.build.bundletool.testing.DeviceFactory.abis;
+import static com.android.tools.build.bundletool.testing.DeviceFactory.createDeviceSpecFile;
+import static com.android.tools.build.bundletool.testing.DeviceFactory.density;
+import static com.android.tools.build.bundletool.testing.DeviceFactory.mergeSpecs;
 import static com.android.tools.build.bundletool.testing.FakeSystemEnvironmentProvider.ANDROID_HOME;
 import static com.android.tools.build.bundletool.testing.FakeSystemEnvironmentProvider.ANDROID_SERIAL;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifest;
@@ -37,6 +43,7 @@ import static org.mockito.Mockito.mock;
 import com.android.apksig.SigningCertificateLineage;
 import com.android.apksig.SigningCertificateLineage.SignerConfig;
 import com.android.bundle.Targeting.ApkTargeting;
+import com.android.bundle.Targeting.ScreenDensity.DensityAlias;
 import com.android.bundle.Targeting.VariantTargeting;
 import com.android.tools.build.bundletool.device.AdbServer;
 import com.android.tools.build.bundletool.flags.FlagParser;
@@ -1143,6 +1150,44 @@ public class BuildApksCommandTest {
     command.execute();
 
     assertThat(Files.exists(outputApks)).isTrue();
+  }
+
+  @Test
+  public void systemApkOptions_systemMode_succeeds() throws Exception {
+    Path deviceSpecPath =
+        createDeviceSpecFile(
+            mergeSpecs(density(DensityAlias.MDPI), abis("x86")), tmpDir.resolve("device.json"));
+    BuildApksCommand buildApksCommand =
+        BuildApksCommand.fromFlags(
+            new FlagParser()
+                .parse(
+                    "--bundle=" + bundlePath,
+                    "--output=" + outputFilePath,
+                    "--mode=" + SYSTEM,
+                    "--device-spec=" + deviceSpecPath,
+                    "--system-apk-options=" + UNCOMPRESSED_NATIVE_LIBRARIES),
+            fakeAdbServer);
+    assertThat(buildApksCommand.getSystemApkOptions())
+        .containsExactly(UNCOMPRESSED_NATIVE_LIBRARIES);
+  }
+
+  @Test
+  public void systemApkOptions_nonSystemMode_throws() throws Exception {
+    InvalidCommandException flagsException =
+        assertThrows(
+            InvalidCommandException.class,
+            () ->
+                BuildApksCommand.fromFlags(
+                    new FlagParser()
+                        .parse(
+                            "--bundle=" + bundlePath,
+                            "--output=" + outputFilePath,
+                            "--mode=" + DEFAULT,
+                            "--system-apk-options=" + UNCOMPRESSED_NATIVE_LIBRARIES),
+                    fakeAdbServer));
+    assertThat(flagsException)
+        .hasMessageThat()
+        .contains("'system-apk-options' flag is available in system mode only.");
   }
 
 

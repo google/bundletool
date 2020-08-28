@@ -871,6 +871,19 @@ public class AndroidManifestTest {
   }
 
   @Test
+  public void configSplit_emptyFeatureSplitId() {
+    AndroidManifest moduleManifest = AndroidManifest.create(androidManifest("com.package.test"));
+    AndroidManifest configManifest =
+        AndroidManifest.createForConfigSplit(
+            moduleManifest.getPackageName(),
+            moduleManifest.getVersionCode(),
+            /* splitId= */ "x86",
+            /* featureSplitId= */ "",
+            /* extractNativeLibs= */ Optional.of(false));
+    assertThat(configManifest.getConfigForSplit()).isEmpty();
+  }
+
+  @Test
   public void configSplit_noExtraElementsFromModuleSplit() throws Exception {
     XmlNode.Builder xmlNodeBuilder = XmlNode.newBuilder();
     TextFormat.merge(TestData.openReader("testdata/manifest/manifest1.textpb"), xmlNodeBuilder);

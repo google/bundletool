@@ -362,8 +362,8 @@ public class ManifestDeliveryElementTest {
     assertThat(exception)
         .hasMessageThat()
         .contains(
-            "Expected <dist:install-time> element to contain only <dist:conditions> "
-                + "element but found: 'condtions' with namespace URI: "
+            "Expected <dist:install-time> element to contain only <dist:conditions> or "
+                + "<dist:removable> element but found: 'condtions' with namespace URI: "
                 + "'http://schemas.android.com/apk/distribution'");
   }
 
@@ -527,8 +527,8 @@ public class ManifestDeliveryElementTest {
     assertThat(exception)
         .hasMessageThat()
         .contains(
-            "Expected <dist:install-time> element to contain only <dist:conditions> element but "
-                + "found: 'conditions' with namespace not provided.");
+            "Expected <dist:install-time> element to contain only <dist:conditions> or "
+                + "<dist:removable> element but found: 'conditions' with namespace not provided.");
   }
 
   @Test

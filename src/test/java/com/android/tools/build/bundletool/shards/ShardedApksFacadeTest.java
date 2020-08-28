@@ -14,7 +14,7 @@
  * limitations under the License
  */
 
-package com.android.tools.build.bundletool.splitters;
+package com.android.tools.build.bundletool.shards;
 
 import static com.android.bundle.Targeting.Abi.AbiAlias.X86;
 import static com.android.bundle.Targeting.Abi.AbiAlias.X86_64;
@@ -83,10 +83,8 @@ import dagger.Component;
 import java.security.PrivateKey;
 import java.security.cert.X509Certificate;
 import java.util.List;
-import java.util.Optional;
 import javax.inject.Inject;
 import org.junit.Before;
-import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.experimental.theories.DataPoints;
 import org.junit.experimental.theories.FromDataPoints;
@@ -95,7 +93,7 @@ import org.junit.experimental.theories.Theory;
 import org.junit.runner.RunWith;
 
 @RunWith(Theories.class)
-public class ShardedApksGeneratorTest {
+public class ShardedApksFacadeTest {
   private static final Version BUNDLETOOL_VERSION = BundleToolVersion.getCurrentVersion();
   private static final ApkOptimizations DEFAULT_APK_OPTIMIZATIONS =
       ApkOptimizations.getDefaultOptimizationsForVersion(BUNDLETOOL_VERSION);
@@ -104,7 +102,7 @@ public class ShardedApksGeneratorTest {
   private static final BundleModuleName BASE_MODULE_NAME = BundleModuleName.create("base");
   private static final BundleModuleName VR_MODULE_NAME = BundleModuleName.create("vr");
 
-  @Inject ShardedApksGenerator shardedApksGenerator;
+  @Inject ShardedApksFacade shardedApksFacade;
 
   @DataPoints("standaloneSplitTypes")
   public static final ImmutableSet<SplitType> STANDALONE_SPLIT_TYPES =
@@ -119,6 +117,8 @@ public class ShardedApksGeneratorTest {
   @Theory
   public void simpleMultipleModules(
       @FromDataPoints("standaloneSplitTypes") SplitType standaloneSplitType) throws Exception {
+    TestComponent.useTestModule(this, TestModule.builder().withDeviceSpec(DEVICE_SPEC).build());
+
     ImmutableList<BundleModule> bundleModule =
         ImmutableList.of(
             new BundleModuleBuilder("base")
@@ -132,9 +132,11 @@ public class ShardedApksGeneratorTest {
 
     ImmutableList<ModuleSplit> moduleSplits =
         standaloneSplitType.equals(SplitType.STANDALONE)
-            ? generateModuleSplitsForStandalone(bundleModule)
-            : generateModuleSplitsForSystem(
-                bundleModule, ImmutableSet.of(BASE_MODULE_NAME, VR_MODULE_NAME));
+            ? shardedApksFacade.generateSplits(bundleModule, DEFAULT_APK_OPTIMIZATIONS)
+            : shardedApksFacade.generateSystemSplits(
+                bundleModule,
+                ImmutableSet.of(BASE_MODULE_NAME, VR_MODULE_NAME),
+                DEFAULT_APK_OPTIMIZATIONS);
 
     assertThat(moduleSplits).hasSize(1);
     ModuleSplit moduleSplit = moduleSplits.get(0);
@@ -148,6 +150,12 @@ public class ShardedApksGeneratorTest {
   @Theory
   public void singleModule_withNativeLibsAndDensity(
       @FromDataPoints("standaloneSplitTypes") SplitType standaloneSplitType) throws Exception {
+    TestComponent.useTestModule(
+        this,
+        standaloneSplitType.equals(SplitType.SYSTEM)
+            ? TestModule.builder().withDeviceSpec(DEVICE_SPEC).build()
+            : TestModule.builder().build());
+
     ImmutableList<BundleModule> bundleModule =
         ImmutableList.of(
             new BundleModuleBuilder("base")
@@ -178,21 +186,36 @@ public class ShardedApksGeneratorTest {
     ImmutableList<ModuleSplit> moduleSplits;
 
     if (standaloneSplitType.equals(SplitType.SYSTEM)) {
-      moduleSplits = generateModuleSplitsForSystem(bundleModule, ImmutableSet.of(BASE_MODULE_NAME));
+      moduleSplits =
+          shardedApksFacade.generateSystemSplits(
+              bundleModule, ImmutableSet.of(BASE_MODULE_NAME), DEFAULT_APK_OPTIMIZATIONS);
       assertThat(moduleSplits).hasSize(1); // x86, mdpi split
     } else {
-      moduleSplits = generateModuleSplitsForStandalone(bundleModule);
+      moduleSplits = shardedApksFacade.generateSplits(bundleModule, DEFAULT_APK_OPTIMIZATIONS);
       assertThat(moduleSplits).hasSize(14); // 7 (density), 2 (abi) splits
     }
     assertThat(moduleSplits.stream().map(ModuleSplit::getSplitType).collect(toImmutableSet()))
         .containsExactly(standaloneSplitType);
   }
 
-  @Ignore
   @Test
   @Theory
   public void singleModule_withNativeLibsAndDensity_strip64bitNativeLibs(
       @FromDataPoints("standaloneSplitTypes") SplitType standaloneSplitType) throws Exception {
+    Optimizations optimizations =
+        Optimizations.newBuilder()
+            .setStandaloneConfig(StandaloneConfig.newBuilder().setStrip64BitLibraries(true))
+            .build();
+    TestComponent.useTestModule(
+        this,
+        standaloneSplitType.equals(SplitType.SYSTEM)
+            ? TestModule.builder()
+                .withDeviceSpec(DEVICE_SPEC)
+                .withBundleConfig(BundleConfig.newBuilder().setOptimizations(optimizations))
+                .build()
+            : TestModule.builder()
+                .withBundleConfig(BundleConfig.newBuilder().setOptimizations(optimizations))
+                .build());
     ImmutableList<BundleModule> bundleModule =
         ImmutableList.of(
             new BundleModuleBuilder("base")
@@ -223,10 +246,12 @@ public class ShardedApksGeneratorTest {
     ImmutableList<ModuleSplit> moduleSplits;
 
     if (standaloneSplitType.equals(SplitType.SYSTEM)) {
-      moduleSplits = generateModuleSplitsForSystem(bundleModule, ImmutableSet.of(BASE_MODULE_NAME));
+      moduleSplits =
+          shardedApksFacade.generateSystemSplits(
+              bundleModule, ImmutableSet.of(BASE_MODULE_NAME), DEFAULT_APK_OPTIMIZATIONS);
       assertThat(moduleSplits).hasSize(1); // x86, mdpi split
     } else {
-      moduleSplits = generateModuleSplitsForStandalone(bundleModule);
+      moduleSplits = shardedApksFacade.generateSplits(bundleModule, DEFAULT_APK_OPTIMIZATIONS);
       assertThat(moduleSplits).hasSize(7); // 7 (density), 1 (abi) split
     }
     // Verify that the only ABI is x86.
@@ -257,6 +282,9 @@ public class ShardedApksGeneratorTest {
     TestComponent.useTestModule(
         this,
         TestModule.builder()
+            .withDeviceSpec(
+                mergeSpecs(
+                    sdkVersion(28), abis("x86"), density(DensityAlias.MDPI), locales("en-US")))
             .withBundleConfig(
                 BundleConfig.newBuilder()
                     .setOptimizations(
@@ -292,13 +320,10 @@ public class ShardedApksGeneratorTest {
                 .build());
 
     ImmutableList<ModuleSplit> moduleSplits =
-        shardedApksGenerator.generateSystemSplits(
+        shardedApksFacade.generateSystemSplits(
             /* modules= */ bundleModule,
             /* modulesToFuse= */ ImmutableSet.of(BASE_MODULE_NAME),
-            DEFAULT_APK_OPTIMIZATIONS,
-            Optional.of(
-                mergeSpecs(
-                    sdkVersion(28), abis("x86"), density(DensityAlias.MDPI), locales("en-US"))));
+            DEFAULT_APK_OPTIMIZATIONS);
 
     assertThat(moduleSplits).hasSize(1); // 1 (density), 1 (abi) split
     ModuleSplit moduleSplit = moduleSplits.get(0);
@@ -312,7 +337,12 @@ public class ShardedApksGeneratorTest {
 
   @Test
   public void singleModule_withNativeLibsAndLanguagesWithDeviceSpec() throws Exception {
-
+    TestComponent.useTestModule(
+        this,
+        TestModule.builder()
+            .withDeviceSpec(
+                mergeSpecs(sdkVersion(28), abis("x86"), density(DensityAlias.MDPI), locales("es")))
+            .build());
     ImmutableList<BundleModule> bundleModule =
         ImmutableList.of(
             new BundleModuleBuilder("base")
@@ -345,13 +375,10 @@ public class ShardedApksGeneratorTest {
                 .build());
 
     ImmutableList<ModuleSplit> moduleSplits =
-        shardedApksGenerator.generateSystemSplits(
+        shardedApksFacade.generateSystemSplits(
             /* modules= */ bundleModule,
             /* modulesToFuse= */ ImmutableSet.of(BASE_MODULE_NAME),
-            DEFAULT_APK_OPTIMIZATIONS,
-            Optional.of(
-                mergeSpecs(
-                    sdkVersion(28), abis("x86"), density(DensityAlias.MDPI), locales("es"))));
+            DEFAULT_APK_OPTIMIZATIONS);
 
     assertThat(moduleSplits).hasSize(2); // fused, es split
     ImmutableMap<Boolean, ModuleSplit> splitByMasterSplitTypeMap =
@@ -394,7 +421,12 @@ public class ShardedApksGeneratorTest {
 
   @Test
   public void multipleModule_withLanguages() throws Exception {
-
+    TestComponent.useTestModule(
+        this,
+        TestModule.builder()
+            .withDeviceSpec(
+                mergeSpecs(sdkVersion(28), abis("x86"), density(DensityAlias.MDPI), locales("fr")))
+            .build());
     ImmutableList<BundleModule> bundleModule =
         ImmutableList.of(
             new BundleModuleBuilder("base")
@@ -429,13 +461,10 @@ public class ShardedApksGeneratorTest {
                 .build());
 
     ImmutableList<ModuleSplit> moduleSplits =
-        shardedApksGenerator.generateSystemSplits(
+        shardedApksFacade.generateSystemSplits(
             /* modules= */ bundleModule,
             /* modulesToFuse= */ ImmutableSet.of(BASE_MODULE_NAME, VR_MODULE_NAME),
-            DEFAULT_APK_OPTIMIZATIONS,
-            Optional.of(
-                mergeSpecs(
-                    sdkVersion(28), abis("x86"), density(DensityAlias.MDPI), locales("fr"))));
+            DEFAULT_APK_OPTIMIZATIONS);
 
     assertThat(moduleSplits).hasSize(3); // fused, base-es, vr-es, vr-it splits
     ImmutableMap<String, ModuleSplit> splitBySplitIdMap =
@@ -497,7 +526,7 @@ public class ShardedApksGeneratorTest {
                 .build());
 
     ImmutableList<ModuleSplit> moduleSplits =
-        shardedApksGenerator.generateSplits(bundleModule, DEFAULT_APK_OPTIMIZATIONS);
+        shardedApksFacade.generateSplits(bundleModule, DEFAULT_APK_OPTIMIZATIONS);
 
     assertThat(moduleSplits).hasSize(1);
     ModuleSplit moduleSplit = getOnlyElement(moduleSplits);
@@ -505,17 +534,6 @@ public class ShardedApksGeneratorTest {
         .hasValue(StampType.STAMP_TYPE_STANDALONE_APK.toString());
     assertThat(moduleSplit.getAndroidManifest().getMetadataValue(STAMP_SOURCE_METADATA_KEY))
         .hasValue(stampSource);
-  }
-
-  private ImmutableList<ModuleSplit> generateModuleSplitsForStandalone(
-      ImmutableList<BundleModule> bundleModule) {
-    return shardedApksGenerator.generateSplits(bundleModule, DEFAULT_APK_OPTIMIZATIONS);
-  }
-
-  private ImmutableList<ModuleSplit> generateModuleSplitsForSystem(
-      ImmutableList<BundleModule> bundleModule, ImmutableSet<BundleModuleName> moduleToFuse) {
-    return shardedApksGenerator.generateSystemSplits(
-        bundleModule, moduleToFuse, DEFAULT_APK_OPTIMIZATIONS, Optional.of(DEVICE_SPEC));
   }
 
   private static ImmutableSet<String> getEntriesPaths(ModuleSplit moduleSplit) {
@@ -527,10 +545,10 @@ public class ShardedApksGeneratorTest {
   @CommandScoped
   @Component(modules = {BuildApksModule.class, TestModule.class})
   interface TestComponent {
-    void inject(ShardedApksGeneratorTest test);
+    void inject(ShardedApksFacadeTest test);
 
-    static void useTestModule(ShardedApksGeneratorTest testInstance, TestModule testModule) {
-      DaggerShardedApksGeneratorTest_TestComponent.builder()
+    static void useTestModule(ShardedApksFacadeTest testInstance, TestModule testModule) {
+      DaggerShardedApksFacadeTest_TestComponent.builder()
           .testModule(testModule)
           .build()
           .inject(testInstance);

@@ -13,31 +13,29 @@
  * See the License for the specific language governing permissions and
  * limitations under the License
  */
-package com.android.tools.build.bundletool.commands;
+package com.android.tools.build.bundletool.preprocessors;
 
-import com.android.tools.build.bundletool.io.TempDirectory;
-import com.android.tools.build.bundletool.model.AppBundle;
+import com.android.tools.build.bundletool.commands.BuildApksCommand;
+import com.android.tools.build.bundletool.commands.CommandScoped;
 import dagger.BindsInstance;
 import dagger.Component;
+import java.util.zip.ZipFile;
 
-/** Dagger component to create a {@link BuildApksManager}. */
+/** Dagger component to create a {@link AppBundlePreprocessorManager}. */
 @CommandScoped
-@Component(modules = BuildApksModule.class)
-public interface BuildApksManagerComponent {
-  BuildApksManager create();
+@Component(modules = AppBundlePreprocessorModule.class)
+public interface AppBundlePreprocessorComponent {
+  AppBundlePreprocessorManager create();
 
-  /** Builder for the {@link BuildApksManagerComponent}. */
+  /** Builder for the {@link AppBundlePreprocessorComponent}. */
   @Component.Builder
   interface Builder {
-    BuildApksManagerComponent build();
-
-    @BindsInstance
-    Builder setTempDirectory(TempDirectory tempDirectory);
+    AppBundlePreprocessorComponent build();
 
     @BindsInstance
     Builder setBuildApksCommand(BuildApksCommand command);
 
     @BindsInstance
-    Builder setAppBundle(AppBundle appBundle);
+    Builder setBundleZip(ZipFile bundleZip);
   }
 }

@@ -19,5 +19,5 @@ import com.android.tools.build.bundletool.model.AppBundle;
 
 /** An {@link AppBundle} preprocessor that is executed before the splitting pipelines. */
 public interface AppBundlePreprocessor {
-  public AppBundle preprocess(AppBundle initialAppbundle);
+  public AppBundle preprocess(AppBundle appBundle);
 }

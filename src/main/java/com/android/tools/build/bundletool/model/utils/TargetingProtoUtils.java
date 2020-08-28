@@ -22,6 +22,7 @@ import static com.google.common.collect.MoreCollectors.onlyElement;
 import com.android.bundle.Targeting.Abi;
 import com.android.bundle.Targeting.ApkTargeting;
 import com.android.bundle.Targeting.AssetsDirectoryTargeting;
+import com.android.bundle.Targeting.MultiAbi;
 import com.android.bundle.Targeting.ScreenDensity;
 import com.android.bundle.Targeting.ScreenDensityTargeting;
 import com.android.bundle.Targeting.SdkVersion;
@@ -58,6 +59,24 @@ public final class TargetingProtoUtils {
           .addAllAlternatives(targeting.getLanguage().getValueList());
     }
     return alternativeTargeting.build();
+  }
+
+  /** Extracts multi-ABI values from the targeting. */
+  public static ImmutableSet<MultiAbi> multiAbiValues(ApkTargeting targeting) {
+    return ImmutableSet.copyOf(targeting.getMultiAbiTargeting().getValueList());
+  }
+
+  /** Extracts multi-ABI alternatives from the targeting. */
+  public static ImmutableSet<MultiAbi> multiAbiAlternatives(ApkTargeting targeting) {
+    return ImmutableSet.copyOf(targeting.getMultiAbiTargeting().getAlternativesList());
+  }
+
+  /** Extracts targeted multi-ABI universe (values and alternatives) from the targeting. */
+  public static ImmutableSet<MultiAbi> multiAbiUniverse(ApkTargeting targeting) {
+    return ImmutableSet.<MultiAbi>builder()
+        .addAll(multiAbiValues(targeting))
+        .addAll(multiAbiAlternatives(targeting))
+        .build();
   }
 
   /** Extracts ABI values from the targeting. */

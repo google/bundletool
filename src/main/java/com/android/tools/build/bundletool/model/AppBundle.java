@@ -148,10 +148,6 @@ public abstract class AppBundle {
     return Version.of(getBundleConfig().getBundletool().getVersion());
   }
 
-  public boolean has32BitRenderscriptCode() {
-    return getFeatureModules().values().stream().anyMatch(BundleModule::hasRenderscript32Bitcode);
-  }
-
   /**
    * Returns a set of ABIs that this App Bundle targets.
    *

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2017 The Android Open Source Project
+ * Copyright (C) 2020 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,10 +14,9 @@
  * limitations under the License
  */
 
-package com.android.tools.build.bundletool.splitters;
+package com.android.tools.build.bundletool.shards;
 
 import static com.android.bundle.Targeting.Abi.AbiAlias.ARMEABI;
-import static com.android.bundle.Targeting.Abi.AbiAlias.ARMEABI_V7A;
 import static com.android.bundle.Targeting.Abi.AbiAlias.X86;
 import static com.android.bundle.Targeting.Abi.AbiAlias.X86_64;
 import static com.android.tools.build.bundletool.model.AndroidManifest.ACTIVITY_ELEMENT_NAME;
@@ -28,50 +27,35 @@ import static com.android.tools.build.bundletool.model.utils.ResourcesUtils.DEFA
 import static com.android.tools.build.bundletool.model.utils.ResourcesUtils.HDPI_VALUE;
 import static com.android.tools.build.bundletool.model.utils.ResourcesUtils.LDPI_VALUE;
 import static com.android.tools.build.bundletool.model.utils.ResourcesUtils.MDPI_VALUE;
-import static com.android.tools.build.bundletool.testing.DeviceFactory.abis;
-import static com.android.tools.build.bundletool.testing.DeviceFactory.density;
-import static com.android.tools.build.bundletool.testing.DeviceFactory.locales;
-import static com.android.tools.build.bundletool.testing.DeviceFactory.mergeSpecs;
-import static com.android.tools.build.bundletool.testing.DeviceFactory.sdkVersion;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifest;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifestForAssetModule;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifestForFeature;
-import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withFusingAttribute;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withMainActivity;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withSplitNameActivity;
-import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withTitle;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.xmlAttribute;
 import static com.android.tools.build.bundletool.testing.ResourcesTableFactory.HDPI;
 import static com.android.tools.build.bundletool.testing.ResourcesTableFactory.LDPI;
-import static com.android.tools.build.bundletool.testing.ResourcesTableFactory.TEST_LABEL_RESOURCE_ID;
 import static com.android.tools.build.bundletool.testing.ResourcesTableFactory.USER_PACKAGE_OFFSET;
 import static com.android.tools.build.bundletool.testing.ResourcesTableFactory.entry;
 import static com.android.tools.build.bundletool.testing.ResourcesTableFactory.fileReference;
 import static com.android.tools.build.bundletool.testing.ResourcesTableFactory.locale;
 import static com.android.tools.build.bundletool.testing.ResourcesTableFactory.pkg;
 import static com.android.tools.build.bundletool.testing.ResourcesTableFactory.resourceTable;
-import static com.android.tools.build.bundletool.testing.ResourcesTableFactory.resourceTableWithTestLabel;
 import static com.android.tools.build.bundletool.testing.ResourcesTableFactory.type;
-import static com.android.tools.build.bundletool.testing.TargetingUtils.abiTargeting;
-import static com.android.tools.build.bundletool.testing.TargetingUtils.alternativeLanguageTargeting;
-import static com.android.tools.build.bundletool.testing.TargetingUtils.apexImageTargeting;
-import static com.android.tools.build.bundletool.testing.TargetingUtils.apexImages;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.apkAbiTargeting;
-import static com.android.tools.build.bundletool.testing.TargetingUtils.apkAlternativeLanguageTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.apkDensityTargeting;
-import static com.android.tools.build.bundletool.testing.TargetingUtils.apkLanguageTargeting;
-import static com.android.tools.build.bundletool.testing.TargetingUtils.apkMultiAbiTargetingFromAllTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.assets;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.assetsDirectoryTargeting;
-import static com.android.tools.build.bundletool.testing.TargetingUtils.languageTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.mergeApkTargeting;
+import static com.android.tools.build.bundletool.testing.TargetingUtils.mergeVariantTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.nativeDirectoryTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.nativeLibraries;
-import static com.android.tools.build.bundletool.testing.TargetingUtils.targetedApexImage;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.targetedAssetsDirectory;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.targetedNativeDirectory;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.textureCompressionTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.toScreenDensity;
+import static com.android.tools.build.bundletool.testing.TargetingUtils.variantAbiTargeting;
+import static com.android.tools.build.bundletool.testing.TargetingUtils.variantSdkTargeting;
 import static com.android.tools.build.bundletool.testing.TestUtils.extractPaths;
 import static com.android.tools.build.bundletool.testing.truth.resources.TruthResourceTable.assertThat;
 import static com.google.common.collect.ImmutableList.toImmutableList;
@@ -85,51 +69,51 @@ import com.android.aapt.ConfigurationOuterClass.Configuration;
 import com.android.aapt.Resources.ResourceTable;
 import com.android.aapt.Resources.XmlElement;
 import com.android.aapt.Resources.XmlNode;
+import com.android.bundle.Config.BundleConfig;
+import com.android.bundle.Config.Optimizations;
+import com.android.bundle.Config.SplitDimension;
+import com.android.bundle.Config.SplitDimension.Value;
+import com.android.bundle.Config.SplitsConfig;
 import com.android.bundle.Config.SuffixStripping;
-import com.android.bundle.Devices.DeviceSpec;
-import com.android.bundle.Files.ApexImages;
 import com.android.bundle.Targeting.Abi.AbiAlias;
 import com.android.bundle.Targeting.ApkTargeting;
-import com.android.bundle.Targeting.LanguageTargeting;
 import com.android.bundle.Targeting.ScreenDensity.DensityAlias;
 import com.android.bundle.Targeting.TextureCompressionFormat.TextureCompressionFormatAlias;
 import com.android.bundle.Targeting.VariantTargeting;
 import com.android.tools.build.bundletool.commands.BuildApksModule;
 import com.android.tools.build.bundletool.commands.CommandScoped;
-import com.android.tools.build.bundletool.model.BundleMetadata;
 import com.android.tools.build.bundletool.model.BundleModule;
-import com.android.tools.build.bundletool.model.BundleModuleName;
 import com.android.tools.build.bundletool.model.ModuleSplit;
 import com.android.tools.build.bundletool.model.ModuleSplit.SplitType;
 import com.android.tools.build.bundletool.model.OptimizationDimension;
-import com.android.tools.build.bundletool.model.ShardedSystemSplits;
 import com.android.tools.build.bundletool.model.utils.xmlproto.XmlProtoElement;
+import com.android.tools.build.bundletool.optimizations.ApkOptimizations;
 import com.android.tools.build.bundletool.testing.BundleModuleBuilder;
 import com.android.tools.build.bundletool.testing.ResourceTableBuilder;
 import com.android.tools.build.bundletool.testing.TestModule;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
-import com.google.common.collect.Iterables;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 import com.google.protobuf.Message;
 import dagger.Component;
-import java.util.Optional;
 import javax.inject.Inject;
 import org.junit.Before;
-import org.junit.Ignore;
 import org.junit.Test;
-import org.junit.experimental.theories.DataPoints;
-import org.junit.experimental.theories.FromDataPoints;
-import org.junit.experimental.theories.Theories;
-import org.junit.experimental.theories.Theory;
 import org.junit.runner.RunWith;
+import org.junit.runners.JUnit4;
 
-@RunWith(Theories.class)
-public class BundleSharderTest {
+@RunWith(JUnit4.class)
+public class StandaloneApksGeneratorTest {
 
-  private static final BundleMetadata DEFAULT_METADATA = BundleMetadata.builder().build();
+  private static final ApkOptimizations NO_DIMENSIONS =
+      ApkOptimizations.builder()
+          .setSplitDimensions(ImmutableSet.of())
+          .setStandaloneDimensions(ImmutableSet.of())
+          .build();
+
+  private static final VariantTargeting VARIANT_TARGETING_WITH_SDK_1 = variantSdkTargeting(1);
 
   private static final ImmutableSet<DensityAlias> ALL_DENSITIES =
       ImmutableSet.of(
@@ -140,7 +124,6 @@ public class BundleSharderTest {
           DensityAlias.XHDPI,
           DensityAlias.XXHDPI,
           DensityAlias.XXXHDPI);
-
   private static final ApkTargeting LDPI_TARGETING =
       apkDensityTargeting(
           DensityAlias.LDPI, Sets.difference(ALL_DENSITIES, ImmutableSet.of(DensityAlias.LDPI)));
@@ -165,11 +148,7 @@ public class BundleSharderTest {
           DensityAlias.XXXHDPI,
           Sets.difference(ALL_DENSITIES, ImmutableSet.of(DensityAlias.XXXHDPI)));
 
-  private static final BundleModuleName BASE_MODULE_NAME = BundleModuleName.create("base");
-  private static final BundleModuleName FEATURE_MODULE_NAME = BundleModuleName.create("feature");
-  private static final BundleModuleName VR_MODULE_NAME = BundleModuleName.create("vr");
-
-  @Inject BundleSharder bundleSharder;
+  @Inject StandaloneApksGenerator standaloneApksGenerator;
 
   @Before
   public void setUp() {
@@ -206,16 +185,13 @@ public class BundleSharderTest {
             .build();
 
     ImmutableList<ModuleSplit> shards =
-        bundleSharder.shardBundle(
-            ImmutableList.of(bundleModule),
-            ImmutableSet.of(),
-            DEFAULT_METADATA,
-            BundleSharderConfiguration.getDefaultInstance());
+        standaloneApksGenerator.generateStandaloneApks(
+            ImmutableList.of(bundleModule), NO_DIMENSIONS);
 
     assertThat(shards).hasSize(1);
     ModuleSplit fatShard = shards.get(0);
     assertThat(fatShard.getApkTargeting()).isEqualToDefaultInstance();
-    assertThat(fatShard.getVariantTargeting()).isEqualToDefaultInstance();
+    assertThat(fatShard.getVariantTargeting()).isEqualTo(VARIANT_TARGETING_WITH_SDK_1);
     assertThat(fatShard.getSplitType()).isEqualTo(SplitType.STANDALONE);
     assertThat(extractPaths(fatShard.getEntries()))
         .containsExactly(
@@ -254,11 +230,8 @@ public class BundleSharderTest {
             .build();
 
     ImmutableList<ModuleSplit> shards =
-        bundleSharder.shardBundle(
-            ImmutableList.of(bundleModule),
-            ImmutableSet.of(),
-            DEFAULT_METADATA,
-            BundleSharderConfiguration.getDefaultInstance());
+        standaloneApksGenerator.generateStandaloneApks(
+            ImmutableList.of(bundleModule), NO_DIMENSIONS);
 
     assertThat(shards).hasSize(1);
     assertThat(extractPaths(shards.get(0).getEntries()))
@@ -269,57 +242,6 @@ public class BundleSharderTest {
             "root/license.dat");
   }
 
-
-  @Test
-  public void shardByNoDimension_strip64BitLibraries_filteredOut() throws Exception {
-    BundleModule bundleModule =
-        new BundleModuleBuilder("base")
-            .addFile("assets/file.txt")
-            .addFile("dex/classes.dex")
-            .addFile("lib/x86/libtest.so")
-            .addFile("lib/x86_64/libtest.so")
-            .addFile("res/drawable/image.jpg")
-            .addFile("res/drawable-mdpi/image.jpg")
-            .addFile("root/license.dat")
-            .setManifest(androidManifest("com.test.app"))
-            .setNativeConfig(
-                nativeLibraries(
-                    targetedNativeDirectory("lib/x86", nativeDirectoryTargeting(X86)),
-                    targetedNativeDirectory("lib/x86_64", nativeDirectoryTargeting(X86_64))))
-            .setResourceTable(
-                new ResourceTableBuilder()
-                    .addPackage("com.test.app")
-                    .addDrawableResourceForMultipleDensities(
-                        "image",
-                        ImmutableMap.of(
-                            DEFAULT_DENSITY_VALUE,
-                            "res/drawable/image.jpg",
-                            MDPI_VALUE,
-                            "res/drawable-mdpi/image.jpg"))
-                    .build())
-            .build();
-
-    ImmutableList<ModuleSplit> shards =
-        bundleSharder.shardBundle(
-            ImmutableList.of(bundleModule),
-            ImmutableSet.of(),
-            DEFAULT_METADATA,
-            BundleSharderConfiguration.builder().setStrip64BitLibrariesFromShards(true).build());
-
-    assertThat(shards).hasSize(1);
-    ModuleSplit fatShard = shards.get(0);
-    assertThat(fatShard.getApkTargeting()).isEqualToDefaultInstance();
-    assertThat(fatShard.getVariantTargeting()).isEqualToDefaultInstance();
-    assertThat(fatShard.getSplitType()).isEqualTo(SplitType.STANDALONE);
-    assertThat(extractPaths(fatShard.getEntries()))
-        .containsExactly(
-            "assets/file.txt",
-            "dex/classes.dex",
-            "lib/x86/libtest.so",
-            "res/drawable/image.jpg",
-            "res/drawable-mdpi/image.jpg",
-            "root/license.dat");
-  }
 
   @Test
   public void removeSplitNameFromShard() throws Exception {
@@ -339,11 +261,8 @@ public class BundleSharderTest {
             .build();
 
     ImmutableList<ModuleSplit> shards =
-        bundleSharder.shardBundle(
-            ImmutableList.of(bundleModule),
-            ImmutableSet.of(),
-            DEFAULT_METADATA,
-            BundleSharderConfiguration.getDefaultInstance());
+        standaloneApksGenerator.generateStandaloneApks(
+            ImmutableList.of(bundleModule), NO_DIMENSIONS);
 
     assertThat(shards).hasSize(1);
     ModuleSplit fatShard = shards.get(0);
@@ -363,18 +282,8 @@ public class BundleSharderTest {
             xmlAttribute(ANDROID_NAMESPACE_URI, "name", NAME_RESOURCE_ID, "FooActivity"));
   }
 
-  @DataPoints("deviceSpecs")
-  public static final ImmutableSet<Optional<DeviceSpec>> DEVICE_SPECS =
-      ImmutableSet.of(
-          Optional.empty(),
-          Optional.of(
-              mergeSpecs(
-                  sdkVersion(28), abis("x86_64"), density(DensityAlias.MDPI), locales("en-US"))));
-
   @Test
-  @Theory
-  public void shardByAbi_havingNoNativeTargeting_producesOneApk(
-      @FromDataPoints("deviceSpecs") Optional<DeviceSpec> deviceSpec) throws Exception {
+  public void shardByAbi_havingNoNativeTargeting_producesOneApk() throws Exception {
     BundleModule bundleModule =
         new BundleModuleBuilder("base")
             .addFile("assets/file.txt")
@@ -398,30 +307,14 @@ public class BundleSharderTest {
                     .build())
             .build();
 
-    ImmutableList<ModuleSplit> shards;
-    if (deviceSpec.isPresent()) {
-      ShardedSystemSplits shardedSystemSplits =
-          bundleSharder.shardForSystemApps(
-              /* modules= */ ImmutableList.of(bundleModule),
-              /* modulesToFuse= */ ImmutableSet.of(BASE_MODULE_NAME),
-              ImmutableSet.of(OptimizationDimension.ABI),
-              DEFAULT_METADATA,
-              BundleSharderConfiguration.builder().setDeviceSpec(deviceSpec).build());
-      assertThat(shardedSystemSplits.getAdditionalSplits()).isEmpty();
-      shards = ImmutableList.of(shardedSystemSplits.getSystemImageSplit());
-    } else {
-      shards =
-          bundleSharder.shardBundle(
-              ImmutableList.of(bundleModule),
-              ImmutableSet.of(OptimizationDimension.ABI),
-              DEFAULT_METADATA,
-              BundleSharderConfiguration.builder().setDeviceSpec(deviceSpec).build());
-    }
+    ImmutableList<ModuleSplit> shards =
+        standaloneApksGenerator.generateStandaloneApks(
+            ImmutableList.of(bundleModule), standaloneApkOptimizations(OptimizationDimension.ABI));
 
     assertThat(shards).hasSize(1);
     ModuleSplit fatShard = shards.get(0);
     assertThat(fatShard.getApkTargeting()).isEqualToDefaultInstance();
-    assertThat(fatShard.getVariantTargeting()).isEqualToDefaultInstance();
+    assertThat(fatShard.getVariantTargeting()).isEqualTo(VARIANT_TARGETING_WITH_SDK_1);
 
     assertThat(fatShard.getSplitType()).isEqualTo(SplitType.STANDALONE);
     assertThat(extractPaths(fatShard.getEntries()))
@@ -436,9 +329,7 @@ public class BundleSharderTest {
   }
 
   @Test
-  @Theory
-  public void shardByAbi_havingSingleAbi_producesOneApk(
-      @FromDataPoints("deviceSpecs") Optional<DeviceSpec> deviceSpec) throws Exception {
+  public void shardByAbi_havingSingleAbi_producesOneApk() throws Exception {
     BundleModule bundleModule =
         new BundleModuleBuilder("base")
             .addFile("assets/file.txt")
@@ -464,30 +355,16 @@ public class BundleSharderTest {
                     .build())
             .build();
 
-    ImmutableList<ModuleSplit> shards;
-    if (deviceSpec.isPresent()) {
-      ShardedSystemSplits shardedSystemSplits =
-          bundleSharder.shardForSystemApps(
-              /* modules= */ ImmutableList.of(bundleModule),
-              /* modulesToFuse= */ ImmutableSet.of(BASE_MODULE_NAME),
-              ImmutableSet.of(OptimizationDimension.ABI),
-              DEFAULT_METADATA,
-              BundleSharderConfiguration.builder().setDeviceSpec(deviceSpec).build());
-      assertThat(shardedSystemSplits.getAdditionalSplits()).isEmpty();
-      shards = ImmutableList.of(shardedSystemSplits.getSystemImageSplit());
-    } else {
-      shards =
-          bundleSharder.shardBundle(
-              ImmutableList.of(bundleModule),
-              ImmutableSet.of(OptimizationDimension.ABI),
-              DEFAULT_METADATA,
-              BundleSharderConfiguration.builder().setDeviceSpec(deviceSpec).build());
-    }
+    ImmutableList<ModuleSplit> shards =
+        standaloneApksGenerator.generateStandaloneApks(
+            ImmutableList.of(bundleModule), standaloneApkOptimizations(OptimizationDimension.ABI));
 
     assertThat(shards).hasSize(1);
     ModuleSplit fatShard = shards.get(0);
     assertThat(fatShard.getApkTargeting()).isEqualTo(apkAbiTargeting(AbiAlias.X86_64));
-    assertThat(fatShard.getVariantTargeting()).isEqualToDefaultInstance();
+    assertThat(fatShard.getVariantTargeting())
+        .isEqualTo(
+            mergeVariantTargeting(variantAbiTargeting(X86_64), VARIANT_TARGETING_WITH_SDK_1));
 
     assertThat(fatShard.getSplitType()).isEqualTo(SplitType.STANDALONE);
 
@@ -533,21 +410,32 @@ public class BundleSharderTest {
             .build();
 
     ImmutableList<ModuleSplit> shards =
-        bundleSharder.shardBundle(
-            ImmutableList.of(bundleModule),
-            ImmutableSet.of(OptimizationDimension.ABI),
-            DEFAULT_METADATA,
-            BundleSharderConfiguration.getDefaultInstance());
+        standaloneApksGenerator.generateStandaloneApks(
+            ImmutableList.of(bundleModule), standaloneApkOptimizations(OptimizationDimension.ABI));
 
     assertThat(shards).hasSize(3);
     assertThat(shards.stream().map(ModuleSplit::getSplitType).distinct().collect(toImmutableSet()))
         .containsExactly(SplitType.STANDALONE);
+
+    VariantTargeting armVariantTargeting =
+        mergeVariantTargeting(
+            variantAbiTargeting(ARMEABI, ImmutableSet.of(X86, X86_64)),
+            VARIANT_TARGETING_WITH_SDK_1);
+    VariantTargeting x86VariantTargeting =
+        mergeVariantTargeting(
+            variantAbiTargeting(X86, ImmutableSet.of(ARMEABI, X86_64)),
+            VARIANT_TARGETING_WITH_SDK_1);
+    VariantTargeting x64VariantTargeting =
+        mergeVariantTargeting(
+            variantAbiTargeting(X86_64, ImmutableSet.of(ARMEABI, X86)),
+            VARIANT_TARGETING_WITH_SDK_1);
+
     assertThat(
             shards.stream()
                 .map(ModuleSplit::getVariantTargeting)
                 .distinct()
                 .collect(toImmutableSet()))
-        .containsExactly(VariantTargeting.getDefaultInstance());
+        .containsExactly(armVariantTargeting, x64VariantTargeting, x86VariantTargeting);
     for (ModuleSplit shard : shards) {
       assertThat(extractPaths(shard.getEntries()))
           .containsAtLeast(
@@ -579,172 +467,6 @@ public class BundleSharderTest {
   }
 
   @Test
-  public void shardByAbi_havingManyAbisForSystemShards_producesSingleApk() throws Exception {
-    BundleModule bundleModule =
-        new BundleModuleBuilder("base")
-            .addFile("assets/file.txt")
-            .addFile("dex/classes.dex")
-            .addFile("lib/armeabi/libtest.so")
-            .addFile("lib/x86/libtest.so")
-            .addFile("lib/x86_64/libtest.so")
-            .addFile("res/drawable/image.jpg")
-            .addFile("res/drawable-mdpi/image.jpg")
-            .addFile("root/license.dat")
-            .setManifest(androidManifest("com.test.app"))
-            .setNativeConfig(
-                nativeLibraries(
-                    targetedNativeDirectory("lib/armeabi", nativeDirectoryTargeting(ARMEABI)),
-                    targetedNativeDirectory("lib/x86", nativeDirectoryTargeting(X86)),
-                    targetedNativeDirectory("lib/x86_64", nativeDirectoryTargeting(X86_64))))
-            .setResourceTable(
-                new ResourceTableBuilder()
-                    .addPackage("com.test.app")
-                    .addDrawableResourceForMultipleDensities(
-                        "image",
-                        ImmutableMap.of(
-                            DEFAULT_DENSITY_VALUE,
-                            "res/drawable/image.jpg",
-                            MDPI_VALUE,
-                            "res/drawable-mdpi/image.jpg"))
-                    .build())
-            .build();
-
-    ShardedSystemSplits shards =
-        bundleSharder.shardForSystemApps(
-            /* modules= */ ImmutableList.of(bundleModule),
-            /* modulesToFuse= */ ImmutableSet.of(BASE_MODULE_NAME),
-            ImmutableSet.of(OptimizationDimension.ABI),
-            DEFAULT_METADATA,
-            BundleSharderConfiguration.builder()
-                .setDeviceSpec(
-                    mergeSpecs(
-                        sdkVersion(28),
-                        abis("armeabi"),
-                        density(DensityAlias.MDPI),
-                        locales("en-US")))
-                .build());
-
-    ModuleSplit armeabiShard = shards.getSystemImageSplit();
-    assertThat(armeabiShard.getApkTargeting())
-        .isEqualTo(apkAbiTargeting(ARMEABI, ImmutableSet.of(X86, X86_64)));
-    assertThat(armeabiShard.getVariantTargeting()).isEqualToDefaultInstance();
-    assertThat(armeabiShard.getSplitType()).isEqualTo(SplitType.STANDALONE);
-    assertThat(extractPaths(armeabiShard.getEntries()))
-        .containsExactly(
-            "assets/file.txt",
-            "dex/classes.dex",
-            "lib/armeabi/libtest.so",
-            "res/drawable/image.jpg",
-            "res/drawable-mdpi/image.jpg",
-            "root/license.dat");
-    assertThat(shards.getAdditionalSplits()).isEmpty();
-  }
-
-  @Test
-  public void shardByAbi_havingManyModulesWithLanguagesForSystemShards() throws Exception {
-    BundleModule baseModule =
-        new BundleModuleBuilder("base")
-            .addFile("assets/languages#lang_es/image.jpg")
-            .addFile("assets/languages#lang_fr/image.jpg")
-            .setAssetsConfig(
-                assets(
-                    targetedAssetsDirectory(
-                        "assets/languages#lang_es",
-                        assetsDirectoryTargeting(languageTargeting("es"))),
-                    targetedAssetsDirectory(
-                        "assets/languages#lang_fr",
-                        assetsDirectoryTargeting(languageTargeting("fr")))))
-            .setManifest(androidManifest("com.app"))
-            .setResourceTable(resourceTableWithTestLabel("Test feature"))
-            .build();
-
-    BundleModule vrModule =
-        new BundleModuleBuilder("vr")
-            .addFile("assets/vr/languages#lang_es/image.jpg")
-            .addFile("assets/vr/languages#lang_fr/image.jpg")
-            .setAssetsConfig(
-                assets(
-                    targetedAssetsDirectory(
-                        "assets/vr/languages#lang_es",
-                        assetsDirectoryTargeting(languageTargeting("es"))),
-                    targetedAssetsDirectory(
-                        "assets/vr/languages#lang_fr",
-                        assetsDirectoryTargeting(languageTargeting("fr")))))
-            .setManifest(
-                androidManifestForFeature(
-                    "com.app",
-                    withFusingAttribute(true),
-                    withTitle("@string/test_label", TEST_LABEL_RESOURCE_ID)))
-            .build();
-
-    ShardedSystemSplits shards =
-        bundleSharder.shardForSystemApps(
-            /* modules= */ ImmutableList.of(baseModule, vrModule),
-            /* modulesToFuse= */ ImmutableSet.of(BASE_MODULE_NAME, VR_MODULE_NAME),
-            ImmutableSet.of(
-                OptimizationDimension.ABI,
-                OptimizationDimension.LANGUAGE,
-                OptimizationDimension.SCREEN_DENSITY),
-            DEFAULT_METADATA,
-            BundleSharderConfiguration.builder()
-                .setDeviceSpec(
-                    mergeSpecs(
-                        sdkVersion(28), abis("armeabi"), density(DensityAlias.MDPI), locales("es")))
-                .build());
-
-    ModuleSplit fusedShard = shards.getSystemImageSplit();
-    assertThat(fusedShard.isBaseModuleSplit()).isTrue();
-
-    assertThat(extractPaths(fusedShard.getEntries()))
-        .containsExactly(
-            "assets/vr/languages#lang_es/image.jpg", "assets/languages#lang_es/image.jpg");
-
-    ImmutableList<ModuleSplit> langSplits = shards.getAdditionalSplits();
-    assertThat(langSplits).hasSize(1);
-    ImmutableMap<String, ModuleSplit> langSplitsNameMap =
-        Maps.uniqueIndex(langSplits, split -> split.getModuleName().getName());
-
-    assertThat(langSplitsNameMap.keySet()).containsExactly("base");
-
-    ModuleSplit frBaseSplit = langSplitsNameMap.get("base");
-    assertThat(extractPaths(frBaseSplit.getEntries()))
-        .containsExactly(
-            "assets/languages#lang_fr/image.jpg", "assets/vr/languages#lang_fr/image.jpg");
-    assertThat(frBaseSplit.getAndroidManifest().getSplitId()).hasValue("config.fr");
-  }
-
-  @Ignore
-  @Test
-  public void shardByAbi_strip64BitLibraries_filteredOut() throws Exception {
-    BundleModule bundleModule =
-        new BundleModuleBuilder("base")
-            .addFile("dex/classes.dex")
-            .addFile("lib/x86/libtest.so")
-            .addFile("lib/x86_64/libtest.so")
-            .setManifest(androidManifest("com.test.app"))
-            .setNativeConfig(
-                nativeLibraries(
-                    targetedNativeDirectory("lib/x86", nativeDirectoryTargeting(X86)),
-                    targetedNativeDirectory("lib/x86_64", nativeDirectoryTargeting(X86_64))))
-            .build();
-
-    ImmutableList<ModuleSplit> shards =
-        bundleSharder.shardBundle(
-            ImmutableList.of(bundleModule),
-            ImmutableSet.of(OptimizationDimension.ABI),
-            DEFAULT_METADATA,
-            BundleSharderConfiguration.builder().setStrip64BitLibrariesFromShards(true).build());
-
-    assertThat(shards).hasSize(1);
-    ModuleSplit shard = shards.get(0);
-    assertThat(shard.getSplitType()).isEqualTo(SplitType.STANDALONE);
-    assertThat(shard.getVariantTargeting()).isEqualToDefaultInstance();
-    assertThat(extractPaths(shard.getEntries()))
-        .containsAtLeast("dex/classes.dex", "lib/x86/libtest.so");
-    assertThat(shard.getApkTargeting()).isEqualTo(apkAbiTargeting(X86));
-  }
-
-  @Test
   public void shardByAbi_assetsAbiTargetingIsIgnored() throws Exception {
     BundleModule bundleModule =
         new BundleModuleBuilder("base")
@@ -772,16 +494,12 @@ public class BundleSharderTest {
             .build();
 
     ImmutableList<ModuleSplit> shards =
-        bundleSharder.shardBundle(
-            ImmutableList.of(bundleModule),
-            ImmutableSet.of(OptimizationDimension.ABI),
-            DEFAULT_METADATA,
-            BundleSharderConfiguration.getDefaultInstance());
+        standaloneApksGenerator.generateStandaloneApks(
+            ImmutableList.of(bundleModule), standaloneApkOptimizations(OptimizationDimension.ABI));
 
     assertThat(shards).hasSize(1);
     ModuleSplit fatShard = shards.get(0);
     assertThat(fatShard.getApkTargeting()).isEqualToDefaultInstance();
-    assertThat(fatShard.getVariantTargeting()).isEqualToDefaultInstance();
     assertThat(fatShard.getSplitType()).isEqualTo(SplitType.STANDALONE);
     assertThat(fatShard.getApkTargeting()).isEqualToDefaultInstance();
     assertThat(extractPaths(fatShard.getEntries()))
@@ -797,80 +515,6 @@ public class BundleSharderTest {
   }
 
   @Test
-  public void shardApexModule() throws Exception {
-    ApexImages apexConfig =
-        apexImages(
-            targetedApexImage("apex/x86_64.x86.img", apexImageTargeting("x86_64", "x86")),
-            targetedApexImage(
-                "apex/x86_64.armeabi-v7a.img", apexImageTargeting("x86_64", "armeabi-v7a")),
-            targetedApexImage("apex/x86_64.img", apexImageTargeting("x86_64")),
-            targetedApexImage("apex/x86.armeabi-v7a.img", apexImageTargeting("x86", "armeabi-v7a")),
-            targetedApexImage("apex/x86.img", apexImageTargeting("x86")),
-            targetedApexImage("apex/armeabi-v7a.img", apexImageTargeting("armeabi-v7a")));
-    BundleModule apexModule =
-        new BundleModuleBuilder("base")
-            .addFile("root/apex_manifest.json")
-            .addFile("apex/x86_64.x86.img")
-            .addFile("apex/x86_64.armeabi-v7a.img")
-            .addFile("apex/x86_64.img")
-            .addFile("apex/x86.armeabi-v7a.img")
-            .addFile("apex/x86.img")
-            .addFile("apex/armeabi-v7a.img")
-            .setManifest(androidManifest("com.test.app"))
-            .setApexConfig(apexConfig)
-            .build();
-
-    ImmutableList<ModuleSplit> shards =
-        bundleSharder.shardApexBundle(apexModule, BundleSharderConfiguration.getDefaultInstance());
-
-    assertThat(shards).hasSize(6);
-    assertThat(shards.stream().map(ModuleSplit::getSplitType).distinct().collect(toImmutableSet()))
-        .containsExactly(SplitType.STANDALONE);
-    assertThat(
-            shards.stream()
-                .map(ModuleSplit::getVariantTargeting)
-                .distinct()
-                .collect(toImmutableSet()))
-        .containsExactly(VariantTargeting.getDefaultInstance());
-    ImmutableSet<AbiAlias> x64X86Set = ImmutableSet.of(X86, X86_64);
-    ImmutableSet<AbiAlias> x64ArmSet = ImmutableSet.of(ARMEABI_V7A, X86_64);
-    ImmutableSet<AbiAlias> x64Set = ImmutableSet.of(X86_64);
-    ImmutableSet<AbiAlias> x86ArmSet = ImmutableSet.of(ARMEABI_V7A, X86);
-    ImmutableSet<AbiAlias> x86Set = ImmutableSet.of(X86);
-    ImmutableSet<AbiAlias> armSet = ImmutableSet.of(ARMEABI_V7A);
-    ImmutableSet<ImmutableSet<AbiAlias>> allTargeting =
-        ImmutableSet.of(armSet, x86ArmSet, x64ArmSet, x86Set, x64X86Set, x64Set);
-    ApkTargeting x64X86Targeting = apkMultiAbiTargetingFromAllTargeting(x64X86Set, allTargeting);
-    ApkTargeting x64ArmTargeting = apkMultiAbiTargetingFromAllTargeting(x64ArmSet, allTargeting);
-    ApkTargeting a64Targeting = apkMultiAbiTargetingFromAllTargeting(x64Set, allTargeting);
-    ApkTargeting x86ArmTargeting = apkMultiAbiTargetingFromAllTargeting(x86ArmSet, allTargeting);
-    ApkTargeting x86Targeting = apkMultiAbiTargetingFromAllTargeting(x86Set, allTargeting);
-    ApkTargeting armTargeting = apkMultiAbiTargetingFromAllTargeting(armSet, allTargeting);
-    ImmutableMap<ApkTargeting, ModuleSplit> splitsByTargeting =
-        Maps.uniqueIndex(shards, ModuleSplit::getApkTargeting);
-    assertThat(splitsByTargeting.keySet())
-        .containsExactly(
-            x64X86Targeting,
-            x64ArmTargeting,
-            a64Targeting,
-            x86ArmTargeting,
-            x86Targeting,
-            armTargeting);
-    assertThat(extractPaths(splitsByTargeting.get(x64X86Targeting).getEntries()))
-        .containsExactly("root/apex_manifest.json", "apex/x86_64.x86.img");
-    assertThat(extractPaths(splitsByTargeting.get(x64ArmTargeting).getEntries()))
-        .containsExactly("root/apex_manifest.json", "apex/x86_64.armeabi-v7a.img");
-    assertThat(extractPaths(splitsByTargeting.get(a64Targeting).getEntries()))
-        .containsExactly("root/apex_manifest.json", "apex/x86_64.img");
-    assertThat(extractPaths(splitsByTargeting.get(x86ArmTargeting).getEntries()))
-        .containsExactly("root/apex_manifest.json", "apex/x86.armeabi-v7a.img");
-    assertThat(extractPaths(splitsByTargeting.get(x86Targeting).getEntries()))
-        .containsExactly("root/apex_manifest.json", "apex/x86.img");
-    assertThat(extractPaths(splitsByTargeting.get(armTargeting).getEntries()))
-        .containsExactly("root/apex_manifest.json", "apex/armeabi-v7a.img");
-  }
-
-  @Test
   public void shardByDensity_havingNoResources_producesOneApk() throws Exception {
     BundleModule bundleModule =
         new BundleModuleBuilder("base")
@@ -882,16 +526,14 @@ public class BundleSharderTest {
             .build();
 
     ImmutableList<ModuleSplit> shards =
-        bundleSharder.shardBundle(
+        standaloneApksGenerator.generateStandaloneApks(
             ImmutableList.of(bundleModule),
-            ImmutableSet.of(OptimizationDimension.SCREEN_DENSITY),
-            DEFAULT_METADATA,
-            BundleSharderConfiguration.getDefaultInstance());
+            standaloneApkOptimizations(OptimizationDimension.SCREEN_DENSITY));
 
     assertThat(shards).hasSize(1);
     ModuleSplit shard = shards.get(0);
     assertThat(shard.getApkTargeting()).isEqualToDefaultInstance();
-    assertThat(shard.getVariantTargeting()).isEqualToDefaultInstance();
+    assertThat(shard.getVariantTargeting()).isEqualTo(VARIANT_TARGETING_WITH_SDK_1);
     assertThat(shard.getSplitType()).isEqualTo(SplitType.STANDALONE);
     assertThat(shard.getResourceTable()).isEmpty();
     assertThat(extractPaths(shard.getEntries()))
@@ -927,11 +569,9 @@ public class BundleSharderTest {
             .build();
 
     ImmutableList<ModuleSplit> shards =
-        bundleSharder.shardBundle(
+        standaloneApksGenerator.generateStandaloneApks(
             ImmutableList.of(bundleModule),
-            ImmutableSet.of(OptimizationDimension.SCREEN_DENSITY),
-            DEFAULT_METADATA,
-            BundleSharderConfiguration.getDefaultInstance());
+            standaloneApkOptimizations(OptimizationDimension.SCREEN_DENSITY));
 
     assertThat(shards).hasSize(1);
     ModuleSplit shard = shards.get(0);
@@ -947,7 +587,7 @@ public class BundleSharderTest {
         .ignoringRepeatedFieldOrder()
         .isEqualTo(resourceTable);
     assertThat(shard.getApkTargeting()).isEqualToDefaultInstance();
-    assertThat(shard.getVariantTargeting()).isEqualToDefaultInstance();
+    assertThat(shard.getVariantTargeting()).isEqualTo(VARIANT_TARGETING_WITH_SDK_1);
     assertThat(shard.getSplitType()).isEqualTo(SplitType.STANDALONE);
 
     ImmutableList<ApkTargeting> targetings =
@@ -977,11 +617,9 @@ public class BundleSharderTest {
             .build();
 
     ImmutableList<ModuleSplit> shards =
-        bundleSharder.shardBundle(
+        standaloneApksGenerator.generateStandaloneApks(
             ImmutableList.of(bundleModule),
-            ImmutableSet.of(OptimizationDimension.SCREEN_DENSITY),
-            DEFAULT_METADATA,
-            BundleSharderConfiguration.getDefaultInstance());
+            standaloneApkOptimizations(OptimizationDimension.SCREEN_DENSITY));
 
     assertThat(shards).hasSize(1);
     ModuleSplit shard = shards.get(0);
@@ -998,14 +636,8 @@ public class BundleSharderTest {
     assertThat(shard.getApkTargeting()).isEqualToDefaultInstance();
   }
 
-  @Ignore("Targeting by screen density cannot yet be expressed for assets/.")
   @Test
-  public void shardByDensity_assetsDensityTargetingIsIgnored() throws Exception {}
-
-  @Test
-  @Theory
-  public void shardByAbiAndDensity_havingNoAbiAndNoResources_producesOneApk(
-      @FromDataPoints("deviceSpecs") Optional<DeviceSpec> deviceSpec) throws Exception {
+  public void shardByAbiAndDensity_havingNoAbiAndNoResources_producesOneApk() throws Exception {
     BundleModule bundleModule =
         new BundleModuleBuilder("base")
             .addFile("assets/file.txt")
@@ -1014,30 +646,16 @@ public class BundleSharderTest {
             .setManifest(androidManifest("com.test.app"))
             .build();
 
-    ImmutableList<ModuleSplit> shards;
-    if (deviceSpec.isPresent()) {
-      ShardedSystemSplits shardedSystemSplits =
-          bundleSharder.shardForSystemApps(
-              /* modules= */ ImmutableList.of(bundleModule),
-              /* modulesToFuse= */ ImmutableSet.of(BASE_MODULE_NAME),
-              ImmutableSet.of(OptimizationDimension.ABI, OptimizationDimension.SCREEN_DENSITY),
-              DEFAULT_METADATA,
-              BundleSharderConfiguration.builder().setDeviceSpec(deviceSpec).build());
-      assertThat(shardedSystemSplits.getAdditionalSplits()).isEmpty();
-      shards = ImmutableList.of(shardedSystemSplits.getSystemImageSplit());
-    } else {
-      shards =
-          bundleSharder.shardBundle(
-              ImmutableList.of(bundleModule),
-              ImmutableSet.of(OptimizationDimension.ABI, OptimizationDimension.SCREEN_DENSITY),
-              DEFAULT_METADATA,
-              BundleSharderConfiguration.builder().setDeviceSpec(deviceSpec).build());
-    }
+    ImmutableList<ModuleSplit> shards =
+        standaloneApksGenerator.generateStandaloneApks(
+            ImmutableList.of(bundleModule),
+            standaloneApkOptimizations(
+                OptimizationDimension.ABI, OptimizationDimension.SCREEN_DENSITY));
 
     assertThat(shards).hasSize(1);
     ModuleSplit fatShard = shards.get(0);
     assertThat(fatShard.getApkTargeting()).isEqualToDefaultInstance();
-    assertThat(fatShard.getVariantTargeting()).isEqualToDefaultInstance();
+    assertThat(fatShard.getVariantTargeting()).isEqualTo(VARIANT_TARGETING_WITH_SDK_1);
 
     assertThat(fatShard.getSplitType()).isEqualTo(SplitType.STANDALONE);
 
@@ -1073,22 +691,15 @@ public class BundleSharderTest {
             .build();
 
     ImmutableList<ModuleSplit> shards =
-        bundleSharder.shardBundle(
+        standaloneApksGenerator.generateStandaloneApks(
             ImmutableList.of(bundleModule),
-            ImmutableSet.of(OptimizationDimension.ABI, OptimizationDimension.SCREEN_DENSITY),
-            DEFAULT_METADATA,
-            BundleSharderConfiguration.getDefaultInstance());
+            standaloneApkOptimizations(
+                OptimizationDimension.ABI, OptimizationDimension.SCREEN_DENSITY));
 
     // 7 shards: {x86} x {LDPI, MDPI, ..., XXXHDPI}.
     assertThat(shards).hasSize(7);
     assertThat(shards.stream().map(ModuleSplit::getSplitType).distinct().collect(toImmutableSet()))
         .containsExactly(SplitType.STANDALONE);
-    assertThat(
-            shards.stream()
-                .map(ModuleSplit::getVariantTargeting)
-                .distinct()
-                .collect(toImmutableSet()))
-        .containsExactly(VariantTargeting.getDefaultInstance());
 
     for (ModuleSplit shard : shards) {
       assertThat(extractPaths(shard.getEntries()))
@@ -1119,255 +730,6 @@ public class BundleSharderTest {
             mergeApkTargeting(apkAbiTargeting(X86), XXHDPI_TARGETING),
             mergeApkTargeting(apkAbiTargeting(X86), XXXHDPI_TARGETING),
             mergeApkTargeting(apkAbiTargeting(X86), TVDPI_TARGETING));
-  }
-
-  @Test
-  public void
-      shardByAbiAndDensity_havingOneAbiAndSomeDensityResourceWithDeviceSpec_producesSingleApk()
-          throws Exception {
-    BundleModule bundleModule =
-        new BundleModuleBuilder("base")
-            .addFile("assets/file.txt")
-            .addFile("dex/classes.dex")
-            .addFile("lib/x86/libtest.so")
-            .addFile("res/drawable-ldpi/image.jpg")
-            .addFile("res/drawable-hdpi/image.jpg")
-            .addFile("root/license.dat")
-            .setManifest(androidManifest("com.test.app"))
-            .setNativeConfig(
-                nativeLibraries(targetedNativeDirectory("lib/x86", nativeDirectoryTargeting(X86))))
-            .setResourceTable(
-                new ResourceTableBuilder()
-                    .addPackage("com.test.app")
-                    .addDrawableResourceForMultipleDensities(
-                        "image",
-                        ImmutableMap.of(
-                            LDPI_VALUE,
-                            "res/drawable-ldpi/image.jpg",
-                            HDPI_VALUE,
-                            "res/drawable-hdpi/image.jpg"))
-                    .build())
-            .build();
-
-    ShardedSystemSplits shards =
-        bundleSharder.shardForSystemApps(
-            /* modules= */ ImmutableList.of(bundleModule),
-            /* modulesToFuse= */ ImmutableSet.of(BASE_MODULE_NAME),
-            ImmutableSet.of(OptimizationDimension.ABI, OptimizationDimension.SCREEN_DENSITY),
-            DEFAULT_METADATA,
-            BundleSharderConfiguration.builder()
-                .setDeviceSpec(
-                    mergeSpecs(
-                        sdkVersion(28), abis("x86"), density(DensityAlias.MDPI), locales("en-US")))
-                .build());
-
-    assertThat(shards.getAdditionalSplits()).isEmpty();
-
-    // 1 shards: {x86} x {MDPI}.
-    ModuleSplit fatShard = shards.getSystemImageSplit();
-    assertThat(fatShard.getApkTargeting().getAbiTargeting()).isEqualTo(abiTargeting(X86));
-    assertThat(fatShard.getApkTargeting().getScreenDensityTargeting().getValueList())
-        .containsExactly(toScreenDensity(DensityAlias.MDPI));
-    assertThat(fatShard.getVariantTargeting()).isEqualToDefaultInstance();
-    assertThat(fatShard.getSplitType()).isEqualTo(SplitType.STANDALONE);
-    // The MDPI shard would match both hdpi and ldpi variant of the resource.
-    assertThat(fatShard.getResourceTable().get())
-        .containsResource("com.test.app:drawable/image")
-        .withConfigSize(2);
-    assertThat(extractPaths(fatShard.getEntries()))
-        .containsExactly(
-            "assets/file.txt",
-            "dex/classes.dex",
-            "lib/x86/libtest.so",
-            "res/drawable-hdpi/image.jpg",
-            "res/drawable-ldpi/image.jpg",
-            "root/license.dat");
-  }
-
-  @Test
-  public void shardByAbiAndDensity_havingOneAbiAndOneDensityMultipleLanguageResourceWithDeviceSpec()
-      throws Exception {
-    BundleModule bundleModule =
-        new BundleModuleBuilder("base")
-            .addFile("dex/classes.dex")
-            .addFile("lib/x86/libtest.so")
-            .addFile("root/license.dat")
-            .addFile("assets/languages#lang_es/image.jpg")
-            .addFile("assets/languages#lang_fr/image.jpg")
-            .setManifest(androidManifest("com.test.app"))
-            .setNativeConfig(
-                nativeLibraries(targetedNativeDirectory("lib/x86", nativeDirectoryTargeting(X86))))
-            .setAssetsConfig(
-                assets(
-                    targetedAssetsDirectory(
-                        "assets/languages#lang_es",
-                        assetsDirectoryTargeting(languageTargeting("es"))),
-                    targetedAssetsDirectory(
-                        "assets/languages#lang_fr",
-                        assetsDirectoryTargeting(languageTargeting("fr")))))
-            .setResourceTable(
-                new ResourceTableBuilder()
-                    .addPackage("com.test.app")
-                    .addStringResourceForMultipleLocales(
-                        "text",
-                        ImmutableMap.of(
-                            /* default locale */ "", "hello", "es", "hola", "fr", "bonjour"))
-                    .build())
-            .build();
-
-    ShardedSystemSplits shards =
-        bundleSharder.shardForSystemApps(
-            /* modules= */ ImmutableList.of(bundleModule),
-            /* modulesToFuse= */ ImmutableSet.of(BASE_MODULE_NAME),
-            ImmutableSet.of(
-                OptimizationDimension.ABI,
-                OptimizationDimension.SCREEN_DENSITY,
-                OptimizationDimension.LANGUAGE),
-            DEFAULT_METADATA,
-            BundleSharderConfiguration.builder()
-                .setDeviceSpec(
-                    mergeSpecs(
-                        sdkVersion(28), abis("x86"), density(DensityAlias.MDPI), locales("fr")))
-                .build());
-
-    // shard {x86} x {MDPI} x {fr}
-    ModuleSplit fatShard = shards.getSystemImageSplit();
-    assertThat(fatShard.getApkTargeting())
-        .isEqualTo(mergeApkTargeting(apkAbiTargeting(X86), apkLanguageTargeting("fr")));
-    assertThat(fatShard.getVariantTargeting()).isEqualToDefaultInstance();
-    assertThat(fatShard.getSplitType()).isEqualTo(SplitType.STANDALONE);
-    // es strings missing from resource table.
-    assertThat(fatShard.getResourceTable().get())
-        .isEqualTo(
-            new ResourceTableBuilder()
-                .addPackage("com.test.app")
-                .addStringResourceForMultipleLocales(
-                    "text", ImmutableMap.of(/* default locale */ "", "hello", "fr", "bonjour"))
-                .build());
-    assertThat(extractPaths(fatShard.getEntries()))
-        .containsExactly(
-            "dex/classes.dex",
-            "lib/x86/libtest.so",
-            "root/license.dat",
-            "assets/languages#lang_fr/image.jpg");
-
-    ModuleSplit esLangShard = Iterables.getOnlyElement(shards.getAdditionalSplits());
-
-    assertThat(esLangShard.getApkTargeting()).isEqualTo(apkLanguageTargeting("es"));
-    assertThat(esLangShard.getSplitType()).isEqualTo(SplitType.SPLIT);
-    assertThat(esLangShard.getResourceTable().get())
-        .isEqualTo(
-            new ResourceTableBuilder()
-                .addPackage("com.test.app")
-                .addStringResourceForMultipleLocales("text", ImmutableMap.of("es", "hola"))
-                .build());
-    assertThat(extractPaths(esLangShard.getEntries()))
-        .containsExactly("assets/languages#lang_es/image.jpg");
-  }
-
-  @Test
-  public void
-      shardByAbiAndDensity_multipleLanguageResourceAndDeviceSpecMissingLanguage_fallsBackToDefault()
-          throws Exception {
-    BundleModule bundleModule =
-        new BundleModuleBuilder("base")
-            .addFile("dex/classes.dex")
-            .addFile("lib/x86/libtest.so")
-            .addFile("root/license.dat")
-            .addFile("assets/languages#lang_es/image.jpg")
-            .addFile("assets/languages#lang_fr/image.jpg")
-            .addFile("assets/languages/image.jpg")
-            .setManifest(androidManifest("com.test.app"))
-            .setNativeConfig(
-                nativeLibraries(targetedNativeDirectory("lib/x86", nativeDirectoryTargeting(X86))))
-            .setAssetsConfig(
-                assets(
-                    targetedAssetsDirectory(
-                        "assets/languages#lang_es",
-                        assetsDirectoryTargeting(languageTargeting("es"))),
-                    targetedAssetsDirectory(
-                        "assets/languages#lang_fr",
-                        assetsDirectoryTargeting(languageTargeting("fr"))),
-                    targetedAssetsDirectory(
-                        "assets/languages",
-                        assetsDirectoryTargeting(alternativeLanguageTargeting("es", "fr")))))
-            .setResourceTable(
-                new ResourceTableBuilder()
-                    .addPackage("com.test.app")
-                    .addStringResourceForMultipleLocales(
-                        "text",
-                        ImmutableMap.of(
-                            /* default locale */ "", "hello", "es", "hola", "fr", "bonjour"))
-                    .build())
-            .build();
-
-    ShardedSystemSplits shards =
-        bundleSharder.shardForSystemApps(
-            /* modules= */ ImmutableList.of(bundleModule),
-            /* modulesToFuse= */ ImmutableSet.of(BASE_MODULE_NAME),
-            ImmutableSet.of(
-                OptimizationDimension.ABI,
-                OptimizationDimension.SCREEN_DENSITY,
-                OptimizationDimension.LANGUAGE),
-            DEFAULT_METADATA,
-            BundleSharderConfiguration.builder()
-                .setDeviceSpec(
-                    mergeSpecs(
-                        sdkVersion(28), abis("x86"), density(DensityAlias.MDPI), locales("de")))
-                .build());
-
-    ModuleSplit fatShard = shards.getSystemImageSplit();
-    assertThat(fatShard.getApkTargeting())
-        .isEqualTo(
-            mergeApkTargeting(apkAbiTargeting(X86), apkAlternativeLanguageTargeting("es", "fr")));
-    assertThat(fatShard.getApkTargeting().getAbiTargeting()).isEqualTo(abiTargeting(X86));
-    assertThat(fatShard.getApkTargeting().getScreenDensityTargeting()).isEqualToDefaultInstance();
-    assertThat(fatShard.getVariantTargeting()).isEqualToDefaultInstance();
-    assertThat(fatShard.getSplitType()).isEqualTo(SplitType.STANDALONE);
-    assertThat(fatShard.getResourceTable().get())
-        .isEqualTo(
-            new ResourceTableBuilder()
-                .addPackage("com.test.app")
-                .addStringResourceForMultipleLocales(
-                    "text", ImmutableMap.of(/* default locale */ "", "hello"))
-                .build());
-    assertThat(extractPaths(fatShard.getEntries()))
-        .containsExactly(
-            "dex/classes.dex",
-            "lib/x86/libtest.so",
-            "root/license.dat",
-            "assets/languages/image.jpg");
-
-    ImmutableMap<LanguageTargeting, ModuleSplit> splitLanguageTargetingMap =
-        Maps.uniqueIndex(
-            shards.getAdditionalSplits(), split -> split.getApkTargeting().getLanguageTargeting());
-
-    assertThat(splitLanguageTargetingMap.keySet())
-        .containsExactly(languageTargeting("es"), languageTargeting("fr"));
-
-    ModuleSplit esLangShard = splitLanguageTargetingMap.get(languageTargeting("es"));
-    assertThat(esLangShard.getApkTargeting()).isEqualTo(apkLanguageTargeting("es"));
-    assertThat(esLangShard.getSplitType()).isEqualTo(SplitType.SPLIT);
-    assertThat(esLangShard.getResourceTable().get())
-        .isEqualTo(
-            new ResourceTableBuilder()
-                .addPackage("com.test.app")
-                .addStringResourceForMultipleLocales("text", ImmutableMap.of("es", "hola"))
-                .build());
-    assertThat(extractPaths(esLangShard.getEntries()))
-        .containsExactly("assets/languages#lang_es/image.jpg");
-
-    ModuleSplit frLangShard = splitLanguageTargetingMap.get(languageTargeting("fr"));
-    assertThat(frLangShard.getApkTargeting()).isEqualTo(apkLanguageTargeting("fr"));
-    assertThat(frLangShard.getSplitType()).isEqualTo(SplitType.SPLIT);
-    assertThat(frLangShard.getResourceTable().get())
-        .isEqualTo(
-            new ResourceTableBuilder()
-                .addPackage("com.test.app")
-                .addStringResourceForMultipleLocales("text", ImmutableMap.of("fr", "bonjour"))
-                .build());
-    assertThat(extractPaths(frLangShard.getEntries()))
-        .containsExactly("assets/languages#lang_fr/image.jpg");
   }
 
   @Test
@@ -1403,21 +765,14 @@ public class BundleSharderTest {
             .build();
 
     ImmutableList<ModuleSplit> shards =
-        bundleSharder.shardBundle(
+        standaloneApksGenerator.generateStandaloneApks(
             ImmutableList.of(bundleModule),
-            ImmutableSet.of(OptimizationDimension.ABI, OptimizationDimension.SCREEN_DENSITY),
-            DEFAULT_METADATA,
-            BundleSharderConfiguration.getDefaultInstance());
+            standaloneApkOptimizations(
+                OptimizationDimension.ABI, OptimizationDimension.SCREEN_DENSITY));
 
     assertThat(shards).hasSize(3 * 7);
     assertThat(shards.stream().map(ModuleSplit::getSplitType).distinct().collect(toImmutableSet()))
         .containsExactly(SplitType.STANDALONE);
-    assertThat(
-            shards.stream()
-                .map(ModuleSplit::getVariantTargeting)
-                .distinct()
-                .collect(toImmutableSet()))
-        .containsExactly(VariantTargeting.getDefaultInstance());
 
     ApkTargeting armTargeting = apkAbiTargeting(ARMEABI, ImmutableSet.of(X86, X86_64));
     ApkTargeting x86Targeting = apkAbiTargeting(X86, ImmutableSet.of(ARMEABI, X86_64));
@@ -1518,9 +873,7 @@ public class BundleSharderTest {
   }
 
   @Test
-  @Theory
-  public void manyModulesShardByNoDimension_producesFatApk(
-      @FromDataPoints("deviceSpecs") Optional<DeviceSpec> deviceSpec) throws Exception {
+  public void manyModulesShardByNoDimension_producesFatApk() throws Exception {
     BundleModule baseModule =
         new BundleModuleBuilder("base")
             .addFile("lib/x86_64/libtest1.so")
@@ -1564,26 +917,9 @@ public class BundleSharderTest {
             .setManifest(androidManifestForFeature("com.test.app"))
             .build();
 
-    ImmutableList<ModuleSplit> shards;
-    if (deviceSpec.isPresent()) {
-      ShardedSystemSplits shardedSystemSplits =
-          bundleSharder.shardForSystemApps(
-              /* modules= */ ImmutableList.of(baseModule, featureModule),
-              /* modulesToFuse= */ ImmutableSet.of(BASE_MODULE_NAME, FEATURE_MODULE_NAME),
-              ImmutableSet.of(),
-              DEFAULT_METADATA,
-              BundleSharderConfiguration.builder().setDeviceSpec(deviceSpec).build());
-      assertThat(shardedSystemSplits.getAdditionalSplits()).isEmpty();
-      shards = ImmutableList.of(shardedSystemSplits.getSystemImageSplit());
-
-    } else {
-      shards =
-          bundleSharder.shardBundle(
-              ImmutableList.of(baseModule, featureModule),
-              ImmutableSet.of(),
-              DEFAULT_METADATA,
-              BundleSharderConfiguration.builder().setDeviceSpec(deviceSpec).build());
-    }
+    ImmutableList<ModuleSplit> shards =
+        standaloneApksGenerator.generateStandaloneApks(
+            ImmutableList.of(baseModule, featureModule), NO_DIMENSIONS);
 
     assertThat(shards).hasSize(1);
     ModuleSplit fatApk = shards.get(0);
@@ -1628,16 +964,16 @@ public class BundleSharderTest {
             .build();
 
     ImmutableList<ModuleSplit> shards =
-        bundleSharder.shardBundle(
+        standaloneApksGenerator.generateStandaloneApks(
             ImmutableList.of(baseModule, featureModule1, featureModule2),
-            ImmutableSet.of(OptimizationDimension.ABI),
-            DEFAULT_METADATA,
-            BundleSharderConfiguration.getDefaultInstance());
+            standaloneApkOptimizations(OptimizationDimension.ABI));
 
     assertThat(shards).hasSize(1);
     ModuleSplit shard = shards.get(0);
     assertThat(shard.getApkTargeting()).isEqualTo(apkAbiTargeting(X86_64));
-    assertThat(shard.getVariantTargeting()).isEqualToDefaultInstance();
+    assertThat(shard.getVariantTargeting())
+        .isEqualTo(
+            mergeVariantTargeting(variantAbiTargeting(X86_64), VARIANT_TARGETING_WITH_SDK_1));
     assertThat(shard.getSplitType()).isEqualTo(SplitType.STANDALONE);
     assertThat(extractPaths(shard.getEntries()))
         .containsExactly(
@@ -1674,11 +1010,9 @@ public class BundleSharderTest {
             .build();
 
     ImmutableList<ModuleSplit> shards =
-        bundleSharder.shardBundle(
+        standaloneApksGenerator.generateStandaloneApks(
             ImmutableList.of(baseModule, featureModule1, featureModule2),
-            ImmutableSet.of(OptimizationDimension.ABI),
-            DEFAULT_METADATA,
-            BundleSharderConfiguration.getDefaultInstance());
+            standaloneApkOptimizations(OptimizationDimension.ABI));
 
     assertThat(shards).hasSize(2);
     assertThat(shards.stream().map(ModuleSplit::getSplitType).distinct().collect(toImmutableSet()))
@@ -1688,7 +1022,11 @@ public class BundleSharderTest {
                 .map(ModuleSplit::getVariantTargeting)
                 .distinct()
                 .collect(toImmutableSet()))
-        .containsExactly(VariantTargeting.getDefaultInstance());
+        .containsExactly(
+            mergeVariantTargeting(
+                VARIANT_TARGETING_WITH_SDK_1, variantAbiTargeting(X86_64, ImmutableSet.of(X86))),
+            mergeVariantTargeting(
+                VARIANT_TARGETING_WITH_SDK_1, variantAbiTargeting(X86, ImmutableSet.of(X86_64))));
 
     ImmutableMap<ApkTargeting, ModuleSplit> shardsByTargeting =
         Maps.uniqueIndex(shards, ModuleSplit::getApkTargeting);
@@ -1718,25 +1056,21 @@ public class BundleSharderTest {
             .build();
 
     ImmutableList<ModuleSplit> shards =
-        bundleSharder.shardBundle(
+        standaloneApksGenerator.generateStandaloneApks(
             ImmutableList.of(baseModule, featureModule),
-            ImmutableSet.of(OptimizationDimension.SCREEN_DENSITY),
-            DEFAULT_METADATA,
-            BundleSharderConfiguration.getDefaultInstance());
+            standaloneApkOptimizations(OptimizationDimension.SCREEN_DENSITY));
 
     assertThat(shards).hasSize(1);
     ModuleSplit fatShard = shards.get(0);
     assertThat(fatShard.getApkTargeting()).isEqualToDefaultInstance();
-    assertThat(fatShard.getVariantTargeting()).isEqualToDefaultInstance();
     assertThat(fatShard.getSplitType()).isEqualTo(SplitType.STANDALONE);
     assertThat(extractPaths(fatShard.getEntries()))
         .containsExactly("assets/file.txt", "dex/classes.dex", "root/license.dat");
   }
 
   @Test
-  @Theory
-  public void manyModulesShardByDensity_havingOnlyOneDensityResource_producesSingleApk(
-      @FromDataPoints("deviceSpecs") Optional<DeviceSpec> deviceSpec) throws Exception {
+  public void manyModulesShardByDensity_havingOnlyOneDensityResource_producesSingleApk()
+      throws Exception {
     BundleModule baseModule =
         new BundleModuleBuilder("base")
             .addFile("res/drawable-hdpi/image.jpg")
@@ -1772,25 +1106,10 @@ public class BundleSharderTest {
                                 fileReference("res/drawable-hdpi/image2.jpg", HDPI))))))
             .build();
 
-    ImmutableList<ModuleSplit> shards;
-    if (deviceSpec.isPresent()) {
-      ShardedSystemSplits shardedSystemSplits =
-          bundleSharder.shardForSystemApps(
-              /* modules= */ ImmutableList.of(baseModule, featureModule),
-              /* modulesToFuse= */ ImmutableSet.of(BASE_MODULE_NAME, FEATURE_MODULE_NAME),
-              ImmutableSet.of(OptimizationDimension.SCREEN_DENSITY),
-              DEFAULT_METADATA,
-              BundleSharderConfiguration.builder().setDeviceSpec(deviceSpec).build());
-      assertThat(shardedSystemSplits.getAdditionalSplits()).isEmpty();
-      shards = ImmutableList.of(shardedSystemSplits.getSystemImageSplit());
-    } else {
-      shards =
-          bundleSharder.shardBundle(
-              ImmutableList.of(baseModule, featureModule),
-              ImmutableSet.of(OptimizationDimension.SCREEN_DENSITY),
-              DEFAULT_METADATA,
-              BundleSharderConfiguration.builder().setDeviceSpec(deviceSpec).build());
-    }
+    ImmutableList<ModuleSplit> shards =
+        standaloneApksGenerator.generateStandaloneApks(
+            ImmutableList.of(baseModule, featureModule),
+            standaloneApkOptimizations(OptimizationDimension.SCREEN_DENSITY));
 
     assertThat(shards).hasSize(1);
     ModuleSplit shard = shards.get(0);
@@ -1821,16 +1140,14 @@ public class BundleSharderTest {
             .build();
 
     ImmutableList<ModuleSplit> shards =
-        bundleSharder.shardBundle(
+        standaloneApksGenerator.generateStandaloneApks(
             ImmutableList.of(baseModule, featureModule),
-            ImmutableSet.of(OptimizationDimension.ABI, OptimizationDimension.SCREEN_DENSITY),
-            DEFAULT_METADATA,
-            BundleSharderConfiguration.getDefaultInstance());
+            standaloneApkOptimizations(
+                OptimizationDimension.ABI, OptimizationDimension.SCREEN_DENSITY));
 
     assertThat(shards).hasSize(1);
     ModuleSplit fatShard = shards.get(0);
     assertThat(fatShard.getApkTargeting()).isEqualToDefaultInstance();
-    assertThat(fatShard.getVariantTargeting()).isEqualToDefaultInstance();
     assertThat(fatShard.getSplitType()).isEqualTo(SplitType.STANDALONE);
     assertThat(extractPaths(fatShard.getEntries()))
         .containsExactly("assets/file.txt", "dex/classes.dex", "root/license.dat");
@@ -1871,21 +1188,14 @@ public class BundleSharderTest {
             .build();
 
     ImmutableList<ModuleSplit> shards =
-        bundleSharder.shardBundle(
+        standaloneApksGenerator.generateStandaloneApks(
             ImmutableList.of(baseModule, featureModule),
-            ImmutableSet.of(OptimizationDimension.ABI, OptimizationDimension.SCREEN_DENSITY),
-            DEFAULT_METADATA,
-            BundleSharderConfiguration.getDefaultInstance());
+            standaloneApkOptimizations(
+                OptimizationDimension.ABI, OptimizationDimension.SCREEN_DENSITY));
 
     assertThat(shards).hasSize(2 * 7);
     assertThat(shards.stream().map(ModuleSplit::getSplitType).distinct().collect(toImmutableSet()))
         .containsExactly(SplitType.STANDALONE);
-    assertThat(
-            shards.stream()
-                .map(ModuleSplit::getVariantTargeting)
-                .distinct()
-                .collect(toImmutableSet()))
-        .containsExactly(VariantTargeting.getDefaultInstance());
 
     ApkTargeting armTargeting = apkAbiTargeting(ARMEABI, ImmutableSet.of(X86));
     ApkTargeting x86Targeting = apkAbiTargeting(X86, ImmutableSet.of(ARMEABI));
@@ -1978,70 +1288,6 @@ public class BundleSharderTest {
   }
 
   @Test
-  public void
-      manyModulesShardByAbiAndDensity_havingManyAbisAndSomeResourceWithDeviceSpec_producesSingleApk()
-          throws Exception {
-    BundleModule baseModule =
-        new BundleModuleBuilder("base")
-            .addFile("assets/file.txt")
-            .addFile("dex/classes.dex")
-            .addFile("res/drawable/image.jpg")
-            .addFile("res/drawable-hdpi/image.jpg")
-            .addFile("root/license.dat")
-            .setManifest(androidManifest("com.test.app"))
-            .setResourceTable(
-                new ResourceTableBuilder()
-                    .addPackage("com.test.app")
-                    .addDrawableResourceForMultipleDensities(
-                        "image",
-                        ImmutableMap.of(
-                            DEFAULT_DENSITY_VALUE,
-                            "res/drawable/image.jpg",
-                            HDPI_VALUE,
-                            "res/drawable-hdpi/image.jpg"))
-                    .build())
-            .build();
-    BundleModule featureModule =
-        new BundleModuleBuilder("feature")
-            .addFile("lib/armeabi/libtest.so")
-            .addFile("lib/x86/libtest.so")
-            .setManifest(androidManifestForFeature("com.test.app"))
-            .setNativeConfig(
-                nativeLibraries(
-                    targetedNativeDirectory("lib/armeabi", nativeDirectoryTargeting(ARMEABI)),
-                    targetedNativeDirectory("lib/x86", nativeDirectoryTargeting(X86))))
-            .build();
-
-    ShardedSystemSplits shards =
-        bundleSharder.shardForSystemApps(
-            /* modules= */ ImmutableList.of(baseModule, featureModule),
-            /* modulesToFuse= */ ImmutableSet.of(BASE_MODULE_NAME, FEATURE_MODULE_NAME),
-            ImmutableSet.of(OptimizationDimension.ABI, OptimizationDimension.SCREEN_DENSITY),
-            DEFAULT_METADATA,
-            BundleSharderConfiguration.builder()
-                .setDeviceSpec(
-                    mergeSpecs(abis("x86"), density(DensityAlias.MDPI), locales("en-US")))
-                .build());
-
-    ModuleSplit fatShard = shards.getSystemImageSplit();
-    assertThat(fatShard.getApkTargeting().getAbiTargeting())
-        .isEqualTo(abiTargeting(X86, ImmutableSet.of(ARMEABI)));
-    assertThat(fatShard.getApkTargeting().getScreenDensityTargeting().getValueList())
-        .containsExactly(toScreenDensity(DensityAlias.MDPI));
-    assertThat(fatShard.getVariantTargeting()).isEqualToDefaultInstance();
-    assertThat(fatShard.getSplitType()).isEqualTo(SplitType.STANDALONE);
-    assertThat(fatShard.isBaseModuleSplit()).isTrue();
-    assertThat(extractPaths(fatShard.getEntries()))
-        .containsExactly(
-            "assets/file.txt",
-            "dex/classes.dex",
-            "lib/x86/libtest.so",
-            "res/drawable/image.jpg",
-            "root/license.dat");
-    assertThat(shards.getAdditionalSplits()).isEmpty();
-  }
-
-  @Test
   public void shardAssetModules() throws Exception {
     BundleModule baseModule =
         new BundleModuleBuilder("base")
@@ -2056,28 +1302,34 @@ public class BundleSharderTest {
             .build();
 
     ImmutableList<ModuleSplit> shards =
-        bundleSharder.shardBundle(
+        standaloneApksGenerator.generateStandaloneApks(
             ImmutableList.of(baseModule, assetModule),
-            ImmutableSet.of(OptimizationDimension.ABI, OptimizationDimension.SCREEN_DENSITY),
-            DEFAULT_METADATA,
-            BundleSharderConfiguration.getDefaultInstance());
+            standaloneApkOptimizations(
+                OptimizationDimension.ABI, OptimizationDimension.SCREEN_DENSITY));
 
     assertThat(shards).hasSize(1);
     ModuleSplit fatShard = shards.get(0);
     assertThat(fatShard.getApkTargeting()).isEqualToDefaultInstance();
-    assertThat(fatShard.getVariantTargeting()).isEqualToDefaultInstance();
+    assertThat(fatShard.getVariantTargeting()).isEqualTo(VARIANT_TARGETING_WITH_SDK_1);
     assertThat(fatShard.getSplitType()).isEqualTo(SplitType.STANDALONE);
     assertThat(extractPaths(fatShard.getEntries()))
         .containsExactly("assets/file.txt", "dex/classes.dex", "root/license.dat");
   }
 
+  private static ApkOptimizations standaloneApkOptimizations(OptimizationDimension... dimensions) {
+    return ApkOptimizations.builder()
+        .setSplitDimensions(ImmutableSet.of())
+        .setStandaloneDimensions(ImmutableSet.copyOf(dimensions))
+        .build();
+  }
+
   @CommandScoped
   @Component(modules = {BuildApksModule.class, TestModule.class})
   interface TestComponent {
-    void inject(BundleSharderTest test);
+    void inject(StandaloneApksGeneratorTest test);
 
-    static void useTestModule(BundleSharderTest testInstance, TestModule testModule) {
-      DaggerBundleSharderTest_TestComponent.builder()
+    static void useTestModule(StandaloneApksGeneratorTest testInstance, TestModule testModule) {
+      DaggerStandaloneApksGeneratorTest_TestComponent.builder()
           .testModule(testModule)
           .build()
           .inject(testInstance);

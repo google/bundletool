@@ -17,6 +17,7 @@
 package com.android.tools.build.bundletool.testing;
 
 import static com.android.tools.build.bundletool.model.utils.ProtoUtils.mergeFromProtos;
+import static com.google.common.base.Predicates.alwaysTrue;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.ImmutableSet.toImmutableSet;
 import static com.google.common.truth.Truth.assertThat;
@@ -926,9 +927,7 @@ public final class TargetingUtils {
   public static ImmutableList<ModuleSplit> getSplitsWithTargetingEqualTo(
       Collection<ModuleSplit> splits, ApkTargeting apkTargeting) {
     return filterSplitsByTargeting(
-        splits,
-        apkTargeting::equals,
-        variantTargeting -> variantTargeting.equals(lPlusVariantTargeting()));
+        splits, apkTargeting::equals, /* variantTargetingPredicate= */ alwaysTrue());
   }
 
   public static ImmutableList<ModuleSplit> getSplitsWithDefaultTargeting(
@@ -947,9 +946,7 @@ public final class TargetingUtils {
       Collection<ModuleSplit> splits, Consumer<ModuleSplit> assertionFn) {
     ImmutableList<ModuleSplit> nonDefaultSplits =
         filterSplitsByTargeting(
-            splits,
-            Predicates.not(ApkTargeting.getDefaultInstance()::equals),
-            Predicates.alwaysTrue());
+            splits, Predicates.not(ApkTargeting.getDefaultInstance()::equals), alwaysTrue());
     assertThat(nonDefaultSplits).isNotEmpty();
     nonDefaultSplits.stream().forEach(assertionFn);
   }

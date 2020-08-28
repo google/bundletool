@@ -30,9 +30,14 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Sets;
 import java.util.Set;
 import javax.annotation.CheckReturnValue;
+import javax.inject.Inject;
 
 /** Identify embedded APKs which should be signed with the same key as generated APKs. */
 public class EmbeddedApkSigningPreprocessor implements AppBundlePreprocessor {
+
+  @Inject
+  EmbeddedApkSigningPreprocessor() {}
+
   @Override
   public AppBundle preprocess(AppBundle bundle) {
     ImmutableSet<ZipPath> unsignedEmbeddedApkPaths =

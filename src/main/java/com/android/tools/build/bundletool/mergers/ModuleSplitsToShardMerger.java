@@ -17,27 +17,21 @@
 package com.android.tools.build.bundletool.mergers;
 
 import static com.android.tools.build.bundletool.mergers.AndroidManifestMerger.fusingMerger;
-import static com.android.tools.build.bundletool.mergers.AndroidManifestMerger.manifestOverride;
 import static com.android.tools.build.bundletool.mergers.AndroidManifestMerger.useBaseModuleManifestMerger;
 import static com.android.tools.build.bundletool.mergers.MergingUtils.mergeTargetedAssetsDirectories;
 import static com.android.tools.build.bundletool.model.BundleMetadata.BUNDLETOOL_NAMESPACE;
 import static com.android.tools.build.bundletool.model.BundleMetadata.MAIN_DEX_LIST_FILE_NAME;
 import static com.android.tools.build.bundletool.model.BundleModule.DEX_DIRECTORY;
 import static com.android.tools.build.bundletool.model.BundleModuleName.BASE_MODULE_NAME;
-import static com.android.tools.build.bundletool.model.utils.CollectorUtils.groupingByDeterministic;
 import static com.android.tools.build.bundletool.model.version.VersionGuardedFeature.FUSE_ACTIVITIES_FROM_FEATURE_MANIFESTS;
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.collect.ImmutableList.toImmutableList;
-import static com.google.common.collect.ImmutableSet.toImmutableSet;
-import static com.google.common.collect.MoreCollectors.onlyElement;
 
 import com.android.aapt.Resources.ResourceTable;
-import com.android.bundle.Devices.DeviceSpec;
 import com.android.bundle.Files.Assets;
 import com.android.bundle.Files.TargetedAssetsDirectory;
 import com.android.bundle.Targeting.ApkTargeting;
 import com.android.bundle.Targeting.VariantTargeting;
-import com.android.tools.build.bundletool.device.ApkMatcher;
 import com.android.tools.build.bundletool.io.TempDirectory;
 import com.android.tools.build.bundletool.model.AndroidManifest;
 import com.android.tools.build.bundletool.model.BundleMetadata;
@@ -45,8 +39,6 @@ import com.android.tools.build.bundletool.model.BundleModuleName;
 import com.android.tools.build.bundletool.model.ModuleEntry;
 import com.android.tools.build.bundletool.model.ModuleSplit;
 import com.android.tools.build.bundletool.model.ModuleSplit.SplitType;
-import com.android.tools.build.bundletool.model.ShardedSystemSplits;
-import com.android.tools.build.bundletool.model.SuffixManager;
 import com.android.tools.build.bundletool.model.ZipPath;
 import com.android.tools.build.bundletool.model.exceptions.CommandExecutionException;
 import com.android.tools.build.bundletool.model.utils.Versions;
@@ -60,7 +52,6 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.ListMultimap;
 import com.google.common.collect.Multimap;
 import com.google.common.collect.SetMultimap;
-import com.google.common.collect.Sets;
 import com.google.common.collect.Streams;
 import com.google.common.io.ByteSource;
 import java.io.IOException;
@@ -87,109 +78,26 @@ public class ModuleSplitsToShardMerger {
   private final Version bundletoolVersion;
   private final TempDirectory globalTempDir;
   private final DexMerger dexMerger;
+  private final BundleMetadata bundleMetadata;
 
   @Inject
   public ModuleSplitsToShardMerger(
-      Version bundletoolVersion, TempDirectory globalTempDir, DexMerger dexMerger) {
+      Version bundletoolVersion,
+      TempDirectory globalTempDir,
+      DexMerger dexMerger,
+      BundleMetadata bundleMetadata) {
     this.bundletoolVersion = bundletoolVersion;
     this.globalTempDir = globalTempDir;
     this.dexMerger = dexMerger;
+    this.bundleMetadata = bundleMetadata;
   }
 
-  /**
-   * Gets a list of collections of splits, and merges each collection into a single standalone APK
-   * (aka shard).
-   *
-   * @param unfusedShards a list of lists - each inner list is a collection of splits
-   * @param bundleMetadata the App Bundle metadata
-   * @return a list of shards, each one made of the corresponding collection of splits
-   */
-  public ImmutableList<ModuleSplit> merge(
-      ImmutableList<ImmutableList<ModuleSplit>> unfusedShards, BundleMetadata bundleMetadata) {
-    // Results of the dex merging are cached. Due to the nature of the cache keys and values, the
-    // cache is deliberately not part of the object state, so that it is dropped after the method
-    // call finishes.
-    Map<ImmutableSet<ModuleEntry>, ImmutableList<Path>> mergedDexCache = new HashMap<>();
-
-    ImmutableList.Builder<ModuleSplit> shards = ImmutableList.builder();
-    for (ImmutableList<ModuleSplit> unfusedShard : unfusedShards) {
-      shards.add(mergeSingleShard(unfusedShard, bundleMetadata, mergedDexCache));
-    }
-    return shards.build();
-  }
-
-  /**
-   * Gets a collections of splits and merges them into a single system APK (aka shard), and
-   * additionally returns unmatched language splits for fused modules and module splits for unfused
-   * modules.
-   *
-   * @param splits Collection of generated splits from all modules and configurations.
-   * @param bundleMetadata the App Bundle metadata
-   * @param deviceSpec the device specification to generate a system APK for.
-   * @return {@link ShardedSystemSplits} containing a single fused system APK and additional
-   *     language and feature splits.
-   */
-  public ShardedSystemSplits mergeSystemShard(
-      ImmutableCollection<ModuleSplit> splits,
-      ImmutableSet<BundleModuleName> modulesToFuse,
-      BundleMetadata bundleMetadata,
-      DeviceSpec deviceSpec) {
-    ApkMatcher deviceSpecMatcher = new ApkMatcher(deviceSpec);
-    AndroidManifest baseMasterAndroidManifest = getBaseMasterAndroidManifest(splits);
-    ImmutableSet<ModuleSplit> splitsOfFusedModules =
-        splits.stream()
-            .filter(split -> modulesToFuse.contains(split.getModuleName()))
-            .collect(toImmutableSet());
-    ImmutableSet<ModuleSplit> splitsOfNonFusedModules =
-        Sets.difference(ImmutableSet.copyOf(splits), splitsOfFusedModules).immutableCopy();
-
-    ImmutableSet<ModuleSplit> splitsForTheSystemApk =
-        splitsOfFusedModules.stream()
-            .filter(
-                split ->
-                    !split.getApkTargeting().hasLanguageTargeting()
-                        || deviceSpecMatcher.matchesModuleSplitByTargeting(split))
-            .collect(toImmutableSet());
-
-    ModuleSplit fusedSplit =
-        mergeSingleShard(splitsForTheSystemApk, bundleMetadata, new HashMap<>());
-
-    // Groups all the unmatched language splits for fused modules by language and fuse them to
-    // generate a single split for each language.
-    ImmutableSet<ModuleSplit> nonMatchedLanguageSplitsForFusedModules =
-        Sets.difference(splitsOfFusedModules, splitsForTheSystemApk).stream()
-            .collect(groupingByDeterministic(ModuleSplit::getApkTargeting))
-            .values()
-            .stream()
-            .map(
-                languageSplits ->
-                    mergeNonMatchedLanguageSplitsForSystemApks(
-                        languageSplits, bundleMetadata, baseMasterAndroidManifest))
-            .collect(toImmutableSet());
-
-    // Write split id for splits not fused.
-    ImmutableList<ModuleSplit> otherSplits =
-        Sets.union(nonMatchedLanguageSplitsForFusedModules, splitsOfNonFusedModules).stream()
-            .collect(groupingByDeterministic(ModuleSplit::getModuleName))
-            .values()
-            .stream()
-            .flatMap(ModuleSplitsToShardMerger::writeSplitIdInManifestHavingSameModule)
-            .collect(toImmutableList());
-
-    return ShardedSystemSplits.builder()
-        .setSystemImageSplit(fusedSplit)
-        .setAdditionalSplits(otherSplits)
-        .build();
-  }
-
-  @VisibleForTesting
-  ModuleSplit mergeSingleShard(
+  /** Gets a list of splits, and merges them into a single standalone APK (aka shard). */
+  public ModuleSplit mergeSingleShard(
       ImmutableCollection<ModuleSplit> splitsOfShard,
-      BundleMetadata bundleMetadata,
       Map<ImmutableSet<ModuleEntry>, ImmutableList<Path>> mergedDexCache) {
     return mergeSingleShard(
         splitsOfShard,
-        bundleMetadata,
         mergedDexCache,
         /* mergedSplitType= */ SplitType.STANDALONE,
         FUSE_ACTIVITIES_FROM_FEATURE_MANIFESTS.enabledForVersion(bundletoolVersion)
@@ -197,9 +105,14 @@ public class ModuleSplitsToShardMerger {
             : useBaseModuleManifestMerger());
   }
 
-  private ModuleSplit mergeSingleShard(
+  /**
+   * Gets a list of splits, and merges them into a single standalone APK (aka shard).
+   *
+   * <p>Allows to customize split type {@code mergedSplitType} of merged shard and Android manifest
+   * merger {@code manifestMerger}.
+   */
+  public ModuleSplit mergeSingleShard(
       ImmutableCollection<ModuleSplit> splitsOfShard,
-      BundleMetadata bundleMetadata,
       Map<ImmutableSet<ModuleEntry>, ImmutableList<Path>> mergedDexCache,
       SplitType mergedSplitType,
       AndroidManifestMerger manifestMerger) {
@@ -532,36 +445,5 @@ public class ModuleSplitsToShardMerger {
     try (InputStream is = entry.getContent().openStream()) {
       Files.copy(is, toFile);
     }
-  }
-
-  private static Stream<ModuleSplit> writeSplitIdInManifestHavingSameModule(
-      ImmutableList<ModuleSplit> splits) {
-    checkState(splits.stream().map(ModuleSplit::getModuleName).distinct().count() == 1);
-    SuffixManager suffixManager = new SuffixManager();
-    return splits.stream()
-        .map(split -> split.writeSplitIdInManifest(suffixManager.createSuffix(split)));
-  }
-
-  private ModuleSplit mergeNonMatchedLanguageSplitsForSystemApks(
-      ImmutableCollection<ModuleSplit> splits,
-      BundleMetadata bundleMetadata,
-      AndroidManifest baseMasterAndroidManifest) {
-    // For the config splits the manifest is overridden later so we use the base master manifest
-    // initially for the fused split as base manifest might be missing in the splits we are trying
-    // to merge.
-    return mergeSingleShard(
-        splits,
-        bundleMetadata,
-        new HashMap<>(),
-        /* mergedSplitType= */ SplitType.SPLIT,
-        manifestOverride(baseMasterAndroidManifest));
-  }
-
-  private static AndroidManifest getBaseMasterAndroidManifest(
-      ImmutableCollection<ModuleSplit> splits) {
-    return splits.stream()
-        .filter(split -> split.isMasterSplit() && split.isBaseModuleSplit())
-        .collect(onlyElement())
-        .getAndroidManifest();
   }
 }

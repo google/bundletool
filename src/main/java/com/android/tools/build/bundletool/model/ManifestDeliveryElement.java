@@ -291,8 +291,8 @@ public abstract class ManifestDeliveryElement {
     if (offendingElement.isPresent()) {
       throw InvalidBundleException.builder()
           .withUserMessage(
-              "Expected <dist:install-time> element to contain only <dist:conditions> "
-                  + "element but found: %s.",
+              "Expected <dist:install-time> element to contain only <dist:conditions> or "
+                  + "<dist:removable> element but found: %s.",
               printElement(offendingElement.get()))
           .build();
     }

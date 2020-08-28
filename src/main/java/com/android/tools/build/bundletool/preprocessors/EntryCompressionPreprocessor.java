@@ -28,6 +28,7 @@ import com.android.tools.build.bundletool.model.BundleModule.ModuleType;
 import com.google.common.collect.ImmutableCollection;
 import com.google.common.collect.ImmutableList;
 import javax.annotation.CheckReturnValue;
+import javax.inject.Inject;
 
 /**
  * Preprocessor that overrides the compression for module entries.
@@ -35,6 +36,9 @@ import javax.annotation.CheckReturnValue;
  * <p>Asset module entries are uncompressed.
  */
 public class EntryCompressionPreprocessor implements AppBundlePreprocessor {
+
+  @Inject
+  EntryCompressionPreprocessor() {}
 
   @Override
   public AppBundle preprocess(AppBundle bundle) {

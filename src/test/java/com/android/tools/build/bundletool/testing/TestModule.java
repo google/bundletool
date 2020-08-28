@@ -16,11 +16,11 @@
 package com.android.tools.build.bundletool.testing;
 
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifest;
+import static com.google.common.base.Preconditions.checkArgument;
 
 import com.android.bundle.Config.BundleConfig;
 import com.android.bundle.Config.Bundletool;
 import com.android.bundle.Devices.DeviceSpec;
-import com.android.tools.build.bundletool.commands.AppBundleModule.AppBundleZip;
 import com.android.tools.build.bundletool.commands.BuildApksCommand;
 import com.android.tools.build.bundletool.commands.BuildApksCommand.ApkBuildMode;
 import com.android.tools.build.bundletool.io.AppBundleSerializer;
@@ -49,20 +49,16 @@ import javax.annotation.Nullable;
 public class TestModule {
 
   private final BuildApksCommand buildApksCommand;
+  private final AppBundle appBundle;
 
-  private TestModule(BuildApksCommand buildApksCommand) {
+  private TestModule(BuildApksCommand buildApksCommand, AppBundle appBundle) {
     this.buildApksCommand = buildApksCommand;
+    this.appBundle = appBundle;
   }
 
-  @SuppressWarnings("CloseableProvides") // Only used for tests.
   @Provides
-  @AppBundleZip
-  ZipFile provideZipFile() {
-    try {
-      return new ZipFile(buildApksCommand.getBundlePath().toFile());
-    } catch (IOException e) {
-      throw new UncheckedIOException(e);
-    }
+  AppBundle provideAppBundle() {
+    return appBundle;
   }
 
   @Provides
@@ -222,12 +218,20 @@ public class TestModule {
         if (outputDirectory == null) {
           outputDirectory = tempDirectory.getPath();
         }
+
+        checkArgument(
+            appBundle == null || bundlePath == null,
+            "Cannot call both withAppBundle() and withBundlePath().");
         if (appBundle == null) {
-          appBundle =
-              new AppBundleBuilder()
-                  .setBundleConfig(bundleConfig)
-                  .addModule("base", module -> module.setManifest(androidManifest("com.package")))
-                  .build();
+          if (bundlePath != null) {
+            appBundle = AppBundle.buildFromZip(new ZipFile(bundlePath.toFile()));
+          } else {
+            appBundle =
+                new AppBundleBuilder()
+                    .setBundleConfig(bundleConfig)
+                    .addModule("base", module -> module.setManifest(androidManifest("com.package")))
+                    .build();
+          }
         } else {
           if (!bundleConfig.equals(DEFAULT_BUNDLE_CONFIG)) {
             BundleConfig newBundleConfig =
@@ -235,6 +239,7 @@ public class TestModule {
             appBundle = appBundle.toBuilder().setBundleConfig(newBundleConfig).build();
           }
         }
+
         if (bundlePath == null) {
           bundlePath = tempDirectory.getPath().resolve("bundle.aab");
           new AppBundleSerializer().writeToDisk(appBundle, bundlePath);
@@ -288,7 +293,7 @@ public class TestModule {
           buildApksCommandSetter.accept(command);
         }
 
-        return new TestModule(command.build());
+        return new TestModule(command.build(), appBundle);
       } catch (IOException e) {
         throw new UncheckedIOException(e);
       }

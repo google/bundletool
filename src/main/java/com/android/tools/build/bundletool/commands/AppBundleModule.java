@@ -15,26 +15,16 @@
  */
 package com.android.tools.build.bundletool.commands;
 
-import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
 import com.android.bundle.Config.BundleConfig;
 import com.android.tools.build.bundletool.model.AppBundle;
 import com.android.tools.build.bundletool.model.BundleMetadata;
 import dagger.Module;
 import dagger.Provides;
-import java.lang.annotation.Retention;
-import java.util.zip.ZipFile;
-import javax.inject.Qualifier;
 
 /** Dagger module for components that manipulate an App Bundle. */
 @Module
 public final class AppBundleModule {
-
-  @CommandScoped
-  @Provides
-  static AppBundle provideAppBundle(@AppBundleZip ZipFile zip) {
-    return AppBundle.buildFromZip(zip);
-  }
 
   @CommandScoped
   @Provides
@@ -49,9 +39,4 @@ public final class AppBundleModule {
   }
 
   private AppBundleModule() {}
-
-  /** Qualifying annotation for the ZipFile corresponding to the App Bundle. */
-  @Retention(RUNTIME)
-  @Qualifier
-  public @interface AppBundleZip {}
 }

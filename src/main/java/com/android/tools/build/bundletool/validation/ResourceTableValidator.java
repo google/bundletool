@@ -16,6 +16,7 @@
 
 package com.android.tools.build.bundletool.validation;
 
+import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.ImmutableSet.toImmutableSet;
 import static com.google.common.collect.Sets.difference;
 import static com.google.common.collect.Sets.newHashSet;
@@ -112,10 +113,16 @@ public class ResourceTableValidator extends SubValidator {
   void checkResourceIds(ImmutableList<BundleModule> modules) {
     BundleModule baseModule = BundleValidationUtils.expectBaseModule(modules);
     if (baseModule.getAndroidManifest().getIsolatedSplits().orElse(false)) {
-      // If splits are isolated, it's ok to have inter-module duplication, but we still need to
-      // check for uniqueness within each module.
+      // If splits are isolated, resource IDs cannot be duplicated between modules included in
+      // fusing. It's ok to have inter-module duplication for modules not included in fusing, but we
+      // still need to check for uniqueness within each module.
+      ImmutableList<BundleModule> modulesIncludedInFusing =
+          modules.stream().filter(BundleModule::isIncludedInFusing).collect(toImmutableList());
+      checkResourceIdsAreUnique(modulesIncludedInFusing);
       for (BundleModule module : modules) {
-        checkResourceIdsAreUnique(ImmutableList.of(module));
+        if (!module.isIncludedInFusing()) {
+          checkResourceIdsAreUnique(ImmutableList.of(module));
+        }
       }
     } else {
       checkResourceIdsAreUnique(modules);

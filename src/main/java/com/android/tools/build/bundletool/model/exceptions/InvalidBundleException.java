@@ -15,9 +15,7 @@
  */
 package com.android.tools.build.bundletool.model.exceptions;
 
-import com.android.bundle.Errors.BundleToolError;
 import com.android.bundle.Errors.BundleToolError.ErrorType;
-import com.android.bundle.Errors.MandatoryBundleFileMissingError;
 
 /** Indicates invalid bundle. */
 public class InvalidBundleException extends BundleToolException {
@@ -30,7 +28,6 @@ public class InvalidBundleException extends BundleToolException {
       ErrorType errorType, String userMessage, String internalMessage, Throwable cause) {
     super(errorType, userMessage, internalMessage, cause);
   }
-
 
   public static UserExceptionBuilder<InvalidBundleException> builder() {
     return new UserExceptionBuilder<>(InvalidBundleException::new);

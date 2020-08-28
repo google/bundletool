@@ -21,9 +21,6 @@ import static com.android.tools.build.bundletool.model.BundleModule.BUILD_INFO_S
 import static com.android.tools.build.bundletool.model.BundleModule.DEX_DIRECTORY;
 import static com.android.tools.build.bundletool.model.BundleModule.MANIFEST_FILENAME;
 import static com.android.tools.build.bundletool.model.BundleModule.ROOT_DIRECTORY;
-import static com.android.tools.build.bundletool.model.targeting.TargetingUtils.getMinSdk;
-import static com.android.tools.build.bundletool.model.utils.Versions.ANDROID_R_API_VERSION;
-import static com.android.tools.build.bundletool.model.utils.files.BufferedIo.inputStream;
 import static com.android.tools.build.bundletool.model.utils.files.FilePreconditions.checkFileDoesNotExist;
 import static com.android.tools.build.bundletool.model.utils.files.FilePreconditions.checkFileHasExtension;
 import static com.android.tools.build.bundletool.model.utils.files.FileUtils.createParentDirectories;
@@ -31,7 +28,6 @@ import static com.android.tools.build.bundletool.model.version.VersionGuardedFea
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.collect.ImmutableList.toImmutableList;
-import static java.lang.Math.max;
 
 import com.android.bundle.Config.BundleConfig;
 import com.android.tools.build.apkzlib.zfile.ZFiles;
@@ -39,25 +35,18 @@ import com.android.tools.build.apkzlib.zip.AlignmentRule;
 import com.android.tools.build.apkzlib.zip.AlignmentRules;
 import com.android.tools.build.apkzlib.zip.ZFile;
 import com.android.tools.build.apkzlib.zip.ZFileOptions;
-import com.android.tools.build.bundletool.commands.BuildApksModule.ApkSigningConfig;
-import com.android.tools.build.bundletool.commands.BuildApksModule.StampSigningConfig;
 import com.android.tools.build.bundletool.io.ZipBuilder.EntryOption;
 import com.android.tools.build.bundletool.model.Aapt2Command;
 import com.android.tools.build.bundletool.model.BundleModule.SpecialModuleEntry;
 import com.android.tools.build.bundletool.model.ModuleEntry;
 import com.android.tools.build.bundletool.model.ModuleSplit;
-import com.android.tools.build.bundletool.model.SigningConfiguration;
-import com.android.tools.build.bundletool.model.WearApkLocator;
 import com.android.tools.build.bundletool.model.ZipPath;
 import com.android.tools.build.bundletool.model.utils.GZipUtils;
 import com.android.tools.build.bundletool.model.utils.PathMatcher;
-import com.android.tools.build.bundletool.model.utils.Versions;
 import com.android.tools.build.bundletool.model.utils.files.FileUtils;
 import com.android.tools.build.bundletool.model.version.Version;
-import com.android.tools.build.bundletool.model.version.VersionGuardedFeature;
 import com.google.common.base.Predicate;
 import com.google.common.base.Predicates;
-import com.google.common.collect.ImmutableCollection;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import java.io.IOException;
@@ -65,7 +54,6 @@ import java.io.InputStream;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.Optional;
 import java.util.regex.Pattern;
 import javax.inject.Inject;
 
@@ -110,8 +98,6 @@ final class ApkSerializerHelper {
 
   private final Aapt2Command aapt2Command;
   private final Version bundletoolVersion;
-  private final Optional<SigningConfiguration> signingConfig;
-  private final Optional<SigningConfiguration> stampSigningConfig;
   private final ImmutableList<PathMatcher> uncompressedPathMatchers;
   private final ApkSigner apkSigner;
 
@@ -119,14 +105,10 @@ final class ApkSerializerHelper {
   ApkSerializerHelper(
       Aapt2Command aapt2Command,
       Version bundletoolVersion,
-      @ApkSigningConfig Optional<SigningConfiguration> signingConfig,
-      @StampSigningConfig Optional<SigningConfiguration> stampSigningConfig,
       BundleConfig bundleConfig,
       ApkSigner apkSigner) {
     this.aapt2Command = aapt2Command;
     this.bundletoolVersion = bundletoolVersion;
-    this.signingConfig = signingConfig;
-    this.stampSigningConfig = stampSigningConfig;
     this.uncompressedPathMatchers =
         bundleConfig.getCompression().getUncompressedGlobList().stream()
             .map(PathMatcher::createFromGlob)
@@ -136,30 +118,35 @@ final class ApkSerializerHelper {
 
   Path writeToZipFile(ModuleSplit split, Path outputPath) {
     try (TempDirectory tempDirectory = new TempDirectory()) {
-      writeToZipFile(split, outputPath, tempDirectory.getPath());
+      writeToZipFile(split, outputPath, tempDirectory);
+    } catch (IOException e) {
+      throw new UncheckedIOException(e);
     }
     return outputPath;
   }
 
-  private void writeToZipFile(ModuleSplit split, Path outputPath, Path tempDir) {
+  private void writeToZipFile(ModuleSplit split, Path outputPath, TempDirectory tempDir)
+      throws IOException {
     checkFileDoesNotExist(outputPath);
     createParentDirectories(outputPath);
 
+    // Sign the embedded APKs
+    split = apkSigner.signEmbeddedApks(split);
+
     // Write a Proto-APK with only files that aapt2 requires as part of the convert command.
-    Path partialProtoApk = tempDir.resolve("proto.apk");
-    writeProtoApk(split, partialProtoApk, tempDir);
+    Path partialProtoApk = tempDir.getPath().resolve("proto.apk");
+    writeProtoApk(split, partialProtoApk);
 
     // Have aapt2 convert the Proto-APK to a Binary-APK.
-    Path binaryApk = tempDir.resolve("binary.apk");
+    Path binaryApk = tempDir.getPath().resolve("binary.apk");
     aapt2Command.convertApkProtoToBinary(partialProtoApk, binaryApk);
     checkState(Files.exists(binaryApk), "No APK created by aapt2 convert command.");
 
     // Create a new APK that includes files processed by aapt2 and the other ones.
-    Path unsignedApkPath = tempDir.resolve("apk-unsigned.apk");
     try (ZFile zOutputApk =
             ZFiles.apk(
-                unsignedApkPath.toFile(),
-                createZFileOptions(tempDir)
+                outputPath.toFile(),
+                createZFileOptions(tempDir.getPath())
                     .setAlignmentRule(APK_ALIGNMENT_RULE)
                     .setCoverEmptySpaceUsingExtraField(true)
                     // Clear timestamps on zip entries to minimize diffs between APKs.
@@ -168,7 +155,7 @@ final class ApkSerializerHelper {
                 BUILT_BY,
                 CREATED_BY);
         ZFile zAapt2Files =
-            new ZFile(binaryApk.toFile(), createZFileOptions(tempDir), /* readOnly= */ true)) {
+            ZFile.openReadOnly(binaryApk.toFile(), createZFileOptions(tempDir.getPath()))) {
 
       // Add files from the binary APK generated by AAPT2.
       zOutputApk.mergeFrom(zAapt2Files, /* ignoreFilter= */ Predicates.alwaysFalse());
@@ -176,40 +163,15 @@ final class ApkSerializerHelper {
       // Add the remaining files.
       addNonAapt2Files(zOutputApk, split);
       zOutputApk.sortZipContents();
-    } catch (IOException e) {
-      throw new UncheckedIOException(
-          String.format("Failed to write APK file '%s'.", unsignedApkPath), e);
     }
 
-    // Sign APK.
-    boolean signWithV1 =
-        split.getAndroidManifest().getEffectiveMinSdkVersion() < Versions.ANDROID_N_API_VERSION
-            || !VersionGuardedFeature.NO_V1_SIGNING_WHEN_POSSIBLE.enabledForVersion(
-                bundletoolVersion);
-    int minSdkVersion = split.getAndroidManifest().getEffectiveMinSdkVersion();
-    if (signingConfig.isPresent()) {
-      apkSigner.signApk(
-          unsignedApkPath,
-          outputPath,
-          signingConfig.get(),
-          stampSigningConfig,
-          signWithV1,
-          shouldSignWithV3(split),
-          minSdkVersion);
-    } else {
-      try {
-        Files.move(unsignedApkPath, outputPath);
-      } catch (IOException e) {
-        throw new UncheckedIOException(
-            String.format("Failed to write APK file '%s'.", outputPath), e);
-      }
-    }
+    apkSigner.signApk(outputPath, split);
   }
 
   Path writeCompressedApkToZipFile(ModuleSplit split, Path outputPath) {
     try (TempDirectory tempDirectory = new TempDirectory()) {
       Path tempApkOutputPath = tempDirectory.getPath().resolve("output.apk");
-      writeToZipFile(split, tempApkOutputPath, tempDirectory.getPath());
+      writeToZipFile(split, tempApkOutputPath);
       writeCompressedApkToZipFile(tempApkOutputPath, outputPath);
     }
     return outputPath;
@@ -240,11 +202,8 @@ final class ApkSerializerHelper {
    * @param outputPath Path to where the APK should be created.
    * @return The path to the created APK.
    */
-  private Path writeProtoApk(ModuleSplit split, Path outputPath, Path tempDir) {
+  private Path writeProtoApk(ModuleSplit split, Path outputPath) throws IOException {
     boolean extractNativeLibs = split.getAndroidManifest().getExtractNativeLibsValue().orElse(true);
-
-    // Embedded Wear 1.x APKs are supposed to be under res/raw/*
-    ImmutableCollection<ZipPath> wear1ApkPaths = WearApkLocator.findEmbeddedWearApkPaths(split);
 
     ZipBuilder zipBuilder = new ZipBuilder();
     for (ModuleEntry entry : split.getEntries()) {
@@ -258,25 +217,7 @@ final class ApkSerializerHelper {
               pathInApk,
               /* uncompressNativeLibs= */ !extractNativeLibs,
               /* forceUncompressed= */ entry.getForceUncompressed());
-      if (signingConfig.isPresent()
-          && (entry.getShouldSign() || wear1ApkPaths.contains(pathInApk))) {
-        // Sign the embedded APK
-        Path apkSignerOutputPath;
-        try {
-          apkSignerOutputPath =
-              Files.createTempDirectory(tempDir, "signing-").resolve("signed.apk");
-        } catch (IOException e) {
-          throw new UncheckedIOException(
-              String.format(
-                  "Error while creating temp directory for signed APK output '%s'.", tempDir),
-              e);
-        }
-        apkSigner.signEmbeddedApk(
-            entry, signingConfig.get(), apkSignerOutputPath, shouldSignWithV3(split));
-        zipBuilder.addFileFromDisk(pathInApk, apkSignerOutputPath.toFile(), entryOptions);
-      } else {
-        zipBuilder.addFile(pathInApk, entry.getContent(), entryOptions);
-      }
+      zipBuilder.addFile(pathInApk, entry.getContent(), entryOptions);
     }
 
     split
@@ -288,12 +229,7 @@ final class ApkSerializerHelper {
     zipBuilder.addFileWithProtoContent(
         ZipPath.create(MANIFEST_FILENAME), split.getAndroidManifest().getManifestRoot().getProto());
 
-    try {
-      zipBuilder.writeTo(outputPath);
-    } catch (IOException e) {
-      throw new UncheckedIOException(
-          String.format("Error while writing APK to file '%s'.", outputPath), e);
-    }
+    zipBuilder.writeTo(outputPath);
 
     return outputPath;
   }
@@ -344,21 +280,7 @@ final class ApkSerializerHelper {
       if (!FILES_FOR_AAPT2.apply(pathInApk)) {
         boolean shouldCompress =
             shouldCompress(pathInApk, !extractNativeLibs, entry.getForceUncompressed());
-        if (signingConfig.isPresent() && entry.getShouldSign()) {
-          // Unlike ZipBuilder, ZFile copies the source stream immediately
-          try (TempDirectory signingDir = new TempDirectory()) {
-            // Sign the embedded APK
-            Path apkSignerOutputPath =
-                Files.createTempDirectory(signingDir.getPath(), "signing-").resolve("signed.apk");
-            apkSigner.signEmbeddedApk(
-                entry, signingConfig.get(), apkSignerOutputPath, shouldSignWithV3(split));
-            try (InputStream inputStream = inputStream(apkSignerOutputPath)) {
-              zFile.add(pathInApk.toString(), inputStream, shouldCompress);
-            }
-          }
-        } else {
-          addFile(zFile, pathInApk, entry, shouldCompress);
-        }
+        addFile(zFile, pathInApk, entry, shouldCompress);
       }
     }
   }
@@ -377,7 +299,7 @@ final class ApkSerializerHelper {
    * split. Entries from apex/ will be moved to the top level and named "apex_payload.img" for
    * images or "apex_build_info.pb" for APEX build info. There should only be one such entry.
    */
-  private ZipPath toApkEntryPath(ZipPath pathInModule) {
+  static ZipPath toApkEntryPath(ZipPath pathInModule) {
     if (pathInModule.startsWith(DEX_DIRECTORY)) {
       checkArgument(
           pathInModule.getNameCount() == 2,
@@ -415,16 +337,5 @@ final class ApkSerializerHelper {
   private static ZFileOptions createZFileOptions(Path tempDir) {
     ZFileOptions options = new ZFileOptions();
     return options;
-  }
-
-  private boolean shouldSignWithV3(ModuleSplit split) {
-    if (!signingConfig.isPresent()) {
-      return false;
-    }
-    int minManifestSdkVersion = split.getAndroidManifest().getEffectiveMinSdkVersion();
-    int minApkTargetingSdkVersion = getMinSdk(split.getApkTargeting().getSdkVersionTargeting());
-    boolean splitIsTargetedAtRPlus =
-        max(minManifestSdkVersion, minApkTargetingSdkVersion) >= ANDROID_R_API_VERSION;
-    return splitIsTargetedAtRPlus || !signingConfig.get().getRestrictV3SigningToRPlus();
   }
 }

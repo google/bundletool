@@ -36,14 +36,10 @@ public abstract class BundleToolException extends RuntimeException {
   }
 
   public final BundleToolError toProto() {
-    BundleToolError.Builder builder =
-        BundleToolError.newBuilder()
-            .setExceptionMessage(getMessage())
-            .setUserMessage(userMessage)
-            .setErrorType(errorType);
-    customizeProto(builder);
-    return builder.build();
+    return BundleToolError.newBuilder()
+        .setExceptionMessage(getMessage())
+        .setUserMessage(userMessage)
+        .setErrorType(errorType)
+        .build();
   }
-
-  protected void customizeProto(BundleToolError.Builder builder) {}
 }
