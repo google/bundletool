@@ -54,6 +54,7 @@ public abstract class GetDeviceSpecCommand {
   private static final Flag<String> DEVICE_ID_FLAG = Flag.string("device-id");
   private static final Flag<Path> OUTPUT_FLAG = Flag.path("output");
   private static final Flag<Boolean> OVERWRITE_OUTPUT_FLAG = Flag.booleanFlag("overwrite");
+  private static final Flag<String> DEVICE_TIER_FLAG = Flag.string("device-tier");
 
   private static final SystemEnvironmentProvider DEFAULT_PROVIDER =
       new DefaultSystemEnvironmentProvider();
@@ -69,6 +70,8 @@ public abstract class GetDeviceSpecCommand {
   public abstract boolean getOverwriteOutput();
 
   abstract AdbServer getAdbServer();
+
+  public abstract Optional<String> getDeviceTier();
 
   public static Builder builder() {
     return new AutoValue_GetDeviceSpecCommand.Builder().setOverwriteOutput(false);
@@ -93,6 +96,8 @@ public abstract class GetDeviceSpecCommand {
 
     /** The caller is responsible for the lifecycle of the {@link AdbServer}. */
     public abstract Builder setAdbServer(AdbServer adbServer);
+
+    public abstract Builder setDeviceTier(String deviceTier);
 
     abstract GetDeviceSpecCommand autoBuild();
 
@@ -128,6 +133,8 @@ public abstract class GetDeviceSpecCommand {
     builder.setAdbPath(adbPath);
 
     OVERWRITE_OUTPUT_FLAG.getValue(flags).ifPresent(builder::setOverwriteOutput);
+
+    DEVICE_TIER_FLAG.getValue(flags).ifPresent(builder::setDeviceTier);
     flags.checkNoUnknownFlags();
 
     return builder.build();
@@ -144,6 +151,9 @@ public abstract class GetDeviceSpecCommand {
     AdbServer adb = getAdbServer();
     adb.init(getAdbPath());
     DeviceSpec deviceSpec = new DeviceAnalyzer(adb).getDeviceSpec(getDeviceId());
+    if (getDeviceTier().isPresent()) {
+      deviceSpec = deviceSpec.toBuilder().setDeviceTier(getDeviceTier().get()).build();
+    }
     writeDeviceSpecToFile(deviceSpec, getOutputPath());
     return deviceSpec;
   }
@@ -209,6 +219,15 @@ public abstract class GetDeviceSpecCommand {
                 .setFlagName(OVERWRITE_OUTPUT_FLAG.getName())
                 .setOptional(true)
                 .setDescription("If set, any previous existing output will be overwritten.")
+                .build())
+        .addFlag(
+            FlagDescription.builder()
+                .setFlagName(DEVICE_TIER_FLAG.getName())
+                .setExampleValue("low")
+                .setOptional(true)
+                .setDescription(
+                    "Device tier of the given device. This value will be used to match the correct"
+                        + " device tier targeted APKs to this device.")
                 .build())
         .build();
   }

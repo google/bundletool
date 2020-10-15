@@ -23,8 +23,11 @@ import com.android.bundle.Config.Bundletool;
 import com.android.bundle.Devices.DeviceSpec;
 import com.android.tools.build.bundletool.commands.BuildApksCommand;
 import com.android.tools.build.bundletool.commands.BuildApksCommand.ApkBuildMode;
+import com.android.tools.build.bundletool.commands.BuildApksManagerComponent.UseBundleCompression;
+import com.android.tools.build.bundletool.commands.CommandScoped;
 import com.android.tools.build.bundletool.io.AppBundleSerializer;
 import com.android.tools.build.bundletool.io.TempDirectory;
+import com.android.tools.build.bundletool.io.ZipReader;
 import com.android.tools.build.bundletool.model.ApkListener;
 import com.android.tools.build.bundletool.model.ApkModifier;
 import com.android.tools.build.bundletool.model.AppBundle;
@@ -50,15 +53,24 @@ public class TestModule {
 
   private final BuildApksCommand buildApksCommand;
   private final AppBundle appBundle;
+  private final boolean useBundleCompression;
 
-  private TestModule(BuildApksCommand buildApksCommand, AppBundle appBundle) {
+  private TestModule(
+      BuildApksCommand buildApksCommand, AppBundle appBundle, boolean useBundleCompression) {
     this.buildApksCommand = buildApksCommand;
     this.appBundle = appBundle;
+    this.useBundleCompression = useBundleCompression;
   }
 
   @Provides
   AppBundle provideAppBundle() {
     return appBundle;
+  }
+
+  @SuppressWarnings({"CloseableProvides", "MustBeClosedChecker"}) // Only for tests.
+  @Provides
+  ZipReader provideZipReader(BuildApksCommand command) {
+    return ZipReader.createFromFile(command.getBundlePath());
   }
 
   @Provides
@@ -67,8 +79,15 @@ public class TestModule {
   }
 
   @Provides
+  @CommandScoped
   TempDirectory provideTempDirectory() {
     return new TempDirectory();
+  }
+
+  @Provides
+  @UseBundleCompression
+  boolean provideUseBundleCompression() {
+    return useBundleCompression;
   }
 
   public static Builder builder() {
@@ -103,6 +122,7 @@ public class TestModule {
     @Nullable private PrintStream printStream;
     @Nullable private Boolean localTestingEnabled;
     @Nullable private SourceStamp sourceStamp;
+    private boolean useBundleCompression = true;
 
     public Builder withAppBundle(AppBundle appBundle) {
       this.appBundle = appBundle;
@@ -210,6 +230,11 @@ public class TestModule {
       return this;
     }
 
+    public Builder useBundleCompression(boolean useBundleCompression) {
+      this.useBundleCompression = useBundleCompression;
+      return this;
+    }
+
     public TestModule build() {
       try {
         if (tempDirectory == null) {
@@ -293,7 +318,7 @@ public class TestModule {
           buildApksCommandSetter.accept(command);
         }
 
-        return new TestModule(command.build(), appBundle);
+        return new TestModule(command.build(), appBundle, useBundleCompression);
       } catch (IOException e) {
         throw new UncheckedIOException(e);
       }

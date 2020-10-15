@@ -92,6 +92,11 @@ class ApkSigner {
               .setV3SigningEnabled(signWithV3)
               .setOtherSignersSignaturesPreserved(false)
               .setMinSdkVersion(minSdkVersion);
+      optStampSigningConfig.ifPresent(
+          stampConfig -> {
+            apkSigner.setSourceStampSignerConfig(
+                convertToApksigSignerConfig(stampConfig.getSignerConfig()));
+          });
       apkSigner.build().sign();
       Files.move(signedApkPath, apkPath, REPLACE_EXISTING);
     } catch (IOException

@@ -228,8 +228,7 @@ public class ModuleSplitter {
 
   /* Writes the final manifest that reflects the Split ID. */
   public ModuleSplit writeSplitIdInManifest(ModuleSplit moduleSplit) {
-    String resolvedSuffix =
-        suffixManager.createSuffix(moduleSplit);
+    String resolvedSuffix = suffixManager.createSuffix(moduleSplit);
     return moduleSplit.writeSplitIdInManifest(resolvedSuffix);
   }
 
@@ -309,19 +308,16 @@ public class ModuleSplitter {
         moduleSplits.stream().map(ModuleSplit::getVariantTargeting).distinct().count() == 1,
         "Expected same variant targeting across all splits.");
     ImmutableList<ManifestMutator> manifestMutators =
-        moduleSplits
-            .stream()
+        moduleSplits.stream()
             .flatMap(moduleSplit -> moduleSplit.getMasterManifestMutators().stream())
             .collect(toImmutableList());
 
-    return moduleSplits
-        .stream()
+    return moduleSplits.stream()
         .map(
             moduleSplit -> {
               if (moduleSplit.isMasterSplit()) {
                 moduleSplit =
-                    moduleSplit
-                        .toBuilder()
+                    moduleSplit.toBuilder()
                         .setAndroidManifest(
                             moduleSplit.getAndroidManifest().applyMutators(manifestMutators))
                         .build();
@@ -333,9 +329,7 @@ public class ModuleSplitter {
 
   private SplittingPipeline createNativeLibrariesSplittingPipeline() {
     ImmutableList.Builder<ModuleSplitSplitter> nativeSplitters = ImmutableList.builder();
-    if (apkGenerationConfiguration.getEnableNativeLibraryCompressionSplitter()) {
-      nativeSplitters.add(new NativeLibrariesCompressionSplitter(apkGenerationConfiguration));
-    }
+    nativeSplitters.add(new NativeLibrariesCompressionSplitter(apkGenerationConfiguration));
     if (apkGenerationConfiguration
         .getOptimizationDimensions()
         .contains(OptimizationDimension.ABI)) {
@@ -359,6 +353,14 @@ public class ModuleSplitter {
           TextureCompressionFormatAssetsSplitter.create(
               apkGenerationConfiguration.shouldStripTargetingSuffix(
                   OptimizationDimension.TEXTURE_COMPRESSION_FORMAT)));
+    }
+    if (apkGenerationConfiguration
+        .getOptimizationDimensions()
+        .contains(OptimizationDimension.DEVICE_TIER)) {
+      assetsSplitters.add(
+          DeviceTierAssetsSplitter.create(
+              apkGenerationConfiguration.shouldStripTargetingSuffix(
+                  OptimizationDimension.DEVICE_TIER)));
     }
     return new SplittingPipeline(assetsSplitters.build());
   }
@@ -390,12 +392,9 @@ public class ModuleSplitter {
       return split;
     }
 
-    return split
-        .toBuilder()
+    return split.toBuilder()
         .setApkTargeting(
-            split
-                .getApkTargeting()
-                .toBuilder()
+            split.getApkTargeting().toBuilder()
                 .setSdkVersionTargeting(
                     SdkVersionTargeting.newBuilder()
                         .addValue(

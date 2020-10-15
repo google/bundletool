@@ -23,6 +23,7 @@ import static com.google.common.collect.ImmutableSet.toImmutableSet;
 import com.android.bundle.Devices.DeviceSpec;
 import com.android.bundle.Targeting.AbiTargeting;
 import com.android.bundle.Targeting.DeviceFeatureTargeting;
+import com.android.bundle.Targeting.DeviceTierTargeting;
 import com.android.bundle.Targeting.LanguageTargeting;
 import com.android.bundle.Targeting.ScreenDensityTargeting;
 import com.android.bundle.Targeting.SdkVersionTargeting;
@@ -59,6 +60,10 @@ public final class DeviceSpecUtils {
 
   public static boolean isTextureCompressionFormatMissing(DeviceSpec deviceSpec) {
     return deviceSpec.getGlExtensionsList().isEmpty() && !getGlEsVersion(deviceSpec).isPresent();
+  }
+
+  public static boolean isDeviceTierMissing(DeviceSpec deviceSpec) {
+    return deviceSpec.getDeviceTier().isEmpty();
   }
 
   /** Extracts the GL ES version, if any, form the device features. */
@@ -152,6 +157,13 @@ public final class DeviceSpecUtils {
                 glEsVersion ->
                     GL_ES_VERSION_FEATURE_PREFIX + "0x" + Integer.toHexString(glEsVersion))
             .ifPresent(deviceSpec::addDeviceFeatures);
+      }
+      return this;
+    }
+
+    DeviceSpecFromTargetingBuilder setDeviceTier(DeviceTierTargeting deviceTierTargeting) {
+      if (!deviceTierTargeting.equals(DeviceTierTargeting.getDefaultInstance())) {
+        deviceSpec.setDeviceTier(Iterables.getOnlyElement(deviceTierTargeting.getValueList()));
       }
       return this;
     }

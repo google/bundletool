@@ -38,14 +38,17 @@ import static com.android.tools.build.bundletool.testing.ApksArchiveHelpers.crea
 import static com.android.tools.build.bundletool.testing.ApksArchiveHelpers.createMasterApkDescription;
 import static com.android.tools.build.bundletool.testing.ApksArchiveHelpers.createSplitApkSet;
 import static com.android.tools.build.bundletool.testing.ApksArchiveHelpers.createVariant;
+import static com.android.tools.build.bundletool.testing.ApksArchiveHelpers.splitApkDescription;
 import static com.android.tools.build.bundletool.testing.ApksArchiveHelpers.standaloneVariant;
 import static com.android.tools.build.bundletool.testing.DeviceFactory.createDeviceSpecFile;
 import static com.android.tools.build.bundletool.testing.DeviceFactory.deviceWithSdk;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.apkAbiTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.apkDensityTargeting;
+import static com.android.tools.build.bundletool.testing.TargetingUtils.apkDeviceTierTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.apkLanguageTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.apkSdkTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.apkTextureTargeting;
+import static com.android.tools.build.bundletool.testing.TargetingUtils.deviceTierTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.lPlusVariantTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.mergeApkTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.mergeVariantTargeting;
@@ -1258,6 +1261,103 @@ public final class GetSizeCommandTest {
                 "%s,,%s,%d,%d", "24-", "etc2", 3 * compressedApkSize, 3 * compressedApkSize),
             String.format(
                 "%s,,%s,%d,%d", "24-", "astc", 3 * compressedApkSize, 3 * compressedApkSize));
+  }
+
+  @Test
+  public void getSizeTotal_withDeviceTier() throws Exception {
+    Variant lVariant =
+        createVariant(
+            lPlusVariantTargeting(),
+            createSplitApkSet(
+                /* moduleName= */ "base",
+                createMasterApkDescription(
+                    ApkTargeting.getDefaultInstance(), ZipPath.create("base-master.apk")),
+                splitApkDescription(
+                    apkDeviceTierTargeting(
+                        deviceTierTargeting(
+                            /* value= */ "low", /* alternatives= */ ImmutableList.of("high"))),
+                    ZipPath.create("base-tier_low.apk")),
+                splitApkDescription(
+                    apkDeviceTierTargeting(
+                        deviceTierTargeting(
+                            /* value= */ "high", /* alternatives= */ ImmutableList.of("low"))),
+                    ZipPath.create("base-tier_high.apk"))));
+
+    BuildApksResult tableOfContentsProto =
+        BuildApksResult.newBuilder()
+            .setBundletool(
+                Bundletool.newBuilder()
+                    .setVersion(BundleToolVersion.getCurrentVersion().toString()))
+            .addVariant(lVariant)
+            .build();
+    Path apksArchiveFile =
+        createApksArchiveFile(tableOfContentsProto, tmpDir.resolve("bundle.apks"));
+
+    ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+
+    GetSizeCommand.builder()
+        .setGetSizeSubCommand(GetSizeSubcommand.TOTAL)
+        .setApksArchivePath(apksArchiveFile)
+        .setDimensions(ImmutableSet.of(Dimension.DEVICE_TIER, Dimension.SDK))
+        .build()
+        .getSizeTotal(new PrintStream(outputStream));
+
+    assertThat(new String(outputStream.toByteArray(), UTF_8).split(CRLF))
+        .asList()
+        .containsExactly(
+            "SDK,DEVICE_TIER,MIN,MAX",
+            String.format(
+                "%s,%s,%d,%d", "21-", "low", 2 * compressedApkSize, 2 * compressedApkSize),
+            String.format(
+                "%s,%s,%d,%d", "21-", "high", 2 * compressedApkSize, 2 * compressedApkSize));
+  }
+
+  @Test
+  public void getSizeTotal_withDeviceTier_withDeviceTier() throws Exception {
+    Variant lVariant =
+        createVariant(
+            lPlusVariantTargeting(),
+            createSplitApkSet(
+                /* moduleName= */ "base",
+                createMasterApkDescription(
+                    ApkTargeting.getDefaultInstance(), ZipPath.create("base-master.apk")),
+                splitApkDescription(
+                    apkDeviceTierTargeting(
+                        deviceTierTargeting(
+                            /* value= */ "low", /* alternatives= */ ImmutableList.of("high"))),
+                    ZipPath.create("base-tier_low.apk")),
+                splitApkDescription(
+                    apkDeviceTierTargeting(
+                        deviceTierTargeting(
+                            /* value= */ "high", /* alternatives= */ ImmutableList.of("low"))),
+                    ZipPath.create("base-tier_high.apk"))));
+
+    BuildApksResult tableOfContentsProto =
+        BuildApksResult.newBuilder()
+            .setBundletool(
+                Bundletool.newBuilder()
+                    .setVersion(BundleToolVersion.getCurrentVersion().toString()))
+            .addVariant(lVariant)
+            .build();
+    Path apksArchiveFile =
+        createApksArchiveFile(tableOfContentsProto, tmpDir.resolve("bundle.apks"));
+
+    ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+
+    GetSizeCommand.builder()
+        .setGetSizeSubCommand(GetSizeSubcommand.TOTAL)
+        .setApksArchivePath(apksArchiveFile)
+        .setDimensions(ImmutableSet.of(Dimension.SDK, Dimension.DEVICE_TIER))
+        .setDeviceSpec(DeviceSpec.newBuilder().setSdkVersion(25).setDeviceTier("high").build())
+        .build()
+        .getSizeTotal(new PrintStream(outputStream));
+
+    assertThat(new String(outputStream.toByteArray(), UTF_8).split(CRLF))
+        .asList()
+        .containsExactly(
+            "SDK,DEVICE_TIER,MIN,MAX",
+            String.format(
+                "%s,%s,%d,%d", "25", "high", 2 * compressedApkSize, 2 * compressedApkSize));
   }
 
   /** Copies the testdata resource into the temporary directory. */

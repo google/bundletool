@@ -21,25 +21,27 @@ import static com.google.common.collect.ImmutableList.toImmutableList;
 import com.android.bundle.Commands.ApkDescription;
 import com.android.bundle.Commands.AssetSliceSet;
 import com.android.bundle.Targeting.AbiTargeting;
+import com.android.bundle.Targeting.DeviceTierTargeting;
 import com.android.bundle.Targeting.LanguageTargeting;
 import com.android.bundle.Targeting.ScreenDensityTargeting;
 import com.android.bundle.Targeting.SdkVersionTargeting;
 import com.android.bundle.Targeting.TextureCompressionFormatTargeting;
 import com.android.bundle.Targeting.VariantTargeting;
+import com.android.tools.build.bundletool.device.ApkMatcher.GeneratedApk;
 import com.android.tools.build.bundletool.model.ConfigurationSizes;
 import com.android.tools.build.bundletool.model.GetSizeRequest;
-import com.android.tools.build.bundletool.model.ZipPath;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import java.util.Collection;
 
 /**
- * Get total size (min and max) for a list of asset modules, for each {@link SizeConfiguration}
- * based on the requested dimensions passed to {@link GetSizeCommand}.
+ * Get total size (min and max) for a list of asset modules, for each {@link
+ * com.android.tools.build.bundletool.model.SizeConfiguration} based on the requested dimensions
+ * passed to {@link com.android.tools.build.bundletool.commands.GetSizeCommand}.
  *
  * <p>Asset module slices are filtered based on the given {@link VariantTargeting} and {@link
- * DeviceSpec}.
+ * com.android.bundle.Devices.DeviceSpec}.
  */
 public class AssetModuleSizeAggregator extends AbstractSizeAggregator {
 
@@ -82,22 +84,26 @@ public class AssetModuleSizeAggregator extends AbstractSizeAggregator {
         variantTargeting.hasTextureCompressionFormatTargeting()
             ? ImmutableSet.of(variantTargeting.getTextureCompressionFormatTargeting())
             : getAllTextureCompressionFormatTargetings(apkDescriptions);
+    ImmutableSet<DeviceTierTargeting> devicetierTargetingOptions =
+        getAllDeviceTierTargetings(apkDescriptions);
 
     return getSizesPerConfiguration(
         sdkVersionTargetingOptions,
         abiTargetingOptions,
         languageTargetingOptions,
         screenDensityTargetingOptions,
-        textureCompressionFormatTargetingOptions);
+        textureCompressionFormatTargetingOptions,
+        devicetierTargetingOptions);
   }
 
   @Override
-  protected ImmutableList<ZipPath> getMatchingApks(
+  protected ImmutableList<GeneratedApk> getMatchingApks(
       SdkVersionTargeting sdkVersionTargeting,
       AbiTargeting abiTargeting,
       ScreenDensityTargeting screenDensityTargeting,
       LanguageTargeting languageTargeting,
-      TextureCompressionFormatTargeting textureTargeting) {
+      TextureCompressionFormatTargeting textureTargeting,
+      DeviceTierTargeting deviceTierTargeting) {
     return new ApkMatcher(
             getDeviceSpec(
                 getSizeRequest.getDeviceSpec(),
@@ -105,7 +111,8 @@ public class AssetModuleSizeAggregator extends AbstractSizeAggregator {
                 abiTargeting,
                 screenDensityTargeting,
                 languageTargeting,
-                textureTargeting),
+                textureTargeting,
+                deviceTierTargeting),
             getSizeRequest.getModules(),
             getSizeRequest.getInstant())
         .getMatchingApksFromAssetModules(assetModules);

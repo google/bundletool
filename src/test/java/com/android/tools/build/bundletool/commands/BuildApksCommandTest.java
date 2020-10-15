@@ -19,6 +19,7 @@ package com.android.tools.build.bundletool.commands;
 import static com.android.tools.build.bundletool.commands.BuildApksCommand.ApkBuildMode.DEFAULT;
 import static com.android.tools.build.bundletool.commands.BuildApksCommand.ApkBuildMode.SYSTEM;
 import static com.android.tools.build.bundletool.commands.BuildApksCommand.ApkBuildMode.UNIVERSAL;
+import static com.android.tools.build.bundletool.commands.BuildApksCommand.OutputFormat.DIRECTORY;
 import static com.android.tools.build.bundletool.commands.BuildApksCommand.SystemApkOption.UNCOMPRESSED_NATIVE_LIBRARIES;
 import static com.android.tools.build.bundletool.model.OptimizationDimension.ABI;
 import static com.android.tools.build.bundletool.model.OptimizationDimension.SCREEN_DENSITY;
@@ -27,7 +28,9 @@ import static com.android.tools.build.bundletool.testing.Aapt2Helper.AAPT2_PATH;
 import static com.android.tools.build.bundletool.testing.DeviceFactory.abis;
 import static com.android.tools.build.bundletool.testing.DeviceFactory.createDeviceSpecFile;
 import static com.android.tools.build.bundletool.testing.DeviceFactory.density;
+import static com.android.tools.build.bundletool.testing.DeviceFactory.locales;
 import static com.android.tools.build.bundletool.testing.DeviceFactory.mergeSpecs;
+import static com.android.tools.build.bundletool.testing.DeviceFactory.sdkVersion;
 import static com.android.tools.build.bundletool.testing.FakeSystemEnvironmentProvider.ANDROID_HOME;
 import static com.android.tools.build.bundletool.testing.FakeSystemEnvironmentProvider.ANDROID_SERIAL;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifest;
@@ -114,7 +117,7 @@ public class BuildApksCommandTest {
   private static final String DEBUG_KEYSTORE_PASSWORD = "android";
   private static final String DEBUG_KEY_PASSWORD = "android";
   private static final String DEBUG_KEY_ALIAS = "AndroidDebugKey";
-  private static final String STAMP_SOURCE = "https://www.validsource.com";
+  private static final String STAMP_SOURCE = "https://www.example.com";
   private static final String STAMP_KEYSTORE_PASSWORD = "stamp-keystore-password";
   private static final String STAMP_KEY_PASSWORD = "stamp-key-password";
   private static final String STAMP_KEY_ALIAS = "stamp-key-alias";
@@ -423,6 +426,38 @@ public class BuildApksCommandTest {
   }
 
   @Test
+  public void buildingViaFlagsAndBuilderHasSameResult_optionalOutputFormat() throws Exception {
+    ByteArrayOutputStream output = new ByteArrayOutputStream();
+    BuildApksCommand commandViaFlags =
+        BuildApksCommand.fromFlags(
+            new FlagParser()
+                .parse(
+                    "--bundle=" + bundlePath,
+                    "--output=" + outputFilePath,
+                    "--aapt2=" + AAPT2_PATH,
+                    // Optional values.
+                    "--output-format=" + DIRECTORY),
+            new PrintStream(output),
+            systemEnvironmentProvider,
+            fakeAdbServer);
+    BuildApksCommand.Builder commandViaBuilder =
+        BuildApksCommand.builder()
+            .setBundlePath(bundlePath)
+            .setOutputFile(outputFilePath)
+            // Optional values.
+            .setOutputFormat(DIRECTORY)
+            // Must copy instance of the internal executor service.
+            .setAapt2Command(commandViaFlags.getAapt2Command().get())
+            .setExecutorServiceInternal(commandViaFlags.getExecutorService())
+            .setExecutorServiceCreatedByBundleTool(true)
+            .setOutputPrintStream(commandViaFlags.getOutputPrintStream().get());
+    DebugKeystoreUtils.getDebugSigningConfiguration(systemEnvironmentProvider)
+        .ifPresent(commandViaBuilder::setSigningConfiguration);
+
+    assertThat(commandViaBuilder.build()).isEqualTo(commandViaFlags);
+  }
+
+  @Test
   public void buildingViaFlagsAndBuilderHasSameResult_optionalVerbose() throws Exception {
     ByteArrayOutputStream output = new ByteArrayOutputStream();
     BuildApksCommand commandViaFlags =
@@ -558,6 +593,45 @@ public class BuildApksCommandTest {
   }
 
   @Test
+  public void buildingViaFlagsAndBuilderHasSameResult_optionalDeviceTier() throws Exception {
+    Path deviceSpecPath =
+        createDeviceSpecFile(
+            mergeSpecs(sdkVersion(28), density(DensityAlias.HDPI), abis("x86"), locales("en")),
+            tmpDir.resolve("device.json"));
+    final String deviceTier = "low";
+    ByteArrayOutputStream output = new ByteArrayOutputStream();
+    BuildApksCommand commandViaFlags =
+        BuildApksCommand.fromFlags(
+            new FlagParser()
+                .parse(
+                    "--bundle=" + bundlePath,
+                    "--output=" + outputFilePath,
+                    "--aapt2=" + AAPT2_PATH,
+                    // Optional values.
+                    "--device-spec=" + deviceSpecPath,
+                    "--device-tier=" + deviceTier),
+            new PrintStream(output),
+            systemEnvironmentProvider,
+            fakeAdbServer);
+    BuildApksCommand.Builder commandViaBuilder =
+        BuildApksCommand.builder()
+            .setBundlePath(bundlePath)
+            .setOutputFile(outputFilePath)
+            // Optional values.
+            .setDeviceSpec(deviceSpecPath)
+            .setDeviceTier(deviceTier)
+            // Must copy instance of the internal executor service.
+            .setAapt2Command(commandViaFlags.getAapt2Command().get())
+            .setExecutorServiceInternal(commandViaFlags.getExecutorService())
+            .setExecutorServiceCreatedByBundleTool(true)
+            .setOutputPrintStream(commandViaFlags.getOutputPrintStream().get());
+    DebugKeystoreUtils.getDebugSigningConfiguration(systemEnvironmentProvider)
+        .ifPresent(commandViaBuilder::setSigningConfiguration);
+
+    assertThat(commandViaBuilder.build()).isEqualTo(commandViaFlags);
+  }
+
+  @Test
   public void outputNotSet_throws() throws Exception {
     expectMissingRequiredBuilderPropertyException(
         "outputFile",
@@ -640,9 +714,7 @@ public class BuildApksCommandTest {
                     .build());
     assertThat(builderException)
         .hasMessageThat()
-        .contains(
-            "Modules can be only set when running with 'universal', 'system' or "
-                + "'system_compressed' mode flag.");
+        .contains("Modules can be only set when running with 'universal' or 'system' mode flag.");
   }
 
   @Test
@@ -1137,6 +1209,23 @@ public class BuildApksCommandTest {
 
     Exception e = assertThrows(IllegalArgumentException.class, command::execute);
     assertThat(e).hasMessageThat().contains("already exists");
+  }
+
+  @Test
+  public void overwriteRequestedForDirectoryOutputFormat_throws() throws Exception {
+    createAppBundle(bundlePath);
+
+    ParsedFlags flags =
+        new FlagParser()
+            .parse(
+                "--bundle=" + bundlePath,
+                "--output=" + tmpDir,
+                "--output-format=" + DIRECTORY,
+                "--overwrite");
+    BuildApksCommand command = BuildApksCommand.fromFlags(flags, fakeAdbServer);
+
+    Exception e = assertThrows(InvalidCommandException.class, command::execute);
+    assertThat(e).hasMessageThat().contains("flag is not supported");
   }
 
   @Test

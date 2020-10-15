@@ -98,15 +98,20 @@ public final class OptimizationsMerger {
 
     boolean uncompressDexFiles = requestedOptimizations.getUncompressDexFiles().getEnabled();
 
+    ImmutableMap<OptimizationDimension, SuffixStripping> suffixStrippings =
+        getSuffixStrippings(
+            bundleConfig.getOptimizations().getSplitsConfig().getSplitDimensionList());
+
     return ApkOptimizations.builder()
         .setSplitDimensions(splitDimensions)
         .setUncompressNativeLibraries(uncompressNativeLibraries)
         .setUncompressDexFiles(uncompressDexFiles)
         .setStandaloneDimensions(standaloneDimensions)
+        .setSuffixStrippings(suffixStrippings)
         .build();
   }
 
-  public static ImmutableMap<OptimizationDimension, SuffixStripping> getSuffixStrippings(
+  private static ImmutableMap<OptimizationDimension, SuffixStripping> getSuffixStrippings(
       List<SplitDimension> requestedSplitDimensions) {
     Map<OptimizationDimension, SuffixStripping> mergedDimensions =
         new EnumMap<>(OptimizationDimension.class);

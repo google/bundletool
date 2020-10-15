@@ -26,6 +26,7 @@ import static com.android.tools.build.bundletool.model.AndroidManifest.NAME_RESO
 import static com.android.tools.build.bundletool.model.AndroidManifest.SPLIT_NAME_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.ManifestMutator.withExtractNativeLibs;
 import static com.android.tools.build.bundletool.model.OptimizationDimension.ABI;
+import static com.android.tools.build.bundletool.model.OptimizationDimension.DEVICE_TIER;
 import static com.android.tools.build.bundletool.model.OptimizationDimension.LANGUAGE;
 import static com.android.tools.build.bundletool.model.OptimizationDimension.SCREEN_DENSITY;
 import static com.android.tools.build.bundletool.model.OptimizationDimension.TEXTURE_COMPRESSION_FORMAT;
@@ -60,12 +61,14 @@ import static com.android.tools.build.bundletool.testing.TargetingUtils.alternat
 import static com.android.tools.build.bundletool.testing.TargetingUtils.apkAbiTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.apkAlternativeLanguageTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.apkDensityTargeting;
+import static com.android.tools.build.bundletool.testing.TargetingUtils.apkDeviceTierTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.apkGraphicsTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.apkLanguageTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.apkMinSdkTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.apkTextureTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.assets;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.assetsDirectoryTargeting;
+import static com.android.tools.build.bundletool.testing.TargetingUtils.deviceTierTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.getSplitsWithTargetingEqualTo;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.lPlusVariantTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.languageTargeting;
@@ -83,9 +86,11 @@ import static com.android.tools.build.bundletool.testing.TargetingUtils.variantM
 import static com.android.tools.build.bundletool.testing.TestUtils.extractPaths;
 import static com.android.tools.build.bundletool.testing.truth.resources.TruthResourceTable.assertThat;
 import static com.google.common.base.Preconditions.checkState;
+import static com.google.common.base.Predicates.not;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.ImmutableSet.toImmutableSet;
 import static com.google.common.collect.Iterables.getOnlyElement;
+import static com.google.common.collect.MoreCollectors.onlyElement;
 import static com.google.common.truth.Truth.assertThat;
 import static com.google.common.truth.Truth8.assertThat;
 import static com.google.common.truth.extensions.proto.ProtoTruth.assertThat;
@@ -255,8 +260,7 @@ public class ModuleSplitterTest {
     assertThat(splits.stream().map(ModuleSplit::getSplitType).distinct().collect(toImmutableSet()))
         .containsExactly(SplitType.SPLIT);
     assertThat(
-            splits
-                .stream()
+            splits.stream()
                 .map(ModuleSplit::getVariantTargeting)
                 .distinct()
                 .collect(toImmutableSet()))
@@ -386,8 +390,7 @@ public class ModuleSplitterTest {
     assertThat(splits.stream().map(ModuleSplit::getSplitType).distinct().collect(toImmutableSet()))
         .containsExactly(SplitType.SPLIT);
     assertThat(
-            splits
-                .stream()
+            splits.stream()
                 .map(ModuleSplit::getVariantTargeting)
                 .distinct()
                 .collect(toImmutableSet()))
@@ -509,8 +512,7 @@ public class ModuleSplitterTest {
     assertThat(splits.stream().map(ModuleSplit::getSplitType).distinct().collect(toImmutableSet()))
         .containsExactly(SplitType.SPLIT);
     assertThat(
-            splits
-                .stream()
+            splits.stream()
                 .map(ModuleSplit::getVariantTargeting)
                 .distinct()
                 .collect(toImmutableSet()))
@@ -707,8 +709,7 @@ public class ModuleSplitterTest {
     assertThat(splits.stream().map(ModuleSplit::getSplitType).distinct().collect(toImmutableSet()))
         .containsExactly(SplitType.SPLIT);
     assertThat(
-            splits
-                .stream()
+            splits.stream()
                 .map(ModuleSplit::getVariantTargeting)
                 .distinct()
                 .collect(toImmutableSet()))
@@ -737,8 +738,7 @@ public class ModuleSplitterTest {
     assertThat(splits.stream().map(ModuleSplit::getSplitType).distinct().collect(toImmutableSet()))
         .containsExactly(SplitType.SPLIT);
     assertThat(
-            splits
-                .stream()
+            splits.stream()
                 .map(ModuleSplit::getVariantTargeting)
                 .distinct()
                 .collect(toImmutableSet()))
@@ -768,8 +768,7 @@ public class ModuleSplitterTest {
     assertThat(splits.stream().map(ModuleSplit::getSplitType).distinct().collect(toImmutableSet()))
         .containsExactly(SplitType.SPLIT);
     assertThat(
-            splits
-                .stream()
+            splits.stream()
                 .map(ModuleSplit::getVariantTargeting)
                 .distinct()
                 .collect(toImmutableSet()))
@@ -813,7 +812,7 @@ public class ModuleSplitterTest {
             BUNDLETOOL_VERSION,
             ApkGenerationConfiguration.builder()
                 .setOptimizationDimensions(ImmutableSet.of(ABI))
-                .setEnableNativeLibraryCompressionSplitter(true)
+                .setEnableUncompressedNativeLibraries(true)
                 .build(),
             lPlusVariantTargeting(),
             ImmutableSet.of("testModule"));
@@ -825,12 +824,12 @@ public class ModuleSplitterTest {
         .containsExactly(SplitType.SPLIT);
     assertThat(splits.stream().map(split -> split.getVariantTargeting()).collect(toImmutableSet()))
         .containsExactly(variantMinSdkTargeting(ANDROID_L_API_VERSION));
-    ModuleSplit x86Split =
-        splits.stream()
-            .filter(split -> split.getApkTargeting().hasAbiTargeting())
-            .findFirst()
-            .get();
-    assertThat(x86Split.findEntry("lib/x86/liba.so").get().getForceUncompressed()).isFalse();
+
+    ModuleSplit master = splits.stream().filter(ModuleSplit::isMasterSplit).collect(onlyElement());
+    ModuleSplit abi =
+        splits.stream().filter(not(ModuleSplit::isMasterSplit)).collect(onlyElement());
+    assertThat(master.getAndroidManifest().getExtractNativeLibsValue()).hasValue(true);
+    assertThat(abi.findEntry("lib/x86/liba.so").get().getForceUncompressed()).isFalse();
   }
 
   @Test
@@ -851,7 +850,7 @@ public class ModuleSplitterTest {
             BUNDLETOOL_VERSION,
             ApkGenerationConfiguration.builder()
                 .setOptimizationDimensions(ImmutableSet.of(ABI))
-                .setEnableNativeLibraryCompressionSplitter(true)
+                .setEnableUncompressedNativeLibraries(true)
                 .build(),
             variantMinSdkTargeting(ANDROID_M_API_VERSION),
             ImmutableSet.of("testModule"));
@@ -863,12 +862,44 @@ public class ModuleSplitterTest {
         .containsExactly(SplitType.SPLIT);
     assertThat(splits.stream().map(split -> split.getVariantTargeting()).collect(toImmutableSet()))
         .containsExactly(variantMinSdkTargeting(ANDROID_M_API_VERSION));
-    ModuleSplit x86Split =
-        splits.stream()
-            .filter(split -> split.getApkTargeting().hasAbiTargeting())
-            .findFirst()
-            .get();
-    assertThat(x86Split.findEntry("lib/x86/liba.so").get().getForceUncompressed()).isTrue();
+
+    ModuleSplit master = splits.stream().filter(ModuleSplit::isMasterSplit).collect(onlyElement());
+    ModuleSplit abi =
+        splits.stream().filter(not(ModuleSplit::isMasterSplit)).collect(onlyElement());
+    assertThat(master.getAndroidManifest().getExtractNativeLibsValue()).hasValue(false);
+    assertThat(abi.findEntry("lib/x86/liba.so").get().getForceUncompressed()).isTrue();
+  }
+
+  @Test
+  public void nativeSplits_mPlusTargeting_disabledUncompressedSplitter() {
+    NativeLibraries nativeConfig =
+        nativeLibraries(targetedNativeDirectory("lib/x86", nativeDirectoryTargeting("x86")));
+    BundleModule testModule =
+        new BundleModuleBuilder("testModule")
+            .setManifest(androidManifest("com.test.app"))
+            .setNativeConfig(nativeConfig)
+            .addFile("lib/x86/liba.so")
+            .build();
+
+    ModuleSplitter moduleSplitter =
+        ModuleSplitter.createNoStamp(
+            testModule,
+            BUNDLETOOL_VERSION,
+            ApkGenerationConfiguration.builder()
+                .setOptimizationDimensions(ImmutableSet.of(ABI))
+                .setEnableUncompressedNativeLibraries(false)
+                .build(),
+            variantMinSdkTargeting(ANDROID_M_API_VERSION),
+            ImmutableSet.of("testModule"));
+
+    List<ModuleSplit> splits = moduleSplitter.splitModule();
+    assertThat(splits).hasSize(2);
+
+    ModuleSplit master = splits.stream().filter(ModuleSplit::isMasterSplit).collect(onlyElement());
+    ModuleSplit abi =
+        splits.stream().filter(not(ModuleSplit::isMasterSplit)).collect(onlyElement());
+    assertThat(master.getAndroidManifest().getExtractNativeLibsValue()).hasValue(true);
+    assertThat(abi.findEntry("lib/x86/liba.so").get().getForceUncompressed()).isFalse();
   }
 
   @Test
@@ -885,8 +916,7 @@ public class ModuleSplitterTest {
     assertThat(splits.stream().map(ModuleSplit::getSplitType).distinct().collect(toImmutableSet()))
         .containsExactly(SplitType.SPLIT);
     assertThat(
-            splits
-                .stream()
+            splits.stream()
                 .map(ModuleSplit::getVariantTargeting)
                 .distinct()
                 .collect(toImmutableSet()))
@@ -898,9 +928,7 @@ public class ModuleSplitterTest {
     assertThat(masterSplit.isMasterSplit()).isTrue();
 
     ImmutableSet<String> actualFiles =
-        masterSplit
-            .getEntries()
-            .stream()
+        masterSplit.getEntries().stream()
             .map(ModuleEntry::getPath)
             .map(ZipPath::toString)
             .collect(toImmutableSet());
@@ -983,8 +1011,7 @@ public class ModuleSplitterTest {
     assertThat(splits.stream().map(ModuleSplit::getSplitType).distinct().collect(toImmutableSet()))
         .containsExactly(SplitType.SPLIT);
     assertThat(
-            splits
-                .stream()
+            splits.stream()
                 .map(ModuleSplit::getVariantTargeting)
                 .distinct()
                 .collect(toImmutableSet()))
@@ -1044,8 +1071,7 @@ public class ModuleSplitterTest {
     assertThat(splits.stream().map(ModuleSplit::getSplitType).distinct().collect(toImmutableSet()))
         .containsExactly(SplitType.SPLIT);
     assertThat(
-            splits
-                .stream()
+            splits.stream()
                 .map(ModuleSplit::getVariantTargeting)
                 .distinct()
                 .collect(toImmutableSet()))
@@ -1095,6 +1121,73 @@ public class ModuleSplitterTest {
             USER_PACKAGE_OFFSET,
             "com.test.app",
             type(0x01, "string", entry(0x01, "welcome_label", values))));
+  }
+
+  @Test
+  public void deviceTierAsset_splitting_and_merging() {
+    BundleModule testModule =
+        new BundleModuleBuilder("testModule")
+            .addFile("assets/main#tier_low/image.jpg")
+            .addFile("assets/main#tier_medium/image.jpg")
+            .addFile("dex/classes.dex")
+            .setAssetsConfig(
+                assets(
+                    targetedAssetsDirectory(
+                        "assets/main#tier_low",
+                        assetsDirectoryTargeting(
+                            deviceTierTargeting(
+                                /* value= */ "low",
+                                /* alternatives= */ ImmutableList.of("medium")))),
+                    targetedAssetsDirectory(
+                        "assets/main#tier_medium",
+                        assetsDirectoryTargeting(
+                            deviceTierTargeting(
+                                /* value= */ "medium",
+                                /* alternatives= */ ImmutableList.of("low"))))))
+            .setManifest(androidManifest("com.test.app"))
+            .build();
+
+    ImmutableList<ModuleSplit> splits = createDeviceTierSplitter(testModule).splitModule();
+
+    // expected 3 splits: low tier, medium tier and the master split.
+    assertThat(splits).hasSize(3);
+    assertThat(splits.stream().map(ModuleSplit::getSplitType).distinct().collect(toImmutableSet()))
+        .containsExactly(SplitType.SPLIT);
+    assertThat(
+            splits.stream()
+                .map(ModuleSplit::getVariantTargeting)
+                .distinct()
+                .collect(toImmutableSet()))
+        .containsExactly(lPlusVariantTargeting());
+
+    ImmutableList<ModuleSplit> defaultSplits =
+        getSplitsWithTargetingEqualTo(splits, DEFAULT_MASTER_SPLIT_SDK_TARGETING);
+    assertThat(defaultSplits).hasSize(1);
+    assertThat(extractPaths(defaultSplits.get(0).getEntries())).containsExactly("dex/classes.dex");
+
+    ImmutableList<ModuleSplit> lowTierSplits =
+        getSplitsWithTargetingEqualTo(
+            splits,
+            mergeApkTargeting(
+                DEFAULT_MASTER_SPLIT_SDK_TARGETING,
+                apkDeviceTierTargeting(
+                    deviceTierTargeting(
+                        /* value= */ "low", /* alternatives= */ ImmutableList.of("medium")))));
+    assertThat(lowTierSplits).hasSize(1);
+    assertThat(extractPaths(lowTierSplits.get(0).getEntries()))
+        .containsExactly("assets/main#tier_low/image.jpg");
+
+    ImmutableList<ModuleSplit> mediumTierSplits =
+        getSplitsWithTargetingEqualTo(
+            splits,
+            mergeApkTargeting(
+                DEFAULT_MASTER_SPLIT_SDK_TARGETING,
+                apkDeviceTierTargeting(
+                    deviceTierTargeting(
+                        /* value= */ "medium", /* alternatives= */ ImmutableList.of("low")))));
+    assertThat(mediumTierSplits).hasSize(1);
+    assertThat(extractPaths(mediumTierSplits.get(0).getEntries()))
+        .containsExactly("assets/main#tier_medium/image.jpg");
   }
 
   @Test
@@ -1728,7 +1821,7 @@ public class ModuleSplitterTest {
 
   @Test
   public void testModuleSplitter_baseSplit_addsStamp() throws Exception {
-    String stampSource = "https://www.validsource.com";
+    String stampSource = "https://www.example.com";
     StampType stampType = StampType.STAMP_TYPE_DISTRIBUTION_APK;
     BundleModule bundleModule =
         new BundleModuleBuilder("base").setManifest(androidManifest("com.test.app")).build();
@@ -1755,7 +1848,7 @@ public class ModuleSplitterTest {
 
   @Test
   public void testModuleSplitter_nativeSplit_addsNoStamp() throws Exception {
-    String stampSource = "https://www.validsource.com";
+    String stampSource = "https://www.example.com";
     StampType stampType = StampType.STAMP_TYPE_DISTRIBUTION_APK;
     NativeLibraries nativeConfig =
         nativeLibraries(targetedNativeDirectory("lib/x86", nativeDirectoryTargeting("x86")));
@@ -1771,7 +1864,7 @@ public class ModuleSplitterTest {
             BUNDLETOOL_VERSION,
             ApkGenerationConfiguration.builder()
                 .setOptimizationDimensions(ImmutableSet.of(ABI))
-                .setEnableNativeLibraryCompressionSplitter(true)
+                .setEnableUncompressedNativeLibraries(true)
                 .build(),
             lPlusVariantTargeting(),
             ImmutableSet.of("testModule"),
@@ -1802,6 +1895,16 @@ public class ModuleSplitterTest {
     }
     assertThat(masterSplitsFound).isEqualTo(1);
     return masterSplit;
+  }
+
+
+  private static ModuleSplitter createDeviceTierSplitter(BundleModule module) {
+    return ModuleSplitter.createNoStamp(
+        module,
+        BUNDLETOOL_VERSION,
+        withOptimizationDimensions(ImmutableSet.of(DEVICE_TIER)),
+        lPlusVariantTargeting(),
+        ImmutableSet.of(module.getName().getName()));
   }
 
   private static ModuleSplitter createAbiAndDensitySplitter(BundleModule module) {
@@ -1835,10 +1938,7 @@ public class ModuleSplitterTest {
         .setSuffixStrippings(
             ImmutableMap.of(
                 TEXTURE_COMPRESSION_FORMAT,
-                SuffixStripping.newBuilder()
-                    .setEnabled(true)
-                    .setDefaultSuffix("etc1")
-                    .build()))
+                SuffixStripping.newBuilder().setEnabled(true).setDefaultSuffix("etc1").build()))
         .build();
   }
 }

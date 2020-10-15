@@ -30,6 +30,7 @@ public interface GetSizeRequest {
     SCREEN_DENSITY,
     LANGUAGE,
     TEXTURE_COMPRESSION_FORMAT,
+    DEVICE_TIER,
     ALL
   }
 

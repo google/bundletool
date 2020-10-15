@@ -18,8 +18,9 @@ package com.android.tools.build.bundletool.commands;
 
 import static com.android.tools.build.bundletool.commands.BuildApksCommand.ApkBuildMode.DEFAULT;
 import static com.android.tools.build.bundletool.commands.BuildApksCommand.ApkBuildMode.SYSTEM;
-import static com.android.tools.build.bundletool.commands.BuildApksCommand.ApkBuildMode.SYSTEM_COMPRESSED;
 import static com.android.tools.build.bundletool.commands.BuildApksCommand.ApkBuildMode.UNIVERSAL;
+import static com.android.tools.build.bundletool.commands.BuildApksCommand.OutputFormat.APK_SET;
+import static com.android.tools.build.bundletool.commands.BuildApksCommand.OutputFormat.DIRECTORY;
 import static com.android.tools.build.bundletool.commands.CommandUtils.ANDROID_SERIAL_VARIABLE;
 import static com.android.tools.build.bundletool.model.utils.SdkToolsLocator.ANDROID_HOME_VARIABLE;
 import static com.android.tools.build.bundletool.model.utils.SdkToolsLocator.SYSTEM_PATH_VARIABLE;
@@ -40,6 +41,7 @@ import com.android.tools.build.bundletool.device.DeviceSpecParser;
 import com.android.tools.build.bundletool.flags.Flag;
 import com.android.tools.build.bundletool.flags.ParsedFlags;
 import com.android.tools.build.bundletool.io.TempDirectory;
+import com.android.tools.build.bundletool.io.ZipReader;
 import com.android.tools.build.bundletool.model.Aapt2Command;
 import com.android.tools.build.bundletool.model.ApkListener;
 import com.android.tools.build.bundletool.model.ApkModifier;
@@ -57,9 +59,9 @@ import com.android.tools.build.bundletool.model.utils.DefaultSystemEnvironmentPr
 import com.android.tools.build.bundletool.model.utils.SystemEnvironmentProvider;
 import com.android.tools.build.bundletool.model.utils.files.FileUtils;
 import com.android.tools.build.bundletool.preprocessors.AppBundlePreprocessorManager;
+import com.android.tools.build.bundletool.preprocessors.AppBundleRecompressor;
 import com.android.tools.build.bundletool.preprocessors.DaggerAppBundlePreprocessorComponent;
 import com.android.tools.build.bundletool.splitters.DexCompressionSplitter;
-import com.android.tools.build.bundletool.splitters.NativeLibrariesCompressionSplitter;
 import com.android.tools.build.bundletool.validation.AppBundleValidator;
 import com.android.tools.build.bundletool.validation.SubValidator;
 import com.google.auto.value.AutoValue;
@@ -104,11 +106,6 @@ public abstract class BuildApksCommand {
     UNIVERSAL,
     /** SYSTEM mode generates APKs for the system image. */
     SYSTEM,
-    /**
-     * SYSTEM_COMPRESSED mode generates compressed APK and an additional uncompressed stub APK
-     * (containing only android manifest) for the system image.
-     */
-    SYSTEM_COMPRESSED,
     /** PERSISTENT mode only generates non-instant APKs (i.e. splits and standalone APKs). */
     PERSISTENT,
     /**
@@ -119,10 +116,6 @@ public abstract class BuildApksCommand {
     public final String getLowerCaseName() {
       return Ascii.toLowerCase(name());
     }
-
-    public final boolean isAnySystemMode() {
-      return equals(SYSTEM) || equals(SYSTEM_COMPRESSED);
-    }
   }
 
   /** Options to customize generated system APKs. */
@@ -131,8 +124,18 @@ public abstract class BuildApksCommand {
     UNCOMPRESSED_DEX_FILES;
   }
 
+  /** Output format for generated APKs. */
+  public enum OutputFormat {
+    /** Generated APKs are stored inside created APK Set archive. */
+    APK_SET,
+    /** Generated APKs are stored inside specified directory. */
+    DIRECTORY
+  }
+
   private static final Flag<Path> BUNDLE_LOCATION_FLAG = Flag.path("bundle");
   private static final Flag<Path> OUTPUT_FILE_FLAG = Flag.path("output");
+  private static final Flag<OutputFormat> OUTPUT_FORMAT_FLAG =
+      Flag.enumFlag("output-format", OutputFormat.class);
   private static final Flag<Boolean> OVERWRITE_OUTPUT_FLAG = Flag.booleanFlag("overwrite");
   private static final Flag<ImmutableSet<OptimizationDimension>> OPTIMIZE_FOR_FLAG =
       Flag.enumSet("optimize-for", OptimizationDimension.class);
@@ -150,6 +153,7 @@ public abstract class BuildApksCommand {
   private static final Flag<Path> DEVICE_SPEC_FLAG = Flag.path("device-spec");
   private static final Flag<ImmutableSet<SystemApkOption>> SYSTEM_APK_OPTIONS =
       Flag.enumSet("system-apk-options", SystemApkOption.class);
+  private static final Flag<String> DEVICE_TIER_FLAG = Flag.string("device-tier");
 
   private static final Flag<Boolean> VERBOSE_FLAG = Flag.booleanFlag("verbose");
 
@@ -176,6 +180,18 @@ public abstract class BuildApksCommand {
   // Number embedded at the beginning of a zip file to indicate its file format.
   private static final int ZIP_MAGIC = 0x04034b50;
 
+  /**
+   * Whether the new APK serializer is enabled.
+   *
+   * <p>Can be overridden using the system property "bundletool.serializer.zipflinger" set to
+   * "true".
+   */
+  private static final boolean ENABLE_NEW_APK_SERIALIZER =
+      SystemEnvironmentProvider.DEFAULT_PROVIDER
+          .getProperty("bundletool.serializer.zipflinger")
+          .map(Boolean::parseBoolean)
+          .orElse(false);
+
   public abstract Path getBundlePath();
 
   public abstract Path getOutputFile();
@@ -187,6 +203,8 @@ public abstract class BuildApksCommand {
   public abstract ImmutableSet<String> getModules();
 
   public abstract Optional<DeviceSpec> getDeviceSpec();
+
+  public abstract Optional<String> getDeviceTier();
 
   public abstract ImmutableSet<SystemApkOption> getSystemApkOptions();
 
@@ -218,7 +236,7 @@ public abstract class BuildApksCommand {
 
   abstract boolean isExecutorServiceCreatedByBundleTool();
 
-  public abstract boolean getCreateApkSetArchive();
+  public abstract OutputFormat getOutputFormat();
 
 
   public abstract Optional<ApkListener> getApkListener();
@@ -235,27 +253,42 @@ public abstract class BuildApksCommand {
 
   public abstract Optional<Long> getAssetModulesVersionOverride();
 
+  public abstract boolean getEnableNewApkSerializer();
+
   public static Builder builder() {
     return new AutoValue_BuildApksCommand.Builder()
         .setOverwriteOutput(false)
         .setApkBuildMode(DEFAULT)
         .setLocalTestingMode(false)
         .setGenerateOnlyForConnectedDevice(false)
-        .setCreateApkSetArchive(true)
+        .setOutputFormat(APK_SET)
         .setVerbose(false)
         .setOptimizationDimensions(ImmutableSet.of())
         .setModules(ImmutableSet.of())
         .setExtraValidators(ImmutableList.of())
-        .setSystemApkOptions(ImmutableSet.of());
+        .setSystemApkOptions(ImmutableSet.of())
+        .setEnableNewApkSerializer(ENABLE_NEW_APK_SERIALIZER);
   }
 
   /** Builder for the {@link BuildApksCommand}. */
   @AutoValue.Builder
   public abstract static class Builder {
+
     /** Sets the path to the bundle. Must have the extension ".aab". */
     public abstract Builder setBundlePath(Path bundlePath);
 
-    /** Sets the path to where the APK Set must be generated. Must have the extension ".apks". */
+    /** Sets the output format. */
+    public abstract Builder setOutputFormat(OutputFormat outputFormat);
+
+    /**
+     * Sets path to the output produced by the command. Depends on the output format:
+     *
+     * <ul>
+     *   <li>'APK_SET', path to where the APK Set must be generated. Must have the extension
+     *       ".apks".
+     *   <li>'DIRECTORY', path to the directory where generated APKs will be stored.
+     * </ul>
+     */
     public abstract Builder setOutputFile(Path outputFile);
 
     /**
@@ -300,6 +333,12 @@ public abstract class BuildApksCommand {
       // Parse as partial and fully validate later.
       return setDeviceSpec(DeviceSpecParser.parsePartialDeviceSpec(deviceSpecFile));
     }
+
+    /**
+     * Sets the device tier to use for APK matching. This will override the device tier of the given
+     * device spec.
+     */
+    public abstract Builder setDeviceTier(String deviceTier);
 
     /** Sets options to generated APKs in system mode. */
     public abstract Builder setSystemApkOptions(ImmutableSet<SystemApkOption> options);
@@ -358,11 +397,13 @@ public abstract class BuildApksCommand {
 
     /**
      * If false will extract the APK set to the output directory without creating the final archive.
-     * Important: if this mode is used, the caller should still provide a "apks file" as the output
-     * file parameter. This is because there is a lots of validation here that assumes that. The
-     * command will return the directory where the APK files were copied to.
+     *
+     * @deprecated use {@link Builder#setOutputFormat} instead.
      */
-    public abstract Builder setCreateApkSetArchive(boolean value);
+    @Deprecated
+    public Builder setCreateApkSetArchive(boolean createApkSetArchive) {
+      return setOutputFormat(createApkSetArchive ? APK_SET : DIRECTORY);
+    }
 
 
     /**
@@ -401,6 +442,8 @@ public abstract class BuildApksCommand {
     /** If present, will replace the version of the asset modules with the provided value. */
     public abstract Builder setAssetModulesVersionOverride(long value);
 
+    public abstract Builder setEnableNewApkSerializer(boolean enabled);
+
     abstract BuildApksCommand autoBuild();
 
     public BuildApksCommand build() {
@@ -429,7 +472,7 @@ public abstract class BuildApksCommand {
       }
 
       if (command.getDeviceSpec().isPresent()) {
-        boolean supportsPartialDeviceSpecs = command.getApkBuildMode().isAnySystemMode();
+        boolean supportsPartialDeviceSpecs = command.getApkBuildMode().equals(SYSTEM);
         DeviceSpecParser.validateDeviceSpec(
             command.getDeviceSpec().get(), /* canSkipFields= */ supportsPartialDeviceSpecs);
 
@@ -441,14 +484,13 @@ public abstract class BuildApksCommand {
                     UNIVERSAL.getLowerCaseName())
                 .build();
           case SYSTEM:
-          case SYSTEM_COMPRESSED:
             DeviceSpec deviceSpec = command.getDeviceSpec().get();
             if (deviceSpec.getScreenDensity() == 0 || deviceSpec.getSupportedAbisList().isEmpty()) {
               throw InvalidCommandException.builder()
                   .withInternalMessage(
                       "Device spec must have screen density and ABIs set when running with "
-                          + "'%s' or '%s' mode flag. ",
-                      SYSTEM.getLowerCaseName(), SYSTEM_COMPRESSED.getLowerCaseName())
+                          + "'%s' mode flag. ",
+                      SYSTEM.getLowerCaseName())
                   .build();
             }
             break;
@@ -457,11 +499,11 @@ public abstract class BuildApksCommand {
           case PERSISTENT:
         }
       } else {
-        if (command.getApkBuildMode().isAnySystemMode()) {
+        if (command.getApkBuildMode().equals(SYSTEM)) {
           throw InvalidCommandException.builder()
               .withInternalMessage(
-                  "Device spec must always be set when running with '%s' or '%s' mode flag.",
-                  SYSTEM.getLowerCaseName(), SYSTEM_COMPRESSED.getLowerCaseName())
+                  "Device spec must always be set when running with '%s' mode flag.",
+                  SYSTEM.getLowerCaseName())
               .build();
         }
       }
@@ -479,7 +521,17 @@ public abstract class BuildApksCommand {
             .build();
       }
 
-      if (command.getCreateApkSetArchive()) {
+      if (command.getDeviceTier().isPresent()
+          && !command.getGenerateOnlyForConnectedDevice()
+          && !command.getDeviceSpec().isPresent()) {
+        throw InvalidCommandException.builder()
+            .withInternalMessage(
+                "Setting --device-tier requires using either the --connected-device or the"
+                    + " --device-spec flag.")
+            .build();
+      }
+
+      if (command.getOutputFormat().equals(APK_SET)) {
         if (!APK_SET_ARCHIVE_EXTENSION.equals(
             MoreFiles.getFileExtension(command.getOutputFile()))) {
           throw InvalidCommandException.builder()
@@ -491,14 +543,12 @@ public abstract class BuildApksCommand {
       }
 
       if (!command.getModules().isEmpty()
-          && !command.getApkBuildMode().isAnySystemMode()
+          && !command.getApkBuildMode().equals(SYSTEM)
           && !command.getApkBuildMode().equals(UNIVERSAL)) {
         throw InvalidCommandException.builder()
             .withInternalMessage(
-                "Modules can be only set when running with '%s', '%s' or '%s' mode flag.",
-                UNIVERSAL.getLowerCaseName(),
-                SYSTEM.getLowerCaseName(),
-                SYSTEM_COMPRESSED.getLowerCaseName())
+                "Modules can be only set when running with '%s' or '%s' mode flag.",
+                UNIVERSAL.getLowerCaseName(), SYSTEM.getLowerCaseName())
             .build();
       }
       return command;
@@ -521,6 +571,7 @@ public abstract class BuildApksCommand {
             .setOutputPrintStream(out);
 
     // Optional arguments.
+    OUTPUT_FORMAT_FLAG.getValue(flags).ifPresent(buildApksCommand::setOutputFormat);
     OVERWRITE_OUTPUT_FLAG.getValue(flags).ifPresent(buildApksCommand::setOverwriteOutput);
     AAPT2_PATH_FLAG
         .getValue(flags)
@@ -561,7 +612,7 @@ public abstract class BuildApksCommand {
     }
 
     ApkBuildMode apkBuildMode = BUILD_MODE_FLAG.getValue(flags).orElse(DEFAULT);
-    boolean supportsPartialDeviceSpecs = apkBuildMode.isAnySystemMode();
+    boolean supportsPartialDeviceSpecs = apkBuildMode.equals(SYSTEM);
 
     Function<Path, DeviceSpec> deviceSpecParser =
         supportsPartialDeviceSpecs
@@ -569,7 +620,7 @@ public abstract class BuildApksCommand {
             : DeviceSpecParser::parseDeviceSpec;
 
     Optional<ImmutableSet<SystemApkOption>> systemApkOptions = SYSTEM_APK_OPTIONS.getValue(flags);
-    if (systemApkOptions.isPresent() && !apkBuildMode.isAnySystemMode()) {
+    if (systemApkOptions.isPresent() && !apkBuildMode.equals(SYSTEM)) {
       throw InvalidCommandException.builder()
           .withInternalMessage(
               "'%s' flag is available in system mode only.", SYSTEM_APK_OPTIONS.getName())
@@ -581,6 +632,7 @@ public abstract class BuildApksCommand {
         .getValue(flags)
         .map(deviceSpecParser)
         .ifPresent(buildApksCommand::setDeviceSpec);
+    DEVICE_TIER_FLAG.getValue(flags).ifPresent(buildApksCommand::setDeviceTier);
     MODULES_FLAG.getValue(flags).ifPresent(buildApksCommand::setModules);
     VERBOSE_FLAG.getValue(flags).ifPresent(buildApksCommand::setVerbose);
 
@@ -592,47 +644,66 @@ public abstract class BuildApksCommand {
   public Path execute() {
     validateInput();
 
-    Path outputDirectory = getCreateApkSetArchive() ? getOutputFile().getParent() : getOutputFile();
+    Path outputDirectory =
+        getOutputFormat().equals(APK_SET) ? getOutputFile().getParent() : getOutputFile();
     if (outputDirectory != null && Files.notExists(outputDirectory)) {
       logger.info("Output directory '" + outputDirectory + "' does not exist, creating it.");
       FileUtils.createDirectories(outputDirectory);
     }
 
-    try (TempDirectory tempDir = new TempDirectory();
-        ZipFile bundleZip = new ZipFile(getBundlePath().toFile())) {
-      AppBundleValidator bundleValidator = AppBundleValidator.create(getExtraValidators());
-      bundleValidator.validateFile(bundleZip);
+    try (TempDirectory tempDir = new TempDirectory(getClass().getSimpleName())) {
+      Path bundlePath;
+      // The new APK serializer relies on the compression of entries in the App Bundle.
+      // Unfortunately, we don't know the compression level that was used when the bundle was built,
+      // so we re-compress all entries with our desired compression level.
+      // Exception is made when the device spec is specified, we only need a fraction of the
+      // entries, so re-compressing all entries would be a waste of CPU.
+      boolean recompressAppBundle = getEnableNewApkSerializer() && !getDeviceSpec().isPresent();
+      if (recompressAppBundle) {
+        bundlePath = tempDir.getPath().resolve("recompressed.aab");
+        new AppBundleRecompressor(getExecutorService())
+            .recompressAppBundle(getBundlePath().toFile(), bundlePath.toFile());
+      } else {
+        bundlePath = getBundlePath();
+      }
 
-      AppBundle appBundle = AppBundle.buildFromZip(bundleZip);
-      bundleValidator.validate(appBundle);
+      try (ZipFile bundleZip = new ZipFile(bundlePath.toFile());
+          ZipReader zipReader = ZipReader.createFromFile(bundlePath)) {
+        AppBundleValidator bundleValidator = AppBundleValidator.create(getExtraValidators());
+        bundleValidator.validateFile(bundleZip);
 
-      AppBundlePreprocessorManager appBundlePreprocessorManager =
-          DaggerAppBundlePreprocessorComponent.builder()
-              .setBuildApksCommand(this)
-              .setBundleZip(bundleZip)
-              .build()
-              .create();
-      AppBundle preprocessedAppBundle = appBundlePreprocessorManager.processAppBundle(appBundle);
+        AppBundle appBundle = AppBundle.buildFromZip(bundleZip);
+        bundleValidator.validate(appBundle);
 
-      BuildApksManager buildApksManager =
-          DaggerBuildApksManagerComponent.builder()
-              .setBuildApksCommand(this)
-              .setTempDirectory(tempDir)
-              .setAppBundle(preprocessedAppBundle)
-              .build()
-              .create();
-      buildApksManager.execute();
-    } catch (ZipException e) {
-      throw InvalidBundleException.builder()
-          .withCause(e)
-          .withUserMessage("The App Bundle is not a valid zip file.")
-          .build();
+        AppBundlePreprocessorManager appBundlePreprocessorManager =
+            DaggerAppBundlePreprocessorComponent.builder()
+                .setBuildApksCommand(this)
+                .build()
+                .create();
+        AppBundle preprocessedAppBundle = appBundlePreprocessorManager.processAppBundle(appBundle);
+
+        BuildApksManager buildApksManager =
+            DaggerBuildApksManagerComponent.builder()
+                .setBuildApksCommand(this)
+                .setTempDirectory(tempDir)
+                .setAppBundle(preprocessedAppBundle)
+                .setZipReader(zipReader)
+                .setUseBundleCompression(recompressAppBundle)
+                .build()
+                .create();
+        buildApksManager.execute();
+      } catch (ZipException e) {
+        throw InvalidBundleException.builder()
+            .withCause(e)
+            .withUserMessage("The App Bundle is not a valid zip file.")
+            .build();
+      } finally {
+        if (isExecutorServiceCreatedByBundleTool()) {
+          getExecutorService().shutdown();
+        }
+      }
     } catch (IOException e) {
       throw new UncheckedIOException("An error occurred when processing the App Bundle.", e);
-    } finally {
-      if (isExecutorServiceCreatedByBundleTool()) {
-        getExecutorService().shutdown();
-      }
     }
 
     return getOutputFile();
@@ -641,8 +712,21 @@ public abstract class BuildApksCommand {
   private void validateInput() {
     checkFileExistsAndReadable(getBundlePath());
 
-    if (getCreateApkSetArchive() && !getOverwriteOutput()) {
-      checkFileDoesNotExist(getOutputFile());
+    switch (getOutputFormat()) {
+      case APK_SET:
+        if (!getOverwriteOutput()) {
+          checkFileDoesNotExist(getOutputFile());
+        }
+        break;
+      case DIRECTORY:
+        if (getOverwriteOutput()) {
+          throw InvalidCommandException.builder()
+              .withInternalMessage(
+                  "'%s' flag is not supported for '%s' output format.",
+                  OVERWRITE_OUTPUT_FLAG.getName(), DIRECTORY)
+              .build();
+        }
+        break;
     }
 
     if (getGenerateOnlyForConnectedDevice()) {
@@ -687,7 +771,22 @@ public abstract class BuildApksCommand {
             FlagDescription.builder()
                 .setFlagName(OUTPUT_FILE_FLAG.getName())
                 .setExampleValue("output.apks")
-                .setDescription("Path to where the APK Set archive should be created.")
+                .setDescription(
+                    "Path to where the APK Set archive should be created (default) or path to the"
+                        + " directory where generated APKs should be stored when flag --%s is set"
+                        + " to '%s'.",
+                    OUTPUT_FORMAT_FLAG.getName(), DIRECTORY)
+                .build())
+        .addFlag(
+            FlagDescription.builder()
+                .setFlagName(OUTPUT_FORMAT_FLAG.getName())
+                .setExampleValue(joinFlagOptions(OutputFormat.values()))
+                .setOptional(true)
+                .setDescription(
+                    "Specifies output format for generated APKs. If set to '%s' outputs APKs into"
+                        + " the created APK Set archive (default). If set to '%s' outputs APKs"
+                        + " into the specified directory.",
+                    APK_SET, DIRECTORY)
                 .build())
         .addFlag(
             FlagDescription.builder()
@@ -711,15 +810,12 @@ public abstract class BuildApksCommand {
                     "Specifies which mode to run '%s' command against. Acceptable values are '%s'. "
                         + "If not set or set to '%s' we generate split, standalone and instant "
                         + "APKs. If set to '%s' we generate universal APK. If set to '%s' we "
-                        + "generate APKs for system image. If set to '%s' we generate compressed "
-                        + "APK and an additional uncompressed stub APK (containing only Android "
-                        + "manifest) for the system image.",
+                        + "generate APKs for system image.",
                     BuildApksCommand.COMMAND_NAME,
                     joinFlagOptions(ApkBuildMode.values()),
                     DEFAULT.getLowerCaseName(),
                     UNIVERSAL.getLowerCaseName(),
-                    SYSTEM.getLowerCaseName(),
-                    SYSTEM_COMPRESSED.getLowerCaseName())
+                    SYSTEM.getLowerCaseName())
                 .build())
         .addFlag(
             FlagDescription.builder()
@@ -833,15 +929,24 @@ public abstract class BuildApksCommand {
                 .build())
         .addFlag(
             FlagDescription.builder()
+                .setFlagName(DEVICE_TIER_FLAG.getName())
+                .setExampleValue("low")
+                .setOptional(true)
+                .setDescription(
+                    "Device tier to use for APK matching. This flag should be only be set with"
+                        + " --%s or --%s flags. If a device spec with a device tier is provided,"
+                        + " the value specified here will override the value set in the device"
+                        + " spec.",
+                    DEVICE_SPEC_FLAG.getName(), CONNECTED_DEVICE_FLAG.getName())
+                .build())
+        .addFlag(
+            FlagDescription.builder()
                 .setFlagName(MODULES_FLAG.getName())
                 .setExampleValue("base,module1,module2")
                 .setOptional(true)
                 .setDescription(
-                    "List of module names to include in the generated APK Set in modes %s, %s and "
-                        + "%s.",
-                    UNIVERSAL.getLowerCaseName(),
-                    SYSTEM.getLowerCaseName(),
-                    SYSTEM_COMPRESSED.getLowerCaseName())
+                    "List of module names to include in the generated APK Set in modes %s and %s.",
+                    UNIVERSAL.getLowerCaseName(), SYSTEM.getLowerCaseName())
                 .build())
         .addFlag(
             FlagDescription.builder()
@@ -869,6 +974,55 @@ public abstract class BuildApksCommand {
                 .setOptional(true)
                 .setDescription(
                     "If set, a stamp will be generated and embedded in the generated APKs.")
+                .build())
+        .addFlag(
+            FlagDescription.builder()
+                .setFlagName(STAMP_KEYSTORE_FLAG.getName())
+                .setExampleValue("path/to/keystore")
+                .setOptional(true)
+                .setDescription(
+                    "Path to the stamp keystore that should be used to sign the APK contents hash."
+                        + " If not set, the '%s' keystore will be tried if present. Otherwise, the"
+                        + " default debug keystore will be used if it exists. If a default debug"
+                        + " keystore is not found, the stamp will fail to get generated. If"
+                        + " set, the flag '%s' must also be set.",
+                    KEYSTORE_FLAG, STAMP_KEY_ALIAS_FLAG)
+                .build())
+        .addFlag(
+            FlagDescription.builder()
+                .setFlagName(STAMP_KEYSTORE_PASSWORD_FLAG.getName())
+                .setExampleValue("[pass|file]:value")
+                .setOptional(true)
+                .setDescription(
+                    "Password of the stamp keystore to use to sign the APK contents hash. If"
+                        + " provided, must be prefixed with either 'pass:' (if the password is"
+                        + " passed in clear text, e.g. 'pass:qwerty') or 'file:' (if the password"
+                        + " is the first line of a file, e.g. 'file:/tmp/myPassword.txt'). If this"
+                        + " flag is not set, the password will be requested on the prompt.")
+                .build())
+        .addFlag(
+            FlagDescription.builder()
+                .setFlagName(STAMP_KEY_ALIAS_FLAG.getName())
+                .setExampleValue("stamp-key-alias")
+                .setOptional(true)
+                .setDescription(
+                    "Alias of the stamp key to use in the keystore to sign the APK contents hash."
+                        + " If not set, the '%s' key alias will be tried if present.",
+                    KEY_ALIAS_FLAG)
+                .build())
+        .addFlag(
+            FlagDescription.builder()
+                .setFlagName(STAMP_KEY_PASSWORD_FLAG.getName())
+                .setExampleValue("stamp-key-password")
+                .setOptional(true)
+                .setDescription(
+                    "Password of the stamp key in the keystore to use to sign the APK contents"
+                        + " hash. if provided, must be prefixed with either 'pass:' (if the"
+                        + " password is passed in clear text, e.g. 'pass:qwerty') or 'file:' (if"
+                        + " the password is the first line of a file, e.g."
+                        + " 'file:/tmp/myPassword.txt'). If this flag is not set, the keystore"
+                        + " password will be tried. If that fails, the password will be requested"
+                        + " on the prompt.")
                 .build())
         .addFlag(
             FlagDescription.builder()

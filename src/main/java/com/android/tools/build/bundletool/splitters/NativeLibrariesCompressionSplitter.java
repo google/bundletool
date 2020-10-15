@@ -28,7 +28,6 @@ import static com.google.common.collect.ImmutableSet.toImmutableSet;
 import com.android.bundle.Files.TargetedNativeDirectory;
 import com.android.tools.build.bundletool.model.ModuleEntry;
 import com.android.tools.build.bundletool.model.ModuleSplit;
-import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableCollection;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
@@ -39,11 +38,6 @@ import java.util.List;
 public final class NativeLibrariesCompressionSplitter implements ModuleSplitSplitter {
 
   private final ApkGenerationConfiguration apkGenerationConfiguration;
-
-  @VisibleForTesting
-  NativeLibrariesCompressionSplitter() {
-    this(ApkGenerationConfiguration.getDefaultInstance());
-  }
 
   public NativeLibrariesCompressionSplitter(ApkGenerationConfiguration apkGenerationConfiguration) {
     this.apkGenerationConfiguration = apkGenerationConfiguration;
@@ -69,8 +63,7 @@ public final class NativeLibrariesCompressionSplitter implements ModuleSplitSpli
         moduleSplit.getNativeConfig().get().getDirectoryList();
 
     ImmutableSet<ModuleEntry> libraryEntries =
-        allTargetedDirectories
-            .stream()
+        allTargetedDirectories.stream()
             .flatMap(directory -> moduleSplit.findEntriesUnderPath(directory.getPath()))
             .collect(toImmutableSet());
 
@@ -83,6 +76,11 @@ public final class NativeLibrariesCompressionSplitter implements ModuleSplitSpli
   }
 
   private boolean supportUncompressedNativeLibs(ModuleSplit moduleSplit) {
+    // If uncompressed native libraries are disabled for bundle we should compress them for all
+    // variants.
+    if (!apkGenerationConfiguration.getEnableUncompressedNativeLibraries()) {
+      return false;
+    }
     // Instant apps support uncompressed native libs since Android L.
     if (apkGenerationConfiguration.isForInstantAppVariants()) {
       return true;
@@ -128,9 +126,7 @@ public final class NativeLibrariesCompressionSplitter implements ModuleSplitSpli
       boolean forceUncompressed) {
 
     ImmutableSet<ModuleEntry> nonLibraryEntries =
-        moduleSplit
-            .getEntries()
-            .stream()
+        moduleSplit.getEntries().stream()
             .filter(entry -> !libraryEntries.contains(entry))
             .collect(toImmutableSet());
 
@@ -149,8 +145,7 @@ public final class NativeLibrariesCompressionSplitter implements ModuleSplitSpli
       ModuleSplit moduleSplit,
       ImmutableList<ModuleEntry> moduleEntries,
       boolean extractNativeLibs) {
-    return moduleSplit
-        .toBuilder()
+    return moduleSplit.toBuilder()
         .addMasterManifestMutator(withExtractNativeLibs(extractNativeLibs))
         .setEntries(moduleEntries)
         .build();

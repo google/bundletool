@@ -38,6 +38,7 @@ public class AdbCommandTest {
                 .putAll("foo", ImmutableList.of("foo1.apk", "foo2.apk"))
                 .putAll("bar", ImmutableList.of("bar.apex"))
                 .build(),
+            false,
             true,
             Optional.of(DEVICE_ID),
             new FakeCommandExecutor(
@@ -52,6 +53,28 @@ public class AdbCommandTest {
   }
 
   @Test
+  public void installMultiPackage_withDevice_withStaged() {
+    new DefaultAdbCommand(Paths.get("adb"))
+        .installMultiPackage(
+            ImmutableListMultimap.<String, String>builder()
+                .putAll("foo", ImmutableList.of("foo1.apk", "foo2.apk"))
+                .putAll("bar", ImmutableList.of("bar.apex"))
+                .build(),
+            true,
+            false,
+            Optional.of(DEVICE_ID),
+            new FakeCommandExecutor(
+                ImmutableList.of(
+                    "adb",
+                    "-s",
+                    DEVICE_ID,
+                    "install-multi-package",
+                    "--staged",
+                    "foo1.apk:foo2.apk",
+                    "bar.apex")));
+  }
+
+  @Test
   public void installMultiPackage_withoutDevice_withoutRollback() {
     new DefaultAdbCommand(Paths.get("adb"))
         .installMultiPackage(
@@ -59,6 +82,7 @@ public class AdbCommandTest {
                 .putAll("foo", ImmutableList.of("foo1.apk", "foo2.apk"))
                 .putAll("bar", ImmutableList.of("bar.apex"))
                 .build(),
+            false,
             false,
             Optional.empty(),
             new FakeCommandExecutor(

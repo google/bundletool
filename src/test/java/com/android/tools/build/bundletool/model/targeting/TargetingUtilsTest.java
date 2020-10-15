@@ -16,16 +16,10 @@
 
 package com.android.tools.build.bundletool.model.targeting;
 
-import static com.android.bundle.Targeting.TextureCompressionFormat.TextureCompressionFormatAlias.ATC;
-import static com.android.bundle.Targeting.TextureCompressionFormat.TextureCompressionFormatAlias.ETC1_RGB8;
 import static com.android.tools.build.bundletool.model.targeting.TargetingUtils.containsDeviceTierTargeting;
-import static com.android.tools.build.bundletool.model.targeting.TargetingUtils.excludeAssetsTargetingOtherValue;
 import static com.android.tools.build.bundletool.model.targeting.TargetingUtils.getMaxSdk;
 import static com.android.tools.build.bundletool.model.targeting.TargetingUtils.getMinSdk;
-import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifest;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.abiTargeting;
-import static com.android.tools.build.bundletool.testing.TargetingUtils.alternativeTextureCompressionTargeting;
-import static com.android.tools.build.bundletool.testing.TargetingUtils.assets;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.assetsDirectoryTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.deviceTierTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.graphicsApiTargeting;
@@ -34,24 +28,17 @@ import static com.android.tools.build.bundletool.testing.TargetingUtils.mergeAss
 import static com.android.tools.build.bundletool.testing.TargetingUtils.openGlVersionFrom;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.sdkVersionFrom;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.sdkVersionTargeting;
-import static com.android.tools.build.bundletool.testing.TargetingUtils.targetedAssetsDirectory;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.textureCompressionTargeting;
-import static com.android.tools.build.bundletool.testing.TestUtils.createModuleEntryForFile;
 import static com.google.common.truth.Truth.assertThat;
 import static com.google.common.truth.extensions.proto.ProtoTruth.assertThat;
 
 import com.android.bundle.Targeting.Abi.AbiAlias;
-import com.android.bundle.Targeting.ApkTargeting;
 import com.android.bundle.Targeting.AssetsDirectoryTargeting;
 import com.android.bundle.Targeting.SdkVersion;
 import com.android.bundle.Targeting.SdkVersionTargeting;
 import com.android.bundle.Targeting.TextureCompressionFormat.TextureCompressionFormatAlias;
 import com.android.bundle.Targeting.VariantTargeting;
-import com.android.tools.build.bundletool.model.AndroidManifest;
-import com.android.tools.build.bundletool.model.BundleModuleName;
-import com.android.tools.build.bundletool.model.ModuleSplit;
 import com.android.tools.build.bundletool.model.ZipPath;
-import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Range;
 import org.junit.Test;
@@ -60,8 +47,6 @@ import org.junit.runners.JUnit4;
 
 @RunWith(JUnit4.class)
 public class TargetingUtilsTest {
-
-  private static final byte[] DUMMY_CONTENT = new byte[1];
 
   @Test
   public void getDimensions_noDimension() {
@@ -235,52 +220,6 @@ public class TargetingUtilsTest {
         .isEqualTo(Integer.MAX_VALUE);
   }
 
-  @Test
-  public void excludeAssetsTargetingOtherValue_variousTargeting() {
-    ModuleSplit split =
-        ModuleSplit.builder()
-            // Unrelevant, default values for a split:
-            .setModuleName(BundleModuleName.create("base"))
-            .setApkTargeting(ApkTargeting.getDefaultInstance())
-            .setVariantTargeting(VariantTargeting.getDefaultInstance())
-            .setAndroidManifest(AndroidManifest.create(androidManifest("com.test.app")))
-            .setMasterSplit(true)
-            // Create entries for assets and their associated assets config with some targeting:
-            .setEntries(
-                ImmutableList.of(
-                    createModuleEntryForFile(
-                        "assets/textures/untargeted_texture.dat", DUMMY_CONTENT),
-                    createModuleEntryForFile(
-                        "assets/textures#tcf_etc1/etc1_texture.dat", DUMMY_CONTENT),
-                    createModuleEntryForFile(
-                        "assets/textures#tcf_atc/atc_texture.dat", DUMMY_CONTENT)))
-            .setAssetsConfig(
-                assets(
-                    targetedAssetsDirectory(
-                        "assets/textures",
-                        assetsDirectoryTargeting(
-                            alternativeTextureCompressionTargeting(ETC1_RGB8))),
-                    targetedAssetsDirectory(
-                        "assets/textures#tcf_etc1",
-                        assetsDirectoryTargeting(textureCompressionTargeting(ETC1_RGB8))),
-                    targetedAssetsDirectory(
-                        "assets/textures#tcf_atc",
-                        assetsDirectoryTargeting(textureCompressionTargeting(ATC)))))
-            .build();
-
-    ModuleSplit assetsRemovedSplit =
-        excludeAssetsTargetingOtherValue(
-            split, TargetingDimension.TEXTURE_COMPRESSION_FORMAT, "etc1");
-
-    // Check that the ATC and untargeted sibling folders have been excluded
-    assertThat(assetsRemovedSplit.getEntries()).hasSize(1);
-    assertThat((Object) assetsRemovedSplit.getEntries().get(0).getPath())
-        .isEqualTo(ZipPath.create("assets/textures#tcf_etc1/etc1_texture.dat"));
-
-    assertThat(assetsRemovedSplit.getAssetsConfig().get().getDirectoryCount()).isEqualTo(1);
-    assertThat(assetsRemovedSplit.getAssetsConfig().get().getDirectory(0).getPath())
-        .isEqualTo("assets/textures#tcf_etc1");
-  }
 
   @Test
   public void containsDeviceTierTargeting_noDeviceTierTargeting() {

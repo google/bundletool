@@ -36,6 +36,11 @@ public abstract class BundleMetadata {
 
   public static final String MAIN_DEX_LIST_FILE_NAME = "mainDexList.txt";
 
+  /** Namespaced directory where the proguard map, if any, is stored. */
+  public static final String OBFUSCATION_NAMESPACE = "com.android.tools.build.obfuscation";
+
+  public static final String PROGUARD_MAP_FILE_NAME = "proguard.map";
+
   /**
    * Returns the raw metadata map.
    *

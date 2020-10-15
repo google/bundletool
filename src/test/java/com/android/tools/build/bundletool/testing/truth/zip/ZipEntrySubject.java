@@ -40,6 +40,8 @@ public class ZipEntrySubject extends Subject {
    */
   private static final long EXTENDED_DOS_TIME_EPOCH_START_TIMESTAMP = 312768000000L;
 
+  private static final long ZIPFLINGER_ZIP_TIMESTAMP = 347158862000L;
+
   private final ZipEntry actual;
   private InputStream zip;
 
@@ -95,20 +97,22 @@ public class ZipEntrySubject extends Subject {
     // Zip files internally use extended DOS time.
     assertWithMessage("File \"%s\" in zip file does not have the expected time", actual)
         .that(fromLocalTimeToUtc(actual.getTime()))
-        .isEqualTo(EXTENDED_DOS_TIME_EPOCH_START_TIMESTAMP);
+        .isAnyOf(EXTENDED_DOS_TIME_EPOCH_START_TIMESTAMP, ZIPFLINGER_ZIP_TIMESTAMP);
     return this;
   }
 
   public ZipEntrySubject thatIsCompressed() {
     if (actual.getMethod() != ZipEntry.DEFLATED) {
-      failWithActual(simpleFact("expected to be compressed in the zip file."));
+      failWithoutActual(
+          simpleFact("expected to be compressed in the zip file but was uncompressed."));
     }
     return this;
   }
 
   public ZipEntrySubject thatIsUncompressed() {
     if (actual.getMethod() != ZipEntry.STORED) {
-      failWithActual(simpleFact("expected to be uncompressed in the zip file."));
+      failWithoutActual(
+          simpleFact("expected to be uncompressed in the zip file but was compressed."));
     }
     return this;
   }

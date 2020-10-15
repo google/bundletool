@@ -154,6 +154,19 @@ public class InstallMultiApksCommandTest {
   }
 
   @Test
+  public void fromFlags_staged() {
+    Path zipFile = tmpDir.resolve("container.zip");
+
+    InstallMultiApksCommand fromFlags =
+        InstallMultiApksCommand.fromFlags(
+            new FlagParser().parse("--staged", "--apks-zip=" + zipFile),
+            systemEnvironmentProvider,
+            fakeServerOneDevice(qDeviceWithLocales("en-US")));
+
+    assertThat(fromFlags.getStaged()).isTrue();
+  }
+
+  @Test
   public void fromFlags_deviceId() {
     Path zipFile = tmpDir.resolve("container.zip");
 
@@ -259,7 +272,8 @@ public class InstallMultiApksCommandTest {
                             Paths.get(PKG_NAME_2, PKG_NAME_2 + "feature1-master.apk").toString(),
                             Paths.get(PKG_NAME_2, PKG_NAME_2 + "feature2-master.apk").toString())
                         .build(),
-                    false,
+                    /* expectedStaged= */ false,
+                    /* expectedEnableRollback= */ false,
                     Optional.of(DEVICE_ID)))
             .build();
 
@@ -307,7 +321,8 @@ public class InstallMultiApksCommandTest {
             .setAdbCommand(
                 createFakeAdbCommand(
                     expectedInstallApks(PKG_NAME_1, tableOfContent1),
-                    false,
+                    /* expectedStaged= */ false,
+                    /* expectedEnableRollback= */ false,
                     Optional.of(DEVICE_ID)))
             .build();
 
@@ -363,7 +378,8 @@ public class InstallMultiApksCommandTest {
             .setAdbCommand(
                 createFakeAdbCommand(
                     expectedInstallApks(PKG_NAME_2, apexTableOfContents),
-                    false,
+                    /* expectedStaged= */ false,
+                    /* expectedEnableRollback= */ false,
                     Optional.of(DEVICE_ID)))
             .build();
 
@@ -403,7 +419,11 @@ public class InstallMultiApksCommandTest {
                         PKG_NAME_2, 2L)))
             .setAdbCommand(
                 // EXPECT that execute will not be called
-                createFakeAdbCommand(ImmutableListMultimap.of(), false, Optional.of(DEVICE_ID)))
+                createFakeAdbCommand(
+                    ImmutableListMultimap.of(),
+                    /* expectedStaged= */ false,
+                    /* expectedEnableRollback= */ false,
+                    Optional.of(DEVICE_ID)))
             .build();
 
     // EXPECT no further commands to be executed.
@@ -444,7 +464,11 @@ public class InstallMultiApksCommandTest {
             .setAapt2Command(createFakeAapt2Command(ImmutableMap.of(PKG_NAME_1, 1L)))
             .setAdbCommand(
                 // EXPECT that execute will not be called
-                createFakeAdbCommand(ImmutableListMultimap.of(), false, Optional.of(DEVICE_ID)))
+                createFakeAdbCommand(
+                    ImmutableListMultimap.of(),
+                    /* expectedStaged= */ false,
+                    /* expectedEnableRollback= */ false,
+                    Optional.of(DEVICE_ID)))
             .build();
 
     // EXPECT to check the existing list of packages...
@@ -486,7 +510,10 @@ public class InstallMultiApksCommandTest {
             .setAapt2Command(aapt2Command)
             .setAdbCommand(
                 createFakeAdbCommand(
-                    expectedInstallApks(PKG_NAME_2, tableOfContents2), false, Optional.empty()))
+                    expectedInstallApks(PKG_NAME_2, tableOfContents2),
+                    /* expectedStaged= */ false,
+                    /* expectedEnableRollback= */ false,
+                    Optional.empty()))
             .build();
 
     // EXPECT the command to skip the incompatible package.
@@ -518,7 +545,8 @@ public class InstallMultiApksCommandTest {
                         .putAll(expectedInstallApks(PKG_NAME_1, tableOfContents1))
                         .putAll(expectedInstallApks(PKG_NAME_2, tableOfContents2))
                         .build(),
-                    false,
+                    /* expectedStaged= */ false,
+                    /* expectedEnableRollback= */ false,
                     Optional.of(DEVICE_ID)))
             .build();
 
@@ -552,7 +580,8 @@ public class InstallMultiApksCommandTest {
                 // EXPECT only the higher version package to be installed.
                 createFakeAdbCommand(
                     expectedInstallApks(PKG_NAME_2, tableOfContents2),
-                    false,
+                    /* expectedStaged= */ false,
+                    /* expectedEnableRollback= */ false,
                     Optional.of(DEVICE_ID)))
             .build();
 
@@ -596,7 +625,48 @@ public class InstallMultiApksCommandTest {
                 // EXPECT the --enable-rollback flag to be included.
                 createFakeAdbCommand(
                     expectedInstallApks(PKG_NAME_1, apexTableOfContents),
-                    true,
+                    /* expectedStaged= */ false,
+                    /* expectedEnableRollback= */ true,
+                    Optional.of(DEVICE_ID)))
+            .build();
+
+    givenEmptyListPackages(device);
+    command.execute();
+    assertAdbCommandExecuted();
+  }
+
+  @Test
+  public void execute_staged() throws Exception {
+    // GIVEN a fake .apks file with an .apex file.
+    BuildApksResult apexTableOfContents =
+        BuildApksResult.newBuilder()
+            .setPackageName(PKG_NAME_1)
+            .setBundletool(
+                Bundletool.newBuilder()
+                    .setVersion(BundleToolVersion.getCurrentVersion().toString()))
+            .addVariant(
+                apexVariant(
+                    VariantTargeting.getDefaultInstance(),
+                    ApkTargeting.getDefaultInstance(),
+                    ZipPath.create(PKG_NAME_1 + "base.apex")))
+            .build();
+    Path apksPath = createApksArchiveFile(apexTableOfContents, tmpDir.resolve("package1.apks"));
+
+    // GIVEN an install command with the --staged flag...
+    InstallMultiApksCommand command =
+        InstallMultiApksCommand.builder()
+            .setAdbServer(fakeServerOneDevice(device))
+            .setDeviceId(DEVICE_ID)
+            .setAdbPath(adbPath)
+            .setStaged(true)
+            .setApksArchivePaths(ImmutableList.of(apksPath))
+            .setAapt2Command(createFakeAapt2Command(ImmutableMap.of(PKG_NAME_1, 1L)))
+            .setAdbCommand(
+                // EXPECT the --staged flag to be included.
+                createFakeAdbCommand(
+                    expectedInstallApks(PKG_NAME_1, apexTableOfContents),
+                    /* expectedStaged= */ true,
+                    /* expectedEnableRollback= */ false,
                     Optional.of(DEVICE_ID)))
             .build();
 
@@ -685,30 +755,35 @@ public class InstallMultiApksCommandTest {
 
   private AdbCommand createFakeAdbCommand(
       ImmutableListMultimap<String, String> expectedApkToInstallByPackage,
+      boolean expectedStaged,
       boolean expectedEnableRollback,
       Optional<String> expectedDeviceId) {
     return new FakeAdbCommand(
-        expectedApkToInstallByPackage, expectedEnableRollback, expectedDeviceId);
+        expectedApkToInstallByPackage, expectedStaged, expectedEnableRollback, expectedDeviceId);
   }
 
   private class FakeAdbCommand implements AdbCommand {
     private final ImmutableListMultimap<String, String> expectedApkToInstallByPackage;
+    private final boolean expectedStaged;
     private final boolean expectedEnableRollback;
     private final Optional<String> expectedDeviceId;
 
     public FakeAdbCommand(
         ImmutableListMultimap<String, String> expectedApkToInstallByPackage,
+        boolean expectedStaged,
         boolean expectedEnableRollback,
         Optional<String> expectedDeviceId) {
       this.expectedApkToInstallByPackage =
           ImmutableListMultimap.copyOf(expectedApkToInstallByPackage);
       this.expectedEnableRollback = expectedEnableRollback;
       this.expectedDeviceId = expectedDeviceId;
+      this.expectedStaged = expectedStaged;
     }
 
     @Override
     public ImmutableList<String> installMultiPackage(
         ImmutableListMultimap<String, String> apkToInstallByPackage,
+        boolean staged,
         boolean enableRollback,
         Optional<String> deviceId) {
       adbCommandExecuted = true;
@@ -731,6 +806,7 @@ public class InstallMultiApksCommandTest {
                           .collect(toImmutableList())));
       assertThat(cleanApkToInstallByPackageBuilder.build())
           .isEqualTo(expectedApkToInstallByPackage);
+      assertThat(staged).isEqualTo(expectedStaged);
       assertThat(enableRollback).isEqualTo(expectedEnableRollback);
       assertThat(deviceId).isEqualTo(expectedDeviceId);
       return ImmutableList.of();

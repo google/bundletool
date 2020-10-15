@@ -20,6 +20,8 @@ import static com.android.tools.build.bundletool.model.utils.TargetingProtoUtils
 import static com.android.tools.build.bundletool.model.utils.TargetingProtoUtils.abiValues;
 import static com.android.tools.build.bundletool.model.utils.TargetingProtoUtils.densityUniverse;
 import static com.android.tools.build.bundletool.model.utils.TargetingProtoUtils.densityValues;
+import static com.android.tools.build.bundletool.model.utils.TargetingProtoUtils.deviceTierUniverse;
+import static com.android.tools.build.bundletool.model.utils.TargetingProtoUtils.deviceTierValues;
 import static com.android.tools.build.bundletool.model.utils.TargetingProtoUtils.languageUniverse;
 import static com.android.tools.build.bundletool.model.utils.TargetingProtoUtils.languageValues;
 import static com.android.tools.build.bundletool.model.utils.TargetingProtoUtils.multiAbiUniverse;
@@ -32,6 +34,7 @@ import com.android.bundle.Files.TargetedAssetsDirectory;
 import com.android.bundle.Targeting.Abi;
 import com.android.bundle.Targeting.AbiTargeting;
 import com.android.bundle.Targeting.ApkTargeting;
+import com.android.bundle.Targeting.DeviceTierTargeting;
 import com.android.bundle.Targeting.LanguageTargeting;
 import com.android.bundle.Targeting.MultiAbi;
 import com.android.bundle.Targeting.MultiAbiTargeting;
@@ -71,8 +74,14 @@ final class MergingUtils {
   /**
    * Merges two targetings into targeting of an APK shard.
    *
-   * <p>Expects that the input targetings have only ABI, screen density, language or texture
-   * compression format targeting.
+   * <p>Supports only the following targetings:
+   * <ul>
+   *   <li>ABI
+   *   <li>Screen density
+   *   <li>Language
+   *   <li>Texture compression format
+   *   <li>Device tier
+   * </ul>
    *
    * <p>If both targetings target a common dimension, then the targeted universe in that dimension
    * must be the same.
@@ -80,8 +89,8 @@ final class MergingUtils {
   public static ApkTargeting mergeShardTargetings(
       ApkTargeting targeting1, ApkTargeting targeting2) {
 
-    checkHasOnlyAbiDensityLanguageAndTcfTargeting(targeting1);
-    checkHasOnlyAbiDensityLanguageAndTcfTargeting(targeting2);
+    checkTargetingIsSupported(targeting1);
+    checkTargetingIsSupported(targeting2);
 
     ApkTargeting.Builder merged = ApkTargeting.newBuilder();
     if (targeting1.hasAbiTargeting() || targeting2.hasAbiTargeting()) {
@@ -104,6 +113,10 @@ final class MergingUtils {
           mergeTextureCompressionFormatTargetingsOf(targeting1, targeting2));
     }
 
+    if (targeting1.hasDeviceTierTargeting() || targeting2.hasDeviceTierTargeting()) {
+      merged.setDeviceTierTargeting(mergeDeviceTierTargetingsOf(targeting1, targeting2));
+    }
+
     return merged.build();
   }
 
@@ -124,7 +137,7 @@ final class MergingUtils {
     }
   }
 
-  private static void checkHasOnlyAbiDensityLanguageAndTcfTargeting(ApkTargeting targeting) {
+  private static void checkTargetingIsSupported(ApkTargeting targeting) {
     ApkTargeting targetingWithoutAbiDensityLanguageAndTcf =
         targeting.toBuilder()
             .clearAbiTargeting()
@@ -132,6 +145,7 @@ final class MergingUtils {
             .clearScreenDensityTargeting()
             .clearLanguageTargeting()
             .clearTextureCompressionFormatTargeting()
+            .clearDeviceTierTargeting()
             .build();
     if (!targetingWithoutAbiDensityLanguageAndTcf.equals(ApkTargeting.getDefaultInstance())) {
       throw CommandExecutionException.builder()
@@ -194,6 +208,17 @@ final class MergingUtils {
         Sets.union(
             textureCompressionFormatValues(targeting1), textureCompressionFormatValues(targeting2));
     return TextureCompressionFormatTargeting.newBuilder()
+        .addAllValue(values)
+        .addAllAlternatives(Sets.difference(universe, values))
+        .build();
+  }
+
+  private static DeviceTierTargeting mergeDeviceTierTargetingsOf(
+      ApkTargeting targeting1, ApkTargeting targeting2) {
+    Set<String> universe =
+        Sets.union(deviceTierUniverse(targeting1), deviceTierUniverse(targeting2));
+    Set<String> values = Sets.union(deviceTierValues(targeting1), deviceTierValues(targeting2));
+    return DeviceTierTargeting.newBuilder()
         .addAllValue(values)
         .addAllAlternatives(Sets.difference(universe, values))
         .build();

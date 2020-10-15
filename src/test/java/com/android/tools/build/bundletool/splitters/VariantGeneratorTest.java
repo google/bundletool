@@ -80,7 +80,7 @@ public class VariantGeneratorTest {
         variantGenerator.generateVariants(
             createSingleLibraryDexModule(),
             ApkGenerationConfiguration.builder()
-                .setEnableNativeLibraryCompressionSplitter(true)
+                .setEnableUncompressedNativeLibraries(true)
                 .build());
     assertThat(splits)
         .containsExactly(lPlusVariantTargeting(), variantMinSdkTargeting(ANDROID_M_API_VERSION));
@@ -107,7 +107,7 @@ public class VariantGeneratorTest {
             createSingleLibraryDexModule(),
             ApkGenerationConfiguration.builder()
                 .setEnableDexCompressionSplitter(true)
-                .setEnableNativeLibraryCompressionSplitter(true)
+                .setEnableUncompressedNativeLibraries(true)
                 .build());
     assertThat(splits)
         .containsExactly(
@@ -125,7 +125,7 @@ public class VariantGeneratorTest {
             createSingleLibraryDexModuleMinSdk(22),
             ApkGenerationConfiguration.builder()
                 .setEnableDexCompressionSplitter(true)
-                .setEnableNativeLibraryCompressionSplitter(true)
+                .setEnableUncompressedNativeLibraries(true)
                 .build());
     assertThat(splits)
         .containsExactly(
@@ -143,7 +143,7 @@ public class VariantGeneratorTest {
             createSingleLibraryDexModuleMinSdk(ANDROID_M_API_VERSION),
             ApkGenerationConfiguration.builder()
                 .setEnableDexCompressionSplitter(true)
-                .setEnableNativeLibraryCompressionSplitter(true)
+                .setEnableUncompressedNativeLibraries(true)
                 .build());
     assertThat(splits)
         .containsExactly(
@@ -160,7 +160,7 @@ public class VariantGeneratorTest {
             createSingleLibraryDexModuleMaxSdk(ANDROID_Q_API_VERSION - 1),
             ApkGenerationConfiguration.builder()
                 .setEnableDexCompressionSplitter(true)
-                .setEnableNativeLibraryCompressionSplitter(true)
+                .setEnableUncompressedNativeLibraries(true)
                 .build());
     assertThat(splits)
         .containsExactly(lPlusVariantTargeting(), variantMinSdkTargeting(ANDROID_M_API_VERSION));
@@ -176,7 +176,7 @@ public class VariantGeneratorTest {
                 ANDROID_M_API_VERSION - 1, ANDROID_M_API_VERSION + 1),
             ApkGenerationConfiguration.builder()
                 .setEnableDexCompressionSplitter(true)
-                .setEnableNativeLibraryCompressionSplitter(true)
+                .setEnableUncompressedNativeLibraries(true)
                 .build());
     assertThat(splits)
         .containsExactly(
@@ -208,7 +208,7 @@ public class VariantGeneratorTest {
             ApkGenerationConfiguration.builder()
                 .setForInstantAppVariants(true)
                 .setEnableDexCompressionSplitter(true)
-                .setEnableNativeLibraryCompressionSplitter(true)
+                .setEnableUncompressedNativeLibraries(true)
                 .build());
     assertThat(splits).containsExactly(lPlusVariantTargeting());
   }

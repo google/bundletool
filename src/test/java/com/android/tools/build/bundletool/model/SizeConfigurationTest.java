@@ -25,11 +25,13 @@ import static com.android.bundle.Targeting.TextureCompressionFormat.TextureCompr
 import static com.android.bundle.Targeting.TextureCompressionFormat.TextureCompressionFormatAlias.ETC2;
 import static com.android.bundle.Targeting.TextureCompressionFormat.TextureCompressionFormatAlias.PVRTC;
 import static com.android.tools.build.bundletool.model.SizeConfiguration.getAbiName;
+import static com.android.tools.build.bundletool.model.SizeConfiguration.getDeviceTierName;
 import static com.android.tools.build.bundletool.model.SizeConfiguration.getLocaleName;
 import static com.android.tools.build.bundletool.model.SizeConfiguration.getScreenDensityName;
 import static com.android.tools.build.bundletool.model.SizeConfiguration.getSdkName;
 import static com.android.tools.build.bundletool.model.SizeConfiguration.getTextureCompressionFormatName;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.abiTargeting;
+import static com.android.tools.build.bundletool.testing.TargetingUtils.deviceTierTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.languageTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.screenDensityTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.sdkVersionFrom;
@@ -43,6 +45,7 @@ import com.android.bundle.Targeting.LanguageTargeting;
 import com.android.bundle.Targeting.ScreenDensityTargeting;
 import com.android.bundle.Targeting.SdkVersionTargeting;
 import com.android.bundle.Targeting.TextureCompressionFormatTargeting;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -144,5 +147,15 @@ public class SizeConfigurationTest {
         () ->
             getTextureCompressionFormatName(
                 textureCompressionTargeting(ImmutableSet.of(ASTC, ETC2), ImmutableSet.of())));
+  }
+
+  @Test
+  public void getDeviceTier_singleDevicetierTargeting() {
+    assertThat(getDeviceTierName(deviceTierTargeting("low"))).hasValue("low");
+    assertThat(
+            getDeviceTierName(
+                deviceTierTargeting(
+                    /* value= */ "high", /* alternatives= */ ImmutableList.of("low"))))
+        .hasValue("high");
   }
 }

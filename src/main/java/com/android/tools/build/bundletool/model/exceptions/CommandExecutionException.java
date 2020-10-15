@@ -25,6 +25,10 @@ public class CommandExecutionException extends BundleToolException {
     super(ErrorType.COMMAND_EXECUTION_ERROR, userMessage, internalMessage, cause);
   }
 
+  public CommandExecutionException(String userMessage, String internalMessage) {
+    super(ErrorType.COMMAND_EXECUTION_ERROR, userMessage, internalMessage);
+  }
+
   public static InternalExceptionBuilder<? extends CommandExecutionException> builder() {
     return new InternalExceptionBuilder<>(CommandExecutionException::new);
   }

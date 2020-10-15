@@ -35,7 +35,7 @@ public abstract class ApkGenerationConfiguration {
 
   public abstract boolean isForInstantAppVariants();
 
-  public abstract boolean getEnableNativeLibraryCompressionSplitter();
+  public abstract boolean getEnableUncompressedNativeLibraries();
 
   public abstract boolean getEnableDexCompressionSplitter();
 
@@ -57,8 +57,7 @@ public abstract class ApkGenerationConfiguration {
   public abstract ImmutableSet<ResourceId> getBaseManifestReachableResources();
 
   /** The configuration of the suffixes for the different dimensions. */
-  public abstract ImmutableMap<OptimizationDimension, SuffixStripping>
-      getSuffixStrippings();
+  public abstract ImmutableMap<OptimizationDimension, SuffixStripping> getSuffixStrippings();
 
   public boolean shouldStripTargetingSuffix(OptimizationDimension dimension) {
     return getSuffixStrippings().containsKey(dimension)
@@ -73,7 +72,7 @@ public abstract class ApkGenerationConfiguration {
   public static Builder builder() {
     return new AutoValue_ApkGenerationConfiguration.Builder()
         .setForInstantAppVariants(false)
-        .setEnableNativeLibraryCompressionSplitter(false)
+        .setEnableUncompressedNativeLibraries(false)
         .setEnableDexCompressionSplitter(false)
         .setInstallableOnExternalStorage(false)
         .setAbisForPlaceholderLibs(ImmutableSet.of())
@@ -100,8 +99,8 @@ public abstract class ApkGenerationConfiguration {
 
     public abstract Builder setInstallableOnExternalStorage(boolean installableOnExternalStorage);
 
-    public abstract Builder setEnableNativeLibraryCompressionSplitter(
-        boolean enableNativeLibraryCompressionSplitter);
+    public abstract Builder setEnableUncompressedNativeLibraries(
+        boolean enableUncompressedNativeLibraries);
 
     public abstract Builder setEnableDexCompressionSplitter(boolean enableDexCompressionSplitter);
 

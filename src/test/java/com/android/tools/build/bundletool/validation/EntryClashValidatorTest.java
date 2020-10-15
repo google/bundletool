@@ -206,6 +206,26 @@ public class EntryClashValidatorTest {
   }
 
   @Test
+  public void entryNameCollision_theSameFileBetweenAssetModules_ok() throws Exception {
+    String fileName = "assets/file.txt";
+    byte[] fileContentA = {'a'};
+    BundleModule base =
+        new BundleModuleBuilder("base").setManifest(androidManifest("com.test.app")).build();
+    BundleModule assetModule1 =
+        new BundleModuleBuilder("assets1")
+            .addFile(fileName, fileContentA)
+            .setManifest(androidManifestForAssetModule("com.test.app"))
+            .build();
+    BundleModule assetModule2 =
+        new BundleModuleBuilder("assets2")
+            .addFile(fileName, fileContentA)
+            .setManifest(androidManifestForAssetModule("com.test.app"))
+            .build();
+    new EntryClashValidator()
+        .validateAllModules(ImmutableList.of(base, assetModule1, assetModule2));
+  }
+
+  @Test
   public void entryNameCollision_theSameFileBetweenBaseAndAssetModule_throws() throws Exception {
     String fileName = "assets/file.txt";
     byte[] fileContentA = {'a'};

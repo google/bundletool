@@ -31,7 +31,7 @@ import com.android.tools.build.bundletool.model.ModuleEntry;
 import com.android.tools.build.bundletool.model.ModuleSplit;
 import com.android.tools.build.bundletool.model.ZipPath;
 import com.android.tools.build.bundletool.model.targeting.TargetingDimension;
-import com.android.tools.build.bundletool.model.targeting.TargetingUtils;
+import com.android.tools.build.bundletool.shards.SuffixStripper;
 import com.google.common.base.Function;
 import com.google.common.collect.ImmutableCollection;
 import com.google.common.collect.ImmutableList;
@@ -119,7 +119,8 @@ public class AssetsDimensionSplitterFactory {
 
       private ModuleSplit removeAssetsTargeting(ModuleSplit split) {
         return targetingDimensionToRemove.isPresent()
-            ? TargetingUtils.removeAssetsTargeting(split, targetingDimensionToRemove.get())
+            ? SuffixStripper.createForDimension(targetingDimensionToRemove.get())
+                .removeAssetsTargeting(split)
             : split;
       }
 

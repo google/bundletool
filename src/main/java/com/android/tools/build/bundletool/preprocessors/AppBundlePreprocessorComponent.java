@@ -19,7 +19,6 @@ import com.android.tools.build.bundletool.commands.BuildApksCommand;
 import com.android.tools.build.bundletool.commands.CommandScoped;
 import dagger.BindsInstance;
 import dagger.Component;
-import java.util.zip.ZipFile;
 
 /** Dagger component to create a {@link AppBundlePreprocessorManager}. */
 @CommandScoped
@@ -34,8 +33,5 @@ public interface AppBundlePreprocessorComponent {
 
     @BindsInstance
     Builder setBuildApksCommand(BuildApksCommand command);
-
-    @BindsInstance
-    Builder setBundleZip(ZipFile bundleZip);
   }
 }

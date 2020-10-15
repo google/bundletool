@@ -15,6 +15,7 @@
  */
 package com.android.tools.build.bundletool.io;
 
+import static com.android.tools.build.bundletool.commands.BuildApksCommand.ApkBuildMode.SYSTEM;
 import static com.android.tools.build.bundletool.io.ConcurrencyUtils.waitForAll;
 import static com.android.tools.build.bundletool.model.utils.CollectorUtils.groupingByDeterministic;
 import static com.android.tools.build.bundletool.model.utils.CollectorUtils.groupingBySortedKeys;
@@ -38,6 +39,7 @@ import com.android.bundle.Commands.LocalTestingInfo;
 import com.android.bundle.Commands.Variant;
 import com.android.bundle.Config.AssetModulesConfig;
 import com.android.bundle.Config.Bundletool;
+import com.android.bundle.Config.SuffixStripping;
 import com.android.bundle.Devices.DeviceSpec;
 import com.android.bundle.Targeting.VariantTargeting;
 import com.android.tools.build.bundletool.commands.BuildApksCommand.ApkBuildMode;
@@ -57,9 +59,11 @@ import com.android.tools.build.bundletool.model.GeneratedAssetSlices;
 import com.android.tools.build.bundletool.model.ManifestDeliveryElement;
 import com.android.tools.build.bundletool.model.ModuleSplit;
 import com.android.tools.build.bundletool.model.ModuleSplit.SplitType;
+import com.android.tools.build.bundletool.model.OptimizationDimension;
 import com.android.tools.build.bundletool.model.VariantKey;
 import com.android.tools.build.bundletool.model.ZipPath;
 import com.android.tools.build.bundletool.model.version.BundleToolVersion;
+import com.android.tools.build.bundletool.optimizations.ApkOptimizations;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableListMultimap;
@@ -69,7 +73,6 @@ import com.google.common.util.concurrent.ListeningExecutorService;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
-import java.util.Collection;
 import java.util.Map.Entry;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -90,6 +93,7 @@ public class ApkSerializerManager {
   private final boolean verbose;
 
   private final ApkPathManager apkPathManager;
+  private final ApkOptimizations apkOptimizations;
 
   @Inject
   public ApkSerializerManager(
@@ -99,7 +103,8 @@ public class ApkSerializerManager {
       ListeningExecutorService executorService,
       @FirstVariantNumber Optional<Integer> firstVariantNumber,
       @VerboseLogs boolean verbose,
-      ApkPathManager apkPathManager) {
+      ApkPathManager apkPathManager,
+      ApkOptimizations apkOptimizations) {
     this.appBundle = appBundle;
     this.apkListener = apkListener.orElse(ApkListener.NO_OP);
     this.apkModifier = apkModifier.orElse(ApkModifier.NO_OP);
@@ -107,6 +112,7 @@ public class ApkSerializerManager {
     this.firstVariantNumber = firstVariantNumber.orElse(0);
     this.verbose = verbose;
     this.apkPathManager = apkPathManager;
+    this.apkOptimizations = apkOptimizations;
   }
 
   public void populateApkSetBuilder(
@@ -167,8 +173,9 @@ public class ApkSerializerManager {
     // Running with system APK mode generates a fused APK and additional unmatched language splits.
     // To avoid filtering of unmatched language splits we skip device filtering for system mode.
     Predicate<ModuleSplit> deviceFilter =
-        deviceSpec.isPresent() && !apkBuildMode.isAnySystemMode()
-            ? new ApkMatcher(deviceSpec.get())::matchesModuleSplitByTargeting
+        deviceSpec.isPresent() && !apkBuildMode.equals(SYSTEM)
+            ? new ApkMatcher(addDefaultDeviceTierIfNecessary(deviceSpec.get()))
+                ::matchesModuleSplitByTargeting
             : alwaysTrue();
 
     ImmutableListMultimap<VariantKey, ModuleSplit> splitsByVariant =
@@ -201,9 +208,7 @@ public class ApkSerializerManager {
 
     // After variant targeting of APKs are cleared, there might be duplicate APKs
     // which are removed and the distinct APKs are then serialized in parallel.
-    // Note: Only serializing compressed system APK produces multiple ApkDescriptions,
-    // i.e compressed and stub APK descriptions.
-    ImmutableMap<ModuleSplit, ImmutableList<ApkDescription>> apkDescriptionBySplit =
+    ImmutableMap<ModuleSplit, ApkDescription> apkDescriptionBySplit =
         finalSplitsByVariant.values().stream()
             .distinct()
             .collect(
@@ -235,7 +240,7 @@ public class ApkSerializerManager {
                 .setModuleMetadata(appBundle.getModule(moduleName).getModuleMetadata())
                 .addAllApkDescription(
                     splitsByModuleName.get(moduleName).stream()
-                        .flatMap(split -> apkDescriptionBySplit.get(split).stream())
+                        .map(apkDescriptionBySplit::get)
                         .collect(toImmutableList())));
       }
       variants.add(variant.build());
@@ -253,7 +258,8 @@ public class ApkSerializerManager {
 
     Predicate<ModuleSplit> deviceFilter =
         deviceSpec.isPresent()
-            ? new ApkMatcher(deviceSpec.get())::matchesModuleSplitByTargeting
+            ? new ApkMatcher(addDefaultDeviceTierIfNecessary(deviceSpec.get()))
+                ::matchesModuleSplitByTargeting
             : alwaysTrue();
 
     ApkSerializer apkSerializer = new ApkSerializer(apkListener, apkBuildMode);
@@ -275,8 +281,7 @@ public class ApkSerializerManager {
             .stream()
             .collect(
                 ImmutableListMultimap.flatteningToImmutableListMultimap(
-                    Entry::getKey,
-                    entry -> waitForAll(entry.getValue()).stream().flatMap(Collection::stream)));
+                    Entry::getKey, entry -> waitForAll(entry.getValue()).stream()));
     return generatedSlicesByModule.asMap().entrySet().stream()
         .map(
             entry ->
@@ -332,7 +337,6 @@ public class ApkSerializerManager {
                 && generatedApks.getSystemApks().isEmpty(),
             "Internal error: For universal APK expecting only standalone APKs.");
         break;
-      case SYSTEM_COMPRESSED:
       case SYSTEM:
         checkArgument(
             generatedApks.getSplitApks().isEmpty()
@@ -401,6 +405,25 @@ public class ApkSerializerManager {
     return DeliveryType.INSTALL_TIME;
   }
 
+  /**
+   * Adds a default device tier to the given {@link DeviceSpec} if it has none.
+   *
+   * <p>The default tier is taken from the optimization settings in the {@link
+   * com.android.bundle.Config.BundleConfig}.
+   */
+  private DeviceSpec addDefaultDeviceTierIfNecessary(DeviceSpec deviceSpec) {
+    if (!deviceSpec.getDeviceTier().isEmpty()) {
+      return deviceSpec;
+    }
+    Optional<SuffixStripping> deviceTierSuffix =
+        Optional.ofNullable(
+            apkOptimizations.getSuffixStrippings().get(OptimizationDimension.DEVICE_TIER));
+    if (!deviceTierSuffix.isPresent()) {
+      return deviceSpec;
+    }
+    return deviceSpec.toBuilder().setDeviceTier(deviceTierSuffix.get().getDefaultSuffix()).build();
+  }
+
   private final class ApkSerializer {
     private final ApkListener apkListener;
     private final ApkBuildMode apkBuildMode;
@@ -410,41 +433,37 @@ public class ApkSerializerManager {
       this.apkBuildMode = apkBuildMode;
     }
 
-    public ImmutableList<ApkDescription> serialize(
+    public ApkDescription serialize(
         ApkSetBuilder apkSetBuilder, ModuleSplit split, ZipPath apkPath) {
-      ImmutableList<ApkDescription> apkDescriptions;
+      ApkDescription apkDescription;
       switch (split.getSplitType()) {
         case INSTANT:
-          apkDescriptions = ImmutableList.of(apkSetBuilder.addInstantApk(split, apkPath));
+          apkDescription = apkSetBuilder.addInstantApk(split, apkPath);
           break;
         case SPLIT:
-          apkDescriptions = ImmutableList.of(apkSetBuilder.addSplitApk(split, apkPath));
+          apkDescription = apkSetBuilder.addSplitApk(split, apkPath);
           break;
         case SYSTEM:
           if (split.isBaseModuleSplit() && split.isMasterSplit()) {
-            apkDescriptions =
-                apkBuildMode.equals(ApkBuildMode.SYSTEM_COMPRESSED)
-                    ? apkSetBuilder.addCompressedSystemApks(split, apkPath)
-                    : ImmutableList.of(apkSetBuilder.addSystemApk(split, apkPath));
+            apkDescription = apkSetBuilder.addSystemApk(split, apkPath);
           } else {
-            apkDescriptions = ImmutableList.of(apkSetBuilder.addSplitApk(split, apkPath));
+            apkDescription = apkSetBuilder.addSplitApk(split, apkPath);
           }
           break;
         case STANDALONE:
-          apkDescriptions =
+          apkDescription =
               apkBuildMode.equals(ApkBuildMode.UNIVERSAL)
-                  ? ImmutableList.of(apkSetBuilder.addStandaloneUniversalApk(split))
-                  : ImmutableList.of(apkSetBuilder.addStandaloneApk(split, apkPath));
+                  ? apkSetBuilder.addStandaloneUniversalApk(split)
+                  : apkSetBuilder.addStandaloneApk(split, apkPath);
           break;
         case ASSET_SLICE:
-          apkDescriptions = ImmutableList.of(apkSetBuilder.addAssetSliceApk(split, apkPath));
+          apkDescription = apkSetBuilder.addAssetSliceApk(split, apkPath);
           break;
         default:
           throw new IllegalStateException("Unexpected splitType: " + split.getSplitType());
       }
 
-      // Notify apk listener.
-      apkDescriptions.forEach(apkListener::onApkFinalized);
+      apkListener.onApkFinalized(apkDescription);
 
       if (verbose) {
         System.out.printf(
@@ -454,7 +473,7 @@ public class ApkSerializerManager {
             split.getSplitType());
       }
 
-      return apkDescriptions;
+      return apkDescription;
     }
   }
 }

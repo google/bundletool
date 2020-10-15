@@ -152,6 +152,7 @@ public class Sharder {
                 split ->
                     split.getApkTargeting().toBuilder()
                         .clearTextureCompressionFormatTargeting()
+                        .clearDeviceTierTargeting()
                         .build()
                         .equals(ApkTargeting.getDefaultInstance())),
         "Master splits are expected to have default or Texture Compression Format only targeting.");

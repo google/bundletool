@@ -23,9 +23,11 @@ import static com.android.tools.build.bundletool.testing.TargetingUtils.abiTarge
 import static com.android.tools.build.bundletool.testing.TargetingUtils.apkAbiTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.apkAlternativeLanguageTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.apkDensityTargeting;
+import static com.android.tools.build.bundletool.testing.TargetingUtils.apkDeviceTierTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.apkLanguageTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.apkMinSdkTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.apkTextureTargeting;
+import static com.android.tools.build.bundletool.testing.TargetingUtils.deviceTierTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.languageTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.mergeApkTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.screenDensityTargeting;
@@ -38,6 +40,7 @@ import com.android.bundle.Targeting.Abi.AbiAlias;
 import com.android.bundle.Targeting.ApkTargeting;
 import com.android.bundle.Targeting.ScreenDensity.DensityAlias;
 import com.android.tools.build.bundletool.model.exceptions.CommandExecutionException;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import org.junit.Test;
 import org.junit.experimental.theories.Theories;
@@ -128,6 +131,14 @@ public class MergingUtilsTest {
   }
 
   @Test
+  public void mergeShardTargetings_equalDeviceTier_ok() {
+    ApkTargeting targeting =
+        apkDeviceTierTargeting(deviceTierTargeting("low", ImmutableList.of("high")));
+
+    assertThat(MergingUtils.mergeShardTargetings(targeting, targeting)).isEqualTo(targeting);
+  }
+
+  @Test
   public void mergeShardTargetings_differentAbis_ok() {
     ApkTargeting targeting1 =
         apkAbiTargeting(AbiAlias.X86, ImmutableSet.of(AbiAlias.X86_64, AbiAlias.MIPS));
@@ -182,6 +193,18 @@ public class MergingUtilsTest {
         .isEqualTo(
             apkTextureTargeting(
                 textureCompressionTargeting(S3TC, ImmutableSet.of(ETC1_RGB8, ATC))));
+  }
+
+  @Test
+  public void mergeShardTargetings_differentDeviceTiers_ok() {
+    ApkTargeting targeting1 =
+        apkDeviceTierTargeting(deviceTierTargeting("low", ImmutableList.of("high")));
+    ApkTargeting targeting2 =
+        apkDeviceTierTargeting(deviceTierTargeting("low", ImmutableList.of("medium")));
+
+    assertThat(MergingUtils.mergeShardTargetings(targeting1, targeting2))
+        .isEqualTo(
+            apkDeviceTierTargeting(deviceTierTargeting("low", ImmutableList.of("high", "medium"))));
   }
 
   @Test

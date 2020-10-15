@@ -41,6 +41,7 @@ public interface DexMerger {
       ImmutableList<Path> dexFiles,
       Path outputDir,
       Optional<Path> mainDexListFile,
+      Optional<Path> proguardMap,
       boolean isDebuggable,
       int minSdkVersion);
 }

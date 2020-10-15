@@ -222,6 +222,13 @@ public class TargetedDirectorySegmentTest {
   }
 
   @Test
+  public void testTargeting_deviceTier_invalidTierName() {
+    assertThrows(
+        InvalidBundleException.class,
+        () -> TargetedDirectorySegment.parse("test#tier_invalid+tier(name"));
+  }
+
+  @Test
   public void testFailsParsing_missingKey() {
     assertThrows(InvalidBundleException.class, () -> TargetedDirectorySegment.parse("bad#"));
     assertThrows(InvalidBundleException.class, () -> TargetedDirectorySegment.parse("bad#_2.0"));

@@ -44,6 +44,7 @@ public class AppBundleValidator {
           new EntryClashValidator(),
           new AbiParityValidator(),
           new TextureCompressionFormatParityValidator(),
+          new DeviceTierParityValidator(),
           new DexFilesValidator(),
           new ApexBundleValidator(),
           new AssetBundleValidator(),

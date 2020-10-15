@@ -137,6 +137,10 @@ public final class DeviceFactory {
     return DeviceSpec.newBuilder().addAllGlExtensions(Arrays.asList(glExtensions)).build();
   }
 
+  public static DeviceSpec deviceTier(String deviceTier) {
+    return DeviceSpec.newBuilder().setDeviceTier(deviceTier).build();
+  }
+
   public static DeviceSpec mergeSpecs(DeviceSpec deviceSpec, DeviceSpec... specParts) {
     return mergeFromProtos(deviceSpec, specParts);
   }

@@ -113,7 +113,7 @@ public class SplitApksGeneratorTest {
         splitApksGenerator.generateSplits(
             bundleModule,
             ApkGenerationConfiguration.builder()
-                .setEnableNativeLibraryCompressionSplitter(true)
+                .setEnableUncompressedNativeLibraries(true)
                 .build());
 
     VariantTargeting lVariantTargeting =
@@ -176,7 +176,7 @@ public class SplitApksGeneratorTest {
         splitApksGenerator.generateSplits(
             bundleModule,
             ApkGenerationConfiguration.builder()
-                .setEnableNativeLibraryCompressionSplitter(true)
+                .setEnableUncompressedNativeLibraries(true)
                 .setEnableDexCompressionSplitter(true)
                 .build());
 
@@ -264,7 +264,7 @@ public class SplitApksGeneratorTest {
         splitApksGenerator.generateSplits(
             bundleModule,
             ApkGenerationConfiguration.builder()
-                .setEnableNativeLibraryCompressionSplitter(true)
+                .setEnableUncompressedNativeLibraries(true)
                 .setEnableDexCompressionSplitter(true)
                 .setForInstantAppVariants(true)
                 .build());

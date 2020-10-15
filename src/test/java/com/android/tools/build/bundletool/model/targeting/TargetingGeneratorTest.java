@@ -18,6 +18,7 @@ package com.android.tools.build.bundletool.model.targeting;
 
 import static com.android.tools.build.bundletool.testing.TargetingUtils.alternativeLanguageTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.assetsDirectoryTargeting;
+import static com.android.tools.build.bundletool.testing.TargetingUtils.deviceTierTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.graphicsApiTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.languageTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.mergeAssetsTargeting;
@@ -614,6 +615,46 @@ public class TargetingGeneratorTest {
                                 assetsDirectoryTargeting(
                                     textureCompressionTargeting(
                                         TextureCompressionFormatAlias.ETC1_RGB8)))))
+                .build());
+  }
+
+  @Test
+  public void generateTargetingForAssets_deviceTierTargeting() {
+    Assets assetsConfig =
+        new TargetingGenerator()
+            .generateTargetingForAssets(
+                ImmutableList.of(
+                    ZipPath.create("assets/img#tier_low"),
+                    ZipPath.create("assets/img#tier_medium"),
+                    ZipPath.create("assets/img#tier_high")));
+    assertThat(assetsConfig)
+        .ignoringRepeatedFieldOrder()
+        .isEqualTo(
+            Assets.newBuilder()
+                .addDirectory(
+                    TargetedAssetsDirectory.newBuilder()
+                        .setPath("assets/img#tier_low")
+                        .setTargeting(
+                            assetsDirectoryTargeting(
+                                deviceTierTargeting(
+                                    /* value= */ "low",
+                                    /* alternatives= */ ImmutableList.of("high", "medium")))))
+                .addDirectory(
+                    TargetedAssetsDirectory.newBuilder()
+                        .setPath("assets/img#tier_medium")
+                        .setTargeting(
+                            assetsDirectoryTargeting(
+                                deviceTierTargeting(
+                                    /* value= */ "medium",
+                                    /* alternatives= */ ImmutableList.of("high", "low")))))
+                .addDirectory(
+                    TargetedAssetsDirectory.newBuilder()
+                        .setPath("assets/img#tier_high")
+                        .setTargeting(
+                            assetsDirectoryTargeting(
+                                deviceTierTargeting(
+                                    /* value= */ "high",
+                                    /* alternatives= */ ImmutableList.of("low", "medium")))))
                 .build());
   }
 

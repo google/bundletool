@@ -132,7 +132,12 @@ public abstract class ManifestDeliveryElement {
                             removable
                                 .getAttribute(DISTRIBUTION_NAMESPACE_URI, "value")
                                 .map(XmlProtoAttribute::getValueAsBoolean)
-                                .get()));
+                                .orElseThrow(
+                                    () ->
+                                        InvalidBundleException.createWithUserMessage(
+                                            "No attribute 'dist:value' found in element"
+                                                + " <dist:removable> of manifest. Make sure the"
+                                                + " namespace is also set."))));
   }
 
   /**

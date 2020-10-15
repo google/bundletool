@@ -73,11 +73,11 @@ public class EntryClashValidator extends SubValidator {
 
   private static void checkEntryClash(ZipPath path, BundleModule module1, BundleModule module2) {
     // For entries from asset modules we don't allow to have entry with the same name in any other
-    // module even with equal content. This is because entries in asset modules are uncompressed
-    // and during standalone/universal apk generation we have a collision: should we compress this
-    // entry or not.
+    // module of different type even with equal content. This is because entries in asset modules
+    // are uncompressed and during standalone/universal apk generation we have a collision: should
+    // we compress this entry or not.
     if (ModuleType.ASSET_MODULE.equals(module1.getModuleType())
-        || ModuleType.ASSET_MODULE.equals(module2.getModuleType())) {
+        ^ ModuleType.ASSET_MODULE.equals(module2.getModuleType())) {
       throw InvalidBundleException.builder()
           .withUserMessage(
               "Both modules '%s' and '%s' contain asset entry '%s'.",

@@ -17,8 +17,10 @@
 package com.android.tools.build.bundletool.model.utils;
 
 import static com.android.tools.build.bundletool.testing.TargetingUtils.abiTargeting;
+import static com.android.tools.build.bundletool.testing.TargetingUtils.alternativeDeviceTierTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.alternativeLanguageTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.assetsDirectoryTargeting;
+import static com.android.tools.build.bundletool.testing.TargetingUtils.deviceTierTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.graphicsApiTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.languageTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.mergeAssetsTargeting;
@@ -28,6 +30,7 @@ import static com.google.common.truth.extensions.proto.ProtoTruth.assertThat;
 
 import com.android.bundle.Targeting.Abi.AbiAlias;
 import com.android.bundle.Targeting.TextureCompressionFormat.TextureCompressionFormatAlias;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -74,6 +77,15 @@ public class TargetingProtoUtilsTest {
         .isEqualTo(
             assetsDirectoryTargeting(
                 abiTargeting(ImmutableSet.of(), ImmutableSet.of(AbiAlias.ARM64_V8A))));
+  }
+
+  @Test
+  public void toAlternativeTargeting_deviceTier() {
+    assertThat(
+            TargetingProtoUtils.toAlternativeTargeting(
+                assetsDirectoryTargeting(deviceTierTargeting("low"))))
+        .isEqualTo(
+            assetsDirectoryTargeting(alternativeDeviceTierTargeting(ImmutableList.of("low"))));
   }
 
   @Test

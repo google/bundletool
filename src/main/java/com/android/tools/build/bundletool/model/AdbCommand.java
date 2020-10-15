@@ -31,6 +31,7 @@ public interface AdbCommand {
 
   ImmutableList<String> installMultiPackage(
       ImmutableListMultimap<String, String> apkToInstallByPackage,
+      boolean staged,
       boolean enableRollback,
       Optional<String> deviceId);
 
@@ -50,15 +51,17 @@ public interface AdbCommand {
     @Override
     public ImmutableList<String> installMultiPackage(
         ImmutableListMultimap<String, String> apkToInstallByPackage,
+        boolean staged,
         boolean enableRollback,
         Optional<String> deviceId) {
       return installMultiPackage(
-          apkToInstallByPackage, enableRollback, deviceId, new DefaultCommandExecutor());
+          apkToInstallByPackage, staged, enableRollback, deviceId, new DefaultCommandExecutor());
     }
 
     @VisibleForTesting
     ImmutableList<String> installMultiPackage(
         ImmutableListMultimap<String, String> apkToInstallByPackage,
+        boolean staged,
         boolean enableRollback,
         Optional<String> deviceId,
         CommandExecutor commandExecutor) {
@@ -66,6 +69,9 @@ public interface AdbCommand {
           ImmutableList.<String>builder().add(adbPath.toString());
       deviceId.ifPresent(id -> commandBuilder.add("-s", id));
       commandBuilder.add("install-multi-package");
+      if (staged) {
+        commandBuilder.add("--staged");
+      }
       if (enableRollback) {
         commandBuilder.add("--enable-rollback");
       }

@@ -18,11 +18,13 @@ package com.android.tools.build.bundletool.device;
 
 import static com.android.tools.build.bundletool.device.DeviceSpecUtils.getDeviceSupportedTextureCompressionFormats;
 import static com.android.tools.build.bundletool.device.DeviceSpecUtils.isAbiMissing;
+import static com.android.tools.build.bundletool.device.DeviceSpecUtils.isDeviceTierMissing;
 import static com.android.tools.build.bundletool.device.DeviceSpecUtils.isLocalesMissing;
 import static com.android.tools.build.bundletool.device.DeviceSpecUtils.isScreenDensityMissing;
 import static com.android.tools.build.bundletool.device.DeviceSpecUtils.isSdkVersionMissing;
 import static com.android.tools.build.bundletool.device.DeviceSpecUtils.isTextureCompressionFormatMissing;
 import static com.android.tools.build.bundletool.model.GetSizeRequest.Dimension.ABI;
+import static com.android.tools.build.bundletool.model.GetSizeRequest.Dimension.DEVICE_TIER;
 import static com.android.tools.build.bundletool.model.GetSizeRequest.Dimension.LANGUAGE;
 import static com.android.tools.build.bundletool.model.GetSizeRequest.Dimension.SCREEN_DENSITY;
 import static com.android.tools.build.bundletool.model.GetSizeRequest.Dimension.SDK;
@@ -35,30 +37,34 @@ import com.android.bundle.Commands.ApkDescription;
 import com.android.bundle.Devices.DeviceSpec;
 import com.android.bundle.Targeting.AbiTargeting;
 import com.android.bundle.Targeting.ApkTargeting;
+import com.android.bundle.Targeting.DeviceTierTargeting;
 import com.android.bundle.Targeting.LanguageTargeting;
 import com.android.bundle.Targeting.ScreenDensityTargeting;
 import com.android.bundle.Targeting.SdkVersionTargeting;
 import com.android.bundle.Targeting.TextureCompressionFormatTargeting;
 import com.android.tools.build.bundletool.commands.GetSizeCommand;
+import com.android.tools.build.bundletool.device.ApkMatcher.GeneratedApk;
 import com.android.tools.build.bundletool.device.DeviceSpecUtils.DeviceSpecFromTargetingBuilder;
 import com.android.tools.build.bundletool.model.ConfigurationSizes;
 import com.android.tools.build.bundletool.model.GetSizeRequest;
 import com.android.tools.build.bundletool.model.GetSizeRequest.Dimension;
 import com.android.tools.build.bundletool.model.SizeConfiguration;
-import com.android.tools.build.bundletool.model.ZipPath;
 import com.google.common.base.Joiner;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
+import com.google.protobuf.Message;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.function.Function;
+import java.util.function.Predicate;
 
 /**
  * Common class to generate {@link ConfigurationSizes} for sets of APKs based on the requested
  * dimensions passed to {@link GetSizeCommand}.
  *
- * <p>Subclasses should implement the high level logic to get the total size ({@link getSize}) and
- * the logic to get the matching apks from a particular combination of targetings ({@link
+ * <p>Subclasses should implement the high level logic to get the total size ({@code getSize}) and
+ * the logic to get the matching apks from a particular combination of targetings ({@code
  * getMatchingApks}).
  */
 public abstract class AbstractSizeAggregator {
@@ -77,113 +83,96 @@ public abstract class AbstractSizeAggregator {
   /** Aggregate the sizes of a set of APKs info a {@link ConfigurationSizes}. */
   public abstract ConfigurationSizes getSize();
 
-  protected abstract ImmutableList<ZipPath> getMatchingApks(
+  protected abstract ImmutableList<GeneratedApk> getMatchingApks(
       SdkVersionTargeting sdkVersionTargeting,
       AbiTargeting abiTargeting,
       ScreenDensityTargeting screenDensityTargeting,
       LanguageTargeting languageTargeting,
-      TextureCompressionFormatTargeting textureTargeting);
+      TextureCompressionFormatTargeting textureTargeting,
+      DeviceTierTargeting deviceTierTargeting);
 
   protected ImmutableSet<SdkVersionTargeting> getAllSdkVersionTargetings(
       ImmutableList<ApkDescription> apkDescriptions) {
-    ImmutableSet.Builder<SdkVersionTargeting> sdkVersionTargetingOptions = ImmutableSet.builder();
-
-    if (isSdkVersionMissing(getSizeRequest.getDeviceSpec())) {
-      sdkVersionTargetingOptions.addAll(
-          apkDescriptions.stream()
-              .map(ApkDescription::getTargeting)
-              .filter(ApkTargeting::hasSdkVersionTargeting)
-              .map(ApkTargeting::getSdkVersionTargeting)
-              .collect(toImmutableSet()));
-    }
-
-    // Adding default targeting (if targetings are empty) to help computing the cartesian product
-    // across all targetings.
-    return sdkVersionTargetingOptions.build().isEmpty()
-        ? ImmutableSet.of(SdkVersionTargeting.getDefaultInstance())
-        : sdkVersionTargetingOptions.build();
+    return getAllTargetings(
+        apkDescriptions,
+        DeviceSpecUtils::isSdkVersionMissing,
+        ApkTargeting::hasSdkVersionTargeting,
+        ApkTargeting::getSdkVersionTargeting,
+        SdkVersionTargeting.getDefaultInstance());
   }
 
   protected ImmutableSet<AbiTargeting> getAllAbiTargetings(
       ImmutableList<ApkDescription> apkDescriptions) {
-    ImmutableSet.Builder<AbiTargeting> abiTargetingOptions = ImmutableSet.builder();
-
-    if (isAbiMissing(getSizeRequest.getDeviceSpec())) {
-      abiTargetingOptions.addAll(
-          apkDescriptions.stream()
-              .map(ApkDescription::getTargeting)
-              .filter(ApkTargeting::hasAbiTargeting)
-              .map(ApkTargeting::getAbiTargeting)
-              .collect(toImmutableSet()));
-    }
-
-    // Adding default targeting (if targetings are empty) to help computing the cartesian product
-    // across all targetings.
-    return abiTargetingOptions.build().isEmpty()
-        ? ImmutableSet.of(AbiTargeting.getDefaultInstance())
-        : abiTargetingOptions.build();
+    return getAllTargetings(
+        apkDescriptions,
+        DeviceSpecUtils::isAbiMissing,
+        ApkTargeting::hasAbiTargeting,
+        ApkTargeting::getAbiTargeting,
+        AbiTargeting.getDefaultInstance());
   }
 
   protected ImmutableSet<ScreenDensityTargeting> getAllScreenDensityTargetings(
       ImmutableList<ApkDescription> apkDescriptions) {
-    ImmutableSet.Builder<ScreenDensityTargeting> screenDensityTargetingOptions =
-        ImmutableSet.builder();
-
-    if (isScreenDensityMissing(getSizeRequest.getDeviceSpec())) {
-      screenDensityTargetingOptions.addAll(
-          apkDescriptions.stream()
-              .map(ApkDescription::getTargeting)
-              .filter(ApkTargeting::hasScreenDensityTargeting)
-              .map(ApkTargeting::getScreenDensityTargeting)
-              .collect(toImmutableSet()));
-    }
-
-    // Adding default targeting (if targetings are empty) to help computing the cartesian product
-    // across all targetings.
-    return screenDensityTargetingOptions.build().isEmpty()
-        ? ImmutableSet.of(ScreenDensityTargeting.getDefaultInstance())
-        : screenDensityTargetingOptions.build();
+    return getAllTargetings(
+        apkDescriptions,
+        DeviceSpecUtils::isScreenDensityMissing,
+        ApkTargeting::hasScreenDensityTargeting,
+        ApkTargeting::getScreenDensityTargeting,
+        ScreenDensityTargeting.getDefaultInstance());
   }
 
   protected ImmutableSet<LanguageTargeting> getAllLanguageTargetings(
       ImmutableList<ApkDescription> apkDescriptions) {
-    ImmutableSet.Builder<LanguageTargeting> languageTargetingOptions = ImmutableSet.builder();
-
-    if (isLocalesMissing(getSizeRequest.getDeviceSpec())) {
-      languageTargetingOptions.addAll(
-          apkDescriptions.stream()
-              .map(ApkDescription::getTargeting)
-              .filter(ApkTargeting::hasLanguageTargeting)
-              .map(ApkTargeting::getLanguageTargeting)
-              .collect(toImmutableSet()));
-    }
-
-    // Adding default targeting (if targetings are empty) to help computing the cartesian product
-    // across all targetings.
-    return languageTargetingOptions.build().isEmpty()
-        ? ImmutableSet.of(LanguageTargeting.getDefaultInstance())
-        : languageTargetingOptions.build();
+    return getAllTargetings(
+        apkDescriptions,
+        DeviceSpecUtils::isLocalesMissing,
+        ApkTargeting::hasLanguageTargeting,
+        ApkTargeting::getLanguageTargeting,
+        LanguageTargeting.getDefaultInstance());
   }
 
   protected ImmutableSet<TextureCompressionFormatTargeting>
       getAllTextureCompressionFormatTargetings(ImmutableList<ApkDescription> apkDescriptions) {
-    ImmutableSet<TextureCompressionFormatTargeting> textureCompressionFormatTargetingOptions;
+    return getAllTargetings(
+        apkDescriptions,
+        DeviceSpecUtils::isTextureCompressionFormatMissing,
+        ApkTargeting::hasTextureCompressionFormatTargeting,
+        ApkTargeting::getTextureCompressionFormatTargeting,
+        TextureCompressionFormatTargeting.getDefaultInstance());
+  }
 
-    if (isTextureCompressionFormatMissing(getSizeRequest.getDeviceSpec())) {
-      textureCompressionFormatTargetingOptions =
+  protected ImmutableSet<DeviceTierTargeting> getAllDeviceTierTargetings(
+      ImmutableList<ApkDescription> apkDescriptions) {
+    return getAllTargetings(
+        apkDescriptions,
+        DeviceSpecUtils::isDeviceTierMissing,
+        ApkTargeting::hasDeviceTierTargeting,
+        ApkTargeting::getDeviceTierTargeting,
+        DeviceTierTargeting.getDefaultInstance());
+  }
+
+  /** Retrieves all targetings for a generic dimension. */
+  protected <T extends Message> ImmutableSet<T> getAllTargetings(
+      ImmutableList<ApkDescription> apkDescriptions,
+      Predicate<DeviceSpec> isDimensionMissingFromDevice,
+      Predicate<ApkTargeting> hasTargeting,
+      Function<ApkTargeting, T> getTargeting,
+      T defaultInstance) {
+    ImmutableSet<T> targetingOptions;
+
+    if (isDimensionMissingFromDevice.test(getSizeRequest.getDeviceSpec())) {
+      targetingOptions =
           apkDescriptions.stream()
               .map(ApkDescription::getTargeting)
-              .filter(ApkTargeting::hasTextureCompressionFormatTargeting)
-              .map(ApkTargeting::getTextureCompressionFormatTargeting)
+              .filter(hasTargeting)
+              .map(getTargeting)
               .collect(toImmutableSet());
     } else {
-      textureCompressionFormatTargetingOptions = ImmutableSet.of();
+      targetingOptions = ImmutableSet.of();
     }
     // Adding default targeting (if targetings are empty) to help computing the cartesian product
     // across all targetings.
-    return textureCompressionFormatTargetingOptions.isEmpty()
-        ? ImmutableSet.of(TextureCompressionFormatTargeting.getDefaultInstance())
-        : textureCompressionFormatTargetingOptions;
+    return targetingOptions.isEmpty() ? ImmutableSet.of(defaultInstance) : targetingOptions;
   }
 
   protected ConfigurationSizes getSizesPerConfiguration(
@@ -191,7 +180,8 @@ public abstract class AbstractSizeAggregator {
       ImmutableSet<AbiTargeting> abiTargetingOptions,
       ImmutableSet<LanguageTargeting> languageTargetingOptions,
       ImmutableSet<ScreenDensityTargeting> screenDensityTargetingOptions,
-      ImmutableSet<TextureCompressionFormatTargeting> textureCompressionFormatTargetingOptions) {
+      ImmutableSet<TextureCompressionFormatTargeting> textureCompressionFormatTargetingOptions,
+      ImmutableSet<DeviceTierTargeting> deviceTierTargetingOptions) {
     Map<SizeConfiguration, Long> minSizeByConfiguration = new HashMap<>();
     Map<SizeConfiguration, Long> maxSizeByConfiguration = new HashMap<>();
 
@@ -201,28 +191,32 @@ public abstract class AbstractSizeAggregator {
           for (LanguageTargeting languageTargeting : languageTargetingOptions) {
             for (TextureCompressionFormatTargeting textureCompressionFormatTargeting :
                 textureCompressionFormatTargetingOptions) {
+              for (DeviceTierTargeting deviceTierTargeting : deviceTierTargetingOptions) {
 
-              SizeConfiguration configuration =
-                  mergeWithDeviceSpec(
-                      getSizeConfiguration(
-                          sdkVersionTargeting,
-                          abiTargeting,
-                          screenDensityTargeting,
-                          languageTargeting,
-                          textureCompressionFormatTargeting),
-                      getSizeRequest.getDeviceSpec());
+                SizeConfiguration configuration =
+                    mergeWithDeviceSpec(
+                        getSizeConfiguration(
+                            sdkVersionTargeting,
+                            abiTargeting,
+                            screenDensityTargeting,
+                            languageTargeting,
+                            textureCompressionFormatTargeting,
+                            deviceTierTargeting),
+                        getSizeRequest.getDeviceSpec());
 
-              long compressedSize =
-                  getCompressedSize(
-                      getMatchingApks(
-                          sdkVersionTargeting,
-                          abiTargeting,
-                          screenDensityTargeting,
-                          languageTargeting,
-                          textureCompressionFormatTargeting));
+                long compressedSize =
+                    getCompressedSize(
+                        getMatchingApks(
+                            sdkVersionTargeting,
+                            abiTargeting,
+                            screenDensityTargeting,
+                            languageTargeting,
+                            textureCompressionFormatTargeting,
+                            deviceTierTargeting));
 
-              minSizeByConfiguration.merge(configuration, compressedSize, Math::min);
-              maxSizeByConfiguration.merge(configuration, compressedSize, Math::max);
+                minSizeByConfiguration.merge(configuration, compressedSize, Math::min);
+                maxSizeByConfiguration.merge(configuration, compressedSize, Math::max);
+              }
             }
           }
         }
@@ -239,7 +233,8 @@ public abstract class AbstractSizeAggregator {
       AbiTargeting abiTargeting,
       ScreenDensityTargeting screenDensityTargeting,
       LanguageTargeting languageTargeting,
-      TextureCompressionFormatTargeting textureCompressionFormatTargeting) {
+      TextureCompressionFormatTargeting textureCompressionFormatTargeting,
+      DeviceTierTargeting deviceTierTargeting) {
 
     ImmutableSet<Dimension> dimensions = getSizeRequest.getDimensions();
     SizeConfiguration.Builder sizeConfiguration = SizeConfiguration.builder();
@@ -266,6 +261,11 @@ public abstract class AbstractSizeAggregator {
           .ifPresent(sizeConfiguration::setTextureCompressionFormat);
     }
 
+    if (dimensions.contains(DEVICE_TIER)) {
+      SizeConfiguration.getDeviceTierName(deviceTierTargeting)
+          .ifPresent(sizeConfiguration::setDeviceTier);
+    }
+
     return sizeConfiguration.build();
   }
 
@@ -275,7 +275,8 @@ public abstract class AbstractSizeAggregator {
       AbiTargeting abiTargeting,
       ScreenDensityTargeting screenDensityTargeting,
       LanguageTargeting languageTargeting,
-      TextureCompressionFormatTargeting textureTargeting) {
+      TextureCompressionFormatTargeting textureTargeting,
+      DeviceTierTargeting deviceTierTargeting) {
 
     return new DeviceSpecFromTargetingBuilder(deviceSpec)
         .setSdkVersion(sdkVersionTargeting)
@@ -283,6 +284,7 @@ public abstract class AbstractSizeAggregator {
         .setScreenDensity(screenDensityTargeting)
         .setSupportedLocales(languageTargeting)
         .setSupportedTextureCompressionFormats(textureTargeting)
+        .setDeviceTier(deviceTierTargeting)
         .build();
   }
 
@@ -316,11 +318,15 @@ public abstract class AbstractSizeAggregator {
                   .collect(toImmutableList())));
     }
 
+    if (dimensions.contains(DEVICE_TIER) && !isDeviceTierMissing(deviceSpec)) {
+      mergedSizeConfiguration.setDeviceTier(deviceSpec.getDeviceTier());
+    }
+
     return mergedSizeConfiguration.build();
   }
 
   /** Gets the total compressed sizes represented by the APK paths. */
-  private long getCompressedSize(ImmutableList<ZipPath> apkPaths) {
-    return apkPaths.stream().mapToLong(apkPath -> sizeByApkPaths.get(apkPath.toString())).sum();
+  private long getCompressedSize(ImmutableList<GeneratedApk> apks) {
+    return apks.stream().mapToLong(apk -> sizeByApkPaths.get(apk.getPath().toString())).sum();
   }
 }

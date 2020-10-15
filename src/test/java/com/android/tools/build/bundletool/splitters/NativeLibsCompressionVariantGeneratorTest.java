@@ -45,7 +45,7 @@ public class NativeLibsCompressionVariantGeneratorTest {
     NativeLibsCompressionVariantGenerator nativeLibsCompressionVariantGenerator =
         new NativeLibsCompressionVariantGenerator(
             ApkGenerationConfiguration.builder()
-                .setEnableNativeLibraryCompressionSplitter(true)
+                .setEnableUncompressedNativeLibraries(true)
                 .build());
     ImmutableCollection<VariantTargeting> splits =
         nativeLibsCompressionVariantGenerator
@@ -59,7 +59,7 @@ public class NativeLibsCompressionVariantGeneratorTest {
     NativeLibsCompressionVariantGenerator nativeLibsCompressionVariantGenerator =
         new NativeLibsCompressionVariantGenerator(
             ApkGenerationConfiguration.builder()
-                .setEnableNativeLibraryCompressionSplitter(true)
+                .setEnableUncompressedNativeLibraries(true)
                 .setInstallableOnExternalStorage(true)
                 .build());
     ImmutableCollection<VariantTargeting> splits =
@@ -74,7 +74,7 @@ public class NativeLibsCompressionVariantGeneratorTest {
     NativeLibsCompressionVariantGenerator nativeLibsCompressionVariantGenerator =
         new NativeLibsCompressionVariantGenerator(
             ApkGenerationConfiguration.builder()
-                .setEnableNativeLibraryCompressionSplitter(true)
+                .setEnableUncompressedNativeLibraries(true)
                 .build());
     ImmutableCollection<VariantTargeting> splits =
         nativeLibsCompressionVariantGenerator
@@ -101,7 +101,7 @@ public class NativeLibsCompressionVariantGeneratorTest {
     NativeLibsCompressionVariantGenerator nativeLibsCompressionVariantGenerator =
         new NativeLibsCompressionVariantGenerator(
             ApkGenerationConfiguration.builder()
-                .setEnableNativeLibraryCompressionSplitter(true)
+                .setEnableUncompressedNativeLibraries(true)
                 .build());
 
     BundleModule bundleModule =
@@ -122,7 +122,7 @@ public class NativeLibsCompressionVariantGeneratorTest {
         new NativeLibsCompressionVariantGenerator(
             ApkGenerationConfiguration.builder()
                 .setForInstantAppVariants(true)
-                .setEnableNativeLibraryCompressionSplitter(true)
+                .setEnableUncompressedNativeLibraries(true)
                 .build());
 
     ImmutableCollection<VariantTargeting> splits =

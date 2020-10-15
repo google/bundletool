@@ -17,6 +17,7 @@
 package com.android.tools.build.bundletool.model.utils;
 
 import static com.android.tools.build.bundletool.model.GetSizeRequest.Dimension.ABI;
+import static com.android.tools.build.bundletool.model.GetSizeRequest.Dimension.DEVICE_TIER;
 import static com.android.tools.build.bundletool.model.GetSizeRequest.Dimension.LANGUAGE;
 import static com.android.tools.build.bundletool.model.GetSizeRequest.Dimension.SCREEN_DENSITY;
 import static com.android.tools.build.bundletool.model.GetSizeRequest.Dimension.SDK;
@@ -85,6 +86,7 @@ public class GetSizeCsvUtilsTest {
                             .setScreenDensity("480")
                             .setLocale("en,fr")
                             .setTextureCompressionFormat("ASTC,ETC2")
+                            .setDeviceTier("low")
                             .build(),
                         1L),
                     ImmutableMap.of(
@@ -94,13 +96,15 @@ public class GetSizeCsvUtilsTest {
                             .setScreenDensity("480")
                             .setLocale("en,fr")
                             .setTextureCompressionFormat("ASTC,ETC2")
+                            .setDeviceTier("low")
                             .build(),
                         6L)),
-                ImmutableSet.of(SCREEN_DENSITY, ABI, LANGUAGE, SDK, TEXTURE_COMPRESSION_FORMAT)))
+                ImmutableSet.of(
+                    SCREEN_DENSITY, ABI, LANGUAGE, SDK, TEXTURE_COMPRESSION_FORMAT, DEVICE_TIER)))
         .isEqualTo(
-            "SDK,ABI,SCREEN_DENSITY,LANGUAGE,TEXTURE_COMPRESSION_FORMAT,MIN,MAX"
+            "SDK,ABI,SCREEN_DENSITY,LANGUAGE,TEXTURE_COMPRESSION_FORMAT,DEVICE_TIER,MIN,MAX"
                 + CRLF
-                + "22,\"x86,armeabi-v7a\",480,\"en,fr\",\"ASTC,ETC2\",1,6"
+                + "22,\"x86,armeabi-v7a\",480,\"en,fr\",\"ASTC,ETC2\",low,1,6"
                 + CRLF);
   }
 }

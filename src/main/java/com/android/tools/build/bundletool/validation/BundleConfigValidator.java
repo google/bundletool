@@ -18,6 +18,7 @@ package com.android.tools.build.bundletool.validation;
 import static com.android.tools.build.bundletool.model.targeting.TargetingUtils.containsDeviceTierTargeting;
 import static com.android.tools.build.bundletool.model.targeting.TargetingUtils.extractAssetsTargetedDirectories;
 import static com.google.common.collect.ImmutableSet.toImmutableSet;
+import static java.util.stream.Collectors.joining;
 
 import com.android.bundle.Config.BundleConfig;
 import com.android.bundle.Config.Compression;
@@ -39,7 +40,6 @@ import com.google.common.collect.Sets;
 import com.google.common.collect.Sets.SetView;
 import java.util.List;
 import java.util.Optional;
-import java.util.stream.Collectors;
 
 /** Validator of the BundleConfig. */
 public final class BundleConfigValidator extends SubValidator {
@@ -49,6 +49,9 @@ public final class BundleConfigValidator extends SubValidator {
    * file in an APK, and are probably an error from the developers.
    */
   private static final ImmutableSet<String> FORBIDDEN_CHARS_IN_GLOB = ImmutableSet.of("\n", "\\\\");
+
+  private static final ImmutableSet<SplitDimension.Value> SUFFIX_STRIPPING_ENABLED_DIMENSIONS =
+      ImmutableSet.of(Value.TEXTURE_COMPRESSION_FORMAT, Value.DEVICE_TIER);
 
   @Override
   public void validateBundle(AppBundle bundle) {
@@ -109,11 +112,12 @@ public final class BundleConfigValidator extends SubValidator {
             dimension ->
                 dimension.hasSuffixStripping()
                     && dimension.getSuffixStripping().getEnabled()
-                    && !dimension.getValue().equals(Value.TEXTURE_COMPRESSION_FORMAT))) {
+                    && !SUFFIX_STRIPPING_ENABLED_DIMENSIONS.contains(dimension.getValue()))) {
       throw InvalidBundleException.builder()
           .withUserMessage(
-              "Suffix stripping was enabled for an unsupported dimension. Only"
-                  + " TEXTURE_COMPRESSION_FORMAT is supported.")
+              "Suffix stripping was enabled for an unsupported dimension. Supported dimensions"
+                  + " are: %s.",
+              SUFFIX_STRIPPING_ENABLED_DIMENSIONS.stream().map(Value::name).collect(joining(", ")))
           .build();
     }
 
@@ -135,7 +139,7 @@ public final class BundleConfigValidator extends SubValidator {
                       "The default texture compression format chosen for suffix stripping (\"%s\") "
                           + "is not valid. Supported formats are: %s.",
                       dimension.getSuffixStripping().getDefaultSuffix(),
-                      supportedTextures.stream().collect(Collectors.joining(", ")))
+                      supportedTextures.stream().collect(joining(", ")))
                   .build();
             });
   }

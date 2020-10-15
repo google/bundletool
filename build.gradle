@@ -21,17 +21,6 @@ apply plugin: "maven"
 repositories {
     jcenter()
     google()
-    // We need to add this custom format repo because we use r8 version which is
-    // not available in gMaven yet. This repo can be removed once new version is
-    // uploaded to gMaven.
-    // Shrunk version of r8 is available there by the following path:
-    // https://storage.googleapis.com/r8-releases/raw/[revision]/r8lib.jar
-    ivy {
-        url "https://storage.googleapis.com/r8-releases/raw"
-        patternLayout {
-            artifact "[revision]/[artifact]lib.[ext]"
-        }
-    }
 }
 
 configurations {
@@ -42,10 +31,11 @@ configurations {
 
 // The repackaging rules are defined in the "shadowJar" task below.
 dependencies {
-    compile "com.android.tools:r8:2.0.23"
-    compile "com.android.tools.build:apkzlib:4.0.0"
-    compile "com.android.tools.build:apksig:4.0.0"
+    compile "com.android.tools:r8:2.1.66"
+    compile "com.android.tools.build:apkzlib:4.2.0-alpha13"
+    compile "com.android.tools.build:apksig:4.2.0-alpha13"
     compile "com.android.tools.ddms:ddmlib:26.2.0"
+    compile "com.android:zipflinger:4.2.0-alpha11"
 
     shadow "com.android.tools.build:aapt2-proto:4.1.0-alpha01-6193524"
     shadow "com.google.auto.value:auto-value-annotations:1.6.2"
@@ -151,6 +141,7 @@ shadowJar {
     // Package all the Android Gradle plugin dependencies that are compiled from
     // source.
     dependencies {
+        include(dependency('com.android:zipflinger:.*'))
         include(dependency {
             it.moduleGroup.startsWith('com.android.tools')
         })
@@ -180,8 +171,8 @@ task executableJar(type: ShadowJar) {
     from({ zipTree(project.configurations.compileMacOs.singleFile) }) { into 'macos/' }
     from({ zipTree(project.configurations.compileLinux.singleFile) }) { into 'linux/' }
     configurations = [
-        project.configurations.runtime,
-        project.configurations.shadow
+            project.configurations.runtime,
+            project.configurations.shadow
     ]
     manifest {
         attributes 'Main-Class': 'com.android.tools.build.bundletool.BundleToolMain'

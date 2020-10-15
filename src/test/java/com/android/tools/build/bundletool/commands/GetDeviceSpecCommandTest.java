@@ -61,6 +61,7 @@ public class GetDeviceSpecCommandTest {
   @Rule public TemporaryFolder tmp = new TemporaryFolder();
   private Path tmpDir;
   private static final String DEVICE_ID = "id1";
+  private static final String DEVICE_TIER = "low";
 
   private SystemEnvironmentProvider systemEnvironmentProvider;
   private Path adbPath;
@@ -134,7 +135,11 @@ public class GetDeviceSpecCommandTest {
     GetDeviceSpecCommand commandViaFlags =
         GetDeviceSpecCommand.fromFlags(
             new FlagParser()
-                .parse("--adb=" + adbPath, "--device-id=" + DEVICE_ID, "--output=" + outputPath),
+                .parse(
+                    "--adb=" + adbPath,
+                    "--device-id=" + DEVICE_ID,
+                    "--output=" + outputPath,
+                    "--device-tier=" + DEVICE_TIER),
             systemEnvironmentProvider,
             fakeServerOneDevice(lDeviceWithLocales("en-US")));
 
@@ -144,6 +149,7 @@ public class GetDeviceSpecCommandTest {
             .setDeviceId(DEVICE_ID)
             .setOutputPath(outputPath)
             .setAdbServer(commandViaFlags.getAdbServer())
+            .setDeviceTier(DEVICE_TIER)
             .build();
 
     assertThat(commandViaFlags).isEqualTo(commandViaBuilder);

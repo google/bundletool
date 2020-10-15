@@ -28,6 +28,7 @@ import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.with
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withUsesSplit;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.apexImages;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.assetsDirectoryTargeting;
+import static com.android.tools.build.bundletool.testing.TargetingUtils.deviceTierTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.graphicsApiTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.mergeAssetsTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.multiAbiTargeting;
@@ -422,18 +423,19 @@ public class BuildBundleCommandTest {
                     .setTargeting(AssetsDirectoryTargeting.getDefaultInstance()))
             .addDirectory(
                 TargetedAssetsDirectory.newBuilder()
-                    .setPath("assets/gfx#opengl_3.0/texture#tcf_atc")
+                    .setPath("assets/gfx#opengl_3.0/texture#tcf_atc/device#tier_low")
                     .setTargeting(
                         mergeAssetsTargeting(
                             assetsDirectoryTargeting(graphicsApiTargeting(openGlVersionFrom(3))),
                             assetsDirectoryTargeting(
-                                textureCompressionTargeting(TextureCompressionFormatAlias.ATC)))))
+                                textureCompressionTargeting(TextureCompressionFormatAlias.ATC)),
+                            assetsDirectoryTargeting(deviceTierTargeting("low")))))
             .build();
     Path module =
         new ZipBuilder()
             .addFileWithContent(ZipPath.create("assets/anything.dat"), "any".getBytes(UTF_8))
             .addFileWithContent(
-                ZipPath.create("assets/gfx#opengl_3.0/texture#tcf_atc/file.dat"),
+                ZipPath.create("assets/gfx#opengl_3.0/texture#tcf_atc/device#tier_low/file.dat"),
                 "any2".getBytes(UTF_8))
             .addFileWithContent(ZipPath.create("dex/classes.dex"), "dex".getBytes(UTF_8))
             .addFileWithProtoContent(ZipPath.create("manifest/AndroidManifest.xml"), manifest)
@@ -448,7 +450,7 @@ public class BuildBundleCommandTest {
     try (ZipFile bundle = new ZipFile(bundlePath.toFile())) {
       assertThat(bundle).hasFile("base/assets/anything.dat").withContent("any".getBytes(UTF_8));
       assertThat(bundle)
-          .hasFile("base/assets/gfx#opengl_3.0/texture#tcf_atc/file.dat")
+          .hasFile("base/assets/gfx#opengl_3.0/texture#tcf_atc/device#tier_low/file.dat")
           .withContent("any2".getBytes(UTF_8));
       assertThat(bundle).hasFile("base/dex/classes.dex").withContent("dex".getBytes(UTF_8));
       assertThat(bundle)

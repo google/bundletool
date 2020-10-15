@@ -64,6 +64,7 @@ public abstract class InstallApksCommand {
   private static final Flag<ImmutableSet<String>> MODULES_FLAG = Flag.stringSet("modules");
   private static final Flag<Boolean> ALLOW_DOWNGRADE_FLAG = Flag.booleanFlag("allow-downgrade");
   private static final Flag<Boolean> ALLOW_TEST_ONLY_FLAG = Flag.booleanFlag("allow-test-only");
+  private static final Flag<String> DEVICE_TIER_FLAG = Flag.string("device-tier");
 
   private static final SystemEnvironmentProvider DEFAULT_PROVIDER =
       new DefaultSystemEnvironmentProvider();
@@ -79,6 +80,8 @@ public abstract class InstallApksCommand {
   public abstract boolean getAllowDowngrade();
 
   public abstract boolean getAllowTestOnly();
+
+  public abstract Optional<String> getDeviceTier();
 
   abstract AdbServer getAdbServer();
 
@@ -106,6 +109,8 @@ public abstract class InstallApksCommand {
 
     public abstract Builder setAllowTestOnly(boolean allowTestOnly);
 
+    public abstract Builder setDeviceTier(String deviceTier);
+
     public abstract InstallApksCommand build();
   }
 
@@ -124,6 +129,7 @@ public abstract class InstallApksCommand {
     Optional<ImmutableSet<String>> modules = MODULES_FLAG.getValue(flags);
     Optional<Boolean> allowDowngrade = ALLOW_DOWNGRADE_FLAG.getValue(flags);
     Optional<Boolean> allowTestOnly = ALLOW_TEST_ONLY_FLAG.getValue(flags);
+    Optional<String> deviceTier = DEVICE_TIER_FLAG.getValue(flags);
 
     flags.checkNoUnknownFlags();
 
@@ -133,6 +139,7 @@ public abstract class InstallApksCommand {
     modules.ifPresent(command::setModules);
     allowDowngrade.ifPresent(command::setAllowDowngrade);
     allowTestOnly.ifPresent(command::setAllowTestOnly);
+    deviceTier.ifPresent(command::setDeviceTier);
 
     return command.build();
   }
@@ -145,6 +152,9 @@ public abstract class InstallApksCommand {
 
     try (TempDirectory tempDirectory = new TempDirectory()) {
       DeviceSpec deviceSpec = new DeviceAnalyzer(adbServer).getDeviceSpec(getDeviceId());
+      if (getDeviceTier().isPresent()) {
+        deviceSpec = deviceSpec.toBuilder().setDeviceTier(getDeviceTier().get()).build();
+      }
       BuildApksResult toc = ResultUtils.readTableOfContents(getApksArchivePath());
 
       final ImmutableList<Path> apksToInstall =
@@ -343,6 +353,15 @@ public abstract class InstallApksCommand {
                 .setDescription(
                     "If set, apps with 'android:testOnly=true' set in their manifest can also be"
                         + " deployed")
+                .build())
+        .addFlag(
+            FlagDescription.builder()
+                .setFlagName(DEVICE_TIER_FLAG.getName())
+                .setExampleValue("high")
+                .setOptional(true)
+                .setDescription(
+                    "Device tier to use for apk matching. This flag is only relevant if the "
+                        + "bundle uses device tier targeting, and should be set in that case.")
                 .build())
         .build();
   }

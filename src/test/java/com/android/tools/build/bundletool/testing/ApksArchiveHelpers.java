@@ -34,7 +34,6 @@ import com.android.bundle.Commands.ModuleMetadata;
 import com.android.bundle.Commands.SplitApkMetadata;
 import com.android.bundle.Commands.StandaloneApkMetadata;
 import com.android.bundle.Commands.SystemApkMetadata;
-import com.android.bundle.Commands.SystemApkMetadata.SystemApkType;
 import com.android.bundle.Commands.Variant;
 import com.android.bundle.Targeting.ApkTargeting;
 import com.android.bundle.Targeting.ModuleTargeting;
@@ -256,10 +255,7 @@ public final class ApksArchiveHelpers {
             ApkDescription.newBuilder()
                 .setPath(apkPath.toString())
                 .setTargeting(apkTargeting)
-                .setSystemApkMetadata(
-                    SystemApkMetadata.newBuilder()
-                        .addFusedModuleName("base")
-                        .setSystemApkType(SystemApkType.SYSTEM)))
+                .setSystemApkMetadata(SystemApkMetadata.newBuilder().addFusedModuleName("base")))
         .build();
   }
 

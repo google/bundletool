@@ -21,6 +21,8 @@ import static com.android.tools.build.bundletool.mergers.AndroidManifestMerger.u
 import static com.android.tools.build.bundletool.mergers.MergingUtils.mergeTargetedAssetsDirectories;
 import static com.android.tools.build.bundletool.model.BundleMetadata.BUNDLETOOL_NAMESPACE;
 import static com.android.tools.build.bundletool.model.BundleMetadata.MAIN_DEX_LIST_FILE_NAME;
+import static com.android.tools.build.bundletool.model.BundleMetadata.OBFUSCATION_NAMESPACE;
+import static com.android.tools.build.bundletool.model.BundleMetadata.PROGUARD_MAP_FILE_NAME;
 import static com.android.tools.build.bundletool.model.BundleModule.DEX_DIRECTORY;
 import static com.android.tools.build.bundletool.model.BundleModuleName.BASE_MODULE_NAME;
 import static com.android.tools.build.bundletool.model.version.VersionGuardedFeature.FUSE_ACTIVITIES_FROM_FEATURE_MANIFESTS;
@@ -34,7 +36,7 @@ import com.android.bundle.Targeting.ApkTargeting;
 import com.android.bundle.Targeting.VariantTargeting;
 import com.android.tools.build.bundletool.io.TempDirectory;
 import com.android.tools.build.bundletool.model.AndroidManifest;
-import com.android.tools.build.bundletool.model.BundleMetadata;
+import com.android.tools.build.bundletool.model.AppBundle;
 import com.android.tools.build.bundletool.model.BundleModuleName;
 import com.android.tools.build.bundletool.model.ModuleEntry;
 import com.android.tools.build.bundletool.model.ModuleSplit;
@@ -78,18 +80,18 @@ public class ModuleSplitsToShardMerger {
   private final Version bundletoolVersion;
   private final TempDirectory globalTempDir;
   private final DexMerger dexMerger;
-  private final BundleMetadata bundleMetadata;
+  private final AppBundle appBundle;
 
   @Inject
   public ModuleSplitsToShardMerger(
       Version bundletoolVersion,
       TempDirectory globalTempDir,
       DexMerger dexMerger,
-      BundleMetadata bundleMetadata) {
+      AppBundle appBundle) {
     this.bundletoolVersion = bundletoolVersion;
     this.globalTempDir = globalTempDir;
     this.dexMerger = dexMerger;
-    this.bundleMetadata = bundleMetadata;
+    this.appBundle = appBundle;
   }
 
   /** Gets a list of splits, and merges them into a single standalone APK (aka shard). */
@@ -160,8 +162,7 @@ public class ModuleSplitsToShardMerger {
     AndroidManifest mergedAndroidManifest = manifestMerger.merge(androidManifestsToMergeByModule);
 
     Collection<ModuleEntry> mergedDexFiles =
-        mergeDexFilesAndCache(
-            dexFilesToMergeByModule, bundleMetadata, mergedAndroidManifest, mergedDexCache);
+        mergeDexFilesAndCache(dexFilesToMergeByModule, mergedAndroidManifest, mergedDexCache);
 
     // Record names of the modules this shard was fused from.
     ImmutableList<String> fusedModuleNames = getUniqueModuleNames(splitsOfShard);
@@ -260,13 +261,13 @@ public class ModuleSplitsToShardMerger {
 
   private Collection<ModuleEntry> mergeDexFilesAndCache(
       ListMultimap<BundleModuleName, ModuleEntry> dexFilesToMergeByModule,
-      BundleMetadata bundleMetadata,
       AndroidManifest androidManifest,
       Map<ImmutableSet<ModuleEntry>, ImmutableList<Path>> mergedDexCache) {
 
-    if (dexFilesToMergeByModule.keySet().size() <= 1) {
-      // Don't merge if all dex files live inside a single module. If that module contains multiple
-      // dex files, it should have been built with multi-dex support.
+    if (dexFilesToMergeByModule.size() <= 1 || appBundle.getFeatureModules().size() <= 1) {
+      // Don't merge if there is only one dex file or an application doesn't have feature modules.
+      // If base module contains multiple dex files, it should have been built with multi-dex
+      // support.
       return dexFilesToMergeByModule.values();
     } else if (androidManifest.getEffectiveMinSdkVersion() >= Versions.ANDROID_L_API_VERSION) {
       // When APK targets L+ devices we know the devices already have multi-dex support.
@@ -278,8 +279,7 @@ public class ModuleSplitsToShardMerger {
 
       ImmutableList<Path> mergedDexFiles =
           mergedDexCache.computeIfAbsent(
-              ImmutableSet.copyOf(dexEntries),
-              key -> mergeDexFiles(dexEntries, bundleMetadata, androidManifest));
+              ImmutableSet.copyOf(dexEntries), key -> mergeDexFiles(dexEntries, androidManifest));
 
       // Names of the merged dex files need to be preserved ("classes.dex", "classes2.dex" etc.).
       return mergedDexFiles.stream()
@@ -322,9 +322,7 @@ public class ModuleSplitsToShardMerger {
   }
 
   private ImmutableList<Path> mergeDexFiles(
-      List<ModuleEntry> dexEntries,
-      BundleMetadata bundleMetadata,
-      AndroidManifest androidManifest) {
+      List<ModuleEntry> dexEntries, AndroidManifest androidManifest) {
     try {
       Path dexOriginalDir = Files.createTempDirectory(globalTempDir.getPath(), "dex-merging-in");
       // The merged dex files will be written to a sub-directory of the global temp directory
@@ -332,7 +330,10 @@ public class ModuleSplitsToShardMerger {
       Path dexMergedDir = Files.createTempDirectory(globalTempDir.getPath(), "dex-merging-out");
 
       // The dex merger requires the main dex list represented as a file.
-      Optional<Path> mainDexListFile = writeMainDexListFileIfPresent(bundleMetadata);
+      Optional<Path> mainDexListFile = writeMainDexListFileIfPresent();
+
+      // The dex merger requires the proguard map represented as a file.
+      Optional<Path> proguardMapFile = writeProguardMapFileIfPresent();
 
       // Write input dex data to temporary files "0.dex", "1.dex" etc. The names/order is not
       // important. The filenames just need to be unique and have the ".dex" extension.
@@ -344,6 +345,7 @@ public class ModuleSplitsToShardMerger {
               dexFiles,
               dexMergedDir,
               mainDexListFile,
+              proguardMapFile,
               androidManifest.getEffectiveApplicationDebuggable(),
               androidManifest.getEffectiveMinSdkVersion());
 
@@ -400,11 +402,12 @@ public class ModuleSplitsToShardMerger {
     }
   }
 
-  private Optional<Path> writeMainDexListFileIfPresent(BundleMetadata bundleMetadata)
-      throws IOException {
+  private Optional<Path> writeMainDexListFileIfPresent() throws IOException {
 
     Optional<ByteSource> mainDexListFile =
-        bundleMetadata.getFileAsByteSource(BUNDLETOOL_NAMESPACE, MAIN_DEX_LIST_FILE_NAME);
+        appBundle
+            .getBundleMetadata()
+            .getFileAsByteSource(BUNDLETOOL_NAMESPACE, MAIN_DEX_LIST_FILE_NAME);
 
     if (!mainDexListFile.isPresent()) {
       return Optional.empty();
@@ -415,6 +418,24 @@ public class ModuleSplitsToShardMerger {
       Files.copy(inputStream, mainDexListFilePath, StandardCopyOption.REPLACE_EXISTING);
     }
     return Optional.of(mainDexListFilePath);
+  }
+
+  private Optional<Path> writeProguardMapFileIfPresent() throws IOException {
+
+    Optional<ByteSource> proguardFile =
+        appBundle
+            .getBundleMetadata()
+            .getFileAsByteSource(OBFUSCATION_NAMESPACE, PROGUARD_MAP_FILE_NAME);
+
+    if (!proguardFile.isPresent()) {
+      return Optional.empty();
+    }
+
+    Path proguardMapFilePath = Files.createTempFile(globalTempDir.getPath(), "proguard", ".map");
+    try (InputStream inputStream = proguardFile.get().openStream()) {
+      Files.copy(inputStream, proguardMapFilePath, StandardCopyOption.REPLACE_EXISTING);
+    }
+    return Optional.of(proguardMapFilePath);
   }
 
   private static ImmutableList<String> getUniqueModuleNames(

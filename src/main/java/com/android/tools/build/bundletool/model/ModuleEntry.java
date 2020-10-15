@@ -26,6 +26,7 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Path;
 import java.util.Objects;
+import java.util.Optional;
 
 /**
  * Represents an entry in an App Bundle's module.
@@ -41,6 +42,14 @@ public abstract class ModuleEntry {
 
   /** Path of the entry inside the module. */
   public abstract ZipPath getPath();
+
+  /**
+   * Path of the entry inside the App Bundle, if it comes from the App Bundle.
+   *
+   * <p>If the content of the entry was generated or modified by bundletool, then this method should
+   * return an empty {@link Optional}.
+   */
+  public abstract Optional<ZipPath> getBundlePath();
 
   /** Returns whether entry should always be left uncompressed in generated archives. */
   public abstract boolean getForceUncompressed();
@@ -108,6 +117,10 @@ public abstract class ModuleEntry {
   public abstract static class Builder {
     public abstract Builder setPath(ZipPath path);
 
+    public abstract Builder setBundlePath(ZipPath zipPath);
+
+    public abstract Builder setBundlePath(Optional<ZipPath> zipPath);
+
     public abstract Builder setForceUncompressed(boolean forcedUncompressed);
 
     public abstract Builder setShouldSign(boolean shouldSign);
@@ -115,10 +128,12 @@ public abstract class ModuleEntry {
     public abstract Builder setContent(ByteSource content);
 
     public Builder setContent(Path path) {
+      setBundlePath(Optional.empty());
       return setContent(MoreFiles.asByteSource(path));
     }
 
     public Builder setContent(File file) {
+      setBundlePath(Optional.empty());
       return setContent(Files.asByteSource(file));
     }
 

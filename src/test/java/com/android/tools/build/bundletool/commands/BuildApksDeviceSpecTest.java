@@ -18,7 +18,6 @@ package com.android.tools.build.bundletool.commands;
 import static com.android.bundle.Targeting.ScreenDensity.DensityAlias.HDPI;
 import static com.android.bundle.Targeting.ScreenDensity.DensityAlias.XHDPI;
 import static com.android.tools.build.bundletool.commands.BuildApksCommand.ApkBuildMode.SYSTEM;
-import static com.android.tools.build.bundletool.commands.BuildApksCommand.ApkBuildMode.SYSTEM_COMPRESSED;
 import static com.android.tools.build.bundletool.commands.BuildApksCommand.ApkBuildMode.UNIVERSAL;
 import static com.android.tools.build.bundletool.model.utils.ResultUtils.instantApkVariants;
 import static com.android.tools.build.bundletool.model.utils.ResultUtils.splitApkVariants;
@@ -49,7 +48,6 @@ import com.android.bundle.Commands.BuildApksResult;
 import com.android.bundle.Commands.Variant;
 import com.android.bundle.Devices.DeviceSpec;
 import com.android.bundle.Targeting.ScreenDensity.DensityAlias;
-import com.android.tools.build.bundletool.commands.BuildApksCommand.ApkBuildMode;
 import com.android.tools.build.bundletool.device.AdbServer;
 import com.android.tools.build.bundletool.flags.FlagParser;
 import com.android.tools.build.bundletool.io.AppBundleSerializer;
@@ -62,7 +60,6 @@ import com.android.tools.build.bundletool.testing.FakeAdbServer;
 import com.android.tools.build.bundletool.testing.FakeSystemEnvironmentProvider;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
-import com.google.common.collect.ImmutableSet;
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
 import java.nio.file.Path;
@@ -70,8 +67,6 @@ import java.util.zip.ZipFile;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
-import org.junit.experimental.theories.DataPoints;
-import org.junit.experimental.theories.FromDataPoints;
 import org.junit.experimental.theories.Theories;
 import org.junit.experimental.theories.Theory;
 import org.junit.rules.TemporaryFolder;
@@ -191,14 +186,9 @@ public class BuildApksDeviceSpecTest {
             "Optimizing for device spec is not possible when running with 'universal' mode flag.");
   }
 
-  @DataPoints("systemApkBuildModes")
-  public static final ImmutableSet<ApkBuildMode> SYSTEM_APK_BUILD_MODE =
-      ImmutableSet.of(SYSTEM, SYSTEM_COMPRESSED);
-
   @Test
   @Theory
-  public void deviceSpec_systemApkMode_withoutDeviceSpec_throws(
-      @FromDataPoints("systemApkBuildModes") ApkBuildMode systemApkBuildMode) throws Exception {
+  public void deviceSpec_systemApkMode_withoutDeviceSpec_throws() throws Exception {
     AppBundle appBundle =
         new AppBundleBuilder()
             .addModule("base", module -> module.setManifest(androidManifest("com.app")))
@@ -209,20 +199,18 @@ public class BuildApksDeviceSpecTest {
         BuildApksCommand.builder()
             .setBundlePath(bundlePath)
             .setOutputFile(outputFilePath)
-            .setApkBuildMode(systemApkBuildMode);
+            .setApkBuildMode(SYSTEM);
 
     Throwable exception = assertThrows(InvalidCommandException.class, command::build);
     assertThat(exception)
         .hasMessageThat()
-        .contains(
-            "Device spec must always be set when running with 'system' or 'system_compressed' "
-                + "mode flag.");
+        .contains("Device spec must always be set when running with 'system' mode flag.");
   }
 
   @Test
   @Theory
-  public void deviceSpec_systemApkMode_partialDeviceSpecWithAbiAndScreenDensity_succeeds(
-      @FromDataPoints("systemApkBuildModes") ApkBuildMode systemApkBuildMode) throws Exception {
+  public void deviceSpec_systemApkMode_partialDeviceSpecWithAbiAndScreenDensity_succeeds()
+      throws Exception {
     DeviceSpec deviceSpec = mergeSpecs(abis("arm64-v8a"), density(DensityAlias.MDPI));
 
     AppBundle appBundle =
@@ -236,15 +224,14 @@ public class BuildApksDeviceSpecTest {
             .setBundlePath(bundlePath)
             .setOutputFile(outputFilePath)
             .setDeviceSpec(deviceSpec)
-            .setApkBuildMode(systemApkBuildMode);
+            .setApkBuildMode(SYSTEM);
 
     command.build();
   }
 
   @Test
   @Theory
-  public void deviceSpec_systemApkMode_partialDeviceSpecMissingAbi_throws(
-      @FromDataPoints("systemApkBuildModes") ApkBuildMode systemApkBuildMode) throws Exception {
+  public void deviceSpec_systemApkMode_partialDeviceSpecMissingAbi_throws() throws Exception {
     DeviceSpec deviceSpec = mergeSpecs(density(DensityAlias.MDPI));
 
     AppBundle appBundle =
@@ -258,20 +245,19 @@ public class BuildApksDeviceSpecTest {
             .setBundlePath(bundlePath)
             .setOutputFile(outputFilePath)
             .setDeviceSpec(deviceSpec)
-            .setApkBuildMode(systemApkBuildMode);
+            .setApkBuildMode(SYSTEM);
 
     Throwable exception = assertThrows(InvalidCommandException.class, command::build);
     assertThat(exception)
         .hasMessageThat()
         .contains(
-            "Device spec must have screen density and ABIs set when running with 'system' or "
-                + "'system_compressed' mode flag.");
+            "Device spec must have screen density and ABIs set when running with 'system' mode"
+                + " flag.");
   }
 
   @Test
   @Theory
-  public void deviceSpec_systemApkMode_partialDeviceSpecMissingDensity_throws(
-      @FromDataPoints("systemApkBuildModes") ApkBuildMode systemApkBuildMode) throws Exception {
+  public void deviceSpec_systemApkMode_partialDeviceSpecMissingDensity_throws() throws Exception {
     DeviceSpec deviceSpec = mergeSpecs(abis("arm64-v8a"));
 
     AppBundle appBundle =
@@ -285,14 +271,14 @@ public class BuildApksDeviceSpecTest {
             .setBundlePath(bundlePath)
             .setOutputFile(outputFilePath)
             .setDeviceSpec(deviceSpec)
-            .setApkBuildMode(systemApkBuildMode);
+            .setApkBuildMode(SYSTEM);
 
     Throwable exception = assertThrows(InvalidCommandException.class, command::build);
     assertThat(exception)
         .hasMessageThat()
         .contains(
-            "Device spec must have screen density and ABIs set when running with 'system' or "
-                + "'system_compressed' mode flag.");
+            "Device spec must have screen density and ABIs set when running with 'system' mode"
+                + " flag.");
   }
 
   @Test

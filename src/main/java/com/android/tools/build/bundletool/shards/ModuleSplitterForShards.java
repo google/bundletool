@@ -23,14 +23,11 @@ import static com.google.common.collect.ImmutableList.toImmutableList;
 import com.android.bundle.Config.BundleConfig;
 import com.android.bundle.Config.SplitDimension;
 import com.android.bundle.Config.SplitDimension.Value;
-import com.android.bundle.Config.SuffixStripping;
 import com.android.bundle.Devices.DeviceSpec;
 import com.android.tools.build.bundletool.mergers.SameTargetingMerger;
 import com.android.tools.build.bundletool.model.BundleModule;
 import com.android.tools.build.bundletool.model.ModuleSplit;
 import com.android.tools.build.bundletool.model.OptimizationDimension;
-import com.android.tools.build.bundletool.model.targeting.TargetingDimension;
-import com.android.tools.build.bundletool.model.targeting.TargetingUtils;
 import com.android.tools.build.bundletool.model.version.Version;
 import com.android.tools.build.bundletool.splitters.AbiApexImagesSplitter;
 import com.android.tools.build.bundletool.splitters.AbiNativeLibrariesSplitter;
@@ -48,6 +45,9 @@ import javax.inject.Inject;
 
 /** Splits bundle modules into module splits that are next merged into standalone APKs. */
 public class ModuleSplitterForShards {
+
+  private static final ImmutableSet<SplitDimension.Value> SUFFIX_STRIPPING_DIMENSIONS =
+      ImmutableSet.of(Value.TEXTURE_COMPRESSION_FORMAT, Value.DEVICE_TIER);
 
   private final Version bundleVersion;
   private final BundleConfig bundleConfig;
@@ -106,51 +106,30 @@ public class ModuleSplitterForShards {
     return mergedSplits;
   }
 
-  /**
-   * Strip assets from splits when they have a targeting that needs stripping (i.e: texture
-   * compression format only for now).
-   */
+  /** Strip assets from splits when they have a targeting that needs stripping. */
   private ImmutableList<ModuleSplit> stripAssetsWithTargeting(ImmutableList<ModuleSplit> splits) {
-    Optional<SuffixStripping> tcfSuffixStripping =
+    ImmutableList<SplitDimension> dimensionsToStrip =
         bundleConfig.getOptimizations().getSplitsConfig().getSplitDimensionList().stream()
-            .filter(dimension -> dimension.getValue().equals(Value.TEXTURE_COMPRESSION_FORMAT))
-            .findFirst()
-            .map(SplitDimension::getSuffixStripping);
-    if (!tcfSuffixStripping.isPresent()) {
-      // In this case, return the unmodified list of splits (only TCF is supported for now in assets
-      // stripping).
+            .filter(dimension -> SUFFIX_STRIPPING_DIMENSIONS.contains(dimension.getValue()))
+            .collect(toImmutableList());
+
+    if (dimensionsToStrip.isEmpty()) {
       return splits;
     }
 
     return splits.stream()
-        .map(
-            split ->
-                stripAssetsWithTargeting(
-                    split, TargetingDimension.TEXTURE_COMPRESSION_FORMAT, tcfSuffixStripping.get()))
+        .map(split -> stripAssetsWithTargeting(split, dimensionsToStrip))
         .collect(toImmutableList());
   }
 
   private static ModuleSplit stripAssetsWithTargeting(
-      ModuleSplit split, TargetingDimension dimension, SuffixStripping suffixStripping) {
-    // Only TCF is supported for now in assets stripping.
-    checkArgument(dimension.equals(TargetingDimension.TEXTURE_COMPRESSION_FORMAT));
-
-    // Only keep assets for the selected texture compression format.
-    split =
-        TargetingUtils.excludeAssetsTargetingOtherValue(
-            split, dimension, suffixStripping.getDefaultSuffix());
-
-    // Strip the targeting from the asset paths if suffix stripping is enabled.
-    if (suffixStripping.getEnabled()) {
-      split = TargetingUtils.removeAssetsTargeting(split, dimension);
+      ModuleSplit split, ImmutableList<SplitDimension> dimensionsToStrip) {
+    for (SplitDimension dimension : dimensionsToStrip) {
+      checkArgument(SUFFIX_STRIPPING_DIMENSIONS.contains(dimension.getValue()));
+      split =
+          SuffixStripper.createForDimension(dimension.getValue())
+              .applySuffixStripping(split, dimension.getSuffixStripping());
     }
-
-    // Apply the updated targeting to the module split (as it now only contains assets for
-    // the selected TCF)
-    split =
-        TargetingUtils.setTargetingByDefaultSuffix(
-            split, dimension, suffixStripping.getDefaultSuffix());
-
     return split;
   }
 

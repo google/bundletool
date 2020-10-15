@@ -239,6 +239,7 @@ public abstract class AppBundle {
 
       moduleBuilder.addEntry(
           ModuleEntry.builder()
+              .setBundlePath(ZipPath.create(entry.getName()))
               .setPath(ZipUtils.convertBundleToModulePath(ZipPath.create(entry.getName())))
               .setContent(ZipUtils.asByteSource(bundleFile, entry))
               .build());

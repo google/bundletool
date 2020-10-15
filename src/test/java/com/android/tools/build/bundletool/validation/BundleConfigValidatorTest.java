@@ -208,8 +208,8 @@ public final class BundleConfigValidatorTest {
     assertThat(exception)
         .hasMessageThat()
         .contains(
-            "Suffix stripping was enabled for an unsupported dimension. Only"
-                + " TEXTURE_COMPRESSION_FORMAT is supported.");
+            "Suffix stripping was enabled for an unsupported dimension. Supported dimensions are:"
+                + " TEXTURE_COMPRESSION_FORMAT, DEVICE_TIER.");
   }
 
   @Test

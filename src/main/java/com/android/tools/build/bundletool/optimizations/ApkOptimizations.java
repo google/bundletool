@@ -16,16 +16,20 @@
 package com.android.tools.build.bundletool.optimizations;
 
 import static com.android.tools.build.bundletool.model.OptimizationDimension.ABI;
+import static com.android.tools.build.bundletool.model.OptimizationDimension.DEVICE_TIER;
 import static com.android.tools.build.bundletool.model.OptimizationDimension.LANGUAGE;
 import static com.android.tools.build.bundletool.model.OptimizationDimension.SCREEN_DENSITY;
 import static com.android.tools.build.bundletool.model.OptimizationDimension.TEXTURE_COMPRESSION_FORMAT;
 import static com.google.common.base.Preconditions.checkNotNull;
 
+import com.android.bundle.Config.SuffixStripping;
 import com.android.tools.build.bundletool.model.OptimizationDimension;
 import com.android.tools.build.bundletool.model.version.Version;
 import com.google.auto.value.AutoValue;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.ImmutableSortedMap;
+import com.google.common.collect.Sets;
 import com.google.errorprone.annotations.Immutable;
 
 /** Optimizations that should be performed on the generated APKs. */
@@ -68,7 +72,16 @@ public abstract class ApkOptimizations {
                       .build())
               .build();
 
+  /** List of dimensions supported by asset modules. */
+  private static final ImmutableSet<OptimizationDimension> DIMENSIONS_SUPPORTED_BY_ASSET_MODULES =
+      ImmutableSet.of(LANGUAGE, TEXTURE_COMPRESSION_FORMAT, DEVICE_TIER);
+
   public abstract ImmutableSet<OptimizationDimension> getSplitDimensions();
+
+  public ImmutableSet<OptimizationDimension> getSplitDimensionsForAssetModules() {
+    return Sets.intersection(getSplitDimensions(), DIMENSIONS_SUPPORTED_BY_ASSET_MODULES)
+        .immutableCopy();
+  }
 
   public abstract boolean getUncompressNativeLibraries();
 
@@ -76,12 +89,15 @@ public abstract class ApkOptimizations {
 
   public abstract ImmutableSet<OptimizationDimension> getStandaloneDimensions();
 
+  public abstract ImmutableMap<OptimizationDimension, SuffixStripping> getSuffixStrippings();
+
   public abstract Builder toBuilder();
 
   public static Builder builder() {
     return new AutoValue_ApkOptimizations.Builder()
         .setUncompressNativeLibraries(false)
-        .setUncompressDexFiles(false);
+        .setUncompressDexFiles(false)
+        .setSuffixStrippings(ImmutableMap.of());
   }
 
   /** Builder for the {@link ApkOptimizations} class. */
@@ -95,6 +111,9 @@ public abstract class ApkOptimizations {
 
     public abstract Builder setStandaloneDimensions(
         ImmutableSet<OptimizationDimension> standaloneDimensions);
+
+    public abstract Builder setSuffixStrippings(
+        ImmutableMap<OptimizationDimension, SuffixStripping> suffixStrippings);
 
     public abstract ApkOptimizations build();
   }
@@ -121,16 +140,6 @@ public abstract class ApkOptimizations {
     // Currently no optimizations are performed.
     return ApkOptimizations.builder()
         .setSplitDimensions(ImmutableSet.of())
-        .setStandaloneDimensions(ImmutableSet.of())
-        .build();
-  }
-
-  public static ApkOptimizations getOptimizationsForAssetSlices() {
-    return ApkOptimizations.builder()
-        .setSplitDimensions(
-            ImmutableSet.of(
-                OptimizationDimension.TEXTURE_COMPRESSION_FORMAT,
-                LANGUAGE))
         .setStandaloneDimensions(ImmutableSet.of())
         .build();
   }

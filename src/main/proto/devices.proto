@@ -27,4 +27,7 @@ message DeviceSpec {
 
   // getprop ro.build.version.codename
   string codename = 7;
+
+  // Device tier.
+  string device_tier = 8;
 }

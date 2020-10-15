@@ -40,7 +40,7 @@ public class NativeLibsCompressionVariantGenerator implements BundleModuleVarian
 
   @Override
   public Stream<VariantTargeting> generate(BundleModule module) {
-    if (!apkGenerationConfiguration.getEnableNativeLibraryCompressionSplitter()
+    if (!apkGenerationConfiguration.getEnableUncompressedNativeLibraries()
         || apkGenerationConfiguration.isForInstantAppVariants()
         || !module.getNativeConfig().isPresent()) {
       return Stream.of();

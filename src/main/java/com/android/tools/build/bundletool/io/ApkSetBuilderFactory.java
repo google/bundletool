@@ -59,12 +59,6 @@ public final class ApkSetBuilderFactory {
     /** Adds an asset slice APK to the APK Set archive. */
     ApkDescription addAssetSliceApk(ModuleSplit split, ZipPath apkPath);
 
-    /**
-     * Adds an compressed system APK and an and an additional uncompressed stub APK containing just
-     * the android manifest to the APK Set archive.
-     */
-    ImmutableList<ApkDescription> addCompressedSystemApks(ModuleSplit split, ZipPath apkPath);
-
     /** Sets the TOC file in the APK Set archive. */
     void setTableOfContentsFile(BuildApksResult tableOfContentsProto);
 
@@ -155,15 +149,6 @@ public final class ApkSetBuilderFactory {
     }
 
     @Override
-    public ImmutableList<ApkDescription> addCompressedSystemApks(
-        ModuleSplit split, ZipPath apkPath) {
-      ImmutableList<ApkDescription> apkDescriptions =
-          standaloneApkSerializer.writeCompressedSystemApksToDisk(split, tempDirectory, apkPath);
-      apkDescriptions.forEach(apkDescription -> relativeApkPaths.add(apkDescription.getPath()));
-      return apkDescriptions;
-    }
-
-    @Override
     public void setTableOfContentsFile(BuildApksResult tableOfContentsProto) {
       tableOfContents = tableOfContentsProto;
     }
@@ -235,13 +220,6 @@ public final class ApkSetBuilderFactory {
     @Override
     public ApkDescription addSystemApk(ModuleSplit split, ZipPath apkPath) {
       return standaloneApkSerializer.writeSystemApkToDisk(split, outputDirectory, apkPath);
-    }
-
-    @Override
-    public ImmutableList<ApkDescription> addCompressedSystemApks(
-        ModuleSplit split, ZipPath apkPath) {
-      return standaloneApkSerializer.writeCompressedSystemApksToDisk(
-          split, outputDirectory, apkPath);
     }
 
     @Override

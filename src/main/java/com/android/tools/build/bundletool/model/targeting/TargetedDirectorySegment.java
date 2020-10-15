@@ -49,6 +49,7 @@ public abstract class TargetedDirectorySegment {
       Pattern.compile("(?<base>.+?)#(?<key>.+?)_(?<value>.+)");
 
   private static final Pattern LANGUAGE_CODE_PATTERN = Pattern.compile("^[a-zA-Z]{2,3}$");
+  private static final Pattern DEVICE_TIER_PATTERN = Pattern.compile("[a-zA-Z][a-zA-Z0-9_]*");
 
   private static final String OPENGL_KEY = "opengl";
   private static final String VULKAN_KEY = "vulkan";
@@ -102,6 +103,8 @@ public abstract class TargetedDirectorySegment {
     } else if (dimension.equals(TargetingDimension.TEXTURE_COMPRESSION_FORMAT)
         && getTargeting().hasTextureCompressionFormat()) {
       newTargeting.clearTextureCompressionFormat();
+    } else if (dimension.equals(TargetingDimension.DEVICE_TIER) && getTargeting().hasDeviceTier()) {
+      newTargeting.clearDeviceTier();
     } else {
       // Nothing to remove, return the existing immutable object.
       return this;
@@ -222,9 +225,7 @@ public abstract class TargetedDirectorySegment {
       case TEXTURE_COMPRESSION_FORMAT:
         return parseTextureCompressionFormat(name, value);
       case DEVICE_TIER:
-        return AssetsDirectoryTargeting.newBuilder()
-            .setDeviceTier(DeviceTierTargeting.newBuilder().addValue(value).build())
-            .build();
+        return parseDeviceTier(name, value);
       default:
         throw InvalidBundleException.builder()
             .withUserMessage("Unrecognized key: '%s'.", key)
@@ -323,6 +324,21 @@ public abstract class TargetedDirectorySegment {
     }
     return AssetsDirectoryTargeting.newBuilder()
         .setLanguage(LanguageTargeting.newBuilder().addValue(value.toLowerCase()))
+        .build();
+  }
+
+  private static AssetsDirectoryTargeting parseDeviceTier(String name, String value) {
+    Matcher matcher = DEVICE_TIER_PATTERN.matcher(value);
+    if (!matcher.matches()) {
+      throw InvalidBundleException.builder()
+          .withUserMessage(
+              "Device tier names should start with a letter and contain only letters, numbers and"
+                  + " underscores. Found tier named '%s' in directory '%s'.",
+              value, name)
+          .build();
+    }
+    return AssetsDirectoryTargeting.newBuilder()
+        .setDeviceTier(DeviceTierTargeting.newBuilder().addValue(value))
         .build();
   }
 }

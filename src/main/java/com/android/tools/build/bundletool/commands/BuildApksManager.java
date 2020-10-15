@@ -15,13 +15,13 @@
  */
 package com.android.tools.build.bundletool.commands;
 
+import static com.android.tools.build.bundletool.commands.BuildApksCommand.ApkBuildMode.SYSTEM;
 import static com.android.tools.build.bundletool.model.version.VersionGuardedFeature.RESOURCES_REFERENCED_IN_MANIFEST_TO_MASTER_SPLIT;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.ImmutableSet.toImmutableSet;
 
 import com.android.bundle.Commands.LocalTestingInfo;
 import com.android.bundle.Config.BundleConfig;
-import com.android.bundle.Config.SuffixStripping;
 import com.android.bundle.Devices.DeviceSpec;
 import com.android.tools.build.bundletool.commands.BuildApksCommand.ApkBuildMode;
 import com.android.tools.build.bundletool.commands.BuildApksCommand.SystemApkOption;
@@ -40,7 +40,6 @@ import com.android.tools.build.bundletool.model.BundleModuleName;
 import com.android.tools.build.bundletool.model.GeneratedApks;
 import com.android.tools.build.bundletool.model.GeneratedAssetSlices;
 import com.android.tools.build.bundletool.model.ModuleSplit;
-import com.android.tools.build.bundletool.model.OptimizationDimension;
 import com.android.tools.build.bundletool.model.SigningConfiguration;
 import com.android.tools.build.bundletool.model.exceptions.IncompatibleDeviceException;
 import com.android.tools.build.bundletool.model.exceptions.InvalidCommandException;
@@ -51,7 +50,6 @@ import com.android.tools.build.bundletool.model.utils.Versions;
 import com.android.tools.build.bundletool.model.version.Version;
 import com.android.tools.build.bundletool.model.version.VersionGuardedFeature;
 import com.android.tools.build.bundletool.optimizations.ApkOptimizations;
-import com.android.tools.build.bundletool.optimizations.OptimizationsMerger;
 import com.android.tools.build.bundletool.preprocessors.LocalTestingPreprocessor;
 import com.android.tools.build.bundletool.shards.ShardedApksFacade;
 import com.android.tools.build.bundletool.splitters.ApkGenerationConfiguration;
@@ -60,7 +58,6 @@ import com.android.tools.build.bundletool.splitters.ResourceAnalyzer;
 import com.android.tools.build.bundletool.splitters.SplitApksGenerator;
 import com.android.tools.build.bundletool.validation.AppBundleValidator;
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -83,7 +80,7 @@ public final class BuildApksManager {
   private final ApkSerializerManager apkSerializerManager;
   private final SplitApksGenerator splitApksGenerator;
   private final ShardedApksFacade shardedApksFacade;
-  private final OptimizationsMerger optimizationsMerger;
+  private final ApkOptimizations apkOptimizations;
 
   @Inject
   BuildApksManager(
@@ -97,7 +94,7 @@ public final class BuildApksManager {
       ApkSerializerManager apkSerializerManager,
       SplitApksGenerator splitApksGenerator,
       ShardedApksFacade shardedApksFacade,
-      OptimizationsMerger optimizationsMerger) {
+      ApkOptimizations apkOptimizations) {
     this.appBundle = appBundle;
     this.command = command;
     this.bundletoolVersion = bundletoolVersion;
@@ -108,7 +105,7 @@ public final class BuildApksManager {
     this.splitApksGenerator = splitApksGenerator;
     this.apkSerializerManager = apkSerializerManager;
     this.shardedApksFacade = shardedApksFacade;
-    this.optimizationsMerger = optimizationsMerger;
+    this.apkOptimizations = apkOptimizations;
   }
 
   public void execute() throws IOException {
@@ -208,13 +205,12 @@ public final class BuildApksManager {
     ImmutableList<BundleModule> allModules = getModulesForStandaloneApks(appBundle);
     return appBundle.isApex()
         ? shardedApksFacade.generateApexSplits(modulesToFuse(allModules))
-        : shardedApksFacade.generateSplits(
-            modulesToFuse(allModules), getApkOptimizations(appBundle.getBundleConfig()));
+        : shardedApksFacade.generateSplits(modulesToFuse(allModules), apkOptimizations);
   }
 
   private ImmutableList<ModuleSplit> generateAssetSlices(AppBundle appBundle) {
     ApkGenerationConfiguration assetSlicesGenerationConfiguration =
-        getAssetSliceGenerationConfiguration(appBundle.getBundleConfig());
+        getAssetSliceGenerationConfiguration();
     AssetSlicesGenerator assetSlicesGenerator =
         new AssetSlicesGenerator(
             appBundle,
@@ -263,7 +259,7 @@ public final class BuildApksManager {
         /* modulesToFuse= */ modulesToFuse.stream()
             .map(BundleModule::getName)
             .collect(toImmutableSet()),
-        getSystemApkOptimizations(appBundle.getBundleConfig()));
+        getSystemApkOptimizations());
   }
 
   private static void checkDeviceCompatibilityWithBundle(
@@ -273,12 +269,17 @@ public final class BuildApksManager {
   }
 
   private ApkSetBuilder createApkSetBuilder(Path tempDir) {
-    if (!command.getCreateApkSetArchive()) {
-      return ApkSetBuilderFactory.createApkSetWithoutArchiveBuilder(
-          splitApkSerializer, standaloneApkSerializer, command.getOutputFile());
+    switch (command.getOutputFormat()) {
+      case APK_SET:
+        return ApkSetBuilderFactory.createApkSetBuilder(
+            splitApkSerializer, standaloneApkSerializer, tempDir);
+      case DIRECTORY:
+        return ApkSetBuilderFactory.createApkSetWithoutArchiveBuilder(
+            splitApkSerializer, standaloneApkSerializer, command.getOutputFile());
     }
-    return ApkSetBuilderFactory.createApkSetBuilder(
-        splitApkSerializer, standaloneApkSerializer, tempDir);
+    throw InvalidCommandException.builder()
+        .withInternalMessage("Unsupported output format '%s'.", command.getOutputFormat())
+        .build();
   }
 
   private ApkGenerationConfiguration.Builder getCommonSplitApkGenerationConfiguration(
@@ -286,16 +287,12 @@ public final class BuildApksManager {
     BundleConfig bundleConfig = appBundle.getBundleConfig();
     Version bundleToolVersion = Version.of(bundleConfig.getBundletool().getVersion());
 
-    ApkOptimizations apkOptimizations = getApkOptimizations(bundleConfig);
-
     ApkGenerationConfiguration.Builder apkGenerationConfiguration =
         ApkGenerationConfiguration.builder()
             .setOptimizationDimensions(apkOptimizations.getSplitDimensions());
 
-    boolean enableNativeLibraryCompressionSplitter =
-        apkOptimizations.getUncompressNativeLibraries();
-    apkGenerationConfiguration.setEnableNativeLibraryCompressionSplitter(
-        enableNativeLibraryCompressionSplitter);
+    apkGenerationConfiguration.setEnableUncompressedNativeLibraries(
+        apkOptimizations.getUncompressNativeLibraries());
 
     apkGenerationConfiguration.setInstallableOnExternalStorage(
         appBundle
@@ -312,7 +309,7 @@ public final class BuildApksManager {
     apkGenerationConfiguration.setMasterPinnedResourceNames(
         appBundle.getMasterPinnedResourceNames());
 
-    apkGenerationConfiguration.setSuffixStrippings(getSuffixStrippings(bundleConfig));
+    apkGenerationConfiguration.setSuffixStrippings(apkOptimizations.getSuffixStrippings());
 
     command
         .getSigningConfiguration()
@@ -322,13 +319,10 @@ public final class BuildApksManager {
     return apkGenerationConfiguration;
   }
 
-  private static ApkGenerationConfiguration getAssetSliceGenerationConfiguration(
-      BundleConfig bundleConfig) {
-    ApkOptimizations apkOptimizations = ApkOptimizations.getOptimizationsForAssetSlices();
-
+  private ApkGenerationConfiguration getAssetSliceGenerationConfiguration() {
     return ApkGenerationConfiguration.builder()
-        .setOptimizationDimensions(apkOptimizations.getSplitDimensions())
-        .setSuffixStrippings(getSuffixStrippings(bundleConfig))
+        .setOptimizationDimensions(apkOptimizations.getSplitDimensionsForAssetModules())
+        .setSuffixStrippings(apkOptimizations.getSuffixStrippings())
         .build();
   }
 
@@ -336,19 +330,9 @@ public final class BuildApksManager {
     return modules.stream().filter(BundleModule::isIncludedInFusing).collect(toImmutableList());
   }
 
-  private static ImmutableMap<OptimizationDimension, SuffixStripping> getSuffixStrippings(
-      BundleConfig bundleConfig) {
-    return OptimizationsMerger.getSuffixStrippings(
-        bundleConfig.getOptimizations().getSplitsConfig().getSplitDimensionList());
-  }
-
-  private ApkOptimizations getApkOptimizations(BundleConfig bundleConfig) {
-    return optimizationsMerger.mergeWithDefaults(bundleConfig, command.getOptimizationDimensions());
-  }
-
-  private ApkOptimizations getSystemApkOptimizations(BundleConfig bundleConfig) {
+  private ApkOptimizations getSystemApkOptimizations() {
     ImmutableSet<SystemApkOption> systemApkOptions = command.getSystemApkOptions();
-    return getApkOptimizations(bundleConfig).toBuilder()
+    return apkOptimizations.toBuilder()
         .setUncompressNativeLibraries(
             systemApkOptions.contains(SystemApkOption.UNCOMPRESSED_NATIVE_LIBRARIES))
         .setUncompressDexFiles(systemApkOptions.contains(SystemApkOption.UNCOMPRESSED_DEX_FILES))
@@ -533,7 +517,7 @@ public final class BuildApksManager {
       if (appBundle.isAssetOnly()) {
         return false;
       }
-      return apkBuildMode.isAnySystemMode();
+      return apkBuildMode.equals(SYSTEM);
     }
 
     public boolean generateAssetSlices() {

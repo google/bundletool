@@ -25,6 +25,7 @@ message ApkTargeting {
   TextureCompressionFormatTargeting texture_compression_format_targeting = 6;
   MultiAbiTargeting multi_abi_targeting = 7;
   SanitizerTargeting sanitizer_targeting = 8;
+  DeviceTierTargeting device_tier_targeting = 9;
 }
 
 // Targeting on the module level.

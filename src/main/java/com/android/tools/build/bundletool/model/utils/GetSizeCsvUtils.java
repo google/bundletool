@@ -39,7 +39,8 @@ public final class GetSizeCsvUtils {
           Dimension.ABI,
           Dimension.SCREEN_DENSITY,
           Dimension.LANGUAGE,
-          Dimension.TEXTURE_COMPRESSION_FORMAT);
+          Dimension.TEXTURE_COMPRESSION_FORMAT,
+          Dimension.DEVICE_TIER);
 
   public static String getSizeTotalOutputInCsv(
       ConfigurationSizes configurationSizes, ImmutableSet<Dimension> dimensions) {
@@ -80,12 +81,16 @@ public final class GetSizeCsvUtils {
       long minSize,
       long maxSize) {
     ImmutableMap<Dimension, Supplier<Optional<String>>> dimensionToTextMap =
-        ImmutableMap.of(
-            Dimension.ABI, sizeConfiguration::getAbi,
-            Dimension.SDK, sizeConfiguration::getSdkVersion,
-            Dimension.LANGUAGE, sizeConfiguration::getLocale,
-            Dimension.SCREEN_DENSITY, sizeConfiguration::getScreenDensity,
-            Dimension.TEXTURE_COMPRESSION_FORMAT, sizeConfiguration::getTextureCompressionFormat);
+        ImmutableMap.<Dimension, Supplier<Optional<String>>>builder()
+            .put(Dimension.ABI, sizeConfiguration::getAbi)
+            .put(Dimension.SDK, sizeConfiguration::getSdkVersion)
+            .put(Dimension.LANGUAGE, sizeConfiguration::getLocale)
+            .put(Dimension.SCREEN_DENSITY, sizeConfiguration::getScreenDensity)
+            .put(
+                Dimension.TEXTURE_COMPRESSION_FORMAT,
+                sizeConfiguration::getTextureCompressionFormat)
+            .put(Dimension.DEVICE_TIER, sizeConfiguration::getDeviceTier)
+            .build();
 
     return Stream.concat(
             dimensions.stream()

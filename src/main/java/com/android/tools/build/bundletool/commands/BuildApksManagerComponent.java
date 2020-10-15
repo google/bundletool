@@ -15,10 +15,15 @@
  */
 package com.android.tools.build.bundletool.commands;
 
+import static java.lang.annotation.RetentionPolicy.RUNTIME;
+
 import com.android.tools.build.bundletool.io.TempDirectory;
+import com.android.tools.build.bundletool.io.ZipReader;
 import com.android.tools.build.bundletool.model.AppBundle;
 import dagger.BindsInstance;
 import dagger.Component;
+import java.lang.annotation.Retention;
+import javax.inject.Qualifier;
 
 /** Dagger component to create a {@link BuildApksManager}. */
 @CommandScoped
@@ -39,5 +44,19 @@ public interface BuildApksManagerComponent {
 
     @BindsInstance
     Builder setAppBundle(AppBundle appBundle);
+
+    @BindsInstance
+    Builder setZipReader(ZipReader zipReader);
+
+    @BindsInstance
+    Builder setUseBundleCompression(@UseBundleCompression boolean useBundleCompression);
   }
+
+  /**
+   * Qualifying annotation a {@code boolean} on whether entries in the APKs can be serialized with
+   * the same compression as the entries in the App Bundle.
+   */
+  @Qualifier
+  @Retention(RUNTIME)
+  public @interface UseBundleCompression {}
 }

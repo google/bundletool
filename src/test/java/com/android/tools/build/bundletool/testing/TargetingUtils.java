@@ -382,6 +382,10 @@ public final class TargetingUtils {
         .build();
   }
 
+  public static ApkTargeting apkDeviceTierTargeting(DeviceTierTargeting deviceTierTargeting) {
+    return ApkTargeting.newBuilder().setDeviceTierTargeting(deviceTierTargeting).build();
+  }
+
   // Variant Targeting helpers. Should be written in terms of existing targeting dimension protos or
   // helpers. See below, for the targeting dimension helper methods.
 
@@ -883,8 +887,21 @@ public final class TargetingUtils {
 
   // Device Tier targeting.
 
-  public static DeviceTierTargeting deviceTierTargeting(String tier) {
-    return DeviceTierTargeting.newBuilder().addValue(tier).build();
+  public static DeviceTierTargeting deviceTierTargeting(String value) {
+    return DeviceTierTargeting.newBuilder().addValue(value).build();
+  }
+
+  public static DeviceTierTargeting deviceTierTargeting(
+      String value, ImmutableList<String> alternatives) {
+    return DeviceTierTargeting.newBuilder()
+        .addValue(value)
+        .addAllAlternatives(alternatives)
+        .build();
+  }
+
+  public static DeviceTierTargeting alternativeDeviceTierTargeting(
+      ImmutableList<String> alternatives) {
+    return DeviceTierTargeting.newBuilder().addAllAlternatives(alternatives).build();
   }
 
   // Device Feature targeting.

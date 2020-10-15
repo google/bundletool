@@ -34,8 +34,10 @@ import com.android.bundle.Devices.DeviceSpec;
 import com.android.bundle.Targeting.ApkTargeting;
 import com.android.tools.build.bundletool.model.ModuleSplit;
 import com.android.tools.build.bundletool.model.ZipPath;
+import com.android.tools.build.bundletool.model.exceptions.IncompatibleDeviceException;
 import com.android.tools.build.bundletool.model.exceptions.InvalidCommandException;
 import com.android.tools.build.bundletool.model.version.Version;
+import com.google.auto.value.AutoValue;
 import com.google.common.base.Predicate;
 import com.google.common.base.Predicates;
 import com.google.common.collect.ImmutableList;
@@ -80,6 +82,7 @@ public class ApkMatcher {
     DeviceFeatureMatcher deviceFeatureMatcher = new DeviceFeatureMatcher(deviceSpec);
     TextureCompressionFormatMatcher textureCompressionFormatMatcher =
         new TextureCompressionFormatMatcher(deviceSpec);
+    DeviceTierMatcher deviceTierMatcher = new DeviceTierMatcher(deviceSpec);
 
     this.apkMatchers =
         ImmutableList.of(
@@ -88,7 +91,8 @@ public class ApkMatcher {
             multiAbiMatcher,
             screenDensityMatcher,
             languageMatcher,
-            textureCompressionFormatMatcher);
+            textureCompressionFormatMatcher,
+            deviceTierMatcher);
     this.requestedModuleNames = requestedModuleNames;
     this.matchInstant = matchInstant;
     this.moduleMatcher = new ModuleMatcher(sdkVersionMatcher, deviceFeatureMatcher);
@@ -108,27 +112,31 @@ public class ApkMatcher {
    * @param buildApksResult describes APKs produced by the BundleTool
    * @return paths of the matching APKs as represented by {@link ApkDescription#getPath()}
    */
-  public ImmutableList<ZipPath> getMatchingApks(BuildApksResult buildApksResult) {
+  public ImmutableList<GeneratedApk> getMatchingApks(BuildApksResult buildApksResult) {
     Optional<Variant> matchingVariant = variantMatcher.getMatchingVariant(buildApksResult);
 
     if (matchingVariant.isPresent()) {
       validateVariant(matchingVariant.get(), buildApksResult);
     }
 
-    ImmutableList<ZipPath> variantApks =
+    ImmutableList<GeneratedApk> variantApks =
         matchingVariant.isPresent()
             ? getMatchingApksFromVariant(
                 matchingVariant.get(), Version.of(buildApksResult.getBundletool().getVersion()))
             : ImmutableList.of();
 
-    ImmutableList<ZipPath> assetModuleApks =
+    ImmutableList<GeneratedApk> assetModuleApks =
         getMatchingApksFromAssetModules(buildApksResult.getAssetSliceSetList());
 
-    return ImmutableList.<ZipPath>builder().addAll(variantApks).addAll(assetModuleApks).build();
+    return ImmutableList.<GeneratedApk>builder()
+        .addAll(variantApks)
+        .addAll(assetModuleApks)
+        .build();
   }
 
-  public ImmutableList<ZipPath> getMatchingApksFromVariant(Variant variant, Version bundleVersion) {
-    ImmutableList.Builder<ZipPath> matchedApksBuilder = ImmutableList.builder();
+  public ImmutableList<GeneratedApk> getMatchingApksFromVariant(
+      Variant variant, Version bundleVersion) {
+    ImmutableList.Builder<GeneratedApk> matchedApksBuilder = ImmutableList.builder();
 
     Predicate<String> moduleNameMatcher = getModuleNameMatcher(variant, bundleVersion);
 
@@ -143,7 +151,11 @@ public class ApkMatcher {
         checkCompatibleWithApkTargeting(apkTargeting);
 
         if (matchesApk(apkTargeting, isSplit, moduleName, moduleNameMatcher)) {
-          matchedApksBuilder.add(ZipPath.create(apkDescription.getPath()));
+          matchedApksBuilder.add(
+              GeneratedApk.create(
+                  ZipPath.create(apkDescription.getPath()),
+                  moduleName,
+                  apkSet.getModuleMetadata().getDeliveryType()));
         }
       }
     }
@@ -279,9 +291,9 @@ public class ApkMatcher {
     matcher.checkDeviceCompatible(matcher.getTargetingValue(apkTargeting));
   }
 
-  public ImmutableList<ZipPath> getMatchingApksFromAssetModules(
+  public ImmutableList<GeneratedApk> getMatchingApksFromAssetModules(
       Collection<AssetSliceSet> assetModules) {
-    ImmutableList.Builder<ZipPath> matchedApksBuilder = ImmutableList.builder();
+    ImmutableList.Builder<GeneratedApk> matchedApksBuilder = ImmutableList.builder();
 
     Predicate<String> assetModuleNameMatcher = getAssetModuleNameMatcher(assetModules);
 
@@ -291,7 +303,11 @@ public class ApkMatcher {
         ApkTargeting apkTargeting = apkDescription.getTargeting();
 
         if (matchesApk(apkTargeting, /*isSplit=*/ true, moduleName, assetModuleNameMatcher)) {
-          matchedApksBuilder.add(ZipPath.create(apkDescription.getPath()));
+          matchedApksBuilder.add(
+              GeneratedApk.create(
+                  ZipPath.create(apkDescription.getPath()),
+                  moduleName,
+                  sliceSet.getAssetModuleMetadata().getDeliveryType()));
         }
       }
     }
@@ -315,5 +331,20 @@ public class ApkMatcher {
             .collect(toImmutableSet());
 
     return upfrontAssetModuleNames::contains;
+  }
+
+  /** Describes an APK generated by `build-apks` command of bundletool */
+  @AutoValue
+  public abstract static class GeneratedApk {
+    /** Path of the APK inside APKS (result of `build-apks`) output. */
+    public abstract ZipPath getPath();
+
+    public abstract String getModuleName();
+
+    public abstract DeliveryType getDeliveryType();
+
+    public static GeneratedApk create(ZipPath path, String moduleName, DeliveryType deliveryType) {
+      return new AutoValue_ApkMatcher_GeneratedApk(path, moduleName, deliveryType);
+    }
   }
 }

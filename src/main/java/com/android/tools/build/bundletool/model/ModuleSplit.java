@@ -57,6 +57,7 @@ import com.android.tools.build.bundletool.model.SourceStamp.StampType;
 import com.android.tools.build.bundletool.model.utils.ResourcesUtils;
 import com.google.auto.value.AutoValue;
 import com.google.auto.value.extension.memoized.Memoized;
+import com.google.common.base.Ascii;
 import com.google.common.base.Joiner;
 import com.google.common.base.Predicate;
 import com.google.common.base.Predicates;
@@ -214,10 +215,15 @@ public abstract class ModuleSplit {
     if (!textureFormatTargeting.getValueList().isEmpty()) {
       textureFormatTargeting
           .getValueList()
-          .forEach(value -> suffixJoiner.add(value.getAlias().name().toLowerCase()));
+          .forEach(value -> suffixJoiner.add(Ascii.toLowerCase(value.getAlias().name())));
     } else if (!textureFormatTargeting.getAlternativesList().isEmpty()) {
       suffixJoiner.add("other_tcf");
     }
+
+    getApkTargeting()
+        .getDeviceTierTargeting()
+        .getValueList()
+        .forEach(value -> suffixJoiner.add("tier_" + Ascii.toLowerCase(value)));
 
     return suffixJoiner.toString();
   }
@@ -651,13 +657,14 @@ public abstract class ModuleSplit {
         checkState(
             moduleSplit.getApkTargeting().toBuilder()
                 .clearSdkVersionTargeting()
-                // TCF can be set on standalone/universal APKs: if suffix stripping was enabled,
-                // a default targeting suffix was used.
+                // TCF and Device Tier can be set on standalone/universal APKs: if suffix stripping
+                // was enabled, a default targeting suffix was used.
                 .clearTextureCompressionFormatTargeting()
+                .clearDeviceTierTargeting()
                 .build()
                 .equals(ApkTargeting.getDefaultInstance()),
-            "Master split cannot have any targeting other than SDK version or Texture"
-                + "Compression Format.");
+            "Master split cannot have any targeting other than SDK version, Texture"
+                + "Compression Format and Device Tier.");
       }
       return moduleSplit;
     }

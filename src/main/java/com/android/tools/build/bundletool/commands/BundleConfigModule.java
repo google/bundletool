@@ -16,11 +16,7 @@
 package com.android.tools.build.bundletool.commands;
 
 import com.android.bundle.Config.BundleConfig;
-import com.android.bundle.Config.SuffixStripping;
-import com.android.tools.build.bundletool.model.OptimizationDimension;
 import com.android.tools.build.bundletool.model.version.Version;
-import com.android.tools.build.bundletool.optimizations.OptimizationsMerger;
-import com.google.common.collect.ImmutableMap;
 import dagger.Module;
 import dagger.Provides;
 
@@ -32,14 +28,6 @@ public final class BundleConfigModule {
   @Provides
   static Version provideBundletoolVersion(BundleConfig bundleConfig) {
     return Version.of(bundleConfig.getBundletool().getVersion());
-  }
-
-  @CommandScoped
-  @Provides
-  static ImmutableMap<OptimizationDimension, SuffixStripping>
-      provideSuffixStrippingPerOptimizationDimension(BundleConfig bundleConfig) {
-    return OptimizationsMerger.getSuffixStrippings(
-        bundleConfig.getOptimizations().getSplitsConfig().getSplitDimensionList());
   }
 
   private BundleConfigModule() {}

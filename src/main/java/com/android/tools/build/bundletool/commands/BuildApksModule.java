@@ -15,6 +15,7 @@
  */
 package com.android.tools.build.bundletool.commands;
 
+import static com.google.common.base.Preconditions.checkState;
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
 import com.android.bundle.Config.BundleConfig;
@@ -22,6 +23,7 @@ import com.android.bundle.Devices.DeviceSpec;
 import com.android.tools.build.bundletool.commands.BuildApksCommand.ApkBuildMode;
 import com.android.tools.build.bundletool.device.AdbServer;
 import com.android.tools.build.bundletool.device.DeviceAnalyzer;
+import com.android.tools.build.bundletool.io.ApkSerializerModule;
 import com.android.tools.build.bundletool.model.ApkListener;
 import com.android.tools.build.bundletool.model.ApkModifier;
 import com.android.tools.build.bundletool.model.SigningConfiguration;
@@ -37,7 +39,13 @@ import java.util.Optional;
 import javax.inject.Qualifier;
 
 /** Dagger module for the build-apks command. */
-@Module(includes = {BundleConfigModule.class, BundletoolModule.class, AppBundleModule.class})
+@Module(
+    includes = {
+      BundleConfigModule.class,
+      BundletoolModule.class,
+      AppBundleModule.class,
+      ApkSerializerModule.class
+    })
 public final class BuildApksModule {
 
   @CommandScoped
@@ -109,15 +117,22 @@ public final class BuildApksModule {
   @CommandScoped
   @Provides
   static Optional<DeviceSpec> provideDeviceSpec(BuildApksCommand command) {
+    Optional<DeviceSpec> deviceSpec = command.getDeviceSpec();
     if (command.getGenerateOnlyForConnectedDevice()) {
       AdbServer adbServer = command.getAdbServer().get();
       adbServer.init(command.getAdbPath().get());
 
-      DeviceSpec connectedDeviceSpec =
-          new DeviceAnalyzer(adbServer).getDeviceSpec(command.getDeviceId());
-      return Optional.of(connectedDeviceSpec);
+      deviceSpec = Optional.of(new DeviceAnalyzer(adbServer).getDeviceSpec(command.getDeviceId()));
     }
-    return command.getDeviceSpec();
+    if (command.getDeviceTier().isPresent()) {
+      // --device-tier can only be specified along with --device-spec or --connected-device, so
+      // deviceSpec should always be present in this case.
+      checkState(deviceSpec.isPresent(), "Device tier specified but no device was provided.");
+      deviceSpec =
+          deviceSpec.map(
+              spec -> spec.toBuilder().setDeviceTier(command.getDeviceTier().get()).build());
+    }
+    return deviceSpec;
   }
 
   @CommandScoped

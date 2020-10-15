@@ -68,6 +68,14 @@ public class AssetModuleSplitter {
               apkGenerationConfiguration.shouldStripTargetingSuffix(
                   OptimizationDimension.TEXTURE_COMPRESSION_FORMAT)));
     }
+    if (apkGenerationConfiguration
+        .getOptimizationDimensions()
+        .contains(OptimizationDimension.DEVICE_TIER)) {
+      assetsSplitters.add(
+          DeviceTierAssetsSplitter.create(
+              apkGenerationConfiguration.shouldStripTargetingSuffix(
+                  OptimizationDimension.DEVICE_TIER)));
+    }
     return new SplittingPipeline(assetsSplitters.build());
   }
 

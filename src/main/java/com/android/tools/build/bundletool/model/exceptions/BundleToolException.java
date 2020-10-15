@@ -31,6 +31,12 @@ public abstract class BundleToolException extends RuntimeException {
     this.userMessage = userMessage;
   }
 
+  BundleToolException(ErrorType errorType, String userMessage, String internalMessage) {
+    super(internalMessage);
+    this.errorType = errorType;
+    this.userMessage = userMessage;
+  }
+
   public String getUserMessage() {
     return userMessage;
   }

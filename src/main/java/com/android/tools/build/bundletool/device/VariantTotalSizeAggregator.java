@@ -23,16 +23,17 @@ import static com.google.common.collect.ImmutableList.toImmutableList;
 import com.android.bundle.Commands.ApkDescription;
 import com.android.bundle.Commands.Variant;
 import com.android.bundle.Targeting.AbiTargeting;
+import com.android.bundle.Targeting.DeviceTierTargeting;
 import com.android.bundle.Targeting.LanguageTargeting;
 import com.android.bundle.Targeting.ScreenDensityTargeting;
 import com.android.bundle.Targeting.SdkVersionTargeting;
 import com.android.bundle.Targeting.TextureCompressionFormatTargeting;
 import com.android.bundle.Targeting.VariantTargeting;
 import com.android.tools.build.bundletool.commands.GetSizeCommand;
+import com.android.tools.build.bundletool.device.ApkMatcher.GeneratedApk;
 import com.android.tools.build.bundletool.model.ConfigurationSizes;
 import com.android.tools.build.bundletool.model.GetSizeRequest;
 import com.android.tools.build.bundletool.model.SizeConfiguration;
-import com.android.tools.build.bundletool.model.ZipPath;
 import com.android.tools.build.bundletool.model.version.Version;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
@@ -68,12 +69,13 @@ public class VariantTotalSizeAggregator extends AbstractSizeAggregator {
   }
 
   @Override
-  protected ImmutableList<ZipPath> getMatchingApks(
+  protected ImmutableList<GeneratedApk> getMatchingApks(
       SdkVersionTargeting sdkVersionTargeting,
       AbiTargeting abiTargeting,
       ScreenDensityTargeting screenDensityTargeting,
       LanguageTargeting languageTargeting,
-      TextureCompressionFormatTargeting textureTargeting) {
+      TextureCompressionFormatTargeting textureTargeting,
+      DeviceTierTargeting deviceTierTargeting) {
     return new ApkMatcher(
             getDeviceSpec(
                 getSizeRequest.getDeviceSpec(),
@@ -81,7 +83,8 @@ public class VariantTotalSizeAggregator extends AbstractSizeAggregator {
                 abiTargeting,
                 screenDensityTargeting,
                 languageTargeting,
-                textureTargeting),
+                textureTargeting,
+                deviceTierTargeting),
             getSizeRequest.getModules(),
             getSizeRequest.getInstant())
         .getMatchingApksFromVariant(variant, bundleVersion);
@@ -102,13 +105,16 @@ public class VariantTotalSizeAggregator extends AbstractSizeAggregator {
         getAllScreenDensityTargetings(apkDescriptions);
     ImmutableSet<TextureCompressionFormatTargeting> textureCompressionFormatTargetingOptions =
         getAllTextureCompressionFormatTargetings(apkDescriptions);
+    ImmutableSet<DeviceTierTargeting> deviceTierTargetingOptions =
+        getAllDeviceTierTargetings(apkDescriptions);
 
     return getSizesPerConfiguration(
         sdkVersionTargetingOptions,
         abiTargetingOptions,
         languageTargetingOptions,
         screenDensityTargetingOptions,
-        textureCompressionFormatTargetingOptions);
+        textureCompressionFormatTargetingOptions,
+        deviceTierTargetingOptions);
   }
 
   private ConfigurationSizes getSizeStandaloneVariant() {
@@ -130,7 +136,8 @@ public class VariantTotalSizeAggregator extends AbstractSizeAggregator {
                 variantTargeting.getAbiTargeting(),
                 variantTargeting.getScreenDensityTargeting(),
                 LanguageTargeting.getDefaultInstance(),
-                variantTargeting.getTextureCompressionFormatTargeting()),
+                variantTargeting.getTextureCompressionFormatTargeting(),
+                DeviceTierTargeting.getDefaultInstance()),
             getSizeRequest.getDeviceSpec());
 
     // Variants of standalone APKs have only one APK each.

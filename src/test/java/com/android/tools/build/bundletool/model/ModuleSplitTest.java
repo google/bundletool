@@ -33,11 +33,13 @@ import static com.android.tools.build.bundletool.testing.TargetingUtils.abiTarge
 import static com.android.tools.build.bundletool.testing.TargetingUtils.alternativeLanguageTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.apkAbiTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.apkDensityTargeting;
+import static com.android.tools.build.bundletool.testing.TargetingUtils.apkDeviceTierTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.apkGraphicsTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.apkLanguageTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.apkMultiAbiTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.apkSanitizerTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.apkTextureTargeting;
+import static com.android.tools.build.bundletool.testing.TargetingUtils.deviceTierTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.graphicsApiTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.lPlusVariantTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.languageTargeting;
@@ -305,6 +307,22 @@ public class ModuleSplitTest {
   }
 
   @Test
+  public void moduleDeviceTierSplitSuffixAndName() {
+    ModuleSplit deviceTieredSplit =
+        ModuleSplit.builder()
+            .setModuleName(BundleModuleName.create("base"))
+            .setVariantTargeting(lPlusVariantTargeting())
+            .setApkTargeting(
+                apkDeviceTierTargeting(
+                    deviceTierTargeting("low", ImmutableList.of("medium", "high"))))
+            .setMasterSplit(false)
+            .setAndroidManifest(AndroidManifest.create(androidManifest("com.test.app")))
+            .build();
+    deviceTieredSplit = deviceTieredSplit.writeSplitIdInManifest(deviceTieredSplit.getSuffix());
+    assertThat(deviceTieredSplit.getAndroidManifest().getSplitId()).hasValue("config.tier_low");
+  }
+
+  @Test
   public void apexModuleMultiAbiSplitSuffixAndName() {
     ModuleSplit resSplit =
         ModuleSplit.builder()
@@ -445,7 +463,7 @@ public class ModuleSplitTest {
             .build();
     SourceStamp sourceStamp =
         SourceStamp.builder()
-            .setSource("https://www.validsource.com")
+            .setSource("https://www.example.com")
             .setSigningConfiguration(stampSigningConfig)
             .build();
     StampType stampType = StampType.STAMP_TYPE_DISTRIBUTION_APK;
@@ -471,7 +489,7 @@ public class ModuleSplitTest {
             .build();
     SourceStamp sourceStamp =
         SourceStamp.builder()
-            .setSource("https://www.validsource.com")
+            .setSource("https://www.example.com")
             .setSigningConfiguration(stampSigningConfig)
             .build();
     StampType stampType = StampType.STAMP_TYPE_DISTRIBUTION_APK;

@@ -25,7 +25,6 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Path;
-import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
 import javax.annotation.WillNotClose;
 
@@ -58,20 +57,6 @@ public final class GZipUtils {
       ByteStreams.copy(stream, compressedStream);
     }
     return countingOutputStream.getCount();
-  }
-
-  public static void compress(Path sourceFile, Path gzippedDestinationFile) throws IOException {
-    try (GZIPOutputStream gzipOutputStream =
-        new GZIPOutputStream(java.nio.file.Files.newOutputStream(gzippedDestinationFile))) {
-      java.nio.file.Files.copy(sourceFile, gzipOutputStream);
-    }
-  }
-
-  public static void uncompress(Path gzippedSourceFile, Path destinationFile) throws IOException {
-    try (GZIPInputStream gzipInputStream =
-        new GZIPInputStream(java.nio.file.Files.newInputStream(gzippedSourceFile))) {
-      java.nio.file.Files.copy(gzipInputStream, destinationFile);
-    }
   }
 
   private GZipUtils() {}

@@ -21,6 +21,7 @@ import static com.android.tools.build.bundletool.model.targeting.TargetingUtils.
 import static com.android.tools.build.bundletool.model.targeting.TargetingUtils.getMinSdk;
 
 import com.android.bundle.Targeting.AbiTargeting;
+import com.android.bundle.Targeting.DeviceTierTargeting;
 import com.android.bundle.Targeting.LanguageTargeting;
 import com.android.bundle.Targeting.ScreenDensity;
 import com.android.bundle.Targeting.ScreenDensityTargeting;
@@ -50,6 +51,8 @@ public abstract class SizeConfiguration {
   public abstract Optional<String> getSdkVersion();
 
   public abstract Optional<String> getTextureCompressionFormat();
+
+  public abstract Optional<String> getDeviceTier();
 
   public abstract Builder toBuilder();
 
@@ -109,6 +112,13 @@ public abstract class SizeConfiguration {
             Iterables.getOnlyElement(textureCompressionFormatTargeting.getValueList()).getAlias()));
   }
 
+  public static Optional<String> getDeviceTierName(DeviceTierTargeting deviceTierTargeting) {
+    if (deviceTierTargeting.getValueList().isEmpty()) {
+      return Optional.empty();
+    }
+    return Optional.of(Iterables.getOnlyElement(deviceTierTargeting.getValueList()));
+  }
+
   /** Builder for the {@link SizeConfiguration}. */
   @AutoValue.Builder
   public abstract static class Builder {
@@ -121,6 +131,8 @@ public abstract class SizeConfiguration {
     public abstract Builder setSdkVersion(String sdkVersion);
 
     public abstract Builder setTextureCompressionFormat(String textureCompressionFormat);
+
+    public abstract Builder setDeviceTier(String deviceTier);
 
     public abstract SizeConfiguration build();
   }

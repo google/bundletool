@@ -48,6 +48,7 @@ public class D8DexMerger implements DexMerger {
       ImmutableList<Path> dexFiles,
       Path outputDir,
       Optional<Path> mainDexListFile,
+      Optional<Path> proguardMap,
       boolean isDebuggable,
       int minSdkVersion) {
 
@@ -68,9 +69,9 @@ public class D8DexMerger implements DexMerger {
               // primary dex file will be filled as appropriate.
               .setMode(isDebuggable ? CompilationMode.DEBUG : CompilationMode.RELEASE);
       mainDexListFile.ifPresent(command::addMainDexListFiles);
-
+      proguardMap.ifPresent(command::setProguardInputMapFile);
       // D8 throws when main dex list is not provided and the merge result doesn't fit into a single
-      // dex file.
+      // dex file or when the mapping file passed is invalid.
       D8.run(command.build());
 
       File[] mergedFiles = outputDir.toFile().listFiles();
@@ -78,7 +79,18 @@ public class D8DexMerger implements DexMerger {
       return Arrays.stream(mergedFiles).map(File::toPath).collect(toImmutableList());
 
     } catch (CompilationFailedException e) {
-      throw translateD8Exception(e);
+      if (proguardMap.isPresent()) {
+        // Try without the proguard map
+        return merge(
+            dexFiles,
+            outputDir,
+            mainDexListFile,
+            Optional.empty(),
+            isDebuggable,
+            minSdkVersion);
+      } else {
+        throw translateD8Exception(e);
+      }
     }
   }
 

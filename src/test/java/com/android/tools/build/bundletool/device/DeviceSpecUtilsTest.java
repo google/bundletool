@@ -31,6 +31,7 @@ import static com.android.tools.build.bundletool.testing.DeviceFactory.locales;
 import static com.android.tools.build.bundletool.testing.DeviceFactory.mergeSpecs;
 import static com.android.tools.build.bundletool.testing.DeviceFactory.sdkVersion;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.abiTargeting;
+import static com.android.tools.build.bundletool.testing.TargetingUtils.deviceTierTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.languageTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.screenDensityTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.sdkVersionFrom;
@@ -48,6 +49,7 @@ import com.android.bundle.Targeting.SdkVersionTargeting;
 import com.android.bundle.Targeting.TextureCompressionFormat.TextureCompressionFormatAlias;
 import com.android.bundle.Targeting.TextureCompressionFormatTargeting;
 import com.android.tools.build.bundletool.device.DeviceSpecUtils.DeviceSpecFromTargetingBuilder;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -159,6 +161,18 @@ public class DeviceSpecUtilsTest {
     assertThat(deviceSpec.getGlExtensionsList())
         .containsExactly("GL_KHR_texture_compression_astc_ldr");
     assertThat(deviceSpec.getDeviceFeaturesList()).containsExactly("reqGlEsVersion=0x30000");
+  }
+
+  @Test
+  public void deviceSpecFromTargetingBuilder_setDeviceTier() {
+    DeviceSpec deviceSpec =
+        new DeviceSpecFromTargetingBuilder(DeviceSpec.getDefaultInstance())
+            .setDeviceTier(
+                deviceTierTargeting(
+                    /* value= */ "high", /* alternatives= */ ImmutableList.of("low")))
+            .build();
+
+    assertThat(deviceSpec.getDeviceTier()).isEqualTo("high");
   }
 
   @Test

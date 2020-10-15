@@ -84,6 +84,7 @@ public abstract class InstallMultiApksCommand {
   private static final Flag<ImmutableList<Path>> APKS_ARCHIVES_FLAG = Flag.pathList("apks");
   private static final Flag<Path> APKS_ARCHIVE_ZIP_FLAG = Flag.path("apks-zip");
   private static final Flag<String> DEVICE_ID_FLAG = Flag.string("device-id");
+  private static final Flag<Boolean> STAGED = Flag.booleanFlag("staged");
   private static final Flag<Boolean> ENABLE_ROLLBACK_FLAG = Flag.booleanFlag("enable-rollback");
   private static final Flag<Boolean> UPDATE_ONLY_FLAG = Flag.booleanFlag("update-only");
   private static final Flag<Path> AAPT2_PATH_FLAG = Flag.path("aapt2");
@@ -109,12 +110,15 @@ public abstract class InstallMultiApksCommand {
 
   abstract boolean getEnableRollback();
 
+  abstract boolean getStaged();
+
   abstract boolean getUpdateOnly();
 
   abstract AdbServer getAdbServer();
 
   public static Builder builder() {
     return new AutoValue_InstallMultiApksCommand.Builder()
+        .setStaged(false)
         .setEnableRollback(false)
         .setUpdateOnly(false);
   }
@@ -149,6 +153,8 @@ public abstract class InstallMultiApksCommand {
 
     abstract Builder setEnableRollback(boolean value);
 
+    abstract Builder setStaged(boolean value);
+
     abstract Builder setUpdateOnly(boolean value);
 
     /** The caller is responsible for the lifecycle of the {@link AdbServer}. */
@@ -170,6 +176,7 @@ public abstract class InstallMultiApksCommand {
         .ifPresent(command::setDeviceId);
     ENABLE_ROLLBACK_FLAG.getValue(flags).ifPresent(command::setEnableRollback);
     UPDATE_ONLY_FLAG.getValue(flags).ifPresent(command::setUpdateOnly);
+    STAGED.getValue(flags).ifPresent(command::setStaged);
     AAPT2_PATH_FLAG
         .getValue(flags)
         .ifPresent(
@@ -233,8 +240,10 @@ public abstract class InstallMultiApksCommand {
 
       AdbCommand adbCommand = getOrCreateAdbCommand();
       ImmutableList<String> commandResults =
-          adbCommand.installMultiPackage(apkToInstallByPackage, getEnableRollback(), getDeviceId());
+          adbCommand.installMultiPackage(
+              apkToInstallByPackage, getStaged(), getEnableRollback(), getDeviceId());
       logger.info(String.format("Output:\n%s", String.join("\n", commandResults)));
+      logger.info("Please reboot device to complete installation.");
     }
   }
 
@@ -467,6 +476,14 @@ public abstract class InstallMultiApksCommand {
                 .setDescription(
                     "Zip file containing .apks files to install. Either --apks or"
                         + " --apks-zip is required.")
+                .build())
+        .addFlag(
+            FlagDescription.builder()
+                .setFlagName(STAGED.getName())
+                .setOptional(true)
+                .setDescription(
+                    "Marks the installation as staged, to be applied on device reboot. Enabled"
+                        + " automatically for APEX packages.")
                 .build())
         .addFlag(
             FlagDescription.builder()

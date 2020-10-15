@@ -58,6 +58,11 @@ public final class TargetingProtoUtils {
           .getLanguageBuilder()
           .addAllAlternatives(targeting.getLanguage().getValueList());
     }
+    if (targeting.hasDeviceTier()) {
+      alternativeTargeting
+          .getDeviceTierBuilder()
+          .addAllAlternatives(targeting.getDeviceTier().getValueList());
+    }
     return alternativeTargeting.build();
   }
 
@@ -155,6 +160,19 @@ public final class TargetingProtoUtils {
     return ImmutableSet.<TextureCompressionFormat>builder()
         .addAll(textureCompressionFormatValues(targeting))
         .addAll(textureCompressionFormatAlternatives(targeting))
+        .build();
+  }
+
+  /** Extracts Texture Compression Format values from the targeting. */
+  public static ImmutableSet<String> deviceTierValues(ApkTargeting targeting) {
+    return ImmutableSet.copyOf(targeting.getDeviceTierTargeting().getValueList());
+  }
+
+  /** Extracts targeted Device Tier universe (values and alternatives) from the targeting. */
+  public static ImmutableSet<String> deviceTierUniverse(ApkTargeting targeting) {
+    return ImmutableSet.<String>builder()
+        .addAll(targeting.getDeviceTierTargeting().getValueList())
+        .addAll(targeting.getDeviceTierTargeting().getAlternativesList())
         .build();
   }
 

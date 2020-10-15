@@ -500,7 +500,7 @@ public class ShardedApksFacadeTest {
 
   @Test
   public void testStandaloneApk_addsStamp() throws Exception {
-    String stampSource = "https://www.validsource.com";
+    String stampSource = "https://www.example.com";
     TestComponent.useTestModule(
         this,
         TestModule.builder()

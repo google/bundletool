@@ -46,6 +46,24 @@ message Variant {
   uint32 variant_number = 3;
 }
 
+// Describes the output of the "extract-apks" command.
+message ExtractApksResult {
+  // Set of  extracted APKs.
+  repeated ExtractedApk apks = 1;
+}
+
+// Describes extracted APK.
+message ExtractedApk {
+  // Module name.
+  string module_name = 1;
+
+  // Path
+  string path = 2;
+
+  // Indicates the delivery type (e.g. on-demand) of the APK.
+  DeliveryType delivery_type = 3;
+}
+
 // Represents a module.
 // For pre-L devices multiple modules (possibly all) may be merged into one.
 message ApkSet {
@@ -160,19 +178,8 @@ message StandaloneApkMetadata {
 message SystemApkMetadata {
   // Names of the modules fused in this system APK.
   repeated string fused_module_name = 1;
-  enum SystemApkType {
-    UNSPECIFIED_VALUE = 0;
-    // Uncompressed APK for system image.
-    SYSTEM = 1;
-    // Stub APK for compressed APK in the system image
-    // (contains only android manifest).
-    SYSTEM_STUB = 2;
-    // Compressed APK for system image.
-    SYSTEM_COMPRESSED = 3;
-  }
-  // Indicates whether the APK is uncompressed system APK, stub APK or
-  // compressed system APK.
-  SystemApkType system_apk_type = 2;
+  // Was "system_apk_type".
+  reserved 2;
 }
 
 // Holds data specific to APEX APKs.

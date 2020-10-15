@@ -57,7 +57,7 @@ public class NativeLibrariesCompressionSplitterTest {
   @Test
   public void nativeCompressionSplitter_withM_withLibsWithoutExternalStorage() throws Exception {
     NativeLibrariesCompressionSplitter nativeLibrariesCompressionSplitter =
-        new NativeLibrariesCompressionSplitter();
+        createSplitterWithEnabledUncompressedLibraries();
     ImmutableCollection<ModuleSplit> splits =
         nativeLibrariesCompressionSplitter.split(
             ModuleSplit.forNativeLibraries(
@@ -83,7 +83,7 @@ public class NativeLibrariesCompressionSplitterTest {
   @Test
   public void nativeCompressionSplitter_withM_withNativeActivities() throws Exception {
     NativeLibrariesCompressionSplitter nativeLibrariesCompressionSplitter =
-        new NativeLibrariesCompressionSplitter();
+        createSplitterWithEnabledUncompressedLibraries();
     ImmutableCollection<ModuleSplit> splits =
         nativeLibrariesCompressionSplitter.split(
             ModuleSplit.forNativeLibraries(
@@ -106,7 +106,7 @@ public class NativeLibrariesCompressionSplitterTest {
   @Test
   public void nativeCompressionSplitter_withM_withMainLibrary() throws Exception {
     NativeLibrariesCompressionSplitter nativeLibrariesCompressionSplitter =
-        new NativeLibrariesCompressionSplitter();
+        createSplitterWithEnabledUncompressedLibraries();
     ImmutableCollection<ModuleSplit> splits =
         nativeLibrariesCompressionSplitter.split(
             ModuleSplit.forNativeLibraries(
@@ -120,7 +120,7 @@ public class NativeLibrariesCompressionSplitterTest {
   @Test
   public void nativeCompressionSplitter_withN_withNativeActivities() throws Exception {
     NativeLibrariesCompressionSplitter nativeLibrariesCompressionSplitter =
-        new NativeLibrariesCompressionSplitter();
+        createSplitterWithEnabledUncompressedLibraries();
     ImmutableCollection<ModuleSplit> splits =
         nativeLibrariesCompressionSplitter.split(
             ModuleSplit.forNativeLibraries(
@@ -140,7 +140,10 @@ public class NativeLibrariesCompressionSplitterTest {
   public void nativeCompressionSplitter_withP_withLibsWithExternalStorage() throws Exception {
     NativeLibrariesCompressionSplitter nativeLibrariesCompressionSplitter =
         new NativeLibrariesCompressionSplitter(
-            ApkGenerationConfiguration.builder().setInstallableOnExternalStorage(true).build());
+            ApkGenerationConfiguration.builder()
+                .setEnableUncompressedNativeLibraries(true)
+                .setInstallableOnExternalStorage(true)
+                .build());
     ImmutableCollection<ModuleSplit> splits =
         nativeLibrariesCompressionSplitter.split(
             ModuleSplit.forNativeLibraries(
@@ -166,7 +169,7 @@ public class NativeLibrariesCompressionSplitterTest {
   @Test
   public void nativeCompressionSplitter_withM_withoutLibs() throws Exception {
     NativeLibrariesCompressionSplitter nativeLibrariesCompressionSplitter =
-        new NativeLibrariesCompressionSplitter();
+        createSplitterWithEnabledUncompressedLibraries();
     BundleModule bundleModule =
         new BundleModuleBuilder("testModule")
             .addFile("dex/classes.dex")
@@ -192,7 +195,7 @@ public class NativeLibrariesCompressionSplitterTest {
   @Test
   public void otherEntriesCompressionUnchanged() throws Exception {
     NativeLibrariesCompressionSplitter nativeLibrariesCompressionSplitter =
-        new NativeLibrariesCompressionSplitter();
+        createSplitterWithEnabledUncompressedLibraries();
 
     BundleModule bundleModule =
         new BundleModuleBuilder("testModule")
@@ -239,7 +242,7 @@ public class NativeLibrariesCompressionSplitterTest {
   @Test
   public void nativeCompressionSplitter_preM_withLibsWithoutExternalStorage() throws Exception {
     NativeLibrariesCompressionSplitter nativeLibrariesCompressionSplitter =
-        new NativeLibrariesCompressionSplitter();
+        createSplitterWithEnabledUncompressedLibraries();
     ImmutableCollection<ModuleSplit> splits =
         nativeLibrariesCompressionSplitter.split(
             ModuleSplit.forNativeLibraries(
@@ -265,7 +268,10 @@ public class NativeLibrariesCompressionSplitterTest {
   public void nativeCompressionSplitter_preP_withLibsWithoutExternalStorage() throws Exception {
     NativeLibrariesCompressionSplitter nativeLibrariesCompressionSplitter =
         new NativeLibrariesCompressionSplitter(
-            ApkGenerationConfiguration.builder().setInstallableOnExternalStorage(true).build());
+            ApkGenerationConfiguration.builder()
+                .setEnableUncompressedNativeLibraries(true)
+                .setInstallableOnExternalStorage(true)
+                .build());
     ImmutableCollection<ModuleSplit> splits =
         nativeLibrariesCompressionSplitter.split(
             ModuleSplit.forNativeLibraries(
@@ -292,7 +298,10 @@ public class NativeLibrariesCompressionSplitterTest {
   public void splittingByCompression_preM_instantModule() throws Exception {
     NativeLibrariesCompressionSplitter nativeLibrariesCompressionSplitter =
         new NativeLibrariesCompressionSplitter(
-            ApkGenerationConfiguration.builder().setForInstantAppVariants(true).build());
+            ApkGenerationConfiguration.builder()
+                .setEnableUncompressedNativeLibraries(true)
+                .setForInstantAppVariants(true)
+                .build());
 
     ImmutableCollection<ModuleSplit> splits =
         nativeLibrariesCompressionSplitter.split(
@@ -312,6 +321,35 @@ public class NativeLibrariesCompressionSplitterTest {
     assertThat(
             compareManifestMutators(
                 moduleSplit.getMasterManifestMutators(), withExtractNativeLibs(false)))
+        .isTrue();
+  }
+
+  @Test
+  public void nativeCompressionSplitter_withP_disabledUncompressedNativeLibs() throws Exception {
+    NativeLibrariesCompressionSplitter nativeLibrariesCompressionSplitter =
+        new NativeLibrariesCompressionSplitter(
+            ApkGenerationConfiguration.builder()
+                .setEnableUncompressedNativeLibraries(false)
+                .build());
+    ImmutableCollection<ModuleSplit> splits =
+        nativeLibrariesCompressionSplitter.split(
+            ModuleSplit.forNativeLibraries(
+                createSingleLibraryModule("testModule", "x86", "lib/x86/libnoname.so"),
+                variantSdkTargeting(ANDROID_P_API_VERSION)));
+
+    assertThat(splits).hasSize(1);
+    ModuleSplit moduleSplit = Iterables.getOnlyElement(splits);
+
+    assertThat(moduleSplit.getVariantTargeting())
+        .isEqualTo(variantSdkTargeting(ANDROID_P_API_VERSION));
+
+    assertThat(extractPaths(moduleSplit.getEntries())).containsExactly("lib/x86/libnoname.so");
+    assertThat(moduleSplit.isMasterSplit()).isTrue();
+    assertThat(getForceUncompressed(moduleSplit, "lib/x86/libnoname.so")).isFalse();
+    assertThat(moduleSplit.getApkTargeting()).isEqualToDefaultInstance();
+    assertThat(
+            compareManifestMutators(
+                moduleSplit.getMasterManifestMutators(), withExtractNativeLibs(true)))
         .isTrue();
   }
 
@@ -344,12 +382,18 @@ public class NativeLibrariesCompressionSplitterTest {
    * Compares manifest mutators by applying the mutators against same manifests and comparing the
    * edited manifest, as we can't compare two mutators(lambda expressions) directly.
    */
-  private boolean compareManifestMutators(
+  private static boolean compareManifestMutators(
       ImmutableList<com.android.tools.build.bundletool.model.ManifestMutator> manifestMutators,
       com.android.tools.build.bundletool.model.ManifestMutator otherManifestMutator) {
 
     return DEFAULT_MANIFEST
         .applyMutators(manifestMutators)
         .equals(DEFAULT_MANIFEST.applyMutators(ImmutableList.of(otherManifestMutator)));
+  }
+
+  private static NativeLibrariesCompressionSplitter
+      createSplitterWithEnabledUncompressedLibraries() {
+    return new NativeLibrariesCompressionSplitter(
+        ApkGenerationConfiguration.builder().setEnableUncompressedNativeLibraries(true).build());
   }
 }
