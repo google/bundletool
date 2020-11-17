@@ -1080,6 +1080,21 @@ public class BuildBundleCommandTest {
     assertThat(Files.size(bundlePath)).isGreaterThan(0L);
   }
 
+  @Test
+  public void allParentDirectoriesCreated() throws IOException {
+    Path outputPath = tmpDir.resolve("non-existing-dir").resolve("bundle.aab");
+
+    Path module = createSimpleBaseModule();
+    BuildBundleCommand.builder()
+            .setModulesPaths(ImmutableList.of(module))
+            .setOverwriteOutput(true)
+            .setOutputPath(outputPath)
+            .build()
+            .execute();
+
+    assertThat(Files.exists(outputPath)).isTrue();
+  }
+
   private Path createSimpleBaseModule() throws IOException {
     return new ZipBuilder()
         .addFileWithProtoContent(

@@ -41,6 +41,7 @@ import com.android.tools.build.bundletool.model.exceptions.CommandExecutionExcep
 import com.android.tools.build.bundletool.model.exceptions.InvalidCommandException;
 import com.android.tools.build.bundletool.model.targeting.TargetingGenerator;
 import com.android.tools.build.bundletool.model.utils.files.BufferedIo;
+import com.android.tools.build.bundletool.model.utils.files.FileUtils;
 import com.android.tools.build.bundletool.model.version.BundleToolVersion;
 import com.android.tools.build.bundletool.validation.BundleModulesValidator;
 import com.google.auto.value.AutoValue;
@@ -55,6 +56,7 @@ import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Optional;
+import java.util.logging.Logger;
 import java.util.zip.ZipException;
 import java.util.zip.ZipFile;
 
@@ -71,6 +73,8 @@ public abstract class BuildBundleCommand {
   private static final Flag<ImmutableMap<ZipPath, Path>> METADATA_FILES_FLAG =
       Flag.mapCollector("metadata-file", ZipPath.class, Path.class);
   private static final Flag<Boolean> UNCOMPRESSED_FLAG = Flag.booleanFlag("uncompressed");
+
+  private static final Logger logger = Logger.getLogger(BuildBundleCommand.class.getName());
 
   public abstract Path getOutputPath();
 
@@ -251,6 +255,12 @@ public abstract class BuildBundleCommand {
       AppBundle appBundle =
           AppBundle.buildFromModules(
               modulesWithTargeting.build(), bundleConfig, getBundleMetadata());
+
+      Path outputDirectory = getOutputPath().getParent();
+      if (Files.notExists(outputDirectory)) {
+        logger.info("Output directory '" + outputDirectory + "' does not exist, creating it.");
+        FileUtils.createDirectories(outputDirectory);
+      }
 
       if (getOverwriteOutput()) {
         Files.deleteIfExists(getOutputPath());
