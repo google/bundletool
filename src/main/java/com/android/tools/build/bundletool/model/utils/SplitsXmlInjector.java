@@ -64,7 +64,7 @@ public class SplitsXmlInjector {
                       return processSplitApkVariant(keySplit.getValue());
                     case STANDALONE:
                       return keySplit.getValue().stream()
-                          .map(this::processStandaloneVariant)
+                          .map(SplitsXmlInjector::processStandaloneVariant)
                           .collect(toImmutableList());
                     case INSTANT:
                       return keySplit.getValue();
@@ -78,31 +78,31 @@ public class SplitsXmlInjector {
             .collect(toImmutableList()));
   }
 
-  private ModuleSplit processStandaloneVariant(ModuleSplit split) {
+  private static ModuleSplit processStandaloneVariant(ModuleSplit split) {
     if (!split.getResourceTable().isPresent()) {
       return split;
     }
 
     SplitsProtoXmlBuilder splitsProtoXmlBuilder = new SplitsProtoXmlBuilder();
-    ResourcesUtils.getAllLanguages(split.getResourceTable().get()).stream()
-        .filter(language -> !language.isEmpty())
-        .forEach(
-            language ->
-                splitsProtoXmlBuilder.addLanguageMapping(
-                    split.getModuleName(), language, /* splitId= */ ""));
+    addLanguageSplitsFromResourceTable(splitsProtoXmlBuilder, split);
     return injectSplitsXml(split, splitsProtoXmlBuilder.build());
   }
 
-  private ImmutableList<ModuleSplit> processSplitApkVariant(Collection<ModuleSplit> splits) {
-    SplitsProtoXmlBuilder splitsProtoXmlBuilder = new SplitsProtoXmlBuilder();
-    for (ModuleSplit split : splits) {
-      String splitId = split.getAndroidManifest().getSplitId().orElse("");
-      for (String language : split.getApkTargeting().getLanguageTargeting().getValueList()) {
-        splitsProtoXmlBuilder.addLanguageMapping(split.getModuleName(), language, splitId);
-      }
-    }
+  private static ImmutableList<ModuleSplit> processSplitApkVariant(Collection<ModuleSplit> splits) {
+    boolean hasLanguageSplits =
+        splits.stream().anyMatch(split -> split.getApkTargeting().hasLanguageTargeting());
 
-    XmlNode splitsXmlContent = splitsProtoXmlBuilder.build();
+    // If language splits are available we gather language mappings from these splits otherwise this
+    // means that language splits are not generated and we need to gather all languages from
+    // resource table of master splits.
+    // We need to check splits targeting and can not rely on disabled language dimension because in
+    // case of system variant it is possible to generate splits that don't have language targeting
+    // for bundles with enabled language dimension.
+    XmlNode splitsXmlContent =
+        hasLanguageSplits
+            ? getSplitsXmlContentFromLanguageTargeting(splits)
+            : getSplitsXmlContentFromResourceTables(splits);
+
     ImmutableList.Builder<ModuleSplit> result = new ImmutableList.Builder<>();
 
     for (ModuleSplit split : splits) {
@@ -115,7 +115,39 @@ public class SplitsXmlInjector {
     return result.build();
   }
 
-  private ModuleSplit injectSplitsXml(ModuleSplit split, XmlNode xmlNode) {
+  private static XmlNode getSplitsXmlContentFromLanguageTargeting(Collection<ModuleSplit> splits) {
+    SplitsProtoXmlBuilder splitsProtoXmlBuilder = new SplitsProtoXmlBuilder();
+    for (ModuleSplit split : splits) {
+      String splitId = split.getAndroidManifest().getSplitId().orElse("");
+      for (String language : split.getApkTargeting().getLanguageTargeting().getValueList()) {
+        splitsProtoXmlBuilder.addLanguageMapping(split.getModuleName(), language, splitId);
+      }
+    }
+    return splitsProtoXmlBuilder.build();
+  }
+
+  private static XmlNode getSplitsXmlContentFromResourceTables(Collection<ModuleSplit> splits) {
+    SplitsProtoXmlBuilder splitsProtoXmlBuilder = new SplitsProtoXmlBuilder();
+    splits.stream()
+        .filter(ModuleSplit::isMasterSplit)
+        .forEach(split -> addLanguageSplitsFromResourceTable(splitsProtoXmlBuilder, split));
+    return splitsProtoXmlBuilder.build();
+  }
+
+  private static void addLanguageSplitsFromResourceTable(
+      SplitsProtoXmlBuilder splitsProtoXmlBuilder, ModuleSplit split) {
+    if (!split.getResourceTable().isPresent()) {
+      return;
+    }
+    String splitId = split.getAndroidManifest().getSplitId().orElse("");
+    ResourcesUtils.getAllLanguages(split.getResourceTable().get()).stream()
+        .filter(language -> !language.isEmpty())
+        .forEach(
+            language ->
+                splitsProtoXmlBuilder.addLanguageMapping(split.getModuleName(), language, splitId));
+  }
+
+  private static ModuleSplit injectSplitsXml(ModuleSplit split, XmlNode xmlNode) {
     ZipPath resourcePath = getUniqueResourcePath(split);
 
     ResourceInjector resourceInjector = ResourceInjector.fromModuleSplit(split);

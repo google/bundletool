@@ -34,19 +34,15 @@ import static com.android.tools.build.bundletool.testing.TargetingUtils.alternat
 import static com.android.tools.build.bundletool.testing.TargetingUtils.apkAbiTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.apkDensityTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.apkDeviceTierTargeting;
-import static com.android.tools.build.bundletool.testing.TargetingUtils.apkGraphicsTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.apkLanguageTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.apkMultiAbiTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.apkSanitizerTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.apkTextureTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.deviceTierTargeting;
-import static com.android.tools.build.bundletool.testing.TargetingUtils.graphicsApiTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.lPlusVariantTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.languageTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.multiAbiTargeting;
-import static com.android.tools.build.bundletool.testing.TargetingUtils.openGlVersionFrom;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.textureCompressionTargeting;
-import static com.android.tools.build.bundletool.testing.TargetingUtils.vulkanVersionFrom;
 import static com.android.tools.build.bundletool.testing.TestUtils.createModuleEntryForFile;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.truth.Truth.assertThat;
@@ -68,7 +64,6 @@ import com.android.bundle.Targeting.TextureCompressionFormat.TextureCompressionF
 import com.android.bundle.Targeting.VariantTargeting;
 import com.android.tools.build.bundletool.model.SourceStamp.StampType;
 import com.android.tools.build.bundletool.model.utils.xmlproto.XmlProtoElement;
-import com.android.tools.build.bundletool.model.utils.xmlproto.XmlProtoNode;
 import com.android.tools.build.bundletool.testing.BundleModuleBuilder;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
@@ -78,7 +73,6 @@ import java.security.PrivateKey;
 import java.security.cert.X509Certificate;
 import java.util.Arrays;
 import org.junit.BeforeClass;
-import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
@@ -182,27 +176,6 @@ public class ModuleSplitTest {
                 ANDROID_NAMESPACE_URI, "isFeatureSplit", IS_FEATURE_SPLIT_RESOURCE_ID, true));
   }
 
-  @Ignore("Graphics API is currently not being reflected in the manifest.")
-  @Test
-  public void graphicsApiTargetingIsReflectedInManifest() throws Exception {
-    BundleModule module =
-        new BundleModuleBuilder("testModule")
-            .addFile("assets/dict.dat")
-            .setManifest(androidManifest("com.test.app"))
-            .build();
-    ModuleSplit split =
-        ModuleSplit.forModule(module)
-            .toBuilder()
-            .setApkTargeting(apkGraphicsTargeting(graphicsApiTargeting(openGlVersionFrom(2))))
-            .setMasterSplit(false)
-            .build();
-
-    split = split.writeSplitIdInManifest(split.getSuffix());
-    XmlProtoNode configManifest = split.getAndroidManifest().getManifestRoot();
-
-    assertManifestHasGlTargeting(configManifest, 0x20000);
-  }
-
   @Test
   public void moduleResourceSplitSuffixAndName() {
     ModuleSplit resSplit =
@@ -215,56 +188,6 @@ public class ModuleSplitTest {
             .build();
     resSplit = resSplit.writeSplitIdInManifest(resSplit.getSuffix());
     assertThat(resSplit.getAndroidManifest().getSplitId()).hasValue("config.hdpi");
-  }
-
-  @Test
-  public void moduleOpenGlSplitSuffixAndName() {
-    ModuleSplit resSplit =
-        ModuleSplit.builder()
-            .setModuleName(BundleModuleName.create("base"))
-            .setVariantTargeting(lPlusVariantTargeting())
-            .setApkTargeting(
-                apkGraphicsTargeting(graphicsApiTargeting(openGlVersionFrom(3, 1)))) // 3.1
-            .setMasterSplit(false)
-            .setAndroidManifest(AndroidManifest.create(androidManifest("com.test.app")))
-            .build();
-    resSplit = resSplit.writeSplitIdInManifest(resSplit.getSuffix());
-    assertThat(resSplit.getAndroidManifest().getSplitId()).hasValue("config.gl3_1");
-  }
-
-  @Test
-  public void moduleVulkanSplitSuffixAndName() {
-    ModuleSplit resSplit =
-        ModuleSplit.builder()
-            .setModuleName(BundleModuleName.create("base"))
-            .setVariantTargeting(lPlusVariantTargeting())
-            .setApkTargeting(
-                apkGraphicsTargeting(graphicsApiTargeting(vulkanVersionFrom(3, 1)))) // 3.1
-            .setMasterSplit(false)
-            .setAndroidManifest(AndroidManifest.create(androidManifest("com.test.app")))
-            .build();
-    resSplit = resSplit.writeSplitIdInManifest(resSplit.getSuffix());
-    assertThat(resSplit.getAndroidManifest().getSplitId()).hasValue("config.vk3_1");
-  }
-
-  @Test
-  public void moduleOpenGlSplitSuffixAndName_alternatives() {
-    ModuleSplit resSplit =
-        ModuleSplit.builder()
-            .setModuleName(BundleModuleName.create("base"))
-            .setVariantTargeting(lPlusVariantTargeting())
-            .setApkTargeting(
-                apkGraphicsTargeting(
-                    graphicsApiTargeting(
-                        ImmutableSet.of(),
-                        ImmutableSet.of(
-                            openGlVersionFrom(3), // not gl >= 3
-                            vulkanVersionFrom(3))))) // and not vulkan >= 3
-            .setMasterSplit(false)
-            .setAndroidManifest(AndroidManifest.create(androidManifest("com.test.app")))
-            .build();
-    resSplit = resSplit.writeSplitIdInManifest(resSplit.getSuffix());
-    assertThat(resSplit.getAndroidManifest().getSplitId()).hasValue("config.other_gfx");
   }
 
   @Test
@@ -532,16 +455,4 @@ public class ModuleSplitTest {
         .collect(toImmutableList());
   }
 
-  private static void assertManifestHasGlTargeting(XmlProtoNode manifest, int expectedValue) {
-    ImmutableList<XmlElement> features =
-        manifest
-            .getElement()
-            .getChildrenElements("uses-feature")
-            .map(XmlProtoElement::getProto)
-            .collect(toImmutableList());
-    assertThat(features).hasSize(1);
-    assertThat(features.get(0).getAttributeList()).hasSize(1);
-    assertThat(features.get(0).getAttribute(0))
-        .isEqualTo(xmlDecimalIntegerAttribute(ANDROID_NAMESPACE_URI, "glEsVersion", expectedValue));
-  }
 }

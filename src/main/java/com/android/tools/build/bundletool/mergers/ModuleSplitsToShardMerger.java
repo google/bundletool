@@ -30,6 +30,7 @@ import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 
 import com.android.aapt.Resources.ResourceTable;
+import com.android.bundle.Config.StandaloneConfig.DexMergingStrategy;
 import com.android.bundle.Files.Assets;
 import com.android.bundle.Files.TargetedAssetsDirectory;
 import com.android.bundle.Targeting.ApkTargeting;
@@ -263,15 +264,16 @@ public class ModuleSplitsToShardMerger {
       ListMultimap<BundleModuleName, ModuleEntry> dexFilesToMergeByModule,
       AndroidManifest androidManifest,
       Map<ImmutableSet<ModuleEntry>, ImmutableList<Path>> mergedDexCache) {
-
     if (dexFilesToMergeByModule.size() <= 1 || appBundle.getFeatureModules().size() <= 1) {
       // Don't merge if there is only one dex file or an application doesn't have feature modules.
       // If base module contains multiple dex files, it should have been built with multi-dex
       // support.
       return dexFilesToMergeByModule.values();
-    } else if (androidManifest.getEffectiveMinSdkVersion() >= Versions.ANDROID_L_API_VERSION) {
+    } else if (getDexMergingStrategy().equals(DexMergingStrategy.NEVER_MERGE)
+        || androidManifest.getEffectiveMinSdkVersion() >= Versions.ANDROID_L_API_VERSION) {
       // When APK targets L+ devices we know the devices already have multi-dex support.
-      // In this case we can skip merging dexes and just rename original ones to be in order.
+      // In this case or when dex merging is explicitly disabled we skip merging dexes and just
+      // rename original ones to be in order.
       return renameDexFromAllModulesToSingleShard(dexFilesToMergeByModule);
     } else {
       ImmutableList<ModuleEntry> dexEntries =
@@ -436,6 +438,14 @@ public class ModuleSplitsToShardMerger {
       Files.copy(inputStream, proguardMapFilePath, StandardCopyOption.REPLACE_EXISTING);
     }
     return Optional.of(proguardMapFilePath);
+  }
+
+  private DexMergingStrategy getDexMergingStrategy() {
+    return appBundle
+        .getBundleConfig()
+        .getOptimizations()
+        .getStandaloneConfig()
+        .getDexMergingStrategy();
   }
 
   private static ImmutableList<String> getUniqueModuleNames(

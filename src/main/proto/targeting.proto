@@ -18,7 +18,7 @@ message VariantTargeting {
 // Targeting on the level of individual APKs.
 message ApkTargeting {
   AbiTargeting abi_targeting = 1;
-  GraphicsApiTargeting graphics_api_targeting = 2;
+  reserved 2;  // was GraphicsApiTargeting
   LanguageTargeting language_targeting = 3;
   ScreenDensityTargeting screen_density_targeting = 4;
   SdkVersionTargeting sdk_version_targeting = 5;
@@ -68,26 +68,6 @@ message ScreenDensity {
 message SdkVersion {
   // Inclusive.
   google.protobuf.Int32Value min = 1;
-}
-
-message GraphicsApi {
-  oneof api_oneof {
-    // Inclusive.
-    OpenGlVersion min_open_gl_version = 1;
-    // Inclusive.
-    VulkanVersion min_vulkan_version = 2;
-  }
-}
-
-message VulkanVersion {
-  int32 major = 1;  // VK_VERSION_MAJOR
-  int32 minor = 2;  // VK_VERSION_MINOR
-}
-
-message OpenGlVersion {
-  // e.g. OpenGL ES 3.2 is represented as { major: 3, minor: 2 }
-  int32 major = 1;  // GL_MAJOR_VERSION
-  int32 minor = 2;  // GL_MINOR_VERSION
 }
 
 message TextureCompressionFormat {
@@ -142,7 +122,7 @@ message DeviceFeature {
 // Targeting specific for directories under assets/.
 message AssetsDirectoryTargeting {
   AbiTargeting abi = 1;
-  GraphicsApiTargeting graphics_api = 2;
+  reserved 2;  // was GraphicsApiTargeting
   TextureCompressionFormatTargeting texture_compression_format = 3;
   LanguageTargeting language = 4;
   DeviceTierTargeting device_tier = 5;
@@ -151,7 +131,7 @@ message AssetsDirectoryTargeting {
 // Targeting specific for directories under lib/.
 message NativeDirectoryTargeting {
   Abi abi = 1;
-  GraphicsApi graphics_api = 2;
+  reserved 2;  // was GraphicsApi
   TextureCompressionFormat texture_compression_format = 3;
   Sanitizer sanitizer = 4;
 }
@@ -188,13 +168,6 @@ message LanguageTargeting {
   // Targeting of other sibling directories that were in the Bundle.
   // For master splits this is targeting of other master splits.
   repeated string alternatives = 2;
-}
-
-message GraphicsApiTargeting {
-  repeated GraphicsApi value = 1;
-  // Targeting of other sibling directories that were in the Bundle.
-  // For master splits this is targeting of other master splits.
-  repeated GraphicsApi alternatives = 2;
 }
 
 message SdkVersionTargeting {

@@ -114,7 +114,8 @@ public class AssetModuleSizeAggregator extends AbstractSizeAggregator {
                 textureTargeting,
                 deviceTierTargeting),
             getSizeRequest.getModules(),
-            getSizeRequest.getInstant())
+            getSizeRequest.getInstant(),
+            /* ensureDensityAndAbiApksMatched= */ false)
         .getMatchingApksFromAssetModules(assetModules);
   }
 }

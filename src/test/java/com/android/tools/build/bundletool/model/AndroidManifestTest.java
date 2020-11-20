@@ -26,6 +26,7 @@ import static com.android.tools.build.bundletool.model.AndroidManifest.NAME_RESO
 import static com.android.tools.build.bundletool.model.AndroidManifest.RESOURCE_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.VALUE_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.VERSION_CODE_RESOURCE_ID;
+import static com.android.tools.build.bundletool.model.AndroidManifest.VERSION_NAME_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.BundleModule.ModuleType.ASSET_MODULE;
 import static com.android.tools.build.bundletool.model.BundleModule.ModuleType.FEATURE_MODULE;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifest;
@@ -363,6 +364,29 @@ public class AndroidManifestTest {
     assertThat(exception)
         .hasMessageThat()
         .contains("Attribute 'versionCode' expected to have type 'decimal int' but found:");
+  }
+
+  @Test
+  public void getVersionName() {
+    AndroidManifest androidManifest =
+        AndroidManifest.create(
+            xmlNode(
+                xmlElement(
+                    "manifest",
+                    xmlAttribute(
+                        ANDROID_NAMESPACE_URI,
+                        "versionName",
+                        VERSION_NAME_RESOURCE_ID,
+                        "new app version"),
+                    xmlNode(xmlElement("application")))));
+    assertThat(androidManifest.getVersionName()).hasValue("new app version");
+  }
+
+  @Test
+  public void getVersionName_missing_isEmpty() {
+    AndroidManifest androidManifest =
+        AndroidManifest.create(xmlNode(xmlElement("manifest", xmlNode(xmlElement("application")))));
+    assertThat(androidManifest.getVersionName()).isEmpty();
   }
 
   @Test

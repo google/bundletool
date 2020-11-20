@@ -21,6 +21,7 @@ import static com.android.bundle.Config.SplitDimension.Value.UNSPECIFIED_VALUE;
 import com.android.bundle.Config.BundleConfig;
 import com.android.bundle.Config.Optimizations;
 import com.android.bundle.Config.SplitDimension;
+import com.android.bundle.Config.SplitDimension.Value;
 import com.android.bundle.Config.SuffixStripping;
 import com.android.tools.build.bundletool.model.OptimizationDimension;
 import com.android.tools.build.bundletool.model.utils.EnumMapper;
@@ -41,12 +42,18 @@ import javax.inject.Inject;
  */
 public final class OptimizationsMerger {
 
+  private static final ImmutableSet<SplitDimension.Value> IGNORED_SPLIT_DIMENSION_VALUES =
+      ImmutableSet.<SplitDimension.Value>builder()
+          .add(UNRECOGNIZED)
+          .add(UNSPECIFIED_VALUE)
+          .build();
+
   private static final ImmutableMap<SplitDimension.Value, OptimizationDimension>
       SPLIT_DIMENSION_ENUM_MAP =
           EnumMapper.mapByName(
               SplitDimension.Value.class,
               OptimizationDimension.class,
-              /* ignoreValues= */ ImmutableSet.of(UNRECOGNIZED, UNSPECIFIED_VALUE));
+              IGNORED_SPLIT_DIMENSION_VALUES);
 
   @Inject
   public OptimizationsMerger() {}

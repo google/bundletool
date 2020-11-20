@@ -65,6 +65,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Supplier;
 import java.util.regex.Pattern;
 import org.junit.Before;
@@ -265,6 +266,100 @@ public class InstallMultiApksCommandTest {
                                 Paths.get(PKG_NAME_1, PKG_NAME_1 + "feature1-master.apk")
                                     .toString(),
                                 Paths.get(PKG_NAME_1, PKG_NAME_1 + "feature2-master.apk")
+                                    .toString()))
+                        .putAll(
+                            PKG_NAME_2,
+                            Paths.get(PKG_NAME_2, PKG_NAME_2 + "base-master.apk").toString(),
+                            Paths.get(PKG_NAME_2, PKG_NAME_2 + "feature1-master.apk").toString(),
+                            Paths.get(PKG_NAME_2, PKG_NAME_2 + "feature2-master.apk").toString())
+                        .build(),
+                    /* expectedStaged= */ false,
+                    /* expectedEnableRollback= */ false,
+                    Optional.of(DEVICE_ID)))
+            .build();
+
+    // EXPECT
+    // 1) Get existing packages.
+    device.injectShellCommandOutput("pm list packages --show-versioncode", () -> "");
+    device.injectShellCommandOutput("pm list packages --apex-only --show-versioncode", () -> "");
+    // 2) Install command (above)
+    command.execute();
+    assertAdbCommandExecuted();
+  }
+
+  @Test
+  public void execute_extractZipWithSdkDirectories() throws Exception {
+    // GIVEN a zip file containing fake .apks files
+    BuildApksResult tableOfContent1 = fakeTableOfContents(PKG_NAME_1);
+    Path package1Apks = createApksArchiveFile(tableOfContent1, tmpDir.resolve("package1.apks"));
+    BuildApksResult tableOfContent2 = fakeTableOfContents(PKG_NAME_2);
+    Path package2Apks = createApksArchiveFile(tableOfContent2, tmpDir.resolve("package2.apks"));
+    BuildApksResult tableOfContent3 =
+        BuildApksResult.newBuilder()
+            .setPackageName(PKG_NAME_1)
+            .setBundletool(
+                Bundletool.newBuilder()
+                    .setVersion(BundleToolVersion.getCurrentVersion().toString()))
+            .addVariant(
+                createVariant(
+                    VariantTargeting.getDefaultInstance(),
+                    createSplitApkSet(
+                        "base",
+                        createMasterApkDescription(
+                            ApkTargeting.getDefaultInstance(),
+                            ZipPath.create(PKG_NAME_1 + "base-master.apk"))),
+                    createSplitApkSet(
+                        "feature3",
+                        createMasterApkDescription(
+                            ApkTargeting.getDefaultInstance(),
+                            ZipPath.create(PKG_NAME_1 + "feature3-master.apk"))),
+                    createSplitApkSet(
+                        "feature4",
+                        createMasterApkDescription(
+                            ApkTargeting.getDefaultInstance(),
+                            ZipPath.create(PKG_NAME_1 + "feature4-master.apk")))))
+            .build();
+    Path package1v2Apks = createApksArchiveFile(tableOfContent3, tmpDir.resolve("package3.apks"));
+
+    ZipBuilder bundleBuilder = new ZipBuilder();
+    bundleBuilder
+        .addFileFromDisk(ZipPath.create("29/package1.apks"), package1Apks.toFile())
+        .addFileFromDisk(ZipPath.create("30/package1.apks"), package1v2Apks.toFile())
+        .addFileFromDisk(ZipPath.create("package2.apks"), package2Apks.toFile());
+    Path zipBundle = bundleBuilder.writeTo(tmpDir.resolve("bundle.zip"));
+
+    AtomicReference<Integer> counter = new AtomicReference<>(3);
+
+    InstallMultiApksCommand command =
+        InstallMultiApksCommand.builder()
+            .setAdbServer(fakeServerOneDevice(device))
+            .setDeviceId(DEVICE_ID)
+            .setAdbPath(adbPath)
+            .setApksArchiveZipPath(zipBundle)
+            .setAapt2Command(
+                createFakeAapt2CommandFromSupplier(
+                    ImmutableMap.of(
+                        PKG_NAME_2,
+                            () ->
+                                ImmutableList.of(
+                                    String.format(
+                                        "package: name='%s' versionCode='%d' ", PKG_NAME_2, 2)),
+                        PKG_NAME_1,
+                            () ->
+                                ImmutableList.of(
+                                    String.format(
+                                        "package: name='%s' versionCode='%d' ",
+                                        PKG_NAME_1, counter.getAndSet(counter.get() + 1))))))
+            .setAdbCommand(
+                createFakeAdbCommand(
+                    ImmutableListMultimap.<String, String>builder()
+                        .putAll(
+                            PKG_NAME_1,
+                            ImmutableList.of(
+                                Paths.get(PKG_NAME_1, PKG_NAME_1 + "base-master.apk").toString(),
+                                Paths.get(PKG_NAME_1, PKG_NAME_1 + "feature3-master.apk")
+                                    .toString(),
+                                Paths.get(PKG_NAME_1, PKG_NAME_1 + "feature4-master.apk")
                                     .toString()))
                         .putAll(
                             PKG_NAME_2,

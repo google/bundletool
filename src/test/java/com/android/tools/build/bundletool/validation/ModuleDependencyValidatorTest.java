@@ -426,7 +426,7 @@ public class ModuleDependencyValidatorTest {
   }
 
   @Test
-  public void validateAllModules_conditionalModule_dependsOnSomething_throws() throws Exception {
+  public void validateAllModules_conditionalModule_dependsOnConditional_throws() throws Exception {
     ImmutableList<BundleModule> allModules =
         ImmutableList.of(
             module("base", androidManifest(PKG_NAME)),
@@ -447,8 +447,25 @@ public class ModuleDependencyValidatorTest {
     assertThat(exception)
         .hasMessageThat()
         .contains(
-            "Conditional module 'conditional' cannot have dependencies but uses module "
-                + "'conditional2'");
+            "Conditional module 'conditional' cannot depend on a module 'conditional2' that is "
+                + "not install-time.");
+  }
+
+  @Test
+  public void validateAllModules_conditionalModule_dependsOnInstallTime_succeeds()
+      throws Exception {
+    ImmutableList<BundleModule> allModules =
+        ImmutableList.of(
+            module("base", androidManifest(PKG_NAME)),
+            module(
+                "conditional",
+                androidManifest(
+                    PKG_NAME,
+                    withFeatureCondition("android.feature"),
+                    withUsesSplit("installTime"))),
+            module("installTime", androidManifest(PKG_NAME, withInstallTimeDelivery())));
+
+    new ModuleDependencyValidator().validateAllModules(allModules);
   }
 
   @Test

@@ -18,11 +18,8 @@ package com.android.tools.build.bundletool.model.targeting;
 
 import static com.android.tools.build.bundletool.testing.TargetingUtils.assetsDirectoryTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.deviceTierTargeting;
-import static com.android.tools.build.bundletool.testing.TargetingUtils.graphicsApiTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.languageTargeting;
-import static com.android.tools.build.bundletool.testing.TargetingUtils.openGlVersionFrom;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.textureCompressionTargeting;
-import static com.android.tools.build.bundletool.testing.TargetingUtils.vulkanVersionFrom;
 import static com.google.common.truth.Truth.assertThat;
 import static com.google.common.truth.Truth8.assertThat;
 import static com.google.common.truth.extensions.proto.ProtoTruth.assertThat;
@@ -43,40 +40,6 @@ public class TargetedDirectorySegmentTest {
     assertThat(segment.getName()).isEqualTo("test");
     assertThat(segment.getTargetingDimension()).isEmpty();
     assertThat(segment.getTargeting()).isEqualToDefaultInstance();
-  }
-
-  @Test
-  public void testTargeting_openGl_ok() {
-    TargetedDirectorySegment segment = TargetedDirectorySegment.parse("test#opengl_2.3");
-    assertThat(segment.getName()).isEqualTo("test");
-    assertThat(segment.getTargetingDimension()).hasValue(TargetingDimension.GRAPHICS_API);
-    assertThat(segment.getTargeting())
-        .isEqualTo(assetsDirectoryTargeting(graphicsApiTargeting(openGlVersionFrom(2, 3))));
-  }
-
-  @Test
-  public void testTargeting_openGl_bad_version() {
-    assertThrows(
-        InvalidBundleException.class, () -> TargetedDirectorySegment.parse("test#opengl_2.3.3"));
-    assertThrows(
-        InvalidBundleException.class, () -> TargetedDirectorySegment.parse("test#opengl_x.y"));
-  }
-
-  @Test
-  public void testTargeting_vulkan_ok() {
-    TargetedDirectorySegment segment = TargetedDirectorySegment.parse("test#vulkan_2.3");
-    assertThat(segment.getName()).isEqualTo("test");
-    assertThat(segment.getTargetingDimension()).hasValue(TargetingDimension.GRAPHICS_API);
-    assertThat(segment.getTargeting())
-        .isEqualTo(assetsDirectoryTargeting(graphicsApiTargeting(vulkanVersionFrom(2, 3))));
-  }
-
-  @Test
-  public void testTargeting_vulkan_bad_version() {
-    assertThrows(
-        InvalidBundleException.class, () -> TargetedDirectorySegment.parse("test#vulkan_2.3.3"));
-    assertThrows(
-        InvalidBundleException.class, () -> TargetedDirectorySegment.parse("test#vulkan_x.y"));
   }
 
   @Test
@@ -276,18 +239,6 @@ public class TargetedDirectorySegmentTest {
   public void testTargeting_nokey_toPathIdempotent() {
     TargetedDirectorySegment segment = TargetedDirectorySegment.parse("test");
     assertThat(segment.toPathSegment()).isEqualTo("test");
-  }
-
-  @Test
-  public void testTargeting_openGl_toPathIdempotent() {
-    TargetedDirectorySegment segment = TargetedDirectorySegment.parse("test#opengl_2.3");
-    assertThat(segment.toPathSegment()).isEqualTo("test#opengl_2.3");
-  }
-
-  @Test
-  public void testTargeting_vulkan_toPathIdempotent() {
-    TargetedDirectorySegment segment = TargetedDirectorySegment.parse("test#vulkan_2.3");
-    assertThat(segment.toPathSegment()).isEqualTo("test#vulkan_2.3");
   }
 
   @Test

@@ -21,10 +21,8 @@ import static com.android.tools.build.bundletool.testing.TargetingUtils.alternat
 import static com.android.tools.build.bundletool.testing.TargetingUtils.alternativeLanguageTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.assetsDirectoryTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.deviceTierTargeting;
-import static com.android.tools.build.bundletool.testing.TargetingUtils.graphicsApiTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.languageTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.mergeAssetsTargeting;
-import static com.android.tools.build.bundletool.testing.TargetingUtils.openGlVersionFrom;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.textureCompressionTargeting;
 import static com.google.common.truth.extensions.proto.ProtoTruth.assertThat;
 
@@ -38,16 +36,6 @@ import org.junit.runners.JUnit4;
 
 @RunWith(JUnit4.class)
 public class TargetingProtoUtilsTest {
-
-  @Test
-  public void toAlternativeTargeting_graphicsApi() {
-    assertThat(
-            TargetingProtoUtils.toAlternativeTargeting(
-                assetsDirectoryTargeting(graphicsApiTargeting(openGlVersionFrom(2, 3)))))
-        .isEqualTo(
-            assetsDirectoryTargeting(
-                graphicsApiTargeting(ImmutableSet.of(), ImmutableSet.of(openGlVersionFrom(2, 3)))));
-  }
 
   @Test
   public void toAlternativeTargeting_language() {
@@ -98,8 +86,7 @@ public class TargetingProtoUtilsTest {
                     assetsDirectoryTargeting(
                         abiTargeting(
                             ImmutableSet.of(AbiAlias.ARM64_V8A, AbiAlias.ARMEABI_V7A),
-                            ImmutableSet.of())),
-                    assetsDirectoryTargeting(graphicsApiTargeting(openGlVersionFrom(3))))))
+                            ImmutableSet.of())))))
         .isEqualTo(
             mergeAssetsTargeting(
                 assetsDirectoryTargeting(
@@ -108,9 +95,6 @@ public class TargetingProtoUtilsTest {
                 assetsDirectoryTargeting(
                     abiTargeting(
                         ImmutableSet.of(),
-                        ImmutableSet.of(AbiAlias.ARM64_V8A, AbiAlias.ARMEABI_V7A))),
-                assetsDirectoryTargeting(
-                    graphicsApiTargeting(
-                        ImmutableSet.of(), ImmutableSet.of(openGlVersionFrom(3))))));
+                        ImmutableSet.of(AbiAlias.ARM64_V8A, AbiAlias.ARMEABI_V7A)))));
   }
 }

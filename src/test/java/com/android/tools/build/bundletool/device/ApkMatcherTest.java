@@ -107,8 +107,6 @@ import org.junit.runners.JUnit4;
 @RunWith(JUnit4.class)
 public class ApkMatcherTest {
 
-  private static final boolean MATCH_INSTANT = true;
-  private static final boolean NOT_MATCH_INSTANT = false;
   // SDK variant matching.
 
   @Test
@@ -980,14 +978,11 @@ public class ApkMatcherTest {
                     splitApkDescription(ApkTargeting.getDefaultInstance(), apk))));
 
     Optional<ImmutableSet<String>> allModules = Optional.empty();
-    assertThat(
-            new ApkMatcher(device, allModules, NOT_MATCH_INSTANT).getMatchingApks(buildApksResult))
+    assertThat(createMatcher(device, allModules).getMatchingApks(buildApksResult))
         .containsExactly(baseMatchedApk(apk));
 
     Optional<ImmutableSet<String>> baseModuleOnly = Optional.of(ImmutableSet.of("base"));
-    assertThat(
-            new ApkMatcher(device, baseModuleOnly, NOT_MATCH_INSTANT)
-                .getMatchingApks(buildApksResult))
+    assertThat(createMatcher(device, baseModuleOnly).getMatchingApks(buildApksResult))
         .containsExactly(baseMatchedApk(apk));
 
     Optional<ImmutableSet<String>> unknownModuleOnly =
@@ -995,9 +990,7 @@ public class ApkMatcherTest {
     InvalidCommandException exception =
         assertThrows(
             InvalidCommandException.class,
-            () ->
-                new ApkMatcher(device, unknownModuleOnly, NOT_MATCH_INSTANT)
-                    .getMatchingApks(buildApksResult));
+            () -> createMatcher(device, unknownModuleOnly).getMatchingApks(buildApksResult));
 
     assertThat(exception)
         .hasMessageThat()
@@ -1017,19 +1010,15 @@ public class ApkMatcherTest {
                     splitApkDescription(ApkTargeting.getDefaultInstance(), apk))));
 
     Optional<ImmutableSet<String>> allModules = Optional.empty();
-    assertThat(new ApkMatcher(device, allModules, MATCH_INSTANT).getMatchingApks(buildApksResult))
-        .isEmpty();
+    assertThat(createInstantMatcher(device, allModules).getMatchingApks(buildApksResult)).isEmpty();
 
     Optional<ImmutableSet<String>> baseModuleOnly = Optional.of(ImmutableSet.of("base"));
-    assertThat(
-            new ApkMatcher(device, baseModuleOnly, MATCH_INSTANT).getMatchingApks(buildApksResult))
+    assertThat(createInstantMatcher(device, baseModuleOnly).getMatchingApks(buildApksResult))
         .isEmpty();
 
     Optional<ImmutableSet<String>> featureModuleOnly = Optional.of(ImmutableSet.of("feature"));
     // No matching instant variant
-    assertThat(
-            new ApkMatcher(device, featureModuleOnly, MATCH_INSTANT)
-                .getMatchingApks(buildApksResult))
+    assertThat(createInstantMatcher(device, featureModuleOnly).getMatchingApks(buildApksResult))
         .isEmpty();
   }
 
@@ -1046,12 +1035,11 @@ public class ApkMatcherTest {
                     instantApkDescription(ApkTargeting.getDefaultInstance(), apk))));
 
     Optional<ImmutableSet<String>> allModules = Optional.empty();
-    assertThat(new ApkMatcher(device, allModules, MATCH_INSTANT).getMatchingApks(buildApksResult))
+    assertThat(createInstantMatcher(device, allModules).getMatchingApks(buildApksResult))
         .containsExactly(baseMatchedApk(apk));
 
     Optional<ImmutableSet<String>> baseModuleOnly = Optional.of(ImmutableSet.of("base"));
-    assertThat(
-            new ApkMatcher(device, baseModuleOnly, MATCH_INSTANT).getMatchingApks(buildApksResult))
+    assertThat(createInstantMatcher(device, baseModuleOnly).getMatchingApks(buildApksResult))
         .containsExactly(baseMatchedApk(apk));
 
     Optional<ImmutableSet<String>> unknownModuleOnly =
@@ -1059,9 +1047,7 @@ public class ApkMatcherTest {
     InvalidCommandException exception =
         assertThrows(
             InvalidCommandException.class,
-            () ->
-                new ApkMatcher(device, unknownModuleOnly, MATCH_INSTANT)
-                    .getMatchingApks(buildApksResult));
+            () -> createInstantMatcher(device, unknownModuleOnly).getMatchingApks(buildApksResult));
 
     assertThat(exception)
         .hasMessageThat()
@@ -1084,9 +1070,7 @@ public class ApkMatcherTest {
     InvalidCommandException exception =
         assertThrows(
             InvalidCommandException.class,
-            () ->
-                new ApkMatcher(x86Device, baseModuleOnly, NOT_MATCH_INSTANT)
-                    .getMatchingApks(buildApksResult));
+            () -> createMatcher(x86Device, baseModuleOnly).getMatchingApks(buildApksResult));
 
     assertThat(exception).hasMessageThat().contains("Cannot restrict modules");
   }
@@ -1117,29 +1101,22 @@ public class ApkMatcherTest {
 
     // By default on-demand features are not installed.
     Optional<ImmutableSet<String>> allModules = Optional.empty();
-    assertThat(
-            new ApkMatcher(device, allModules, NOT_MATCH_INSTANT).getMatchingApks(buildApksResult))
+    assertThat(createMatcher(device, allModules).getMatchingApks(buildApksResult))
         .containsExactly(baseMatchedApk(baseApk));
 
     Optional<ImmutableSet<String>> baseModuleOnly = Optional.of(ImmutableSet.of("base"));
-    assertThat(
-            new ApkMatcher(device, baseModuleOnly, NOT_MATCH_INSTANT)
-                .getMatchingApks(buildApksResult))
+    assertThat(createMatcher(device, baseModuleOnly).getMatchingApks(buildApksResult))
         .containsExactly(baseMatchedApk(baseApk));
 
     Optional<ImmutableSet<String>> feature2ModuleOnly = Optional.of(ImmutableSet.of("feature2"));
-    assertThat(
-            new ApkMatcher(device, feature2ModuleOnly, NOT_MATCH_INSTANT)
-                .getMatchingApks(buildApksResult))
+    assertThat(createMatcher(device, feature2ModuleOnly).getMatchingApks(buildApksResult))
         .containsExactly(
             baseMatchedApk(baseApk),
             matchedApk(feature1Apk, /* moduleName=*/ "feature1", ON_DEMAND),
             matchedApk(feature2Apk, /* moduleName=*/ "feature2", ON_DEMAND));
 
     Optional<ImmutableSet<String>> feature1ModuleOnly = Optional.of(ImmutableSet.of("feature1"));
-    assertThat(
-            new ApkMatcher(device, feature1ModuleOnly, NOT_MATCH_INSTANT)
-                .getMatchingApks(buildApksResult))
+    assertThat(createMatcher(device, feature1ModuleOnly).getMatchingApks(buildApksResult))
         .containsExactly(
             baseMatchedApk(baseApk),
             matchedApk(feature1Apk, /* moduleName=*/ "feature1", ON_DEMAND));
@@ -1183,14 +1160,11 @@ public class ApkMatcherTest {
 
     // By default on-demand features are not installed.
     Optional<ImmutableSet<String>> allModules = Optional.empty();
-    assertThat(
-            new ApkMatcher(device, allModules, NOT_MATCH_INSTANT).getMatchingApks(buildApksResult))
+    assertThat(createMatcher(device, allModules).getMatchingApks(buildApksResult))
         .containsExactly(baseMatchedApk(baseApk));
 
     Optional<ImmutableSet<String>> feature4ModuleOnly = Optional.of(ImmutableSet.of("feature4"));
-    assertThat(
-            new ApkMatcher(device, feature4ModuleOnly, NOT_MATCH_INSTANT)
-                .getMatchingApks(buildApksResult))
+    assertThat(createMatcher(device, feature4ModuleOnly).getMatchingApks(buildApksResult))
         .containsExactly(
             baseMatchedApk(baseApk),
             matchedApk(feature1Apk, /* moduleName=*/ "feature1", ON_DEMAND),
@@ -1199,9 +1173,7 @@ public class ApkMatcherTest {
             matchedApk(feature4Apk, /* moduleName=*/ "feature4", ON_DEMAND));
 
     Optional<ImmutableSet<String>> feature2ModuleOnly = Optional.of(ImmutableSet.of("feature2"));
-    assertThat(
-            new ApkMatcher(device, feature2ModuleOnly, NOT_MATCH_INSTANT)
-                .getMatchingApks(buildApksResult))
+    assertThat(createMatcher(device, feature2ModuleOnly).getMatchingApks(buildApksResult))
         .containsExactly(
             baseMatchedApk(baseApk),
             matchedApk(feature1Apk, /* moduleName=*/ "feature1", ON_DEMAND),
@@ -1240,34 +1212,27 @@ public class ApkMatcherTest {
 
     // By default only install-time module are matched.
     Optional<ImmutableSet<String>> allModules = Optional.empty();
-    assertThat(
-            new ApkMatcher(device, allModules, NOT_MATCH_INSTANT).getMatchingApks(buildApksResult))
+    assertThat(createMatcher(device, allModules).getMatchingApks(buildApksResult))
         .containsExactly(
             matchedApk(baseApk, /* moduleName=*/ "base", INSTALL_TIME),
             matchedApk(installTimeFeatureApk, /* moduleName=*/ "installTimeFeature", INSTALL_TIME));
 
     Optional<ImmutableSet<String>> baseModuleOnly = Optional.of(ImmutableSet.of("base"));
-    assertThat(
-            new ApkMatcher(device, baseModuleOnly, NOT_MATCH_INSTANT)
-                .getMatchingApks(buildApksResult))
+    assertThat(createMatcher(device, baseModuleOnly).getMatchingApks(buildApksResult))
         .containsExactly(
             matchedApk(baseApk, /* moduleName=*/ "base", INSTALL_TIME),
             matchedApk(installTimeFeatureApk, /* moduleName=*/ "installTimeFeature", INSTALL_TIME));
 
     Optional<ImmutableSet<String>> installTimeModuleOnly =
         Optional.of(ImmutableSet.of("installTimeFeature"));
-    assertThat(
-            new ApkMatcher(device, installTimeModuleOnly, NOT_MATCH_INSTANT)
-                .getMatchingApks(buildApksResult))
+    assertThat(createMatcher(device, installTimeModuleOnly).getMatchingApks(buildApksResult))
         .containsExactly(
             matchedApk(baseApk, /* moduleName=*/ "base", INSTALL_TIME),
             matchedApk(installTimeFeatureApk, /* moduleName=*/ "installTimeFeature", INSTALL_TIME));
 
     Optional<ImmutableSet<String>> onDemandModuleOnly =
         Optional.of(ImmutableSet.of("onDemandFeature"));
-    assertThat(
-            new ApkMatcher(device, onDemandModuleOnly, NOT_MATCH_INSTANT)
-                .getMatchingApks(buildApksResult))
+    assertThat(createMatcher(device, onDemandModuleOnly).getMatchingApks(buildApksResult))
         .containsExactly(
             matchedApk(baseApk, /* moduleName=*/ "base", INSTALL_TIME),
             matchedApk(onDemandFeatureApk, /* moduleName=*/ "onDemandFeature", ON_DEMAND),
@@ -1275,9 +1240,7 @@ public class ApkMatcherTest {
 
     Optional<ImmutableSet<String>> fastFollowModuleOnly =
         Optional.of(ImmutableSet.of("fastFollowFeature"));
-    assertThat(
-            new ApkMatcher(device, fastFollowModuleOnly, NOT_MATCH_INSTANT)
-                .getMatchingApks(buildApksResult))
+    assertThat(createMatcher(device, fastFollowModuleOnly).getMatchingApks(buildApksResult))
         .containsExactly(
             matchedApk(baseApk, /* moduleName=*/ "base", INSTALL_TIME),
             matchedApk(fastFollowFeatureApk, /* moduleName=*/ "fastFollowFeature", FAST_FOLLOW),
@@ -1313,8 +1276,7 @@ public class ApkMatcherTest {
 
     // By default only install-time module are matched.
     Optional<ImmutableSet<String>> allModules = Optional.empty();
-    assertThat(
-            new ApkMatcher(device, allModules, NOT_MATCH_INSTANT).getMatchingApks(buildApksResult))
+    assertThat(createMatcher(device, allModules).getMatchingApks(buildApksResult))
         .containsExactly(baseMatchedApk(baseApk));
   }
 
@@ -1574,16 +1536,87 @@ public class ApkMatcherTest {
             matchedApk(installTimeMasterApk2, installTimeModule2, INSTALL_TIME));
 
     assertThat(
-            new ApkMatcher(
-                    enDevice,
-                    Optional.of(ImmutableSet.of(installTimeModule1, onDemandModule)),
-                    false)
+            createMatcher(
+                    enDevice, Optional.of(ImmutableSet.of(installTimeModule1, onDemandModule)))
                 .getMatchingApks(buildApksResult))
         .containsExactly(
             baseMatchedApk(baseApk),
             matchedApk(installTimeMasterApk1, installTimeModule1, INSTALL_TIME),
             matchedApk(installTimeEnApk1, installTimeModule1, INSTALL_TIME),
             matchedApk(onDemandMasterApk, onDemandModule, ON_DEMAND));
+  }
+
+  @Test
+  public void ensureDensityAndAbiSplitIsMatchedPerEachModule_split() {
+    ZipPath baseMasterSplitApk = ZipPath.create("base-master.apk");
+    ZipPath baseX86SplitApk = ZipPath.create("base-x86.apk");
+    ZipPath baseMdpiSplitApk = ZipPath.create("base-mdpi.apk");
+    ZipPath baseHdpiSplitApk = ZipPath.create("base-hdpi.apk");
+    ZipPath screenMdpiApk = ZipPath.create("screen-mdpi.apk");
+
+    BuildApksResult buildApksResult =
+        buildApksResult(
+            splitApkVariant(
+                variantSdkTargeting(sdkVersionFrom(21), ImmutableSet.of(sdkVersionFrom(1))),
+                splitApkSet(
+                    /* moduleName= */ "base",
+                    splitApkDescription(ApkTargeting.getDefaultInstance(), baseMasterSplitApk),
+                    splitApkDescription(
+                        apkAbiTargeting(X86, ImmutableSet.of(X86_64)), baseX86SplitApk),
+                    splitApkDescription(
+                        apkDensityTargeting(MDPI, ImmutableSet.of(HDPI, XHDPI)), baseMdpiSplitApk),
+                    splitApkDescription(
+                        apkDensityTargeting(HDPI, ImmutableSet.of(MDPI, XHDPI)), baseHdpiSplitApk)),
+                splitApkSet(
+                    /* moduleName= */ "screen",
+                    splitApkDescription(
+                        apkDensityTargeting(MDPI, ImmutableSet.of(HDPI)), screenMdpiApk))));
+
+    Optional<ImmutableSet<String>> allModules = Optional.of(ImmutableSet.of("base", "screen"));
+
+    assertThat(
+            createSafeMatcher(mergeSpecs(density(MDPI), abis("x86")), allModules)
+                .getMatchingApks(buildApksResult))
+        .containsExactly(
+            matchedApk(baseMasterSplitApk, "base", INSTALL_TIME),
+            matchedApk(baseX86SplitApk, "base", INSTALL_TIME),
+            matchedApk(baseMdpiSplitApk, "base", INSTALL_TIME),
+            matchedApk(screenMdpiApk, "screen", INSTALL_TIME));
+
+    IncompatibleDeviceException baseException =
+        assertThrows(
+            IncompatibleDeviceException.class,
+            () ->
+                createSafeMatcher(mergeSpecs(density(MDPI), abis("x86_64")), allModules)
+                    .getMatchingApks(buildApksResult));
+    assertThat(baseException)
+        .hasMessageThat()
+        .isEqualTo(
+            "Missing APKs for [ABI] dimensions in the module 'base' for the provided device.");
+
+    IncompatibleDeviceException screenException =
+        assertThrows(
+            IncompatibleDeviceException.class,
+            () ->
+                createSafeMatcher(mergeSpecs(density(HDPI), abis("x86")), allModules)
+                    .getMatchingApks(buildApksResult));
+    assertThat(screenException)
+        .hasMessageThat()
+        .isEqualTo(
+            "Missing APKs for [SCREEN_DENSITY] dimensions in the module 'screen' for the provided"
+                + " device.");
+
+    IncompatibleDeviceException multipleDimensionsException =
+        assertThrows(
+            IncompatibleDeviceException.class,
+            () ->
+                createSafeMatcher(mergeSpecs(density(XHDPI), abis("x86_64")), allModules)
+                    .getMatchingApks(buildApksResult));
+    assertThat(multipleDimensionsException)
+        .hasMessageThat()
+        .isEqualTo(
+            "Missing APKs for [ABI, SCREEN_DENSITY] dimensions in the module 'base' for the"
+                + " provided device.");
   }
 
   private static BuildApksResult buildApksResult(Variant... variants) {
@@ -1616,5 +1649,22 @@ public class ApkMatcherTest {
 
   private static GeneratedApk baseMatchedApk(ZipPath path) {
     return matchedApk(path, /* moduleName=*/ "base", INSTALL_TIME);
+  }
+
+  private static ApkMatcher createMatcher(DeviceSpec spec, Optional<ImmutableSet<String>> modules) {
+    return new ApkMatcher(
+        spec, modules, /* matchInstant= */ false, /* ensureDensityAndAbiApksMatched= */ false);
+  }
+
+  private static ApkMatcher createInstantMatcher(
+      DeviceSpec spec, Optional<ImmutableSet<String>> modules) {
+    return new ApkMatcher(
+        spec, modules, /* matchInstant= */ true, /* ensureDensityAndAbiApksMatched= */ false);
+  }
+
+  private static ApkMatcher createSafeMatcher(
+      DeviceSpec spec, Optional<ImmutableSet<String>> modules) {
+    return new ApkMatcher(
+        spec, modules, /* matchInstant= */ false, /* ensureDensityAndAbiApksMatched= */ true);
   }
 }

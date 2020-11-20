@@ -16,6 +16,7 @@
 
 package com.android.tools.build.bundletool.mergers;
 
+import static com.android.bundle.Config.StandaloneConfig.DexMergingStrategy.NEVER_MERGE;
 import static com.android.bundle.Targeting.Abi.AbiAlias.MIPS;
 import static com.android.bundle.Targeting.Abi.AbiAlias.X86;
 import static com.android.tools.build.bundletool.model.AndroidManifest.THEME_RESOURCE_ID;
@@ -75,6 +76,7 @@ import com.android.tools.build.bundletool.model.ModuleSplit.SplitType;
 import com.android.tools.build.bundletool.model.exceptions.CommandExecutionException;
 import com.android.tools.build.bundletool.model.utils.Versions;
 import com.android.tools.build.bundletool.testing.AppBundleBuilder;
+import com.android.tools.build.bundletool.testing.BundleConfigBuilder;
 import com.android.tools.build.bundletool.testing.TestModule;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
@@ -108,6 +110,16 @@ public class ModuleSplitsToShardMergerTest {
 
   private static final AppBundle BUNDLE_WITH_ONE_FEATURE_NO_MAIN_DEX_LIST =
       new AppBundleBuilder()
+          .addModule(
+              "base", moduleBuilder -> moduleBuilder.setManifest(androidManifest("com.test")))
+          .addModule(
+              FEATURE_MODULE_NAME,
+              moduleBuilder ->
+                  moduleBuilder.setManifest(androidManifestForFeature("com.test.feature")))
+          .build();
+  private static final AppBundle BUNDLE_WITH_ONE_FEATURE_DISABLED_MERGING =
+      new AppBundleBuilder()
+          .setBundleConfig(BundleConfigBuilder.create().setDexMergingStrategy(NEVER_MERGE).build())
           .addModule(
               "base", moduleBuilder -> moduleBuilder.setManifest(androidManifest("com.test")))
           .addModule(
@@ -443,6 +455,40 @@ public class ModuleSplitsToShardMergerTest {
         .containsExactly("dex/classes.dex", "dex/classes2.dex");
     assertThat(dexData(merged, "dex/classes.dex")).isEqualTo(CLASSES_OTHER_DEX_CONTENT);
     assertThat(dexData(merged, "dex/classes2.dex")).isEqualTo(CLASSES_DEX_CONTENT);
+
+    // The merged result with rename should not be cached.
+    assertThat(dexMergingCache).isEmpty();
+  }
+
+  @Test
+  public void dexFiles_inMultipleModules_areRenamedWhenMergeIsDisabled() throws Exception {
+    TestComponent.useTestModule(
+        this, TestModule.builder().withAppBundle(BUNDLE_WITH_ONE_FEATURE_DISABLED_MERGING).build());
+
+    Map<ImmutableSet<ModuleEntry>, ImmutableList<Path>> dexMergingCache = createCache();
+
+    ModuleEntry dexEntry1 = createModuleEntryForFile("dex/classes.dex", CLASSES_DEX_CONTENT);
+    ModuleSplit baseSplit =
+        createModuleSplitBuilder()
+            .setModuleName(BundleModuleName.create("base"))
+            .setEntries(ImmutableList.of(dexEntry1))
+            .build();
+
+    ModuleEntry dexEntry2 = createModuleEntryForFile("dex/classes.dex", CLASSES_OTHER_DEX_CONTENT);
+    ModuleSplit featureSplit =
+        createModuleSplitBuilder()
+            .setModuleName(BundleModuleName.create("feature"))
+            .setEntries(ImmutableList.of(dexEntry2))
+            .build();
+
+    ModuleSplit merged =
+        splitsToShardMerger.mergeSingleShard(
+            ImmutableList.of(baseSplit, featureSplit), dexMergingCache);
+
+    assertThat(extractPaths(merged.getEntries()))
+        .containsExactly("dex/classes.dex", "dex/classes2.dex");
+    assertThat(dexData(merged, "dex/classes.dex")).isEqualTo(CLASSES_DEX_CONTENT);
+    assertThat(dexData(merged, "dex/classes2.dex")).isEqualTo(CLASSES_OTHER_DEX_CONTENT);
 
     // The merged result with rename should not be cached.
     assertThat(dexMergingCache).isEmpty();

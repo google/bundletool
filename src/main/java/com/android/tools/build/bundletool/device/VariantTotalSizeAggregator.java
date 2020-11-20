@@ -86,7 +86,8 @@ public class VariantTotalSizeAggregator extends AbstractSizeAggregator {
                 textureTargeting,
                 deviceTierTargeting),
             getSizeRequest.getModules(),
-            getSizeRequest.getInstant())
+            getSizeRequest.getInstant(),
+            /* ensureDensityAndAbiApksMatched= */ false)
         .getMatchingApksFromVariant(variant, bundleVersion);
   }
 

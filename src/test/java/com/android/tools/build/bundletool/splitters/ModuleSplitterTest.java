@@ -62,7 +62,6 @@ import static com.android.tools.build.bundletool.testing.TargetingUtils.apkAbiTa
 import static com.android.tools.build.bundletool.testing.TargetingUtils.apkAlternativeLanguageTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.apkDensityTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.apkDeviceTierTargeting;
-import static com.android.tools.build.bundletool.testing.TargetingUtils.apkGraphicsTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.apkLanguageTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.apkMinSdkTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.apkTextureTargeting;
@@ -73,11 +72,8 @@ import static com.android.tools.build.bundletool.testing.TargetingUtils.getSplit
 import static com.android.tools.build.bundletool.testing.TargetingUtils.lPlusVariantTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.languageTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.mergeApkTargeting;
-import static com.android.tools.build.bundletool.testing.TargetingUtils.mergeAssetsTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.nativeDirectoryTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.nativeLibraries;
-import static com.android.tools.build.bundletool.testing.TargetingUtils.openGlVersionFrom;
-import static com.android.tools.build.bundletool.testing.TargetingUtils.openGlVersionTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.targetedAssetsDirectory;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.targetedNativeDirectory;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.textureCompressionTargeting;
@@ -107,7 +103,6 @@ import com.android.bundle.Files.Assets;
 import com.android.bundle.Files.NativeLibraries;
 import com.android.bundle.Targeting.Abi.AbiAlias;
 import com.android.bundle.Targeting.ApkTargeting;
-import com.android.bundle.Targeting.AssetsDirectoryTargeting;
 import com.android.bundle.Targeting.ScreenDensity.DensityAlias;
 import com.android.bundle.Targeting.VariantTargeting;
 import com.android.tools.build.bundletool.model.AndroidManifest;
@@ -148,7 +143,6 @@ public class ModuleSplitterTest {
   private static final ApkTargeting DEFAULT_MASTER_SPLIT_SDK_TARGETING = apkMinSdkTargeting(21);
 
   private static final Version BUNDLETOOL_VERSION = BundleToolVersion.getCurrentVersion();
-
 
   @Test
   public void minSdkVersionInOutputTargeting_getsSetToL() throws Exception {
@@ -935,6 +929,117 @@ public class ModuleSplitterTest {
     ImmutableSet<String> expectedFiles =
         ImmutableSet.of("dex/classes.dex", "assets/some_asset.txt", "root/some_other_file.txt");
     assertThat(actualFiles).containsAtLeastElementsIn(expectedFiles);
+  }
+
+  @Test
+  public void textureCompressionFormatAsset_splitting_and_merging() throws Exception {
+    BundleModule testModule =
+        new BundleModuleBuilder("testModule")
+            .addFile("assets/main#tcf_etc1/image.jpg")
+            .addFile("assets/main#tcf_s3tc/image.jpg")
+            .addFile("assets/other#tcf_etc1/image.jpg")
+            .addFile("assets/other#tcf_s3tc/image.jpg")
+            .addFile("assets/other#tcf_atc/image.jpg")
+            .addFile("dex/classes.dex")
+            .setAssetsConfig(
+                assets(
+                    targetedAssetsDirectory(
+                        "assets/main#tcf_etc1",
+                        assetsDirectoryTargeting(
+                            textureCompressionTargeting(ETC1_RGB8, ImmutableSet.of(S3TC)))),
+                    targetedAssetsDirectory(
+                        "assets/main#tcf_s3tc",
+                        assetsDirectoryTargeting(
+                            textureCompressionTargeting(S3TC, ImmutableSet.of(ETC1_RGB8)))),
+                    targetedAssetsDirectory(
+                        "assets/other#tcf_etc1",
+                        assetsDirectoryTargeting(
+                            textureCompressionTargeting(ETC1_RGB8, ImmutableSet.of(S3TC, ATC)))),
+                    targetedAssetsDirectory(
+                        "assets/other#tcf_s3tc",
+                        assetsDirectoryTargeting(
+                            textureCompressionTargeting(S3TC, ImmutableSet.of(ETC1_RGB8, ATC)))),
+                    targetedAssetsDirectory(
+                        "assets/other#tcf_atc",
+                        assetsDirectoryTargeting(
+                            textureCompressionTargeting(ATC, ImmutableSet.of(ETC1_RGB8, S3TC))))))
+            .setManifest(androidManifest("com.test.app"))
+            .build();
+
+    ImmutableList<ModuleSplit> splits =
+        createTextureCompressionFormatSplitter(testModule).splitModule();
+
+    // expected 6 splits: etc1_rgb8 (with 2 sets of alternatives), s3tc (2 sets of alternatives),
+    // atc and the master split.
+    assertThat(splits).hasSize(6);
+    assertThat(splits.stream().map(ModuleSplit::getSplitType).distinct().collect(toImmutableSet()))
+        .containsExactly(SplitType.SPLIT);
+    assertThat(
+            splits.stream()
+                .map(ModuleSplit::getVariantTargeting)
+                .distinct()
+                .collect(toImmutableSet()))
+        .containsExactly(lPlusVariantTargeting());
+
+    ImmutableList<ModuleSplit> defaultSplits =
+        getSplitsWithTargetingEqualTo(splits, DEFAULT_MASTER_SPLIT_SDK_TARGETING);
+    assertThat(defaultSplits).hasSize(1);
+    assertThat(extractPaths(defaultSplits.get(0).getEntries())).containsExactly("dex/classes.dex");
+
+    ImmutableList<ModuleSplit> mainEtc1Splits =
+        getSplitsWithTargetingEqualTo(
+            splits,
+            mergeApkTargeting(
+                DEFAULT_MASTER_SPLIT_SDK_TARGETING,
+                apkTextureTargeting(
+                    textureCompressionTargeting(ETC1_RGB8, ImmutableSet.of(S3TC)))));
+    assertThat(mainEtc1Splits).hasSize(1);
+    assertThat(extractPaths(mainEtc1Splits.get(0).getEntries()))
+        .containsExactly("assets/main/image.jpg");
+
+    ImmutableList<ModuleSplit> mainS3tcSplits =
+        getSplitsWithTargetingEqualTo(
+            splits,
+            mergeApkTargeting(
+                DEFAULT_MASTER_SPLIT_SDK_TARGETING,
+                apkTextureTargeting(
+                    textureCompressionTargeting(S3TC, ImmutableSet.of(ETC1_RGB8)))));
+    assertThat(mainS3tcSplits).hasSize(1);
+    assertThat(extractPaths(mainS3tcSplits.get(0).getEntries()))
+        .containsExactly("assets/main/image.jpg");
+
+    ImmutableList<ModuleSplit> otherEtc1Splits =
+        getSplitsWithTargetingEqualTo(
+            splits,
+            mergeApkTargeting(
+                DEFAULT_MASTER_SPLIT_SDK_TARGETING,
+                apkTextureTargeting(
+                    textureCompressionTargeting(ETC1_RGB8, ImmutableSet.of(ATC, S3TC)))));
+    assertThat(otherEtc1Splits).hasSize(1);
+    assertThat(extractPaths(otherEtc1Splits.get(0).getEntries()))
+        .containsExactly("assets/other/image.jpg");
+
+    ImmutableList<ModuleSplit> otherS3tcSplits =
+        getSplitsWithTargetingEqualTo(
+            splits,
+            mergeApkTargeting(
+                DEFAULT_MASTER_SPLIT_SDK_TARGETING,
+                apkTextureTargeting(
+                    textureCompressionTargeting(S3TC, ImmutableSet.of(ETC1_RGB8, ATC)))));
+    assertThat(otherS3tcSplits).hasSize(1);
+    assertThat(extractPaths(otherS3tcSplits.get(0).getEntries()))
+        .containsExactly("assets/other/image.jpg");
+
+    ImmutableList<ModuleSplit> otherAtcSplits =
+        getSplitsWithTargetingEqualTo(
+            splits,
+            mergeApkTargeting(
+                DEFAULT_MASTER_SPLIT_SDK_TARGETING,
+                apkTextureTargeting(
+                    textureCompressionTargeting(ATC, ImmutableSet.of(ETC1_RGB8, S3TC)))));
+    assertThat(otherAtcSplits).hasSize(1);
+    assertThat(extractPaths(otherAtcSplits.get(0).getEntries()))
+        .containsExactly("assets/other/image.jpg");
   }
 
   @Test
@@ -1897,6 +2002,15 @@ public class ModuleSplitterTest {
     return masterSplit;
   }
 
+  private static ModuleSplitter createTextureCompressionFormatSplitter(BundleModule module) {
+    return ModuleSplitter.createNoStamp(
+        module,
+        BUNDLETOOL_VERSION,
+        withTcfSuffixStripping(
+            withOptimizationDimensions(ImmutableSet.of(TEXTURE_COMPRESSION_FORMAT))),
+        lPlusVariantTargeting(),
+        ImmutableSet.of(module.getName().getName()));
+  }
 
   private static ModuleSplitter createDeviceTierSplitter(BundleModule module) {
     return ModuleSplitter.createNoStamp(

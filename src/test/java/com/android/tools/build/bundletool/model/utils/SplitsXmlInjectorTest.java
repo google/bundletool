@@ -46,6 +46,8 @@ import com.android.tools.build.bundletool.model.SplitsProtoXmlBuilder;
 import com.android.tools.build.bundletool.testing.ResourceTableBuilder;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import com.google.protobuf.ExtensionRegistry;
+import java.util.Optional;
 import javax.annotation.Nullable;
 import org.junit.Before;
 import org.junit.Test;
@@ -162,6 +164,73 @@ public class SplitsXmlInjectorTest {
             .addLanguageMapping(BASE_MODULE_NAME, "fr", "config.fr")
             .build();
     assertThat(XmlNode.parseFrom(processedBaseMasterSplit.getEntries().get(0).getContent().read()))
+        .ignoringRepeatedFieldOrder()
+        .isEqualTo(expectedSplitsProtoXml);
+  }
+
+  @Test
+  public void process_noLanguageTargeting() throws Exception {
+    ResourceTable baseResourceTable =
+        new ResourceTableBuilder()
+            .addPackage("com.example.app")
+            .addStringResourceForMultipleLocales(
+                "title", ImmutableMap.of("ru", "title ru-RU", "fr", "title fr", "es", "title es"))
+            .build();
+    ModuleSplit baseModule =
+        createModuleSplit(
+                BASE_MODULE_NAME.getName(),
+                /* splitId= */ "",
+                /* masterSplit= */ true,
+                SPLIT,
+                /* languageTargeting= */ null)
+            .toBuilder()
+            .setResourceTable(baseResourceTable)
+            .build();
+
+    ResourceTable featureResourceTable =
+        new ResourceTableBuilder()
+            .addPackage("com.example.app.module")
+            .addStringResourceForMultipleLocales(
+                "module_str", ImmutableMap.of("ru", "module ru-RU"))
+            .build();
+    ModuleSplit featureModule =
+        createModuleSplit(
+                "module",
+                /* splitId= */ "module",
+                /* masterSplit= */ true,
+                SPLIT,
+                /* languageTargeting= */ null)
+            .toBuilder()
+            .setResourceTable(featureResourceTable)
+            .build();
+
+    GeneratedApks result =
+        splitsXmlInjector.process(
+            GeneratedApks.fromModuleSplits(ImmutableList.of(baseModule, featureModule)));
+
+    ModuleSplit processedBaseMasterSplit =
+        result
+            .getAllApksStream()
+            .filter(module -> module.isMasterSplit() && module.isBaseModuleSplit())
+            .collect(onlyElement());
+
+    assertThat(processedBaseMasterSplit.getResourceTable().get())
+        .containsResource("com.example.app:xml/splits0")
+        .withFileReference("res/xml/splits0.xml");
+
+    XmlNode expectedSplitsProtoXml =
+        new SplitsProtoXmlBuilder()
+            .addLanguageMapping(BundleModuleName.create("module"), "ru", "module")
+            .addLanguageMapping(BASE_MODULE_NAME, "ru", "")
+            .addLanguageMapping(BASE_MODULE_NAME, "fr", "")
+            .addLanguageMapping(BASE_MODULE_NAME, "es", "")
+            .build();
+    Optional<ModuleEntry> splitsXml = processedBaseMasterSplit.findEntry("res/xml/splits0.xml");
+    assertThat(splitsXml).isPresent();
+
+    assertThat(
+            XmlNode.parseFrom(
+                splitsXml.get().getContent().read(), ExtensionRegistry.getEmptyRegistry()))
         .ignoringRepeatedFieldOrder()
         .isEqualTo(expectedSplitsProtoXml);
   }

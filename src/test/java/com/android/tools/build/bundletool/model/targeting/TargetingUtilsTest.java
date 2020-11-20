@@ -22,10 +22,8 @@ import static com.android.tools.build.bundletool.model.targeting.TargetingUtils.
 import static com.android.tools.build.bundletool.testing.TargetingUtils.abiTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.assetsDirectoryTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.deviceTierTargeting;
-import static com.android.tools.build.bundletool.testing.TargetingUtils.graphicsApiTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.languageTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.mergeAssetsTargeting;
-import static com.android.tools.build.bundletool.testing.TargetingUtils.openGlVersionFrom;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.sdkVersionFrom;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.sdkVersionTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.textureCompressionTargeting;
@@ -52,14 +50,6 @@ public class TargetingUtilsTest {
   public void getDimensions_noDimension() {
     assertThat(TargetingUtils.getTargetingDimensions(AssetsDirectoryTargeting.getDefaultInstance()))
         .isEmpty();
-  }
-
-  @Test
-  public void getDimensions_graphicsApi() {
-    assertThat(
-            TargetingUtils.getTargetingDimensions(
-                assetsDirectoryTargeting(graphicsApiTargeting(openGlVersionFrom(2, 3)))))
-        .containsExactly(TargetingDimension.GRAPHICS_API);
   }
 
   @Test
@@ -105,12 +95,8 @@ public class TargetingUtilsTest {
                     assetsDirectoryTargeting(
                         abiTargeting(
                             ImmutableSet.of(AbiAlias.ARM64_V8A, AbiAlias.ARMEABI_V7A),
-                            ImmutableSet.of())),
-                    assetsDirectoryTargeting(graphicsApiTargeting(openGlVersionFrom(3))))))
-        .containsExactly(
-            TargetingDimension.ABI,
-            TargetingDimension.TEXTURE_COMPRESSION_FORMAT,
-            TargetingDimension.GRAPHICS_API);
+                            ImmutableSet.of())))))
+        .containsExactly(TargetingDimension.ABI, TargetingDimension.TEXTURE_COMPRESSION_FORMAT);
   }
 
   @Test
@@ -219,7 +205,6 @@ public class TargetingUtilsTest {
             getMaxSdk(sdkVersionTargeting(sdkVersionFrom(23), ImmutableSet.of(sdkVersionFrom(21)))))
         .isEqualTo(Integer.MAX_VALUE);
   }
-
 
   @Test
   public void containsDeviceTierTargeting_noDeviceTierTargeting() {

@@ -412,6 +412,13 @@ public abstract class AndroidManifest {
         .map(XmlProtoAttribute::getValueAsDecimalInteger);
   }
 
+  /** Returns the version name. */
+  public Optional<String> getVersionName() {
+    return getManifestElement()
+        .getAndroidAttribute(VERSION_NAME_RESOURCE_ID)
+        .map(XmlProtoAttribute::getValueAsString);
+  }
+
   /** Returns the value of isolatedSplits attribute. */
   public Optional<Boolean> getIsolatedSplits() {
     return getManifestElement()

@@ -64,6 +64,8 @@ import java.util.zip.ZipFile;
 @AutoValue
 public abstract class BuildBundleCommand {
 
+  private static final Logger logger = Logger.getLogger(BuildBundleCommand.class.getName());
+
   public static final String COMMAND_NAME = "build-bundle";
 
   private static final Flag<Path> OUTPUT_FLAG = Flag.path("output");
@@ -73,8 +75,6 @@ public abstract class BuildBundleCommand {
   private static final Flag<ImmutableMap<ZipPath, Path>> METADATA_FILES_FLAG =
       Flag.mapCollector("metadata-file", ZipPath.class, Path.class);
   private static final Flag<Boolean> UNCOMPRESSED_FLAG = Flag.booleanFlag("uncompressed");
-
-  private static final Logger logger = Logger.getLogger(BuildBundleCommand.class.getName());
 
   public abstract Path getOutputPath();
 

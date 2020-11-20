@@ -45,11 +45,6 @@ public final class TargetingProtoUtils {
           .getTextureCompressionFormatBuilder()
           .addAllAlternatives(targeting.getTextureCompressionFormat().getValueList());
     }
-    if (targeting.hasGraphicsApi()) {
-      alternativeTargeting
-          .getGraphicsApiBuilder()
-          .addAllAlternatives(targeting.getGraphicsApi().getValueList());
-    }
     if (targeting.hasAbi()) {
       alternativeTargeting.getAbiBuilder().addAllAlternatives(targeting.getAbi().getValueList());
     }

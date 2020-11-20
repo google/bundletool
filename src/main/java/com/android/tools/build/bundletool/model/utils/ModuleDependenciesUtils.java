@@ -34,6 +34,7 @@ import com.google.common.collect.ImmutableMultimap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Multimap;
 import com.google.common.collect.Multimaps;
+import java.util.HashSet;
 import java.util.Set;
 
 /** Helpers related to dependencies of the modules. */
@@ -51,6 +52,16 @@ public final class ModuleDependenciesUtils {
     return dependencyModules.stream()
         .map(module -> appBundle.getModule(BundleModuleName.create(module)))
         .collect(toImmutableSet());
+  }
+
+  public static ImmutableSet<String> getModulesIncludingDependencies(
+      Variant variant, Set<String> requestedModules) {
+    ImmutableMultimap<String, String> adjacencyMap = buildAdjacencyMap(variant);
+    HashSet<String> dependencyModules = new HashSet<>(requestedModules);
+    for (String requestedModuleName : requestedModules) {
+      addModuleDependencies(requestedModuleName, adjacencyMap, dependencyModules);
+    }
+    return ImmutableSet.copyOf(dependencyModules);
   }
 
   /** Builds a map of module dependencies. */

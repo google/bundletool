@@ -21,7 +21,6 @@ package com.android.tools.build.bundletool.model.targeting;
  */
 public enum TargetingDimension {
   ABI,
-  GRAPHICS_API,
   LANGUAGE,
   TEXTURE_COMPRESSION_FORMAT,
   DEVICE_TIER;

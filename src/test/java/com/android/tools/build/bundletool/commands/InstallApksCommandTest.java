@@ -16,6 +16,8 @@
 
 package com.android.tools.build.bundletool.commands;
 
+import static com.android.bundle.Targeting.Abi.AbiAlias.X86;
+import static com.android.bundle.Targeting.Abi.AbiAlias.X86_64;
 import static com.android.tools.build.bundletool.testing.ApksArchiveHelpers.createApkDescription;
 import static com.android.tools.build.bundletool.testing.ApksArchiveHelpers.createApksArchiveFile;
 import static com.android.tools.build.bundletool.testing.ApksArchiveHelpers.createApksDirectory;
@@ -47,11 +49,12 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import com.android.bundle.Commands.AssetModuleMetadata;
 import com.android.bundle.Commands.AssetSliceSet;
 import com.android.bundle.Commands.BuildApksResult;
+import com.android.bundle.Commands.DefaultTargetingValue;
 import com.android.bundle.Commands.DeliveryType;
 import com.android.bundle.Commands.LocalTestingInfo;
 import com.android.bundle.Config.Bundletool;
+import com.android.bundle.Config.SplitDimension.Value;
 import com.android.bundle.Devices.DeviceSpec;
-import com.android.bundle.Targeting.Abi.AbiAlias;
 import com.android.bundle.Targeting.ApkTargeting;
 import com.android.bundle.Targeting.ScreenDensity.DensityAlias;
 import com.android.bundle.Targeting.SdkVersion;
@@ -62,7 +65,6 @@ import com.android.tools.build.bundletool.flags.FlagParser;
 import com.android.tools.build.bundletool.model.ZipPath;
 import com.android.tools.build.bundletool.model.exceptions.CommandExecutionException;
 import com.android.tools.build.bundletool.model.exceptions.IncompatibleDeviceException;
-import com.android.tools.build.bundletool.model.exceptions.InvalidDeviceSpecException;
 import com.android.tools.build.bundletool.model.utils.SystemEnvironmentProvider;
 import com.android.tools.build.bundletool.model.version.BundleToolVersion;
 import com.android.tools.build.bundletool.testing.FakeAdbServer;
@@ -449,7 +451,7 @@ public class InstallApksCommandTest {
                         "base",
                         createMasterApkDescription(ApkTargeting.getDefaultInstance(), apkL),
                         createApkDescription(
-                            apkAbiTargeting(AbiAlias.X86, ImmutableSet.of()),
+                            apkAbiTargeting(X86, ImmutableSet.of()),
                             apkLx86,
                             /* isMasterSplit= */ false))))
             .build();
@@ -527,6 +529,53 @@ public class InstallApksCommandTest {
 
     Throwable exception = assertThrows(IllegalStateException.class, () -> command.execute());
     assertThat(exception).hasMessageThat().contains("Error retrieving device density");
+  }
+
+  @Test
+  public void incompleteApksFile_missingAbiSplitMatchedForDevice_throws() throws Exception {
+    // Partial APK Set file where 'x86' split is included and 'x86_64' split is not included because
+    // device spec sent to 'build-apks' command doesn't support it.
+    // Next, device spec that should be matched to 'x86_64' split is provided to 'install-apks'
+    // command and command must throw IncompatibleDeviceException as mathed split 'x86_64' is not
+    // available.
+    BuildApksResult tableOfContent =
+        BuildApksResult.newBuilder()
+            .setBundletool(
+                Bundletool.newBuilder()
+                    .setVersion(BundleToolVersion.getCurrentVersion().toString()))
+            .addVariant(
+                createVariant(
+                    VariantTargeting.getDefaultInstance(),
+                    createSplitApkSet(
+                        /* moduleName= */ "base",
+                        createMasterApkDescription(
+                            ApkTargeting.getDefaultInstance(), ZipPath.create("base-master.apk")),
+                        splitApkDescription(
+                            apkAbiTargeting(X86, ImmutableSet.of(X86_64)),
+                            ZipPath.create("base-x86.apk")))))
+            .build();
+
+    Path apksFile = createApks(tableOfContent, /* apksInDirectory= */ false);
+
+    DeviceSpec deviceSpec =
+        mergeSpecs(
+            sdkVersion(21), density(DensityAlias.MDPI), abis("x86_64", "x86"), locales("en-US"));
+    FakeDevice fakeDevice = FakeDevice.fromDeviceSpec(DEVICE_ID, DeviceState.ONLINE, deviceSpec);
+    AdbServer adbServer =
+        new FakeAdbServer(/* hasInitialDeviceList= */ true, ImmutableList.of(fakeDevice));
+
+    InstallApksCommand command =
+        InstallApksCommand.builder()
+            .setApksArchivePath(apksFile)
+            .setAdbPath(adbPath)
+            .setAdbServer(adbServer)
+            .build();
+
+    Throwable exception = assertThrows(IncompatibleDeviceException.class, command::execute);
+    assertThat(exception)
+        .hasMessageThat()
+        .contains(
+            "Missing APKs for [ABI] dimensions in the module 'base' for the provided device.");
   }
 
   @Test
@@ -1039,7 +1088,8 @@ public class InstallApksCommandTest {
   }
 
   @Test
-  public void bundleWithDeviceTierTargeting_noDeviceTierSpecified_throws() throws Exception {
+  public void bundleWithDeviceTierTargeting_noDeviceTierSpecified_usesDefaultValue()
+      throws Exception {
     ZipPath baseMasterApk = ZipPath.create("base-master.apk");
     ZipPath baseLowApk = ZipPath.create("base-tier_low.apk");
     ZipPath baseHighApk = ZipPath.create("base-tier_high.apk");
@@ -1069,28 +1119,31 @@ public class InstallApksCommandTest {
                                     /* value= */ "high",
                                     /* alternatives= */ ImmutableList.of("low"))),
                             baseHighApk))))
+            .addDefaultTargetingValue(
+                DefaultTargetingValue.newBuilder()
+                    .setDimension(Value.DEVICE_TIER)
+                    .setDefaultValue("low"))
             .build();
 
-    Path apksArchiveFile = createApksArchiveFile(buildApksResult, tmpDir.resolve("bundle.apks"));
+    Path apksFile = createApksArchiveFile(buildApksResult, tmpDir.resolve("bundle.apks"));
 
+    List<Path> installedApks = new ArrayList<>();
     FakeDevice fakeDevice =
         FakeDevice.fromDeviceSpec(DEVICE_ID, DeviceState.ONLINE, lDeviceWithLocales("en-US"));
+    fakeDevice.setInstallApksSideEffect((apks, installOptions) -> installedApks.addAll(apks));
     AdbServer adbServer =
         new FakeAdbServer(/* hasInitialDeviceList= */ true, ImmutableList.of(fakeDevice));
 
-    InvalidDeviceSpecException exception =
-        assertThrows(
-            InvalidDeviceSpecException.class,
-            () ->
-                InstallApksCommand.builder()
-                    .setApksArchivePath(apksArchiveFile)
-                    .setAdbPath(adbPath)
-                    .setAdbServer(adbServer)
-                    .build()
-                    .execute());
-    assertThat(exception)
-        .hasMessageThat()
-        .contains("The bundle uses device tier targeting, but no device tier was specified.");
+    InstallApksCommand.builder()
+        .setApksArchivePath(apksFile)
+        .setAdbPath(adbPath)
+        .setAdbServer(adbServer)
+        .build()
+        .execute();
+
+    // Base only, the on demand asset is not installed. Low tier splits are filtered out.
+    assertThat(getFileNames(installedApks))
+        .containsExactly(baseMasterApk.toString(), baseLowApk.toString());
   }
 
   @Test
@@ -1155,6 +1208,10 @@ public class InstallApksCommandTest {
             // Add local testing info to check that pushed APKs are also filtered by tier.
             .setLocalTestingInfo(
                 LocalTestingInfo.newBuilder().setEnabled(true).setLocalTestingPath("local_testing"))
+            .addDefaultTargetingValue(
+                DefaultTargetingValue.newBuilder()
+                    .setDimension(Value.DEVICE_TIER)
+                    .setDefaultValue("low"))
             .build();
 
     Path apksFile = createApks(tableOfContent, apksInDirectory);

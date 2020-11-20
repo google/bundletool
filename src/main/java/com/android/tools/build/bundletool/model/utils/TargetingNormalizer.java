@@ -24,8 +24,6 @@ import com.android.bundle.Targeting.Abi;
 import com.android.bundle.Targeting.AbiTargeting;
 import com.android.bundle.Targeting.ApkTargeting;
 import com.android.bundle.Targeting.DeviceTierTargeting;
-import com.android.bundle.Targeting.GraphicsApi;
-import com.android.bundle.Targeting.GraphicsApiTargeting;
 import com.android.bundle.Targeting.LanguageTargeting;
 import com.android.bundle.Targeting.MultiAbi;
 import com.android.bundle.Targeting.MultiAbiTargeting;
@@ -45,13 +43,6 @@ import java.util.Comparator;
 public final class TargetingNormalizer {
 
   private static final Comparator<Abi> ABI_COMPARATOR = comparing(Abi::getAlias);
-
-  private static final Comparator<GraphicsApi> GRAPHICS_API_COMPARATOR =
-      Comparator.comparing(GraphicsApi::getApiOneofCase)
-          .thenComparing(graphicsApi -> graphicsApi.getMinOpenGlVersion().getMajor())
-          .thenComparing(graphicsApi -> graphicsApi.getMinOpenGlVersion().getMinor())
-          .thenComparing(graphicsApi -> graphicsApi.getMinVulkanVersion().getMajor())
-          .thenComparing(graphicsApi -> graphicsApi.getMinVulkanVersion().getMinor());
 
   private static final Comparator<MultiAbi> MULTI_ABI_COMPARATOR =
       comparing(MultiAbi::getAbiList, lexicographical(comparing(Abi::getAlias)));
@@ -74,10 +65,6 @@ public final class TargetingNormalizer {
     }
     if (targeting.hasLanguageTargeting()) {
       normalized.setLanguageTargeting(normalizeLanguageTargeting(targeting.getLanguageTargeting()));
-    }
-    if (targeting.hasGraphicsApiTargeting()) {
-      normalized.setGraphicsApiTargeting(
-          normalizeGraphicsApiTargeting(targeting.getGraphicsApiTargeting()));
     }
     if (targeting.hasMultiAbiTargeting()) {
       normalized.setMultiAbiTargeting(normalizeMultiAbiTargeting(targeting.getMultiAbiTargeting()));
@@ -135,15 +122,6 @@ public final class TargetingNormalizer {
         .addAllValue(ImmutableList.sortedCopyOf(ABI_COMPARATOR, targeting.getValueList()))
         .addAllAlternatives(
             ImmutableList.sortedCopyOf(ABI_COMPARATOR, targeting.getAlternativesList()))
-        .build();
-  }
-
-  private static GraphicsApiTargeting normalizeGraphicsApiTargeting(
-      GraphicsApiTargeting targeting) {
-    return GraphicsApiTargeting.newBuilder()
-        .addAllValue(ImmutableList.sortedCopyOf(GRAPHICS_API_COMPARATOR, targeting.getValueList()))
-        .addAllAlternatives(
-            ImmutableList.sortedCopyOf(GRAPHICS_API_COMPARATOR, targeting.getAlternativesList()))
         .build();
   }
 

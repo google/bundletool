@@ -128,6 +128,7 @@ import com.android.bundle.Commands.ApkSet;
 import com.android.bundle.Commands.AssetModulesInfo;
 import com.android.bundle.Commands.AssetSliceSet;
 import com.android.bundle.Commands.BuildApksResult;
+import com.android.bundle.Commands.DefaultTargetingValue;
 import com.android.bundle.Commands.DeliveryType;
 import com.android.bundle.Commands.InstantMetadata;
 import com.android.bundle.Commands.ModuleMetadata;
@@ -4440,6 +4441,13 @@ public class BuildApksManagerTest {
         .isEqualTo("base-tier_medium.apk");
     assertThat(filesInApk(mediumTierSplit, apkSetFile))
         .contains("assets/images#tier_medium/image.jpg");
+
+    assertThat(result.getDefaultTargetingValueList())
+        .containsExactly(
+            DefaultTargetingValue.newBuilder()
+                .setDimension(Value.DEVICE_TIER)
+                .setDefaultValue("low")
+                .build());
   }
 
   @Test

@@ -52,9 +52,6 @@ public final class TargetingUtils {
     if (targeting.hasAbi()) {
       dimensions.add(TargetingDimension.ABI);
     }
-    if (targeting.hasGraphicsApi()) {
-      dimensions.add(TargetingDimension.GRAPHICS_API);
-    }
     if (targeting.hasTextureCompressionFormat()) {
       dimensions.add(TargetingDimension.TEXTURE_COMPRESSION_FORMAT);
     }

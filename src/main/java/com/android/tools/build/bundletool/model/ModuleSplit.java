@@ -40,18 +40,14 @@ import com.android.bundle.Files.NativeLibraries;
 import com.android.bundle.Targeting.Abi;
 import com.android.bundle.Targeting.AbiTargeting;
 import com.android.bundle.Targeting.ApkTargeting;
-import com.android.bundle.Targeting.GraphicsApi;
-import com.android.bundle.Targeting.GraphicsApiTargeting;
 import com.android.bundle.Targeting.LanguageTargeting;
 import com.android.bundle.Targeting.MultiAbi;
 import com.android.bundle.Targeting.MultiAbiTargeting;
-import com.android.bundle.Targeting.OpenGlVersion;
 import com.android.bundle.Targeting.Sanitizer;
 import com.android.bundle.Targeting.Sanitizer.SanitizerAlias;
 import com.android.bundle.Targeting.SanitizerTargeting;
 import com.android.bundle.Targeting.TextureCompressionFormatTargeting;
 import com.android.bundle.Targeting.VariantTargeting;
-import com.android.bundle.Targeting.VulkanVersion;
 import com.android.tools.build.bundletool.model.BundleModule.ModuleType;
 import com.android.tools.build.bundletool.model.SourceStamp.StampType;
 import com.android.tools.build.bundletool.model.utils.ResourcesUtils;
@@ -201,15 +197,6 @@ public abstract class ModuleSplit {
                         .get(value.getDensityAlias())
                         .replace('-', '_')));
 
-    GraphicsApiTargeting graphicsApiTargeting = getApkTargeting().getGraphicsApiTargeting();
-    if (!graphicsApiTargeting.getValueList().isEmpty()) {
-      graphicsApiTargeting
-          .getValueList()
-          .forEach(value -> suffixJoiner.add(formatGraphicsApi(value)));
-    } else if (!graphicsApiTargeting.getAlternativesList().isEmpty()) {
-      suffixJoiner.add("other_gfx");
-    }
-
     TextureCompressionFormatTargeting textureFormatTargeting =
         getApkTargeting().getTextureCompressionFormatTargeting();
     if (!textureFormatTargeting.getValueList().isEmpty()) {
@@ -230,26 +217,6 @@ public abstract class ModuleSplit {
 
   private static String formatAbi(Abi abi) {
     return AbiName.fromProto(abi.getAlias()).getPlatformName().replace('-', '_');
-  }
-
-  private static String formatGraphicsApi(GraphicsApi graphicsTargeting) {
-    StringJoiner result = new StringJoiner("_");
-    if (graphicsTargeting.hasMinOpenGlVersion()) {
-      result.add("gl" + formatGlVersion(graphicsTargeting.getMinOpenGlVersion()));
-    } else if (graphicsTargeting.hasMinVulkanVersion()) {
-      result.add("vk" + formatVulkanVersion(graphicsTargeting.getMinVulkanVersion()));
-    }
-    return result.toString();
-  }
-
-  private static String formatVulkanVersion(VulkanVersion vulkanVersion) {
-    // Will treat missing minor as 0 which is fine.
-    return vulkanVersion.getMajor() + "_" + vulkanVersion.getMinor();
-  }
-
-  private static String formatGlVersion(OpenGlVersion glVersion) {
-    // Will treat missing minor as 0 which is fine.
-    return glVersion.getMajor() + "_" + glVersion.getMinor();
   }
 
   /** Filters out any entries not referenced in the given resource table. */

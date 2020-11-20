@@ -21,11 +21,8 @@ import static com.google.common.base.Preconditions.checkState;
 
 import com.android.bundle.Targeting.AssetsDirectoryTargeting;
 import com.android.bundle.Targeting.DeviceTierTargeting;
-import com.android.bundle.Targeting.GraphicsApi;
-import com.android.bundle.Targeting.GraphicsApiTargeting;
 import com.android.bundle.Targeting.LanguageTargeting;
 import com.android.tools.build.bundletool.model.exceptions.InvalidBundleException;
-import com.android.tools.build.bundletool.model.utils.GraphicsApiUtils;
 import com.android.tools.build.bundletool.model.utils.TextureCompressionUtils;
 import com.google.auto.value.AutoValue;
 import com.google.common.collect.ImmutableList;
@@ -51,16 +48,12 @@ public abstract class TargetedDirectorySegment {
   private static final Pattern LANGUAGE_CODE_PATTERN = Pattern.compile("^[a-zA-Z]{2,3}$");
   private static final Pattern DEVICE_TIER_PATTERN = Pattern.compile("[a-zA-Z][a-zA-Z0-9_]*");
 
-  private static final String OPENGL_KEY = "opengl";
-  private static final String VULKAN_KEY = "vulkan";
   private static final String LANG_KEY = "lang";
   private static final String TCF_KEY = "tcf";
   private static final String DEVICE_TIER_KEY = "tier";
 
   private static final ImmutableMap<String, TargetingDimension> KEY_TO_DIMENSION =
       ImmutableMap.<String, TargetingDimension>builder()
-          .put(OPENGL_KEY, TargetingDimension.GRAPHICS_API)
-          .put(VULKAN_KEY, TargetingDimension.GRAPHICS_API)
           .put(LANG_KEY, TargetingDimension.LANGUAGE)
           .put(TCF_KEY, TargetingDimension.TEXTURE_COMPRESSION_FORMAT)
           .put(DEVICE_TIER_KEY, TargetingDimension.DEVICE_TIER)
@@ -68,8 +61,6 @@ public abstract class TargetedDirectorySegment {
   private static final ImmutableSetMultimap<TargetingDimension, String> DIMENSION_TO_KEY =
       KEY_TO_DIMENSION.asMultimap().inverse();
 
-  private static final Pattern OPENGL_VALUE_PATTERN = Pattern.compile("(\\d)\\.(\\d)");
-  private static final Pattern VULKAN_VALUE_PATTERN = Pattern.compile("(\\d)\\.(\\d)");
 
   public abstract String getName();
 
@@ -95,9 +86,6 @@ public abstract class TargetedDirectorySegment {
     AssetsDirectoryTargeting.Builder newTargeting = getTargeting().toBuilder();
     if (dimension.equals(TargetingDimension.ABI) && getTargeting().hasAbi()) {
       newTargeting.clearAbi();
-    } else if (dimension.equals(TargetingDimension.GRAPHICS_API)
-        && getTargeting().hasGraphicsApi()) {
-      newTargeting.clearGraphicsApi();
     } else if (dimension.equals(TargetingDimension.LANGUAGE) && getTargeting().hasLanguage()) {
       newTargeting.clearLanguage();
     } else if (dimension.equals(TargetingDimension.TEXTURE_COMPRESSION_FORMAT)
@@ -174,8 +162,6 @@ public abstract class TargetedDirectorySegment {
 
     if (targeting.hasLanguage()) {
       return Optional.of(LANG_KEY);
-    } else if (targeting.hasGraphicsApi()) {
-      return getGraphicsApiKey(targeting);
     } else if (targeting.hasTextureCompressionFormat()) {
       return Optional.of(TCF_KEY);
     } else if (targeting.hasDeviceTier()) {
@@ -193,8 +179,6 @@ public abstract class TargetedDirectorySegment {
 
     if (targeting.hasLanguage()) {
       return Optional.of(Iterables.getOnlyElement(targeting.getLanguage().getValueList()));
-    } else if (targeting.hasGraphicsApi()) {
-      return getGraphicsApiValue(targeting);
     } else if (targeting.hasTextureCompressionFormat()) {
       return Optional.ofNullable(
           TextureCompressionUtils.TARGETING_TO_TEXTURE.getOrDefault(
@@ -218,8 +202,6 @@ public abstract class TargetedDirectorySegment {
     }
 
     switch (KEY_TO_DIMENSION.get(key)) {
-      case GRAPHICS_API:
-        return parseGraphicsApi(name, key, value);
       case LANGUAGE:
         return parseLanguage(name, value);
       case TEXTURE_COMPRESSION_FORMAT:
@@ -231,72 +213,6 @@ public abstract class TargetedDirectorySegment {
             .withUserMessage("Unrecognized key: '%s'.", key)
             .build();
     }
-  }
-
-  private static AssetsDirectoryTargeting parseGraphicsApi(String name, String key, String value) {
-    GraphicsApiTargeting graphicsApiTargeting;
-    Matcher matcher;
-    switch (key) {
-      case OPENGL_KEY:
-        matcher = OPENGL_VALUE_PATTERN.matcher(value);
-        if (!matcher.matches()) {
-          throw InvalidBundleException.builder()
-              .withUserMessage(
-                  "Could not parse OpenGL version '%s' for the directory '%s'.", value, name)
-              .build();
-        }
-        graphicsApiTargeting =
-            GraphicsApiUtils.openGlVersionFrom(
-                Integer.parseInt(matcher.group(1)), Integer.parseInt(matcher.group(2)));
-        break;
-
-      case VULKAN_KEY:
-        matcher = VULKAN_VALUE_PATTERN.matcher(value);
-        if (!matcher.matches()) {
-          throw InvalidBundleException.builder()
-              .withUserMessage(
-                  "Could not parse Vulkan version '%s' for the directory '%s'.", value, name)
-              .build();
-        }
-        graphicsApiTargeting =
-            GraphicsApiUtils.vulkanVersionFrom(
-                Integer.parseInt(matcher.group(1)), Integer.parseInt(matcher.group(2)));
-        break;
-
-      default:
-        throw InvalidBundleException.createWithUserMessage(
-            "Not a valid graphics API identifier: " + key);
-    }
-
-    return AssetsDirectoryTargeting.newBuilder().setGraphicsApi(graphicsApiTargeting).build();
-  }
-
-  /** Do the reverse of parseGraphicsApi, return the key of the graphics api. */
-  private static Optional<String> getGraphicsApiKey(AssetsDirectoryTargeting targeting) {
-    GraphicsApi graphicsApi = Iterables.getOnlyElement(targeting.getGraphicsApi().getValueList());
-    if (graphicsApi.hasMinOpenGlVersion()) {
-      return Optional.of(OPENGL_KEY);
-    } else if (graphicsApi.hasMinVulkanVersion()) {
-      return Optional.of(VULKAN_KEY);
-    }
-
-    return Optional.empty();
-  }
-
-  /** Do the reverse of parseGraphicsApi, return the key and value to be used in a path. */
-  private static Optional<String> getGraphicsApiValue(AssetsDirectoryTargeting targeting) {
-    GraphicsApi graphicsApi = Iterables.getOnlyElement(targeting.getGraphicsApi().getValueList());
-    if (graphicsApi.hasMinOpenGlVersion()) {
-      int majorVersion = graphicsApi.getMinOpenGlVersion().getMajor();
-      int minorVersion = graphicsApi.getMinOpenGlVersion().getMinor();
-      return Optional.of(String.format("%d.%d", majorVersion, minorVersion));
-    } else if (graphicsApi.hasMinVulkanVersion()) {
-      int majorVersion = graphicsApi.getMinVulkanVersion().getMajor();
-      int minorVersion = graphicsApi.getMinVulkanVersion().getMinor();
-      return Optional.of(String.format("%d.%d", majorVersion, minorVersion));
-    }
-
-    return Optional.empty();
   }
 
   private static AssetsDirectoryTargeting parseTextureCompressionFormat(String name, String value) {

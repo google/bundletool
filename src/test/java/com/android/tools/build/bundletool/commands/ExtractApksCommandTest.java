@@ -63,10 +63,12 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import com.android.bundle.Commands.AssetModuleMetadata;
 import com.android.bundle.Commands.AssetSliceSet;
 import com.android.bundle.Commands.BuildApksResult;
+import com.android.bundle.Commands.DefaultTargetingValue;
 import com.android.bundle.Commands.DeliveryType;
 import com.android.bundle.Commands.ExtractApksResult;
 import com.android.bundle.Commands.ExtractedApk;
 import com.android.bundle.Config.Bundletool;
+import com.android.bundle.Config.SplitDimension.Value;
 import com.android.bundle.Devices.DeviceSpec;
 import com.android.bundle.Targeting.Abi.AbiAlias;
 import com.android.bundle.Targeting.ApkTargeting;
@@ -1715,7 +1717,7 @@ public class ExtractApksCommandTest {
   }
 
   @Test
-  public void bundleWithDeviceTierTargeting_noDeviceTierSpecified_throws() throws Exception {
+  public void bundleWithDeviceTierTargeting_noDeviceTierSpecified_usesDefaults() throws Exception {
     ZipPath baseMasterApk = ZipPath.create("base-master.apk");
     ZipPath baseLowApk = ZipPath.create("base-tier_low.apk");
     ZipPath baseHighApk = ZipPath.create("base-tier_high.apk");
@@ -1744,25 +1746,30 @@ public class ExtractApksCommandTest {
                                     /* value= */ "high",
                                     /* alternatives= */ ImmutableList.of("low"))),
                             baseHighApk))))
+            .addDefaultTargetingValue(
+                DefaultTargetingValue.newBuilder()
+                    .setDimension(Value.DEVICE_TIER)
+                    .setDefaultValue("low"))
             .build();
 
     Path apksArchiveFile = createApksArchiveFile(buildApksResult, tmpDir.resolve("bundle.apks"));
 
     DeviceSpec deviceSpec = lDevice();
 
-    InvalidDeviceSpecException exception =
-        assertThrows(
-            InvalidDeviceSpecException.class,
-            () ->
-                ExtractApksCommand.builder()
-                    .setApksArchivePath(apksArchiveFile)
-                    .setDeviceSpec(deviceSpec)
-                    .setOutputDirectory(tmpDir)
-                    .build()
-                    .execute());
-    assertThat(exception)
-        .hasMessageThat()
-        .contains("The bundle uses device tier targeting, but no device tier was specified.");
+    ImmutableList<Path> matchedApks =
+        ExtractApksCommand.builder()
+            .setApksArchivePath(apksArchiveFile)
+            .setDeviceSpec(deviceSpec)
+            .setOutputDirectory(tmpDir)
+            .build()
+            .execute();
+
+    // Master and high tier splits for base and asset module.
+    assertThat(matchedApks)
+        .containsExactly(inOutputDirectory(baseMasterApk), inOutputDirectory(baseLowApk));
+    for (Path matchedApk : matchedApks) {
+      checkFileExistsAndReadable(tmpDir.resolve(matchedApk));
+    }
   }
 
   @Test
@@ -1821,6 +1828,10 @@ public class ExtractApksCommandTest {
                                     /* value= */ "high",
                                     /* alternatives= */ ImmutableList.of("low"))),
                             asset1HighApk)))
+            .addDefaultTargetingValue(
+                DefaultTargetingValue.newBuilder()
+                    .setDimension(Value.DEVICE_TIER)
+                    .setDefaultValue("low"))
             .build();
 
     Path apksArchiveFile = createApksArchiveFile(buildApksResult, tmpDir.resolve("bundle.apks"));
@@ -1845,6 +1856,47 @@ public class ExtractApksCommandTest {
     for (Path matchedApk : matchedApks) {
       checkFileExistsAndReadable(tmpDir.resolve(matchedApk));
     }
+  }
+
+  @Test
+  public void incompleteApksFile_missingMatchedAbiSplit_throws() throws Exception {
+    // Partial APK Set file where 'x86' split is included and 'x86_64' split is not included because
+    // device spec sent to 'build-apks' command doesn't support it.
+    // Next, device spec that should be matched to 'x86_64' split is provided to 'extract-apks'
+    // command and command throws IncompatibleDeviceException.
+    BuildApksResult tableOfContent =
+        BuildApksResult.newBuilder()
+            .setBundletool(
+                Bundletool.newBuilder()
+                    .setVersion(BundleToolVersion.getCurrentVersion().toString()))
+            .addVariant(
+                createVariant(
+                    VariantTargeting.getDefaultInstance(),
+                    createSplitApkSet(
+                        /* moduleName= */ "base",
+                        createMasterApkDescription(
+                            ApkTargeting.getDefaultInstance(), ZipPath.create("base-master.apk")),
+                        splitApkDescription(
+                            apkAbiTargeting(X86, ImmutableSet.of(X86_64)),
+                            ZipPath.create("base-x86.apk")))))
+            .build();
+
+    Path apksArchiveFile = createApksArchiveFile(tableOfContent, tmpDir.resolve("bundle.apks"));
+
+    DeviceSpec deviceSpec = mergeSpecs(deviceWithSdk(21), abis("x86_64", "x86"));
+
+    ExtractApksCommand command =
+        ExtractApksCommand.builder()
+            .setDeviceSpec(deviceSpec)
+            .setApksArchivePath(apksArchiveFile)
+            .setOutputDirectory(tmpDir)
+            .build();
+    IncompatibleDeviceException exception =
+        assertThrows(IncompatibleDeviceException.class, command::execute);
+    assertThat(exception)
+        .hasMessageThat()
+        .isEqualTo(
+            "Missing APKs for [ABI] dimensions in the module 'base' for the provided device.");
   }
 
   @Test

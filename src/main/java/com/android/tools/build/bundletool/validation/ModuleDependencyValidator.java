@@ -194,12 +194,12 @@ public class ModuleDependencyValidator extends SubValidator {
       ModuleDeliveryType moduleDeliveryType = modulesByName.get(moduleName).getDeliveryType();
       ModuleDeliveryType depDeliveryType = modulesByName.get(moduleDep).getDeliveryType();
 
-      // Conditional modules can't have dependencies.
+      // Conditional modules can only depend on always installed modules.
       if (moduleDeliveryType.equals(ModuleDeliveryType.CONDITIONAL_INITIAL_INSTALL)
-          && !moduleDep.equals(BASE_MODULE_NAME.getName())) {
+          && !depDeliveryType.equals(ModuleDeliveryType.ALWAYS_INITIAL_INSTALL)) {
         throw InvalidBundleException.builder()
             .withUserMessage(
-                "Conditional module '%s' cannot have dependencies but uses module '%s'.",
+                "Conditional module '%s' cannot depend on a module '%s' that is not install-time.",
                 moduleName, moduleDep)
             .build();
       }

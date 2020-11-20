@@ -102,6 +102,23 @@ message StandaloneConfig {
   repeated SplitDimension split_dimension = 1;
   // Whether 64 bit libraries should be stripped from Standalone APKs.
   bool strip_64_bit_libraries = 2;
+  // Dex merging strategy that should be applied to produce Standalone APKs.
+  DexMergingStrategy dex_merging_strategy = 3;
+
+  enum DexMergingStrategy {
+    // Strategy that does dex merging for applications that have minimum SDK
+    // below 21 to ensure dex files from all modules are merged into one or
+    // mainDexList is applied when merging into one dex is not possible. For
+    // applications with minSdk >= 21 dex files from all modules are copied into
+    // standalone APK as is because Android supports multiple dex files natively
+    // starting from Android 5.0.
+    MERGE_IF_NEEDED = 0;
+    // Requires to copy dex files from all modules into standalone APK as is.
+    // If an application supports SDKs below 21 this strategy puts
+    // responsibility of providing dex files compatible with legacy multidex on
+    // application developers.
+    NEVER_MERGE = 1;
+  }
 }
 
 message SplitDimension {

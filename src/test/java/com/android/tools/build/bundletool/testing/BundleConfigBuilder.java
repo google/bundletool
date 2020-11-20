@@ -19,6 +19,7 @@ package com.android.tools.build.bundletool.testing;
 import com.android.bundle.Config.BundleConfig;
 import com.android.bundle.Config.Bundletool;
 import com.android.bundle.Config.SplitDimension;
+import com.android.bundle.Config.StandaloneConfig.DexMergingStrategy;
 import com.android.bundle.Config.SuffixStripping;
 import com.android.bundle.Config.UnsignedEmbeddedApkConfig;
 import com.android.tools.build.bundletool.model.version.BundleToolVersion;
@@ -78,6 +79,14 @@ public class BundleConfigBuilder {
 
   public BundleConfigBuilder setUncompressDexFiles(boolean enabled) {
     builder.getOptimizationsBuilder().getUncompressDexFilesBuilder().setEnabled(enabled);
+    return this;
+  }
+
+  public BundleConfigBuilder setDexMergingStrategy(DexMergingStrategy dexMergingStrategy) {
+    builder
+        .getOptimizationsBuilder()
+        .getStandaloneConfigBuilder()
+        .setDexMergingStrategy(dexMergingStrategy);
     return this;
   }
 

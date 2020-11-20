@@ -26,6 +26,9 @@ import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.ImmutableListMultimap.toImmutableListMultimap;
 import static com.google.common.collect.ImmutableMap.toImmutableMap;
 import static com.google.common.collect.Streams.stream;
+import static java.util.Comparator.comparing;
+import static java.util.stream.Collectors.groupingBy;
+import static java.util.stream.Collectors.maxBy;
 
 import com.android.bundle.Devices.DeviceSpec;
 import com.android.tools.build.bundletool.commands.CommandHelp.CommandDescription;
@@ -53,6 +56,7 @@ import com.google.common.base.Suppliers;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableListMultimap;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.Streams;
 import com.google.common.io.ByteStreams;
 import com.google.errorprone.annotations.CanIgnoreReturnValue;
 import java.io.IOException;
@@ -217,23 +221,28 @@ public abstract class InstallMultiApksCommand {
       ImmutableMap<String, InstalledPackageInfo> existingPackages =
           getPackagesInstalledOnDevice(device);
 
-      ImmutableList<InstallableApk> apksToInstall =
+      ImmutableList<PackagePathVersion> installableApksFilesWithBadgingInfo =
           getActualApksPaths(tempDirectory).stream()
               .flatMap(
                   apksArchivePath ->
                       stream(
                           apksWithPackageName(apksArchivePath, deviceSpec, aapt2CommandSupplier)))
-              .filter(apk -> shouldInstall(apk, existingPackages))
+              .filter(apks -> shouldInstall(apks, existingPackages))
+              .collect(toImmutableList());
+
+      ImmutableList<PackagePathVersion> apkFilesToInstall =
+          uniqueApksByPackageName(installableApksFilesWithBadgingInfo).stream()
               .flatMap(apks -> extractApkListFromApks(deviceSpec, apks, tempDirectory).stream())
               .collect(toImmutableList());
       ImmutableListMultimap<String, String> apkToInstallByPackage =
-          apksToInstall.stream()
+          apkFilesToInstall.stream()
               .collect(
                   toImmutableListMultimap(
-                      InstallableApk::getPackageName,
-                      installableApk -> installableApk.getPath().toAbsolutePath().toString()));
+                      PackagePathVersion::getPackageName,
+                      packagePathVersion ->
+                          packagePathVersion.getPath().toAbsolutePath().toString()));
 
-      if (apksToInstall.isEmpty()) {
+      if (apkFilesToInstall.isEmpty()) {
         logger.warning("No packages found to install! Exiting...");
         return;
       }
@@ -257,7 +266,7 @@ public abstract class InstallMultiApksCommand {
    * </ul>
    */
   private boolean shouldInstall(
-      InstallableApk apk, ImmutableMap<String, InstalledPackageInfo> existingPackages) {
+      PackagePathVersion apk, ImmutableMap<String, InstalledPackageInfo> existingPackages) {
     if (getUpdateOnly() && !existingPackages.containsKey(apk.getPackageName())) {
       logger.info(
           String.format(
@@ -310,7 +319,7 @@ public abstract class InstallMultiApksCommand {
                     installedPackageInfo -> installedPackageInfo));
   }
 
-  private static Optional<InstallableApk> apksWithPackageName(
+  private static Optional<PackagePathVersion> apksWithPackageName(
       Path apksArchivePath, DeviceSpec deviceSpec, Supplier<Aapt2Command> aapt2CommandSupplier) {
     try (TempDirectory tempDirectory = new TempDirectory()) {
       // Any of the extracted .apk/.apex files will work.
@@ -326,7 +335,7 @@ public abstract class InstallMultiApksCommand {
       BadgingInfo badgingInfo =
           BadgingInfoParser.parse(aapt2CommandSupplier.get().dumpBadging(extractedFile));
       return Optional.of(
-          InstallableApk.create(
+          PackagePathVersion.create(
               apksArchivePath, badgingInfo.getPackageName(), badgingInfo.getVersionCode()));
     } catch (IncompatibleDeviceException e) {
       logger.warning(
@@ -355,8 +364,8 @@ public abstract class InstallMultiApksCommand {
   }
 
   /** Extracts the apk/apex files that will be installed from a given .apks. */
-  private static ImmutableList<InstallableApk> extractApkListFromApks(
-      DeviceSpec deviceSpec, InstallableApk apksArchive, TempDirectory tempDirectory) {
+  private static ImmutableList<PackagePathVersion> extractApkListFromApks(
+      DeviceSpec deviceSpec, PackagePathVersion apksArchive, TempDirectory tempDirectory) {
     logger.info(String.format("Extracting package '%s'", apksArchive.getPackageName()));
     try {
       Path output = tempDirectory.getPath().resolve(apksArchive.getPackageName());
@@ -371,7 +380,7 @@ public abstract class InstallMultiApksCommand {
       return extractApksCommand.build().execute().stream()
           .map(
               path ->
-                  InstallableApk.create(
+                  PackagePathVersion.create(
                       path, apksArchive.getPackageName(), apksArchive.getVersionCode()))
           .collect(toImmutableList());
     } catch (IncompatibleDeviceException e) {
@@ -411,8 +420,8 @@ public abstract class InstallMultiApksCommand {
               .collect(toImmutableList());
       for (ZipEntry apksToExtract : apksToExtractList) {
         Path extractedApksPath =
-            zipExtractedSubDirectory.resolve(
-                ZipPath.create(apksToExtract.getName()).getFileName().toString());
+            zipExtractedSubDirectory.resolve(ZipPath.create(apksToExtract.getName()).toString());
+        Files.createDirectories(extractedApksPath.getParent());
         try (InputStream inputStream = apksArchiveContainer.getInputStream(apksToExtract);
             OutputStream outputApks = Files.newOutputStream(extractedApksPath)) {
           ByteStreams.copy(inputStream, outputApks);
@@ -421,6 +430,23 @@ public abstract class InstallMultiApksCommand {
       }
     }
     return extractedApks.build();
+  }
+
+  /**
+   * If multiple APKS files for the same package are present and installable, only the APKS with
+   * higher version code should be installed.
+   */
+  private static ImmutableList<PackagePathVersion> uniqueApksByPackageName(
+      ImmutableList<PackagePathVersion> installableApksFiles) {
+    return installableApksFiles.stream()
+        .collect(
+            groupingBy(
+                PackagePathVersion::getPackageName,
+                maxBy(comparing(PackagePathVersion::getVersionCode))))
+        .values()
+        .stream()
+        .flatMap(Streams::stream)
+        .collect(toImmutableList());
   }
 
   public static CommandHelp help() {
@@ -519,12 +545,13 @@ public abstract class InstallMultiApksCommand {
     return CommandUtils.extractAapt2FromJar(tempDirectoryForJarCommand);
   }
 
-  /** Represents pair of APK path and package name of this APK. */
+  /** Represents a Package with a path to a relevant file and a version code. */
   @AutoValue
-  public abstract static class InstallableApk {
+  abstract static class PackagePathVersion {
 
-    public static InstallableApk create(Path path, String packageName, long versionCode) {
-      return new AutoValue_InstallMultiApksCommand_InstallableApk(path, packageName, versionCode);
+    public static PackagePathVersion create(Path path, String packageName, long versionCode) {
+      return new AutoValue_InstallMultiApksCommand_PackagePathVersion(
+          path, packageName, versionCode);
     }
 
     public abstract Path getPath();
@@ -533,6 +560,6 @@ public abstract class InstallMultiApksCommand {
 
     public abstract long getVersionCode();
 
-    InstallableApk() {}
+    PackagePathVersion() {}
   }
 }

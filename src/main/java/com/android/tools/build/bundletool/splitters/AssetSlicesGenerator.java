@@ -48,13 +48,10 @@ public class AssetSlicesGenerator {
 
   public ImmutableList<ModuleSplit> generateAssetSlices() {
     ImmutableList.Builder<ModuleSplit> splits = ImmutableList.builder();
-    Optional<Long> appVersionCode =
+    Optional<Integer> appVersionCode =
         appBundle.isAssetOnly()
             ? Optional.empty()
-            : Optional.of(
-                (long) appBundle.getBaseModule().getAndroidManifest().getVersionCode().get());
-    Optional<Long> nonUpfrontAssetModulesVersionCode =
-        assetModulesVersionOverride.isPresent() ? assetModulesVersionOverride : appVersionCode;
+            : appBundle.getBaseModule().getAndroidManifest().getVersionCode();
 
     for (BundleModule module : appBundle.getAssetModules().values()) {
       AssetModuleSplitter moduleSplitter =
@@ -62,30 +59,45 @@ public class AssetSlicesGenerator {
       splits.addAll(
           moduleSplitter.splitModule().stream()
               .map(
-                  split ->
-                      addVersionCode(
-                          split,
-                          // Install-time assets module don't support separate versioning and
-                          // reuse app's version code.
-                          module.getDeliveryType().equals(ModuleDeliveryType.NO_INITIAL_INSTALL)
-                              ? nonUpfrontAssetModulesVersionCode
-                              : appVersionCode))
+                  split -> {
+                    if (module.getDeliveryType().equals(ModuleDeliveryType.NO_INITIAL_INSTALL)) {
+                      // In slices for on-demand and fast-follow asset modules the version name
+                      // instead of the version code is set, since their version code is not used by
+                      // Android.
+                      Optional<String> nonUpfrontAssetModulesVersionName =
+                          (assetModulesVersionOverride.isPresent()
+                                  ? assetModulesVersionOverride
+                                  : appVersionCode)
+                              .map(Object::toString);
+                      return addVersionName(split, nonUpfrontAssetModulesVersionName);
+                    } else {
+                      // Install-time assets module have the same version code as the app.
+                      return addVersionCode(split, appVersionCode);
+                    }
+                  })
               .collect(toImmutableList()));
     }
     return splits.build();
   }
 
-  private static ModuleSplit addVersionCode(ModuleSplit moduleSplit, Optional<Long> versionCode) {
+  private static ModuleSplit addVersionCode(
+      ModuleSplit moduleSplit, Optional<Integer> versionCode) {
     if (!versionCode.isPresent()) {
       return moduleSplit;
     }
     return moduleSplit.toBuilder()
         .setAndroidManifest(
-            moduleSplit
-                .getAndroidManifest()
-                .toEditor()
-                .setLongVersionCode(versionCode.get())
-                .save())
+            moduleSplit.getAndroidManifest().toEditor().setVersionCode(versionCode.get()).save())
+        .build();
+  }
+
+  private static ModuleSplit addVersionName(ModuleSplit moduleSplit, Optional<String> versionName) {
+    if (!versionName.isPresent()) {
+      return moduleSplit;
+    }
+    return moduleSplit.toBuilder()
+        .setAndroidManifest(
+            moduleSplit.getAndroidManifest().toEditor().setVersionName(versionName.get()).save())
         .build();
   }
 }

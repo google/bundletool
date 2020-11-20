@@ -37,14 +37,11 @@ import com.android.bundle.Targeting.AssetsDirectoryTargeting;
 import com.android.bundle.Targeting.DeviceFeature;
 import com.android.bundle.Targeting.DeviceFeatureTargeting;
 import com.android.bundle.Targeting.DeviceTierTargeting;
-import com.android.bundle.Targeting.GraphicsApi;
-import com.android.bundle.Targeting.GraphicsApiTargeting;
 import com.android.bundle.Targeting.LanguageTargeting;
 import com.android.bundle.Targeting.ModuleTargeting;
 import com.android.bundle.Targeting.MultiAbi;
 import com.android.bundle.Targeting.MultiAbiTargeting;
 import com.android.bundle.Targeting.NativeDirectoryTargeting;
-import com.android.bundle.Targeting.OpenGlVersion;
 import com.android.bundle.Targeting.Sanitizer;
 import com.android.bundle.Targeting.Sanitizer.SanitizerAlias;
 import com.android.bundle.Targeting.SanitizerTargeting;
@@ -58,7 +55,6 @@ import com.android.bundle.Targeting.TextureCompressionFormat.TextureCompressionF
 import com.android.bundle.Targeting.TextureCompressionFormatTargeting;
 import com.android.bundle.Targeting.UserCountriesTargeting;
 import com.android.bundle.Targeting.VariantTargeting;
-import com.android.bundle.Targeting.VulkanVersion;
 import com.android.tools.build.bundletool.model.AbiName;
 import com.android.tools.build.bundletool.model.ModuleSplit;
 import com.android.tools.build.bundletool.model.utils.Versions;
@@ -104,11 +100,6 @@ public final class TargetingUtils {
   public static AssetsDirectoryTargeting assetsDirectoryTargeting(String architecture) {
     AbiAlias alias = toAbiAlias(architecture);
     return assetsDirectoryTargeting(abiTargeting(alias));
-  }
-
-  public static AssetsDirectoryTargeting assetsDirectoryTargeting(
-      GraphicsApiTargeting graphicsTargeting) {
-    return AssetsDirectoryTargeting.newBuilder().setGraphicsApi(graphicsTargeting).build();
   }
 
   public static AssetsDirectoryTargeting assetsDirectoryTargeting(
@@ -346,10 +337,6 @@ public final class TargetingUtils {
 
   public static ApkTargeting apkMinSdkTargeting(int minSdkVersion) {
     return apkSdkTargeting(sdkVersionFrom(minSdkVersion));
-  }
-
-  public static ApkTargeting apkGraphicsTargeting(GraphicsApiTargeting graphicsTargeting) {
-    return ApkTargeting.newBuilder().setGraphicsApiTargeting(graphicsTargeting).build();
   }
 
   public static ApkTargeting apkSdkTargeting(SdkVersion sdkVersion) {
@@ -708,45 +695,6 @@ public final class TargetingUtils {
                         aliases.stream().map(TargetingUtils::toAbi).collect(toImmutableList()))
                     .build())
         .collect(toImmutableList());
-  }
-
-  // Graphics API Targeting
-
-  public static GraphicsApi openGlVersionFrom(int fromMajor) {
-    return openGlVersionFrom(fromMajor, 0);
-  }
-
-  public static GraphicsApi openGlVersionFrom(int fromMajor, int fromMinor) {
-    return GraphicsApi.newBuilder()
-        .setMinOpenGlVersion(OpenGlVersion.newBuilder().setMajor(fromMajor).setMinor(fromMinor))
-        .build();
-  }
-
-  public static GraphicsApiTargeting graphicsApiTargeting(
-      ImmutableSet<GraphicsApi> values, ImmutableSet<GraphicsApi> alternatives) {
-    return GraphicsApiTargeting.newBuilder()
-        .addAllValue(values)
-        .addAllAlternatives(alternatives)
-        .build();
-  }
-
-  public static GraphicsApiTargeting graphicsApiTargeting(GraphicsApi value) {
-    return graphicsApiTargeting(ImmutableSet.of(value), ImmutableSet.of());
-  }
-
-  public static GraphicsApiTargeting openGlVersionTargeting(
-      GraphicsApi value, ImmutableSet<GraphicsApi> alternatives) {
-    return graphicsApiTargeting(ImmutableSet.of(value), alternatives);
-  }
-
-  public static GraphicsApi vulkanVersionFrom(int fromMajor) {
-    return vulkanVersionFrom(fromMajor, 0);
-  }
-
-  public static GraphicsApi vulkanVersionFrom(int fromMajor, int fromMinor) {
-    return GraphicsApi.newBuilder()
-        .setMinVulkanVersion(VulkanVersion.newBuilder().setMajor(fromMajor).setMinor(fromMinor))
-        .build();
   }
 
   // Screen Density targeting.

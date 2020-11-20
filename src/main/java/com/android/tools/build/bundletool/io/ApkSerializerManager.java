@@ -33,12 +33,15 @@ import com.android.bundle.Commands.AssetModuleMetadata;
 import com.android.bundle.Commands.AssetModulesInfo;
 import com.android.bundle.Commands.AssetSliceSet;
 import com.android.bundle.Commands.BuildApksResult;
+import com.android.bundle.Commands.DefaultTargetingValue;
 import com.android.bundle.Commands.DeliveryType;
 import com.android.bundle.Commands.InstantMetadata;
 import com.android.bundle.Commands.LocalTestingInfo;
 import com.android.bundle.Commands.Variant;
 import com.android.bundle.Config.AssetModulesConfig;
+import com.android.bundle.Config.BundleConfig;
 import com.android.bundle.Config.Bundletool;
+import com.android.bundle.Config.SplitDimension;
 import com.android.bundle.Config.SuffixStripping;
 import com.android.bundle.Devices.DeviceSpec;
 import com.android.bundle.Targeting.VariantTargeting;
@@ -140,6 +143,7 @@ public class ApkSerializerManager {
       apksResult.setAssetModulesInfo(
           getAssetModulesInfo(appBundle.getBundleConfig().getAssetModulesConfig()));
     }
+    apksResult.addAllDefaultTargetingValue(getDefaultTargetingValues(appBundle.getBundleConfig()));
     apkSetBuilder.setTableOfContentsFile(apksResult.build());
   }
 
@@ -393,6 +397,19 @@ public class ApkSerializerManager {
         .addAllAppVersion(assetModulesConfig.getAppVersionList())
         .setAssetVersionTag(assetModulesConfig.getAssetVersionTag())
         .build();
+  }
+
+  private static ImmutableList<DefaultTargetingValue> getDefaultTargetingValues(
+      BundleConfig bundleConfig) {
+    return bundleConfig.getOptimizations().getSplitsConfig().getSplitDimensionList().stream()
+        .filter(SplitDimension::hasSuffixStripping)
+        .map(
+            splitDimension ->
+                DefaultTargetingValue.newBuilder()
+                    .setDimension(splitDimension.getValue())
+                    .setDefaultValue(splitDimension.getSuffixStripping().getDefaultSuffix())
+                    .build())
+        .collect(toImmutableList());
   }
 
   private static DeliveryType getDeliveryType(ManifestDeliveryElement deliveryElement) {

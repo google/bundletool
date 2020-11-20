@@ -82,9 +82,6 @@ public class AssetsTargetingValidator extends SubValidator {
     if (targeting.hasAbi()) {
       checkHasValuesOrAlternatives(targeting.getAbi(), targetedDirectory.getPath());
     }
-    if (targeting.hasGraphicsApi()) {
-      checkHasValuesOrAlternatives(targeting.getGraphicsApi(), targetedDirectory.getPath());
-    }
     if (targeting.hasLanguage()) {
       checkHasValuesOrAlternatives(targeting.getLanguage(), targetedDirectory.getPath());
     }

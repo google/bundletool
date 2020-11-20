@@ -17,8 +17,7 @@
 package com.android.tools.build.bundletool.model.targeting;
 
 import static com.android.tools.build.bundletool.testing.TargetingUtils.assetsDirectoryTargeting;
-import static com.android.tools.build.bundletool.testing.TargetingUtils.graphicsApiTargeting;
-import static com.android.tools.build.bundletool.testing.TargetingUtils.openGlVersionFrom;
+import static com.android.tools.build.bundletool.testing.TargetingUtils.languageTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.textureCompressionTargeting;
 import static com.google.common.truth.Truth.assertThat;
 import static com.google.common.truth.extensions.proto.ProtoTruth.assertThat;
@@ -46,20 +45,20 @@ public class TargetedDirectoryTest {
   @Test
   public void pathBaseName_multiLevelTargeting() {
     assertThat(
-            TargetedDirectory.parse(ZipPath.create("assets/world/gfx#opengl_3.2/texture#tcf_etc1"))
+            TargetedDirectory.parse(ZipPath.create("assets/world/i18n#lang_ru/texture#tcf_etc1"))
                 .getPathBaseName())
-        .isEqualTo("assets/world/gfx#opengl_3.2/texture");
+        .isEqualTo("assets/world/i18n#lang_ru/texture");
   }
 
   @Test
   public void subPathBaseName_multiLevelTargeting() {
     TargetedDirectory targetedDirectory =
-        TargetedDirectory.parse(ZipPath.create("assets/world/gfx#opengl_3.2/texture#tcf_etc1"));
+        TargetedDirectory.parse(ZipPath.create("assets/world/i18n#lang_ru/texture#tcf_etc1"));
     assertThat(targetedDirectory.getSubPathBaseName(0)).isEqualTo("assets");
     assertThat(targetedDirectory.getSubPathBaseName(1)).isEqualTo("assets/world");
-    assertThat(targetedDirectory.getSubPathBaseName(2)).isEqualTo("assets/world/gfx");
+    assertThat(targetedDirectory.getSubPathBaseName(2)).isEqualTo("assets/world/i18n");
     assertThat(targetedDirectory.getSubPathBaseName(3))
-        .isEqualTo("assets/world/gfx#opengl_3.2/texture");
+        .isEqualTo("assets/world/i18n#lang_ru/texture");
   }
 
   @Test
@@ -69,31 +68,24 @@ public class TargetedDirectoryTest {
   }
 
   @Test
-  public void pathBaseName_rootElement() {
-    TargetedDirectory targetedDirectory = TargetedDirectory.parse(ZipPath.create("world"));
-    assertThat(targetedDirectory.getPathBaseName()).isEqualTo("world");
-    TargetedDirectory targetedDirectoryWithKey =
-        TargetedDirectory.parse(ZipPath.create("world#opengl_1.0"));
-    assertThat(targetedDirectoryWithKey.getPathBaseName()).isEqualTo("world");
-  }
-
-  @Test
   public void simpleDirectory_tokenization() {
-    ZipPath path = ZipPath.create("assets/gfx#opengl_1.0");
+    ZipPath path = ZipPath.create("assets/texture#tcf_etc2");
     TargetedDirectory actual = TargetedDirectory.parse(path);
 
     assertThat(actual.getPathSegments()).hasSize(2);
     assertThat(actual.getPathSegments().get(0).getName()).isEqualTo("assets");
     assertThat(actual.getPathSegments().get(0).getTargeting())
         .isEqualTo(AssetsDirectoryTargeting.getDefaultInstance());
-    assertThat(actual.getPathSegments().get(1).getName()).isEqualTo("gfx");
+    assertThat(actual.getPathSegments().get(1).getName()).isEqualTo("texture");
     assertThat(actual.getPathSegments().get(1).getTargeting())
-        .isEqualTo(assetsDirectoryTargeting(graphicsApiTargeting(openGlVersionFrom(1))));
+        .isEqualTo(
+            assetsDirectoryTargeting(
+                textureCompressionTargeting(TextureCompressionFormatAlias.ETC2)));
   }
 
   @Test
   public void multiLevelDirectory_tokenization() {
-    ZipPath path = ZipPath.create("assets/world/gfx#opengl_1.0/texture#tcf_etc1");
+    ZipPath path = ZipPath.create("assets/world/gfx#lang_en/texture#tcf_etc1");
     TargetedDirectory actual = TargetedDirectory.parse(path);
 
     assertThat(actual.getPathSegments()).hasSize(4);
@@ -105,7 +97,7 @@ public class TargetedDirectoryTest {
         .isEqualTo(AssetsDirectoryTargeting.getDefaultInstance());
     assertThat(actual.getPathSegments().get(2).getName()).isEqualTo("gfx");
     assertThat(actual.getPathSegments().get(2).getTargeting())
-        .isEqualTo(assetsDirectoryTargeting(graphicsApiTargeting(openGlVersionFrom(1))));
+        .isEqualTo(assetsDirectoryTargeting(languageTargeting("en")));
     assertThat(actual.getPathSegments().get(3).getName()).isEqualTo("texture");
     assertThat(actual.getPathSegments().get(3).getTargeting())
         .isEqualTo(
@@ -135,7 +127,7 @@ public class TargetedDirectoryTest {
 
   @Test
   public void upperCaseNames_ok() {
-    ZipPath path = ZipPath.create("assets/world/gFX#opengl_1.0/TEXTURE#tcf_etc1");
+    ZipPath path = ZipPath.create("assets/world/gFX#lang_en/TEXTURE#tcf_etc1");
     TargetedDirectory actual = TargetedDirectory.parse(path);
 
     assertThat(actual.getPathSegments()).hasSize(4);
@@ -147,7 +139,7 @@ public class TargetedDirectoryTest {
         .isEqualTo(AssetsDirectoryTargeting.getDefaultInstance());
     assertThat(actual.getPathSegments().get(2).getName()).isEqualTo("gFX");
     assertThat(actual.getPathSegments().get(2).getTargeting())
-        .isEqualTo(assetsDirectoryTargeting(graphicsApiTargeting(openGlVersionFrom(1))));
+        .isEqualTo(assetsDirectoryTargeting(languageTargeting("en")));
     assertThat(actual.getPathSegments().get(3).getName()).isEqualTo("TEXTURE");
     assertThat(actual.getPathSegments().get(3).getTargeting())
         .isEqualTo(

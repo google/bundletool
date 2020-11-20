@@ -26,6 +26,10 @@ message BuildApksResult {
 
   // Asset modules metadata for asset only bundles.
   AssetModulesInfo asset_modules_info = 6;
+
+  // Default values for targeting dimensions, as specified in the BundleConfig.
+  // Only set for dimensions that have a default suffix specified.
+  repeated DefaultTargetingValue default_targeting_value = 7;
 }
 
 // Variant is a group of APKs that covers a part of the device configuration
@@ -207,4 +211,13 @@ message AssetModulesInfo {
   // Version tag for the asset upload.
   // Only relevant for asset-only bundles.
   string asset_version_tag = 2;
+}
+
+// Default value targeted by a particular dimension.
+message DefaultTargetingValue {
+  // The dimension being targeted.
+  SplitDimension.Value dimension = 1;
+
+  // The default value being targeted.
+  string default_value = 2;
 }

@@ -20,7 +20,6 @@ import static com.google.common.collect.MoreCollectors.toOptional;
 
 import com.android.bundle.Config.BundleConfig;
 import com.android.bundle.Targeting.AbiTargeting;
-import com.android.bundle.Targeting.GraphicsApiTargeting;
 import com.android.bundle.Targeting.LanguageTargeting;
 import com.android.bundle.Targeting.TextureCompressionFormatTargeting;
 import com.android.tools.build.bundletool.model.BundleModule;
@@ -35,16 +34,6 @@ public final class BundleValidationUtils {
     if (targeting.getValueCount() == 0 && targeting.getAlternativesCount() == 0) {
       throw InvalidBundleException.builder()
           .withUserMessage("Directory '%s' has set but empty ABI targeting.", directoryPath)
-          .build();
-    }
-  }
-
-  public static void checkHasValuesOrAlternatives(
-      GraphicsApiTargeting targeting, String directoryPath) {
-    if (targeting.getValueCount() == 0 && targeting.getAlternativesCount() == 0) {
-      throw InvalidBundleException.builder()
-          .withUserMessage(
-              "Directory '%s' has set but empty Graphics API targeting.", directoryPath)
           .build();
     }
   }

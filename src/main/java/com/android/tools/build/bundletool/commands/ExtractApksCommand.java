@@ -22,13 +22,16 @@ import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.ImmutableSet.toImmutableSet;
+import static com.google.common.collect.MoreCollectors.toOptional;
 import static java.nio.charset.StandardCharsets.UTF_8;
 
 import com.android.bundle.Commands.AssetModuleMetadata;
 import com.android.bundle.Commands.AssetSliceSet;
 import com.android.bundle.Commands.BuildApksResult;
+import com.android.bundle.Commands.DefaultTargetingValue;
 import com.android.bundle.Commands.ExtractApksResult;
 import com.android.bundle.Commands.ExtractedApk;
+import com.android.bundle.Config.SplitDimension.Value;
 import com.android.bundle.Devices.DeviceSpec;
 import com.android.tools.build.bundletool.commands.CommandHelp.CommandDescription;
 import com.android.tools.build.bundletool.commands.CommandHelp.FlagDescription;
@@ -182,8 +185,14 @@ public abstract class ExtractApksCommand {
     BuildApksResult toc = ResultUtils.readTableOfContents(getApksArchivePath());
     Optional<ImmutableSet<String>> requestedModuleNames =
         getModules().map(modules -> resolveRequestedModules(modules, toc));
+    DeviceSpec deviceSpec = applyDefaultsToDeviceSpec(getDeviceSpec(), toc);
 
-    ApkMatcher apkMatcher = new ApkMatcher(getDeviceSpec(), requestedModuleNames, getInstant());
+    ApkMatcher apkMatcher =
+        new ApkMatcher(
+            deviceSpec,
+            requestedModuleNames,
+            getInstant(),
+            /* ensureDensityAndAbiApksMatched= */ true);
     ImmutableList<GeneratedApk> generatedApks = apkMatcher.getMatchingApks(toc);
 
     if (generatedApks.isEmpty()) {
@@ -306,6 +315,23 @@ public abstract class ExtractApksCommand {
       throw new UncheckedIOException(
           "Unable to create a temporary directory for extracted APKs.", e);
     }
+  }
+
+  private static DeviceSpec applyDefaultsToDeviceSpec(DeviceSpec deviceSpec, BuildApksResult toc) {
+    if (!deviceSpec.getDeviceTier().isEmpty()) {
+      return deviceSpec;
+    }
+    Optional<String> defaultDeviceTier =
+        toc.getDefaultTargetingValueList().stream()
+            .filter(
+                defaultTargetingValue ->
+                    defaultTargetingValue.getDimension().equals(Value.DEVICE_TIER))
+            .map(DefaultTargetingValue::getDefaultValue)
+            .collect(toOptional());
+    if (defaultDeviceTier.isPresent()) {
+      return deviceSpec.toBuilder().setDeviceTier(defaultDeviceTier.get()).build();
+    }
+    return deviceSpec;
   }
 
   public static CommandHelp help() {

@@ -29,10 +29,8 @@ import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.with
 import static com.android.tools.build.bundletool.testing.TargetingUtils.apexImages;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.assetsDirectoryTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.deviceTierTargeting;
-import static com.android.tools.build.bundletool.testing.TargetingUtils.graphicsApiTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.mergeAssetsTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.multiAbiTargeting;
-import static com.android.tools.build.bundletool.testing.TargetingUtils.openGlVersionFrom;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.targetedApexImage;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.targetedApexImageWithBuildInfo;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.textureCompressionTargeting;
@@ -133,7 +131,7 @@ public class BuildBundleCommandTest {
     Path bundleConfigJsonPath = tmpDir.resolve("BundleConfig.pb.json");
     Files.write(
         bundleConfigJsonPath,
-        ("{ \"compression\": { \"uncompressedGlob\": [\"foo\"] } }").getBytes(UTF_8));
+        "{ \"compression\": { \"uncompressedGlob\": [\"foo\"] } }".getBytes(UTF_8));
 
     BuildBundleCommand commandViaBuilder =
         BuildBundleCommand.builder()
@@ -423,10 +421,9 @@ public class BuildBundleCommandTest {
                     .setTargeting(AssetsDirectoryTargeting.getDefaultInstance()))
             .addDirectory(
                 TargetedAssetsDirectory.newBuilder()
-                    .setPath("assets/gfx#opengl_3.0/texture#tcf_atc/device#tier_low")
+                    .setPath("assets/texture#tcf_atc/device#tier_low")
                     .setTargeting(
                         mergeAssetsTargeting(
-                            assetsDirectoryTargeting(graphicsApiTargeting(openGlVersionFrom(3))),
                             assetsDirectoryTargeting(
                                 textureCompressionTargeting(TextureCompressionFormatAlias.ATC)),
                             assetsDirectoryTargeting(deviceTierTargeting("low")))))
@@ -435,7 +432,7 @@ public class BuildBundleCommandTest {
         new ZipBuilder()
             .addFileWithContent(ZipPath.create("assets/anything.dat"), "any".getBytes(UTF_8))
             .addFileWithContent(
-                ZipPath.create("assets/gfx#opengl_3.0/texture#tcf_atc/device#tier_low/file.dat"),
+                ZipPath.create("assets/texture#tcf_atc/device#tier_low/file.dat"),
                 "any2".getBytes(UTF_8))
             .addFileWithContent(ZipPath.create("dex/classes.dex"), "dex".getBytes(UTF_8))
             .addFileWithProtoContent(ZipPath.create("manifest/AndroidManifest.xml"), manifest)
@@ -450,7 +447,7 @@ public class BuildBundleCommandTest {
     try (ZipFile bundle = new ZipFile(bundlePath.toFile())) {
       assertThat(bundle).hasFile("base/assets/anything.dat").withContent("any".getBytes(UTF_8));
       assertThat(bundle)
-          .hasFile("base/assets/gfx#opengl_3.0/texture#tcf_atc/device#tier_low/file.dat")
+          .hasFile("base/assets/texture#tcf_atc/device#tier_low/file.dat")
           .withContent("any2".getBytes(UTF_8));
       assertThat(bundle).hasFile("base/dex/classes.dex").withContent("dex".getBytes(UTF_8));
       assertThat(bundle)
@@ -576,7 +573,7 @@ public class BuildBundleCommandTest {
     Path bundleConfigJsonPath = tmp.newFile("BundleConfig.pb.json").toPath();
     Files.write(
         bundleConfigJsonPath,
-        ("{ \"compression\": { \"uncompressedGlob\": \"foo\" } }").getBytes(UTF_8));
+        "{ \"compression\": { \"uncompressedGlob\": \"foo\" } }".getBytes(UTF_8));
 
     Exception e =
         assertThrows(
@@ -1086,11 +1083,11 @@ public class BuildBundleCommandTest {
 
     Path module = createSimpleBaseModule();
     BuildBundleCommand.builder()
-            .setModulesPaths(ImmutableList.of(module))
-            .setOverwriteOutput(true)
-            .setOutputPath(outputPath)
-            .build()
-            .execute();
+        .setModulesPaths(ImmutableList.of(module))
+        .setOverwriteOutput(true)
+        .setOutputPath(outputPath)
+        .build()
+        .execute();
 
     assertThat(Files.exists(outputPath)).isTrue();
   }

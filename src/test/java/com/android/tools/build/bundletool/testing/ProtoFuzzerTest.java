@@ -22,7 +22,6 @@ import static com.google.common.truth.Truth.assertThat;
 import com.android.bundle.Targeting.AbiTargeting;
 import com.android.bundle.Targeting.ApkTargeting;
 import com.android.bundle.Targeting.LanguageTargeting;
-import com.android.bundle.Targeting.VulkanVersion;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import java.util.stream.IntStream;
@@ -55,16 +54,6 @@ public class ProtoFuzzerTest {
     // Order changed
     assertThat(LETTERS_A_TO_Z).isNotEqualTo(shuffled.getValueList());
     assertThat(LETTERS_A_TO_Z).isNotEqualTo(shuffled.getAlternativesList());
-  }
-
-  @Test
-  public void randomProtoMessage_nonMessageFieldPopulated() {
-    VulkanVersion randomProto = ProtoFuzzer.randomProtoMessage(VulkanVersion.class);
-
-    // Values are populated.
-    // Chose a proto with integer fields to reduce the risk of accidentally generating something
-    // that appears like the default instance.
-    assertThat(randomProto).isNotEqualTo(VulkanVersion.getDefaultInstance());
   }
 
   @Test
