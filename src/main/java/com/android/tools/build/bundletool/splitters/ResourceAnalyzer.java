@@ -16,20 +16,18 @@
 
 package com.android.tools.build.bundletool.splitters;
 
-import static com.google.common.base.Preconditions.checkNotNull;
+import static com.google.common.collect.ImmutableMap.toImmutableMap;
 import static com.google.common.collect.ImmutableSet.toImmutableSet;
 
 import com.android.aapt.Resources.CompoundValue;
 import com.android.aapt.Resources.ConfigValue;
 import com.android.aapt.Resources.FileReference;
 import com.android.aapt.Resources.Item;
-import com.android.aapt.Resources.ResourceTable;
 import com.android.aapt.Resources.Style;
 import com.android.aapt.Resources.XmlAttribute;
 import com.android.aapt.Resources.XmlElement;
 import com.android.aapt.Resources.XmlNode;
 import com.android.tools.build.bundletool.model.AppBundle;
-import com.android.tools.build.bundletool.model.BundleModule;
 import com.android.tools.build.bundletool.model.ResourceId;
 import com.android.tools.build.bundletool.model.ResourceTableEntry;
 import com.android.tools.build.bundletool.model.ZipPath;
@@ -51,11 +49,11 @@ import java.util.stream.Stream;
 public class ResourceAnalyzer {
 
   private final AppBundle appBundle;
-  private final ResourceIndex resourceIndex;
+  private final ImmutableMap<ResourceId, ResourceTableEntry> baseModuleResourcesById;
 
   public ResourceAnalyzer(AppBundle appBundle) {
     this.appBundle = appBundle;
-    this.resourceIndex = new ResourceIndex(appBundle);
+    this.baseModuleResourcesById = buildBaseModuleResourcesByIdMap(appBundle);
   }
 
   /**
@@ -69,8 +67,7 @@ public class ResourceAnalyzer {
 
     ImmutableSet<ResourceId> resourceIdsInBaseManifest =
         findAllReferencedAppResources(
-            appBundle.getBaseModule().getAndroidManifest().getManifestRoot().getProto(),
-            appBundle.getBaseModule());
+            appBundle.getBaseModule().getAndroidManifest().getManifestRoot().getProto());
 
     return transitiveClosure(resourceIdsInBaseManifest);
   }
@@ -85,23 +82,22 @@ public class ResourceAnalyzer {
     while (!resourcesToInspect.isEmpty()) {
       ResourceId resourceId = resourcesToInspect.remove();
       if (referencedResources.contains(resourceId)
-          || !resourceIndex.isResourceFromApp(resourceId)) {
+          || !baseModuleResourcesById.containsKey(resourceId)) {
         continue;
       }
       referencedResources.add(resourceId);
 
-      ResourceTableEntry resourceEntry = resourceIndex.getEntryForResourceId(resourceId);
-      BundleModule module = resourceIndex.getModuleForResourceId(resourceId);
+      ResourceTableEntry resourceEntry = baseModuleResourcesById.get(resourceId);
       for (ConfigValue configValue : resourceEntry.getEntry().getConfigValueList()) {
         switch (configValue.getValue().getValueCase()) {
           case ITEM:
             Item item = configValue.getValue().getItem();
-            resourcesToInspect.addAll(findAllReferencedAppResources(item, module));
+            resourcesToInspect.addAll(findAllReferencedAppResources(item));
             break;
 
           case COMPOUND_VALUE:
             CompoundValue compoundValue = configValue.getValue().getCompoundValue();
-            resourcesToInspect.addAll(findAllReferencedAppResources(compoundValue, module));
+            resourcesToInspect.addAll(findAllReferencedAppResources(compoundValue));
             break;
 
           case VALUE_NOT_SET:
@@ -113,16 +109,15 @@ public class ResourceAnalyzer {
     return ImmutableSet.copyOf(referencedResources);
   }
 
-  private ImmutableSet<ResourceId> findAllReferencedAppResources(
-      XmlNode xmlRoot, BundleModule module) {
+  private ImmutableSet<ResourceId> findAllReferencedAppResources(XmlNode xmlRoot) {
     return getAllAttributesRecursively(xmlRoot.getElement())
         .filter(XmlAttribute::hasCompiledItem)
         .map(XmlAttribute::getCompiledItem)
-        .flatMap(item -> findAllReferencedAppResources(item, module).stream())
+        .flatMap(item -> findAllReferencedAppResources(item).stream())
         .collect(toImmutableSet());
   }
 
-  private ImmutableSet<ResourceId> findAllReferencedAppResources(Item item, BundleModule module) {
+  private ImmutableSet<ResourceId> findAllReferencedAppResources(Item item) {
     switch (item.getValueCase()) {
       case REF:
         if (item.getRef().getId() != 0) {
@@ -139,9 +134,10 @@ public class ResourceAnalyzer {
           return ImmutableSet.of();
         }
         ZipPath xmlResourcePath = ZipPath.create(fileRef.getPath());
-        try (InputStream is = module.getEntry(xmlResourcePath).get().getContent().openStream()) {
+        try (InputStream is =
+            appBundle.getBaseModule().getEntry(xmlResourcePath).get().getContent().openStream()) {
           XmlNode xmlRoot = XmlNode.parseFrom(is);
-          return findAllReferencedAppResources(xmlRoot, module);
+          return findAllReferencedAppResources(xmlRoot);
         } catch (InvalidProtocolBufferException e) {
           throw CommandExecutionException.builder()
               .withInternalMessage("Error parsing XML file '%s'.", xmlResourcePath)
@@ -149,10 +145,7 @@ public class ResourceAnalyzer {
               .build();
         } catch (IOException e) {
           throw new UncheckedIOException(
-              String.format(
-                  "Failed to parse file '%s' in module '%s'.",
-                  xmlResourcePath, module.getName().getName()),
-              e);
+              String.format("Failed to parse file '%s' in base module.", xmlResourcePath), e);
         }
 
       default:
@@ -162,8 +155,7 @@ public class ResourceAnalyzer {
     return ImmutableSet.of();
   }
 
-  private ImmutableSet<ResourceId> findAllReferencedAppResources(
-      CompoundValue compoundValue, BundleModule module) throws IOException {
+  private ImmutableSet<ResourceId> findAllReferencedAppResources(CompoundValue compoundValue) {
     switch (compoundValue.getValueCase()) {
       case ATTR:
         return compoundValue.getAttr().getSymbolList().stream()
@@ -178,7 +170,7 @@ public class ResourceAnalyzer {
           referencedResources.add(ResourceId.create(compoundValue.getStyle().getParent().getId()));
         }
         for (Style.Entry entry : compoundValue.getStyle().getEntryList()) {
-          referencedResources.addAll(findAllReferencedAppResources(entry.getItem(), module));
+          referencedResources.addAll(findAllReferencedAppResources(entry.getItem()));
           if (entry.getKey().getId() != 0) {
             referencedResources.add(ResourceId.create(entry.getKey().getId()));
           }
@@ -199,47 +191,12 @@ public class ResourceAnalyzer {
             .flatMap(node -> getAllAttributesRecursively(node.getElement())));
   }
 
-  private static class ResourceIndex {
-    private final ImmutableMap<ResourceId, BundleModule> resourceIdToModule;
-    private final ImmutableMap<ResourceId, ResourceTableEntry> resourceIdToEntry;
-
-    private ResourceIndex(AppBundle appBundle) {
-      ImmutableMap.Builder<ResourceId, BundleModule> resourceIdToModule = ImmutableMap.builder();
-      ImmutableMap.Builder<ResourceId, ResourceTableEntry> resourceIdToEntry =
-          ImmutableMap.builder();
-      for (BundleModule module : appBundle.getFeatureModules().values()) {
-        if (!module.getResourceTable().isPresent()) {
-          continue;
-        }
-        ResourceTable resourceTable = module.getResourceTable().get();
-        ResourcesUtils.entries(resourceTable)
-            .forEach(
-                entry -> {
-                  resourceIdToModule.put(entry.getResourceId(), module);
-                  resourceIdToEntry.put(entry.getResourceId(), entry);
-                });
-      }
-
-      this.resourceIdToModule = resourceIdToModule.build();
-      this.resourceIdToEntry = resourceIdToEntry.build();
+  private static ImmutableMap<ResourceId, ResourceTableEntry> buildBaseModuleResourcesByIdMap(
+      AppBundle appBundle) {
+    if (!appBundle.getBaseModule().getResourceTable().isPresent()) {
+      return ImmutableMap.of();
     }
-
-    BundleModule getModuleForResourceId(ResourceId resourceId) {
-      return checkNotNull(
-          resourceIdToModule.get(resourceId), "Resource ID %s not found", resourceId);
-    }
-
-    ResourceTableEntry getEntryForResourceId(ResourceId resourceId) {
-      return checkNotNull(
-          resourceIdToEntry.get(resourceId), "Resource ID %s not found", resourceId);
-    }
-
-    ImmutableSet<ResourceId> getAllResourceIds() {
-      return resourceIdToModule.keySet();
-    }
-
-    boolean isResourceFromApp(ResourceId resourceId) {
-      return getAllResourceIds().contains(resourceId);
-    }
+    return ResourcesUtils.entries(appBundle.getBaseModule().getResourceTable().get())
+        .collect(toImmutableMap(ResourceTableEntry::getResourceId, entry -> entry));
   }
 }

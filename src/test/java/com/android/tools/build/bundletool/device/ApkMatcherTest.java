@@ -1282,10 +1282,14 @@ public class ApkMatcherTest {
 
   @Test
   public void splitApk_conditionalModule_deviceEligible() {
-    DeviceSpec device = mergeSpecs(deviceWithSdk(24), deviceFeatures("android.hardware.camera.ar"));
+    DeviceSpec device =
+        mergeSpecs(
+            deviceWithSdk(24),
+            deviceFeatures("android.hardware.camera.ar", "reqGlEsVersion=0x30002"));
 
     ZipPath baseApk = ZipPath.create("base-master.apk");
     ZipPath feature1Apk = ZipPath.create("ar-master.apk");
+    ZipPath feature2Apk = ZipPath.create("opengl-master.apk");
     BuildApksResult buildApksResult =
         buildApksResult(
             createVariant(
@@ -1298,18 +1302,27 @@ public class ApkMatcherTest {
                     mergeModuleTargeting(
                         moduleFeatureTargeting("android.hardware.camera.ar"),
                         moduleMinSdkVersionTargeting(24)),
-                    splitApkDescription(ApkTargeting.getDefaultInstance(), feature1Apk))));
+                    splitApkDescription(ApkTargeting.getDefaultInstance(), feature1Apk)),
+                createConditionalApkSet(
+                    /* moduleName= */ "opengl",
+                    mergeModuleTargeting(
+                        moduleFeatureTargeting("android.hardware.opengles.version", 0x30001),
+                        moduleMinSdkVersionTargeting(21)),
+                    splitApkDescription(ApkTargeting.getDefaultInstance(), feature2Apk))));
     assertThat(new ApkMatcher(device).getMatchingApks(buildApksResult))
         .containsExactly(
-            baseMatchedApk(baseApk), matchedApk(feature1Apk, /* moduleName=*/ "ar", INSTALL_TIME));
+            baseMatchedApk(baseApk),
+            matchedApk(feature1Apk, /* moduleName= */ "ar", INSTALL_TIME),
+            matchedApk(feature2Apk, /* moduleName= */ "opengl", INSTALL_TIME));
   }
 
   @Test
   public void splitApk_conditionalModule_deviceNotEligible() {
-    DeviceSpec device = mergeSpecs(deviceWithSdk(21));
+    DeviceSpec device = mergeSpecs(deviceWithSdk(21), deviceFeatures("reqGlEsVersion=0x30000"));
 
     ZipPath baseApk = ZipPath.create("base-master.apk");
     ZipPath feature1Apk = ZipPath.create("ar-master.apk");
+    ZipPath feature2Apk = ZipPath.create("opengl-master.apk");
     BuildApksResult buildApksResult =
         buildApksResult(
             createVariant(
@@ -1322,7 +1335,13 @@ public class ApkMatcherTest {
                     mergeModuleTargeting(
                         moduleFeatureTargeting("android.hardware.camera.ar"),
                         moduleMinSdkVersionTargeting(24)),
-                    splitApkDescription(ApkTargeting.getDefaultInstance(), feature1Apk))));
+                    splitApkDescription(ApkTargeting.getDefaultInstance(), feature1Apk)),
+                createConditionalApkSet(
+                    /* moduleName= */ "opengl",
+                    mergeModuleTargeting(
+                        moduleFeatureTargeting("android.hardware.opengles.version", 0x30001),
+                        moduleMinSdkVersionTargeting(21)),
+                    splitApkDescription(ApkTargeting.getDefaultInstance(), feature2Apk))));
     assertThat(new ApkMatcher(device).getMatchingApks(buildApksResult))
         .containsExactly(baseMatchedApk(baseApk));
   }

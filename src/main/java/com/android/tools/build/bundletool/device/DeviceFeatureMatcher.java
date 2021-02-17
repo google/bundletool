@@ -16,6 +16,7 @@
 
 package com.android.tools.build.bundletool.device;
 
+import static com.android.tools.build.bundletool.device.OpenGlFeatureMatcher.CONDITIONAL_MODULES_OPEN_GL_NAME;
 import static com.google.common.collect.ImmutableSet.toImmutableSet;
 
 import com.android.bundle.Devices.DeviceSpec;
@@ -43,6 +44,7 @@ public class DeviceFeatureMatcher
         targetingValue.stream()
             .map(DeviceFeatureTargeting::getRequiredFeature)
             .map(DeviceFeature::getFeatureName)
+            .filter(featureName -> !featureName.equals(CONDITIONAL_MODULES_OPEN_GL_NAME))
             .collect(toImmutableSet());
     return Sets.difference(requiredFeatureSet, deviceFeatures).isEmpty();
   }

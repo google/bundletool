@@ -24,6 +24,7 @@ import com.android.tools.build.bundletool.model.utils.ZipUtils;
 import com.android.tools.build.bundletool.model.utils.files.BufferedIo;
 import com.google.auto.value.AutoValue;
 import com.google.common.collect.ImmutableSet;
+import com.google.common.hash.Hashing;
 import com.google.common.io.ByteSource;
 import com.google.errorprone.annotations.Immutable;
 import com.google.protobuf.MessageLite;
@@ -36,7 +37,6 @@ import java.util.Enumeration;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
-import java.util.zip.CRC32;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 import java.util.zip.ZipOutputStream;
@@ -49,6 +49,7 @@ import javax.annotation.concurrent.GuardedBy;
  * invoked.
  */
 public final class ZipBuilder {
+  private static final long PRELOAD_INTO_MEMORY_THRESHOLD = 150 * 1024 * 1024L;
   private static final long EPOCH = 0L;
 
   /** Entries to be output. */
@@ -88,12 +89,19 @@ public final class ZipBuilder {
               zipEntry.setMethod(ZipEntry.STORED);
               // ZipFile API requires us to set the following properties manually for uncompressed
               // ZipEntries, just setting the compression method is not enough.
-              byte[] entryData = entry.getContent().get().read();
-              zipEntry.setSize(entryData.length);
-              zipEntry.setCompressedSize(entryData.length);
-              zipEntry.setCrc(computeCrc32(entryData));
+              ByteSource originalData = entry.getContent().get();
+              // If entry is small enough it would be better to preload it into memory to not
+              // read it twice. Two reads are required because we need to know crc32 before we put
+              // entry content into zip.
+              ByteSource entryData =
+                  originalData.size() < PRELOAD_INTO_MEMORY_THRESHOLD
+                      ? preloadEntryData(originalData)
+                      : originalData;
+              zipEntry.setSize(entryData.size());
+              zipEntry.setCompressedSize(entryData.size());
+              zipEntry.setCrc(entryData.hash(Hashing.crc32()).padToLong());
               outZip.putNextEntry(zipEntry);
-              outZip.write(entryData);
+              entry.getContent().get().copyTo(outZip);
             } else {
               outZip.putNextEntry(zipEntry);
               entry.getContent().get().copyTo(outZip);
@@ -275,9 +283,7 @@ public final class ZipBuilder {
     UNCOMPRESSED
   }
 
-  private static long computeCrc32(byte[] data) {
-    CRC32 crc32 = new CRC32();
-    crc32.update(data);
-    return crc32.getValue();
+  private static ByteSource preloadEntryData(ByteSource byteSource) throws IOException {
+    return ByteSource.wrap(byteSource.read());
   }
 }

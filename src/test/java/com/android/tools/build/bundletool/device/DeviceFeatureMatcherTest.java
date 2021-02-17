@@ -17,10 +17,12 @@
 package com.android.tools.build.bundletool.device;
 
 import static com.android.tools.build.bundletool.testing.DeviceFactory.deviceFeatures;
+import static com.android.tools.build.bundletool.testing.TargetingUtils.deviceFeatureTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.deviceFeatureTargetingList;
 import static com.google.common.truth.Truth.assertThat;
 
 import com.android.bundle.Devices.DeviceSpec;
+import com.android.bundle.Targeting.DeviceFeatureTargeting;
 import com.google.common.collect.ImmutableList;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -46,6 +48,19 @@ public class DeviceFeatureMatcherTest {
                     "com.software.soft.feature1", "com.hardware.even.cooler.feature")))
         .isTrue();
     assertThat(matcher.matchesTargeting(ImmutableList.of())).isTrue();
+  }
+
+  @Test
+  public void skipOpenGlFeature() {
+    DeviceSpec deviceSpec = deviceFeatures("com.hardware.cool.feature");
+
+    DeviceFeatureMatcher matcher = new DeviceFeatureMatcher(deviceSpec);
+    ImmutableList<DeviceFeatureTargeting> deviceFeatureTargetings =
+        ImmutableList.of(
+            deviceFeatureTargeting(OpenGlFeatureMatcher.CONDITIONAL_MODULES_OPEN_GL_NAME, 0x30000),
+            deviceFeatureTargeting("com.hardware.cool.feature"));
+
+    assertThat(matcher.matchesTargeting(deviceFeatureTargetings)).isTrue();
   }
 
   @Test

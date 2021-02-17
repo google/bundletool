@@ -44,8 +44,23 @@ public class GetSizeCsvUtilsTest {
                 ConfigurationSizes.create(
                     ImmutableMap.of(SizeConfiguration.getDefaultInstance(), 10L),
                     ImmutableMap.of(SizeConfiguration.getDefaultInstance(), 15L)),
-                ImmutableSet.of()))
+                ImmutableSet.of(),
+                SizeFormatter.rawFormatter()))
         .isEqualTo("MIN,MAX" + CRLF + "10,15" + CRLF);
+  }
+
+  @Test
+  public void getSizeTotalOutputInCsv_emptyDimensions_prettyFormatter() {
+    long minSize = 123203;
+    long maxSize = 2320003;
+    assertThat(
+            getSizeTotalOutputInCsv(
+                ConfigurationSizes.create(
+                    ImmutableMap.of(SizeConfiguration.getDefaultInstance(), minSize),
+                    ImmutableMap.of(SizeConfiguration.getDefaultInstance(), maxSize)),
+                ImmutableSet.of(),
+                SizeFormatter.humanReadableFormatter()))
+        .isEqualTo("MIN,MAX" + CRLF + "123.2 KB,2.32 MB" + CRLF);
   }
 
   @Test
@@ -69,7 +84,8 @@ public class GetSizeCsvUtilsTest {
                             .setAbi("armeabi-v7a")
                             .build(),
                         15L)),
-                ImmutableSet.of(ABI, SDK)))
+                ImmutableSet.of(ABI, SDK),
+                SizeFormatter.rawFormatter()))
         .isEqualTo(
             "SDK,ABI,MIN,MAX" + CRLF + "21-,x86,5,10" + CRLF + "21-,armeabi-v7a,2,15" + CRLF);
   }
@@ -100,7 +116,8 @@ public class GetSizeCsvUtilsTest {
                             .build(),
                         6L)),
                 ImmutableSet.of(
-                    SCREEN_DENSITY, ABI, LANGUAGE, SDK, TEXTURE_COMPRESSION_FORMAT, DEVICE_TIER)))
+                    SCREEN_DENSITY, ABI, LANGUAGE, SDK, TEXTURE_COMPRESSION_FORMAT, DEVICE_TIER),
+                SizeFormatter.rawFormatter()))
         .isEqualTo(
             "SDK,ABI,SCREEN_DENSITY,LANGUAGE,TEXTURE_COMPRESSION_FORMAT,DEVICE_TIER,MIN,MAX"
                 + CRLF

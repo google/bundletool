@@ -416,6 +416,32 @@ public final class GetSizeCommandTest {
   }
 
   @Test
+  public void builderAndFlagsConstruction_optionalHumanReadableSizes() throws Exception {
+    BuildApksResult tableOfContentsProto = BuildApksResult.getDefaultInstance();
+    Path apksArchiveFile =
+        createApksArchiveFile(tableOfContentsProto, tmpDir.resolve("bundle.apks"));
+
+    GetSizeCommand fromFlags =
+        GetSizeCommand.fromFlags(
+            new FlagParser()
+                .parse(
+                    "get-size",
+                    "total",
+                    "--apks=" + apksArchiveFile,
+                    // Optional values.
+                    "--human-readable-sizes"));
+
+    GetSizeCommand fromBuilderApi =
+        GetSizeCommand.builder()
+            .setApksArchivePath(apksArchiveFile)
+            .setHumanReadableSizes(true)
+            .setGetSizeSubCommand(GetSizeSubcommand.TOTAL)
+            .build();
+
+    assertThat(fromFlags).isEqualTo(fromBuilderApi);
+  }
+
+  @Test
   public void getSizeTotalInternal_singleSplitVariant() throws Exception {
     Variant lVariant =
         createVariant(
@@ -807,6 +833,64 @@ public final class GetSizeCommandTest {
                 + String.format("%d,%d", compressedApkSize, 3 * compressedApkSize)
                 + CRLF);
   }
+
+  @Test
+  public void getSizeTotal_noDimensions_prettyPrint() throws Exception {
+    Variant lVariant =
+        createVariant(
+            lPlusVariantTargeting(),
+            createSplitApkSet(
+                /* moduleName= */ "base",
+                createMasterApkDescription(
+                    ApkTargeting.getDefaultInstance(), ZipPath.create("base-master.apk")),
+                createApkDescription(
+                    apkDensityTargeting(LDPI, ImmutableSet.of(MDPI)),
+                    ZipPath.create("base-ldpi.apk"),
+                    /* isMasterSplit= */ false),
+                createApkDescription(
+                    apkDensityTargeting(MDPI, ImmutableSet.of(LDPI)),
+                    ZipPath.create("base-mdpi.apk"),
+                    /* isMasterSplit= */ false)),
+            createSplitApkSet(
+                /* moduleName= */ "feature1",
+                createMasterApkDescription(
+                    ApkTargeting.getDefaultInstance(), ZipPath.create("base-feature1.apk"))));
+
+    Variant preLVariant =
+        standaloneVariant(
+            mergeVariantTargeting(
+                variantSdkTargeting(sdkVersionFrom(15), ImmutableSet.of(sdkVersionFrom(21)))),
+            ApkTargeting.getDefaultInstance(),
+            ZipPath.create("preL.apk"));
+    BuildApksResult tableOfContentsProto =
+        BuildApksResult.newBuilder()
+            .setBundletool(
+                Bundletool.newBuilder()
+                    .setVersion(BundleToolVersion.getCurrentVersion().toString()))
+            .addVariant(lVariant)
+            .addVariant(preLVariant)
+            .build();
+
+    Path apksArchiveFile =
+        createApksArchiveFile(tableOfContentsProto, tmpDir.resolve("bundle.apks"));
+
+    ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+
+    GetSizeCommand.builder()
+        .setGetSizeSubCommand(GetSizeSubcommand.TOTAL)
+        .setApksArchivePath(apksArchiveFile)
+        .setHumanReadableSizes(true)
+        .build()
+        .getSizeTotal(new PrintStream(outputStream));
+
+    assertThat(new String(outputStream.toByteArray(), UTF_8))
+        .isEqualTo(
+            "MIN,MAX"
+                + CRLF
+                + String.format("%d B,%d B", compressedApkSize, 3 * compressedApkSize)
+                + CRLF);
+  }
+
 
   @Test
   public void getSizeTotal_withSelectModules() throws Exception {

@@ -44,6 +44,7 @@ import com.android.tools.build.bundletool.model.SizeConfiguration;
 import com.android.tools.build.bundletool.model.exceptions.InvalidCommandException;
 import com.android.tools.build.bundletool.model.utils.ConfigurationSizesMerger;
 import com.android.tools.build.bundletool.model.utils.ResultUtils;
+import com.android.tools.build.bundletool.model.utils.SizeFormatter;
 import com.android.tools.build.bundletool.model.utils.files.FilePreconditions;
 import com.android.tools.build.bundletool.model.version.Version;
 import com.google.auto.value.AutoValue;
@@ -101,6 +102,8 @@ public abstract class GetSizeCommand implements GetSizeRequest {
   private static final Flag<Boolean> INSTANT_FLAG = Flag.booleanFlag("instant");
   private static final Flag<ImmutableSet<Dimension>> DIMENSIONS_FLAG =
       Flag.enumSet("dimensions", Dimension.class);
+  private static final Flag<Boolean> HUMAN_READABLE_SIZES_FLAG =
+      Flag.booleanFlag("human-readable-sizes");
   private static final Joiner COMMA_JOINER = Joiner.on(',');
 
   @VisibleForTesting
@@ -130,11 +133,15 @@ public abstract class GetSizeCommand implements GetSizeRequest {
   @Override
   public abstract boolean getInstant();
 
+  /** Gets whether to format sizes to human readable units. */
+  public abstract boolean getHumanReadableSizes();
+
   public static Builder builder() {
     return new AutoValue_GetSizeCommand.Builder()
         .setDeviceSpec(DeviceSpec.getDefaultInstance())
         .setInstant(false)
-        .setDimensions(ImmutableSet.of());
+        .setDimensions(ImmutableSet.of())
+        .setHumanReadableSizes(false);
   }
 
   /** Builder for the {@link GetSizeCommand}. */
@@ -163,6 +170,9 @@ public abstract class GetSizeCommand implements GetSizeRequest {
     /** Sets the sub-command of the get-size command, e.g. total. */
     public abstract Builder setGetSizeSubCommand(GetSizeSubcommand getSizeSubcommand);
 
+    /** Sets whether to format sizes to human readable units. */
+    public abstract Builder setHumanReadableSizes(boolean humanReadableSizes);
+
     public abstract GetSizeCommand build();
   }
 
@@ -171,6 +181,7 @@ public abstract class GetSizeCommand implements GetSizeRequest {
     Optional<Path> deviceSpecPath = DEVICE_SPEC_FLAG.getValue(flags);
     Optional<ImmutableSet<String>> modules = MODULES_FLAG.getValue(flags);
     Optional<Boolean> instant = INSTANT_FLAG.getValue(flags);
+    Optional<Boolean> pretty = HUMAN_READABLE_SIZES_FLAG.getValue(flags);
 
     ImmutableSet<Dimension> dimensions = DIMENSIONS_FLAG.getValue(flags).orElse(ImmutableSet.of());
     flags.checkNoUnknownFlags();
@@ -191,6 +202,7 @@ public abstract class GetSizeCommand implements GetSizeRequest {
     modules.ifPresent(command::setModules);
 
     instant.ifPresent(command::setInstant);
+    pretty.ifPresent(command::setHumanReadableSizes);
 
     if (dimensions.contains(Dimension.ALL)) {
       dimensions = SUPPORTED_DIMENSIONS;
@@ -223,7 +235,14 @@ public abstract class GetSizeCommand implements GetSizeRequest {
   }
 
   public void getSizeTotal(PrintStream output) {
-    output.print(getSizeTotalOutputInCsv(getSizeTotalInternal(), getDimensions()));
+    output.print(
+        getSizeTotalOutputInCsv(getSizeTotalInternal(), getDimensions(), getSizeFormatter()));
+  }
+
+  private SizeFormatter getSizeFormatter() {
+    return getHumanReadableSizes()
+        ? SizeFormatter.humanReadableFormatter()
+        : SizeFormatter.rawFormatter();
   }
 
   @VisibleForTesting
@@ -333,6 +352,13 @@ public abstract class GetSizeCommand implements GetSizeRequest {
                 .setDescription(
                     "When set, APKs of the instant modules will be considered instead of the "
                         + "installable APKs. Defaults to false.")
+                .build())
+        .addFlag(
+            FlagDescription.builder()
+                .setFlagName(HUMAN_READABLE_SIZES_FLAG.getName())
+                .setDescription(
+                    "When set, size values are formatted to human readable units: KB, MB, GB."
+                        + " Defaults to false.")
                 .build())
         .build();
   }

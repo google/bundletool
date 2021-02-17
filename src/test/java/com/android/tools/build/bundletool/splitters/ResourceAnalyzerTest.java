@@ -122,6 +122,46 @@ public class ResourceAnalyzerTest {
   }
 
   @Test
+  public void attributeWithCompiledItem_refToUnknownResourceInBase_ignored() throws Exception {
+    XmlNode manifest =
+        AndroidManifest.create(
+                xmlNode(
+                    xmlElement(
+                        "manifest",
+                        xmlNode(
+                            xmlElement(
+                                "application",
+                                xmlResourceReferenceAttribute(
+                                    ANDROID_NAMESPACE_URI,
+                                    "name",
+                                    /* attrResourceId= */ 0x999999,
+                                    /* valueResourceId= */ 0x12345678))))))
+            .getManifestRoot()
+            .getProto();
+    ResourceTable resourceTable =
+        resourceTable(
+            pkg(
+                0x12,
+                "com.test.app.feature",
+                type(0x34, "string", entry(0x5678, "name", value("hello", DEFAULT_CONFIG)))));
+    AppBundle appBundle =
+        new AppBundleBuilder()
+            .addModule("base", builder -> builder.setManifest(manifest))
+            .addModule(
+                "feature",
+                builder ->
+                    builder
+                        .setManifest(androidManifest("com.test.app.feature"))
+                        .setResourceTable(resourceTable))
+            .build();
+
+    ImmutableSet<ResourceId> resourceIds =
+        new ResourceAnalyzer(appBundle).findAllAppResourcesReachableFromBaseManifest();
+
+    assertThat(resourceIds).isEmpty();
+  }
+
+  @Test
   public void attributeWithCompiledItem_nonRef_ignored() throws Exception {
     XmlNode manifest =
         AndroidManifest.create(

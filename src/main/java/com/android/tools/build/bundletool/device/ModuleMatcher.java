@@ -31,13 +31,19 @@ public class ModuleMatcher {
   private final ImmutableList<? extends TargetingDimensionMatcher<?>> moduleMatchers;
 
   public ModuleMatcher(
-      SdkVersionMatcher sdkVersionMatcher, DeviceFeatureMatcher deviceFeatureMatcher) {
-    this.moduleMatchers = ImmutableList.of(sdkVersionMatcher, deviceFeatureMatcher);
+      SdkVersionMatcher sdkVersionMatcher,
+      DeviceFeatureMatcher deviceFeatureMatcher,
+      OpenGlFeatureMatcher openGlFeatureMatcher) {
+    this.moduleMatchers =
+        ImmutableList.of(sdkVersionMatcher, deviceFeatureMatcher, openGlFeatureMatcher);
   }
 
   @VisibleForTesting
   public ModuleMatcher(DeviceSpec deviceSpec) {
-    this(new SdkVersionMatcher(deviceSpec), new DeviceFeatureMatcher(deviceSpec));
+    this(
+        new SdkVersionMatcher(deviceSpec),
+        new DeviceFeatureMatcher(deviceSpec),
+        new OpenGlFeatureMatcher(deviceSpec));
   }
 
   /**

@@ -16,6 +16,7 @@
 
 package com.android.tools.build.bundletool.device;
 
+import static com.android.tools.build.bundletool.device.OpenGlFeatureMatcher.CONDITIONAL_MODULES_OPEN_GL_NAME;
 import static com.android.tools.build.bundletool.testing.DeviceFactory.deviceFeatures;
 import static com.android.tools.build.bundletool.testing.DeviceFactory.deviceWithSdk;
 import static com.android.tools.build.bundletool.testing.DeviceFactory.mergeSpecs;
@@ -44,8 +45,13 @@ public class ModuleMatcherTest {
   @Test
   public void matchesModuleTargeting_positive() {
     ModuleTargeting targeting =
-        mergeModuleTargeting(moduleMinSdkVersionTargeting(21), moduleFeatureTargeting("feature1"));
-    DeviceSpec deviceSpec = mergeSpecs(deviceWithSdk(22), deviceFeatures("feature1", "feature2"));
+        mergeModuleTargeting(
+            moduleMinSdkVersionTargeting(21),
+            moduleFeatureTargeting("feature1"),
+            moduleFeatureTargeting(CONDITIONAL_MODULES_OPEN_GL_NAME, 0x30001));
+    DeviceSpec deviceSpec =
+        mergeSpecs(
+            deviceWithSdk(22), deviceFeatures("feature1", "feature2", "reqGlEsVersion=0x30002"));
     ModuleMatcher moduleMatcher = new ModuleMatcher(deviceSpec);
 
     assertThat(moduleMatcher.matchesModuleTargeting(targeting)).isTrue();
@@ -68,6 +74,18 @@ public class ModuleMatcherTest {
         mergeModuleTargeting(moduleMinSdkVersionTargeting(21), moduleFeatureTargeting("feature1"));
     DeviceSpec deviceSpecNoFeature = mergeSpecs(deviceWithSdk(21), deviceFeatures("feature2"));
     ModuleMatcher moduleMatcher = new ModuleMatcher(deviceSpecNoFeature);
+
+    assertThat(moduleMatcher.matchesModuleTargeting(targeting)).isFalse();
+  }
+
+  @Test
+  public void matchesModuleTargeting_negative_openGlVersionTooLow() {
+    ModuleTargeting targeting =
+        mergeModuleTargeting(
+            moduleMinSdkVersionTargeting(21),
+            moduleFeatureTargeting(CONDITIONAL_MODULES_OPEN_GL_NAME, 0x30001));
+    DeviceSpec deviceSpec = mergeSpecs(deviceWithSdk(22), deviceFeatures("reqGlEsVersion=0x30000"));
+    ModuleMatcher moduleMatcher = new ModuleMatcher(deviceSpec);
 
     assertThat(moduleMatcher.matchesModuleTargeting(targeting)).isFalse();
   }

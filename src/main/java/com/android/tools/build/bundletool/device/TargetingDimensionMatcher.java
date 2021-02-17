@@ -112,7 +112,7 @@ public abstract class TargetingDimensionMatcher<T> {
   /**
    * Checks if a device is compatible with a given targeting considering alternatives.
    *
-   * @throws {@link CommandExecutionException} if a device can't support given targeting value
+   * @throws CommandExecutionException if a device can't support given targeting value
    */
   public void checkDeviceCompatible(T targetingValue) {
     if (isDeviceDimensionPresent()) {

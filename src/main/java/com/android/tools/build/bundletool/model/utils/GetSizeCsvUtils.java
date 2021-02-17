@@ -43,8 +43,9 @@ public final class GetSizeCsvUtils {
           Dimension.DEVICE_TIER);
 
   public static String getSizeTotalOutputInCsv(
-      ConfigurationSizes configurationSizes, ImmutableSet<Dimension> dimensions) {
-
+      ConfigurationSizes configurationSizes,
+      ImmutableSet<Dimension> dimensions,
+      SizeFormatter sizeFormatter) {
     checkState(
         configurationSizes
             .getMinSizeConfigurationMap()
@@ -59,6 +60,7 @@ public final class GetSizeCsvUtils {
         configurationSizes.getMinSizeConfigurationMap().keySet()) {
       csvFormatter.addRow(
           getSizeTotalCsvRow(
+              sizeFormatter,
               dimensions,
               sizeConfiguration,
               configurationSizes.getMinSizeConfigurationMap().get(sizeConfiguration),
@@ -76,6 +78,7 @@ public final class GetSizeCsvUtils {
   }
 
   private static ImmutableList<String> getSizeTotalCsvRow(
+      SizeFormatter sizeFormatter,
       ImmutableSet<Dimension> dimensions,
       SizeConfiguration sizeConfiguration,
       long minSize,
@@ -96,7 +99,7 @@ public final class GetSizeCsvUtils {
             dimensions.stream()
                 .sorted(DIMENSIONS_COMPARATOR)
                 .map(dimension -> dimensionToTextMap.get(dimension).get().orElse("")),
-            Stream.of(String.valueOf(minSize), String.valueOf(maxSize)))
+            Stream.of(sizeFormatter.format(minSize), sizeFormatter.format(maxSize)))
         .collect(toImmutableList());
   }
 
