@@ -17,9 +17,15 @@
 package com.android.tools.build.bundletool.model;
 
 import static com.google.common.truth.Truth.assertThat;
+import static com.google.common.truth.Truth8.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
+import com.android.bundle.CodeTransparencyOuterClass.CodeRelatedFile;
+import com.android.bundle.CodeTransparencyOuterClass.CodeTransparency;
 import com.google.common.io.ByteSource;
+import com.google.common.io.CharSource;
+import com.google.protobuf.util.JsonFormat;
+import java.nio.charset.Charset;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
@@ -74,5 +80,47 @@ public class BundleMetadataTest {
     assertThat(exception)
         .hasMessageThat()
         .contains("Top-level directories for metadata files must be namespaced");
+  }
+
+  @Test
+  public void getModuleEntryForTransparencyFile_empty() {
+    BundleMetadata metadata =
+        BundleMetadata.builder()
+            .addFile(/* namespacedDir= */ "com.namespace", /* fileName= */ "filename", DUMMY_DATA)
+            .build();
+
+    assertThat(metadata.getModuleEntryForTransparencyFile()).isEmpty();
+  }
+
+  @Test
+  public void getModuleEntryForTransparencyFile() throws Exception {
+    ByteSource transparencyContents =
+        CharSource.wrap(
+                JsonFormat.printer()
+                    .print(
+                        CodeTransparency.newBuilder()
+                            .addCodeRelatedFile(
+                                CodeRelatedFile.newBuilder()
+                                    .setPath("dex/classes.dex")
+                                    .setSha256("sha256"))))
+            .asByteSource(Charset.defaultCharset());
+    BundleMetadata metadata =
+        BundleMetadata.builder()
+            .addFile(
+                BundleMetadata.BUNDLETOOL_NAMESPACE,
+                BundleMetadata.TRANSPARENCY_FILE_NAME,
+                transparencyContents)
+            .build();
+
+    assertThat(metadata.getModuleEntryForTransparencyFile())
+        .hasValue(
+            ModuleEntry.builder()
+                .setContent(transparencyContents)
+                .setBundlePath(
+                    ZipPath.create("BUNDLE-METADATA")
+                        .resolve(BundleMetadata.BUNDLETOOL_NAMESPACE)
+                        .resolve(BundleMetadata.TRANSPARENCY_FILE_NAME))
+                .setPath(ZipPath.create("META-INF").resolve(BundleMetadata.TRANSPARENCY_FILE_NAME))
+                .build());
   }
 }

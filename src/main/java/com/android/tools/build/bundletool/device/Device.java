@@ -36,7 +36,7 @@ import java.util.concurrent.TimeUnit;
 /** Interface for BundleTool - Ddmlib interactions. Represents a connected device. */
 public abstract class Device {
 
-  private static final Duration DEFAULT_ADB_TIMEOUT = Duration.ofMinutes(10);
+  public static final Duration DEFAULT_ADB_TIMEOUT = Duration.ofMinutes(10);
 
   public abstract DeviceState getState();
 
@@ -65,7 +65,7 @@ public abstract class Device {
 
   public abstract void installApks(ImmutableList<Path> apks, InstallOptions installOptions);
 
-  public abstract void pushApks(ImmutableList<Path> apks, PushOptions installOptions);
+  public abstract void push(ImmutableList<Path> files, PushOptions installOptions);
 
   public abstract Path syncPackageToDevice(Path localFilePath)
       throws TimeoutException, AdbCommandRejectedException, SyncException, IOException;

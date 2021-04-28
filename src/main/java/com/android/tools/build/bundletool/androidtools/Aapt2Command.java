@@ -14,9 +14,9 @@
  * limitations under the License
  */
 
-package com.android.tools.build.bundletool.model;
+package com.android.tools.build.bundletool.androidtools;
 
-import com.android.tools.build.bundletool.model.CommandExecutor.CommandOptions;
+import com.android.tools.build.bundletool.androidtools.CommandExecutor.CommandOptions;
 import com.google.common.collect.ImmutableList;
 import java.nio.file.Path;
 import java.time.Duration;
@@ -25,6 +25,8 @@ import java.time.Duration;
 public interface Aapt2Command {
 
   void convertApkProtoToBinary(Path protoApk, Path binaryApk);
+
+  void optimizeToSparseResourceTables(Path originalApk, Path outputApk);
 
   /** Dumps the badging information of an .apk/.apex file, returning a String per line of out. */
   default ImmutableList<String> dumpBadging(Path apkPath) {
@@ -37,17 +39,33 @@ public interface Aapt2Command {
 
       @Override
       public void convertApkProtoToBinary(Path protoApk, Path binaryApk) {
+        ImmutableList<String> convertCommand =
+            ImmutableList.of(
+                aapt2Path.toString(),
+                "convert",
+                "--output-format",
+                "binary",
+                "-o",
+                binaryApk.toString(),
+                protoApk.toString());
+
         new DefaultCommandExecutor()
-            .execute(
-                ImmutableList.of(
-                    aapt2Path.toString(),
-                    "convert",
-                    "--output-format",
-                    "binary",
-                    "-o",
-                    binaryApk.toString(),
-                    protoApk.toString()),
-                CommandOptions.builder().setTimeout(timeoutMillis).build());
+            .execute(convertCommand, CommandOptions.builder().setTimeout(timeoutMillis).build());
+      }
+
+      @Override
+      public void optimizeToSparseResourceTables(Path originalApk, Path outputApk) {
+        ImmutableList<String> convertCommand =
+            ImmutableList.of(
+                aapt2Path.toString(),
+                "optimize",
+                "--enable-sparse-encoding",
+                "-o",
+                outputApk.toString(),
+                originalApk.toString());
+
+        new DefaultCommandExecutor()
+            .execute(convertCommand, CommandOptions.builder().setTimeout(timeoutMillis).build());
       }
 
       @Override

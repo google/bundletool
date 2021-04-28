@@ -23,13 +23,14 @@ import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 
 import com.android.bundle.Config.BundleConfig;
+import com.android.bundle.Config.ResourceOptimizations.SparseEncoding;
 import com.android.tools.build.apkzlib.zfile.ZFiles;
 import com.android.tools.build.apkzlib.zip.AlignmentRule;
 import com.android.tools.build.apkzlib.zip.AlignmentRules;
 import com.android.tools.build.apkzlib.zip.ZFile;
 import com.android.tools.build.apkzlib.zip.ZFileOptions;
+import com.android.tools.build.bundletool.androidtools.Aapt2Command;
 import com.android.tools.build.bundletool.io.ZipBuilder.EntryOption;
-import com.android.tools.build.bundletool.model.Aapt2Command;
 import com.android.tools.build.bundletool.model.BundleModule.SpecialModuleEntry;
 import com.android.tools.build.bundletool.model.ModuleEntry;
 import com.android.tools.build.bundletool.model.ModuleSplit;
@@ -79,6 +80,7 @@ final class ApkzlibApkSerializerHelper extends ApkSerializerHelper {
   private final Version bundletoolVersion;
   private final ImmutableList<PathMatcher> uncompressedPathMatchers;
   private final ApkSigner apkSigner;
+  private final boolean enableSparseEncoding;
 
   @Inject
   ApkzlibApkSerializerHelper(
@@ -93,6 +95,12 @@ final class ApkzlibApkSerializerHelper extends ApkSerializerHelper {
             .map(PathMatcher::createFromGlob)
             .collect(toImmutableList());
     this.apkSigner = apkSigner;
+    this.enableSparseEncoding =
+        bundleConfig
+            .getOptimizations()
+            .getResourceOptimizations()
+            .getSparseEncoding()
+            .equals(SparseEncoding.ENFORCED);
   }
 
   @Override
@@ -119,7 +127,14 @@ final class ApkzlibApkSerializerHelper extends ApkSerializerHelper {
 
     // Have aapt2 convert the Proto-APK to a Binary-APK.
     Path binaryApk = tempDir.getPath().resolve("binary.apk");
-    aapt2Command.convertApkProtoToBinary(partialProtoApk, binaryApk);
+
+    if (enableSparseEncoding && split.getResourceTable().isPresent()) {
+      Path interimApk = tempDir.getPath().resolve("interim.apk");
+      aapt2Command.convertApkProtoToBinary(partialProtoApk, interimApk);
+      aapt2Command.optimizeToSparseResourceTables(interimApk, binaryApk);
+    } else {
+      aapt2Command.convertApkProtoToBinary(partialProtoApk, binaryApk);
+    }
     checkState(Files.exists(binaryApk), "No APK created by aapt2 convert command.");
 
     // Create a new APK that includes files processed by aapt2 and the other ones.

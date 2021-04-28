@@ -1,0 +1,28 @@
+syntax = "proto3";
+
+package android.bundle;
+
+option java_package = "com.android.bundle";
+
+// Code transparency related metadata.
+message CodeTransparency {
+  // List of code-related files in the bundle.
+  repeated CodeRelatedFile code_related_file = 1;
+}
+
+message CodeRelatedFile {
+  enum Type {
+    DEX = 0;
+    NATIVE_LIBRARY = 1;
+  }
+  // Path to file in the bundle.
+  // Required.
+  string path = 1;
+  // Type of code-related file.
+  // Required.
+  Type type = 2;
+  // Path to file in the APK. Only set for NATIVE_LIBRARY types.
+  string apk_path = 3;
+  // SHA256 digest of the code-related file.
+  string sha256 = 4;
+}

@@ -16,11 +16,15 @@
 package com.android.tools.build.bundletool.testing;
 
 import com.android.bundle.Config.BundleConfig;
+import com.android.tools.build.bundletool.io.AppBundleSerializer;
 import com.android.tools.build.bundletool.model.AppBundle;
 import com.android.tools.build.bundletool.model.BundleMetadata;
 import com.android.tools.build.bundletool.model.BundleModule;
 import com.google.common.collect.ImmutableList;
-import com.google.common.io.Files;
+import com.google.common.io.ByteSource;
+import com.google.common.io.MoreFiles;
+import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.function.Consumer;
 import java.util.zip.ZipFile;
@@ -63,7 +67,12 @@ public class AppBundleBuilder {
   }
 
   public AppBundleBuilder addMetadataFile(String namespacedDir, String fileName, Path file) {
-    metadata.addFile(namespacedDir, fileName, Files.asByteSource(file.toFile()));
+    metadata.addFile(namespacedDir, fileName, MoreFiles.asByteSource(file));
+    return this;
+  }
+
+  public AppBundleBuilder addMetadataFile(String namespacedDir, String fileName, ByteSource file) {
+    metadata.addFile(namespacedDir, fileName, file);
     return this;
   }
 
@@ -74,5 +83,20 @@ public class AppBundleBuilder {
 
   public AppBundle build() {
     return AppBundle.buildFromModules(modules.build(), bundleConfig, metadata.build());
+  }
+
+  public byte[] buildAsByteArray() throws IOException {
+    Path tempBundle = Files.createTempFile("temp", ".aab");
+    try {
+      Files.deleteIfExists(tempBundle);
+      writeTo(tempBundle);
+      return Files.readAllBytes(tempBundle);
+    } finally {
+      Files.deleteIfExists(tempBundle);
+    }
+  }
+
+  public void writeTo(Path outputPath) throws IOException {
+    new AppBundleSerializer(false).writeToDisk(build(), outputPath);
   }
 }

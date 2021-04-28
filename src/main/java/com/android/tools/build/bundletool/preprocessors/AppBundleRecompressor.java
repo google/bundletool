@@ -20,14 +20,18 @@ import static com.android.tools.build.bundletool.model.CompressionLevel.DEFAULT_
 import static com.android.tools.build.bundletool.model.CompressionLevel.NO_COMPRESSION;
 import static com.android.tools.build.bundletool.model.CompressionLevel.SAME_AS_SOURCE;
 import static com.google.common.collect.ImmutableList.toImmutableList;
+import static com.google.common.collect.ImmutableMap.toImmutableMap;
+import static com.google.common.collect.ImmutableSet.toImmutableSet;
 import static com.google.common.util.concurrent.Futures.immediateFuture;
 
+import com.android.aapt.Resources.XmlNode;
 import com.android.bundle.Config.BundleConfig;
 import com.android.tools.build.bundletool.io.ApkSerializerHelper;
 import com.android.tools.build.bundletool.io.TempDirectory;
 import com.android.tools.build.bundletool.io.ZipEntrySource;
 import com.android.tools.build.bundletool.io.ZipEntrySourceFactory;
 import com.android.tools.build.bundletool.io.ZipReader;
+import com.android.tools.build.bundletool.model.AndroidManifest;
 import com.android.tools.build.bundletool.model.CompressionLevel;
 import com.android.tools.build.bundletool.model.ZipPath;
 import com.android.tools.build.bundletool.model.exceptions.InvalidBundleException;
@@ -36,16 +40,20 @@ import com.android.tools.build.bundletool.model.utils.SystemEnvironmentProvider;
 import com.android.zipflinger.Entry;
 import com.android.zipflinger.ZipArchive;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableSet;
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.ListeningExecutorService;
 import com.google.common.util.concurrent.MoreExecutors;
+import com.google.protobuf.ExtensionRegistryLite;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ExecutorService;
 
@@ -72,9 +80,11 @@ public final class AppBundleRecompressor {
           .orElse(100_000L);
 
   private final ListeningExecutorService executor;
+  private final ModuleCompressionManager moduleCompressionManager;
 
   public AppBundleRecompressor(ExecutorService executor) {
     this.executor = MoreExecutors.listeningDecorator(executor);
+    this.moduleCompressionManager = new ModuleCompressionManager();
   }
 
   public void recompressAppBundle(File inputFile, File outputFile) {
@@ -85,7 +95,10 @@ public final class AppBundleRecompressor {
       List<ListenableFuture<ZipEntrySource>> sources = new ArrayList<>();
 
       BundleConfig bundleConfig = extractBundleConfig(zipReader);
-      CompressionManager compressionManager = new CompressionManager(bundleConfig);
+      ImmutableSet<String> uncompressedAssetsModules =
+          extractModulesWithUncompressedAssets(zipReader, bundleConfig);
+      CompressionManager compressionManager =
+          new CompressionManager(bundleConfig, uncompressedAssetsModules);
 
       for (Entry entry : zipReader.getEntries().values()) {
         CompressionLevel compressionLevel = compressionManager.getCompressionLevel(entry);
@@ -122,10 +135,10 @@ public final class AppBundleRecompressor {
   private static BundleConfig extractBundleConfig(ZipReader zipReader) {
     if (!zipReader.getEntry("BundleConfig.pb").isPresent()) {
       throw InvalidBundleException.createWithUserMessage(
-          "File 'BundleConfig.pb' not found. Is this an App Bundle?");
+          "File 'BundleConfig.pb' not found but required in App Bundle format.");
     }
     try (InputStream inputStream = zipReader.getUncompressedPayload("BundleConfig.pb")) {
-      return BundleConfig.parseFrom(inputStream);
+      return BundleConfig.parseFrom(inputStream, ExtensionRegistryLite.getEmptyRegistry());
     } catch (IOException e) {
       throw new UncheckedIOException(e);
     }
@@ -137,6 +150,8 @@ public final class AppBundleRecompressor {
    * <ul>
    *   <li>The compression of entries that don't end up in the final APKs doesn't matter, so we
    *       re-use whatever compression was used in the source bundle.
+   *   <li>Asset files in asset modules are left uncompressed unless configured otherwise in
+   *       BundleConfig.
    *   <li>Entries that will be processed by aapt2 will be uncompressed, so that aapt2 does not
    *       attempt to re-compress them during the conversion to binary format (aapt2 preserves the
    *       compression of the entries of the input APK). This is because we don't want to rely on
@@ -152,19 +167,33 @@ public final class AppBundleRecompressor {
    * </ul>
    */
   private static class CompressionManager {
-    private final ImmutableList<PathMatcher> uncompressedPathMatchers;
 
-    CompressionManager(BundleConfig bundleConfig) {
+    private static final ZipPath ASSETS_DIRECTORY = ZipPath.create("assets");
+
+    private final ImmutableList<PathMatcher> uncompressedPathMatchers;
+    private final ImmutableSet<String> uncompressedAssetsModuleNames;
+
+    CompressionManager(
+        BundleConfig bundleConfig, ImmutableSet<String> uncompressedAssetsModuleNames) {
       this.uncompressedPathMatchers =
           bundleConfig.getCompression().getUncompressedGlobList().stream()
               .map(PathMatcher::createFromGlob)
               .collect(toImmutableList());
+      this.uncompressedAssetsModuleNames = uncompressedAssetsModuleNames;
     }
 
     CompressionLevel getCompressionLevel(Entry entry) {
-      Optional<ZipPath> pathInModule = toPathInModule(ZipPath.create(entry.getName()));
+      ZipPath bundleEntryPath = ZipPath.create(entry.getName());
+      Optional<ZipPath> pathInModule = toPathInModule(bundleEntryPath);
+
       if (!pathInModule.isPresent()) {
         return SAME_AS_SOURCE;
+      }
+
+      String moduleName = bundleEntryPath.getName(0).toString();
+      if (pathInModule.get().startsWith(ASSETS_DIRECTORY)
+          && uncompressedAssetsModuleNames.contains(moduleName)) {
+        return NO_COMPRESSION;
       }
 
       ZipPath pathInApk = ApkSerializerHelper.toApkEntryPath(pathInModule.get());
@@ -185,6 +214,40 @@ public final class AppBundleRecompressor {
         return Optional.empty();
       }
       return Optional.of(pathInBundle.subpath(1, pathInBundle.getNameCount()));
+    }
+  }
+
+  private ImmutableSet<String> extractModulesWithUncompressedAssets(
+      ZipReader zipReader, BundleConfig config) {
+    return getAllManifestsByModuleName(zipReader).entrySet().stream()
+        .filter(
+            entry -> {
+              AndroidManifest manifest = entry.getValue();
+              return moduleCompressionManager.shouldForceUncompressAssets(config, manifest);
+            })
+        .map(Map.Entry::getKey)
+        .collect(toImmutableSet());
+  }
+
+  private static ImmutableMap<String, AndroidManifest> getAllManifestsByModuleName(
+      ZipReader zipReader) {
+    ZipPath manifestSuffixPath = ZipPath.create("manifest/AndroidManifest.xml");
+
+    return zipReader.getEntries().keySet().stream()
+        .map(ZipPath::create)
+        .filter(zipPath -> zipPath.getNameCount() == 3 && zipPath.endsWith(manifestSuffixPath))
+        .collect(
+            toImmutableMap(
+                zipPath -> zipPath.getName(0).toString(),
+                zipPath -> parseAndroidManifest(zipReader, zipPath)));
+  }
+
+  private static AndroidManifest parseAndroidManifest(ZipReader zipReader, ZipPath path) {
+    try (InputStream inputStream = zipReader.getUncompressedPayload(path.toString())) {
+      return AndroidManifest.create(
+          XmlNode.parseFrom(inputStream, ExtensionRegistryLite.getEmptyRegistry()));
+    } catch (IOException e) {
+      throw new UncheckedIOException(e);
     }
   }
 }

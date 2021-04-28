@@ -14,9 +14,9 @@
  * limitations under the License
  */
 
-package com.android.tools.build.bundletool.model;
+package com.android.tools.build.bundletool.androidtools;
 
-import com.android.tools.build.bundletool.model.CommandExecutor.CommandOptions;
+import com.android.tools.build.bundletool.androidtools.CommandExecutor.CommandOptions;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableListMultimap;
@@ -33,6 +33,7 @@ public interface AdbCommand {
       ImmutableListMultimap<String, String> apkToInstallByPackage,
       boolean staged,
       boolean enableRollback,
+      Optional<Duration> timeout,
       Optional<String> deviceId);
 
   static AdbCommand create(Path adbPath) {
@@ -53,9 +54,15 @@ public interface AdbCommand {
         ImmutableListMultimap<String, String> apkToInstallByPackage,
         boolean staged,
         boolean enableRollback,
+        Optional<Duration> timeout,
         Optional<String> deviceId) {
       return installMultiPackage(
-          apkToInstallByPackage, staged, enableRollback, deviceId, new DefaultCommandExecutor());
+          apkToInstallByPackage,
+          staged,
+          enableRollback,
+          timeout,
+          deviceId,
+          new DefaultCommandExecutor());
     }
 
     @VisibleForTesting
@@ -63,6 +70,7 @@ public interface AdbCommand {
         ImmutableListMultimap<String, String> apkToInstallByPackage,
         boolean staged,
         boolean enableRollback,
+        Optional<Duration> timeout,
         Optional<String> deviceId,
         CommandExecutor commandExecutor) {
       ImmutableList.Builder<String> commandBuilder =
@@ -74,6 +82,11 @@ public interface AdbCommand {
       }
       if (enableRollback) {
         commandBuilder.add("--enable-rollback");
+      }
+      if (timeout.isPresent()) {
+        commandBuilder
+            .add("--staged-ready-timeout")
+            .add(String.format("%d", timeout.get().toMillis()));
       }
       // Splits of a single package must be installed together.
       apkToInstallByPackage

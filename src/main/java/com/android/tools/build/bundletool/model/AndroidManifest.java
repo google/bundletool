@@ -16,6 +16,9 @@
 
 package com.android.tools.build.bundletool.model;
 
+import static com.android.tools.build.bundletool.model.ModuleDeliveryType.ALWAYS_INITIAL_INSTALL;
+import static com.android.tools.build.bundletool.model.ModuleDeliveryType.CONDITIONAL_INITIAL_INSTALL;
+import static com.android.tools.build.bundletool.model.ModuleDeliveryType.NO_INITIAL_INSTALL;
 import static com.android.tools.build.bundletool.model.version.VersionGuardedFeature.NAMESPACE_ON_INCLUDE_ATTRIBUTE_REQUIRED;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
@@ -87,10 +90,13 @@ public abstract class AndroidManifest {
   public static final String CONDITION_MIN_SDK_VERSION_NAME = "min-sdk";
   public static final String CONDITION_MAX_SDK_VERSION_NAME = "max-sdk";
   public static final String CONDITION_USER_COUNTRIES_NAME = "user-countries";
+  public static final String CONDITION_DEVICE_TIERS_NAME = "device-tiers";
+  public static final String DEVICE_TIER_ELEMENT_NAME = "device-tier";
   public static final String SPLIT_NAME_ATTRIBUTE_NAME = "splitName";
   public static final String VERSION_NAME_ATTRIBUTE_NAME = "versionName";
   public static final String INSTALL_LOCATION_ATTRIBUTE_NAME = "installLocation";
   public static final String IS_SPLIT_REQUIRED_ATTRIBUTE_NAME = "isSplitRequired";
+  public static final String SHARED_USER_ID_ATTRIBUTE_NAME = "sharedUserId";
 
   public static final String MODULE_TYPE_FEATURE_VALUE = "feature";
   public static final String MODULE_TYPE_ASSET_VALUE = "asset-pack";
@@ -623,6 +629,44 @@ public abstract class AndroidManifest {
     }
   }
 
+  public ModuleDeliveryType getModuleDeliveryType() {
+    if (getManifestDeliveryElement().isPresent()) {
+      ManifestDeliveryElement manifestDeliveryElement = getManifestDeliveryElement().get();
+      if (manifestDeliveryElement.hasInstallTimeElement()) {
+        return manifestDeliveryElement.hasModuleConditions()
+            ? CONDITIONAL_INITIAL_INSTALL
+            : ALWAYS_INITIAL_INSTALL;
+      } else {
+        return NO_INITIAL_INSTALL;
+      }
+    }
+
+    // Handling legacy on-demand attribute value.
+    if (getOnDemandAttribute().map(XmlProtoAttribute::getValueAsBoolean).orElse(false)) {
+      return NO_INITIAL_INSTALL;
+    }
+
+    // Legacy onDemand attribute is equal to false or for base module: no delivery information.
+    return ALWAYS_INITIAL_INSTALL;
+  }
+
+  public ModuleDeliveryType getInstantModuleDeliveryType() {
+    if (getInstantManifestDeliveryElement().isPresent()) {
+      ManifestDeliveryElement instantManifestDeliveryElement =
+          getInstantManifestDeliveryElement().get();
+      if (instantManifestDeliveryElement.hasInstallTimeElement()) {
+        return instantManifestDeliveryElement.hasModuleConditions()
+            ? CONDITIONAL_INITIAL_INSTALL
+            : ALWAYS_INITIAL_INSTALL;
+      } else {
+        return NO_INITIAL_INSTALL;
+      }
+    }
+
+    // Handling dist:instant attribute value.
+    return NO_INITIAL_INSTALL;
+  }
+
   /** Returns a stream of the <meta-data> XML elements under the <application> tag. */
   private Stream<XmlProtoElement> getMetadataElements() {
     return getManifestElement()
@@ -641,5 +685,11 @@ public abstract class AndroidManifest {
 
   public ManifestEditor toEditor() {
     return new ManifestEditor(getManifestRoot(), getBundleToolVersion());
+  }
+
+  public boolean hasSharedUserId() {
+    return getManifestElement()
+        .getAttribute(ANDROID_NAMESPACE_URI, SHARED_USER_ID_ATTRIBUTE_NAME)
+        .isPresent();
   }
 }

@@ -82,6 +82,7 @@ import com.android.bundle.Targeting.TextureCompressionFormat.TextureCompressionF
 import com.android.bundle.Targeting.VariantTargeting;
 import com.android.tools.build.bundletool.commands.BuildApksModule;
 import com.android.tools.build.bundletool.commands.CommandScoped;
+import com.android.tools.build.bundletool.model.BundleMetadata;
 import com.android.tools.build.bundletool.model.BundleModule;
 import com.android.tools.build.bundletool.model.ModuleSplit;
 import com.android.tools.build.bundletool.model.ModuleSplit.SplitType;
@@ -96,6 +97,7 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
+import com.google.common.io.ByteSource;
 import com.google.protobuf.Message;
 import dagger.Component;
 import javax.inject.Inject;
@@ -147,6 +149,14 @@ public class StandaloneApksGeneratorTest {
       apkDensityTargeting(
           DensityAlias.XXXHDPI,
           Sets.difference(ALL_DENSITIES, ImmutableSet.of(DensityAlias.XXXHDPI)));
+
+  private static final BundleMetadata BUNDLE_METADATA_WITH_TRANSPARENCY =
+      BundleMetadata.builder()
+          .addFile(
+              BundleMetadata.BUNDLETOOL_NAMESPACE,
+              BundleMetadata.TRANSPARENCY_FILE_NAME,
+              ByteSource.empty())
+          .build();
 
   @Inject StandaloneApksGenerator standaloneApksGenerator;
 
@@ -467,6 +477,78 @@ public class StandaloneApksGeneratorTest {
   }
 
   @Test
+  public void shardByAbi_havingManyAbis_producesManyApks_withTransparency() throws Exception {
+    TestComponent.useTestModule(
+        this, TestModule.builder().withBundleMetadata(BUNDLE_METADATA_WITH_TRANSPARENCY).build());
+    BundleModule bundleModule =
+        new BundleModuleBuilder("base")
+            .addFile("assets/file.txt")
+            .addFile("dex/classes.dex")
+            .addFile("lib/armeabi/libtest.so")
+            .addFile("lib/x86/libtest.so")
+            .addFile("lib/x86_64/libtest.so")
+            .addFile("res/drawable/image.jpg")
+            .addFile("res/drawable-mdpi/image.jpg")
+            .addFile("root/license.dat")
+            .setManifest(androidManifest("com.test.app"))
+            .setNativeConfig(
+                nativeLibraries(
+                    targetedNativeDirectory("lib/armeabi", nativeDirectoryTargeting(ARMEABI)),
+                    targetedNativeDirectory("lib/x86", nativeDirectoryTargeting(X86)),
+                    targetedNativeDirectory("lib/x86_64", nativeDirectoryTargeting(X86_64))))
+            .setResourceTable(
+                new ResourceTableBuilder()
+                    .addPackage("com.test.app")
+                    .addDrawableResourceForMultipleDensities(
+                        "image",
+                        ImmutableMap.of(
+                            DEFAULT_DENSITY_VALUE,
+                            "res/drawable/image.jpg",
+                            MDPI_VALUE,
+                            "res/drawable-mdpi/image.jpg"))
+                    .build())
+            .build();
+
+    ImmutableList<ModuleSplit> shards =
+        standaloneApksGenerator.generateStandaloneApks(
+            ImmutableList.of(bundleModule), standaloneApkOptimizations(OptimizationDimension.ABI));
+
+    assertThat(shards).hasSize(3);
+    assertThat(shards.stream().map(ModuleSplit::getSplitType).distinct().collect(toImmutableSet()))
+        .containsExactly(SplitType.STANDALONE);
+
+    VariantTargeting armVariantTargeting =
+        mergeVariantTargeting(
+            variantAbiTargeting(ARMEABI, ImmutableSet.of(X86, X86_64)),
+            VARIANT_TARGETING_WITH_SDK_1);
+    VariantTargeting x86VariantTargeting =
+        mergeVariantTargeting(
+            variantAbiTargeting(X86, ImmutableSet.of(ARMEABI, X86_64)),
+            VARIANT_TARGETING_WITH_SDK_1);
+    VariantTargeting x64VariantTargeting =
+        mergeVariantTargeting(
+            variantAbiTargeting(X86_64, ImmutableSet.of(ARMEABI, X86)),
+            VARIANT_TARGETING_WITH_SDK_1);
+
+    assertThat(
+            shards.stream()
+                .map(ModuleSplit::getVariantTargeting)
+                .distinct()
+                .collect(toImmutableSet()))
+        .containsExactly(armVariantTargeting, x64VariantTargeting, x86VariantTargeting);
+    for (ModuleSplit shard : shards) {
+      assertThat(extractPaths(shard.getEntries()))
+          .containsAtLeast(
+              "assets/file.txt",
+              "dex/classes.dex",
+              "res/drawable/image.jpg",
+              "res/drawable-mdpi/image.jpg",
+              "root/license.dat",
+              "META-INF/code_transparency.json");
+    }
+  }
+
+  @Test
   public void shardByAbi_assetsAbiTargetingIsIgnored() throws Exception {
     BundleModule bundleModule =
         new BundleModuleBuilder("base")
@@ -733,6 +815,57 @@ public class StandaloneApksGeneratorTest {
   }
 
   @Test
+  public void shardByAbiAndDensity_havingOneAbiAndSomeDensityResource_produceManyApks_transparency()
+      throws Exception {
+    TestComponent.useTestModule(
+        this, TestModule.builder().withBundleMetadata(BUNDLE_METADATA_WITH_TRANSPARENCY).build());
+    BundleModule bundleModule =
+        new BundleModuleBuilder("base")
+            .addFile("assets/file.txt")
+            .addFile("dex/classes.dex")
+            .addFile("lib/x86/libtest.so")
+            .addFile("res/drawable-ldpi/image.jpg")
+            .addFile("res/drawable-hdpi/image.jpg")
+            .addFile("root/license.dat")
+            .setManifest(androidManifest("com.test.app"))
+            .setNativeConfig(
+                nativeLibraries(targetedNativeDirectory("lib/x86", nativeDirectoryTargeting(X86))))
+            .setResourceTable(
+                new ResourceTableBuilder()
+                    .addPackage("com.test.app")
+                    .addDrawableResourceForMultipleDensities(
+                        "image",
+                        ImmutableMap.of(
+                            LDPI_VALUE,
+                            "res/drawable-ldpi/image.jpg",
+                            HDPI_VALUE,
+                            "res/drawable-hdpi/image.jpg"))
+                    .build())
+            .build();
+
+    ImmutableList<ModuleSplit> shards =
+        standaloneApksGenerator.generateStandaloneApks(
+            ImmutableList.of(bundleModule),
+            standaloneApkOptimizations(
+                OptimizationDimension.ABI, OptimizationDimension.SCREEN_DENSITY));
+
+    // 7 shards: {x86} x {LDPI, MDPI, ..., XXXHDPI}.
+    assertThat(shards).hasSize(7);
+    assertThat(shards.stream().map(ModuleSplit::getSplitType).distinct().collect(toImmutableSet()))
+        .containsExactly(SplitType.STANDALONE);
+
+    for (ModuleSplit shard : shards) {
+      assertThat(extractPaths(shard.getEntries()))
+          .containsAtLeast(
+              "assets/file.txt",
+              "dex/classes.dex",
+              "lib/x86/libtest.so",
+              "root/license.dat",
+              "META-INF/code_transparency.json");
+    }
+  }
+
+  @Test
   public void shardByAbiAndDensity_havingManyAbisAndSomeResource_producesManyApks()
       throws Exception {
     BundleModule bundleModule =
@@ -936,6 +1069,68 @@ public class StandaloneApksGeneratorTest {
     assertThat(fatApk.getResourceTable().get())
         .containsResource("com.test.app.split:drawable/image2")
         .onlyWithConfigs(LDPI);
+  }
+
+  @Test
+  public void manyModulesShardByNoDimension_producesFatApk_withTransparency() throws Exception {
+    TestComponent.useTestModule(
+        this, TestModule.builder().withBundleMetadata(BUNDLE_METADATA_WITH_TRANSPARENCY).build());
+    BundleModule baseModule =
+        new BundleModuleBuilder("base")
+            .addFile("lib/x86_64/libtest1.so")
+            .setNativeConfig(
+                nativeLibraries(
+                    targetedNativeDirectory("lib/x86_64", nativeDirectoryTargeting(X86_64))))
+            .addFile("res/drawable-ldpi/image1.jpg")
+            .setResourceTable(
+                resourceTable(
+                    pkg(
+                        USER_PACKAGE_OFFSET,
+                        "com.test.app",
+                        type(
+                            0x01,
+                            "drawable",
+                            entry(
+                                0x01,
+                                "image1",
+                                fileReference("res/drawable-ldpi/image1.jpg", LDPI))))))
+            .setManifest(androidManifest("com.test.app"))
+            .build();
+    BundleModule featureModule =
+        new BundleModuleBuilder("feature")
+            .addFile("lib/x86_64/libtest2.so")
+            .setNativeConfig(
+                nativeLibraries(
+                    targetedNativeDirectory("lib/x86_64", nativeDirectoryTargeting(X86_64))))
+            .addFile("res/drawable-ldpi/image2.jpg")
+            .setResourceTable(
+                resourceTable(
+                    pkg(
+                        USER_PACKAGE_OFFSET + 1,
+                        "com.test.app.split",
+                        type(
+                            0x01,
+                            "drawable",
+                            entry(
+                                0x01,
+                                "image2",
+                                fileReference("res/drawable-ldpi/image2.jpg", LDPI))))))
+            .setManifest(androidManifestForFeature("com.test.app"))
+            .build();
+
+    ImmutableList<ModuleSplit> shards =
+        standaloneApksGenerator.generateStandaloneApks(
+            ImmutableList.of(baseModule, featureModule), NO_DIMENSIONS);
+
+    assertThat(shards).hasSize(1);
+    ModuleSplit fatApk = shards.get(0);
+    assertThat(extractPaths(fatApk.getEntries()))
+        .containsExactly(
+            "lib/x86_64/libtest1.so",
+            "lib/x86_64/libtest2.so",
+            "res/drawable-ldpi/image1.jpg",
+            "res/drawable-ldpi/image2.jpg",
+            "META-INF/code_transparency.json");
   }
 
   @Test

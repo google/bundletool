@@ -19,7 +19,6 @@ package com.android.tools.build.bundletool.splitters;
 import static com.android.tools.build.bundletool.model.utils.TargetingProtoUtils.sdkVersionFrom;
 import static com.android.tools.build.bundletool.model.utils.TargetingProtoUtils.sdkVersionTargeting;
 import static com.android.tools.build.bundletool.model.utils.TargetingProtoUtils.variantTargeting;
-import static com.android.tools.build.bundletool.model.utils.Versions.ANDROID_R_API_VERSION;
 
 import com.android.bundle.Targeting.VariantTargeting;
 import com.android.tools.build.bundletool.model.BundleModule;
@@ -37,8 +36,12 @@ public final class SigningConfigurationVariantGenerator implements BundleModuleV
 
   @Override
   public Stream<VariantTargeting> generate(BundleModule module) {
-    return apkGenerationConfiguration.getRestrictV3SigningToRPlus()
-        ? Stream.of(variantTargeting(sdkVersionTargeting(sdkVersionFrom(ANDROID_R_API_VERSION))))
+    return apkGenerationConfiguration.getMinimumV3SigningApiVersion().isPresent()
+        ? Stream.of(
+            variantTargeting(
+                sdkVersionTargeting(
+                    sdkVersionFrom(
+                        apkGenerationConfiguration.getMinimumV3SigningApiVersion().get()))))
         : Stream.of();
   }
 }

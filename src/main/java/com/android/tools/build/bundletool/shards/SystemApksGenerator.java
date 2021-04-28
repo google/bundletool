@@ -28,6 +28,7 @@ import com.android.bundle.Targeting.VariantTargeting;
 import com.android.tools.build.bundletool.device.ApkMatcher;
 import com.android.tools.build.bundletool.mergers.ModuleSplitsToShardMerger;
 import com.android.tools.build.bundletool.model.AndroidManifest;
+import com.android.tools.build.bundletool.model.BundleMetadata;
 import com.android.tools.build.bundletool.model.BundleModule;
 import com.android.tools.build.bundletool.model.BundleModuleName;
 import com.android.tools.build.bundletool.model.ModuleEntry;
@@ -36,6 +37,7 @@ import com.android.tools.build.bundletool.model.ModuleSplit.SplitType;
 import com.android.tools.build.bundletool.model.SuffixManager;
 import com.android.tools.build.bundletool.model.ZipPath;
 import com.android.tools.build.bundletool.optimizations.ApkOptimizations;
+import com.android.tools.build.bundletool.splitters.CodeTransparencyInjector;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
@@ -53,17 +55,20 @@ public class SystemApksGenerator {
   private final Sharder sharder;
   private final ModuleSplitsToShardMerger shardsMerger;
   private final Optional<DeviceSpec> deviceSpec;
+  private final CodeTransparencyInjector codeTransparencyInjector;
 
   @Inject
   public SystemApksGenerator(
       ModuleSplitterForShards moduleSplitter,
       Sharder sharder,
       ModuleSplitsToShardMerger shardsMerger,
-      Optional<DeviceSpec> deviceSpec) {
+      Optional<DeviceSpec> deviceSpec,
+      BundleMetadata bundleMetadata) {
     this.moduleSplitter = moduleSplitter;
     this.sharder = sharder;
     this.shardsMerger = shardsMerger;
     this.deviceSpec = deviceSpec;
+    this.codeTransparencyInjector = new CodeTransparencyInjector(bundleMetadata);
   }
 
   /**
@@ -92,6 +97,7 @@ public class SystemApksGenerator {
 
     return processSplitsOfSystemShard(systemShard, modulesToFuse).stream()
         .map(module -> applyUncompressedOptimizations(module, apkOptimizations))
+        .map(codeTransparencyInjector::inject)
         .collect(toImmutableList());
   }
 

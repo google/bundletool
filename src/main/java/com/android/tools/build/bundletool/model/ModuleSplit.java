@@ -600,6 +600,13 @@ public abstract class ModuleSplit {
 
     public abstract Builder setEntries(List<ModuleEntry> entries);
 
+    abstract ImmutableList.Builder<ModuleEntry> entriesBuilder();
+
+    public Builder addEntry(ModuleEntry moduleEntry) {
+      entriesBuilder().add(moduleEntry);
+      return this;
+    }
+
     public abstract Builder setResourceTable(ResourceTable resourceTable);
 
     public abstract Builder setAndroidManifest(AndroidManifest androidManifest);

@@ -20,6 +20,7 @@ import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 
 import com.android.ddmlib.AdbCommandRejectedException;
+import com.android.ddmlib.DdmPreferences;
 import com.android.ddmlib.IDevice;
 import com.android.ddmlib.IDevice.DeviceState;
 import com.android.ddmlib.IShellOutputReceiver;
@@ -38,6 +39,7 @@ import java.io.IOException;
 import java.io.PrintStream;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.time.Clock;
 import java.util.Arrays;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
@@ -46,6 +48,7 @@ import java.util.concurrent.TimeUnit;
 public class DdmlibDevice extends Device {
 
   private final IDevice device;
+  private final Clock clock;
   private static final int ADB_TIMEOUT_MS = 60000;
   private static final String DEVICE_FEATURES_COMMAND = "pm list features";
   private static final String GL_EXTENSIONS_COMMAND = "dumpsys SurfaceFlinger";
@@ -53,8 +56,14 @@ public class DdmlibDevice extends Device {
   private final DeviceFeaturesParser deviceFeaturesParser = new DeviceFeaturesParser();
   private final GlExtensionsParser glExtensionsParser = new GlExtensionsParser();
 
-  public DdmlibDevice(IDevice device) {
+  public DdmlibDevice(IDevice device, Clock clock) {
     this.device = device;
+    this.clock = clock;
+  }
+
+  @SuppressWarnings("JavaTimeDefaultTimeZone")
+  public DdmlibDevice(IDevice device) {
+    this(device, Clock.systemDefaultZone());
   }
 
   @Override
@@ -147,13 +156,13 @@ public class DdmlibDevice extends Device {
   }
 
   @Override
-  public void pushApks(ImmutableList<Path> apks, PushOptions pushOptions) {
+  public void push(ImmutableList<Path> files, PushOptions pushOptions) {
     String splitsPath = pushOptions.getDestinationPath();
     checkArgument(!splitsPath.isEmpty(), "Splits path cannot be empty.");
 
     RemoteCommandExecutor commandExecutor =
         new RemoteCommandExecutor(this, pushOptions.getTimeout().toMillis(), System.err);
-
+    DdmPreferences.setTimeOut((int) pushOptions.getTimeout().toMillis());
     try {
       // There are two different flows, depending on if the path is absolute or not...
       if (!splitsPath.startsWith("/")) {
@@ -184,14 +193,7 @@ public class DdmlibDevice extends Device {
       commandExecutor.executeAndPrint(
           "mkdir -p %s && rmdir %s && mkdir -p %s", splitsPath, splitsPath, splitsPath);
 
-      // Try to push files normally. Will fail if ADB shell doesn't have permission to write.
-      for (Path path : apks) {
-        device.pushFile(
-            path.toFile().getAbsolutePath(),
-            joinUnixPaths(splitsPath, path.getFileName().toString()));
-        System.err.printf(
-            "Pushed \"%s\"%n", joinUnixPaths(splitsPath, path.getFileName().toString()));
-      }
+      pushFiles(commandExecutor, splitsPath, files);
     } catch (IOException
         | TimeoutException
         | SyncException
@@ -203,6 +205,37 @@ public class DdmlibDevice extends Device {
               "Pushing additional splits for local testing failed. Your app might still have been"
                   + " installed correctly, but you won't be able to test dynamic modules.")
           .build();
+    }
+  }
+
+  private void pushFiles(
+      RemoteCommandExecutor executor, String splitsPath, ImmutableList<Path> files)
+      throws IOException, SyncException, TimeoutException, AdbCommandRejectedException,
+          ShellCommandUnresponsiveException {
+    try {
+      // Try to push files normally. Will fail if ADB shell doesn't have permission to write.
+      pushFilesToLocation(splitsPath, files);
+    } catch (SyncException e) {
+      // On some Android 11 devices push to target location may fail with 'fchown failed:
+      // Operation not permitted'. Workaround is to push files to temporary location and next
+      // move files.
+      if (!e.getMessage().contains("fchown failed: Operation not permitted")) {
+        throw e;
+      }
+      String tempPath = String.format("/data/local/tmp/splits-%d", clock.millis());
+      pushFilesToLocation(tempPath, files);
+      executor.executeAndPrint("rm -rf %s && mv %s %s", splitsPath, tempPath, splitsPath);
+    }
+  }
+
+  private void pushFilesToLocation(String splitsPath, ImmutableList<Path> files)
+      throws IOException, SyncException, TimeoutException, AdbCommandRejectedException {
+    for (Path path : files) {
+      device.pushFile(
+          path.toFile().getAbsolutePath(),
+          joinUnixPaths(splitsPath, path.getFileName().toString()));
+      System.err.printf(
+          "Pushed \"%s\"%n", joinUnixPaths(splitsPath, path.getFileName().toString()));
     }
   }
 

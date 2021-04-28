@@ -18,6 +18,8 @@ package com.android.tools.build.bundletool.model;
 
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifest;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifestForAssetModule;
+import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifestForFeature;
+import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withSharedUserId;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.nativeDirectoryTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.nativeLibraries;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.targetedNativeDirectory;
@@ -368,6 +370,37 @@ public class AppBundleTest {
             .addModule("asset1", baseModule -> baseModule.setManifest(ASSET_MODULE_MANIFEST))
             .build();
     assertThat(appBundle.isAssetOnly()).isTrue();
+  }
+
+  @Test
+  public void hasSharedUserId() {
+    AppBundle appBundle =
+        new AppBundleBuilder()
+            .addModule(
+                "base",
+                baseModule ->
+                    baseModule.setManifest(
+                        androidManifest(PACKAGE_NAME, withSharedUserId("shared_user_id"))))
+            .build();
+    assertThat(appBundle.hasSharedUserId()).isTrue();
+
+    AppBundle appBundle2 =
+        new AppBundleBuilder()
+            .addModule("base", baseModule -> baseModule.setManifest(androidManifest(PACKAGE_NAME)))
+            .addModule(
+                "feature1",
+                featureModule ->
+                    featureModule.setManifest(
+                        androidManifestForFeature(
+                            PACKAGE_NAME, withSharedUserId("shared_user_id"))))
+            .build();
+    assertThat(appBundle2.hasSharedUserId()).isTrue();
+
+    AppBundle appBundle3 =
+        new AppBundleBuilder()
+            .addModule("base", baseModule -> baseModule.setManifest(androidManifest(PACKAGE_NAME)))
+            .build();
+    assertThat(appBundle3.hasSharedUserId()).isFalse();
   }
 
   private static ZipBuilder createBasicZipBuilder(BundleConfig config) {

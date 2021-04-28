@@ -35,12 +35,11 @@ import com.android.tools.build.bundletool.io.TempDirectory;
 import com.android.tools.build.bundletool.mergers.BundleModuleMerger;
 import com.android.tools.build.bundletool.model.AppBundle;
 import com.android.tools.build.bundletool.model.BundleModule;
-import com.android.tools.build.bundletool.model.BundleModule.ModuleDeliveryType;
 import com.android.tools.build.bundletool.model.BundleModuleName;
 import com.android.tools.build.bundletool.model.GeneratedApks;
 import com.android.tools.build.bundletool.model.GeneratedAssetSlices;
+import com.android.tools.build.bundletool.model.ModuleDeliveryType;
 import com.android.tools.build.bundletool.model.ModuleSplit;
-import com.android.tools.build.bundletool.model.SigningConfiguration;
 import com.android.tools.build.bundletool.model.exceptions.IncompatibleDeviceException;
 import com.android.tools.build.bundletool.model.exceptions.InvalidCommandException;
 import com.android.tools.build.bundletool.model.targeting.AlternativeVariantTargetingPopulator;
@@ -311,10 +310,10 @@ public final class BuildApksManager {
 
     apkGenerationConfiguration.setSuffixStrippings(apkOptimizations.getSuffixStrippings());
 
-    command
-        .getSigningConfiguration()
-        .map(SigningConfiguration::getRestrictV3SigningToRPlus)
-        .ifPresent(apkGenerationConfiguration::setRestrictV3SigningToRPlus);
+    command.getSigningConfiguration().ifPresent(
+        signingConfig ->
+            apkGenerationConfiguration.setMinimumV3SigningApiVersion(
+                signingConfig.getMinimumV3SigningApiVersion()));
 
     return apkGenerationConfiguration;
   }

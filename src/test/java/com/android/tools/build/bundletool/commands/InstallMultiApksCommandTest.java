@@ -17,13 +17,16 @@
 package com.android.tools.build.bundletool.commands;
 
 import static com.android.tools.build.bundletool.model.utils.Versions.ANDROID_Q_API_VERSION;
+import static com.android.tools.build.bundletool.model.utils.Versions.ANDROID_S_API_VERSION;
 import static com.android.tools.build.bundletool.testing.ApksArchiveHelpers.apexVariant;
 import static com.android.tools.build.bundletool.testing.ApksArchiveHelpers.apkDescriptionStream;
 import static com.android.tools.build.bundletool.testing.ApksArchiveHelpers.createApksArchiveFile;
 import static com.android.tools.build.bundletool.testing.ApksArchiveHelpers.createMasterApkDescription;
 import static com.android.tools.build.bundletool.testing.ApksArchiveHelpers.createSplitApkSet;
 import static com.android.tools.build.bundletool.testing.ApksArchiveHelpers.createVariant;
+import static com.android.tools.build.bundletool.testing.DeviceFactory.mergeSpecs;
 import static com.android.tools.build.bundletool.testing.DeviceFactory.qDeviceWithLocales;
+import static com.android.tools.build.bundletool.testing.DeviceFactory.sdkVersion;
 import static com.android.tools.build.bundletool.testing.FakeSystemEnvironmentProvider.ANDROID_HOME;
 import static com.android.tools.build.bundletool.testing.FakeSystemEnvironmentProvider.ANDROID_SERIAL;
 import static com.google.common.collect.ImmutableList.toImmutableList;
@@ -41,12 +44,12 @@ import com.android.bundle.Targeting.SdkVersion;
 import com.android.bundle.Targeting.SdkVersionTargeting;
 import com.android.bundle.Targeting.VariantTargeting;
 import com.android.ddmlib.IDevice.DeviceState;
+import com.android.tools.build.bundletool.androidtools.Aapt2Command;
+import com.android.tools.build.bundletool.androidtools.AdbCommand;
 import com.android.tools.build.bundletool.device.AdbServer;
 import com.android.tools.build.bundletool.device.Device;
 import com.android.tools.build.bundletool.flags.FlagParser;
 import com.android.tools.build.bundletool.io.ZipBuilder;
-import com.android.tools.build.bundletool.model.Aapt2Command;
-import com.android.tools.build.bundletool.model.AdbCommand;
 import com.android.tools.build.bundletool.model.ZipPath;
 import com.android.tools.build.bundletool.model.exceptions.IncompatibleDeviceException;
 import com.android.tools.build.bundletool.model.exceptions.InvalidCommandException;
@@ -63,6 +66,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.time.Duration;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicReference;
@@ -165,6 +169,19 @@ public class InstallMultiApksCommandTest {
             fakeServerOneDevice(qDeviceWithLocales("en-US")));
 
     assertThat(fromFlags.getStaged()).isTrue();
+  }
+
+  @Test
+  public void fromFlags_timeout() {
+    Path zipFile = tmpDir.resolve("container.zip");
+
+    InstallMultiApksCommand fromFlags =
+        InstallMultiApksCommand.fromFlags(
+            new FlagParser().parse("--timeout-millis=3000", "--apks-zip=" + zipFile),
+            systemEnvironmentProvider,
+            fakeServerOneDevice(qDeviceWithLocales("en-US")));
+
+    assertThat(fromFlags.getTimeout()).hasValue(Duration.ofSeconds(3));
   }
 
   @Test
@@ -733,19 +750,8 @@ public class InstallMultiApksCommandTest {
   @Test
   public void execute_staged() throws Exception {
     // GIVEN a fake .apks file with an .apex file.
-    BuildApksResult apexTableOfContents =
-        BuildApksResult.newBuilder()
-            .setPackageName(PKG_NAME_1)
-            .setBundletool(
-                Bundletool.newBuilder()
-                    .setVersion(BundleToolVersion.getCurrentVersion().toString()))
-            .addVariant(
-                apexVariant(
-                    VariantTargeting.getDefaultInstance(),
-                    ApkTargeting.getDefaultInstance(),
-                    ZipPath.create(PKG_NAME_1 + "base.apex")))
-            .build();
-    Path apksPath = createApksArchiveFile(apexTableOfContents, tmpDir.resolve("package1.apks"));
+    BuildApksResult toc = fakeTableOfContents(PKG_NAME_1);
+    Path apksPath = createApksArchiveFile(toc, tmpDir.resolve("package1.apks"));
 
     // GIVEN an install command with the --staged flag...
     InstallMultiApksCommand command =
@@ -759,13 +765,128 @@ public class InstallMultiApksCommandTest {
             .setAdbCommand(
                 // EXPECT the --staged flag to be included.
                 createFakeAdbCommand(
-                    expectedInstallApks(PKG_NAME_1, apexTableOfContents),
+                    expectedInstallApks(PKG_NAME_1, toc),
                     /* expectedStaged= */ true,
                     /* expectedEnableRollback= */ false,
+                    /* expectedTimeout= */ Optional.empty(),
                     Optional.of(DEVICE_ID)))
             .build();
 
     givenEmptyListPackages(device);
+    command.execute();
+    assertAdbCommandExecuted();
+  }
+
+  @Test
+  public void execute_timeout_androidQ_throws() throws Exception {
+    // GIVEN a fake .apks file with an .apex file.
+    BuildApksResult toc = fakeTableOfContents(PKG_NAME_1);
+    Path apksPath = createApksArchiveFile(toc, tmpDir.resolve("package1.apks"));
+
+    // GIVEN an install command with the --staged flag...
+    InstallMultiApksCommand command =
+        InstallMultiApksCommand.builder()
+            .setAdbServer(fakeServerOneDevice(device))
+            .setDeviceId(DEVICE_ID)
+            .setAdbPath(adbPath)
+            .setTimeout(Duration.ofSeconds(20))
+            .setApksArchivePaths(ImmutableList.of(apksPath))
+            .setAapt2Command(createFakeAapt2Command(ImmutableMap.of(PKG_NAME_1, 1L)))
+            .setAdbCommand(
+                // EXPECT the --staged flag to be included.
+                createFakeAdbCommand(
+                    expectedInstallApks(PKG_NAME_1, toc),
+                    /* expectedStaged= */ false,
+                    /* expectedEnableRollback= */ false,
+                    /* expectedTimeout= */ Optional.of(Duration.ofSeconds(20)),
+                    Optional.of(DEVICE_ID)))
+            .build();
+
+    givenEmptyListPackages(device);
+    InvalidCommandException exception =
+        assertThrows(InvalidCommandException.class, command::execute);
+    assertThat(exception)
+        .hasMessageThat()
+        .isEqualTo("'timeout-millis' flag is supported for Android 12+ devices.");
+  }
+
+  @Test
+  public void execute_timeout_androidS_success() throws Exception {
+    FakeDevice sDevice =
+        FakeDevice.fromDeviceSpec(
+            DEVICE_ID,
+            DeviceState.ONLINE,
+            mergeSpecs(qDeviceWithLocales("en-US"), sdkVersion(ANDROID_S_API_VERSION)));
+    // GIVEN a fake .apks file with an .apex file.
+    BuildApksResult toc = fakeTableOfContents(PKG_NAME_1);
+    Path apksPath = createApksArchiveFile(toc, tmpDir.resolve("package1.apks"));
+
+    // GIVEN an install command with the --staged flag...
+    InstallMultiApksCommand command =
+        InstallMultiApksCommand.builder()
+            .setAdbServer(fakeServerOneDevice(sDevice))
+            .setDeviceId(DEVICE_ID)
+            .setAdbPath(adbPath)
+            .setTimeout(Duration.ofSeconds(20))
+            .setApksArchivePaths(ImmutableList.of(apksPath))
+            .setAapt2Command(createFakeAapt2Command(ImmutableMap.of(PKG_NAME_1, 1L)))
+            .setAdbCommand(
+                // EXPECT the --staged flag to be included.
+                createFakeAdbCommand(
+                    expectedInstallApks(PKG_NAME_1, toc),
+                    /* expectedStaged= */ false,
+                    /* expectedEnableRollback= */ false,
+                    /* expectedTimeout= */ Optional.of(Duration.ofSeconds(20)),
+                    Optional.of(DEVICE_ID)))
+            .build();
+
+    givenEmptyListPackages(sDevice);
+    command.execute();
+    assertAdbCommandExecuted();
+  }
+
+  @Test
+  public void execute_updateOnly_apexInsideApksHasApkExtension_fixesExtension() throws Exception {
+    // GIVEN an apks file containing an apex package with .apk extension.
+    BuildApksResult apexTableOfContents =
+        BuildApksResult.newBuilder()
+            .setPackageName(PKG_NAME_2)
+            .setBundletool(
+                Bundletool.newBuilder()
+                    .setVersion(BundleToolVersion.getCurrentVersion().toString()))
+            .addVariant(
+                apexVariant(
+                    VariantTargeting.getDefaultInstance(),
+                    ApkTargeting.getDefaultInstance(),
+                    ZipPath.create(PKG_NAME_2 + "-base.apk")))
+            .build();
+    Path packageApks = createApksArchiveFile(apexTableOfContents, tmpDir.resolve("package.apks"));
+
+    // GIVEN this apex is installed on device...
+    device.injectShellCommandOutput("pm list packages --show-versioncode", () -> "");
+    device.injectShellCommandOutput(
+        "pm list packages --apex-only --show-versioncode",
+        () -> String.format("package:%s versionCode:1\njunk_to_ignore", PKG_NAME_2));
+
+    // GIVEN the --update-only flag is set on the command...
+    InstallMultiApksCommand command =
+        InstallMultiApksCommand.builder()
+            .setAdbServer(fakeServerOneDevice(device))
+            .setUpdateOnly(true)
+            .setDeviceId(DEVICE_ID)
+            .setAdbPath(adbPath)
+            .setApksArchivePaths(ImmutableList.of(packageApks))
+            .setAapt2Command(createFakeAapt2Command(ImmutableMap.of(PKG_NAME_2, 2L)))
+            .setAdbCommand(
+                createFakeAdbCommand(
+                    ImmutableListMultimap.of(
+                        PKG_NAME_2, Paths.get(PKG_NAME_2, PKG_NAME_2 + "-base.apex").toString()),
+                    /* expectedStaged= */ false,
+                    /* expectedEnableRollback= */ false,
+                    Optional.of(DEVICE_ID)))
+            .build();
+
+    // EXPECT only one of the packages
     command.execute();
     assertAdbCommandExecuted();
   }
@@ -854,24 +975,45 @@ public class InstallMultiApksCommandTest {
       boolean expectedEnableRollback,
       Optional<String> expectedDeviceId) {
     return new FakeAdbCommand(
-        expectedApkToInstallByPackage, expectedStaged, expectedEnableRollback, expectedDeviceId);
+        expectedApkToInstallByPackage,
+        expectedStaged,
+        expectedEnableRollback,
+        /* expectedTimeout= */ Optional.empty(),
+        expectedDeviceId);
+  }
+
+  private AdbCommand createFakeAdbCommand(
+      ImmutableListMultimap<String, String> expectedApkToInstallByPackage,
+      boolean expectedStaged,
+      boolean expectedEnableRollback,
+      Optional<Duration> expectedTimeout,
+      Optional<String> expectedDeviceId) {
+    return new FakeAdbCommand(
+        expectedApkToInstallByPackage,
+        expectedStaged,
+        expectedEnableRollback,
+        expectedTimeout,
+        expectedDeviceId);
   }
 
   private class FakeAdbCommand implements AdbCommand {
     private final ImmutableListMultimap<String, String> expectedApkToInstallByPackage;
     private final boolean expectedStaged;
     private final boolean expectedEnableRollback;
+    private final Optional<Duration> expectedTimeout;
     private final Optional<String> expectedDeviceId;
 
     public FakeAdbCommand(
         ImmutableListMultimap<String, String> expectedApkToInstallByPackage,
         boolean expectedStaged,
         boolean expectedEnableRollback,
+        Optional<Duration> expectedTimeout,
         Optional<String> expectedDeviceId) {
       this.expectedApkToInstallByPackage =
           ImmutableListMultimap.copyOf(expectedApkToInstallByPackage);
       this.expectedEnableRollback = expectedEnableRollback;
       this.expectedDeviceId = expectedDeviceId;
+      this.expectedTimeout = expectedTimeout;
       this.expectedStaged = expectedStaged;
     }
 
@@ -880,6 +1022,7 @@ public class InstallMultiApksCommandTest {
         ImmutableListMultimap<String, String> apkToInstallByPackage,
         boolean staged,
         boolean enableRollback,
+        Optional<Duration> timeout,
         Optional<String> deviceId) {
       adbCommandExecuted = true;
       // The apkToInstallByPackage include files in a temporary directory, and there is no good way
@@ -903,6 +1046,7 @@ public class InstallMultiApksCommandTest {
           .isEqualTo(expectedApkToInstallByPackage);
       assertThat(staged).isEqualTo(expectedStaged);
       assertThat(enableRollback).isEqualTo(expectedEnableRollback);
+      assertThat(timeout).isEqualTo(expectedTimeout);
       assertThat(deviceId).isEqualTo(expectedDeviceId);
       return ImmutableList.of();
     }
@@ -913,6 +1057,11 @@ public class InstallMultiApksCommandTest {
     return new Aapt2Command() {
       @Override
       public void convertApkProtoToBinary(Path protoApk, Path binaryApk) {
+        throw new UnsupportedOperationException();
+      }
+
+      @Override
+      public void optimizeToSparseResourceTables(Path originalApk, Path outputApk) {
         throw new UnsupportedOperationException();
       }
 

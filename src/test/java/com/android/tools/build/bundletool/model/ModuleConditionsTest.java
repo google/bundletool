@@ -17,6 +17,7 @@
 package com.android.tools.build.bundletool.model;
 
 import static com.android.tools.build.bundletool.testing.TargetingUtils.mergeModuleTargeting;
+import static com.android.tools.build.bundletool.testing.TargetingUtils.moduleDeviceTiersTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.moduleExcludeCountriesTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.moduleFeatureTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.moduleIncludeCountriesTargeting;
@@ -30,6 +31,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import com.android.bundle.Targeting.ModuleTargeting;
 import com.android.tools.build.bundletool.model.exceptions.InvalidBundleException;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableSet;
 import java.util.Optional;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -119,6 +121,19 @@ public class ModuleConditionsTest {
   }
 
   @Test
+  public void toTargeting_deviceTiersConditions() {
+    ModuleConditions moduleConditions =
+        ModuleConditions.builder()
+            .setDeviceTiersCondition(DeviceTiersCondition.create(ImmutableSet.of("mid", "high")))
+            .build();
+
+    ModuleTargeting moduleTargeting = moduleConditions.toTargeting();
+    assertThat(moduleTargeting)
+        .ignoringRepeatedFieldOrder()
+        .isEqualTo(moduleDeviceTiersTargeting("mid", "high"));
+  }
+
+  @Test
   public void toTargeting_userCountriesCondition() {
     ModuleConditions moduleConditions =
         ModuleConditions.builder()
@@ -157,6 +172,7 @@ public class ModuleConditionsTest {
             .setMinSdkVersion(24)
             .setUserCountriesCondition(
                 UserCountriesCondition.create(ImmutableList.of("FR"), /* exclude= */ false))
+            .setDeviceTiersCondition(DeviceTiersCondition.create(ImmutableSet.of("high")))
             .build();
 
     ModuleTargeting moduleTargeting = moduleConditions.toTargeting();
@@ -167,6 +183,7 @@ public class ModuleConditionsTest {
                 moduleFeatureTargeting("com.feature1"),
                 moduleFeatureTargeting("com.feature2"),
                 moduleMinSdkVersionTargeting(24),
-                moduleIncludeCountriesTargeting("FR")));
+                moduleIncludeCountriesTargeting("FR"),
+                moduleDeviceTiersTargeting("high")));
   }
 }

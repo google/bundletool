@@ -31,6 +31,8 @@ import static java.util.stream.Collectors.groupingBy;
 import static java.util.stream.Collectors.maxBy;
 
 import com.android.bundle.Devices.DeviceSpec;
+import com.android.tools.build.bundletool.androidtools.Aapt2Command;
+import com.android.tools.build.bundletool.androidtools.AdbCommand;
 import com.android.tools.build.bundletool.commands.CommandHelp.CommandDescription;
 import com.android.tools.build.bundletool.commands.CommandHelp.FlagDescription;
 import com.android.tools.build.bundletool.device.AdbServer;
@@ -44,18 +46,18 @@ import com.android.tools.build.bundletool.device.PackagesParser.InstalledPackage
 import com.android.tools.build.bundletool.flags.Flag;
 import com.android.tools.build.bundletool.flags.ParsedFlags;
 import com.android.tools.build.bundletool.io.TempDirectory;
-import com.android.tools.build.bundletool.model.Aapt2Command;
-import com.android.tools.build.bundletool.model.AdbCommand;
 import com.android.tools.build.bundletool.model.ZipPath;
 import com.android.tools.build.bundletool.model.exceptions.IncompatibleDeviceException;
 import com.android.tools.build.bundletool.model.exceptions.InvalidCommandException;
 import com.android.tools.build.bundletool.model.utils.DefaultSystemEnvironmentProvider;
 import com.android.tools.build.bundletool.model.utils.SystemEnvironmentProvider;
+import com.android.tools.build.bundletool.model.utils.Versions;
 import com.google.auto.value.AutoValue;
 import com.google.common.base.Suppliers;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableListMultimap;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Streams;
 import com.google.common.io.ByteStreams;
 import com.google.errorprone.annotations.CanIgnoreReturnValue;
@@ -65,6 +67,7 @@ import java.io.OutputStream;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Duration;
 import java.util.Locale;
 import java.util.Optional;
 import java.util.concurrent.TimeoutException;
@@ -92,6 +95,7 @@ public abstract class InstallMultiApksCommand {
   private static final Flag<Boolean> ENABLE_ROLLBACK_FLAG = Flag.booleanFlag("enable-rollback");
   private static final Flag<Boolean> UPDATE_ONLY_FLAG = Flag.booleanFlag("update-only");
   private static final Flag<Path> AAPT2_PATH_FLAG = Flag.path("aapt2");
+  private static final Flag<Integer> TIMEOUT_MILLIS_FLAG = Flag.positiveInteger("timeout-millis");
 
   private static final SystemEnvironmentProvider DEFAULT_PROVIDER =
       new DefaultSystemEnvironmentProvider();
@@ -119,6 +123,8 @@ public abstract class InstallMultiApksCommand {
   abstract boolean getUpdateOnly();
 
   abstract AdbServer getAdbServer();
+
+  abstract Optional<Duration> getTimeout();
 
   public static Builder builder() {
     return new AutoValue_InstallMultiApksCommand.Builder()
@@ -164,6 +170,8 @@ public abstract class InstallMultiApksCommand {
     /** The caller is responsible for the lifecycle of the {@link AdbServer}. */
     abstract Builder setAdbServer(AdbServer adbServer);
 
+    abstract Builder setTimeout(Duration value);
+
     public abstract InstallMultiApksCommand build();
   }
 
@@ -185,7 +193,9 @@ public abstract class InstallMultiApksCommand {
         .getValue(flags)
         .ifPresent(
             aapt2Path -> command.setAapt2Command(Aapt2Command.createFromExecutablePath(aapt2Path)));
-
+    TIMEOUT_MILLIS_FLAG
+        .getValue(flags)
+        .ifPresent(timeoutMillis -> command.setTimeout(Duration.ofMillis(timeoutMillis)));
 
     Optional<ImmutableList<Path>> apksPaths = APKS_ARCHIVES_FLAG.getValue(flags);
     Optional<Path> apksArchiveZip = APKS_ARCHIVE_ZIP_FLAG.getValue(flags);
@@ -213,6 +223,14 @@ public abstract class InstallMultiApksCommand {
       DeviceSpec deviceSpec = deviceAnalyzer.getDeviceSpec(getDeviceId());
       Device device = deviceAnalyzer.getAndValidateDevice(getDeviceId());
 
+      if (getTimeout().isPresent()
+          && !device.getVersion().isGreaterOrEqualThan(Versions.ANDROID_S_API_VERSION)) {
+        throw InvalidCommandException.builder()
+            .withInternalMessage(
+                "'%s' flag is supported for Android 12+ devices.", TIMEOUT_MILLIS_FLAG.getName())
+            .build();
+      }
+
       Path aapt2Dir = tempDirectory.getPath().resolve("aapt2");
       Files.createDirectory(aapt2Dir);
       Supplier<Aapt2Command> aapt2CommandSupplier =
@@ -232,7 +250,14 @@ public abstract class InstallMultiApksCommand {
 
       ImmutableList<PackagePathVersion> apkFilesToInstall =
           uniqueApksByPackageName(installableApksFilesWithBadgingInfo).stream()
-              .flatMap(apks -> extractApkListFromApks(deviceSpec, apks, tempDirectory).stream())
+              .flatMap(
+                  apks ->
+                      extractApkListFromApks(
+                          deviceSpec,
+                          apks,
+                          Optional.ofNullable(existingPackages.get(apks.getPackageName())),
+                          tempDirectory)
+                          .stream())
               .collect(toImmutableList());
       ImmutableListMultimap<String, String> apkToInstallByPackage =
           apkFilesToInstall.stream()
@@ -250,7 +275,7 @@ public abstract class InstallMultiApksCommand {
       AdbCommand adbCommand = getOrCreateAdbCommand();
       ImmutableList<String> commandResults =
           adbCommand.installMultiPackage(
-              apkToInstallByPackage, getStaged(), getEnableRollback(), getDeviceId());
+              apkToInstallByPackage, getStaged(), getEnableRollback(), getTimeout(), getDeviceId());
       logger.info(String.format("Output:\n%s", String.join("\n", commandResults)));
       logger.info("Please reboot device to complete installation.");
     }
@@ -306,17 +331,16 @@ public abstract class InstallMultiApksCommand {
         new AdbShellCommandTask(device, "pm list packages --apex-only --show-versioncode")
             .execute();
 
-    return new PackagesParser()
-            .parse(
-                ImmutableList.<String>builder()
-                    .addAll(listPackagesOutput)
-                    .addAll(listApexPackagesOutput)
-                    .build())
-            .stream()
-            .collect(
-                toImmutableMap(
-                    InstalledPackageInfo::getPackageName,
-                    installedPackageInfo -> installedPackageInfo));
+    ImmutableSet<InstalledPackageInfo> installedApks =
+        new PackagesParser(/* isApex= */ false).parse(listPackagesOutput);
+    ImmutableSet<InstalledPackageInfo> installedApexPackages =
+        new PackagesParser(/* isApex= */ true).parse(listApexPackagesOutput);
+
+    return Streams.concat(installedApks.stream(), installedApexPackages.stream())
+        .collect(
+            toImmutableMap(
+                InstalledPackageInfo::getPackageName,
+                installedPackageInfo -> installedPackageInfo));
   }
 
   private static Optional<PackagePathVersion> apksWithPackageName(
@@ -365,7 +389,10 @@ public abstract class InstallMultiApksCommand {
 
   /** Extracts the apk/apex files that will be installed from a given .apks. */
   private static ImmutableList<PackagePathVersion> extractApkListFromApks(
-      DeviceSpec deviceSpec, PackagePathVersion apksArchive, TempDirectory tempDirectory) {
+      DeviceSpec deviceSpec,
+      PackagePathVersion apksArchive,
+      Optional<InstalledPackageInfo> installedPackage,
+      TempDirectory tempDirectory) {
     logger.info(String.format("Extracting package '%s'", apksArchive.getPackageName()));
     try {
       Path output = tempDirectory.getPath().resolve(apksArchive.getPackageName());
@@ -377,7 +404,12 @@ public abstract class InstallMultiApksCommand {
               .setDeviceSpec(deviceSpec)
               .setOutputDirectory(output);
 
-      return extractApksCommand.build().execute().stream()
+      ImmutableList<Path> extractedPaths =
+          fixExtension(
+              extractApksCommand.build().execute(),
+              installedPackage.map(InstalledPackageInfo::isApex).orElse(false));
+
+      return extractedPaths.stream()
           .map(
               path ->
                   PackagePathVersion.create(
@@ -392,6 +424,22 @@ public abstract class InstallMultiApksCommand {
     } catch (IOException e) {
       throw new UncheckedIOException(e);
     }
+  }
+
+  private static ImmutableList<Path> fixExtension(
+      ImmutableList<Path> extractedPaths, boolean isApex) throws IOException {
+    if (!isApex) {
+      return extractedPaths;
+    }
+    ImmutableList.Builder<Path> newPaths = ImmutableList.builder();
+    for (Path path : extractedPaths) {
+      Path withApexExtension =
+          path.resolveSibling(
+              com.google.common.io.Files.getNameWithoutExtension(path.toString()) + ".apex");
+      Files.move(path, withApexExtension);
+      newPaths.add(withApexExtension);
+    }
+    return newPaths.build();
   }
 
   /**
@@ -533,6 +581,16 @@ public abstract class InstallMultiApksCommand {
                 .setExampleValue("path/to/aapt2")
                 .setOptional(true)
                 .setDescription("Path to the aapt2 binary to use.")
+                .build())
+        .addFlag(
+            FlagDescription.builder()
+                .setFlagName(TIMEOUT_MILLIS_FLAG.getName())
+                .setExampleValue("60000")
+                .setOptional(true)
+                .setDescription(
+                    "Timeout in milliseconds which is passed to 'adb install-multi-package'"
+                        + " command. One minute, by default. Only available for Android 12+"
+                        + " devices.")
                 .build())
         .build();
   }

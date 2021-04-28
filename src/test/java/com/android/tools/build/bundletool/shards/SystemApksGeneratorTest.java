@@ -74,6 +74,7 @@ import com.android.bundle.Targeting.LanguageTargeting;
 import com.android.bundle.Targeting.ScreenDensity.DensityAlias;
 import com.android.tools.build.bundletool.commands.BuildApksModule;
 import com.android.tools.build.bundletool.commands.CommandScoped;
+import com.android.tools.build.bundletool.model.BundleMetadata;
 import com.android.tools.build.bundletool.model.BundleModule;
 import com.android.tools.build.bundletool.model.BundleModuleName;
 import com.android.tools.build.bundletool.model.ModuleEntry;
@@ -89,6 +90,7 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Maps;
+import com.google.common.io.ByteSource;
 import dagger.Component;
 import javax.inject.Inject;
 import org.junit.Before;
@@ -104,6 +106,14 @@ public class SystemApksGeneratorTest {
 
   private static final BundleModuleName FEATURE_MODULE_NAME = BundleModuleName.create("feature");
   private static final BundleModuleName VR_MODULE_NAME = BundleModuleName.create("vr");
+
+  private static final BundleMetadata BUNDLE_METADATA_WITH_TRANSPARENCY =
+      BundleMetadata.builder()
+          .addFile(
+              BundleMetadata.BUNDLETOOL_NAMESPACE,
+              BundleMetadata.TRANSPARENCY_FILE_NAME,
+              ByteSource.empty())
+          .build();
 
   @Inject SystemApksGenerator systemApksGenerator;
 
@@ -159,6 +169,39 @@ public class SystemApksGeneratorTest {
             "res/drawable/image.jpg",
             "res/drawable-mdpi/image.jpg",
             "root/license.dat");
+  }
+
+  @Test
+  public void producesOneApk_withTransparency() throws Exception {
+    SystemApksGeneratorTest.TestComponent.useTestModule(
+        this,
+        TestModule.builder()
+            .withBundleMetadata(BUNDLE_METADATA_WITH_TRANSPARENCY)
+            .withDeviceSpec(DEVICE_SPEC)
+            .build());
+    BundleModule bundleModule =
+        new BundleModuleBuilder("base")
+            .addFile("assets/file.txt")
+            .addFile("dex/classes.dex")
+            .addFile("lib/x86/libtest.so")
+            .setManifest(androidManifest("com.test.app"))
+            .build();
+
+    ImmutableList<ModuleSplit> shards =
+        systemApksGenerator.generateSystemApks(
+            /* modules= */ ImmutableList.of(bundleModule),
+            /* modulesToFuse= */ ImmutableSet.of(BASE_MODULE_NAME),
+            splitOptimizations(OptimizationDimension.ABI));
+
+    assertThat(shards).hasSize(1);
+    ModuleSplit fatShard = shards.get(0);
+    assertThat(fatShard.getSplitType()).isEqualTo(SplitType.SYSTEM);
+    assertThat(extractPaths(fatShard.getEntries()))
+        .containsExactly(
+            "assets/file.txt",
+            "dex/classes.dex",
+            "lib/x86/libtest.so",
+            "META-INF/code_transparency.json");
   }
 
   @Test
@@ -348,6 +391,59 @@ public class SystemApksGeneratorTest {
         .containsExactly(
             "assets/languages#lang_fr/image.jpg", "assets/vr/languages#lang_fr/image.jpg");
     assertThat(frBaseSplit.getAndroidManifest().getSplitId()).hasValue("config.fr");
+  }
+
+  @Test
+  public void producesTwoApks_withTransparency() throws Exception {
+    TestComponent.useTestModule(
+        this,
+        TestModule.builder()
+            .withBundleMetadata(BUNDLE_METADATA_WITH_TRANSPARENCY)
+            .withDeviceSpec(DEVICE_SPEC)
+            .build());
+    BundleModule baseModule =
+        new BundleModuleBuilder("base")
+            .addFile("assets/languages#lang_fr/image.jpg")
+            .setAssetsConfig(
+                assets(
+                    targetedAssetsDirectory(
+                        "assets/languages#lang_fr",
+                        assetsDirectoryTargeting(languageTargeting("fr")))))
+            .setManifest(androidManifest("com.app"))
+            .build();
+
+    BundleModule vrModule =
+        new BundleModuleBuilder("vr")
+            .addFile("assets/vr/languages#lang_fr/image.jpg")
+            .setAssetsConfig(
+                assets(
+                    targetedAssetsDirectory(
+                        "assets/vr/languages#lang_fr",
+                        assetsDirectoryTargeting(languageTargeting("fr")))))
+            .setManifest(
+                androidManifestForFeature(
+                    "com.app",
+                    withFusingAttribute(true),
+                    withTitle("@string/test_label", TEST_LABEL_RESOURCE_ID)))
+            .build();
+
+    ImmutableList<ModuleSplit> shards =
+        systemApksGenerator.generateSystemApks(
+            /* modules= */ ImmutableList.of(baseModule, vrModule),
+            /* modulesToFuse= */ ImmutableSet.of(BASE_MODULE_NAME, VR_MODULE_NAME),
+            splitOptimizations(OptimizationDimension.LANGUAGE));
+
+    assertThat(shards).hasSize(2);
+    
+    ModuleSplit fusedShard = shards.get(0);
+    assertThat(fusedShard.isBaseModuleSplit()).isTrue();
+    assertThat(extractPaths(fusedShard.getEntries()))
+        .containsExactly("META-INF/code_transparency.json");
+
+    ModuleSplit languageSplit = shards.get(1);
+    assertThat(extractPaths(languageSplit.getEntries()))
+        .containsExactly(
+            "assets/languages#lang_fr/image.jpg", "assets/vr/languages#lang_fr/image.jpg");
   }
 
   @Test

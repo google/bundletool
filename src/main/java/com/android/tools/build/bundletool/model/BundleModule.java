@@ -16,9 +16,9 @@
 
 package com.android.tools.build.bundletool.model;
 
-import static com.android.tools.build.bundletool.model.BundleModule.ModuleDeliveryType.ALWAYS_INITIAL_INSTALL;
-import static com.android.tools.build.bundletool.model.BundleModule.ModuleDeliveryType.CONDITIONAL_INITIAL_INSTALL;
-import static com.android.tools.build.bundletool.model.BundleModule.ModuleDeliveryType.NO_INITIAL_INSTALL;
+import static com.android.tools.build.bundletool.model.ModuleDeliveryType.ALWAYS_INITIAL_INSTALL;
+import static com.android.tools.build.bundletool.model.ModuleDeliveryType.CONDITIONAL_INITIAL_INSTALL;
+import static com.android.tools.build.bundletool.model.ModuleDeliveryType.NO_INITIAL_INSTALL;
 import static com.android.tools.build.bundletool.model.utils.TargetingProtoUtils.sdkVersionFrom;
 import static com.android.tools.build.bundletool.model.utils.TargetingProtoUtils.sdkVersionTargeting;
 import static com.google.common.base.Preconditions.checkArgument;
@@ -35,7 +35,6 @@ import com.android.bundle.Files.Assets;
 import com.android.bundle.Files.NativeLibraries;
 import com.android.bundle.Targeting.ModuleTargeting;
 import com.android.tools.build.bundletool.model.exceptions.InvalidBundleException;
-import com.android.tools.build.bundletool.model.utils.xmlproto.XmlProtoAttribute;
 import com.android.tools.build.bundletool.model.version.BundleToolVersion;
 import com.google.auto.value.AutoValue;
 import com.google.auto.value.extension.memoized.Memoized;
@@ -95,14 +94,6 @@ public abstract class BundleModule {
 
   public abstract BundleModuleName getName();
 
-  /** Describes how the module is delivered at install-time. */
-  public enum ModuleDeliveryType {
-    ALWAYS_INITIAL_INSTALL,
-    CONDITIONAL_INITIAL_INSTALL,
-    // Covers both on-demand and fast-follow modes.
-    NO_INITIAL_INSTALL
-  }
-
   /** Describes the content type of the module. */
   public enum ModuleType {
     FEATURE_MODULE,
@@ -151,48 +142,14 @@ public abstract class BundleModule {
   }
 
   public ModuleDeliveryType getDeliveryType() {
-    if (getAndroidManifest().getManifestDeliveryElement().isPresent()) {
-      ManifestDeliveryElement manifestDeliveryElement =
-          getAndroidManifest().getManifestDeliveryElement().get();
-      if (manifestDeliveryElement.hasInstallTimeElement()) {
-        return manifestDeliveryElement.hasModuleConditions()
-            ? CONDITIONAL_INITIAL_INSTALL
-            : ALWAYS_INITIAL_INSTALL;
-      } else {
-        return NO_INITIAL_INSTALL;
-      }
-    }
-
-    // Handling legacy on-demand attribute value.
-    if (getAndroidManifest()
-        .getOnDemandAttribute()
-        .map(XmlProtoAttribute::getValueAsBoolean)
-        .orElse(false)) {
-      return NO_INITIAL_INSTALL;
-    }
-
-    // Legacy onDemand attribute is equal to false or for base module: no delivery information.
-    return ALWAYS_INITIAL_INSTALL;
+    return getAndroidManifest().getModuleDeliveryType();
   }
 
   public Optional<ModuleDeliveryType> getInstantDeliveryType() {
     if (!isInstantModule()) {
       return Optional.empty();
     }
-    if (getAndroidManifest().getInstantManifestDeliveryElement().isPresent()) {
-      ManifestDeliveryElement instantManifestDeliveryElement =
-          getAndroidManifest().getInstantManifestDeliveryElement().get();
-      if (instantManifestDeliveryElement.hasInstallTimeElement()) {
-        return instantManifestDeliveryElement.hasModuleConditions()
-            ? Optional.of(CONDITIONAL_INITIAL_INSTALL)
-            : Optional.of(ALWAYS_INITIAL_INSTALL);
-      } else {
-        return Optional.of(NO_INITIAL_INSTALL);
-      }
-    }
-
-    // Handling dist:instant attribute value.
-    return Optional.of(NO_INITIAL_INSTALL);
+    return Optional.of(getAndroidManifest().getInstantModuleDeliveryType());
   }
 
   public ModuleType getModuleType() {
@@ -362,8 +319,6 @@ public abstract class BundleModule {
      *
      * <p>Certain files (eg. AndroidManifest.xml and several module meta-data files) are immediately
      * parsed and stored in dedicated class fields instead of as entries.
-     *
-     * @throws IOException when the entry cannot be read or has invalid contents
      */
     public Builder addEntry(ModuleEntry moduleEntry) {
       Optional<SpecialModuleEntry> specialEntry =

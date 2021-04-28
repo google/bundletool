@@ -17,20 +17,17 @@
 package com.android.tools.build.bundletool.model;
 
 import static com.android.tools.build.bundletool.model.AndroidManifest.MODULE_TYPE_FEATURE_VALUE;
-import static com.android.tools.build.bundletool.model.BundleModule.ModuleDeliveryType.ALWAYS_INITIAL_INSTALL;
-import static com.android.tools.build.bundletool.model.BundleModule.ModuleDeliveryType.NO_INITIAL_INSTALL;
+import static com.android.tools.build.bundletool.model.ModuleDeliveryType.ALWAYS_INITIAL_INSTALL;
+import static com.android.tools.build.bundletool.model.ModuleDeliveryType.NO_INITIAL_INSTALL;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifest;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifestForAssetModule;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withFeatureCondition;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withFusingAttribute;
-import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withInstallTimeDelivery;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withInstant;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withInstantInstallTimeDelivery;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withInstantOnDemandDelivery;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withMinSdkCondition;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withMinSdkVersion;
-import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withOnDemandAttribute;
-import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withOnDemandDelivery;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withSplitId;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withTypeAttribute;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withUsesSplit;
@@ -55,24 +52,16 @@ import com.android.bundle.Files.TargetedApexImage;
 import com.android.bundle.Files.TargetedAssetsDirectory;
 import com.android.bundle.Files.TargetedNativeDirectory;
 import com.android.bundle.Targeting.ModuleTargeting;
-import com.android.tools.build.bundletool.model.BundleModule.ModuleDeliveryType;
 import com.android.tools.build.bundletool.model.BundleModule.ModuleType;
 import com.android.tools.build.bundletool.testing.BundleConfigBuilder;
 import java.io.UncheckedIOException;
 import java.util.Arrays;
-import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
-import org.mockito.MockitoAnnotations;
 
 @RunWith(JUnit4.class)
 public class BundleModuleTest {
-
-  @Before
-  public void setUp() {
-    MockitoAnnotations.initMocks(this);
-  }
 
   private static final BundleConfig DEFAULT_BUNDLE_CONFIG = BundleConfigBuilder.create().build();
   private static final byte[] DUMMY_CONTENT = new byte[0];
@@ -364,69 +353,6 @@ public class BundleModuleTest {
             mergeModuleTargeting(
                 moduleFeatureTargeting("com.android.hardware.feature"),
                 moduleMinSdkVersionTargeting(/* minSdkVersion= */ 24)));
-  }
-
-  @Test
-  public void getDeliveryType_noConfig() throws Exception {
-    BundleModule bundleModule =
-        createMinimalModuleBuilder()
-            .setAndroidManifestProto(androidManifest("com.test.app"))
-            .build();
-
-    assertThat(bundleModule.getDeliveryType()).isEqualTo(ModuleDeliveryType.ALWAYS_INITIAL_INSTALL);
-  }
-
-  @Test
-  public void getDeliveryType_legacy_onDemandTrue() throws Exception {
-    BundleModule bundleModule =
-        createMinimalModuleBuilder()
-            .setAndroidManifestProto(androidManifest("com.test.app", withOnDemandAttribute(true)))
-            .build();
-
-    assertThat(bundleModule.getDeliveryType()).isEqualTo(ModuleDeliveryType.NO_INITIAL_INSTALL);
-  }
-
-  @Test
-  public void getdeliveryType_legacy_onDemandFalse() throws Exception {
-    BundleModule bundleModule =
-        createMinimalModuleBuilder()
-            .setAndroidManifestProto(androidManifest("com.test.app", withOnDemandAttribute(false)))
-            .build();
-
-    assertThat(bundleModule.getDeliveryType()).isEqualTo(ModuleDeliveryType.ALWAYS_INITIAL_INSTALL);
-  }
-
-  @Test
-  public void getdeliveryType_onDemandElement_only() throws Exception {
-    BundleModule bundleModule =
-        createMinimalModuleBuilder()
-            .setAndroidManifestProto(androidManifest("com.test.app", withOnDemandDelivery()))
-            .build();
-
-    assertThat(bundleModule.getDeliveryType()).isEqualTo(ModuleDeliveryType.NO_INITIAL_INSTALL);
-  }
-
-  @Test
-  public void getdeliveryType_onDemandElement_andConditions() throws Exception {
-    BundleModule bundleModule =
-        createMinimalModuleBuilder()
-            .setAndroidManifestProto(
-                androidManifest("com.test.app", withOnDemandDelivery(), withMinSdkCondition(21)))
-            .build();
-
-    assertThat(bundleModule.getDeliveryType())
-        .isEqualTo(ModuleDeliveryType.CONDITIONAL_INITIAL_INSTALL);
-  }
-
-  @Test
-  public void getdeliveryType_installTimeElement_noConditions() throws Exception {
-    BundleModule bundleModule =
-        createMinimalModuleBuilder()
-            .setAndroidManifestProto(
-                androidManifest("com.test.app", withInstallTimeDelivery(), withOnDemandDelivery()))
-            .build();
-
-    assertThat(bundleModule.getDeliveryType()).isEqualTo(ModuleDeliveryType.ALWAYS_INITIAL_INSTALL);
   }
 
   @Test

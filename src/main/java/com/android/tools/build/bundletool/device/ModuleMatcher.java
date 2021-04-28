@@ -33,9 +33,11 @@ public class ModuleMatcher {
   public ModuleMatcher(
       SdkVersionMatcher sdkVersionMatcher,
       DeviceFeatureMatcher deviceFeatureMatcher,
-      OpenGlFeatureMatcher openGlFeatureMatcher) {
+      OpenGlFeatureMatcher openGlFeatureMatcher,
+      DeviceTierModuleMatcher deviceTierModuleMatcher) {
     this.moduleMatchers =
-        ImmutableList.of(sdkVersionMatcher, deviceFeatureMatcher, openGlFeatureMatcher);
+        ImmutableList.of(
+            sdkVersionMatcher, deviceFeatureMatcher, openGlFeatureMatcher, deviceTierModuleMatcher);
   }
 
   @VisibleForTesting
@@ -43,7 +45,8 @@ public class ModuleMatcher {
     this(
         new SdkVersionMatcher(deviceSpec),
         new DeviceFeatureMatcher(deviceSpec),
-        new OpenGlFeatureMatcher(deviceSpec));
+        new OpenGlFeatureMatcher(deviceSpec),
+        new DeviceTierModuleMatcher(deviceSpec));
   }
 
   /**

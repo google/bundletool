@@ -31,8 +31,9 @@ import static com.google.common.collect.ImmutableSet.toImmutableSet;
 import static java.util.Comparator.comparing;
 
 import com.android.bundle.Config.BundleConfig;
+import com.android.bundle.Config.ResourceOptimizations.SparseEncoding;
+import com.android.tools.build.bundletool.androidtools.Aapt2Command;
 import com.android.tools.build.bundletool.commands.BuildApksManagerComponent.UseBundleCompression;
-import com.android.tools.build.bundletool.model.Aapt2Command;
 import com.android.tools.build.bundletool.model.BundleModule.SpecialModuleEntry;
 import com.android.tools.build.bundletool.model.CompressionLevel;
 import com.android.tools.build.bundletool.model.ModuleEntry;
@@ -68,6 +69,7 @@ final class ZipFlingerApkSerializerHelper extends ApkSerializerHelper {
   private final ApkSigner apkSigner;
   private final Aapt2Command aapt2;
   private final Version bundletoolVersion;
+  private final boolean enableSparseEncoding;
 
   /**
    * Whether to re-use the compression of the entries in the App Bundle.
@@ -91,6 +93,12 @@ final class ZipFlingerApkSerializerHelper extends ApkSerializerHelper {
     this.bundletoolVersion = bundletoolVersion;
     this.apkSigner = apkSigner;
     this.useBundleCompression = useBundleCompression;
+    this.enableSparseEncoding =
+        bundleConfig
+            .getOptimizations()
+            .getResourceOptimizations()
+            .getSparseEncoding()
+            .equals(SparseEncoding.ENFORCED);
   }
 
   @Override
@@ -116,7 +124,13 @@ final class ZipFlingerApkSerializerHelper extends ApkSerializerHelper {
 
     // Invoke aapt2 to convert files from proto to binary format.
     Path binaryApkPath = tempDir.getPath().resolve("binary.apk");
-    aapt2.convertApkProtoToBinary(partialProtoApk, binaryApkPath);
+    if (enableSparseEncoding) {
+      Path interimApk = tempDir.getPath().resolve("interim.apk");
+      aapt2.convertApkProtoToBinary(partialProtoApk, interimApk);
+      aapt2.optimizeToSparseResourceTables(interimApk, binaryApkPath);
+    } else {
+      aapt2.convertApkProtoToBinary(partialProtoApk, binaryApkPath);
+    }
     checkState(Files.exists(binaryApkPath), "No APK created by aapt2 convert command.");
 
     CompressionManager compressionManager = new CompressionManager(split, bundleConfig);

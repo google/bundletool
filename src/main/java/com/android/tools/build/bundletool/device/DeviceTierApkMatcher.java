@@ -27,13 +27,13 @@ import com.google.common.collect.Sets;
 import com.google.common.collect.Sets.SetView;
 
 /**
- * A {@link TargetingDimensionMatcher} that provides matching on device tier.
+ * A {@link TargetingDimensionMatcher} that provides APK matching on device tier.
  *
  * <p>Device tier is an artificial concept and it is explicitly defined in the {@link DeviceSpec}.
  */
-public class DeviceTierMatcher extends TargetingDimensionMatcher<DeviceTierTargeting> {
+public class DeviceTierApkMatcher extends TargetingDimensionMatcher<DeviceTierTargeting> {
 
-  public DeviceTierMatcher(DeviceSpec deviceSpec) {
+  public DeviceTierApkMatcher(DeviceSpec deviceSpec) {
     super(deviceSpec);
   }
 

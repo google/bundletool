@@ -35,6 +35,7 @@ import static com.android.tools.build.bundletool.model.SourceStamp.STAMP_TYPE_ME
 import static com.android.tools.build.bundletool.model.utils.Versions.ANDROID_L_API_VERSION;
 import static com.android.tools.build.bundletool.model.utils.Versions.ANDROID_M_API_VERSION;
 import static com.android.tools.build.bundletool.model.utils.Versions.ANDROID_Q_API_VERSION;
+import static com.android.tools.build.bundletool.model.utils.Versions.ANDROID_R_API_VERSION;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifest;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.clearApplication;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withInstant;
@@ -106,6 +107,7 @@ import com.android.bundle.Targeting.ApkTargeting;
 import com.android.bundle.Targeting.ScreenDensity.DensityAlias;
 import com.android.bundle.Targeting.VariantTargeting;
 import com.android.tools.build.bundletool.model.AndroidManifest;
+import com.android.tools.build.bundletool.model.BundleMetadata;
 import com.android.tools.build.bundletool.model.BundleModule;
 import com.android.tools.build.bundletool.model.BundleModuleName;
 import com.android.tools.build.bundletool.model.ModuleEntry;
@@ -144,6 +146,8 @@ public class ModuleSplitterTest {
 
   private static final Version BUNDLETOOL_VERSION = BundleToolVersion.getCurrentVersion();
 
+  private static final BundleMetadata BUNDLE_METADATA = BundleMetadata.builder().build();
+
   @Test
   public void minSdkVersionInOutputTargeting_getsSetToL() throws Exception {
     BundleModule bundleModule =
@@ -170,7 +174,10 @@ public class ModuleSplitterTest {
         ModuleSplitter.createNoStamp(
                 testModule,
                 BUNDLETOOL_VERSION,
-                ApkGenerationConfiguration.builder().setRestrictV3SigningToRPlus(true).build(),
+                BUNDLE_METADATA,
+                ApkGenerationConfiguration.builder()
+                    .setMinimumV3SigningApiVersion(Optional.of(ANDROID_R_API_VERSION))
+                    .build(),
                 variantMinSdkTargeting(Versions.ANDROID_R_API_VERSION),
                 ImmutableSet.of("testModule"))
             .splitModule();
@@ -189,7 +196,10 @@ public class ModuleSplitterTest {
         ModuleSplitter.createNoStamp(
                 testModule,
                 BUNDLETOOL_VERSION,
-                ApkGenerationConfiguration.builder().setRestrictV3SigningToRPlus(true).build(),
+                BUNDLE_METADATA,
+                ApkGenerationConfiguration.builder()
+                    .setMinimumV3SigningApiVersion(Optional.of(ANDROID_R_API_VERSION))
+                    .build(),
                 VariantTargeting.getDefaultInstance(),
                 ImmutableSet.of("testModule"))
             .splitModule();
@@ -208,6 +218,7 @@ public class ModuleSplitterTest {
         ModuleSplitter.createNoStamp(
                 testModule,
                 BUNDLETOOL_VERSION,
+                BUNDLE_METADATA,
                 ApkGenerationConfiguration.getDefaultInstance(),
                 variantMinSdkTargeting(Versions.ANDROID_R_API_VERSION),
                 ImmutableSet.of("testModule"))
@@ -804,6 +815,7 @@ public class ModuleSplitterTest {
         ModuleSplitter.createNoStamp(
             testModule,
             BUNDLETOOL_VERSION,
+            BUNDLE_METADATA,
             ApkGenerationConfiguration.builder()
                 .setOptimizationDimensions(ImmutableSet.of(ABI))
                 .setEnableUncompressedNativeLibraries(true)
@@ -842,6 +854,7 @@ public class ModuleSplitterTest {
         ModuleSplitter.createNoStamp(
             testModule,
             BUNDLETOOL_VERSION,
+            BUNDLE_METADATA,
             ApkGenerationConfiguration.builder()
                 .setOptimizationDimensions(ImmutableSet.of(ABI))
                 .setEnableUncompressedNativeLibraries(true)
@@ -879,6 +892,7 @@ public class ModuleSplitterTest {
         ModuleSplitter.createNoStamp(
             testModule,
             BUNDLETOOL_VERSION,
+            BUNDLE_METADATA,
             ApkGenerationConfiguration.builder()
                 .setOptimizationDimensions(ImmutableSet.of(ABI))
                 .setEnableUncompressedNativeLibraries(false)
@@ -1054,6 +1068,7 @@ public class ModuleSplitterTest {
         ModuleSplitter.createNoStamp(
             testModule,
             BUNDLETOOL_VERSION,
+            BUNDLE_METADATA,
             ApkGenerationConfiguration.builder().setEnableDexCompressionSplitter(true).build(),
             variantMinSdkTargeting(ANDROID_Q_API_VERSION),
             ImmutableSet.of("testModule"));
@@ -1079,6 +1094,7 @@ public class ModuleSplitterTest {
         ModuleSplitter.createNoStamp(
             testModule,
             BUNDLETOOL_VERSION,
+            BUNDLE_METADATA,
             ApkGenerationConfiguration.builder().setEnableDexCompressionSplitter(true).build(),
             lPlusVariantTargeting(),
             ImmutableSet.of("testModule"));
@@ -1432,6 +1448,7 @@ public class ModuleSplitterTest {
         ModuleSplitter.createNoStamp(
                 bundleModule,
                 BUNDLETOOL_VERSION,
+                BUNDLE_METADATA,
                 ApkGenerationConfiguration.builder().setForInstantAppVariants(true).build(),
                 lPlusVariantTargeting(),
                 ImmutableSet.of("testModule"))
@@ -1492,6 +1509,7 @@ public class ModuleSplitterTest {
         ModuleSplitter.createNoStamp(
                 bundleModule,
                 BUNDLETOOL_VERSION,
+                BUNDLE_METADATA,
                 ApkGenerationConfiguration.builder().setForInstantAppVariants(true).build(),
                 lPlusVariantTargeting(),
                 ImmutableSet.of())
@@ -1526,6 +1544,7 @@ public class ModuleSplitterTest {
         ModuleSplitter.createNoStamp(
                 bundleModule,
                 BUNDLETOOL_VERSION,
+                BUNDLE_METADATA,
                 ApkGenerationConfiguration.builder().setForInstantAppVariants(true).build(),
                 lPlusVariantTargeting(),
                 ImmutableSet.of("testModule"))
@@ -1552,6 +1571,7 @@ public class ModuleSplitterTest {
         ModuleSplitter.createNoStamp(
                 bundleModule,
                 BUNDLETOOL_VERSION,
+                BUNDLE_METADATA,
                 ApkGenerationConfiguration.builder().setForInstantAppVariants(true).build(),
                 lPlusVariantTargeting(),
                 ImmutableSet.of("testModule"))
@@ -1578,6 +1598,7 @@ public class ModuleSplitterTest {
         ModuleSplitter.createNoStamp(
                 bundleModule,
                 BUNDLETOOL_VERSION,
+                BUNDLE_METADATA,
                 ApkGenerationConfiguration.builder().setForInstantAppVariants(true).build(),
                 lPlusVariantTargeting(),
                 ImmutableSet.of("testModule"))
@@ -1656,6 +1677,7 @@ public class ModuleSplitterTest {
         ModuleSplitter.createNoStamp(
             baseModule,
             BUNDLETOOL_VERSION,
+            BUNDLE_METADATA,
             ApkGenerationConfiguration.builder()
                 .setAbisForPlaceholderLibs(
                     ImmutableSet.of(toAbi(AbiAlias.X86), toAbi(AbiAlias.ARM64_V8A)))
@@ -1684,6 +1706,7 @@ public class ModuleSplitterTest {
         ModuleSplitter.createNoStamp(
             baseModule,
             BUNDLETOOL_VERSION,
+            BUNDLE_METADATA,
             ApkGenerationConfiguration.builder()
                 .setAbisForPlaceholderLibs(
                     ImmutableSet.of(toAbi(AbiAlias.X86), toAbi(AbiAlias.ARM64_V8A)))
@@ -1728,6 +1751,7 @@ public class ModuleSplitterTest {
         ModuleSplitter.createNoStamp(
             baseModule,
             BUNDLETOOL_VERSION,
+            BUNDLE_METADATA,
             ApkGenerationConfiguration.builder()
                 .setOptimizationDimensions(ImmutableSet.of(LANGUAGE))
                 .setMasterPinnedResourceIds(ImmutableSet.of(ResourceId.create(0x7f010001)))
@@ -1789,6 +1813,7 @@ public class ModuleSplitterTest {
         ModuleSplitter.createNoStamp(
             baseModule,
             BUNDLETOOL_VERSION,
+            BUNDLE_METADATA,
             ApkGenerationConfiguration.builder()
                 .setOptimizationDimensions(ImmutableSet.of(LANGUAGE))
                 .setMasterPinnedResourceNames(ImmutableSet.of("welcome_label"))
@@ -1846,6 +1871,7 @@ public class ModuleSplitterTest {
         ModuleSplitter.createNoStamp(
             baseModule,
             BUNDLETOOL_VERSION,
+            BUNDLE_METADATA,
             ApkGenerationConfiguration.builder()
                 .setOptimizationDimensions(ImmutableSet.of(LANGUAGE))
                 .setBaseManifestReachableResources(ImmutableSet.of(ResourceId.create(0x7f010001)))
@@ -1901,6 +1927,7 @@ public class ModuleSplitterTest {
         ModuleSplitter.createNoStamp(
             baseModule,
             BUNDLETOOL_VERSION,
+            BUNDLE_METADATA,
             ApkGenerationConfiguration.builder()
                 .setOptimizationDimensions(ImmutableSet.of(LANGUAGE))
                 .setBaseManifestReachableResources(ImmutableSet.of(ResourceId.create(0x7f010001)))
@@ -1934,6 +1961,7 @@ public class ModuleSplitterTest {
         ModuleSplitter.create(
             bundleModule,
             BUNDLETOOL_VERSION,
+            BUNDLE_METADATA,
             ApkGenerationConfiguration.getDefaultInstance(),
             lPlusVariantTargeting(),
             ImmutableSet.of("base"),
@@ -1967,6 +1995,7 @@ public class ModuleSplitterTest {
         ModuleSplitter.create(
             testModule,
             BUNDLETOOL_VERSION,
+            BUNDLE_METADATA,
             ApkGenerationConfiguration.builder()
                 .setOptimizationDimensions(ImmutableSet.of(ABI))
                 .setEnableUncompressedNativeLibraries(true)
@@ -1989,6 +2018,30 @@ public class ModuleSplitterTest {
     assertThat(x86Split.getAndroidManifest().getMetadataValue(STAMP_SOURCE_METADATA_KEY)).isEmpty();
   }
 
+  @Test
+  public void pinSpecIsCopied() {
+    NativeLibraries nativeConfig =
+        nativeLibraries(targetedNativeDirectory("lib/x86", nativeDirectoryTargeting("x86")));
+    BundleModule testModule =
+        new BundleModuleBuilder("testModule")
+            .setManifest(androidManifest("com.test.app"))
+            .setNativeConfig(nativeConfig)
+            .addFile("lib/x86/liba.so")
+            .addFile("assets/com.android.hints.pins.txt")
+            .build();
+    ImmutableList<ModuleSplit> splits = createAbiAndDensitySplitter(testModule).splitModule();
+    assertThat(splits).hasSize(2);
+    assertThat(
+            splits.stream()
+                .map(
+                    (s) ->
+                        s.getEntries().stream()
+                            .filter((e) -> e.getPath().endsWith(PinSpecInjector.PIN_SPEC_NAME))
+                            .count())
+                .distinct())
+        .containsExactly(1L);
+  }
+
   private ModuleSplit checkAndReturnTheOnlyMasterSplit(List<ModuleSplit> splits) {
     int masterSplitsFound = 0;
     ModuleSplit masterSplit = null;
@@ -2006,6 +2059,7 @@ public class ModuleSplitterTest {
     return ModuleSplitter.createNoStamp(
         module,
         BUNDLETOOL_VERSION,
+        BUNDLE_METADATA,
         withTcfSuffixStripping(
             withOptimizationDimensions(ImmutableSet.of(TEXTURE_COMPRESSION_FORMAT))),
         lPlusVariantTargeting(),
@@ -2016,6 +2070,7 @@ public class ModuleSplitterTest {
     return ModuleSplitter.createNoStamp(
         module,
         BUNDLETOOL_VERSION,
+        BUNDLE_METADATA,
         withOptimizationDimensions(ImmutableSet.of(DEVICE_TIER)),
         lPlusVariantTargeting(),
         ImmutableSet.of(module.getName().getName()));
@@ -2025,6 +2080,7 @@ public class ModuleSplitterTest {
     return ModuleSplitter.createNoStamp(
         module,
         BUNDLETOOL_VERSION,
+        BUNDLE_METADATA,
         withOptimizationDimensions(ImmutableSet.of(ABI, SCREEN_DENSITY)),
         lPlusVariantTargeting(),
         ImmutableSet.of(module.getName().getName()));
@@ -2034,6 +2090,7 @@ public class ModuleSplitterTest {
     return ModuleSplitter.createNoStamp(
         module,
         BUNDLETOOL_VERSION,
+        BUNDLE_METADATA,
         withOptimizationDimensions(ImmutableSet.of(ABI, SCREEN_DENSITY, LANGUAGE)),
         lPlusVariantTargeting(),
         ImmutableSet.of(module.getName().getName()));

@@ -34,6 +34,7 @@ import com.android.apksig.apk.ApkFormatException;
 import com.android.apksig.util.DataSource;
 import com.android.apksig.util.DataSources;
 import com.android.bundle.Devices.DeviceSpec;
+import com.android.tools.build.bundletool.androidtools.Aapt2Command;
 import com.android.tools.build.bundletool.commands.CommandHelp.CommandDescription;
 import com.android.tools.build.bundletool.commands.CommandHelp.FlagDescription;
 import com.android.tools.build.bundletool.device.AdbServer;
@@ -42,7 +43,6 @@ import com.android.tools.build.bundletool.flags.Flag;
 import com.android.tools.build.bundletool.flags.ParsedFlags;
 import com.android.tools.build.bundletool.io.TempDirectory;
 import com.android.tools.build.bundletool.io.ZipReader;
-import com.android.tools.build.bundletool.model.Aapt2Command;
 import com.android.tools.build.bundletool.model.ApkListener;
 import com.android.tools.build.bundletool.model.ApkModifier;
 import com.android.tools.build.bundletool.model.AppBundle;
@@ -162,6 +162,8 @@ public abstract class BuildApksCommand {
   private static final Flag<String> KEY_ALIAS_FLAG = Flag.string("ks-key-alias");
   private static final Flag<Password> KEYSTORE_PASSWORD_FLAG = Flag.password("ks-pass");
   private static final Flag<Password> KEY_PASSWORD_FLAG = Flag.password("key-pass");
+  private static final Flag<Integer> MINIMUM_V3_SIGNING_API_VERSION_FLAG =
+      Flag.positiveInteger("min-v3-signing-api-version");
 
   // SourceStamp-related flags.
   private static final Flag<Boolean> CREATE_STAMP_FLAG = Flag.booleanFlag("create-stamp");
@@ -885,6 +887,15 @@ public abstract class BuildApksCommand {
                 .build())
         .addFlag(
             FlagDescription.builder()
+                .setFlagName(MINIMUM_V3_SIGNING_API_VERSION_FLAG.getName())
+                .setExampleValue("30")
+                .setOptional(true)
+                .setDescription(
+                    "The minimum API version for signing the generated APKs using V3 signature"
+                        + " scheme.")
+                .build())
+        .addFlag(
+            FlagDescription.builder()
                 .setFlagName(CONNECTED_DEVICE_FLAG.getName())
                 .setOptional(true)
                 .setDescription(
@@ -1053,13 +1064,16 @@ public abstract class BuildApksCommand {
     Optional<String> keyAlias = KEY_ALIAS_FLAG.getValue(flags);
     Optional<Password> keystorePassword = KEYSTORE_PASSWORD_FLAG.getValue(flags);
     Optional<Password> keyPassword = KEY_PASSWORD_FLAG.getValue(flags);
+    Optional<Integer> minV3SigningApi = MINIMUM_V3_SIGNING_API_VERSION_FLAG.getValue(flags);
 
     if (keystorePath.isPresent() && keyAlias.isPresent()) {
       SignerConfig signerConfig =
           SignerConfig.extractFromKeystore(
               keystorePath.get(), keyAlias.get(), keystorePassword, keyPassword);
       SigningConfiguration.Builder builder =
-          SigningConfiguration.builder().setSignerConfig(signerConfig);
+          SigningConfiguration.builder()
+              .setSignerConfig(signerConfig)
+              .setMinimumV3SigningApiVersion(minV3SigningApi);
       buildApksCommand.setSigningConfiguration(builder.build());
     } else if (keystorePath.isPresent() && !keyAlias.isPresent()) {
       throw InvalidCommandException.builder()

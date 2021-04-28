@@ -19,6 +19,7 @@ package com.android.tools.build.bundletool.model;
 import static com.google.common.base.Preconditions.checkArgument;
 
 import com.google.auto.value.AutoValue;
+import com.google.auto.value.extension.memoized.Memoized;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.io.ByteSource;
 import com.google.errorprone.annotations.Immutable;
@@ -41,12 +42,16 @@ public abstract class BundleMetadata {
 
   public static final String PROGUARD_MAP_FILE_NAME = "proguard.map";
 
+  public static final String TRANSPARENCY_FILE_NAME = "code_transparency.json";
+
   /**
    * Returns the raw metadata map.
    *
    * <p>Keys are in format {@code <namespaced-dir>/<file-name>}.
    */
   public abstract ImmutableMap<ZipPath, ByteSource> getFileContentMap();
+
+  public abstract Builder toBuilder();
 
   public static Builder builder() {
     return new AutoValue_BundleMetadata.Builder();
@@ -55,6 +60,21 @@ public abstract class BundleMetadata {
   /** Gets contents of metadata file {@code <namespaced-dir>/<file-name>}, if it exists. */
   public Optional<ByteSource> getFileAsByteSource(String namespacedDir, String fileName) {
     return Optional.ofNullable(getFileContentMap().get(toMetadataPath(namespacedDir, fileName)));
+  }
+
+  @Memoized
+  public Optional<ModuleEntry> getModuleEntryForTransparencyFile() {
+    return getFileAsByteSource(BUNDLETOOL_NAMESPACE, TRANSPARENCY_FILE_NAME)
+        .map(
+            transparencyFileContent ->
+                ModuleEntry.builder()
+                    .setContent(transparencyFileContent)
+                    .setBundlePath(
+                        ZipPath.create("BUNDLE-METADATA")
+                            .resolve(BUNDLETOOL_NAMESPACE)
+                            .resolve(TRANSPARENCY_FILE_NAME))
+                    .setPath(ZipPath.create("META-INF").resolve(TRANSPARENCY_FILE_NAME))
+                    .build());
   }
 
   /** Converts the arguments to a valid key for {@link #getFileContentMap()}. */

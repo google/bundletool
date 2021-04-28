@@ -93,7 +93,8 @@ public class ApkMatcher {
     OpenGlFeatureMatcher openGlFeatureMatcher = new OpenGlFeatureMatcher(deviceSpec);
     TextureCompressionFormatMatcher textureCompressionFormatMatcher =
         new TextureCompressionFormatMatcher(deviceSpec);
-    DeviceTierMatcher deviceTierMatcher = new DeviceTierMatcher(deviceSpec);
+    DeviceTierApkMatcher deviceTierApkMatcher = new DeviceTierApkMatcher(deviceSpec);
+    DeviceTierModuleMatcher deviceTierModuleMatcher = new DeviceTierModuleMatcher(deviceSpec);
 
     this.apkMatchers =
         ImmutableList.of(
@@ -103,12 +104,13 @@ public class ApkMatcher {
             screenDensityMatcher,
             languageMatcher,
             textureCompressionFormatMatcher,
-            deviceTierMatcher);
+            deviceTierApkMatcher);
     this.requestedModuleNames = requestedModuleNames;
     this.matchInstant = matchInstant;
     this.ensureDensityAndAbiApksMatched = ensureDensityAndAbiApksMatched;
     this.moduleMatcher =
-        new ModuleMatcher(sdkVersionMatcher, deviceFeatureMatcher, openGlFeatureMatcher);
+        new ModuleMatcher(
+            sdkVersionMatcher, deviceFeatureMatcher, openGlFeatureMatcher, deviceTierModuleMatcher);
     this.variantMatcher =
         new VariantMatcher(
             sdkVersionMatcher,

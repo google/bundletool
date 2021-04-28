@@ -15,10 +15,10 @@
  */
 package com.android.tools.build.bundletool.commands;
 
+import com.android.tools.build.bundletool.androidtools.Aapt2Command;
 import com.android.tools.build.bundletool.io.TempDirectory;
 import com.android.tools.build.bundletool.mergers.D8DexMerger;
 import com.android.tools.build.bundletool.mergers.DexMerger;
-import com.android.tools.build.bundletool.model.Aapt2Command;
 import dagger.Binds;
 import dagger.Module;
 import dagger.Provides;

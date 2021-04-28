@@ -37,7 +37,14 @@ public abstract class SigningConfiguration {
 
   public abstract SignerConfig getSignerConfig();
 
-  public abstract boolean getRestrictV3SigningToRPlus();
+  /**
+   * Returns the minimum required platform API version for which v3 signing/rotation should be
+   * performed.
+   *
+   * <p>Returns {@link Optional#empty()} if there is no minimum, meaning rotation can occur in all
+   * platforms levels, if specified.
+   */
+  public abstract Optional<Integer> getMinimumV3SigningApiVersion();
 
 
   public SignerConfig getSignerConfigForV1AndV2() {
@@ -48,7 +55,7 @@ public abstract class SigningConfiguration {
   public abstract Builder toBuilder();
 
   public static Builder builder() {
-    return new AutoValue_SigningConfiguration.Builder().setRestrictV3SigningToRPlus(false);
+    return new AutoValue_SigningConfiguration.Builder();
   }
 
   /** Builder of {@link SigningConfiguration} instances. */
@@ -69,8 +76,9 @@ public abstract class SigningConfiguration {
           SignerConfig.builder().setPrivateKey(privateKey).setCertificates(certificates).build());
     }
 
-    /** Sets whether v3 signing should be restricted to R+ variant targeting. */
-    public abstract Builder setRestrictV3SigningToRPlus(boolean restrictV3SigningToRPlus);
+    /** Sets whether v3 signing should be restricted to an API level, if any. */
+    public abstract Builder setMinimumV3SigningApiVersion(
+        Optional<Integer> minimumV3SigningApiVersion);
 
 
     abstract SigningConfiguration autoBuild();

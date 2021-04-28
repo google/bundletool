@@ -35,10 +35,19 @@ public class PackagesParserTest {
 
   @Test
   public void listPackagesOutput() {
-    assertThat(new PackagesParser().parse(LIST_PACKAGES_OUTPUT))
+    assertThat(new PackagesParser(/* isApex= */ false).parse(LIST_PACKAGES_OUTPUT))
         .containsExactly(
-            InstalledPackageInfo.create("com.android.bluetooth", 123),
-            InstalledPackageInfo.create("com.android.providers.contacts", 4),
-            InstalledPackageInfo.create("com.android.theme.icon.roundedrect", 56));
+            InstalledPackageInfo.create("com.android.bluetooth", 123, false),
+            InstalledPackageInfo.create("com.android.providers.contacts", 4, false),
+            InstalledPackageInfo.create("com.android.theme.icon.roundedrect", 56, false));
+  }
+
+  @Test
+  public void listApexPackagesOutput() {
+    assertThat(new PackagesParser(/* isApex= */ true).parse(LIST_PACKAGES_OUTPUT))
+        .containsExactly(
+            InstalledPackageInfo.create("com.android.bluetooth", 123, true),
+            InstalledPackageInfo.create("com.android.providers.contacts", 4, true),
+            InstalledPackageInfo.create("com.android.theme.icon.roundedrect", 56, true));
   }
 }

@@ -59,6 +59,7 @@ import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.andr
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withAppIcon;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withCustomThemeActivity;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withDelivery;
+import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withDeviceTiersCondition;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withFusingAttribute;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withInstallLocation;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withInstallTimeDelivery;
@@ -90,6 +91,7 @@ import static com.android.tools.build.bundletool.testing.TargetingUtils.assetsDi
 import static com.android.tools.build.bundletool.testing.TargetingUtils.deviceTierTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.languageTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.mergeVariantTargeting;
+import static com.android.tools.build.bundletool.testing.TargetingUtils.moduleDeviceTiersTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.nativeDirectoryTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.nativeLibraries;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.sdkVersionFrom;
@@ -4669,6 +4671,46 @@ public class BuildApksManagerTest {
             deviceTierTargeting(
                 /* value= */ "low", /* alternatives= */ ImmutableList.of("medium")));
     assertThat(filesInApk(lowTierSplit, apkSetFile)).contains("assets/images#tier_low/image.jpg");
+  }
+
+  @Test
+  public void deviceTieredConditionalModule() throws Exception {
+    AppBundle appBundle =
+        new AppBundleBuilder()
+            .addModule(
+                "base",
+                builder ->
+                    builder
+                        .setManifest(androidManifest("com.test"))
+                        .setResourceTable(resourceTableWithTestLabel("Test feature")))
+            .addModule(
+                "device_tier_feature",
+                builder ->
+                    builder.setManifest(
+                        androidManifest(
+                            "com.test",
+                            withTitle("@string/test_label", TEST_LABEL_RESOURCE_ID),
+                            withFusingAttribute(false),
+                            withDeviceTiersCondition(ImmutableList.of("medium", "high")))))
+            .build();
+
+    TestComponent.useTestModule(
+        this, TestModule.builder().withAppBundle(appBundle).withOutputPath(outputFilePath).build());
+
+    buildApksManager.execute();
+
+    ZipFile apkSetFile = openZipFile(outputFilePath.toFile());
+    BuildApksResult result = extractTocFromApkSetFile(apkSetFile, outputDir);
+
+    ModuleMetadata deviceTierModule =
+        result.getVariantList().stream()
+            .flatMap(variant -> variant.getApkSetList().stream())
+            .map(ApkSet::getModuleMetadata)
+            .filter(moduleMetadata -> moduleMetadata.getName().equals("device_tier_feature"))
+            .distinct()
+            .collect(onlyElement());
+    assertThat(deviceTierModule.getTargeting())
+        .isEqualTo(moduleDeviceTiersTargeting("medium", "high"));
   }
 
   @Test

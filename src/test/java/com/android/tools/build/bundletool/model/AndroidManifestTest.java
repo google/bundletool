@@ -29,12 +29,15 @@ import static com.android.tools.build.bundletool.model.AndroidManifest.VERSION_C
 import static com.android.tools.build.bundletool.model.AndroidManifest.VERSION_NAME_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.BundleModule.ModuleType.ASSET_MODULE;
 import static com.android.tools.build.bundletool.model.BundleModule.ModuleType.FEATURE_MODULE;
+import static com.android.tools.build.bundletool.model.ModuleDeliveryType.ALWAYS_INITIAL_INSTALL;
+import static com.android.tools.build.bundletool.model.ModuleDeliveryType.NO_INITIAL_INSTALL;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifest;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifestForAssetModule;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withCustomThemeActivity;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withFastFollowDelivery;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withFusingAttribute;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withInstallTimeDelivery;
+import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withInstant;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withInstantInstallTimeDelivery;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withInstantOnDemandDelivery;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withLegacyFusingAttribute;
@@ -46,6 +49,7 @@ import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.with
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withNativeActivity;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withOnDemandAttribute;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withOnDemandDelivery;
+import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withSharedUserId;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withTargetSandboxVersion;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withTypeAttribute;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withUsesSplit;
@@ -1032,6 +1036,16 @@ public class AndroidManifestTest {
     assertThat(androidManifest.getMetadataValueAsInteger("metadata-key")).hasValue(123);
   }
 
+  @Test
+  public void hasSharedUserId() {
+    AndroidManifest androidManifest = AndroidManifest.create(androidManifest("com.test.app"));
+    assertThat(androidManifest.hasSharedUserId()).isFalse();
+
+    AndroidManifest androidManifest2 =
+        AndroidManifest.create(androidManifest("com.test.app", withSharedUserId("shared_user_id")));
+    assertThat(androidManifest2.hasSharedUserId()).isTrue();
+  }
+
   private XmlNode metadataWithValue(String key, String value) {
     return xmlNode(
         xmlElement(
@@ -1059,5 +1073,74 @@ public class AndroidManifestTest {
                 xmlAttribute(ANDROID_NAMESPACE_URI, "name", NAME_RESOURCE_ID, key),
                 xmlResourceReferenceAttribute(
                     ANDROID_NAMESPACE_URI, "resource", RESOURCE_RESOURCE_ID, resourceIdValue))));
+  }
+
+  @Test
+  public void getDeliveryType_noConfig() throws Exception {
+    AndroidManifest manifest = AndroidManifest.create(androidManifest("com.test.app"));
+    assertThat(manifest.getModuleDeliveryType()).isEqualTo(ALWAYS_INITIAL_INSTALL);
+  }
+
+  @Test
+  public void getDeliveryType_legacy_onDemandTrue() throws Exception {
+    AndroidManifest manifest =
+        AndroidManifest.create(androidManifest("com.test.app", withOnDemandAttribute(true)));
+    assertThat(manifest.getModuleDeliveryType()).isEqualTo(ModuleDeliveryType.NO_INITIAL_INSTALL);
+  }
+
+  @Test
+  public void getDeliveryType_legacy_onDemandFalse() throws Exception {
+    AndroidManifest manifest =
+        AndroidManifest.create(androidManifest("com.test.app", withOnDemandAttribute(false)));
+    assertThat(manifest.getModuleDeliveryType()).isEqualTo(ALWAYS_INITIAL_INSTALL);
+  }
+
+  @Test
+  public void getDeliveryType_onDemandElement_only() throws Exception {
+    AndroidManifest manifest =
+        AndroidManifest.create(androidManifest("com.test.app", withOnDemandDelivery()));
+    assertThat(manifest.getModuleDeliveryType())
+        .isEqualTo(ModuleDeliveryType.NO_INITIAL_INSTALL);
+  }
+
+  @Test
+  public void getDeliveryType_onDemandElement_andConditions() throws Exception {
+    AndroidManifest manifest =
+        AndroidManifest.create(
+            androidManifest("com.test.app", withOnDemandDelivery(), withMinSdkCondition(21)));
+    assertThat(manifest.getModuleDeliveryType())
+        .isEqualTo(ModuleDeliveryType.CONDITIONAL_INITIAL_INSTALL);
+  }
+
+  @Test
+  public void getDeliveryType_installTimeElement_noConditions() throws Exception {
+    AndroidManifest manifest =
+        AndroidManifest.create(
+            androidManifest("com.test.app", withInstallTimeDelivery(), withOnDemandDelivery()));
+    assertThat(manifest.getModuleDeliveryType()).isEqualTo(ALWAYS_INITIAL_INSTALL);
+  }
+
+  @Test
+  public void getInstantDeliveryType_instantAttributeTrue() {
+    AndroidManifest manifest =
+        AndroidManifest.create(androidManifestForAssetModule("com.test.app", withInstant(true)));
+    assertThat(manifest.getInstantModuleDeliveryType()).isEqualTo(NO_INITIAL_INSTALL);
+  }
+
+  @Test
+  public void getInstantDeliveryType_onDemandElement() {
+    AndroidManifest manifest =
+        AndroidManifest.create(
+            androidManifestForAssetModule("com.test.app", withInstantOnDemandDelivery()));
+    assertThat(manifest.getInstantModuleDeliveryType()).isEqualTo(NO_INITIAL_INSTALL);
+  }
+
+  @Test
+  public void getInstantDeliveryType_installTimeElement() {
+    AndroidManifest manifest =
+        AndroidManifest.create(
+            androidManifestForAssetModule("com.test.app", withInstantInstallTimeDelivery()));
+    assertThat(manifest.getInstantModuleDeliveryType())
+        .isEqualTo(ALWAYS_INITIAL_INSTALL);
   }
 }

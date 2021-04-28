@@ -73,10 +73,10 @@ import com.android.tools.build.bundletool.testing.FakeSystemEnvironmentProvider;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
-import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import org.junit.Before;
@@ -102,15 +102,20 @@ public class InstallApksCommandTest {
   private SystemEnvironmentProvider systemEnvironmentProvider;
   private Path adbPath;
   private Path sdkDirPath;
+  private Path simpleApksPath;
 
   @Before
-  public void setUp() throws IOException {
+  public void setUp() throws Exception {
     tmpDir = tmp.getRoot().toPath();
     sdkDirPath = Files.createDirectory(tmpDir.resolve("android-sdk"));
     adbPath = sdkDirPath.resolve("platform-tools").resolve("adb");
     Files.createDirectories(adbPath.getParent());
     Files.createFile(adbPath);
     adbPath.toFile().setExecutable(true);
+    simpleApksPath =
+        createApksArchiveFile(
+            createSimpleTableOfContent(ZipPath.create("base-master.apk")),
+            tmpDir.resolve("simple-bundle.apks"));
     this.systemEnvironmentProvider =
         new FakeSystemEnvironmentProvider(
             ImmutableMap.of(ANDROID_HOME, sdkDirPath.toString(), ANDROID_SERIAL, DEVICE_ID));
@@ -118,18 +123,15 @@ public class InstallApksCommandTest {
 
   @Test
   public void fromFlagsEquivalentToBuilder_onlyApkPaths() throws Exception {
-    Path apksFile = tmpDir.resolve("appbundle.apks");
-    Files.createFile(apksFile);
-
     InstallApksCommand fromFlags =
         InstallApksCommand.fromFlags(
-            new FlagParser().parse("--apks=" + apksFile),
+            new FlagParser().parse("--apks=" + simpleApksPath),
             systemEnvironmentProvider,
             fakeServerOneDevice(lDeviceWithLocales("en-US")));
 
     InstallApksCommand fromBuilder =
         InstallApksCommand.builder()
-            .setApksArchivePath(apksFile)
+            .setApksArchivePath(simpleApksPath)
             .setAdbPath(adbPath)
             .setAdbServer(fromFlags.getAdbServer())
             .setDeviceId(DEVICE_ID)
@@ -140,18 +142,15 @@ public class InstallApksCommandTest {
 
   @Test
   public void fromFlagsEquivalentToBuilder_apkPathsAndAdb() throws Exception {
-    Path apksFile = tmpDir.resolve("appbundle.apks");
-    Files.createFile(apksFile);
-
     InstallApksCommand fromFlags =
         InstallApksCommand.fromFlags(
-            new FlagParser().parse("--apks=" + apksFile, "--adb=" + adbPath),
+            new FlagParser().parse("--apks=" + simpleApksPath, "--adb=" + adbPath),
             systemEnvironmentProvider,
             fakeServerOneDevice(lDeviceWithLocales("en-US")));
 
     InstallApksCommand fromBuilder =
         InstallApksCommand.builder()
-            .setApksArchivePath(apksFile)
+            .setApksArchivePath(simpleApksPath)
             .setAdbPath(adbPath)
             .setAdbServer(fromFlags.getAdbServer())
             .setDeviceId(DEVICE_ID)
@@ -162,19 +161,16 @@ public class InstallApksCommandTest {
 
   @Test
   public void fromFlagsEquivalentToBuilder_deviceId() throws Exception {
-    Path apksFile = tmpDir.resolve("appbundle.apks");
-    Files.createFile(apksFile);
-
     InstallApksCommand fromFlags =
         InstallApksCommand.fromFlags(
             new FlagParser()
-                .parse("--apks=" + apksFile, "--adb=" + adbPath, "--device-id=" + DEVICE_ID),
+                .parse("--apks=" + simpleApksPath, "--adb=" + adbPath, "--device-id=" + DEVICE_ID),
             systemEnvironmentProvider,
             fakeServerOneDevice(lDeviceWithLocales("en-US")));
 
     InstallApksCommand fromBuilder =
         InstallApksCommand.builder()
-            .setApksArchivePath(apksFile)
+            .setApksArchivePath(simpleApksPath)
             .setAdbPath(adbPath)
             .setAdbServer(fromFlags.getAdbServer())
             .setDeviceId(DEVICE_ID)
@@ -185,18 +181,15 @@ public class InstallApksCommandTest {
 
   @Test
   public void fromFlagsEquivalentToBuilder_allowDowngrade() throws Exception {
-    Path apksFile = tmpDir.resolve("appbundle.apks");
-    Files.createFile(apksFile);
-
     InstallApksCommand fromFlags =
         InstallApksCommand.fromFlags(
-            new FlagParser().parse("--apks=" + apksFile, "--allow-downgrade"),
+            new FlagParser().parse("--apks=" + simpleApksPath, "--allow-downgrade"),
             systemEnvironmentProvider,
             fakeServerOneDevice(lDeviceWithLocales("en-US")));
 
     InstallApksCommand fromBuilder =
         InstallApksCommand.builder()
-            .setApksArchivePath(apksFile)
+            .setApksArchivePath(simpleApksPath)
             .setAdbPath(adbPath)
             .setAdbServer(fromFlags.getAdbServer())
             .setDeviceId(DEVICE_ID)
@@ -208,18 +201,15 @@ public class InstallApksCommandTest {
 
   @Test
   public void fromFlagsEquivalentToBuilder_androidSerialVariable() throws Exception {
-    Path apksFile = tmpDir.resolve("appbundle.apks");
-    Files.createFile(apksFile);
-
     InstallApksCommand fromFlags =
         InstallApksCommand.fromFlags(
-            new FlagParser().parse("--apks=" + apksFile, "--adb=" + adbPath),
+            new FlagParser().parse("--apks=" + simpleApksPath, "--adb=" + adbPath),
             systemEnvironmentProvider,
             fakeServerOneDevice(lDeviceWithLocales("en-US")));
 
     InstallApksCommand fromBuilder =
         InstallApksCommand.builder()
-            .setApksArchivePath(apksFile)
+            .setApksArchivePath(simpleApksPath)
             .setAdbPath(adbPath)
             .setAdbServer(fromFlags.getAdbServer())
             .setDeviceId(DEVICE_ID)
@@ -230,19 +220,16 @@ public class InstallApksCommandTest {
 
   @Test
   public void fromFlagsEquivalentToBuilder_modules() throws Exception {
-    Path apksFile = tmpDir.resolve("appbundle.apks");
-    Files.createFile(apksFile);
-
     InstallApksCommand fromFlags =
         InstallApksCommand.fromFlags(
             new FlagParser()
-                .parse("--apks=" + apksFile, "--adb=" + adbPath, "--modules=base,feature"),
+                .parse("--apks=" + simpleApksPath, "--adb=" + adbPath, "--modules=base,feature"),
             systemEnvironmentProvider,
             fakeServerOneDevice(lDeviceWithLocales("en-US")));
 
     InstallApksCommand fromBuilder =
         InstallApksCommand.builder()
-            .setApksArchivePath(apksFile)
+            .setApksArchivePath(simpleApksPath)
             .setAdbPath(adbPath)
             .setAdbServer(fromFlags.getAdbServer())
             .setModules(ImmutableSet.of("base", "feature"))
@@ -254,22 +241,41 @@ public class InstallApksCommandTest {
 
   @Test
   public void fromFlagsEquivalentToBuilder_deviceTier() throws Exception {
-    Path apksFile = tmpDir.resolve("appbundle.apks");
-    Files.createFile(apksFile);
-
     InstallApksCommand fromFlags =
         InstallApksCommand.fromFlags(
-            new FlagParser().parse("--apks=" + apksFile, "--adb=" + adbPath, "--device-tier=high"),
+            new FlagParser()
+                .parse("--apks=" + simpleApksPath, "--adb=" + adbPath, "--device-tier=high"),
             systemEnvironmentProvider,
             fakeServerOneDevice(lDeviceWithLocales("en-US")));
 
     InstallApksCommand fromBuilder =
         InstallApksCommand.builder()
-            .setApksArchivePath(apksFile)
+            .setApksArchivePath(simpleApksPath)
             .setAdbPath(adbPath)
             .setAdbServer(fromFlags.getAdbServer())
             .setDeviceId(DEVICE_ID)
             .setDeviceTier("high")
+            .build();
+
+    assertThat(fromBuilder).isEqualTo(fromFlags);
+  }
+
+  @Test
+  public void fromFlagsEquivalentToBuilder_timeout() throws Exception {
+    InstallApksCommand fromFlags =
+        InstallApksCommand.fromFlags(
+            new FlagParser()
+                .parse("--apks=" + simpleApksPath, "--adb=" + adbPath, "--timeout-millis=30000"),
+            systemEnvironmentProvider,
+            fakeServerOneDevice(lDeviceWithLocales("en-US")));
+
+    InstallApksCommand fromBuilder =
+        InstallApksCommand.builder()
+            .setApksArchivePath(simpleApksPath)
+            .setAdbPath(adbPath)
+            .setAdbServer(fromFlags.getAdbServer())
+            .setDeviceId(DEVICE_ID)
+            .setTimeout(Duration.ofSeconds(30))
             .build();
 
     assertThat(fromBuilder).isEqualTo(fromFlags);
@@ -313,13 +319,10 @@ public class InstallApksCommandTest {
 
   @Test
   public void badAdbLocation_fails() throws Exception {
-    Path apksFile = tmpDir.resolve("appbundle.apks");
-    Files.createFile(apksFile);
-
     InstallApksCommand command =
         InstallApksCommand.builder()
             .setAdbPath(Paths.get("bad_adb_path"))
-            .setApksArchivePath(apksFile)
+            .setApksArchivePath(simpleApksPath)
             .setAdbServer(fakeServerOneDevice(lDeviceWithLocales("en-US")))
             .build();
     Throwable exception = assertThrows(IllegalArgumentException.class, () -> command.execute());
@@ -328,9 +331,6 @@ public class InstallApksCommandTest {
 
   @Test
   public void noDeviceId_moreThanOneDeviceConnected() throws Exception {
-    Path apksFile = tmpDir.resolve("appbundle.apks");
-    Files.createFile(apksFile);
-
     AdbServer adbServer =
         new FakeAdbServer(
             /* hasInitialDeviceList= */ true,
@@ -342,7 +342,7 @@ public class InstallApksCommandTest {
 
     InstallApksCommand command =
         InstallApksCommand.builder()
-            .setApksArchivePath(apksFile)
+            .setApksArchivePath(simpleApksPath)
             .setAdbPath(adbPath)
             .setAdbServer(adbServer)
             .build();
@@ -355,9 +355,6 @@ public class InstallApksCommandTest {
 
   @Test
   public void missingDeviceWithId() throws Exception {
-    Path apksFile = tmpDir.resolve("appbundle.apks");
-    Files.createFile(apksFile);
-
     AdbServer adbServer =
         new FakeAdbServer(
             /* hasInitialDeviceList= */ true,
@@ -367,7 +364,7 @@ public class InstallApksCommandTest {
 
     InstallApksCommand command =
         InstallApksCommand.builder()
-            .setApksArchivePath(apksFile)
+            .setApksArchivePath(simpleApksPath)
             .setAdbPath(adbPath)
             .setAdbServer(adbServer)
             .setDeviceId("doesnt-exist")
@@ -379,11 +376,6 @@ public class InstallApksCommandTest {
 
   @Test
   public void adbInstallFails_throws() throws Exception {
-    Path apksFile =
-        createApksArchiveFile(
-            createSimpleTableOfContent(ZipPath.create("base-master.apk")),
-            tmpDir.resolve("bundle.apks"));
-
     FakeDevice fakeDevice =
         FakeDevice.fromDeviceSpec(DEVICE_ID, DeviceState.ONLINE, lDeviceWithLocales("en-US"));
     AdbServer adbServer =
@@ -397,7 +389,7 @@ public class InstallApksCommandTest {
 
     InstallApksCommand command =
         InstallApksCommand.builder()
-            .setApksArchivePath(apksFile)
+            .setApksArchivePath(simpleApksPath)
             .setAdbPath(adbPath)
             .setAdbServer(adbServer)
             .build();
@@ -482,11 +474,6 @@ public class InstallApksCommandTest {
 
   @Test
   public void badSdkVersionDevice_throws() throws Exception {
-    Path apksFile =
-        createApksArchiveFile(
-            createSimpleTableOfContent(ZipPath.create("base-master.apk")),
-            tmpDir.resolve("bundle.apks"));
-
     DeviceSpec deviceSpec =
         mergeSpecs(sdkVersion(1), density(480), abis("x86_64", "x86"), locales("en-US"));
     FakeDevice fakeDevice = FakeDevice.fromDeviceSpec(DEVICE_ID, DeviceState.ONLINE, deviceSpec);
@@ -495,7 +482,7 @@ public class InstallApksCommandTest {
 
     InstallApksCommand command =
         InstallApksCommand.builder()
-            .setApksArchivePath(apksFile)
+            .setApksArchivePath(simpleApksPath)
             .setAdbPath(adbPath)
             .setAdbServer(adbServer)
             .build();
@@ -934,20 +921,30 @@ public class InstallApksCommandTest {
             .build();
 
     Path apksFile = createApks(tableOfContent, apksInDirectory);
+    Duration timeout = Duration.ofMinutes(5);
 
     List<Path> installedApks = new ArrayList<>();
-    List<Path> pushedApks = new ArrayList<>();
+    List<Path> pushedFiles = new ArrayList<>();
     FakeDevice fakeDevice =
         FakeDevice.fromDeviceSpec(DEVICE_ID, DeviceState.ONLINE, lDeviceWithLocales("en-US"));
     AdbServer adbServer =
         new FakeAdbServer(/* hasInitialDeviceList= */ true, ImmutableList.of(fakeDevice));
-    fakeDevice.setInstallApksSideEffect((apks, installOptions) -> installedApks.addAll(apks));
-    fakeDevice.setPushApksSideEffect((apks, installOptions) -> pushedApks.addAll(apks));
+    fakeDevice.setInstallApksSideEffect(
+        (apks, installOptions) -> {
+          assertThat(installOptions.getTimeout()).isEqualTo(timeout);
+          installedApks.addAll(apks);
+        });
+    fakeDevice.setPushSideEffect(
+        (files, pushOptions) -> {
+          assertThat(pushOptions.getTimeout()).isEqualTo(timeout);
+          pushedFiles.addAll(files);
+        });
 
     InstallApksCommand.builder()
         .setApksArchivePath(apksFile)
         .setAdbPath(adbPath)
         .setAdbServer(adbServer)
+        .setTimeout(timeout)
         .build()
         .execute();
 
@@ -961,7 +958,7 @@ public class InstallApksCommandTest {
             installTimeAssetMasterApk.toString(),
             installTimeAssetEnApk.toString());
     // Base config splits, install-time and on-demand features and on-demand assets. All languages.
-    assertThat(getFileNames(pushedApks))
+    assertThat(getFileNames(pushedFiles))
         .containsExactly(
             baseEnApk.toString(),
             installTimeFeatureMasterApk.toString(),
@@ -1050,13 +1047,13 @@ public class InstallApksCommandTest {
     Path apksFile = createApks(tableOfContent, apksInDirectory);
 
     List<Path> installedApks = new ArrayList<>();
-    List<Path> pushedApks = new ArrayList<>();
+    List<Path> pushedFiles = new ArrayList<>();
     FakeDevice fakeDevice =
         FakeDevice.fromDeviceSpec(DEVICE_ID, DeviceState.ONLINE, lDeviceWithLocales("en-US"));
     AdbServer adbServer =
         new FakeAdbServer(/* hasInitialDeviceList= */ true, ImmutableList.of(fakeDevice));
     fakeDevice.setInstallApksSideEffect((apks, installOptions) -> installedApks.addAll(apks));
-    fakeDevice.setPushApksSideEffect((apks, installOptions) -> pushedApks.addAll(apks));
+    fakeDevice.setPushSideEffect((files, installOptions) -> pushedFiles.addAll(files));
 
     InstallApksCommand.builder()
         .setApksArchivePath(apksFile)
@@ -1077,7 +1074,7 @@ public class InstallApksCommandTest {
             installTimeAssetMasterApk.toString(),
             installTimeAssetEnApk.toString());
     // Base config splits, install-time and on-demand features and on-demand assets. All languages.
-    assertThat(getFileNames(pushedApks))
+    assertThat(getFileNames(pushedFiles))
         .containsExactly(
             baseEnApk.toString(),
             installTimeFeatureMasterApk.toString(),
@@ -1085,6 +1082,101 @@ public class InstallApksCommandTest {
             installTimeFeaturePlApk.toString(),
             onDemandFeatureMasterApk.toString(),
             onDemandAssetMasterApk.toString());
+  }
+
+  @Test
+  public void localTestingMode_additionalLocalTestingFiles() throws Exception {
+    ZipPath baseApk = ZipPath.create("base-master.apk");
+    ZipPath baseEnApk = ZipPath.create("base-en.apk");
+    ZipPath onDemandFeatureMasterApk = ZipPath.create("ondemand_feature-master.apk");
+
+    Path additionalXml = tmpDir.resolve("additional.xml");
+    Files.write(additionalXml, new byte[0]);
+
+    BuildApksResult tableOfContent =
+        BuildApksResult.newBuilder()
+            .setPackageName(PKG_NAME)
+            .setBundletool(
+                Bundletool.newBuilder()
+                    .setVersion(BundleToolVersion.getCurrentVersion().toString()))
+            .addVariant(
+                createVariant(
+                    VariantTargeting.getDefaultInstance(),
+                    createSplitApkSet(
+                        "base",
+                        createMasterApkDescription(ApkTargeting.getDefaultInstance(), baseApk),
+                        createApkDescription(
+                            apkLanguageTargeting("en"), baseEnApk, /* isMasterSplit= */ false)),
+                    createSplitApkSet(
+                        "ondemand_feature",
+                        DeliveryType.ON_DEMAND,
+                        /* moduleDependencies= */ ImmutableList.of(),
+                        createMasterApkDescription(
+                            ApkTargeting.getDefaultInstance(), onDemandFeatureMasterApk))))
+            .setLocalTestingInfo(
+                LocalTestingInfo.newBuilder()
+                    .setEnabled(true)
+                    .setLocalTestingPath("local_testing")
+                    .build())
+            .build();
+
+    Path apksFile = createApks(tableOfContent, /* apksInDirectory= */ false);
+
+    List<Path> installedApks = new ArrayList<>();
+    List<Path> pushedFiles = new ArrayList<>();
+    FakeDevice fakeDevice =
+        FakeDevice.fromDeviceSpec(DEVICE_ID, DeviceState.ONLINE, lDeviceWithLocales("en-US"));
+    AdbServer adbServer =
+        new FakeAdbServer(/* hasInitialDeviceList= */ true, ImmutableList.of(fakeDevice));
+    fakeDevice.setInstallApksSideEffect((apks, installOptions) -> installedApks.addAll(apks));
+    fakeDevice.setPushSideEffect((files, installOptions) -> pushedFiles.addAll(files));
+
+    InstallApksCommand.builder()
+        .setApksArchivePath(apksFile)
+        .setAdbPath(adbPath)
+        .setAdbServer(adbServer)
+        .setAdditionalLocalTestingFiles(ImmutableList.of(additionalXml))
+        .build()
+        .execute();
+
+    // Base, install-time and on-demand features and install-time assets.
+    assertThat(getFileNames(installedApks))
+        .containsExactly(baseApk.toString(), baseEnApk.toString());
+    // Base config splits, install-time and on-demand features and on-demand assets. All languages.
+    assertThat(getFileNames(pushedFiles))
+        .containsExactly(
+            baseEnApk.toString(),
+            onDemandFeatureMasterApk.toString(),
+            additionalXml.getFileName().toString());
+  }
+
+  @Test
+  public void noLocalTesting_additionalLocalTestingFiles_throws() throws Exception {
+    Path additionalXml = tmpDir.resolve("additional.xml");
+    Files.write(additionalXml, new byte[0]);
+
+    AdbServer adbServer =
+        new FakeAdbServer(
+            /* hasInitialDeviceList= */ true,
+            ImmutableList.of(
+                FakeDevice.fromDeviceSpec(
+                    DEVICE_ID, DeviceState.ONLINE, lDeviceWithLocales("en-US"))));
+
+    InstallApksCommand command =
+        InstallApksCommand.builder()
+            .setApksArchivePath(simpleApksPath)
+            .setAdbPath(adbPath)
+            .setAdbServer(adbServer)
+            .setAdditionalLocalTestingFiles(ImmutableList.of(additionalXml))
+            .build();
+
+    IllegalArgumentException exception =
+        assertThrows(IllegalArgumentException.class, command::execute);
+    assertThat(exception)
+        .hasMessageThat()
+        .contains(
+            "'additional-local-testing-files' flag is only supported for APKs built in local"
+                + " testing mode.");
   }
 
   @Test
@@ -1217,13 +1309,13 @@ public class InstallApksCommandTest {
     Path apksFile = createApks(tableOfContent, apksInDirectory);
 
     List<Path> installedApks = new ArrayList<>();
-    List<Path> pushedApks = new ArrayList<>();
+    List<Path> pushedFiles = new ArrayList<>();
     FakeDevice fakeDevice =
         FakeDevice.fromDeviceSpec(DEVICE_ID, DeviceState.ONLINE, lDeviceWithLocales("en-US"));
     AdbServer adbServer =
         new FakeAdbServer(/* hasInitialDeviceList= */ true, ImmutableList.of(fakeDevice));
     fakeDevice.setInstallApksSideEffect((apks, installOptions) -> installedApks.addAll(apks));
-    fakeDevice.setPushApksSideEffect((apks, installOptions) -> pushedApks.addAll(apks));
+    fakeDevice.setPushSideEffect((files, installOptions) -> pushedFiles.addAll(files));
 
     InstallApksCommand.builder()
         .setApksArchivePath(apksFile)
@@ -1237,7 +1329,7 @@ public class InstallApksCommandTest {
     assertThat(getFileNames(installedApks))
         .containsExactly(baseMasterApk.toString(), baseHighApk.toString());
     // Base config splits and on-demand assets. Low tier splits are filtered out.
-    assertThat(getFileNames(pushedApks))
+    assertThat(getFileNames(pushedFiles))
         .containsExactly(
             baseHighApk.toString(), asset1MasterApk.toString(), asset1HighApk.toString());
   }

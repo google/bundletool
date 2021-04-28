@@ -18,6 +18,7 @@ package com.android.tools.build.bundletool.model;
 
 import com.android.bundle.Targeting.DeviceFeature;
 import com.android.bundle.Targeting.DeviceFeatureTargeting;
+import com.android.bundle.Targeting.DeviceTierModuleTargeting;
 import com.android.bundle.Targeting.ModuleTargeting;
 import com.android.bundle.Targeting.UserCountriesTargeting;
 import com.android.tools.build.bundletool.model.exceptions.InvalidBundleException;
@@ -42,6 +43,8 @@ public abstract class ModuleConditions {
   public abstract Optional<Integer> getMaxSdkVersion();
 
   public abstract Optional<UserCountriesCondition> getUserCountriesCondition();
+
+  public abstract Optional<DeviceTiersCondition> getDeviceTiersCondition();
 
   public boolean isEmpty() {
     return toTargeting().equals(ModuleTargeting.getDefaultInstance());
@@ -91,6 +94,13 @@ public abstract class ModuleConditions {
               .build());
     }
 
+    if (getDeviceTiersCondition().isPresent()) {
+      moduleTargeting.setDeviceTierTargeting(
+          DeviceTierModuleTargeting.newBuilder()
+              .addAllValue(getDeviceTiersCondition().get().getDeviceTiers())
+              .build());
+    }
+
     return moduleTargeting.build();
   }
 
@@ -111,6 +121,8 @@ public abstract class ModuleConditions {
 
     public abstract Builder setUserCountriesCondition(
         UserCountriesCondition userCountriesCondition);
+
+    public abstract Builder setDeviceTiersCondition(DeviceTiersCondition deviceTiersCondition);
 
     protected abstract ModuleConditions autoBuild();
 

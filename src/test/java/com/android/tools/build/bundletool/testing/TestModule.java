@@ -31,6 +31,7 @@ import com.android.tools.build.bundletool.io.ZipReader;
 import com.android.tools.build.bundletool.model.ApkListener;
 import com.android.tools.build.bundletool.model.ApkModifier;
 import com.android.tools.build.bundletool.model.AppBundle;
+import com.android.tools.build.bundletool.model.BundleMetadata;
 import com.android.tools.build.bundletool.model.OptimizationDimension;
 import com.android.tools.build.bundletool.model.SigningConfiguration;
 import com.android.tools.build.bundletool.model.SourceStamp;
@@ -103,6 +104,8 @@ public class TestModule {
                     .setVersion(BundleToolVersion.getCurrentVersion().toString()))
             .build();
 
+    private static final BundleMetadata DEFAULT_BUNDLE_METADATA = BundleMetadata.builder().build();
+
     @Nullable private TempDirectory tempDirectory;
     @Nullable private Path outputDirectory;
     @Nullable private Path bundlePath;
@@ -123,6 +126,7 @@ public class TestModule {
     @Nullable private Boolean localTestingEnabled;
     @Nullable private SourceStamp sourceStamp;
     private boolean useBundleCompression = true;
+    private BundleMetadata bundleMetadata = DEFAULT_BUNDLE_METADATA;
 
     public Builder withAppBundle(AppBundle appBundle) {
       this.appBundle = appBundle;
@@ -140,6 +144,11 @@ public class TestModule {
      */
     public Builder withBundleConfig(BundleConfig.Builder bundleConfig) {
       this.bundleConfig = this.bundleConfig.toBuilder().mergeFrom(bundleConfig.build()).build();
+      return this;
+    }
+
+    public Builder withBundleMetadata(BundleMetadata bundleMetadata) {
+      this.bundleMetadata = bundleMetadata;
       return this;
     }
 
@@ -264,7 +273,9 @@ public class TestModule {
             appBundle = appBundle.toBuilder().setBundleConfig(newBundleConfig).build();
           }
         }
-
+        if (!bundleMetadata.equals(DEFAULT_BUNDLE_METADATA)) {
+          appBundle = appBundle.toBuilder().setBundleMetadata(bundleMetadata).build();
+        }
         if (bundlePath == null) {
           bundlePath = tempDirectory.getPath().resolve("bundle.aab");
           new AppBundleSerializer().writeToDisk(appBundle, bundlePath);

@@ -23,6 +23,7 @@ import com.android.bundle.Targeting.AssetsDirectoryTargeting;
 import com.android.bundle.Targeting.DeviceTierTargeting;
 import com.android.bundle.Targeting.LanguageTargeting;
 import com.android.tools.build.bundletool.model.exceptions.InvalidBundleException;
+import com.android.tools.build.bundletool.model.utils.DeviceTierUtils;
 import com.android.tools.build.bundletool.model.utils.TextureCompressionUtils;
 import com.google.auto.value.AutoValue;
 import com.google.common.collect.ImmutableList;
@@ -46,7 +47,6 @@ public abstract class TargetedDirectorySegment {
       Pattern.compile("(?<base>.+?)#(?<key>.+?)_(?<value>.+)");
 
   private static final Pattern LANGUAGE_CODE_PATTERN = Pattern.compile("^[a-zA-Z]{2,3}$");
-  private static final Pattern DEVICE_TIER_PATTERN = Pattern.compile("[a-zA-Z][a-zA-Z0-9_]*");
 
   private static final String LANG_KEY = "lang";
   private static final String TCF_KEY = "tcf";
@@ -244,15 +244,7 @@ public abstract class TargetedDirectorySegment {
   }
 
   private static AssetsDirectoryTargeting parseDeviceTier(String name, String value) {
-    Matcher matcher = DEVICE_TIER_PATTERN.matcher(value);
-    if (!matcher.matches()) {
-      throw InvalidBundleException.builder()
-          .withUserMessage(
-              "Device tier names should start with a letter and contain only letters, numbers and"
-                  + " underscores. Found tier named '%s' in directory '%s'.",
-              value, name)
-          .build();
-    }
+    DeviceTierUtils.validateDeviceTierForAssetsDirectory(name, value);
     return AssetsDirectoryTargeting.newBuilder()
         .setDeviceTier(DeviceTierTargeting.newBuilder().addValue(value))
         .build();

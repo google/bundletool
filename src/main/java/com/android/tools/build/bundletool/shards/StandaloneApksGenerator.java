@@ -20,6 +20,7 @@ import static com.android.tools.build.bundletool.model.targeting.TargetingUtils.
 import static com.google.common.collect.ImmutableList.toImmutableList;
 
 import com.android.tools.build.bundletool.mergers.ModuleSplitsToShardMerger;
+import com.android.tools.build.bundletool.model.BundleMetadata;
 import com.android.tools.build.bundletool.model.BundleModule;
 import com.android.tools.build.bundletool.model.ModuleEntry;
 import com.android.tools.build.bundletool.model.ModuleSplit;
@@ -27,6 +28,7 @@ import com.android.tools.build.bundletool.model.ModuleSplit.SplitType;
 import com.android.tools.build.bundletool.model.SourceStamp;
 import com.android.tools.build.bundletool.model.SourceStamp.StampType;
 import com.android.tools.build.bundletool.optimizations.ApkOptimizations;
+import com.android.tools.build.bundletool.splitters.CodeTransparencyInjector;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Maps;
@@ -42,17 +44,20 @@ public class StandaloneApksGenerator {
   private final ModuleSplitterForShards moduleSplitter;
   private final Sharder sharder;
   private final ModuleSplitsToShardMerger shardsMerger;
+  private final CodeTransparencyInjector codeTransparencyInjector;
 
   @Inject
   public StandaloneApksGenerator(
       Optional<SourceStamp> stampSource,
       ModuleSplitterForShards moduleSplitter,
       Sharder sharder,
-      ModuleSplitsToShardMerger shardsMerger) {
+      ModuleSplitsToShardMerger shardsMerger,
+      BundleMetadata bundleMetadata) {
     this.stampSource = stampSource;
     this.moduleSplitter = moduleSplitter;
     this.sharder = sharder;
     this.shardsMerger = shardsMerger;
+    this.codeTransparencyInjector = new CodeTransparencyInjector(bundleMetadata);
   }
 
   /**
@@ -93,6 +98,7 @@ public class StandaloneApksGenerator {
         .map(unfusedShard -> shardsMerger.mergeSingleShard(unfusedShard, dexCache))
         .map(StandaloneApksGenerator::setVariantTargetingAndSplitType)
         .map(this::writeSourceStampInManifest)
+        .map(codeTransparencyInjector::inject)
         .collect(toImmutableList());
   }
 

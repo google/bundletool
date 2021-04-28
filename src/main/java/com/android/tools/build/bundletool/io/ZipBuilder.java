@@ -114,9 +114,8 @@ public final class ZipBuilder {
       // Fails if the target file exists.
       Files.move(tempFile, target);
 
-    } catch (IOException e) {
+    } finally {
       Files.deleteIfExists(tempFile);
-      throw e;
     }
 
     return target;

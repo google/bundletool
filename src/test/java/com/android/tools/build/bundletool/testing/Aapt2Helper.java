@@ -15,9 +15,9 @@
  */
 package com.android.tools.build.bundletool.testing;
 
-import com.android.tools.build.bundletool.model.Aapt2Command;
-import com.android.tools.build.bundletool.model.CommandExecutor.CommandOptions;
-import com.android.tools.build.bundletool.model.DefaultCommandExecutor;
+import com.android.tools.build.bundletool.androidtools.Aapt2Command;
+import com.android.tools.build.bundletool.androidtools.CommandExecutor.CommandOptions;
+import com.android.tools.build.bundletool.androidtools.DefaultCommandExecutor;
 import com.google.common.collect.ImmutableList;
 import java.nio.file.Path;
 import java.nio.file.Paths;

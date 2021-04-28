@@ -16,11 +16,15 @@
 package com.android.tools.build.bundletool.validation;
 
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifest;
+import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withMinSdkVersion;
 import static com.google.common.truth.Truth.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.android.aapt.Resources.ResourceTable;
 import com.android.bundle.Config.BundleConfig;
+import com.android.bundle.Config.Optimizations;
+import com.android.bundle.Config.ResourceOptimizations;
+import com.android.bundle.Config.ResourceOptimizations.SparseEncoding;
 import com.android.bundle.Config.SplitDimension;
 import com.android.bundle.Config.SplitDimension.Value;
 import com.android.bundle.Config.SuffixStripping;
@@ -275,7 +279,7 @@ public final class BundleConfigValidatorTest {
     AppBundleBuilder appBundleBuilder =
         new AppBundleBuilder()
             .addModule(
-                new BundleModuleBuilder("a")
+                new BundleModuleBuilder("base")
                     .addFile("assets/textures#tcf_astc/level1.assets")
                     .addFile("assets/textures#tcf_astc/level1.assets")
                     .setManifest(androidManifest("com.test.app"))
@@ -293,7 +297,7 @@ public final class BundleConfigValidatorTest {
                     .addSplitDimension(Value.DEVICE_TIER, false, false, "medium")
                     .build())
             .addModule(
-                new BundleModuleBuilder("a")
+                new BundleModuleBuilder("base")
                     .addFile("assets/textures#tier_medium/level1.assets")
                     .addFile("assets/textures#tier_high/level1.assets")
                     .setManifest(androidManifest("com.test.app"))
@@ -306,6 +310,10 @@ public final class BundleConfigValidatorTest {
   public void optimizations_defaultDeviceTier_targeted_unspecified_throws() throws Exception {
     AppBundleBuilder appBundleBuilder =
         new AppBundleBuilder()
+            .addModule(
+                new BundleModuleBuilder("base")
+                    .setManifest(androidManifest("com.test.app"))
+                    .build())
             .addModule(
                 new BundleModuleBuilder("a")
                     .addFile("assets/textures#tier_medium/level1.assets")
@@ -322,6 +330,52 @@ public final class BundleConfigValidatorTest {
         .contains(
             "Module 'a' contains assets targeted by device tier but default device tier value has"
                 + " not been specified for the bundle.");
+  }
+
+  @Test
+  public void optimizations_sparseEncodingEnforced_minSdk26_ok() {
+    AppBundleBuilder appBundleBuilder =
+        new AppBundleBuilder()
+            .addModule(
+                new BundleModuleBuilder("base")
+                    .setManifest(androidManifest("com.test.app", withMinSdkVersion(26)))
+                    .build())
+            .setBundleConfig(
+                BundleConfig.newBuilder()
+                    .setOptimizations(
+                        Optimizations.newBuilder()
+                            .setResourceOptimizations(
+                                ResourceOptimizations.newBuilder()
+                                    .setSparseEncoding(SparseEncoding.ENFORCED)))
+                    .build());
+
+    new BundleConfigValidator().validateBundle(appBundleBuilder.build());
+  }
+
+  @Test
+  public void optimizations_sparseEncodingEnforced_minSdk21_throws() {
+    AppBundleBuilder appBundleBuilder =
+        new AppBundleBuilder()
+            .addModule(
+                new BundleModuleBuilder("base")
+                    .setManifest(androidManifest("com.test.app", withMinSdkVersion(21)))
+                    .build())
+            .setBundleConfig(
+                BundleConfig.newBuilder()
+                    .setOptimizations(
+                        Optimizations.newBuilder()
+                            .setResourceOptimizations(
+                                ResourceOptimizations.newBuilder()
+                                    .setSparseEncoding(SparseEncoding.ENFORCED)))
+                    .build());
+
+    InvalidBundleException e =
+        assertThrows(
+            InvalidBundleException.class,
+            () -> new BundleConfigValidator().validateBundle(appBundleBuilder.build()));
+    assertThat(e)
+        .hasMessageThat()
+        .contains("Sparse encoding is available for applications with minSdk >= 26.");
   }
 
   @Test

@@ -27,6 +27,7 @@ import com.android.tools.build.bundletool.model.BundleModule;
 import com.android.tools.build.bundletool.testing.BundleModuleBuilder;
 import com.google.common.collect.ImmutableCollection;
 import java.io.IOException;
+import java.util.Optional;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
@@ -38,7 +39,9 @@ public class SigningConfigurationVariantGeneratorTest {
       throws Exception {
     SigningConfigurationVariantGenerator signingConfigurationVariantGenerator =
         new SigningConfigurationVariantGenerator(
-            ApkGenerationConfiguration.builder().setRestrictV3SigningToRPlus(true).build());
+            ApkGenerationConfiguration.builder()
+                .setMinimumV3SigningApiVersion(Optional.of(ANDROID_R_API_VERSION))
+                .build());
 
     ImmutableCollection<VariantTargeting> splits =
         signingConfigurationVariantGenerator.generate(createModule()).collect(toImmutableList());

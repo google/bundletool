@@ -31,11 +31,11 @@ import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 
 @RunWith(JUnit4.class)
-public class DeviceTierMatcherTest {
+public class DeviceTierApkMatcherTest {
 
   @Test
   public void matchesTargeting_matches() {
-    DeviceTierMatcher matcher = new DeviceTierMatcher(deviceTier("low"));
+    DeviceTierApkMatcher matcher = new DeviceTierApkMatcher(deviceTier("low"));
 
     assertThat(matcher.matchesTargeting(deviceTierTargeting("low"))).isTrue();
     assertThat(
@@ -46,7 +46,7 @@ public class DeviceTierMatcherTest {
 
   @Test
   public void matchesTargeting_doesNotMatch() {
-    DeviceTierMatcher matcher = new DeviceTierMatcher(deviceTier("low"));
+    DeviceTierApkMatcher matcher = new DeviceTierApkMatcher(deviceTier("low"));
 
     assertThat(matcher.matchesTargeting(deviceTierTargeting("medium"))).isFalse();
     assertThat(
@@ -57,7 +57,7 @@ public class DeviceTierMatcherTest {
 
   @Test
   public void matchesTargeting_overlappingValuesAndAlternatives_throws() {
-    DeviceTierMatcher matcher = new DeviceTierMatcher(deviceTier("low"));
+    DeviceTierApkMatcher matcher = new DeviceTierApkMatcher(deviceTier("low"));
 
     assertThrows(
         IllegalArgumentException.class,
@@ -67,7 +67,7 @@ public class DeviceTierMatcherTest {
 
   @Test
   public void getTargetingValue() {
-    DeviceTierMatcher matcher = new DeviceTierMatcher(deviceTier("low"));
+    DeviceTierApkMatcher matcher = new DeviceTierApkMatcher(deviceTier("low"));
 
     DeviceTierTargeting targeting = deviceTierTargeting("low", ImmutableList.of("medium"));
     assertThat(
@@ -78,13 +78,13 @@ public class DeviceTierMatcherTest {
 
   @Test
   public void isDimensionPresent() {
-    assertThat(new DeviceTierMatcher(deviceTier("low")).isDeviceDimensionPresent()).isTrue();
-    assertThat(new DeviceTierMatcher(abis("x86")).isDeviceDimensionPresent()).isFalse();
+    assertThat(new DeviceTierApkMatcher(deviceTier("low")).isDeviceDimensionPresent()).isTrue();
+    assertThat(new DeviceTierApkMatcher(abis("x86")).isDeviceDimensionPresent()).isFalse();
   }
 
   @Test
   public void checkDeviceCompatibleInternal_isCompatible() {
-    DeviceTierMatcher matcher = new DeviceTierMatcher(deviceTier("low"));
+    DeviceTierApkMatcher matcher = new DeviceTierApkMatcher(deviceTier("low"));
 
     matcher.checkDeviceCompatibleInternal(deviceTierTargeting("low"));
     matcher.checkDeviceCompatibleInternal(
@@ -93,7 +93,7 @@ public class DeviceTierMatcherTest {
 
   @Test
   public void checkDeviceCompatibleInternal_isNotCompatible() {
-    DeviceTierMatcher matcher = new DeviceTierMatcher(deviceTier("low"));
+    DeviceTierApkMatcher matcher = new DeviceTierApkMatcher(deviceTier("low"));
 
     assertThrows(
         IllegalArgumentException.class,

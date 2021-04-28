@@ -22,6 +22,7 @@ import static com.android.tools.build.bundletool.model.utils.SdkToolsLocator.SYS
 import static com.android.tools.build.bundletool.model.utils.files.FilePreconditions.checkDirectoryExists;
 import static com.android.tools.build.bundletool.model.utils.files.FilePreconditions.checkFileExistsAndExecutable;
 import static com.android.tools.build.bundletool.model.utils.files.FilePreconditions.checkFileExistsAndReadable;
+import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.ImmutableSet.toImmutableSet;
 
@@ -50,6 +51,7 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Sets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Duration;
 import java.util.Optional;
 
 /** Installs APKs on a connected device. */
@@ -65,6 +67,9 @@ public abstract class InstallApksCommand {
   private static final Flag<Boolean> ALLOW_DOWNGRADE_FLAG = Flag.booleanFlag("allow-downgrade");
   private static final Flag<Boolean> ALLOW_TEST_ONLY_FLAG = Flag.booleanFlag("allow-test-only");
   private static final Flag<String> DEVICE_TIER_FLAG = Flag.string("device-tier");
+  private static final Flag<ImmutableList<Path>> ADDITIONAL_LOCAL_TESTING_FILES_FLAG =
+      Flag.pathList("additional-local-testing-files");
+  private static final Flag<Integer> TIMEOUT_MILLIS_FLAG = Flag.positiveInteger("timeout-millis");
 
   private static final SystemEnvironmentProvider DEFAULT_PROVIDER =
       new DefaultSystemEnvironmentProvider();
@@ -83,12 +88,17 @@ public abstract class InstallApksCommand {
 
   public abstract Optional<String> getDeviceTier();
 
+  public abstract Optional<ImmutableList<Path>> getAdditionalLocalTestingFiles();
+
   abstract AdbServer getAdbServer();
+
+  public abstract Duration getTimeout();
 
   public static Builder builder() {
     return new AutoValue_InstallApksCommand.Builder()
         .setAllowDowngrade(false)
-        .setAllowTestOnly(false);
+        .setAllowTestOnly(false)
+        .setTimeout(Device.DEFAULT_ADB_TIMEOUT);
   }
 
   /** Builder for the {@link InstallApksCommand}. */
@@ -111,6 +121,10 @@ public abstract class InstallApksCommand {
 
     public abstract Builder setDeviceTier(String deviceTier);
 
+    public abstract Builder setAdditionalLocalTestingFiles(ImmutableList<Path> additionalFiles);
+
+    public abstract Builder setTimeout(Duration timeout);
+
     public abstract InstallApksCommand build();
   }
 
@@ -130,6 +144,9 @@ public abstract class InstallApksCommand {
     Optional<Boolean> allowDowngrade = ALLOW_DOWNGRADE_FLAG.getValue(flags);
     Optional<Boolean> allowTestOnly = ALLOW_TEST_ONLY_FLAG.getValue(flags);
     Optional<String> deviceTier = DEVICE_TIER_FLAG.getValue(flags);
+    Optional<ImmutableList<Path>> additionalLocalTestingFiles =
+        ADDITIONAL_LOCAL_TESTING_FILES_FLAG.getValue(flags);
+    Optional<Integer> timeoutMillis = TIMEOUT_MILLIS_FLAG.getValue(flags);
 
     flags.checkNoUnknownFlags();
 
@@ -140,12 +157,15 @@ public abstract class InstallApksCommand {
     allowDowngrade.ifPresent(command::setAllowDowngrade);
     allowTestOnly.ifPresent(command::setAllowTestOnly);
     deviceTier.ifPresent(command::setDeviceTier);
+    additionalLocalTestingFiles.ifPresent(command::setAdditionalLocalTestingFiles);
+    timeoutMillis.ifPresent(timeout -> command.setTimeout(Duration.ofMillis(timeout)));
 
     return command.build();
   }
 
   public void execute() {
-    validateInput();
+    BuildApksResult toc = readBuildApksResult();
+    validateInput(toc);
 
     AdbServer adbServer = getAdbServer();
     adbServer.init(getAdbPath());
@@ -155,17 +175,21 @@ public abstract class InstallApksCommand {
       if (getDeviceTier().isPresent()) {
         deviceSpec = deviceSpec.toBuilder().setDeviceTier(getDeviceTier().get()).build();
       }
-      BuildApksResult toc = ResultUtils.readTableOfContents(getApksArchivePath());
 
       final ImmutableList<Path> apksToInstall =
           getApksToInstall(toc, deviceSpec, tempDirectory.getPath());
-      final ImmutableList<Path> apksToPush =
-          getApksToPushToStorage(toc, deviceSpec, tempDirectory.getPath());
+      final ImmutableList<Path> filesToPush =
+          ImmutableList.<Path>builder()
+              .addAll(getApksToPushToStorage(toc, deviceSpec, tempDirectory.getPath()))
+              .addAll(getAdditionalLocalTestingFiles().orElse(ImmutableList.of()))
+              .build();
+
       AdbRunner adbRunner = new AdbRunner(adbServer);
       InstallOptions installOptions =
           InstallOptions.builder()
               .setAllowDowngrade(getAllowDowngrade())
               .setAllowTestOnly(getAllowTestOnly())
+              .setTimeout(getTimeout())
               .build();
 
       if (getDeviceId().isPresent()) {
@@ -175,8 +199,8 @@ public abstract class InstallApksCommand {
         adbRunner.run(device -> device.installApks(apksToInstall, installOptions));
       }
 
-      if (!apksToPush.isEmpty()) {
-        pushSplits(apksToPush, toc, adbRunner);
+      if (!filesToPush.isEmpty()) {
+        pushFiles(filesToPush, toc, adbRunner);
       }
     }
   }
@@ -246,7 +270,7 @@ public abstract class InstallApksCommand {
         .collect(toImmutableList());
   }
 
-  private void pushSplits(ImmutableList<Path> splits, BuildApksResult toc, AdbRunner adbRunner) {
+  private void pushFiles(ImmutableList<Path> files, BuildApksResult toc, AdbRunner adbRunner) {
     String packageName = toc.getPackageName();
     if (packageName.isEmpty()) {
       throw CommandExecutionException.builder()
@@ -259,12 +283,13 @@ public abstract class InstallApksCommand {
         Device.PushOptions.builder()
             .setDestinationPath(toc.getLocalTestingInfo().getLocalTestingPath())
             .setClearDestinationPath(true)
-            .setPackageName(packageName);
+            .setPackageName(packageName)
+            .setTimeout(getTimeout());
 
     if (getDeviceId().isPresent()) {
-      adbRunner.run(device -> device.pushApks(splits, pushOptions.build()), getDeviceId().get());
+      adbRunner.run(device -> device.push(files, pushOptions.build()), getDeviceId().get());
     } else {
-      adbRunner.run(device -> device.pushApks(splits, pushOptions.build()));
+      adbRunner.run(device -> device.push(files, pushOptions.build()));
     }
   }
 
@@ -274,13 +299,23 @@ public abstract class InstallApksCommand {
     return deviceSpec.toBuilder().addAllSupportedLocales(targetedLanguages).build();
   }
 
-  private void validateInput() {
+  private void validateInput(BuildApksResult toc) {
+    checkFileExistsAndExecutable(getAdbPath());
+    if (getAdditionalLocalTestingFiles().isPresent()) {
+      checkArgument(
+          toc.getLocalTestingInfo().getEnabled(),
+          "'%s' flag is only supported for APKs built in local testing mode.",
+          ADDITIONAL_LOCAL_TESTING_FILES_FLAG.getName());
+    }
+  }
+
+  private BuildApksResult readBuildApksResult() {
     if (Files.isDirectory(getApksArchivePath())) {
       checkDirectoryExists(getApksArchivePath());
     } else {
       checkFileExistsAndReadable(getApksArchivePath());
     }
-    checkFileExistsAndExecutable(getAdbPath());
+    return ResultUtils.readTableOfContents(getApksArchivePath());
   }
 
   public static CommandHelp help() {
@@ -362,6 +397,23 @@ public abstract class InstallApksCommand {
                 .setDescription(
                     "Device tier to use for apk matching. This flag is only relevant if the "
                         + "bundle uses device tier targeting, and should be set in that case.")
+                .build())
+        .addFlag(
+            FlagDescription.builder()
+                .setFlagName(ADDITIONAL_LOCAL_TESTING_FILES_FLAG.getName())
+                .setOptional(true)
+                .setDescription(
+                    "List of files which will be additionally pushed to local testing folder. This"
+                        + " flag is only supported for APKs built in local testing mode.")
+                .build())
+        .addFlag(
+            FlagDescription.builder()
+                .setFlagName(TIMEOUT_MILLIS_FLAG.getName())
+                .setExampleValue("60000")
+                .setOptional(true)
+                .setDescription(
+                    "Timeout in milliseconds which is passed to adb commands. Default is 10"
+                        + " minutes.")
                 .build())
         .build();
   }

@@ -16,10 +16,15 @@
 
 package com.android.tools.build.bundletool.device;
 
+import static com.android.ddmlib.Log.LogLevel.ERROR;
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 
+import com.android.ddmlib.AdbInitOptions;
 import com.android.ddmlib.AndroidDebugBridge;
+import com.android.ddmlib.Log;
+import com.android.ddmlib.Log.ILogOutput;
+import com.android.ddmlib.Log.LogLevel;
 import com.android.tools.build.bundletool.model.exceptions.CommandExecutionException;
 import com.google.common.collect.ImmutableList;
 import com.google.errorprone.annotations.concurrent.GuardedBy;
@@ -74,7 +79,23 @@ public class DdmlibAdbServer extends AdbServer {
           pathToAdb);
       return;
     }
-    AndroidDebugBridge.initIfNeeded(/* clientSupport= */ false);
+
+    AdbInitOptions.Builder builder =
+        AdbInitOptions.builder().setClientSupportEnabled(false).useJdwpProxyService(false);
+    String env = System.getenv("ANDROID_ADB_SERVER_PORT");
+    if (env != null) {
+      try {
+        builder.enableUserManagedAdbMode(Integer.decode(env));
+      } catch (NumberFormatException e) {
+        throw CommandExecutionException.builder()
+            .withCause(e)
+            .withInternalMessage(
+                "Failed to parse ANDROID_ADB_SERVER_PORT environment variable (%s)", env)
+            .build();
+      }
+    }
+    Log.addLogger(new FilteredLogOutput());
+    AndroidDebugBridge.init(builder.build());
     this.adb = AndroidDebugBridge.createBridge(pathToAdb.toString(), /* forceNewBridge= */ false);
 
     if (adb == null) {
@@ -105,5 +126,33 @@ public class DdmlibAdbServer extends AdbServer {
       AndroidDebugBridge.terminate();
     }
     state = State.CLOSED;
+  }
+
+  private static class FilteredLogOutput implements ILogOutput {
+
+    @Override
+    public void printLog(LogLevel logLevel, String tag, String message) {
+      if (!shouldIgnore(logLevel, message)) {
+        Log.printLog(logLevel, tag, message);
+      }
+    }
+
+    @Override
+    public void printAndPromptLog(LogLevel logLevel, String tag, String message) {
+      if (!shouldIgnore(logLevel, message)) {
+        Log.printLog(logLevel, tag, message);
+      }
+    }
+
+    private boolean shouldIgnore(LogLevel logLevel, String message) {
+      // Ignore ddmlib 'com.android.ddmlib.CommandFailedException: bad sub-command' log which
+      // is shown every time on emulators with version < 30.0.18 but doesn't affect the
+      // functionality.
+      // This exception is thrown because 'adb emu avd path' command was added only in version
+      // 30.0.18.
+      return ERROR.equals(logLevel)
+          && message.contains("bad sub-command")
+          && message.contains("EmulatorConsole.getAvdPath");
+    }
   }
 }

@@ -211,6 +211,15 @@ public abstract class AppBundle {
     return getBundleConfig().getType().equals(BundleType.ASSET_ONLY);
   }
 
+  /**
+   * Returns whether any of the feature modules specify `sharedUserId` attribute in the manifest.
+   */
+  public boolean hasSharedUserId() {
+    return getFeatureModules().values().stream()
+        .map(BundleModule::getAndroidManifest)
+        .anyMatch(AndroidManifest::hasSharedUserId);
+  }
+
   public abstract Builder toBuilder();
 
   static Builder builder() {

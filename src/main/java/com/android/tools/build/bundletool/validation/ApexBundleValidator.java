@@ -149,14 +149,17 @@ public class ApexBundleValidator extends SubValidator {
           .build();
     }
 
-    if (!apexBuildInfos.isEmpty()
-        && !apexBuildInfos.stream()
+    ImmutableSet<String> expectedImages =
+        apexBuildInfos.stream()
             .map(f -> f.replace(BundleModule.BUILD_INFO_SUFFIX, BundleModule.APEX_IMAGE_SUFFIX))
-            .collect(toImmutableSet())
-            .equals(apexImages)) {
+            .collect(toImmutableSet());
+    if (!apexBuildInfos.isEmpty() && !expectedImages.equals(apexImages)) {
       throw InvalidBundleException.builder()
           .withUserMessage(
-              "If APEX build info is provided then one must be provided for each APEX image file.")
+              "If APEX build info is provided then one must be provided for each APEX image file:\n"
+                  + " Expected %s\n"
+                  + " Found %s.",
+              expectedImages, apexImages)
           .build();
     }
 

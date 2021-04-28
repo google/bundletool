@@ -15,7 +15,6 @@
  */
 package com.android.tools.build.bundletool.io;
 
-import static com.android.tools.build.bundletool.model.utils.Versions.ANDROID_R_API_VERSION;
 import static java.lang.Math.max;
 import static java.nio.file.StandardCopyOption.REPLACE_EXISTING;
 
@@ -176,13 +175,19 @@ class ApkSigner {
 
   private boolean shouldSignWithV3Scheme(ModuleSplit split) {
     if (!optSigningConfig.isPresent()) {
+      // No v3 scheme rotation specified.
       return false;
     }
+
+    if (!optSigningConfig.get().getMinimumV3SigningApiVersion().isPresent()) {
+      // Caller specified rotations are fine to perform on all API levels.
+      return true;
+    }
+
+    int minimumV3signingApiVersion = optSigningConfig.get().getMinimumV3SigningApiVersion().get();
     int minManifestSdkVersion = split.getAndroidManifest().getEffectiveMinSdkVersion();
     int minApkTargetingSdkVersion =
         TargetingUtils.getMinSdk(split.getApkTargeting().getSdkVersionTargeting());
-    boolean splitIsTargetedAtRPlus =
-        max(minManifestSdkVersion, minApkTargetingSdkVersion) >= ANDROID_R_API_VERSION;
-    return splitIsTargetedAtRPlus || !optSigningConfig.get().getRestrictV3SigningToRPlus();
+    return max(minManifestSdkVersion, minApkTargetingSdkVersion) >= minimumV3signingApiVersion;
   }
 }

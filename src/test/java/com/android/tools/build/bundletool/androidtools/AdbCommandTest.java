@@ -13,14 +13,15 @@
  * See the License for the specific language governing permissions and
  * limitations under the License
  */
-package com.android.tools.build.bundletool.model;
+package com.android.tools.build.bundletool.androidtools;
 
 import static com.google.common.truth.Truth.assertThat;
 
-import com.android.tools.build.bundletool.model.AdbCommand.DefaultAdbCommand;
+import com.android.tools.build.bundletool.androidtools.AdbCommand.DefaultAdbCommand;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableListMultimap;
 import java.nio.file.Paths;
+import java.time.Duration;
 import java.util.Optional;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -40,6 +41,7 @@ public class AdbCommandTest {
                 .build(),
             false,
             true,
+            /* timeout= */ Optional.empty(),
             Optional.of(DEVICE_ID),
             new FakeCommandExecutor(
                 ImmutableList.of(
@@ -62,6 +64,7 @@ public class AdbCommandTest {
                 .build(),
             true,
             false,
+            /* timeout= */ Optional.empty(),
             Optional.of(DEVICE_ID),
             new FakeCommandExecutor(
                 ImmutableList.of(
@@ -70,6 +73,31 @@ public class AdbCommandTest {
                     DEVICE_ID,
                     "install-multi-package",
                     "--staged",
+                    "foo1.apk:foo2.apk",
+                    "bar.apex")));
+  }
+
+  @Test
+  public void installMultiPackage_withDevice_withStaged_withTimeout() {
+    new DefaultAdbCommand(Paths.get("adb"))
+        .installMultiPackage(
+            ImmutableListMultimap.<String, String>builder()
+                .putAll("foo", ImmutableList.of("foo1.apk", "foo2.apk"))
+                .putAll("bar", ImmutableList.of("bar.apex"))
+                .build(),
+            true,
+            false,
+            /* timeout= */ Optional.of(Duration.ofSeconds(3)),
+            Optional.of(DEVICE_ID),
+            new FakeCommandExecutor(
+                ImmutableList.of(
+                    "adb",
+                    "-s",
+                    DEVICE_ID,
+                    "install-multi-package",
+                    "--staged",
+                    "--staged-ready-timeout",
+                    "3000",
                     "foo1.apk:foo2.apk",
                     "bar.apex")));
   }
@@ -84,7 +112,8 @@ public class AdbCommandTest {
                 .build(),
             false,
             false,
-            Optional.empty(),
+            /* timeout= */ Optional.empty(),
+            /* deviceId= */ Optional.empty(),
             new FakeCommandExecutor(
                 ImmutableList.of("adb", "install-multi-package", "foo1.apk:foo2.apk", "bar.apex")));
   }

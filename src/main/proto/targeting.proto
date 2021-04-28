@@ -34,6 +34,7 @@ message ModuleTargeting {
   SdkVersionTargeting sdk_version_targeting = 1;
   repeated DeviceFeatureTargeting device_feature_targeting = 2;
   UserCountriesTargeting user_countries_targeting = 3;
+  DeviceTierModuleTargeting device_tier_targeting = 4;
 }
 
 // User Countries targeting describing an inclusive/exclusive list of country
@@ -195,7 +196,13 @@ message DeviceFeatureTargeting {
   DeviceFeature required_feature = 1;
 }
 
+// Targets assets and APKs to a concrete device tier.
 message DeviceTierTargeting {
   repeated string value = 1;
   repeated string alternatives = 2;
+}
+
+// Targets conditional modules to a set of device tiers.
+message DeviceTierModuleTargeting {
+  repeated string value = 1;
 }

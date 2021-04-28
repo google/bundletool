@@ -18,10 +18,12 @@ package com.android.tools.build.bundletool.model;
 
 import static com.android.tools.build.bundletool.model.AndroidManifest.CODE_ATTRIBUTE_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.CONDITION_DEVICE_FEATURE_NAME;
+import static com.android.tools.build.bundletool.model.AndroidManifest.CONDITION_DEVICE_TIERS_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.CONDITION_MAX_SDK_VERSION_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.CONDITION_MIN_SDK_VERSION_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.CONDITION_USER_COUNTRIES_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.COUNTRY_ELEMENT_NAME;
+import static com.android.tools.build.bundletool.model.AndroidManifest.DEVICE_TIER_ELEMENT_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.DISTRIBUTION_NAMESPACE_URI;
 import static com.android.tools.build.bundletool.model.AndroidManifest.EXCLUDE_ATTRIBUTE_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.NAME_ATTRIBUTE_NAME;
@@ -33,6 +35,7 @@ import static java.util.stream.Collectors.counting;
 
 import com.android.aapt.Resources.XmlNode;
 import com.android.tools.build.bundletool.model.exceptions.InvalidBundleException;
+import com.android.tools.build.bundletool.model.utils.DeviceTierUtils;
 import com.android.tools.build.bundletool.model.utils.xmlproto.XmlProtoAttribute;
 import com.android.tools.build.bundletool.model.utils.xmlproto.XmlProtoElement;
 import com.android.tools.build.bundletool.model.utils.xmlproto.XmlProtoNode;
@@ -42,6 +45,7 @@ import com.google.auto.value.extension.memoized.Memoized;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableSet;
 import com.google.errorprone.annotations.Immutable;
 import java.util.LinkedHashSet;
 import java.util.Optional;
@@ -63,7 +67,8 @@ public abstract class ManifestDeliveryElement {
       ImmutableList.of(
           CONDITION_MIN_SDK_VERSION_NAME,
           CONDITION_MAX_SDK_VERSION_NAME,
-          CONDITION_USER_COUNTRIES_NAME);
+          CONDITION_USER_COUNTRIES_NAME,
+          CONDITION_DEVICE_TIERS_NAME);
 
   abstract XmlProtoElement getDeliveryElement();
 
@@ -185,6 +190,9 @@ public abstract class ManifestDeliveryElement {
         case CONDITION_USER_COUNTRIES_NAME:
           moduleConditions.setUserCountriesCondition(parseUserCountriesCondition(conditionElement));
           break;
+        case CONDITION_DEVICE_TIERS_NAME:
+          moduleConditions.setDeviceTiersCondition(parseDeviceTiersCondition(conditionElement));
+          break;
         default:
           throw InvalidBundleException.builder()
               .withUserMessage("Unrecognized module condition: '%s'", conditionElement.getName())
@@ -241,6 +249,47 @@ public abstract class ManifestDeliveryElement {
             .map(XmlProtoAttribute::getValueAsBoolean)
             .orElse(false);
     return UserCountriesCondition.create(countryCodes.build(), exclude);
+  }
+
+  private DeviceTiersCondition parseDeviceTiersCondition(XmlProtoElement conditionElement) {
+    ImmutableList<XmlProtoElement> children =
+        conditionElement.getChildrenElements().collect(toImmutableList());
+
+    if (children.isEmpty()) {
+      throw InvalidBundleException.builder()
+          .withUserMessage(
+              "At least one device tier should be specified in '<dist:%s>' element.",
+              CONDITION_DEVICE_TIERS_NAME)
+          .build();
+    }
+
+    ImmutableSet.Builder<String> deviceTiers = ImmutableSet.builder();
+    for (XmlProtoElement deviceTierElement : children) {
+      if (!deviceTierElement.getName().equals(DEVICE_TIER_ELEMENT_NAME)) {
+        throw InvalidBundleException.builder()
+            .withUserMessage(
+                "Expected only '<dist:%s>' elements inside '<dist:%s>', but found %s.",
+                DEVICE_TIER_ELEMENT_NAME,
+                CONDITION_DEVICE_TIERS_NAME,
+                printElement(deviceTierElement))
+            .build();
+      }
+      String tierName =
+          deviceTierElement
+              .getAttribute(DISTRIBUTION_NAMESPACE_URI, NAME_ATTRIBUTE_NAME)
+              .map(XmlProtoAttribute::getValueAsString)
+              .orElseThrow(
+                  () ->
+                      InvalidBundleException.builder()
+                          .withUserMessage(
+                              "'<dist:%s>' element is expected to have 'dist:%s' attribute "
+                                  + "but found none.",
+                              DEVICE_TIER_ELEMENT_NAME, NAME_ATTRIBUTE_NAME)
+                          .build());
+      DeviceTierUtils.validateDeviceTierForConditionalModule(tierName);
+      deviceTiers.add(tierName);
+    }
+    return DeviceTiersCondition.create(deviceTiers.build());
   }
 
   private static void validateDeliveryElement(

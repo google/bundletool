@@ -1,0 +1,51 @@
+/*
+ * Copyright (C) 2021 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License
+ */
+package com.android.tools.build.bundletool.model.utils;
+
+import static com.android.tools.build.bundletool.model.AndroidManifest.DEVICE_TIER_ELEMENT_NAME;
+
+import com.android.tools.build.bundletool.model.exceptions.InvalidBundleException;
+import java.util.regex.Pattern;
+
+/** Utilities for device tier names. */
+public class DeviceTierUtils {
+  private static final Pattern DEVICE_TIER_PATTERN = Pattern.compile("[a-zA-Z][a-zA-Z0-9_]*");
+
+  public static void validateDeviceTierForAssetsDirectory(String directory, String tierName) {
+    if (!DEVICE_TIER_PATTERN.matcher(tierName).matches()) {
+      throw InvalidBundleException.builder()
+          .withUserMessage(
+              "Device tier names should start with a letter and contain only letters, numbers and"
+                  + " underscores. Found tier named '%s' for directory '%s'.",
+              tierName, directory)
+          .build();
+    }
+  }
+
+  public static void validateDeviceTierForConditionalModule(String tierName) {
+    if (!DEVICE_TIER_PATTERN.matcher(tierName).matches()) {
+      throw InvalidBundleException.builder()
+          .withUserMessage(
+              "Device tier names should start with a letter and contain only letters, numbers and"
+                  + " underscores. Found tier named '%s' in '<dist:%s>' element.",
+              tierName, DEVICE_TIER_ELEMENT_NAME)
+          .build();
+    }
+  }
+
+  // Do not instantiate.
+  private DeviceTierUtils() {}
+}

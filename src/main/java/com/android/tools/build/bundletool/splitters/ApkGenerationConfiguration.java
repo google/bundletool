@@ -24,6 +24,7 @@ import com.google.auto.value.AutoValue;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.errorprone.annotations.Immutable;
+import java.util.Optional;
 
 /** Configuration to be passed to Module Splitters and Variant generators. */
 @Immutable
@@ -64,8 +65,14 @@ public abstract class ApkGenerationConfiguration {
         && getSuffixStrippings().get(dimension).getEnabled();
   }
 
-  /** Whether v3 signing should be restricted to R+ variant targeting. */
-  public abstract boolean getRestrictV3SigningToRPlus();
+  /**
+   * Returns the minimum required platform API version for which v3 signing/rotation should be
+   * performed.
+   *
+   * <p>Returns {@link Optional#empty()} if there is no minimum, meaning rotation can occur in all
+   * platforms levels, if specified.
+   */
+  public abstract Optional<Integer> getMinimumV3SigningApiVersion();
 
   public abstract Builder toBuilder();
 
@@ -80,8 +87,7 @@ public abstract class ApkGenerationConfiguration {
         .setMasterPinnedResourceIds(ImmutableSet.of())
         .setMasterPinnedResourceNames(ImmutableSet.of())
         .setBaseManifestReachableResources(ImmutableSet.of())
-        .setSuffixStrippings(ImmutableMap.of())
-        .setRestrictV3SigningToRPlus(false);
+        .setSuffixStrippings(ImmutableMap.of());
   }
 
   public static ApkGenerationConfiguration getDefaultInstance() {
@@ -115,7 +121,8 @@ public abstract class ApkGenerationConfiguration {
     public abstract Builder setSuffixStrippings(
         ImmutableMap<OptimizationDimension, SuffixStripping> suffixStripping);
 
-    public abstract Builder setRestrictV3SigningToRPlus(boolean restrictV3SigningToRPlus);
+    public abstract Builder setMinimumV3SigningApiVersion(
+        Optional<Integer> minimumV3SigningApiVersion);
 
     public abstract ApkGenerationConfiguration build();
   }

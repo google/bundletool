@@ -23,6 +23,8 @@ import static java.util.stream.Collectors.joining;
 import com.android.bundle.Config.BundleConfig;
 import com.android.bundle.Config.Compression;
 import com.android.bundle.Config.Optimizations;
+import com.android.bundle.Config.ResourceOptimizations;
+import com.android.bundle.Config.ResourceOptimizations.SparseEncoding;
 import com.android.bundle.Config.SplitDimension;
 import com.android.bundle.Config.SplitDimension.Value;
 import com.android.tools.build.bundletool.model.AppBundle;
@@ -34,6 +36,7 @@ import com.android.tools.build.bundletool.model.utils.PathMatcher;
 import com.android.tools.build.bundletool.model.utils.PathMatcher.GlobPatternSyntaxException;
 import com.android.tools.build.bundletool.model.utils.ResourcesUtils;
 import com.android.tools.build.bundletool.model.utils.TextureCompressionUtils;
+import com.android.tools.build.bundletool.model.utils.Versions;
 import com.android.tools.build.bundletool.model.version.BundleToolVersion;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Sets;
@@ -59,7 +62,7 @@ public final class BundleConfigValidator extends SubValidator {
 
     validateVersion(bundleConfig);
     validateCompression(bundleConfig.getCompression());
-    validateOptimizations(bundleConfig.getOptimizations());
+    validateOptimizations(bundleConfig.getOptimizations(), bundle);
     validateMasterResources(bundleConfig, bundle);
     validateDefaultDeviceTier(bundleConfig, bundle);
   }
@@ -83,9 +86,12 @@ public final class BundleConfigValidator extends SubValidator {
     }
   }
 
-  private void validateOptimizations(Optimizations optimizations) {
-    List<SplitDimension> splitDimensions = optimizations.getSplitsConfig().getSplitDimensionList();
+  private void validateOptimizations(Optimizations optimizations, AppBundle bundle) {
+    validateSplitDimensions(optimizations.getSplitsConfig().getSplitDimensionList());
+    validateResourceOptimizations(optimizations.getResourceOptimizations(), bundle);
+  }
 
+  private void validateSplitDimensions(List<SplitDimension> splitDimensions) {
     // We only throw if an unrecognized dimension is enabled, since that would generate an
     // unexpected output. However, we tolerate if the unknown dimension is negated since the output
     // will be the same.
@@ -142,6 +148,22 @@ public final class BundleConfigValidator extends SubValidator {
                       supportedTextures.stream().collect(joining(", ")))
                   .build();
             });
+  }
+
+  private void validateResourceOptimizations(
+      ResourceOptimizations resourceOptimizations, AppBundle bundle) {
+    if (bundle.isAssetOnly()) {
+      return;
+    }
+    int minSdk = bundle.getBaseModule().getAndroidManifest().getEffectiveMinSdkVersion();
+    if (resourceOptimizations.getSparseEncoding().equals(SparseEncoding.ENFORCED)
+        && minSdk < Versions.ANDROID_O_API_VERSION) {
+      throw InvalidBundleException.builder()
+          .withUserMessage(
+              "Sparse encoding is available for applications with minSdk >= %d.",
+              Versions.ANDROID_O_API_VERSION)
+          .build();
+    }
   }
 
   private void validateVersion(BundleConfig bundleConfig) {

@@ -57,7 +57,7 @@ public class FakeDevice extends Device {
   private final ImmutableMap<String, String> properties;
   private final Map<String, FakeShellCommandAction> commandInjections = new HashMap<>();
   private Optional<SideEffect<InstallOptions>> installApksSideEffect = Optional.empty();
-  private Optional<SideEffect<PushOptions>> pushApksSideEffect = Optional.empty();
+  private Optional<SideEffect<PushOptions>> pushSideEffect = Optional.empty();
   private static final Joiner COMMA_JOINER = Joiner.on(',');
   private static final Joiner DASH_JOINER = Joiner.on('-');
   private static final Joiner LINE_JOINER = Joiner.on(System.getProperty("line.separator"));
@@ -240,11 +240,11 @@ public class FakeDevice extends Device {
   }
 
   @Override
-  public void pushApks(ImmutableList<Path> apks, PushOptions pushOptions) {
-    for (Path apk : apks) {
-      checkState(Files.exists(apk));
+  public void push(ImmutableList<Path> files, PushOptions pushOptions) {
+    for (Path file : files) {
+      checkState(Files.exists(file));
     }
-    pushApksSideEffect.ifPresent(val -> val.apply(apks, pushOptions));
+    pushSideEffect.ifPresent(val -> val.apply(files, pushOptions));
   }
 
   @Override
@@ -260,8 +260,8 @@ public class FakeDevice extends Device {
     installApksSideEffect = Optional.of(sideEffect);
   }
 
-  public void setPushApksSideEffect(SideEffect<PushOptions> sideEffect) {
-    pushApksSideEffect = Optional.of(sideEffect);
+  public void setPushSideEffect(SideEffect<PushOptions> sideEffect) {
+    pushSideEffect = Optional.of(sideEffect);
   }
 
   public void clearInstallApksSideEffect() {

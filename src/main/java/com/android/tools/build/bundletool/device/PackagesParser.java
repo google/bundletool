@@ -30,6 +30,12 @@ public final class PackagesParser {
   private static final Pattern PACKAGE_AND_VERSION =
       Pattern.compile("package:(?<package>.+?) versionCode:(?<version>\\d+)");
 
+  private final boolean isApex;
+
+  public PackagesParser(boolean isApex) {
+    this.isApex = isApex;
+  }
+
   /** Parses output of "pm list packages". */
   public ImmutableSet<InstalledPackageInfo> parse(ImmutableList<String> listPackagesOutput) {
     // The command lists the packages in the form
@@ -39,24 +45,26 @@ public final class PackagesParser {
     return listPackagesOutput.stream()
         .map(PACKAGE_AND_VERSION::matcher)
         .filter(Matcher::matches)
-        .map(PackagesParser::processMatch)
+        .map(this::processMatch)
         .collect(toImmutableSet());
   }
 
-  private static InstalledPackageInfo processMatch(Matcher matcher) {
+  private InstalledPackageInfo processMatch(Matcher matcher) {
     return InstalledPackageInfo.create(
-        matcher.group("package"), Long.parseLong(matcher.group("version")));
+        matcher.group("package"), Long.parseLong(matcher.group("version")), isApex);
   }
 
   /** Represents an installed package and its version code. */
   @AutoValue
   public abstract static class InstalledPackageInfo {
-    static InstalledPackageInfo create(String packageName, long versionCode) {
-      return new AutoValue_PackagesParser_InstalledPackageInfo(packageName, versionCode);
+    static InstalledPackageInfo create(String packageName, long versionCode, boolean isApex) {
+      return new AutoValue_PackagesParser_InstalledPackageInfo(packageName, versionCode, isApex);
     }
 
     public abstract String getPackageName();
 
     public abstract long getVersionCode();
+
+    public abstract boolean isApex();
   }
 }

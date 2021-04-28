@@ -16,6 +16,7 @@
 
 package com.android.tools.build.bundletool.commands;
 
+import static com.android.bundle.CodeTransparencyOuterClass.CodeRelatedFile.Type.DEX;
 import static com.android.tools.build.bundletool.commands.BuildApksCommand.ApkBuildMode.DEFAULT;
 import static com.android.tools.build.bundletool.commands.BuildApksCommand.ApkBuildMode.SYSTEM;
 import static com.android.tools.build.bundletool.commands.BuildApksCommand.ApkBuildMode.UNIVERSAL;
@@ -45,24 +46,27 @@ import static org.mockito.Mockito.mock;
 
 import com.android.apksig.SigningCertificateLineage;
 import com.android.apksig.SigningCertificateLineage.SignerConfig;
+import com.android.bundle.CodeTransparencyOuterClass.CodeRelatedFile;
+import com.android.bundle.CodeTransparencyOuterClass.CodeTransparency;
 import com.android.bundle.Targeting.ApkTargeting;
 import com.android.bundle.Targeting.ScreenDensity.DensityAlias;
 import com.android.bundle.Targeting.VariantTargeting;
+import com.android.tools.build.bundletool.androidtools.Aapt2Command;
 import com.android.tools.build.bundletool.device.AdbServer;
 import com.android.tools.build.bundletool.flags.FlagParser;
 import com.android.tools.build.bundletool.flags.FlagParser.FlagParseException;
 import com.android.tools.build.bundletool.flags.ParsedFlags;
 import com.android.tools.build.bundletool.io.AppBundleSerializer;
 import com.android.tools.build.bundletool.io.StandaloneApkSerializer;
-import com.android.tools.build.bundletool.model.Aapt2Command;
 import com.android.tools.build.bundletool.model.AndroidManifest;
-import com.android.tools.build.bundletool.model.AppBundle;
+import com.android.tools.build.bundletool.model.BundleMetadata;
 import com.android.tools.build.bundletool.model.BundleModuleName;
 import com.android.tools.build.bundletool.model.ModuleSplit;
 import com.android.tools.build.bundletool.model.SigningConfiguration;
 import com.android.tools.build.bundletool.model.SourceStamp;
 import com.android.tools.build.bundletool.model.ZipPath;
 import com.android.tools.build.bundletool.model.exceptions.CommandExecutionException;
+import com.android.tools.build.bundletool.model.exceptions.InvalidBundleException;
 import com.android.tools.build.bundletool.model.exceptions.InvalidCommandException;
 import com.android.tools.build.bundletool.model.utils.SystemEnvironmentProvider;
 import com.android.tools.build.bundletool.model.utils.files.FileUtils;
@@ -74,6 +78,8 @@ import com.android.tools.build.bundletool.testing.TestModule;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
+import com.google.common.io.CharSource;
+import com.google.protobuf.util.JsonFormat;
 import dagger.Component;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
@@ -82,6 +88,7 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.io.PrintStream;
+import java.nio.charset.Charset;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -94,6 +101,7 @@ import java.security.PrivateKey;
 import java.security.cert.Certificate;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
+import java.util.Optional;
 import java.util.Properties;
 import javax.inject.Inject;
 import org.junit.Before;
@@ -1279,13 +1287,70 @@ public class BuildApksCommandTest {
         .contains("'system-apk-options' flag is available in system mode only.");
   }
 
+  @Test
+  public void populateMinV3SigningApi() {
+    ByteArrayOutputStream output = new ByteArrayOutputStream();
+    int minV3Api = 30;
+
+    BuildApksCommand commandViaFlags =
+        BuildApksCommand.fromFlags(
+            new FlagParser()
+                .parse(
+                    "--bundle=" + bundlePath,
+                    "--output=" + outputFilePath,
+                    "--aapt2=" + AAPT2_PATH,
+                    "--ks=" + keystorePath,
+                    "--ks-key-alias=" + KEY_ALIAS,
+                    "--ks-pass=pass:" + KEYSTORE_PASSWORD,
+                    "--key-pass=pass:" + KEY_PASSWORD,
+                    "--min-v3-signing-api-version=" + minV3Api),
+            new PrintStream(output),
+            systemEnvironmentProvider,
+            fakeAdbServer);
+
+    SigningConfiguration signingConfiguration = commandViaFlags.getSigningConfiguration().get();
+    assertThat(signingConfiguration.getMinimumV3SigningApiVersion().get()).isEqualTo(minV3Api);
+  }
+
+  @Test
+  public void badTransparencyFile_throws() throws Exception {
+    createAppBundle(
+        bundlePath,
+        Optional.of(
+            CodeTransparency.newBuilder()
+                .addCodeRelatedFile(
+                    CodeRelatedFile.newBuilder()
+                        .setType(DEX)
+                        .setApkPath("non/existent/path/dex.file")
+                        .setSha256("sha-256"))
+                .build()));
+
+    ParsedFlags flags =
+        new FlagParser().parse("--bundle=" + bundlePath, "--output=" + outputFilePath);
+    BuildApksCommand command = BuildApksCommand.fromFlags(flags, fakeAdbServer);
+
+    Throwable e = assertThrows(InvalidBundleException.class, command::execute);
+    assertThat(e).hasMessageThat().contains("Code transparency verification failed.");
+  }
+
 
   private static void createAppBundle(Path path) throws IOException {
-    AppBundle appBundle =
+    createAppBundle(path, /* codeTransparency= */ Optional.empty());
+  }
+
+  private static void createAppBundle(Path path, Optional<CodeTransparency> codeTransparency)
+      throws IOException {
+    AppBundleBuilder appBundle =
         new AppBundleBuilder()
-            .addModule("base", module -> module.setManifest(androidManifest("com.app")).build())
-            .build();
-    new AppBundleSerializer().writeToDisk(appBundle, path);
+            .addModule("base", module -> module.setManifest(androidManifest("com.app")).build());
+    if (codeTransparency.isPresent()) {
+      appBundle.addMetadataFile(
+          BundleMetadata.BUNDLETOOL_NAMESPACE,
+          BundleMetadata.TRANSPARENCY_FILE_NAME,
+          CharSource.wrap(JsonFormat.printer().print(codeTransparency.get()))
+              .asByteSource(Charset.defaultCharset()));
+    }
+    new AppBundleSerializer().writeToDisk(appBundle.build(), path);
   }
 
   private static void createKeyStore(Path keystorePath, String keystorePassword)

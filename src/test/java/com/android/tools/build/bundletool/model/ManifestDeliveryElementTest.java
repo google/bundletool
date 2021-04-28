@@ -17,6 +17,7 @@
 package com.android.tools.build.bundletool.model;
 
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifest;
+import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withDeviceTiersCondition;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withEmptyDeliveryElement;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withFastFollowDelivery;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withFeatureCondition;
@@ -44,6 +45,7 @@ import com.android.tools.build.bundletool.model.utils.xmlproto.XmlProtoElementBu
 import com.android.tools.build.bundletool.model.utils.xmlproto.XmlProtoNode;
 import com.android.tools.build.bundletool.model.version.Version;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableSet;
 import java.util.Optional;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -365,6 +367,125 @@ public class ManifestDeliveryElementTest {
             "Expected <dist:install-time> element to contain only <dist:conditions> or "
                 + "<dist:removable> element but found: 'condtions' with namespace URI: "
                 + "'http://schemas.android.com/apk/distribution'");
+  }
+
+  @Test
+  public void moduleConditions_deviceTiersCondition() {
+    Optional<ManifestDeliveryElement> deliveryElement =
+        ManifestDeliveryElement.fromManifestRootNode(
+            androidManifest(
+                "com.test.app", withDeviceTiersCondition(ImmutableList.of("medium", "high"))),
+            /* isFastFollowAllowed= */ false);
+
+    assertThat(deliveryElement).isPresent();
+
+    assertThat(deliveryElement.get().hasModuleConditions()).isTrue();
+    assertThat(deliveryElement.get().getModuleConditions().getDeviceTiersCondition())
+        .hasValue(DeviceTiersCondition.create(ImmutableSet.of("medium", "high")));
+  }
+
+  @Test
+  public void moduleConditions_multipleDeviceTiersCondition_throws() {
+    Optional<ManifestDeliveryElement> element =
+        ManifestDeliveryElement.fromManifestRootNode(
+            androidManifest(
+                "com.test.app",
+                withDeviceTiersCondition(ImmutableList.of("medium", "high")),
+                withDeviceTiersCondition(ImmutableList.of("low"))),
+            /* isFastFollowAllowed= */ false);
+
+    assertThat(element).isPresent();
+
+    InvalidBundleException exception =
+        assertThrows(InvalidBundleException.class, () -> element.get().getModuleConditions());
+    assertThat(exception)
+        .hasMessageThat()
+        .contains("Multiple '<dist:device-tiers>' conditions are not supported.");
+  }
+
+  @Test
+  public void moduleConditions_emptyDeviceTiersCondition_throws() {
+    Optional<ManifestDeliveryElement> element =
+        ManifestDeliveryElement.fromManifestRootNode(
+            androidManifest("com.test.app", withDeviceTiersCondition(ImmutableList.of())),
+            /* isFastFollowAllowed= */ false);
+
+    assertThat(element).isPresent();
+
+    InvalidBundleException exception =
+        assertThrows(InvalidBundleException.class, () -> element.get().getModuleConditions());
+    assertThat(exception)
+        .hasMessageThat()
+        .contains("At least one device tier should be specified in '<dist:device-tiers>' element.");
+  }
+
+  @Test
+  public void moduleConditions_wrongElementInsideDeviceTiersCondition_throws() {
+    XmlProtoElement badDeviceTierCondition =
+        XmlProtoElementBuilder.create(DISTRIBUTION_NAMESPACE_URI, "device-tiers")
+            .addChildElement(XmlProtoElementBuilder.create(DISTRIBUTION_NAMESPACE_URI, "wrong"))
+            .build();
+
+    Optional<ManifestDeliveryElement> element =
+        ManifestDeliveryElement.fromManifestRootNode(
+            createAndroidManifestWithConditions(badDeviceTierCondition),
+            /* isFastFollowAllowed= */ false);
+
+    assertThat(element).isPresent();
+
+    InvalidBundleException exception =
+        assertThrows(InvalidBundleException.class, () -> element.get().getModuleConditions());
+    assertThat(exception)
+        .hasMessageThat()
+        .contains(
+            "Expected only '<dist:device-tier>' elements inside '<dist:device-tiers>', but found"
+                + " 'wrong'");
+  }
+
+  @Test
+  public void moduleConditions_wrongAttributeInDeviceTierElement_throws() {
+    XmlProtoElement badDeviceTierCondition =
+        XmlProtoElementBuilder.create(DISTRIBUTION_NAMESPACE_URI, "device-tiers")
+            .addChildElement(
+                XmlProtoElementBuilder.create(DISTRIBUTION_NAMESPACE_URI, "device-tier")
+                    .addAttribute(
+                        XmlProtoAttributeBuilder.create(DISTRIBUTION_NAMESPACE_URI, "tierName")
+                            .setValueAsString("low")))
+            .build();
+
+    Optional<ManifestDeliveryElement> element =
+        ManifestDeliveryElement.fromManifestRootNode(
+            createAndroidManifestWithConditions(badDeviceTierCondition),
+            /* isFastFollowAllowed= */ false);
+
+    assertThat(element).isPresent();
+
+    InvalidBundleException exception =
+        assertThrows(InvalidBundleException.class, () -> element.get().getModuleConditions());
+    assertThat(exception)
+        .hasMessageThat()
+        .isEqualTo(
+            "'<dist:device-tier>' element is expected to have 'dist:name' attribute but found"
+                + " none.");
+  }
+
+  @Test
+  public void moduleConditions_wrongDeviceTierName_throws() {
+    Optional<ManifestDeliveryElement> element =
+        ManifestDeliveryElement.fromManifestRootNode(
+            androidManifest("com.test.app", withDeviceTiersCondition(ImmutableList.of("tier!!!"))),
+            /* isFastFollowAllowed= */ false);
+
+    assertThat(element).isPresent();
+
+    InvalidBundleException exception =
+        assertThrows(InvalidBundleException.class, () -> element.get().getModuleConditions());
+    assertThat(exception)
+        .hasMessageThat()
+        .isEqualTo(
+            "Device tier names should start with a letter and contain only "
+                + "letters, numbers and underscores. Found tier named 'tier!!!' in "
+                + "'<dist:device-tier>' element.");
   }
 
   @Test

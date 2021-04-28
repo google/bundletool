@@ -81,6 +81,25 @@ message Optimizations {
   // If no StandaloneConfig is set, the configuration is inherited from
   // splits_config.
   StandaloneConfig standalone_config = 4;
+
+  // Optimizations that are applied to resources.
+  ResourceOptimizations resource_optimizations = 5;
+}
+
+message ResourceOptimizations {
+  // Whether to use sparse encoding for resource tables.
+  // Resources in sparse resource table are accessed using a binary search tree.
+  // This decreases APK size at the cost of resource retrieval performance.
+  SparseEncoding sparse_encoding = 1;
+
+  enum SparseEncoding {
+    // Disables sparse encoding.
+    UNSPECIFIED = 0;
+    // Forces sparse resourse tables in all produced variants. This mode is
+    // available only for applications with minSdk >= 26 because sparse
+    // resource table support was added in Android O.
+    ENFORCED = 1;
+  }
 }
 
 message UncompressNativeLibraries {

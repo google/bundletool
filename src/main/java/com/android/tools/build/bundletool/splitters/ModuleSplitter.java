@@ -20,7 +20,6 @@ import static com.android.tools.build.bundletool.model.targeting.TargetingUtils.
 import static com.android.tools.build.bundletool.model.utils.TargetingProtoUtils.lPlusVariantTargeting;
 import static com.android.tools.build.bundletool.model.utils.TargetingProtoUtils.sdkVersionFrom;
 import static com.android.tools.build.bundletool.model.utils.Versions.ANDROID_L_API_VERSION;
-import static com.android.tools.build.bundletool.model.utils.Versions.ANDROID_R_API_VERSION;
 import static com.android.tools.build.bundletool.model.version.VersionGuardedFeature.PIN_LOWEST_DENSITY_OF_EACH_STYLE_TO_MASTER;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Preconditions.checkState;
@@ -33,6 +32,7 @@ import com.android.bundle.Targeting.SdkVersionTargeting;
 import com.android.bundle.Targeting.VariantTargeting;
 import com.android.tools.build.bundletool.mergers.SameTargetingMerger;
 import com.android.tools.build.bundletool.model.AndroidManifest;
+import com.android.tools.build.bundletool.model.BundleMetadata;
 import com.android.tools.build.bundletool.model.BundleModule;
 import com.android.tools.build.bundletool.model.ManifestEditor;
 import com.android.tools.build.bundletool.model.ManifestMutator;
@@ -74,12 +74,15 @@ public class ModuleSplitter {
   private final StampType stampType;
 
   private final AbiPlaceholderInjector abiPlaceholderInjector;
+  private final PinSpecInjector pinSpecInjector;
+  private final CodeTransparencyInjector codeTransparencyInjector;
 
   @VisibleForTesting
   public static ModuleSplitter createForTest(BundleModule module, Version bundleVersion) {
     return new ModuleSplitter(
         module,
         bundleVersion,
+        BundleMetadata.builder().build(),
         ApkGenerationConfiguration.getDefaultInstance(),
         lPlusVariantTargeting(),
         /* allModuleNames= */ ImmutableSet.of(),
@@ -90,12 +93,14 @@ public class ModuleSplitter {
   public static ModuleSplitter createNoStamp(
       BundleModule module,
       Version bundleVersion,
+      BundleMetadata bundleMetadata,
       ApkGenerationConfiguration apkGenerationConfiguration,
       VariantTargeting variantTargeting,
       ImmutableSet<String> allModuleNames) {
     return new ModuleSplitter(
         module,
         bundleVersion,
+        bundleMetadata,
         apkGenerationConfiguration,
         variantTargeting,
         allModuleNames,
@@ -106,6 +111,7 @@ public class ModuleSplitter {
   public static ModuleSplitter create(
       BundleModule module,
       Version bundleVersion,
+      BundleMetadata bundleMetadata,
       ApkGenerationConfiguration apkGenerationConfiguration,
       VariantTargeting variantTargeting,
       ImmutableSet<String> allModuleNames,
@@ -114,6 +120,7 @@ public class ModuleSplitter {
     return new ModuleSplitter(
         module,
         bundleVersion,
+        bundleMetadata,
         apkGenerationConfiguration,
         variantTargeting,
         allModuleNames,
@@ -124,6 +131,7 @@ public class ModuleSplitter {
   private ModuleSplitter(
       BundleModule module,
       Version bundleVersion,
+      BundleMetadata bundleMetadata,
       ApkGenerationConfiguration apkGenerationConfiguration,
       VariantTargeting variantTargeting,
       ImmutableSet<String> allModuleNames,
@@ -135,6 +143,8 @@ public class ModuleSplitter {
     this.variantTargeting = checkNotNull(variantTargeting);
     this.abiPlaceholderInjector =
         new AbiPlaceholderInjector(apkGenerationConfiguration.getAbisForPlaceholderLibs());
+    this.pinSpecInjector = new PinSpecInjector(module);
+    this.codeTransparencyInjector = new CodeTransparencyInjector(bundleMetadata);
     this.allModuleNames = allModuleNames;
     this.stampSource = stampSource;
     this.stampType = stampType;
@@ -169,6 +179,8 @@ public class ModuleSplitter {
   private ImmutableList<ModuleSplit> splitModuleInternal() {
     ImmutableList<ModuleSplit> moduleSplits =
         runSplitters().stream()
+            .map(pinSpecInjector::inject)
+            .map(codeTransparencyInjector::inject)
             .map(this::addApkTargetingForSigningConfiguration)
             .map(this::addLPlusApkTargeting)
             .map(this::writeSplitIdInManifest)
@@ -410,15 +422,20 @@ public class ModuleSplitter {
    * exists and is greater than R+, then it is not overridden.
    */
   private ModuleSplit addApkTargetingForSigningConfiguration(ModuleSplit split) {
-    if (apkGenerationConfiguration.getRestrictV3SigningToRPlus()
-        && getMinSdk(variantTargeting.getSdkVersionTargeting()) >= ANDROID_R_API_VERSION
-        && getMinSdk(split.getApkTargeting().getSdkVersionTargeting()) < ANDROID_R_API_VERSION) {
+    if (!apkGenerationConfiguration.getMinimumV3SigningApiVersion().isPresent()) {
+      return split;
+    }
+    int minimumV3SigningApiVersion =
+        apkGenerationConfiguration.getMinimumV3SigningApiVersion().get();
+    if (getMinSdk(variantTargeting.getSdkVersionTargeting()) >= minimumV3SigningApiVersion
+        && getMinSdk(split.getApkTargeting().getSdkVersionTargeting())
+            < minimumV3SigningApiVersion) {
       return split.toBuilder()
           .setApkTargeting(
               split.getApkTargeting().toBuilder()
                   .setSdkVersionTargeting(
                       SdkVersionTargeting.newBuilder()
-                          .addValue(sdkVersionFrom(ANDROID_R_API_VERSION)))
+                          .addValue(sdkVersionFrom(minimumV3SigningApiVersion)))
                   .build())
           .build();
     }
