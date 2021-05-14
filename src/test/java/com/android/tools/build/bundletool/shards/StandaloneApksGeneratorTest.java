@@ -154,7 +154,7 @@ public class StandaloneApksGeneratorTest {
       BundleMetadata.builder()
           .addFile(
               BundleMetadata.BUNDLETOOL_NAMESPACE,
-              BundleMetadata.TRANSPARENCY_FILE_NAME,
+              BundleMetadata.TRANSPARENCY_SIGNED_FILE_NAME,
               ByteSource.empty())
           .build();
 
@@ -544,7 +544,7 @@ public class StandaloneApksGeneratorTest {
               "res/drawable/image.jpg",
               "res/drawable-mdpi/image.jpg",
               "root/license.dat",
-              "META-INF/code_transparency.json");
+              "META-INF/code_transparency_signed.jwt");
     }
   }
 
@@ -861,7 +861,7 @@ public class StandaloneApksGeneratorTest {
               "dex/classes.dex",
               "lib/x86/libtest.so",
               "root/license.dat",
-              "META-INF/code_transparency.json");
+              "META-INF/code_transparency_signed.jwt");
     }
   }
 
@@ -1130,7 +1130,7 @@ public class StandaloneApksGeneratorTest {
             "lib/x86_64/libtest2.so",
             "res/drawable-ldpi/image1.jpg",
             "res/drawable-ldpi/image2.jpg",
-            "META-INF/code_transparency.json");
+            "META-INF/code_transparency_signed.jwt");
   }
 
   @Test

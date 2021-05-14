@@ -41,6 +41,7 @@ import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.base.StandardSystemProperty.USER_HOME;
 import static com.google.common.truth.Truth.assertThat;
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.jose4j.jws.AlgorithmIdentifiers.RSA_USING_SHA256;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.mock;
 
@@ -104,6 +105,8 @@ import java.security.cert.X509Certificate;
 import java.util.Optional;
 import java.util.Properties;
 import javax.inject.Inject;
+import org.jose4j.jws.JsonWebSignature;
+import org.jose4j.lang.JoseException;
 import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Rule;
@@ -161,7 +164,9 @@ public class BuildApksCommandTest {
   public static void setUpClass() throws Exception {
     // Creating a new key takes in average 75ms (with peaks at 200ms), so creating a single one for
     // all the tests.
-    KeyPair keyPair = KeyPairGenerator.getInstance("RSA").genKeyPair();
+    KeyPairGenerator kpg = KeyPairGenerator.getInstance("RSA");
+    kpg.initialize(/* keysize= */ 3072);
+    KeyPair keyPair = kpg.genKeyPair();
     privateKey = keyPair.getPrivate();
     certificate = CertificateFactory.buildSelfSignedCertificate(keyPair, "CN=BuildApksCommandTest");
 
@@ -1330,24 +1335,28 @@ public class BuildApksCommandTest {
     BuildApksCommand command = BuildApksCommand.fromFlags(flags, fakeAdbServer);
 
     Throwable e = assertThrows(InvalidBundleException.class, command::execute);
-    assertThat(e).hasMessageThat().contains("Code transparency verification failed.");
+    assertThat(e)
+        .hasMessageThat()
+        .contains(
+            "Code transparency verification failed because code was modified after transparency"
+                + " metadata generation.");
   }
 
 
-  private static void createAppBundle(Path path) throws IOException {
+  private void createAppBundle(Path path) throws Exception {
     createAppBundle(path, /* codeTransparency= */ Optional.empty());
   }
 
-  private static void createAppBundle(Path path, Optional<CodeTransparency> codeTransparency)
-      throws IOException {
+  private void createAppBundle(Path path, Optional<CodeTransparency> codeTransparency)
+      throws Exception {
     AppBundleBuilder appBundle =
         new AppBundleBuilder()
             .addModule("base", module -> module.setManifest(androidManifest("com.app")).build());
     if (codeTransparency.isPresent()) {
       appBundle.addMetadataFile(
           BundleMetadata.BUNDLETOOL_NAMESPACE,
-          BundleMetadata.TRANSPARENCY_FILE_NAME,
-          CharSource.wrap(JsonFormat.printer().print(codeTransparency.get()))
+          BundleMetadata.TRANSPARENCY_SIGNED_FILE_NAME,
+          CharSource.wrap(createJwsToken(JsonFormat.printer().print(codeTransparency.get())))
               .asByteSource(Charset.defaultCharset()));
     }
     new AppBundleSerializer().writeToDisk(appBundle.build(), path);
@@ -1428,6 +1437,15 @@ public class BuildApksCommandTest {
         .setVariantTargeting(VariantTargeting.getDefaultInstance())
         .setMasterSplit(true)
         .build();
+  }
+
+  private String createJwsToken(String payload) throws JoseException {
+    JsonWebSignature jws = new JsonWebSignature();
+    jws.setAlgorithmHeaderValue(RSA_USING_SHA256);
+    jws.setCertificateChainHeaderValue(certificate);
+    jws.setPayload(payload);
+    jws.setKey(privateKey);
+    return jws.getCompactSerialization();
   }
 
   @CommandScoped

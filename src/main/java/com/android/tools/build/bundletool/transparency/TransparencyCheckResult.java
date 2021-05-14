@@ -21,34 +21,52 @@ import com.google.auto.value.AutoValue;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.MapDifference;
 import com.google.common.collect.Maps;
+import java.util.Optional;
 
 /** Represents result of code transparency verification. */
 @AutoValue
 public abstract class TransparencyCheckResult {
 
-  /** {@link CodeRelatedFile}s extracted from the transparency metadata, keyed by path. */
+  /**
+   * Thumbprint of the public key certificate used to successfully verify transparency. Only set if
+   * code transparency signature was successfully verified.
+   */
+  public abstract Optional<String> certificateThumbprint();
+
+  /**
+   * {@link CodeRelatedFile}s extracted from the transparency metadata, keyed by path. Only set if
+   * transparency signature was successfully verified.
+   */
   abstract ImmutableMap<String, CodeRelatedFile> codeRelatedFilesFromTransparencyMetadata();
 
-  /** {@link CodeRelatedFile}s extracted from the bundle, keyed by path. */
-  abstract ImmutableMap<String, CodeRelatedFile> codeRelatedFilesFromBundle();
+  /**
+   * {@link CodeRelatedFile}s extracted from the bundle or APKs, keyed by path. Only set if
+   * transparency signature was successfully verified.
+   */
+  abstract ImmutableMap<String, CodeRelatedFile> actualCodeRelatedFiles();
 
   /**
    * Difference between {@link #codeRelatedFilesFromTransparencyMetadata()} and {@link
-   * #codeRelatedFilesFromBundle()}.
+   * #actualCodeRelatedFiles()}.
    */
   abstract MapDifference<String, CodeRelatedFile> codeTransparencyDiff();
 
+  /** Returns {@code true} if code transparency signature was successfully verified. */
+  public boolean signatureVerified() {
+    return certificateThumbprint().isPresent();
+  }
+
   /**
-   * Returns {@code true} if code transparency was successfully verified, and {@code false}
-   * otherwise.
+   * Returns {@code true} if the code transparency file contents match actual code related files
+   * present in the bundle or APKs.
    */
-  public boolean verified() {
-    return codeTransparencyDiff().areEqual();
+  public boolean fileContentsVerified() {
+    return signatureVerified() && codeTransparencyDiff().areEqual();
   }
 
   /**
    * Returns string representation of difference between code transparency file contents and code
-   * related files present in the bundle.
+   * related files present in the bundle or the APKs.
    */
   public String getDiffAsString() {
     return "Files deleted after transparency metadata generation: "
@@ -59,12 +77,22 @@ public abstract class TransparencyCheckResult {
         + codeTransparencyDiff().entriesDiffering().keySet();
   }
 
-  public static TransparencyCheckResult create(
+  static TransparencyCheckResult createForValidSignature(
+      String certificateThumbprint,
       ImmutableMap<String, CodeRelatedFile> codeRelatedFilesFromTransparencyMetadata,
-      ImmutableMap<String, CodeRelatedFile> codeRelatedFilesFromBundle) {
+      ImmutableMap<String, CodeRelatedFile> actualCodeRelatedFiles) {
     return new AutoValue_TransparencyCheckResult(
+        Optional.of(certificateThumbprint),
         codeRelatedFilesFromTransparencyMetadata,
-        codeRelatedFilesFromBundle,
-        Maps.difference(codeRelatedFilesFromTransparencyMetadata, codeRelatedFilesFromBundle));
+        actualCodeRelatedFiles,
+        Maps.difference(codeRelatedFilesFromTransparencyMetadata, actualCodeRelatedFiles));
+  }
+
+  static TransparencyCheckResult createForInvalidSignature() {
+    return new AutoValue_TransparencyCheckResult(
+        /* certificateThumbprint= */ Optional.empty(),
+        /* codeRelatedFilesFromTransparencyMetadata= */ ImmutableMap.of(),
+        /* actualCodeRelatedFiles= */ ImmutableMap.of(),
+        /* codeTransparencyDiff= */ Maps.difference(ImmutableMap.of(), ImmutableMap.of()));
   }
 }

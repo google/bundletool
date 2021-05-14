@@ -15,12 +15,14 @@
  */
 package com.android.tools.build.bundletool.commands;
 
+import static com.android.tools.build.bundletool.commands.AddTransparencyCommand.MIN_RSA_KEY_LENGTH;
 import static com.android.tools.build.bundletool.model.BundleMetadata.BUNDLETOOL_NAMESPACE;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifest;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withSharedUserId;
 import static com.google.common.truth.Truth.assertThat;
 import static com.google.common.truth.Truth8.assertThat;
 import static com.google.common.truth.extensions.proto.ProtoTruth.assertThat;
+import static org.jose4j.jws.AlgorithmIdentifiers.RSA_USING_SHA256;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.android.aapt.Resources.XmlNode;
@@ -53,6 +55,7 @@ import java.security.PrivateKey;
 import java.security.cert.Certificate;
 import java.util.Optional;
 import java.util.zip.ZipFile;
+import org.jose4j.jws.JsonWebSignature;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
@@ -98,13 +101,7 @@ public final class AddTransparencyCommandTest {
     bundlePath = tmpDir.resolve("bundle.aab");
     outputPath = tmpDir.resolve("bundle_with_transparency.aab");
     keystorePath = tmpDir.resolve("keystore.jks");
-    createKeyStore(keystorePath);
-    signerConfig =
-        SignerConfig.extractFromKeystore(
-            keystorePath,
-            KEY_ALIAS,
-            Optional.of(Password.createForTest(KEYSTORE_PASSWORD)),
-            Optional.of(Password.createForTest(KEY_PASSWORD)));
+    createRsaKeySignerConfig(keystorePath, MIN_RSA_KEY_LENGTH);
     fileHashDex1 = ByteSource.wrap(FILE_CONTENT_DEX1).hash(Hashing.sha256()).toString();
     fileHashDex2 = ByteSource.wrap(FILE_CONTENT_DEX2).hash(Hashing.sha256()).toString();
     fileHashNativeLib1 =
@@ -114,7 +111,7 @@ public final class AddTransparencyCommandTest {
   }
 
   @Test
-  public void buildingCommandViaFlags_bundlePathNotSet() {
+  public void buildingCommandViaFlags_bundlePathNotSet() throws Exception {
     Throwable e =
         assertThrows(
             RequiredFlagNotSetException.class,
@@ -131,7 +128,7 @@ public final class AddTransparencyCommandTest {
   }
 
   @Test
-  public void buildingCommandViaFlags_outputPathNotSet() {
+  public void buildingCommandViaFlags_outputPathNotSet() throws Exception {
     Throwable e =
         assertThrows(
             RequiredFlagNotSetException.class,
@@ -182,7 +179,7 @@ public final class AddTransparencyCommandTest {
   }
 
   @Test
-  public void buildingCommandViaFlags_unknownFlag() {
+  public void buildingCommandViaFlags_unknownFlag() throws Exception {
     Throwable e =
         assertThrows(
             UnknownFlagsException.class,
@@ -201,7 +198,7 @@ public final class AddTransparencyCommandTest {
   }
 
   @Test
-  public void buildingCommandViaFlagsAndBuilderHasSameResult() {
+  public void buildingCommandViaFlagsAndBuilderHasSameResult() throws Exception {
     AddTransparencyCommand commandViaFlags =
         AddTransparencyCommand.fromFlags(
             new FlagParser()
@@ -223,7 +220,7 @@ public final class AddTransparencyCommandTest {
   }
 
   @Test
-  public void execute_bundleNotFound() {
+  public void execute_bundleNotFound() throws Exception {
     AddTransparencyCommand addTransparencyCommand =
         AddTransparencyCommand.builder()
             .setBundlePath(bundlePath)
@@ -236,7 +233,7 @@ public final class AddTransparencyCommandTest {
   }
 
   @Test
-  public void execute_wrongInputFileFormat() {
+  public void execute_wrongInputFileFormat() throws Exception {
     AddTransparencyCommand addTransparencyCommand =
         AddTransparencyCommand.builder()
             .setBundlePath(tmpDir.resolve("bundle.txt"))
@@ -296,6 +293,40 @@ public final class AddTransparencyCommandTest {
   }
 
   @Test
+  public void execute_unsupportedKeyLength() throws Exception {
+    createBundle(bundlePath);
+    createRsaKeySignerConfig(keystorePath, /* keySize= */ 1024);
+    AddTransparencyCommand addTransparencyCommand =
+        AddTransparencyCommand.builder()
+            .setBundlePath(bundlePath)
+            .setOutputPath(outputPath)
+            .setSignerConfig(signerConfig)
+            .build();
+
+    Throwable e = assertThrows(IllegalArgumentException.class, addTransparencyCommand::execute);
+    assertThat(e)
+        .hasMessageThat()
+        .isEqualTo("Minimum required key length is 3072 bits, but 1024 bit key was provided.");
+  }
+
+  @Test
+  public void execute_unsupportedAlgorithm() throws Exception {
+    createBundle(bundlePath);
+    createSignerConfigWithUnsupportedAlgorithm(keystorePath, /* keySize= */ 1024);
+    AddTransparencyCommand addTransparencyCommand =
+        AddTransparencyCommand.builder()
+            .setBundlePath(bundlePath)
+            .setOutputPath(outputPath)
+            .setSignerConfig(signerConfig)
+            .build();
+
+    Throwable e = assertThrows(IllegalArgumentException.class, addTransparencyCommand::execute);
+    assertThat(e)
+        .hasMessageThat()
+        .isEqualTo("Transparency signing key must be an RSA key, but DSA key was provided.");
+  }
+
+  @Test
   public void execute_success() throws Exception {
     createBundle(bundlePath);
     AddTransparencyCommand addTransparencyCommand =
@@ -308,12 +339,21 @@ public final class AddTransparencyCommandTest {
     addTransparencyCommand.execute();
 
     AppBundle outputBundle = AppBundle.buildFromZip(new ZipFile(outputPath.toFile()));
-    Optional<ByteSource> transparencyFile =
+    Optional<ByteSource> signedTransparencyFile =
         outputBundle
             .getBundleMetadata()
-            .getFileAsByteSource(BUNDLETOOL_NAMESPACE, BundleMetadata.TRANSPARENCY_FILE_NAME);
-    assertThat(transparencyFile).isPresent();
-    CodeTransparency transparencyProto = getTransparencyProto(transparencyFile.get());
+            .getFileAsByteSource(
+                BUNDLETOOL_NAMESPACE, BundleMetadata.TRANSPARENCY_SIGNED_FILE_NAME);
+    assertThat(signedTransparencyFile).isPresent();
+    JsonWebSignature jws =
+        (JsonWebSignature)
+            JsonWebSignature.fromCompactSerialization(
+                signedTransparencyFile.get().asCharSource(Charset.defaultCharset()).read());
+    assertThat(jws.getAlgorithmHeaderValue()).isEqualTo(RSA_USING_SHA256);
+    assertThat(jws.getCertificateChainHeaderValue()).isEqualTo(signerConfig.getCertificates());
+    // jws.getPayload method will do signature verification using the public key set below.
+    jws.setKey(signerConfig.getCertificates().get(0).getPublicKey());
+    CodeTransparency transparencyProto = getTransparencyProto(jws.getPayload());
     assertThat(transparencyProto)
         .ignoringRepeatedFieldOrder()
         .isEqualTo(expectedTransparencyProto());
@@ -340,16 +380,40 @@ public final class AddTransparencyCommandTest {
     new AppBundleSerializer().writeToDisk(appBundle, path);
   }
 
-  private static void createKeyStore(Path keystorePath) throws Exception {
-    KeyPair keyPair = KeyPairGenerator.getInstance("RSA").genKeyPair();
+  private void createSignerConfigWithUnsupportedAlgorithm(Path keystorePath, int keySize)
+      throws Exception {
+    KeyPairGenerator kpg = KeyPairGenerator.getInstance("DSA");
+    kpg.initialize(keySize);
+    KeyPair keyPair = kpg.genKeyPair();
+    PrivateKey privateKey = keyPair.getPrivate();
+    Certificate certificate =
+        CertificateFactory.buildSelfSignedDSACertificate(keyPair, "CN=AddTransparencyCommandTest");
+    createSignerConfig(keystorePath, privateKey, certificate);
+  }
+
+  private void createRsaKeySignerConfig(Path keystorePath, int keySize) throws Exception {
+    KeyPairGenerator kpg = KeyPairGenerator.getInstance("RSA");
+    kpg.initialize(keySize);
+    KeyPair keyPair = kpg.genKeyPair();
     PrivateKey privateKey = keyPair.getPrivate();
     Certificate certificate =
         CertificateFactory.buildSelfSignedCertificate(keyPair, "CN=AddTransparencyCommandTest");
+    createSignerConfig(keystorePath, privateKey, certificate);
+  }
+
+  private void createSignerConfig(Path keystorePath, PrivateKey privateKey, Certificate certificate)
+      throws Exception {
     KeyStore keystore = KeyStore.getInstance("JKS");
     keystore.load(/* stream= */ null, KEYSTORE_PASSWORD.toCharArray());
     keystore.setKeyEntry(
         KEY_ALIAS, privateKey, KEY_PASSWORD.toCharArray(), new Certificate[] {certificate});
     keystore.store(new FileOutputStream(keystorePath.toFile()), KEYSTORE_PASSWORD.toCharArray());
+    signerConfig =
+        SignerConfig.extractFromKeystore(
+            keystorePath,
+            KEY_ALIAS,
+            Optional.of(Password.createForTest(KEYSTORE_PASSWORD)),
+            Optional.of(Password.createForTest(KEY_PASSWORD)));
   }
 
   private static BundleModule addCodeFilesToBundleModule(
@@ -411,11 +475,10 @@ public final class AddTransparencyCommandTest {
                 .build());
   }
 
-  private static CodeTransparency getTransparencyProto(ByteSource transparencySource)
+  private static CodeTransparency getTransparencyProto(String transparencyPayload)
       throws IOException {
     CodeTransparency.Builder transparencyProto = CodeTransparency.newBuilder();
-    JsonFormat.parser()
-        .merge(transparencySource.asCharSource(Charset.defaultCharset()).read(), transparencyProto);
+    JsonFormat.parser().merge(transparencyPayload, transparencyProto);
     return transparencyProto.build();
   }
 }

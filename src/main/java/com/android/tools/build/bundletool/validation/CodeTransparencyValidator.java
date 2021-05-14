@@ -30,20 +30,26 @@ public final class CodeTransparencyValidator extends SubValidator {
 
   @Override
   public void validateBundle(AppBundle bundle) {
-    Optional<ByteSource> transparencyFile =
+    Optional<ByteSource> signedTransparencyFile =
         bundle
             .getBundleMetadata()
             .getFileAsByteSource(
-                BundleMetadata.BUNDLETOOL_NAMESPACE, BundleMetadata.TRANSPARENCY_FILE_NAME);
-    if (!transparencyFile.isPresent()) {
+                BundleMetadata.BUNDLETOOL_NAMESPACE, BundleMetadata.TRANSPARENCY_SIGNED_FILE_NAME);
+    if (!signedTransparencyFile.isPresent()) {
       return;
     }
     TransparencyCheckResult transparencyCheckResult =
-        checkTransparency(bundle, transparencyFile.get());
-    if (!transparencyCheckResult.verified()) {
+        checkTransparency(bundle, signedTransparencyFile.get());
+    if (!transparencyCheckResult.signatureVerified()) {
+      throw InvalidBundleException.builder()
+          .withUserMessage("Code transparency verification failed because signature is invalid.")
+          .build();
+    }
+    if (!transparencyCheckResult.fileContentsVerified()) {
       throw InvalidBundleException.builder()
           .withUserMessage(
-              "Code transparency verification failed.\n"
+              "Code transparency verification failed because code was modified "
+                  + "after transparency metadata generation.\n"
                   + transparencyCheckResult.getDiffAsString())
           .build();
     }

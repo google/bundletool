@@ -18,11 +18,13 @@ package com.android.tools.build.bundletool.model;
 
 import static com.google.common.base.Preconditions.checkArgument;
 
+import com.android.tools.build.bundletool.model.ModuleEntry.ModuleEntryBundleLocation;
 import com.google.auto.value.AutoValue;
 import com.google.auto.value.extension.memoized.Memoized;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.io.ByteSource;
 import com.google.errorprone.annotations.Immutable;
+import java.nio.file.Paths;
 import java.util.Optional;
 
 /** Holder of the App Bundle metadata. */
@@ -42,7 +44,7 @@ public abstract class BundleMetadata {
 
   public static final String PROGUARD_MAP_FILE_NAME = "proguard.map";
 
-  public static final String TRANSPARENCY_FILE_NAME = "code_transparency.json";
+  public static final String TRANSPARENCY_SIGNED_FILE_NAME = "code_transparency_signed.jwt";
 
   /**
    * Returns the raw metadata map.
@@ -63,17 +65,20 @@ public abstract class BundleMetadata {
   }
 
   @Memoized
-  public Optional<ModuleEntry> getModuleEntryForTransparencyFile() {
-    return getFileAsByteSource(BUNDLETOOL_NAMESPACE, TRANSPARENCY_FILE_NAME)
+  public Optional<ModuleEntry> getModuleEntryForSignedTransparencyFile() {
+    return getFileAsByteSource(BUNDLETOOL_NAMESPACE, TRANSPARENCY_SIGNED_FILE_NAME)
         .map(
-            transparencyFileContent ->
+            transparencySignedFileContent ->
                 ModuleEntry.builder()
-                    .setContent(transparencyFileContent)
-                    .setBundlePath(
-                        ZipPath.create("BUNDLE-METADATA")
-                            .resolve(BUNDLETOOL_NAMESPACE)
-                            .resolve(TRANSPARENCY_FILE_NAME))
-                    .setPath(ZipPath.create("META-INF").resolve(TRANSPARENCY_FILE_NAME))
+                    .setContent(transparencySignedFileContent)
+                    // TODO(b/186621568): Set bundle path.
+                    .setBundleLocation(
+                        ModuleEntryBundleLocation.create(
+                            Paths.get(""),
+                            ZipPath.create("BUNDLE-METADATA")
+                                .resolve(BUNDLETOOL_NAMESPACE)
+                                .resolve(TRANSPARENCY_SIGNED_FILE_NAME)))
+                    .setPath(ZipPath.create("META-INF").resolve(TRANSPARENCY_SIGNED_FILE_NAME))
                     .build());
   }
 

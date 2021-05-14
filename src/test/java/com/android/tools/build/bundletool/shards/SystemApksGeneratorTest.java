@@ -111,7 +111,7 @@ public class SystemApksGeneratorTest {
       BundleMetadata.builder()
           .addFile(
               BundleMetadata.BUNDLETOOL_NAMESPACE,
-              BundleMetadata.TRANSPARENCY_FILE_NAME,
+              BundleMetadata.TRANSPARENCY_SIGNED_FILE_NAME,
               ByteSource.empty())
           .build();
 
@@ -201,7 +201,7 @@ public class SystemApksGeneratorTest {
             "assets/file.txt",
             "dex/classes.dex",
             "lib/x86/libtest.so",
-            "META-INF/code_transparency.json");
+            "META-INF/code_transparency_signed.jwt");
   }
 
   @Test
@@ -438,7 +438,7 @@ public class SystemApksGeneratorTest {
     ModuleSplit fusedShard = shards.get(0);
     assertThat(fusedShard.isBaseModuleSplit()).isTrue();
     assertThat(extractPaths(fusedShard.getEntries()))
-        .containsExactly("META-INF/code_transparency.json");
+        .containsExactly("META-INF/code_transparency_signed.jwt");
 
     ModuleSplit languageSplit = shards.get(1);
     assertThat(extractPaths(languageSplit.getEntries()))

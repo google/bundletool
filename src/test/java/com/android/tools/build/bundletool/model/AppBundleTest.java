@@ -34,6 +34,7 @@ import com.android.bundle.Config.BundleConfig;
 import com.android.bundle.Config.BundleConfig.BundleType;
 import com.android.bundle.Targeting.Abi.AbiAlias;
 import com.android.tools.build.bundletool.io.ZipBuilder;
+import com.android.tools.build.bundletool.model.ModuleEntry.ModuleEntryBundleLocation;
 import com.android.tools.build.bundletool.testing.AppBundleBuilder;
 import com.android.tools.build.bundletool.testing.BundleConfigBuilder;
 import com.google.common.io.ByteSource;
@@ -401,6 +402,42 @@ public class AppBundleTest {
             .addModule("base", baseModule -> baseModule.setManifest(androidManifest(PACKAGE_NAME)))
             .build();
     assertThat(appBundle3.hasSharedUserId()).isFalse();
+  }
+
+  @Test
+  public void bundleLocation_fromZip_areSet() throws Exception {
+    String dexZipEntry = "base/dex/classes.dex";
+    ZipPath dexModuleEntryPath = ZipPath.create("dex/classes.dex");
+
+    createBasicZipBuilderWithManifest()
+        .addFileWithContent(ZipPath.create(dexZipEntry), DUMMY_CONTENT)
+        .writeTo(bundleFile);
+
+    try (ZipFile appBundleZip = new ZipFile(bundleFile.toFile())) {
+      AppBundle appBundle = AppBundle.buildFromZip(appBundleZip);
+      assertThat(appBundle.getFeatureModules().keySet())
+          .containsExactly(BundleModuleName.create("base"));
+      assertThat(appBundle.getBaseModule().getEntry(dexModuleEntryPath)).isPresent();
+      assertThat(appBundle.getBaseModule().getEntry(dexModuleEntryPath).get().getBundleLocation())
+          .hasValue(ModuleEntryBundleLocation.create(bundleFile, ZipPath.create(dexZipEntry)));
+    }
+  }
+
+  @Test
+  public void bundleLocation_notFromZip_notSet() throws Exception {
+    String dexFilePath = "dex/classes.dex";
+    AppBundle appBundle =
+        new AppBundleBuilder()
+            .addModule("base", builder -> builder.setManifest(MANIFEST).addFile(dexFilePath))
+            .build();
+    assertThat(appBundle.getBaseModule().getEntry(ZipPath.create(dexFilePath))).isPresent();
+    assertThat(
+            appBundle
+                .getBaseModule()
+                .getEntry(ZipPath.create(dexFilePath))
+                .get()
+                .getBundleLocation())
+        .isEmpty();
   }
 
   private static ZipBuilder createBasicZipBuilder(BundleConfig config) {

@@ -36,7 +36,7 @@ dependencies {
     compile "com.android.tools.build:apkzlib:4.2.0-alpha13"
     compile "com.android.tools.build:apksig:4.2.0-alpha13"
     compile "com.android.tools.ddms:ddmlib:30.0.0-alpha10"
-    compile "com.android:zipflinger:4.2.0-alpha11"
+    compile "com.android:zipflinger:7.0.0-alpha14"
 
     shadow "com.android.tools.build:aapt2-proto:4.1.0-alpha01-6193524"
     shadow "com.google.auto.value:auto-value-annotations:1.6.2"
@@ -48,6 +48,7 @@ dependencies {
     shadow "com.google.dagger:dagger:2.28.3"
     annotationProcessor "com.google.dagger:dagger-compiler:2.28.3"
     shadow "javax.inject:javax.inject:1"
+    shadow "org.bitbucket.b_c:jose4j:0.7.0"
 
     compileWindows "com.android.tools.build:aapt2:4.1.0-alpha01-6193524:windows"
     compileMacOs "com.android.tools.build:aapt2:4.1.0-alpha01-6193524:osx"
@@ -75,6 +76,7 @@ dependencies {
     testCompile("org.smali:dexlib2:2.3.4") {
         exclude group: "com.google.guava", module: "guava"
     }
+    testCompile "org.bitbucket.b_c:jose4j:0.7.0"
 }
 
 def osName = System.getProperty("os.name").toLowerCase()

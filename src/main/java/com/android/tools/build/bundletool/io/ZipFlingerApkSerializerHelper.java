@@ -197,8 +197,8 @@ final class ZipFlingerApkSerializerHelper extends ApkSerializerHelper {
       }
       boolean shouldCompress = compressionManager.shouldCompress(pathInApk);
 
-      if (moduleEntry.getBundlePath().isPresent()) {
-        ZipPath pathInBundle = moduleEntry.getBundlePath().get();
+      if (moduleEntry.getBundleLocation().isPresent()) {
+        ZipPath pathInBundle = moduleEntry.getBundleLocation().get().entryPathInBundle();
         Entry entry = bundleEntries.get(pathInBundle.toString());
         checkNotNull(entry, "Could not find entry '%s'.", pathInBundle);
 
@@ -265,8 +265,8 @@ final class ZipFlingerApkSerializerHelper extends ApkSerializerHelper {
           continue;
         }
 
-        if (moduleEntry.getBundlePath().isPresent()) {
-          ZipPath pathInBundle = moduleEntry.getBundlePath().get();
+        if (moduleEntry.getBundleLocation().isPresent()) {
+          ZipPath pathInBundle = moduleEntry.getBundleLocation().get().entryPathInBundle();
           Entry entry = bundleEntriesByName.get(pathInBundle.toString());
           checkNotNull(entry, "Could not find entry '%s'.", pathInBundle);
           apkWriter.add(sourceFactory.create(entry, pathInApk, NO_COMPRESSION));

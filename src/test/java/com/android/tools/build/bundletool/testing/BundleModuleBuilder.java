@@ -27,11 +27,13 @@ import com.android.bundle.Files.NativeLibraries;
 import com.android.tools.build.bundletool.model.BundleModule;
 import com.android.tools.build.bundletool.model.BundleModuleName;
 import com.android.tools.build.bundletool.model.ModuleEntry;
+import com.android.tools.build.bundletool.model.ModuleEntry.ModuleEntryBundleLocation;
 import com.android.tools.build.bundletool.model.ZipPath;
 import com.android.tools.build.bundletool.model.utils.xmlproto.XmlProtoNode;
 import com.android.tools.build.bundletool.model.utils.xmlproto.XmlProtoNodeBuilder;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.io.ByteSource;
+import java.nio.file.Path;
 
 /** Builder to build a {@link BundleModule}. */
 public class BundleModuleBuilder {
@@ -59,6 +61,26 @@ public class BundleModuleBuilder {
         ModuleEntry.builder()
             .setPath(ZipPath.create(relativePath))
             .setContent(ByteSource.wrap(content))
+            .build());
+    return this;
+  }
+
+  /**
+   * Adds an entry that should be sourced from a zip file.
+   *
+   * <p>The content will not be loaded.
+   *
+   * @param relativePath the file path in the module that is being constructed
+   * @param zipFilePath location of the on-disk zip file
+   * @param entryFullZipPath the entry path inside the zip file
+   */
+  public BundleModuleBuilder addFile(
+      String relativePath, Path zipFilePath, ZipPath entryFullZipPath) {
+    entries.add(
+        ModuleEntry.builder()
+            .setContent(ByteSource.empty())
+            .setPath(ZipPath.create(relativePath))
+            .setBundleLocation(ModuleEntryBundleLocation.create(zipFilePath, entryFullZipPath))
             .build());
     return this;
   }

@@ -15,6 +15,8 @@
  */
 package com.android.tools.build.bundletool.transparency;
 
+import static com.google.common.base.Preconditions.checkArgument;
+
 import com.android.bundle.CodeTransparencyOuterClass.CodeRelatedFile;
 import com.android.bundle.CodeTransparencyOuterClass.CodeTransparency;
 import com.android.tools.build.bundletool.model.AppBundle;
@@ -47,8 +49,10 @@ public final class CodeTransparencyFactory {
   }
 
   private static CodeRelatedFile createCodeRelatedFile(ModuleEntry moduleEntry) {
+    checkArgument(moduleEntry.getBundleLocation().isPresent());
     CodeRelatedFile.Builder codeRelatedFile =
-        CodeRelatedFile.newBuilder().setPath(moduleEntry.getBundlePath().get().toString());
+        CodeRelatedFile.newBuilder()
+            .setPath(moduleEntry.getBundleLocation().get().entryPathInBundle().toString());
     if (moduleEntry.getPath().startsWith(BundleModule.LIB_DIRECTORY)) {
       codeRelatedFile.setType(CodeRelatedFile.Type.NATIVE_LIBRARY);
       codeRelatedFile.setApkPath(moduleEntry.getPath().toString());

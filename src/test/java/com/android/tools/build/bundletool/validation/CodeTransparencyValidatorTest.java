@@ -19,6 +19,7 @@ import static com.android.bundle.CodeTransparencyOuterClass.CodeRelatedFile.Type
 import static com.android.bundle.CodeTransparencyOuterClass.CodeRelatedFile.Type.NATIVE_LIBRARY;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifest;
 import static com.google.common.truth.Truth.assertThat;
+import static org.jose4j.jws.AlgorithmIdentifiers.RSA_USING_SHA256;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.android.bundle.CodeTransparencyOuterClass.CodeRelatedFile;
@@ -28,13 +29,20 @@ import com.android.tools.build.bundletool.model.AppBundle;
 import com.android.tools.build.bundletool.model.BundleMetadata;
 import com.android.tools.build.bundletool.model.exceptions.InvalidBundleException;
 import com.android.tools.build.bundletool.testing.AppBundleBuilder;
+import com.android.tools.build.bundletool.testing.CertificateFactory;
 import com.google.common.hash.Hashing;
 import com.google.common.io.ByteSource;
 import com.google.common.io.CharSource;
 import com.google.protobuf.util.JsonFormat;
 import java.nio.charset.Charset;
 import java.nio.file.Path;
+import java.security.KeyPair;
+import java.security.KeyPairGenerator;
+import java.security.PrivateKey;
+import java.security.cert.X509Certificate;
 import java.util.zip.ZipFile;
+import org.jose4j.jws.JsonWebSignature;
+import org.jose4j.lang.JoseException;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
@@ -53,25 +61,22 @@ public final class CodeTransparencyValidatorTest {
   @Rule public final TemporaryFolder tmp = new TemporaryFolder();
 
   private Path bundlePath;
+  PrivateKey privateKey;
+  KeyPairGenerator kpg;
+  X509Certificate certificate;
+  CodeTransparency validCodeTransparency;
 
   @Before
-  public void setUp() {
+  public void setUp() throws Exception {
     bundlePath = tmp.getRoot().toPath().resolve("bundle.aab");
-  }
+    kpg = KeyPairGenerator.getInstance("RSA");
+    kpg.initialize(/* keySize= */ 3072);
+    KeyPair keyPair = kpg.genKeyPair();
+    privateKey = keyPair.getPrivate();
+    certificate =
+        CertificateFactory.buildSelfSignedCertificate(keyPair, "CN=CodeTransparencyValidatorTest");
 
-  @Test
-  public void transparencyFileNotPresent() {
-    new CodeTransparencyValidator()
-        .validateBundle(
-            new AppBundleBuilder()
-                .addModule(
-                    "base", module -> module.setManifest(androidManifest("com.test.app")).build())
-                .build());
-  }
-
-  @Test
-  public void transparencyVerified() throws Exception {
-    CodeTransparency validCodeTransparency =
+    validCodeTransparency =
         CodeTransparency.newBuilder()
             .addCodeRelatedFile(
                 CodeRelatedFile.newBuilder()
@@ -86,6 +91,20 @@ public final class CodeTransparencyValidatorTest {
                         ByteSource.wrap(NATIVE_LIB_FILE_CONTENT).hash(Hashing.sha256()).toString())
                     .setApkPath(NATIVE_LIB_PATH))
             .build();
+  }
+
+  @Test
+  public void transparencyFileNotPresent() {
+    new CodeTransparencyValidator()
+        .validateBundle(
+            new AppBundleBuilder()
+                .addModule(
+                    "base", module -> module.setManifest(androidManifest("com.test.app")).build())
+                .build());
+  }
+
+  @Test
+  public void transparencyVerified() throws Exception {
     createBundle(bundlePath, validCodeTransparency);
     AppBundle bundle = AppBundle.buildFromZip(new ZipFile(bundlePath.toFile()));
 
@@ -93,7 +112,26 @@ public final class CodeTransparencyValidatorTest {
   }
 
   @Test
-  public void transparencyVerificationFailed() throws Exception {
+  public void transparencyVerificationFailed_invalidSignature() throws Exception {
+    // Update certificate value so that it does not match the private key that will used to sign the
+    // transparency metadata.
+    certificate =
+        CertificateFactory.buildSelfSignedCertificate(
+            kpg.generateKeyPair(), "CN=CodeTransparencyValidatorTest_WrongCertificate");
+    createBundle(bundlePath, validCodeTransparency);
+    AppBundle bundle = AppBundle.buildFromZip(new ZipFile(bundlePath.toFile()));
+
+    Exception e =
+        assertThrows(
+            InvalidBundleException.class,
+            () -> new CodeTransparencyValidator().validateBundle(bundle));
+    assertThat(e)
+        .hasMessageThat()
+        .contains("Code transparency verification failed because signature is invalid.");
+  }
+
+  @Test
+  public void transparencyVerificationFailed_codeModified() throws Exception {
     createBundle(bundlePath, CodeTransparency.getDefaultInstance());
     AppBundle bundle = AppBundle.buildFromZip(new ZipFile(bundlePath.toFile()));
 
@@ -101,7 +139,11 @@ public final class CodeTransparencyValidatorTest {
         assertThrows(
             InvalidBundleException.class,
             () -> new CodeTransparencyValidator().validateBundle(bundle));
-    assertThat(e).hasMessageThat().contains("Code transparency verification failed.");
+    assertThat(e)
+        .hasMessageThat()
+        .contains(
+            "Code transparency verification failed because code was modified after transparency"
+                + " metadata generation.");
     assertThat(e)
         .hasMessageThat()
         .contains(
@@ -110,6 +152,7 @@ public final class CodeTransparencyValidatorTest {
   }
 
   private void createBundle(Path path, CodeTransparency codeTransparency) throws Exception {
+    String transparencyPayload = JsonFormat.printer().print(codeTransparency);
     AppBundleBuilder appBundle =
         new AppBundleBuilder()
             .addModule(
@@ -121,9 +164,18 @@ public final class CodeTransparencyValidatorTest {
                         .addFile(NATIVE_LIB_PATH, NATIVE_LIB_FILE_CONTENT))
             .addMetadataFile(
                 BundleMetadata.BUNDLETOOL_NAMESPACE,
-                BundleMetadata.TRANSPARENCY_FILE_NAME,
-                CharSource.wrap(JsonFormat.printer().print(codeTransparency))
+                BundleMetadata.TRANSPARENCY_SIGNED_FILE_NAME,
+                CharSource.wrap(createJwsToken(transparencyPayload))
                     .asByteSource(Charset.defaultCharset()));
     new AppBundleSerializer().writeToDisk(appBundle.build(), path);
+  }
+
+  private String createJwsToken(String payload) throws JoseException {
+    JsonWebSignature jws = new JsonWebSignature();
+    jws.setAlgorithmHeaderValue(RSA_USING_SHA256);
+    jws.setCertificateChainHeaderValue(certificate);
+    jws.setPayload(payload);
+    jws.setKey(privateKey);
+    return jws.getCompactSerialization();
   }
 }

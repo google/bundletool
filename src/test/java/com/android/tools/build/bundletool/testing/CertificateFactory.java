@@ -55,10 +55,28 @@ public final class CertificateFactory {
     }
   }
 
-  /** Builds a self-signed certificate. */
+  /** Builds a self-signed certificate using RSA signature algorithm. */
   public static X509Certificate buildSelfSignedCertificate(
       KeyPair keyPair, String distinguishedName) {
-    return inflateCertificate(buildSelfSignedCertificateDerEncoded(keyPair, distinguishedName));
+    return inflateCertificate(
+        buildSelfSignedCertificateDerEncoded(keyPair, distinguishedName, "SHA256withRSA"));
+  }
+
+  /** Builds a self-signed certificate using DSA signature algorithm. */
+  public static X509Certificate buildSelfSignedDSACertificate(
+      KeyPair keyPair, String distinguishedName) {
+    return inflateCertificate(
+        buildSelfSignedCertificateDerEncoded(keyPair, distinguishedName, "SHA256withDSA"));
+  }
+
+  /**
+   * Builds a self-signed certificate using RSA signature algorithm.
+   *
+   * @return the DER-encoded certificate.
+   */
+  public static byte[] buildSelfSignedCertificateDerEncoded(
+      KeyPair keyPair, String distinguishedName) {
+    return buildSelfSignedCertificateDerEncoded(keyPair, distinguishedName, "SHA256withRSA");
   }
 
   /**
@@ -66,8 +84,8 @@ public final class CertificateFactory {
    *
    * @return the DER-encoded certificate.
    */
-  public static byte[] buildSelfSignedCertificateDerEncoded(
-      KeyPair keyPair, String distinguishedName) {
+  private static byte[] buildSelfSignedCertificateDerEncoded(
+      KeyPair keyPair, String distinguishedName, String signatureAlgorithm) {
     X500Principal principal = new X500Principal(distinguishedName);
 
     // Default is 30 years. Fields are ignored by Android framework anyway (as of Jan 2017).
@@ -88,7 +106,7 @@ public final class CertificateFactory {
               new ASN1ObjectIdentifier(BASIC_CONSTRAINTS_EXTENSION),
               false,
               new DERSequence(ASN1Boolean.TRUE))
-          .build(new JcaContentSignerBuilder("SHA256withRSA").build(keyPair.getPrivate()))
+          .build(new JcaContentSignerBuilder(signatureAlgorithm).build(keyPair.getPrivate()))
           .getEncoded();
     } catch (IOException e) {
       throw new UncheckedIOException(e);

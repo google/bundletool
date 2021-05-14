@@ -64,7 +64,7 @@ public class SplitApksGeneratorTest {
       BundleMetadata.builder()
           .addFile(
               BundleMetadata.BUNDLETOOL_NAMESPACE,
-              BundleMetadata.TRANSPARENCY_FILE_NAME,
+              BundleMetadata.TRANSPARENCY_SIGNED_FILE_NAME,
               ByteSource.empty())
           .build();
 
@@ -133,7 +133,7 @@ public class SplitApksGeneratorTest {
     ModuleSplit baseModule = moduleSplitMap.get("base");
     assertThat(baseModule.getSplitType()).isEqualTo(SplitType.SPLIT);
     assertThat(extractPaths(baseModule.getEntries()))
-        .containsExactly("assets/leftover.txt", "META-INF/code_transparency.json");
+        .containsExactly("assets/leftover.txt", "META-INF/code_transparency_signed.jwt");
     assertThat(baseModule.getVariantTargeting()).isEqualTo(lPlusVariantTargeting());
 
     ModuleSplit testModule = moduleSplitMap.get("test");
@@ -241,7 +241,7 @@ public class SplitApksGeneratorTest {
     ModuleSplit mainSplitOfBaseModule =
         getModuleSplit(moduleSplits, minSdkLTargeting, /* moduleName= */ "base");
     assertThat(extractPaths(mainSplitOfBaseModule.getEntries()))
-        .containsExactly("assets/leftover.txt", "META-INF/code_transparency.json");
+        .containsExactly("assets/leftover.txt", "META-INF/code_transparency_signed.jwt");
     ModuleSplit abiSplitOfBaseModule =
         getModuleSplit(moduleSplits, minSdkLWithAbiTargeting, /* moduleName= */ "base");
     assertThat(extractPaths(abiSplitOfBaseModule.getEntries()))
@@ -429,7 +429,9 @@ public class SplitApksGeneratorTest {
     assertThat(baseModule.getSplitType()).isEqualTo(SplitType.INSTANT);
     assertThat(extractPaths(baseModule.getEntries()))
         .containsExactly(
-            "assets/leftover.txt", "lib/x86_64/libsome.so", "META-INF/code_transparency.json");
+            "assets/leftover.txt",
+            "lib/x86_64/libsome.so",
+            "META-INF/code_transparency_signed.jwt");
     assertThat(baseModule.getVariantTargeting()).isEqualTo(lPlusVariantTargeting());
     assertThat(getForceUncompressed(baseModule, "lib/x86_64/libsome.so")).isTrue();
 

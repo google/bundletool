@@ -29,6 +29,7 @@ import com.android.bundle.Files.TargetedNativeDirectory;
 import com.android.bundle.Targeting.Abi;
 import com.android.bundle.Targeting.NativeDirectoryTargeting;
 import com.android.tools.build.bundletool.model.BundleModule.ModuleType;
+import com.android.tools.build.bundletool.model.ModuleEntry.ModuleEntryBundleLocation;
 import com.android.tools.build.bundletool.model.exceptions.InvalidBundleException;
 import com.android.tools.build.bundletool.model.utils.ZipUtils;
 import com.android.tools.build.bundletool.model.version.Version;
@@ -41,6 +42,7 @@ import com.google.errorprone.annotations.Immutable;
 import com.google.protobuf.InvalidProtocolBufferException;
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.nio.file.Paths;
 import java.util.Collection;
 import java.util.Enumeration;
 import java.util.HashMap;
@@ -248,13 +250,15 @@ public abstract class AppBundle {
 
       moduleBuilder.addEntry(
           ModuleEntry.builder()
-              .setBundlePath(ZipPath.create(entry.getName()))
+              .setBundleLocation(
+                  ModuleEntryBundleLocation.create(
+                      Paths.get(bundleFile.getName()), ZipPath.create(entry.getName())))
               .setPath(ZipUtils.convertBundleToModulePath(ZipPath.create(entry.getName())))
               .setContent(ZipUtils.asByteSource(bundleFile, entry))
               .build());
     }
     return moduleBuilders.values().stream()
-        .map(module -> module.build())
+        .map(BundleModule.Builder::build)
         .collect(toImmutableList());
   }
 

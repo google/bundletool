@@ -15,6 +15,7 @@
  */
 package com.android.tools.build.bundletool.commands;
 
+import static org.jose4j.jws.AlgorithmIdentifiers.RSA_USING_SHA256;
 
 import com.android.bundle.CodeTransparencyOuterClass.CodeTransparency;
 import com.android.tools.build.bundletool.commands.CommandHelp.CommandDescription;
@@ -30,6 +31,7 @@ import com.android.tools.build.bundletool.model.exceptions.InvalidBundleExceptio
 import com.android.tools.build.bundletool.model.utils.files.FilePreconditions;
 import com.android.tools.build.bundletool.transparency.CodeTransparencyFactory;
 import com.google.auto.value.AutoValue;
+import com.google.common.base.Preconditions;
 import com.google.common.io.ByteSource;
 import com.google.common.io.CharSource;
 import com.google.protobuf.InvalidProtocolBufferException;
@@ -38,15 +40,23 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.charset.Charset;
 import java.nio.file.Path;
+import java.security.cert.X509Certificate;
+import java.security.interfaces.RSAPrivateKey;
 import java.util.Optional;
 import java.util.zip.ZipException;
 import java.util.zip.ZipFile;
+import org.jose4j.jws.JsonWebSignature;
+import org.jose4j.keys.RsaKeyUtil;
+import org.jose4j.lang.JoseException;
+import org.jose4j.lang.UncheckedJoseException;
 
 /** Command to add a Code Transparency File to Android App Bundle. */
 @AutoValue
 public abstract class AddTransparencyCommand {
 
   public static final String COMMAND_NAME = "add-transparency";
+
+  static final int MIN_RSA_KEY_LENGTH = 3072;
 
   private static final Flag<Path> BUNDLE_LOCATION_FLAG = Flag.path("bundle");
 
@@ -117,13 +127,15 @@ public abstract class AddTransparencyCommand {
                     + " one of the manifests.")
             .build();
       }
+      String jsonText =
+          toJsonText(CodeTransparencyFactory.createCodeTransparencyMetadata(inputBundle));
       AppBundle.Builder bundleBuilder = inputBundle.toBuilder();
       bundleBuilder.setBundleMetadata(
           inputBundle.getBundleMetadata().toBuilder()
               .addFile(
                   BundleMetadata.BUNDLETOOL_NAMESPACE,
-                  BundleMetadata.TRANSPARENCY_FILE_NAME,
-                  toJsonBytes(CodeTransparencyFactory.createCodeTransparencyMetadata(inputBundle)))
+                  BundleMetadata.TRANSPARENCY_SIGNED_FILE_NAME,
+                  toBytes(createJwsToken(jsonText)))
               .build());
       new AppBundleSerializer().writeToDisk(bundleBuilder.build(), getOutputPath());
     } catch (ZipException e) {
@@ -133,6 +145,9 @@ public abstract class AddTransparencyCommand {
           .build();
     } catch (IOException e) {
       throw new UncheckedIOException("An error occurred when processing the App Bundle.", e);
+    } catch (JoseException e) {
+      throw new UncheckedJoseException(
+          "An error occurred when signing the code transparency file.", e);
     }
   }
 
@@ -199,10 +214,23 @@ public abstract class AddTransparencyCommand {
         .build();
   }
 
-  private static ByteSource toJsonBytes(CodeTransparency codeTransparency)
+  private String createJwsToken(String payload) throws JoseException {
+    JsonWebSignature jws = new JsonWebSignature();
+    jws.setAlgorithmHeaderValue(RSA_USING_SHA256);
+    jws.setCertificateChainHeaderValue(
+        getSignerConfig().getCertificates().toArray(new X509Certificate[0]));
+    jws.setPayload(payload);
+    jws.setKey(getSignerConfig().getPrivateKey());
+    return jws.getCompactSerialization();
+  }
+
+  private static String toJsonText(CodeTransparency codeTransparency)
       throws InvalidProtocolBufferException {
-    return CharSource.wrap(JsonFormat.printer().print(codeTransparency))
-        .asByteSource(Charset.defaultCharset());
+    return JsonFormat.printer().print(codeTransparency);
+  }
+
+  private static ByteSource toBytes(String content) {
+    return CharSource.wrap(content).asByteSource(Charset.defaultCharset());
   }
 
   private void validateInputs() {
@@ -210,6 +238,16 @@ public abstract class AddTransparencyCommand {
     FilePreconditions.checkFileExistsAndReadable(getBundlePath());
     FilePreconditions.checkFileHasExtension("AAB file", getOutputPath(), ".aab");
     FilePreconditions.checkFileDoesNotExist(getOutputPath());
+    Preconditions.checkArgument(
+        getSignerConfig().getPrivateKey().getAlgorithm().equals(RsaKeyUtil.RSA),
+        "Transparency signing key must be an RSA key, but %s key was provided.",
+        getSignerConfig().getPrivateKey().getAlgorithm());
+    int keyLength = ((RSAPrivateKey) getSignerConfig().getPrivateKey()).getModulus().bitLength();
+    Preconditions.checkArgument(
+        keyLength >= MIN_RSA_KEY_LENGTH,
+        "Minimum required key length is %s bits, but %s bit key was provided.",
+        MIN_RSA_KEY_LENGTH,
+        keyLength);
   }
 }
 

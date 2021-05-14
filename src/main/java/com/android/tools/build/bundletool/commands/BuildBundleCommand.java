@@ -256,7 +256,7 @@ public abstract class BuildBundleCommand {
           AppBundle.buildFromModules(
               modulesWithTargeting.build(), bundleConfig, getBundleMetadata());
 
-      Path outputDirectory = getOutputPath().getParent();
+      Path outputDirectory = getOutputPath().toAbsolutePath().getParent();
       if (Files.notExists(outputDirectory)) {
         logger.info("Output directory '" + outputDirectory + "' does not exist, creating it.");
         FileUtils.createDirectories(outputDirectory);

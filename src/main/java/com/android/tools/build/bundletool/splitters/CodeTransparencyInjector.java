@@ -20,10 +20,9 @@ import com.android.tools.build.bundletool.model.ModuleSplit;
 import com.android.tools.build.bundletool.model.ModuleSplit.SplitType;
 
 /**
- * Copies the code transparency file
- * (BUNDLE-METADATA/com.android.tools.build.bundletool/code_transparency.json) to the base split of
- *
- * <p>the main module, as well as standalone splits.
+ * Copies the signed code transparency file
+ * (BUNDLE-METADATA/com.android.tools.build.bundletool/code_transparency_signed.jwt) to the base
+ * split of the main module, as well as standalone splits.
  */
 public final class CodeTransparencyInjector {
 
@@ -34,13 +33,11 @@ public final class CodeTransparencyInjector {
   }
 
   public ModuleSplit inject(ModuleSplit split) {
-    if (bundleMetadata.getModuleEntryForTransparencyFile().isPresent()
-        && shouldPropagateTransparency(split)) {
-      return split.toBuilder()
-          .addEntry(bundleMetadata.getModuleEntryForTransparencyFile().get())
-          .build();
+    ModuleSplit.Builder splitBuilder = split.toBuilder();
+    if (shouldPropagateTransparency(split)) {
+      bundleMetadata.getModuleEntryForSignedTransparencyFile().ifPresent(splitBuilder::addEntry);
     }
-    return split;
+    return splitBuilder.build();
   }
 
   private static boolean shouldPropagateTransparency(ModuleSplit split) {

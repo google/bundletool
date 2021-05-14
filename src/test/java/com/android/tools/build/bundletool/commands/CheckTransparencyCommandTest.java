@@ -15,16 +15,23 @@
  */
 package com.android.tools.build.bundletool.commands;
 
+import static com.android.tools.build.bundletool.testing.FakeSystemEnvironmentProvider.ANDROID_HOME;
+import static com.android.tools.build.bundletool.testing.FakeSystemEnvironmentProvider.ANDROID_SERIAL;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifest;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withSharedUserId;
 import static com.google.common.truth.Truth.assertThat;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.util.stream.Collectors.toMap;
+import static org.jose4j.jws.AlgorithmIdentifiers.RSA_USING_SHA256;
+import static org.jose4j.jws.AlgorithmIdentifiers.RSA_USING_SHA384;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.Mockito.mock;
 
 import com.android.aapt.Resources.XmlNode;
 import com.android.bundle.CodeTransparencyOuterClass.CodeRelatedFile;
 import com.android.bundle.CodeTransparencyOuterClass.CodeTransparency;
+import com.android.tools.build.bundletool.commands.CheckTransparencyCommand.Mode;
+import com.android.tools.build.bundletool.device.AdbServer;
 import com.android.tools.build.bundletool.flags.Flag.RequiredFlagNotSetException;
 import com.android.tools.build.bundletool.flags.FlagParser;
 import com.android.tools.build.bundletool.flags.ParsedFlags.UnknownFlagsException;
@@ -32,8 +39,12 @@ import com.android.tools.build.bundletool.io.AppBundleSerializer;
 import com.android.tools.build.bundletool.model.BundleMetadata;
 import com.android.tools.build.bundletool.model.BundleModule;
 import com.android.tools.build.bundletool.model.exceptions.InvalidBundleException;
+import com.android.tools.build.bundletool.model.utils.SystemEnvironmentProvider;
 import com.android.tools.build.bundletool.testing.AppBundleBuilder;
 import com.android.tools.build.bundletool.testing.BundleModuleBuilder;
+import com.android.tools.build.bundletool.testing.CertificateFactory;
+import com.android.tools.build.bundletool.testing.FakeSystemEnvironmentProvider;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.hash.Hashing;
 import com.google.common.io.ByteSource;
 import com.google.common.io.CharSource;
@@ -42,8 +53,15 @@ import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
 import java.nio.charset.Charset;
 import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.security.KeyPair;
+import java.security.KeyPairGenerator;
+import java.security.PrivateKey;
+import java.security.cert.X509Certificate;
 import java.util.Map;
 import java.util.Optional;
+import org.jose4j.jws.JsonWebSignature;
+import org.jose4j.lang.JoseException;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
@@ -62,71 +80,275 @@ public final class CheckTransparencyCommandTest {
   private static final String NATIVE_LIB_PATH1 = "lib/arm64-v8a/libnative.so";
   private static final String NATIVE_LIB_PATH2 = "lib/armeabi-v7a/libnative.so";
   private static final byte[] FILE_CONTENT = new byte[] {1, 2, 3};
+  private static final Path ADB_PATH =
+      Paths.get("third_party/java/android/android_sdk_linux/platform-tools/adb.static");
+  private static final String DEVICE_ID = "id1";
 
   @Rule public final TemporaryFolder tmp = new TemporaryFolder();
 
   private Path tmpDir;
   private Path bundlePath;
+  private Path apkZipPath;
+  private KeyPairGenerator kpg;
+  private PrivateKey privateKey;
+  private X509Certificate certificate;
+
+  private final AdbServer fakeAdbServer = mock(AdbServer.class);
+  private final SystemEnvironmentProvider systemEnvironmentProvider =
+      new FakeSystemEnvironmentProvider(
+          ImmutableMap.of(ANDROID_HOME, "/android/home", ANDROID_SERIAL, DEVICE_ID));
 
   @Before
-  public void setUp() {
+  public void setUp() throws Exception {
     tmpDir = tmp.getRoot().toPath();
     bundlePath = tmpDir.resolve("bundle.aab");
+    apkZipPath = tmpDir.resolve("apks.zip");
+    kpg = KeyPairGenerator.getInstance("RSA");
+    kpg.initialize(/* keySize= */ 3072);
+    KeyPair keyPair = kpg.genKeyPair();
+    privateKey = keyPair.getPrivate();
+    certificate =
+        CertificateFactory.buildSelfSignedCertificate(keyPair, "CN=CheckTransparencyCommandTest");
   }
 
   @Test
-  public void buildingCommandViaFlags_bundlePathNotSet() {
+  public void buildingCommandViaFlags_modeNotSet() {
     Throwable e =
         assertThrows(
             RequiredFlagNotSetException.class,
-            () -> CheckTransparencyCommand.fromFlags(new FlagParser().parse("")));
+            () ->
+                CheckTransparencyCommand.fromFlags(
+                    new FlagParser().parse(), systemEnvironmentProvider, fakeAdbServer));
+    assertThat(e).hasMessageThat().contains("Missing the required --mode flag");
+  }
+
+  @Test
+  public void buildingCommandViaFlags_bundleMode_bundlePathNotSet() {
+    Throwable e =
+        assertThrows(
+            RequiredFlagNotSetException.class,
+            () ->
+                CheckTransparencyCommand.fromFlags(
+                    new FlagParser().parse("--mode=BUNDLE"),
+                    systemEnvironmentProvider,
+                    fakeAdbServer));
     assertThat(e).hasMessageThat().contains("Missing the required --bundle flag");
   }
 
   @Test
-  public void buildingCommandViaFlags_unknownFlagSet() {
+  public void buildingCommandViaFlags_bundleMode_adbPathSet() {
     Throwable e =
         assertThrows(
             UnknownFlagsException.class,
             () ->
                 CheckTransparencyCommand.fromFlags(
-                    new FlagParser().parse("--bundle=" + bundlePath, "--unknownFlag=hello")));
+                    new FlagParser()
+                        .parse("--mode=BUNDLE", "--bundle=" + bundlePath, "--adb=path/to/adb"),
+                    systemEnvironmentProvider,
+                    fakeAdbServer));
     assertThat(e).hasMessageThat().contains("Unrecognized flags");
   }
 
   @Test
-  public void buildingCommandViaFlagsAndBuilderHasSameResult() {
+  public void buildingCommandViaFlags_bundleMode_unknownFlagSet() {
+    Throwable e =
+        assertThrows(
+            UnknownFlagsException.class,
+            () ->
+                CheckTransparencyCommand.fromFlags(
+                    new FlagParser()
+                        .parse("--mode=BUNDLE", "--bundle=" + bundlePath, "--unknownFlag=hello"),
+                    systemEnvironmentProvider,
+                    fakeAdbServer));
+    assertThat(e).hasMessageThat().contains("Unrecognized flags");
+  }
+
+  @Test
+  public void buildingCommandViaFlagsAndBuilderHasSameResult_bundleMode() {
     CheckTransparencyCommand commandViaFlags =
-        CheckTransparencyCommand.fromFlags(new FlagParser().parse("--bundle=" + bundlePath));
+        CheckTransparencyCommand.fromFlags(
+            new FlagParser().parse("--mode=BUNDLE", "--bundle=" + bundlePath),
+            systemEnvironmentProvider,
+            fakeAdbServer);
     CheckTransparencyCommand commandViaBuilder =
-        CheckTransparencyCommand.builder().setBundlePath(bundlePath).build();
+        CheckTransparencyCommand.builder().setMode(Mode.BUNDLE).setBundlePath(bundlePath).build();
 
     assertThat(commandViaBuilder).isEqualTo(commandViaFlags);
   }
 
   @Test
-  public void execute_bundleNotFound() {
+  public void buildingCommandViaFlags_apkMode_apkZipPathNotSet() {
+    Throwable e =
+        assertThrows(
+            RequiredFlagNotSetException.class,
+            () ->
+                CheckTransparencyCommand.fromFlags(
+                    new FlagParser().parse("--mode=APK"),
+                    systemEnvironmentProvider,
+                    fakeAdbServer));
+    assertThat(e).hasMessageThat().contains("Missing the required --apk-zip flag");
+  }
+
+  @Test
+  public void buildingCommandViaFlags_apkMode_adbPathSet() {
+    Throwable e =
+        assertThrows(
+            UnknownFlagsException.class,
+            () ->
+                CheckTransparencyCommand.fromFlags(
+                    new FlagParser()
+                        .parse("--mode=APK", "--apk-zip=" + apkZipPath, "--adb=path/to/adb"),
+                    systemEnvironmentProvider,
+                    fakeAdbServer));
+    assertThat(e).hasMessageThat().contains("Unrecognized flags");
+  }
+
+  @Test
+  public void buildingCommandViaFlags_apkMode_unknownFlagSet() {
+    Throwable e =
+        assertThrows(
+            UnknownFlagsException.class,
+            () ->
+                CheckTransparencyCommand.fromFlags(
+                    new FlagParser()
+                        .parse("--mode=APK", "--apk-zip=" + bundlePath, "--unknownFlag=hello"),
+                    systemEnvironmentProvider,
+                    fakeAdbServer));
+    assertThat(e).hasMessageThat().contains("Unrecognized flags");
+  }
+
+  @Test
+  public void buildingCommandViaFlagsAndBuilderHasSameResult_apkMode() {
+    CheckTransparencyCommand commandViaFlags =
+        CheckTransparencyCommand.fromFlags(
+            new FlagParser().parse("--mode=APK", "--apk-zip=" + apkZipPath),
+            systemEnvironmentProvider,
+            fakeAdbServer);
+    CheckTransparencyCommand commandViaBuilder =
+        CheckTransparencyCommand.builder().setMode(Mode.APK).setApkZipPath(apkZipPath).build();
+
+    assertThat(commandViaBuilder).isEqualTo(commandViaFlags);
+  }
+
+  @Test
+  public void buildingCommandViaFlags_connectedDeviceMode_bundleFlagSet() {
+    Throwable e =
+        assertThrows(
+            UnknownFlagsException.class,
+            () ->
+                CheckTransparencyCommand.fromFlags(
+                    new FlagParser()
+                        .parse(
+                            "--mode=CONNECTED_DEVICE",
+                            "--adb=" + ADB_PATH,
+                            "--bundle=" + bundlePath),
+                    systemEnvironmentProvider,
+                    fakeAdbServer));
+    assertThat(e).hasMessageThat().contains("Unrecognized flags");
+  }
+
+  @Test
+  public void buildingCommandViaFlags_connectedDeviceMode_unknownFlagSet() {
+    Throwable e =
+        assertThrows(
+            UnknownFlagsException.class,
+            () ->
+                CheckTransparencyCommand.fromFlags(
+                    new FlagParser()
+                        .parse(
+                            "--mode=CONNECTED_DEVICE",
+                            "--connected-device=true",
+                            "--adb=" + ADB_PATH,
+                            "--unknownFlag=hello"),
+                    systemEnvironmentProvider,
+                    fakeAdbServer));
+    assertThat(e).hasMessageThat().contains("Unrecognized flags");
+  }
+
+  @Test
+  public void buildingCommandViaFlagsAndBuilderHasSameResult_connectedDeviceMode() {
+    CheckTransparencyCommand commandViaFlags =
+        CheckTransparencyCommand.fromFlags(
+            new FlagParser()
+                .parse("--mode=CONNECTED_DEVICE", "--adb=" + ADB_PATH, "--device-id=" + DEVICE_ID),
+            systemEnvironmentProvider,
+            fakeAdbServer);
+    CheckTransparencyCommand commandViaBuilder =
+        CheckTransparencyCommand.builder()
+            .setMode(Mode.CONNECTED_DEVICE)
+            .setAdbPath(ADB_PATH)
+            .setAdbServer(fakeAdbServer)
+            .setDeviceId(DEVICE_ID)
+            .build();
+
+    assertThat(commandViaBuilder).isEqualTo(commandViaFlags);
+  }
+
+  @Test
+  public void buildingCommandViaFlags_connectedDeviceMode_deviceIdRetrievedFromEnvironmend() {
+    CheckTransparencyCommand commandViaFlags =
+        CheckTransparencyCommand.fromFlags(
+            new FlagParser().parse("--mode=CONNECTED_DEVICE", "--adb=" + ADB_PATH),
+            systemEnvironmentProvider,
+            fakeAdbServer);
+    CheckTransparencyCommand commandViaBuilder =
+        CheckTransparencyCommand.builder()
+            .setMode(Mode.CONNECTED_DEVICE)
+            .setAdbPath(ADB_PATH)
+            .setAdbServer(fakeAdbServer)
+            .setDeviceId(DEVICE_ID)
+            .build();
+
+    assertThat(commandViaBuilder).isEqualTo(commandViaFlags);
+  }
+
+  @Test
+  public void execute_bundleMode_bundleNotFound() {
     CheckTransparencyCommand checkTransparencyCommand =
-        CheckTransparencyCommand.builder().setBundlePath(bundlePath).build();
+        CheckTransparencyCommand.builder().setMode(Mode.BUNDLE).setBundlePath(bundlePath).build();
 
     Throwable e = assertThrows(IllegalArgumentException.class, checkTransparencyCommand::execute);
     assertThat(e).hasMessageThat().contains("not found");
   }
 
   @Test
-  public void execute_wrongInputFileFormat() {
+  public void execute_bundleMode_wrongInputFileFormat() {
     CheckTransparencyCommand checkTransparencyCommand =
-        CheckTransparencyCommand.builder().setBundlePath(tmpDir.resolve("bundle.txt")).build();
+        CheckTransparencyCommand.builder()
+            .setMode(Mode.BUNDLE)
+            .setBundlePath(tmpDir.resolve("bundle.txt"))
+            .build();
 
     Throwable e = assertThrows(IllegalArgumentException.class, checkTransparencyCommand::execute);
     assertThat(e).hasMessageThat().contains("expected to have '.aab' extension.");
   }
 
   @Test
-  public void execute_transparencyFileMissing() throws Exception {
+  public void execute_apkMode_fileNotFound() {
+    CheckTransparencyCommand checkTransparencyCommand =
+        CheckTransparencyCommand.builder().setMode(Mode.APK).setApkZipPath(apkZipPath).build();
+
+    Throwable e = assertThrows(IllegalArgumentException.class, checkTransparencyCommand::execute);
+    assertThat(e).hasMessageThat().contains("not found");
+  }
+
+  @Test
+  public void execute_apkMode_wrongInputFileFormat() {
+    CheckTransparencyCommand checkTransparencyCommand =
+        CheckTransparencyCommand.builder()
+            .setMode(Mode.APK)
+            .setApkZipPath(tmpDir.resolve("apks.txt"))
+            .build();
+
+    Throwable e = assertThrows(IllegalArgumentException.class, checkTransparencyCommand::execute);
+    assertThat(e).hasMessageThat().contains("expected to have '.zip' extension.");
+  }
+
+  @Test
+  public void execute_bundletMode_transparencyFileMissing() throws Exception {
     createBundle(bundlePath, /* transparencyMetadata= */ Optional.empty());
     CheckTransparencyCommand checkTransparencyCommand =
-        CheckTransparencyCommand.builder().setBundlePath(bundlePath).build();
+        CheckTransparencyCommand.builder().setMode(Mode.BUNDLE).setBundlePath(bundlePath).build();
 
     Throwable e = assertThrows(InvalidBundleException.class, checkTransparencyCommand::execute);
     assertThat(e)
@@ -137,7 +359,7 @@ public final class CheckTransparencyCommandTest {
   }
 
   @Test
-  public void execute_transparencyVerificationFailed() throws Exception {
+  public void execute_bundleMode_codeModified() throws Exception {
     CodeTransparency.Builder codeTransparency =
         createValidTransparencyProto(
             ByteSource.wrap(FILE_CONTENT).hash(Hashing.sha256()).toString())
@@ -164,12 +386,16 @@ public final class CheckTransparencyCommandTest {
     ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
 
     CheckTransparencyCommand.builder()
+        .setMode(Mode.BUNDLE)
         .setBundlePath(bundlePath)
         .build()
         .checkTransparency(new PrintStream(outputStream));
 
     String output = new String(outputStream.toByteArray(), UTF_8);
-    assertThat(output).contains("Code transparency verification failed.");
+    assertThat(output)
+        .contains(
+            "Code transparency verification failed because code was modified after transparency"
+                + " metadata generation.");
     assertThat(output)
         .contains("Files deleted after transparency metadata generation: [dex/deleted.dex]");
     assertThat(output)
@@ -179,7 +405,12 @@ public final class CheckTransparencyCommandTest {
   }
 
   @Test
-  public void execute_transparencyVerified() throws Exception {
+  public void execute_transparencyVerified_invalidSignature() throws Exception {
+    // Update certificate value so that it does not match the private key that will used to sign the
+    // transparency metadata.
+    certificate =
+        CertificateFactory.buildSelfSignedCertificate(
+            kpg.generateKeyPair(), "CN=CodeTransparencyValidatorTest_WrongCertificate");
     CodeTransparency validCodeTransparency =
         createValidTransparencyProto(
             ByteSource.wrap(FILE_CONTENT).hash(Hashing.sha256()).toString());
@@ -188,19 +419,42 @@ public final class CheckTransparencyCommandTest {
 
     CheckTransparencyCommand.builder()
         .setBundlePath(bundlePath)
+        .setMode(Mode.BUNDLE)
         .build()
         .checkTransparency(new PrintStream(outputStream));
 
     assertThat(new String(outputStream.toByteArray(), UTF_8))
-        .contains("Code transparency verified.");
+        .contains("Code transparency verification failed because signature is invalid.");
   }
 
   @Test
-  public void execute_transparencyFilePresent_sharedUserIdSpecifiedInManifest() throws Exception {
+  public void execute_bundleMode_transparencyVerified() throws Exception {
     CodeTransparency validCodeTransparency =
         createValidTransparencyProto(
             ByteSource.wrap(FILE_CONTENT).hash(Hashing.sha256()).toString());
-    createBundle(bundlePath, Optional.of(validCodeTransparency), /* hasSharedUserId= */ true);
+    createBundle(bundlePath, Optional.of(validCodeTransparency));
+    ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+
+    CheckTransparencyCommand.builder()
+        .setMode(Mode.BUNDLE)
+        .setBundlePath(bundlePath)
+        .build()
+        .checkTransparency(new PrintStream(outputStream));
+
+    assertThat(new String(outputStream.toByteArray(), UTF_8))
+        .contains("Code transparency verified. Public key certificate fingerprint: ");
+  }
+
+  @Test
+  public void execute_bundleMode_unsupportedSignatureAlgorithm() throws Exception {
+    CodeTransparency validCodeTransparency =
+        createValidTransparencyProto(
+            ByteSource.wrap(FILE_CONTENT).hash(Hashing.sha256()).toString());
+    createBundle(
+        bundlePath,
+        Optional.of(validCodeTransparency),
+        /* hasSharedUserId= */ false,
+        RSA_USING_SHA384);
     ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
 
     Throwable e =
@@ -208,6 +462,34 @@ public final class CheckTransparencyCommandTest {
             InvalidBundleException.class,
             () ->
                 CheckTransparencyCommand.builder()
+                    .setMode(Mode.BUNDLE)
+                    .setBundlePath(bundlePath)
+                    .build()
+                    .checkTransparency(new PrintStream(outputStream)));
+    assertThat(e)
+        .hasMessageThat()
+        .contains("Exception while verifying code transparency signature.");
+  }
+
+  @Test
+  public void execute_bundleMode_transparencyFilePresent_sharedUserIdSpecifiedInManifest()
+      throws Exception {
+    CodeTransparency validCodeTransparency =
+        createValidTransparencyProto(
+            ByteSource.wrap(FILE_CONTENT).hash(Hashing.sha256()).toString());
+    createBundle(
+        bundlePath,
+        Optional.of(validCodeTransparency),
+        /* hasSharedUserId= */ true,
+        RSA_USING_SHA256);
+    ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+
+    Throwable e =
+        assertThrows(
+            InvalidBundleException.class,
+            () ->
+                CheckTransparencyCommand.builder()
+                    .setMode(Mode.BUNDLE)
                     .setBundlePath(bundlePath)
                     .build()
                     .checkTransparency(new PrintStream(outputStream)));
@@ -225,11 +507,14 @@ public final class CheckTransparencyCommandTest {
 
   private void createBundle(Path path, Optional<CodeTransparency> transparencyMetadata)
       throws Exception {
-    createBundle(path, transparencyMetadata, /* hasSharedUserId= */ false);
+    createBundle(path, transparencyMetadata, /* hasSharedUserId= */ false, RSA_USING_SHA256);
   }
 
   private void createBundle(
-      Path path, Optional<CodeTransparency> transparencyMetadata, boolean hasSharedUserId)
+      Path path,
+      Optional<CodeTransparency> transparencyMetadata,
+      boolean hasSharedUserId,
+      String algorithmIdentifier)
       throws Exception {
     AppBundleBuilder appBundle =
         new AppBundleBuilder()
@@ -241,8 +526,10 @@ public final class CheckTransparencyCommandTest {
     if (transparencyMetadata.isPresent()) {
       appBundle.addMetadataFile(
           BundleMetadata.BUNDLETOOL_NAMESPACE,
-          BundleMetadata.TRANSPARENCY_FILE_NAME,
-          CharSource.wrap(JsonFormat.printer().print(transparencyMetadata.get()))
+          BundleMetadata.TRANSPARENCY_SIGNED_FILE_NAME,
+          CharSource.wrap(
+                  createJwsToken(
+                      JsonFormat.printer().print(transparencyMetadata.get()), algorithmIdentifier))
               .asByteSource(Charset.defaultCharset()));
     }
     new AppBundleSerializer().writeToDisk(appBundle.build(), path);
@@ -302,5 +589,14 @@ public final class CheckTransparencyCommandTest {
                 .setApkPath(NATIVE_LIB_PATH2)
                 .setSha256(fileContentHash)
                 .build());
+  }
+
+  private String createJwsToken(String payload, String algorithmIdentifier) throws JoseException {
+    JsonWebSignature jws = new JsonWebSignature();
+    jws.setAlgorithmHeaderValue(algorithmIdentifier);
+    jws.setCertificateChainHeaderValue(certificate);
+    jws.setPayload(payload);
+    jws.setKey(privateKey);
+    return jws.getCompactSerialization();
   }
 }

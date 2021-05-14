@@ -18,6 +18,7 @@ package com.android.tools.build.bundletool;
 import com.android.tools.build.bundletool.commands.AddTransparencyCommand;
 import com.android.tools.build.bundletool.commands.BuildApksCommand;
 import com.android.tools.build.bundletool.commands.BuildBundleCommand;
+import com.android.tools.build.bundletool.commands.CheckTransparencyCommand;
 import com.android.tools.build.bundletool.commands.CommandHelp;
 import com.android.tools.build.bundletool.commands.DumpCommand;
 import com.android.tools.build.bundletool.commands.ExtractApksCommand;
