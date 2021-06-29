@@ -21,6 +21,7 @@ import static com.android.tools.build.bundletool.model.ModuleDeliveryType.ALWAYS
 import static com.android.tools.build.bundletool.model.ModuleDeliveryType.NO_INITIAL_INSTALL;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifest;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifestForAssetModule;
+import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifestForMlModule;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withFeatureCondition;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withFusingAttribute;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withInstant;
@@ -431,13 +432,23 @@ public class BundleModuleTest {
   }
 
   @Test
-  public void getModuleType_remoteAsset() {
+  public void getModuleType_assetModule() {
     BundleModule bundleModule =
         createMinimalModuleBuilder()
             .setAndroidManifestProto(androidManifestForAssetModule("com.test.app"))
             .build();
 
     assertThat(bundleModule.getModuleType()).isEqualTo(ModuleType.ASSET_MODULE);
+  }
+
+  @Test
+  public void getModuleType_mlModule() {
+    BundleModule bundleModule =
+        createMinimalModuleBuilder()
+            .setAndroidManifestProto(androidManifestForMlModule("com.test.app"))
+            .build();
+
+    assertThat(bundleModule.getModuleType()).isEqualTo(ModuleType.ML_MODULE);
   }
 
   @Test

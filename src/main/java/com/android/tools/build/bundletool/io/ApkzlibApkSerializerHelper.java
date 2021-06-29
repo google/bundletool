@@ -38,6 +38,7 @@ import com.android.tools.build.bundletool.model.ZipPath;
 import com.android.tools.build.bundletool.model.utils.PathMatcher;
 import com.android.tools.build.bundletool.model.utils.files.FileUtils;
 import com.android.tools.build.bundletool.model.version.Version;
+import com.google.common.base.Optional;
 import com.google.common.base.Predicates;
 import com.google.common.collect.ImmutableList;
 import java.io.IOException;
@@ -72,9 +73,6 @@ final class ApkzlibApkSerializerHelper extends ApkSerializerHelper {
       AlignmentRules.compose(
           AlignmentRules.constantForSuffix(NATIVE_LIBRARIES_SUFFIX, 4096),
           AlignmentRules.constant(4));
-
-  private static final String BUILT_BY = "BundleTool";
-  private static final String CREATED_BY = BUILT_BY;
 
   private final Aapt2Command aapt2Command;
   private final Version bundletoolVersion;
@@ -146,9 +144,11 @@ final class ApkzlibApkSerializerHelper extends ApkSerializerHelper {
                     .setCoverEmptySpaceUsingExtraField(true)
                     // Clear timestamps on zip entries to minimize diffs between APKs.
                     .setNoTimestamps(true),
-                /* signingOptions= */ com.google.common.base.Optional.absent(),
-                BUILT_BY,
-                CREATED_BY);
+                /* signingOptions= */ Optional.absent(),
+                /* builtBy= */ null,
+                /* createdBy= */ null,
+                // Use ZFileOptions.setAlwaysGenerateJarManifest(false) when this is released.
+                /* writeManifest= */ false);
         ZFile zAapt2Files =
             ZFile.openReadOnly(binaryApk.toFile(), createZFileOptions(tempDir.getPath()))) {
 
@@ -207,14 +207,21 @@ final class ApkzlibApkSerializerHelper extends ApkSerializerHelper {
 
   private EntryOption[] entryOptionForPath(
       ZipPath path, boolean uncompressNativeLibs, boolean forceUncompressed) {
-    if (shouldCompress(path, uncompressNativeLibs, forceUncompressed)) {
+    if (mayCompress(path, uncompressNativeLibs, forceUncompressed)) {
       return new EntryOption[] {};
     } else {
       return new EntryOption[] {EntryOption.UNCOMPRESSED};
     }
   }
 
-  private boolean shouldCompress(
+  /**
+   * Returns true if the specified file may be compressed in the final generated APK.
+   *
+   * <p>If this method returns true, the preference is that the file is compressed within the APK,
+   * however this isn't guaranteed, e.g. if the file's compressed size is greater than the
+   * uncompressed size. If this method returns false, the file must be stored uncompressed.
+   */
+  private boolean mayCompress(
       ZipPath path, boolean uncompressNativeLibs, boolean forceUncompressed) {
     if (uncompressedPathMatchers.stream()
         .anyMatch(pathMatcher -> pathMatcher.matches(path.toString()))) {
@@ -237,7 +244,7 @@ final class ApkzlibApkSerializerHelper extends ApkSerializerHelper {
       return false;
     }
 
-    // By default, compressed.
+    // By default, may be compressed.
     return true;
   }
 
@@ -249,17 +256,17 @@ final class ApkzlibApkSerializerHelper extends ApkSerializerHelper {
     for (ModuleEntry entry : split.getEntries()) {
       ZipPath pathInApk = toApkEntryPath(entry.getPath());
       if (!requiresAapt2Conversion(pathInApk)) {
-        boolean shouldCompress =
-            shouldCompress(pathInApk, !extractNativeLibs, entry.getForceUncompressed());
-        addFile(zFile, pathInApk, entry, shouldCompress);
+        boolean mayCompress =
+            mayCompress(pathInApk, !extractNativeLibs, entry.getForceUncompressed());
+        addFile(zFile, pathInApk, entry, mayCompress);
       }
     }
   }
 
-  void addFile(ZFile zFile, ZipPath pathInApk, ModuleEntry entry, boolean shouldCompress)
+  void addFile(ZFile zFile, ZipPath pathInApk, ModuleEntry entry, boolean mayCompress)
       throws IOException {
     try (InputStream entryInputStream = entry.getContent().openStream()) {
-      zFile.add(pathInApk.toString(), entryInputStream, shouldCompress);
+      zFile.add(pathInApk.toString(), entryInputStream, mayCompress);
     }
   }
 

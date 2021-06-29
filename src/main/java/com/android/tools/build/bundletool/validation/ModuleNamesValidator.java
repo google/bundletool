@@ -16,7 +16,6 @@
 package com.android.tools.build.bundletool.validation;
 
 import com.android.tools.build.bundletool.model.BundleModule;
-import com.android.tools.build.bundletool.model.BundleModule.ModuleType;
 import com.android.tools.build.bundletool.model.BundleModuleName;
 import com.android.tools.build.bundletool.model.exceptions.InvalidBundleException;
 import com.google.common.collect.ImmutableList;
@@ -39,8 +38,7 @@ final class ModuleNamesValidator extends SubValidator {
     for (BundleModule module : modules) {
       Optional<String> splitId = module.getAndroidManifest().getSplitId();
       BundleModuleName moduleName = module.getName();
-      boolean isFeatureModule =
-          module.getAndroidManifest().getModuleType().equals(ModuleType.FEATURE_MODULE);
+      boolean isFeatureModule = module.getAndroidManifest().getModuleType().isFeatureModule();
 
       if (moduleName.equals(BundleModuleName.BASE_MODULE_NAME)) {
         if (splitId.isPresent()) {

@@ -33,6 +33,7 @@ import com.android.tools.build.bundletool.model.utils.DefaultSystemEnvironmentPr
 import com.android.tools.build.bundletool.model.utils.SystemEnvironmentProvider;
 import com.android.tools.build.bundletool.model.utils.files.FilePreconditions;
 import com.google.auto.value.AutoValue;
+import com.google.common.collect.ImmutableSet;
 import com.google.common.io.MoreFiles;
 import com.google.protobuf.util.JsonFormat;
 import java.io.IOException;
@@ -55,6 +56,8 @@ public abstract class GetDeviceSpecCommand {
   private static final Flag<Path> OUTPUT_FLAG = Flag.path("output");
   private static final Flag<Boolean> OVERWRITE_OUTPUT_FLAG = Flag.booleanFlag("overwrite");
   private static final Flag<String> DEVICE_TIER_FLAG = Flag.string("device-tier");
+  private static final Flag<ImmutableSet<String>> DEVICE_GROUPS_FLAG =
+      Flag.stringSet("device-groups");
 
   private static final SystemEnvironmentProvider DEFAULT_PROVIDER =
       new DefaultSystemEnvironmentProvider();
@@ -72,6 +75,8 @@ public abstract class GetDeviceSpecCommand {
   abstract AdbServer getAdbServer();
 
   public abstract Optional<String> getDeviceTier();
+
+  public abstract Optional<ImmutableSet<String>> getDeviceGroups();
 
   public static Builder builder() {
     return new AutoValue_GetDeviceSpecCommand.Builder().setOverwriteOutput(false);
@@ -98,6 +103,8 @@ public abstract class GetDeviceSpecCommand {
     public abstract Builder setAdbServer(AdbServer adbServer);
 
     public abstract Builder setDeviceTier(String deviceTier);
+
+    public abstract Builder setDeviceGroups(ImmutableSet<String> deviceGroups);
 
     abstract GetDeviceSpecCommand autoBuild();
 
@@ -135,6 +142,7 @@ public abstract class GetDeviceSpecCommand {
     OVERWRITE_OUTPUT_FLAG.getValue(flags).ifPresent(builder::setOverwriteOutput);
 
     DEVICE_TIER_FLAG.getValue(flags).ifPresent(builder::setDeviceTier);
+    DEVICE_GROUPS_FLAG.getValue(flags).ifPresent(builder::setDeviceGroups);
     flags.checkNoUnknownFlags();
 
     return builder.build();
@@ -153,6 +161,9 @@ public abstract class GetDeviceSpecCommand {
     DeviceSpec deviceSpec = new DeviceAnalyzer(adb).getDeviceSpec(getDeviceId());
     if (getDeviceTier().isPresent()) {
       deviceSpec = deviceSpec.toBuilder().setDeviceTier(getDeviceTier().get()).build();
+    }
+    if (getDeviceGroups().isPresent()) {
+      deviceSpec = deviceSpec.toBuilder().addAllDeviceGroups(getDeviceGroups().get()).build();
     }
     writeDeviceSpecToFile(deviceSpec, getOutputPath());
     return deviceSpec;
@@ -227,7 +238,20 @@ public abstract class GetDeviceSpecCommand {
                 .setOptional(true)
                 .setDescription(
                     "Device tier of the given device. This value will be used to match the correct"
-                        + " device tier targeted APKs to this device.")
+                        + " device tier targeted APKs to this device."
+                        + " This flag is only relevant if the bundle uses device tier targeting,"
+                        + " and should be set in that case.")
+                .build())
+        .addFlag(
+            FlagDescription.builder()
+                .setFlagName(DEVICE_GROUPS_FLAG.getName())
+                .setExampleValue("highRam,googlePixel")
+                .setOptional(true)
+                .setDescription(
+                    "Device groups the given device belongs to. This value will be used to match"
+                        + " the correct device group conditional modules to this device."
+                        + " This flag is only relevant if the bundle uses device group targeting"
+                        + " in conditional modules and should be set in that case.")
                 .build())
         .build();
   }

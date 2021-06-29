@@ -28,7 +28,7 @@ import com.android.bundle.Targeting.VariantTargeting;
 import com.android.tools.build.bundletool.device.ApkMatcher;
 import com.android.tools.build.bundletool.mergers.ModuleSplitsToShardMerger;
 import com.android.tools.build.bundletool.model.AndroidManifest;
-import com.android.tools.build.bundletool.model.BundleMetadata;
+import com.android.tools.build.bundletool.model.AppBundle;
 import com.android.tools.build.bundletool.model.BundleModule;
 import com.android.tools.build.bundletool.model.BundleModuleName;
 import com.android.tools.build.bundletool.model.ModuleEntry;
@@ -63,12 +63,12 @@ public class SystemApksGenerator {
       Sharder sharder,
       ModuleSplitsToShardMerger shardsMerger,
       Optional<DeviceSpec> deviceSpec,
-      BundleMetadata bundleMetadata) {
+      AppBundle appBundle) {
     this.moduleSplitter = moduleSplitter;
     this.sharder = sharder;
     this.shardsMerger = shardsMerger;
     this.deviceSpec = deviceSpec;
-    this.codeTransparencyInjector = new CodeTransparencyInjector(bundleMetadata);
+    this.codeTransparencyInjector = new CodeTransparencyInjector(appBundle);
   }
 
   /**

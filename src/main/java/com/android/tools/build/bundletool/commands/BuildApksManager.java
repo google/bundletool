@@ -310,10 +310,12 @@ public final class BuildApksManager {
 
     apkGenerationConfiguration.setSuffixStrippings(apkOptimizations.getSuffixStrippings());
 
-    command.getSigningConfiguration().ifPresent(
-        signingConfig ->
-            apkGenerationConfiguration.setMinimumV3SigningApiVersion(
-                signingConfig.getMinimumV3SigningApiVersion()));
+    command
+        .getSigningConfiguration()
+        .ifPresent(
+            signingConfig ->
+                apkGenerationConfiguration.setMinimumV3SigningApiVersion(
+                    signingConfig.getMinimumV3SigningApiVersion()));
 
     return apkGenerationConfiguration;
   }

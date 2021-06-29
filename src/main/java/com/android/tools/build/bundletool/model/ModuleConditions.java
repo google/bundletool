@@ -18,7 +18,7 @@ package com.android.tools.build.bundletool.model;
 
 import com.android.bundle.Targeting.DeviceFeature;
 import com.android.bundle.Targeting.DeviceFeatureTargeting;
-import com.android.bundle.Targeting.DeviceTierModuleTargeting;
+import com.android.bundle.Targeting.DeviceGroupModuleTargeting;
 import com.android.bundle.Targeting.ModuleTargeting;
 import com.android.bundle.Targeting.UserCountriesTargeting;
 import com.android.tools.build.bundletool.model.exceptions.InvalidBundleException;
@@ -44,7 +44,7 @@ public abstract class ModuleConditions {
 
   public abstract Optional<UserCountriesCondition> getUserCountriesCondition();
 
-  public abstract Optional<DeviceTiersCondition> getDeviceTiersCondition();
+  public abstract Optional<DeviceGroupsCondition> getDeviceGroupsCondition();
 
   public boolean isEmpty() {
     return toTargeting().equals(ModuleTargeting.getDefaultInstance());
@@ -94,10 +94,10 @@ public abstract class ModuleConditions {
               .build());
     }
 
-    if (getDeviceTiersCondition().isPresent()) {
-      moduleTargeting.setDeviceTierTargeting(
-          DeviceTierModuleTargeting.newBuilder()
-              .addAllValue(getDeviceTiersCondition().get().getDeviceTiers())
+    if (getDeviceGroupsCondition().isPresent()) {
+      moduleTargeting.setDeviceGroupTargeting(
+          DeviceGroupModuleTargeting.newBuilder()
+              .addAllValue(getDeviceGroupsCondition().get().getDeviceGroups())
               .build());
     }
 
@@ -122,7 +122,7 @@ public abstract class ModuleConditions {
     public abstract Builder setUserCountriesCondition(
         UserCountriesCondition userCountriesCondition);
 
-    public abstract Builder setDeviceTiersCondition(DeviceTiersCondition deviceTiersCondition);
+    public abstract Builder setDeviceGroupsCondition(DeviceGroupsCondition deviceGroupsCondition);
 
     protected abstract ModuleConditions autoBuild();
 

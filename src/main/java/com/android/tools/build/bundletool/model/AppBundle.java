@@ -25,6 +25,7 @@ import static java.util.function.Function.identity;
 
 import com.android.bundle.Config.BundleConfig;
 import com.android.bundle.Config.BundleConfig.BundleType;
+import com.android.bundle.Config.StandaloneConfig.DexMergingStrategy;
 import com.android.bundle.Files.TargetedNativeDirectory;
 import com.android.bundle.Targeting.Abi;
 import com.android.bundle.Targeting.NativeDirectoryTargeting;
@@ -114,9 +115,15 @@ public abstract class AppBundle {
 
   public abstract BundleMetadata getBundleMetadata();
 
+  /**
+   * Returns all feature modules for this bundle, including the base module.
+   *
+   * <p>ML modules are treated as feature modules across bundletool and app delivery, so they are
+   * returned by this method.
+   */
   public ImmutableMap<BundleModuleName, BundleModule> getFeatureModules() {
     return getModules().values().stream()
-        .filter(module -> module.getModuleType().equals(ModuleType.FEATURE_MODULE))
+        .filter(module -> module.getModuleType().isFeatureModule())
         .collect(toImmutableMap(BundleModule::getName, identity()));
   }
 
@@ -213,13 +220,24 @@ public abstract class AppBundle {
     return getBundleConfig().getType().equals(BundleType.ASSET_ONLY);
   }
 
-  /**
-   * Returns whether any of the feature modules specify `sharedUserId` attribute in the manifest.
-   */
+  /** Returns whether the base module has `sharedUserId` attribute in the manifest. */
   public boolean hasSharedUserId() {
-    return getFeatureModules().values().stream()
-        .map(BundleModule::getAndroidManifest)
-        .anyMatch(AndroidManifest::hasSharedUserId);
+    return getBaseModule().getAndroidManifest().hasSharedUserId();
+  }
+
+  /**
+   * Returns {@code true} if bundletool will merge dex files when generating standalone APKs. This
+   * happens for applications with dynamic feature modules that have min sdk below 21 and specified
+   * DexMergingStrategy is MERGE_IF_NEEDED.
+   */
+  public boolean dexMergingEnabled() {
+    return getDexMergingStrategy().equals(DexMergingStrategy.MERGE_IF_NEEDED)
+        && getBaseModule().getAndroidManifest().getEffectiveMinSdkVersion() < 21
+        && getFeatureModules().size() > 1;
+  }
+
+  private DexMergingStrategy getDexMergingStrategy() {
+    return getBundleConfig().getOptimizations().getStandaloneConfig().getDexMergingStrategy();
   }
 
   public abstract Builder toBuilder();
@@ -257,9 +275,29 @@ public abstract class AppBundle {
               .setContent(ZipUtils.asByteSource(bundleFile, entry))
               .build());
     }
+
+    // We verify the presence of the manifest before building the BundleModule objects because the
+    // manifest is a required field of the BundleModule class.
+    checkModulesHaveManifest(moduleBuilders.values());
+
     return moduleBuilders.values().stream()
         .map(BundleModule.Builder::build)
         .collect(toImmutableList());
+  }
+
+  private static void checkModulesHaveManifest(Collection<BundleModule.Builder> bundleModules) {
+    ImmutableSet<String> modulesWithoutManifest =
+        bundleModules.stream()
+            .filter(bundleModule -> !bundleModule.hasAndroidManifest())
+            .map(module -> module.getName().getName())
+            .collect(toImmutableSet());
+    if (!modulesWithoutManifest.isEmpty()) {
+      throw InvalidBundleException.builder()
+          .withUserMessage(
+              "Found modules in the App Bundle without an AndroidManifest.xml: %s",
+              modulesWithoutManifest)
+          .build();
+    }
   }
 
   private static BundleConfig readBundleConfig(ZipFile bundleFile) {

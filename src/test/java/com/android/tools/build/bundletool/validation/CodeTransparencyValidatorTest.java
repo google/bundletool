@@ -127,7 +127,7 @@ public final class CodeTransparencyValidatorTest {
             () -> new CodeTransparencyValidator().validateBundle(bundle));
     assertThat(e)
         .hasMessageThat()
-        .contains("Code transparency verification failed because signature is invalid.");
+        .contains("Verification failed because code transparency signature is invalid.");
   }
 
   @Test
@@ -142,8 +142,8 @@ public final class CodeTransparencyValidatorTest {
     assertThat(e)
         .hasMessageThat()
         .contains(
-            "Code transparency verification failed because code was modified after transparency"
-                + " metadata generation.");
+            "Verification failed because code was modified after transparency metadata"
+                + " generation.");
     assertThat(e)
         .hasMessageThat()
         .contains(

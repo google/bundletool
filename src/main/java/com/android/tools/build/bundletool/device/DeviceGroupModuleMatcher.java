@@ -16,26 +16,30 @@
 package com.android.tools.build.bundletool.device;
 
 import com.android.bundle.Devices.DeviceSpec;
-import com.android.bundle.Targeting.DeviceTierModuleTargeting;
+import com.android.bundle.Targeting.DeviceGroupModuleTargeting;
 import com.android.bundle.Targeting.ModuleTargeting;
+import java.util.Collections;
 
 /**
- * A {@link TargetingDimensionMatcher} that provides module matching on device tier.
+ * A {@link TargetingDimensionMatcher} that provides module matching on a set of device groups.
  *
- * <p>Device tier is an artificial concept and it is explicitly defined in the {@link DeviceSpec}.
+ * <p>Device groups are an artificial concept and they are explicitly defined in the {@link
+ * DeviceSpec}.
  */
-public class DeviceTierModuleMatcher extends TargetingDimensionMatcher<DeviceTierModuleTargeting> {
+public class DeviceGroupModuleMatcher
+    extends TargetingDimensionMatcher<DeviceGroupModuleTargeting> {
 
-  public DeviceTierModuleMatcher(DeviceSpec deviceSpec) {
+  public DeviceGroupModuleMatcher(DeviceSpec deviceSpec) {
     super(deviceSpec);
   }
 
   @Override
-  public boolean matchesTargeting(DeviceTierModuleTargeting targetingValue) {
-    if (targetingValue.equals(DeviceTierModuleTargeting.getDefaultInstance())) {
+  public boolean matchesTargeting(DeviceGroupModuleTargeting targetingValue) {
+    if (targetingValue.equals(DeviceGroupModuleTargeting.getDefaultInstance())) {
       return true;
     }
-    return targetingValue.getValueList().contains(getDeviceSpec().getDeviceTier());
+    return !Collections.disjoint(
+        targetingValue.getValueList(), getDeviceSpec().getDeviceGroupsList());
   }
 
   @Override
@@ -44,10 +48,10 @@ public class DeviceTierModuleMatcher extends TargetingDimensionMatcher<DeviceTie
   }
 
   @Override
-  protected void checkDeviceCompatibleInternal(DeviceTierModuleTargeting targetingValue) {}
+  protected void checkDeviceCompatibleInternal(DeviceGroupModuleTargeting targetingValue) {}
 
   @Override
-  protected DeviceTierModuleTargeting getTargetingValue(ModuleTargeting moduleTargeting) {
-    return moduleTargeting.getDeviceTierTargeting();
+  protected DeviceGroupModuleTargeting getTargetingValue(ModuleTargeting moduleTargeting) {
+    return moduleTargeting.getDeviceGroupTargeting();
   }
 }

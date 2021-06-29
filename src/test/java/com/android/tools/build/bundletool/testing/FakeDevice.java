@@ -34,7 +34,11 @@ import com.google.common.base.Joiner;
 import com.google.common.base.Splitter;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.io.ByteStreams;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -255,6 +259,19 @@ public class FakeDevice extends Device {
 
   @Override
   public void removeRemotePackage(Path remoteFilePath) {}
+
+  @Override
+  public void pull(ImmutableList<FilePullParams> files) {
+    for (FilePullParams filePullParams : files) {
+      Path sourcePath = Paths.get(filePullParams.getPathOnDevice());
+      try (InputStream inputStream = Files.newInputStream(sourcePath);
+          OutputStream outputStream = Files.newOutputStream(filePullParams.getDestinationPath())) {
+        ByteStreams.copy(inputStream, outputStream);
+      } catch (IOException e) {
+        throw new UncheckedIOException(e);
+      }
+    }
+  }
 
   public void setInstallApksSideEffect(SideEffect<InstallOptions> sideEffect) {
     installApksSideEffect = Optional.of(sideEffect);

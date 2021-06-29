@@ -32,6 +32,7 @@ import com.android.ddmlib.SyncException.SyncError;
 import com.android.sdklib.AndroidVersion;
 import com.android.sdklib.AndroidVersion.VersionCodes;
 import com.android.tools.build.bundletool.device.DdmlibDevice.RemoteCommandExecutor;
+import com.android.tools.build.bundletool.device.Device.FilePullParams;
 import com.android.tools.build.bundletool.device.Device.InstallOptions;
 import com.android.tools.build.bundletool.device.Device.PushOptions;
 import com.google.common.collect.ImmutableList;
@@ -175,6 +176,21 @@ public final class DdmlibDeviceTest {
         .pushFile(APK_PATH.toFile().getAbsolutePath(), tempPath + "/" + APK_PATH.getFileName());
     verify(mockDevice)
         .pushFile(APK_PATH_2.toFile().getAbsolutePath(), tempPath + "/" + APK_PATH_2.getFileName());
+  }
+
+  @Test
+  public void pullFiles() throws Exception {
+    Path destinationPath = Paths.get("/destination/path", APK_PATH.getFileName().toString());
+    DdmlibDevice ddmlibDevice = new DdmlibDevice(mockDevice);
+
+    ddmlibDevice.pull(
+        ImmutableList.of(
+            FilePullParams.builder()
+                .setPathOnDevice(APK_PATH.toFile().getAbsolutePath())
+                .setDestinationPath(destinationPath)
+                .build()));
+
+    verify(mockDevice).pullFile(APK_PATH.toFile().getAbsolutePath(), destinationPath.toString());
   }
 
   private void mockAdbShellCommand(String command, String response) throws Exception {

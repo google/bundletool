@@ -43,7 +43,7 @@ import static com.android.tools.build.bundletool.testing.ApksArchiveHelpers.stan
 import static com.android.tools.build.bundletool.testing.DeviceFactory.abis;
 import static com.android.tools.build.bundletool.testing.DeviceFactory.density;
 import static com.android.tools.build.bundletool.testing.DeviceFactory.deviceFeatures;
-import static com.android.tools.build.bundletool.testing.DeviceFactory.deviceTier;
+import static com.android.tools.build.bundletool.testing.DeviceFactory.deviceGroups;
 import static com.android.tools.build.bundletool.testing.DeviceFactory.deviceWithSdk;
 import static com.android.tools.build.bundletool.testing.DeviceFactory.lDevice;
 import static com.android.tools.build.bundletool.testing.DeviceFactory.lDeviceWithAbis;
@@ -63,7 +63,7 @@ import static com.android.tools.build.bundletool.testing.TargetingUtils.apkTextu
 import static com.android.tools.build.bundletool.testing.TargetingUtils.mergeApkTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.mergeModuleTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.mergeVariantTargeting;
-import static com.android.tools.build.bundletool.testing.TargetingUtils.moduleDeviceTiersTargeting;
+import static com.android.tools.build.bundletool.testing.TargetingUtils.moduleDeviceGroupsTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.moduleFeatureTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.moduleMinSdkVersionTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.multiAbiTargeting;
@@ -1288,7 +1288,7 @@ public class ApkMatcherTest {
         mergeSpecs(
             deviceWithSdk(24),
             deviceFeatures("android.hardware.camera.ar", "reqGlEsVersion=0x30002"),
-            deviceTier("high"));
+            deviceGroups("highRam"));
 
     ZipPath baseApk = ZipPath.create("base-master.apk");
     ZipPath feature1Apk = ZipPath.create("ar-master.apk");
@@ -1316,7 +1316,7 @@ public class ApkMatcherTest {
                 createConditionalApkSet(
                     /* moduleName= */ "high_end",
                     mergeModuleTargeting(
-                        moduleDeviceTiersTargeting("high"), moduleMinSdkVersionTargeting(21)),
+                        moduleDeviceGroupsTargeting("highRam"), moduleMinSdkVersionTargeting(21)),
                     splitApkDescription(ApkTargeting.getDefaultInstance(), feature3Apk))));
     assertThat(new ApkMatcher(device).getMatchingApks(buildApksResult))
         .containsExactly(
@@ -1356,7 +1356,7 @@ public class ApkMatcherTest {
                 createConditionalApkSet(
                     /* moduleName= */ "high_end",
                     mergeModuleTargeting(
-                        moduleDeviceTiersTargeting("high"), moduleMinSdkVersionTargeting(21)),
+                        moduleDeviceGroupsTargeting("highRam"), moduleMinSdkVersionTargeting(21)),
                     splitApkDescription(ApkTargeting.getDefaultInstance(), feature3Apk))));
     assertThat(new ApkMatcher(device).getMatchingApks(buildApksResult))
         .containsExactly(baseMatchedApk(baseApk));

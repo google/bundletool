@@ -90,8 +90,8 @@ public abstract class AndroidManifest {
   public static final String CONDITION_MIN_SDK_VERSION_NAME = "min-sdk";
   public static final String CONDITION_MAX_SDK_VERSION_NAME = "max-sdk";
   public static final String CONDITION_USER_COUNTRIES_NAME = "user-countries";
-  public static final String CONDITION_DEVICE_TIERS_NAME = "device-tiers";
-  public static final String DEVICE_TIER_ELEMENT_NAME = "device-tier";
+  public static final String CONDITION_DEVICE_GROUPS_NAME = "device-groups";
+  public static final String DEVICE_GROUP_ELEMENT_NAME = "device-group";
   public static final String SPLIT_NAME_ATTRIBUTE_NAME = "splitName";
   public static final String VERSION_NAME_ATTRIBUTE_NAME = "versionName";
   public static final String INSTALL_LOCATION_ATTRIBUTE_NAME = "installLocation";
@@ -100,6 +100,7 @@ public abstract class AndroidManifest {
 
   public static final String MODULE_TYPE_FEATURE_VALUE = "feature";
   public static final String MODULE_TYPE_ASSET_VALUE = "asset-pack";
+  public static final String MODULE_TYPE_ML_VALUE = "ml-pack";
 
   /** <meta-data> name that specifies native library for native activity */
   public static final String NATIVE_ACTIVITY_LIB_NAME = "android.app.lib_name";
@@ -349,6 +350,8 @@ public abstract class AndroidManifest {
         return ModuleType.FEATURE_MODULE;
       case MODULE_TYPE_ASSET_VALUE:
         return ModuleType.ASSET_MODULE;
+      case MODULE_TYPE_ML_VALUE:
+        return ModuleType.ML_MODULE;
       default:
         throw InvalidBundleException.builder()
             .withUserMessage("Found invalid type attribute %s for <module> element.", value)

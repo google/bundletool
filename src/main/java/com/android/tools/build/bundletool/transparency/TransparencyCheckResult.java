@@ -16,83 +16,95 @@
 
 package com.android.tools.build.bundletool.transparency;
 
-import com.android.bundle.CodeTransparencyOuterClass.CodeRelatedFile;
 import com.google.auto.value.AutoValue;
-import com.google.common.collect.ImmutableMap;
-import com.google.common.collect.MapDifference;
-import com.google.common.collect.Maps;
 import java.util.Optional;
 
 /** Represents result of code transparency verification. */
 @AutoValue
 public abstract class TransparencyCheckResult {
 
-  /**
-   * Thumbprint of the public key certificate used to successfully verify transparency. Only set if
-   * code transparency signature was successfully verified.
-   */
-  public abstract Optional<String> certificateThumbprint();
+  /** Whether code transparency signature was successfully verified. */
+  abstract boolean transparencySignatureVerified();
+
+  /** Whether code transparency file contents were successfully verified. */
+  abstract boolean fileContentsVerified();
 
   /**
-   * {@link CodeRelatedFile}s extracted from the transparency metadata, keyed by path. Only set if
-   * transparency signature was successfully verified.
+   * SHA-256 Fingerprint of the public key certificate that was used for verifying code transparency
+   * signature. Only set when {@link #transparencySignatureVerified()} is true.
    */
-  abstract ImmutableMap<String, CodeRelatedFile> codeRelatedFilesFromTransparencyMetadata();
+  public abstract Optional<String> transparencyKeyCertificateFingerprint();
 
   /**
-   * {@link CodeRelatedFile}s extracted from the bundle or APKs, keyed by path. Only set if
-   * transparency signature was successfully verified.
+   * SHA-256 Fingerprint of the public key certificate corresponding to the APK signature. Only set
+   * if the transparency was verified in CONNECTED_DEVICE or APK mode. Empty in BUNDLE mode and when
+   * APK signature verification fails.
    */
-  abstract ImmutableMap<String, CodeRelatedFile> actualCodeRelatedFiles();
+  public abstract Optional<String> apkSigningKeyCertificateFingerprint();
 
   /**
-   * Difference between {@link #codeRelatedFilesFromTransparencyMetadata()} and {@link
-   * #actualCodeRelatedFiles()}.
+   * Error message containint information about the cause of code transparency verification failure.
+   * Only set when code transparency verification fails.
    */
-  abstract MapDifference<String, CodeRelatedFile> codeTransparencyDiff();
+  public abstract Optional<String> errorMessage();
 
-  /** Returns {@code true} if code transparency signature was successfully verified. */
-  public boolean signatureVerified() {
-    return certificateThumbprint().isPresent();
+  /** Returns true if code transparency signature and file contents were successfully verified. */
+  public boolean verified() {
+    return transparencySignatureVerified() && fileContentsVerified();
   }
 
   /**
-   * Returns {@code true} if the code transparency file contents match actual code related files
-   * present in the bundle or APKs.
+   * Returns SHA-256 fingerprint of the public key certificate that was used to successfully verify
+   * transparency signature, or an empty string if verification failed.
    */
-  public boolean fileContentsVerified() {
-    return signatureVerified() && codeTransparencyDiff().areEqual();
+  public String getTransparencyKeyCertificateFingerprint() {
+    return transparencyKeyCertificateFingerprint().orElse("");
   }
 
   /**
-   * Returns string representation of difference between code transparency file contents and code
-   * related files present in the bundle or the APKs.
+   * Returns SHA-256 fingerprint of the APK signing key certificate. Returns an empty string if the
+   * fingerprint is not set.
    */
-  public String getDiffAsString() {
-    return "Files deleted after transparency metadata generation: "
-        + codeTransparencyDiff().entriesOnlyOnLeft().keySet()
-        + "\nFiles added after transparency metadata generation: "
-        + codeTransparencyDiff().entriesOnlyOnRight().keySet()
-        + "\nFiles modified after transparency metadata generation: "
-        + codeTransparencyDiff().entriesDiffering().keySet();
+  public String getApkSigningKeyCertificateFingerprint() {
+    return apkSigningKeyCertificateFingerprint().orElse("");
   }
 
-  static TransparencyCheckResult createForValidSignature(
-      String certificateThumbprint,
-      ImmutableMap<String, CodeRelatedFile> codeRelatedFilesFromTransparencyMetadata,
-      ImmutableMap<String, CodeRelatedFile> actualCodeRelatedFiles) {
-    return new AutoValue_TransparencyCheckResult(
-        Optional.of(certificateThumbprint),
-        codeRelatedFilesFromTransparencyMetadata,
-        actualCodeRelatedFiles,
-        Maps.difference(codeRelatedFilesFromTransparencyMetadata, actualCodeRelatedFiles));
+  /**
+   * Returns an error message containing information about the cause of code transparency
+   * verification failure, or an empty string if code transparency was successfully verified.
+   */
+  public String getErrorMessage() {
+    return errorMessage().orElse("");
   }
 
-  static TransparencyCheckResult createForInvalidSignature() {
-    return new AutoValue_TransparencyCheckResult(
-        /* certificateThumbprint= */ Optional.empty(),
-        /* codeRelatedFilesFromTransparencyMetadata= */ ImmutableMap.of(),
-        /* actualCodeRelatedFiles= */ ImmutableMap.of(),
-        /* codeTransparencyDiff= */ Maps.difference(ImmutableMap.of(), ImmutableMap.of()));
+  /** Creates a builder for TransparencyCheckResult. */
+  public static Builder builder() {
+    return new AutoValue_TransparencyCheckResult.Builder()
+        .transparencySignatureVerified(false)
+        .fileContentsVerified(false);
+  }
+
+  /** Returns empty TransparencyCheckResult. */
+  public static TransparencyCheckResult empty() {
+    return builder().build();
+  }
+
+  /** Builder for TransparencyCheckResult. */
+  @AutoValue.Builder
+  public abstract static class Builder {
+
+    public abstract Builder transparencySignatureVerified(boolean transparencySignatureVerified);
+
+    public abstract Builder fileContentsVerified(boolean fileContentsVerified);
+
+    public abstract Builder transparencyKeyCertificateFingerprint(
+        String transparencyKeyCertificateFingerprint);
+
+    public abstract Builder apkSigningKeyCertificateFingerprint(
+        String apkSigningKeyCertificateFingerprint);
+
+    public abstract Builder errorMessage(String errorMessage);
+
+    public abstract TransparencyCheckResult build();
   }
 }

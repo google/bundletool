@@ -16,36 +16,52 @@
 package com.android.tools.build.bundletool.transparency;
 
 import static com.google.common.base.Preconditions.checkArgument;
+import static com.google.common.collect.ImmutableList.toImmutableList;
 
 import com.android.bundle.CodeTransparencyOuterClass.CodeRelatedFile;
 import com.android.bundle.CodeTransparencyOuterClass.CodeTransparency;
 import com.android.tools.build.bundletool.model.AppBundle;
 import com.android.tools.build.bundletool.model.BundleModule;
 import com.android.tools.build.bundletool.model.ModuleEntry;
+import com.android.tools.build.bundletool.model.exceptions.InvalidBundleException;
+import com.google.common.collect.ImmutableList;
 import com.google.common.hash.Hashing;
+import com.google.protobuf.util.JsonFormat;
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.util.Comparator;
+import java.util.stream.Stream;
 
 /** Shared static utilities for adding and verifying {@link CodeTransparency}. */
 public final class CodeTransparencyFactory {
 
   /** Returns {@link CodeTransparency} for the given {@link AppBundle}. */
   public static CodeTransparency createCodeTransparencyMetadata(AppBundle bundle) {
-    CodeTransparency.Builder transparencyBuilder = CodeTransparency.newBuilder();
-    bundle
-        .getFeatureModules()
-        .values()
-        .forEach(featureModule -> addModuleToTransparencyFile(transparencyBuilder, featureModule));
-    return transparencyBuilder.build();
+    ImmutableList<CodeRelatedFile> codeRelatedFiles =
+        bundle.getFeatureModules().values().stream()
+            .flatMap(bundleModule -> getCodeRelatedFileEntries(bundleModule))
+            .map(CodeTransparencyFactory::createCodeRelatedFile)
+            .sorted(Comparator.comparing(CodeRelatedFile::getPath))
+            .collect(toImmutableList());
+    return CodeTransparency.newBuilder().addAllCodeRelatedFile(codeRelatedFiles).build();
   }
 
-  private static void addModuleToTransparencyFile(
-      CodeTransparency.Builder codeTransparencyBuilder, BundleModule module) {
-    module.getEntries().stream()
-        .filter(CodeTransparencyFactory::isCodeRelatedFile)
-        .forEach(
-            moduleEntry ->
-                codeTransparencyBuilder.addCodeRelatedFile(createCodeRelatedFile(moduleEntry)));
+  /** Returns {@link CodeTransparency} parsed from transparency file JSON payload. */
+  public static CodeTransparency parseFrom(String codeTransparency) {
+    CodeTransparency.Builder codeTransparencyProto = CodeTransparency.newBuilder();
+    try {
+      JsonFormat.parser().merge(codeTransparency, codeTransparencyProto);
+    } catch (IOException e) {
+      throw InvalidBundleException.builder()
+          .withUserMessage("Unable to parse code transparency file contents.")
+          .withCause(e)
+          .build();
+    }
+    return codeTransparencyProto.build();
+  }
+
+  private static Stream<ModuleEntry> getCodeRelatedFileEntries(BundleModule module) {
+    return module.getEntries().stream().filter(CodeTransparencyFactory::isCodeRelatedFile);
   }
 
   private static CodeRelatedFile createCodeRelatedFile(ModuleEntry moduleEntry) {

@@ -16,7 +16,7 @@
 
 package com.android.tools.build.bundletool.validation;
 
-import static com.android.tools.build.bundletool.transparency.CodeTransparencyChecker.checkTransparency;
+import static com.android.tools.build.bundletool.transparency.BundleTransparencyCheckUtils.checkTransparency;
 
 import com.android.tools.build.bundletool.model.AppBundle;
 import com.android.tools.build.bundletool.model.BundleMetadata;
@@ -40,17 +40,9 @@ public final class CodeTransparencyValidator extends SubValidator {
     }
     TransparencyCheckResult transparencyCheckResult =
         checkTransparency(bundle, signedTransparencyFile.get());
-    if (!transparencyCheckResult.signatureVerified()) {
+    if (!transparencyCheckResult.verified()) {
       throw InvalidBundleException.builder()
-          .withUserMessage("Code transparency verification failed because signature is invalid.")
-          .build();
-    }
-    if (!transparencyCheckResult.fileContentsVerified()) {
-      throw InvalidBundleException.builder()
-          .withUserMessage(
-              "Code transparency verification failed because code was modified "
-                  + "after transparency metadata generation.\n"
-                  + transparencyCheckResult.getDiffAsString())
+          .withUserMessage(transparencyCheckResult.getErrorMessage())
           .build();
     }
   }

@@ -72,6 +72,8 @@ public abstract class Device {
 
   public abstract void removeRemotePackage(Path remoteFilePath) throws InstallException;
 
+  public abstract void pull(ImmutableList<FilePullParams> files);
+
   /** Options related to APK installation. */
   @Immutable
   @AutoValue
@@ -140,6 +142,32 @@ public abstract class Device {
       public abstract Builder setClearDestinationPath(boolean shouldClear);
 
       public abstract PushOptions build();
+    }
+  }
+
+  /** Parameters related to pulling a single file from the device. */
+  @Immutable
+  @AutoValue
+  @AutoValue.CopyAnnotations
+  public abstract static class FilePullParams {
+    /** Path to the remote file that should be pulled from the device. */
+    public abstract String getPathOnDevice();
+
+    /** Path to the local file where the pulled file should be written to. */
+    public abstract Path getDestinationPath();
+
+    public static Builder builder() {
+      return new AutoValue_Device_FilePullParams.Builder();
+    }
+
+    /** Builder for {@link FilePullParams}. */
+    @AutoValue.Builder
+    public abstract static class Builder {
+      public abstract Builder setPathOnDevice(String pathOnDevice);
+
+      public abstract Builder setDestinationPath(Path destinationPath);
+
+      public abstract FilePullParams build();
     }
   }
 }

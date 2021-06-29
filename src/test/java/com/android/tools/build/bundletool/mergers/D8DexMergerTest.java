@@ -231,15 +231,40 @@ public class D8DexMergerTest {
   }
 
   @Test
+  public void mergeCoreDesugaringLibrary_ok() throws Exception {
+    // Two application dex files together with code desugaring dex.
+    Path dexFile1 = writeTestDataToFile("testdata/dex/classes.dex");
+    Path dexFile2 = writeTestDataToFile("testdata/dex/classes-other.dex");
+    Path dexFile3 = writeTestDataToFile("testdata/dex/classes-emulated-coredesugar.dex");
+
+    ImmutableList<Path> mergedDexFiles =
+        new D8DexMerger()
+            .merge(
+                ImmutableList.of(dexFile1, dexFile2, dexFile3),
+                outputDir,
+                /* mainDexListFile= */ Optional.empty(),
+                /* proguardMap= */ NO_FILE,
+                /* isDebuggable= */ false,
+                /* minSdkVersion= */ ANDROID_K_API_VERSION);
+    ImmutableList<String> mergedDexFilenames =
+        mergedDexFiles.stream().map(dex -> dex.getFileName().toString()).collect(toImmutableList());
+
+    assertThat(mergedDexFiles.size()).isAtLeast(2);
+    assertThat(mergedDexFilenames).containsExactly("classes.dex", "classes2.dex");
+    assertThat(listClassesInDexFiles(mergedDexFiles.get(0)))
+        .isEqualTo(listClassesInDexFiles(dexFile1, dexFile2));
+    // Core desugaring dex must not be merged with application dex.
+    assertThat(Files.readAllBytes(mergedDexFiles.get(1))).isEqualTo(Files.readAllBytes(dexFile3));
+  }
+
+  @Test
   public void bogusMapFileWorks() throws Exception {
     // The two input dex files cannot fit into a single dex file.
     Path dexFile1 = writeTestDataToFile("testdata/dex/classes-large.dex");
     Path dexFile2 = writeTestDataToFile("testdata/dex/classes-large2.dex");
 
-    Optional<Path>  bogusMapFile =
-        Optional.of(
-            FileUtils.createFileWithLines(
-                tmp, "NOT_A_VALID::MAPPING->::file->x"));
+    Optional<Path> bogusMapFile =
+        Optional.of(FileUtils.createFileWithLines(tmp, "NOT_A_VALID::MAPPING->::file->x"));
 
     ImmutableList<Path> mergedDexFiles =
         new D8DexMerger()
@@ -263,7 +288,7 @@ public class D8DexMergerTest {
 
     // We are not testing actual distribution, just that a valid map
     // file is passed through correctly.
-    Optional<Path>  mapFile =
+    Optional<Path> mapFile =
         Optional.of(
             FileUtils.createFileWithLines(
                 tmp,
@@ -289,7 +314,6 @@ public class D8DexMergerTest {
     assertThat(mergedDexFiles.size()).isAtLeast(2);
     assertThat(listClassesInDexFiles(mergedDexFiles))
         .isEqualTo(listClassesInDexFiles(dexFile1, dexFile2));
-
   }
 
   private Path writeTestDataToFile(String testDataPath) throws Exception {

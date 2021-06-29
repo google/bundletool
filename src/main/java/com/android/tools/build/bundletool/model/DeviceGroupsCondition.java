@@ -19,13 +19,13 @@ import com.google.auto.value.AutoValue;
 import com.google.common.collect.ImmutableSet;
 import com.google.errorprone.annotations.Immutable;
 
-/** A {@link BundleModule} condition describing a set of device tiers. */
+/** A {@link BundleModule} condition describing a set of device groups. */
 @Immutable
 @AutoValue
-public abstract class DeviceTiersCondition {
-  public abstract ImmutableSet<String> getDeviceTiers();
+public abstract class DeviceGroupsCondition {
+  public abstract ImmutableSet<String> getDeviceGroups();
 
-  public static DeviceTiersCondition create(ImmutableSet<String> deviceTiers) {
-    return new AutoValue_DeviceTiersCondition(deviceTiers);
+  public static DeviceGroupsCondition create(ImmutableSet<String> deviceGroups) {
+    return new AutoValue_DeviceGroupsCondition(deviceGroups);
   }
 }

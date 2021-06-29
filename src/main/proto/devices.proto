@@ -30,4 +30,7 @@ message DeviceSpec {
 
   // Device tier.
   string device_tier = 8;
+
+  // Device groups the device belongs to.
+  repeated string device_groups = 9;
 }

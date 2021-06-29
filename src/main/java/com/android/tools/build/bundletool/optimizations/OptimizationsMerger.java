@@ -103,7 +103,10 @@ public final class OptimizationsMerger {
             ? requestedOptimizations.getUncompressNativeLibraries().getEnabled()
             : defaultOptimizations.getUncompressNativeLibraries();
 
-    boolean uncompressDexFiles = requestedOptimizations.getUncompressDexFiles().getEnabled();
+    boolean uncompressDexFiles =
+        requestedOptimizations.hasUncompressDexFiles()
+            ? requestedOptimizations.getUncompressDexFiles().getEnabled()
+            : defaultOptimizations.getUncompressDexFiles();
 
     ImmutableMap<OptimizationDimension, SuffixStripping> suffixStrippings =
         getSuffixStrippings(

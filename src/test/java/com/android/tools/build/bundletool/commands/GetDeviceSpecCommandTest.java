@@ -40,8 +40,10 @@ import com.android.tools.build.bundletool.model.utils.files.BufferedIo;
 import com.android.tools.build.bundletool.testing.FakeAdbServer;
 import com.android.tools.build.bundletool.testing.FakeDevice;
 import com.android.tools.build.bundletool.testing.FakeSystemEnvironmentProvider;
+import com.google.common.base.Joiner;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableSet;
 import com.google.protobuf.util.JsonFormat;
 import java.io.IOException;
 import java.io.Reader;
@@ -62,6 +64,8 @@ public class GetDeviceSpecCommandTest {
   private Path tmpDir;
   private static final String DEVICE_ID = "id1";
   private static final String DEVICE_TIER = "low";
+  private static final ImmutableSet<String> DEVICE_GROUPS =
+      ImmutableSet.of("highRam", "googlePixel");
 
   private SystemEnvironmentProvider systemEnvironmentProvider;
   private Path adbPath;
@@ -139,7 +143,8 @@ public class GetDeviceSpecCommandTest {
                     "--adb=" + adbPath,
                     "--device-id=" + DEVICE_ID,
                     "--output=" + outputPath,
-                    "--device-tier=" + DEVICE_TIER),
+                    "--device-tier=" + DEVICE_TIER,
+                    "--device-groups=" + Joiner.on(",").join(DEVICE_GROUPS)),
             systemEnvironmentProvider,
             fakeServerOneDevice(lDeviceWithLocales("en-US")));
 
@@ -150,6 +155,7 @@ public class GetDeviceSpecCommandTest {
             .setOutputPath(outputPath)
             .setAdbServer(commandViaFlags.getAdbServer())
             .setDeviceTier(DEVICE_TIER)
+            .setDeviceGroups(DEVICE_GROUPS)
             .build();
 
     assertThat(commandViaFlags).isEqualTo(commandViaBuilder);

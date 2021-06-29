@@ -85,6 +85,25 @@ public class BundleModuleBuilder {
     return this;
   }
 
+  /**
+   * Adds an entry that should be sourced from a zip file.
+   *
+   * @param relativePath the file path in the module that is being constructed
+   * @param zipFilePath location of the on-disk zip file
+   * @param entryFullZipPath the entry path inside the zip file
+   * @param content the contents of the file
+   */
+  public BundleModuleBuilder addFile(
+      String relativePath, Path zipFilePath, ZipPath entryFullZipPath, byte[] content) {
+    entries.add(
+        ModuleEntry.builder()
+            .setContent(ByteSource.wrap(content))
+            .setPath(ZipPath.create(relativePath))
+            .setBundleLocation(ModuleEntryBundleLocation.create(zipFilePath, entryFullZipPath))
+            .build());
+    return this;
+  }
+
   public BundleModuleBuilder addFile(String relativePath) {
     return addFile(relativePath, new byte[1]);
   }

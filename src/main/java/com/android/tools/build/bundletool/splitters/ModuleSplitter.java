@@ -26,12 +26,14 @@ import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 
 import com.android.aapt.ConfigurationOuterClass.Configuration;
+import com.android.bundle.Config.BundleConfig;
 import com.android.bundle.Targeting.ApkTargeting;
 import com.android.bundle.Targeting.SdkVersion;
 import com.android.bundle.Targeting.SdkVersionTargeting;
 import com.android.bundle.Targeting.VariantTargeting;
 import com.android.tools.build.bundletool.mergers.SameTargetingMerger;
 import com.android.tools.build.bundletool.model.AndroidManifest;
+import com.android.tools.build.bundletool.model.AppBundle;
 import com.android.tools.build.bundletool.model.BundleMetadata;
 import com.android.tools.build.bundletool.model.BundleModule;
 import com.android.tools.build.bundletool.model.ManifestEditor;
@@ -82,7 +84,10 @@ public class ModuleSplitter {
     return new ModuleSplitter(
         module,
         bundleVersion,
-        BundleMetadata.builder().build(),
+        AppBundle.buildFromModules(
+            ImmutableList.of(module),
+            BundleConfig.getDefaultInstance(),
+            BundleMetadata.builder().build()),
         ApkGenerationConfiguration.getDefaultInstance(),
         lPlusVariantTargeting(),
         /* allModuleNames= */ ImmutableSet.of(),
@@ -93,14 +98,14 @@ public class ModuleSplitter {
   public static ModuleSplitter createNoStamp(
       BundleModule module,
       Version bundleVersion,
-      BundleMetadata bundleMetadata,
+      AppBundle appBundle,
       ApkGenerationConfiguration apkGenerationConfiguration,
       VariantTargeting variantTargeting,
       ImmutableSet<String> allModuleNames) {
     return new ModuleSplitter(
         module,
         bundleVersion,
-        bundleMetadata,
+        appBundle,
         apkGenerationConfiguration,
         variantTargeting,
         allModuleNames,
@@ -111,7 +116,7 @@ public class ModuleSplitter {
   public static ModuleSplitter create(
       BundleModule module,
       Version bundleVersion,
-      BundleMetadata bundleMetadata,
+      AppBundle appBundle,
       ApkGenerationConfiguration apkGenerationConfiguration,
       VariantTargeting variantTargeting,
       ImmutableSet<String> allModuleNames,
@@ -120,7 +125,7 @@ public class ModuleSplitter {
     return new ModuleSplitter(
         module,
         bundleVersion,
-        bundleMetadata,
+        appBundle,
         apkGenerationConfiguration,
         variantTargeting,
         allModuleNames,
@@ -131,7 +136,7 @@ public class ModuleSplitter {
   private ModuleSplitter(
       BundleModule module,
       Version bundleVersion,
-      BundleMetadata bundleMetadata,
+      AppBundle appBundle,
       ApkGenerationConfiguration apkGenerationConfiguration,
       VariantTargeting variantTargeting,
       ImmutableSet<String> allModuleNames,
@@ -144,7 +149,7 @@ public class ModuleSplitter {
     this.abiPlaceholderInjector =
         new AbiPlaceholderInjector(apkGenerationConfiguration.getAbisForPlaceholderLibs());
     this.pinSpecInjector = new PinSpecInjector(module);
-    this.codeTransparencyInjector = new CodeTransparencyInjector(bundleMetadata);
+    this.codeTransparencyInjector = new CodeTransparencyInjector(appBundle);
     this.allModuleNames = allModuleNames;
     this.stampSource = stampSource;
     this.stampType = stampType;

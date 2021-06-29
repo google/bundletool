@@ -26,9 +26,17 @@ import com.android.tools.r8.CompilationFailedException;
 import com.android.tools.r8.CompilationMode;
 import com.android.tools.r8.D8;
 import com.android.tools.r8.D8Command;
+import com.android.tools.r8.DexIndexedConsumer.ForwardingConsumer;
+import com.android.tools.r8.Diagnostic;
+import com.android.tools.r8.DiagnosticsHandler;
 import com.android.tools.r8.OutputMode;
+import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.Streams;
 import java.io.File;
+import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.Optional;
@@ -36,7 +44,9 @@ import javax.inject.Inject;
 
 /** Merges dex files using D8. */
 public class D8DexMerger implements DexMerger {
-
+  private static final String CORE_DESUGARING_PREFIX = "j$.";
+  private static final String CORE_DESUGARING_LIBRARY_EXCEPTION =
+      "Merging dex file containing classes with prefix 'j$.'";
   private static final String DEX_OVERFLOW_MSG =
       "Cannot fit requested classes in a single dex file";
 
@@ -59,7 +69,18 @@ public class D8DexMerger implements DexMerger {
       // however we are merging existing dex files. The parameters considered are:
       // - classpathFiles, libraryFiles: Required for desugaring during compilation.
       D8Command.Builder command =
-          D8Command.builder()
+          D8Command.builder(
+                  new DiagnosticsHandler() {
+                    @Override
+                    public void error(Diagnostic error) {
+                      if (error
+                          .getDiagnosticMessage()
+                          .contains(CORE_DESUGARING_LIBRARY_EXCEPTION)) {
+                        return;
+                      }
+                      DiagnosticsHandler.super.error(error);
+                    }
+                  })
               .setOutput(outputDir, OutputMode.DexIndexed)
               .addProgramFiles(dexFiles)
               .setMinApiLevel(minSdkVersion)
@@ -79,15 +100,16 @@ public class D8DexMerger implements DexMerger {
       return Arrays.stream(mergedFiles).map(File::toPath).collect(toImmutableList());
 
     } catch (CompilationFailedException e) {
+      if (isCoreDesugaringException(e)) {
+        // If merge fails because of core desugaring library, exclude dex files related to core
+        // desugaring lib and try again.
+        return mergeAppDexFilesAndRenameCoreDesugaringDex(
+            dexFiles, outputDir, mainDexListFile, proguardMap, isDebuggable, minSdkVersion);
+      }
       if (proguardMap.isPresent()) {
         // Try without the proguard map
         return merge(
-            dexFiles,
-            outputDir,
-            mainDexListFile,
-            Optional.empty(),
-            isDebuggable,
-            minSdkVersion);
+            dexFiles, outputDir, mainDexListFile, Optional.empty(), isDebuggable, minSdkVersion);
       } else {
         throw translateD8Exception(e);
       }
@@ -113,9 +135,83 @@ public class D8DexMerger implements DexMerger {
           .withCause(d8Exception)
           .build();
     } else {
+      Throwable rootCause = Throwables.getRootCause(d8Exception);
       return CommandExecutionException.builder()
-          .withInternalMessage("Dex merging failed.")
+          .withInternalMessage("Dex merging failed. %s", rootCause.getMessage())
           .withCause(d8Exception)
+          .build();
+    }
+  }
+
+  private static boolean isCoreDesugaringException(CompilationFailedException d8Exception) {
+    return ThrowableUtils.anyInCausalChainOrSuppressedMatches(
+        d8Exception,
+        t -> t.getMessage() != null && t.getMessage().contains(CORE_DESUGARING_LIBRARY_EXCEPTION));
+  }
+
+  private ImmutableList<Path> mergeAppDexFilesAndRenameCoreDesugaringDex(
+      ImmutableList<Path> dexFiles,
+      Path outputDir,
+      Optional<Path> mainDexListFile,
+      Optional<Path> proguardMap,
+      boolean isDebuggable,
+      int minSdkVersion) {
+    ImmutableList<Path> desugaringDexFiles =
+        dexFiles.stream().filter(D8DexMerger::isCoreDesugaringDex).collect(toImmutableList());
+    ImmutableList<Path> appDexFiles =
+        dexFiles.stream()
+            .filter(dex -> !desugaringDexFiles.contains(dex))
+            .collect(toImmutableList());
+
+    ImmutableList<Path> mergedAppDexFiles =
+        merge(appDexFiles, outputDir, mainDexListFile, proguardMap, isDebuggable, minSdkVersion);
+    ImmutableList<Path> mergedDesugaringDexFiles =
+        Streams.mapWithIndex(
+                desugaringDexFiles.stream(),
+                (dex, index) ->
+                    copyDexToOutput(dex, outputDir, (int) index + 1 + mergedAppDexFiles.size()))
+            .collect(toImmutableList());
+
+    return ImmutableList.<Path>builder()
+        .addAll(mergedAppDexFiles)
+        .addAll(mergedDesugaringDexFiles)
+        .build();
+  }
+
+  private static Path copyDexToOutput(Path input, Path outputDir, int index) {
+    String outputName = index == 1 ? "classes.dex" : String.format("classes%d.dex", index);
+    Path output = outputDir.resolve(outputName);
+    try {
+      Files.copy(input, output);
+      return output;
+    } catch (IOException e) {
+      throw new UncheckedIOException(e);
+    }
+  }
+
+  private static boolean isCoreDesugaringDex(Path dexFile) {
+    try {
+      boolean[] isDesugaringDex = new boolean[] {true};
+      D8Command.Builder builder =
+          D8Command.builder()
+              .addProgramFiles(dexFile)
+              .setProgramConsumer(new ForwardingConsumer(null));
+      builder.addOutputInspection(
+          inspection ->
+              inspection.forEachClass(
+                  clazz ->
+                      isDesugaringDex[0] =
+                          isDesugaringDex[0]
+                              && clazz
+                                  .getClassReference()
+                                  .getTypeName()
+                                  .startsWith(CORE_DESUGARING_PREFIX)));
+      D8.run(builder.build());
+      return isDesugaringDex[0];
+    } catch (CompilationFailedException e) {
+      throw CommandExecutionException.builder()
+          .withInternalMessage("Failed to read dex file %s.", dexFile.getFileName().toString())
+          .withCause(e)
           .build();
     }
   }

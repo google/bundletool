@@ -17,7 +17,7 @@
 package com.android.tools.build.bundletool.model;
 
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifest;
-import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withDeviceTiersCondition;
+import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withDeviceGroupsCondition;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withEmptyDeliveryElement;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withFastFollowDelivery;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withFeatureCondition;
@@ -370,28 +370,28 @@ public class ManifestDeliveryElementTest {
   }
 
   @Test
-  public void moduleConditions_deviceTiersCondition() {
+  public void moduleConditions_deviceGroupsCondition() {
     Optional<ManifestDeliveryElement> deliveryElement =
         ManifestDeliveryElement.fromManifestRootNode(
             androidManifest(
-                "com.test.app", withDeviceTiersCondition(ImmutableList.of("medium", "high"))),
+                "com.test.app", withDeviceGroupsCondition(ImmutableList.of("group1", "group2"))),
             /* isFastFollowAllowed= */ false);
 
     assertThat(deliveryElement).isPresent();
 
     assertThat(deliveryElement.get().hasModuleConditions()).isTrue();
-    assertThat(deliveryElement.get().getModuleConditions().getDeviceTiersCondition())
-        .hasValue(DeviceTiersCondition.create(ImmutableSet.of("medium", "high")));
+    assertThat(deliveryElement.get().getModuleConditions().getDeviceGroupsCondition())
+        .hasValue(DeviceGroupsCondition.create(ImmutableSet.of("group1", "group2")));
   }
 
   @Test
-  public void moduleConditions_multipleDeviceTiersCondition_throws() {
+  public void moduleConditions_multipleDeviceGroupsCondition_throws() {
     Optional<ManifestDeliveryElement> element =
         ManifestDeliveryElement.fromManifestRootNode(
             androidManifest(
                 "com.test.app",
-                withDeviceTiersCondition(ImmutableList.of("medium", "high")),
-                withDeviceTiersCondition(ImmutableList.of("low"))),
+                withDeviceGroupsCondition(ImmutableList.of("group1", "group2")),
+                withDeviceGroupsCondition(ImmutableList.of("group3"))),
             /* isFastFollowAllowed= */ false);
 
     assertThat(element).isPresent();
@@ -400,35 +400,14 @@ public class ManifestDeliveryElementTest {
         assertThrows(InvalidBundleException.class, () -> element.get().getModuleConditions());
     assertThat(exception)
         .hasMessageThat()
-        .contains("Multiple '<dist:device-tiers>' conditions are not supported.");
+        .contains("Multiple '<dist:device-groups>' conditions are not supported.");
   }
 
   @Test
-  public void moduleConditions_emptyDeviceTiersCondition_throws() {
+  public void moduleConditions_emptyDeviceGroupsCondition_throws() {
     Optional<ManifestDeliveryElement> element =
         ManifestDeliveryElement.fromManifestRootNode(
-            androidManifest("com.test.app", withDeviceTiersCondition(ImmutableList.of())),
-            /* isFastFollowAllowed= */ false);
-
-    assertThat(element).isPresent();
-
-    InvalidBundleException exception =
-        assertThrows(InvalidBundleException.class, () -> element.get().getModuleConditions());
-    assertThat(exception)
-        .hasMessageThat()
-        .contains("At least one device tier should be specified in '<dist:device-tiers>' element.");
-  }
-
-  @Test
-  public void moduleConditions_wrongElementInsideDeviceTiersCondition_throws() {
-    XmlProtoElement badDeviceTierCondition =
-        XmlProtoElementBuilder.create(DISTRIBUTION_NAMESPACE_URI, "device-tiers")
-            .addChildElement(XmlProtoElementBuilder.create(DISTRIBUTION_NAMESPACE_URI, "wrong"))
-            .build();
-
-    Optional<ManifestDeliveryElement> element =
-        ManifestDeliveryElement.fromManifestRootNode(
-            createAndroidManifestWithConditions(badDeviceTierCondition),
+            androidManifest("com.test.app", withDeviceGroupsCondition(ImmutableList.of())),
             /* isFastFollowAllowed= */ false);
 
     assertThat(element).isPresent();
@@ -438,24 +417,46 @@ public class ManifestDeliveryElementTest {
     assertThat(exception)
         .hasMessageThat()
         .contains(
-            "Expected only '<dist:device-tier>' elements inside '<dist:device-tiers>', but found"
-                + " 'wrong'");
+            "At least one device group should be specified in '<dist:device-groups>' element.");
   }
 
   @Test
-  public void moduleConditions_wrongAttributeInDeviceTierElement_throws() {
-    XmlProtoElement badDeviceTierCondition =
-        XmlProtoElementBuilder.create(DISTRIBUTION_NAMESPACE_URI, "device-tiers")
-            .addChildElement(
-                XmlProtoElementBuilder.create(DISTRIBUTION_NAMESPACE_URI, "device-tier")
-                    .addAttribute(
-                        XmlProtoAttributeBuilder.create(DISTRIBUTION_NAMESPACE_URI, "tierName")
-                            .setValueAsString("low")))
+  public void moduleConditions_wrongElementInsideDeviceGroupsCondition_throws() {
+    XmlProtoElement badDeviceGroupCondition =
+        XmlProtoElementBuilder.create(DISTRIBUTION_NAMESPACE_URI, "device-groups")
+            .addChildElement(XmlProtoElementBuilder.create(DISTRIBUTION_NAMESPACE_URI, "wrong"))
             .build();
 
     Optional<ManifestDeliveryElement> element =
         ManifestDeliveryElement.fromManifestRootNode(
-            createAndroidManifestWithConditions(badDeviceTierCondition),
+            createAndroidManifestWithConditions(badDeviceGroupCondition),
+            /* isFastFollowAllowed= */ false);
+
+    assertThat(element).isPresent();
+
+    InvalidBundleException exception =
+        assertThrows(InvalidBundleException.class, () -> element.get().getModuleConditions());
+    assertThat(exception)
+        .hasMessageThat()
+        .contains(
+            "Expected only '<dist:device-group>' elements inside '<dist:device-groups>', but found"
+                + " 'wrong'");
+  }
+
+  @Test
+  public void moduleConditions_wrongAttributeInDeviceGroupElement_throws() {
+    XmlProtoElement badDeviceGroupCondition =
+        XmlProtoElementBuilder.create(DISTRIBUTION_NAMESPACE_URI, "device-groups")
+            .addChildElement(
+                XmlProtoElementBuilder.create(DISTRIBUTION_NAMESPACE_URI, "device-group")
+                    .addAttribute(
+                        XmlProtoAttributeBuilder.create(DISTRIBUTION_NAMESPACE_URI, "groupName")
+                            .setValueAsString("group1")))
+            .build();
+
+    Optional<ManifestDeliveryElement> element =
+        ManifestDeliveryElement.fromManifestRootNode(
+            createAndroidManifestWithConditions(badDeviceGroupCondition),
             /* isFastFollowAllowed= */ false);
 
     assertThat(element).isPresent();
@@ -465,15 +466,16 @@ public class ManifestDeliveryElementTest {
     assertThat(exception)
         .hasMessageThat()
         .isEqualTo(
-            "'<dist:device-tier>' element is expected to have 'dist:name' attribute but found"
+            "'<dist:device-group>' element is expected to have 'dist:name' attribute but found"
                 + " none.");
   }
 
   @Test
-  public void moduleConditions_wrongDeviceTierName_throws() {
+  public void moduleConditions_wrongDeviceGroupName_throws() {
     Optional<ManifestDeliveryElement> element =
         ManifestDeliveryElement.fromManifestRootNode(
-            androidManifest("com.test.app", withDeviceTiersCondition(ImmutableList.of("tier!!!"))),
+            androidManifest(
+                "com.test.app", withDeviceGroupsCondition(ImmutableList.of("group!!!"))),
             /* isFastFollowAllowed= */ false);
 
     assertThat(element).isPresent();
@@ -483,9 +485,9 @@ public class ManifestDeliveryElementTest {
     assertThat(exception)
         .hasMessageThat()
         .isEqualTo(
-            "Device tier names should start with a letter and contain only "
-                + "letters, numbers and underscores. Found tier named 'tier!!!' in "
-                + "'<dist:device-tier>' element.");
+            "Device group names should start with a letter and contain only "
+                + "letters, numbers and underscores. Found group named 'group!!!' in "
+                + "'<dist:device-group>' element.");
   }
 
   @Test

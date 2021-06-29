@@ -67,6 +67,8 @@ import com.android.bundle.Commands.DefaultTargetingValue;
 import com.android.bundle.Commands.DeliveryType;
 import com.android.bundle.Commands.ExtractApksResult;
 import com.android.bundle.Commands.ExtractedApk;
+import com.android.bundle.Commands.LocalTestingInfo;
+import com.android.bundle.Commands.LocalTestingInfoForMetadata;
 import com.android.bundle.Config.Bundletool;
 import com.android.bundle.Config.SplitDimension.Value;
 import com.android.bundle.Devices.DeviceSpec;
@@ -1899,11 +1901,18 @@ public class ExtractApksCommandTest {
             "Missing APKs for [ABI] dimensions in the module 'base' for the provided device.");
   }
 
+  @DataPoints("localTestingEnabled")
+  public static final ImmutableSet<Boolean> LOCAL_TESTING_ENABLED = ImmutableSet.of(true, false);
+
   @Test
-  public void extractApks_producesOutputMetadata() throws Exception {
+  @Theory
+  public void extractApks_producesOutputMetadata(
+      @FromDataPoints("localTestingEnabled") boolean localTestingEnabled) throws Exception {
+    String onDemandModule = "ondemand_assetmodule";
     ZipPath apkBase = ZipPath.create("base-master.apk");
     ZipPath apkFeature1 = ZipPath.create("feature1-master.apk");
     ZipPath apkFeature2 = ZipPath.create("feature2-master.apk");
+    ZipPath onDemandMasterApk = ZipPath.create(onDemandModule + "-master.apk");
     BuildApksResult tableOfContentsProto =
         BuildApksResult.newBuilder()
             .setBundletool(
@@ -1927,7 +1936,26 @@ public class ExtractApksCommandTest {
                         /* moduleDependencies= */ ImmutableList.of("feature1"),
                         createMasterApkDescription(
                             ApkTargeting.getDefaultInstance(), apkFeature2))))
+            .addAssetSliceSet(
+                AssetSliceSet.newBuilder()
+                    .setAssetModuleMetadata(
+                        AssetModuleMetadata.newBuilder()
+                            .setName(onDemandModule)
+                            .setDeliveryType(DeliveryType.ON_DEMAND))
+                    .addApkDescription(
+                        splitApkDescription(ApkTargeting.getDefaultInstance(), onDemandMasterApk)))
             .build();
+
+    if (localTestingEnabled) {
+      tableOfContentsProto =
+          tableOfContentsProto.toBuilder()
+              .setPackageName("com.acme.anvil")
+              .setLocalTestingInfo(
+                  LocalTestingInfo.newBuilder()
+                      .setEnabled(true)
+                      .setLocalTestingPath("local_testing_dir"))
+              .build();
+    }
     Path apksArchiveFile =
         createApksArchiveFile(tableOfContentsProto, tmpDir.resolve("bundle.apks"));
 
@@ -1938,7 +1966,7 @@ public class ExtractApksCommandTest {
             .setApksArchivePath(apksArchiveFile)
             .setDeviceSpec(deviceSpec)
             .setOutputDirectory(tmpDir)
-            .setModules(ImmutableSet.of("feature2"))
+            .setModules(ImmutableSet.of("feature2", "ondemand_assetmodule"))
             .setIncludeMetadata(true)
             .build()
             .execute();
@@ -1947,33 +1975,50 @@ public class ExtractApksCommandTest {
         .containsExactly(
             inOutputDirectory(apkBase),
             inOutputDirectory(apkFeature1),
-            inOutputDirectory(apkFeature2));
+            inOutputDirectory(apkFeature2),
+            inOutputDirectory(onDemandMasterApk));
 
     Path metadataFile = inTempDirectory("metadata.json");
     assertThat(Files.isRegularFile(metadataFile)).isTrue();
+    ExtractApksResult expectedResult =
+        ExtractApksResult.newBuilder()
+            .addApks(
+                ExtractedApk.newBuilder()
+                    .setPath(apkBase.toString())
+                    .setDeliveryType(DeliveryType.INSTALL_TIME)
+                    .setModuleName("base")
+                    .build())
+            .addApks(
+                ExtractedApk.newBuilder()
+                    .setPath(apkFeature1.toString())
+                    .setDeliveryType(DeliveryType.ON_DEMAND)
+                    .setModuleName("feature1")
+                    .build())
+            .addApks(
+                ExtractedApk.newBuilder()
+                    .setPath(apkFeature2.toString())
+                    .setDeliveryType(DeliveryType.ON_DEMAND)
+                    .setModuleName("feature2")
+                    .build())
+            .addApks(
+                ExtractedApk.newBuilder()
+                    .setPath(onDemandMasterApk.toString())
+                    .setDeliveryType(DeliveryType.ON_DEMAND)
+                    .setModuleName("ondemand_assetmodule")
+                    .build())
+            .build();
+    if (localTestingEnabled) {
+      expectedResult =
+          expectedResult.toBuilder()
+              .setLocalTestingInfo(
+                  LocalTestingInfoForMetadata.newBuilder()
+                      .setLocalTestingDir(
+                          "/sdcard/Android/data/com.acme.anvil/files/local_testing_dir"))
+              .build();
+    }
     assertThat(parseExtractApksResult(metadataFile))
         .ignoringRepeatedFieldOrder()
-        .isEqualTo(
-            ExtractApksResult.newBuilder()
-                .addApks(
-                    ExtractedApk.newBuilder()
-                        .setPath(apkBase.toString())
-                        .setDeliveryType(DeliveryType.INSTALL_TIME)
-                        .setModuleName("base")
-                        .build())
-                .addApks(
-                    ExtractedApk.newBuilder()
-                        .setPath(apkFeature1.toString())
-                        .setDeliveryType(DeliveryType.ON_DEMAND)
-                        .setModuleName("feature1")
-                        .build())
-                .addApks(
-                    ExtractedApk.newBuilder()
-                        .setPath(apkFeature2.toString())
-                        .setDeliveryType(DeliveryType.ON_DEMAND)
-                        .setModuleName("feature2")
-                        .build())
-                .build());
+        .isEqualTo(expectedResult);
   }
 
   private static ExtractApksResult parseExtractApksResult(Path file) throws Exception {

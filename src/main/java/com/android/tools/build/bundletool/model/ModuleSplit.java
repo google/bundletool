@@ -511,6 +511,7 @@ public abstract class ModuleSplit {
   private static SplitType getSplitTypeFromModuleType(ModuleType moduleType) {
     switch (moduleType) {
       case FEATURE_MODULE:
+      case ML_MODULE:
         return SplitType.SPLIT;
       case ASSET_MODULE:
         return SplitType.ASSET_SLICE;

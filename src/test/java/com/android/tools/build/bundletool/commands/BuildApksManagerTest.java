@@ -47,6 +47,7 @@ import static com.android.tools.build.bundletool.model.utils.Versions.ANDROID_Q_
 import static com.android.tools.build.bundletool.testing.ApkSetUtils.extractFromApkSetFile;
 import static com.android.tools.build.bundletool.testing.ApkSetUtils.extractTocFromApkSetFile;
 import static com.android.tools.build.bundletool.testing.ApkSetUtils.parseTocFromFile;
+import static com.android.tools.build.bundletool.testing.CodeTransparencyTestUtils.createJwsToken;
 import static com.android.tools.build.bundletool.testing.DeviceFactory.abis;
 import static com.android.tools.build.bundletool.testing.DeviceFactory.density;
 import static com.android.tools.build.bundletool.testing.DeviceFactory.deviceTier;
@@ -59,7 +60,7 @@ import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.andr
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withAppIcon;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withCustomThemeActivity;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withDelivery;
-import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withDeviceTiersCondition;
+import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withDeviceGroupsCondition;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withFusingAttribute;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withInstallLocation;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withInstallTimeDelivery;
@@ -91,7 +92,7 @@ import static com.android.tools.build.bundletool.testing.TargetingUtils.assetsDi
 import static com.android.tools.build.bundletool.testing.TargetingUtils.deviceTierTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.languageTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.mergeVariantTargeting;
-import static com.android.tools.build.bundletool.testing.TargetingUtils.moduleDeviceTiersTargeting;
+import static com.android.tools.build.bundletool.testing.TargetingUtils.moduleDeviceGroupsTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.nativeDirectoryTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.nativeLibraries;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.sdkVersionFrom;
@@ -125,6 +126,8 @@ import com.android.aapt.ConfigurationOuterClass.Configuration;
 import com.android.aapt.Resources.XmlNode;
 import com.android.apex.ApexManifestProto.ApexManifest;
 import com.android.apksig.ApkVerifier;
+import com.android.bundle.CodeTransparencyOuterClass.CodeRelatedFile;
+import com.android.bundle.CodeTransparencyOuterClass.CodeTransparency;
 import com.android.bundle.Commands.ApkDescription;
 import com.android.bundle.Commands.ApkSet;
 import com.android.bundle.Commands.AssetModulesInfo;
@@ -166,6 +169,7 @@ import com.android.tools.build.bundletool.io.AppBundleSerializer;
 import com.android.tools.build.bundletool.model.AndroidManifest;
 import com.android.tools.build.bundletool.model.ApkModifier;
 import com.android.tools.build.bundletool.model.AppBundle;
+import com.android.tools.build.bundletool.model.BundleMetadata;
 import com.android.tools.build.bundletool.model.SigningConfiguration;
 import com.android.tools.build.bundletool.model.SourceStamp;
 import com.android.tools.build.bundletool.model.ZipPath;
@@ -190,7 +194,10 @@ import com.google.common.collect.ImmutableMultiset;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Maps;
+import com.google.common.hash.Hashing;
+import com.google.common.io.ByteSource;
 import com.google.common.io.ByteStreams;
+import com.google.common.io.CharSource;
 import com.google.common.io.Closer;
 import com.google.common.truth.Correspondence;
 import com.google.common.util.concurrent.ListeningExecutorService;
@@ -202,6 +209,7 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.nio.charset.Charset;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -283,7 +291,9 @@ public class BuildApksManagerTest {
   public static void setUpClass() throws Exception {
     // Creating a new key takes in average 75ms (with peaks at 200ms), so creating a single one for
     // all the tests.
-    KeyPair keyPair = KeyPairGenerator.getInstance("RSA").genKeyPair();
+    KeyPairGenerator kpg = KeyPairGenerator.getInstance("RSA");
+    kpg.initialize(/* keySize= */ 3072);
+    KeyPair keyPair = kpg.genKeyPair();
     privateKey = keyPair.getPrivate();
     certificate = CertificateFactory.buildSelfSignedCertificate(keyPair, "CN=BuildApksCommandTest");
   }
@@ -1626,7 +1636,6 @@ public class BuildApksManagerTest {
       TruthZip.assertThat(systemApkZipFile)
           .containsExactlyEntries(
               "AndroidManifest.xml",
-              "META-INF/MANIFEST.MF",
               "lib/x86/libsome.so",
               "lib/x86_64/libsome.so",
               "res/drawable-ldpi/image.jpg",
@@ -3711,7 +3720,6 @@ public class BuildApksManagerTest {
     BuildApksResult result = extractTocFromApkSetFile(apkSetFile, outputDir);
 
     final String manifest = "AndroidManifest.xml";
-    final String signature = "META-INF/MANIFEST.MF";
 
     // Validate split APKs.
     ImmutableList<Variant> splitApkVariants = splitApkVariants(result);
@@ -3736,19 +3744,13 @@ public class BuildApksManagerTest {
     // Correct files inside APKs.
     assertThat(filesInApks(splitApksByModule.get("base"), apkSetFile))
         .containsExactly(
-            "res/xml/splits0.xml",
-            "resources.arsc",
-            "assets/file.txt",
-            "classes.dex",
-            manifest,
-            signature);
+            "res/xml/splits0.xml", "resources.arsc", "assets/file.txt", "classes.dex", manifest);
     assertThat(filesInApks(splitApksByModule.get("abi_feature"), apkSetFile))
         .isEqualTo(
             ImmutableMultiset.builder()
                 .add("lib/x86/libsome.so")
                 .add("lib/x86_64/libsome.so")
                 .addCopies(manifest, 3)
-                .addCopies(signature, 3)
                 .build());
     assertThat(filesInApks(splitApksByModule.get("language_feature"), apkSetFile))
         .isEqualTo(
@@ -3759,7 +3761,6 @@ public class BuildApksManagerTest {
                 .add("res/drawable-pl/image.jpg")
                 .addCopies("resources.arsc", 4)
                 .addCopies(manifest, 4)
-                .addCopies(signature, 4)
                 .build());
 
     // Validate standalone APKs.
@@ -3785,7 +3786,6 @@ public class BuildApksManagerTest {
                 // "res/xml/splits0.xml" is created by bundletool with list of generated splits.
                 .addCopies("resources.arsc", 2)
                 .addCopies(manifest, 2)
-                .addCopies(signature, 2)
                 .build());
   }
 
@@ -4674,7 +4674,7 @@ public class BuildApksManagerTest {
   }
 
   @Test
-  public void deviceTieredConditionalModule() throws Exception {
+  public void deviceGroupTargetedConditionalModule() throws Exception {
     AppBundle appBundle =
         new AppBundleBuilder()
             .addModule(
@@ -4691,7 +4691,7 @@ public class BuildApksManagerTest {
                             "com.test",
                             withTitle("@string/test_label", TEST_LABEL_RESOURCE_ID),
                             withFusingAttribute(false),
-                            withDeviceTiersCondition(ImmutableList.of("medium", "high")))))
+                            withDeviceGroupsCondition(ImmutableList.of("group1", "group2")))))
             .build();
 
     TestComponent.useTestModule(
@@ -4710,7 +4710,7 @@ public class BuildApksManagerTest {
             .distinct()
             .collect(onlyElement());
     assertThat(deviceTierModule.getTargeting())
-        .isEqualTo(moduleDeviceTiersTargeting("medium", "high"));
+        .isEqualTo(moduleDeviceGroupsTargeting("group1", "group2"));
   }
 
   @Test
@@ -5114,8 +5114,15 @@ public class BuildApksManagerTest {
     }
   }
 
+  @DataPoints("manifestReachableResourcesDisabledVersions")
+  public static final ImmutableSet<Version> MANIFEST_REACHABLE_RESOURCES_DISABLED_VERSIONS =
+      ImmutableSet.of(Version.of("0.8.0"), Version.of("1.7.0"));
+
   @Test
-  public void pinningOfManifestReachableResources_disabledBefore_0_8_1() throws Exception {
+  @Theory
+  public void pinningOfManifestReachableResources_disabled(
+      @FromDataPoints("manifestReachableResourcesDisabledVersions") Version bundleVersion)
+      throws Exception {
     AppBundle appBundle =
         new AppBundleBuilder()
             .addModule(
@@ -5137,7 +5144,8 @@ public class BuildApksManagerTest {
                                         /* mdpi */ 160, "res/drawable-mdpi/manifest_image.jpg",
                                         /* hdpi */ 240, "res/drawable-hdpi/manifest_image.jpg"))
                                 .build()))
-            .setBundleConfig(BundleConfigBuilder.create().setVersion("0.8.0").build())
+            .setBundleConfig(
+                BundleConfigBuilder.create().setVersion(bundleVersion.toString()).build())
             .build();
     TestComponent.useTestModule(
         this, TestModule.builder().withAppBundle(appBundle).withOutputPath(outputFilePath).build());
@@ -5405,6 +5413,136 @@ public class BuildApksManagerTest {
     ZipFile apkSetFile = openZipFile(outputFilePath.toFile());
     BuildApksResult result = extractTocFromApkSetFile(apkSetFile, outputDir);
     assertThat(result.getPackageName()).isEqualTo("com.app");
+  }
+
+  @Test
+  public void transparencyFilePropagatedAsExpected() throws Exception {
+    String dexFilePath = "dex/classes.dex";
+    byte[] dexFileInBaseModuleContent = TestData.readBytes("testdata/dex/classes.dex");
+    byte[] dexFileInFeatureModuleContent = TestData.readBytes("testdata/dex/classes-other.dex");
+    String libFilePath = "lib/x86_64/libsome.so";
+    byte[] libFileInBaseModuleContent = new byte[] {4, 5, 6};
+    CodeTransparency codeTransparency =
+        CodeTransparency.newBuilder()
+            .addCodeRelatedFile(
+                CodeRelatedFile.newBuilder()
+                    .setType(CodeRelatedFile.Type.DEX)
+                    .setPath("base/" + dexFilePath)
+                    .setSha256(
+                        ByteSource.wrap(dexFileInBaseModuleContent)
+                            .hash(Hashing.sha256())
+                            .toString()))
+            .addCodeRelatedFile(
+                CodeRelatedFile.newBuilder()
+                    .setType(CodeRelatedFile.Type.NATIVE_LIBRARY)
+                    .setPath("base/" + libFilePath)
+                    .setSha256(
+                        ByteSource.wrap(libFileInBaseModuleContent)
+                            .hash(Hashing.sha256())
+                            .toString())
+                    .setApkPath(libFilePath))
+            .addCodeRelatedFile(
+                CodeRelatedFile.newBuilder()
+                    .setType(CodeRelatedFile.Type.DEX)
+                    .setPath("feature/" + dexFilePath)
+                    .setSha256(
+                        ByteSource.wrap(dexFileInFeatureModuleContent)
+                            .hash(Hashing.sha256())
+                            .toString()))
+            .build();
+    Path bundlePath = tmpDir.resolve("bundle.aab");
+    AppBundleBuilder appBundle =
+        new AppBundleBuilder()
+            .addModule(
+                "base",
+                module ->
+                    module
+                        .setManifest(androidManifest("com.test.app", withMinSdkVersion(20)))
+                        .setResourceTable(resourceTableWithTestLabel("Test feature"))
+                        .addFile(
+                            dexFilePath,
+                            bundlePath,
+                            ZipPath.create("base/" + dexFilePath),
+                            dexFileInBaseModuleContent)
+                        .addFile(
+                            libFilePath,
+                            bundlePath,
+                            ZipPath.create("base/" + libFilePath),
+                            libFileInBaseModuleContent)
+                        .setNativeConfig(
+                            nativeLibraries(
+                                targetedNativeDirectory(
+                                    "lib/x86_64", nativeDirectoryTargeting(AbiAlias.X86_64)))))
+            .addModule(
+                "feature",
+                module ->
+                    module
+                        .setManifest(
+                            androidManifest(
+                                "com.test.app",
+                                withDelivery(DeliveryType.ON_DEMAND),
+                                withFusingAttribute(true),
+                                withTitle("@string/test_label", TEST_LABEL_RESOURCE_ID)))
+                        .addFile(
+                            dexFilePath,
+                            bundlePath,
+                            ZipPath.create("feature/" + dexFilePath),
+                            dexFileInFeatureModuleContent))
+            .addMetadataFile(
+                BundleMetadata.BUNDLETOOL_NAMESPACE,
+                BundleMetadata.TRANSPARENCY_SIGNED_FILE_NAME,
+                CharSource.wrap(createJwsToken(codeTransparency, certificate, privateKey))
+                    .asByteSource(Charset.defaultCharset()));
+
+    TestComponent.useTestModule(
+        this,
+        TestModule.builder()
+            .withCustomBuildApksCommandSetter(command -> command.setEnableNewApkSerializer(true))
+            .withOutputPath(outputFilePath)
+            .withAppBundle(appBundle.build())
+            .build());
+    buildApksManager.execute();
+
+    ZipFile apkSetFile = openZipFile(outputFilePath.toFile());
+    BuildApksResult result = extractTocFromApkSetFile(apkSetFile, outputDir);
+
+    ImmutableList<ApkDescription> splitApks = apkDescriptions(splitApkVariants(result));
+
+    // Transparency file should be propagated to main split of the base module.
+    ImmutableList<ApkDescription> mainSplitsOfBaseModule =
+        splitApks.stream()
+            .filter(
+                apk ->
+                    apk.getSplitApkMetadata().getSplitId().isEmpty()
+                        && apk.getSplitApkMetadata().getIsMasterSplit())
+            .collect(toImmutableList());
+    assertThat(mainSplitsOfBaseModule).hasSize(2);
+    for (ApkDescription apk : mainSplitsOfBaseModule) {
+      ZipFile zipFile = openZipFile(extractFromApkSetFile(apkSetFile, apk.getPath(), outputDir));
+      assertThat(filesUnderPath(zipFile, ZipPath.create("META-INF")))
+          .contains("META-INF/" + BundleMetadata.TRANSPARENCY_SIGNED_FILE_NAME);
+    }
+
+    // Other splits should not contain transparency file.
+    ImmutableList<ApkDescription> otherSplits =
+        splitApks.stream()
+            .filter(apk -> !apk.getSplitApkMetadata().getSplitId().isEmpty())
+            .collect(toImmutableList());
+    assertThat(otherSplits).hasSize(4);
+    for (ApkDescription apk : otherSplits) {
+      ZipFile zipFile = openZipFile(extractFromApkSetFile(apkSetFile, apk.getPath(), outputDir));
+      assertThat(filesUnderPath(zipFile, ZipPath.create("META-INF"))).isEmpty();
+    }
+
+    // Because minSdkVersion < 21, bundle has a feature module and merging strategy is
+    // MERGE_IF_NEEDED (default), transparency file should not be propagated to standalone APK.
+    assertThat(standaloneApkVariants(result)).hasSize(1);
+    ImmutableList<ApkDescription> standaloneApks =
+        apkDescriptions(standaloneApkVariants(result).get(0));
+    File standaloneApkFile =
+        extractFromApkSetFile(apkSetFile, standaloneApks.get(0).getPath(), outputDir);
+    ZipFile standaloneApkZip = openZipFile(standaloneApkFile);
+    assertThat(filesUnderPath(standaloneApkZip, ZipPath.create("META-INF"))).isEmpty();
   }
 
   private static ImmutableList<ApkDescription> apkDescriptions(List<Variant> variants) {

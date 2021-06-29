@@ -35,6 +35,7 @@ import com.android.bundle.Config.BundleConfig.BundleType;
 import com.android.bundle.Targeting.Abi.AbiAlias;
 import com.android.tools.build.bundletool.io.ZipBuilder;
 import com.android.tools.build.bundletool.model.ModuleEntry.ModuleEntryBundleLocation;
+import com.android.tools.build.bundletool.model.exceptions.InvalidBundleException;
 import com.android.tools.build.bundletool.testing.AppBundleBuilder;
 import com.android.tools.build.bundletool.testing.BundleConfigBuilder;
 import com.google.common.io.ByteSource;
@@ -216,7 +217,7 @@ public class AppBundleTest {
         .writeTo(bundleFile);
 
     try (ZipFile appBundleZip = new ZipFile(bundleFile.toFile())) {
-      assertThrows(IllegalStateException.class, () -> AppBundle.buildFromZip(appBundleZip));
+      assertThrows(InvalidBundleException.class, () -> AppBundle.buildFromZip(appBundleZip));
     }
   }
 
@@ -374,7 +375,7 @@ public class AppBundleTest {
   }
 
   @Test
-  public void hasSharedUserId() {
+  public void hasSharedUserId_specifiedInBaseModule_returnsTrue() {
     AppBundle appBundle =
         new AppBundleBuilder()
             .addModule(
@@ -384,8 +385,11 @@ public class AppBundleTest {
                         androidManifest(PACKAGE_NAME, withSharedUserId("shared_user_id"))))
             .build();
     assertThat(appBundle.hasSharedUserId()).isTrue();
+  }
 
-    AppBundle appBundle2 =
+  @Test
+  public void hasSharedUserId_specifiedInFeatureModule_returnsFalse() {
+    AppBundle appBundle =
         new AppBundleBuilder()
             .addModule("base", baseModule -> baseModule.setManifest(androidManifest(PACKAGE_NAME)))
             .addModule(
@@ -395,13 +399,16 @@ public class AppBundleTest {
                         androidManifestForFeature(
                             PACKAGE_NAME, withSharedUserId("shared_user_id"))))
             .build();
-    assertThat(appBundle2.hasSharedUserId()).isTrue();
+    assertThat(appBundle.hasSharedUserId()).isFalse();
+  }
 
-    AppBundle appBundle3 =
+  @Test
+  public void hasSharedUserId_unSpecified_returnsFalse() {
+    AppBundle appBundle =
         new AppBundleBuilder()
             .addModule("base", baseModule -> baseModule.setManifest(androidManifest(PACKAGE_NAME)))
             .build();
-    assertThat(appBundle3.hasSharedUserId()).isFalse();
+    assertThat(appBundle.hasSharedUserId()).isFalse();
   }
 
   @Test

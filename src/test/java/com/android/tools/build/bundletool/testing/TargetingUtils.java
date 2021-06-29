@@ -36,7 +36,7 @@ import com.android.bundle.Targeting.ApkTargeting;
 import com.android.bundle.Targeting.AssetsDirectoryTargeting;
 import com.android.bundle.Targeting.DeviceFeature;
 import com.android.bundle.Targeting.DeviceFeatureTargeting;
-import com.android.bundle.Targeting.DeviceTierModuleTargeting;
+import com.android.bundle.Targeting.DeviceGroupModuleTargeting;
 import com.android.bundle.Targeting.DeviceTierTargeting;
 import com.android.bundle.Targeting.LanguageTargeting;
 import com.android.bundle.Targeting.ModuleTargeting;
@@ -591,10 +591,10 @@ public final class TargetingUtils {
         .build();
   }
 
-  public static ModuleTargeting moduleDeviceTiersTargeting(String... deviceTiers) {
+  public static ModuleTargeting moduleDeviceGroupsTargeting(String... deviceTiers) {
     return ModuleTargeting.newBuilder()
-        .setDeviceTierTargeting(
-            DeviceTierModuleTargeting.newBuilder().addAllValue(Arrays.asList(deviceTiers)))
+        .setDeviceGroupTargeting(
+            DeviceGroupModuleTargeting.newBuilder().addAllValue(Arrays.asList(deviceTiers)))
         .build();
   }
 

@@ -23,7 +23,7 @@ import com.android.bundle.Targeting.AssetsDirectoryTargeting;
 import com.android.bundle.Targeting.DeviceTierTargeting;
 import com.android.bundle.Targeting.LanguageTargeting;
 import com.android.tools.build.bundletool.model.exceptions.InvalidBundleException;
-import com.android.tools.build.bundletool.model.utils.DeviceTierUtils;
+import com.android.tools.build.bundletool.model.utils.DeviceTargetingUtils;
 import com.android.tools.build.bundletool.model.utils.TextureCompressionUtils;
 import com.google.auto.value.AutoValue;
 import com.google.common.collect.ImmutableList;
@@ -244,7 +244,7 @@ public abstract class TargetedDirectorySegment {
   }
 
   private static AssetsDirectoryTargeting parseDeviceTier(String name, String value) {
-    DeviceTierUtils.validateDeviceTierForAssetsDirectory(name, value);
+    DeviceTargetingUtils.validateDeviceTierForAssetsDirectory(name, value);
     return AssetsDirectoryTargeting.newBuilder()
         .setDeviceTier(DeviceTierTargeting.newBuilder().addValue(value))
         .build();

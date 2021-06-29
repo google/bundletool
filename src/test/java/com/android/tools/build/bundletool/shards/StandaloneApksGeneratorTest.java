@@ -74,6 +74,8 @@ import com.android.bundle.Config.Optimizations;
 import com.android.bundle.Config.SplitDimension;
 import com.android.bundle.Config.SplitDimension.Value;
 import com.android.bundle.Config.SplitsConfig;
+import com.android.bundle.Config.StandaloneConfig;
+import com.android.bundle.Config.StandaloneConfig.DexMergingStrategy;
 import com.android.bundle.Config.SuffixStripping;
 import com.android.bundle.Targeting.Abi.AbiAlias;
 import com.android.bundle.Targeting.ApkTargeting;
@@ -157,6 +159,14 @@ public class StandaloneApksGeneratorTest {
               BundleMetadata.TRANSPARENCY_SIGNED_FILE_NAME,
               ByteSource.empty())
           .build();
+
+  private static final BundleConfig.Builder bundleConfigNodexmergestrategy =
+      BundleConfig.newBuilder()
+          .setOptimizations(
+              Optimizations.newBuilder()
+                  .setStandaloneConfig(
+                      StandaloneConfig.newBuilder()
+                          .setDexMergingStrategy(DexMergingStrategy.NEVER_MERGE)));
 
   @Inject StandaloneApksGenerator standaloneApksGenerator;
 
@@ -479,7 +489,11 @@ public class StandaloneApksGeneratorTest {
   @Test
   public void shardByAbi_havingManyAbis_producesManyApks_withTransparency() throws Exception {
     TestComponent.useTestModule(
-        this, TestModule.builder().withBundleMetadata(BUNDLE_METADATA_WITH_TRANSPARENCY).build());
+        this,
+        TestModule.builder()
+            .withBundleConfig(bundleConfigNodexmergestrategy)
+            .withBundleMetadata(BUNDLE_METADATA_WITH_TRANSPARENCY)
+            .build());
     BundleModule bundleModule =
         new BundleModuleBuilder("base")
             .addFile("assets/file.txt")
@@ -818,7 +832,11 @@ public class StandaloneApksGeneratorTest {
   public void shardByAbiAndDensity_havingOneAbiAndSomeDensityResource_produceManyApks_transparency()
       throws Exception {
     TestComponent.useTestModule(
-        this, TestModule.builder().withBundleMetadata(BUNDLE_METADATA_WITH_TRANSPARENCY).build());
+        this,
+        TestModule.builder()
+            .withBundleConfig(bundleConfigNodexmergestrategy)
+            .withBundleMetadata(BUNDLE_METADATA_WITH_TRANSPARENCY)
+            .build());
     BundleModule bundleModule =
         new BundleModuleBuilder("base")
             .addFile("assets/file.txt")
@@ -1074,7 +1092,11 @@ public class StandaloneApksGeneratorTest {
   @Test
   public void manyModulesShardByNoDimension_producesFatApk_withTransparency() throws Exception {
     TestComponent.useTestModule(
-        this, TestModule.builder().withBundleMetadata(BUNDLE_METADATA_WITH_TRANSPARENCY).build());
+        this,
+        TestModule.builder()
+            .withBundleConfig(bundleConfigNodexmergestrategy)
+            .withBundleMetadata(BUNDLE_METADATA_WITH_TRANSPARENCY)
+            .build());
     BundleModule baseModule =
         new BundleModuleBuilder("base")
             .addFile("lib/x86_64/libtest1.so")

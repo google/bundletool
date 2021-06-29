@@ -108,6 +108,14 @@ public class BundleToolMain {
         case VersionCommand.COMMAND_NAME:
           VersionCommand.fromFlags(flags, System.out).execute();
           break;
+        case AddTransparencyCommand.COMMAND_NAME:
+          AddTransparencyCommand.fromFlags(flags).execute();
+          break;
+        case CheckTransparencyCommand.COMMAND_NAME:
+          try (AdbServer adbServer = DdmlibAdbServer.getInstance()) {
+            CheckTransparencyCommand.fromFlags(flags, adbServer).execute();
+          }
+          break;
         case HELP_CMD:
           if (flags.getSubCommand().isPresent()) {
             help(flags.getSubCommand().get(), runtime);
@@ -185,6 +193,12 @@ public class BundleToolMain {
         break;
       case GetSizeCommand.COMMAND_NAME:
         commandHelp = GetSizeCommand.help();
+        break;
+      case AddTransparencyCommand.COMMAND_NAME:
+        commandHelp = AddTransparencyCommand.help();
+        break;
+      case CheckTransparencyCommand.COMMAND_NAME:
+        commandHelp = CheckTransparencyCommand.help();
         break;
       default:
         System.err.printf("Error: Unrecognized command '%s'.%n%n%n", commandName);

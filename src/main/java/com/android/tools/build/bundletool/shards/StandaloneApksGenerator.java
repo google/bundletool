@@ -20,7 +20,7 @@ import static com.android.tools.build.bundletool.model.targeting.TargetingUtils.
 import static com.google.common.collect.ImmutableList.toImmutableList;
 
 import com.android.tools.build.bundletool.mergers.ModuleSplitsToShardMerger;
-import com.android.tools.build.bundletool.model.BundleMetadata;
+import com.android.tools.build.bundletool.model.AppBundle;
 import com.android.tools.build.bundletool.model.BundleModule;
 import com.android.tools.build.bundletool.model.ModuleEntry;
 import com.android.tools.build.bundletool.model.ModuleSplit;
@@ -52,12 +52,12 @@ public class StandaloneApksGenerator {
       ModuleSplitterForShards moduleSplitter,
       Sharder sharder,
       ModuleSplitsToShardMerger shardsMerger,
-      BundleMetadata bundleMetadata) {
+      AppBundle appBundle) {
     this.stampSource = stampSource;
     this.moduleSplitter = moduleSplitter;
     this.sharder = sharder;
     this.shardsMerger = shardsMerger;
-    this.codeTransparencyInjector = new CodeTransparencyInjector(bundleMetadata);
+    this.codeTransparencyInjector = new CodeTransparencyInjector(appBundle);
   }
 
   /**

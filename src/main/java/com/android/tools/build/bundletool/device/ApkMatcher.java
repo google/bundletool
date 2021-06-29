@@ -94,7 +94,7 @@ public class ApkMatcher {
     TextureCompressionFormatMatcher textureCompressionFormatMatcher =
         new TextureCompressionFormatMatcher(deviceSpec);
     DeviceTierApkMatcher deviceTierApkMatcher = new DeviceTierApkMatcher(deviceSpec);
-    DeviceTierModuleMatcher deviceTierModuleMatcher = new DeviceTierModuleMatcher(deviceSpec);
+    DeviceGroupModuleMatcher deviceGroupModuleMatcher = new DeviceGroupModuleMatcher(deviceSpec);
 
     this.apkMatchers =
         ImmutableList.of(
@@ -110,7 +110,10 @@ public class ApkMatcher {
     this.ensureDensityAndAbiApksMatched = ensureDensityAndAbiApksMatched;
     this.moduleMatcher =
         new ModuleMatcher(
-            sdkVersionMatcher, deviceFeatureMatcher, openGlFeatureMatcher, deviceTierModuleMatcher);
+            sdkVersionMatcher,
+            deviceFeatureMatcher,
+            openGlFeatureMatcher,
+            deviceGroupModuleMatcher);
     this.variantMatcher =
         new VariantMatcher(
             sdkVersionMatcher,

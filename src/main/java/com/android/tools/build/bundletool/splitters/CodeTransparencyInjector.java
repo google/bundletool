@@ -15,7 +15,7 @@
  */
 package com.android.tools.build.bundletool.splitters;
 
-import com.android.tools.build.bundletool.model.BundleMetadata;
+import com.android.tools.build.bundletool.model.AppBundle;
 import com.android.tools.build.bundletool.model.ModuleSplit;
 import com.android.tools.build.bundletool.model.ModuleSplit.SplitType;
 
@@ -26,22 +26,27 @@ import com.android.tools.build.bundletool.model.ModuleSplit.SplitType;
  */
 public final class CodeTransparencyInjector {
 
-  private final BundleMetadata bundleMetadata;
+  private final AppBundle appBundle;
 
-  public CodeTransparencyInjector(BundleMetadata bundleMetadata) {
-    this.bundleMetadata = bundleMetadata;
+  public CodeTransparencyInjector(AppBundle appBundle) {
+    this.appBundle = appBundle;
   }
 
   public ModuleSplit inject(ModuleSplit split) {
     ModuleSplit.Builder splitBuilder = split.toBuilder();
     if (shouldPropagateTransparency(split)) {
-      bundleMetadata.getModuleEntryForSignedTransparencyFile().ifPresent(splitBuilder::addEntry);
+      appBundle
+          .getBundleMetadata()
+          .getModuleEntryForSignedTransparencyFile()
+          .ifPresent(splitBuilder::addEntry);
     }
     return splitBuilder.build();
   }
 
-  private static boolean shouldPropagateTransparency(ModuleSplit split) {
-    return split.getSplitType() == SplitType.STANDALONE
-        || (split.isMasterSplit() && split.isBaseModuleSplit());
+  private boolean shouldPropagateTransparency(ModuleSplit split) {
+    if (split.getSplitType() == SplitType.STANDALONE) {
+      return !appBundle.dexMergingEnabled();
+    }
+    return split.isMasterSplit() && split.isBaseModuleSplit();
   }
 }

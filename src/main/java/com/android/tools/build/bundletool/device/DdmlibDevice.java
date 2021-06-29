@@ -16,6 +16,7 @@
 
 package com.android.tools.build.bundletool.device;
 
+import static com.android.tools.build.bundletool.device.LocalTestingPathResolver.resolveLocalTestingPath;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 
@@ -164,21 +165,7 @@ public class DdmlibDevice extends Device {
         new RemoteCommandExecutor(this, pushOptions.getTimeout().toMillis(), System.err);
     DdmPreferences.setTimeOut((int) pushOptions.getTimeout().toMillis());
     try {
-      // There are two different flows, depending on if the path is absolute or not...
-      if (!splitsPath.startsWith("/")) {
-        // Path is relative, so we're going to try to push it to the app's external dir
-        String packageName =
-            pushOptions
-                .getPackageName()
-                .orElseThrow(
-                    () ->
-                        CommandExecutionException.builder()
-                            .withInternalMessage(
-                                "PushOptions.packageName must be set for relative paths.")
-                            .build());
-
-        splitsPath = joinUnixPaths("/sdcard/Android/data/", packageName, "files", splitsPath);
-      }
+      splitsPath = resolveLocalTestingPath(splitsPath, pushOptions.getPackageName());
       // Now the path is absolute. We assume it's pointing to a location writeable by ADB shell.
       // It shouldn't point to app's private directory.
 
@@ -248,6 +235,20 @@ public class DdmlibDevice extends Device {
   @Override
   public void removeRemotePackage(Path remoteFilePath) throws InstallException {
     device.removeRemotePackage(remoteFilePath.toString());
+  }
+
+  @Override
+  public void pull(ImmutableList<FilePullParams> files) {
+    files.forEach(file -> pullFile(file.getPathOnDevice(), file.getDestinationPath().toString()));
+  }
+
+  private void pullFile(String pathOnDevice, String destinationPath) {
+    try {
+      device.pullFile(pathOnDevice, destinationPath);
+    } catch (IOException | AdbCommandRejectedException | TimeoutException | SyncException e) {
+      throw new CommandExecutionException(
+          "Exception while pulling file from the device.", e.getMessage(), e.getCause());
+    }
   }
 
   static class RemoteCommandExecutor {

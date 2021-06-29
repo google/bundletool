@@ -1338,8 +1338,8 @@ public class BuildApksCommandTest {
     assertThat(e)
         .hasMessageThat()
         .contains(
-            "Code transparency verification failed because code was modified after transparency"
-                + " metadata generation.");
+            "Verification failed because code was modified after transparency metadata"
+                + " generation.");
   }
 
 

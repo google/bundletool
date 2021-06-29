@@ -29,10 +29,12 @@ import static com.android.tools.build.bundletool.model.AndroidManifest.VERSION_C
 import static com.android.tools.build.bundletool.model.AndroidManifest.VERSION_NAME_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.BundleModule.ModuleType.ASSET_MODULE;
 import static com.android.tools.build.bundletool.model.BundleModule.ModuleType.FEATURE_MODULE;
+import static com.android.tools.build.bundletool.model.BundleModule.ModuleType.ML_MODULE;
 import static com.android.tools.build.bundletool.model.ModuleDeliveryType.ALWAYS_INITIAL_INSTALL;
 import static com.android.tools.build.bundletool.model.ModuleDeliveryType.NO_INITIAL_INSTALL;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifest;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifestForAssetModule;
+import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifestForMlModule;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withCustomThemeActivity;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withFastFollowDelivery;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withFusingAttribute;
@@ -589,6 +591,15 @@ public class AndroidManifestTest {
     assertThat(manifest.getOptionalModuleType()).isPresent();
     assertThat(manifest.getOptionalModuleType()).hasValue(FEATURE_MODULE);
     assertThat(manifest.getModuleType()).isEqualTo(FEATURE_MODULE);
+  }
+
+  @Test
+  public void moduleTypeAttribute_mlModule() {
+    AndroidManifest manifest = AndroidManifest.create(androidManifestForMlModule("com.test.app"));
+
+    assertThat(manifest.getOptionalModuleType()).isPresent();
+    assertThat(manifest.getOptionalModuleType()).hasValue(ML_MODULE);
+    assertThat(manifest.getModuleType()).isEqualTo(ML_MODULE);
   }
 
   @Test

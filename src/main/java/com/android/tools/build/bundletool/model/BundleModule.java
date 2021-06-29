@@ -16,9 +16,6 @@
 
 package com.android.tools.build.bundletool.model;
 
-import static com.android.tools.build.bundletool.model.ModuleDeliveryType.ALWAYS_INITIAL_INSTALL;
-import static com.android.tools.build.bundletool.model.ModuleDeliveryType.CONDITIONAL_INITIAL_INSTALL;
-import static com.android.tools.build.bundletool.model.ModuleDeliveryType.NO_INITIAL_INSTALL;
 import static com.android.tools.build.bundletool.model.utils.TargetingProtoUtils.sdkVersionFrom;
 import static com.android.tools.build.bundletool.model.utils.TargetingProtoUtils.sdkVersionTargeting;
 import static com.google.common.base.Preconditions.checkArgument;
@@ -28,6 +25,7 @@ import static java.util.function.Function.identity;
 import com.android.aapt.Resources.ResourceTable;
 import com.android.aapt.Resources.XmlNode;
 import com.android.bundle.Commands.DeliveryType;
+import com.android.bundle.Commands.FeatureModuleType;
 import com.android.bundle.Commands.ModuleMetadata;
 import com.android.bundle.Config.BundleConfig;
 import com.android.bundle.Files.ApexImages;
@@ -96,8 +94,20 @@ public abstract class BundleModule {
 
   /** Describes the content type of the module. */
   public enum ModuleType {
-    FEATURE_MODULE,
-    ASSET_MODULE
+    FEATURE_MODULE(true),
+    ASSET_MODULE(false),
+    ML_MODULE(true);
+
+    private final boolean isFeatureModule;
+
+    ModuleType(boolean isFeatureModule) {
+      this.isFeatureModule = isFeatureModule;
+    }
+
+    /** Returns whether the module is a feature, including ML modules. */
+    public boolean isFeatureModule() {
+      return isFeatureModule;
+    }
   }
 
   /** The version of Bundletool that built this module, taken from BundleConfig. */
@@ -236,13 +246,18 @@ public abstract class BundleModule {
   }
 
   public ModuleMetadata getModuleMetadata() {
-    return ModuleMetadata.newBuilder()
-        .setName(getName().getName())
-        .setIsInstant(isInstantModule())
-        .addAllDependencies(getDependencies())
-        .setTargeting(getModuleTargeting())
-        .setDeliveryType(moduleDeliveryTypeToDeliveryType(getDeliveryType()))
-        .build();
+    ModuleMetadata.Builder moduleMetadata =
+        ModuleMetadata.newBuilder()
+            .setName(getName().getName())
+            .setIsInstant(isInstantModule())
+            .addAllDependencies(getDependencies())
+            .setTargeting(getModuleTargeting())
+            .setDeliveryType(moduleDeliveryTypeToDeliveryType(getDeliveryType()));
+
+    moduleTypeToFeatureModuleType(getModuleType())
+        .ifPresent(moduleType -> moduleMetadata.setModuleType(moduleType));
+
+    return moduleMetadata.build();
   }
 
   private static DeliveryType moduleDeliveryTypeToDeliveryType(
@@ -255,6 +270,18 @@ public abstract class BundleModule {
         return DeliveryType.ON_DEMAND;
     }
     throw new IllegalArgumentException("Unknown module delivery type: " + moduleDeliveryType);
+  }
+
+  private static Optional<FeatureModuleType> moduleTypeToFeatureModuleType(ModuleType moduleType) {
+    switch (moduleType) {
+      case FEATURE_MODULE:
+        return Optional.of(FeatureModuleType.FEATURE_MODULE);
+      case ML_MODULE:
+        return Optional.of(FeatureModuleType.ML_MODULE);
+      case ASSET_MODULE:
+        return Optional.empty();
+    }
+    throw new IllegalArgumentException("Unknown module type: " + moduleType);
   }
 
   public static Builder builder() {
@@ -335,6 +362,14 @@ public abstract class BundleModule {
 
       return this;
     }
+
+    abstract Optional<XmlNode> getAndroidManifestProto();
+
+    public boolean hasAndroidManifest() {
+      return getAndroidManifestProto().isPresent();
+    }
+
+    public abstract BundleModuleName getName();
 
     public abstract BundleModule build();
   }

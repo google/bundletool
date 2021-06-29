@@ -177,8 +177,9 @@ public abstract class ZipPath implements Comparable<ZipPath> {
   }
 
   /** Returns the path as used in the zip file. */
+  @Memoized
   @Override
-  public final String toString() {
+  public String toString() {
     return JOINER.join(getNames());
   }
 

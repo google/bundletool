@@ -17,6 +17,11 @@ Bundletool has a few different responsibilities:
 
 *   **Extract device spec** from a device as a JSON file.
 
+*   **Add code transparency** to an Android App Bundle. Code transparency is an
+    optional code signing mechanism.
+
+*   **Verify code transparency** inside an Android App Bundle, APK files or an
+    application installed on a connected device.
 
 Read more about the App Bundle format and Bundletool's usage at
 [g.co/androidappbundle](https://g.co/androidappbundle)
@@ -26,4 +31,4 @@ https://developer.android.com/studio/command-line/bundletool
 
 ## Releases
 
-Latest release: [1.6.1](https://github.com/google/bundletool/releases)
+Latest release: [1.7.0](https://github.com/google/bundletool/releases)

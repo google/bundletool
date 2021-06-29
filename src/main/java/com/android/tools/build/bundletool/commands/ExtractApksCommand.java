@@ -16,6 +16,7 @@
 
 package com.android.tools.build.bundletool.commands;
 
+import static com.android.tools.build.bundletool.device.LocalTestingPathResolver.resolveLocalTestingPath;
 import static com.android.tools.build.bundletool.model.utils.files.FilePreconditions.checkDirectoryExists;
 import static com.android.tools.build.bundletool.model.utils.files.FilePreconditions.checkFileExistsAndReadable;
 import static com.google.common.base.Preconditions.checkArgument;
@@ -31,6 +32,7 @@ import com.android.bundle.Commands.BuildApksResult;
 import com.android.bundle.Commands.DefaultTargetingValue;
 import com.android.bundle.Commands.ExtractApksResult;
 import com.android.bundle.Commands.ExtractedApk;
+import com.android.bundle.Commands.LocalTestingInfoForMetadata;
 import com.android.bundle.Config.SplitDimension.Value;
 import com.android.bundle.Devices.DeviceSpec;
 import com.android.tools.build.bundletool.commands.CommandHelp.CommandDescription;
@@ -207,7 +209,7 @@ public abstract class ExtractApksCommand {
           .map(matchedApk -> getApksArchivePath().resolve(matchedApk.getPath().toString()))
           .collect(toImmutableList());
     } else {
-      return extractMatchedApksFromApksArchive(generatedApks);
+      return extractMatchedApksFromApksArchive(generatedApks, toc);
     }
   }
 
@@ -244,7 +246,7 @@ public abstract class ExtractApksCommand {
   }
 
   private ImmutableList<Path> extractMatchedApksFromApksArchive(
-      ImmutableList<GeneratedApk> generatedApks) {
+      ImmutableList<GeneratedApk> generatedApks, BuildApksResult toc) {
     Path outputDirectoryPath =
         getOutputDirectory().orElseGet(ExtractApksCommand::createTempDirectory);
 
@@ -274,7 +276,7 @@ public abstract class ExtractApksCommand {
         }
       }
       if (getIncludeMetadata()) {
-        produceCommandMetadata(generatedApks, outputDirectoryPath);
+        produceCommandMetadata(generatedApks, toc, outputDirectoryPath);
       }
     } catch (IOException e) {
       throw new UncheckedIOException(
@@ -287,7 +289,8 @@ public abstract class ExtractApksCommand {
   }
 
   private static void produceCommandMetadata(
-      ImmutableList<GeneratedApk> generatedApks, Path outputDir) {
+      ImmutableList<GeneratedApk> generatedApks, BuildApksResult toc, Path outputDir) {
+
     ImmutableList<ExtractedApk> apks =
         generatedApks.stream()
             .map(
@@ -301,11 +304,23 @@ public abstract class ExtractApksCommand {
 
     try {
       JsonFormat.Printer printer = JsonFormat.printer();
-      String metadata = printer.print(ExtractApksResult.newBuilder().addAllApks(apks).build());
+      ExtractApksResult.Builder builder = ExtractApksResult.newBuilder();
+      if (toc.getLocalTestingInfo().getEnabled()) {
+        builder.setLocalTestingInfo(createLocalTestingInfo(toc));
+      }
+      String metadata = printer.print(builder.addAllApks(apks).build());
       Files.write(outputDir.resolve(METADATA_FILE), metadata.getBytes(UTF_8));
     } catch (IOException e) {
       throw new UncheckedIOException("Error while writing metadata.json.", e);
     }
+  }
+
+  private static LocalTestingInfoForMetadata createLocalTestingInfo(BuildApksResult toc) {
+    String localTestingPath = toc.getLocalTestingInfo().getLocalTestingPath();
+    String packageName = toc.getPackageName();
+    return LocalTestingInfoForMetadata.newBuilder()
+        .setLocalTestingDir(resolveLocalTestingPath(localTestingPath, Optional.of(packageName)))
+        .build();
   }
 
   private static Path createTempDirectory() {

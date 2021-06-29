@@ -141,6 +141,10 @@ public final class DeviceFactory {
     return DeviceSpec.newBuilder().setDeviceTier(deviceTier).build();
   }
 
+  public static DeviceSpec deviceGroups(String... deviceGroups) {
+    return DeviceSpec.newBuilder().addAllDeviceGroups(Arrays.asList(deviceGroups)).build();
+  }
+
   public static DeviceSpec mergeSpecs(DeviceSpec deviceSpec, DeviceSpec... specParts) {
     return mergeFromProtos(deviceSpec, specParts);
   }

@@ -67,6 +67,8 @@ public abstract class InstallApksCommand {
   private static final Flag<Boolean> ALLOW_DOWNGRADE_FLAG = Flag.booleanFlag("allow-downgrade");
   private static final Flag<Boolean> ALLOW_TEST_ONLY_FLAG = Flag.booleanFlag("allow-test-only");
   private static final Flag<String> DEVICE_TIER_FLAG = Flag.string("device-tier");
+  private static final Flag<ImmutableSet<String>> DEVICE_GROUPS_FLAG =
+      Flag.stringSet("device-groups");
   private static final Flag<ImmutableList<Path>> ADDITIONAL_LOCAL_TESTING_FILES_FLAG =
       Flag.pathList("additional-local-testing-files");
   private static final Flag<Integer> TIMEOUT_MILLIS_FLAG = Flag.positiveInteger("timeout-millis");
@@ -87,6 +89,8 @@ public abstract class InstallApksCommand {
   public abstract boolean getAllowTestOnly();
 
   public abstract Optional<String> getDeviceTier();
+
+  public abstract Optional<ImmutableSet<String>> getDeviceGroups();
 
   public abstract Optional<ImmutableList<Path>> getAdditionalLocalTestingFiles();
 
@@ -121,6 +125,8 @@ public abstract class InstallApksCommand {
 
     public abstract Builder setDeviceTier(String deviceTier);
 
+    public abstract Builder setDeviceGroups(ImmutableSet<String> deviceGroups);
+
     public abstract Builder setAdditionalLocalTestingFiles(ImmutableList<Path> additionalFiles);
 
     public abstract Builder setTimeout(Duration timeout);
@@ -144,6 +150,7 @@ public abstract class InstallApksCommand {
     Optional<Boolean> allowDowngrade = ALLOW_DOWNGRADE_FLAG.getValue(flags);
     Optional<Boolean> allowTestOnly = ALLOW_TEST_ONLY_FLAG.getValue(flags);
     Optional<String> deviceTier = DEVICE_TIER_FLAG.getValue(flags);
+    Optional<ImmutableSet<String>> deviceGroups = DEVICE_GROUPS_FLAG.getValue(flags);
     Optional<ImmutableList<Path>> additionalLocalTestingFiles =
         ADDITIONAL_LOCAL_TESTING_FILES_FLAG.getValue(flags);
     Optional<Integer> timeoutMillis = TIMEOUT_MILLIS_FLAG.getValue(flags);
@@ -157,6 +164,7 @@ public abstract class InstallApksCommand {
     allowDowngrade.ifPresent(command::setAllowDowngrade);
     allowTestOnly.ifPresent(command::setAllowTestOnly);
     deviceTier.ifPresent(command::setDeviceTier);
+    deviceGroups.ifPresent(command::setDeviceGroups);
     additionalLocalTestingFiles.ifPresent(command::setAdditionalLocalTestingFiles);
     timeoutMillis.ifPresent(timeout -> command.setTimeout(Duration.ofMillis(timeout)));
 
@@ -174,6 +182,9 @@ public abstract class InstallApksCommand {
       DeviceSpec deviceSpec = new DeviceAnalyzer(adbServer).getDeviceSpec(getDeviceId());
       if (getDeviceTier().isPresent()) {
         deviceSpec = deviceSpec.toBuilder().setDeviceTier(getDeviceTier().get()).build();
+      }
+      if (getDeviceGroups().isPresent()) {
+        deviceSpec = deviceSpec.toBuilder().addAllDeviceGroups(getDeviceGroups().get()).build();
       }
 
       final ImmutableList<Path> apksToInstall =
@@ -395,8 +406,21 @@ public abstract class InstallApksCommand {
                 .setExampleValue("high")
                 .setOptional(true)
                 .setDescription(
-                    "Device tier to use for apk matching. This flag is only relevant if the "
-                        + "bundle uses device tier targeting, and should be set in that case.")
+                    "Device tier of the given device. This value will be used to match the correct"
+                        + " device tier targeted APKs to this device."
+                        + " This flag is only relevant if the bundle uses device tier targeting,"
+                        + " and should be set in that case.")
+                .build())
+        .addFlag(
+            FlagDescription.builder()
+                .setFlagName(DEVICE_GROUPS_FLAG.getName())
+                .setExampleValue("highRam,googlePixel")
+                .setOptional(true)
+                .setDescription(
+                    "Device groups the given device belongs to. This value will be used to match"
+                        + " the correct device group conditional modules to this device."
+                        + " This flag is only relevant if the bundle uses device group targeting"
+                        + " in conditional modules and should be set in that case.")
                 .build())
         .addFlag(
             FlagDescription.builder()

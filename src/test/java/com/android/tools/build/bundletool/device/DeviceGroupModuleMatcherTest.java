@@ -15,8 +15,8 @@
  */
 package com.android.tools.build.bundletool.device;
 
-import static com.android.tools.build.bundletool.testing.DeviceFactory.deviceTier;
-import static com.android.tools.build.bundletool.testing.TargetingUtils.moduleDeviceTiersTargeting;
+import static com.android.tools.build.bundletool.testing.DeviceFactory.deviceGroups;
+import static com.android.tools.build.bundletool.testing.TargetingUtils.moduleDeviceGroupsTargeting;
 import static com.google.common.truth.Truth.assertThat;
 
 import com.android.bundle.Devices.DeviceSpec;
@@ -26,18 +26,19 @@ import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 
 @RunWith(JUnit4.class)
-public class DeviceTierModuleMatcherTest {
+public class DeviceGroupModuleMatcherTest {
 
   @Test
   public void matchesTargeting_specifiedDeviceTier() {
-    DeviceTierModuleMatcher matcher = new DeviceTierModuleMatcher(deviceTier("medium"));
+    DeviceGroupModuleMatcher matcher =
+        new DeviceGroupModuleMatcher(deviceGroups("highRam", "mediumRam"));
 
     assertThat(
             matcher
                 .getModuleTargetingPredicate()
-                .test(moduleDeviceTiersTargeting("medium", "high")))
+                .test(moduleDeviceGroupsTargeting("mediumRam", "googlePixel")))
         .isTrue();
-    assertThat(matcher.getModuleTargetingPredicate().test(moduleDeviceTiersTargeting("low")))
+    assertThat(matcher.getModuleTargetingPredicate().test(moduleDeviceGroupsTargeting("lowRam")))
         .isFalse();
     assertThat(matcher.getModuleTargetingPredicate().test(ModuleTargeting.getDefaultInstance()))
         .isTrue();
@@ -45,9 +46,10 @@ public class DeviceTierModuleMatcherTest {
 
   @Test
   public void matchesTargeting_noTierInDeviceSpec() {
-    DeviceTierModuleMatcher matcher = new DeviceTierModuleMatcher(DeviceSpec.getDefaultInstance());
+    DeviceGroupModuleMatcher matcher =
+        new DeviceGroupModuleMatcher(DeviceSpec.getDefaultInstance());
 
-    assertThat(matcher.getModuleTargetingPredicate().test(moduleDeviceTiersTargeting("medium")))
+    assertThat(matcher.getModuleTargetingPredicate().test(moduleDeviceGroupsTargeting("highRam")))
         .isFalse();
     assertThat(matcher.getModuleTargetingPredicate().test(ModuleTargeting.getDefaultInstance()))
         .isTrue();

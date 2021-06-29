@@ -34,7 +34,8 @@ message ModuleTargeting {
   SdkVersionTargeting sdk_version_targeting = 1;
   repeated DeviceFeatureTargeting device_feature_targeting = 2;
   UserCountriesTargeting user_countries_targeting = 3;
-  DeviceTierModuleTargeting device_tier_targeting = 4;
+  DeviceTierModuleTargeting device_tier_targeting = 4 [deprecated = true];
+  DeviceGroupModuleTargeting device_group_targeting = 5;
 }
 
 // User Countries targeting describing an inclusive/exclusive list of country
@@ -204,5 +205,10 @@ message DeviceTierTargeting {
 
 // Targets conditional modules to a set of device tiers.
 message DeviceTierModuleTargeting {
+  repeated string value = 1;
+}
+
+// Targets conditional modules to a set of device groups.
+message DeviceGroupModuleTargeting {
   repeated string value = 1;
 }

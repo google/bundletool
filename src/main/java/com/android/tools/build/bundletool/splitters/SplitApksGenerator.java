@@ -21,7 +21,7 @@ import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.ImmutableSet.toImmutableSet;
 
 import com.android.bundle.Targeting.VariantTargeting;
-import com.android.tools.build.bundletool.model.BundleMetadata;
+import com.android.tools.build.bundletool.model.AppBundle;
 import com.android.tools.build.bundletool.model.BundleModule;
 import com.android.tools.build.bundletool.model.ModuleSplit;
 import com.android.tools.build.bundletool.model.SourceStamp;
@@ -38,18 +38,18 @@ public final class SplitApksGenerator {
   private final Version bundletoolVersion;
   private final Optional<SourceStamp> stampSource;
   private final VariantGenerator variantGenerator;
-  private final BundleMetadata bundleMetadata;
+  private final AppBundle appBundle;
 
   @Inject
   public SplitApksGenerator(
       Version bundletoolVersion,
       Optional<SourceStamp> stampSource,
       VariantGenerator variantGenerator,
-      BundleMetadata bundleMetadata) {
+      AppBundle appBundle) {
     this.bundletoolVersion = bundletoolVersion;
     this.stampSource = stampSource;
     this.variantGenerator = variantGenerator;
-    this.bundleMetadata = bundleMetadata;
+    this.appBundle = appBundle;
   }
 
   public ImmutableList<ModuleSplit> generateSplits(
@@ -87,7 +87,7 @@ public final class SplitApksGenerator {
           ModuleSplitter.create(
               module,
               bundletoolVersion,
-              bundleMetadata,
+              appBundle,
               apkGenerationConfiguration,
               variantTargeting,
               allModuleNames,

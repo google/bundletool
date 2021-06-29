@@ -15,6 +15,8 @@
  */
 package com.android.tools.build.bundletool.model.version;
 
+import java.util.Optional;
+
 /** Features that are enabled only from a certain Bundletool version. */
 public enum VersionGuardedFeature {
 
@@ -40,9 +42,9 @@ public enum VersionGuardedFeature {
   /**
    * Move the resources referenced in the AndroidManifest.xml into the master split to ensure
    * Application.create() will be invoked even if other resources are missing. Added for the
-   * Sideloading API.
+   * Sideloading API, which was deprecated in 1.7.0. Disabling this reduces app sizes.
    */
-  RESOURCES_REFERENCED_IN_MANIFEST_TO_MASTER_SPLIT("0.8.1"),
+  RESOURCES_REFERENCED_IN_MANIFEST_TO_MASTER_SPLIT("0.8.1", "1.7.0"),
 
   /**
    * Resources under "drawable-mdpi" take precedence over ones under "drawable". Although they
@@ -87,8 +89,22 @@ public enum VersionGuardedFeature {
   /** Version from which the given feature should be enabled by default. */
   private final Version enabledSinceVersion;
 
+  /**
+   * Version from which the given feature should be disabled by default.
+   *
+   * <p>This provides an exclusive upper bound for {@link enabledSinceVersion}. If missing, feature
+   * is enabled indefinitely.
+   */
+  private final Optional<Version> disabledSinceVersion;
+
   VersionGuardedFeature(String enabledSinceVersion) {
     this.enabledSinceVersion = Version.of(enabledSinceVersion);
+    this.disabledSinceVersion = Optional.empty();
+  }
+
+  VersionGuardedFeature(String enabledSinceVersion, String disabledSinceVersion) {
+    this.enabledSinceVersion = Version.of(enabledSinceVersion);
+    this.disabledSinceVersion = Optional.of(Version.of(disabledSinceVersion));
   }
 
   /**
@@ -97,6 +113,10 @@ public enum VersionGuardedFeature {
    * @param bundletoolVersion The version of bundletool that was used to build the App Bundle.
    */
   public boolean enabledForVersion(Version bundletoolVersion) {
-    return !bundletoolVersion.isOlderThan(enabledSinceVersion);
+    if (bundletoolVersion.isOlderThan(enabledSinceVersion)) {
+      return false;
+    }
+
+    return disabledSinceVersion.map(bundletoolVersion::isOlderThan).orElse(true);
   }
 }

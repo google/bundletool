@@ -15,13 +15,16 @@
  */
 package com.android.tools.build.bundletool.model.utils;
 
-import static com.android.tools.build.bundletool.model.AndroidManifest.DEVICE_TIER_ELEMENT_NAME;
+import static com.android.tools.build.bundletool.model.AndroidManifest.DEVICE_GROUP_ELEMENT_NAME;
 
 import com.android.tools.build.bundletool.model.exceptions.InvalidBundleException;
 import java.util.regex.Pattern;
 
-/** Utilities for device tier names. */
-public class DeviceTierUtils {
+/** Utilities for device group and tier values. */
+public class DeviceTargetingUtils {
+  private static final Pattern DEVICE_GROUP_PATTERN = Pattern.compile("[a-zA-Z][a-zA-Z0-9_]*");
+
+  @Deprecated
   private static final Pattern DEVICE_TIER_PATTERN = Pattern.compile("[a-zA-Z][a-zA-Z0-9_]*");
 
   public static void validateDeviceTierForAssetsDirectory(String directory, String tierName) {
@@ -35,17 +38,17 @@ public class DeviceTierUtils {
     }
   }
 
-  public static void validateDeviceTierForConditionalModule(String tierName) {
-    if (!DEVICE_TIER_PATTERN.matcher(tierName).matches()) {
+  public static void validateDeviceGroupForConditionalModule(String groupName) {
+    if (!DEVICE_GROUP_PATTERN.matcher(groupName).matches()) {
       throw InvalidBundleException.builder()
           .withUserMessage(
-              "Device tier names should start with a letter and contain only letters, numbers and"
-                  + " underscores. Found tier named '%s' in '<dist:%s>' element.",
-              tierName, DEVICE_TIER_ELEMENT_NAME)
+              "Device group names should start with a letter and contain only letters, numbers and"
+                  + " underscores. Found group named '%s' in '<dist:%s>' element.",
+              groupName, DEVICE_GROUP_ELEMENT_NAME)
           .build();
     }
   }
 
   // Do not instantiate.
-  private DeviceTierUtils() {}
+  private DeviceTargetingUtils() {}
 }

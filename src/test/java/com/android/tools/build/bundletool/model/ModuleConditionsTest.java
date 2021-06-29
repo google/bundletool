@@ -17,7 +17,7 @@
 package com.android.tools.build.bundletool.model;
 
 import static com.android.tools.build.bundletool.testing.TargetingUtils.mergeModuleTargeting;
-import static com.android.tools.build.bundletool.testing.TargetingUtils.moduleDeviceTiersTargeting;
+import static com.android.tools.build.bundletool.testing.TargetingUtils.moduleDeviceGroupsTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.moduleExcludeCountriesTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.moduleFeatureTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.moduleIncludeCountriesTargeting;
@@ -121,16 +121,17 @@ public class ModuleConditionsTest {
   }
 
   @Test
-  public void toTargeting_deviceTiersConditions() {
+  public void toTargeting_deviceGroupsConditions() {
     ModuleConditions moduleConditions =
         ModuleConditions.builder()
-            .setDeviceTiersCondition(DeviceTiersCondition.create(ImmutableSet.of("mid", "high")))
+            .setDeviceGroupsCondition(
+                DeviceGroupsCondition.create(ImmutableSet.of("group1", "group2")))
             .build();
 
     ModuleTargeting moduleTargeting = moduleConditions.toTargeting();
     assertThat(moduleTargeting)
         .ignoringRepeatedFieldOrder()
-        .isEqualTo(moduleDeviceTiersTargeting("mid", "high"));
+        .isEqualTo(moduleDeviceGroupsTargeting("group1", "group2"));
   }
 
   @Test
@@ -172,7 +173,7 @@ public class ModuleConditionsTest {
             .setMinSdkVersion(24)
             .setUserCountriesCondition(
                 UserCountriesCondition.create(ImmutableList.of("FR"), /* exclude= */ false))
-            .setDeviceTiersCondition(DeviceTiersCondition.create(ImmutableSet.of("high")))
+            .setDeviceGroupsCondition(DeviceGroupsCondition.create(ImmutableSet.of("group1")))
             .build();
 
     ModuleTargeting moduleTargeting = moduleConditions.toTargeting();
@@ -184,6 +185,6 @@ public class ModuleConditionsTest {
                 moduleFeatureTargeting("com.feature2"),
                 moduleMinSdkVersionTargeting(24),
                 moduleIncludeCountriesTargeting("FR"),
-                moduleDeviceTiersTargeting("high")));
+                moduleDeviceGroupsTargeting("group1")));
   }
 }

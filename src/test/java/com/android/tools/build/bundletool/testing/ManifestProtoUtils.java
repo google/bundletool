@@ -19,10 +19,10 @@ package com.android.tools.build.bundletool.testing;
 import static com.android.tools.build.bundletool.model.AndroidManifest.ACTIVITY_ELEMENT_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.ANDROID_NAMESPACE_URI;
 import static com.android.tools.build.bundletool.model.AndroidManifest.APPLICATION_ELEMENT_NAME;
-import static com.android.tools.build.bundletool.model.AndroidManifest.CONDITION_DEVICE_TIERS_NAME;
+import static com.android.tools.build.bundletool.model.AndroidManifest.CONDITION_DEVICE_GROUPS_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.DEBUGGABLE_ATTRIBUTE_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.DEBUGGABLE_RESOURCE_ID;
-import static com.android.tools.build.bundletool.model.AndroidManifest.DEVICE_TIER_ELEMENT_NAME;
+import static com.android.tools.build.bundletool.model.AndroidManifest.DEVICE_GROUP_ELEMENT_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.DISTRIBUTION_NAMESPACE_URI;
 import static com.android.tools.build.bundletool.model.AndroidManifest.EXTRACT_NATIVE_LIBS_ATTRIBUTE_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.EXTRACT_NATIVE_LIBS_RESOURCE_ID;
@@ -289,6 +289,18 @@ public final class ManifestProtoUtils {
         packageName,
         ObjectArrays.concat(
             new ManifestMutator[] {withOnDemandAttribute(true), withFusingAttribute(true)},
+            manifestMutators,
+            ManifestMutator.class));
+  }
+
+  public static XmlNode androidManifestForMlModule(
+      String packageName, ManifestMutator... manifestMutators) {
+    return androidManifest(
+        packageName,
+        ObjectArrays.concat(
+            new ManifestMutator[] {
+              withOnDemandAttribute(true), withFusingAttribute(true), withTypeAttribute("ml-pack")
+            },
             manifestMutators,
             ManifestMutator.class));
   }
@@ -748,16 +760,16 @@ public final class ManifestProtoUtils {
                             .setValueAsDecimalInteger(maxSdkVersion)));
   }
 
-  public static ManifestMutator withDeviceTiersCondition(ImmutableList<String> deviceTiers) {
-    XmlProtoElementBuilder deviceTiersElement =
-        XmlProtoElementBuilder.create(DISTRIBUTION_NAMESPACE_URI, CONDITION_DEVICE_TIERS_NAME);
+  public static ManifestMutator withDeviceGroupsCondition(ImmutableList<String> deviceGroups) {
+    XmlProtoElementBuilder deviceGroupsElement =
+        XmlProtoElementBuilder.create(DISTRIBUTION_NAMESPACE_URI, CONDITION_DEVICE_GROUPS_NAME);
 
-    for (String deviceTier : deviceTiers) {
-      deviceTiersElement.addChildElement(
-          XmlProtoElementBuilder.create(DISTRIBUTION_NAMESPACE_URI, DEVICE_TIER_ELEMENT_NAME)
+    for (String deviceGroup : deviceGroups) {
+      deviceGroupsElement.addChildElement(
+          XmlProtoElementBuilder.create(DISTRIBUTION_NAMESPACE_URI, DEVICE_GROUP_ELEMENT_NAME)
               .addAttribute(
                   XmlProtoAttributeBuilder.create(DISTRIBUTION_NAMESPACE_URI, NAME_ATTRIBUTE_NAME)
-                      .setValueAsString(deviceTier)));
+                      .setValueAsString(deviceGroup)));
     }
 
     return manifestElement ->
@@ -766,7 +778,7 @@ public final class ManifestProtoUtils {
             .getOrCreateChildElement(DISTRIBUTION_NAMESPACE_URI, "delivery")
             .getOrCreateChildElement(DISTRIBUTION_NAMESPACE_URI, "install-time")
             .getOrCreateChildElement(DISTRIBUTION_NAMESPACE_URI, "conditions")
-            .addChildElement(deviceTiersElement);
+            .addChildElement(deviceGroupsElement);
   }
 
   /**

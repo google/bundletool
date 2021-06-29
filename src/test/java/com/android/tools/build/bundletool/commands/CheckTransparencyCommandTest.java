@@ -15,53 +15,63 @@
  */
 package com.android.tools.build.bundletool.commands;
 
+import static com.android.tools.build.bundletool.testing.CodeTransparencyTestUtils.createJwsToken;
 import static com.android.tools.build.bundletool.testing.FakeSystemEnvironmentProvider.ANDROID_HOME;
 import static com.android.tools.build.bundletool.testing.FakeSystemEnvironmentProvider.ANDROID_SERIAL;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifest;
-import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withSharedUserId;
 import static com.google.common.truth.Truth.assertThat;
 import static java.nio.charset.StandardCharsets.UTF_8;
-import static java.util.stream.Collectors.toMap;
-import static org.jose4j.jws.AlgorithmIdentifiers.RSA_USING_SHA256;
 import static org.jose4j.jws.AlgorithmIdentifiers.RSA_USING_SHA384;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.mock;
 
-import com.android.aapt.Resources.XmlNode;
 import com.android.bundle.CodeTransparencyOuterClass.CodeRelatedFile;
 import com.android.bundle.CodeTransparencyOuterClass.CodeTransparency;
+import com.android.bundle.Targeting.ApkTargeting;
+import com.android.bundle.Targeting.VariantTargeting;
 import com.android.tools.build.bundletool.commands.CheckTransparencyCommand.Mode;
 import com.android.tools.build.bundletool.device.AdbServer;
 import com.android.tools.build.bundletool.flags.Flag.RequiredFlagNotSetException;
 import com.android.tools.build.bundletool.flags.FlagParser;
 import com.android.tools.build.bundletool.flags.ParsedFlags.UnknownFlagsException;
+import com.android.tools.build.bundletool.io.ApkSerializerHelper;
 import com.android.tools.build.bundletool.io.AppBundleSerializer;
+import com.android.tools.build.bundletool.io.ZipBuilder;
+import com.android.tools.build.bundletool.model.AndroidManifest;
 import com.android.tools.build.bundletool.model.BundleMetadata;
-import com.android.tools.build.bundletool.model.BundleModule;
-import com.android.tools.build.bundletool.model.exceptions.InvalidBundleException;
+import com.android.tools.build.bundletool.model.BundleModuleName;
+import com.android.tools.build.bundletool.model.ModuleEntry;
+import com.android.tools.build.bundletool.model.ModuleSplit;
+import com.android.tools.build.bundletool.model.SignerConfig;
+import com.android.tools.build.bundletool.model.SigningConfiguration;
+import com.android.tools.build.bundletool.model.ZipPath;
+import com.android.tools.build.bundletool.model.exceptions.CommandExecutionException;
+import com.android.tools.build.bundletool.model.exceptions.InvalidCommandException;
 import com.android.tools.build.bundletool.model.utils.SystemEnvironmentProvider;
 import com.android.tools.build.bundletool.testing.AppBundleBuilder;
-import com.android.tools.build.bundletool.testing.BundleModuleBuilder;
 import com.android.tools.build.bundletool.testing.CertificateFactory;
 import com.android.tools.build.bundletool.testing.FakeSystemEnvironmentProvider;
+import com.android.tools.build.bundletool.testing.TestModule;
+import com.android.tools.build.bundletool.transparency.CodeTransparencyCryptoUtils;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.hash.Hashing;
 import com.google.common.io.ByteSource;
 import com.google.common.io.CharSource;
-import com.google.protobuf.util.JsonFormat;
+import com.google.protobuf.ByteString;
+import dagger.Component;
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
 import java.nio.charset.Charset;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
 import java.security.PrivateKey;
 import java.security.cert.X509Certificate;
-import java.util.Map;
-import java.util.Optional;
+import javax.inject.Inject;
 import org.jose4j.jws.JsonWebSignature;
-import org.jose4j.lang.JoseException;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
@@ -72,26 +82,24 @@ import org.junit.runners.JUnit4;
 @RunWith(JUnit4.class)
 public final class CheckTransparencyCommandTest {
 
-  private static final String BASE_MODULE = "base";
-  private static final String FEATURE_MODULE1 = "feature1";
-  private static final String FEATURE_MODULE2 = "feature2";
-  private static final String DEX_PATH1 = "dex/classes.dex";
-  private static final String DEX_PATH2 = "dex/classes2.dex";
-  private static final String NATIVE_LIB_PATH1 = "lib/arm64-v8a/libnative.so";
-  private static final String NATIVE_LIB_PATH2 = "lib/armeabi-v7a/libnative.so";
-  private static final byte[] FILE_CONTENT = new byte[] {1, 2, 3};
   private static final Path ADB_PATH =
       Paths.get("third_party/java/android/android_sdk_linux/platform-tools/adb.static");
   private static final String DEVICE_ID = "id1";
+  private static final String PACKAGE_NAME = "com.test.app";
 
   @Rule public final TemporaryFolder tmp = new TemporaryFolder();
+
+  @Inject ApkSerializerHelper apkSerializerHelper;
 
   private Path tmpDir;
   private Path bundlePath;
   private Path apkZipPath;
   private KeyPairGenerator kpg;
-  private PrivateKey privateKey;
-  private X509Certificate certificate;
+  private PrivateKey transparencyPrivateKey;
+  private X509Certificate transparencyKeyCertificate;
+  private X509Certificate apkSigningKeyCertificate;
+  private Path transparencyKeyCertificatePath;
+  private Path apkSigningKeyCertificatePath;
 
   private final AdbServer fakeAdbServer = mock(AdbServer.class);
   private final SystemEnvironmentProvider systemEnvironmentProvider =
@@ -101,14 +109,41 @@ public final class CheckTransparencyCommandTest {
   @Before
   public void setUp() throws Exception {
     tmpDir = tmp.getRoot().toPath();
-    bundlePath = tmpDir.resolve("bundle.aab");
-    apkZipPath = tmpDir.resolve("apks.zip");
     kpg = KeyPairGenerator.getInstance("RSA");
     kpg.initialize(/* keySize= */ 3072);
+
     KeyPair keyPair = kpg.genKeyPair();
-    privateKey = keyPair.getPrivate();
-    certificate =
-        CertificateFactory.buildSelfSignedCertificate(keyPair, "CN=CheckTransparencyCommandTest");
+    transparencyPrivateKey = keyPair.getPrivate();
+    transparencyKeyCertificate =
+        CertificateFactory.buildSelfSignedCertificate(
+            keyPair, "CN=CheckTransparencyCommandTest_TransparencyKey");
+    transparencyKeyCertificatePath = tmpDir.resolve("transparency-public.cert");
+    Files.write(transparencyKeyCertificatePath, transparencyKeyCertificate.getEncoded());
+
+    KeyPair apkSigningKeyPair = kpg.genKeyPair();
+    apkSigningKeyCertificate =
+        CertificateFactory.buildSelfSignedCertificate(
+            apkSigningKeyPair, "CN=CheckTransparencyCommandTest_ApkSigningKey");
+    apkSigningKeyCertificatePath = tmpDir.resolve("apk-signing-key-public.cert");
+    Files.write(apkSigningKeyCertificatePath, apkSigningKeyCertificate.getEncoded());
+    SigningConfiguration apkSigningConfig =
+        SigningConfiguration.builder()
+            .setSignerConfig(
+                SignerConfig.builder()
+                    .setPrivateKey(apkSigningKeyPair.getPrivate())
+                    .setCertificates(ImmutableList.of(apkSigningKeyCertificate))
+                    .build())
+            .build();
+
+    TestComponent.useTestModule(
+        this,
+        TestModule.builder()
+            .withCustomBuildApksCommandSetter(command -> command.setEnableNewApkSerializer(true))
+            .withSigningConfig(apkSigningConfig)
+            .build());
+
+    bundlePath = tmpDir.resolve("bundle.aab");
+    apkZipPath = tmpDir.resolve("apks.zip");
   }
 
   @Test
@@ -177,6 +212,63 @@ public final class CheckTransparencyCommandTest {
   }
 
   @Test
+  public void buildingCommandViaFlags_bundleMode_withTransparencyCertificateFlag() {
+    CheckTransparencyCommand commandViaFlags =
+        CheckTransparencyCommand.fromFlags(
+            new FlagParser()
+                .parse(
+                    "--mode=BUNDLE",
+                    "--bundle=" + bundlePath,
+                    "--transparency-key-certificate=" + transparencyKeyCertificatePath),
+            systemEnvironmentProvider,
+            fakeAdbServer);
+    CheckTransparencyCommand commandViaBuilder =
+        CheckTransparencyCommand.builder()
+            .setMode(Mode.BUNDLE)
+            .setBundlePath(bundlePath)
+            .setTransparencyKeyCertificate(transparencyKeyCertificate)
+            .build();
+
+    assertThat(commandViaBuilder).isEqualTo(commandViaFlags);
+  }
+
+  @Test
+  public void buildingCommandViaFlags_bundleMode_withTransparencyCertificateFlag_invalidFormat() {
+    Throwable e =
+        assertThrows(
+            InvalidCommandException.class,
+            () ->
+                CheckTransparencyCommand.fromFlags(
+                    new FlagParser()
+                        .parse(
+                            "--mode=BUNDLE",
+                            "--bundle=" + bundlePath,
+                            "--transparency-key-certificate=" + apkZipPath),
+                    systemEnvironmentProvider,
+                    fakeAdbServer));
+    assertThat(e)
+        .hasMessageThat()
+        .contains("Unable to read public key certificate from the provided path.");
+  }
+
+  @Test
+  public void buildingCommandViaFlags_bundleMode_withApkSigningKeyCertificateFlag() {
+    Throwable e =
+        assertThrows(
+            UnknownFlagsException.class,
+            () ->
+                CheckTransparencyCommand.fromFlags(
+                    new FlagParser()
+                        .parse(
+                            "--mode=BUNDLE",
+                            "--bundle=" + bundlePath,
+                            "--apk-signing-key-certificate=" + apkSigningKeyCertificatePath),
+                    systemEnvironmentProvider,
+                    fakeAdbServer));
+    assertThat(e).hasMessageThat().contains("Unrecognized flags: --apk-signing-key-certificate");
+  }
+
+  @Test
   public void buildingCommandViaFlags_apkMode_apkZipPathNotSet() {
     Throwable e =
         assertThrows(
@@ -231,6 +323,48 @@ public final class CheckTransparencyCommandTest {
   }
 
   @Test
+  public void buildingCommandViaFlags_apkMode_withTransparencyCertificateFlag() {
+    CheckTransparencyCommand commandViaFlags =
+        CheckTransparencyCommand.fromFlags(
+            new FlagParser()
+                .parse(
+                    "--mode=APK",
+                    "--apk-zip=" + apkZipPath,
+                    "--transparency-key-certificate=" + transparencyKeyCertificatePath),
+            systemEnvironmentProvider,
+            fakeAdbServer);
+    CheckTransparencyCommand commandViaBuilder =
+        CheckTransparencyCommand.builder()
+            .setMode(Mode.APK)
+            .setApkZipPath(apkZipPath)
+            .setTransparencyKeyCertificate(transparencyKeyCertificate)
+            .build();
+
+    assertThat(commandViaBuilder).isEqualTo(commandViaFlags);
+  }
+
+  @Test
+  public void buildingCommandViaFlags_apkMode_withApkSigningKeyCertificateFlag() {
+    CheckTransparencyCommand commandViaFlags =
+        CheckTransparencyCommand.fromFlags(
+            new FlagParser()
+                .parse(
+                    "--mode=APK",
+                    "--apk-zip=" + apkZipPath,
+                    "--apk-signing-key-certificate=" + apkSigningKeyCertificatePath),
+            systemEnvironmentProvider,
+            fakeAdbServer);
+    CheckTransparencyCommand commandViaBuilder =
+        CheckTransparencyCommand.builder()
+            .setMode(Mode.APK)
+            .setApkZipPath(apkZipPath)
+            .setApkSigningKeyCertificate(apkSigningKeyCertificate)
+            .build();
+
+    assertThat(commandViaBuilder).isEqualTo(commandViaFlags);
+  }
+
+  @Test
   public void buildingCommandViaFlags_connectedDeviceMode_bundleFlagSet() {
     Throwable e =
         assertThrows(
@@ -241,6 +375,7 @@ public final class CheckTransparencyCommandTest {
                         .parse(
                             "--mode=CONNECTED_DEVICE",
                             "--adb=" + ADB_PATH,
+                            "--package-name=" + PACKAGE_NAME,
                             "--bundle=" + bundlePath),
                     systemEnvironmentProvider,
                     fakeAdbServer));
@@ -259,6 +394,7 @@ public final class CheckTransparencyCommandTest {
                             "--mode=CONNECTED_DEVICE",
                             "--connected-device=true",
                             "--adb=" + ADB_PATH,
+                            "--package-name=" + PACKAGE_NAME,
                             "--unknownFlag=hello"),
                     systemEnvironmentProvider,
                     fakeAdbServer));
@@ -270,7 +406,11 @@ public final class CheckTransparencyCommandTest {
     CheckTransparencyCommand commandViaFlags =
         CheckTransparencyCommand.fromFlags(
             new FlagParser()
-                .parse("--mode=CONNECTED_DEVICE", "--adb=" + ADB_PATH, "--device-id=" + DEVICE_ID),
+                .parse(
+                    "--mode=CONNECTED_DEVICE",
+                    "--adb=" + ADB_PATH,
+                    "--device-id=" + DEVICE_ID,
+                    "--package-name=" + PACKAGE_NAME),
             systemEnvironmentProvider,
             fakeAdbServer);
     CheckTransparencyCommand commandViaBuilder =
@@ -279,16 +419,23 @@ public final class CheckTransparencyCommandTest {
             .setAdbPath(ADB_PATH)
             .setAdbServer(fakeAdbServer)
             .setDeviceId(DEVICE_ID)
+            .setPackageName(PACKAGE_NAME)
             .build();
 
     assertThat(commandViaBuilder).isEqualTo(commandViaFlags);
   }
 
   @Test
-  public void buildingCommandViaFlags_connectedDeviceMode_deviceIdRetrievedFromEnvironmend() {
+  public void buildingCommandViaFlags_connectedDeviceMode_withTransparencyCertificateFlag() {
     CheckTransparencyCommand commandViaFlags =
         CheckTransparencyCommand.fromFlags(
-            new FlagParser().parse("--mode=CONNECTED_DEVICE", "--adb=" + ADB_PATH),
+            new FlagParser()
+                .parse(
+                    "--mode=CONNECTED_DEVICE",
+                    "--adb=" + ADB_PATH,
+                    "--device-id=" + DEVICE_ID,
+                    "--package-name=" + PACKAGE_NAME,
+                    "--transparency-key-certificate=" + transparencyKeyCertificatePath),
             systemEnvironmentProvider,
             fakeAdbServer);
     CheckTransparencyCommand commandViaBuilder =
@@ -297,6 +444,57 @@ public final class CheckTransparencyCommandTest {
             .setAdbPath(ADB_PATH)
             .setAdbServer(fakeAdbServer)
             .setDeviceId(DEVICE_ID)
+            .setPackageName(PACKAGE_NAME)
+            .setTransparencyKeyCertificate(transparencyKeyCertificate)
+            .build();
+
+    assertThat(commandViaBuilder).isEqualTo(commandViaFlags);
+  }
+
+  @Test
+  public void buildingCommandViaFlags_connectedDeviceMode_withApkSigningKeyCertificateFlag() {
+    CheckTransparencyCommand commandViaFlags =
+        CheckTransparencyCommand.fromFlags(
+            new FlagParser()
+                .parse(
+                    "--mode=CONNECTED_DEVICE",
+                    "--adb=" + ADB_PATH,
+                    "--device-id=" + DEVICE_ID,
+                    "--package-name=" + PACKAGE_NAME,
+                    "--apk-signing-key-certificate=" + apkSigningKeyCertificatePath),
+            systemEnvironmentProvider,
+            fakeAdbServer);
+    CheckTransparencyCommand commandViaBuilder =
+        CheckTransparencyCommand.builder()
+            .setMode(Mode.CONNECTED_DEVICE)
+            .setAdbPath(ADB_PATH)
+            .setAdbServer(fakeAdbServer)
+            .setDeviceId(DEVICE_ID)
+            .setPackageName(PACKAGE_NAME)
+            .setApkSigningKeyCertificate(apkSigningKeyCertificate)
+            .build();
+
+    assertThat(commandViaBuilder).isEqualTo(commandViaFlags);
+  }
+
+  @Test
+  public void buildingCommandViaFlags_connectedDeviceMode_deviceIdRetrievedFromEnvironment() {
+    CheckTransparencyCommand commandViaFlags =
+        CheckTransparencyCommand.fromFlags(
+            new FlagParser()
+                .parse(
+                    "--mode=CONNECTED_DEVICE",
+                    "--adb=" + ADB_PATH,
+                    "--package-name=" + PACKAGE_NAME),
+            systemEnvironmentProvider,
+            fakeAdbServer);
+    CheckTransparencyCommand commandViaBuilder =
+        CheckTransparencyCommand.builder()
+            .setMode(Mode.CONNECTED_DEVICE)
+            .setAdbPath(ADB_PATH)
+            .setAdbServer(fakeAdbServer)
+            .setDeviceId(DEVICE_ID)
+            .setPackageName(PACKAGE_NAME)
             .build();
 
     assertThat(commandViaBuilder).isEqualTo(commandViaFlags);
@@ -345,44 +543,138 @@ public final class CheckTransparencyCommandTest {
   }
 
   @Test
-  public void execute_bundletMode_transparencyFileMissing() throws Exception {
-    createBundle(bundlePath, /* transparencyMetadata= */ Optional.empty());
-    CheckTransparencyCommand checkTransparencyCommand =
-        CheckTransparencyCommand.builder().setMode(Mode.BUNDLE).setBundlePath(bundlePath).build();
+  public void bundleMode_unsupportedSignatureAlgorithm() throws Exception {
+    String serializedJws =
+        createJwsToken(
+            CodeTransparency.getDefaultInstance(),
+            transparencyKeyCertificate,
+            transparencyPrivateKey,
+            RSA_USING_SHA384);
+    AppBundleBuilder appBundle =
+        new AppBundleBuilder()
+            .addModule("base", module -> module.setManifest(androidManifest("com.test.app")))
+            .addMetadataFile(
+                BundleMetadata.BUNDLETOOL_NAMESPACE,
+                BundleMetadata.TRANSPARENCY_SIGNED_FILE_NAME,
+                CharSource.wrap(serializedJws).asByteSource(Charset.defaultCharset()));
+    new AppBundleSerializer().writeToDisk(appBundle.build(), bundlePath);
 
-    Throwable e = assertThrows(InvalidBundleException.class, checkTransparencyCommand::execute);
+    Throwable e =
+        assertThrows(
+            CommandExecutionException.class,
+            () ->
+                CheckTransparencyCommand.builder()
+                    .setMode(Mode.BUNDLE)
+                    .setBundlePath(bundlePath)
+                    .build()
+                    .checkTransparency(new PrintStream(new ByteArrayOutputStream())));
     assertThat(e)
         .hasMessageThat()
-        .isEqualTo(
-            "Bundle does not include code transparency metadata. Run `add-transparency` command to"
-                + " add code transparency metadata to the bundle.");
+        .contains("Exception while verifying code transparency signature.");
   }
 
   @Test
-  public void execute_bundleMode_codeModified() throws Exception {
-    CodeTransparency.Builder codeTransparency =
-        createValidTransparencyProto(
-            ByteSource.wrap(FILE_CONTENT).hash(Hashing.sha256()).toString())
-            .toBuilder();
-    Map<String, CodeRelatedFile> codeRelatedFileMap =
-        codeTransparency.getCodeRelatedFileList().stream()
-            .collect(toMap(CodeRelatedFile::getPath, codeRelatedFile -> codeRelatedFile));
-    codeRelatedFileMap.put(
-        "dex/deleted.dex",
-        CodeRelatedFile.newBuilder()
-            .setType(CodeRelatedFile.Type.DEX)
-            .setPath("dex/deleted.dex")
-            .build());
-    codeRelatedFileMap.remove(BASE_MODULE + "/" + DEX_PATH1);
-    codeRelatedFileMap.put(
-        BASE_MODULE + "/" + DEX_PATH2,
-        CodeRelatedFile.newBuilder()
-            .setType(CodeRelatedFile.Type.DEX)
-            .setPath(BASE_MODULE + "/" + DEX_PATH2)
-            .setSha256("modifiedSHa256")
-            .build());
-    codeTransparency.clearCodeRelatedFile().addAllCodeRelatedFile(codeRelatedFileMap.values());
-    createBundle(bundlePath, Optional.of(codeTransparency.build()));
+  public void bundleMode_transparencyVerified_transparencyKeyCertificateProvidedByUser()
+      throws Exception {
+    String serializedJws =
+        createJwsToken(
+            CodeTransparency.getDefaultInstance(),
+            transparencyKeyCertificate,
+            transparencyPrivateKey);
+    AppBundleBuilder appBundle =
+        new AppBundleBuilder()
+            .addModule("base", module -> module.setManifest(androidManifest("com.test.app")))
+            .addMetadataFile(
+                BundleMetadata.BUNDLETOOL_NAMESPACE,
+                BundleMetadata.TRANSPARENCY_SIGNED_FILE_NAME,
+                CharSource.wrap(serializedJws).asByteSource(Charset.defaultCharset()));
+    new AppBundleSerializer().writeToDisk(appBundle.build(), bundlePath);
+    ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+
+    CheckTransparencyCommand.builder()
+        .setMode(Mode.BUNDLE)
+        .setBundlePath(bundlePath)
+        .setTransparencyKeyCertificate(transparencyKeyCertificate)
+        .build()
+        .checkTransparency(new PrintStream(outputStream));
+
+    String output = new String(outputStream.toByteArray(), UTF_8);
+    assertThat(output).contains("No APK present. APK signature was not checked.");
+    assertThat(output)
+        .contains(
+            "Code transparency signature verified for the provided code transparency key"
+                + " certificate.");
+    assertThat(output)
+        .contains(
+            "Code transparency verified: code related file contents match the code transparency"
+                + " file.");
+  }
+
+  @Test
+  public void bundleMode_verificationFailed_badCertificateProvidedByUser() throws Exception {
+    String serializedJws =
+        createJwsToken(
+            CodeTransparency.getDefaultInstance(),
+            transparencyKeyCertificate,
+            transparencyPrivateKey);
+    AppBundleBuilder appBundle =
+        new AppBundleBuilder()
+            .addModule("base", module -> module.setManifest(androidManifest("com.test.app")))
+            .addMetadataFile(
+                BundleMetadata.BUNDLETOOL_NAMESPACE,
+                BundleMetadata.TRANSPARENCY_SIGNED_FILE_NAME,
+                CharSource.wrap(serializedJws).asByteSource(Charset.defaultCharset()));
+    new AppBundleSerializer().writeToDisk(appBundle.build(), bundlePath);
+    ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+    X509Certificate badCertificate =
+        CertificateFactory.buildSelfSignedCertificate(
+            kpg.generateKeyPair(), "CN=CheckTransparencyCommandTest_BadCertificate");
+
+    CheckTransparencyCommand.builder()
+        .setMode(Mode.BUNDLE)
+        .setBundlePath(bundlePath)
+        .setTransparencyKeyCertificate(badCertificate)
+        .build()
+        .checkTransparency(new PrintStream(outputStream));
+
+    String output = new String(outputStream.toByteArray(), UTF_8);
+    assertThat(output).contains("No APK present. APK signature was not checked.");
+    assertThat(output)
+        .contains(
+            "Code transparency verification failed because the provided public key certificate does"
+                + " not match the code transparency file.");
+    assertThat(output)
+        .contains(
+            "SHA-256 fingerprint of the certificate that was used to sign code"
+                + " transparency file: "
+                + CodeTransparencyCryptoUtils.getCertificateFingerprint(
+                    transparencyKeyCertificate));
+    assertThat(output)
+        .contains(
+            "SHA-256 fingerprint of the certificate that was provided: "
+                + CodeTransparencyCryptoUtils.getCertificateFingerprint(badCertificate));
+  }
+
+  @Test
+  public void bundleMode_verificationFailed_transparencyKeyCertificateNotProvidedByUser()
+      throws Exception {
+    // The public key transparencyKeyCertificate used to create JWS does not match the private key,
+    // and will result
+    // in signature verification failure later.
+    String serializedJws =
+        createJwsToken(
+            CodeTransparency.getDefaultInstance(),
+            CertificateFactory.buildSelfSignedCertificate(
+                kpg.generateKeyPair(), "CN=CheckTransparencyCommandTest_BadCertificate"),
+            transparencyPrivateKey);
+    AppBundleBuilder appBundle =
+        new AppBundleBuilder()
+            .addModule("base", module -> module.setManifest(androidManifest("com.test.app")))
+            .addMetadataFile(
+                BundleMetadata.BUNDLETOOL_NAMESPACE,
+                BundleMetadata.TRANSPARENCY_SIGNED_FILE_NAME,
+                CharSource.wrap(serializedJws).asByteSource(Charset.defaultCharset()));
+    new AppBundleSerializer().writeToDisk(appBundle.build(), bundlePath);
     ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
 
     CheckTransparencyCommand.builder()
@@ -392,112 +684,224 @@ public final class CheckTransparencyCommandTest {
         .checkTransparency(new PrintStream(outputStream));
 
     String output = new String(outputStream.toByteArray(), UTF_8);
+    assertThat(output).contains("No APK present. APK signature was not checked.");
+    assertThat(output)
+        .contains("Verification failed because code transparency signature is invalid.");
+  }
+
+  @Test
+  public void apkMode_transparencyVerified_transparencyKeyCertificateNotProvidedByUser()
+      throws Exception {
+    Path apkPath = tmpDir.resolve("universal.apk");
+    Path zipOfApksPath = tmpDir.resolve("apks.zip");
+    String dexFileName = "classes.dex";
+    byte[] dexFileContents = new byte[] {1, 2, 3};
+    String serializedJws =
+        createJwsToken(
+            CodeTransparency.newBuilder()
+                .addCodeRelatedFile(
+                    CodeRelatedFile.newBuilder()
+                        .setType(CodeRelatedFile.Type.DEX)
+                        .setPath("base/dex/" + dexFileName)
+                        .setSha256(
+                            ByteSource.wrap(dexFileContents).hash(Hashing.sha256()).toString())
+                        .build())
+                .build(),
+            transparencyKeyCertificate,
+            transparencyPrivateKey);
+    ModuleSplit baseModuleSplit =
+        ModuleSplit.builder()
+            .setModuleName(BundleModuleName.create("base"))
+            .setAndroidManifest(AndroidManifest.create(androidManifest("com.app")))
+            .setApkTargeting(ApkTargeting.getDefaultInstance())
+            .setVariantTargeting(VariantTargeting.getDefaultInstance())
+            .setMasterSplit(true)
+            .addEntry(
+                ModuleEntry.builder()
+                    .setPath(ZipPath.create("").resolve(dexFileName))
+                    .setContent(ByteSource.wrap(dexFileContents))
+                    .build())
+            .addEntry(
+                ModuleEntry.builder()
+                    .setPath(
+                        ZipPath.create("META-INF")
+                            .resolve(BundleMetadata.TRANSPARENCY_SIGNED_FILE_NAME))
+                    .setContent(
+                        CharSource.wrap(serializedJws).asByteSource(Charset.defaultCharset()))
+                    .build())
+            .build();
+    apkSerializerHelper.writeToZipFile(baseModuleSplit, apkPath);
+    ZipBuilder zipBuilder =
+        new ZipBuilder()
+            .addFileWithContent(
+                ZipPath.create("universal.apk"),
+                ByteString.readFrom(Files.newInputStream(apkPath)).toByteArray());
+    zipBuilder.writeTo(zipOfApksPath);
+    ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+
+    CheckTransparencyCommand.builder()
+        .setMode(Mode.APK)
+        .setApkZipPath(zipOfApksPath)
+        .build()
+        .checkTransparency(new PrintStream(outputStream));
+
+    String output = new String(outputStream.toByteArray(), UTF_8);
     assertThat(output)
         .contains(
-            "Code transparency verification failed because code was modified after transparency"
-                + " metadata generation.");
+            "APK signature is valid. SHA-256 fingerprint of the apk signing key certificate (must"
+                + " be compared with the developer's public key manually): "
+                + CodeTransparencyCryptoUtils.getCertificateFingerprint(apkSigningKeyCertificate));
     assertThat(output)
-        .contains("Files deleted after transparency metadata generation: [dex/deleted.dex]");
+        .contains(
+            "Code transparency signature is valid. SHA-256 fingerprint of the code transparency key"
+                + " certificate (must be compared with the developer's public key manually): "
+                + CodeTransparencyCryptoUtils.getCertificateFingerprint(
+                    (JsonWebSignature) JsonWebSignature.fromCompactSerialization(serializedJws)));
     assertThat(output)
-        .contains("Files added after transparency metadata generation: [base/dex/classes.dex]");
-    assertThat(output)
-        .contains("Files modified after transparency metadata generation: [base/dex/classes2.dex]");
+        .contains(
+            "Code transparency verified: code related file contents match the code transparency"
+                + " file.");
   }
 
   @Test
-  public void execute_transparencyVerified_invalidSignature() throws Exception {
-    // Update certificate value so that it does not match the private key that will used to sign the
-    // transparency metadata.
-    certificate =
-        CertificateFactory.buildSelfSignedCertificate(
-            kpg.generateKeyPair(), "CN=CodeTransparencyValidatorTest_WrongCertificate");
-    CodeTransparency validCodeTransparency =
-        createValidTransparencyProto(
-            ByteSource.wrap(FILE_CONTENT).hash(Hashing.sha256()).toString());
-    createBundle(bundlePath, Optional.of(validCodeTransparency));
-    ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
-
-    CheckTransparencyCommand.builder()
-        .setBundlePath(bundlePath)
-        .setMode(Mode.BUNDLE)
-        .build()
-        .checkTransparency(new PrintStream(outputStream));
-
-    assertThat(new String(outputStream.toByteArray(), UTF_8))
-        .contains("Code transparency verification failed because signature is invalid.");
-  }
-
-  @Test
-  public void execute_bundleMode_transparencyVerified() throws Exception {
-    CodeTransparency validCodeTransparency =
-        createValidTransparencyProto(
-            ByteSource.wrap(FILE_CONTENT).hash(Hashing.sha256()).toString());
-    createBundle(bundlePath, Optional.of(validCodeTransparency));
-    ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
-
-    CheckTransparencyCommand.builder()
-        .setMode(Mode.BUNDLE)
-        .setBundlePath(bundlePath)
-        .build()
-        .checkTransparency(new PrintStream(outputStream));
-
-    assertThat(new String(outputStream.toByteArray(), UTF_8))
-        .contains("Code transparency verified. Public key certificate fingerprint: ");
-  }
-
-  @Test
-  public void execute_bundleMode_unsupportedSignatureAlgorithm() throws Exception {
-    CodeTransparency validCodeTransparency =
-        createValidTransparencyProto(
-            ByteSource.wrap(FILE_CONTENT).hash(Hashing.sha256()).toString());
-    createBundle(
-        bundlePath,
-        Optional.of(validCodeTransparency),
-        /* hasSharedUserId= */ false,
-        RSA_USING_SHA384);
-    ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
-
-    Throwable e =
-        assertThrows(
-            InvalidBundleException.class,
-            () ->
-                CheckTransparencyCommand.builder()
-                    .setMode(Mode.BUNDLE)
-                    .setBundlePath(bundlePath)
-                    .build()
-                    .checkTransparency(new PrintStream(outputStream)));
-    assertThat(e)
-        .hasMessageThat()
-        .contains("Exception while verifying code transparency signature.");
-  }
-
-  @Test
-  public void execute_bundleMode_transparencyFilePresent_sharedUserIdSpecifiedInManifest()
+  public void apkMode_transparencyVerified_apkSigningKeyCertificateProvidedByUser()
       throws Exception {
-    CodeTransparency validCodeTransparency =
-        createValidTransparencyProto(
-            ByteSource.wrap(FILE_CONTENT).hash(Hashing.sha256()).toString());
-    createBundle(
-        bundlePath,
-        Optional.of(validCodeTransparency),
-        /* hasSharedUserId= */ true,
-        RSA_USING_SHA256);
+    Path apkPath = tmpDir.resolve("universal.apk");
+    Path zipOfApksPath = tmpDir.resolve("apks.zip");
+    String dexFileName = "classes.dex";
+    byte[] dexFileContents = new byte[] {1, 2, 3};
+    String serializedJws =
+        createJwsToken(
+            CodeTransparency.newBuilder()
+                .addCodeRelatedFile(
+                    CodeRelatedFile.newBuilder()
+                        .setType(CodeRelatedFile.Type.DEX)
+                        .setPath("base/dex/" + dexFileName)
+                        .setSha256(
+                            ByteSource.wrap(dexFileContents).hash(Hashing.sha256()).toString())
+                        .build())
+                .build(),
+            transparencyKeyCertificate,
+            transparencyPrivateKey);
+    ModuleSplit baseModuleSplit =
+        ModuleSplit.builder()
+            .setModuleName(BundleModuleName.create("base"))
+            .setAndroidManifest(AndroidManifest.create(androidManifest("com.app")))
+            .setApkTargeting(ApkTargeting.getDefaultInstance())
+            .setVariantTargeting(VariantTargeting.getDefaultInstance())
+            .setMasterSplit(true)
+            .addEntry(
+                ModuleEntry.builder()
+                    .setPath(ZipPath.create("").resolve(dexFileName))
+                    .setContent(ByteSource.wrap(dexFileContents))
+                    .build())
+            .addEntry(
+                ModuleEntry.builder()
+                    .setPath(
+                        ZipPath.create("META-INF")
+                            .resolve(BundleMetadata.TRANSPARENCY_SIGNED_FILE_NAME))
+                    .setContent(
+                        CharSource.wrap(serializedJws).asByteSource(Charset.defaultCharset()))
+                    .build())
+            .build();
+    apkSerializerHelper.writeToZipFile(baseModuleSplit, apkPath);
+    ZipBuilder zipBuilder =
+        new ZipBuilder()
+            .addFileWithContent(
+                ZipPath.create("universal.apk"),
+                ByteString.readFrom(Files.newInputStream(apkPath)).toByteArray());
+    zipBuilder.writeTo(zipOfApksPath);
     ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
 
-    Throwable e =
-        assertThrows(
-            InvalidBundleException.class,
-            () ->
-                CheckTransparencyCommand.builder()
-                    .setMode(Mode.BUNDLE)
-                    .setBundlePath(bundlePath)
-                    .build()
-                    .checkTransparency(new PrintStream(outputStream)));
-    assertThat(e)
-        .hasMessageThat()
-        .isEqualTo(
-            "Transparency file is present in the bundle, but it can not be verified because"
-                + " `sharedUserId` attribute is specified in one of the manifests.");
+    CheckTransparencyCommand.builder()
+        .setMode(Mode.APK)
+        .setApkZipPath(zipOfApksPath)
+        .setApkSigningKeyCertificate(apkSigningKeyCertificate)
+        .build()
+        .checkTransparency(new PrintStream(outputStream));
+
+    String output = new String(outputStream.toByteArray(), UTF_8);
+    assertThat(output)
+        .contains("APK signature verified for the provided apk signing key certificate.");
+    assertThat(output)
+        .contains(
+            "Code transparency signature is valid. SHA-256 fingerprint of the code transparency key"
+                + " certificate (must be compared with the developer's public key manually): "
+                + CodeTransparencyCryptoUtils.getCertificateFingerprint(
+                    (JsonWebSignature) JsonWebSignature.fromCompactSerialization(serializedJws)));
+    assertThat(output)
+        .contains(
+            "Code transparency verified: code related file contents match the code transparency"
+                + " file.");
+  }
+
+  @Test
+  public void apkMode_verificationFailed_apkSigningKeyCertificateMismatch() throws Exception {
+    Path apkPath = tmpDir.resolve("universal.apk");
+    Path zipOfApksPath = tmpDir.resolve("apks.zip");
+    String dexFileName = "classes.dex";
+    byte[] dexFileContents = new byte[] {1, 2, 3};
+    String serializedJws =
+        createJwsToken(
+            CodeTransparency.newBuilder()
+                .addCodeRelatedFile(
+                    CodeRelatedFile.newBuilder()
+                        .setType(CodeRelatedFile.Type.DEX)
+                        .setPath("base/dex/" + dexFileName)
+                        .setSha256(
+                            ByteSource.wrap(dexFileContents).hash(Hashing.sha256()).toString())
+                        .build())
+                .build(),
+            transparencyKeyCertificate,
+            transparencyPrivateKey);
+    ModuleSplit baseModuleSplit =
+        ModuleSplit.builder()
+            .setModuleName(BundleModuleName.create("base"))
+            .setAndroidManifest(AndroidManifest.create(androidManifest("com.app")))
+            .setApkTargeting(ApkTargeting.getDefaultInstance())
+            .setVariantTargeting(VariantTargeting.getDefaultInstance())
+            .setMasterSplit(true)
+            .addEntry(
+                ModuleEntry.builder()
+                    .setPath(ZipPath.create("").resolve(dexFileName))
+                    .setContent(ByteSource.wrap(dexFileContents))
+                    .build())
+            .addEntry(
+                ModuleEntry.builder()
+                    .setPath(
+                        ZipPath.create("META-INF")
+                            .resolve(BundleMetadata.TRANSPARENCY_SIGNED_FILE_NAME))
+                    .setContent(
+                        CharSource.wrap(serializedJws).asByteSource(Charset.defaultCharset()))
+                    .build())
+            .build();
+    apkSerializerHelper.writeToZipFile(baseModuleSplit, apkPath);
+    ZipBuilder zipBuilder =
+        new ZipBuilder()
+            .addFileWithContent(
+                ZipPath.create("universal.apk"),
+                ByteString.readFrom(Files.newInputStream(apkPath)).toByteArray());
+    zipBuilder.writeTo(zipOfApksPath);
+    ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+    X509Certificate providedApkSigningKeyCert =
+        CertificateFactory.buildSelfSignedCertificate(kpg.genKeyPair(), "CN=BadApkSigningCert");
+
+    CheckTransparencyCommand.builder()
+        .setMode(Mode.APK)
+        .setApkZipPath(zipOfApksPath)
+        .setApkSigningKeyCertificate(providedApkSigningKeyCert)
+        .build()
+        .checkTransparency(new PrintStream(outputStream));
+
+    String output = new String(outputStream.toByteArray(), UTF_8);
+    assertThat(output)
+        .contains(
+            "APK signature verification failed because the provided public key certificate does"
+                + " not match the APK signature."
+                + "\nSHA-256 fingerprint of the certificate that was used to sign the APKs: "
+                + CodeTransparencyCryptoUtils.getCertificateFingerprint(apkSigningKeyCertificate)
+                + "\nSHA-256 fingerprint of the certificate that was provided: "
+                + CodeTransparencyCryptoUtils.getCertificateFingerprint(providedApkSigningKeyCert));
   }
 
   @Test
@@ -505,98 +909,17 @@ public final class CheckTransparencyCommandTest {
     CheckTransparencyCommand.help();
   }
 
-  private void createBundle(Path path, Optional<CodeTransparency> transparencyMetadata)
-      throws Exception {
-    createBundle(path, transparencyMetadata, /* hasSharedUserId= */ false, RSA_USING_SHA256);
-  }
+  @CommandScoped
+  @Component(modules = {BuildApksModule.class, TestModule.class})
+  interface TestComponent {
 
-  private void createBundle(
-      Path path,
-      Optional<CodeTransparency> transparencyMetadata,
-      boolean hasSharedUserId,
-      String algorithmIdentifier)
-      throws Exception {
-    AppBundleBuilder appBundle =
-        new AppBundleBuilder()
-            .addModule(BASE_MODULE, module -> addCodeFilesToBundleModule(module, hasSharedUserId))
-            .addModule(
-                FEATURE_MODULE1, module -> addCodeFilesToBundleModule(module, hasSharedUserId))
-            .addModule(
-                FEATURE_MODULE2, module -> addCodeFilesToBundleModule(module, hasSharedUserId));
-    if (transparencyMetadata.isPresent()) {
-      appBundle.addMetadataFile(
-          BundleMetadata.BUNDLETOOL_NAMESPACE,
-          BundleMetadata.TRANSPARENCY_SIGNED_FILE_NAME,
-          CharSource.wrap(
-                  createJwsToken(
-                      JsonFormat.printer().print(transparencyMetadata.get()), algorithmIdentifier))
-              .asByteSource(Charset.defaultCharset()));
+    void inject(CheckTransparencyCommandTest test);
+
+    static void useTestModule(CheckTransparencyCommandTest testInstance, TestModule testModule) {
+      DaggerCheckTransparencyCommandTest_TestComponent.builder()
+          .testModule(testModule)
+          .build()
+          .inject(testInstance);
     }
-    new AppBundleSerializer().writeToDisk(appBundle.build(), path);
-  }
-
-  private static BundleModule addCodeFilesToBundleModule(
-      BundleModuleBuilder module, boolean hasSharedUserId) {
-    XmlNode manifest =
-        hasSharedUserId
-            ? androidManifest("com.test.app", withSharedUserId("sharedUserId"))
-            : androidManifest("com.test.app");
-    return module
-        .setManifest(manifest)
-        .addFile(DEX_PATH1, FILE_CONTENT)
-        .addFile(DEX_PATH2, FILE_CONTENT)
-        .addFile(NATIVE_LIB_PATH1, FILE_CONTENT)
-        .addFile(NATIVE_LIB_PATH2, FILE_CONTENT)
-        .build();
-  }
-
-  private static CodeTransparency createValidTransparencyProto(String fileContentHash) {
-    CodeTransparency.Builder transparencyBuilder = CodeTransparency.newBuilder();
-    addCodeFilesToTransparencyProto(transparencyBuilder, BASE_MODULE, fileContentHash);
-    addCodeFilesToTransparencyProto(transparencyBuilder, FEATURE_MODULE1, fileContentHash);
-    addCodeFilesToTransparencyProto(transparencyBuilder, FEATURE_MODULE2, fileContentHash);
-    return transparencyBuilder.build();
-  }
-
-  private static void addCodeFilesToTransparencyProto(
-      CodeTransparency.Builder transparencyBuilder, String moduleName, String fileContentHash) {
-    transparencyBuilder
-        .addCodeRelatedFile(
-            CodeRelatedFile.newBuilder()
-                .setPath(moduleName + "/" + DEX_PATH1)
-                .setType(CodeRelatedFile.Type.DEX)
-                .setApkPath("")
-                .setSha256(fileContentHash)
-                .build())
-        .addCodeRelatedFile(
-            CodeRelatedFile.newBuilder()
-                .setPath(moduleName + "/" + DEX_PATH2)
-                .setType(CodeRelatedFile.Type.DEX)
-                .setApkPath("")
-                .setSha256(fileContentHash)
-                .build())
-        .addCodeRelatedFile(
-            CodeRelatedFile.newBuilder()
-                .setPath(moduleName + "/" + NATIVE_LIB_PATH1)
-                .setType(CodeRelatedFile.Type.NATIVE_LIBRARY)
-                .setApkPath(NATIVE_LIB_PATH1)
-                .setSha256(fileContentHash)
-                .build())
-        .addCodeRelatedFile(
-            CodeRelatedFile.newBuilder()
-                .setPath(moduleName + "/" + NATIVE_LIB_PATH2)
-                .setType(CodeRelatedFile.Type.NATIVE_LIBRARY)
-                .setApkPath(NATIVE_LIB_PATH2)
-                .setSha256(fileContentHash)
-                .build());
-  }
-
-  private String createJwsToken(String payload, String algorithmIdentifier) throws JoseException {
-    JsonWebSignature jws = new JsonWebSignature();
-    jws.setAlgorithmHeaderValue(algorithmIdentifier);
-    jws.setCertificateChainHeaderValue(certificate);
-    jws.setPayload(payload);
-    jws.setKey(privateKey);
-    return jws.getCompactSerialization();
   }
 }

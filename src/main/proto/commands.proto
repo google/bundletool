@@ -54,6 +54,15 @@ message Variant {
 message ExtractApksResult {
   // Set of  extracted APKs.
   repeated ExtractedApk apks = 1;
+
+  // Information about the APKs if built with local testing enabled.
+  LocalTestingInfoForMetadata local_testing_info = 2;
+}
+
+message LocalTestingInfoForMetadata {
+  // The absolute path on the device that files targeted by local testing
+  // mode will be pushed to.
+  string local_testing_dir = 1;
 }
 
 // Describes extracted APK.
@@ -80,6 +89,9 @@ message ApkSet {
 message ModuleMetadata {
   // Module name.
   string name = 1;
+
+  // Indicates the type of this feature module.
+  FeatureModuleType module_type = 7;
 
   // Indicates the delivery type (e.g. on-demand) of the module.
   DeliveryType delivery_type = 6;
@@ -138,6 +150,12 @@ enum DeliveryType {
   INSTALL_TIME = 1;
   ON_DEMAND = 2;
   FAST_FOLLOW = 3;
+}
+
+enum FeatureModuleType {
+  UNKNOWN_MODULE_TYPE = 0;
+  FEATURE_MODULE = 1;
+  ML_MODULE = 2;
 }
 
 message ApkDescription {
