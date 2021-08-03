@@ -80,6 +80,7 @@ import com.android.bundle.Commands.AssetModuleMetadata;
 import com.android.bundle.Commands.AssetSliceSet;
 import com.android.bundle.Commands.BuildApksResult;
 import com.android.bundle.Commands.DeliveryType;
+import com.android.bundle.Commands.PermanentlyFusedModule;
 import com.android.bundle.Commands.Variant;
 import com.android.bundle.Config.Bundletool;
 import com.android.bundle.Devices.DeviceSpec;
@@ -997,6 +998,27 @@ public class ApkMatcherTest {
     assertThat(exception)
         .hasMessageThat()
         .contains("The APK Set archive does not contain the following modules: [unknown_module]");
+  }
+
+  @Test
+  public void apkMatch_withModuleNameFiltering_splitApks_permanentlyMergedModule() {
+    DeviceSpec device = deviceWithSdk(21);
+    ZipPath apk = ZipPath.create("master-de-fr.apk");
+    BuildApksResult buildApksResult =
+        buildApksResult(
+                createVariant(
+                    VariantTargeting.getDefaultInstance(),
+                    splitApkSet(
+                        /* moduleName= */ "base",
+                        splitApkDescription(ApkTargeting.getDefaultInstance(), apk))))
+            .toBuilder()
+            .addPermanentlyFusedModules(PermanentlyFusedModule.newBuilder().setName("my-module"))
+            .build();
+
+    ImmutableList<GeneratedApk> matchedApks =
+        createMatcher(device, Optional.of(ImmutableSet.of("my-module")))
+            .getMatchingApks(buildApksResult);
+    assertThat(matchedApks).containsExactly(baseMatchedApk(apk));
   }
 
   @Test

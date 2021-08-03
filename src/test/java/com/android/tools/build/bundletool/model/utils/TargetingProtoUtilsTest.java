@@ -71,9 +71,8 @@ public class TargetingProtoUtilsTest {
   public void toAlternativeTargeting_deviceTier() {
     assertThat(
             TargetingProtoUtils.toAlternativeTargeting(
-                assetsDirectoryTargeting(deviceTierTargeting("low"))))
-        .isEqualTo(
-            assetsDirectoryTargeting(alternativeDeviceTierTargeting(ImmutableList.of("low"))));
+                assetsDirectoryTargeting(deviceTierTargeting(1))))
+        .isEqualTo(assetsDirectoryTargeting(alternativeDeviceTierTargeting(ImmutableList.of(1))));
   }
 
   @Test

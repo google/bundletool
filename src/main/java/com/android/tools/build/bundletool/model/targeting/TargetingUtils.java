@@ -40,6 +40,7 @@ import com.google.common.collect.Iterables;
 import com.google.common.collect.Range;
 import com.google.common.collect.Sets;
 import com.google.common.collect.Streams;
+import com.google.protobuf.Int32Value;
 import java.util.Optional;
 
 /** Utility functions for Targeting proto. */
@@ -252,20 +253,13 @@ public final class TargetingUtils {
    * when validators are run). Prefer using {@link BundleModule#getAssetsConfig} for all other
    * cases.
    */
-  public static ImmutableSet<String> extractDeviceTiers(
+  public static ImmutableSet<Integer> extractDeviceTiers(
       ImmutableSet<TargetedDirectory> targetedDirectories) {
     return targetedDirectories.stream()
         .map(directory -> directory.getTargeting(TargetingDimension.DEVICE_TIER))
         .flatMap(Streams::stream)
         .flatMap(targeting -> targeting.getDeviceTier().getValueList().stream())
+        .map(Int32Value::getValue)
         .collect(toImmutableSet());
-  }
-
-  /** Checks if any of the targeted directories utilize device tier targeting. */
-  public static boolean containsDeviceTierTargeting(
-      ImmutableSet<TargetedDirectory> targetedDirectories) {
-    return targetedDirectories.stream()
-        .map(directory -> directory.getTargeting(TargetingDimension.DEVICE_TIER))
-        .anyMatch(Optional::isPresent);
   }
 }

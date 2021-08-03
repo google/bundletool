@@ -29,6 +29,7 @@ import com.android.bundle.Commands.AssetSliceSet;
 import com.android.bundle.Commands.BuildApksResult;
 import com.android.bundle.Commands.DeliveryType;
 import com.android.bundle.Commands.ModuleMetadata;
+import com.android.bundle.Commands.PermanentlyFusedModule;
 import com.android.bundle.Commands.Variant;
 import com.android.bundle.Devices.DeviceSpec;
 import com.android.bundle.Targeting.ApkTargeting;
@@ -252,13 +253,17 @@ public class ApkMatcher {
 
       Set<String> availableModules =
           Sets.union(
-              variant.getApkSetList().stream()
-                  .map(ApkSet::getModuleMetadata)
-                  .map(ModuleMetadata::getName)
-                  .collect(toImmutableSet()),
-              buildApksResult.getAssetSliceSetList().stream()
-                  .map(AssetSliceSet::getAssetModuleMetadata)
-                  .map(AssetModuleMetadata::getName)
+              Sets.union(
+                  variant.getApkSetList().stream()
+                      .map(ApkSet::getModuleMetadata)
+                      .map(ModuleMetadata::getName)
+                      .collect(toImmutableSet()),
+                  buildApksResult.getAssetSliceSetList().stream()
+                      .map(AssetSliceSet::getAssetModuleMetadata)
+                      .map(AssetModuleMetadata::getName)
+                      .collect(toImmutableSet())),
+              buildApksResult.getPermanentlyFusedModulesList().stream()
+                  .map(PermanentlyFusedModule::getName)
                   .collect(toImmutableSet()));
       Set<String> unknownModules = Sets.difference(requestedModuleNames.get(), availableModules);
       if (!unknownModules.isEmpty()) {

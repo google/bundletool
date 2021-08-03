@@ -102,7 +102,7 @@ public class GetSizeCsvUtilsTest {
                             .setScreenDensity("480")
                             .setLocale("en,fr")
                             .setTextureCompressionFormat("ASTC,ETC2")
-                            .setDeviceTier("low")
+                            .setDeviceTier(1)
                             .build(),
                         1L),
                     ImmutableMap.of(
@@ -112,7 +112,7 @@ public class GetSizeCsvUtilsTest {
                             .setScreenDensity("480")
                             .setLocale("en,fr")
                             .setTextureCompressionFormat("ASTC,ETC2")
-                            .setDeviceTier("low")
+                            .setDeviceTier(1)
                             .build(),
                         6L)),
                 ImmutableSet.of(
@@ -121,7 +121,7 @@ public class GetSizeCsvUtilsTest {
         .isEqualTo(
             "SDK,ABI,SCREEN_DENSITY,LANGUAGE,TEXTURE_COMPRESSION_FORMAT,DEVICE_TIER,MIN,MAX"
                 + CRLF
-                + "22,\"x86,armeabi-v7a\",480,\"en,fr\",\"ASTC,ETC2\",low,1,6"
+                + "22,\"x86,armeabi-v7a\",480,\"en,fr\",\"ASTC,ETC2\",1,1,6"
                 + CRLF);
   }
 }

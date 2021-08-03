@@ -18,6 +18,7 @@ package com.android.tools.build.bundletool.testing;
 
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.truth.Truth.assertThat;
+import static com.google.common.truth.extensions.proto.ProtoTruth.assertThat;
 
 import com.android.bundle.Targeting.AbiTargeting;
 import com.android.bundle.Targeting.ApkTargeting;
@@ -60,7 +61,7 @@ public class ProtoFuzzerTest {
   public void randomProtoMessage_messageFieldPopulated() {
     ApkTargeting randomProto = ProtoFuzzer.randomProtoMessage(ApkTargeting.class);
 
-    assertThat(randomProto.getAbiTargeting()).isNotEqualTo(ApkTargeting.getDefaultInstance());
+    assertThat(randomProto.getAbiTargeting()).isNotEqualToDefaultInstance();
   }
 
   @Test

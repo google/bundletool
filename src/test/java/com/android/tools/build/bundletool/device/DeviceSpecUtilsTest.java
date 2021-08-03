@@ -168,11 +168,10 @@ public class DeviceSpecUtilsTest {
     DeviceSpec deviceSpec =
         new DeviceSpecFromTargetingBuilder(DeviceSpec.getDefaultInstance())
             .setDeviceTier(
-                deviceTierTargeting(
-                    /* value= */ "high", /* alternatives= */ ImmutableList.of("low")))
+                deviceTierTargeting(/* value= */ 2, /* alternatives= */ ImmutableList.of(1)))
             .build();
 
-    assertThat(deviceSpec.getDeviceTier()).isEqualTo("high");
+    assertThat(deviceSpec.getDeviceTier().getValue()).isEqualTo(2);
   }
 
   @Test

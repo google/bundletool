@@ -29,6 +29,7 @@ import static com.android.tools.build.bundletool.model.utils.TargetingProtoUtils
 import static com.android.tools.build.bundletool.model.utils.TargetingProtoUtils.textureCompressionFormatUniverse;
 import static com.android.tools.build.bundletool.model.utils.TargetingProtoUtils.textureCompressionFormatValues;
 import static com.google.common.base.Preconditions.checkNotNull;
+import static com.google.common.collect.ImmutableList.toImmutableList;
 
 import com.android.bundle.Files.TargetedAssetsDirectory;
 import com.android.bundle.Targeting.Abi;
@@ -44,6 +45,7 @@ import com.android.bundle.Targeting.TextureCompressionFormat;
 import com.android.bundle.Targeting.TextureCompressionFormatTargeting;
 import com.android.tools.build.bundletool.model.exceptions.CommandExecutionException;
 import com.google.common.collect.Sets;
+import com.google.protobuf.Int32Value;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -215,12 +217,13 @@ final class MergingUtils {
 
   private static DeviceTierTargeting mergeDeviceTierTargetingsOf(
       ApkTargeting targeting1, ApkTargeting targeting2) {
-    Set<String> universe =
+    Set<Integer> universe =
         Sets.union(deviceTierUniverse(targeting1), deviceTierUniverse(targeting2));
-    Set<String> values = Sets.union(deviceTierValues(targeting1), deviceTierValues(targeting2));
+    Set<Integer> values = Sets.union(deviceTierValues(targeting1), deviceTierValues(targeting2));
+    Set<Integer> alternatives = Sets.difference(universe, values);
     return DeviceTierTargeting.newBuilder()
-        .addAllValue(values)
-        .addAllAlternatives(Sets.difference(universe, values))
+        .addAllValue(values.stream().map(Int32Value::of).collect(toImmutableList()))
+        .addAllAlternatives(alternatives.stream().map(Int32Value::of).collect(toImmutableList()))
         .build();
   }
 

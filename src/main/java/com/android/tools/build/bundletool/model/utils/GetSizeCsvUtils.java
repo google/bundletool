@@ -92,7 +92,9 @@ public final class GetSizeCsvUtils {
             .put(
                 Dimension.TEXTURE_COMPRESSION_FORMAT,
                 sizeConfiguration::getTextureCompressionFormat)
-            .put(Dimension.DEVICE_TIER, sizeConfiguration::getDeviceTier)
+            .put(
+                Dimension.DEVICE_TIER,
+                () -> sizeConfiguration.getDeviceTier().map(i -> i.toString()))
             .build();
 
     return Stream.concat(

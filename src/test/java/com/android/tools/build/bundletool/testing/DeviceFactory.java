@@ -23,6 +23,7 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 import com.android.bundle.Devices.DeviceSpec;
 import com.android.bundle.Targeting.ScreenDensity.DensityAlias;
 import com.android.tools.build.bundletool.model.utils.Versions;
+import com.google.protobuf.Int32Value;
 import com.google.protobuf.util.JsonFormat;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -137,8 +138,8 @@ public final class DeviceFactory {
     return DeviceSpec.newBuilder().addAllGlExtensions(Arrays.asList(glExtensions)).build();
   }
 
-  public static DeviceSpec deviceTier(String deviceTier) {
-    return DeviceSpec.newBuilder().setDeviceTier(deviceTier).build();
+  public static DeviceSpec deviceTier(int deviceTier) {
+    return DeviceSpec.newBuilder().setDeviceTier(Int32Value.of(deviceTier)).build();
   }
 
   public static DeviceSpec deviceGroups(String... deviceGroups) {

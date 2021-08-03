@@ -17,6 +17,7 @@
 package com.android.tools.build.bundletool.model.utils;
 
 import static com.android.tools.build.bundletool.model.utils.Versions.ANDROID_L_API_VERSION;
+import static com.google.common.collect.ImmutableSet.toImmutableSet;
 import static com.google.common.collect.MoreCollectors.onlyElement;
 
 import com.android.bundle.Targeting.Abi;
@@ -30,6 +31,7 @@ import com.android.bundle.Targeting.SdkVersionTargeting;
 import com.android.bundle.Targeting.TextureCompressionFormat;
 import com.android.bundle.Targeting.VariantTargeting;
 import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.Streams;
 import com.google.protobuf.Int32Value;
 import java.util.Optional;
 
@@ -159,16 +161,19 @@ public final class TargetingProtoUtils {
   }
 
   /** Extracts Texture Compression Format values from the targeting. */
-  public static ImmutableSet<String> deviceTierValues(ApkTargeting targeting) {
-    return ImmutableSet.copyOf(targeting.getDeviceTierTargeting().getValueList());
+  public static ImmutableSet<Integer> deviceTierValues(ApkTargeting targeting) {
+    return targeting.getDeviceTierTargeting().getValueList().stream()
+        .map(Int32Value::getValue)
+        .collect(toImmutableSet());
   }
 
   /** Extracts targeted Device Tier universe (values and alternatives) from the targeting. */
-  public static ImmutableSet<String> deviceTierUniverse(ApkTargeting targeting) {
-    return ImmutableSet.<String>builder()
-        .addAll(targeting.getDeviceTierTargeting().getValueList())
-        .addAll(targeting.getDeviceTierTargeting().getAlternativesList())
-        .build();
+  public static ImmutableSet<Integer> deviceTierUniverse(ApkTargeting targeting) {
+    return Streams.concat(
+            targeting.getDeviceTierTargeting().getValueList().stream(),
+            targeting.getDeviceTierTargeting().getAlternativesList().stream())
+        .map(Int32Value::getValue)
+        .collect(toImmutableSet());
   }
 
   public static SdkVersion sdkVersionFrom(int from) {

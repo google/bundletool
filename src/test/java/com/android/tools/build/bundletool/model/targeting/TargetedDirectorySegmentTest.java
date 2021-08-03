@@ -177,18 +177,28 @@ public class TargetedDirectorySegmentTest {
 
   @Test
   public void testTargeting_deviceTier() {
-    TargetedDirectorySegment segment = TargetedDirectorySegment.parse("test#tier_low");
+    TargetedDirectorySegment segment = TargetedDirectorySegment.parse("test#tier_1");
     assertThat(segment.getName()).isEqualTo("test");
     assertThat(segment.getTargetingDimension()).hasValue(TargetingDimension.DEVICE_TIER);
-    assertThat(segment.getTargeting())
-        .isEqualTo(assetsDirectoryTargeting(deviceTierTargeting("low")));
+    assertThat(segment.getTargeting()).isEqualTo(assetsDirectoryTargeting(deviceTierTargeting(1)));
   }
 
   @Test
-  public void testTargeting_deviceTier_invalidTierName() {
+  public void testTargeting_deviceTier_invalidTierName_notNumerical() {
     assertThrows(
-        InvalidBundleException.class,
-        () -> TargetedDirectorySegment.parse("test#tier_invalid+tier(name"));
+        InvalidBundleException.class, () -> TargetedDirectorySegment.parse("test#tier_invalid"));
+  }
+
+  @Test
+  public void testTargeting_deviceTier_invalidTierName_negativeNumber() {
+    assertThrows(
+        InvalidBundleException.class, () -> TargetedDirectorySegment.parse("test#tier_-1"));
+  }
+
+  @Test
+  public void testTargeting_deviceTier_invalidTierName_notAnInt() {
+    assertThrows(
+        InvalidBundleException.class, () -> TargetedDirectorySegment.parse("test#tier_1.5"));
   }
 
   @Test
@@ -274,13 +284,13 @@ public class TargetedDirectorySegmentTest {
 
   @Test
   public void testTargeting_deviceTier_toPathIdempotent() {
-    TargetedDirectorySegment segment = TargetedDirectorySegment.parse("test#tier_high");
-    assertThat(segment.toPathSegment()).isEqualTo("test#tier_high");
+    TargetedDirectorySegment segment = TargetedDirectorySegment.parse("test#tier_2");
+    assertThat(segment.toPathSegment()).isEqualTo("test#tier_2");
 
-    segment = TargetedDirectorySegment.parse("test#tier_medium");
-    assertThat(segment.toPathSegment()).isEqualTo("test#tier_medium");
+    segment = TargetedDirectorySegment.parse("test#tier_1");
+    assertThat(segment.toPathSegment()).isEqualTo("test#tier_1");
 
-    segment = TargetedDirectorySegment.parse("test#tier_low");
-    assertThat(segment.toPathSegment()).isEqualTo("test#tier_low");
+    segment = TargetedDirectorySegment.parse("test#tier_0");
+    assertThat(segment.toPathSegment()).isEqualTo("test#tier_0");
   }
 }

@@ -19,6 +19,7 @@ package com.android.tools.build.bundletool.mergers;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifest;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifestForAssetModule;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifestForFeature;
+import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifestForMlModule;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withFeatureCondition;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withInstallTimeDelivery;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withInstallTimeRemovableElement;
@@ -265,6 +266,30 @@ public class BundleModuleMergerTest {
       assertThat(appBundle.getFeatureModules().keySet())
           .comparingElementsUsing(equalsBundleModuleName())
           .containsExactly("base");
+    }
+  }
+
+  @Test
+  public void testMultipleModulesWithInstallTime_notMergingMlModules() throws Exception {
+    XmlNode installTimeModuleManifest =
+        androidManifestForMlModule("com.test.app.detail", withInstallTimeDelivery());
+    createBasicZipBuilder(BUNDLE_CONFIG_1_0_0)
+        .addFileWithProtoContent(ZipPath.create("base/manifest/AndroidManifest.xml"), MANIFEST)
+        .addFileWithContent(ZipPath.create("base/dex/classes.dex"), DUMMY_CONTENT)
+        .addFileWithContent(ZipPath.create("base/assets/baseAssetfile.txt"), DUMMY_CONTENT)
+        .addFileWithProtoContent(
+            ZipPath.create("detail/manifest/AndroidManifest.xml"), installTimeModuleManifest)
+        .addFileWithContent(ZipPath.create("detail/assets/detailsAssetfile.txt"), DUMMY_CONTENT)
+        .writeTo(bundleFile);
+
+    try (ZipFile appBundleZip = new ZipFile(bundleFile.toFile())) {
+      AppBundle appBundle =
+          BundleModuleMerger.mergeNonRemovableInstallTimeModules(
+              AppBundle.buildFromZip(appBundleZip), /* overrideBundleToolVersion = */ false);
+
+      assertThat(appBundle.getFeatureModules().keySet())
+          .comparingElementsUsing(equalsBundleModuleName())
+          .containsExactly("base", "detail");
     }
   }
 

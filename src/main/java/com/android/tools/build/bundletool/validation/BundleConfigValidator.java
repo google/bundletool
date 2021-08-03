@@ -15,16 +15,12 @@
  */
 package com.android.tools.build.bundletool.validation;
 
-import static com.android.tools.build.bundletool.model.targeting.TargetingUtils.containsDeviceTierTargeting;
-import static com.android.tools.build.bundletool.model.targeting.TargetingUtils.extractAssetsTargetedDirectories;
 import static com.google.common.collect.ImmutableSet.toImmutableSet;
 import static java.util.stream.Collectors.joining;
 
 import com.android.bundle.Config.BundleConfig;
 import com.android.bundle.Config.Compression;
 import com.android.bundle.Config.Optimizations;
-import com.android.bundle.Config.ResourceOptimizations;
-import com.android.bundle.Config.ResourceOptimizations.SparseEncoding;
 import com.android.bundle.Config.SplitDimension;
 import com.android.bundle.Config.SplitDimension.Value;
 import com.android.tools.build.bundletool.model.AppBundle;
@@ -36,7 +32,6 @@ import com.android.tools.build.bundletool.model.utils.PathMatcher;
 import com.android.tools.build.bundletool.model.utils.PathMatcher.GlobPatternSyntaxException;
 import com.android.tools.build.bundletool.model.utils.ResourcesUtils;
 import com.android.tools.build.bundletool.model.utils.TextureCompressionUtils;
-import com.android.tools.build.bundletool.model.utils.Versions;
 import com.android.tools.build.bundletool.model.version.BundleToolVersion;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Sets;
@@ -62,9 +57,8 @@ public final class BundleConfigValidator extends SubValidator {
 
     validateVersion(bundleConfig);
     validateCompression(bundleConfig.getCompression());
-    validateOptimizations(bundleConfig.getOptimizations(), bundle);
+    validateOptimizations(bundleConfig.getOptimizations());
     validateMasterResources(bundleConfig, bundle);
-    validateDefaultDeviceTier(bundleConfig, bundle);
   }
 
   private void validateCompression(Compression compression) {
@@ -86,9 +80,8 @@ public final class BundleConfigValidator extends SubValidator {
     }
   }
 
-  private void validateOptimizations(Optimizations optimizations, AppBundle bundle) {
+  private void validateOptimizations(Optimizations optimizations) {
     validateSplitDimensions(optimizations.getSplitsConfig().getSplitDimensionList());
-    validateResourceOptimizations(optimizations.getResourceOptimizations(), bundle);
   }
 
   private void validateSplitDimensions(List<SplitDimension> splitDimensions) {
@@ -150,22 +143,6 @@ public final class BundleConfigValidator extends SubValidator {
             });
   }
 
-  private void validateResourceOptimizations(
-      ResourceOptimizations resourceOptimizations, AppBundle bundle) {
-    if (bundle.isAssetOnly()) {
-      return;
-    }
-    int minSdk = bundle.getBaseModule().getAndroidManifest().getEffectiveMinSdkVersion();
-    if (resourceOptimizations.getSparseEncoding().equals(SparseEncoding.ENFORCED)
-        && minSdk < Versions.ANDROID_O_API_VERSION) {
-      throw InvalidBundleException.builder()
-          .withUserMessage(
-              "Sparse encoding is available for applications with minSdk >= %d.",
-              Versions.ANDROID_O_API_VERSION)
-          .build();
-    }
-  }
-
   private void validateVersion(BundleConfig bundleConfig) {
     try {
       BundleToolVersion.getVersionFromBundleConfig(bundleConfig);
@@ -204,29 +181,5 @@ public final class BundleConfigValidator extends SubValidator {
               undefinedResources.iterator().next())
           .build();
     }
-  }
-
-  private static void validateDefaultDeviceTier(BundleConfig bundleConfig, AppBundle bundle) {
-    boolean defaultDeviceTierSpecified =
-        bundleConfig.getOptimizations().getSplitsConfig().getSplitDimensionList().stream()
-            .filter(splitDimension -> splitDimension.getValue().equals(Value.DEVICE_TIER))
-            .map(splitDimension -> splitDimension.getSuffixStripping().getDefaultSuffix())
-            .anyMatch(suffix -> !suffix.isEmpty());
-    bundle
-        .getModules()
-        .values()
-        .forEach(
-            module -> {
-              boolean containsDeviceTierTargetedAssets =
-                  containsDeviceTierTargeting(extractAssetsTargetedDirectories(module));
-              if (containsDeviceTierTargetedAssets && !defaultDeviceTierSpecified) {
-                throw InvalidBundleException.builder()
-                    .withUserMessage(
-                        "Module '%s' contains assets targeted by device tier but default device"
-                            + " tier value has not been specified for the bundle.",
-                        module.getName())
-                    .build();
-              }
-            });
   }
 }

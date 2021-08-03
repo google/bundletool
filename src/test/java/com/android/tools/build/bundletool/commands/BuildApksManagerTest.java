@@ -137,6 +137,7 @@ import com.android.bundle.Commands.DefaultTargetingValue;
 import com.android.bundle.Commands.DeliveryType;
 import com.android.bundle.Commands.InstantMetadata;
 import com.android.bundle.Commands.ModuleMetadata;
+import com.android.bundle.Commands.PermanentlyFusedModule;
 import com.android.bundle.Commands.SplitApkMetadata;
 import com.android.bundle.Commands.StandaloneApkMetadata;
 import com.android.bundle.Commands.SystemApkMetadata;
@@ -3129,16 +3130,16 @@ public class BuildApksManagerTest {
                 "device_tier_assets",
                 builder ->
                     builder
-                        .addFile("assets/img#tier_low/asset_low.dat")
-                        .addFile("assets/img#tier_high/asset_high.dat")
+                        .addFile("assets/img#tier_0/asset_low.dat")
+                        .addFile("assets/img#tier_1/asset_high.dat")
                         .setAssetsConfig(
                             assets(
                                 targetedAssetsDirectory(
-                                    "assets/img#tier_low",
-                                    assetsDirectoryTargeting(deviceTierTargeting("low"))),
+                                    "assets/img#tier_0",
+                                    assetsDirectoryTargeting(deviceTierTargeting(0))),
                                 targetedAssetsDirectory(
-                                    "assets/img#tier_high",
-                                    assetsDirectoryTargeting(deviceTierTargeting("high")))))
+                                    "assets/img#tier_1",
+                                    assetsDirectoryTargeting(deviceTierTargeting(1)))))
                         .setManifest(
                             androidManifestForAssetModule(
                                 "com.test.app", withInstallTimeDelivery())))
@@ -3148,7 +3149,7 @@ public class BuildApksManagerTest {
                         Value.DEVICE_TIER,
                         /* negate= */ false,
                         /* stripSuffix= */ true,
-                        /* defaultSuffix= */ "low")
+                        /* defaultSuffix= */ "0")
                     .build())
             .build();
     TestComponent.useTestModule(
@@ -3169,12 +3170,13 @@ public class BuildApksManagerTest {
         new ZipFile(extractFromApkSetFile(apkSetFile, shard.getPath(), outputDir))) {
       assertThat(shardZip).hasFile("assets/img/asset_low.dat");
       assertThat(shardZip).doesNotHaveFile("assets/img/asset_high.dat");
-      assertThat(shardZip).doesNotHaveFile("assets/img#tier_low/asset_low.dat");
-      assertThat(shardZip).doesNotHaveFile("assets/img#tier_high/asset_high.dat");
+      assertThat(shardZip).doesNotHaveFile("assets/img#tier_0/asset_low.dat");
+      assertThat(shardZip).doesNotHaveFile("assets/img#tier_1/asset_high.dat");
     }
 
     // Check that default device tier targeting was applied to the APK
-    assertThat(shard.getTargeting().getDeviceTierTargeting().getValueList()).containsExactly("low");
+    assertThat(shard.getTargeting().getDeviceTierTargeting().getValueList())
+        .containsExactly(Int32Value.of(0));
   }
 
   @Test
@@ -3825,6 +3827,8 @@ public class BuildApksManagerTest {
     BuildApksResult result = extractTocFromApkSetFile(apkSetFile, outputDir);
     ImmutableList<Variant> splitApkVariants = splitApkVariants(result);
     assertThat(splitApkVariants).isNotEmpty();
+    assertThat(result.getPermanentlyFusedModulesList())
+        .containsExactly(PermanentlyFusedModule.newBuilder().setName("abi_feature").build());
 
     for (Variant splitApkVariant : splitApkVariants(result)) {
       assertThat(splitApkVariant.getApkSetList())
@@ -3873,6 +3877,7 @@ public class BuildApksManagerTest {
     BuildApksResult result = extractTocFromApkSetFile(apkSetFile, outputDir);
     ImmutableList<Variant> splitApkVariants = splitApkVariants(result);
     assertThat(splitApkVariants).isNotEmpty();
+    assertThat(result.getPermanentlyFusedModulesList()).isEmpty();
 
     for (Variant splitApkVariant : splitApkVariants(result)) {
       assertThat(splitApkVariant.getApkSetList())
@@ -4375,30 +4380,30 @@ public class BuildApksManagerTest {
                 "base",
                 builder ->
                     builder
-                        .addFile("assets/images#tier_low/image.jpg")
-                        .addFile("assets/images#tier_medium/image.jpg")
+                        .addFile("assets/images#tier_0/image.jpg")
+                        .addFile("assets/images#tier_1/image.jpg")
                         .setManifest(androidManifest("com.test.app"))
                         .setAssetsConfig(
                             assets(
                                 targetedAssetsDirectory(
-                                    "assets/images#tier_low",
+                                    "assets/images#tier_0",
                                     assetsDirectoryTargeting(
                                         deviceTierTargeting(
-                                            /* value= */ "low",
-                                            /* alternatives= */ ImmutableList.of("medium")))),
+                                            /* value= */ 0,
+                                            /* alternatives= */ ImmutableList.of(1)))),
                                 targetedAssetsDirectory(
-                                    "assets/images#tier_medium",
+                                    "assets/images#tier_1",
                                     assetsDirectoryTargeting(
                                         deviceTierTargeting(
-                                            /* value= */ "medium",
-                                            /* alternatives= */ ImmutableList.of("low")))))))
+                                            /* value= */ 1,
+                                            /* alternatives= */ ImmutableList.of(0)))))))
             .setBundleConfig(
                 BundleConfigBuilder.create()
                     .addSplitDimension(
                         Value.DEVICE_TIER,
                         /* negate= */ false,
                         /* stripSuffix= */ false,
-                        /* defaultSuffix= */ "low")
+                        /* defaultSuffix= */ "0")
                     .build())
             .build();
     TestComponent.useTestModule(
@@ -4415,40 +4420,37 @@ public class BuildApksManagerTest {
     assertThat(splitApkVariants(result)).hasSize(1);
     Variant splitApkVariant = splitApkVariants(result).get(0);
 
-    // Check that apks for "low" and "medium" tiers have been created
+    // Check that apks for tier 0 and 1 have been created
     assertThat(splitApkVariant.getApkSetList()).hasSize(1);
     ImmutableList<ApkDescription> deviceTierSplits =
         splitApks.stream()
             .filter(apkDesc -> apkDesc.getTargeting().hasDeviceTierTargeting())
             .collect(toImmutableList());
     assertThat(apkNamesInApkDescriptions(deviceTierSplits))
-        .containsExactly("base-tier_low.apk", "base-tier_medium.apk");
+        .containsExactly("base-tier_0.apk", "base-tier_1.apk");
 
     // Check the content of the APKs
     ImmutableMap<DeviceTierTargeting, ApkDescription> deviceTierSplitsByTargeting =
         Maps.uniqueIndex(deviceTierSplits, apk -> apk.getTargeting().getDeviceTierTargeting());
     ApkDescription lowTierSplit =
         deviceTierSplitsByTargeting.get(
-            deviceTierTargeting(
-                /* value= */ "low", /* alternatives= */ ImmutableList.of("medium")));
+            deviceTierTargeting(/* value= */ 0, /* alternatives= */ ImmutableList.of(1)));
     assertThat(ZipPath.create(lowTierSplit.getPath()).getFileName().toString())
-        .isEqualTo("base-tier_low.apk");
-    assertThat(filesInApk(lowTierSplit, apkSetFile)).contains("assets/images#tier_low/image.jpg");
+        .isEqualTo("base-tier_0.apk");
+    assertThat(filesInApk(lowTierSplit, apkSetFile)).contains("assets/images#tier_0/image.jpg");
 
     ApkDescription mediumTierSplit =
         deviceTierSplitsByTargeting.get(
-            deviceTierTargeting(
-                /* value= */ "medium", /* alternatives= */ ImmutableList.of("low")));
+            deviceTierTargeting(/* value= */ 1, /* alternatives= */ ImmutableList.of(0)));
     assertThat(ZipPath.create(mediumTierSplit.getPath()).getFileName().toString())
-        .isEqualTo("base-tier_medium.apk");
-    assertThat(filesInApk(mediumTierSplit, apkSetFile))
-        .contains("assets/images#tier_medium/image.jpg");
+        .isEqualTo("base-tier_1.apk");
+    assertThat(filesInApk(mediumTierSplit, apkSetFile)).contains("assets/images#tier_1/image.jpg");
 
     assertThat(result.getDefaultTargetingValueList())
         .containsExactly(
             DefaultTargetingValue.newBuilder()
                 .setDimension(Value.DEVICE_TIER)
-                .setDefaultValue("low")
+                .setDefaultValue("0")
                 .build());
   }
 
@@ -4461,30 +4463,30 @@ public class BuildApksManagerTest {
                 "assetmodule",
                 builder ->
                     builder
-                        .addFile("assets/images#tier_low/image.jpg")
-                        .addFile("assets/images#tier_medium/image.jpg")
+                        .addFile("assets/images#tier_0/image.jpg")
+                        .addFile("assets/images#tier_1/image.jpg")
                         .setManifest(androidManifestForAssetModule("com.test.app"))
                         .setAssetsConfig(
                             assets(
                                 targetedAssetsDirectory(
-                                    "assets/images#tier_low",
+                                    "assets/images#tier_0",
                                     assetsDirectoryTargeting(
                                         deviceTierTargeting(
-                                            /* value= */ "low",
-                                            /* alternatives= */ ImmutableList.of("medium")))),
+                                            /* value= */ 0,
+                                            /* alternatives= */ ImmutableList.of(1)))),
                                 targetedAssetsDirectory(
-                                    "assets/images#tier_medium",
+                                    "assets/images#tier_1",
                                     assetsDirectoryTargeting(
                                         deviceTierTargeting(
-                                            /* value= */ "medium",
-                                            /* alternatives= */ ImmutableList.of("low")))))))
+                                            /* value= */ 1,
+                                            /* alternatives= */ ImmutableList.of(0)))))))
             .setBundleConfig(
                 BundleConfigBuilder.create()
                     .addSplitDimension(
                         Value.DEVICE_TIER,
                         /* negate= */ false,
                         /* stripSuffix= */ false,
-                        /* defaultSuffix= */ "low")
+                        /* defaultSuffix= */ "0")
                     .build())
             .build();
     TestComponent.useTestModule(
@@ -4498,13 +4500,13 @@ public class BuildApksManagerTest {
     assertThat(result.getAssetSliceSetList()).hasSize(1);
     List<ApkDescription> assetSlices = result.getAssetSliceSet(0).getApkDescriptionList();
 
-    // Check that apks for "low" and "medium" tiers have been created
+    // Check that apks for tier 0 and 1 have been created
     ImmutableList<ApkDescription> deviceTierSplits =
         assetSlices.stream()
             .filter(apkDesc -> apkDesc.getTargeting().hasDeviceTierTargeting())
             .collect(toImmutableList());
     assertThat(apkNamesInApkDescriptions(deviceTierSplits))
-        .containsExactly("assetmodule-tier_low.apk", "assetmodule-tier_medium.apk");
+        .containsExactly("assetmodule-tier_0.apk", "assetmodule-tier_1.apk");
 
     // Check the content of the APKs
     ImmutableMap<DeviceTierTargeting, ApkDescription> deviceTierSplitsByTargeting =
@@ -4512,20 +4514,17 @@ public class BuildApksManagerTest {
 
     ApkDescription lowTierSplit =
         deviceTierSplitsByTargeting.get(
-            deviceTierTargeting(
-                /* value= */ "low", /* alternatives= */ ImmutableList.of("medium")));
+            deviceTierTargeting(/* value= */ 0, /* alternatives= */ ImmutableList.of(1)));
     assertThat(ZipPath.create(lowTierSplit.getPath()).getFileName().toString())
-        .isEqualTo("assetmodule-tier_low.apk");
-    assertThat(filesInApk(lowTierSplit, apkSetFile)).contains("assets/images#tier_low/image.jpg");
+        .isEqualTo("assetmodule-tier_0.apk");
+    assertThat(filesInApk(lowTierSplit, apkSetFile)).contains("assets/images#tier_0/image.jpg");
 
     ApkDescription mediumTierSplit =
         deviceTierSplitsByTargeting.get(
-            deviceTierTargeting(
-                /* value= */ "medium", /* alternatives= */ ImmutableList.of("low")));
+            deviceTierTargeting(/* value= */ 1, /* alternatives= */ ImmutableList.of(0)));
     assertThat(ZipPath.create(mediumTierSplit.getPath()).getFileName().toString())
-        .isEqualTo("assetmodule-tier_medium.apk");
-    assertThat(filesInApk(mediumTierSplit, apkSetFile))
-        .contains("assets/images#tier_medium/image.jpg");
+        .isEqualTo("assetmodule-tier_1.apk");
+    assertThat(filesInApk(mediumTierSplit, apkSetFile)).contains("assets/images#tier_1/image.jpg");
   }
 
   @Test
@@ -4536,30 +4535,30 @@ public class BuildApksManagerTest {
                 "base",
                 builder ->
                     builder
-                        .addFile("assets/images#tier_low/image.jpg")
-                        .addFile("assets/images#tier_medium/image.jpg")
+                        .addFile("assets/images#tier_0/image.jpg")
+                        .addFile("assets/images#tier_1/image.jpg")
                         .setManifest(androidManifest("com.test.app"))
                         .setAssetsConfig(
                             assets(
                                 targetedAssetsDirectory(
-                                    "assets/images#tier_low",
+                                    "assets/images#tier_0",
                                     assetsDirectoryTargeting(
                                         deviceTierTargeting(
-                                            /* value= */ "low",
-                                            /* alternatives= */ ImmutableList.of("medium")))),
+                                            /* value= */ 0,
+                                            /* alternatives= */ ImmutableList.of(1)))),
                                 targetedAssetsDirectory(
-                                    "assets/images#tier_medium",
+                                    "assets/images#tier_1",
                                     assetsDirectoryTargeting(
                                         deviceTierTargeting(
-                                            /* value= */ "medium",
-                                            /* alternatives= */ ImmutableList.of("low")))))))
+                                            /* value= */ 1,
+                                            /* alternatives= */ ImmutableList.of(0)))))))
             .setBundleConfig(
                 BundleConfigBuilder.create()
                     .addSplitDimension(
                         Value.DEVICE_TIER,
                         /* negate= */ false,
                         /* stripSuffix= */ false,
-                        /* defaultSuffix= */ "low")
+                        /* defaultSuffix= */ "0")
                     .build())
             .build();
     TestComponent.useTestModule(
@@ -4573,7 +4572,7 @@ public class BuildApksManagerTest {
                     abis("x86"),
                     density(DensityAlias.MDPI),
                     locales("en-US"),
-                    deviceTier("medium")))
+                    deviceTier(1)))
             .build());
 
     buildApksManager.execute();
@@ -4584,12 +4583,12 @@ public class BuildApksManagerTest {
     ImmutableList<Variant> splitApkVariants = splitApkVariants(result);
     ImmutableList<ApkDescription> splitApks = apkDescriptions(splitApkVariants);
 
-    // Check that only an APK for "low" tier has been created, not for "medium"
+    // Check that only an APK for tier 1 has been created, not for 0
     ImmutableList<ApkDescription> deviceTierSplits =
         splitApks.stream()
             .filter(apkDesc -> apkDesc.getTargeting().hasDeviceTierTargeting())
             .collect(toImmutableList());
-    assertThat(apkNamesInApkDescriptions(deviceTierSplits)).containsExactly("base-tier_medium.apk");
+    assertThat(apkNamesInApkDescriptions(deviceTierSplits)).containsExactly("base-tier_1.apk");
 
     // Check the content of the APK
     ImmutableMap<DeviceTierTargeting, ApkDescription> deviceTierSplitsByTargeting =
@@ -4597,10 +4596,8 @@ public class BuildApksManagerTest {
 
     ApkDescription mediumTierSplit =
         deviceTierSplitsByTargeting.get(
-            deviceTierTargeting(
-                /* value= */ "medium", /* alternatives= */ ImmutableList.of("low")));
-    assertThat(filesInApk(mediumTierSplit, apkSetFile))
-        .contains("assets/images#tier_medium/image.jpg");
+            deviceTierTargeting(/* value= */ 1, /* alternatives= */ ImmutableList.of(0)));
+    assertThat(filesInApk(mediumTierSplit, apkSetFile)).contains("assets/images#tier_1/image.jpg");
   }
 
   @Test
@@ -4611,30 +4608,30 @@ public class BuildApksManagerTest {
                 "base",
                 builder ->
                     builder
-                        .addFile("assets/images#tier_low/image.jpg")
-                        .addFile("assets/images#tier_medium/image.jpg")
+                        .addFile("assets/images#tier_0/image.jpg")
+                        .addFile("assets/images#tier_1/image.jpg")
                         .setManifest(androidManifest("com.test.app"))
                         .setAssetsConfig(
                             assets(
                                 targetedAssetsDirectory(
-                                    "assets/images#tier_low",
+                                    "assets/images#tier_0",
                                     assetsDirectoryTargeting(
                                         deviceTierTargeting(
-                                            /* value= */ "low",
-                                            /* alternatives= */ ImmutableList.of("medium")))),
+                                            /* value= */ 0,
+                                            /* alternatives= */ ImmutableList.of(1)))),
                                 targetedAssetsDirectory(
-                                    "assets/images#tier_medium",
+                                    "assets/images#tier_1",
                                     assetsDirectoryTargeting(
                                         deviceTierTargeting(
-                                            /* value= */ "medium",
-                                            /* alternatives= */ ImmutableList.of("low")))))))
+                                            /* value= */ 1,
+                                            /* alternatives= */ ImmutableList.of(0)))))))
             .setBundleConfig(
                 BundleConfigBuilder.create()
                     .addSplitDimension(
                         Value.DEVICE_TIER,
                         /* negate= */ false,
                         /* stripSuffix= */ false,
-                        /* defaultSuffix= */ "low")
+                        /* defaultSuffix= */ "0")
                     .build())
             .build();
     TestComponent.useTestModule(
@@ -4655,12 +4652,12 @@ public class BuildApksManagerTest {
     ImmutableList<Variant> splitApkVariants = splitApkVariants(result);
     ImmutableList<ApkDescription> splitApks = apkDescriptions(splitApkVariants);
 
-    // Check that only an APK for "low" tier has been created, not for "medium"
+    // Check that only an APK for tier 0 has been created, not for 1
     ImmutableList<ApkDescription> deviceTierSplits =
         splitApks.stream()
             .filter(apkDesc -> apkDesc.getTargeting().hasDeviceTierTargeting())
             .collect(toImmutableList());
-    assertThat(apkNamesInApkDescriptions(deviceTierSplits)).containsExactly("base-tier_low.apk");
+    assertThat(apkNamesInApkDescriptions(deviceTierSplits)).containsExactly("base-tier_0.apk");
 
     // Check the content of the APK
     ImmutableMap<DeviceTierTargeting, ApkDescription> deviceTierSplitsByTargeting =
@@ -4668,9 +4665,8 @@ public class BuildApksManagerTest {
 
     ApkDescription lowTierSplit =
         deviceTierSplitsByTargeting.get(
-            deviceTierTargeting(
-                /* value= */ "low", /* alternatives= */ ImmutableList.of("medium")));
-    assertThat(filesInApk(lowTierSplit, apkSetFile)).contains("assets/images#tier_low/image.jpg");
+            deviceTierTargeting(/* value= */ 0, /* alternatives= */ ImmutableList.of(1)));
+    assertThat(filesInApk(lowTierSplit, apkSetFile)).contains("assets/images#tier_0/image.jpg");
   }
 
   @Test

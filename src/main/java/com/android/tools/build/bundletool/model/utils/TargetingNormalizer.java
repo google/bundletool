@@ -37,6 +37,8 @@ import com.android.bundle.Targeting.TextureCompressionFormat;
 import com.android.bundle.Targeting.TextureCompressionFormatTargeting;
 import com.android.bundle.Targeting.VariantTargeting;
 import com.google.common.collect.ImmutableList;
+import com.google.protobuf.Int32Value;
+import java.util.Collection;
 import java.util.Comparator;
 
 /** Helpers related to APK resources qualifiers. */
@@ -191,9 +193,17 @@ public final class TargetingNormalizer {
 
   private static DeviceTierTargeting normalizeDeviceTierTargeting(DeviceTierTargeting targeting) {
     return DeviceTierTargeting.newBuilder()
-        .addAllValue(ImmutableList.sortedCopyOf(targeting.getValueList()))
-        .addAllAlternatives(ImmutableList.sortedCopyOf(targeting.getAlternativesList()))
+        .addAllValue(sortInt32Values(targeting.getValueList()))
+        .addAllAlternatives(sortInt32Values(targeting.getAlternativesList()))
         .build();
+  }
+
+  private static ImmutableList<Int32Value> sortInt32Values(Collection<Int32Value> values) {
+    return values.stream()
+        .map(Int32Value::getValue)
+        .sorted()
+        .map(Int32Value::of)
+        .collect(toImmutableList());
   }
 
   private TargetingNormalizer() {}

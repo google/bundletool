@@ -30,6 +30,10 @@ message BuildApksResult {
   // Default values for targeting dimensions, as specified in the BundleConfig.
   // Only set for dimensions that have a default suffix specified.
   repeated DefaultTargetingValue default_targeting_value = 7;
+
+  // Information about permanently fused install-time modules, which were
+  // presented in original bundle but fused into base in all variants.
+  repeated PermanentlyFusedModule permanently_fused_modules = 8;
 }
 
 // Variant is a group of APKs that covers a part of the device configuration
@@ -238,4 +242,9 @@ message DefaultTargetingValue {
 
   // The default value being targeted.
   string default_value = 2;
+}
+
+message PermanentlyFusedModule {
+  // Module name.
+  string name = 1;
 }

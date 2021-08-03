@@ -31,6 +31,7 @@ import com.android.bundle.Files.NativeLibraries;
 import com.android.tools.build.bundletool.model.AndroidManifest;
 import com.android.tools.build.bundletool.model.AppBundle;
 import com.android.tools.build.bundletool.model.BundleModule;
+import com.android.tools.build.bundletool.model.BundleModule.ModuleType;
 import com.android.tools.build.bundletool.model.BundleModuleName;
 import com.android.tools.build.bundletool.model.ModuleEntry;
 import com.android.tools.build.bundletool.model.ZipPath;
@@ -103,6 +104,10 @@ public class BundleModuleMerger {
 
   private static boolean shouldMerge(
       BundleModule module, BundleConfig bundleConfig, boolean overrideBundleToolVersion) {
+    if (module.getModuleType() != ModuleType.FEATURE_MODULE) {
+      return false;
+    }
+
     return module
         .getAndroidManifest()
         .getManifestDeliveryElement()

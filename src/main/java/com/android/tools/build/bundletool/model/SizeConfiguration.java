@@ -52,7 +52,7 @@ public abstract class SizeConfiguration {
 
   public abstract Optional<String> getTextureCompressionFormat();
 
-  public abstract Optional<String> getDeviceTier();
+  public abstract Optional<Integer> getDeviceTier();
 
   public abstract Builder toBuilder();
 
@@ -112,11 +112,11 @@ public abstract class SizeConfiguration {
             Iterables.getOnlyElement(textureCompressionFormatTargeting.getValueList()).getAlias()));
   }
 
-  public static Optional<String> getDeviceTierName(DeviceTierTargeting deviceTierTargeting) {
+  public static Optional<Integer> getDeviceTierLevel(DeviceTierTargeting deviceTierTargeting) {
     if (deviceTierTargeting.getValueList().isEmpty()) {
       return Optional.empty();
     }
-    return Optional.of(Iterables.getOnlyElement(deviceTierTargeting.getValueList()));
+    return Optional.of(Iterables.getOnlyElement(deviceTierTargeting.getValueList()).getValue());
   }
 
   /** Builder for the {@link SizeConfiguration}. */
@@ -132,7 +132,7 @@ public abstract class SizeConfiguration {
 
     public abstract Builder setTextureCompressionFormat(String textureCompressionFormat);
 
-    public abstract Builder setDeviceTier(String deviceTier);
+    public abstract Builder setDeviceTier(Integer deviceTier);
 
     public abstract SizeConfiguration build();
   }

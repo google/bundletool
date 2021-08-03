@@ -35,6 +35,7 @@ import com.android.tools.build.bundletool.model.utils.files.FilePreconditions;
 import com.google.auto.value.AutoValue;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.io.MoreFiles;
+import com.google.protobuf.Int32Value;
 import com.google.protobuf.util.JsonFormat;
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -55,7 +56,7 @@ public abstract class GetDeviceSpecCommand {
   private static final Flag<String> DEVICE_ID_FLAG = Flag.string("device-id");
   private static final Flag<Path> OUTPUT_FLAG = Flag.path("output");
   private static final Flag<Boolean> OVERWRITE_OUTPUT_FLAG = Flag.booleanFlag("overwrite");
-  private static final Flag<String> DEVICE_TIER_FLAG = Flag.string("device-tier");
+  private static final Flag<Integer> DEVICE_TIER_FLAG = Flag.nonNegativeInteger("device-tier");
   private static final Flag<ImmutableSet<String>> DEVICE_GROUPS_FLAG =
       Flag.stringSet("device-groups");
 
@@ -74,7 +75,7 @@ public abstract class GetDeviceSpecCommand {
 
   abstract AdbServer getAdbServer();
 
-  public abstract Optional<String> getDeviceTier();
+  public abstract Optional<Integer> getDeviceTier();
 
   public abstract Optional<ImmutableSet<String>> getDeviceGroups();
 
@@ -102,7 +103,7 @@ public abstract class GetDeviceSpecCommand {
     /** The caller is responsible for the lifecycle of the {@link AdbServer}. */
     public abstract Builder setAdbServer(AdbServer adbServer);
 
-    public abstract Builder setDeviceTier(String deviceTier);
+    public abstract Builder setDeviceTier(Integer deviceTier);
 
     public abstract Builder setDeviceGroups(ImmutableSet<String> deviceGroups);
 
@@ -160,7 +161,8 @@ public abstract class GetDeviceSpecCommand {
     adb.init(getAdbPath());
     DeviceSpec deviceSpec = new DeviceAnalyzer(adb).getDeviceSpec(getDeviceId());
     if (getDeviceTier().isPresent()) {
-      deviceSpec = deviceSpec.toBuilder().setDeviceTier(getDeviceTier().get()).build();
+      deviceSpec =
+          deviceSpec.toBuilder().setDeviceTier(Int32Value.of(getDeviceTier().get())).build();
     }
     if (getDeviceGroups().isPresent()) {
       deviceSpec = deviceSpec.toBuilder().addAllDeviceGroups(getDeviceGroups().get()).build();

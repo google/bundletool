@@ -99,6 +99,12 @@ public abstract class Flag<T> {
         name, /* validator= */ n -> n > 0, /* errorMessage= */ "The value must be positive.");
   }
 
+  /** Integer flag holding a single value. */
+  public static Flag<Integer> nonNegativeInteger(String name) {
+    return new IntegerFlag(
+        name, /* validator= */ n -> n >= 0, /* errorMessage= */ "The value must be non-negative.");
+  }
+
   /** String flag holding a single value. */
   public static Flag<String> string(String name) {
     return new StringFlag(name);

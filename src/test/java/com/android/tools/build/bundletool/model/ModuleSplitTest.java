@@ -235,14 +235,12 @@ public class ModuleSplitTest {
         ModuleSplit.builder()
             .setModuleName(BundleModuleName.create("base"))
             .setVariantTargeting(lPlusVariantTargeting())
-            .setApkTargeting(
-                apkDeviceTierTargeting(
-                    deviceTierTargeting("low", ImmutableList.of("medium", "high"))))
+            .setApkTargeting(apkDeviceTierTargeting(deviceTierTargeting(0, ImmutableList.of(1, 2))))
             .setMasterSplit(false)
             .setAndroidManifest(AndroidManifest.create(androidManifest("com.test.app")))
             .build();
     deviceTieredSplit = deviceTieredSplit.writeSplitIdInManifest(deviceTieredSplit.getSuffix());
-    assertThat(deviceTieredSplit.getAndroidManifest().getSplitId()).hasValue("config.tier_low");
+    assertThat(deviceTieredSplit.getAndroidManifest().getSplitId()).hasValue("config.tier_0");
   }
 
   @Test

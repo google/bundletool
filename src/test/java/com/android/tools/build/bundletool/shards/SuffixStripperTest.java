@@ -217,29 +217,25 @@ public class SuffixStripperTest {
             .setMasterSplit(true)
             .setEntries(
                 ImmutableList.of(
+                    createModuleEntryForFile("assets/img#tier_0/low_res_image.dat", DUMMY_CONTENT),
                     createModuleEntryForFile(
-                        "assets/img#tier_low/low_res_image.dat", DUMMY_CONTENT),
-                    createModuleEntryForFile(
-                        "assets/img#tier_high/high_res_image.dat", DUMMY_CONTENT)))
+                        "assets/img#tier_1/high_res_image.dat", DUMMY_CONTENT)))
             .setAssetsConfig(
                 assets(
                     targetedAssetsDirectory(
-                        "assets/img#tier_low",
+                        "assets/img#tier_0",
                         assetsDirectoryTargeting(
-                            deviceTierTargeting(
-                                "low", /* alternatives= */ ImmutableList.of("high")))),
+                            deviceTierTargeting(0, /* alternatives= */ ImmutableList.of(1)))),
                     targetedAssetsDirectory(
-                        "assets/img#tier_high",
+                        "assets/img#tier_1",
                         assetsDirectoryTargeting(
-                            deviceTierTargeting(
-                                "high", /* alternatives= */ ImmutableList.of("low"))))))
+                            deviceTierTargeting(1, /* alternatives= */ ImmutableList.of(0))))))
             .build();
 
     ModuleSplit strippedSplit =
         SuffixStripper.createForDimension(TargetingDimension.DEVICE_TIER)
             .applySuffixStripping(
-                split,
-                SuffixStripping.newBuilder().setDefaultSuffix("low").setEnabled(true).build());
+                split, SuffixStripping.newBuilder().setDefaultSuffix("0").setEnabled(true).build());
 
     // Check that the high tier sibling folder has been excluded
     assertThat(strippedSplit.getEntries()).hasSize(1);
@@ -252,7 +248,7 @@ public class SuffixStripperTest {
 
     // Check that the APK and Variant targeting were applied.
     assertThat(strippedSplit.getApkTargeting())
-        .isEqualTo(apkDeviceTierTargeting(deviceTierTargeting("low")));
+        .isEqualTo(apkDeviceTierTargeting(deviceTierTargeting(0)));
     assertThat(strippedSplit.getVariantTargeting()).isEqualToDefaultInstance();
   }
 
@@ -267,42 +263,39 @@ public class SuffixStripperTest {
             .setMasterSplit(true)
             .setEntries(
                 ImmutableList.of(
+                    createModuleEntryForFile("assets/img#tier_0/low_res_image.dat", DUMMY_CONTENT),
                     createModuleEntryForFile(
-                        "assets/img#tier_low/low_res_image.dat", DUMMY_CONTENT),
-                    createModuleEntryForFile(
-                        "assets/img#tier_high/high_res_image.dat", DUMMY_CONTENT)))
+                        "assets/img#tier_1/high_res_image.dat", DUMMY_CONTENT)))
             .setAssetsConfig(
                 assets(
                     targetedAssetsDirectory(
-                        "assets/img#tier_low",
+                        "assets/img#tier_0",
                         assetsDirectoryTargeting(
-                            deviceTierTargeting(
-                                "low", /* alternatives= */ ImmutableList.of("high")))),
+                            deviceTierTargeting(0, /* alternatives= */ ImmutableList.of(1)))),
                     targetedAssetsDirectory(
-                        "assets/img#tier_high",
+                        "assets/img#tier_1",
                         assetsDirectoryTargeting(
-                            deviceTierTargeting(
-                                "high", /* alternatives= */ ImmutableList.of("low"))))))
+                            deviceTierTargeting(1, /* alternatives= */ ImmutableList.of(0))))))
             .build();
 
     ModuleSplit strippedSplit =
         SuffixStripper.createForDimension(TargetingDimension.DEVICE_TIER)
             .applySuffixStripping(
                 split,
-                SuffixStripping.newBuilder().setDefaultSuffix("low").setEnabled(false).build());
+                SuffixStripping.newBuilder().setDefaultSuffix("0").setEnabled(false).build());
 
     // Check that the high tier sibling folder has been excluded
     assertThat(strippedSplit.getEntries()).hasSize(1);
     assertThat(strippedSplit.getEntries().get(0).getPath())
-        .isEqualTo(ZipPath.create("assets/img#tier_low/low_res_image.dat"));
+        .isEqualTo(ZipPath.create("assets/img#tier_0/low_res_image.dat"));
 
     assertThat(strippedSplit.getAssetsConfig().get().getDirectoryCount()).isEqualTo(1);
     assertThat(strippedSplit.getAssetsConfig().get().getDirectory(0).getPath())
-        .isEqualTo("assets/img#tier_low");
+        .isEqualTo("assets/img#tier_0");
 
     // Check that the APK and Variant targeting were applied.
     assertThat(strippedSplit.getApkTargeting())
-        .isEqualTo(apkDeviceTierTargeting(deviceTierTargeting("low")));
+        .isEqualTo(apkDeviceTierTargeting(deviceTierTargeting(0)));
     assertThat(strippedSplit.getVariantTargeting()).isEqualToDefaultInstance();
   }
 

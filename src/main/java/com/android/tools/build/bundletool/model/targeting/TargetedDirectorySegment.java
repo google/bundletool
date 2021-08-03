@@ -31,6 +31,7 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSetMultimap;
 import com.google.common.collect.Iterables;
 import com.google.errorprone.annotations.Immutable;
+import com.google.protobuf.Int32Value;
 import java.util.Collection;
 import java.util.Optional;
 import java.util.regex.Matcher;
@@ -186,7 +187,9 @@ public abstract class TargetedDirectorySegment {
                   .getAlias(),
               null));
     } else if (targeting.hasDeviceTier()) {
-      return Optional.of(Iterables.getOnlyElement(targeting.getDeviceTier().getValueList()));
+      return Optional.of(
+          Integer.toString(
+              Iterables.getOnlyElement(targeting.getDeviceTier().getValueList()).getValue()));
     }
 
     return Optional.empty();
@@ -246,7 +249,8 @@ public abstract class TargetedDirectorySegment {
   private static AssetsDirectoryTargeting parseDeviceTier(String name, String value) {
     DeviceTargetingUtils.validateDeviceTierForAssetsDirectory(name, value);
     return AssetsDirectoryTargeting.newBuilder()
-        .setDeviceTier(DeviceTierTargeting.newBuilder().addValue(value))
+        .setDeviceTier(
+            DeviceTierTargeting.newBuilder().addValue(Int32Value.of(Integer.parseInt(value))))
         .build();
   }
 }

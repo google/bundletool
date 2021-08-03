@@ -25,7 +25,7 @@ import static com.android.bundle.Targeting.TextureCompressionFormat.TextureCompr
 import static com.android.bundle.Targeting.TextureCompressionFormat.TextureCompressionFormatAlias.ETC2;
 import static com.android.bundle.Targeting.TextureCompressionFormat.TextureCompressionFormatAlias.PVRTC;
 import static com.android.tools.build.bundletool.model.SizeConfiguration.getAbiName;
-import static com.android.tools.build.bundletool.model.SizeConfiguration.getDeviceTierName;
+import static com.android.tools.build.bundletool.model.SizeConfiguration.getDeviceTierLevel;
 import static com.android.tools.build.bundletool.model.SizeConfiguration.getLocaleName;
 import static com.android.tools.build.bundletool.model.SizeConfiguration.getScreenDensityName;
 import static com.android.tools.build.bundletool.model.SizeConfiguration.getSdkName;
@@ -151,11 +151,10 @@ public class SizeConfigurationTest {
 
   @Test
   public void getDeviceTier_singleDevicetierTargeting() {
-    assertThat(getDeviceTierName(deviceTierTargeting("low"))).hasValue("low");
+    assertThat(getDeviceTierLevel(deviceTierTargeting(0))).hasValue(0);
     assertThat(
-            getDeviceTierName(
-                deviceTierTargeting(
-                    /* value= */ "high", /* alternatives= */ ImmutableList.of("low"))))
-        .hasValue("high");
+            getDeviceTierLevel(
+                deviceTierTargeting(/* value= */ 1, /* alternatives= */ ImmutableList.of(0))))
+        .hasValue(1);
   }
 }

@@ -36,6 +36,7 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Streams;
+import com.google.protobuf.Int32Value;
 import java.util.Optional;
 
 /** Utils for {@link DeviceSpec}. */
@@ -63,7 +64,7 @@ public final class DeviceSpecUtils {
   }
 
   public static boolean isDeviceTierMissing(DeviceSpec deviceSpec) {
-    return deviceSpec.getDeviceTier().isEmpty();
+    return !deviceSpec.hasDeviceTier();
   }
 
   /** Extracts the GL ES version, if any, form the device features. */
@@ -163,7 +164,8 @@ public final class DeviceSpecUtils {
 
     DeviceSpecFromTargetingBuilder setDeviceTier(DeviceTierTargeting deviceTierTargeting) {
       if (!deviceTierTargeting.equals(DeviceTierTargeting.getDefaultInstance())) {
-        deviceSpec.setDeviceTier(Iterables.getOnlyElement(deviceTierTargeting.getValueList()));
+        deviceSpec.setDeviceTier(
+            Int32Value.of(Iterables.getOnlyElement(deviceTierTargeting.getValueList()).getValue()));
       }
       return this;
     }

@@ -49,14 +49,14 @@ public class DeviceTierParityValidatorTest {
   public void sameTiers_ok() {
     BundleModule moduleA =
         new BundleModuleBuilder("a")
-            .addFile("assets/img#tier_low/image.jpg")
-            .addFile("assets/img#tier_high/image.jpg")
+            .addFile("assets/img#tier_0/image.jpg")
+            .addFile("assets/img#tier_1/image.jpg")
             .setManifest(androidManifest("com.test.app"))
             .build();
     BundleModule moduleB =
         new BundleModuleBuilder("b")
-            .addFile("assets/img#tier_low/image.jpg")
-            .addFile("assets/img#tier_high/image.jpg")
+            .addFile("assets/img#tier_0/image.jpg")
+            .addFile("assets/img#tier_1/image.jpg")
             .setManifest(androidManifest("com.test.app"))
             .build();
 
@@ -67,14 +67,14 @@ public class DeviceTierParityValidatorTest {
   public void sameTiersAndNoTier_ok() {
     BundleModule moduleA =
         new BundleModuleBuilder("a")
-            .addFile("assets/img#tier_low/image.jpg")
-            .addFile("assets/img#tier_high/image.jpg")
+            .addFile("assets/img#tier_0/image.jpg")
+            .addFile("assets/img#tier_1/image.jpg")
             .setManifest(androidManifest("com.test.app"))
             .build();
     BundleModule moduleB =
         new BundleModuleBuilder("b")
-            .addFile("assets/img#tier_low/image.jpg")
-            .addFile("assets/img#tier_high/image.jpg")
+            .addFile("assets/img#tier_0/image.jpg")
+            .addFile("assets/img#tier_1/image.jpg")
             .setManifest(androidManifest("com.test.app"))
             .build();
     BundleModule moduleC =
@@ -87,14 +87,14 @@ public class DeviceTierParityValidatorTest {
   public void differentTiers_throws() {
     BundleModule moduleA =
         new BundleModuleBuilder("a")
-            .addFile("assets/img#tier_low/image.jpg")
-            .addFile("assets/img#tier_high/image.jpg")
+            .addFile("assets/img#tier_0/image.jpg")
+            .addFile("assets/img#tier_2/image.jpg")
             .setManifest(androidManifest("com.test.app"))
             .build();
     BundleModule moduleB =
         new BundleModuleBuilder("b")
-            .addFile("assets/img#tier_low/image.jpg")
-            .addFile("assets/img#tier_medium/image.jpg")
+            .addFile("assets/img#tier_0/image.jpg")
+            .addFile("assets/img#tier_1/image.jpg")
             .setManifest(androidManifest("com.test.app"))
             .build();
 
@@ -109,6 +109,6 @@ public class DeviceTierParityValidatorTest {
         .hasMessageThat()
         .contains(
             "All modules with device tier targeting must support the same set of tiers, but module"
-                + " 'a' supports [low, high] and module 'b' supports [low, medium].");
+                + " 'a' supports [0, 2] and module 'b' supports [0, 1].");
   }
 }

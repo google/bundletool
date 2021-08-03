@@ -210,7 +210,7 @@ public abstract class ModuleSplit {
     getApkTargeting()
         .getDeviceTierTargeting()
         .getValueList()
-        .forEach(value -> suffixJoiner.add("tier_" + Ascii.toLowerCase(value)));
+        .forEach(value -> suffixJoiner.add("tier_" + value.getValue()));
 
     return suffixJoiner.toString();
   }

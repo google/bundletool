@@ -16,7 +16,6 @@
 
 package com.android.tools.build.bundletool.model.targeting;
 
-import static com.android.tools.build.bundletool.model.targeting.TargetingUtils.containsDeviceTierTargeting;
 import static com.android.tools.build.bundletool.model.targeting.TargetingUtils.getMaxSdk;
 import static com.android.tools.build.bundletool.model.targeting.TargetingUtils.getMinSdk;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.abiTargeting;
@@ -36,7 +35,6 @@ import com.android.bundle.Targeting.SdkVersion;
 import com.android.bundle.Targeting.SdkVersionTargeting;
 import com.android.bundle.Targeting.TextureCompressionFormat.TextureCompressionFormatAlias;
 import com.android.bundle.Targeting.VariantTargeting;
-import com.android.tools.build.bundletool.model.ZipPath;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Range;
 import org.junit.Test;
@@ -80,8 +78,7 @@ public class TargetingUtilsTest {
   @Test
   public void getDimensions_deviceTier() {
     assertThat(
-            TargetingUtils.getTargetingDimensions(
-                assetsDirectoryTargeting(deviceTierTargeting("low"))))
+            TargetingUtils.getTargetingDimensions(assetsDirectoryTargeting(deviceTierTargeting(0))))
         .containsExactly(TargetingDimension.DEVICE_TIER);
   }
 
@@ -204,26 +201,6 @@ public class TargetingUtilsTest {
     assertThat(
             getMaxSdk(sdkVersionTargeting(sdkVersionFrom(23), ImmutableSet.of(sdkVersionFrom(21)))))
         .isEqualTo(Integer.MAX_VALUE);
-  }
-
-  @Test
-  public void containsDeviceTierTargeting_noDeviceTierTargeting() {
-    assertThat(
-            containsDeviceTierTargeting(
-                ImmutableSet.of(
-                    TargetedDirectory.parse(ZipPath.create("assets/world/texture#tcf_etc1")),
-                    TargetedDirectory.parse(ZipPath.create("assets/world/texture#tcf_astc")))))
-        .isFalse();
-  }
-
-  @Test
-  public void containsDeviceTierTargeting_withDeviceTierTargeting() {
-    assertThat(
-            containsDeviceTierTargeting(
-                ImmutableSet.of(
-                    TargetedDirectory.parse(ZipPath.create("assets/world/texture#tier_medium")),
-                    TargetedDirectory.parse(ZipPath.create("assets/world/texture#tier_high")))))
-        .isTrue();
   }
 
   private static VariantTargeting variantTargetingFromSdkVersion(SdkVersion values) {

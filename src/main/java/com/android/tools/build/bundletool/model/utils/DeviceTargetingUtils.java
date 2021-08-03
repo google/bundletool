@@ -18,21 +18,22 @@ package com.android.tools.build.bundletool.model.utils;
 import static com.android.tools.build.bundletool.model.AndroidManifest.DEVICE_GROUP_ELEMENT_NAME;
 
 import com.android.tools.build.bundletool.model.exceptions.InvalidBundleException;
+import com.google.common.primitives.Ints;
 import java.util.regex.Pattern;
+import javax.annotation.Nullable;
 
 /** Utilities for device group and tier values. */
 public class DeviceTargetingUtils {
   private static final Pattern DEVICE_GROUP_PATTERN = Pattern.compile("[a-zA-Z][a-zA-Z0-9_]*");
 
-  @Deprecated
-  private static final Pattern DEVICE_TIER_PATTERN = Pattern.compile("[a-zA-Z][a-zA-Z0-9_]*");
-
   public static void validateDeviceTierForAssetsDirectory(String directory, String tierName) {
-    if (!DEVICE_TIER_PATTERN.matcher(tierName).matches()) {
+    @Nullable Integer tier = Ints.tryParse(tierName);
+
+    if (tier == null || tier < 0) {
       throw InvalidBundleException.builder()
           .withUserMessage(
-              "Device tier names should start with a letter and contain only letters, numbers and"
-                  + " underscores. Found tier named '%s' for directory '%s'.",
+              "Device tiers should be non-negative integers. "
+                  + "Found tier '%s' for directory '%s'.",
               tierName, directory)
           .build();
     }

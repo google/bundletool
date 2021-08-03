@@ -262,7 +262,7 @@ public abstract class AbstractSizeAggregator {
     }
 
     if (dimensions.contains(DEVICE_TIER)) {
-      SizeConfiguration.getDeviceTierName(deviceTierTargeting)
+      SizeConfiguration.getDeviceTierLevel(deviceTierTargeting)
           .ifPresent(sizeConfiguration::setDeviceTier);
     }
 
@@ -319,7 +319,7 @@ public abstract class AbstractSizeAggregator {
     }
 
     if (dimensions.contains(DEVICE_TIER) && !isDeviceTierMissing(deviceSpec)) {
-      mergedSizeConfiguration.setDeviceTier(deviceSpec.getDeviceTier());
+      mergedSizeConfiguration.setDeviceTier(deviceSpec.getDeviceTier().getValue());
     }
 
     return mergedSizeConfiguration.build();

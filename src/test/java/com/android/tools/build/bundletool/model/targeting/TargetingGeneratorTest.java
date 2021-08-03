@@ -586,37 +586,34 @@ public class TargetingGeneratorTest {
         new TargetingGenerator()
             .generateTargetingForAssets(
                 ImmutableList.of(
-                    ZipPath.create("assets/img#tier_low"),
-                    ZipPath.create("assets/img#tier_medium"),
-                    ZipPath.create("assets/img#tier_high")));
+                    ZipPath.create("assets/img#tier_0"),
+                    ZipPath.create("assets/img#tier_1"),
+                    ZipPath.create("assets/img#tier_2")));
     assertThat(assetsConfig)
         .ignoringRepeatedFieldOrder()
         .isEqualTo(
             Assets.newBuilder()
                 .addDirectory(
                     TargetedAssetsDirectory.newBuilder()
-                        .setPath("assets/img#tier_low")
+                        .setPath("assets/img#tier_0")
                         .setTargeting(
                             assetsDirectoryTargeting(
                                 deviceTierTargeting(
-                                    /* value= */ "low",
-                                    /* alternatives= */ ImmutableList.of("high", "medium")))))
+                                    /* value= */ 0, /* alternatives= */ ImmutableList.of(1, 2)))))
                 .addDirectory(
                     TargetedAssetsDirectory.newBuilder()
-                        .setPath("assets/img#tier_medium")
+                        .setPath("assets/img#tier_1")
                         .setTargeting(
                             assetsDirectoryTargeting(
                                 deviceTierTargeting(
-                                    /* value= */ "medium",
-                                    /* alternatives= */ ImmutableList.of("high", "low")))))
+                                    /* value= */ 1, /* alternatives= */ ImmutableList.of(0, 2)))))
                 .addDirectory(
                     TargetedAssetsDirectory.newBuilder()
-                        .setPath("assets/img#tier_high")
+                        .setPath("assets/img#tier_2")
                         .setTargeting(
                             assetsDirectoryTargeting(
                                 deviceTierTargeting(
-                                    /* value= */ "high",
-                                    /* alternatives= */ ImmutableList.of("low", "medium")))))
+                                    /* value= */ 2, /* alternatives= */ ImmutableList.of(0, 1)))))
                 .build());
   }
 

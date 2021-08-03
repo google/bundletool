@@ -49,6 +49,7 @@ import com.google.auto.value.AutoValue;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Sets;
+import com.google.protobuf.Int32Value;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
@@ -66,7 +67,7 @@ public abstract class InstallApksCommand {
   private static final Flag<ImmutableSet<String>> MODULES_FLAG = Flag.stringSet("modules");
   private static final Flag<Boolean> ALLOW_DOWNGRADE_FLAG = Flag.booleanFlag("allow-downgrade");
   private static final Flag<Boolean> ALLOW_TEST_ONLY_FLAG = Flag.booleanFlag("allow-test-only");
-  private static final Flag<String> DEVICE_TIER_FLAG = Flag.string("device-tier");
+  private static final Flag<Integer> DEVICE_TIER_FLAG = Flag.nonNegativeInteger("device-tier");
   private static final Flag<ImmutableSet<String>> DEVICE_GROUPS_FLAG =
       Flag.stringSet("device-groups");
   private static final Flag<ImmutableList<Path>> ADDITIONAL_LOCAL_TESTING_FILES_FLAG =
@@ -88,7 +89,7 @@ public abstract class InstallApksCommand {
 
   public abstract boolean getAllowTestOnly();
 
-  public abstract Optional<String> getDeviceTier();
+  public abstract Optional<Integer> getDeviceTier();
 
   public abstract Optional<ImmutableSet<String>> getDeviceGroups();
 
@@ -123,7 +124,7 @@ public abstract class InstallApksCommand {
 
     public abstract Builder setAllowTestOnly(boolean allowTestOnly);
 
-    public abstract Builder setDeviceTier(String deviceTier);
+    public abstract Builder setDeviceTier(Integer deviceTier);
 
     public abstract Builder setDeviceGroups(ImmutableSet<String> deviceGroups);
 
@@ -149,7 +150,7 @@ public abstract class InstallApksCommand {
     Optional<ImmutableSet<String>> modules = MODULES_FLAG.getValue(flags);
     Optional<Boolean> allowDowngrade = ALLOW_DOWNGRADE_FLAG.getValue(flags);
     Optional<Boolean> allowTestOnly = ALLOW_TEST_ONLY_FLAG.getValue(flags);
-    Optional<String> deviceTier = DEVICE_TIER_FLAG.getValue(flags);
+    Optional<Integer> deviceTier = DEVICE_TIER_FLAG.getValue(flags);
     Optional<ImmutableSet<String>> deviceGroups = DEVICE_GROUPS_FLAG.getValue(flags);
     Optional<ImmutableList<Path>> additionalLocalTestingFiles =
         ADDITIONAL_LOCAL_TESTING_FILES_FLAG.getValue(flags);
@@ -181,7 +182,8 @@ public abstract class InstallApksCommand {
     try (TempDirectory tempDirectory = new TempDirectory()) {
       DeviceSpec deviceSpec = new DeviceAnalyzer(adbServer).getDeviceSpec(getDeviceId());
       if (getDeviceTier().isPresent()) {
-        deviceSpec = deviceSpec.toBuilder().setDeviceTier(getDeviceTier().get()).build();
+        deviceSpec =
+            deviceSpec.toBuilder().setDeviceTier(Int32Value.of(getDeviceTier().get())).build();
       }
       if (getDeviceGroups().isPresent()) {
         deviceSpec = deviceSpec.toBuilder().addAllDeviceGroups(getDeviceGroups().get()).build();

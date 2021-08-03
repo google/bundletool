@@ -153,7 +153,7 @@ public abstract class BuildApksCommand {
   private static final Flag<Path> DEVICE_SPEC_FLAG = Flag.path("device-spec");
   private static final Flag<ImmutableSet<SystemApkOption>> SYSTEM_APK_OPTIONS =
       Flag.enumSet("system-apk-options", SystemApkOption.class);
-  private static final Flag<String> DEVICE_TIER_FLAG = Flag.string("device-tier");
+  private static final Flag<Integer> DEVICE_TIER_FLAG = Flag.nonNegativeInteger("device-tier");
 
   private static final Flag<Boolean> VERBOSE_FLAG = Flag.booleanFlag("verbose");
 
@@ -206,7 +206,7 @@ public abstract class BuildApksCommand {
 
   public abstract Optional<DeviceSpec> getDeviceSpec();
 
-  public abstract Optional<String> getDeviceTier();
+  public abstract Optional<Integer> getDeviceTier();
 
   public abstract ImmutableSet<SystemApkOption> getSystemApkOptions();
 
@@ -340,7 +340,7 @@ public abstract class BuildApksCommand {
      * Sets the device tier to use for APK matching. This will override the device tier of the given
      * device spec.
      */
-    public abstract Builder setDeviceTier(String deviceTier);
+    public abstract Builder setDeviceTier(Integer deviceTier);
 
     /** Sets options to generated APKs in system mode. */
     public abstract Builder setSystemApkOptions(ImmutableSet<SystemApkOption> options);

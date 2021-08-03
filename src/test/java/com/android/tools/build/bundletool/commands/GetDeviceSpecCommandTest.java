@@ -63,7 +63,7 @@ public class GetDeviceSpecCommandTest {
   @Rule public TemporaryFolder tmp = new TemporaryFolder();
   private Path tmpDir;
   private static final String DEVICE_ID = "id1";
-  private static final String DEVICE_TIER = "low";
+  private static final int DEVICE_TIER = 1;
   private static final ImmutableSet<String> DEVICE_GROUPS =
       ImmutableSet.of("highRam", "googlePixel");
 

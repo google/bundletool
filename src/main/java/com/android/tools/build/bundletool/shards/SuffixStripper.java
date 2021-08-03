@@ -36,6 +36,7 @@ import com.android.tools.build.bundletool.model.targeting.TargetingDimension;
 import com.android.tools.build.bundletool.model.utils.TextureCompressionUtils;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
+import com.google.protobuf.Int32Value;
 
 /**
  * Strips suffixes on a module for a given targeting dimension.
@@ -350,7 +351,8 @@ public final class SuffixStripper {
     @Override
     public ApkTargeting setTargetingDimension(ApkTargeting apkTargeting, String value) {
       return apkTargeting.toBuilder()
-          .setDeviceTierTargeting(DeviceTierTargeting.newBuilder().addValue(value))
+          .setDeviceTierTargeting(
+              DeviceTierTargeting.newBuilder().addValue(Int32Value.of(Integer.parseInt(value))))
           .build();
     }
 
@@ -371,8 +373,14 @@ public final class SuffixStripper {
         return false;
       }
 
-      String targetingValue = Iterables.getOnlyElement(targeting.getDeviceTier().getValueList());
-      return !searchedValue.equals(targetingValue);
+      // If the searched value (default tier) is empty, we default it to "0", which is the standard
+      // default when the developer doesn't provide an override.
+      String searchedValueWithDefault = searchedValue.isEmpty() ? "0" : searchedValue;
+
+      String targetingValue =
+          Integer.toString(
+              Iterables.getOnlyElement(targeting.getDeviceTier().getValueList()).getValue());
+      return !searchedValueWithDefault.equals(targetingValue);
     }
   }
 }

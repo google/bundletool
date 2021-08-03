@@ -56,6 +56,7 @@ import static com.android.tools.build.bundletool.testing.TargetingUtils.sdkVersi
 import static com.android.tools.build.bundletool.testing.TargetingUtils.variantSdkTargeting;
 import static com.android.tools.build.bundletool.testing.TestUtils.expectMissingRequiredFlagException;
 import static com.google.common.truth.Truth.assertThat;
+import static com.google.common.truth.Truth8.assertThat;
 import static com.google.common.truth.extensions.proto.ProtoTruth.assertThat;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -69,6 +70,7 @@ import com.android.bundle.Commands.ExtractApksResult;
 import com.android.bundle.Commands.ExtractedApk;
 import com.android.bundle.Commands.LocalTestingInfo;
 import com.android.bundle.Commands.LocalTestingInfoForMetadata;
+import com.android.bundle.Commands.PermanentlyFusedModule;
 import com.android.bundle.Config.Bundletool;
 import com.android.bundle.Config.SplitDimension.Value;
 import com.android.bundle.Devices.DeviceSpec;
@@ -91,6 +93,7 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.io.ByteStreams;
 import com.google.common.io.MoreFiles;
+import com.google.protobuf.Int32Value;
 import com.google.protobuf.util.JsonFormat;
 import java.io.ByteArrayOutputStream;
 import java.io.FileOutputStream;
@@ -207,6 +210,40 @@ public class ExtractApksCommandTest {
     assertThat(exception)
         .hasMessageThat()
         .contains("Output directory should not be set when APKs are inside directory");
+  }
+
+  @Test
+  public void permanentlyMergedModule() throws Exception {
+    ZipPath apkLBase = ZipPath.create("apkL-base.apk");
+    BuildApksResult tableOfContentsProto =
+        BuildApksResult.newBuilder()
+            .setBundletool(
+                Bundletool.newBuilder()
+                    .setVersion(BundleToolVersion.getCurrentVersion().toString()))
+            .addVariant(
+                createVariant(
+                    VariantTargeting.getDefaultInstance(),
+                    createSplitApkSet(
+                        "base",
+                        createMasterApkDescription(ApkTargeting.getDefaultInstance(), apkLBase))))
+            .addPermanentlyFusedModules(
+                PermanentlyFusedModule.newBuilder().setName("permanent").build())
+            .build();
+
+    Path apksArchiveFile =
+        createApksArchiveFile(tableOfContentsProto, tmpDir.resolve("bundle.apks"));
+    Path deviceSpecFile = createDeviceSpecFile(deviceWithSdk(21), tmpDir.resolve("device.json"));
+    ExtractApksCommand command =
+        ExtractApksCommand.fromFlags(
+            new FlagParser()
+                .parse(
+                    "--device-spec=" + deviceSpecFile,
+                    "--apks=" + apksArchiveFile,
+                    "--modules=permanent"));
+
+    ImmutableList<Path> matchedApks = command.execute();
+    assertThat(matchedApks.stream().map(apk -> apk.getFileName().toString()))
+        .containsExactly("apkL-base.apk");
   }
 
   @Test
@@ -1721,8 +1758,8 @@ public class ExtractApksCommandTest {
   @Test
   public void bundleWithDeviceTierTargeting_noDeviceTierSpecified_usesDefaults() throws Exception {
     ZipPath baseMasterApk = ZipPath.create("base-master.apk");
-    ZipPath baseLowApk = ZipPath.create("base-tier_low.apk");
-    ZipPath baseHighApk = ZipPath.create("base-tier_high.apk");
+    ZipPath baseLowApk = ZipPath.create("base-tier_0.apk");
+    ZipPath baseHighApk = ZipPath.create("base-tier_1.apk");
     BuildApksResult buildApksResult =
         BuildApksResult.newBuilder()
             .setBundletool(
@@ -1739,19 +1776,68 @@ public class ExtractApksCommandTest {
                         splitApkDescription(
                             apkDeviceTierTargeting(
                                 deviceTierTargeting(
-                                    /* value= */ "low",
-                                    /* alternatives= */ ImmutableList.of("high"))),
+                                    /* value= */ 0, /* alternatives= */ ImmutableList.of(1))),
                             baseLowApk),
                         splitApkDescription(
                             apkDeviceTierTargeting(
                                 deviceTierTargeting(
-                                    /* value= */ "high",
-                                    /* alternatives= */ ImmutableList.of("low"))),
+                                    /* value= */ 1, /* alternatives= */ ImmutableList.of(0))),
                             baseHighApk))))
             .addDefaultTargetingValue(
                 DefaultTargetingValue.newBuilder()
                     .setDimension(Value.DEVICE_TIER)
-                    .setDefaultValue("low"))
+                    .setDefaultValue("1"))
+            .build();
+
+    Path apksArchiveFile = createApksArchiveFile(buildApksResult, tmpDir.resolve("bundle.apks"));
+
+    DeviceSpec deviceSpec = lDevice();
+
+    ImmutableList<Path> matchedApks =
+        ExtractApksCommand.builder()
+            .setApksArchivePath(apksArchiveFile)
+            .setDeviceSpec(deviceSpec)
+            .setOutputDirectory(tmpDir)
+            .build()
+            .execute();
+
+    // Master and high tier splits for base and asset module.
+    assertThat(matchedApks)
+        .containsExactly(inOutputDirectory(baseMasterApk), inOutputDirectory(baseHighApk));
+    for (Path matchedApk : matchedApks) {
+      checkFileExistsAndReadable(tmpDir.resolve(matchedApk));
+    }
+  }
+
+  @Test
+  public void bundleWithDeviceTierTargeting_noDeviceTierSpecifiedNorDefault_usesZeroAsDefault()
+      throws Exception {
+    ZipPath baseMasterApk = ZipPath.create("base-master.apk");
+    ZipPath baseLowApk = ZipPath.create("base-tier_0.apk");
+    ZipPath baseHighApk = ZipPath.create("base-tier_1.apk");
+    BuildApksResult buildApksResult =
+        BuildApksResult.newBuilder()
+            .setBundletool(
+                Bundletool.newBuilder()
+                    .setVersion(BundleToolVersion.getCurrentVersion().toString()))
+            .addVariant(
+                createVariant(
+                    variantSdkTargeting(
+                        sdkVersionFrom(21), ImmutableSet.of(SdkVersion.getDefaultInstance())),
+                    createSplitApkSet(
+                        "base",
+                        createMasterApkDescription(
+                            ApkTargeting.getDefaultInstance(), baseMasterApk),
+                        splitApkDescription(
+                            apkDeviceTierTargeting(
+                                deviceTierTargeting(
+                                    /* value= */ 0, /* alternatives= */ ImmutableList.of(1))),
+                            baseLowApk),
+                        splitApkDescription(
+                            apkDeviceTierTargeting(
+                                deviceTierTargeting(
+                                    /* value= */ 1, /* alternatives= */ ImmutableList.of(0))),
+                            baseHighApk))))
             .build();
 
     Path apksArchiveFile = createApksArchiveFile(buildApksResult, tmpDir.resolve("bundle.apks"));
@@ -1777,11 +1863,11 @@ public class ExtractApksCommandTest {
   @Test
   public void bundleWithDeviceTierTargeting_deviceTierSet_filtersByTier() throws Exception {
     ZipPath baseMasterApk = ZipPath.create("base-master.apk");
-    ZipPath baseLowApk = ZipPath.create("base-tier_low.apk");
-    ZipPath baseHighApk = ZipPath.create("base-tier_high.apk");
+    ZipPath baseLowApk = ZipPath.create("base-tier_0.apk");
+    ZipPath baseHighApk = ZipPath.create("base-tier_1.apk");
     ZipPath asset1MasterApk = ZipPath.create("asset1-master.apk");
-    ZipPath asset1LowApk = ZipPath.create("asset1-tier_low.apk");
-    ZipPath asset1HighApk = ZipPath.create("asset1-tier_high.apk");
+    ZipPath asset1LowApk = ZipPath.create("asset1-tier_0.apk");
+    ZipPath asset1HighApk = ZipPath.create("asset1-tier_1.apk");
     BuildApksResult buildApksResult =
         BuildApksResult.newBuilder()
             .setBundletool(
@@ -1798,14 +1884,12 @@ public class ExtractApksCommandTest {
                         splitApkDescription(
                             apkDeviceTierTargeting(
                                 deviceTierTargeting(
-                                    /* value= */ "low",
-                                    /* alternatives= */ ImmutableList.of("high"))),
+                                    /* value= */ 0, /* alternatives= */ ImmutableList.of(1))),
                             baseLowApk),
                         splitApkDescription(
                             apkDeviceTierTargeting(
                                 deviceTierTargeting(
-                                    /* value= */ "high",
-                                    /* alternatives= */ ImmutableList.of("low"))),
+                                    /* value= */ 1, /* alternatives= */ ImmutableList.of(0))),
                             baseHighApk))))
             .addAssetSliceSet(
                 AssetSliceSet.newBuilder()
@@ -1820,25 +1904,23 @@ public class ExtractApksCommandTest {
                         splitApkDescription(
                             apkDeviceTierTargeting(
                                 deviceTierTargeting(
-                                    /* value= */ "low",
-                                    /* alternatives= */ ImmutableList.of("high"))),
+                                    /* value= */ 0, /* alternatives= */ ImmutableList.of(1))),
                             asset1LowApk))
                     .addApkDescription(
                         splitApkDescription(
                             apkDeviceTierTargeting(
                                 deviceTierTargeting(
-                                    /* value= */ "high",
-                                    /* alternatives= */ ImmutableList.of("low"))),
+                                    /* value= */ 1, /* alternatives= */ ImmutableList.of(0))),
                             asset1HighApk)))
             .addDefaultTargetingValue(
                 DefaultTargetingValue.newBuilder()
                     .setDimension(Value.DEVICE_TIER)
-                    .setDefaultValue("low"))
+                    .setDefaultValue("0"))
             .build();
 
     Path apksArchiveFile = createApksArchiveFile(buildApksResult, tmpDir.resolve("bundle.apks"));
 
-    DeviceSpec deviceSpec = lDevice().toBuilder().setDeviceTier("high").build();
+    DeviceSpec deviceSpec = lDevice().toBuilder().setDeviceTier(Int32Value.of(1)).build();
 
     ImmutableList<Path> matchedApks =
         ExtractApksCommand.builder()

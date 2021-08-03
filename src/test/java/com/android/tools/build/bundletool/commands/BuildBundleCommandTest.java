@@ -421,18 +421,18 @@ public class BuildBundleCommandTest {
                     .setTargeting(AssetsDirectoryTargeting.getDefaultInstance()))
             .addDirectory(
                 TargetedAssetsDirectory.newBuilder()
-                    .setPath("assets/texture#tcf_atc/device#tier_low")
+                    .setPath("assets/texture#tcf_atc/device#tier_0")
                     .setTargeting(
                         mergeAssetsTargeting(
                             assetsDirectoryTargeting(
                                 textureCompressionTargeting(TextureCompressionFormatAlias.ATC)),
-                            assetsDirectoryTargeting(deviceTierTargeting("low")))))
+                            assetsDirectoryTargeting(deviceTierTargeting(0)))))
             .build();
     Path module =
         new ZipBuilder()
             .addFileWithContent(ZipPath.create("assets/anything.dat"), "any".getBytes(UTF_8))
             .addFileWithContent(
-                ZipPath.create("assets/texture#tcf_atc/device#tier_low/file.dat"),
+                ZipPath.create("assets/texture#tcf_atc/device#tier_0/file.dat"),
                 "any2".getBytes(UTF_8))
             .addFileWithContent(ZipPath.create("dex/classes.dex"), "dex".getBytes(UTF_8))
             .addFileWithProtoContent(ZipPath.create("manifest/AndroidManifest.xml"), manifest)
@@ -447,7 +447,7 @@ public class BuildBundleCommandTest {
     try (ZipFile bundle = new ZipFile(bundlePath.toFile())) {
       assertThat(bundle).hasFile("base/assets/anything.dat").withContent("any".getBytes(UTF_8));
       assertThat(bundle)
-          .hasFile("base/assets/texture#tcf_atc/device#tier_low/file.dat")
+          .hasFile("base/assets/texture#tcf_atc/device#tier_0/file.dat")
           .withContent("any2".getBytes(UTF_8));
       assertThat(bundle).hasFile("base/dex/classes.dex").withContent("dex".getBytes(UTF_8));
       assertThat(bundle)

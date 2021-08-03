@@ -244,7 +244,7 @@ public class InstallApksCommandTest {
     InstallApksCommand fromFlags =
         InstallApksCommand.fromFlags(
             new FlagParser()
-                .parse("--apks=" + simpleApksPath, "--adb=" + adbPath, "--device-tier=high"),
+                .parse("--apks=" + simpleApksPath, "--adb=" + adbPath, "--device-tier=1"),
             systemEnvironmentProvider,
             fakeServerOneDevice(lDeviceWithLocales("en-US")));
 
@@ -254,7 +254,7 @@ public class InstallApksCommandTest {
             .setAdbPath(adbPath)
             .setAdbServer(fromFlags.getAdbServer())
             .setDeviceId(DEVICE_ID)
-            .setDeviceTier("high")
+            .setDeviceTier(1)
             .build();
 
     assertThat(fromBuilder).isEqualTo(fromFlags);
@@ -1183,8 +1183,8 @@ public class InstallApksCommandTest {
   public void bundleWithDeviceTierTargeting_noDeviceTierSpecified_usesDefaultValue()
       throws Exception {
     ZipPath baseMasterApk = ZipPath.create("base-master.apk");
-    ZipPath baseLowApk = ZipPath.create("base-tier_low.apk");
-    ZipPath baseHighApk = ZipPath.create("base-tier_high.apk");
+    ZipPath baseLowApk = ZipPath.create("base-tier_0.apk");
+    ZipPath baseHighApk = ZipPath.create("base-tier_1.apk");
     BuildApksResult buildApksResult =
         BuildApksResult.newBuilder()
             .setPackageName(PKG_NAME)
@@ -1202,19 +1202,17 @@ public class InstallApksCommandTest {
                         splitApkDescription(
                             apkDeviceTierTargeting(
                                 deviceTierTargeting(
-                                    /* value= */ "low",
-                                    /* alternatives= */ ImmutableList.of("high"))),
+                                    /* value= */ 0, /* alternatives= */ ImmutableList.of(1))),
                             baseLowApk),
                         splitApkDescription(
                             apkDeviceTierTargeting(
                                 deviceTierTargeting(
-                                    /* value= */ "high",
-                                    /* alternatives= */ ImmutableList.of("low"))),
+                                    /* value= */ 1, /* alternatives= */ ImmutableList.of(0))),
                             baseHighApk))))
             .addDefaultTargetingValue(
                 DefaultTargetingValue.newBuilder()
                     .setDimension(Value.DEVICE_TIER)
-                    .setDefaultValue("low"))
+                    .setDefaultValue("1"))
             .build();
 
     Path apksFile = createApksArchiveFile(buildApksResult, tmpDir.resolve("bundle.apks"));
@@ -1235,6 +1233,60 @@ public class InstallApksCommandTest {
 
     // Base only, the on demand asset is not installed. Low tier splits are filtered out.
     assertThat(getFileNames(installedApks))
+        .containsExactly(baseMasterApk.toString(), baseHighApk.toString());
+  }
+
+  @Test
+  public void bundleWithDeviceTierTargeting_noDeviceTierSpecifiedNorDefault_usesZeroAsDefault()
+      throws Exception {
+    ZipPath baseMasterApk = ZipPath.create("base-master.apk");
+    ZipPath baseLowApk = ZipPath.create("base-tier_0.apk");
+    ZipPath baseHighApk = ZipPath.create("base-tier_1.apk");
+    BuildApksResult buildApksResult =
+        BuildApksResult.newBuilder()
+            .setPackageName(PKG_NAME)
+            .setBundletool(
+                Bundletool.newBuilder()
+                    .setVersion(BundleToolVersion.getCurrentVersion().toString()))
+            .addVariant(
+                createVariant(
+                    variantSdkTargeting(
+                        sdkVersionFrom(21), ImmutableSet.of(SdkVersion.getDefaultInstance())),
+                    createSplitApkSet(
+                        "base",
+                        createMasterApkDescription(
+                            ApkTargeting.getDefaultInstance(), baseMasterApk),
+                        splitApkDescription(
+                            apkDeviceTierTargeting(
+                                deviceTierTargeting(
+                                    /* value= */ 0, /* alternatives= */ ImmutableList.of(1))),
+                            baseLowApk),
+                        splitApkDescription(
+                            apkDeviceTierTargeting(
+                                deviceTierTargeting(
+                                    /* value= */ 1, /* alternatives= */ ImmutableList.of(0))),
+                            baseHighApk))))
+            .build();
+
+    Path apksFile = createApksArchiveFile(buildApksResult, tmpDir.resolve("bundle.apks"));
+
+    List<Path> installedApks = new ArrayList<>();
+    FakeDevice fakeDevice =
+        FakeDevice.fromDeviceSpec(DEVICE_ID, DeviceState.ONLINE, lDeviceWithLocales("en-US"));
+    fakeDevice.setInstallApksSideEffect((apks, installOptions) -> installedApks.addAll(apks));
+    AdbServer adbServer =
+        new FakeAdbServer(/* hasInitialDeviceList= */ true, ImmutableList.of(fakeDevice));
+
+    InstallApksCommand.builder()
+        .setApksArchivePath(apksFile)
+        .setAdbPath(adbPath)
+        .setAdbServer(adbServer)
+        .build()
+        .execute();
+
+    // Base only, the on demand asset is not installed. Tier 0 splits are returned, since it is the
+    // default when unspecified.
+    assertThat(getFileNames(installedApks))
         .containsExactly(baseMasterApk.toString(), baseLowApk.toString());
   }
 
@@ -1243,11 +1295,11 @@ public class InstallApksCommandTest {
   public void bundleWithDeviceTierTargeting_deviceTierSet_filtersByTier(
       @FromDataPoints("apksInDirectory") boolean apksInDirectory) throws Exception {
     ZipPath baseMasterApk = ZipPath.create("base-master.apk");
-    ZipPath baseLowApk = ZipPath.create("base-tier_low.apk");
-    ZipPath baseHighApk = ZipPath.create("base-tier_high.apk");
+    ZipPath baseLowApk = ZipPath.create("base-tier_0.apk");
+    ZipPath baseHighApk = ZipPath.create("base-tier_1.apk");
     ZipPath asset1MasterApk = ZipPath.create("asset1-master.apk");
-    ZipPath asset1LowApk = ZipPath.create("asset1-tier_low.apk");
-    ZipPath asset1HighApk = ZipPath.create("asset1-tier_high.apk");
+    ZipPath asset1LowApk = ZipPath.create("asset1-tier_0.apk");
+    ZipPath asset1HighApk = ZipPath.create("asset1-tier_1.apk");
     BuildApksResult tableOfContent =
         BuildApksResult.newBuilder()
             .setPackageName(PKG_NAME)
@@ -1265,14 +1317,12 @@ public class InstallApksCommandTest {
                         splitApkDescription(
                             apkDeviceTierTargeting(
                                 deviceTierTargeting(
-                                    /* value= */ "low",
-                                    /* alternatives= */ ImmutableList.of("high"))),
+                                    /* value= */ 0, /* alternatives= */ ImmutableList.of(1))),
                             baseLowApk),
                         splitApkDescription(
                             apkDeviceTierTargeting(
                                 deviceTierTargeting(
-                                    /* value= */ "high",
-                                    /* alternatives= */ ImmutableList.of("low"))),
+                                    /* value= */ 1, /* alternatives= */ ImmutableList.of(0))),
                             baseHighApk))))
             .addAssetSliceSet(
                 AssetSliceSet.newBuilder()
@@ -1287,15 +1337,13 @@ public class InstallApksCommandTest {
                         splitApkDescription(
                             apkDeviceTierTargeting(
                                 deviceTierTargeting(
-                                    /* value= */ "low",
-                                    /* alternatives= */ ImmutableList.of("high"))),
+                                    /* value= */ 0, /* alternatives= */ ImmutableList.of(1))),
                             asset1LowApk))
                     .addApkDescription(
                         splitApkDescription(
                             apkDeviceTierTargeting(
                                 deviceTierTargeting(
-                                    /* value= */ "high",
-                                    /* alternatives= */ ImmutableList.of("low"))),
+                                    /* value= */ 1, /* alternatives= */ ImmutableList.of(0))),
                             asset1HighApk)))
             // Add local testing info to check that pushed APKs are also filtered by tier.
             .setLocalTestingInfo(
@@ -1303,7 +1351,7 @@ public class InstallApksCommandTest {
             .addDefaultTargetingValue(
                 DefaultTargetingValue.newBuilder()
                     .setDimension(Value.DEVICE_TIER)
-                    .setDefaultValue("low"))
+                    .setDefaultValue("0"))
             .build();
 
     Path apksFile = createApks(tableOfContent, apksInDirectory);
@@ -1321,7 +1369,7 @@ public class InstallApksCommandTest {
         .setApksArchivePath(apksFile)
         .setAdbPath(adbPath)
         .setAdbServer(adbServer)
-        .setDeviceTier("high")
+        .setDeviceTier(1)
         .build()
         .execute();
 

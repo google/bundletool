@@ -35,41 +35,36 @@ public class DeviceTierApkMatcherTest {
 
   @Test
   public void matchesTargeting_matches() {
-    DeviceTierApkMatcher matcher = new DeviceTierApkMatcher(deviceTier("low"));
+    DeviceTierApkMatcher matcher = new DeviceTierApkMatcher(deviceTier(1));
 
-    assertThat(matcher.matchesTargeting(deviceTierTargeting("low"))).isTrue();
-    assertThat(
-            matcher.matchesTargeting(
-                deviceTierTargeting("low", ImmutableList.of("medium", "high"))))
+    assertThat(matcher.matchesTargeting(deviceTierTargeting(1))).isTrue();
+    assertThat(matcher.matchesTargeting(deviceTierTargeting(1, ImmutableList.of(0, 2, 3))))
         .isTrue();
   }
 
   @Test
   public void matchesTargeting_doesNotMatch() {
-    DeviceTierApkMatcher matcher = new DeviceTierApkMatcher(deviceTier("low"));
+    DeviceTierApkMatcher matcher = new DeviceTierApkMatcher(deviceTier(1));
 
-    assertThat(matcher.matchesTargeting(deviceTierTargeting("medium"))).isFalse();
-    assertThat(
-            matcher.matchesTargeting(
-                deviceTierTargeting("medium", ImmutableList.of("low", "high"))))
+    assertThat(matcher.matchesTargeting(deviceTierTargeting(2))).isFalse();
+    assertThat(matcher.matchesTargeting(deviceTierTargeting(2, ImmutableList.of(0, 1, 3))))
         .isFalse();
   }
 
   @Test
   public void matchesTargeting_overlappingValuesAndAlternatives_throws() {
-    DeviceTierApkMatcher matcher = new DeviceTierApkMatcher(deviceTier("low"));
+    DeviceTierApkMatcher matcher = new DeviceTierApkMatcher(deviceTier(1));
 
     assertThrows(
         IllegalArgumentException.class,
-        () ->
-            matcher.matchesTargeting(deviceTierTargeting("low", ImmutableList.of("low", "high"))));
+        () -> matcher.matchesTargeting(deviceTierTargeting(1, ImmutableList.of(1, 3))));
   }
 
   @Test
   public void getTargetingValue() {
-    DeviceTierApkMatcher matcher = new DeviceTierApkMatcher(deviceTier("low"));
+    DeviceTierApkMatcher matcher = new DeviceTierApkMatcher(deviceTier(1));
 
-    DeviceTierTargeting targeting = deviceTierTargeting("low", ImmutableList.of("medium"));
+    DeviceTierTargeting targeting = deviceTierTargeting(1, ImmutableList.of(0, 2));
     assertThat(
             matcher.getTargetingValue(
                 ApkTargeting.newBuilder().setDeviceTierTargeting(targeting).build()))
@@ -78,27 +73,24 @@ public class DeviceTierApkMatcherTest {
 
   @Test
   public void isDimensionPresent() {
-    assertThat(new DeviceTierApkMatcher(deviceTier("low")).isDeviceDimensionPresent()).isTrue();
+    assertThat(new DeviceTierApkMatcher(deviceTier(1)).isDeviceDimensionPresent()).isTrue();
     assertThat(new DeviceTierApkMatcher(abis("x86")).isDeviceDimensionPresent()).isFalse();
   }
 
   @Test
   public void checkDeviceCompatibleInternal_isCompatible() {
-    DeviceTierApkMatcher matcher = new DeviceTierApkMatcher(deviceTier("low"));
+    DeviceTierApkMatcher matcher = new DeviceTierApkMatcher(deviceTier(1));
 
-    matcher.checkDeviceCompatibleInternal(deviceTierTargeting("low"));
-    matcher.checkDeviceCompatibleInternal(
-        deviceTierTargeting("medium", ImmutableList.of("low", "high")));
+    matcher.checkDeviceCompatibleInternal(deviceTierTargeting(1));
+    matcher.checkDeviceCompatibleInternal(deviceTierTargeting(2, ImmutableList.of(1, 3)));
   }
 
   @Test
   public void checkDeviceCompatibleInternal_isNotCompatible() {
-    DeviceTierApkMatcher matcher = new DeviceTierApkMatcher(deviceTier("low"));
+    DeviceTierApkMatcher matcher = new DeviceTierApkMatcher(deviceTier(1));
 
     assertThrows(
         IllegalArgumentException.class,
-        () ->
-            matcher.checkDeviceCompatibleInternal(
-                deviceTierTargeting("medium", ImmutableList.of("high"))));
+        () -> matcher.checkDeviceCompatibleInternal(deviceTierTargeting(2, ImmutableList.of(3))));
   }
 }

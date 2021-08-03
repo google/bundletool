@@ -31,6 +31,7 @@ import com.android.tools.build.bundletool.model.SourceStamp;
 import com.android.tools.build.bundletool.optimizations.ApkOptimizations;
 import com.android.tools.build.bundletool.optimizations.OptimizationsMerger;
 import com.google.common.util.concurrent.ListeningExecutorService;
+import com.google.protobuf.Int32Value;
 import dagger.Module;
 import dagger.Provides;
 import java.io.PrintStream;
@@ -130,7 +131,10 @@ public final class BuildApksModule {
       checkState(deviceSpec.isPresent(), "Device tier specified but no device was provided.");
       deviceSpec =
           deviceSpec.map(
-              spec -> spec.toBuilder().setDeviceTier(command.getDeviceTier().get()).build());
+              spec ->
+                  spec.toBuilder()
+                      .setDeviceTier(Int32Value.of(command.getDeviceTier().get()))
+                      .build());
     }
     return deviceSpec;
   }

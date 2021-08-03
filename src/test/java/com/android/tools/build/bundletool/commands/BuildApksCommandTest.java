@@ -611,7 +611,7 @@ public class BuildApksCommandTest {
         createDeviceSpecFile(
             mergeSpecs(sdkVersion(28), density(DensityAlias.HDPI), abis("x86"), locales("en")),
             tmpDir.resolve("device.json"));
-    final String deviceTier = "low";
+    final int deviceTier = 1;
     ByteArrayOutputStream output = new ByteArrayOutputStream();
     BuildApksCommand commandViaFlags =
         BuildApksCommand.fromFlags(

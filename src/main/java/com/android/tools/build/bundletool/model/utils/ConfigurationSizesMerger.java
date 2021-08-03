@@ -72,7 +72,7 @@ public class ConfigurationSizesMerger {
    *
    * <p>This happens if they have the same value or any of them is absent.
    */
-  private static boolean areCompatible(Optional<String> value1, Optional<String> value2) {
+  private static <T> boolean areCompatible(Optional<T> value1, Optional<T> value2) {
     return value1.equals(value2) || !value1.isPresent() || !value2.isPresent();
   }
 

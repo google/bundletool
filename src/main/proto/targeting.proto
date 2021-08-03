@@ -34,8 +34,9 @@ message ModuleTargeting {
   SdkVersionTargeting sdk_version_targeting = 1;
   repeated DeviceFeatureTargeting device_feature_targeting = 2;
   UserCountriesTargeting user_countries_targeting = 3;
-  DeviceTierModuleTargeting device_tier_targeting = 4 [deprecated = true];
   DeviceGroupModuleTargeting device_group_targeting = 5;
+
+  reserved 4;
 }
 
 // User Countries targeting describing an inclusive/exclusive list of country
@@ -199,13 +200,12 @@ message DeviceFeatureTargeting {
 
 // Targets assets and APKs to a concrete device tier.
 message DeviceTierTargeting {
-  repeated string value = 1;
-  repeated string alternatives = 2;
-}
+  repeated google.protobuf.Int32Value value = 3;
+  repeated google.protobuf.Int32Value alternatives = 4;
 
-// Targets conditional modules to a set of device tiers.
-message DeviceTierModuleTargeting {
-  repeated string value = 1;
+  // TODO(b/192929170): remove them once all callers are migrated.
+  repeated string value_deprecated = 1 [deprecated = true];
+  repeated string alternatives_deprecated = 2 [deprecated = true];
 }
 
 // Targets conditional modules to a set of device groups.

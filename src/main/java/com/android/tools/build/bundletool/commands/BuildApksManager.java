@@ -58,6 +58,7 @@ import com.android.tools.build.bundletool.splitters.SplitApksGenerator;
 import com.android.tools.build.bundletool.validation.AppBundleValidator;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.Sets;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -108,6 +109,7 @@ public final class BuildApksManager {
   }
 
   public void execute() throws IOException {
+    ImmutableSet<BundleModuleName> permanentlyFusedModules = ImmutableSet.of();
     ImmutableSet<BundleModule> requestedModules =
         command.getModules().isEmpty()
             ? ImmutableSet.of()
@@ -131,6 +133,9 @@ public final class BuildApksManager {
       AppBundleValidator bundleValidator = AppBundleValidator.create(command.getExtraValidators());
       bundleValidator.validate(mergedAppBundle);
       generatedApksBuilder.setSplitApks(generateSplitApks(mergedAppBundle));
+      permanentlyFusedModules =
+          Sets.difference(appBundle.getModules().keySet(), mergedAppBundle.getModules().keySet())
+              .immutableCopy();
     }
 
     // Instant APKs
@@ -192,7 +197,8 @@ public final class BuildApksManager {
         generatedAssetSlices.build(),
         command.getApkBuildMode(),
         deviceSpec,
-        getLocalTestingInfo(appBundle));
+        getLocalTestingInfo(appBundle),
+        permanentlyFusedModules);
 
     if (command.getOverwriteOutput()) {
       Files.deleteIfExists(command.getOutputFile());

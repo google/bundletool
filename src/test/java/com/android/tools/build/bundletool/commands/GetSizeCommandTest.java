@@ -90,6 +90,7 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Sets;
 import com.google.common.io.ByteSource;
 import com.google.common.io.ByteStreams;
+import com.google.protobuf.Int32Value;
 import com.google.protobuf.util.JsonFormat;
 import java.io.ByteArrayOutputStream;
 import java.io.FileOutputStream;
@@ -1359,13 +1360,13 @@ public final class GetSizeCommandTest {
                 splitApkDescription(
                     apkDeviceTierTargeting(
                         deviceTierTargeting(
-                            /* value= */ "low", /* alternatives= */ ImmutableList.of("high"))),
-                    ZipPath.create("base-tier_low.apk")),
+                            /* value= */ 0, /* alternatives= */ ImmutableList.of(1))),
+                    ZipPath.create("base-tier_0.apk")),
                 splitApkDescription(
                     apkDeviceTierTargeting(
                         deviceTierTargeting(
-                            /* value= */ "high", /* alternatives= */ ImmutableList.of("low"))),
-                    ZipPath.create("base-tier_high.apk"))));
+                            /* value= */ 1, /* alternatives= */ ImmutableList.of(0))),
+                    ZipPath.create("base-tier_1.apk"))));
 
     BuildApksResult tableOfContentsProto =
         BuildApksResult.newBuilder()
@@ -1390,10 +1391,8 @@ public final class GetSizeCommandTest {
         .asList()
         .containsExactly(
             "SDK,DEVICE_TIER,MIN,MAX",
-            String.format(
-                "%s,%s,%d,%d", "21-", "low", 2 * compressedApkSize, 2 * compressedApkSize),
-            String.format(
-                "%s,%s,%d,%d", "21-", "high", 2 * compressedApkSize, 2 * compressedApkSize));
+            String.format("%s,%s,%d,%d", "21-", "0", 2 * compressedApkSize, 2 * compressedApkSize),
+            String.format("%s,%s,%d,%d", "21-", "1", 2 * compressedApkSize, 2 * compressedApkSize));
   }
 
   @Test
@@ -1408,13 +1407,13 @@ public final class GetSizeCommandTest {
                 splitApkDescription(
                     apkDeviceTierTargeting(
                         deviceTierTargeting(
-                            /* value= */ "low", /* alternatives= */ ImmutableList.of("high"))),
-                    ZipPath.create("base-tier_low.apk")),
+                            /* value= */ 0, /* alternatives= */ ImmutableList.of(1))),
+                    ZipPath.create("base-tier_0.apk")),
                 splitApkDescription(
                     apkDeviceTierTargeting(
                         deviceTierTargeting(
-                            /* value= */ "high", /* alternatives= */ ImmutableList.of("low"))),
-                    ZipPath.create("base-tier_high.apk"))));
+                            /* value= */ 1, /* alternatives= */ ImmutableList.of(0))),
+                    ZipPath.create("base-tier_1.apk"))));
 
     BuildApksResult tableOfContentsProto =
         BuildApksResult.newBuilder()
@@ -1432,7 +1431,8 @@ public final class GetSizeCommandTest {
         .setGetSizeSubCommand(GetSizeSubcommand.TOTAL)
         .setApksArchivePath(apksArchiveFile)
         .setDimensions(ImmutableSet.of(Dimension.SDK, Dimension.DEVICE_TIER))
-        .setDeviceSpec(DeviceSpec.newBuilder().setSdkVersion(25).setDeviceTier("high").build())
+        .setDeviceSpec(
+            DeviceSpec.newBuilder().setSdkVersion(25).setDeviceTier(Int32Value.of(1)).build())
         .build()
         .getSizeTotal(new PrintStream(outputStream));
 
@@ -1440,8 +1440,7 @@ public final class GetSizeCommandTest {
         .asList()
         .containsExactly(
             "SDK,DEVICE_TIER,MIN,MAX",
-            String.format(
-                "%s,%s,%d,%d", "25", "high", 2 * compressedApkSize, 2 * compressedApkSize));
+            String.format("%s,%s,%d,%d", "25", "1", 2 * compressedApkSize, 2 * compressedApkSize));
   }
 
   /** Copies the testdata resource into the temporary directory. */

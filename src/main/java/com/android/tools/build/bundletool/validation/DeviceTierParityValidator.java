@@ -30,9 +30,9 @@ public class DeviceTierParityValidator extends SubValidator {
   @Override
   public void validateAllModules(ImmutableList<BundleModule> modules) {
     BundleModule referenceModule = null;
-    ImmutableSet<String> referenceTiers = null;
+    ImmutableSet<Integer> referenceTiers = null;
     for (BundleModule module : modules) {
-      ImmutableSet<String> moduleTiers =
+      ImmutableSet<Integer> moduleTiers =
           extractDeviceTiers(extractAssetsTargetedDirectories(module));
 
       if (moduleTiers.isEmpty()) {

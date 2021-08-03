@@ -52,6 +52,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.io.ByteStreams;
+import com.google.protobuf.Int32Value;
 import com.google.protobuf.util.JsonFormat;
 import java.io.IOException;
 import java.io.InputStream;
@@ -333,20 +334,21 @@ public abstract class ExtractApksCommand {
   }
 
   private static DeviceSpec applyDefaultsToDeviceSpec(DeviceSpec deviceSpec, BuildApksResult toc) {
-    if (!deviceSpec.getDeviceTier().isEmpty()) {
+    if (deviceSpec.hasDeviceTier()) {
       return deviceSpec;
     }
-    Optional<String> defaultDeviceTier =
+    int defaultDeviceTier =
         toc.getDefaultTargetingValueList().stream()
             .filter(
                 defaultTargetingValue ->
                     defaultTargetingValue.getDimension().equals(Value.DEVICE_TIER))
             .map(DefaultTargetingValue::getDefaultValue)
-            .collect(toOptional());
-    if (defaultDeviceTier.isPresent()) {
-      return deviceSpec.toBuilder().setDeviceTier(defaultDeviceTier.get()).build();
-    }
-    return deviceSpec;
+            // Don't fail if the default value is empty.
+            .filter(defaultValue -> !defaultValue.isEmpty())
+            .map(Integer::parseInt)
+            .collect(toOptional())
+            .orElse(0);
+    return deviceSpec.toBuilder().setDeviceTier(Int32Value.of(defaultDeviceTier)).build();
   }
 
   public static CommandHelp help() {

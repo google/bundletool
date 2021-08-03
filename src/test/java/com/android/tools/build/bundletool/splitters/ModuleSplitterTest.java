@@ -1249,23 +1249,21 @@ public class ModuleSplitterTest {
   public void deviceTierAsset_splitting_and_merging() {
     BundleModule testModule =
         new BundleModuleBuilder("testModule")
-            .addFile("assets/main#tier_low/image.jpg")
-            .addFile("assets/main#tier_medium/image.jpg")
+            .addFile("assets/main#tier_0/image.jpg")
+            .addFile("assets/main#tier_1/image.jpg")
             .addFile("dex/classes.dex")
             .setAssetsConfig(
                 assets(
                     targetedAssetsDirectory(
-                        "assets/main#tier_low",
+                        "assets/main#tier_0",
                         assetsDirectoryTargeting(
                             deviceTierTargeting(
-                                /* value= */ "low",
-                                /* alternatives= */ ImmutableList.of("medium")))),
+                                /* value= */ 0, /* alternatives= */ ImmutableList.of(1)))),
                     targetedAssetsDirectory(
-                        "assets/main#tier_medium",
+                        "assets/main#tier_1",
                         assetsDirectoryTargeting(
                             deviceTierTargeting(
-                                /* value= */ "medium",
-                                /* alternatives= */ ImmutableList.of("low"))))))
+                                /* value= */ 1, /* alternatives= */ ImmutableList.of(0))))))
             .setManifest(androidManifest("com.test.app"))
             .build();
 
@@ -1293,11 +1291,10 @@ public class ModuleSplitterTest {
             mergeApkTargeting(
                 DEFAULT_MASTER_SPLIT_SDK_TARGETING,
                 apkDeviceTierTargeting(
-                    deviceTierTargeting(
-                        /* value= */ "low", /* alternatives= */ ImmutableList.of("medium")))));
+                    deviceTierTargeting(/* value= */ 0, /* alternatives= */ ImmutableList.of(1)))));
     assertThat(lowTierSplits).hasSize(1);
     assertThat(extractPaths(lowTierSplits.get(0).getEntries()))
-        .containsExactly("assets/main#tier_low/image.jpg");
+        .containsExactly("assets/main#tier_0/image.jpg");
 
     ImmutableList<ModuleSplit> mediumTierSplits =
         getSplitsWithTargetingEqualTo(
@@ -1305,11 +1302,10 @@ public class ModuleSplitterTest {
             mergeApkTargeting(
                 DEFAULT_MASTER_SPLIT_SDK_TARGETING,
                 apkDeviceTierTargeting(
-                    deviceTierTargeting(
-                        /* value= */ "medium", /* alternatives= */ ImmutableList.of("low")))));
+                    deviceTierTargeting(/* value= */ 1, /* alternatives= */ ImmutableList.of(0)))));
     assertThat(mediumTierSplits).hasSize(1);
     assertThat(extractPaths(mediumTierSplits.get(0).getEntries()))
-        .containsExactly("assets/main#tier_medium/image.jpg");
+        .containsExactly("assets/main#tier_1/image.jpg");
   }
 
   @Test

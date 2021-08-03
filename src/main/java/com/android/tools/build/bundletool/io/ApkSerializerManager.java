@@ -37,6 +37,7 @@ import com.android.bundle.Commands.DefaultTargetingValue;
 import com.android.bundle.Commands.DeliveryType;
 import com.android.bundle.Commands.InstantMetadata;
 import com.android.bundle.Commands.LocalTestingInfo;
+import com.android.bundle.Commands.PermanentlyFusedModule;
 import com.android.bundle.Commands.Variant;
 import com.android.bundle.Config.AssetModulesConfig;
 import com.android.bundle.Config.BundleConfig;
@@ -71,8 +72,10 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableListMultimap;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Multimap;
 import com.google.common.util.concurrent.ListeningExecutorService;
+import com.google.protobuf.Int32Value;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
@@ -124,7 +127,8 @@ public class ApkSerializerManager {
       GeneratedAssetSlices generatedAssetSlices,
       ApkBuildMode apkBuildMode,
       Optional<DeviceSpec> deviceSpec,
-      LocalTestingInfo localTestingInfo) {
+      LocalTestingInfo localTestingInfo,
+      ImmutableSet<BundleModuleName> permanentlyFusedModules) {
     ImmutableList<Variant> allVariantsWithTargeting =
         serializeApks(apkSetBuilder, generatedApks, apkBuildMode, deviceSpec);
     ImmutableList<AssetSliceSet> allAssetSliceSets =
@@ -144,6 +148,10 @@ public class ApkSerializerManager {
           getAssetModulesInfo(appBundle.getBundleConfig().getAssetModulesConfig()));
     }
     apksResult.addAllDefaultTargetingValue(getDefaultTargetingValues(appBundle.getBundleConfig()));
+    permanentlyFusedModules.forEach(
+        moduleName ->
+            apksResult.addPermanentlyFusedModules(
+                PermanentlyFusedModule.newBuilder().setName(moduleName.getName())));
     apkSetBuilder.setTableOfContentsFile(apksResult.build());
   }
 
@@ -426,10 +434,11 @@ public class ApkSerializerManager {
    * Adds a default device tier to the given {@link DeviceSpec} if it has none.
    *
    * <p>The default tier is taken from the optimization settings in the {@link
-   * com.android.bundle.Config.BundleConfig}.
+   * com.android.bundle.Config.BundleConfig}. If suffix stripping is enabled but the default tier is
+   * unspecified, it defaults to 0.
    */
   private DeviceSpec addDefaultDeviceTierIfNecessary(DeviceSpec deviceSpec) {
-    if (!deviceSpec.getDeviceTier().isEmpty()) {
+    if (deviceSpec.hasDeviceTier()) {
       return deviceSpec;
     }
     Optional<SuffixStripping> deviceTierSuffix =
@@ -438,7 +447,19 @@ public class ApkSerializerManager {
     if (!deviceTierSuffix.isPresent()) {
       return deviceSpec;
     }
-    return deviceSpec.toBuilder().setDeviceTier(deviceTierSuffix.get().getDefaultSuffix()).build();
+    return deviceSpec.toBuilder()
+        .setDeviceTier(
+            Int32Value.of(
+                deviceTierSuffix
+                    .map(
+                        suffix ->
+                            // Use the standard default value 0 if the app doesn't specify an
+                            // explicit default.
+                            suffix.getDefaultSuffix().isEmpty()
+                                ? 0
+                                : Integer.parseInt(suffix.getDefaultSuffix()))
+                    .orElse(0)))
+        .build();
   }
 
   private final class ApkSerializer {

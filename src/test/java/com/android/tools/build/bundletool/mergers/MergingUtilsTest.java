@@ -132,8 +132,7 @@ public class MergingUtilsTest {
 
   @Test
   public void mergeShardTargetings_equalDeviceTier_ok() {
-    ApkTargeting targeting =
-        apkDeviceTierTargeting(deviceTierTargeting("low", ImmutableList.of("high")));
+    ApkTargeting targeting = apkDeviceTierTargeting(deviceTierTargeting(0, ImmutableList.of(1)));
 
     assertThat(MergingUtils.mergeShardTargetings(targeting, targeting)).isEqualTo(targeting);
   }
@@ -197,14 +196,11 @@ public class MergingUtilsTest {
 
   @Test
   public void mergeShardTargetings_differentDeviceTiers_ok() {
-    ApkTargeting targeting1 =
-        apkDeviceTierTargeting(deviceTierTargeting("low", ImmutableList.of("high")));
-    ApkTargeting targeting2 =
-        apkDeviceTierTargeting(deviceTierTargeting("low", ImmutableList.of("medium")));
+    ApkTargeting targeting1 = apkDeviceTierTargeting(deviceTierTargeting(0, ImmutableList.of(1)));
+    ApkTargeting targeting2 = apkDeviceTierTargeting(deviceTierTargeting(0, ImmutableList.of(2)));
 
     assertThat(MergingUtils.mergeShardTargetings(targeting1, targeting2))
-        .isEqualTo(
-            apkDeviceTierTargeting(deviceTierTargeting("low", ImmutableList.of("high", "medium"))));
+        .isEqualTo(apkDeviceTierTargeting(deviceTierTargeting(0, ImmutableList.of(1, 2))));
   }
 
   @Test

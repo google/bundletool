@@ -16,6 +16,8 @@
 package com.android.tools.build.bundletool.device;
 
 import static com.google.common.base.Preconditions.checkArgument;
+import static com.google.common.collect.ImmutableSet.toImmutableSet;
+import static java.util.stream.Collectors.joining;
 
 import com.android.bundle.Devices.DeviceSpec;
 import com.android.bundle.Targeting.ApkTargeting;
@@ -25,6 +27,8 @@ import com.android.tools.build.bundletool.model.exceptions.InvalidDeviceSpecExce
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Sets;
 import com.google.common.collect.Sets.SetView;
+import com.google.common.collect.Streams;
+import com.google.protobuf.Int32Value;
 
 /**
  * A {@link TargetingDimensionMatcher} that provides APK matching on device tier.
@@ -55,22 +59,26 @@ public class DeviceTierApkMatcher extends TargetingDimensionMatcher<DeviceTierTa
       return true;
     }
 
-    ImmutableSet<String> values = ImmutableSet.copyOf(targeting.getValueList());
-    ImmutableSet<String> alternatives = ImmutableSet.copyOf(targeting.getAlternativesList());
+    ImmutableSet<Integer> values =
+        targeting.getValueList().stream().map(Int32Value::getValue).collect(toImmutableSet());
+    ImmutableSet<Integer> alternatives =
+        targeting.getAlternativesList().stream()
+            .map(Int32Value::getValue)
+            .collect(toImmutableSet());
 
-    SetView<String> intersection = Sets.intersection(values, alternatives);
+    SetView<Integer> intersection = Sets.intersection(values, alternatives);
     checkArgument(
         intersection.isEmpty(),
         "Expected targeting values and alternatives to be mutually exclusive, but both contain: %s",
         intersection);
 
-    if (getDeviceSpec().getDeviceTier().isEmpty()) {
+    if (!getDeviceSpec().hasDeviceTier()) {
       throw InvalidDeviceSpecException.builder()
           .withUserMessage(
               "The bundle uses device tier targeting, but no device tier was specified.")
           .build();
     }
-    if (values.contains(getDeviceSpec().getDeviceTier())) {
+    if (values.contains(getDeviceSpec().getDeviceTier().getValue())) {
       return true;
     }
     return false;
@@ -78,7 +86,7 @@ public class DeviceTierApkMatcher extends TargetingDimensionMatcher<DeviceTierTa
 
   @Override
   protected boolean isDeviceDimensionPresent() {
-    return !getDeviceSpec().getDeviceTier().isEmpty();
+    return getDeviceSpec().hasDeviceTier();
   }
 
   @Override
@@ -86,15 +94,15 @@ public class DeviceTierApkMatcher extends TargetingDimensionMatcher<DeviceTierTa
     if (targeting.equals(DeviceTierTargeting.getDefaultInstance())) {
       return;
     }
-    ImmutableSet<String> valuesAndAlternatives =
-        ImmutableSet.<String>builder()
-            .addAll(targeting.getValueList())
-            .addAll(targeting.getAlternativesList())
-            .build();
+    ImmutableSet<Integer> valuesAndAlternatives =
+        Streams.concat(
+                targeting.getValueList().stream().map(Int32Value::getValue),
+                targeting.getAlternativesList().stream().map(Int32Value::getValue))
+            .collect(toImmutableSet());
     checkArgument(
-        valuesAndAlternatives.contains(getDeviceSpec().getDeviceTier()),
+        valuesAndAlternatives.contains(getDeviceSpec().getDeviceTier().getValue()),
         "The specified device tier '%s' does not match any of the available values: %s.",
-        getDeviceSpec().getDeviceTier(),
-        String.join(", ", valuesAndAlternatives));
+        getDeviceSpec().getDeviceTier().getValue(),
+        valuesAndAlternatives.stream().map(i -> i.toString()).collect(joining(", ")));
   }
 }

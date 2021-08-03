@@ -843,21 +843,23 @@ public final class TargetingUtils {
 
   // Device Tier targeting.
 
-  public static DeviceTierTargeting deviceTierTargeting(String value) {
-    return DeviceTierTargeting.newBuilder().addValue(value).build();
+  public static DeviceTierTargeting deviceTierTargeting(int value) {
+    return DeviceTierTargeting.newBuilder().addValue(Int32Value.of(value)).build();
   }
 
   public static DeviceTierTargeting deviceTierTargeting(
-      String value, ImmutableList<String> alternatives) {
+      int value, ImmutableList<Integer> alternatives) {
     return DeviceTierTargeting.newBuilder()
-        .addValue(value)
-        .addAllAlternatives(alternatives)
+        .addValue(Int32Value.of(value))
+        .addAllAlternatives(alternatives.stream().map(Int32Value::of).collect(toImmutableList()))
         .build();
   }
 
   public static DeviceTierTargeting alternativeDeviceTierTargeting(
-      ImmutableList<String> alternatives) {
-    return DeviceTierTargeting.newBuilder().addAllAlternatives(alternatives).build();
+      ImmutableList<Integer> alternatives) {
+    return DeviceTierTargeting.newBuilder()
+        .addAllAlternatives(alternatives.stream().map(Int32Value::of).collect(toImmutableList()))
+        .build();
   }
 
   // Device Feature targeting.

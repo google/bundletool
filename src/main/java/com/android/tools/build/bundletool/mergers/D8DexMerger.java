@@ -33,6 +33,8 @@ import com.android.tools.r8.OutputMode;
 import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Streams;
+import com.google.common.io.MoreFiles;
+import com.google.common.io.RecursiveDeleteOption;
 import java.io.File;
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -100,6 +102,8 @@ public class D8DexMerger implements DexMerger {
       return Arrays.stream(mergedFiles).map(File::toPath).collect(toImmutableList());
 
     } catch (CompilationFailedException e) {
+      // Make sure to delete entries in the output dir.
+      cleanupOutputDir(outputDir);
       if (isCoreDesugaringException(e)) {
         // If merge fails because of core desugaring library, exclude dex files related to core
         // desugaring lib and try again.
@@ -107,7 +111,7 @@ public class D8DexMerger implements DexMerger {
             dexFiles, outputDir, mainDexListFile, proguardMap, isDebuggable, minSdkVersion);
       }
       if (proguardMap.isPresent()) {
-        // Try without the proguard map
+        // Try without the proguard map.
         return merge(
             dexFiles, outputDir, mainDexListFile, Optional.empty(), isDebuggable, minSdkVersion);
       } else {
@@ -213,6 +217,14 @@ public class D8DexMerger implements DexMerger {
           .withInternalMessage("Failed to read dex file %s.", dexFile.getFileName().toString())
           .withCause(e)
           .build();
+    }
+  }
+
+  private static void cleanupOutputDir(Path outputDir) {
+    try {
+      MoreFiles.deleteDirectoryContents(outputDir, RecursiveDeleteOption.ALLOW_INSECURE);
+    } catch (IOException e1) {
+      throw new UncheckedIOException(e1);
     }
   }
 }

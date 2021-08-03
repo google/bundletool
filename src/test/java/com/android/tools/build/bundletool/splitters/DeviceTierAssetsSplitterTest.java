@@ -47,30 +47,27 @@ public class DeviceTierAssetsSplitterTest {
   public void multipleDeviceTiersAndUntargetedFile() {
     BundleModule testModule =
         new BundleModuleBuilder("testModule")
-            .addFile("assets/images#tier_low/image.jpg")
-            .addFile("assets/images#tier_medium/image.jpg")
-            .addFile("assets/images#tier_high/image.jpg")
+            .addFile("assets/images#tier_0/image.jpg")
+            .addFile("assets/images#tier_1/image.jpg")
+            .addFile("assets/images#tier_2/image.jpg")
             .addFile("assets/file.txt")
             .setAssetsConfig(
                 assets(
                     targetedAssetsDirectory(
-                        "assets/images#tier_low",
+                        "assets/images#tier_0",
                         assetsDirectoryTargeting(
                             deviceTierTargeting(
-                                /* value= */ "low",
-                                /* alternatives= */ ImmutableList.of("medium", "high")))),
+                                /* value= */ 0, /* alternatives= */ ImmutableList.of(1, 2)))),
                     targetedAssetsDirectory(
-                        "assets/images#tier_medium",
+                        "assets/images#tier_1",
                         assetsDirectoryTargeting(
                             deviceTierTargeting(
-                                /* value= */ "medium",
-                                /* alternatives= */ ImmutableList.of("low", "high")))),
+                                /* value= */ 1, /* alternatives= */ ImmutableList.of(0, 2)))),
                     targetedAssetsDirectory(
-                        "assets/images#tier_high",
+                        "assets/images#tier_2",
                         assetsDirectoryTargeting(
                             deviceTierTargeting(
-                                /* value= */ "high",
-                                /* alternatives= */ ImmutableList.of("low", "medium")))),
+                                /* value= */ 2, /* alternatives= */ ImmutableList.of(0, 1)))),
                     targetedAssetsDirectory(
                         "assets", AssetsDirectoryTargeting.getDefaultInstance())))
             .setManifest(androidManifest("com.test.app"))
@@ -90,53 +87,48 @@ public class DeviceTierAssetsSplitterTest {
         getSplitsWithTargetingEqualTo(
             assetsSplits,
             apkDeviceTierTargeting(
-                deviceTierTargeting(
-                    /* value= */ "low", /* alternatives= */ ImmutableList.of("high", "medium"))));
+                deviceTierTargeting(/* value= */ 0, /* alternatives= */ ImmutableList.of(1, 2))));
     assertThat(lowSplits).hasSize(1);
     assertThat(extractPaths(lowSplits.get(0).findEntriesUnderPath(ASSETS_DIRECTORY)))
-        .containsExactly("assets/images#tier_low/image.jpg");
+        .containsExactly("assets/images#tier_0/image.jpg");
 
     List<ModuleSplit> mediumSplits =
         getSplitsWithTargetingEqualTo(
             assetsSplits,
             apkDeviceTierTargeting(
-                deviceTierTargeting(
-                    /* value= */ "medium", /* alternatives= */ ImmutableList.of("high", "low"))));
+                deviceTierTargeting(/* value= */ 1, /* alternatives= */ ImmutableList.of(0, 2))));
     assertThat(mediumSplits).hasSize(1);
     assertThat(extractPaths(mediumSplits.get(0).findEntriesUnderPath(ASSETS_DIRECTORY)))
-        .containsExactly("assets/images#tier_medium/image.jpg");
+        .containsExactly("assets/images#tier_1/image.jpg");
 
     List<ModuleSplit> highSplits =
         getSplitsWithTargetingEqualTo(
             assetsSplits,
             apkDeviceTierTargeting(
-                deviceTierTargeting(
-                    /* value= */ "high", /* alternatives= */ ImmutableList.of("low", "medium"))));
+                deviceTierTargeting(/* value= */ 2, /* alternatives= */ ImmutableList.of(0, 1))));
     assertThat(highSplits).hasSize(1);
     assertThat(extractPaths(highSplits.get(0).findEntriesUnderPath(ASSETS_DIRECTORY)))
-        .containsExactly("assets/images#tier_high/image.jpg");
+        .containsExactly("assets/images#tier_2/image.jpg");
   }
 
   @Test
   public void deviceTiers_lowTierMissing_ok() {
     BundleModule testModule =
         new BundleModuleBuilder("testModule")
-            .addFile("assets/images#tier_medium/image.jpg")
-            .addFile("assets/images#tier_high/image.jpg")
+            .addFile("assets/images#tier_1/image.jpg")
+            .addFile("assets/images#tier_2/image.jpg")
             .setAssetsConfig(
                 assets(
                     targetedAssetsDirectory(
-                        "assets/images#tier_medium",
+                        "assets/images#tier_1",
                         assetsDirectoryTargeting(
                             deviceTierTargeting(
-                                /* value= */ "medium",
-                                /* alternatives= */ ImmutableList.of("high")))),
+                                /* value= */ 1, /* alternatives= */ ImmutableList.of(2)))),
                     targetedAssetsDirectory(
-                        "assets/images#tier_high",
+                        "assets/images#tier_2",
                         assetsDirectoryTargeting(
                             deviceTierTargeting(
-                                /* value= */ "high",
-                                /* alternatives= */ ImmutableList.of("medium"))))))
+                                /* value= */ 2, /* alternatives= */ ImmutableList.of(1))))))
             .setManifest(androidManifest("com.test.app"))
             .build();
 
@@ -153,50 +145,45 @@ public class DeviceTierAssetsSplitterTest {
         getSplitsWithTargetingEqualTo(
             assetsSplits,
             apkDeviceTierTargeting(
-                deviceTierTargeting(
-                    /* value= */ "medium", /* alternatives= */ ImmutableList.of("high"))));
+                deviceTierTargeting(/* value= */ 1, /* alternatives= */ ImmutableList.of(2))));
     assertThat(mediumSplits).hasSize(1);
     assertThat(extractPaths(mediumSplits.get(0).findEntriesUnderPath(ASSETS_DIRECTORY)))
-        .containsExactly("assets/images#tier_medium/image.jpg");
+        .containsExactly("assets/images#tier_1/image.jpg");
 
     List<ModuleSplit> highSplits =
         getSplitsWithTargetingEqualTo(
             assetsSplits,
             apkDeviceTierTargeting(
-                deviceTierTargeting(
-                    /* value= */ "high", /* alternatives= */ ImmutableList.of("medium"))));
+                deviceTierTargeting(/* value= */ 2, /* alternatives= */ ImmutableList.of(1))));
     assertThat(highSplits).hasSize(1);
     assertThat(extractPaths(highSplits.get(0).findEntriesUnderPath(ASSETS_DIRECTORY)))
-        .containsExactly("assets/images#tier_high/image.jpg");
+        .containsExactly("assets/images#tier_2/image.jpg");
   }
 
   @Test
   public void multipleDeviceTiers_withSuffixStripping() {
     BundleModule testModule =
         new BundleModuleBuilder("testModule")
-            .addFile("assets/images#tier_low/image.jpg")
-            .addFile("assets/images#tier_medium/image.jpg")
-            .addFile("assets/images#tier_high/image.jpg")
+            .addFile("assets/images#tier_0/image.jpg")
+            .addFile("assets/images#tier_1/image.jpg")
+            .addFile("assets/images#tier_2/image.jpg")
             .setAssetsConfig(
                 assets(
                     targetedAssetsDirectory(
-                        "assets/images#tier_low",
+                        "assets/images#tier_0",
                         assetsDirectoryTargeting(
                             deviceTierTargeting(
-                                /* value= */ "low",
-                                /* alternatives= */ ImmutableList.of("high", "medium")))),
+                                /* value= */ 0, /* alternatives= */ ImmutableList.of(1, 2)))),
                     targetedAssetsDirectory(
-                        "assets/images#tier_medium",
+                        "assets/images#tier_1",
                         assetsDirectoryTargeting(
                             deviceTierTargeting(
-                                /* value= */ "medium",
-                                /* alternatives= */ ImmutableList.of("high", "low")))),
+                                /* value= */ 1, /* alternatives= */ ImmutableList.of(0, 2)))),
                     targetedAssetsDirectory(
-                        "assets/images#tier_high",
+                        "assets/images#tier_2",
                         assetsDirectoryTargeting(
                             deviceTierTargeting(
-                                /* value= */ "high",
-                                /* alternatives= */ ImmutableList.of("low", "medium"))))))
+                                /* value= */ 2, /* alternatives= */ ImmutableList.of(0, 1))))))
             .setManifest(androidManifest("com.test.app"))
             .build();
 
@@ -213,8 +200,7 @@ public class DeviceTierAssetsSplitterTest {
         getSplitsWithTargetingEqualTo(
             assetsSplits,
             apkDeviceTierTargeting(
-                deviceTierTargeting(
-                    /* value= */ "low", /* alternatives= */ ImmutableList.of("high", "medium"))));
+                deviceTierTargeting(/* value= */ 0, /* alternatives= */ ImmutableList.of(1, 2))));
     assertThat(lowSplits).hasSize(1);
     assertThat(extractPaths(lowSplits.get(0).findEntriesUnderPath(ASSETS_DIRECTORY)))
         .containsExactly("assets/images/image.jpg");
@@ -223,8 +209,7 @@ public class DeviceTierAssetsSplitterTest {
         getSplitsWithTargetingEqualTo(
             assetsSplits,
             apkDeviceTierTargeting(
-                deviceTierTargeting(
-                    /* value= */ "medium", /* alternatives= */ ImmutableList.of("high", "low"))));
+                deviceTierTargeting(/* value= */ 1, /* alternatives= */ ImmutableList.of(0, 2))));
     assertThat(mediumSplits).hasSize(1);
     assertThat(extractPaths(mediumSplits.get(0).findEntriesUnderPath(ASSETS_DIRECTORY)))
         .containsExactly("assets/images/image.jpg");
@@ -233,8 +218,7 @@ public class DeviceTierAssetsSplitterTest {
         getSplitsWithTargetingEqualTo(
             assetsSplits,
             apkDeviceTierTargeting(
-                deviceTierTargeting(
-                    /* value= */ "high", /* alternatives= */ ImmutableList.of("low", "medium"))));
+                deviceTierTargeting(/* value= */ 2, /* alternatives= */ ImmutableList.of(0, 1))));
     assertThat(highSplits).hasSize(1);
     assertThat(extractPaths(highSplits.get(0).findEntriesUnderPath(ASSETS_DIRECTORY)))
         .containsExactly("assets/images/image.jpg");
