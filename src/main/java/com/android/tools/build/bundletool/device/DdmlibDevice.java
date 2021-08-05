@@ -58,6 +58,7 @@ public class DdmlibDevice extends Device {
   private static final int ADB_TIMEOUT_MS = 60000;
   private static final String DEVICE_FEATURES_COMMAND = "pm list features";
   private static final String GL_EXTENSIONS_COMMAND = "dumpsys SurfaceFlinger";
+  private static final int MIN_INSTALL_WITH_PERMISSIONS_API_LEVEL = 23;
 
   private final DeviceFeaturesParser deviceFeaturesParser = new DeviceFeaturesParser();
   private final GlExtensionsParser glExtensionsParser = new GlExtensionsParser();
@@ -168,6 +169,10 @@ public class DdmlibDevice extends Device {
     }
     if (installOptions.getAllowTestOnly()) {
       extraArgs.add("-t");
+    }
+    if (installOptions.getGrantAllPermissions() &&
+            getVersion().isGreaterOrEqualThan(MIN_INSTALL_WITH_PERMISSIONS_API_LEVEL)) {
+      extraArgs.add("-g");
     }
 
     try {

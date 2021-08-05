@@ -87,6 +87,8 @@ public abstract class Device {
 
     public abstract boolean getAllowTestOnly();
 
+    public abstract boolean getGrantAllPermissions();
+
     public abstract Duration getTimeout();
 
     public static Builder builder() {
@@ -94,7 +96,8 @@ public abstract class Device {
           .setTimeout(DEFAULT_ADB_TIMEOUT)
           .setAllowReinstall(true)
           .setAllowDowngrade(false)
-          .setAllowTestOnly(false);
+          .setAllowTestOnly(false)
+          .setGrantAllPermissions(false);
     }
 
     /** Builder for {@link InstallOptions}. */
@@ -107,6 +110,8 @@ public abstract class Device {
       public abstract Builder setTimeout(Duration timeout);
 
       public abstract Builder setAllowTestOnly(boolean allowTestOnly);
+
+      public abstract Builder setGrantAllPermissions(boolean grantAllPermissions);
 
       public abstract InstallOptions build();
     }

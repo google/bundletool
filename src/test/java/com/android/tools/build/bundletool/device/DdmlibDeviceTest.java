@@ -123,6 +123,38 @@ public final class DdmlibDeviceTest {
   }
 
   @Test
+  public void grantAllPermissionsPreM() throws Exception {
+    when(mockDevice.getVersion()).thenReturn(new AndroidVersion(VersionCodes.KITKAT));
+    DdmlibDevice ddmlibDevice = new DdmlibDevice(mockDevice);
+
+    ddmlibDevice.installApks(
+            ImmutableList.of(APK_PATH), InstallOptions.builder().setGrantAllPermissions(true).build());
+
+    verify(mockDevice).installPackage(eq(APK_PATH.toString()), anyBoolean());
+  }
+
+  @SuppressWarnings("unchecked")
+  @Test
+  public void grantAllPermissionsPostM() throws Exception {
+    when(mockDevice.getVersion()).thenReturn(new AndroidVersion(VersionCodes.M));
+    DdmlibDevice ddmlibDevice = new DdmlibDevice(mockDevice);
+
+    ddmlibDevice.installApks(
+            ImmutableList.of(APK_PATH), InstallOptions.builder().setGrantAllPermissions(true).build());
+
+    ArgumentCaptor<List<String>> extraArgsCaptor = ArgumentCaptor.forClass(List.class);
+    verify(mockDevice)
+            .installPackages(
+                    eq(ImmutableList.of(APK_PATH.toFile())),
+                    anyBoolean(),
+                    extraArgsCaptor.capture(),
+                    anyLong(),
+                    any(TimeUnit.class));
+
+    assertThat(extraArgsCaptor.getValue()).contains("-g");
+  }
+
+  @Test
   public void pushFiles_targetLocation() throws Exception {
     String destinationPath = "/destination/path";
     when(mockDevice.getVersion()).thenReturn(new AndroidVersion(VersionCodes.KITKAT));

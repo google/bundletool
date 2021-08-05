@@ -69,6 +69,8 @@ public abstract class InstallApksCommand {
   private static final Flag<ImmutableSet<String>> MODULES_FLAG = Flag.stringSet("modules");
   private static final Flag<Boolean> ALLOW_DOWNGRADE_FLAG = Flag.booleanFlag("allow-downgrade");
   private static final Flag<Boolean> ALLOW_TEST_ONLY_FLAG = Flag.booleanFlag("allow-test-only");
+  private static final Flag<Boolean> GRANT_ALL_PERMISSIONS_FLAG =
+      Flag.booleanFlag("grant-all-permissions");
   private static final Flag<Integer> DEVICE_TIER_FLAG = Flag.nonNegativeInteger("device-tier");
   private static final Flag<ImmutableSet<String>> DEVICE_GROUPS_FLAG =
       Flag.stringSet("device-groups");
@@ -91,6 +93,8 @@ public abstract class InstallApksCommand {
 
   public abstract boolean getAllowTestOnly();
 
+  public abstract boolean getGrantAllPermissions();
+
   public abstract Optional<Integer> getDeviceTier();
 
   public abstract Optional<ImmutableSet<String>> getDeviceGroups();
@@ -105,6 +109,7 @@ public abstract class InstallApksCommand {
     return new AutoValue_InstallApksCommand.Builder()
         .setAllowDowngrade(false)
         .setAllowTestOnly(false)
+        .setGrantAllPermissions(false)
         .setTimeout(Device.DEFAULT_ADB_TIMEOUT);
   }
 
@@ -125,6 +130,8 @@ public abstract class InstallApksCommand {
     public abstract Builder setAdbServer(AdbServer adbServer);
 
     public abstract Builder setAllowTestOnly(boolean allowTestOnly);
+
+    public abstract Builder setGrantAllPermissions(boolean grantAllPermissions);
 
     public abstract Builder setDeviceTier(Integer deviceTier);
 
@@ -152,6 +159,7 @@ public abstract class InstallApksCommand {
     Optional<ImmutableSet<String>> modules = MODULES_FLAG.getValue(flags);
     Optional<Boolean> allowDowngrade = ALLOW_DOWNGRADE_FLAG.getValue(flags);
     Optional<Boolean> allowTestOnly = ALLOW_TEST_ONLY_FLAG.getValue(flags);
+    Optional<Boolean> grantAllPermissions = GRANT_ALL_PERMISSIONS_FLAG.getValue(flags);
     Optional<Integer> deviceTier = DEVICE_TIER_FLAG.getValue(flags);
     Optional<ImmutableSet<String>> deviceGroups = DEVICE_GROUPS_FLAG.getValue(flags);
     Optional<ImmutableList<Path>> additionalLocalTestingFiles =
@@ -166,6 +174,7 @@ public abstract class InstallApksCommand {
     modules.ifPresent(command::setModules);
     allowDowngrade.ifPresent(command::setAllowDowngrade);
     allowTestOnly.ifPresent(command::setAllowTestOnly);
+    grantAllPermissions.ifPresent(command::setGrantAllPermissions);
     deviceTier.ifPresent(command::setDeviceTier);
     deviceGroups.ifPresent(command::setDeviceGroups);
     additionalLocalTestingFiles.ifPresent(command::setAdditionalLocalTestingFiles);
@@ -204,6 +213,7 @@ public abstract class InstallApksCommand {
           InstallOptions.builder()
               .setAllowDowngrade(getAllowDowngrade())
               .setAllowTestOnly(getAllowTestOnly())
+              .setGrantAllPermissions(getGrantAllPermissions())
               .setTimeout(getTimeout())
               .build();
 
@@ -429,6 +439,13 @@ public abstract class InstallApksCommand {
                 .setDescription(
                     "If set, apps with 'android:testOnly=true' set in their manifest can also be"
                         + " deployed")
+                .build())
+        .addFlag(
+            FlagDescription.builder()
+                .setFlagName(GRANT_ALL_PERMISSIONS_FLAG.getName())
+                .setOptional(true)
+                .setDescription(
+                    "If set, all permissions listed in the app manifest will be granted")
                 .build())
         .addFlag(
             FlagDescription.builder()
