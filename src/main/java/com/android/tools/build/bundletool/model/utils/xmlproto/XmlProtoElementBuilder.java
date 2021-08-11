@@ -26,6 +26,7 @@ import com.android.aapt.Resources.XmlNamespace;
 import com.android.aapt.Resources.XmlNode;
 import com.google.common.collect.ImmutableList;
 import java.util.List;
+import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
 
@@ -134,6 +135,25 @@ public final class XmlProtoElementBuilder
             });
   }
 
+  public XmlProtoElementBuilder removeSourceDataRecursive() {
+    removeSourceDataRecursiveInternal(getProto());
+    return this;
+  }
+
+  private static void removeSourceDataRecursiveInternal(XmlElement.Builder builder) {
+    builder.getAttributeBuilderList().forEach(XmlAttribute.Builder::clearSource);
+    builder.getNamespaceDeclarationBuilderList().forEach(XmlNamespace.Builder::clearSource);
+    builder
+        .getChildBuilderList()
+        .forEach(
+            child -> {
+              child.clearSource();
+              if (child.hasElement()) {
+                removeSourceDataRecursiveInternal(child.getElementBuilder());
+              }
+            });
+  }
+
   public XmlProtoElementBuilder removeAttribute(String namespaceUri, String name) {
     return removeAttributeInternal(
         attribute ->
@@ -216,6 +236,17 @@ public final class XmlProtoElementBuilder
     if (getProtoChildrenList().size() != keptChildren.size()) {
       element.clearChild().addAllChild(keptChildren);
     }
+    return this;
+  }
+
+  public XmlProtoElementBuilder modifyChildElements(
+      Function<XmlProtoNodeBuilder, XmlProtoNodeBuilder> mapper) {
+    ImmutableList<XmlNode> modifiedElements =
+        getChildren()
+            .map(mapper)
+            .map(builder -> builder.build().getProto())
+            .collect(toImmutableList());
+    element.clearChild().addAllChild(modifiedElements);
     return this;
   }
 }

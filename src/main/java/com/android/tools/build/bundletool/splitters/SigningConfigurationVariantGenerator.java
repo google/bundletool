@@ -36,12 +36,12 @@ public final class SigningConfigurationVariantGenerator implements BundleModuleV
 
   @Override
   public Stream<VariantTargeting> generate(BundleModule module) {
-    return apkGenerationConfiguration.getMinimumV3SigningApiVersion().isPresent()
+    return apkGenerationConfiguration.getMinimumV3RotationApiVersion().isPresent()
         ? Stream.of(
             variantTargeting(
                 sdkVersionTargeting(
                     sdkVersionFrom(
-                        apkGenerationConfiguration.getMinimumV3SigningApiVersion().get()))))
+                        apkGenerationConfiguration.getMinimumV3RotationApiVersion().get()))))
         : Stream.of();
   }
 }

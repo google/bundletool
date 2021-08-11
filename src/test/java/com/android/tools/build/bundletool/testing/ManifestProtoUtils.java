@@ -16,6 +16,7 @@
 
 package com.android.tools.build.bundletool.testing;
 
+import static com.android.tools.build.bundletool.model.AndroidManifest.ACTIVITY_ALIAS_ELEMENT_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.ACTIVITY_ELEMENT_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.ANDROID_NAMESPACE_URI;
 import static com.android.tools.build.bundletool.model.AndroidManifest.APPLICATION_ELEMENT_NAME;
@@ -44,6 +45,7 @@ import static com.android.tools.build.bundletool.model.AndroidManifest.NAME_RESO
 import static com.android.tools.build.bundletool.model.AndroidManifest.NATIVE_ACTIVITY_LIB_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.NO_NAMESPACE_URI;
 import static com.android.tools.build.bundletool.model.AndroidManifest.PROVIDER_ELEMENT_NAME;
+import static com.android.tools.build.bundletool.model.AndroidManifest.RECEIVER_ELEMENT_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.RESOURCE_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.SERVICE_ELEMENT_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.SPLIT_NAME_ATTRIBUTE_NAME;
@@ -840,6 +842,17 @@ public final class ManifestProtoUtils {
   /** Adds an activity with the {@code splitName} attribute. */
   public static ManifestMutator withSplitNameActivity(String activityName, String splitName) {
     return withSplitNameElement(ACTIVITY_ELEMENT_NAME, activityName, splitName);
+  }
+
+  /** Adds an activity alias with the {@code splitName} attribute. */
+  public static ManifestMutator withSplitNameActivityAlias(
+      String activityAliasName, String splitName) {
+    return withSplitNameElement(ACTIVITY_ALIAS_ELEMENT_NAME, activityAliasName, splitName);
+  }
+
+  /** Adds a receiver with the {@code splitName} attribute. */
+  public static ManifestMutator withSplitNameReceiver(String serviceName, String splitName) {
+    return withSplitNameElement(RECEIVER_ELEMENT_NAME, serviceName, splitName);
   }
 
   /** Adds a service with the {@code splitName} attribute. */

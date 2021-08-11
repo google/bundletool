@@ -31,12 +31,12 @@ configurations {
 
 // The repackaging rules are defined in the "shadowJar" task below.
 dependencies {
-    compile "com.android.tools:common:30.0.0-alpha10"
+    compile "com.android.tools:common:30.1.0-alpha07"
     compile "com.android.tools:r8:2.2.64"
     compile "com.android.tools.build:apkzlib:4.2.0-alpha13"
     compile "com.android.tools.build:apksig:4.2.0-alpha13"
-    compile "com.android.tools.ddms:ddmlib:30.0.0-alpha10"
-    compile "com.android:zipflinger:7.0.0-alpha14"
+    compile "com.android.tools.ddms:ddmlib:30.1.0-alpha07"
+    compile "com.android:zipflinger:7.1.0-alpha07"
 
     shadow "com.android.tools.build:aapt2-proto:7.0.0-beta04-7396180"
     shadow "com.google.auto.value:auto-value-annotations:1.6.2"

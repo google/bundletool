@@ -16,7 +16,8 @@
 
 package com.android.tools.build.bundletool.mergers;
 
-import static com.android.tools.build.bundletool.mergers.AndroidManifestMerger.fusingMerger;
+import static com.android.tools.build.bundletool.mergers.AndroidManifestMerger.fusingMergerApplicationElements;
+import static com.android.tools.build.bundletool.mergers.AndroidManifestMerger.fusingMergerOnlyReplaceActivities;
 import static com.android.tools.build.bundletool.mergers.AndroidManifestMerger.useBaseModuleManifestMerger;
 import static com.android.tools.build.bundletool.mergers.MergingUtils.mergeTargetedAssetsDirectories;
 import static com.android.tools.build.bundletool.model.BundleMetadata.BUNDLETOOL_NAMESPACE;
@@ -26,6 +27,7 @@ import static com.android.tools.build.bundletool.model.BundleMetadata.PROGUARD_M
 import static com.android.tools.build.bundletool.model.BundleModule.DEX_DIRECTORY;
 import static com.android.tools.build.bundletool.model.BundleModuleName.BASE_MODULE_NAME;
 import static com.android.tools.build.bundletool.model.version.VersionGuardedFeature.FUSE_ACTIVITIES_FROM_FEATURE_MANIFESTS;
+import static com.android.tools.build.bundletool.model.version.VersionGuardedFeature.FUSE_APPLICATION_ELEMENTS_FROM_FEATURE_MANIFESTS;
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 
@@ -103,9 +105,17 @@ public class ModuleSplitsToShardMerger {
         splitsOfShard,
         mergedDexCache,
         /* mergedSplitType= */ SplitType.STANDALONE,
-        FUSE_ACTIVITIES_FROM_FEATURE_MANIFESTS.enabledForVersion(bundletoolVersion)
-            ? fusingMerger()
-            : useBaseModuleManifestMerger());
+        createManifestMerger());
+  }
+
+  private AndroidManifestMerger createManifestMerger() {
+    if (FUSE_APPLICATION_ELEMENTS_FROM_FEATURE_MANIFESTS.enabledForVersion(bundletoolVersion)) {
+      return fusingMergerApplicationElements();
+    }
+    if (FUSE_ACTIVITIES_FROM_FEATURE_MANIFESTS.enabledForVersion(bundletoolVersion)) {
+      return fusingMergerOnlyReplaceActivities();
+    }
+    return useBaseModuleManifestMerger();
   }
 
   /**

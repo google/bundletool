@@ -21,6 +21,7 @@ import static com.google.common.truth.Truth.assertThat;
 import static com.google.common.truth.Truth8.assertThat;
 import static com.google.common.truth.extensions.proto.ProtoTruth.assertThat;
 
+import com.android.aapt.Resources.SourcePosition;
 import com.android.aapt.Resources.XmlAttribute;
 import com.android.aapt.Resources.XmlElement;
 import com.android.aapt.Resources.XmlNamespace;
@@ -417,8 +418,7 @@ public class XmlProtoElementBuilderTest {
         .isEqualTo(XmlElement.newBuilder().setName("hello").build());
     assertThat(element.getProto().build())
         .isEqualTo(
-            protoElement
-                .toBuilder()
+            protoElement.toBuilder()
                 .addChild(XmlNode.newBuilder().setElement(XmlElement.newBuilder().setName("hello")))
                 .build());
   }
@@ -449,8 +449,7 @@ public class XmlProtoElementBuilderTest {
         .isEqualTo(XmlElement.newBuilder().setName("hello").setNamespaceUri("namespace").build());
     assertThat(element.getProto().build())
         .isEqualTo(
-            protoElement
-                .toBuilder()
+            protoElement.toBuilder()
                 .addChild(
                     XmlNode.newBuilder()
                         .setElement(
@@ -471,8 +470,7 @@ public class XmlProtoElementBuilderTest {
 
     assertThat(element.getProto().build())
         .isEqualTo(
-            protoElement
-                .toBuilder()
+            protoElement.toBuilder()
                 .addChild(XmlNode.newBuilder().setElement(childElement))
                 .build());
   }
@@ -498,8 +496,7 @@ public class XmlProtoElementBuilderTest {
 
     assertThat(element.getProto().build())
         .isEqualTo(
-            protoElement
-                .toBuilder()
+            protoElement.toBuilder()
                 .addNamespaceDeclaration(
                     XmlNamespace.newBuilder().setPrefix("ns").setUri("http://namespace"))
                 .build());
@@ -548,5 +545,63 @@ public class XmlProtoElementBuilderTest {
     assertThat(fetchedElements).hasSize(1);
     XmlProtoElementBuilder fetchedElement = fetchedElements.get(0);
     assertThat(fetchedElement.getProto().build()).isEqualTo(childElement);
+  }
+
+  @Test
+  public void removeSourceDataRecursive() {
+    SourcePosition sourcePosition =
+        SourcePosition.newBuilder().setLineNumber(12).setColumnNumber(32).build();
+    XmlElement element =
+        XmlElement.newBuilder()
+            .addAttribute(
+                XmlAttribute.newBuilder()
+                    .setSource(sourcePosition)
+                    .setName("name1")
+                    .setValue("value"))
+            .addAttribute(
+                XmlAttribute.newBuilder()
+                    .setSource(sourcePosition)
+                    .setName("name2")
+                    .setValue("value"))
+            .addNamespaceDeclaration(
+                XmlNamespace.newBuilder()
+                    .setSource(sourcePosition)
+                    .setPrefix("pref")
+                    .setUri("http://uri"))
+            .addChild(
+                XmlNode.newBuilder()
+                    .setElement(
+                        XmlElement.newBuilder()
+                            .addAttribute(
+                                XmlAttribute.newBuilder()
+                                    .setSource(sourcePosition)
+                                    .setName("nested")
+                                    .setValue("another"))))
+            .addChild(XmlNode.newBuilder().setSource(sourcePosition).setText("Text1"))
+            .addChild(XmlNode.newBuilder().setSource(sourcePosition).setText("Text2"))
+            .build();
+
+    XmlElement elementWithoutSource =
+        new XmlProtoElementBuilder(element.toBuilder())
+            .removeSourceDataRecursive()
+            .build()
+            .getProto();
+
+    XmlElement expected =
+        XmlElement.newBuilder()
+            .addAttribute(XmlAttribute.newBuilder().setName("name1").setValue("value"))
+            .addAttribute(XmlAttribute.newBuilder().setName("name2").setValue("value"))
+            .addNamespaceDeclaration(
+                XmlNamespace.newBuilder().setPrefix("pref").setUri("http://uri"))
+            .addChild(
+                XmlNode.newBuilder()
+                    .setElement(
+                        XmlElement.newBuilder()
+                            .addAttribute(
+                                XmlAttribute.newBuilder().setName("nested").setValue("another"))))
+            .addChild(XmlNode.newBuilder().setText("Text1"))
+            .addChild(XmlNode.newBuilder().setText("Text2"))
+            .build();
+    assertThat(elementWithoutSource).isEqualTo(expected);
   }
 }

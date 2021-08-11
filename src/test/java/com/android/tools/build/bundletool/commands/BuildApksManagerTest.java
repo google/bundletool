@@ -72,6 +72,7 @@ import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.with
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withNativeActivity;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withOnDemandAttribute;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withOnDemandDelivery;
+import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withSplitNameService;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withTargetSdkVersion;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withTitle;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withUsesSplit;
@@ -1063,7 +1064,8 @@ public class BuildApksManagerTest {
   }
 
   @Test
-  public void buildApksCommand_universal_mergeActivitiesFromFeatureManifest() throws Exception {
+  public void buildApksCommand_universal_mergeApplicationElementsFromFeatureManifest()
+      throws Exception {
     final int baseThemeRefId = 123;
     final int featureThemeRefId = 4456;
     AppBundle appBundle =
@@ -1086,7 +1088,8 @@ public class BuildApksManagerTest {
                             "com.test.app.feature1",
                             withFusingAttribute(true),
                             withTitle("@string/test_label", TEST_LABEL_RESOURCE_ID),
-                            withCustomThemeActivity("activity1", featureThemeRefId))))
+                            withCustomThemeActivity("activity1", featureThemeRefId),
+                            withSplitNameService("service1", "feature"))))
             .addModule(
                 "not_fused",
                 builder ->
@@ -1095,7 +1098,86 @@ public class BuildApksManagerTest {
                             "com.test.app.feature2",
                             withFusingAttribute(false),
                             withTitle("@string/test_label", TEST_LABEL_RESOURCE_ID),
-                            withCustomThemeActivity("activity2", featureThemeRefId))))
+                            withCustomThemeActivity("activity2", featureThemeRefId),
+                            withSplitNameService("service2", "not_fused"))))
+            .build();
+    TestComponent.useTestModule(
+        this,
+        TestModule.builder()
+            .withAppBundle(appBundle)
+            .withOutputPath(outputFilePath)
+            .withApkBuildMode(UNIVERSAL)
+            .build());
+
+    buildApksManager.execute();
+
+    ZipFile apkSetFile = openZipFile(outputFilePath.toFile());
+    BuildApksResult result = extractTocFromApkSetFile(apkSetFile, outputDir);
+
+    Variant universalVariant = standaloneApkVariants(result).get(0);
+    assertThat(apkDescriptions(universalVariant)).hasSize(1);
+    ApkDescription universalApk = apkDescriptions(universalVariant).get(0);
+
+    // Correct modules selected for merging.
+    assertThat(universalApk.getStandaloneApkMetadata().getFusedModuleNameList())
+        .containsExactly("base", "feature");
+    File universalApkFile = extractFromApkSetFile(apkSetFile, universalApk.getPath(), outputDir);
+    AndroidManifest manifest = extractAndroidManifest(universalApkFile);
+
+    Map<String, Integer> refIdByActivity =
+        transformValues(
+            manifest.getActivitiesByName(),
+            activity ->
+                activity
+                    .getAndroidAttribute(AndroidManifest.THEME_RESOURCE_ID)
+                    .get()
+                    .getValueAsRefId());
+    assertThat(refIdByActivity)
+        .containsExactly("activity1", featureThemeRefId, "activity2", baseThemeRefId);
+    assertThat(getServicesFromManifest(manifest)).containsExactly("service1");
+  }
+
+  @Test
+  public void buildApksCommand_universal_mergeActivitiesFromFeatureManifest_0_13_4()
+      throws Exception {
+    final int baseThemeRefId = 123;
+    final int featureThemeRefId = 4456;
+    AppBundle appBundle =
+        new AppBundleBuilder()
+            .setBundleConfig(
+                BundleConfig.newBuilder()
+                    .setBundletool(Bundletool.newBuilder().setVersion("0.13.4"))
+                    .build())
+            .addModule(
+                "base",
+                builder ->
+                    builder
+                        .setManifest(
+                            androidManifest(
+                                "com.test.app",
+                                withCustomThemeActivity("activity1", baseThemeRefId),
+                                withCustomThemeActivity("activity2", baseThemeRefId)))
+                        .setResourceTable(resourceTableWithTestLabel("Test feature")))
+            .addModule(
+                "feature",
+                builder ->
+                    builder.setManifest(
+                        androidManifestForFeature(
+                            "com.test.app.feature1",
+                            withFusingAttribute(true),
+                            withTitle("@string/test_label", TEST_LABEL_RESOURCE_ID),
+                            withCustomThemeActivity("activity1", featureThemeRefId),
+                            withSplitNameService("service1", "feature"))))
+            .addModule(
+                "not_fused",
+                builder ->
+                    builder.setManifest(
+                        androidManifestForFeature(
+                            "com.test.app.feature2",
+                            withFusingAttribute(false),
+                            withTitle("@string/test_label", TEST_LABEL_RESOURCE_ID),
+                            withCustomThemeActivity("activity2", featureThemeRefId),
+                            withSplitNameService("service2", "not_fused"))))
             .build();
     TestComponent.useTestModule(
         this,
@@ -1130,6 +1212,7 @@ public class BuildApksManagerTest {
                     .getValueAsRefId());
     assertThat(refIdByActivity)
         .containsExactly("activity1", featureThemeRefId, "activity2", baseThemeRefId);
+    assertThat(getServicesFromManifest(manifest)).isEmpty();
   }
 
   @Test
@@ -5637,6 +5720,21 @@ public class BuildApksManagerTest {
     } catch (IOException e) {
       throw new UncheckedIOException(e);
     }
+  }
+
+  private static ImmutableList<String> getServicesFromManifest(AndroidManifest manifest) {
+    return manifest
+        .getManifestRoot()
+        .getElement()
+        .getChildElement(AndroidManifest.APPLICATION_ELEMENT_NAME)
+        .getChildrenElements(AndroidManifest.SERVICE_ELEMENT_NAME)
+        .map(
+            element ->
+                element
+                    .getAndroidAttribute(AndroidManifest.NAME_RESOURCE_ID)
+                    .get()
+                    .getValueAsString())
+        .collect(toImmutableList());
   }
 
   private ImmutableMap<ApkTargeting, Variant> extractApexVariantsByTargeting(

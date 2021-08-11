@@ -15,23 +15,14 @@
  */
 package com.android.tools.build.bundletool.io;
 
-import static java.lang.Math.max;
 import static java.nio.file.StandardCopyOption.REPLACE_EXISTING;
 
-import com.android.apksig.ApkSigner.SignerConfig;
 import com.android.apksig.apk.ApkFormatException;
-import com.android.tools.build.bundletool.commands.BuildApksModule.ApkSigningConfig;
-import com.android.tools.build.bundletool.commands.BuildApksModule.StampSigningConfig;
 import com.android.tools.build.bundletool.model.ModuleEntry;
 import com.android.tools.build.bundletool.model.ModuleSplit;
-import com.android.tools.build.bundletool.model.SigningConfiguration;
 import com.android.tools.build.bundletool.model.WearApkLocator;
 import com.android.tools.build.bundletool.model.ZipPath;
 import com.android.tools.build.bundletool.model.exceptions.CommandExecutionException;
-import com.android.tools.build.bundletool.model.targeting.TargetingUtils;
-import com.android.tools.build.bundletool.model.utils.Versions;
-import com.android.tools.build.bundletool.model.version.Version;
-import com.android.tools.build.bundletool.model.version.VersionGuardedFeature;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.errorprone.annotations.CheckReturnValue;
@@ -43,59 +34,43 @@ import java.nio.file.Path;
 import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
 import java.security.SignatureException;
-import java.util.Optional;
 import javax.inject.Inject;
 
 /** Signs APKs. */
 class ApkSigner {
 
-  /** Name identifying uniquely the {@link SignerConfig} passed to the engine. */
-  private static final String SIGNER_CONFIG_NAME = "BNDLTOOL";
-
-  private final Optional<SigningConfiguration> optSigningConfig;
-  private final Optional<SigningConfiguration> optStampSigningConfig;
-  private final Version bundletoolVersion;
+  private final SigningConfigurationHelper signingConfigHelper;
   private final TempDirectory tempDirectory;
 
   @Inject
-  ApkSigner(
-      @ApkSigningConfig Optional<SigningConfiguration> signingConfig,
-      @StampSigningConfig Optional<SigningConfiguration> stampSigningConfig,
-      Version bundletoolVersion,
-      TempDirectory tempDirectory) {
-    this.optSigningConfig = signingConfig;
-    this.optStampSigningConfig = stampSigningConfig;
-    this.bundletoolVersion = bundletoolVersion;
+  ApkSigner(SigningConfigurationHelper signingConfigHelper, TempDirectory tempDirectory) {
+    this.signingConfigHelper = signingConfigHelper;
     this.tempDirectory = tempDirectory;
   }
 
   public void signApk(Path apkPath, ModuleSplit split) {
-    if (!optSigningConfig.isPresent()) {
+    if (!signingConfigHelper.shouldSignGeneratedApks()) {
       return;
     }
-    SigningConfiguration signingConfiguration = optSigningConfig.get();
-
-    boolean signWithV1 = shouldSignWithV1Scheme(split);
-    boolean signWithV3 = shouldSignWithV3Scheme(split);
-    int minSdkVersion = split.getAndroidManifest().getEffectiveMinSdkVersion();
 
     try (TempDirectory tempDirectory = new TempDirectory(getClass().getSimpleName())) {
       Path signedApkPath = tempDirectory.getPath().resolve("signed.apk");
       com.android.apksig.ApkSigner.Builder apkSigner =
           new com.android.apksig.ApkSigner.Builder(
-                  extractSignerConfigs(signingConfiguration, signWithV3))
+                  signingConfigHelper.getSignerConfigsForSplit(split))
               .setInputApk(apkPath.toFile())
               .setOutputApk(signedApkPath.toFile())
-              .setV1SigningEnabled(signWithV1)
+              .setV1SigningEnabled(signingConfigHelper.shouldSignWithV1(split))
               .setV2SigningEnabled(true)
-              .setV3SigningEnabled(signWithV3)
+              .setV3SigningEnabled(true)
               .setOtherSignersSignaturesPreserved(false)
-              .setMinSdkVersion(minSdkVersion);
-      optStampSigningConfig.ifPresent(
-          stampConfig -> {
-            apkSigner.setSourceStampSignerConfig(
-                convertToApksigSignerConfig(stampConfig.getSignerConfig()));
-          });
+              .setMinSdkVersion(split.getAndroidManifest().getEffectiveMinSdkVersion());
+      signingConfigHelper
+          .getSigningCertificateLineageForSplit(split)
+          .ifPresent(apkSigner::setSigningCertificateLineage);
+      signingConfigHelper
+          .getSourceStampSignerConfig()
+          .ifPresent(apkSigner::setSourceStampSignerConfig);
       apkSigner.build().sign();
       Files.move(signedApkPath, apkPath, REPLACE_EXISTING);
     } catch (IOException
@@ -147,47 +122,5 @@ class ApkSigner {
     } catch (IOException e) {
       throw new UncheckedIOException(e);
     }
-  }
-
-  private static ImmutableList<SignerConfig> extractSignerConfigs(
-      SigningConfiguration signingConfiguration, boolean signWithV3) {
-    if (!signWithV3) {
-      return ImmutableList.of(
-          convertToApksigSignerConfig(signingConfiguration.getSignerConfigForV1AndV2()));
-    }
-
-    ImmutableList.Builder<SignerConfig> signerConfigs = ImmutableList.builder();
-    signerConfigs.add(convertToApksigSignerConfig(signingConfiguration.getSignerConfig()));
-    return signerConfigs.build();
-  }
-
-  private static SignerConfig convertToApksigSignerConfig(
-      com.android.tools.build.bundletool.model.SignerConfig signerConfig) {
-    return new SignerConfig.Builder(
-            SIGNER_CONFIG_NAME, signerConfig.getPrivateKey(), signerConfig.getCertificates())
-        .build();
-  }
-
-  private boolean shouldSignWithV1Scheme(ModuleSplit split) {
-    return split.getAndroidManifest().getEffectiveMinSdkVersion() < Versions.ANDROID_N_API_VERSION
-        || !VersionGuardedFeature.NO_V1_SIGNING_WHEN_POSSIBLE.enabledForVersion(bundletoolVersion);
-  }
-
-  private boolean shouldSignWithV3Scheme(ModuleSplit split) {
-    if (!optSigningConfig.isPresent()) {
-      // No v3 scheme rotation specified.
-      return false;
-    }
-
-    if (!optSigningConfig.get().getMinimumV3SigningApiVersion().isPresent()) {
-      // Caller specified rotations are fine to perform on all API levels.
-      return true;
-    }
-
-    int minimumV3signingApiVersion = optSigningConfig.get().getMinimumV3SigningApiVersion().get();
-    int minManifestSdkVersion = split.getAndroidManifest().getEffectiveMinSdkVersion();
-    int minApkTargetingSdkVersion =
-        TargetingUtils.getMinSdk(split.getApkTargeting().getSdkVersionTargeting());
-    return max(minManifestSdkVersion, minApkTargetingSdkVersion) >= minimumV3signingApiVersion;
   }
 }

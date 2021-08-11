@@ -18,9 +18,11 @@ package com.android.tools.build.bundletool.mergers;
 
 import static com.android.tools.build.bundletool.model.BundleModuleName.BASE_MODULE_NAME;
 
+import com.android.tools.build.bundletool.mergers.FusingAndroidManifestMerger.Mode;
 import com.android.tools.build.bundletool.model.AndroidManifest;
 import com.android.tools.build.bundletool.model.BundleModuleName;
 import com.android.tools.build.bundletool.model.exceptions.CommandExecutionException;
+import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.SetMultimap;
 import java.util.Set;
@@ -35,8 +37,21 @@ public interface AndroidManifestMerger {
     return (manifests) -> override;
   }
 
-  static AndroidManifestMerger fusingMerger() {
-    return new FusingAndroidManifestMerger();
+  static AndroidManifestMerger fusingMergerOnlyReplaceActivities() {
+    return new FusingAndroidManifestMerger(
+        ImmutableSet.of(AndroidManifest.ACTIVITY_ELEMENT_NAME), Mode.REPLACE);
+  }
+
+  static AndroidManifestMerger fusingMergerApplicationElements() {
+    return new FusingAndroidManifestMerger(
+        ImmutableSet.of(
+            AndroidManifest.ACTIVITY_ELEMENT_NAME,
+            AndroidManifest.ACTIVITY_ALIAS_ELEMENT_NAME,
+            AndroidManifest.META_DATA_ELEMENT_NAME,
+            AndroidManifest.PROVIDER_ELEMENT_NAME,
+            AndroidManifest.RECEIVER_ELEMENT_NAME,
+            AndroidManifest.SERVICE_ELEMENT_NAME),
+        Mode.MERGE_CHILDREN);
   }
 
   /** Merger that takes manifest from base module as merged manifest */

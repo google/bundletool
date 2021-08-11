@@ -111,7 +111,8 @@ public abstract class BuildApksCommand {
     /**
      * INSTANT mode only generates instant APKs, assuming at least one module is instant-enabled.
      */
-    INSTANT;
+    INSTANT
+  ;
 
     public final String getLowerCaseName() {
       return Ascii.toLowerCase(name());
@@ -173,6 +174,9 @@ public abstract class BuildApksCommand {
   private static final Flag<Password> STAMP_KEY_PASSWORD_FLAG = Flag.password("stamp-key-pass");
   private static final Flag<String> STAMP_SOURCE_FLAG = Flag.string("stamp-source");
 
+  // Key-rotation-related flags.
+  private static final Flag<Path> LINEAGE_FLAG = Flag.path("lineage");
+  private static final Flag<Path> OLDEST_SIGNER_FLAG = Flag.path("oldest-signer");
 
   private static final String APK_SET_ARCHIVE_EXTENSION = "apks";
 
@@ -192,7 +196,7 @@ public abstract class BuildApksCommand {
       SystemEnvironmentProvider.DEFAULT_PROVIDER
           .getProperty("bundletool.serializer.zipflinger")
           .map(Boolean::parseBoolean)
-          .orElse(false);
+          .orElse(true);
 
   public abstract Path getBundlePath();
 
@@ -896,6 +900,58 @@ public abstract class BuildApksCommand {
                 .build())
         .addFlag(
             FlagDescription.builder()
+                .setFlagName(LINEAGE_FLAG.getName())
+                .setExampleValue("path/to/existing/lineage")
+                .setOptional(true)
+                .setDescription(
+                    "Input SigningCertificateLineage. This file contains a binary representation "
+                        + "of a SigningCertificateLineage object, which contains the "
+                        + "proof-of-rotation for different signing certificates. This can be used "
+                        + "with APK Signature Scheme v3 to rotate the signing certificate for an "
+                        + "APK. An APK previously signed with a SigningCertificateLineage can also "
+                        + "be specified; the lineage will then be read from the signed data in the "
+                        + "APK. If set, the flag '%s' must also be set.",
+                    OLDEST_SIGNER_FLAG)
+                .build())
+        .addFlag(
+            FlagDescription.builder()
+                .setFlagName(OLDEST_SIGNER_FLAG.getName())
+                .setExampleValue("path/to/keystore.properties")
+                .setOptional(true)
+                .setDescription(
+                    "Path to a properties file containing the properties of the oldest keystore "
+                        + "that has previously been used for signing. This is used to sign the "
+                        + "generated APKs with signature scheme v1 and v2 for backward "
+                        + "compatibility when the key has been rotated using signature scheme "
+                        + "v3. If set, the flag '%s' must also be set.\n"
+                        + "\n"
+                        + "The file is required to include values for the following properties:\n"
+                        + "  * ks - Path to the keystore.\n"
+                        + "  * ks-key-alias - Alias of the key to use in the keystore.\n"
+                        + "\n"
+                        + "The file may also optionally include values for the following "
+                        + "properties:\n"
+                        + "  * ks-pass - Password of the keystore. If provided, must be prefixed "
+                        + "with either 'pass:' (if the password is passed in clear text, e.g. "
+                        + "'pass:qwerty') or 'file:' (if the password is the first line of a "
+                        + "file, e.g. 'file:/tmp/myPassword.txt'). If this property is not set, "
+                        + "the password will be requested on the prompt.\n"
+                        + "  * key-pass - Password of the key in the keystore. If provided, must "
+                        + "be prefixed with either 'pass:' (if the password is passed in clear "
+                        + "text, e.g. 'pass:qwerty') or 'file:' (if the password is the first "
+                        + "line of a file, e.g. 'file:/tmp/myPassword.txt'). If this property is "
+                        + "not set, the keystore password will be tried. If that fails, the "
+                        + "password will be requested on the prompt.\n"
+                        + "\n"
+                        + "Example keystore.properties file:\n"
+                        + "ks=/path/to/keystore.jks\n"
+                        + "ks-key-alias=keyAlias\n"
+                        + "ks-pass=pass:myPassword\n"
+                        + "key-pass=file:/path/to/myPassword.txt",
+                    LINEAGE_FLAG)
+                .build())
+        .addFlag(
+            FlagDescription.builder()
                 .setFlagName(CONNECTED_DEVICE_FLAG.getName())
                 .setOptional(true)
                 .setDescription(
@@ -1073,7 +1129,8 @@ public abstract class BuildApksCommand {
       SigningConfiguration.Builder builder =
           SigningConfiguration.builder()
               .setSignerConfig(signerConfig)
-              .setMinimumV3SigningApiVersion(minV3SigningApi);
+              .setMinimumV3RotationApiVersion(minV3SigningApi);
+      populateLineageFromFlags(builder, flags);
       buildApksCommand.setSigningConfiguration(builder.build());
     } else if (keystorePath.isPresent() && !keyAlias.isPresent()) {
       throw InvalidCommandException.builder()
@@ -1100,6 +1157,59 @@ public abstract class BuildApksCommand {
     }
   }
 
+  private static void populateLineageFromFlags(
+      SigningConfiguration.Builder signingConfiguration, ParsedFlags flags) {
+    // Key-rotation-related arguments.
+    Optional<Path> lineagePath = LINEAGE_FLAG.getValue(flags);
+    Optional<Path> oldestSignerPropertiesPath = OLDEST_SIGNER_FLAG.getValue(flags);
+
+    if (lineagePath.isPresent() && oldestSignerPropertiesPath.isPresent()) {
+      signingConfiguration.setSigningCertificateLineage(
+          getLineageFromInputFile(lineagePath.get().toFile()));
+      KeystoreProperties oldestSignerProperties =
+          KeystoreProperties.readFromFile(oldestSignerPropertiesPath.get());
+      signingConfiguration.setOldestSigner(
+          SignerConfig.extractFromKeystore(
+              oldestSignerProperties.getKeystorePath(),
+              oldestSignerProperties.getKeyAlias(),
+              oldestSignerProperties.getKeystorePassword(),
+              oldestSignerProperties.getKeyPassword()));
+    } else if (lineagePath.isPresent() && !oldestSignerPropertiesPath.isPresent()) {
+      throw InvalidCommandException.builder()
+          .withInternalMessage(
+              "Flag '%s' is required when '%s' is set.", OLDEST_SIGNER_FLAG, LINEAGE_FLAG)
+          .build();
+    } else if (!lineagePath.isPresent() && oldestSignerPropertiesPath.isPresent()) {
+      throw InvalidCommandException.builder()
+          .withInternalMessage(
+              "Flag '%s' is required when '%s' is set.", LINEAGE_FLAG, OLDEST_SIGNER_FLAG)
+          .build();
+    }
+  }
+
+  /** Extracts the Signing Certificate Lineage from the provided lineage or APK file. */
+  private static SigningCertificateLineage getLineageFromInputFile(File inputLineageFile) {
+    try (RandomAccessFile f = new RandomAccessFile(inputLineageFile, "r")) {
+      if (f.length() < 4) {
+        throw CommandExecutionException.builder()
+            .withInternalMessage("The input file is not a valid lineage file.")
+            .build();
+      }
+      DataSource apk = DataSources.asDataSource(f);
+      int magicValue = apk.getByteBuffer(0, 4).order(ByteOrder.LITTLE_ENDIAN).getInt();
+      if (magicValue == SigningCertificateLineage.MAGIC) {
+        return SigningCertificateLineage.readFromFile(inputLineageFile);
+      } else if (magicValue == ZIP_MAGIC) {
+        return SigningCertificateLineage.readFromApkFile(inputLineageFile);
+      } else {
+        throw CommandExecutionException.builder()
+            .withInternalMessage("The input file is not a valid lineage file.")
+            .build();
+      }
+    } catch (IOException | ApkFormatException | IllegalArgumentException e) {
+      throw CommandExecutionException.builder().withCause(e).build();
+    }
+  }
 
   private static void populateSourceStampFromFlags(
       Builder buildApksCommand,

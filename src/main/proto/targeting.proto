@@ -203,9 +203,7 @@ message DeviceTierTargeting {
   repeated google.protobuf.Int32Value value = 3;
   repeated google.protobuf.Int32Value alternatives = 4;
 
-  // TODO(b/192929170): remove them once all callers are migrated.
-  repeated string value_deprecated = 1 [deprecated = true];
-  repeated string alternatives_deprecated = 2 [deprecated = true];
+  reserved 1, 2;
 }
 
 // Targets conditional modules to a set of device groups.

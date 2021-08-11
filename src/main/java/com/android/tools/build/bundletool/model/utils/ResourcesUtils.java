@@ -37,6 +37,7 @@ import com.google.common.collect.ImmutableCollection;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import java.util.Collection;
+import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
 import java.util.function.Function;
@@ -123,19 +124,19 @@ public final class ResourcesUtils {
       for (int typeIdx = pkg.getTypeCount() - 1; typeIdx >= 0; typeIdx--) {
         Type.Builder type = pkg.getTypeBuilder(typeIdx);
 
-        for (int entryIdx = type.getEntryCount() - 1; entryIdx >= 0; entryIdx--) {
+        List<Entry> unfilteredEntries = type.getEntryList();
+        type.clearEntry();
+
+        for (Entry unfilteredEntry : unfilteredEntries) {
           ResourceTableEntry entry =
               ResourceTableEntry.create(
-                  filteredTable.getPackage(pkgIdx), pkg.getType(typeIdx), type.getEntry(entryIdx));
+                  filteredTable.getPackage(pkgIdx), pkg.getType(typeIdx), unfilteredEntry);
           if (removeEntryPredicate.test(entry)) {
-            type.removeEntry(entryIdx);
             continue;
           }
           Entry filteredEntry = configValuesFilterFn.apply(entry);
           if (filteredEntry.getConfigValueCount() > 0) {
-            type.setEntry(entryIdx, filteredEntry);
-          } else {
-            type.removeEntry(entryIdx);
+            type.addEntry(filteredEntry);
           }
         } // entries
 

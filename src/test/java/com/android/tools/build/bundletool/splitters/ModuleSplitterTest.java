@@ -177,7 +177,7 @@ public class ModuleSplitterTest {
                 BUNDLETOOL_VERSION,
                 APP_BUNDLE,
                 ApkGenerationConfiguration.builder()
-                    .setMinimumV3SigningApiVersion(Optional.of(ANDROID_R_API_VERSION))
+                    .setMinimumV3RotationApiVersion(Optional.of(ANDROID_R_API_VERSION))
                     .build(),
                 variantMinSdkTargeting(Versions.ANDROID_R_API_VERSION),
                 ImmutableSet.of("testModule"))
@@ -199,7 +199,7 @@ public class ModuleSplitterTest {
                 BUNDLETOOL_VERSION,
                 APP_BUNDLE,
                 ApkGenerationConfiguration.builder()
-                    .setMinimumV3SigningApiVersion(Optional.of(ANDROID_R_API_VERSION))
+                    .setMinimumV3RotationApiVersion(Optional.of(ANDROID_R_API_VERSION))
                     .build(),
                 VariantTargeting.getDefaultInstance(),
                 ImmutableSet.of("testModule"))

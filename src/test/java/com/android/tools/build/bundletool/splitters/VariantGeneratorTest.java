@@ -224,7 +224,7 @@ public class VariantGeneratorTest {
         variantGenerator.generateVariants(
             bundleModule,
             ApkGenerationConfiguration.builder()
-                .setMinimumV3SigningApiVersion(Optional.of(ANDROID_R_API_VERSION))
+                .setMinimumV3RotationApiVersion(Optional.of(ANDROID_R_API_VERSION))
                 .build());
     assertThat(splits)
         .containsExactly(lPlusVariantTargeting(), variantMinSdkTargeting(ANDROID_R_API_VERSION));
@@ -243,7 +243,7 @@ public class VariantGeneratorTest {
         variantGenerator.generateVariants(
             bundleModule,
             ApkGenerationConfiguration.builder()
-                .setMinimumV3SigningApiVersion(Optional.of(ANDROID_R_API_VERSION))
+                .setMinimumV3RotationApiVersion(Optional.of(ANDROID_R_API_VERSION))
                 .build());
     assertThat(splits).containsExactly(variantMinSdkTargeting(ANDROID_R_API_VERSION + 1));
   }
@@ -261,7 +261,7 @@ public class VariantGeneratorTest {
         variantGenerator.generateVariants(
             bundleModule,
             ApkGenerationConfiguration.builder()
-                .setMinimumV3SigningApiVersion(Optional.of(ANDROID_R_API_VERSION))
+                .setMinimumV3RotationApiVersion(Optional.of(ANDROID_R_API_VERSION))
                 .build());
     assertThat(splits).containsExactly(lPlusVariantTargeting());
   }

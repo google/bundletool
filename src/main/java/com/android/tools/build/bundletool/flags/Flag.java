@@ -25,6 +25,7 @@ import com.android.tools.build.bundletool.flags.FlagParser.FlagParseException;
 import com.android.tools.build.bundletool.model.Password;
 import com.android.tools.build.bundletool.model.ZipPath;
 import com.android.tools.build.bundletool.model.utils.files.FileUtils;
+import com.google.common.base.Ascii;
 import com.google.common.base.MoreObjects;
 import com.google.common.base.Splitter;
 import com.google.common.collect.ImmutableList;
@@ -211,7 +212,7 @@ public abstract class Flag<T> {
     @Override
     protected T parse(String value) {
       try {
-        return Enum.valueOf(enumType, value.toUpperCase());
+        return Enum.valueOf(enumType, Ascii.toUpperCase(value));
       } catch (IllegalArgumentException e) {
         throw new FlagParseException(
             String.format(

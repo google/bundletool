@@ -226,17 +226,16 @@ final class ZipFlingerApkSerializerHelper extends ApkSerializerHelper {
 
       } else {
         byte[] uncompressedContent = moduleEntry.getContent().read();
-        BytesSource2 bytesSource =
-            new BytesSource2(
+        BytesSource bytesSource =
+            new BytesSource(
                 uncompressedContent,
                 pathInApk.toString(),
                 mayCompress ? DEFAULT_COMPRESSION.getValue() : NO_COMPRESSION.getValue());
         bytesSource.align(getEntryAlignment(pathInApk, mayCompress));
-        if (mayCompress && bytesSource.getCompressedSize2() >= bytesSource.getUncompressedSize2()) {
+        if (mayCompress && bytesSource.getCompressedSize() >= bytesSource.getUncompressedSize()) {
           // Not enough gains from compression, leave the entry uncompressed.
           bytesSource =
-              new BytesSource2(
-                  uncompressedContent, pathInApk.toString(), NO_COMPRESSION.getValue());
+              new BytesSource(uncompressedContent, pathInApk.toString(), NO_COMPRESSION.getValue());
           bytesSource.align(getEntryAlignment(pathInApk, /* compressed= */ false));
         }
 

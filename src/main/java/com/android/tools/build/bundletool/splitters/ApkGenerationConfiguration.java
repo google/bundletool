@@ -72,7 +72,7 @@ public abstract class ApkGenerationConfiguration {
    * <p>Returns {@link Optional#empty()} if there is no minimum, meaning rotation can occur in all
    * platforms levels, if specified.
    */
-  public abstract Optional<Integer> getMinimumV3SigningApiVersion();
+  public abstract Optional<Integer> getMinimumV3RotationApiVersion();
 
   public abstract Builder toBuilder();
 
@@ -121,8 +121,8 @@ public abstract class ApkGenerationConfiguration {
     public abstract Builder setSuffixStrippings(
         ImmutableMap<OptimizationDimension, SuffixStripping> suffixStripping);
 
-    public abstract Builder setMinimumV3SigningApiVersion(
-        Optional<Integer> minimumV3SigningApiVersion);
+    public abstract Builder setMinimumV3RotationApiVersion(
+        Optional<Integer> minimumV3RotationApiVersion);
 
     public abstract ApkGenerationConfiguration build();
   }

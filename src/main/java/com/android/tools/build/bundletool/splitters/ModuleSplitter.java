@@ -427,20 +427,20 @@ public class ModuleSplitter {
    * exists and is greater than R+, then it is not overridden.
    */
   private ModuleSplit addApkTargetingForSigningConfiguration(ModuleSplit split) {
-    if (!apkGenerationConfiguration.getMinimumV3SigningApiVersion().isPresent()) {
+    if (!apkGenerationConfiguration.getMinimumV3RotationApiVersion().isPresent()) {
       return split;
     }
-    int minimumV3SigningApiVersion =
-        apkGenerationConfiguration.getMinimumV3SigningApiVersion().get();
-    if (getMinSdk(variantTargeting.getSdkVersionTargeting()) >= minimumV3SigningApiVersion
+    int minimumV3RotationApiVersion =
+        apkGenerationConfiguration.getMinimumV3RotationApiVersion().get();
+    if (getMinSdk(variantTargeting.getSdkVersionTargeting()) >= minimumV3RotationApiVersion
         && getMinSdk(split.getApkTargeting().getSdkVersionTargeting())
-            < minimumV3SigningApiVersion) {
+            < minimumV3RotationApiVersion) {
       return split.toBuilder()
           .setApkTargeting(
               split.getApkTargeting().toBuilder()
                   .setSdkVersionTargeting(
                       SdkVersionTargeting.newBuilder()
-                          .addValue(sdkVersionFrom(minimumV3SigningApiVersion)))
+                          .addValue(sdkVersionFrom(minimumV3RotationApiVersion)))
                   .build())
           .build();
     }

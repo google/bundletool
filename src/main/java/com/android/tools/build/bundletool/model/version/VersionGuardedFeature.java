@@ -63,6 +63,15 @@ public enum VersionGuardedFeature {
   NO_V1_SIGNING_WHEN_POSSIBLE("0.11.0"),
 
   /**
+   * Fuse application elements: activity, activity-alias, meta-data, provider, receiver, service
+   * from feature module AndroidManifest for standalone/universal/system APKs.
+   *
+   * <p>Android Gradle plugin fuses all these elements by themselves, but all other build systems do
+   * not.
+   */
+  FUSE_APPLICATION_ELEMENTS_FROM_FEATURE_MANIFESTS("1.8.0"),
+
+  /**
    * Fuse activities from feature module AndroinManifest instead of relying on activities that are
    * merged from features to base module by Gradle plugin
    * (https://github.com/google/bundletool/issues/68).

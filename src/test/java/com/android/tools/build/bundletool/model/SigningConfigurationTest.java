@@ -19,10 +19,8 @@ import static com.android.tools.build.bundletool.testing.CertificateFactory.buil
 import static com.google.common.truth.Truth.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
-import com.android.apksig.SigningCertificateLineage;
 import com.android.tools.build.bundletool.model.exceptions.CommandExecutionException;
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.Iterables;
 import java.io.FileOutputStream;
 import java.nio.file.Path;
 import java.security.KeyPair;
@@ -159,16 +157,23 @@ public class SigningConfigurationTest {
     assertThat(e).hasMessageThat().contains("No key found with alias 'BadKeyAlias'");
   }
 
-
-
   @Test
-  public void getSignerConfigForV1AndV2_oldestSignerIsNotPresent() throws Exception {
-    SignerConfig signerConfig = createSignerConfig("CN=ApkSignerTest");
+  public void buildSigningConfiguration_missingSigningCertificateLineage() throws Exception {
+    SignerConfig signerConfig = createSignerConfig("CN=SigningConfigurationTest");
+    SignerConfig oldSignerConfig = createSignerConfig("CN=SigningConfigurationTest Old");
 
-    SigningConfiguration signingConfig =
-        SigningConfiguration.builder().setSignerConfig(signerConfig).build();
+    Exception exception =
+        assertThrows(
+            IllegalStateException.class,
+            () ->
+                SigningConfiguration.builder()
+                    .setSignerConfig(signerConfig)
+                    .setOldestSigner(oldSignerConfig)
+                    .build());
 
-    assertThat(signingConfig.getSignerConfigForV1AndV2()).isEqualTo(signerConfig);
+    assertThat(exception)
+        .hasMessageThat()
+        .contains("Oldest signer should not be provided without signing certificate lineage.");
   }
 
   private Path createKeystore() throws Exception {
@@ -197,13 +202,6 @@ public class SigningConfigurationTest {
     return SignerConfig.builder()
         .setPrivateKey(privateKey)
         .setCertificates(ImmutableList.of(oldCertificate))
-        .build();
-  }
-
-  private static SigningCertificateLineage.SignerConfig convertToApksigSignerConfig(
-      SignerConfig signerConfig) {
-    return new SigningCertificateLineage.SignerConfig.Builder(
-            signerConfig.getPrivateKey(), Iterables.getOnlyElement(signerConfig.getCertificates()))
         .build();
   }
 }

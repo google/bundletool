@@ -40,7 +40,7 @@ public class SigningConfigurationVariantGeneratorTest {
     SigningConfigurationVariantGenerator signingConfigurationVariantGenerator =
         new SigningConfigurationVariantGenerator(
             ApkGenerationConfiguration.builder()
-                .setMinimumV3SigningApiVersion(Optional.of(ANDROID_R_API_VERSION))
+                .setMinimumV3RotationApiVersion(Optional.of(ANDROID_R_API_VERSION))
                 .build());
 
     ImmutableCollection<VariantTargeting> splits =

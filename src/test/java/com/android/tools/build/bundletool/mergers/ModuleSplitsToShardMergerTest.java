@@ -19,13 +19,24 @@ package com.android.tools.build.bundletool.mergers;
 import static com.android.bundle.Config.StandaloneConfig.DexMergingStrategy.NEVER_MERGE;
 import static com.android.bundle.Targeting.Abi.AbiAlias.MIPS;
 import static com.android.bundle.Targeting.Abi.AbiAlias.X86;
+import static com.android.tools.build.bundletool.model.AndroidManifest.ACTIVITY_ALIAS_ELEMENT_NAME;
+import static com.android.tools.build.bundletool.model.AndroidManifest.ACTIVITY_ELEMENT_NAME;
+import static com.android.tools.build.bundletool.model.AndroidManifest.META_DATA_ELEMENT_NAME;
+import static com.android.tools.build.bundletool.model.AndroidManifest.PROVIDER_ELEMENT_NAME;
+import static com.android.tools.build.bundletool.model.AndroidManifest.RECEIVER_ELEMENT_NAME;
+import static com.android.tools.build.bundletool.model.AndroidManifest.SERVICE_ELEMENT_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.THEME_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.version.BundleToolVersion.getCurrentVersion;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifest;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifestForFeature;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withCustomThemeActivity;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withDebuggableAttribute;
+import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withMetadataValue;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withMinSdkVersion;
+import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withSplitNameActivityAlias;
+import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withSplitNameProvider;
+import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withSplitNameReceiver;
+import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withSplitNameService;
 import static com.android.tools.build.bundletool.testing.ModuleSplitUtils.createAssetsDirectoryLanguageTargeting;
 import static com.android.tools.build.bundletool.testing.ResourcesTableFactory.USER_PACKAGE_OFFSET;
 import static com.android.tools.build.bundletool.testing.ResourcesTableFactory.entry;
@@ -44,6 +55,7 @@ import static com.android.tools.build.bundletool.testing.TargetingUtils.nativeLi
 import static com.android.tools.build.bundletool.testing.TargetingUtils.targetedNativeDirectory;
 import static com.android.tools.build.bundletool.testing.TestUtils.createModuleEntryForFile;
 import static com.android.tools.build.bundletool.testing.TestUtils.extractPaths;
+import static com.google.common.collect.ImmutableMap.toImmutableMap;
 import static com.google.common.collect.Iterables.getOnlyElement;
 import static com.google.common.truth.Truth.assertThat;
 import static com.google.common.truth.Truth8.assertThat;
@@ -79,6 +91,7 @@ import com.android.tools.build.bundletool.testing.AppBundleBuilder;
 import com.android.tools.build.bundletool.testing.BundleConfigBuilder;
 import com.android.tools.build.bundletool.testing.TestModule;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Maps;
 import dagger.Component;
@@ -583,7 +596,7 @@ public class ModuleSplitsToShardMergerTest {
   }
 
   @Test
-  public void manifests_valid_mergeFeatureActivitiesIntoBaseManifest() throws Exception {
+  public void manifests_valid_fuseFeatureApplicationElementsIntoBaseManifest() throws Exception {
     AndroidManifest manifestBase =
         AndroidManifest.create(
             androidManifest(
@@ -592,7 +605,14 @@ public class ModuleSplitsToShardMergerTest {
                 withCustomThemeActivity("activity2", 2)));
     AndroidManifest manifestFeat =
         AndroidManifest.create(
-            androidManifest("com.test.app2", withCustomThemeActivity("activity1", 3)));
+            androidManifest(
+                "com.test.app2",
+                withCustomThemeActivity("activity1", 3),
+                withMetadataValue("moduleMeta", "module"),
+                withSplitNameActivityAlias("moduleActivityAlias", "module"),
+                withSplitNameProvider("moduleProvider", "module"),
+                withSplitNameReceiver("moduleReceiver", "module"),
+                withSplitNameService("moduleService", "module")));
 
     ModuleSplit split1 =
         createModuleSplitBuilder()
@@ -612,6 +632,73 @@ public class ModuleSplitsToShardMergerTest {
     assertThat(shard.getAndroidManifest().getPackageName()).isEqualTo("com.test.app1");
     assertThat(extractActivityThemeRefIds(shard.getAndroidManifest()))
         .containsExactly("activity1", 3, "activity2", 2);
+    assertThat(extractApplicationElements(shard.getAndroidManifest()))
+        .containsExactly(
+            "activity1",
+            ACTIVITY_ELEMENT_NAME,
+            "activity2",
+            ACTIVITY_ELEMENT_NAME,
+            "moduleMeta",
+            META_DATA_ELEMENT_NAME,
+            "moduleActivityAlias",
+            ACTIVITY_ALIAS_ELEMENT_NAME,
+            "moduleProvider",
+            PROVIDER_ELEMENT_NAME,
+            "moduleReceiver",
+            RECEIVER_ELEMENT_NAME,
+            "moduleService",
+            SERVICE_ELEMENT_NAME,
+            "com.android.dynamic.apk.fused.modules",
+            META_DATA_ELEMENT_NAME);
+  }
+
+  @Test
+  public void manifests_valid_mergeFeatureActivitiesIntoBaseManifest_versionBefore_1_8_0()
+      throws Exception {
+    TestComponent.useTestModule(this, TestModule.builder().withBundletoolVersion("1.7.0").build());
+    AndroidManifest manifestBase =
+        AndroidManifest.create(
+            androidManifest(
+                "com.test.app1",
+                withCustomThemeActivity("activity1", 1),
+                withCustomThemeActivity("activity2", 2)));
+    AndroidManifest manifestFeat =
+        AndroidManifest.create(
+            androidManifest(
+                "com.test.app2",
+                withCustomThemeActivity("activity1", 3),
+                withMetadataValue("moduleMeta", "module"),
+                withSplitNameActivityAlias("moduleActivityAlias", "module"),
+                withSplitNameProvider("moduleProvider", "module"),
+                withSplitNameReceiver("moduleReceived", "module"),
+                withSplitNameService("moduleService", "module")));
+
+    ModuleSplit split1 =
+        createModuleSplitBuilder()
+            .setAndroidManifest(manifestBase)
+            .setModuleName(BundleModuleName.create("base"))
+            .build();
+
+    ModuleSplit split2 =
+        createModuleSplitBuilder()
+            .setAndroidManifest(manifestFeat)
+            .setModuleName(BundleModuleName.create("module"))
+            .build();
+
+    ModuleSplit shard =
+        splitsToShardMerger.mergeSingleShard(ImmutableList.of(split1, split2), createCache());
+
+    assertThat(shard.getAndroidManifest().getPackageName()).isEqualTo("com.test.app1");
+    assertThat(extractActivityThemeRefIds(shard.getAndroidManifest()))
+        .containsExactly("activity1", 3, "activity2", 2);
+    assertThat(extractApplicationElements(shard.getAndroidManifest()))
+        .containsExactly(
+            "activity1",
+            ACTIVITY_ELEMENT_NAME,
+            "activity2",
+            ACTIVITY_ELEMENT_NAME,
+            "com.android.dynamic.apk.fused.modules",
+            META_DATA_ELEMENT_NAME);
   }
 
   @Test
@@ -865,6 +952,24 @@ public class ModuleSplitsToShardMergerTest {
     return Maps.transformValues(
         manifest.getActivitiesByName(),
         el -> el.getAndroidAttribute(THEME_RESOURCE_ID).get().getValueAsRefId());
+  }
+
+  private static ImmutableMap<String, String> extractApplicationElements(AndroidManifest manifest) {
+    return manifest
+        .getManifestRoot()
+        .getElement()
+        .getChildElement(AndroidManifest.APPLICATION_ELEMENT_NAME)
+        .getChildrenElements()
+        .filter(
+            element -> element.getAndroidAttribute(AndroidManifest.NAME_RESOURCE_ID).isPresent())
+        .collect(
+            toImmutableMap(
+                element ->
+                    element
+                        .getAndroidAttribute(AndroidManifest.NAME_RESOURCE_ID)
+                        .get()
+                        .getValueAsString(),
+                element -> element.getName()));
   }
 
   @CommandScoped

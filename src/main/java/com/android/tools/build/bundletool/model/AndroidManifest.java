@@ -70,7 +70,10 @@ public abstract class AndroidManifest {
   public static final String META_DATA_ELEMENT_NAME = "meta-data";
   public static final String USES_SDK_ELEMENT_NAME = "uses-sdk";
   public static final String ACTIVITY_ELEMENT_NAME = "activity";
+  public static final String ACTIVITY_ALIAS_ELEMENT_NAME = "activity-alias";
+  public static final String INTENT_FILTER_ELEMENT_NAME = "intent-filder";
   public static final String SERVICE_ELEMENT_NAME = "service";
+  public static final String RECEIVER_ELEMENT_NAME = "receiver";
   public static final String PROVIDER_ELEMENT_NAME = "provider";
   public static final String SUPPORTS_GL_TEXTURE_ELEMENT_NAME = "supports-gl-texture";
 

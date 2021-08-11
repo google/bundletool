@@ -320,8 +320,8 @@ public final class BuildApksManager {
         .getSigningConfiguration()
         .ifPresent(
             signingConfig ->
-                apkGenerationConfiguration.setMinimumV3SigningApiVersion(
-                    signingConfig.getMinimumV3SigningApiVersion()));
+                apkGenerationConfiguration.setMinimumV3RotationApiVersion(
+                    signingConfig.getMinimumV3RotationApiVersion()));
 
     return apkGenerationConfiguration;
   }

@@ -34,9 +34,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.android.bundle.Config.SplitDimension.Value;
 import com.android.tools.build.bundletool.io.AppBundleSerializer;
-import com.android.tools.build.bundletool.io.ZipBuilder;
 import com.android.tools.build.bundletool.model.AppBundle;
-import com.android.tools.build.bundletool.model.ZipPath;
 import com.android.tools.build.bundletool.model.exceptions.InvalidBundleException;
 import com.android.tools.build.bundletool.testing.AppBundleBuilder;
 import com.android.tools.build.bundletool.testing.BundleConfigBuilder;
@@ -44,7 +42,6 @@ import com.android.tools.build.bundletool.validation.SubValidator;
 import com.google.common.collect.ImmutableList;
 import java.io.IOException;
 import java.nio.file.Path;
-import java.util.zip.ZipFile;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
@@ -65,33 +62,6 @@ public final class BuildApksValidationTest {
     Path rootPath = temporaryFolder.getRoot().toPath();
     bundlePath = rootPath.resolve("bundle.aab");
     outputFilePath = rootPath.resolve("output.apks");
-  }
-
-  @Test
-  public void bundleWithDirectoryZipEntries_throws() throws Exception {
-    Path tmpBundlePath = temporaryFolder.getRoot().toPath().resolve("tmp-bundle.aab");
-    AppBundle tmpBundle =
-        new AppBundleBuilder()
-            .addModule("base", module -> module.setManifest(androidManifest("com.app")))
-            .build();
-    new AppBundleSerializer().writeToDisk(tmpBundle, tmpBundlePath);
-
-    // Copy the valid bundle, only add a directory zip entry.
-    try (ZipFile tmpBundleZip = new ZipFile(tmpBundlePath.toFile())) {
-      new ZipBuilder()
-          .copyAllContentsFromZip(ZipPath.create(""), tmpBundleZip)
-          .addDirectory(ZipPath.create("directory-entries-are-forbidden"))
-          .writeTo(bundlePath);
-    }
-
-    BuildApksCommand command =
-        BuildApksCommand.builder().setBundlePath(bundlePath).setOutputFile(outputFilePath).build();
-
-    InvalidBundleException exception = assertThrows(InvalidBundleException.class, command::execute);
-
-    assertThat(exception)
-        .hasMessageThat()
-        .contains("zip file contains directory zip entry 'directory-entries-are-forbidden/'");
   }
 
   @Test

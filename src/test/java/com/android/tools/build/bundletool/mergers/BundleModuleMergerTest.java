@@ -23,10 +23,14 @@ import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.andr
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withFeatureCondition;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withInstallTimeDelivery;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withInstallTimeRemovableElement;
+import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withMetadataValue;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withMinSdkVersion;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withOnDemandDelivery;
+import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withSplitNameActivity;
+import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withSplitNameService;
 import static com.google.common.truth.Truth.assertThat;
 import static com.google.common.truth.Truth8.assertThat;
+import static com.google.common.truth.extensions.proto.ProtoTruth.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.android.aapt.Resources.XmlNode;
@@ -59,6 +63,8 @@ public class BundleModuleMergerTest {
   private static final byte[] DUMMY_CONTENT_2 = new byte[2];
   private static final BundleConfig BUNDLE_CONFIG_1_0_0 =
       BundleConfigBuilder.create().setVersion("1.0.0").build();
+  private static final BundleConfig BUNDLE_CONFIG_1_8_0 =
+      BundleConfigBuilder.create().setVersion("1.8.0").build();
   private static final BundleConfig BUNDLE_CONFIG_0_14_0 =
       BundleConfigBuilder.create().setVersion("0.14.0").build();
   private static final XmlNode MANIFEST = androidManifest("com.test.app.detail");
@@ -458,6 +464,65 @@ public class BundleModuleMergerTest {
           .isPresent();
       assertThat(appBundlePostMerge.getBaseModule().getEntry(ZipPath.create("dex/classes2.dex")))
           .isPresent();
+    }
+  }
+
+  @Test
+  public void fuseApplicationElementsInManifest_1_8_0() throws Exception {
+    XmlNode installTimeModuleManifest =
+        androidManifestForFeature(
+            "com.test.app.detail",
+            withInstallTimeDelivery(),
+            withSplitNameActivity("activity1", "detail"),
+            withSplitNameService("service", "detail"));
+    createBasicZipBuilder(BUNDLE_CONFIG_1_8_0)
+        .addFileWithProtoContent(ZipPath.create("base/manifest/AndroidManifest.xml"), MANIFEST)
+        .addFileWithProtoContent(
+            ZipPath.create("detail/manifest/AndroidManifest.xml"), installTimeModuleManifest)
+        .writeTo(bundleFile);
+
+    try (ZipFile appBundleZip = new ZipFile(bundleFile.toFile())) {
+      AppBundle appBundle =
+          BundleModuleMerger.mergeNonRemovableInstallTimeModules(
+              AppBundle.buildFromZip(appBundleZip), /* overrideBundleToolVersion = */ false);
+
+      XmlNode fusedManifest =
+          androidManifest(
+              "com.test.app.detail",
+              withSplitNameActivity("activity1", "detail"),
+              withSplitNameService("service", "detail"),
+              withMetadataValue("com.android.dynamic.apk.fused.modules", "base,detail"));
+      assertThat(appBundle.getBaseModule().getAndroidManifest().getManifestRoot().getProto())
+          .isEqualTo(fusedManifest);
+    }
+  }
+
+  @Test
+  public void fuseOnlyActivitiesInManifest_1_0_0() throws Exception {
+    XmlNode installTimeModuleManifest =
+        androidManifestForFeature(
+            "com.test.app.detail",
+            withInstallTimeDelivery(),
+            withSplitNameActivity("activity1", "detail"),
+            withSplitNameService("service", "detail"));
+    createBasicZipBuilder(BUNDLE_CONFIG_1_0_0)
+        .addFileWithProtoContent(ZipPath.create("base/manifest/AndroidManifest.xml"), MANIFEST)
+        .addFileWithProtoContent(
+            ZipPath.create("detail/manifest/AndroidManifest.xml"), installTimeModuleManifest)
+        .writeTo(bundleFile);
+
+    try (ZipFile appBundleZip = new ZipFile(bundleFile.toFile())) {
+      AppBundle appBundle =
+          BundleModuleMerger.mergeNonRemovableInstallTimeModules(
+              AppBundle.buildFromZip(appBundleZip), /* overrideBundleToolVersion = */ false);
+
+      XmlNode fusedManifest =
+          androidManifest(
+              "com.test.app.detail",
+              withSplitNameActivity("activity1", "detail"),
+              withMetadataValue("com.android.dynamic.apk.fused.modules", "base,detail"));
+      assertThat(appBundle.getBaseModule().getAndroidManifest().getManifestRoot().getProto())
+          .isEqualTo(fusedManifest);
     }
   }
 

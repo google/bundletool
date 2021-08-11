@@ -26,33 +26,51 @@ import java.security.PrivateKey;
 import java.security.cert.X509Certificate;
 import java.util.Optional;
 
-/** Information required to sign an APK. */
+/** Information required to sign the generated APKs. */
 @SuppressWarnings("Immutable") // PrivateKey and X509Certificate are considered immutable.
 @Immutable
 @AutoValue
 @AutoValue.CopyAnnotations
 public abstract class SigningConfiguration {
 
-  SigningConfiguration() {}
-
+  /**
+   * Config of the signer to sign the generated APKs.
+   *
+   * <p>If {@link getSigningCertificateLineage} is empty, then this is used for signing with all
+   * supported signature schemes.
+   *
+   * <p>If {@link getSigningCertificateLineage} is present, then this corresponds to the newest
+   * certificate in the lineage, and is used for v3 signing on qualifying APKs (see {@link
+   * getMinimumV3RotationApiVersion}).
+   */
   public abstract SignerConfig getSignerConfig();
 
   /**
-   * Returns the minimum required platform API version for which v3 signing/rotation should be
-   * performed.
-   *
-   * <p>Returns {@link Optional#empty()} if there is no minimum, meaning rotation can occur in all
-   * platforms levels, if specified.
+   * Minimum platform API version for which v3 signing should be performed. If no value is present,
+   * then v3 signing is performed for all versions.
    */
-  public abstract Optional<Integer> getMinimumV3SigningApiVersion();
+  public abstract Optional<Integer> getMinimumV3RotationApiVersion();
 
+  /**
+   * Signing certificate lineage used for v3 signing on qualifying APKs (see {@link
+   * getMinimumV3RotationApiVersion}).
+   */
+  public abstract Optional<SigningCertificateLineage> getSigningCertificateLineage();
 
-  public SignerConfig getSignerConfigForV1AndV2() {
-    SignerConfig signerConfig = getSignerConfig();
-    return signerConfig;
-  }
+  /**
+   * Config of the signer corresponsing to the oldest certificate in the {@link
+   * getSigningCertificateLineage} (this can only be set if a lineage is present).
+   *
+   * <p>This is used for v1 and v2 signing on qualifying APKs that are signed with v3 key rotation
+   * (see {@link getMinimumV3RotationApiVersion}). This is never used for v3 signing.
+   */
+  public abstract Optional<SignerConfig> getOldestSigner();
 
   public abstract Builder toBuilder();
+
+  public int getEffectiveMinimumV3RotationApiVersion() {
+    return getMinimumV3RotationApiVersion().orElse(1);
+  }
 
   public static Builder builder() {
     return new AutoValue_SigningConfiguration.Builder();
@@ -61,30 +79,35 @@ public abstract class SigningConfiguration {
   /** Builder of {@link SigningConfiguration} instances. */
   @AutoValue.Builder
   public abstract static class Builder {
-    /** Sets the {@link SignerConfig} to use to sign the APK. */
     public abstract Builder setSignerConfig(SignerConfig signerConfig);
 
-    /** Sets the private key and corresponding certificate to use to sign the APK. */
     public Builder setSignerConfig(PrivateKey privateKey, X509Certificate certificate) {
       return setSignerConfig(privateKey, ImmutableList.of(certificate));
     }
 
-    /** Sets the private key and corresponding certificates to use to sign the APK. */
     public Builder setSignerConfig(
         PrivateKey privateKey, ImmutableList<X509Certificate> certificates) {
       return setSignerConfig(
           SignerConfig.builder().setPrivateKey(privateKey).setCertificates(certificates).build());
     }
 
-    /** Sets whether v3 signing should be restricted to an API level, if any. */
-    public abstract Builder setMinimumV3SigningApiVersion(
-        Optional<Integer> minimumV3SigningApiVersion);
+    public abstract Builder setMinimumV3RotationApiVersion(
+        Optional<Integer> minimumV3RotationApiVersion);
 
+    public abstract Builder setSigningCertificateLineage(
+        SigningCertificateLineage signingCertificateLineage);
+
+    public abstract Builder setOldestSigner(SignerConfig oldestSigner);
 
     abstract SigningConfiguration autoBuild();
 
     public SigningConfiguration build() {
       SigningConfiguration signingConfiguration = autoBuild();
+      if (signingConfiguration.getOldestSigner().isPresent()) {
+        checkState(
+            signingConfiguration.getSigningCertificateLineage().isPresent(),
+            "Oldest signer should not be provided without signing certificate lineage.");
+      }
       return signingConfiguration;
     }
   }

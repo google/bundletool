@@ -16,7 +16,10 @@
 
 package com.android.tools.build.bundletool.mergers;
 
+import static com.android.tools.build.bundletool.mergers.AndroidManifestMerger.fusingMergerApplicationElements;
+import static com.android.tools.build.bundletool.mergers.AndroidManifestMerger.fusingMergerOnlyReplaceActivities;
 import static com.android.tools.build.bundletool.model.BundleModule.DEX_DIRECTORY;
+import static com.android.tools.build.bundletool.model.version.VersionGuardedFeature.FUSE_APPLICATION_ELEMENTS_FROM_FEATURE_MANIFESTS;
 import static com.android.tools.build.bundletool.model.version.VersionGuardedFeature.MERGE_INSTALL_TIME_MODULES_INTO_BASE;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.ImmutableListMultimap.flatteningToImmutableListMultimap;
@@ -82,7 +85,7 @@ public class BundleModuleMerger {
     mergeAssetsTable(bundleModulesToFuse).ifPresent(mergedBaseModule::setAssetsConfig);
     mergeNativeLibraryTable(bundleModulesToFuse).ifPresent(mergedBaseModule::setNativeConfig);
     mergeResourceTable(bundleModulesToFuse).ifPresent(mergedBaseModule::setResourceTable);
-    mergeAndroidManifest(bundleModulesToFuse, mergedBaseModule);
+    mergeAndroidManifest(appBundle.getVersion(), bundleModulesToFuse, mergedBaseModule);
 
     ImmutableList<ModuleEntry> renamedDexEntries =
         ModuleSplitsToShardMerger.renameDexFromAllModulesToSingleShard(
@@ -161,13 +164,20 @@ public class BundleModuleMerger {
   }
 
   private static void mergeAndroidManifest(
-      ImmutableSet<BundleModule> bundleModulesToFuse, BundleModule.Builder mergedBaseModule) {
+      Version bundletoolVersion,
+      ImmutableSet<BundleModule> bundleModulesToFuse,
+      BundleModule.Builder mergedBaseModule) {
     HashMultimap<BundleModuleName, AndroidManifest> manifests =
         bundleModulesToFuse.stream()
             .collect(
                 toMultimap(
                     BundleModule::getName, BundleModule::getAndroidManifest, HashMultimap::create));
-    AndroidManifest mergedManifest = new FusingAndroidManifestMerger().merge(manifests);
+    AndroidManifestMerger manifestMerger =
+        FUSE_APPLICATION_ELEMENTS_FROM_FEATURE_MANIFESTS.enabledForVersion(bundletoolVersion)
+            ? fusingMergerApplicationElements()
+            : fusingMergerOnlyReplaceActivities();
+
+    AndroidManifest mergedManifest = manifestMerger.merge(manifests);
     mergedManifest =
         mergedManifest
             .toEditor()

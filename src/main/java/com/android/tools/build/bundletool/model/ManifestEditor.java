@@ -51,14 +51,12 @@ import static com.google.common.collect.MoreCollectors.toOptional;
 import static java.util.stream.Collectors.joining;
 
 import com.android.tools.build.bundletool.model.utils.xmlproto.XmlProtoAttributeBuilder;
-import com.android.tools.build.bundletool.model.utils.xmlproto.XmlProtoElement;
 import com.android.tools.build.bundletool.model.utils.xmlproto.XmlProtoElementBuilder;
 import com.android.tools.build.bundletool.model.utils.xmlproto.XmlProtoNode;
 import com.android.tools.build.bundletool.model.utils.xmlproto.XmlProtoNodeBuilder;
 import com.android.tools.build.bundletool.model.version.Version;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
-import java.util.Map;
 import java.util.Optional;
 import javax.annotation.CheckReturnValue;
 
@@ -282,28 +280,6 @@ public class ManifestEditor {
                         .getAndroidAttribute(SPLIT_NAME_RESOURCE_ID)
                         .filter(attr -> !allModuleNames.contains(attr.getValueAsString()))
                         .isPresent());
-    return this;
-  }
-
-  /**
-   * Adds or replaces existing in current manifest activities with provided new activities based on
-   * activity class name.
-   */
-  public ManifestEditor addOrReplaceActivities(Map<String, XmlProtoElement> activitiesByClassName) {
-    if (activitiesByClassName.isEmpty()) {
-      return this;
-    }
-
-    XmlProtoElementBuilder app = manifestElement.getOrCreateChildElement(APPLICATION_ELEMENT_NAME);
-    app.removeChildrenElementsIf(
-        el ->
-            el.isElement()
-                && ACTIVITY_ELEMENT_NAME.equals(el.getElement().getName())
-                && el.getElement()
-                    .getAndroidAttribute(NAME_RESOURCE_ID)
-                    .filter(name -> activitiesByClassName.containsKey(name.getValueAsString()))
-                    .isPresent());
-    activitiesByClassName.values().forEach(activity -> app.addChildElement(activity.toBuilder()));
     return this;
   }
 

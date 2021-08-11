@@ -40,6 +40,7 @@ import static com.android.tools.build.bundletool.testing.TestUtils.expectMissing
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.base.StandardSystemProperty.USER_HOME;
 import static com.google.common.truth.Truth.assertThat;
+import static com.google.common.truth.Truth8.assertThat;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.jose4j.jws.AlgorithmIdentifiers.RSA_USING_SHA256;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -1314,7 +1315,7 @@ public class BuildApksCommandTest {
             fakeAdbServer);
 
     SigningConfiguration signingConfiguration = commandViaFlags.getSigningConfiguration().get();
-    assertThat(signingConfiguration.getMinimumV3SigningApiVersion().get()).isEqualTo(minV3Api);
+    assertThat(signingConfiguration.getMinimumV3RotationApiVersion()).hasValue(minV3Api);
   }
 
   @Test
@@ -1342,6 +1343,168 @@ public class BuildApksCommandTest {
                 + " generation.");
   }
 
+  @Test
+  public void populateLineage_binaryFile() throws Exception {
+    SignerConfig signerConfig = new SignerConfig.Builder(privateKey, certificate).build();
+    SignerConfig oldestSignerConfig =
+        new SignerConfig.Builder(oldestSignerPrivateKey, oldestSignerCertificate).build();
+    SigningCertificateLineage lineage =
+        new SigningCertificateLineage.Builder(oldestSignerConfig, signerConfig).build();
+
+    File lineageFile = tmpDir.resolve("lineage-file").toFile();
+    lineage.writeToFile(lineageFile);
+
+    ByteArrayOutputStream output = new ByteArrayOutputStream();
+    BuildApksCommand commandViaFlags =
+        BuildApksCommand.fromFlags(
+            new FlagParser()
+                .parse(
+                    "--bundle=" + bundlePath,
+                    "--output=" + outputFilePath,
+                    "--aapt2=" + AAPT2_PATH,
+                    "--ks=" + keystorePath,
+                    "--ks-key-alias=" + KEY_ALIAS,
+                    "--ks-pass=pass:" + KEYSTORE_PASSWORD,
+                    "--key-pass=pass:" + KEY_PASSWORD,
+                    "--lineage=" + lineageFile,
+                    "--oldest-signer=" + oldestSignerPropertiesPath),
+            new PrintStream(output),
+            systemEnvironmentProvider,
+            fakeAdbServer);
+
+    SigningConfiguration signingConfiguration = commandViaFlags.getSigningConfiguration().get();
+    assertThat(signingConfiguration.getSigningCertificateLineage().get().getCertificatesInLineage())
+        .containsExactly(oldestSignerCertificate, certificate);
+    assertThat(signingConfiguration.getOldestSigner().get().getPrivateKey())
+        .isEqualTo(oldestSignerConfig.getPrivateKey());
+    assertThat(signingConfiguration.getOldestSigner().get().getCertificates())
+        .containsExactly(oldestSignerConfig.getCertificate());
+  }
+
+  @Test
+  public void populateLineage_apkFile() throws Exception {
+    SignerConfig signerConfig = new SignerConfig.Builder(privateKey, certificate).build();
+    SignerConfig oldestSignerConfig =
+        new SignerConfig.Builder(oldestSignerPrivateKey, oldestSignerCertificate).build();
+    SigningCertificateLineage lineage =
+        new SigningCertificateLineage.Builder(oldestSignerConfig, signerConfig).build();
+
+    com.android.tools.build.bundletool.model.SignerConfig oldestSigner =
+        com.android.tools.build.bundletool.model.SignerConfig.builder()
+            .setPrivateKey(oldestSignerPrivateKey)
+            .setCertificates(ImmutableList.of(oldestSignerCertificate))
+            .build();
+
+    TestComponent.useTestModule(
+        this,
+        TestModule.builder()
+            .withSigningConfig(
+                SigningConfiguration.builder()
+                    .setSignerConfig(privateKey, certificate)
+                    .setSigningCertificateLineage(lineage)
+                    .setOldestSigner(oldestSigner)
+                    .build())
+            .build());
+
+    File lineageFile = createMinimalistSignedApkFile().toFile();
+
+    ByteArrayOutputStream output = new ByteArrayOutputStream();
+    BuildApksCommand commandViaFlags =
+        BuildApksCommand.fromFlags(
+            new FlagParser()
+                .parse(
+                    "--bundle=" + bundlePath,
+                    "--output=" + outputFilePath,
+                    "--aapt2=" + AAPT2_PATH,
+                    "--ks=" + keystorePath,
+                    "--ks-key-alias=" + KEY_ALIAS,
+                    "--ks-pass=pass:" + KEYSTORE_PASSWORD,
+                    "--key-pass=pass:" + KEY_PASSWORD,
+                    "--lineage=" + lineageFile,
+                    "--oldest-signer=" + oldestSignerPropertiesPath),
+            new PrintStream(output),
+            systemEnvironmentProvider,
+            fakeAdbServer);
+
+    SigningConfiguration signingConfiguration = commandViaFlags.getSigningConfiguration().get();
+    assertThat(signingConfiguration.getSigningCertificateLineage().get().getCertificatesInLineage())
+        .containsExactly(oldestSignerCertificate, certificate);
+    assertThat(signingConfiguration.getOldestSigner().get().getPrivateKey())
+        .isEqualTo(oldestSignerConfig.getPrivateKey());
+    assertThat(signingConfiguration.getOldestSigner().get().getCertificates())
+        .containsExactly(oldestSignerConfig.getCertificate());
+  }
+
+  @Test
+  public void populateLineage_invalidFile() {
+    CommandExecutionException e =
+        assertThrows(
+            CommandExecutionException.class,
+            () ->
+                BuildApksCommand.fromFlags(
+                    new FlagParser()
+                        .parse(
+                            "--bundle=" + bundlePath,
+                            "--output=" + outputFilePath,
+                            "--aapt2=" + AAPT2_PATH,
+                            "--ks=" + keystorePath,
+                            "--ks-key-alias=" + KEY_ALIAS,
+                            "--ks-pass=pass:" + KEYSTORE_PASSWORD,
+                            "--key-pass=pass:" + KEY_PASSWORD,
+                            "--lineage=" + tmp.newFile(),
+                            "--oldest-signer=" + oldestSignerPropertiesPath),
+                    fakeAdbServer));
+
+    assertThat(e).hasMessageThat().isEqualTo("The input file is not a valid lineage file.");
+  }
+
+  @Test
+  public void lineageFlag_noOldestSigner_fails() {
+    InvalidCommandException e =
+        assertThrows(
+            InvalidCommandException.class,
+            () ->
+                BuildApksCommand.fromFlags(
+                    new FlagParser()
+                        .parse(
+                            "--bundle=" + bundlePath,
+                            "--output=" + outputFilePath,
+                            "--aapt2=" + AAPT2_PATH,
+                            "--ks=" + keystorePath,
+                            "--ks-key-alias=" + KEY_ALIAS,
+                            "--ks-pass=pass:" + KEYSTORE_PASSWORD,
+                            "--key-pass=pass:" + KEY_PASSWORD,
+                            "--lineage=" + tmpDir.resolve("lineage-file")),
+                    fakeAdbServer));
+
+    assertThat(e)
+        .hasMessageThat()
+        .isEqualTo("Flag 'oldest-signer' is required when 'lineage' is set.");
+  }
+
+  @Test
+  public void oldestSignerFlag_noLineage_fails() {
+    InvalidCommandException e =
+        assertThrows(
+            InvalidCommandException.class,
+            () ->
+                BuildApksCommand.fromFlags(
+                    new FlagParser()
+                        .parse(
+                            "--bundle=" + bundlePath,
+                            "--output=" + outputFilePath,
+                            "--aapt2=" + AAPT2_PATH,
+                            "--ks=" + keystorePath,
+                            "--ks-key-alias=" + KEY_ALIAS,
+                            "--ks-pass=pass:" + KEYSTORE_PASSWORD,
+                            "--key-pass=pass:" + KEY_PASSWORD,
+                            "--oldest-signer=" + oldestSignerPropertiesPath),
+                    fakeAdbServer));
+
+    assertThat(e)
+        .hasMessageThat()
+        .isEqualTo("Flag 'lineage' is required when 'oldest-signer' is set.");
+  }
 
   private void createAppBundle(Path path) throws Exception {
     createAppBundle(path, /* codeTransparency= */ Optional.empty());
