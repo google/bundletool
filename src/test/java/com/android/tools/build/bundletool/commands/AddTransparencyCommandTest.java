@@ -49,6 +49,7 @@ import com.android.tools.build.bundletool.testing.AppBundleBuilder;
 import com.android.tools.build.bundletool.testing.BundleModuleBuilder;
 import com.android.tools.build.bundletool.testing.CertificateFactory;
 import com.android.tools.build.bundletool.transparency.CodeTransparencyFactory;
+import com.android.tools.build.bundletool.transparency.CodeTransparencyVersion;
 import com.google.common.base.Splitter;
 import com.google.common.collect.ImmutableList;
 import com.google.common.hash.Hashing;
@@ -89,10 +90,12 @@ public final class AddTransparencyCommandTest {
   private static final String DEX2 = "dex/classes2.dex";
   private static final String NATIVE_LIB_PATH1 = "lib/arm64-v8a/libnative.so";
   private static final String NATIVE_LIB_PATH2 = "lib/armeabi-v7a/libnative.so";
+  private static final String NATIVE_LIB_LARGE = "lib/armeabi-v7a/libnative_large.so";
   private static final byte[] FILE_CONTENT_DEX1 = new byte[] {1, 2, 3};
   private static final byte[] FILE_CONTENT_DEX2 = new byte[] {2, 3, 4};
   private static final byte[] FILE_CONTENT_NATIVE_LIB1 = new byte[] {3, 4, 5};
   private static final byte[] FILE_CONTENT_NATIVE_LIB2 = new byte[] {4, 5, 6};
+  private static final byte[] FILE_CONTENT_NATIVE_LARGE = new byte[4000];
   private static final String RES_FILE = "res/image.png";
   private static final String NON_CODE_FILE_IN_LIB_DIRECTORY = "lib/wrap.sh";
   private static final String KEYSTORE_PASSWORD = "keystore-password";
@@ -113,6 +116,7 @@ public final class AddTransparencyCommandTest {
   private String fileHashDex2;
   private String fileHashNativeLib1;
   private String fileHashNativeLib2;
+  private String fileHashNativeLibLarge;
 
   @Before
   public void setUp() throws Exception {
@@ -131,6 +135,8 @@ public final class AddTransparencyCommandTest {
         ByteSource.wrap(FILE_CONTENT_NATIVE_LIB1).hash(Hashing.sha256()).toString();
     fileHashNativeLib2 =
         ByteSource.wrap(FILE_CONTENT_NATIVE_LIB2).hash(Hashing.sha256()).toString();
+    fileHashNativeLibLarge =
+        ByteSource.wrap(FILE_CONTENT_NATIVE_LARGE).hash(Hashing.sha256()).toString();
   }
 
   @Test
@@ -914,6 +920,7 @@ public final class AddTransparencyCommandTest {
         .addFile(DEX2, FILE_CONTENT_DEX2)
         .addFile(NATIVE_LIB_PATH1, FILE_CONTENT_NATIVE_LIB1)
         .addFile(NATIVE_LIB_PATH2, FILE_CONTENT_NATIVE_LIB2)
+        .addFile(NATIVE_LIB_LARGE, FILE_CONTENT_NATIVE_LARGE)
         // 2 files below are not code related and should not be included in the transparency file.
         .addFile(RES_FILE)
         .addFile(NON_CODE_FILE_IN_LIB_DIRECTORY)
@@ -921,7 +928,8 @@ public final class AddTransparencyCommandTest {
   }
 
   private CodeTransparency expectedTransparencyProto() {
-    CodeTransparency.Builder transparencyBuilder = CodeTransparency.newBuilder();
+    CodeTransparency.Builder transparencyBuilder =
+        CodeTransparency.newBuilder().setVersion(CodeTransparencyVersion.getCurrentVersion());
     addCodeFilesToTransparencyProto(transparencyBuilder, BASE_MODULE);
     addCodeFilesToTransparencyProto(transparencyBuilder, FEATURE_MODULE1);
     addCodeFilesToTransparencyProto(transparencyBuilder, FEATURE_MODULE2);
@@ -958,6 +966,13 @@ public final class AddTransparencyCommandTest {
                 .setType(CodeRelatedFile.Type.NATIVE_LIBRARY)
                 .setApkPath(NATIVE_LIB_PATH2)
                 .setSha256(fileHashNativeLib2)
+                .build())
+        .addCodeRelatedFile(
+            CodeRelatedFile.newBuilder()
+                .setPath(moduleName + "/" + NATIVE_LIB_LARGE)
+                .setType(CodeRelatedFile.Type.NATIVE_LIBRARY)
+                .setApkPath(NATIVE_LIB_LARGE)
+                .setSha256(fileHashNativeLibLarge)
                 .build());
   }
 

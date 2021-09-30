@@ -89,6 +89,8 @@ public final class ApkTransparencyCheckUtils {
 
       CodeTransparency codeTransparencyMetadata =
           CodeTransparencyFactory.parseFrom(jws.getUnverifiedPayload());
+      CodeTransparencyVersion.checkVersion(codeTransparencyMetadata);
+
       ImmutableSet<String> pathsToModifiedFiles =
           getModifiedFiles(codeTransparencyMetadata, deviceSpecificApks);
       result.fileContentsVerified(pathsToModifiedFiles.isEmpty());
@@ -166,7 +168,7 @@ public final class ApkTransparencyCheckUtils {
 
   private static ImmutableSet<String> getDexFiles(CodeTransparency codeTransparency) {
     return codeTransparency.getCodeRelatedFileList().stream()
-        .filter(codeRelatedFile -> codeRelatedFile.getType().equals(CodeRelatedFile.Type.DEX))
+        .filter(ApkTransparencyCheckUtils::isDexFile)
         .map(CodeRelatedFile::getSha256)
         .collect(toImmutableSet());
   }
@@ -182,6 +184,14 @@ public final class ApkTransparencyCheckUtils {
 
   private static boolean isDexFile(ZipEntry zipEntry) {
     return zipEntry.getName().endsWith(".dex");
+  }
+
+  private static boolean isDexFile(CodeRelatedFile codeRelatedFile) {
+    return codeRelatedFile.getType().equals(CodeRelatedFile.Type.DEX)
+        // Code transparency files generated using Bundletool with version older than
+        // 1.8.1 do not have type field set for dex files.
+        || (codeRelatedFile.getType().equals(CodeRelatedFile.Type.TYPE_UNSPECIFIED)
+            && codeRelatedFile.getPath().endsWith(".dex"));
   }
 
   private static boolean isNativeLibrary(ZipEntry zipEntry) {

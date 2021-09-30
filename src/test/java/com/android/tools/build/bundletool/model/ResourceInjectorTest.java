@@ -65,9 +65,7 @@ public class ResourceInjectorTest {
                             .setTypeId(TypeId.newBuilder().setId(1))
                             .setName("xml")
                             .addEntry(
-                                Entry.getDefaultInstance()
-                                    .toBuilder()
-                                    .setEntryId(EntryId.newBuilder().setId(0)))))
+                                Entry.newBuilder().setEntryId(EntryId.newBuilder().setId(0)))))
             .build();
 
     assertThat(resourceInjector.build()).isEqualTo(expected);
@@ -97,9 +95,7 @@ public class ResourceInjectorTest {
                             .setTypeId(TypeId.newBuilder().setId(0x01))
                             .setName("xml")
                             .addEntry(
-                                Entry.getDefaultInstance()
-                                    .toBuilder()
-                                    .setEntryId(EntryId.newBuilder().setId(0x0000)))))
+                                Entry.newBuilder().setEntryId(EntryId.newBuilder().setId(0x0000)))))
             .build();
 
     assertThat(resourceInjector.build()).isEqualTo(expected);
@@ -119,16 +115,13 @@ public class ResourceInjectorTest {
                             .setTypeId(TypeId.newBuilder().setId(0x01))
                             .setName("drawable")
                             .addEntry(
-                                Entry.getDefaultInstance()
-                                    .toBuilder()
-                                    .setEntryId(EntryId.newBuilder().setId(0x0000))))
+                                Entry.newBuilder().setEntryId(EntryId.newBuilder().setId(0x0000))))
                     .addType(
                         Type.newBuilder()
                             .setTypeId(TypeId.newBuilder().setId(0x02))
                             .setName("xml")
                             .addEntry(
-                                Entry.getDefaultInstance()
-                                    .toBuilder()
+                                Entry.newBuilder()
                                     .setEntryId(EntryId.newBuilder().setId(0x0000)))));
     ResourceInjector resourceInjector = new ResourceInjector(resourceTable, PACKAGE_NAME);
     ResourceId resourceId =
@@ -145,21 +138,15 @@ public class ResourceInjectorTest {
                             .setTypeId(TypeId.newBuilder().setId(0x01))
                             .setName("drawable")
                             .addEntry(
-                                Entry.getDefaultInstance()
-                                    .toBuilder()
-                                    .setEntryId(EntryId.newBuilder().setId(0x0000))))
+                                Entry.newBuilder().setEntryId(EntryId.newBuilder().setId(0x0000))))
                     .addType(
                         Type.newBuilder()
                             .setTypeId(TypeId.newBuilder().setId(0x02))
                             .setName("xml")
                             .addEntry(
-                                Entry.getDefaultInstance()
-                                    .toBuilder()
-                                    .setEntryId(EntryId.newBuilder().setId(0x0000)))
+                                Entry.newBuilder().setEntryId(EntryId.newBuilder().setId(0x0000)))
                             .addEntry(
-                                Entry.getDefaultInstance()
-                                    .toBuilder()
-                                    .setEntryId(EntryId.newBuilder().setId(0x0001)))))
+                                Entry.newBuilder().setEntryId(EntryId.newBuilder().setId(0x0001)))))
             .build();
 
     assertThat(resourceInjector.build()).isEqualTo(expected);
@@ -179,16 +166,13 @@ public class ResourceInjectorTest {
                             .setTypeId(TypeId.newBuilder().setId(0x01))
                             .setName("drawable")
                             .addEntry(
-                                Entry.getDefaultInstance()
-                                    .toBuilder()
-                                    .setEntryId(EntryId.newBuilder().setId(0x0000))))
+                                Entry.newBuilder().setEntryId(EntryId.newBuilder().setId(0x0000))))
                     .addType(
                         Type.newBuilder()
                             .setTypeId(TypeId.newBuilder().setId(0x02))
                             .setName("layout")
                             .addEntry(
-                                Entry.getDefaultInstance()
-                                    .toBuilder()
+                                Entry.newBuilder()
                                     .setEntryId(EntryId.newBuilder().setId(0xffff)))));
     ResourceInjector resourceInjector = new ResourceInjector(resourceTable, PACKAGE_NAME);
     assertThrows(

@@ -77,11 +77,14 @@ import com.google.common.collect.ImmutableList;
 import com.google.protobuf.TextFormat;
 import java.util.Optional;
 import org.junit.Test;
+import org.junit.experimental.theories.DataPoints;
+import org.junit.experimental.theories.FromDataPoints;
+import org.junit.experimental.theories.Theories;
+import org.junit.experimental.theories.Theory;
 import org.junit.runner.RunWith;
-import org.junit.runners.JUnit4;
 
 /** Tests for {@link AndroidManifest}. */
-@RunWith(JUnit4.class)
+@RunWith(Theories.class)
 public class AndroidManifestTest {
 
   private static final String ANDROID_NAMESPACE_URI = "http://schemas.android.com/apk/res/android";
@@ -90,6 +93,9 @@ public class AndroidManifestTest {
 
   private static final Version BUNDLE_TOOL_0_3_4 = Version.of("0.3.4");
   private static final Version BUNDLE_TOOL_0_3_3 = Version.of("0.3.3");
+
+  @DataPoints("sdkCodenames")
+  public static final String[] ANDROID_SDK_CODENAMES = {"R", "Q", "Sv2", "Tiramisu"};
 
   @Test
   public void getApplicationDebuggable_absent() {
@@ -154,19 +160,11 @@ public class AndroidManifestTest {
   }
 
   @Test
-  public void getMinSdkVersion_asString() {
+  @Theory
+  public void getMinSdkVersion_asString(@FromDataPoints("sdkCodenames") String codename) {
     AndroidManifest androidManifest =
-        AndroidManifest.create(androidManifest("com.test.app", withMinSdkVersion("Q")));
+        AndroidManifest.create(androidManifest("com.test.app", withMinSdkVersion(codename)));
     assertThat(androidManifest.getMinSdkVersion()).hasValue(DEVELOPMENT_SDK_VERSION);
-
-    AndroidManifest androidManifest2 =
-        AndroidManifest.create(androidManifest("com.test.app", withMinSdkVersion("R")));
-    assertThat(androidManifest2.getMinSdkVersion()).hasValue(DEVELOPMENT_SDK_VERSION);
-
-    // Lowercase disallowed.
-    AndroidManifest androidManifest3 =
-        AndroidManifest.create(androidManifest("com.test.app", withMinSdkVersion("r")));
-    assertThrows(UnexpectedAttributeTypeException.class, () -> androidManifest3.getMinSdkVersion());
   }
 
   @Test
@@ -1110,8 +1108,7 @@ public class AndroidManifestTest {
   public void getDeliveryType_onDemandElement_only() throws Exception {
     AndroidManifest manifest =
         AndroidManifest.create(androidManifest("com.test.app", withOnDemandDelivery()));
-    assertThat(manifest.getModuleDeliveryType())
-        .isEqualTo(ModuleDeliveryType.NO_INITIAL_INSTALL);
+    assertThat(manifest.getModuleDeliveryType()).isEqualTo(ModuleDeliveryType.NO_INITIAL_INSTALL);
   }
 
   @Test
@@ -1151,7 +1148,6 @@ public class AndroidManifestTest {
     AndroidManifest manifest =
         AndroidManifest.create(
             androidManifestForAssetModule("com.test.app", withInstantInstallTimeDelivery()));
-    assertThat(manifest.getInstantModuleDeliveryType())
-        .isEqualTo(ALWAYS_INITIAL_INSTALL);
+    assertThat(manifest.getInstantModuleDeliveryType()).isEqualTo(ALWAYS_INITIAL_INSTALL);
   }
 }

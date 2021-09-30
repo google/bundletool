@@ -44,6 +44,7 @@ import com.google.common.base.Splitter;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Range;
+import com.google.common.primitives.Ints;
 import com.google.errorprone.annotations.Immutable;
 import java.util.Optional;
 import java.util.stream.Stream;
@@ -320,10 +321,13 @@ public abstract class AndroidManifest {
   }
 
   private static boolean isSdkCodename(String sdkVersion) {
+    if (sdkVersion.isEmpty()) {
+      return false;
+    }
     // Codename version can be of the form "[codename]" or "[codename].[fingerprint]".
-    return !sdkVersion.isEmpty()
-        && Range.closed('A', 'Z').contains(sdkVersion.charAt(0))
-        && (sdkVersion.length() == 1 || '.' == sdkVersion.charAt(1));
+    int dotIndex = sdkVersion.indexOf('.');
+    String codename = dotIndex != -1 ? sdkVersion.substring(0, dotIndex) : sdkVersion;
+    return Ints.tryParse(codename) == null;
   }
 
   public boolean hasApplicationElement() {

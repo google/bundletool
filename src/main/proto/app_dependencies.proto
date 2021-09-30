@@ -2,6 +2,8 @@ syntax = "proto2";
 
 package android.bundle;
 
+import "google/protobuf/wrappers.proto";
+
 option java_package = "com.android.bundle";
 
 // Lists the dependencies of an application.
@@ -14,6 +16,9 @@ message AppDependencies {
 
   // List of direct dependencies per bundle module.
   repeated ModuleDependencies module_dependencies = 3;
+
+  // List of repositories where dependencies were found.
+  repeated Repository repositories = 4;
 }
 
 // List of dependencies of a given library.
@@ -45,6 +50,10 @@ message Library {
   }
 
   optional Digests digests = 2;
+
+  // Repository from which the artifact was retrieved (if known).
+  // Index is from pool of repositories defined in AppDependencies.
+  optional google.protobuf.Int32Value repo_index = 3;
 }
 
 message MavenLibrary {
@@ -53,4 +62,23 @@ message MavenLibrary {
   optional string packaging = 3;
   optional string classifier = 4;
   optional string version = 5;
+}
+
+// A repository for resolving artifacts and metadata.
+message Repository {
+  // The type of the repository, and any type-specific configuration info.
+  oneof repo_oneof {
+    MavenRepo maven_repo = 1;
+    IvyRepo ivy_repo = 2;
+  }
+}
+
+message MavenRepo {
+  // The root url for the repository.
+  optional string url = 1;
+}
+
+message IvyRepo {
+  // The root url for the repository.
+  optional string url = 1;
 }

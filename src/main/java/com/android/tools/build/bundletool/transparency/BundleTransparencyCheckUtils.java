@@ -18,6 +18,7 @@ package com.android.tools.build.bundletool.transparency;
 import static com.google.common.collect.ImmutableMap.toImmutableMap;
 
 import com.android.bundle.CodeTransparencyOuterClass.CodeRelatedFile;
+import com.android.bundle.CodeTransparencyOuterClass.CodeTransparency;
 import com.android.tools.build.bundletool.model.AppBundle;
 import com.android.tools.build.bundletool.model.BundleMetadata;
 import com.android.tools.build.bundletool.model.exceptions.InvalidBundleException;
@@ -81,9 +82,13 @@ public final class BundleTransparencyCheckUtils {
         .transparencyKeyCertificateFingerprint(
             CodeTransparencyCryptoUtils.getCertificateFingerprint(jws));
 
+    CodeTransparency parsedTransparencyFile =
+        CodeTransparencyFactory.parseFrom(jws.getUnverifiedPayload());
+    CodeTransparencyVersion.checkVersion(parsedTransparencyFile);
+
     MapDifference<String, CodeRelatedFile> difference =
         Maps.difference(
-            getCodeRelatedFilesFromTransparencyMetadata(jws),
+            getCodeRelatedFilesFromParsedTransparencyFile(parsedTransparencyFile),
             getCodeRelatedFilesFromBundle(bundle));
     result.fileContentsVerified(difference.areEqual());
     if (!difference.areEqual()) {
@@ -92,12 +97,21 @@ public final class BundleTransparencyCheckUtils {
     return result.build();
   }
 
-  private static ImmutableMap<String, CodeRelatedFile> getCodeRelatedFilesFromTransparencyMetadata(
-      JsonWebSignature signedTransparencyFile) {
-    return CodeTransparencyFactory.parseFrom(signedTransparencyFile.getUnverifiedPayload())
-        .getCodeRelatedFileList()
-        .stream()
+  private static ImmutableMap<String, CodeRelatedFile>
+      getCodeRelatedFilesFromParsedTransparencyFile(CodeTransparency parsedTransparencyFile) {
+    return parsedTransparencyFile.getCodeRelatedFileList().stream()
+        .map(BundleTransparencyCheckUtils::addTypeToDexCodeRelatedFiles)
         .collect(toImmutableMap(CodeRelatedFile::getPath, codeRelatedFile -> codeRelatedFile));
+  }
+
+  // Code transparency files generated using Bundletool with version older than
+  // 1.8.1 do not have type field set for dex files.
+  private static CodeRelatedFile addTypeToDexCodeRelatedFiles(CodeRelatedFile codeRelatedFile) {
+    if (codeRelatedFile.getType().equals(CodeRelatedFile.Type.TYPE_UNSPECIFIED)
+        && codeRelatedFile.getPath().endsWith(".dex")) {
+      return codeRelatedFile.toBuilder().setType(CodeRelatedFile.Type.DEX).build();
+    }
+    return codeRelatedFile;
   }
 
   private static ImmutableMap<String, CodeRelatedFile> getCodeRelatedFilesFromBundle(

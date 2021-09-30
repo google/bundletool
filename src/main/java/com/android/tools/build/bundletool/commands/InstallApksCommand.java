@@ -38,6 +38,7 @@ import com.android.tools.build.bundletool.device.AdbServer;
 import com.android.tools.build.bundletool.device.Device;
 import com.android.tools.build.bundletool.device.Device.InstallOptions;
 import com.android.tools.build.bundletool.device.DeviceAnalyzer;
+import com.android.tools.build.bundletool.device.LocalTestingPathResolver;
 import com.android.tools.build.bundletool.flags.Flag;
 import com.android.tools.build.bundletool.flags.ParsedFlags;
 import com.android.tools.build.bundletool.io.TempDirectory;
@@ -50,6 +51,7 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Sets;
 import com.google.protobuf.Int32Value;
+import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
@@ -215,7 +217,28 @@ public abstract class InstallApksCommand {
       if (!filesToPush.isEmpty()) {
         pushFiles(filesToPush, toc, adbRunner);
       }
+      if (toc.getLocalTestingInfo().getEnabled()) {
+        cleanUpEmulatedSplits(adbRunner, toc);
+      }
     }
+  }
+
+  private void cleanUpEmulatedSplits(AdbRunner adbRunner, BuildApksResult toc) {
+    adbRunner.run(
+        device -> {
+          try {
+            device.removeRemotePath(
+                LocalTestingPathResolver.getLocalTestingWorkingDir(toc.getPackageName()),
+                Optional.of(toc.getPackageName()),
+                getTimeout());
+          } catch (IOException e) {
+            System.err.println(
+                "Failed to remove working directory with local testing splits. Your app might"
+                    + " still have been installed correctly but have previous version of"
+                    + " dynamic feature modules. If you see legacy versions of dynamic feature"
+                    + " modules installed try to uninstall and install the app again.");
+          }
+        });
   }
 
   /** Extracts the apks that will be installed. */

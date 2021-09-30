@@ -19,7 +19,6 @@ package com.android.tools.build.bundletool.device;
 import com.android.ddmlib.AdbCommandRejectedException;
 import com.android.ddmlib.IDevice.DeviceState;
 import com.android.ddmlib.IShellOutputReceiver;
-import com.android.ddmlib.InstallException;
 import com.android.ddmlib.ShellCommandUnresponsiveException;
 import com.android.ddmlib.SyncException;
 import com.android.ddmlib.TimeoutException;
@@ -70,7 +69,9 @@ public abstract class Device {
   public abstract Path syncPackageToDevice(Path localFilePath)
       throws TimeoutException, AdbCommandRejectedException, SyncException, IOException;
 
-  public abstract void removeRemotePackage(Path remoteFilePath) throws InstallException;
+  public abstract void removeRemotePath(
+      String remoteFilePath, Optional<String> runAsPackageName, Duration timeout)
+      throws IOException;
 
   public abstract void pull(ImmutableList<FilePullParams> files);
 

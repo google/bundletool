@@ -39,9 +39,11 @@ import com.google.common.collect.ImmutableList;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 import org.junit.Before;
 import org.junit.Test;
@@ -123,6 +125,7 @@ public final class DdmlibDeviceTest {
   @Test
   public void pushFiles_targetLocation() throws Exception {
     String destinationPath = "/destination/path";
+    when(mockDevice.getVersion()).thenReturn(new AndroidVersion(VersionCodes.KITKAT));
     DdmlibDevice ddmlibDevice = new DdmlibDevice(mockDevice);
 
     mockAdbShellCommand(String.format("rm -rf '%s' && echo OK", destinationPath), "OK\n");
@@ -145,9 +148,42 @@ public final class DdmlibDeviceTest {
   }
 
   @Test
+  public void pushFiles_sdk31_additionalPermissions() throws Exception {
+    String destinationPath = "/destination/path";
+    when(mockDevice.getVersion()).thenReturn(new AndroidVersion(31));
+    DdmlibDevice ddmlibDevice = new DdmlibDevice(mockDevice);
+
+    mockAdbShellCommand(String.format("rm -rf '%s' && echo OK", destinationPath), "OK\n");
+    mockAdbShellCommand(
+        String.format(
+            "mkdir -p '%1$s' && rmdir '%1$s' && mkdir -p '%1$s' && echo OK", destinationPath),
+        "OK\n");
+    mockAdbShellCommand(String.format("chmod 775 '%s' && echo OK", destinationPath), "OK\n");
+
+    ddmlibDevice.push(
+        ImmutableList.of(APK_PATH, APK_PATH_2),
+        PushOptions.builder().setDestinationPath(destinationPath).build());
+
+    verify(mockDevice)
+        .pushFile(
+            APK_PATH.toFile().getAbsolutePath(), destinationPath + "/" + APK_PATH.getFileName());
+    verify(mockDevice)
+        .pushFile(
+            APK_PATH_2.toFile().getAbsolutePath(),
+            destinationPath + "/" + APK_PATH_2.getFileName());
+    verify(mockDevice)
+        .executeShellCommand(
+            eq(String.format("chmod 775 '%s' && echo OK", destinationPath)),
+            any(),
+            anyLong(),
+            any());
+  }
+
+  @Test
   public void pushFiles_tempLocation() throws Exception {
     String destinationPath = "/destination/path";
     Clock fixedClock = Clock.fixed(Instant.now(), ZoneId.systemDefault());
+    when(mockDevice.getVersion()).thenReturn(new AndroidVersion(VersionCodes.KITKAT));
     DdmlibDevice ddmlibDevice = new DdmlibDevice(mockDevice, fixedClock);
     String tempPath = "/data/local/tmp/splits-" + fixedClock.millis();
 
@@ -191,6 +227,54 @@ public final class DdmlibDeviceTest {
                 .build()));
 
     verify(mockDevice).pullFile(APK_PATH.toFile().getAbsolutePath(), destinationPath.toString());
+  }
+
+  @Test
+  public void getDensity_densityIsAvailableViaDdmlib() throws Exception {
+    when(mockDevice.getDensity()).thenReturn(540);
+    mockAdbShellCommand("wm density", "Physical density: 420");
+
+    DdmlibDevice ddmlibDevice = new DdmlibDevice(mockDevice);
+    assertThat(ddmlibDevice.getDensity()).isEqualTo(540);
+  }
+
+  @Test
+  public void getDensity_densityIsNotAvailableViaDdmlib_requestViaAdb() throws Exception {
+    when(mockDevice.getDensity()).thenReturn(-1);
+    mockAdbShellCommand("wm density", "Physical density: 420");
+
+    DdmlibDevice ddmlibDevice = new DdmlibDevice(mockDevice);
+    assertThat(ddmlibDevice.getDensity()).isEqualTo(420);
+  }
+
+  @Test
+  public void getDensity_densityIsNotAvailableViaDdmlibAndAdb() throws Exception {
+    when(mockDevice.getDensity()).thenReturn(-1);
+    mockAdbShellCommand("wm density", "Test output");
+
+    DdmlibDevice ddmlibDevice = new DdmlibDevice(mockDevice);
+    assertThat(ddmlibDevice.getDensity()).isEqualTo(-1);
+  }
+
+  @Test
+  public void removeRemotePath() throws Exception {
+    String pathToRemove = "/path/to/remove";
+    DdmlibDevice ddmlibDevice = new DdmlibDevice(mockDevice);
+
+    mockAdbShellCommand(String.format("rm -rf '%s' && echo OK", pathToRemove), "OK\n");
+    ddmlibDevice.removeRemotePath(
+        pathToRemove, /* runAsPackageName= */ Optional.empty(), Duration.ofMillis(10));
+  }
+
+  @Test
+  public void removeRemotePath_runAs() throws Exception {
+    String packageName = "com.test";
+    String pathToRemove = "/path/to/remove";
+    DdmlibDevice ddmlibDevice = new DdmlibDevice(mockDevice);
+
+    mockAdbShellCommand(
+        String.format("run-as '%s' rm -rf '%s' && echo OK", packageName, pathToRemove), "OK\n");
+    ddmlibDevice.removeRemotePath(pathToRemove, Optional.of(packageName), Duration.ofMillis(10));
   }
 
   private void mockAdbShellCommand(String command, String response) throws Exception {

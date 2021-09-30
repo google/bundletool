@@ -129,7 +129,7 @@ final class ZipFlingerApkSerializerHelper extends ApkSerializerHelper {
 
     // Invoke aapt2 to convert files from proto to binary format.
     Path binaryApkPath = tempDir.getPath().resolve("binary.apk");
-    if (enableSparseEncoding) {
+    if (enableSparseEncoding && split.getResourceTable().isPresent()) {
       Path interimApk = tempDir.getPath().resolve("interim.apk");
       aapt2.convertApkProtoToBinary(partialProtoApk, interimApk);
       aapt2.optimizeToSparseResourceTables(interimApk, binaryApkPath);

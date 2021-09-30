@@ -163,8 +163,8 @@ public abstract class BuildApksCommand {
   private static final Flag<String> KEY_ALIAS_FLAG = Flag.string("ks-key-alias");
   private static final Flag<Password> KEYSTORE_PASSWORD_FLAG = Flag.password("ks-pass");
   private static final Flag<Password> KEY_PASSWORD_FLAG = Flag.password("key-pass");
-  private static final Flag<Integer> MINIMUM_V3_SIGNING_API_VERSION_FLAG =
-      Flag.positiveInteger("min-v3-signing-api-version");
+  private static final Flag<Integer> MINIMUM_V3_ROTATION_API_VERSION_FLAG =
+      Flag.positiveInteger("min-v3-rotation-api-version");
 
   // SourceStamp-related flags.
   private static final Flag<Boolean> CREATE_STAMP_FLAG = Flag.booleanFlag("create-stamp");
@@ -891,12 +891,12 @@ public abstract class BuildApksCommand {
                 .build())
         .addFlag(
             FlagDescription.builder()
-                .setFlagName(MINIMUM_V3_SIGNING_API_VERSION_FLAG.getName())
+                .setFlagName(MINIMUM_V3_ROTATION_API_VERSION_FLAG.getName())
                 .setExampleValue("30")
                 .setOptional(true)
                 .setDescription(
-                    "The minimum API version for signing the generated APKs using V3 signature"
-                        + " scheme.")
+                    "The minimum API version for signing the generated APKs with rotation using V3"
+                        + " signature scheme.")
                 .build())
         .addFlag(
             FlagDescription.builder()
@@ -1120,7 +1120,7 @@ public abstract class BuildApksCommand {
     Optional<String> keyAlias = KEY_ALIAS_FLAG.getValue(flags);
     Optional<Password> keystorePassword = KEYSTORE_PASSWORD_FLAG.getValue(flags);
     Optional<Password> keyPassword = KEY_PASSWORD_FLAG.getValue(flags);
-    Optional<Integer> minV3SigningApi = MINIMUM_V3_SIGNING_API_VERSION_FLAG.getValue(flags);
+    Optional<Integer> minV3RotationApi = MINIMUM_V3_ROTATION_API_VERSION_FLAG.getValue(flags);
 
     if (keystorePath.isPresent() && keyAlias.isPresent()) {
       SignerConfig signerConfig =
@@ -1129,7 +1129,7 @@ public abstract class BuildApksCommand {
       SigningConfiguration.Builder builder =
           SigningConfiguration.builder()
               .setSignerConfig(signerConfig)
-              .setMinimumV3RotationApiVersion(minV3SigningApi);
+              .setMinimumV3RotationApiVersion(minV3RotationApi);
       populateLineageFromFlags(builder, flags);
       buildApksCommand.setSigningConfiguration(builder.build());
     } else if (keystorePath.isPresent() && !keyAlias.isPresent()) {

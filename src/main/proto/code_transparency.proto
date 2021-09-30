@@ -8,12 +8,17 @@ option java_package = "com.android.bundle";
 message CodeTransparency {
   // List of code-related files in the bundle.
   repeated CodeRelatedFile code_related_file = 1;
+
+  // Version of code transparency file format.
+  // Required.
+  int32 version = 2;
 }
 
 message CodeRelatedFile {
   enum Type {
-    DEX = 0;
+    TYPE_UNSPECIFIED = 0;
     NATIVE_LIBRARY = 1;
+    DEX = 2;
   }
   // Path to file in the bundle.
   // Required.

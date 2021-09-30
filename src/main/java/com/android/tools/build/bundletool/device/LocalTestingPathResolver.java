@@ -40,4 +40,8 @@ public class LocalTestingPathResolver {
                     .build());
     return joinUnixPaths("/sdcard/Android/data/", packageNameStr, "files", localTestPath);
   }
+
+  public static String getLocalTestingWorkingDir(String packageName) {
+    return joinUnixPaths("/data/data/", packageName, "files/splitcompat");
+  }
 }

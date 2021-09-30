@@ -53,6 +53,7 @@ import com.android.tools.build.bundletool.testing.CertificateFactory;
 import com.android.tools.build.bundletool.testing.FakeSystemEnvironmentProvider;
 import com.android.tools.build.bundletool.testing.TestModule;
 import com.android.tools.build.bundletool.transparency.CodeTransparencyCryptoUtils;
+import com.android.tools.build.bundletool.transparency.CodeTransparencyVersion;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.hash.Hashing;
@@ -543,6 +544,38 @@ public final class CheckTransparencyCommandTest {
   }
 
   @Test
+  public void bundleMode_unsupportedCodeTransparencyVersion() throws Exception {
+    String serializedJws =
+        createJwsToken(
+            CodeTransparency.newBuilder()
+                .setVersion(CodeTransparencyVersion.getCurrentVersion() + 1)
+                .build(),
+            transparencyKeyCertificate,
+            transparencyPrivateKey);
+    AppBundleBuilder appBundle =
+        new AppBundleBuilder()
+            .addModule("base", module -> module.setManifest(androidManifest("com.test.app")))
+            .addMetadataFile(
+                BundleMetadata.BUNDLETOOL_NAMESPACE,
+                BundleMetadata.TRANSPARENCY_SIGNED_FILE_NAME,
+                CharSource.wrap(serializedJws).asByteSource(Charset.defaultCharset()));
+    new AppBundleSerializer().writeToDisk(appBundle.build(), bundlePath);
+    ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+
+    Throwable e =
+        assertThrows(
+            IllegalStateException.class,
+            () ->
+                CheckTransparencyCommand.builder()
+                    .setMode(Mode.BUNDLE)
+                    .setBundlePath(bundlePath)
+                    .setTransparencyKeyCertificate(transparencyKeyCertificate)
+                    .build()
+                    .checkTransparency(new PrintStream(outputStream)));
+    assertThat(e).hasMessageThat().contains("Code transparency file has unsupported version.");
+  }
+
+  @Test
   public void bundleMode_unsupportedSignatureAlgorithm() throws Exception {
     String serializedJws =
         createJwsToken(
@@ -576,6 +609,44 @@ public final class CheckTransparencyCommandTest {
   @Test
   public void bundleMode_transparencyVerified_transparencyKeyCertificateProvidedByUser()
       throws Exception {
+    String serializedJws =
+        createJwsToken(
+            CodeTransparency.newBuilder()
+                .setVersion(CodeTransparencyVersion.getCurrentVersion())
+                .build(),
+            transparencyKeyCertificate,
+            transparencyPrivateKey);
+    AppBundleBuilder appBundle =
+        new AppBundleBuilder()
+            .addModule("base", module -> module.setManifest(androidManifest("com.test.app")))
+            .addMetadataFile(
+                BundleMetadata.BUNDLETOOL_NAMESPACE,
+                BundleMetadata.TRANSPARENCY_SIGNED_FILE_NAME,
+                CharSource.wrap(serializedJws).asByteSource(Charset.defaultCharset()));
+    new AppBundleSerializer().writeToDisk(appBundle.build(), bundlePath);
+    ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+
+    CheckTransparencyCommand.builder()
+        .setMode(Mode.BUNDLE)
+        .setBundlePath(bundlePath)
+        .setTransparencyKeyCertificate(transparencyKeyCertificate)
+        .build()
+        .checkTransparency(new PrintStream(outputStream));
+
+    String output = new String(outputStream.toByteArray(), UTF_8);
+    assertThat(output).contains("No APK present. APK signature was not checked.");
+    assertThat(output)
+        .contains(
+            "Code transparency signature verified for the provided code transparency key"
+                + " certificate.");
+    assertThat(output)
+        .contains(
+            "Code transparency verified: code related file contents match the code transparency"
+                + " file.");
+  }
+
+  @Test
+  public void bundleMode_transparencyVerified_codeTransparencyVersionNotSet() throws Exception {
     String serializedJws =
         createJwsToken(
             CodeTransparency.getDefaultInstance(),
@@ -614,7 +685,9 @@ public final class CheckTransparencyCommandTest {
   public void bundleMode_verificationFailed_badCertificateProvidedByUser() throws Exception {
     String serializedJws =
         createJwsToken(
-            CodeTransparency.getDefaultInstance(),
+            CodeTransparency.newBuilder()
+                .setVersion(CodeTransparencyVersion.getCurrentVersion())
+                .build(),
             transparencyKeyCertificate,
             transparencyPrivateKey);
     AppBundleBuilder appBundle =
@@ -690,6 +763,68 @@ public final class CheckTransparencyCommandTest {
   }
 
   @Test
+  public void apkMode_transparencyVerified_unsupportedCodeTransparencyVersion() throws Exception {
+    Path apkPath = tmpDir.resolve("universal.apk");
+    Path zipOfApksPath = tmpDir.resolve("apks.zip");
+    String dexFileName = "classes.dex";
+    byte[] dexFileContents = new byte[] {1, 2, 3};
+    String serializedJws =
+        createJwsToken(
+            CodeTransparency.newBuilder()
+                .setVersion(CodeTransparencyVersion.getCurrentVersion() + 1)
+                .addCodeRelatedFile(
+                    CodeRelatedFile.newBuilder()
+                        .setType(CodeRelatedFile.Type.DEX)
+                        .setPath("base/dex/" + dexFileName)
+                        .setSha256(
+                            ByteSource.wrap(dexFileContents).hash(Hashing.sha256()).toString())
+                        .build())
+                .build(),
+            transparencyKeyCertificate,
+            transparencyPrivateKey);
+    ModuleSplit baseModuleSplit =
+        ModuleSplit.builder()
+            .setModuleName(BundleModuleName.create("base"))
+            .setAndroidManifest(AndroidManifest.create(androidManifest("com.app")))
+            .setApkTargeting(ApkTargeting.getDefaultInstance())
+            .setVariantTargeting(VariantTargeting.getDefaultInstance())
+            .setMasterSplit(true)
+            .addEntry(
+                ModuleEntry.builder()
+                    .setPath(ZipPath.create("").resolve(dexFileName))
+                    .setContent(ByteSource.wrap(dexFileContents))
+                    .build())
+            .addEntry(
+                ModuleEntry.builder()
+                    .setPath(
+                        ZipPath.create("META-INF")
+                            .resolve(BundleMetadata.TRANSPARENCY_SIGNED_FILE_NAME))
+                    .setContent(
+                        CharSource.wrap(serializedJws).asByteSource(Charset.defaultCharset()))
+                    .build())
+            .build();
+    apkSerializerHelper.writeToZipFile(baseModuleSplit, apkPath);
+    ZipBuilder zipBuilder =
+        new ZipBuilder()
+            .addFileWithContent(
+                ZipPath.create("universal.apk"),
+                ByteString.readFrom(Files.newInputStream(apkPath)).toByteArray());
+    zipBuilder.writeTo(zipOfApksPath);
+    ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+
+    Throwable e =
+        assertThrows(
+            IllegalStateException.class,
+            () ->
+                CheckTransparencyCommand.builder()
+                    .setMode(Mode.APK)
+                    .setApkZipPath(zipOfApksPath)
+                    .build()
+                    .checkTransparency(new PrintStream(outputStream)));
+    assertThat(e).hasMessageThat().contains("Code transparency file has unsupported version.");
+  }
+
+  @Test
   public void apkMode_transparencyVerified_transparencyKeyCertificateNotProvidedByUser()
       throws Exception {
     Path apkPath = tmpDir.resolve("universal.apk");
@@ -699,6 +834,7 @@ public final class CheckTransparencyCommandTest {
     String serializedJws =
         createJwsToken(
             CodeTransparency.newBuilder()
+                .setVersion(CodeTransparencyVersion.getCurrentVersion())
                 .addCodeRelatedFile(
                     CodeRelatedFile.newBuilder()
                         .setType(CodeRelatedFile.Type.DEX)
@@ -773,6 +909,7 @@ public final class CheckTransparencyCommandTest {
     String serializedJws =
         createJwsToken(
             CodeTransparency.newBuilder()
+                .setVersion(CodeTransparencyVersion.getCurrentVersion())
                 .addCodeRelatedFile(
                     CodeRelatedFile.newBuilder()
                         .setType(CodeRelatedFile.Type.DEX)
@@ -836,6 +973,80 @@ public final class CheckTransparencyCommandTest {
   }
 
   @Test
+  public void apkMode_transparencyVerified_unspecifiedTypeForDexFiles() throws Exception {
+    Path apkPath = tmpDir.resolve("universal.apk");
+    Path zipOfApksPath = tmpDir.resolve("apks.zip");
+    String dexFileName = "classes.dex";
+    byte[] dexFileContents = new byte[] {1, 2, 3};
+    String serializedJws =
+        createJwsToken(
+            CodeTransparency.newBuilder()
+                .setVersion(CodeTransparencyVersion.getCurrentVersion())
+                .addCodeRelatedFile(
+                    CodeRelatedFile.newBuilder()
+                        .setType(CodeRelatedFile.Type.TYPE_UNSPECIFIED)
+                        .setPath("base/dex/" + dexFileName)
+                        .setSha256(
+                            ByteSource.wrap(dexFileContents).hash(Hashing.sha256()).toString())
+                        .build())
+                .build(),
+            transparencyKeyCertificate,
+            transparencyPrivateKey);
+    ModuleSplit baseModuleSplit =
+        ModuleSplit.builder()
+            .setModuleName(BundleModuleName.create("base"))
+            .setAndroidManifest(AndroidManifest.create(androidManifest("com.app")))
+            .setApkTargeting(ApkTargeting.getDefaultInstance())
+            .setVariantTargeting(VariantTargeting.getDefaultInstance())
+            .setMasterSplit(true)
+            .addEntry(
+                ModuleEntry.builder()
+                    .setPath(ZipPath.create("").resolve(dexFileName))
+                    .setContent(ByteSource.wrap(dexFileContents))
+                    .build())
+            .addEntry(
+                ModuleEntry.builder()
+                    .setPath(
+                        ZipPath.create("META-INF")
+                            .resolve(BundleMetadata.TRANSPARENCY_SIGNED_FILE_NAME))
+                    .setContent(
+                        CharSource.wrap(serializedJws).asByteSource(Charset.defaultCharset()))
+                    .build())
+            .build();
+    apkSerializerHelper.writeToZipFile(baseModuleSplit, apkPath);
+    ZipBuilder zipBuilder =
+        new ZipBuilder()
+            .addFileWithContent(
+                ZipPath.create("universal.apk"),
+                ByteString.readFrom(Files.newInputStream(apkPath)).toByteArray());
+    zipBuilder.writeTo(zipOfApksPath);
+    ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+
+    CheckTransparencyCommand.builder()
+        .setMode(Mode.APK)
+        .setApkZipPath(zipOfApksPath)
+        .build()
+        .checkTransparency(new PrintStream(outputStream));
+
+    String output = new String(outputStream.toByteArray(), UTF_8);
+    assertThat(output)
+        .contains(
+            "APK signature is valid. SHA-256 fingerprint of the apk signing key certificate (must"
+                + " be compared with the developer's public key manually): "
+                + CodeTransparencyCryptoUtils.getCertificateFingerprint(apkSigningKeyCertificate));
+    assertThat(output)
+        .contains(
+            "Code transparency signature is valid. SHA-256 fingerprint of the code transparency key"
+                + " certificate (must be compared with the developer's public key manually): "
+                + CodeTransparencyCryptoUtils.getCertificateFingerprint(
+                    (JsonWebSignature) JsonWebSignature.fromCompactSerialization(serializedJws)));
+    assertThat(output)
+        .contains(
+            "Code transparency verified: code related file contents match the code transparency"
+                + " file.");
+  }
+
+  @Test
   public void apkMode_verificationFailed_apkSigningKeyCertificateMismatch() throws Exception {
     Path apkPath = tmpDir.resolve("universal.apk");
     Path zipOfApksPath = tmpDir.resolve("apks.zip");
@@ -844,6 +1055,7 @@ public final class CheckTransparencyCommandTest {
     String serializedJws =
         createJwsToken(
             CodeTransparency.newBuilder()
+                .setVersion(CodeTransparencyVersion.getCurrentVersion())
                 .addCodeRelatedFile(
                     CodeRelatedFile.newBuilder()
                         .setType(CodeRelatedFile.Type.DEX)

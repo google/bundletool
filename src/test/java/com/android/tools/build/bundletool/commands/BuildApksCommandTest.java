@@ -1309,7 +1309,7 @@ public class BuildApksCommandTest {
                     "--ks-key-alias=" + KEY_ALIAS,
                     "--ks-pass=pass:" + KEYSTORE_PASSWORD,
                     "--key-pass=pass:" + KEY_PASSWORD,
-                    "--min-v3-signing-api-version=" + minV3Api),
+                    "--min-v3-rotation-api-version=" + minV3Api),
             new PrintStream(output),
             systemEnvironmentProvider,
             fakeAdbServer);

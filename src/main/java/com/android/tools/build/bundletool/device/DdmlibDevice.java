@@ -19,6 +19,9 @@ package com.android.tools.build.bundletool.device;
 import static com.android.tools.build.bundletool.device.LocalTestingPathResolver.resolveLocalTestingPath;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.collect.ImmutableList.toImmutableList;
+import static java.util.Arrays.stream;
+import static java.util.concurrent.TimeUnit.MILLISECONDS;
+import static java.util.concurrent.TimeUnit.MINUTES;
 
 import com.android.ddmlib.AdbCommandRejectedException;
 import com.android.ddmlib.DdmPreferences;
@@ -34,6 +37,7 @@ import com.android.sdklib.AndroidVersion;
 import com.android.tools.build.bundletool.model.exceptions.CommandExecutionException;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
+import com.google.common.primitives.Ints;
 import com.google.errorprone.annotations.FormatMethod;
 import java.io.File;
 import java.io.IOException;
@@ -41,12 +45,13 @@ import java.io.PrintStream;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.Clock;
-import java.util.Arrays;
+import java.time.Duration;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 
 /** Ddmlib-backed implementation of the {@link Device}. */
 public class DdmlibDevice extends Device {
+  private static final String DENSITY_OUTPUT_PREFIX = "Physical density:";
 
   private final IDevice device;
   private final Clock clock;
@@ -84,7 +89,40 @@ public class DdmlibDevice extends Device {
 
   @Override
   public int getDensity() {
-    return device.getDensity();
+    int density = device.getDensity();
+    if (density != -1) {
+      return density;
+    }
+    // This might be a case when ddmlib is unable to retrieve density via reading properties.
+    // For example this happens on Android S emulator.
+    try {
+      int[] parsedDensityFromShell = new int[] {-1};
+      device.executeShellCommand(
+          "wm density",
+          new MultiLineReceiver() {
+            @Override
+            public void processNewLines(String[] lines) {
+              stream(lines)
+                  .filter(string -> string.startsWith(DENSITY_OUTPUT_PREFIX))
+                  .map(string -> string.substring(DENSITY_OUTPUT_PREFIX.length()).trim())
+                  .map(Ints::tryParse)
+                  .forEach(density -> parsedDensityFromShell[0] = density != null ? density : -1);
+            }
+
+            @Override
+            public boolean isCancelled() {
+              return false;
+            }
+          },
+          /* maxTimeToOutputResponse= */ 1,
+          MINUTES);
+      return parsedDensityFromShell[0];
+    } catch (TimeoutException
+        | AdbCommandRejectedException
+        | ShellCommandUnresponsiveException
+        | IOException e) {
+      return -1;
+    }
   }
 
   @Override
@@ -101,14 +139,13 @@ public class DdmlibDevice extends Device {
   public ImmutableList<String> getDeviceFeatures() {
     return deviceFeaturesParser.parse(
         new AdbShellCommandTask(this, DEVICE_FEATURES_COMMAND)
-            .execute(ADB_TIMEOUT_MS, TimeUnit.MILLISECONDS));
+            .execute(ADB_TIMEOUT_MS, MILLISECONDS));
   }
 
   @Override
   public ImmutableList<String> getGlExtensions() {
     return glExtensionsParser.parse(
-        new AdbShellCommandTask(this, GL_EXTENSIONS_COMMAND)
-            .execute(ADB_TIMEOUT_MS, TimeUnit.MILLISECONDS));
+        new AdbShellCommandTask(this, GL_EXTENSIONS_COMMAND).execute(ADB_TIMEOUT_MS, MILLISECONDS));
   }
 
   @Override
@@ -141,7 +178,7 @@ public class DdmlibDevice extends Device {
             installOptions.getAllowReinstall(),
             extraArgs.build(),
             installOptions.getTimeout().toMillis(),
-            TimeUnit.MILLISECONDS);
+            MILLISECONDS);
       } else {
         device.installPackage(
             Iterables.getOnlyElement(apkFiles).toString(),
@@ -177,10 +214,14 @@ public class DdmlibDevice extends Device {
       // ... and recreate it, making sure the destination dir is empty.
       // We don't want splits from previous runs in the directory.
       // There isn't a nice way to test if dir is empty in shell, but rmdir will return error
-      commandExecutor.executeAndPrint(
-          "mkdir -p %s && rmdir %s && mkdir -p %s", splitsPath, splitsPath, splitsPath);
+      commandExecutor.executeAndPrint("mkdir -p %s && rmdir %1$s && mkdir -p %1$s", splitsPath);
 
       pushFiles(commandExecutor, splitsPath, files);
+
+      // Fix permission issue for devices on Android S.
+      if (device.getVersion().getApiLevel() >= 31 || device.getVersion().isPreview()) {
+        commandExecutor.executeAndPrint("chmod 775 %s", splitsPath);
+      }
     } catch (IOException
         | TimeoutException
         | SyncException
@@ -233,8 +274,23 @@ public class DdmlibDevice extends Device {
   }
 
   @Override
-  public void removeRemotePackage(Path remoteFilePath) throws InstallException {
-    device.removeRemotePackage(remoteFilePath.toString());
+  public void removeRemotePath(
+      String remoteFilePath, Optional<String> runAsPackageName, Duration timeout)
+      throws IOException {
+    RemoteCommandExecutor executor =
+        new RemoteCommandExecutor(this, timeout.toMillis(), System.err);
+    try {
+      if (runAsPackageName.isPresent()) {
+        executor.executeAndPrint("run-as %s rm -rf %s", runAsPackageName.get(), remoteFilePath);
+      } else {
+        executor.executeAndPrint("rm -rf %s", remoteFilePath);
+      }
+    } catch (TimeoutException
+        | AdbCommandRejectedException
+        | ShellCommandUnresponsiveException
+        | IOException e) {
+      throw new IOException(String.format("Failed to remove '%s'", remoteFilePath), e);
+    }
   }
 
   @Override
@@ -291,7 +347,7 @@ public class DdmlibDevice extends Device {
       // ExecuteShellCommand would only tell us about ADB errors, and NOT the actual shell commands
       // We need another way to check exit values of the commands we run.
       // By adding " && echo OK" we can make sure "OK" is printed if the cmd executed successfully.
-      device.executeShellCommand(command + " && echo OK", receiver, timeout, TimeUnit.MILLISECONDS);
+      device.executeShellCommand(command + " && echo OK", receiver, timeout, MILLISECONDS);
       if (!"OK".equals(lastOutputLine)) {
         throw new IOException("ADB command failed.");
       }
@@ -309,7 +365,7 @@ public class DdmlibDevice extends Device {
     @FormatMethod
     static String formatCommandWithArgs(String command, String... args) {
       return String.format(
-          command, Arrays.stream(args).map(RemoteCommandExecutor::escapeAndSingleQuote).toArray());
+          command, stream(args).map(RemoteCommandExecutor::escapeAndSingleQuote).toArray());
     }
   }
 

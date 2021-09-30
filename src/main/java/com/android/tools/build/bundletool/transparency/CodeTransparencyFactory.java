@@ -43,7 +43,10 @@ public final class CodeTransparencyFactory {
             .map(CodeTransparencyFactory::createCodeRelatedFile)
             .sorted(Comparator.comparing(CodeRelatedFile::getPath))
             .collect(toImmutableList());
-    return CodeTransparency.newBuilder().addAllCodeRelatedFile(codeRelatedFiles).build();
+    return CodeTransparency.newBuilder()
+        .setVersion(CodeTransparencyVersion.getCurrentVersion())
+        .addAllCodeRelatedFile(codeRelatedFiles)
+        .build();
   }
 
   /** Returns {@link CodeTransparency} parsed from transparency file JSON payload. */

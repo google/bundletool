@@ -108,16 +108,6 @@ public class ModuleSplitsToShardMerger {
         createManifestMerger());
   }
 
-  private AndroidManifestMerger createManifestMerger() {
-    if (FUSE_APPLICATION_ELEMENTS_FROM_FEATURE_MANIFESTS.enabledForVersion(bundletoolVersion)) {
-      return fusingMergerApplicationElements();
-    }
-    if (FUSE_ACTIVITIES_FROM_FEATURE_MANIFESTS.enabledForVersion(bundletoolVersion)) {
-      return fusingMergerOnlyReplaceActivities();
-    }
-    return useBaseModuleManifestMerger();
-  }
-
   /**
    * Gets a list of splits, and merges them into a single standalone APK (aka shard).
    *
@@ -191,6 +181,16 @@ public class ModuleSplitsToShardMerger {
         mergedResourceTable,
         mergedAssetsConfig,
         mergedSplitType);
+  }
+
+  private AndroidManifestMerger createManifestMerger() {
+    if (FUSE_APPLICATION_ELEMENTS_FROM_FEATURE_MANIFESTS.enabledForVersion(bundletoolVersion)) {
+      return fusingMergerApplicationElements();
+    }
+    if (FUSE_ACTIVITIES_FROM_FEATURE_MANIFESTS.enabledForVersion(bundletoolVersion)) {
+      return fusingMergerOnlyReplaceActivities();
+    }
+    return useBaseModuleManifestMerger();
   }
 
   /**

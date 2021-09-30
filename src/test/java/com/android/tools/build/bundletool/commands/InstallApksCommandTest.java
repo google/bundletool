@@ -44,6 +44,7 @@ import static com.android.tools.build.bundletool.testing.TestUtils.expectMissing
 import static com.android.tools.build.bundletool.testing.TestUtils.expectMissingRequiredFlagException;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.truth.Truth.assertThat;
+import static com.google.common.truth.Truth8.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.android.bundle.Commands.AssetModuleMetadata;
@@ -61,6 +62,7 @@ import com.android.bundle.Targeting.SdkVersion;
 import com.android.bundle.Targeting.VariantTargeting;
 import com.android.ddmlib.IDevice.DeviceState;
 import com.android.tools.build.bundletool.device.AdbServer;
+import com.android.tools.build.bundletool.device.LocalTestingPathResolver;
 import com.android.tools.build.bundletool.flags.FlagParser;
 import com.android.tools.build.bundletool.model.ZipPath;
 import com.android.tools.build.bundletool.model.exceptions.CommandExecutionException;
@@ -925,6 +927,7 @@ public class InstallApksCommandTest {
 
     List<Path> installedApks = new ArrayList<>();
     List<Path> pushedFiles = new ArrayList<>();
+    List<String> clearedPathes = new ArrayList<>();
     FakeDevice fakeDevice =
         FakeDevice.fromDeviceSpec(DEVICE_ID, DeviceState.ONLINE, lDeviceWithLocales("en-US"));
     AdbServer adbServer =
@@ -938,6 +941,12 @@ public class InstallApksCommandTest {
         (files, pushOptions) -> {
           assertThat(pushOptions.getTimeout()).isEqualTo(timeout);
           pushedFiles.addAll(files);
+        });
+    fakeDevice.setRemoveRemotePathSideEffect(
+        (remotePath, runAs, removeTimeout) -> {
+          assertThat(removeTimeout).isEqualTo(timeout);
+          assertThat(runAs).hasValue(PKG_NAME);
+          clearedPathes.add(remotePath);
         });
 
     InstallApksCommand.builder()
@@ -966,6 +975,8 @@ public class InstallApksCommandTest {
             installTimeFeaturePlApk.toString(),
             onDemandFeatureMasterApk.toString(),
             onDemandAssetMasterApk.toString());
+    assertThat(clearedPathes)
+        .containsExactly(LocalTestingPathResolver.getLocalTestingWorkingDir(PKG_NAME));
   }
 
   @Test

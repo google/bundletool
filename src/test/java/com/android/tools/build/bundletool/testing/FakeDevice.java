@@ -42,6 +42,7 @@ import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.time.Duration;
 import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
@@ -62,6 +63,7 @@ public class FakeDevice extends Device {
   private final Map<String, FakeShellCommandAction> commandInjections = new HashMap<>();
   private Optional<SideEffect<InstallOptions>> installApksSideEffect = Optional.empty();
   private Optional<SideEffect<PushOptions>> pushSideEffect = Optional.empty();
+  private Optional<RemoveRemotePathSideEffect> removeRemotePathSideEffect = Optional.empty();
   private static final Joiner COMMA_JOINER = Joiner.on(',');
   private static final Joiner DASH_JOINER = Joiner.on('-');
   private static final Joiner LINE_JOINER = Joiner.on(System.getProperty("line.separator"));
@@ -258,7 +260,11 @@ public class FakeDevice extends Device {
   }
 
   @Override
-  public void removeRemotePackage(Path remoteFilePath) {}
+  public void removeRemotePath(
+      String remoteFilePath, Optional<String> runAsPackageName, Duration timeout) {
+    removeRemotePathSideEffect.ifPresent(
+        val -> val.apply(remoteFilePath, runAsPackageName, timeout));
+  }
 
   @Override
   public void pull(ImmutableList<FilePullParams> files) {
@@ -281,6 +287,10 @@ public class FakeDevice extends Device {
     pushSideEffect = Optional.of(sideEffect);
   }
 
+  public void setRemoveRemotePathSideEffect(RemoveRemotePathSideEffect sideEffect) {
+    removeRemotePathSideEffect = Optional.of(sideEffect);
+  }
+
   public void clearInstallApksSideEffect() {
     installApksSideEffect = Optional.empty();
   }
@@ -295,6 +305,11 @@ public class FakeDevice extends Device {
     String onExecute()
         throws TimeoutException, AdbCommandRejectedException, ShellCommandUnresponsiveException,
             IOException;
+  }
+
+  /** Remove remote path side effect. */
+  public interface RemoveRemotePathSideEffect {
+    void apply(String remotePath, Optional<String> runAs, Duration timeout);
   }
 
   /** Side effect. */
