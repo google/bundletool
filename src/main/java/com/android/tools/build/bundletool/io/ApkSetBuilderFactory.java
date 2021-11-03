@@ -59,6 +59,9 @@ public final class ApkSetBuilderFactory {
     /** Adds an asset slice APK to the APK Set archive. */
     ApkDescription addAssetSliceApk(ModuleSplit split, ZipPath apkPath);
 
+    /** Adds a hibernated APK to the APK Set archive. */
+    ApkDescription addHibernatedApk(ModuleSplit split, ZipPath apkPath);
+
     /** Sets the TOC file in the APK Set archive. */
     void setTableOfContentsFile(BuildApksResult tableOfContentsProto);
 
@@ -149,6 +152,14 @@ public final class ApkSetBuilderFactory {
     }
 
     @Override
+    public ApkDescription addHibernatedApk(ModuleSplit split, ZipPath apkPath) {
+      ApkDescription apkDescription =
+          standaloneApkSerializer.writeHibernatedApkToDisk(split, tempDirectory, apkPath);
+      relativeApkPaths.add(apkDescription.getPath());
+      return apkDescription;
+    }
+
+    @Override
     public void setTableOfContentsFile(BuildApksResult tableOfContentsProto) {
       tableOfContents = tableOfContentsProto;
     }
@@ -220,6 +231,11 @@ public final class ApkSetBuilderFactory {
     @Override
     public ApkDescription addSystemApk(ModuleSplit split, ZipPath apkPath) {
       return standaloneApkSerializer.writeSystemApkToDisk(split, outputDirectory, apkPath);
+    }
+
+    @Override
+    public ApkDescription addHibernatedApk(ModuleSplit split, ZipPath apkPath) {
+      return standaloneApkSerializer.writeHibernatedApkToDisk(split, outputDirectory, apkPath);
     }
 
     @Override

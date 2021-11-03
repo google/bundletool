@@ -27,7 +27,6 @@ import com.android.tools.build.bundletool.model.BundleModule;
 import com.android.tools.build.bundletool.testing.BundleModuleBuilder;
 import com.google.common.collect.ImmutableCollection;
 import java.io.IOException;
-import java.util.Optional;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
@@ -40,7 +39,7 @@ public class SigningConfigurationVariantGeneratorTest {
     SigningConfigurationVariantGenerator signingConfigurationVariantGenerator =
         new SigningConfigurationVariantGenerator(
             ApkGenerationConfiguration.builder()
-                .setMinimumV3RotationApiVersion(Optional.of(ANDROID_R_API_VERSION))
+                .setMinSdkForAdditionalVariantWithV3Rotation(ANDROID_R_API_VERSION)
                 .build());
 
     ImmutableCollection<VariantTargeting> splits =

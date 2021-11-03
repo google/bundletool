@@ -17,6 +17,7 @@
 package com.android.tools.build.bundletool.model.utils;
 
 import static com.android.tools.build.bundletool.model.BundleModuleName.BASE_MODULE_NAME;
+import static com.android.tools.build.bundletool.model.ModuleSplit.SplitType.HIBERNATION;
 import static com.android.tools.build.bundletool.model.ModuleSplit.SplitType.INSTANT;
 import static com.android.tools.build.bundletool.model.ModuleSplit.SplitType.SPLIT;
 import static com.android.tools.build.bundletool.model.ModuleSplit.SplitType.STANDALONE;
@@ -92,7 +93,14 @@ public class SplitsXmlInjectorTest {
                 /* splitId= */ "",
                 /* masterSplit= */ true,
                 SPLIT,
+                /* languageTargeting= */ null),
+            createModuleSplit(
+                BASE_MODULE_NAME.getName(),
+                /* splitId= */ "",
+                /* masterSplit= */ true,
+                HIBERNATION,
                 /* languageTargeting= */ null));
+
     assertThat(
             splitsXmlInjector.process(GeneratedApks.fromModuleSplits(modules)).getAllApksStream())
         .containsExactlyElementsIn(modules);
@@ -337,6 +345,48 @@ public class SplitsXmlInjectorTest {
             .addLanguageMapping(BASE_MODULE_NAME, "fr", "")
             .build();
     assertThat(XmlNode.parseFrom(processedStandalone.getEntries().get(0).getContent().read()))
+        .ignoringRepeatedFieldOrder()
+        .isEqualTo(expectedSplitsProtoXml);
+  }
+
+  @Test
+  public void process_hibernationSplitTypes() throws Exception {
+    ModuleSplit hibernated =
+        createModuleSplit(
+            BASE_MODULE_NAME.getName(),
+            /* splitId= */ "",
+            /* masterSplit= */ true,
+            SplitType.HIBERNATION,
+            /* languageTargeting= */ null);
+    ResourceTable hibernatedResourceTable =
+        new ResourceTableBuilder()
+            .addPackage("com.example.app")
+            .addStringResourceForMultipleLocales(
+                "title", ImmutableMap.of("ru-RU", "title ru-RU", "fr", "title fr"))
+            .build();
+    hibernated = hibernated.toBuilder().setResourceTable(hibernatedResourceTable).build();
+
+    GeneratedApks result =
+        splitsXmlInjector.process(GeneratedApks.fromModuleSplits(ImmutableList.of(hibernated)));
+
+    ModuleSplit processedStandalone = result.getAllApksStream().collect(onlyElement());
+
+    assertThat(
+            processedStandalone
+                .getAndroidManifest()
+                .getMetadataResourceId("com.android.vending.splits"))
+        .hasValue(0x7f020000);
+    assertThat(processedStandalone.getResourceTable().get())
+        .containsResource("com.example.app:xml/splits0")
+        .withFileReference("res/xml/splits0.xml");
+
+    XmlNode expectedSplitsProtoXml =
+        new SplitsProtoXmlBuilder()
+            .addLanguageMapping(BASE_MODULE_NAME, "ru", "")
+            .addLanguageMapping(BASE_MODULE_NAME, "fr", "")
+            .build();
+    assertThat(XmlNode.parseFrom(processedStandalone.getEntries().get(0).getContent().read(),
+                ExtensionRegistry.getEmptyRegistry()))
         .ignoringRepeatedFieldOrder()
         .isEqualTo(expectedSplitsProtoXml);
   }

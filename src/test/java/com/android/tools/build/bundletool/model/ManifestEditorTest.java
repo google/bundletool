@@ -17,16 +17,38 @@
 package com.android.tools.build.bundletool.model;
 
 import static com.android.tools.build.bundletool.model.AndroidManifest.ACTIVITY_ELEMENT_NAME;
+import static com.android.tools.build.bundletool.model.AndroidManifest.ALLOW_BACKUP_ATTRIBUTE_NAME;
+import static com.android.tools.build.bundletool.model.AndroidManifest.ALLOW_BACKUP_RESOURCE_ID;
+import static com.android.tools.build.bundletool.model.AndroidManifest.DATA_EXTRACTION_RULES_ATTRIBUTE_NAME;
+import static com.android.tools.build.bundletool.model.AndroidManifest.DATA_EXTRACTION_RULES_RESOURCE_ID;
+import static com.android.tools.build.bundletool.model.AndroidManifest.DESCRIPTION_ATTRIBUTE_NAME;
+import static com.android.tools.build.bundletool.model.AndroidManifest.DESCRIPTION_RESOURCE_ID;
+import static com.android.tools.build.bundletool.model.AndroidManifest.FULL_BACKUP_CONTENT_ATTRIBUTE_NAME;
+import static com.android.tools.build.bundletool.model.AndroidManifest.FULL_BACKUP_CONTENT_RESOURCE_ID;
+import static com.android.tools.build.bundletool.model.AndroidManifest.FULL_BACKUP_ONLY_ATTRIBUTE_NAME;
+import static com.android.tools.build.bundletool.model.AndroidManifest.FULL_BACKUP_ONLY_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.HAS_CODE_RESOURCE_ID;
+import static com.android.tools.build.bundletool.model.AndroidManifest.HAS_FRAGILE_USER_DATA_ATTRIBUTE_NAME;
+import static com.android.tools.build.bundletool.model.AndroidManifest.HAS_FRAGILE_USER_DATA_RESOURCE_ID;
+import static com.android.tools.build.bundletool.model.AndroidManifest.ICON_ATTRIBUTE_NAME;
+import static com.android.tools.build.bundletool.model.AndroidManifest.ICON_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.IS_FEATURE_SPLIT_RESOURCE_ID;
+import static com.android.tools.build.bundletool.model.AndroidManifest.IS_GAME_ATTRIBUTE_NAME;
+import static com.android.tools.build.bundletool.model.AndroidManifest.IS_GAME_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.IS_SPLIT_REQUIRED_ATTRIBUTE_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.IS_SPLIT_REQUIRED_RESOURCE_ID;
+import static com.android.tools.build.bundletool.model.AndroidManifest.LABEL_ATTRIBUTE_NAME;
+import static com.android.tools.build.bundletool.model.AndroidManifest.LABEL_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.MAX_SDK_VERSION_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.MIN_SDK_VERSION_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.NAME_ATTRIBUTE_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.NAME_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.PROVIDER_ELEMENT_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.SERVICE_ELEMENT_NAME;
+import static com.android.tools.build.bundletool.model.AndroidManifest.SHARED_USER_ID_ATTRIBUTE_NAME;
+import static com.android.tools.build.bundletool.model.AndroidManifest.SHARED_USER_ID_RESOURCE_ID;
+import static com.android.tools.build.bundletool.model.AndroidManifest.SHARED_USER_LABEL_ATTRIBUTE_NAME;
+import static com.android.tools.build.bundletool.model.AndroidManifest.SHARED_USER_LABEL_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.SPLIT_NAME_ATTRIBUTE_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.SPLIT_NAME_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.TARGET_SANDBOX_VERSION_RESOURCE_ID;
@@ -44,6 +66,7 @@ import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.xmlB
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.xmlDecimalIntegerAttribute;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.xmlElement;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.xmlNode;
+import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.xmlResourceReferenceAttribute;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.truth.Truth.assertThat;
 import static com.google.common.truth.Truth8.assertThat;
@@ -53,6 +76,8 @@ import com.android.aapt.Resources.XmlAttribute;
 import com.android.aapt.Resources.XmlElement;
 import com.android.aapt.Resources.XmlNode;
 import com.android.tools.build.bundletool.TestData;
+import com.android.tools.build.bundletool.model.manifestelements.Activity;
+import com.android.tools.build.bundletool.model.manifestelements.Receiver;
 import com.android.tools.build.bundletool.model.utils.xmlproto.XmlProtoAttribute;
 import com.android.tools.build.bundletool.model.utils.xmlproto.XmlProtoElement;
 import com.google.common.collect.ImmutableList;
@@ -184,8 +209,7 @@ public class ManifestEditorTest {
 
   @Test
   public void doNotSetFeatureSplit_forBaseSplit() throws Exception {
-    AndroidManifest androidManifest =
-        AndroidManifest.create(xmlNode(xmlElement("manifest", xmlNode(xmlElement("application")))));
+    AndroidManifest androidManifest = createManifestWithApplicationElement();
     AndroidManifest editedManifest =
         androidManifest.toEditor().setSplitIdForFeatureSplit("").save();
 
@@ -200,8 +224,7 @@ public class ManifestEditorTest {
 
   @Test
   public void setFeatureSplit_forNonBaseSplit() throws Exception {
-    AndroidManifest androidManifest =
-        AndroidManifest.create(xmlNode(xmlElement("manifest", xmlNode(xmlElement("application")))));
+    AndroidManifest androidManifest = createManifestWithApplicationElement();
     AndroidManifest editedManifest =
         androidManifest.toEditor().setSplitIdForFeatureSplit("feature1").save();
 
@@ -342,8 +365,7 @@ public class ManifestEditorTest {
 
   @Test
   public void setHasCode_true() throws Exception {
-    AndroidManifest androidManifest =
-        AndroidManifest.create(xmlNode(xmlElement("manifest", xmlNode(xmlElement("application")))));
+    AndroidManifest androidManifest = createManifestWithApplicationElement();
     AndroidManifest editedManifest = androidManifest.toEditor().setHasCode(true).save();
 
     XmlNode manifestRoot = editedManifest.getManifestRoot().getProto();
@@ -363,8 +385,7 @@ public class ManifestEditorTest {
 
   @Test
   public void setHasCode_false() {
-    AndroidManifest androidManifest =
-        AndroidManifest.create(xmlNode(xmlElement("manifest", xmlNode(xmlElement("application")))));
+    AndroidManifest androidManifest = createManifestWithApplicationElement();
     AndroidManifest editedManifest = androidManifest.toEditor().setHasCode(false).save();
 
     XmlNode manifestRoot = editedManifest.getManifestRoot().getProto();
@@ -384,8 +405,7 @@ public class ManifestEditorTest {
 
   @Test
   public void setPackage() {
-    AndroidManifest androidManifest =
-        AndroidManifest.create(xmlNode(xmlElement("manifest", xmlNode(xmlElement("application")))));
+    AndroidManifest androidManifest = createManifestWithApplicationElement();
     AndroidManifest editedManifest = androidManifest.toEditor().setPackage("com.test.app").save();
 
     XmlNode manifestRoot = editedManifest.getManifestRoot().getProto();
@@ -398,8 +418,7 @@ public class ManifestEditorTest {
 
   @Test
   public void setVersionCode() {
-    AndroidManifest androidManifest =
-        AndroidManifest.create(xmlNode(xmlElement("manifest", xmlNode(xmlElement("application")))));
+    AndroidManifest androidManifest = createManifestWithApplicationElement();
     AndroidManifest editedManifest = androidManifest.toEditor().setVersionCode(123).save();
 
     XmlNode manifestRoot = editedManifest.getManifestRoot().getProto();
@@ -414,8 +433,7 @@ public class ManifestEditorTest {
 
   @Test
   public void setConfigForSplit() {
-    AndroidManifest androidManifest =
-        AndroidManifest.create(xmlNode(xmlElement("manifest", xmlNode(xmlElement("application")))));
+    AndroidManifest androidManifest = createManifestWithApplicationElement();
     AndroidManifest editedManifest =
         androidManifest.toEditor().setConfigForSplit("feature1").save();
 
@@ -429,8 +447,7 @@ public class ManifestEditorTest {
 
   @Test
   public void setSplitId() {
-    AndroidManifest androidManifest =
-        AndroidManifest.create(xmlNode(xmlElement("manifest", xmlNode(xmlElement("application")))));
+    AndroidManifest androidManifest = createManifestWithApplicationElement();
     AndroidManifest editedManifest =
         androidManifest.toEditor().setSplitId("feature1.config.x86").save();
 
@@ -477,8 +494,7 @@ public class ManifestEditorTest {
 
   @Test
   public void setFusedModuleNames() throws Exception {
-    AndroidManifest androidManifest =
-        AndroidManifest.create(xmlNode(xmlElement("manifest", xmlNode(xmlElement("application")))));
+    AndroidManifest androidManifest = createManifestWithApplicationElement();
 
     AndroidManifest editedManifest =
         androidManifest.toEditor().setFusedModuleNames(ImmutableList.of("base", "feature")).save();
@@ -491,8 +507,7 @@ public class ManifestEditorTest {
 
   @Test
   public void setSplitsRequired() throws Exception {
-    AndroidManifest androidManifest =
-        AndroidManifest.create(xmlNode(xmlElement("manifest", xmlNode(xmlElement("application")))));
+    AndroidManifest androidManifest = createManifestWithApplicationElement();
 
     AndroidManifest editedManifest = androidManifest.toEditor().setSplitsRequired(true).save();
 
@@ -511,8 +526,7 @@ public class ManifestEditorTest {
 
   @Test
   public void setSplitsRequired_idempotent() throws Exception {
-    AndroidManifest androidManifest =
-        AndroidManifest.create(xmlNode(xmlElement("manifest", xmlNode(xmlElement("application")))));
+    AndroidManifest androidManifest = createManifestWithApplicationElement();
 
     AndroidManifest editedManifest =
         androidManifest.toEditor().setSplitsRequired(true).setSplitsRequired(true).save();
@@ -532,8 +546,7 @@ public class ManifestEditorTest {
 
   @Test
   public void setSplitsRequired_lastInvocationWins() throws Exception {
-    AndroidManifest androidManifest =
-        AndroidManifest.create(xmlNode(xmlElement("manifest", xmlNode(xmlElement("application")))));
+    AndroidManifest androidManifest = createManifestWithApplicationElement();
 
     AndroidManifest editedManifest =
         androidManifest.toEditor().setSplitsRequired(true).setSplitsRequired(false).save();
@@ -553,8 +566,7 @@ public class ManifestEditorTest {
 
   @Test
   public void setTargetSandboxVersion() {
-    AndroidManifest androidManifest =
-        AndroidManifest.create(xmlNode(xmlElement("manifest", xmlNode(xmlElement("application")))));
+    AndroidManifest androidManifest = createManifestWithApplicationElement();
     AndroidManifest editedManifest = androidManifest.toEditor().setTargetSandboxVersion(2).save();
 
     XmlNode manifestRoot = editedManifest.getManifestRoot().getProto();
@@ -701,8 +713,7 @@ public class ManifestEditorTest {
 
   @Test
   public void addMetadataString() {
-    AndroidManifest androidManifest =
-        AndroidManifest.create(xmlNode(xmlElement("manifest", xmlNode(xmlElement("application")))));
+    AndroidManifest androidManifest = createManifestWithApplicationElement();
     AndroidManifest editedManifest =
         androidManifest.toEditor().addMetaDataString("hello", "world").save();
 
@@ -711,8 +722,7 @@ public class ManifestEditorTest {
 
   @Test
   public void addMetadataInteger() {
-    AndroidManifest androidManifest =
-        AndroidManifest.create(xmlNode(xmlElement("manifest", xmlNode(xmlElement("application")))));
+    AndroidManifest androidManifest = createManifestWithApplicationElement();
     AndroidManifest editedManifest =
         androidManifest.toEditor().addMetaDataInteger("hello", 123).save();
 
@@ -720,13 +730,220 @@ public class ManifestEditorTest {
   }
 
   @Test
+  public void addMetadataBoolean() {
+    AndroidManifest androidManifest = createManifestWithApplicationElement();
+    AndroidManifest editedManifest =
+        androidManifest.toEditor().addMetaDataBoolean("hello", true).save();
+
+    assertThat(editedManifest.getMetadataValueAsBoolean("hello")).hasValue(true);
+  }
+
+  @Test
   public void addMetadataResourceReference() {
-    AndroidManifest androidManifest =
-        AndroidManifest.create(xmlNode(xmlElement("manifest", xmlNode(xmlElement("application")))));
+    AndroidManifest androidManifest = createManifestWithApplicationElement();
     AndroidManifest editedManifest =
         androidManifest.toEditor().addMetaDataResourceId("hello", 123).save();
 
     assertThat(editedManifest.getMetadataResourceId("hello")).hasValue(123);
+  }
+
+  @Test
+  public void setSharedUserId() {
+    AndroidManifest androidManifest = createManifestWithApplicationElement();
+    AndroidManifest editedManifest =
+        androidManifest.toEditor().setSharedUserId("shared_user_id").save();
+
+    XmlNode manifestRoot = editedManifest.getManifestRoot().getProto();
+    assertThat(manifestRoot.getElement().getAttributeList())
+        .containsExactly(
+            xmlAttribute(
+                ANDROID_NAMESPACE_URI,
+                SHARED_USER_ID_ATTRIBUTE_NAME,
+                SHARED_USER_ID_RESOURCE_ID,
+                "shared_user_id"));
+  }
+
+  @Test
+  public void setSharedUserLabel() {
+    AndroidManifest androidManifest = createManifestWithApplicationElement();
+    AndroidManifest editedManifest =
+        androidManifest.toEditor().setSharedUserLabel(0x12345678).save();
+
+    XmlNode manifestRoot = editedManifest.getManifestRoot().getProto();
+    assertThat(manifestRoot.getElement().getAttributeList())
+        .containsExactly(
+            xmlResourceReferenceAttribute(
+                ANDROID_NAMESPACE_URI,
+                SHARED_USER_LABEL_ATTRIBUTE_NAME,
+                SHARED_USER_LABEL_RESOURCE_ID,
+                0x12345678));
+  }
+
+  @Test
+  public void setDescription() throws Exception {
+    AndroidManifest androidManifest = createManifestWithApplicationElement();
+
+    AndroidManifest editedManifest = androidManifest.toEditor().setDescription(0x12345678).save();
+
+    assertThat(getApplicationElement(editedManifest).getAttributeList())
+        .containsExactly(
+            xmlResourceReferenceAttribute(
+                ANDROID_NAMESPACE_URI,
+                DESCRIPTION_ATTRIBUTE_NAME,
+                DESCRIPTION_RESOURCE_ID,
+                0x12345678));
+  }
+
+  @Test
+  public void setHasFragileUserData() throws Exception {
+    AndroidManifest androidManifest = createManifestWithApplicationElement();
+
+    AndroidManifest editedManifest = androidManifest.toEditor().setHasFragileUserData(true).save();
+
+    assertThat(getApplicationElement(editedManifest).getAttributeList())
+        .containsExactly(
+            xmlBooleanAttribute(
+                ANDROID_NAMESPACE_URI,
+                HAS_FRAGILE_USER_DATA_ATTRIBUTE_NAME,
+                HAS_FRAGILE_USER_DATA_RESOURCE_ID,
+                true));
+  }
+
+  @Test
+  public void setIsGame() throws Exception {
+    AndroidManifest androidManifest = createManifestWithApplicationElement();
+
+    AndroidManifest editedManifest = androidManifest.toEditor().setIsGame(true).save();
+
+    assertThat(getApplicationElement(editedManifest).getAttributeList())
+        .containsExactly(
+            xmlBooleanAttribute(
+                ANDROID_NAMESPACE_URI, IS_GAME_ATTRIBUTE_NAME, IS_GAME_RESOURCE_ID, true));
+  }
+
+  @Test
+  public void setLabelAsString() throws Exception {
+    AndroidManifest androidManifest = createManifestWithApplicationElement();
+
+    AndroidManifest editedManifest =
+        androidManifest.toEditor().setLabelAsString("app label").save();
+
+    assertThat(getApplicationElement(editedManifest).getAttributeList())
+        .containsExactly(
+            xmlAttribute(
+                ANDROID_NAMESPACE_URI, LABEL_ATTRIBUTE_NAME, LABEL_RESOURCE_ID, "app label"));
+  }
+
+  @Test
+  public void setLabelAsRefId() throws Exception {
+    AndroidManifest androidManifest = createManifestWithApplicationElement();
+
+    AndroidManifest editedManifest = androidManifest.toEditor().setLabelAsRefId(0x12345678).save();
+
+    assertThat(getApplicationElement(editedManifest).getAttributeList())
+        .containsExactly(
+            xmlResourceReferenceAttribute(
+                ANDROID_NAMESPACE_URI, LABEL_ATTRIBUTE_NAME, LABEL_RESOURCE_ID, 0x12345678));
+  }
+
+  @Test
+  public void setIcon() throws Exception {
+    AndroidManifest androidManifest = createManifestWithApplicationElement();
+
+    AndroidManifest editedManifest = androidManifest.toEditor().setIcon(0x12345678).save();
+
+    assertThat(getApplicationElement(editedManifest).getAttributeList())
+        .containsExactly(
+            xmlResourceReferenceAttribute(
+                ANDROID_NAMESPACE_URI, ICON_ATTRIBUTE_NAME, ICON_RESOURCE_ID, 0x12345678));
+  }
+
+  @Test
+  public void setAllowBackup() throws Exception {
+    AndroidManifest androidManifest = createManifestWithApplicationElement();
+
+    AndroidManifest editedManifest = androidManifest.toEditor().setAllowBackup(true).save();
+
+    assertThat(getApplicationElement(editedManifest).getAttributeList())
+        .containsExactly(
+            xmlBooleanAttribute(
+                ANDROID_NAMESPACE_URI,
+                ALLOW_BACKUP_ATTRIBUTE_NAME,
+                ALLOW_BACKUP_RESOURCE_ID,
+                true));
+  }
+
+  @Test
+  public void setFullBackupOnly() throws Exception {
+    AndroidManifest androidManifest = createManifestWithApplicationElement();
+
+    AndroidManifest editedManifest = androidManifest.toEditor().setFullBackupOnly(true).save();
+
+    assertThat(getApplicationElement(editedManifest).getAttributeList())
+        .containsExactly(
+            xmlBooleanAttribute(
+                ANDROID_NAMESPACE_URI,
+                FULL_BACKUP_ONLY_ATTRIBUTE_NAME,
+                FULL_BACKUP_ONLY_RESOURCE_ID,
+                true));
+  }
+
+  @Test
+  public void setFullBackupContent() throws Exception {
+    AndroidManifest androidManifest = createManifestWithApplicationElement();
+
+    AndroidManifest editedManifest =
+        androidManifest.toEditor().setFullBackupContent(0x12341234).save();
+
+    assertThat(getApplicationElement(editedManifest).getAttributeList())
+        .containsExactly(
+            xmlResourceReferenceAttribute(
+                ANDROID_NAMESPACE_URI,
+                FULL_BACKUP_CONTENT_ATTRIBUTE_NAME,
+                FULL_BACKUP_CONTENT_RESOURCE_ID,
+                0x12341234));
+  }
+
+  @Test
+  public void setDataExtractionRules() throws Exception {
+    AndroidManifest androidManifest = createManifestWithApplicationElement();
+
+    AndroidManifest editedManifest =
+        androidManifest.toEditor().setDataExtractionRules(0x12341234).save();
+
+    assertThat(getApplicationElement(editedManifest).getAttributeList())
+        .containsExactly(
+            xmlResourceReferenceAttribute(
+                ANDROID_NAMESPACE_URI,
+                DATA_EXTRACTION_RULES_ATTRIBUTE_NAME,
+                DATA_EXTRACTION_RULES_RESOURCE_ID,
+                0x12341234));
+  }
+
+  @Test
+  public void addActivity() throws Exception {
+    Activity activity = Activity.builder().setName("activityName").build();
+    XmlNode activityXmlNode =
+        XmlNode.newBuilder().setElement(activity.asXmlProtoElement().getProto()).build();
+    AndroidManifest androidManifest = AndroidManifest.create(androidManifest("com.test.app"));
+
+    AndroidManifest editedManifest = androidManifest.toEditor().addActivity(activity).save();
+
+    assertThat(getApplicationElement(editedManifest).getChildList())
+        .containsExactly(activityXmlNode);
+  }
+
+  @Test
+  public void addReceiver() throws Exception {
+    Receiver receiver = Receiver.builder().setName("receiverName").build();
+    XmlNode receiverXmlNode =
+        XmlNode.newBuilder().setElement(receiver.asXmlProtoElement().getProto()).build();
+    AndroidManifest androidManifest = AndroidManifest.create(androidManifest("com.test.app"));
+
+    AndroidManifest editedManifest = androidManifest.toEditor().addReceiver(receiver).save();
+
+    assertThat(getApplicationElement(editedManifest).getChildList())
+        .containsExactly(receiverXmlNode);
   }
 
   private static void assertOnlyMetadataElement(
@@ -750,5 +967,10 @@ public class ManifestEditorTest {
     XmlElement applicationElement = applicationNode.getElement();
     assertThat(applicationElement.getName()).isEqualTo("application");
     return applicationElement;
+  }
+
+  private static AndroidManifest createManifestWithApplicationElement() {
+    return AndroidManifest.create(
+        xmlNode(xmlElement("manifest", xmlNode(xmlElement("application")))));
   }
 }

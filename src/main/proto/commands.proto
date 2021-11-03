@@ -181,6 +181,8 @@ message ApkDescription {
     SplitApkMetadata asset_slice_metadata = 7;
     // Set only for APEX APKs.
     ApexApkMetadata apex_apk_metadata = 8;
+    // Set only for hibernated APKs.
+    HibernatedApkMetadata hibernated_apk_metadata = 9;
   }
 }
 
@@ -213,6 +215,9 @@ message ApexApkMetadata {
   // Configuration for processing of APKs embedded in an APEX image.
   repeated ApexEmbeddedApkConfig apex_embedded_apk_config = 1;
 }
+
+// Holds data specific to Hibernated APKs.
+message HibernatedApkMetadata {}
 
 message LocalTestingInfo {
   // Indicates if the bundle is built in local testing mode.

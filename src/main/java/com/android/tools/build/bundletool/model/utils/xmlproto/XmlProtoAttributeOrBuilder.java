@@ -55,7 +55,7 @@ abstract class XmlProtoAttributeOrBuilder<AttributeProtoT extends XmlAttributeOr
   }
 
   public final int getValueAsRefId() {
-    if (!getProto().getCompiledItem().getValueCase().equals(ValueCase.REF)) {
+    if (!hasRefIdValue()) {
       throw new UnexpectedAttributeTypeException(getProto(), /* expectedType= */ "reference");
     }
     return getProto().getCompiledItem().getRef().getId();
@@ -103,6 +103,15 @@ abstract class XmlProtoAttributeOrBuilder<AttributeProtoT extends XmlAttributeOr
     }
 
     return XmlProtoPrintUtils.getItemValueAsString(getProto().getCompiledItem());
+  }
+
+  public final boolean hasStringValue() {
+    return getProto().getCompiledItem().getValueCase().equals(ValueCase.STR)
+        || !getProto().getValue().isEmpty();
+  }
+
+  public final boolean hasRefIdValue() {
+    return getProto().getCompiledItem().getValueCase().equals(ValueCase.REF);
   }
 
   @Override

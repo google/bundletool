@@ -34,6 +34,7 @@ import com.android.tools.build.bundletool.model.AppBundle;
 import com.android.tools.build.bundletool.model.BundleMetadata;
 import com.android.tools.build.bundletool.model.OptimizationDimension;
 import com.android.tools.build.bundletool.model.SigningConfiguration;
+import com.android.tools.build.bundletool.model.SigningConfigurationProvider;
 import com.android.tools.build.bundletool.model.SourceStamp;
 import com.android.tools.build.bundletool.model.version.BundleToolVersion;
 import com.google.common.collect.ImmutableSet;
@@ -112,6 +113,7 @@ public class TestModule {
     @Nullable private AppBundle appBundle;
     private BundleConfig bundleConfig = DEFAULT_BUNDLE_CONFIG;
     @Nullable private SigningConfiguration signingConfig;
+    @Nullable private SigningConfigurationProvider signingConfigProvider;
     @Nullable private ApkModifier apkModifier;
     @Nullable private ApkListener apkListener;
     @Nullable private Integer firstVariantNumber;
@@ -154,6 +156,11 @@ public class TestModule {
 
     public Builder withSigningConfig(SigningConfiguration signingConfig) {
       this.signingConfig = signingConfig;
+      return this;
+    }
+
+    public Builder withSigningConfigProvider(SigningConfigurationProvider signingConfigProvider) {
+      this.signingConfigProvider = signingConfigProvider;
       return this;
     }
 
@@ -291,6 +298,9 @@ public class TestModule {
                 .setOutputFile(outputPath);
         if (signingConfig != null) {
           command.setSigningConfiguration(signingConfig);
+        }
+        if (signingConfigProvider != null) {
+          command.setSigningConfigurationProvider(signingConfigProvider);
         }
         if (apkModifier != null) {
           command.setApkModifier(apkModifier);

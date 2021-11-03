@@ -84,6 +84,9 @@ message Optimizations {
 
   // Optimizations that are applied to resources.
   ResourceOptimizations resource_optimizations = 5;
+
+  // Configuration for archiving the app.
+  StoreArchive store_archive = 6;
 }
 
 message ResourceOptimizations {
@@ -107,6 +110,15 @@ message UncompressNativeLibraries {
 }
 
 message UncompressDexFiles {
+  bool enabled = 1;
+}
+
+message StoreArchive {
+  // Archive is an app state that allows an official app store to reclaim device
+  // storage and disable app functionality temporarily until the user interacts
+  // with the app again. Upon interaction the latest available version of the
+  // app will be restored while leaving user data unaffected. Disabled by
+  // default.
   bool enabled = 1;
 }
 

@@ -28,6 +28,7 @@ import static com.android.tools.build.bundletool.model.utils.files.FilePrecondit
 import static com.android.tools.build.bundletool.model.utils.files.FilePreconditions.checkFileExistsAndExecutable;
 import static com.android.tools.build.bundletool.model.utils.files.FilePreconditions.checkFileExistsAndReadable;
 import static com.google.common.base.Preconditions.checkArgument;
+import static com.google.common.base.Preconditions.checkState;
 
 import com.android.apksig.SigningCertificateLineage;
 import com.android.apksig.apk.ApkFormatException;
@@ -51,6 +52,7 @@ import com.android.tools.build.bundletool.model.OptimizationDimension;
 import com.android.tools.build.bundletool.model.Password;
 import com.android.tools.build.bundletool.model.SignerConfig;
 import com.android.tools.build.bundletool.model.SigningConfiguration;
+import com.android.tools.build.bundletool.model.SigningConfigurationProvider;
 import com.android.tools.build.bundletool.model.SourceStamp;
 import com.android.tools.build.bundletool.model.exceptions.CommandExecutionException;
 import com.android.tools.build.bundletool.model.exceptions.InvalidBundleException;
@@ -111,8 +113,9 @@ public abstract class BuildApksCommand {
     /**
      * INSTANT mode only generates instant APKs, assuming at least one module is instant-enabled.
      */
-    INSTANT
-  ;
+    INSTANT,
+    /** ARCHIVE mode only generates the archived APK of an app. */
+    ARCHIVE;
 
     public final String getLowerCaseName() {
       return Ascii.toLowerCase(name());
@@ -233,6 +236,10 @@ public abstract class BuildApksCommand {
   public abstract Optional<Aapt2Command> getAapt2Command();
 
   public abstract Optional<SigningConfiguration> getSigningConfiguration();
+
+  public abstract Optional<SigningConfigurationProvider> getSigningConfigurationProvider();
+
+  public abstract Optional<Integer> getMinSdkForAdditionalVariantWithV3Rotation();
 
   ListeningExecutorService getExecutorService() {
     return getExecutorServiceInternal();
@@ -371,11 +378,36 @@ public abstract class BuildApksCommand {
     public abstract Builder setAapt2Command(Aapt2Command aapt2Command);
 
     /**
-     * Sets the signing configuration for the generated APKs.
+     * Sets the signing configuration to be used for all generated APKs.
      *
-     * <p>Optional. If not set, the generated APKs will not be signed.
+     * <p>Optional. Only one of {@link SigningConfiguration} or {@link SigningConfigurationProvider}
+     * should be set. If neither is set, then the generated APKs will not be signed.
      */
     public abstract Builder setSigningConfiguration(SigningConfiguration signingConfiguration);
+
+    abstract Optional<SigningConfiguration> getSigningConfiguration();
+
+    /**
+     * Sets the provider to provide signing configurations for the generated APKs.
+     *
+     * <p>Optional. Only one of {@link SigningConfiguration} or {@link SigningConfigurationProvider}
+     * should be set. If neither is set, then the generated APKs will not be signed.
+     */
+    public abstract Builder setSigningConfigurationProvider(
+        SigningConfigurationProvider signingConfigurationProvider);
+
+    abstract Optional<SigningConfigurationProvider> getSigningConfigurationProvider();
+
+    /**
+     * Minimum SDK version for which signing with v3 key rotation is intended to be performed.
+     *
+     * <p>Optional. Setting a value for this field will force an additional variant to be generated
+     * which targets the specified SDK version. It is still the responsibility of the {@link
+     * SigningConfigurationProvider} to provide the appropriate signing configuration for each of
+     * the generated APKs based on their SDK version targeting.
+     */
+    public abstract Builder setMinSdkForAdditionalVariantWithV3Rotation(
+        int minSdkForAdditionalVariantWithV3Rotation);
 
     /**
      * Allows to set an executor service for parallelization.
@@ -458,6 +490,13 @@ public abstract class BuildApksCommand {
         setExecutorServiceCreatedByBundleTool(true);
       }
 
+      checkState(
+          !getSigningConfiguration().isPresent() || !getSigningConfigurationProvider().isPresent(),
+          "Only one of SigningConfiguration or SigningConfigurationProvider should be set.");
+      getSigningConfiguration()
+          .flatMap(SigningConfiguration::getMinimumV3RotationApiVersion)
+          .ifPresent(this::setMinSdkForAdditionalVariantWithV3Rotation);
+
       BuildApksCommand command = autoBuild();
       if (!command.getOptimizationDimensions().isEmpty()
           && !command.getApkBuildMode().equals(DEFAULT)) {
@@ -503,6 +542,7 @@ public abstract class BuildApksCommand {
           case DEFAULT:
           case INSTANT:
           case PERSISTENT:
+          case ARCHIVE:
         }
       } else {
         if (command.getApkBuildMode().equals(SYSTEM)) {

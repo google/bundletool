@@ -26,8 +26,11 @@ import com.android.tools.build.bundletool.device.DeviceAnalyzer;
 import com.android.tools.build.bundletool.io.ApkSerializerModule;
 import com.android.tools.build.bundletool.model.ApkListener;
 import com.android.tools.build.bundletool.model.ApkModifier;
+import com.android.tools.build.bundletool.model.DefaultSigningConfigurationProvider;
 import com.android.tools.build.bundletool.model.SigningConfiguration;
+import com.android.tools.build.bundletool.model.SigningConfigurationProvider;
 import com.android.tools.build.bundletool.model.SourceStamp;
+import com.android.tools.build.bundletool.model.version.Version;
 import com.android.tools.build.bundletool.optimizations.ApkOptimizations;
 import com.android.tools.build.bundletool.optimizations.OptimizationsMerger;
 import com.google.common.util.concurrent.ListeningExecutorService;
@@ -51,9 +54,15 @@ public final class BuildApksModule {
 
   @CommandScoped
   @Provides
-  @ApkSigningConfig
-  static Optional<SigningConfiguration> provideApkSigningConfiguration(BuildApksCommand command) {
-    return command.getSigningConfiguration();
+  @ApkSigningConfigProvider
+  static Optional<SigningConfigurationProvider> provideApkSigningConfigurationProvider(
+      BuildApksCommand command, Version version) {
+    if (command.getSigningConfigurationProvider().isPresent()) {
+      return command.getSigningConfigurationProvider();
+    }
+    return command
+        .getSigningConfiguration()
+        .map(signingConfig -> new DefaultSigningConfigurationProvider(signingConfig, version));
   }
 
   @CommandScoped
@@ -163,6 +172,14 @@ public final class BuildApksModule {
   @Qualifier
   @Retention(RUNTIME)
   public @interface ApkSigningConfig {}
+
+  /**
+   * Qualifying annotation of a {@code SigningConfigurationProvider} for the APK signing
+   * configuration.
+   */
+  @Qualifier
+  @Retention(RUNTIME)
+  public @interface ApkSigningConfigProvider {}
 
   /**
    * Qualifying annotation of a {@code SigningConfiguration} for the Stamp signing configuration.

@@ -96,6 +96,10 @@ public class ApkPathManager {
         directory = ZipPath.create("asset-slices");
         apkFileName = buildName(moduleName, targetingSuffix);
         break;
+      case HIBERNATION:
+        directory = ZipPath.create("hibernation");
+        apkFileName = buildName("hibernation");
+        break;
       default:
         throw new IllegalStateException("Unrecognized split type: " + moduleSplit.getSplitType());
     }

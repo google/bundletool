@@ -38,7 +38,6 @@ import com.android.tools.build.bundletool.model.BundleModule;
 import com.android.tools.build.bundletool.model.exceptions.CommandExecutionException;
 import com.android.tools.build.bundletool.testing.BundleModuleBuilder;
 import com.google.common.collect.ImmutableCollection;
-import java.util.Optional;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
@@ -224,7 +223,7 @@ public class VariantGeneratorTest {
         variantGenerator.generateVariants(
             bundleModule,
             ApkGenerationConfiguration.builder()
-                .setMinimumV3RotationApiVersion(Optional.of(ANDROID_R_API_VERSION))
+                .setMinSdkForAdditionalVariantWithV3Rotation(ANDROID_R_API_VERSION)
                 .build());
     assertThat(splits)
         .containsExactly(lPlusVariantTargeting(), variantMinSdkTargeting(ANDROID_R_API_VERSION));
@@ -243,7 +242,7 @@ public class VariantGeneratorTest {
         variantGenerator.generateVariants(
             bundleModule,
             ApkGenerationConfiguration.builder()
-                .setMinimumV3RotationApiVersion(Optional.of(ANDROID_R_API_VERSION))
+                .setMinSdkForAdditionalVariantWithV3Rotation(ANDROID_R_API_VERSION)
                 .build());
     assertThat(splits).containsExactly(variantMinSdkTargeting(ANDROID_R_API_VERSION + 1));
   }
@@ -261,7 +260,7 @@ public class VariantGeneratorTest {
         variantGenerator.generateVariants(
             bundleModule,
             ApkGenerationConfiguration.builder()
-                .setMinimumV3RotationApiVersion(Optional.of(ANDROID_R_API_VERSION))
+                .setMinSdkForAdditionalVariantWithV3Rotation(ANDROID_R_API_VERSION)
                 .build());
     assertThat(splits).containsExactly(lPlusVariantTargeting());
   }

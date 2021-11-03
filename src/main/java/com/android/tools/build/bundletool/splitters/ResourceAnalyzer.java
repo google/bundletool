@@ -27,6 +27,7 @@ import com.android.aapt.Resources.Style;
 import com.android.aapt.Resources.XmlAttribute;
 import com.android.aapt.Resources.XmlElement;
 import com.android.aapt.Resources.XmlNode;
+import com.android.tools.build.bundletool.model.AndroidManifest;
 import com.android.tools.build.bundletool.model.AppBundle;
 import com.android.tools.build.bundletool.model.ResourceId;
 import com.android.tools.build.bundletool.model.ResourceTableEntry;
@@ -64,12 +65,21 @@ public class ResourceAnalyzer {
    */
   public ImmutableSet<ResourceId> findAllAppResourcesReachableFromBaseManifest()
       throws IOException {
+    return findAllAppResourcesReachableFromManifest(appBundle.getBaseModule().getAndroidManifest());
+  }
 
-    ImmutableSet<ResourceId> resourceIdsInBaseManifest =
-        findAllReferencedAppResources(
-            appBundle.getBaseModule().getAndroidManifest().getManifestRoot().getProto());
+  /**
+   * Determines which resources of {@code appBundle} are reachable from the {@code androidManifest}.
+   *
+   * <p>Note that this does NOT include resources from static libraries.
+   */
+  public ImmutableSet<ResourceId> findAllAppResourcesReachableFromManifest(
+      AndroidManifest androidManifest) throws IOException {
 
-    return transitiveClosure(resourceIdsInBaseManifest);
+    ImmutableSet<ResourceId> resourceIdsInManifest =
+        findAllReferencedAppResources(androidManifest.getManifestRoot().getProto());
+
+    return transitiveClosure(resourceIdsInManifest);
   }
 
   private ImmutableSet<ResourceId> transitiveClosure(ImmutableSet<ResourceId> anchorResources)

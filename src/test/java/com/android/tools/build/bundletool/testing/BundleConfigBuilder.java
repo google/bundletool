@@ -82,6 +82,11 @@ public class BundleConfigBuilder {
     return this;
   }
 
+  public BundleConfigBuilder setStoreArchive(boolean enabled) {
+    builder.getOptimizationsBuilder().getStoreArchiveBuilder().setEnabled(enabled);
+    return this;
+  }
+
   public BundleConfigBuilder setDexMergingStrategy(DexMergingStrategy dexMergingStrategy) {
     builder
         .getOptimizationsBuilder()

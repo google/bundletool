@@ -44,12 +44,14 @@ import static com.android.tools.build.bundletool.testing.TargetingUtils.language
 import static com.android.tools.build.bundletool.testing.TargetingUtils.multiAbiTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.textureCompressionTargeting;
 import static com.android.tools.build.bundletool.testing.TestUtils.createModuleEntryForFile;
+import static com.android.tools.build.bundletool.testing.TestUtils.extractPaths;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.truth.Truth.assertThat;
 import static com.google.common.truth.Truth8.assertThat;
 import static com.google.common.truth.extensions.proto.ProtoTruth.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
+import com.android.aapt.Resources.ResourceTable;
 import com.android.aapt.Resources.XmlElement;
 import com.android.aapt.Resources.XmlNode;
 import com.android.bundle.Targeting.Abi;
@@ -62,18 +64,31 @@ import com.android.bundle.Targeting.ScreenDensity.DensityAlias;
 import com.android.bundle.Targeting.ScreenDensityTargeting;
 import com.android.bundle.Targeting.TextureCompressionFormat.TextureCompressionFormatAlias;
 import com.android.bundle.Targeting.VariantTargeting;
+import com.android.tools.build.bundletool.model.ModuleSplit.SplitType;
 import com.android.tools.build.bundletool.model.SourceStamp.StampType;
 import com.android.tools.build.bundletool.model.utils.xmlproto.XmlProtoElement;
 import com.android.tools.build.bundletool.testing.BundleModuleBuilder;
+import com.android.tools.build.bundletool.testing.ManifestProtoUtils;
+import com.android.tools.build.bundletool.testing.ResourceTableBuilder;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
 import java.security.PrivateKey;
 import java.security.cert.X509Certificate;
 import java.util.Arrays;
+import java.util.Optional;
+import org.junit.Before;
 import org.junit.BeforeClass;
+import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.TemporaryFolder;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 
@@ -86,6 +101,9 @@ public class ModuleSplitTest {
 
   private static SigningConfiguration stampSigningConfig;
 
+  @Rule public final TemporaryFolder tmp = new TemporaryFolder();
+  private Path tmpDir;
+
   @BeforeClass
   public static void setUpClass() throws Exception {
     KeyPair keyPair = KeyPairGenerator.getInstance("RSA").genKeyPair();
@@ -93,6 +111,11 @@ public class ModuleSplitTest {
     X509Certificate certificate = buildSelfSignedCertificate(keyPair, "CN=ModuleSplitTest");
     stampSigningConfig =
         SigningConfiguration.builder().setSignerConfig(privateKey, certificate).build();
+  }
+
+  @Before
+  public void setUp() {
+    tmpDir = tmp.getRoot().toPath();
   }
 
   @Test
@@ -447,10 +470,127 @@ public class ModuleSplitTest {
         .contains("Invalid stamp source. Stamp sources should be URLs.");
   }
 
+  @Test
+  public void forHibernation() throws Exception {
+    BundleModule module =
+        new BundleModuleBuilder("testModule")
+            .setManifest(androidManifest("com.test.app"))
+            .addFile("res/drawable/background.jpg", DUMMY_CONTENT)
+            .build();
+    AndroidManifest hibernatedManifest =
+        AndroidManifest.create(
+            androidManifest("com.test.app", ManifestProtoUtils.withVersionCode(123)));
+    Path hibernatedClassesDexFile = createTempClassesDexFile(DUMMY_CONTENT);
+
+    ModuleSplit split =
+        ModuleSplit.forHibernation(
+            module,
+            hibernatedManifest,
+            /* hibernatedResourceTable= */ Optional.empty(),
+            hibernatedClassesDexFile);
+
+    assertThat(split.getSplitType()).isEqualTo(SplitType.HIBERNATION);
+    assertThat(split.getModuleName().getName()).isEqualTo("testModule");
+    assertThat(split.getAndroidManifest().getVersionCode()).hasValue(123);
+    assertThat(split.getResourceTable()).isEmpty();
+    assertThat(extractPaths(split.getEntries())).containsExactly("dex/classes.dex");
+  }
+
+  @Test
+  public void forHibernation_copiesResourceTable() throws Exception {
+    BundleModule module =
+        new BundleModuleBuilder("testModule")
+            .setManifest(androidManifest("com.test.app"))
+            .addFile("res/drawable/icon.jpg", DUMMY_CONTENT)
+            .build();
+    AndroidManifest hibernatedManifest =
+        AndroidManifest.create(
+            androidManifest("com.test.app", ManifestProtoUtils.withVersionCode(123)));
+    ResourceTable hibernatedResourceTable =
+        new ResourceTableBuilder()
+            .addPackage("com.test.app")
+            .addDrawableResource("icon", "res/drawable/icon.jpg")
+            .build();
+    Path hibernatedClassesDexFile = createTempClassesDexFile(DUMMY_CONTENT);
+
+    ModuleSplit split =
+        ModuleSplit.forHibernation(
+            module,
+            hibernatedManifest,
+            Optional.of(hibernatedResourceTable),
+            hibernatedClassesDexFile);
+
+    assertThat(split.getResourceTable().get()).isEqualTo(hibernatedResourceTable);
+    assertThat(extractPaths(split.getEntries()))
+        .containsExactly("res/drawable/icon.jpg", "dex/classes.dex");
+  }
+
+  @Test
+  public void forHibernation_filtersResources() throws Exception {
+    BundleModule module =
+        new BundleModuleBuilder("testModule")
+            .setManifest(androidManifest("com.test.app"))
+            .addFile("res/drawable/icon.jpg", DUMMY_CONTENT)
+            .addFile("res/drawable/background.jpg", DUMMY_CONTENT)
+            .build();
+    AndroidManifest hibernatedManifest =
+        AndroidManifest.create(
+            androidManifest("com.test.app", ManifestProtoUtils.withVersionCode(123)));
+    ResourceTable hibernatedResourceTable =
+        new ResourceTableBuilder()
+            .addPackage("com.test.app")
+            .addDrawableResource("icon", "res/drawable/icon.jpg")
+            .build();
+    Path hibernatedClassesDexFile = createTempClassesDexFile(DUMMY_CONTENT);
+
+    ModuleSplit split =
+        ModuleSplit.forHibernation(
+            module,
+            hibernatedManifest,
+            Optional.of(hibernatedResourceTable),
+            hibernatedClassesDexFile);
+
+    assertThat(split.getResourceTable().get()).isEqualTo(hibernatedResourceTable);
+    assertThat(extractPaths(split.getEntries()))
+        .containsExactly("res/drawable/icon.jpg", "dex/classes.dex");
+  }
+
+  @Test
+  public void forHibernation_usesHibernatedClassesFile() throws Exception {
+    BundleModule module =
+        new BundleModuleBuilder("testModule")
+            .setManifest(androidManifest("com.test.app"))
+            .addFile("dex/classes.dex", DUMMY_CONTENT)
+            .build();
+    AndroidManifest hibernatedManifest =
+        AndroidManifest.create(
+            androidManifest("com.test.app", ManifestProtoUtils.withVersionCode(123)));
+    byte[] hibernatedClassesDexFileContent = {1, 2};
+    Path hibernatedClassesDexFile = createTempClassesDexFile(hibernatedClassesDexFileContent);
+
+    ModuleSplit split =
+        ModuleSplit.forHibernation(
+            module,
+            hibernatedManifest,
+            /* hibernatedResourceTable= */ Optional.empty(),
+            hibernatedClassesDexFile);
+
+    assertThat(extractPaths(split.getEntries())).containsExactly("dex/classes.dex");
+    assertThat(split.getEntries().get(0).getContent().read())
+        .isEqualTo(hibernatedClassesDexFileContent);
+  }
+
   private ImmutableList<ModuleEntry> fakeEntriesOf(String... entries) {
     return Arrays.stream(entries)
         .map(entry -> createModuleEntryForFile(entry, DUMMY_CONTENT))
         .collect(toImmutableList());
   }
 
+  private Path createTempClassesDexFile(byte[] content) throws IOException {
+    Path tempDexFilePath = Files.createTempFile(tmpDir, "classes", ".dex");
+    try (InputStream inputStream = new ByteArrayInputStream(content)) {
+      Files.copy(inputStream, tempDexFilePath, StandardCopyOption.REPLACE_EXISTING);
+    }
+    return tempDexFilePath;
+  }
 }

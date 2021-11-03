@@ -30,6 +30,7 @@ import com.android.bundle.Commands.AssetModuleMetadata;
 import com.android.bundle.Commands.AssetSliceSet;
 import com.android.bundle.Commands.BuildApksResult;
 import com.android.bundle.Commands.DeliveryType;
+import com.android.bundle.Commands.HibernatedApkMetadata;
 import com.android.bundle.Commands.ModuleMetadata;
 import com.android.bundle.Commands.SplitApkMetadata;
 import com.android.bundle.Commands.StandaloneApkMetadata;
@@ -259,6 +260,19 @@ public final class ApksArchiveHelpers {
         .build();
   }
 
+  public static ApkSet createHibernatedApkSet(ApkTargeting apkTargeting, ZipPath apkPath) {
+    // Note: Hibernated APK is represented as a module named "base".
+    return ApkSet.newBuilder()
+        .setModuleMetadata(
+            ModuleMetadata.newBuilder().setName("base").setDeliveryType(DeliveryType.INSTALL_TIME))
+        .addApkDescription(
+            ApkDescription.newBuilder()
+                .setPath(apkPath.toString())
+                .setTargeting(apkTargeting)
+                .setHibernatedApkMetadata(HibernatedApkMetadata.getDefaultInstance()))
+        .build();
+  }
+
   public static AssetSliceSet createAssetSliceSet(
       String moduleName, DeliveryType deliveryType, ApkDescription... apkDescriptions) {
     return AssetSliceSet.newBuilder()
@@ -267,7 +281,7 @@ public final class ApksArchiveHelpers {
         .addAllApkDescription(Arrays.asList(apkDescriptions))
         .build();
   }
-  
+
   public static Stream<ApkDescription> apkDescriptionStream(BuildApksResult buildApksResult) {
     return Stream.concat(
         buildApksResult.getVariantList().stream()

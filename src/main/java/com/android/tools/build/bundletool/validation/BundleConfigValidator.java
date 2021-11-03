@@ -61,7 +61,7 @@ public final class BundleConfigValidator extends SubValidator {
     validateMasterResources(bundleConfig, bundle);
   }
 
-  private void validateCompression(Compression compression) {
+  public void validateCompression(Compression compression) {
     for (String pattern : compression.getUncompressedGlobList()) {
       if (FORBIDDEN_CHARS_IN_GLOB.stream().anyMatch(pattern::contains)) {
         throw InvalidBundleException.builder()

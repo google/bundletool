@@ -282,4 +282,55 @@ public class XmlProtoAttributeTest {
         XmlProtoAttributeBuilder.create("namespace", "hello").setValueAsRefId(123).build();
     assertThat(attribute1.hashCode()).isNotEqualTo(attribute2.hashCode());
   }
+
+  @Test
+  public void hasStringValue_generalValue_true() {
+    XmlProtoAttribute attribute =
+        new XmlProtoAttribute(XmlAttribute.newBuilder().setValue("Text").build());
+
+    assertThat(attribute.hasStringValue()).isTrue();
+  }
+
+  @Test
+  public void hasStringValue_compiledValue_true() {
+    XmlProtoAttribute attribute =
+        new XmlProtoAttribute(
+            XmlAttribute.newBuilder()
+                .setCompiledItem(
+                    Item.newBuilder().setStr(Resources.String.newBuilder().setValue("Text")))
+                .build());
+
+    assertThat(attribute.hasStringValue()).isTrue();
+  }
+
+  @Test
+  public void hasStringValue_false() {
+    XmlProtoAttribute attribute =
+        new XmlProtoAttribute(
+            XmlAttribute.newBuilder()
+                .setCompiledItem(
+                    Item.newBuilder().setPrim(Primitive.newBuilder().setBooleanValue(true)))
+                .build());
+
+    assertThat(attribute.hasStringValue()).isFalse();
+  }
+
+  @Test
+  public void hasRefIdVale_true() {
+    XmlProtoAttribute attribute =
+        new XmlProtoAttribute(
+            XmlAttribute.newBuilder()
+                .setCompiledItem(Item.newBuilder().setRef(Reference.newBuilder().setId(0x123)))
+                .build());
+
+    assertThat(attribute.hasRefIdValue()).isTrue();
+  }
+
+  @Test
+  public void hasRefIdVale_false() {
+    XmlProtoAttribute attribute =
+        new XmlProtoAttribute(XmlAttribute.newBuilder().setValue("text").build());
+
+    assertThat(attribute.hasRefIdValue()).isFalse();
+  }
 }

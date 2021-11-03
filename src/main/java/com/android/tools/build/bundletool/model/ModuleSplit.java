@@ -65,6 +65,7 @@ import com.google.errorprone.annotations.Immutable;
 import java.net.MalformedURLException;
 import java.net.URISyntaxException;
 import java.net.URL;
+import java.nio.file.Path;
 import java.util.List;
 import java.util.Optional;
 import java.util.StringJoiner;
@@ -86,6 +87,7 @@ public abstract class ModuleSplit {
     SPLIT,
     INSTANT,
     ASSET_SLICE,
+    HIBERNATION,
   }
 
   /**
@@ -469,6 +471,32 @@ public abstract class ModuleSplit {
         entry -> entry.getPath().startsWith(APEX_DIRECTORY),
         /* setResourceTable= */ false,
         variantTargeting);
+  }
+
+  public static ModuleSplit forHibernation(
+      BundleModule bundleModule,
+      AndroidManifest hibernatedManifest,
+      Optional<ResourceTable> hibernatedResourceTable,
+      Path hibernatedClassesDexFile) {
+    ModuleSplit.Builder hibernatedSplit =
+        ModuleSplit.builder()
+            .setModuleName(bundleModule.getName())
+            .setSplitType(SplitType.HIBERNATION)
+            .setMasterSplit(true)
+            .setAndroidManifest(hibernatedManifest)
+            .setApkTargeting(ApkTargeting.getDefaultInstance())
+            .setVariantTargeting(VariantTargeting.getDefaultInstance());
+    if (hibernatedResourceTable.isPresent()) {
+      hibernatedSplit.setResourceTable(hibernatedResourceTable.get());
+      hibernatedSplit.setEntries(
+          filterResourceEntries(bundleModule.getEntries().asList(), hibernatedResourceTable.get()));
+    }
+    hibernatedSplit.addEntry(
+        ModuleEntry.builder()
+            .setPath(DEX_DIRECTORY.resolve("classes.dex"))
+            .setContent(hibernatedClassesDexFile)
+            .build());
+    return hibernatedSplit.build();
   }
 
   /**

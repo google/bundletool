@@ -240,6 +240,12 @@ public abstract class AppBundle {
     return getBundleConfig().getOptimizations().getStandaloneConfig().getDexMergingStrategy();
   }
 
+  /** Returns {@code true} if app bundle has the store archive feature enabled. */
+  public boolean storeArchiveEnabled() {
+    return getBundleConfig().getOptimizations().hasStoreArchive()
+        && getBundleConfig().getOptimizations().getStoreArchive().getEnabled();
+  }
+
   public abstract Builder toBuilder();
 
   static Builder builder() {

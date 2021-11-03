@@ -23,6 +23,7 @@ import static com.android.bundle.Targeting.Abi.AbiAlias.X86;
 import static com.android.bundle.Targeting.Abi.AbiAlias.X86_64;
 import static com.android.bundle.Targeting.TextureCompressionFormat.TextureCompressionFormatAlias.ATC;
 import static com.android.bundle.Targeting.TextureCompressionFormat.TextureCompressionFormatAlias.ETC1_RGB8;
+import static com.android.tools.build.bundletool.commands.BuildApksCommand.ApkBuildMode.ARCHIVE;
 import static com.android.tools.build.bundletool.commands.BuildApksCommand.ApkBuildMode.INSTANT;
 import static com.android.tools.build.bundletool.commands.BuildApksCommand.ApkBuildMode.PERSISTENT;
 import static com.android.tools.build.bundletool.commands.BuildApksCommand.ApkBuildMode.SYSTEM;
@@ -36,6 +37,7 @@ import static com.android.tools.build.bundletool.model.OptimizationDimension.TEX
 import static com.android.tools.build.bundletool.model.SourceStamp.STAMP_SOURCE_METADATA_KEY;
 import static com.android.tools.build.bundletool.model.utils.ResourcesUtils.MDPI_VALUE;
 import static com.android.tools.build.bundletool.model.utils.ResultUtils.apexApkVariants;
+import static com.android.tools.build.bundletool.model.utils.ResultUtils.hibernatedApkVariants;
 import static com.android.tools.build.bundletool.model.utils.ResultUtils.instantApkVariants;
 import static com.android.tools.build.bundletool.model.utils.ResultUtils.splitApkVariants;
 import static com.android.tools.build.bundletool.model.utils.ResultUtils.standaloneApkVariants;
@@ -175,6 +177,7 @@ import com.android.tools.build.bundletool.model.BundleMetadata;
 import com.android.tools.build.bundletool.model.SigningConfiguration;
 import com.android.tools.build.bundletool.model.SourceStamp;
 import com.android.tools.build.bundletool.model.ZipPath;
+import com.android.tools.build.bundletool.model.exceptions.InvalidCommandException;
 import com.android.tools.build.bundletool.model.exceptions.InvalidVersionCodeException;
 import com.android.tools.build.bundletool.model.utils.CertificateHelper;
 import com.android.tools.build.bundletool.model.utils.files.FilePreconditions;
@@ -5622,6 +5625,95 @@ public class BuildApksManagerTest {
         extractFromApkSetFile(apkSetFile, standaloneApks.get(0).getPath(), outputDir);
     ZipFile standaloneApkZip = openZipFile(standaloneApkFile);
     assertThat(filesUnderPath(standaloneApkZip, ZipPath.create("META-INF"))).isEmpty();
+  }
+
+  @Test
+  public void buildApksCommand_hibernation_success() throws Exception {
+    AppBundle appBundle =
+        new AppBundleBuilder()
+            .addModule("base", builder -> builder.setManifest(androidManifest("com.test.app")))
+            .setBundleConfig(BundleConfigBuilder.create().setStoreArchive(true).build())
+            .build();
+    TestComponent.useTestModule(
+        this,
+        TestModule.builder()
+            .withAppBundle(appBundle)
+            .withOutputPath(outputFilePath)
+            .withApkBuildMode(ARCHIVE)
+            .build());
+
+    buildApksManager.execute();
+
+    ZipFile apkSetFile = openZipFile(outputFilePath.toFile());
+    BuildApksResult result = extractTocFromApkSetFile(apkSetFile, outputDir);
+
+    assertThat(result.getVariantList()).hasSize(1);
+    assertThat(splitApkVariants(result)).isEmpty();
+    assertThat(standaloneApkVariants(result)).isEmpty();
+    assertThat(systemApkVariants(result)).isEmpty();
+    assertThat(hibernatedApkVariants(result)).hasSize(1);
+    Variant hibernatedVariant = hibernatedApkVariants(result).get(0);
+    assertThat(hibernatedVariant.getTargeting()).isEqualToDefaultInstance();
+
+    assertThat(apkDescriptions(hibernatedVariant)).hasSize(1);
+    assertThat(hibernatedVariant.getApkSetList()).hasSize(1);
+    ApkSet apkSet = hibernatedVariant.getApkSet(0);
+    assertThat(
+            apkSet.getApkDescriptionList().stream()
+                .map(ApkDescription::getPath)
+                .collect(toImmutableSet()))
+        .containsExactly("hibernation/hibernation.apk");
+    apkSet
+        .getApkDescriptionList()
+        .forEach(apkDescription -> assertThat(apkSetFile).hasFile(apkDescription.getPath()));
+  }
+
+  @Test
+  public void buildApksCommand_hibernation_apex_hibernatedNotGenerated() throws Exception {
+    ApexImages apexConfig =
+        apexImages(targetedApexImage("apex/x86_64.img", apexImageTargeting("x86_64")));
+    AppBundle appBundle =
+        new AppBundleBuilder()
+            .addModule(
+                "base",
+                builder ->
+                    builder.setManifest(androidManifest("com.test.app")).setApexConfig(apexConfig))
+            .setBundleConfig(BundleConfigBuilder.create().setStoreArchive(true).build())
+            .build();
+    TestComponent.useTestModule(
+        this,
+        TestModule.builder()
+            .withAppBundle(appBundle)
+            .withOutputPath(outputFilePath)
+            .withApkBuildMode(ARCHIVE)
+            .build());
+
+    Exception e = assertThrows(InvalidCommandException.class, () -> buildApksManager.execute());
+    assertThat(e).hasMessageThat().contains("No APKs to generate");
+  }
+
+  @Test
+  public void buildApksCommand_hibernation_assetOnly_hibernatedNotGenerated() throws Exception {
+    AppBundle appBundle =
+        new AppBundleBuilder()
+            .addModule("base", builder -> builder.setManifest(androidManifest("com.test.app")))
+            .setBundleConfig(BundleConfigBuilder.create().setStoreArchive(true).build())
+            .build();
+    TestComponent.useTestModule(
+        this,
+        TestModule.builder()
+            .withAppBundle(appBundle)
+            .withBundleConfig(BundleConfig.newBuilder().setType(BundleType.ASSET_ONLY))
+            .withOutputPath(outputFilePath)
+            .withApkBuildMode(ARCHIVE)
+            .build());
+
+    buildApksManager.execute();
+
+    ZipFile apkSetFile = openZipFile(outputFilePath.toFile());
+    BuildApksResult result = extractTocFromApkSetFile(apkSetFile, outputDir);
+
+    assertThat(hibernatedApkVariants(result)).isEmpty();
   }
 
   private static ImmutableList<ApkDescription> apkDescriptions(List<Variant> variants) {

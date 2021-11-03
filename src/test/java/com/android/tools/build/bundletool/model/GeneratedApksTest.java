@@ -33,21 +33,25 @@ public class GeneratedApksTest {
   @Test
   public void builder_empty() {
     GeneratedApks generatedApks = GeneratedApks.builder().build();
+
     assertThat(generatedApks.size()).isEqualTo(0);
     assertThat(generatedApks.getSplitApks()).isEmpty();
     assertThat(generatedApks.getStandaloneApks()).isEmpty();
     assertThat(generatedApks.getInstantApks()).isEmpty();
     assertThat(generatedApks.getSystemApks()).isEmpty();
+    assertThat(generatedApks.getHibernatedApks()).isEmpty();
   }
 
   @Test
   public void fromModuleSplits_empty() {
     GeneratedApks generatedApks = GeneratedApks.fromModuleSplits(ImmutableList.of());
+
     assertThat(generatedApks.size()).isEqualTo(0);
     assertThat(generatedApks.getSplitApks()).isEmpty();
     assertThat(generatedApks.getStandaloneApks()).isEmpty();
     assertThat(generatedApks.getInstantApks()).isEmpty();
     assertThat(generatedApks.getSystemApks()).isEmpty();
+    assertThat(generatedApks.getHibernatedApks()).isEmpty();
   }
 
   @Test
@@ -58,11 +62,13 @@ public class GeneratedApksTest {
 
     GeneratedApks generatedApks =
         GeneratedApks.fromModuleSplits(ImmutableList.of(splitApk, standaloneApk, instantApk));
+
     assertThat(generatedApks.size()).isEqualTo(3);
     assertThat(generatedApks.getSplitApks()).containsExactly(splitApk);
     assertThat(generatedApks.getStandaloneApks()).containsExactly(standaloneApk);
     assertThat(generatedApks.getInstantApks()).containsExactly(instantApk);
     assertThat(generatedApks.getSystemApks()).isEmpty();
+    assertThat(generatedApks.getHibernatedApks()).isEmpty();
   }
 
   @Test
@@ -70,11 +76,27 @@ public class GeneratedApksTest {
     ModuleSplit systemApk = createModuleSplit(SplitType.SYSTEM);
 
     GeneratedApks generatedApks = GeneratedApks.fromModuleSplits(ImmutableList.of(systemApk));
+
     assertThat(generatedApks.size()).isEqualTo(1);
     assertThat(generatedApks.getSplitApks()).isEmpty();
     assertThat(generatedApks.getStandaloneApks()).isEmpty();
     assertThat(generatedApks.getInstantApks()).isEmpty();
     assertThat(generatedApks.getSystemApks()).containsExactly(systemApk);
+    assertThat(generatedApks.getHibernatedApks()).isEmpty();
+  }
+
+  @Test
+  public void fromModuleSplits_withHibernatedApk_correctSizes() {
+    ModuleSplit hibernatedApk = createModuleSplit(SplitType.HIBERNATION);
+
+    GeneratedApks generatedApks = GeneratedApks.fromModuleSplits(ImmutableList.of(hibernatedApk));
+
+    assertThat(generatedApks.size()).isEqualTo(1);
+    assertThat(generatedApks.getSplitApks()).isEmpty();
+    assertThat(generatedApks.getStandaloneApks()).isEmpty();
+    assertThat(generatedApks.getInstantApks()).isEmpty();
+    assertThat(generatedApks.getSystemApks()).isEmpty();
+    assertThat(generatedApks.getHibernatedApks()).containsExactly(hibernatedApk);
   }
 
   private static ModuleSplit createModuleSplit(SplitType splitType) {

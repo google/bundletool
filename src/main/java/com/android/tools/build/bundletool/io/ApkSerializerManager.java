@@ -346,6 +346,7 @@ public class ApkSerializerManager {
         checkArgument(
             generatedApks.getSplitApks().isEmpty()
                 && generatedApks.getInstantApks().isEmpty()
+                && generatedApks.getHibernatedApks().isEmpty()
                 && generatedApks.getSystemApks().isEmpty(),
             "Internal error: For universal APK expecting only standalone APKs.");
         break;
@@ -353,6 +354,7 @@ public class ApkSerializerManager {
         checkArgument(
             generatedApks.getSplitApks().isEmpty()
                 && generatedApks.getInstantApks().isEmpty()
+                && generatedApks.getHibernatedApks().isEmpty()
                 && generatedApks.getStandaloneApks().isEmpty(),
             "Internal error: For system mode expecting only system APKs.");
         break;
@@ -371,6 +373,14 @@ public class ApkSerializerManager {
         checkArgument(
             generatedApks.getSplitApks().isEmpty() && generatedApks.getStandaloneApks().isEmpty(),
             "Internal error: Persistent APKs not expected with instant mode.");
+        break;
+      case ARCHIVE:
+        checkArgument(
+            generatedApks.getSplitApks().isEmpty()
+                && generatedApks.getInstantApks().isEmpty()
+                && generatedApks.getStandaloneApks().isEmpty()
+                && generatedApks.getSystemApks().isEmpty(),
+            "Internal error: For hibernation mode expecting only hibernated APKs.");
         break;
     }
   }
@@ -496,6 +506,9 @@ public class ApkSerializerManager {
           break;
         case ASSET_SLICE:
           apkDescription = apkSetBuilder.addAssetSliceApk(split, apkPath);
+          break;
+        case HIBERNATION:
+          apkDescription = apkSetBuilder.addHibernatedApk(split, apkPath);
           break;
         default:
           throw new IllegalStateException("Unexpected splitType: " + split.getSplitType());

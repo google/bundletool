@@ -513,6 +513,66 @@ public class ResourceAnalyzerTest {
             ResourceId.create(0x7f020004));
   }
 
+  @Test
+  public void customManifest_filteredRefs_resolved() throws Exception {
+    XmlNode baseManifest =
+        AndroidManifest.create(
+                xmlNode(
+                    xmlElement(
+                        "manifest",
+                        xmlNode(
+                            xmlElement(
+                                "application",
+                                ImmutableList.of(
+                                    xmlResourceReferenceAttribute(
+                                        ANDROID_NAMESPACE_URI,
+                                        "name",
+                                        /* attrResourceId= */ 0x999998,
+                                        /* valueResourceId= */ 0x87654321),
+                                    xmlResourceReferenceAttribute(
+                                        ANDROID_NAMESPACE_URI,
+                                        "name2",
+                                        /* attrResourceId= */ 0x999999,
+                                        /* valueResourceId= */ 0x12345678)))))))
+            .getManifestRoot()
+            .getProto();
+    AndroidManifest customManifest =
+        AndroidManifest.create(
+            xmlNode(
+                xmlElement(
+                    "manifest",
+                    xmlNode(
+                        xmlElement(
+                            "application",
+                            xmlResourceReferenceAttribute(
+                                ANDROID_NAMESPACE_URI,
+                                "name2",
+                                /* attrResourceId= */ 0x999999,
+                                /* valueResourceId= */ 0x12345678))))));
+    ResourceTable resourceTable =
+        resourceTable(
+            pkg(
+                0x12,
+                "com.test.app",
+                type(0x34, "string", entry(0x5678, "name", value("hello", DEFAULT_CONFIG)))),
+            pkg(
+                0x87,
+                "com.test.app",
+                type(0x65, "string", entry(0x4321, "name2", value("world", DEFAULT_CONFIG)))));
+    AppBundle appBundle =
+        new AppBundleBuilder()
+            .addModule(
+                "base",
+                builder -> builder.setManifest(baseManifest).setResourceTable(resourceTable))
+            .build();
+
+    ImmutableSet<ResourceId> resourceIds =
+        new ResourceAnalyzer(appBundle)
+            .findAllAppResourcesReachableFromManifest(customManifest);
+
+    assertThat(resourceIds).containsExactly(ResourceId.create(0x12345678));
+  }
+
   private static ConfigValue compoundValueAttrWithResourceReferences(int... referencedResourceIds) {
     Attribute.Builder attribute = Attribute.newBuilder();
     for (int referencedResourceId : referencedResourceIds) {

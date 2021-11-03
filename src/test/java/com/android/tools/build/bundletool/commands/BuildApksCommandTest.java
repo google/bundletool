@@ -47,7 +47,6 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.mock;
 
 import com.android.apksig.SigningCertificateLineage;
-import com.android.apksig.SigningCertificateLineage.SignerConfig;
 import com.android.bundle.CodeTransparencyOuterClass.CodeRelatedFile;
 import com.android.bundle.CodeTransparencyOuterClass.CodeTransparency;
 import com.android.bundle.Targeting.ApkTargeting;
@@ -61,9 +60,11 @@ import com.android.tools.build.bundletool.flags.ParsedFlags;
 import com.android.tools.build.bundletool.io.AppBundleSerializer;
 import com.android.tools.build.bundletool.io.StandaloneApkSerializer;
 import com.android.tools.build.bundletool.model.AndroidManifest;
+import com.android.tools.build.bundletool.model.ApksigSigningConfiguration;
 import com.android.tools.build.bundletool.model.BundleMetadata;
 import com.android.tools.build.bundletool.model.BundleModuleName;
 import com.android.tools.build.bundletool.model.ModuleSplit;
+import com.android.tools.build.bundletool.model.SignerConfig;
 import com.android.tools.build.bundletool.model.SigningConfiguration;
 import com.android.tools.build.bundletool.model.SourceStamp;
 import com.android.tools.build.bundletool.model.ZipPath;
@@ -371,7 +372,8 @@ public class BuildApksCommandTest {
             .setOutputPrintStream(commandViaFlags.getOutputPrintStream().get())
             .build();
 
-    assertThat(commandViaBuilder).isEqualTo(commandViaFlags);
+    assertThat(commandViaBuilder.getSigningConfiguration())
+        .isEqualTo(commandViaFlags.getSigningConfiguration());
   }
 
   @Test
@@ -937,7 +939,9 @@ public class BuildApksCommandTest {
             .setOutputPrintStream(commandViaFlags.getOutputPrintStream().get())
             .build();
 
-    assertThat(commandViaBuilder).isEqualTo(commandViaFlags);
+    assertThat(commandViaBuilder.getSourceStamp()).isEqualTo(commandViaFlags.getSourceStamp());
+    assertThat(commandViaBuilder.getSigningConfiguration())
+        .isEqualTo(commandViaFlags.getSigningConfiguration());
   }
 
   @Test
@@ -981,7 +985,10 @@ public class BuildApksCommandTest {
     DebugKeystoreUtils.getDebugSigningConfiguration(systemEnvironmentProvider)
         .ifPresent(commandViaBuilder::setSigningConfiguration);
 
-    assertThat(commandViaBuilder.build()).isEqualTo(commandViaFlags);
+    assertThat(commandViaBuilder.build().getSourceStamp())
+        .isEqualTo(commandViaFlags.getSourceStamp());
+    assertThat(commandViaBuilder.build().getSigningConfiguration())
+        .isEqualTo(commandViaFlags.getSigningConfiguration());
   }
 
   @Test
@@ -1025,7 +1032,10 @@ public class BuildApksCommandTest {
     DebugKeystoreUtils.getDebugSigningConfiguration(systemEnvironmentProvider)
         .ifPresent(commandViaBuilder::setSigningConfiguration);
 
-    assertThat(commandViaBuilder.build()).isEqualTo(commandViaFlags);
+    assertThat(commandViaBuilder.build().getSourceStamp())
+        .isEqualTo(commandViaFlags.getSourceStamp());
+    assertThat(commandViaBuilder.build().getSigningConfiguration())
+        .isEqualTo(commandViaFlags.getSigningConfiguration());
   }
 
   @Test
@@ -1091,7 +1101,7 @@ public class BuildApksCommandTest {
             provider,
             fakeAdbServer);
 
-    BuildApksCommand.Builder commandViaBuilder =
+    BuildApksCommand commandViaBuilder =
         BuildApksCommand.builder()
             .setBundlePath(bundlePath)
             .setOutputFile(outputFilePath)
@@ -1104,9 +1114,12 @@ public class BuildApksCommandTest {
             .setAapt2Command(commandViaFlags.getAapt2Command().get())
             .setExecutorServiceInternal(commandViaFlags.getExecutorService())
             .setExecutorServiceCreatedByBundleTool(true)
-            .setOutputPrintStream(commandViaFlags.getOutputPrintStream().get());
+            .setOutputPrintStream(commandViaFlags.getOutputPrintStream().get())
+            .build();
 
-    assertThat(commandViaBuilder.build()).isEqualTo(commandViaFlags);
+    assertThat(commandViaBuilder.getSourceStamp()).isEqualTo(commandViaFlags.getSourceStamp());
+    assertThat(commandViaBuilder.getSigningConfiguration())
+        .isEqualTo(commandViaFlags.getSigningConfiguration());
   }
 
   @Test
@@ -1198,7 +1211,9 @@ public class BuildApksCommandTest {
             .setOutputPrintStream(commandViaFlags.getOutputPrintStream().get())
             .build();
 
-    assertThat(commandViaBuilder).isEqualTo(commandViaFlags);
+    assertThat(commandViaBuilder.getSourceStamp()).isEqualTo(commandViaFlags.getSourceStamp());
+    assertThat(commandViaBuilder.getSigningConfiguration())
+        .isEqualTo(commandViaFlags.getSigningConfiguration());
   }
 
   @Test
@@ -1345,9 +1360,12 @@ public class BuildApksCommandTest {
 
   @Test
   public void populateLineage_binaryFile() throws Exception {
-    SignerConfig signerConfig = new SignerConfig.Builder(privateKey, certificate).build();
-    SignerConfig oldestSignerConfig =
-        new SignerConfig.Builder(oldestSignerPrivateKey, oldestSignerCertificate).build();
+    SigningCertificateLineage.SignerConfig signerConfig =
+        new SigningCertificateLineage.SignerConfig.Builder(privateKey, certificate).build();
+    SigningCertificateLineage.SignerConfig oldestSignerConfig =
+        new SigningCertificateLineage.SignerConfig.Builder(
+                oldestSignerPrivateKey, oldestSignerCertificate)
+            .build();
     SigningCertificateLineage lineage =
         new SigningCertificateLineage.Builder(oldestSignerConfig, signerConfig).build();
 
@@ -1383,9 +1401,12 @@ public class BuildApksCommandTest {
 
   @Test
   public void populateLineage_apkFile() throws Exception {
-    SignerConfig signerConfig = new SignerConfig.Builder(privateKey, certificate).build();
-    SignerConfig oldestSignerConfig =
-        new SignerConfig.Builder(oldestSignerPrivateKey, oldestSignerCertificate).build();
+    SigningCertificateLineage.SignerConfig signerConfig =
+        new SigningCertificateLineage.SignerConfig.Builder(privateKey, certificate).build();
+    SigningCertificateLineage.SignerConfig oldestSignerConfig =
+        new SigningCertificateLineage.SignerConfig.Builder(
+                oldestSignerPrivateKey, oldestSignerCertificate)
+            .build();
     SigningCertificateLineage lineage =
         new SigningCertificateLineage.Builder(oldestSignerConfig, signerConfig).build();
 
@@ -1504,6 +1525,35 @@ public class BuildApksCommandTest {
     assertThat(e)
         .hasMessageThat()
         .isEqualTo("Flag 'lineage' is required when 'oldest-signer' is set.");
+  }
+
+  @Test
+  public void settingBothSigningConfigAndSigningConfigProvider_throwsError() {
+    SigningConfiguration signingConfig =
+        SigningConfiguration.builder().setSignerConfig(privateKey, certificate).build();
+    ApksigSigningConfiguration apksigSigningConfig =
+        ApksigSigningConfiguration.builder()
+            .setSignerConfigs(
+                ImmutableList.of(
+                    SignerConfig.builder()
+                        .setPrivateKey(privateKey)
+                        .setCertificates(ImmutableList.of(certificate))
+                        .build()))
+            .build();
+
+    IllegalStateException e =
+        assertThrows(
+            IllegalStateException.class,
+            () ->
+                BuildApksCommand.builder()
+                    .setSigningConfiguration(signingConfig)
+                    .setSigningConfigurationProvider(apkDescription -> apksigSigningConfig)
+                    .build());
+
+    assertThat(e)
+        .hasMessageThat()
+        .isEqualTo(
+            "Only one of SigningConfiguration or SigningConfigurationProvider should be set.");
   }
 
   private void createAppBundle(Path path) throws Exception {

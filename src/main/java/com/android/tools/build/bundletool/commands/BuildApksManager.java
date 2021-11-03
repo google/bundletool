@@ -15,6 +15,7 @@
  */
 package com.android.tools.build.bundletool.commands;
 
+import static com.android.tools.build.bundletool.commands.BuildApksCommand.ApkBuildMode.ARCHIVE;
 import static com.android.tools.build.bundletool.commands.BuildApksCommand.ApkBuildMode.SYSTEM;
 import static com.android.tools.build.bundletool.model.version.VersionGuardedFeature.RESOURCES_REFERENCED_IN_MANIFEST_TO_MASTER_SPLIT;
 import static com.google.common.collect.ImmutableList.toImmutableList;
@@ -26,6 +27,7 @@ import com.android.bundle.Devices.DeviceSpec;
 import com.android.tools.build.bundletool.commands.BuildApksCommand.ApkBuildMode;
 import com.android.tools.build.bundletool.commands.BuildApksCommand.SystemApkOption;
 import com.android.tools.build.bundletool.device.ApkMatcher;
+import com.android.tools.build.bundletool.internal.HibernatedApksGenerator;
 import com.android.tools.build.bundletool.io.ApkSerializerManager;
 import com.android.tools.build.bundletool.io.ApkSetBuilderFactory;
 import com.android.tools.build.bundletool.io.ApkSetBuilderFactory.ApkSetBuilder;
@@ -81,6 +83,7 @@ public final class BuildApksManager {
   private final SplitApksGenerator splitApksGenerator;
   private final ShardedApksFacade shardedApksFacade;
   private final ApkOptimizations apkOptimizations;
+  private final HibernatedApksGenerator hibernatedApksGenerator;
 
   @Inject
   BuildApksManager(
@@ -94,7 +97,8 @@ public final class BuildApksManager {
       ApkSerializerManager apkSerializerManager,
       SplitApksGenerator splitApksGenerator,
       ShardedApksFacade shardedApksFacade,
-      ApkOptimizations apkOptimizations) {
+      ApkOptimizations apkOptimizations,
+      HibernatedApksGenerator hibernatedApksGenerator) {
     this.appBundle = appBundle;
     this.command = command;
     this.bundletoolVersion = bundletoolVersion;
@@ -106,6 +110,7 @@ public final class BuildApksManager {
     this.apkSerializerManager = apkSerializerManager;
     this.shardedApksFacade = shardedApksFacade;
     this.apkOptimizations = apkOptimizations;
+    this.hibernatedApksGenerator = hibernatedApksGenerator;
   }
 
   public void execute() throws IOException {
@@ -163,6 +168,11 @@ public final class BuildApksManager {
     // System APKs
     if (apksToGenerate.generateSystemApks()) {
       generatedApksBuilder.setSystemApks(generateSystemApks(appBundle, requestedModules));
+    }
+
+    // Hibernated APKs
+    if (apksToGenerate.generateHibernatedApks()) {
+      generatedApksBuilder.setHibernatedApks(generateHibernatedApks(appBundle));
     }
 
     // Asset Slices
@@ -267,6 +277,11 @@ public final class BuildApksManager {
         getSystemApkOptimizations());
   }
 
+  private ImmutableList<ModuleSplit> generateHibernatedApks(AppBundle appBundle)
+      throws IOException {
+    return ImmutableList.of(hibernatedApksGenerator.generateHibernatedApk(appBundle));
+  }
+
   private static void checkDeviceCompatibilityWithBundle(
       GeneratedApks generatedApks, DeviceSpec deviceSpec) {
     ApkMatcher apkMatcher = new ApkMatcher(deviceSpec);
@@ -317,11 +332,8 @@ public final class BuildApksManager {
     apkGenerationConfiguration.setSuffixStrippings(apkOptimizations.getSuffixStrippings());
 
     command
-        .getSigningConfiguration()
-        .ifPresent(
-            signingConfig ->
-                apkGenerationConfiguration.setMinimumV3RotationApiVersion(
-                    signingConfig.getMinimumV3RotationApiVersion()));
+        .getMinSdkForAdditionalVariantWithV3Rotation()
+        .ifPresent(apkGenerationConfiguration::setMinSdkForAdditionalVariantWithV3Rotation);
 
     return apkGenerationConfiguration;
   }
@@ -455,6 +467,7 @@ public final class BuildApksManager {
               || generateInstantApks()
               || generateUniversalApk()
               || generateSystemApks()
+              || generateHibernatedApks()
               || generateAssetSlices();
       if (!generatesAtLeastOneApk) {
         throw InvalidCommandException.builder().withInternalMessage("No APKs to generate.").build();
@@ -525,6 +538,13 @@ public final class BuildApksManager {
         return false;
       }
       return apkBuildMode.equals(SYSTEM);
+    }
+
+    public boolean generateHibernatedApks() {
+      if (appBundle.isApex() || appBundle.isAssetOnly()) {
+        return false;
+      }
+      return apkBuildMode.equals(ARCHIVE);
     }
 
     public boolean generateAssetSlices() {

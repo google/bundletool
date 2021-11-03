@@ -63,6 +63,7 @@ public class SplitsXmlInjector {
                     case SPLIT:
                       return processSplitApkVariant(keySplit.getValue());
                     case STANDALONE:
+                    case HIBERNATION:
                       return keySplit.getValue().stream()
                           .map(SplitsXmlInjector::processStandaloneVariant)
                           .collect(toImmutableList());

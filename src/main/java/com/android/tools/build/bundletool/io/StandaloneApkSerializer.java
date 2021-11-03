@@ -16,13 +16,14 @@
 
 package com.android.tools.build.bundletool.io;
 
-
+import com.android.bundle.Commands;
 import com.android.bundle.Commands.ApexApkMetadata;
 import com.android.bundle.Commands.ApkDescription;
 import com.android.bundle.Commands.SplitApkMetadata;
 import com.android.bundle.Commands.StandaloneApkMetadata;
 import com.android.bundle.Commands.SystemApkMetadata;
 import com.android.tools.build.bundletool.model.ModuleSplit;
+import com.android.tools.build.bundletool.model.ModuleSplit.SplitType;
 import com.android.tools.build.bundletool.model.ZipPath;
 import com.google.common.annotations.VisibleForTesting;
 import java.nio.file.Path;
@@ -45,6 +46,11 @@ public class StandaloneApkSerializer {
 
   public ApkDescription writeToDiskAsUniversal(ModuleSplit standaloneSplit, Path outputDirectory) {
     return writeToDiskInternal(standaloneSplit, outputDirectory, ZipPath.create("universal.apk"));
+  }
+
+  public ApkDescription writeHibernatedApkToDisk(
+      ModuleSplit standaloneSplit, Path outputDirectory, ZipPath apkPath) {
+    return writeToDiskInternal(standaloneSplit, outputDirectory, apkPath);
   }
 
   public ApkDescription writeSystemApkToDisk(
@@ -86,6 +92,8 @@ public class StandaloneApkSerializer {
           ApexApkMetadata.newBuilder()
               .addAllApexEmbeddedApkConfig(standaloneSplit.getApexEmbeddedApkConfigs())
               .build());
+    } else if (standaloneSplit.getSplitType() == SplitType.HIBERNATION) {
+      apkDescription.setHibernatedApkMetadata(Commands.HibernatedApkMetadata.getDefaultInstance());
     } else {
       apkDescription.setStandaloneApkMetadata(
           StandaloneApkMetadata.newBuilder()

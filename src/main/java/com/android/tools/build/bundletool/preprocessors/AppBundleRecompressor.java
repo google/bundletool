@@ -32,11 +32,13 @@ import com.android.tools.build.bundletool.io.ZipEntrySource;
 import com.android.tools.build.bundletool.io.ZipEntrySourceFactory;
 import com.android.tools.build.bundletool.io.ZipReader;
 import com.android.tools.build.bundletool.model.AndroidManifest;
+import com.android.tools.build.bundletool.model.AppBundle;
 import com.android.tools.build.bundletool.model.CompressionLevel;
 import com.android.tools.build.bundletool.model.ZipPath;
 import com.android.tools.build.bundletool.model.exceptions.InvalidBundleException;
 import com.android.tools.build.bundletool.model.utils.PathMatcher;
 import com.android.tools.build.bundletool.model.utils.SystemEnvironmentProvider;
+import com.android.tools.build.bundletool.validation.BundleConfigValidator;
 import com.android.zipflinger.Entry;
 import com.android.zipflinger.ZipArchive;
 import com.google.common.collect.ImmutableList;
@@ -133,12 +135,20 @@ public final class AppBundleRecompressor {
   }
 
   private static BundleConfig extractBundleConfig(ZipReader zipReader) {
-    if (!zipReader.getEntry("BundleConfig.pb").isPresent()) {
-      throw InvalidBundleException.createWithUserMessage(
-          "File 'BundleConfig.pb' not found but required in App Bundle format.");
+    // The bundle hasn't been validated yet, therefore selected validations need to be run manually.
+    if (!zipReader.getEntry(AppBundle.BUNDLE_CONFIG_FILE_NAME).isPresent()) {
+      throw InvalidBundleException.builder()
+          .withUserMessage(
+              "The archive doesn't seem to be an App Bundle, it is missing required file '%s'.",
+              AppBundle.BUNDLE_CONFIG_FILE_NAME)
+          .build();
     }
-    try (InputStream inputStream = zipReader.getUncompressedPayload("BundleConfig.pb")) {
-      return BundleConfig.parseFrom(inputStream, ExtensionRegistryLite.getEmptyRegistry());
+    try (InputStream inputStream =
+        zipReader.getUncompressedPayload(AppBundle.BUNDLE_CONFIG_FILE_NAME)) {
+      BundleConfig bundleConfig =
+          BundleConfig.parseFrom(inputStream, ExtensionRegistryLite.getEmptyRegistry());
+      new BundleConfigValidator().validateCompression(bundleConfig.getCompression());
+      return bundleConfig;
     } catch (IOException e) {
       throw new UncheckedIOException(e);
     }

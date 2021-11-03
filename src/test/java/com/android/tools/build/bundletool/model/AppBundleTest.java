@@ -447,6 +447,36 @@ public class AppBundleTest {
         .isEmpty();
   }
 
+  @Test
+  public void storeArchiveEnabled_notPresent_false() throws Exception {
+    AppBundle appBundle =
+        new AppBundleBuilder()
+            .setBundleConfig(BundleConfigBuilder.create().build())
+            .addModule("base", builder -> builder.setManifest(MANIFEST))
+            .build();
+    assertThat(appBundle.storeArchiveEnabled()).isFalse();
+  }
+
+  @Test
+  public void storeArchiveEnabled_true() throws Exception {
+    AppBundle appBundle =
+        new AppBundleBuilder()
+            .setBundleConfig(BundleConfigBuilder.create().setStoreArchive(true).build())
+            .addModule("base", builder -> builder.setManifest(MANIFEST))
+            .build();
+    assertThat(appBundle.storeArchiveEnabled()).isTrue();
+  }
+
+  @Test
+  public void storeArchiveEnabled_false() throws Exception {
+    AppBundle appBundle =
+        new AppBundleBuilder()
+            .setBundleConfig(BundleConfigBuilder.create().setStoreArchive(false).build())
+            .addModule("base", builder -> builder.setManifest(MANIFEST))
+            .build();
+    assertThat(appBundle.storeArchiveEnabled()).isFalse();
+  }
+
   private static ZipBuilder createBasicZipBuilder(BundleConfig config) {
     ZipBuilder zipBuilder = new ZipBuilder();
     zipBuilder.addFileWithContent(ZipPath.create("BundleConfig.pb"), config.toByteArray());

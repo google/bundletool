@@ -43,15 +43,24 @@ public abstract class GeneratedApks {
 
   public abstract ImmutableList<ModuleSplit> getSystemApks();
 
+  // There is alsways a single hibernated APK. List type is used for consistency.
+  public abstract ImmutableList<ModuleSplit> getHibernatedApks();
+
   public int size() {
     return getInstantApks().size()
         + getSplitApks().size()
         + getStandaloneApks().size()
-        + getSystemApks().size();
+        + getSystemApks().size()
+        + getHibernatedApks().size();
   }
 
   public Stream<ModuleSplit> getAllApksStream() {
-    return Stream.of(getStandaloneApks(), getInstantApks(), getSplitApks(), getSystemApks())
+    return Stream.of(
+            getStandaloneApks(),
+            getInstantApks(),
+            getSplitApks(),
+            getSystemApks(),
+            getHibernatedApks())
         .flatMap(List::stream);
   }
 
@@ -66,7 +75,8 @@ public abstract class GeneratedApks {
         .setInstantApks(ImmutableList.of())
         .setSplitApks(ImmutableList.of())
         .setStandaloneApks(ImmutableList.of())
-        .setSystemApks(ImmutableList.of());
+        .setSystemApks(ImmutableList.of())
+        .setHibernatedApks(ImmutableList.of());
   }
 
   /** Creates a GeneratedApk instance from a list of module splits. */
@@ -78,8 +88,10 @@ public abstract class GeneratedApks {
         .setSplitApks(groups.getOrDefault(SplitType.SPLIT, ImmutableList.of()))
         .setStandaloneApks(groups.getOrDefault(SplitType.STANDALONE, ImmutableList.of()))
         .setSystemApks(groups.getOrDefault(SplitType.SYSTEM, ImmutableList.of()))
+        .setHibernatedApks(groups.getOrDefault(SplitType.HIBERNATION, ImmutableList.of()))
         .build();
   }
+
   /** Builder for {@link GeneratedApks}. */
   @AutoValue.Builder
   public abstract static class Builder {
@@ -91,6 +103,8 @@ public abstract class GeneratedApks {
     public abstract Builder setStandaloneApks(ImmutableList<ModuleSplit> standaloneApks);
 
     public abstract Builder setSystemApks(ImmutableList<ModuleSplit> systemApks);
+
+    public abstract Builder setHibernatedApks(ImmutableList<ModuleSplit> hibernatedApks);
 
     public abstract GeneratedApks build();
   }

@@ -16,14 +16,38 @@
 
 package com.android.tools.build.bundletool.model;
 
+import static com.android.tools.build.bundletool.model.AndroidManifest.ALLOW_BACKUP_ATTRIBUTE_NAME;
+import static com.android.tools.build.bundletool.model.AndroidManifest.ALLOW_BACKUP_RESOURCE_ID;
+import static com.android.tools.build.bundletool.model.AndroidManifest.BACKUP_AGENT_ATTRIBUTE_NAME;
+import static com.android.tools.build.bundletool.model.AndroidManifest.BACKUP_AGENT_RESOURCE_ID;
+import static com.android.tools.build.bundletool.model.AndroidManifest.DATA_EXTRACTION_RULES_ATTRIBUTE_NAME;
+import static com.android.tools.build.bundletool.model.AndroidManifest.DATA_EXTRACTION_RULES_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.DEBUGGABLE_RESOURCE_ID;
+import static com.android.tools.build.bundletool.model.AndroidManifest.DESCRIPTION_ATTRIBUTE_NAME;
+import static com.android.tools.build.bundletool.model.AndroidManifest.DESCRIPTION_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.DEVELOPMENT_SDK_VERSION;
+import static com.android.tools.build.bundletool.model.AndroidManifest.FULL_BACKUP_CONTENT_ATTRIBUTE_NAME;
+import static com.android.tools.build.bundletool.model.AndroidManifest.FULL_BACKUP_CONTENT_RESOURCE_ID;
+import static com.android.tools.build.bundletool.model.AndroidManifest.FULL_BACKUP_ONLY_ATTRIBUTE_NAME;
+import static com.android.tools.build.bundletool.model.AndroidManifest.FULL_BACKUP_ONLY_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.HAS_CODE_RESOURCE_ID;
+import static com.android.tools.build.bundletool.model.AndroidManifest.HAS_FRAGILE_USER_DATA_ATTRIBUTE_NAME;
+import static com.android.tools.build.bundletool.model.AndroidManifest.HAS_FRAGILE_USER_DATA_RESOURCE_ID;
+import static com.android.tools.build.bundletool.model.AndroidManifest.ICON_ATTRIBUTE_NAME;
+import static com.android.tools.build.bundletool.model.AndroidManifest.ICON_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.IS_FEATURE_SPLIT_RESOURCE_ID;
+import static com.android.tools.build.bundletool.model.AndroidManifest.IS_GAME_ATTRIBUTE_NAME;
+import static com.android.tools.build.bundletool.model.AndroidManifest.IS_GAME_RESOURCE_ID;
+import static com.android.tools.build.bundletool.model.AndroidManifest.LABEL_ATTRIBUTE_NAME;
+import static com.android.tools.build.bundletool.model.AndroidManifest.LABEL_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.MODULE_TYPE_ASSET_VALUE;
 import static com.android.tools.build.bundletool.model.AndroidManifest.MODULE_TYPE_FEATURE_VALUE;
 import static com.android.tools.build.bundletool.model.AndroidManifest.NAME_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.RESOURCE_RESOURCE_ID;
+import static com.android.tools.build.bundletool.model.AndroidManifest.SHARED_USER_ID_ATTRIBUTE_NAME;
+import static com.android.tools.build.bundletool.model.AndroidManifest.SHARED_USER_ID_RESOURCE_ID;
+import static com.android.tools.build.bundletool.model.AndroidManifest.SHARED_USER_LABEL_ATTRIBUTE_NAME;
+import static com.android.tools.build.bundletool.model.AndroidManifest.SHARED_USER_LABEL_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.VALUE_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.VERSION_CODE_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.VERSION_NAME_RESOURCE_ID;
@@ -1046,6 +1070,19 @@ public class AndroidManifestTest {
   }
 
   @Test
+  public void getMetadataValueAsBoolean() {
+    AndroidManifest androidManifest =
+        AndroidManifest.create(
+            xmlNode(
+                xmlElement(
+                    "manifest",
+                    xmlNode(
+                        xmlElement(
+                            "application", metadataWithValueAsBoolean("metadata-key", true))))));
+    assertThat(androidManifest.getMetadataValueAsBoolean("metadata-key")).hasValue(true);
+  }
+
+  @Test
   public void hasSharedUserId() {
     AndroidManifest androidManifest = AndroidManifest.create(androidManifest("com.test.app"));
     assertThat(androidManifest.hasSharedUserId()).isFalse();
@@ -1072,6 +1109,15 @@ public class AndroidManifestTest {
                 xmlAttribute(ANDROID_NAMESPACE_URI, "name", NAME_RESOURCE_ID, key),
                 xmlDecimalIntegerAttribute(
                     ANDROID_NAMESPACE_URI, "value", VALUE_RESOURCE_ID, value))));
+  }
+
+  private XmlNode metadataWithValueAsBoolean(String key, boolean value) {
+    return xmlNode(
+        xmlElement(
+            "meta-data",
+            ImmutableList.of(
+                xmlAttribute(ANDROID_NAMESPACE_URI, "name", NAME_RESOURCE_ID, key),
+                xmlBooleanAttribute(ANDROID_NAMESPACE_URI, "value", VALUE_RESOURCE_ID, value))));
   }
 
   private XmlNode metadataWithResourceRef(String key, int resourceIdValue) {
@@ -1149,5 +1195,279 @@ public class AndroidManifestTest {
         AndroidManifest.create(
             androidManifestForAssetModule("com.test.app", withInstantInstallTimeDelivery()));
     assertThat(manifest.getInstantModuleDeliveryType()).isEqualTo(ALWAYS_INITIAL_INSTALL);
+  }
+
+  @Test
+  public void getSharedUserId_present() {
+    AndroidManifest androidManifest =
+        AndroidManifest.create(
+            xmlNode(
+                xmlElement(
+                    "manifest",
+                    xmlAttribute(
+                        ANDROID_NAMESPACE_URI,
+                        SHARED_USER_ID_ATTRIBUTE_NAME,
+                        SHARED_USER_ID_RESOURCE_ID,
+                        "shared user id"),
+                    xmlNode(xmlElement("application")))));
+
+    assertThat(androidManifest.getSharedUserId()).hasValue("shared user id");
+  }
+
+  @Test
+  public void getSharedUserId_missing_isEmpty() {
+    AndroidManifest androidManifest =
+        AndroidManifest.create(xmlNode(xmlElement("manifest", xmlNode(xmlElement("application")))));
+
+    assertThat(androidManifest.getSharedUserId()).isEmpty();
+  }
+
+  @Test
+  public void getSharedUserLabel_present() {
+    AndroidManifest androidManifest =
+        AndroidManifest.create(
+            xmlNode(
+                xmlElement(
+                    "manifest",
+                    xmlResourceReferenceAttribute(
+                        ANDROID_NAMESPACE_URI,
+                        SHARED_USER_LABEL_ATTRIBUTE_NAME,
+                        SHARED_USER_LABEL_RESOURCE_ID,
+                        0x12345678),
+                    xmlNode(xmlElement("application")))));
+
+    assertThat(androidManifest.getSharedUserLabel()).hasValue(0x12345678);
+  }
+
+  @Test
+  public void getSharedUserLabel_missing_isEmpty() {
+    AndroidManifest androidManifest =
+        AndroidManifest.create(xmlNode(xmlElement("manifest", xmlNode(xmlElement("application")))));
+
+    assertThat(androidManifest.getSharedUserId()).isEmpty();
+  }
+
+  @Test
+  public void getDescription_present() {
+    AndroidManifest androidManifest =
+        createManifestWithApplicationRefIdAttribute(
+            DESCRIPTION_ATTRIBUTE_NAME, DESCRIPTION_RESOURCE_ID, 0x12345678);
+
+    assertThat(androidManifest.getDescription()).hasValue(0x12345678);
+  }
+
+  @Test
+  public void getDescription_missing_isEmpty() {
+    AndroidManifest androidManifest =
+        AndroidManifest.create(xmlNode(xmlElement("manifest", xmlNode(xmlElement("application")))));
+
+    assertThat(androidManifest.getDescription()).isEmpty();
+  }
+
+  @Test
+  public void getHasFragileUserData_present() {
+    AndroidManifest androidManifest =
+        createManifestWithApplicationBooleanAttribute(
+            HAS_FRAGILE_USER_DATA_ATTRIBUTE_NAME, HAS_FRAGILE_USER_DATA_RESOURCE_ID, true);
+
+    assertThat(androidManifest.getHasFragileUserData()).hasValue(true);
+  }
+
+  @Test
+  public void getHasFragileUserData_missing_isEmpty() {
+    AndroidManifest androidManifest =
+        AndroidManifest.create(xmlNode(xmlElement("manifest", xmlNode(xmlElement("application")))));
+
+    assertThat(androidManifest.getHasFragileUserData()).isEmpty();
+  }
+
+  @Test
+  public void getIsGame_present() {
+    AndroidManifest androidManifest =
+        createManifestWithApplicationBooleanAttribute(
+            IS_GAME_ATTRIBUTE_NAME, IS_GAME_RESOURCE_ID, true);
+
+    assertThat(androidManifest.getIsGame()).hasValue(true);
+  }
+
+  @Test
+  public void getIsGame_missing_isEmpty() {
+    AndroidManifest androidManifest =
+        AndroidManifest.create(xmlNode(xmlElement("manifest", xmlNode(xmlElement("application")))));
+
+    assertThat(androidManifest.getIsGame()).isEmpty();
+  }
+
+  @Test
+  public void getLabelString_present() {
+    AndroidManifest androidManifest =
+        createManifestWithApplicationAttribute(
+            LABEL_ATTRIBUTE_NAME, LABEL_RESOURCE_ID, "app label");
+
+    assertThat(androidManifest.getLabelString()).hasValue("app label");
+  }
+
+  @Test
+  public void getLabelString_missing_isEmpty() {
+    AndroidManifest androidManifest =
+        AndroidManifest.create(xmlNode(xmlElement("manifest", xmlNode(xmlElement("application")))));
+
+    assertThat(androidManifest.getLabelString()).isEmpty();
+  }
+
+  @Test
+  public void getLabelRefId_present() {
+    AndroidManifest androidManifest =
+        createManifestWithApplicationRefIdAttribute(
+            LABEL_ATTRIBUTE_NAME, LABEL_RESOURCE_ID, 0x12345678);
+
+    assertThat(androidManifest.getLabelRefId()).hasValue(0x12345678);
+  }
+
+  @Test
+  public void getLabelRefId_missing_isEmpty() {
+    AndroidManifest androidManifest =
+        AndroidManifest.create(xmlNode(xmlElement("manifest", xmlNode(xmlElement("application")))));
+
+    assertThat(androidManifest.getLabelRefId()).isEmpty();
+  }
+
+  @Test
+  public void getIcon_present() {
+    AndroidManifest androidManifest =
+        createManifestWithApplicationRefIdAttribute(
+            ICON_ATTRIBUTE_NAME, ICON_RESOURCE_ID, 0x12345678);
+
+    assertThat(androidManifest.getIcon()).hasValue(0x12345678);
+  }
+
+  @Test
+  public void getIcon_missing_isEmpty() {
+    AndroidManifest androidManifest =
+        AndroidManifest.create(xmlNode(xmlElement("manifest", xmlNode(xmlElement("application")))));
+
+    assertThat(androidManifest.getIcon()).isEmpty();
+  }
+
+  @Test
+  public void getAllowBackup_present() {
+    AndroidManifest androidManifest =
+        createManifestWithApplicationBooleanAttribute(
+            ALLOW_BACKUP_ATTRIBUTE_NAME, ALLOW_BACKUP_RESOURCE_ID, true);
+
+    assertThat(androidManifest.getAllowBackup()).hasValue(true);
+  }
+
+  @Test
+  public void getAllowBackup_missing_isEmpty() {
+    AndroidManifest androidManifest =
+        AndroidManifest.create(xmlNode(xmlElement("manifest", xmlNode(xmlElement("application")))));
+
+    assertThat(androidManifest.getIcon()).isEmpty();
+  }
+
+  @Test
+  public void getDataExtractionRules_present() {
+    AndroidManifest androidManifest =
+        createManifestWithApplicationRefIdAttribute(
+            DATA_EXTRACTION_RULES_ATTRIBUTE_NAME, DATA_EXTRACTION_RULES_RESOURCE_ID, 0x12341234);
+
+    assertThat(androidManifest.getDataExtractionRules()).hasValue(0x12341234);
+  }
+
+  @Test
+  public void getDataExtractionRules_missing_isEmpty() {
+    AndroidManifest androidManifest =
+        AndroidManifest.create(xmlNode(xmlElement("manifest", xmlNode(xmlElement("application")))));
+
+    assertThat(androidManifest.getDataExtractionRules()).isEmpty();
+  }
+
+  @Test
+  public void getFullBackupContent_present() {
+    AndroidManifest androidManifest =
+        createManifestWithApplicationRefIdAttribute(
+            FULL_BACKUP_CONTENT_ATTRIBUTE_NAME, FULL_BACKUP_CONTENT_RESOURCE_ID, 0x12341234);
+
+    assertThat(androidManifest.getFullBackupContent()).hasValue(0x12341234);
+  }
+
+  @Test
+  public void getFullBackupContent_missing_isEmpty() {
+    AndroidManifest androidManifest =
+        AndroidManifest.create(xmlNode(xmlElement("manifest", xmlNode(xmlElement("application")))));
+
+    assertThat(androidManifest.getFullBackupContent()).isEmpty();
+  }
+
+  @Test
+  public void getFullBackupOnly_present() {
+    AndroidManifest androidManifest =
+        createManifestWithApplicationBooleanAttribute(
+            FULL_BACKUP_ONLY_ATTRIBUTE_NAME, FULL_BACKUP_ONLY_RESOURCE_ID, true);
+
+    assertThat(androidManifest.getFullBackupOnly()).hasValue(true);
+  }
+
+  @Test
+  public void getFullBackupOnly_missing_isEmpty() {
+    AndroidManifest androidManifest =
+        AndroidManifest.create(xmlNode(xmlElement("manifest", xmlNode(xmlElement("application")))));
+
+    assertThat(androidManifest.getFullBackupOnly()).isEmpty();
+  }
+
+  @Test
+  public void hasBackupAgent_present() {
+    AndroidManifest androidManifest =
+        createManifestWithApplicationAttribute(
+            BACKUP_AGENT_ATTRIBUTE_NAME, BACKUP_AGENT_RESOURCE_ID, "backup agent");
+
+    assertThat(androidManifest.hasBackupAgent()).isTrue();
+  }
+
+  @Test
+  public void hasBackupAgent_missing_returnsFalse() {
+    AndroidManifest androidManifest =
+        AndroidManifest.create(xmlNode(xmlElement("manifest", xmlNode(xmlElement("application")))));
+
+    assertThat(androidManifest.hasBackupAgent()).isFalse();
+  }
+
+  private AndroidManifest createManifestWithApplicationAttribute(
+      String name, int resourceId, String value) {
+    return AndroidManifest.create(
+        xmlNode(
+            xmlElement(
+                "manifest",
+                xmlNode(
+                    xmlElement(
+                        "application",
+                        xmlAttribute(ANDROID_NAMESPACE_URI, name, resourceId, value))))));
+  }
+
+  private AndroidManifest createManifestWithApplicationBooleanAttribute(
+      String name, int resourceId, boolean value) {
+    return AndroidManifest.create(
+        xmlNode(
+            xmlElement(
+                "manifest",
+                xmlNode(
+                    xmlElement(
+                        "application",
+                        xmlBooleanAttribute(ANDROID_NAMESPACE_URI, name, resourceId, value))))));
+  }
+
+  private AndroidManifest createManifestWithApplicationRefIdAttribute(
+      String name, int resourceId, int value) {
+    return AndroidManifest.create(
+        xmlNode(
+            xmlElement(
+                "manifest",
+                xmlNode(
+                    xmlElement(
+                        "application",
+                        xmlResourceReferenceAttribute(
+                            ANDROID_NAMESPACE_URI, name, resourceId, value))))));
   }
 }

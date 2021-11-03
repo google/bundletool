@@ -77,6 +77,7 @@ public abstract class AndroidManifest {
   public static final String RECEIVER_ELEMENT_NAME = "receiver";
   public static final String PROVIDER_ELEMENT_NAME = "provider";
   public static final String SUPPORTS_GL_TEXTURE_ELEMENT_NAME = "supports-gl-texture";
+  public static final String ACTION_ELEMENT_NAME = "action";
 
   public static final String DEBUGGABLE_ATTRIBUTE_NAME = "debuggable";
   public static final String EXTRACT_NATIVE_LIBS_ATTRIBUTE_NAME = "extractNativeLibs";
@@ -101,6 +102,17 @@ public abstract class AndroidManifest {
   public static final String INSTALL_LOCATION_ATTRIBUTE_NAME = "installLocation";
   public static final String IS_SPLIT_REQUIRED_ATTRIBUTE_NAME = "isSplitRequired";
   public static final String SHARED_USER_ID_ATTRIBUTE_NAME = "sharedUserId";
+  public static final String SHARED_USER_LABEL_ATTRIBUTE_NAME = "sharedUserLabel";
+  public static final String DESCRIPTION_ATTRIBUTE_NAME = "description";
+  public static final String HAS_FRAGILE_USER_DATA_ATTRIBUTE_NAME = "hasFragileUserData";
+  public static final String IS_GAME_ATTRIBUTE_NAME = "isGame";
+  public static final String LABEL_ATTRIBUTE_NAME = "label";
+  public static final String ALLOW_BACKUP_ATTRIBUTE_NAME = "allowBackup";
+  public static final String FULL_BACKUP_CONTENT_ATTRIBUTE_NAME = "fullBackupContent";
+  public static final String FULL_BACKUP_ONLY_ATTRIBUTE_NAME = "fullBackupOnly";
+  public static final String BACKUP_AGENT_ATTRIBUTE_NAME = "backupAgent";
+  public static final String DATA_EXTRACTION_RULES_ATTRIBUTE_NAME = "dataExtractionRules";
+  public static final String EXPORTED_ATTRIBUTE_NAME = "exported";
 
   public static final String MODULE_TYPE_FEATURE_VALUE = "feature";
   public static final String MODULE_TYPE_ASSET_VALUE = "asset-pack";
@@ -129,6 +141,18 @@ public abstract class AndroidManifest {
   public static final int IS_SPLIT_REQUIRED_RESOURCE_ID = 0x01010591;
   public static final int THEME_RESOURCE_ID = 0x01010000;
   public static final int ISOLATED_SPLITS_ID = 0x0101054b;
+  public static final int SHARED_USER_ID_RESOURCE_ID = 0x0101000b;
+  public static final int SHARED_USER_LABEL_RESOURCE_ID = 0x01010261;
+  public static final int DESCRIPTION_RESOURCE_ID = 0x01010020;
+  public static final int HAS_FRAGILE_USER_DATA_RESOURCE_ID = 0x0101059a;
+  public static final int IS_GAME_RESOURCE_ID = 0x010103f4;
+  public static final int LABEL_RESOURCE_ID = 0x01010001;
+  public static final int ALLOW_BACKUP_RESOURCE_ID = 0x01010280;
+  public static final int FULL_BACKUP_CONTENT_RESOURCE_ID = 0x010104eb;
+  public static final int FULL_BACKUP_ONLY_RESOURCE_ID = 0x01010473;
+  public static final int BACKUP_AGENT_RESOURCE_ID = 0x0101027f;
+  public static final int DATA_EXTRACTION_RULES_RESOURCE_ID = 0x0101063e;
+  public static final int EXPORTED_RESOURCE_ID = 0x01010010;
 
   // Matches the value of android.os.Build.VERSION_CODES.CUR_DEVELOPMENT, used when turning
   // a manifest attribute which references a prerelease API version (e.g., "Q") into an integer.
@@ -249,10 +273,7 @@ public abstract class AndroidManifest {
    *     empty optional if not set.
    */
   public Optional<Boolean> getApplicationDebuggable() {
-    return getManifestElement()
-        .getOptionalChildElement(APPLICATION_ELEMENT_NAME)
-        .flatMap(app -> app.getAndroidAttribute(DEBUGGABLE_RESOURCE_ID))
-        .map(attr -> attr.getValueAsBoolean());
+    return getApplicationAttributeAsBoolean(DEBUGGABLE_RESOURCE_ID);
   }
 
   public ImmutableMap<String, XmlProtoElement> getActivitiesByName() {
@@ -275,6 +296,10 @@ public abstract class AndroidManifest {
 
   public Optional<Integer> getMaxSdkVersion() {
     return getUsesSdkAttribute(MAX_SDK_VERSION_RESOURCE_ID);
+  }
+
+  public Optional<Integer> getTargetSdkVersion() {
+    return getUsesSdkAttribute(TARGET_SDK_VERSION_RESOURCE_ID);
   }
 
   /** Returns SDK level range this {@link AndroidManifest} declares as supported. */
@@ -335,10 +360,7 @@ public abstract class AndroidManifest {
   }
 
   public Optional<Boolean> getHasCode() {
-    return getManifestElement()
-        .getOptionalChildElement(APPLICATION_ELEMENT_NAME)
-        .flatMap(application -> application.getAndroidAttribute(HAS_CODE_RESOURCE_ID))
-        .map(XmlProtoAttribute::getValueAsBoolean);
+    return getApplicationAttributeAsBoolean(HAS_CODE_RESOURCE_ID);
   }
 
   public boolean getEffectiveHasCode() {
@@ -482,6 +504,18 @@ public abstract class AndroidManifest {
             });
   }
 
+  public Optional<String> getSharedUserId() {
+    return getManifestElement()
+        .getAndroidAttribute(SHARED_USER_ID_RESOURCE_ID)
+        .map(XmlProtoAttribute::getValueAsString);
+  }
+
+  public Optional<Integer> getSharedUserLabel() {
+    return getManifestElement()
+        .getAndroidAttribute(SHARED_USER_LABEL_RESOURCE_ID)
+        .map(XmlProtoAttribute::getValueAsRefId);
+  }
+
   /**
    * Returns whether the module delivery settings are explicitly declared.
    *
@@ -523,10 +557,7 @@ public abstract class AndroidManifest {
    *     empty optional if not set.
    */
   public Optional<Boolean> getExtractNativeLibsValue() {
-    return getManifestElement()
-        .getOptionalChildElement(APPLICATION_ELEMENT_NAME)
-        .flatMap(app -> app.getAndroidAttribute(EXTRACT_NATIVE_LIBS_RESOURCE_ID))
-        .map(XmlProtoAttribute::getValueAsBoolean);
+    return getApplicationAttributeAsBoolean(EXTRACT_NATIVE_LIBS_RESOURCE_ID);
   }
 
   /** Returns the string value of the 'installLocation' attribute if set. */
@@ -551,6 +582,58 @@ public abstract class AndroidManifest {
                     .isPresent());
   }
 
+  public Optional<Integer> getDescription() {
+    return getApplicationAttributeAsRefId(DESCRIPTION_RESOURCE_ID);
+  }
+
+  public Optional<Boolean> getHasFragileUserData() {
+    return getApplicationAttributeAsBoolean(HAS_FRAGILE_USER_DATA_RESOURCE_ID);
+  }
+
+  public Optional<Boolean> getIsGame() {
+    return getApplicationAttributeAsBoolean(IS_GAME_RESOURCE_ID);
+  }
+
+  public boolean hasLabelString() {
+    return hasApplicationAttributeAsString(LABEL_RESOURCE_ID);
+  }
+
+  public boolean hasLabelRefId() {
+    return hasApplicationAttributeAsRefId(LABEL_RESOURCE_ID);
+  }
+
+  public Optional<String> getLabelString() {
+    return getApplicationAttribute(LABEL_RESOURCE_ID);
+  }
+
+  public Optional<Integer> getLabelRefId() {
+    return getApplicationAttributeAsRefId(LABEL_RESOURCE_ID);
+  }
+
+  public Optional<Integer> getIcon() {
+    return getApplicationAttributeAsRefId(ICON_RESOURCE_ID);
+  }
+
+  public Optional<Boolean> getAllowBackup() {
+    return getApplicationAttributeAsBoolean(ALLOW_BACKUP_RESOURCE_ID);
+  }
+
+  public Optional<Integer> getFullBackupContent() {
+    return getApplicationAttributeAsRefId(FULL_BACKUP_CONTENT_RESOURCE_ID);
+  }
+
+  public Optional<Integer> getDataExtractionRules() {
+    return getApplicationAttributeAsRefId(DATA_EXTRACTION_RULES_RESOURCE_ID);
+  }
+
+  public Optional<Boolean> getFullBackupOnly() {
+    return getApplicationAttributeAsBoolean(FULL_BACKUP_ONLY_RESOURCE_ID);
+  }
+
+  public boolean hasBackupAgent() {
+    return hasApplicationAttributeAsString(BACKUP_AGENT_RESOURCE_ID);
+  }
+
   /**
    * Extracts names of the fused modules.
    *
@@ -572,6 +655,11 @@ public abstract class AndroidManifest {
   public Optional<Integer> getMetadataValueAsInteger(String metadataName) {
     return getMetadataAttributeWithName(metadataName)
         .map(XmlProtoAttribute::getValueAsDecimalInteger);
+  }
+
+  /** Returns the boolean value specified in the meta-data of the given name, if it exists. */
+  public Optional<Boolean> getMetadataValueAsBoolean(String metadataName) {
+    return getMetadataAttributeWithName(metadataName).map(XmlProtoAttribute::getValueAsBoolean);
   }
 
   private Optional<XmlProtoAttribute> getMetadataAttributeWithName(String metadataName) {
@@ -701,5 +789,42 @@ public abstract class AndroidManifest {
     return getManifestElement()
         .getAttribute(ANDROID_NAMESPACE_URI, SHARED_USER_ID_ATTRIBUTE_NAME)
         .isPresent();
+  }
+
+  private Optional<String> getApplicationAttribute(int resourceId) {
+    return getManifestElement()
+        .getOptionalChildElement(APPLICATION_ELEMENT_NAME)
+        .flatMap(app -> app.getAndroidAttribute(resourceId))
+        .map(XmlProtoAttribute::getValueAsString);
+  }
+
+  private Optional<Boolean> getApplicationAttributeAsBoolean(int resourceId) {
+    return getManifestElement()
+        .getOptionalChildElement(APPLICATION_ELEMENT_NAME)
+        .flatMap(app -> app.getAndroidAttribute(resourceId))
+        .map(XmlProtoAttribute::getValueAsBoolean);
+  }
+
+  private Optional<Integer> getApplicationAttributeAsRefId(int resourceId) {
+    return getManifestElement()
+        .getOptionalChildElement(APPLICATION_ELEMENT_NAME)
+        .flatMap(app -> app.getAndroidAttribute(resourceId))
+        .map(XmlProtoAttribute::getValueAsRefId);
+  }
+
+  private boolean hasApplicationAttributeAsString(int resourceId) {
+    return getManifestElement()
+        .getOptionalChildElement(APPLICATION_ELEMENT_NAME)
+        .flatMap(app -> app.getAndroidAttribute(resourceId))
+        .map(XmlProtoAttribute::hasStringValue)
+        .orElse(false);
+  }
+
+  private boolean hasApplicationAttributeAsRefId(int resourceId) {
+    return getManifestElement()
+        .getOptionalChildElement(APPLICATION_ELEMENT_NAME)
+        .flatMap(app -> app.getAndroidAttribute(resourceId))
+        .map(XmlProtoAttribute::hasRefIdValue)
+        .orElse(false);
   }
 }

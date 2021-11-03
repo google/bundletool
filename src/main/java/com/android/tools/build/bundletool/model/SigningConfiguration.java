@@ -66,6 +66,13 @@ public abstract class SigningConfiguration {
    */
   public abstract Optional<SignerConfig> getOldestSigner();
 
+  /**
+   * Minimum Android platform version (API Level) for which an APK's rotated signing key should be
+   * used to produce the APK's signature. The original signing key for the APK will be used for all
+   * previous platform versions.
+   */
+  public abstract Optional<Integer> getRotationMinSdkVersion();
+
   public abstract Builder toBuilder();
 
   public int getEffectiveMinimumV3RotationApiVersion() {
@@ -93,6 +100,8 @@ public abstract class SigningConfiguration {
 
     public abstract Builder setMinimumV3RotationApiVersion(
         Optional<Integer> minimumV3RotationApiVersion);
+
+    public abstract Builder setRotationMinSdkVersion(Optional<Integer> rotationMinSdkVersion);
 
     public abstract Builder setSigningCertificateLineage(
         SigningCertificateLineage signingCertificateLineage);

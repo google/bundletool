@@ -15,11 +15,19 @@
  */
 package com.android.tools.build.bundletool.io;
 
+import static com.google.common.collect.ImmutableList.toImmutableList;
 import static java.nio.file.StandardCopyOption.REPLACE_EXISTING;
 
+import com.android.apksig.ApkSigner.SignerConfig;
 import com.android.apksig.apk.ApkFormatException;
+import com.android.tools.build.bundletool.commands.BuildApksModule.ApkSigningConfigProvider;
+import com.android.tools.build.bundletool.commands.BuildApksModule.StampSigningConfig;
+import com.android.tools.build.bundletool.model.ApksigSigningConfiguration;
 import com.android.tools.build.bundletool.model.ModuleEntry;
 import com.android.tools.build.bundletool.model.ModuleSplit;
+import com.android.tools.build.bundletool.model.SigningConfiguration;
+import com.android.tools.build.bundletool.model.SigningConfigurationProvider;
+import com.android.tools.build.bundletool.model.SigningConfigurationProvider.ApkDescription;
 import com.android.tools.build.bundletool.model.WearApkLocator;
 import com.android.tools.build.bundletool.model.ZipPath;
 import com.android.tools.build.bundletool.model.exceptions.CommandExecutionException;
@@ -34,42 +42,58 @@ import java.nio.file.Path;
 import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
 import java.security.SignatureException;
+import java.util.Optional;
 import javax.inject.Inject;
 
 /** Signs APKs. */
 class ApkSigner {
+  /** Name identifying uniquely the {@link SignerConfig}. */
+  private static final String SIGNER_CONFIG_NAME = "BNDLTOOL";
 
-  private final SigningConfigurationHelper signingConfigHelper;
+  private final Optional<SigningConfigurationProvider> signingConfigProvider;
+  private final Optional<SigningConfiguration> sourceStampSigningConfig;
   private final TempDirectory tempDirectory;
 
   @Inject
-  ApkSigner(SigningConfigurationHelper signingConfigHelper, TempDirectory tempDirectory) {
-    this.signingConfigHelper = signingConfigHelper;
+  ApkSigner(
+      @ApkSigningConfigProvider Optional<SigningConfigurationProvider> signingConfigProvider,
+      @StampSigningConfig Optional<SigningConfiguration> sourceStampSigningConfig,
+      TempDirectory tempDirectory) {
+    this.signingConfigProvider = signingConfigProvider;
+    this.sourceStampSigningConfig = sourceStampSigningConfig;
     this.tempDirectory = tempDirectory;
   }
 
   public void signApk(Path apkPath, ModuleSplit split) {
-    if (!signingConfigHelper.shouldSignGeneratedApks()) {
+    if (!signingConfigProvider.isPresent()) {
       return;
     }
+
+    ApksigSigningConfiguration signingConfig =
+        signingConfigProvider.get().getSigningConfiguration(ApkDescription.fromModuleSplit(split));
 
     try (TempDirectory tempDirectory = new TempDirectory(getClass().getSimpleName())) {
       Path signedApkPath = tempDirectory.getPath().resolve("signed.apk");
       com.android.apksig.ApkSigner.Builder apkSigner =
           new com.android.apksig.ApkSigner.Builder(
-                  signingConfigHelper.getSignerConfigsForSplit(split))
+                  signingConfig.getSignerConfigs().stream()
+                      .map(ApkSigner::convertToApksigSignerConfig)
+                      .collect(toImmutableList()))
               .setInputApk(apkPath.toFile())
               .setOutputApk(signedApkPath.toFile())
-              .setV1SigningEnabled(signingConfigHelper.shouldSignWithV1(split))
-              .setV2SigningEnabled(true)
-              .setV3SigningEnabled(true)
+              .setV1SigningEnabled(signingConfig.getV1SigningEnabled())
+              .setV2SigningEnabled(signingConfig.getV2SigningEnabled())
+              .setV3SigningEnabled(signingConfig.getV3SigningEnabled())
               .setOtherSignersSignaturesPreserved(false)
               .setMinSdkVersion(split.getAndroidManifest().getEffectiveMinSdkVersion());
-      signingConfigHelper
-          .getSigningCertificateLineageForSplit(split)
+      signingConfig
+          .getSigningCertificateLineage()
           .ifPresent(apkSigner::setSigningCertificateLineage);
-      signingConfigHelper
-          .getSourceStampSignerConfig()
+
+
+      sourceStampSigningConfig
+          .map(SigningConfiguration::getSignerConfig)
+          .map(ApkSigner::convertToApksigSignerConfig)
           .ifPresent(apkSigner::setSourceStampSignerConfig);
       apkSigner.build().sign();
       Files.move(signedApkPath, apkPath, REPLACE_EXISTING);
@@ -122,5 +146,12 @@ class ApkSigner {
     } catch (IOException e) {
       throw new UncheckedIOException(e);
     }
+  }
+
+  private static SignerConfig convertToApksigSignerConfig(
+      com.android.tools.build.bundletool.model.SignerConfig signerConfig) {
+    return new SignerConfig.Builder(
+            SIGNER_CONFIG_NAME, signerConfig.getPrivateKey(), signerConfig.getCertificates())
+        .build();
   }
 }

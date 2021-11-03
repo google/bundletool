@@ -56,7 +56,8 @@ public class BundleModule64BitNativeLibrariesRemover {
       throw InvalidBundleException.builder()
           .withUserMessage(
               "Usage of 64-bit native libraries is disabled, but App Bundle contains only 64-bit"
-                  + " native libraries.")
+                  + " native libraries. This usually happens if you have included 32 bit "
+                  + "RenderScript files (.bc), but only have 64-bit native code.")
           .build();
     }
 

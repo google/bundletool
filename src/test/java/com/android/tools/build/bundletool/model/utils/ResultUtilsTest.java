@@ -42,6 +42,7 @@ import com.android.bundle.Targeting.ApkTargeting;
 import com.android.bundle.Targeting.SdkVersion;
 import com.android.bundle.Targeting.VariantTargeting;
 import com.android.tools.build.bundletool.model.ZipPath;
+import com.android.tools.build.bundletool.testing.ApksArchiveHelpers;
 import com.google.common.collect.ImmutableSet;
 import java.nio.file.Path;
 import org.junit.Before;
@@ -174,6 +175,14 @@ public class ResultUtilsTest {
   }
 
   @Test
+  public void filterHibernatedApkVariant() throws Exception {
+    Variant hibernatedVariant = createHibernatedVariant();
+    BuildApksResult apksResult = BuildApksResult.newBuilder().addVariant(hibernatedVariant).build();
+
+    assertThat(ResultUtils.hibernatedApkVariants(apksResult)).containsExactly(hibernatedVariant);
+  }
+
+  @Test
   public void isInstantApkVariantTrue() throws Exception {
     Variant variant = createInstantVariant();
 
@@ -181,6 +190,7 @@ public class ResultUtilsTest {
     assertThat(ResultUtils.isSplitApkVariant(variant)).isFalse();
     assertThat(ResultUtils.isStandaloneApkVariant(variant)).isFalse();
     assertThat(ResultUtils.isSystemApkVariant(variant)).isFalse();
+    assertThat(ResultUtils.isHibernatedApkVariant(variant)).isFalse();
   }
 
   @Test
@@ -191,6 +201,7 @@ public class ResultUtilsTest {
     assertThat(ResultUtils.isSplitApkVariant(variant)).isFalse();
     assertThat(ResultUtils.isInstantApkVariant(variant)).isFalse();
     assertThat(ResultUtils.isSystemApkVariant(variant)).isFalse();
+    assertThat(ResultUtils.isHibernatedApkVariant(variant)).isFalse();
   }
 
   @Test
@@ -201,6 +212,7 @@ public class ResultUtilsTest {
     assertThat(ResultUtils.isStandaloneApkVariant(variant)).isFalse();
     assertThat(ResultUtils.isInstantApkVariant(variant)).isFalse();
     assertThat(ResultUtils.isSystemApkVariant(variant)).isFalse();
+    assertThat(ResultUtils.isHibernatedApkVariant(variant)).isFalse();
   }
 
   @Test
@@ -211,6 +223,18 @@ public class ResultUtilsTest {
     assertThat(ResultUtils.isStandaloneApkVariant(variant)).isFalse();
     assertThat(ResultUtils.isInstantApkVariant(variant)).isFalse();
     assertThat(ResultUtils.isSystemApkVariant(variant)).isTrue();
+    assertThat(ResultUtils.isHibernatedApkVariant(variant)).isFalse();
+  }
+
+  @Test
+  public void isHibernatedApkVariantTrue() throws Exception {
+    Variant variant = createHibernatedVariant();
+
+    assertThat(ResultUtils.isHibernatedApkVariant(variant)).isTrue();
+    assertThat(ResultUtils.isSplitApkVariant(variant)).isFalse();
+    assertThat(ResultUtils.isStandaloneApkVariant(variant)).isFalse();
+    assertThat(ResultUtils.isInstantApkVariant(variant)).isFalse();
+    assertThat(ResultUtils.isSystemApkVariant(variant)).isFalse();
   }
 
   @Test
@@ -289,5 +313,13 @@ public class ResultUtilsTest {
     return createVariant(
         variantSdkTargeting(sdkVersionFrom(15), ImmutableSet.of(SdkVersion.getDefaultInstance())),
         createSystemApkSet(ApkTargeting.getDefaultInstance(), systemApk));
+  }
+
+  private Variant createHibernatedVariant() {
+    ZipPath hibernatedApk = ZipPath.create("hibernated.apk");
+    return createVariant(
+        variantSdkTargeting(sdkVersionFrom(15), ImmutableSet.of(SdkVersion.getDefaultInstance())),
+        ApksArchiveHelpers.createHibernatedApkSet(
+            ApkTargeting.getDefaultInstance(), hibernatedApk));
   }
 }

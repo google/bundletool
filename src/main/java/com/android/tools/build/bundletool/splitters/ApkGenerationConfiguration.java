@@ -66,13 +66,12 @@ public abstract class ApkGenerationConfiguration {
   }
 
   /**
-   * Returns the minimum required platform API version for which v3 signing/rotation should be
-   * performed.
+   * Minimum SDK version for which signing with v3 key rotation is intended to be performed.
    *
-   * <p>Returns {@link Optional#empty()} if there is no minimum, meaning rotation can occur in all
-   * platforms levels, if specified.
+   * <p>Optional. Setting a value for this field will force an additional variant to be generated
+   * which targets the specified SDK version.
    */
-  public abstract Optional<Integer> getMinimumV3RotationApiVersion();
+  public abstract Optional<Integer> getMinSdkForAdditionalVariantWithV3Rotation();
 
   public abstract Builder toBuilder();
 
@@ -121,8 +120,8 @@ public abstract class ApkGenerationConfiguration {
     public abstract Builder setSuffixStrippings(
         ImmutableMap<OptimizationDimension, SuffixStripping> suffixStripping);
 
-    public abstract Builder setMinimumV3RotationApiVersion(
-        Optional<Integer> minimumV3RotationApiVersion);
+    public abstract Builder setMinSdkForAdditionalVariantWithV3Rotation(
+        int minSdkForAdditionalVariantWithV3Rotation);
 
     public abstract ApkGenerationConfiguration build();
   }

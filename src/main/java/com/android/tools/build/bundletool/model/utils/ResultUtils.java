@@ -103,8 +103,12 @@ public final class ResultUtils {
   }
 
   public static ImmutableList<Variant> systemApkVariants(ImmutableList<Variant> variants) {
-    return variants.stream()
-        .filter(variant -> isSystemApkVariant(variant))
+    return variants.stream().filter(ResultUtils::isSystemApkVariant).collect(toImmutableList());
+  }
+
+  public static ImmutableList<Variant> hibernatedApkVariants(BuildApksResult result) {
+    return result.getVariantList().stream()
+        .filter(ResultUtils::isHibernatedApkVariant)
         .collect(toImmutableList());
   }
 
@@ -144,6 +148,12 @@ public final class ResultUtils {
         .stream()
         .flatMap(apkSet -> apkSet.getApkDescriptionList().stream())
         .anyMatch(ApkDescription::hasSystemApkMetadata);
+  }
+
+  public static boolean isHibernatedApkVariant(Variant variant) {
+    return variant.getApkSetList().stream()
+        .flatMap(apkSet -> apkSet.getApkDescriptionList().stream())
+        .anyMatch(ApkDescription::hasHibernatedApkMetadata);
   }
 
   public static ImmutableSet<String> getAllTargetedLanguages(BuildApksResult result) {
