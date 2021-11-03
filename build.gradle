@@ -8,11 +8,13 @@ buildscript {
         }
     }
     dependencies {
-        classpath "com.google.protobuf:protobuf-gradle-plugin:0.8.8"
+        classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:1.5.10"
+        classpath "com.google.protobuf:protobuf-gradle-plugin:0.8.17"
         classpath "com.github.jengelman.gradle.plugins:shadow:4.0.4"
     }
 }
 
+apply plugin: "org.jetbrains.kotlin.jvm"
 apply plugin: "com.github.johnrengelman.shadow"
 apply plugin: "com.google.protobuf"
 apply plugin: "java"
@@ -42,9 +44,10 @@ dependencies {
     shadow "com.google.auto.value:auto-value-annotations:1.6.2"
     annotationProcessor "com.google.auto.value:auto-value:1.6.2"
     shadow "com.google.errorprone:error_prone_annotations:2.3.1"
-    shadow "com.google.guava:guava:30.1-jre"
-    shadow "com.google.protobuf:protobuf-java:3.10.0"
-    shadow "com.google.protobuf:protobuf-java-util:3.10.0"
+    shadow "com.google.guava:guava:30.1.1-jre"
+    shadow "com.google.protobuf:protobuf-java:3.19.1"
+    shadow "com.google.protobuf:protobuf-java-util:3.19.1"
+    shadow "com.google.protobuf:protobuf-kotlin:3.19.1"
     shadow "com.google.dagger:dagger:2.28.3"
     annotationProcessor "com.google.dagger:dagger-compiler:2.28.3"
     shadow "javax.inject:javax.inject:1"
@@ -63,12 +66,13 @@ dependencies {
     testCompile "com.google.auto.value:auto-value-annotations:1.6.2"
     testAnnotationProcessor "com.google.auto.value:auto-value:1.6.2"
     testCompile "com.google.errorprone:error_prone_annotations:2.3.1"
-    testCompile "com.google.guava:guava:30.1-jre"
+    testCompile "com.google.guava:guava:30.1.1-jre"
     testCompile "com.google.truth.extensions:truth-java8-extension:0.45"
     testCompile "com.google.truth.extensions:truth-proto-extension:0.45"
     testCompile "com.google.jimfs:jimfs:1.1"
-    testCompile "com.google.protobuf:protobuf-java:3.10.0"
-    testCompile "com.google.protobuf:protobuf-java-util:3.10.0"
+    testCompile "com.google.protobuf:protobuf-java:3.19.1"
+    testCompile "com.google.protobuf:protobuf-java-util:3.19.1"
+    testCompile "com.google.protobuf:protobuf-kotlin:3.19.1"
     testCompile "org.mockito:mockito-core:2.18.3"
     testCompile "junit:junit:4.12"
     testCompile "org.junit.jupiter:junit-jupiter-api:5.2.0"
@@ -118,7 +122,14 @@ test {
 
 protobuf {
     protoc {
-        artifact = "com.google.protobuf:protoc:3.4.0"
+        artifact = "com.google.protobuf:protoc:3.19.1"
+    }
+    generateProtoTasks {
+        all().each { task ->
+            task.builtins {
+                kotlin { }
+            }
+        }
     }
 }
 
