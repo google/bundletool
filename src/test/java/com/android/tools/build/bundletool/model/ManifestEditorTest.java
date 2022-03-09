@@ -39,6 +39,8 @@ import static com.android.tools.build.bundletool.model.AndroidManifest.IS_SPLIT_
 import static com.android.tools.build.bundletool.model.AndroidManifest.IS_SPLIT_REQUIRED_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.LABEL_ATTRIBUTE_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.LABEL_RESOURCE_ID;
+import static com.android.tools.build.bundletool.model.AndroidManifest.LOCALE_CONFIG_ATTRIBUTE_NAME;
+import static com.android.tools.build.bundletool.model.AndroidManifest.LOCALE_CONFIG_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.MAX_SDK_VERSION_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.MIN_SDK_VERSION_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.NAME_ATTRIBUTE_NAME;
@@ -847,6 +849,21 @@ public class ManifestEditorTest {
   }
 
   @Test
+  public void setLocaleConfig() throws Exception {
+    AndroidManifest androidManifest = createManifestWithApplicationElement();
+
+    AndroidManifest editedManifest = androidManifest.toEditor().setLocaleConfig(0x12345678).save();
+
+    assertThat(getApplicationElement(editedManifest).getAttributeList())
+        .containsExactly(
+            xmlResourceReferenceAttribute(
+                ANDROID_NAMESPACE_URI,
+                LOCALE_CONFIG_ATTRIBUTE_NAME,
+                LOCALE_CONFIG_RESOURCE_ID,
+                0x12345678));
+  }
+
+  @Test
   public void setIcon() throws Exception {
     AndroidManifest androidManifest = createManifestWithApplicationElement();
 
@@ -944,6 +961,82 @@ public class ManifestEditorTest {
 
     assertThat(getApplicationElement(editedManifest).getChildList())
         .containsExactly(receiverXmlNode);
+  }
+
+  @Test
+  public void copyPermissions() throws Exception {
+    XmlElement permisisonElement =
+        xmlElement(
+            "permission",
+            xmlAttribute(ANDROID_NAMESPACE_URI, "name", NAME_RESOURCE_ID, "SEND_SMS"));
+    AndroidManifest manifestWithPermissions =
+        AndroidManifest.create(xmlNode(xmlElement("manifest", xmlNode(permisisonElement))));
+    AndroidManifest manifestToUpdate = AndroidManifest.create(androidManifest("com.test.app"));
+
+    AndroidManifest updatedManifest =
+        manifestToUpdate.toEditor().copyPermissions(manifestWithPermissions).save();
+
+    ImmutableList<XmlElement> copiedPermissions =
+        updatedManifest.getManifestRoot().getProto().getElement().getChildList().stream()
+            .map(XmlNode::getElement)
+            .filter(childElement -> childElement.getName().equals("permission"))
+            .collect(toImmutableList());
+    assertThat(copiedPermissions).containsExactly(permisisonElement);
+  }
+
+  @Test
+  public void copyPermissions_noPermissions() throws Exception {
+    AndroidManifest manifestWithoutPermissions =
+        AndroidManifest.create(xmlNode(xmlElement("manifest")));
+    AndroidManifest manifestToUpdate = AndroidManifest.create(androidManifest("com.test.app"));
+
+    AndroidManifest updatedManifest =
+        manifestToUpdate.toEditor().copyPermissions(manifestWithoutPermissions).save();
+
+    ImmutableList<XmlElement> copiedPermissions =
+        updatedManifest.getManifestRoot().getProto().getElement().getChildList().stream()
+            .map(XmlNode::getElement)
+            .filter(childElement -> childElement.getName().equals("permission"))
+            .collect(toImmutableList());
+    assertThat(copiedPermissions).isEmpty();
+  }
+
+  @Test
+  public void copyPermissionGroups() throws Exception {
+    XmlElement permisisonGroupElement =
+        xmlElement(
+            "permission-group",
+            xmlAttribute(ANDROID_NAMESPACE_URI, "name", NAME_RESOURCE_ID, "group.1"));
+    AndroidManifest manifestWithPermissionGroups =
+        AndroidManifest.create(xmlNode(xmlElement("manifest", xmlNode(permisisonGroupElement))));
+    AndroidManifest manifestToUpdate = AndroidManifest.create(androidManifest("com.test.app"));
+
+    AndroidManifest updatedManifest =
+        manifestToUpdate.toEditor().copyPermissionGroups(manifestWithPermissionGroups).save();
+
+    ImmutableList<XmlElement> copiedPermissionGroups =
+        updatedManifest.getManifestRoot().getProto().getElement().getChildList().stream()
+            .map(XmlNode::getElement)
+            .filter(childElement -> childElement.getName().equals("permission-group"))
+            .collect(toImmutableList());
+    assertThat(copiedPermissionGroups).containsExactly(permisisonGroupElement);
+  }
+
+  @Test
+  public void copyPermissionGroups_noPermissionGroups() throws Exception {
+    AndroidManifest manifestWithoutPermissionGroups =
+        AndroidManifest.create(xmlNode(xmlElement("manifest")));
+    AndroidManifest manifestToUpdate = AndroidManifest.create(androidManifest("com.test.app"));
+
+    AndroidManifest updatedManifest =
+        manifestToUpdate.toEditor().copyPermissionGroups(manifestWithoutPermissionGroups).save();
+
+    ImmutableList<XmlElement> copiedPermissionGroups =
+        updatedManifest.getManifestRoot().getProto().getElement().getChildList().stream()
+            .map(XmlNode::getElement)
+            .filter(childElement -> childElement.getName().equals("permission-group"))
+            .collect(toImmutableList());
+    assertThat(copiedPermissionGroups).isEmpty();
   }
 
   private static void assertOnlyMetadataElement(

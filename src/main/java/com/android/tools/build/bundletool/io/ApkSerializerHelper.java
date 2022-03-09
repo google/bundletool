@@ -26,21 +26,16 @@ import static com.android.tools.build.bundletool.model.utils.files.FilePrecondit
 import static com.google.common.base.Preconditions.checkArgument;
 
 import com.android.tools.build.bundletool.model.BundleModule.SpecialModuleEntry;
-import com.android.tools.build.bundletool.model.ModuleSplit;
 import com.android.tools.build.bundletool.model.ZipPath;
 import com.google.common.collect.ImmutableSet;
-import java.nio.file.Path;
 
-/** Serializes APKs to Proto or Binary format. */
-public abstract class ApkSerializerHelper {
-
+/** Helper methods for APK serialization. */
+public final class ApkSerializerHelper {
   static final ImmutableSet<String> NO_COMPRESSION_EXTENSIONS =
       ImmutableSet.of(
           "3g2", "3gp", "3gpp", "3gpp2", "aac", "amr", "awb", "gif", "imy", "jet", "jpeg", "jpg",
           "m4a", "m4v", "mid", "midi", "mkv", "mp2", "mp3", "mp4", "mpeg", "mpg", "ogg", "png",
           "rtttl", "smf", "wav", "webm", "wma", "wmv", "xmf");
-
-  public abstract Path writeToZipFile(ModuleSplit split, Path outputPath);
 
   /**
    * Transforms the entry path in the module to the final path in the module split.
@@ -50,6 +45,20 @@ public abstract class ApkSerializerHelper {
    * images or "apex_build_info.pb" for APEX build info. There should only be one such entry.
    */
   public static ZipPath toApkEntryPath(ZipPath pathInModule) {
+    return toApkEntryPath(pathInModule, /* binaryApk= */ false);
+  }
+
+  /**
+   * Transforms the entry path in the module to the final path in the proto or binary APK.
+   *
+   * <p>The entries from root/, dex/, manifest/ directories will be moved to the top level of the
+   * split. Entries from apex/ will be moved to the top level and named "apex_payload.img" for
+   * images or "apex_build_info.pb" for APEX build info. There should only be one such entry.
+   */
+  public static ZipPath toApkEntryPath(ZipPath pathInModule, boolean binaryApk) {
+    if (binaryApk && pathInModule.equals(SpecialModuleEntry.RESOURCE_TABLE.getPath())) {
+      return ZipPath.create("resources.arsc");
+    }
     if (pathInModule.startsWith(MANIFEST_DIRECTORY)) {
       checkArgument(
           pathInModule.getNameCount() == 2,
@@ -98,4 +107,6 @@ public abstract class ApkSerializerHelper {
         || path.equals(SpecialModuleEntry.RESOURCE_TABLE.getPath())
         || path.equals(ZipPath.create(MANIFEST_FILENAME));
   }
+
+  private ApkSerializerHelper() {}
 }

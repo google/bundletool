@@ -20,6 +20,7 @@ import static com.google.common.base.Predicates.not;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 
 import com.android.bundle.Config.BundleConfig;
+import com.android.tools.build.bundletool.model.AppBundle;
 import com.android.tools.build.bundletool.model.BundleModule;
 import com.android.tools.build.bundletool.model.BundleModuleName;
 import com.android.tools.build.bundletool.model.ModuleEntry;
@@ -43,7 +44,7 @@ public class BundleModulesValidator {
   @VisibleForTesting
   static final ImmutableList<SubValidator> MODULE_FILE_SUB_VALIDATORS =
       // Keep order of common validators in sync with AppBundleValidator.
-      ImmutableList.of(new MandatoryFilesPresenceValidator());
+      ImmutableList.of(new MandatoryFilesPresenceValidator(AppBundle.NON_MODULE_DIRECTORIES));
 
   /** Validators run on the internal representation of bundle modules. */
   @VisibleForTesting

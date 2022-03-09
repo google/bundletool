@@ -86,6 +86,7 @@ import com.android.tools.build.bundletool.model.ModuleEntry;
 import com.android.tools.build.bundletool.model.ModuleSplit;
 import com.android.tools.build.bundletool.model.ModuleSplit.SplitType;
 import com.android.tools.build.bundletool.model.exceptions.CommandExecutionException;
+import com.android.tools.build.bundletool.model.exceptions.InvalidBundleException;
 import com.android.tools.build.bundletool.model.utils.Versions;
 import com.android.tools.build.bundletool.testing.AppBundleBuilder;
 import com.android.tools.build.bundletool.testing.BundleConfigBuilder;
@@ -309,7 +310,7 @@ public class ModuleSplitsToShardMergerTest {
 
     Throwable exception =
         assertThrows(
-            IllegalStateException.class,
+            InvalidBundleException.class,
             () ->
                 splitsToShardMerger.mergeSingleShard(
                     ImmutableList.of(split1, split2), createCache()));
@@ -424,7 +425,7 @@ public class ModuleSplitsToShardMergerTest {
     ModuleSplit featureSplit =
         createModuleSplitBuilder()
             .setModuleName(BundleModuleName.create("feature"))
-            .setEntries(ImmutableList.of(dexEntry2, dexEntry3))
+            .setEntries(ImmutableList.of(dexEntry3, dexEntry2))
             .build();
 
     ModuleSplit merged =
@@ -432,7 +433,8 @@ public class ModuleSplitsToShardMergerTest {
             ImmutableList.of(baseSplit, featureSplit), dexMergingCache);
 
     assertThat(extractPaths(merged.getEntries()))
-        .containsExactly("dex/classes.dex", "dex/classes2.dex", "dex/classes3.dex");
+        .containsExactly("dex/classes.dex", "dex/classes2.dex", "dex/classes3.dex")
+        .inOrder();
     assertThat(dexData(merged, "dex/classes.dex")).isEqualTo(CLASSES_DEX_CONTENT);
     assertThat(dexData(merged, "dex/classes2.dex")).isEqualTo(CLASSES_OTHER_DEX_CONTENT);
     assertThat(dexData(merged, "dex/classes3.dex")).isEqualTo(CLASSES_DEX_CONTENT);

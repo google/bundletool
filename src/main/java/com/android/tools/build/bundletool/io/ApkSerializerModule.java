@@ -20,18 +20,18 @@ import dagger.Module;
 import dagger.Provides;
 import javax.inject.Provider;
 
-/** Dagger module responsible for choosing the {@link ApkSerializerHelper}. */
+/** Dagger module responsible for choosing the {@link ApkSerializer}. */
 @Module
-public final class ApkSerializerModule {
+public abstract class ApkSerializerModule {
 
   @Provides
-  static ApkSerializerHelper provideApkSerializerHelper(
+  static ApkSerializer provideApkSerializer(
       BuildApksCommand command,
-      Provider<ZipFlingerApkSerializerHelper> zipFlingerApkSerializerHelper,
-      Provider<ApkzlibApkSerializerHelper> apkzlibApkSerializerHelper) {
-    return command.getEnableNewApkSerializer()
-        ? zipFlingerApkSerializerHelper.get()
-        : apkzlibApkSerializerHelper.get();
+      Provider<ZipFlingerApkSerializer> zipFlingerApkSerializerHelper,
+      Provider<ModuleSplitSerializer> moduleSplitSerializerProvider) {
+    return command.getEnableApkSerializerWithoutBundleRecompression()
+        ? moduleSplitSerializerProvider.get()
+        : zipFlingerApkSerializerHelper.get();
   }
 
   private ApkSerializerModule() {}

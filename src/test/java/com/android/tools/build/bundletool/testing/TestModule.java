@@ -26,13 +26,16 @@ import com.android.tools.build.bundletool.commands.BuildApksCommand.ApkBuildMode
 import com.android.tools.build.bundletool.commands.BuildApksManagerComponent.UseBundleCompression;
 import com.android.tools.build.bundletool.commands.CommandScoped;
 import com.android.tools.build.bundletool.io.AppBundleSerializer;
+import com.android.tools.build.bundletool.io.SdkBundleSerializer;
 import com.android.tools.build.bundletool.io.TempDirectory;
 import com.android.tools.build.bundletool.io.ZipReader;
 import com.android.tools.build.bundletool.model.ApkListener;
 import com.android.tools.build.bundletool.model.ApkModifier;
 import com.android.tools.build.bundletool.model.AppBundle;
+import com.android.tools.build.bundletool.model.Bundle;
 import com.android.tools.build.bundletool.model.BundleMetadata;
 import com.android.tools.build.bundletool.model.OptimizationDimension;
+import com.android.tools.build.bundletool.model.SdkBundle;
 import com.android.tools.build.bundletool.model.SigningConfiguration;
 import com.android.tools.build.bundletool.model.SigningConfigurationProvider;
 import com.android.tools.build.bundletool.model.SourceStamp;
@@ -54,19 +57,39 @@ import javax.annotation.Nullable;
 public class TestModule {
 
   private final BuildApksCommand buildApksCommand;
-  private final AppBundle appBundle;
+  private final Bundle bundle;
   private final boolean useBundleCompression;
 
   private TestModule(
-      BuildApksCommand buildApksCommand, AppBundle appBundle, boolean useBundleCompression) {
+      BuildApksCommand buildApksCommand, Bundle bundle, boolean useBundleCompression) {
     this.buildApksCommand = buildApksCommand;
-    this.appBundle = appBundle;
+    this.bundle = bundle;
     this.useBundleCompression = useBundleCompression;
   }
 
   @Provides
+  SdkBundle provideSdkBundle() {
+    return (SdkBundle) bundle;
+  }
+
+  @Provides
   AppBundle provideAppBundle() {
-    return appBundle;
+    return (AppBundle) bundle;
+  }
+
+  @Provides
+  Bundle provideBundle() {
+    return bundle;
+  }
+
+  @Provides
+  BundleConfig provideBundleConfig() {
+    return bundle.getBundleConfig();
+  }
+
+  @Provides
+  BundleMetadata provideBundleMetadata() {
+    return bundle.getBundleMetadata();
   }
 
   @SuppressWarnings({"CloseableProvides", "MustBeClosedChecker"}) // Only for tests.
@@ -110,7 +133,7 @@ public class TestModule {
     @Nullable private TempDirectory tempDirectory;
     @Nullable private Path outputDirectory;
     @Nullable private Path bundlePath;
-    @Nullable private AppBundle appBundle;
+    @Nullable private Bundle bundle;
     private BundleConfig bundleConfig = DEFAULT_BUNDLE_CONFIG;
     @Nullable private SigningConfiguration signingConfig;
     @Nullable private SigningConfigurationProvider signingConfigProvider;
@@ -128,14 +151,15 @@ public class TestModule {
     @Nullable private Boolean localTestingEnabled;
     @Nullable private SourceStamp sourceStamp;
     private boolean useBundleCompression = true;
+    private boolean enableApkSerializerWithoutBundleRecompression = true;
     private BundleMetadata bundleMetadata = DEFAULT_BUNDLE_METADATA;
 
     public Builder withAppBundle(AppBundle appBundle) {
-      this.appBundle = appBundle;
+      this.bundle = appBundle;
 
       // If not set, set a default BundleConfig with the latest bundletool version.
       if (appBundle.getBundleConfig().equals(BundleConfig.getDefaultInstance())) {
-        this.appBundle = appBundle.toBuilder().setBundleConfig(DEFAULT_BUNDLE_CONFIG).build();
+        this.bundle = appBundle.toBuilder().setBundleConfig(DEFAULT_BUNDLE_CONFIG).build();
       }
       return this;
     }
@@ -251,6 +275,16 @@ public class TestModule {
       return this;
     }
 
+    public Builder withEnableApkSerializerWithoutBundleRecompression(boolean enable) {
+      this.enableApkSerializerWithoutBundleRecompression = enable;
+      return this;
+    }
+
+    public Builder withSdkBundle(SdkBundle sdkBundle) {
+      this.bundle = sdkBundle;
+      return this;
+    }
+
     public TestModule build() {
       try {
         if (tempDirectory == null) {
@@ -261,13 +295,14 @@ public class TestModule {
         }
 
         checkArgument(
-            appBundle == null || bundlePath == null,
+            bundle == null || bundlePath == null,
             "Cannot call both withAppBundle() and withBundlePath().");
-        if (appBundle == null) {
+        if (bundle == null) {
+          // The default Bundle provided will be an AppBundle.
           if (bundlePath != null) {
-            appBundle = AppBundle.buildFromZip(new ZipFile(bundlePath.toFile()));
+            bundle = AppBundle.buildFromZip(new ZipFile(bundlePath.toFile()));
           } else {
-            appBundle =
+            bundle =
                 new AppBundleBuilder()
                     .setBundleConfig(bundleConfig)
                     .addModule("base", module -> module.setManifest(androidManifest("com.package")))
@@ -276,16 +311,29 @@ public class TestModule {
         } else {
           if (!bundleConfig.equals(DEFAULT_BUNDLE_CONFIG)) {
             BundleConfig newBundleConfig =
-                appBundle.getBundleConfig().toBuilder().mergeFrom(bundleConfig).build();
-            appBundle = appBundle.toBuilder().setBundleConfig(newBundleConfig).build();
+                bundle.getBundleConfig().toBuilder().mergeFrom(bundleConfig).build();
+            if (bundle instanceof AppBundle) {
+              bundle = ((AppBundle) bundle).toBuilder().setBundleConfig(newBundleConfig).build();
+            } else {
+              bundle = ((SdkBundle) bundle).toBuilder().setBundleConfig(newBundleConfig).build();
+            }
           }
         }
         if (!bundleMetadata.equals(DEFAULT_BUNDLE_METADATA)) {
-          appBundle = appBundle.toBuilder().setBundleMetadata(bundleMetadata).build();
+          if (bundle instanceof AppBundle) {
+            bundle = ((AppBundle) bundle).toBuilder().setBundleMetadata(bundleMetadata).build();
+          } else {
+            bundle = ((SdkBundle) bundle).toBuilder().setBundleMetadata(bundleMetadata).build();
+          }
         }
         if (bundlePath == null) {
-          bundlePath = tempDirectory.getPath().resolve("bundle.aab");
-          new AppBundleSerializer().writeToDisk(appBundle, bundlePath);
+          if (bundle instanceof AppBundle) {
+            bundlePath = tempDirectory.getPath().resolve("bundle.aab");
+            new AppBundleSerializer().writeToDisk((AppBundle) bundle, bundlePath);
+          } else {
+            bundlePath = tempDirectory.getPath().resolve("bundle.asb");
+            new SdkBundleSerializer().writeToDisk((SdkBundle) bundle, bundlePath);
+          }
         }
         if (outputPath == null) {
           outputPath = outputDirectory.resolve("bundle.apks");
@@ -293,6 +341,8 @@ public class TestModule {
 
         BuildApksCommand.Builder command =
             BuildApksCommand.builder()
+                .setEnableApkSerializerWithoutBundleRecompression(
+                    enableApkSerializerWithoutBundleRecompression)
                 .setAapt2Command(Aapt2Helper.getAapt2Command())
                 .setBundlePath(bundlePath)
                 .setOutputFile(outputPath);
@@ -339,7 +389,7 @@ public class TestModule {
           buildApksCommandSetter.accept(command);
         }
 
-        return new TestModule(command.build(), appBundle, useBundleCompression);
+        return new TestModule(command.build(), bundle, useBundleCompression);
       } catch (IOException e) {
         throw new UncheckedIOException(e);
       }

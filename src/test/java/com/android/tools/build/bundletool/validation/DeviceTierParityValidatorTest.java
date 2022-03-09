@@ -42,7 +42,7 @@ public class DeviceTierParityValidatorTest {
     BundleModule moduleB =
         new BundleModuleBuilder("b").setManifest(androidManifest("com.test.app")).build();
 
-    new AbiParityValidator().validateAllModules(ImmutableList.of(moduleA, moduleB));
+    new DeviceTierParityValidator().validateAllModules(ImmutableList.of(moduleA, moduleB));
   }
 
   @Test
@@ -60,7 +60,21 @@ public class DeviceTierParityValidatorTest {
             .setManifest(androidManifest("com.test.app"))
             .build();
 
-    new AbiParityValidator().validateAllModules(ImmutableList.of(moduleA, moduleB));
+    new DeviceTierParityValidator().validateAllModules(ImmutableList.of(moduleA, moduleB));
+  }
+
+  @Test
+  public void multipleFilesPerTieredDirectory_ok() {
+    BundleModule moduleA =
+        new BundleModuleBuilder("a")
+            .addFile("assets/img#tier_0/imageA.jpg")
+            .addFile("assets/img#tier_0/imageB.jpg")
+            .addFile("assets/img#tier_1/image1.jpg")
+            .addFile("assets/img#tier_1/image2.jpg")
+            .setManifest(androidManifest("com.test.app"))
+            .build();
+
+    new DeviceTierParityValidator().validateAllModules(ImmutableList.of(moduleA));
   }
 
   @Test
@@ -80,15 +94,14 @@ public class DeviceTierParityValidatorTest {
     BundleModule moduleC =
         new BundleModuleBuilder("c").setManifest(androidManifest("com.test.app")).build();
 
-    new AbiParityValidator().validateAllModules(ImmutableList.of(moduleA, moduleB, moduleC));
+    new DeviceTierParityValidator().validateAllModules(ImmutableList.of(moduleA, moduleB, moduleC));
   }
 
   @Test
-  public void differentTiers_throws() {
+  public void differentTiersInDifferentModules_throws() {
     BundleModule moduleA =
         new BundleModuleBuilder("a")
             .addFile("assets/img#tier_0/image.jpg")
-            .addFile("assets/img#tier_2/image.jpg")
             .setManifest(androidManifest("com.test.app"))
             .build();
     BundleModule moduleB =
@@ -109,6 +122,70 @@ public class DeviceTierParityValidatorTest {
         .hasMessageThat()
         .contains(
             "All modules with device tier targeting must support the same set of tiers, but module"
-                + " 'a' supports [0, 2] and module 'b' supports [0, 1].");
+                + " 'a' supports [0] and module 'b' supports [0, 1].");
+  }
+
+  @Test
+  public void differentTiersInDifferentFolders_throws() {
+    BundleModule moduleA =
+        new BundleModuleBuilder("a")
+            .addFile("assets/img1#tier_0/image.jpg")
+            .addFile("assets/img1#tier_1/image.jpg")
+            .addFile("assets/img2#tier_0/image.jpg")
+            .setManifest(androidManifest("com.test.app"))
+            .build();
+
+    InvalidBundleException exception =
+        assertThrows(
+            InvalidBundleException.class,
+            () -> new DeviceTierParityValidator().validateAllModules(ImmutableList.of(moduleA)));
+
+    assertThat(exception)
+        .hasMessageThat()
+        .contains(
+            "All device-tier-targeted folders in a module must support the same set of tiers, but"
+                + " module 'a' supports [0, 1] and folder 'assets/img2' supports only [0].");
+  }
+
+  @Test
+  public void tierNumbersNotStartingFromZero_throws() {
+    BundleModule moduleA =
+        new BundleModuleBuilder("a")
+            .addFile("assets/img1#tier_1/image.jpg")
+            .addFile("assets/img1#tier_2/image.jpg")
+            .setManifest(androidManifest("com.test.app"))
+            .build();
+
+    InvalidBundleException exception =
+        assertThrows(
+            InvalidBundleException.class,
+            () -> new DeviceTierParityValidator().validateAllModules(ImmutableList.of(moduleA)));
+
+    assertThat(exception)
+        .hasMessageThat()
+        .contains(
+            "All modules with device tier targeting must support the same contiguous"
+                + " range of tier values starting from 0, but module 'a' supports [1, 2].");
+  }
+
+  @Test
+  public void tierNumbersNotContiguous_throws() {
+    BundleModule moduleA =
+        new BundleModuleBuilder("a")
+            .addFile("assets/img1#tier_0/image.jpg")
+            .addFile("assets/img1#tier_2/image.jpg")
+            .setManifest(androidManifest("com.test.app"))
+            .build();
+
+    InvalidBundleException exception =
+        assertThrows(
+            InvalidBundleException.class,
+            () -> new DeviceTierParityValidator().validateAllModules(ImmutableList.of(moduleA)));
+
+    assertThat(exception)
+        .hasMessageThat()
+        .contains(
+            "All modules with device tier targeting must support the same contiguous"
+                + " range of tier values starting from 0, but module 'a' supports [0, 2].");
   }
 }

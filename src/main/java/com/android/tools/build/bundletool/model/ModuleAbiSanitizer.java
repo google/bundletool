@@ -28,10 +28,10 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.ImmutableSetMultimap;
 import com.google.common.collect.Multimaps;
 import com.google.common.collect.Sets;
+import com.google.errorprone.annotations.CheckReturnValue;
 import java.util.Collection;
 import java.util.function.Function;
 import java.util.logging.Logger;
-import javax.annotation.CheckReturnValue;
 
 /**
  * Makes sure that each "lib/<ABI>" directory contains the same number of files. If there is a

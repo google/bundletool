@@ -36,10 +36,10 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Ordering;
 import com.google.common.collect.Range;
+import com.google.errorprone.annotations.CheckReturnValue;
 import java.util.Comparator;
 import java.util.Optional;
 import java.util.Set;
-import javax.annotation.CheckReturnValue;
 
 /**
  * Selector for the best matching density for a given desired density.

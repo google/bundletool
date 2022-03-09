@@ -35,11 +35,11 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Sets;
+import com.google.errorprone.annotations.CheckReturnValue;
 import com.google.protobuf.Message;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Optional;
-import javax.annotation.CheckReturnValue;
 
 /** Adds alternative targeting in the {@code T} dimension. */
 public abstract class AlternativeVariantTargetingPopulator<T extends Message> {
@@ -68,7 +68,7 @@ public abstract class AlternativeVariantTargetingPopulator<T extends Message> {
                     .addAlternativeVariantTargeting(generatedApks.getSplitApks(), standaloneApks))
             .addAll(generatedApks.getInstantApks())
             .addAll(generatedApks.getSystemApks())
-            .addAll(generatedApks.getHibernatedApks())
+            .addAll(generatedApks.getArchivedApks())
             .build();
     return GeneratedApks.fromModuleSplits(moduleSplits);
   }

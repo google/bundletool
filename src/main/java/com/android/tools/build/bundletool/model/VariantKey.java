@@ -16,7 +16,7 @@
 
 package com.android.tools.build.bundletool.model;
 
-import static com.android.tools.build.bundletool.model.ModuleSplit.SplitType.HIBERNATION;
+import static com.android.tools.build.bundletool.model.ModuleSplit.SplitType.ARCHIVE;
 import static com.android.tools.build.bundletool.model.ModuleSplit.SplitType.INSTANT;
 import static com.android.tools.build.bundletool.model.ModuleSplit.SplitType.SPLIT;
 import static com.android.tools.build.bundletool.model.ModuleSplit.SplitType.STANDALONE;
@@ -54,7 +54,7 @@ public abstract class VariantKey implements Comparable<VariantKey> {
     // System APKs never occur with other apk types, its ordering position doesn't matter.
     return comparing(
             VariantKey::getSplitType,
-            Ordering.explicit(INSTANT, STANDALONE, SPLIT, HIBERNATION, SYSTEM))
+            Ordering.explicit(INSTANT, STANDALONE, SPLIT, ARCHIVE, SYSTEM))
         .thenComparing(VariantKey::getVariantTargeting, VARIANT_TARGETING_COMPARATOR)
         .compare(this, o);
   }

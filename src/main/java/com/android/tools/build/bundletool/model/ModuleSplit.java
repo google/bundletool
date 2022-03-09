@@ -16,6 +16,8 @@
 
 package com.android.tools.build.bundletool.model;
 
+import static com.android.tools.build.bundletool.model.AndroidManifest.SDK_PATCH_VERSION_ATTRIBUTE_NAME;
+import static com.android.tools.build.bundletool.model.AndroidManifest.SDK_SANDBOX_MIN_VERSION;
 import static com.android.tools.build.bundletool.model.BundleModule.APEX_DIRECTORY;
 import static com.android.tools.build.bundletool.model.BundleModule.ASSETS_DIRECTORY;
 import static com.android.tools.build.bundletool.model.BundleModule.DEX_DIRECTORY;
@@ -61,6 +63,7 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Multimap;
 import com.google.common.collect.Multimaps;
+import com.google.errorprone.annotations.CheckReturnValue;
 import com.google.errorprone.annotations.Immutable;
 import java.net.MalformedURLException;
 import java.net.URISyntaxException;
@@ -70,7 +73,6 @@ import java.util.List;
 import java.util.Optional;
 import java.util.StringJoiner;
 import java.util.stream.Stream;
-import javax.annotation.CheckReturnValue;
 
 /** A module split is a subset of a bundle module. */
 @Immutable
@@ -80,6 +82,8 @@ public abstract class ModuleSplit {
 
   private static final Joiner MULTI_ABI_SUFFIX_JOINER = Joiner.on('.');
 
+  public static final String DEFAULT_SDK_PATCH_VERSION = "0";
+
   /** The split type being represented by this split. */
   public enum SplitType {
     STANDALONE,
@@ -87,7 +91,7 @@ public abstract class ModuleSplit {
     SPLIT,
     INSTANT,
     ASSET_SLICE,
-    HIBERNATION,
+    ARCHIVE,
   }
 
   /**
@@ -315,6 +319,47 @@ public abstract class ModuleSplit {
     return toBuilder().setAndroidManifest(modifiedManifest).build();
   }
 
+  /** Writes SDK version code to Android Manifest. */
+  public ModuleSplit writeSdkVersionCode(Integer versionCode) {
+    AndroidManifest apkManifest =
+        getAndroidManifest().toEditor().setVersionCode(versionCode).save();
+    return toBuilder().setAndroidManifest(apkManifest).build();
+  }
+
+  /** Writes SDK version name ("majorVersion.0.patchVersion") to Android Manifest. */
+  public ModuleSplit writeSdkVersionName(String versionName) {
+    AndroidManifest apkManifest =
+        getAndroidManifest().toEditor().setVersionName(versionName).save();
+    return toBuilder().setAndroidManifest(apkManifest).build();
+  }
+
+  /**
+   * Overrides minimum SDK version if it is lower than the SDK sandbox minimum version or if it is
+   * not set.
+   */
+  public ModuleSplit overrideMinSdkVersionForSdkSandbox() {
+    if (!getAndroidManifest().getMinSdkVersion().isPresent()
+        || getAndroidManifest().getMinSdkVersion().get() < SDK_SANDBOX_MIN_VERSION) {
+      AndroidManifest apkManifest =
+          getAndroidManifest().toEditor().setMinSdkVersion(SDK_SANDBOX_MIN_VERSION).save();
+      return toBuilder().setAndroidManifest(apkManifest).build();
+    }
+    return this;
+  }
+
+  /** Sets the SDK Patch version to 0 if it is not already set. */
+  public ModuleSplit addDefaultPatchVersionIfNotSet() {
+    if (!getAndroidManifest().getMetadataValue(SDK_PATCH_VERSION_ATTRIBUTE_NAME).isPresent()) {
+      AndroidManifest apkManifest =
+          getAndroidManifest()
+              .toEditor()
+              .addMetaDataString(SDK_PATCH_VERSION_ATTRIBUTE_NAME, DEFAULT_SDK_PATCH_VERSION)
+              .save();
+      return toBuilder().setAndroidManifest(apkManifest).build();
+    }
+    return this;
+  }
+
   private String generateSplitId(String resolvedSuffix) {
     String masterSplitId = getSplitIdForMasterSplit();
     if (isMasterSplit()) {
@@ -473,30 +518,30 @@ public abstract class ModuleSplit {
         variantTargeting);
   }
 
-  public static ModuleSplit forHibernation(
+  public static ModuleSplit forArchive(
       BundleModule bundleModule,
-      AndroidManifest hibernatedManifest,
-      Optional<ResourceTable> hibernatedResourceTable,
-      Path hibernatedClassesDexFile) {
-    ModuleSplit.Builder hibernatedSplit =
+      AndroidManifest archivedManifest,
+      Optional<ResourceTable> archivedResourceTable,
+      Path archivedClassesDexFile) {
+    ModuleSplit.Builder archivedSplit =
         ModuleSplit.builder()
             .setModuleName(bundleModule.getName())
-            .setSplitType(SplitType.HIBERNATION)
+            .setSplitType(SplitType.ARCHIVE)
             .setMasterSplit(true)
-            .setAndroidManifest(hibernatedManifest)
+            .setAndroidManifest(archivedManifest)
             .setApkTargeting(ApkTargeting.getDefaultInstance())
             .setVariantTargeting(VariantTargeting.getDefaultInstance());
-    if (hibernatedResourceTable.isPresent()) {
-      hibernatedSplit.setResourceTable(hibernatedResourceTable.get());
-      hibernatedSplit.setEntries(
-          filterResourceEntries(bundleModule.getEntries().asList(), hibernatedResourceTable.get()));
+    if (archivedResourceTable.isPresent()) {
+      archivedSplit.setResourceTable(archivedResourceTable.get());
+      archivedSplit.setEntries(
+          filterResourceEntries(bundleModule.getEntries().asList(), archivedResourceTable.get()));
     }
-    hibernatedSplit.addEntry(
+    archivedSplit.addEntry(
         ModuleEntry.builder()
             .setPath(DEX_DIRECTORY.resolve("classes.dex"))
-            .setContent(hibernatedClassesDexFile)
+            .setContent(archivedClassesDexFile)
             .build());
-    return hibernatedSplit.build();
+    return archivedSplit.build();
   }
 
   /**

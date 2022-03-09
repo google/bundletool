@@ -18,6 +18,7 @@ package com.android.tools.build.bundletool.testing;
 import com.android.bundle.Commands.ApkDescription;
 import com.android.bundle.Commands.ApkSet;
 import com.android.bundle.Commands.BuildApksResult;
+import com.android.bundle.Commands.BuildSdkApksResult;
 import com.android.bundle.Commands.DeliveryType;
 import com.android.bundle.Commands.ModuleMetadata;
 import com.android.tools.build.bundletool.model.version.BundleToolVersion;
@@ -55,6 +56,14 @@ public final class ApkSetUtils {
       ByteStreams.copy(apkSetFile.getInputStream(apkSetFile.getEntry(path)), fileOutputStream);
     }
     return extractedFile;
+  }
+
+  public static BuildSdkApksResult extractTocFromSdkApkSetFile(
+      ZipFile apkSetFile, Path outputDirPath) throws Exception {
+    File tocFile = extractFromApkSetFile(apkSetFile, "toc.pb", outputDirPath);
+    try (FileInputStream inputStream = new FileInputStream(tocFile)) {
+      return BuildSdkApksResult.parseFrom(inputStream);
+    }
   }
 
   public static ApkSet splitApkSet(String moduleName, ApkDescription... apkDescriptions) {

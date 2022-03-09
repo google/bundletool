@@ -175,11 +175,11 @@ public class ResultUtilsTest {
   }
 
   @Test
-  public void filterHibernatedApkVariant() throws Exception {
-    Variant hibernatedVariant = createHibernatedVariant();
-    BuildApksResult apksResult = BuildApksResult.newBuilder().addVariant(hibernatedVariant).build();
+  public void filterArchivedApkVariant() throws Exception {
+    Variant archivedVariant = createArchivedVariant();
+    BuildApksResult apksResult = BuildApksResult.newBuilder().addVariant(archivedVariant).build();
 
-    assertThat(ResultUtils.hibernatedApkVariants(apksResult)).containsExactly(hibernatedVariant);
+    assertThat(ResultUtils.archivedApkVariants(apksResult)).containsExactly(archivedVariant);
   }
 
   @Test
@@ -190,7 +190,7 @@ public class ResultUtilsTest {
     assertThat(ResultUtils.isSplitApkVariant(variant)).isFalse();
     assertThat(ResultUtils.isStandaloneApkVariant(variant)).isFalse();
     assertThat(ResultUtils.isSystemApkVariant(variant)).isFalse();
-    assertThat(ResultUtils.isHibernatedApkVariant(variant)).isFalse();
+    assertThat(ResultUtils.isArchivedApkVariant(variant)).isFalse();
   }
 
   @Test
@@ -201,7 +201,7 @@ public class ResultUtilsTest {
     assertThat(ResultUtils.isSplitApkVariant(variant)).isFalse();
     assertThat(ResultUtils.isInstantApkVariant(variant)).isFalse();
     assertThat(ResultUtils.isSystemApkVariant(variant)).isFalse();
-    assertThat(ResultUtils.isHibernatedApkVariant(variant)).isFalse();
+    assertThat(ResultUtils.isArchivedApkVariant(variant)).isFalse();
   }
 
   @Test
@@ -212,7 +212,7 @@ public class ResultUtilsTest {
     assertThat(ResultUtils.isStandaloneApkVariant(variant)).isFalse();
     assertThat(ResultUtils.isInstantApkVariant(variant)).isFalse();
     assertThat(ResultUtils.isSystemApkVariant(variant)).isFalse();
-    assertThat(ResultUtils.isHibernatedApkVariant(variant)).isFalse();
+    assertThat(ResultUtils.isArchivedApkVariant(variant)).isFalse();
   }
 
   @Test
@@ -223,14 +223,14 @@ public class ResultUtilsTest {
     assertThat(ResultUtils.isStandaloneApkVariant(variant)).isFalse();
     assertThat(ResultUtils.isInstantApkVariant(variant)).isFalse();
     assertThat(ResultUtils.isSystemApkVariant(variant)).isTrue();
-    assertThat(ResultUtils.isHibernatedApkVariant(variant)).isFalse();
+    assertThat(ResultUtils.isArchivedApkVariant(variant)).isFalse();
   }
 
   @Test
-  public void isHibernatedApkVariantTrue() throws Exception {
-    Variant variant = createHibernatedVariant();
+  public void isArchivedApkVariantTrue() throws Exception {
+    Variant variant = createArchivedVariant();
 
-    assertThat(ResultUtils.isHibernatedApkVariant(variant)).isTrue();
+    assertThat(ResultUtils.isArchivedApkVariant(variant)).isTrue();
     assertThat(ResultUtils.isSplitApkVariant(variant)).isFalse();
     assertThat(ResultUtils.isStandaloneApkVariant(variant)).isFalse();
     assertThat(ResultUtils.isInstantApkVariant(variant)).isFalse();
@@ -315,11 +315,10 @@ public class ResultUtilsTest {
         createSystemApkSet(ApkTargeting.getDefaultInstance(), systemApk));
   }
 
-  private Variant createHibernatedVariant() {
-    ZipPath hibernatedApk = ZipPath.create("hibernated.apk");
+  private Variant createArchivedVariant() {
+    ZipPath archivedApk = ZipPath.create("archived.apk");
     return createVariant(
         variantSdkTargeting(sdkVersionFrom(15), ImmutableSet.of(SdkVersion.getDefaultInstance())),
-        ApksArchiveHelpers.createHibernatedApkSet(
-            ApkTargeting.getDefaultInstance(), hibernatedApk));
+        ApksArchiveHelpers.createArchivedApkSet(ApkTargeting.getDefaultInstance(), archivedApk));
   }
 }

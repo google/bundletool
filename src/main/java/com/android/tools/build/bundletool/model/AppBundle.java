@@ -16,8 +16,11 @@
 
 package com.android.tools.build.bundletool.model;
 
+import static com.android.tools.build.bundletool.model.utils.BundleParser.extractModules;
+import static com.android.tools.build.bundletool.model.utils.BundleParser.readBundleConfig;
+import static com.android.tools.build.bundletool.model.utils.BundleParser.readBundleMetadata;
+import static com.android.tools.build.bundletool.model.utils.BundleParser.sanitize;
 import static com.google.common.base.Preconditions.checkState;
-import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.ImmutableMap.toImmutableMap;
 import static com.google.common.collect.ImmutableSet.toImmutableSet;
 import static com.google.common.collect.MoreCollectors.onlyElement;
@@ -30,9 +33,6 @@ import com.android.bundle.Files.TargetedNativeDirectory;
 import com.android.bundle.Targeting.Abi;
 import com.android.bundle.Targeting.NativeDirectoryTargeting;
 import com.android.tools.build.bundletool.model.BundleModule.ModuleType;
-import com.android.tools.build.bundletool.model.ModuleEntry.ModuleEntryBundleLocation;
-import com.android.tools.build.bundletool.model.exceptions.InvalidBundleException;
-import com.android.tools.build.bundletool.model.utils.ZipUtils;
 import com.android.tools.build.bundletool.model.version.Version;
 import com.google.auto.value.AutoValue;
 import com.google.common.collect.ImmutableList;
@@ -40,19 +40,9 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Maps;
 import com.google.errorprone.annotations.Immutable;
-import com.google.protobuf.InvalidProtocolBufferException;
-import java.io.IOException;
-import java.io.UncheckedIOException;
-import java.nio.file.Paths;
 import java.util.Collection;
-import java.util.Enumeration;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Optional;
 import java.util.stream.Stream;
-import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
-import javax.annotation.CheckReturnValue;
 
 /**
  * Represents an app bundle.
@@ -62,17 +52,21 @@ import javax.annotation.CheckReturnValue;
  */
 @Immutable
 @AutoValue
-public abstract class AppBundle {
+public abstract class AppBundle implements Bundle {
 
   public static final ZipPath METADATA_DIRECTORY = ZipPath.create("BUNDLE-METADATA");
 
   public static final String BUNDLE_CONFIG_FILE_NAME = "BundleConfig.pb";
 
+  /** Top-level directory names that are not recognized as modules. */
+  public static final ImmutableSet<ZipPath> NON_MODULE_DIRECTORIES =
+      ImmutableSet.of(METADATA_DIRECTORY, ZipPath.create("META-INF"));
+
   /** Builds an {@link AppBundle} from an App Bundle on disk. */
   public static AppBundle buildFromZip(ZipFile bundleFile) {
     BundleConfig bundleConfig = readBundleConfig(bundleFile);
     return buildFromModules(
-        sanitize(extractModules(bundleFile, bundleConfig)),
+        sanitize(extractModules(bundleFile, bundleConfig, NON_MODULE_DIRECTORIES)),
         bundleConfig,
         readBundleMetadata(bundleFile));
   }
@@ -111,8 +105,10 @@ public abstract class AppBundle {
    */
   public abstract ImmutableSet<String> getMasterPinnedResourceNames();
 
+  @Override
   public abstract BundleConfig getBundleConfig();
 
+  @Override
   public abstract BundleMetadata getBundleMetadata();
 
   /**
@@ -137,6 +133,7 @@ public abstract class AppBundle {
     return getModule(BundleModuleName.BASE_MODULE_NAME);
   }
 
+  @Override
   public String getPackageName() {
     if (isAssetOnly()) {
       return getModules().values().stream()
@@ -147,6 +144,7 @@ public abstract class AppBundle {
     return getBaseModule().getAndroidManifest().getPackageName();
   }
 
+  @Override
   public BundleModule getModule(BundleModuleName moduleName) {
     BundleModule module = getModules().get(moduleName);
     checkState(module != null, "Module '%s' not found.", moduleName);
@@ -180,36 +178,6 @@ public abstract class AppBundle {
             })
         .distinct()
         .collect(toImmutableSet());
-  }
-
-  /**
-   * Returns the {@link BundleModuleName} corresponding to the provided zip entry. If the zip entry
-   * does not belong to a module, a null {@link BundleModuleName} is returned.
-   */
-  public static Optional<BundleModuleName> extractModuleName(ZipEntry entry) {
-    ZipPath path = ZipPath.create(entry.getName());
-
-    // Ignoring bundle metadata files.
-    if (path.startsWith(METADATA_DIRECTORY)) {
-      return Optional.empty();
-    }
-
-    // Ignoring signature related files.
-    if (path.startsWith("META-INF")) {
-      return Optional.empty();
-    }
-
-    // Ignoring top-level files.
-    if (path.getNameCount() <= 1) {
-      return Optional.empty();
-    }
-
-    // Temporarily excluding .class files.
-    if (path.toString().endsWith(".class")) {
-      return Optional.empty();
-    }
-
-    return Optional.of(BundleModuleName.create(path.getName(0).toString()));
   }
 
   public boolean isApex() {
@@ -250,104 +218,6 @@ public abstract class AppBundle {
 
   static Builder builder() {
     return new AutoValue_AppBundle.Builder();
-  }
-
-  private static ImmutableList<BundleModule> extractModules(
-      ZipFile bundleFile, BundleConfig bundleConfig) {
-    Map<BundleModuleName, BundleModule.Builder> moduleBuilders = new HashMap<>();
-    Enumeration<? extends ZipEntry> entries = bundleFile.entries();
-    while (entries.hasMoreElements()) {
-      ZipEntry entry = entries.nextElement();
-      if (entry.isDirectory()) {
-        continue;
-      }
-
-      Optional<BundleModuleName> moduleName = extractModuleName(entry);
-      if (!moduleName.isPresent()) {
-        continue;
-      }
-
-      BundleModule.Builder moduleBuilder =
-          moduleBuilders.computeIfAbsent(
-              moduleName.get(),
-              name -> BundleModule.builder().setName(name).setBundleConfig(bundleConfig));
-
-      moduleBuilder.addEntry(
-          ModuleEntry.builder()
-              .setBundleLocation(
-                  ModuleEntryBundleLocation.create(
-                      Paths.get(bundleFile.getName()), ZipPath.create(entry.getName())))
-              .setPath(ZipUtils.convertBundleToModulePath(ZipPath.create(entry.getName())))
-              .setContent(ZipUtils.asByteSource(bundleFile, entry))
-              .build());
-    }
-
-    // We verify the presence of the manifest before building the BundleModule objects because the
-    // manifest is a required field of the BundleModule class.
-    checkModulesHaveManifest(moduleBuilders.values());
-
-    return moduleBuilders.values().stream()
-        .map(BundleModule.Builder::build)
-        .collect(toImmutableList());
-  }
-
-  private static void checkModulesHaveManifest(Collection<BundleModule.Builder> bundleModules) {
-    ImmutableSet<String> modulesWithoutManifest =
-        bundleModules.stream()
-            .filter(bundleModule -> !bundleModule.hasAndroidManifest())
-            .map(module -> module.getName().getName())
-            .collect(toImmutableSet());
-    if (!modulesWithoutManifest.isEmpty()) {
-      throw InvalidBundleException.builder()
-          .withUserMessage(
-              "Found modules in the App Bundle without an AndroidManifest.xml: %s",
-              modulesWithoutManifest)
-          .build();
-    }
-  }
-
-  private static BundleConfig readBundleConfig(ZipFile bundleFile) {
-    ZipEntry bundleConfigEntry = bundleFile.getEntry(BUNDLE_CONFIG_FILE_NAME);
-    if (bundleConfigEntry == null) {
-      throw InvalidBundleException.builder()
-          .withUserMessage("File '%s' was not found.", BUNDLE_CONFIG_FILE_NAME)
-          .build();
-    }
-
-    try {
-      return BundleConfig.parseFrom(ZipUtils.asByteSource(bundleFile, bundleConfigEntry).read());
-    } catch (InvalidProtocolBufferException e) {
-      throw InvalidBundleException.builder()
-          .withCause(e)
-          .withUserMessage("Bundle config '%s' could not be parsed.", BUNDLE_CONFIG_FILE_NAME)
-          .build();
-    } catch (IOException e) {
-      throw new UncheckedIOException(
-          String.format("Error reading file '%s'.", BUNDLE_CONFIG_FILE_NAME), e);
-    }
-  }
-
-  private static BundleMetadata readBundleMetadata(ZipFile bundleFile) {
-    BundleMetadata.Builder metadata = BundleMetadata.builder();
-    ZipUtils.allFileEntries(bundleFile)
-        .filter(entry -> ZipPath.create(entry.getName()).startsWith(METADATA_DIRECTORY))
-        .forEach(
-            zipEntry -> {
-              ZipPath bundlePath = ZipPath.create(zipEntry.getName());
-              // Strip the top-level metadata directory.
-              ZipPath metadataPath = bundlePath.subpath(1, bundlePath.getNameCount());
-              metadata.addFile(metadataPath, ZipUtils.asByteSource(bundleFile, zipEntry));
-            });
-    return metadata.build();
-  }
-
-  @CheckReturnValue
-  private static ImmutableList<BundleModule> sanitize(ImmutableList<BundleModule> modules) {
-    // This is a temporary fix to work around a bug in gradle that creates a file named classes1.dex
-    modules =
-        modules.stream().map(new ClassesDexNameSanitizer()::sanitize).collect(toImmutableList());
-
-    return modules;
   }
 
   /** Builder for App Bundle object */

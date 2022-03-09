@@ -22,11 +22,11 @@ import static java.util.function.Function.identity;
 import static java.util.stream.Collectors.partitioningBy;
 
 import com.google.common.collect.ImmutableList;
+import com.google.errorprone.annotations.CheckReturnValue;
 import java.util.Map;
 import java.util.function.Predicate;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import javax.annotation.CheckReturnValue;
 
 /**
  * Sanitizer of the name of dex files to workaround a Gradle plugin bug that creates a bundle with a

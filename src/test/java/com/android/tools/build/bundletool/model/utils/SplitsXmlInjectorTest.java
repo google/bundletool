@@ -17,7 +17,7 @@
 package com.android.tools.build.bundletool.model.utils;
 
 import static com.android.tools.build.bundletool.model.BundleModuleName.BASE_MODULE_NAME;
-import static com.android.tools.build.bundletool.model.ModuleSplit.SplitType.HIBERNATION;
+import static com.android.tools.build.bundletool.model.ModuleSplit.SplitType.ARCHIVE;
 import static com.android.tools.build.bundletool.model.ModuleSplit.SplitType.INSTANT;
 import static com.android.tools.build.bundletool.model.ModuleSplit.SplitType.SPLIT;
 import static com.android.tools.build.bundletool.model.ModuleSplit.SplitType.STANDALONE;
@@ -26,6 +26,7 @@ import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.andr
 import static com.android.tools.build.bundletool.testing.TargetingUtils.languageTargeting;
 import static com.android.tools.build.bundletool.testing.TestUtils.createModuleEntryForFile;
 import static com.android.tools.build.bundletool.testing.truth.resources.TruthResourceTable.assertThat;
+import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.MoreCollectors.onlyElement;
 import static com.google.common.truth.Truth.assertThat;
 import static com.google.common.truth.Truth8.assertThat;
@@ -48,6 +49,7 @@ import com.android.tools.build.bundletool.testing.ResourceTableBuilder;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.protobuf.ExtensionRegistry;
+import java.util.Collection;
 import java.util.Optional;
 import javax.annotation.Nullable;
 import org.junit.Before;
@@ -98,11 +100,10 @@ public class SplitsXmlInjectorTest {
                 BASE_MODULE_NAME.getName(),
                 /* splitId= */ "",
                 /* masterSplit= */ true,
-                HIBERNATION,
+                ARCHIVE,
                 /* languageTargeting= */ null));
 
-    assertThat(
-            splitsXmlInjector.process(GeneratedApks.fromModuleSplits(modules)).getAllApksStream())
+    assertThat(xmlInjectorProcess(GeneratedApks.fromModuleSplits(modules)).stream())
         .containsExactlyElementsIn(modules);
   }
 
@@ -141,18 +142,13 @@ public class SplitsXmlInjectorTest {
                 /* masterSplit= */ false,
                 SPLIT,
                 languageTargeting("ru")));
-    GeneratedApks result =
-        splitsXmlInjector.process(
-            GeneratedApks.fromModuleSplits(
-                ImmutableList.<ModuleSplit>builder()
-                    .add(baseMasterSplit)
-                    .addAll(otherSplits)
-                    .build()));
+    GeneratedApks generatedApks =
+        GeneratedApks.fromModuleSplits(
+            ImmutableList.<ModuleSplit>builder().add(baseMasterSplit).addAll(otherSplits).build());
 
-    assertThat(result.getAllApksStream()).containsAtLeastElementsIn(otherSplits);
+    assertThat(generatedApks.getAllApksStream()).containsAtLeastElementsIn(otherSplits);
     ModuleSplit processedBaseMasterSplit =
-        result
-            .getAllApksStream()
+        xmlInjectorProcess(generatedApks).stream()
             .filter(module -> module.isMasterSplit() && module.isBaseModuleSplit())
             .collect(onlyElement());
 
@@ -212,13 +208,11 @@ public class SplitsXmlInjectorTest {
             .setResourceTable(featureResourceTable)
             .build();
 
-    GeneratedApks result =
-        splitsXmlInjector.process(
-            GeneratedApks.fromModuleSplits(ImmutableList.of(baseModule, featureModule)));
+    GeneratedApks generatedApks =
+        GeneratedApks.fromModuleSplits(ImmutableList.of(baseModule, featureModule));
 
     ModuleSplit processedBaseMasterSplit =
-        result
-            .getAllApksStream()
+        xmlInjectorProcess(generatedApks).stream()
             .filter(module -> module.isMasterSplit() && module.isBaseModuleSplit())
             .collect(onlyElement());
 
@@ -272,18 +266,13 @@ public class SplitsXmlInjectorTest {
                 /* masterSplit= */ false,
                 SYSTEM,
                 languageTargeting("ru")));
-    GeneratedApks result =
-        splitsXmlInjector.process(
-            GeneratedApks.fromModuleSplits(
-                ImmutableList.<ModuleSplit>builder()
-                    .add(baseMasterSplit)
-                    .addAll(otherSplits)
-                    .build()));
+    GeneratedApks generatedApks =
+        GeneratedApks.fromModuleSplits(
+            ImmutableList.<ModuleSplit>builder().add(baseMasterSplit).addAll(otherSplits).build());
 
-    assertThat(result.getAllApksStream()).containsAtLeastElementsIn(otherSplits);
+    assertThat(generatedApks.getAllApksStream()).containsAtLeastElementsIn(otherSplits);
     ModuleSplit processedBaseMasterSplit =
-        result
-            .getAllApksStream()
+        xmlInjectorProcess(generatedApks).stream()
             .filter(module -> module.isMasterSplit() && module.isBaseModuleSplit())
             .collect(onlyElement());
 
@@ -325,10 +314,10 @@ public class SplitsXmlInjectorTest {
             .build();
     standalone = standalone.toBuilder().setResourceTable(standaloneResourceTable).build();
 
-    GeneratedApks result =
-        splitsXmlInjector.process(GeneratedApks.fromModuleSplits(ImmutableList.of(standalone)));
+    GeneratedApks generatedApks = GeneratedApks.fromModuleSplits(ImmutableList.of(standalone));
 
-    ModuleSplit processedStandalone = result.getAllApksStream().collect(onlyElement());
+    ModuleSplit processedStandalone =
+        xmlInjectorProcess(generatedApks).stream().collect(onlyElement());
 
     assertThat(
             processedStandalone
@@ -350,45 +339,32 @@ public class SplitsXmlInjectorTest {
   }
 
   @Test
-  public void process_hibernationSplitTypes() throws Exception {
-    ModuleSplit hibernated =
+  public void process_archiveSplitTypes() throws Exception {
+    ModuleSplit archived =
         createModuleSplit(
             BASE_MODULE_NAME.getName(),
             /* splitId= */ "",
             /* masterSplit= */ true,
-            SplitType.HIBERNATION,
+            SplitType.ARCHIVE,
             /* languageTargeting= */ null);
-    ResourceTable hibernatedResourceTable =
+    ResourceTable archivedResourceTable =
         new ResourceTableBuilder()
             .addPackage("com.example.app")
             .addStringResourceForMultipleLocales(
                 "title", ImmutableMap.of("ru-RU", "title ru-RU", "fr", "title fr"))
             .build();
-    hibernated = hibernated.toBuilder().setResourceTable(hibernatedResourceTable).build();
+    archived = archived.toBuilder().setResourceTable(archivedResourceTable).build();
 
-    GeneratedApks result =
-        splitsXmlInjector.process(GeneratedApks.fromModuleSplits(ImmutableList.of(hibernated)));
+    GeneratedApks generatedApks = GeneratedApks.fromModuleSplits(ImmutableList.of(archived));
 
-    ModuleSplit processedStandalone = result.getAllApksStream().collect(onlyElement());
+    ModuleSplit processedArchivedApk =
+        xmlInjectorProcess(generatedApks).stream().collect(onlyElement());
 
     assertThat(
-            processedStandalone
+            processedArchivedApk
                 .getAndroidManifest()
                 .getMetadataResourceId("com.android.vending.splits"))
-        .hasValue(0x7f020000);
-    assertThat(processedStandalone.getResourceTable().get())
-        .containsResource("com.example.app:xml/splits0")
-        .withFileReference("res/xml/splits0.xml");
-
-    XmlNode expectedSplitsProtoXml =
-        new SplitsProtoXmlBuilder()
-            .addLanguageMapping(BASE_MODULE_NAME, "ru", "")
-            .addLanguageMapping(BASE_MODULE_NAME, "fr", "")
-            .build();
-    assertThat(XmlNode.parseFrom(processedStandalone.getEntries().get(0).getContent().read(),
-                ExtensionRegistry.getEmptyRegistry()))
-        .ignoringRepeatedFieldOrder()
-        .isEqualTo(expectedSplitsProtoXml);
+        .isEmpty();
   }
 
   @Test
@@ -408,9 +384,8 @@ public class SplitsXmlInjectorTest {
             .build();
 
     ModuleSplit processedBaseMasterSplit =
-        splitsXmlInjector
-            .process(GeneratedApks.fromModuleSplits(ImmutableList.of(baseMasterSplit)))
-            .getAllApksStream()
+        xmlInjectorProcess(GeneratedApks.fromModuleSplits(ImmutableList.of(baseMasterSplit)))
+            .stream()
             .collect(onlyElement());
 
     assertThat(processedBaseMasterSplit.getEntries()).hasSize(2);
@@ -444,5 +419,12 @@ public class SplitsXmlInjectorTest {
                 : ApkTargeting.newBuilder().setLanguageTargeting(languageTargeting).build())
         .setVariantTargeting(VariantTargeting.getDefaultInstance())
         .build();
+  }
+
+  private ImmutableList<ModuleSplit> xmlInjectorProcess(GeneratedApks generatedApks) {
+    return generatedApks.getAllApksGroupedByOrderedVariants().asMap().entrySet().stream()
+        .map(keySplit -> splitsXmlInjector.process(keySplit.getKey(), keySplit.getValue()))
+        .flatMap(Collection::stream)
+        .collect(toImmutableList());
   }
 }

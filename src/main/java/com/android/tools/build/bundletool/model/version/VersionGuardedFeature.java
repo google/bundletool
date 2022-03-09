@@ -93,7 +93,10 @@ public enum VersionGuardedFeature {
    * Install time modules will be merged into base unless explicitly turned off via <dist:permanent
    * dist:value="false" /> in "install-time" attribute.
    */
-  MERGE_INSTALL_TIME_MODULES_INTO_BASE("1.0.0");
+  MERGE_INSTALL_TIME_MODULES_INTO_BASE("1.0.0"),
+
+  /* Enabling generation of archived apk. */
+  ARCHIVED_APK_GENERATION("1.8.2");
 
   /** Version from which the given feature should be enabled by default. */
   private final Version enabledSinceVersion;
@@ -127,5 +130,9 @@ public enum VersionGuardedFeature {
     }
 
     return disabledSinceVersion.map(bundletoolVersion::isOlderThan).orElse(true);
+  }
+
+  public Version getEnabledSinceVersion() {
+    return enabledSinceVersion;
   }
 }

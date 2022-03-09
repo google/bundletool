@@ -102,7 +102,8 @@ public class StandaloneApksGenerator {
         .collect(toImmutableList());
   }
 
-  private static ModuleSplit setVariantTargetingAndSplitType(ModuleSplit shard) {
+  /** Sets the variant targeting and split type to standalone. */
+  public static ModuleSplit setVariantTargetingAndSplitType(ModuleSplit shard) {
     return shard.toBuilder()
         .setVariantTargeting(standaloneApkVariantTargeting(shard))
         .setSplitType(SplitType.STANDALONE)

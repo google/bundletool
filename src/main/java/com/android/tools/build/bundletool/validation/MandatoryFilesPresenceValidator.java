@@ -32,8 +32,11 @@ import java.util.zip.ZipFile;
 /** Validates presence of mandatory bundle/module files. */
 public class MandatoryFilesPresenceValidator extends SubValidator {
 
-  private static final ImmutableSet<ZipPath> NON_MODULE_DIRECTORIES =
-      ImmutableSet.of(AppBundle.METADATA_DIRECTORY, ZipPath.create("META-INF"));
+  private final ImmutableSet<ZipPath> nonModuleDirectories;
+
+  MandatoryFilesPresenceValidator(ImmutableSet<ZipPath> nonModuleDirectories) {
+    this.nonModuleDirectories = nonModuleDirectories;
+  }
 
   @Override
   public void validateModuleZipFile(ZipFile moduleFile) {
@@ -51,7 +54,7 @@ public class MandatoryFilesPresenceValidator extends SubValidator {
             .map(ZipPath::create)
             .filter(entryPath -> entryPath.getNameCount() > 1)
             .map(entryPath -> entryPath.getName(0))
-            .filter(not(NON_MODULE_DIRECTORIES::contains))
+            .filter(not(nonModuleDirectories::contains))
             .collect(toImmutableSet());
 
     checkBundleHasBundleConfig(bundleFile);

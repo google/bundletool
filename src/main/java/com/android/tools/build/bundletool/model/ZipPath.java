@@ -26,9 +26,9 @@ import com.google.common.base.Splitter;
 import com.google.common.collect.Comparators;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
+import com.google.errorprone.annotations.CheckReturnValue;
 import com.google.errorprone.annotations.Immutable;
 import java.util.Comparator;
-import javax.annotation.CheckReturnValue;
 import javax.annotation.Nullable;
 
 /**

@@ -30,6 +30,7 @@ import com.google.errorprone.annotations.Immutable;
 import java.util.HashSet;
 import java.util.Optional;
 import java.util.Set;
+import java.util.stream.IntStream;
 
 /**
  * Directory with an optional associated targeting.
@@ -71,6 +72,21 @@ public abstract class TargetedDirectory {
         .subpath(0, maxIndex + 1)
         .resolveSibling(getPathSegments().get(maxIndex).getName())
         .toString();
+  }
+
+  /**
+   * Returns the base name of the subpath composed from the first element up to and including the
+   * element that is targeted by the requested targeting dimension.
+   *
+   * <p>Example: given directory a/b/c#tier_1/d/e, a request for DEVICE_TIER returns a/b/c.
+   *
+   * <p>See {@link ZipPath#subpath} and {@link TargetedDirectory#getPathBaseName}.
+   */
+  public String getSubPathBaseName(TargetingDimension dimension) {
+    Optional<Integer> targetedSegmentIndex = getTargetedPathSegmentIndex(dimension);
+    return targetedSegmentIndex.isPresent()
+        ? getSubPathBaseName(targetedSegmentIndex.get())
+        : getPathBaseName();
   }
 
   /**
@@ -131,6 +147,16 @@ public abstract class TargetedDirectory {
             .map(TargetedDirectorySegment::toPathSegment)
             .collect(toImmutableList());
     return ZipPath.create(pathSegments);
+  }
+
+  private Optional<Integer> getTargetedPathSegmentIndex(TargetingDimension dimension) {
+    // We're assuming that dimensions are not duplicated (see checkNoDuplicateDimensions).
+    return IntStream.range(0, getPathSegments().size())
+        .filter(
+            idx ->
+                getPathSegments().get(idx).getTargetingDimension().equals(Optional.of(dimension)))
+        .boxed()
+        .collect(toOptional());
   }
 
   private static void checkNoDuplicateDimensions(

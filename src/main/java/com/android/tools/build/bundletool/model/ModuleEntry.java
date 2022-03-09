@@ -17,6 +17,9 @@ package com.android.tools.build.bundletool.model;
 
 import com.android.tools.build.bundletool.model.BundleModule.SpecialModuleEntry;
 import com.google.auto.value.AutoValue;
+import com.google.auto.value.extension.memoized.Memoized;
+import com.google.common.hash.HashCode;
+import com.google.common.hash.Hashing;
 import com.google.common.io.ByteSource;
 import com.google.common.io.Files;
 import com.google.common.io.MoreFiles;
@@ -87,13 +90,16 @@ public abstract class ModuleEntry {
       return false;
     }
 
+    return entry1.getContentSha256Hash().equals(entry2.getContentSha256Hash());
+  }
+
+  @Memoized
+  public HashCode getContentSha256Hash() {
     try {
-      return entry1.getContent().contentEquals(entry2.getContent());
+      return getContent().hash(Hashing.sha256());
     } catch (IOException e) {
       throw new UncheckedIOException(
-          String.format(
-              "Failed to compare contents of module entries '%s' and '%s'.", entry1, entry2),
-          e);
+          String.format("Failed to calculate SHA256 hash of module entry '%s'.", this), e);
     }
   }
 

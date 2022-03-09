@@ -23,7 +23,7 @@ import com.android.tools.build.bundletool.model.AppBundle;
 import com.android.tools.build.bundletool.model.BundleModule;
 import com.google.common.collect.ImmutableCollection;
 import com.google.common.collect.ImmutableList;
-import javax.annotation.CheckReturnValue;
+import com.google.errorprone.annotations.CheckReturnValue;
 import javax.inject.Inject;
 
 /**

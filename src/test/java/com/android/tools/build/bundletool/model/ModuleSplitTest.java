@@ -471,25 +471,25 @@ public class ModuleSplitTest {
   }
 
   @Test
-  public void forHibernation() throws Exception {
+  public void forArchive() throws Exception {
     BundleModule module =
         new BundleModuleBuilder("testModule")
             .setManifest(androidManifest("com.test.app"))
             .addFile("res/drawable/background.jpg", DUMMY_CONTENT)
             .build();
-    AndroidManifest hibernatedManifest =
+    AndroidManifest archivedManifest =
         AndroidManifest.create(
             androidManifest("com.test.app", ManifestProtoUtils.withVersionCode(123)));
-    Path hibernatedClassesDexFile = createTempClassesDexFile(DUMMY_CONTENT);
+    Path archivedClassesDexFile = createTempClassesDexFile(DUMMY_CONTENT);
 
     ModuleSplit split =
-        ModuleSplit.forHibernation(
+        ModuleSplit.forArchive(
             module,
-            hibernatedManifest,
-            /* hibernatedResourceTable= */ Optional.empty(),
-            hibernatedClassesDexFile);
+            archivedManifest,
+            /* archivedResourceTable= */ Optional.empty(),
+            archivedClassesDexFile);
 
-    assertThat(split.getSplitType()).isEqualTo(SplitType.HIBERNATION);
+    assertThat(split.getSplitType()).isEqualTo(SplitType.ARCHIVE);
     assertThat(split.getModuleName().getName()).isEqualTo("testModule");
     assertThat(split.getAndroidManifest().getVersionCode()).hasValue(123);
     assertThat(split.getResourceTable()).isEmpty();
@@ -497,87 +497,81 @@ public class ModuleSplitTest {
   }
 
   @Test
-  public void forHibernation_copiesResourceTable() throws Exception {
+  public void forArchive_copiesResourceTable() throws Exception {
     BundleModule module =
         new BundleModuleBuilder("testModule")
             .setManifest(androidManifest("com.test.app"))
             .addFile("res/drawable/icon.jpg", DUMMY_CONTENT)
             .build();
-    AndroidManifest hibernatedManifest =
+    AndroidManifest archivedManifest =
         AndroidManifest.create(
             androidManifest("com.test.app", ManifestProtoUtils.withVersionCode(123)));
-    ResourceTable hibernatedResourceTable =
+    ResourceTable archivedResourceTable =
         new ResourceTableBuilder()
             .addPackage("com.test.app")
             .addDrawableResource("icon", "res/drawable/icon.jpg")
             .build();
-    Path hibernatedClassesDexFile = createTempClassesDexFile(DUMMY_CONTENT);
+    Path archivedClassesDexFile = createTempClassesDexFile(DUMMY_CONTENT);
 
     ModuleSplit split =
-        ModuleSplit.forHibernation(
-            module,
-            hibernatedManifest,
-            Optional.of(hibernatedResourceTable),
-            hibernatedClassesDexFile);
+        ModuleSplit.forArchive(
+            module, archivedManifest, Optional.of(archivedResourceTable), archivedClassesDexFile);
 
-    assertThat(split.getResourceTable().get()).isEqualTo(hibernatedResourceTable);
+    assertThat(split.getResourceTable().get()).isEqualTo(archivedResourceTable);
     assertThat(extractPaths(split.getEntries()))
         .containsExactly("res/drawable/icon.jpg", "dex/classes.dex");
   }
 
   @Test
-  public void forHibernation_filtersResources() throws Exception {
+  public void forArchive_filtersResources() throws Exception {
     BundleModule module =
         new BundleModuleBuilder("testModule")
             .setManifest(androidManifest("com.test.app"))
             .addFile("res/drawable/icon.jpg", DUMMY_CONTENT)
             .addFile("res/drawable/background.jpg", DUMMY_CONTENT)
             .build();
-    AndroidManifest hibernatedManifest =
+    AndroidManifest archivedManifest =
         AndroidManifest.create(
             androidManifest("com.test.app", ManifestProtoUtils.withVersionCode(123)));
-    ResourceTable hibernatedResourceTable =
+    ResourceTable archivedResourceTable =
         new ResourceTableBuilder()
             .addPackage("com.test.app")
             .addDrawableResource("icon", "res/drawable/icon.jpg")
             .build();
-    Path hibernatedClassesDexFile = createTempClassesDexFile(DUMMY_CONTENT);
+    Path archivedClassesDexFile = createTempClassesDexFile(DUMMY_CONTENT);
 
     ModuleSplit split =
-        ModuleSplit.forHibernation(
-            module,
-            hibernatedManifest,
-            Optional.of(hibernatedResourceTable),
-            hibernatedClassesDexFile);
+        ModuleSplit.forArchive(
+            module, archivedManifest, Optional.of(archivedResourceTable), archivedClassesDexFile);
 
-    assertThat(split.getResourceTable().get()).isEqualTo(hibernatedResourceTable);
+    assertThat(split.getResourceTable().get()).isEqualTo(archivedResourceTable);
     assertThat(extractPaths(split.getEntries()))
         .containsExactly("res/drawable/icon.jpg", "dex/classes.dex");
   }
 
   @Test
-  public void forHibernation_usesHibernatedClassesFile() throws Exception {
+  public void forArchive_usesArchivedClassesFile() throws Exception {
     BundleModule module =
         new BundleModuleBuilder("testModule")
             .setManifest(androidManifest("com.test.app"))
             .addFile("dex/classes.dex", DUMMY_CONTENT)
             .build();
-    AndroidManifest hibernatedManifest =
+    AndroidManifest archivedManifest =
         AndroidManifest.create(
             androidManifest("com.test.app", ManifestProtoUtils.withVersionCode(123)));
-    byte[] hibernatedClassesDexFileContent = {1, 2};
-    Path hibernatedClassesDexFile = createTempClassesDexFile(hibernatedClassesDexFileContent);
+    byte[] archivedClassesDexFileContent = {1, 2};
+    Path archivedClassesDexFile = createTempClassesDexFile(archivedClassesDexFileContent);
 
     ModuleSplit split =
-        ModuleSplit.forHibernation(
+        ModuleSplit.forArchive(
             module,
-            hibernatedManifest,
-            /* hibernatedResourceTable= */ Optional.empty(),
-            hibernatedClassesDexFile);
+            archivedManifest,
+            /* archivedResourceTable= */ Optional.empty(),
+            archivedClassesDexFile);
 
     assertThat(extractPaths(split.getEntries())).containsExactly("dex/classes.dex");
     assertThat(split.getEntries().get(0).getContent().read())
-        .isEqualTo(hibernatedClassesDexFileContent);
+        .isEqualTo(archivedClassesDexFileContent);
   }
 
   private ImmutableList<ModuleEntry> fakeEntriesOf(String... entries) {

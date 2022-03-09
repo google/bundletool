@@ -14,7 +14,7 @@
  * limitations under the License
  */
 
-package com.android.tools.build.bundletool.internal;
+package com.android.tools.build.bundletool.archive;
 
 import static com.android.tools.build.bundletool.model.AndroidManifest.ANDROID_NAMESPACE_URI;
 import static com.google.common.base.Preconditions.checkNotNull;
@@ -29,30 +29,29 @@ import com.android.tools.build.bundletool.model.utils.xmlproto.XmlProtoNode;
 import com.android.tools.build.bundletool.model.version.BundleToolVersion;
 import java.util.Optional;
 
-// TODO(b/193792534): Move under models/utils once INTERNAL comments are removed.
-/** Utility methods for creation of hibernated manifest. */
-public final class HibernatedAndroidManifestUtils {
-  public static final String META_DATA_KEY_HIBERNATED = "com.android.vending.hibernated";
+/** Utility methods for creation of archived manifest. */
+public final class ArchivedAndroidManifestUtils {
+  public static final String META_DATA_KEY_ARCHIVED = "com.android.vending.archive";
 
   public static final String REACTIVATE_ACTIVITY_NAME =
-      "com.google.android.hibernation.ReactivateActivity";
+      "com.google.android.archive.ReactivateActivity";
   public static final String HOLO_LIGHT_NO_ACTION_BAR_THEME =
       "@android:style/Theme.Holo.Light.NoActionBar";
   public static final String MAIN_ACTION_NAME = "android.intent.action.MAIN";
   public static final String LAUNCHER_CATEGORY_NAME = "android.intent.category.LAUNCHER";
 
   public static final String UPDATE_BROADCAST_RECEIVER_NAME =
-      "com.google.android.hibernation.UpdateBroadcastReceiver";
+      "com.google.android.archive.UpdateBroadcastReceiver";
   public static final String MY_PACKAGE_REPLACED_ACTION_NAME =
       "android.intent.action.MY_PACKAGE_REPLACED";
 
-  public static AndroidManifest createHibernatedManifest(AndroidManifest manifest) {
+  public static AndroidManifest createArchivedManifest(AndroidManifest manifest) {
     checkNotNull(manifest);
 
     ManifestEditor editor =
         new ManifestEditor(createMinimalManifestTag(), BundleToolVersion.getCurrentVersion())
             .setPackage(manifest.getPackageName())
-            .addMetaDataBoolean(META_DATA_KEY_HIBERNATED, true);
+            .addMetaDataBoolean(META_DATA_KEY_ARCHIVED, true);
 
     manifest.getVersionCode().ifPresent(editor::setVersionCode);
     manifest.getVersionName().ifPresent(editor::setVersionName);
@@ -73,21 +72,25 @@ public final class HibernatedAndroidManifestUtils {
       if (manifest.hasLabelRefId()) {
         manifest.getLabelRefId().ifPresent(editor::setLabelAsRefId);
       }
-      getHibernatedAllowBackup(manifest).ifPresent(editor::setAllowBackup);
+      getArchivedAllowBackup(manifest).ifPresent(editor::setAllowBackup);
       manifest.getFullBackupOnly().ifPresent(editor::setFullBackupOnly);
       manifest.getFullBackupContent().ifPresent(editor::setFullBackupContent);
       manifest.getDataExtractionRules().ifPresent(editor::setDataExtractionRules);
     }
+
+    editor.copyPermissions(manifest);
+    editor.copyPermissionGroups(manifest);
+
     editor.addActivity(createReactivateActivity());
     editor.addReceiver(createUpdateBroadcastReceiver());
 
     return editor.save();
   }
 
-  private static Optional<Boolean> getHibernatedAllowBackup(AndroidManifest manifest) {
+  private static Optional<Boolean> getArchivedAllowBackup(AndroidManifest manifest) {
     // Backup needs to be disabled if Backup Agent is provided and Full Backup Only is disabled.
     // Custom backup agent cannot be kept because it relies on app code that is not present in its
-    // hibernated variant.
+    // archived variant.
     return manifest.getAllowBackup().orElse(true)
             && (!manifest.hasBackupAgent() || manifest.getFullBackupOnly().orElse(false))
         ? manifest.getAllowBackup()
@@ -125,5 +128,5 @@ public final class HibernatedAndroidManifestUtils {
         .build();
   }
 
-  private HibernatedAndroidManifestUtils() {}
+  private ArchivedAndroidManifestUtils() {}
 }

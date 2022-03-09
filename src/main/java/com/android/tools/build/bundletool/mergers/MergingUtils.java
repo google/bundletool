@@ -44,6 +44,7 @@ import com.android.bundle.Targeting.ScreenDensityTargeting;
 import com.android.bundle.Targeting.TextureCompressionFormat;
 import com.android.bundle.Targeting.TextureCompressionFormatTargeting;
 import com.android.tools.build.bundletool.model.exceptions.CommandExecutionException;
+import com.android.tools.build.bundletool.model.exceptions.InvalidBundleException;
 import com.google.common.collect.Sets;
 import com.google.protobuf.Int32Value;
 import java.util.List;
@@ -77,6 +78,7 @@ final class MergingUtils {
    * Merges two targetings into targeting of an APK shard.
    *
    * <p>Supports only the following targetings:
+   *
    * <ul>
    *   <li>ABI
    *   <li>Screen density
@@ -129,9 +131,11 @@ final class MergingUtils {
       String path = directory.getPath();
       if (assetsDirectories.containsKey(path)) {
         TargetedAssetsDirectory existingDirectory = assetsDirectories.get(path);
-        if (!existingDirectory.equals(directory)) {
-          throw new IllegalStateException(
-              "Encountered conflicting targeting values while merging assets config.");
+        if (!existingDirectory.getTargeting().equals(directory.getTargeting())) {
+          throw InvalidBundleException.builder()
+              .withUserMessage(
+                  "Encountered conflicting targeting values while merging assets config.")
+              .build();
         }
       } else {
         assetsDirectories.put(path, directory);

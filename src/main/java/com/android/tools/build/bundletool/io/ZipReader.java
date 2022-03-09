@@ -43,6 +43,8 @@ import java.util.zip.InflaterInputStream;
 /** Parses a zip file, and allows to read entries and their content. */
 public final class ZipReader implements AutoCloseable {
 
+  static final int BUFFER_SIZE_BYTES = 8192;
+
   /** The parsed map of the zip file. */
   private final ZipMap zipMap;
 
@@ -109,7 +111,7 @@ public final class ZipReader implements AutoCloseable {
       return entryPayload;
     }
     Inflater inflater = new Inflater(/* nowrap= */ true); // nowrap = gzip compatible
-    return new InflaterInputStream(entryPayload, inflater);
+    return new InflaterInputStream(entryPayload, inflater, BUFFER_SIZE_BYTES);
   }
 
   private InputStream getEntryPayload(Entry entry) {

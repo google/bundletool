@@ -22,6 +22,7 @@ import static com.android.tools.build.bundletool.commands.BuildApksCommand.ApkBu
 import static com.android.tools.build.bundletool.commands.BuildApksCommand.ApkBuildMode.UNIVERSAL;
 import static com.android.tools.build.bundletool.commands.BuildApksCommand.OutputFormat.DIRECTORY;
 import static com.android.tools.build.bundletool.commands.BuildApksCommand.SystemApkOption.UNCOMPRESSED_NATIVE_LIBRARIES;
+import static com.android.tools.build.bundletool.model.AndroidManifest.SDK_LIBRARY_ELEMENT_NAME;
 import static com.android.tools.build.bundletool.model.OptimizationDimension.ABI;
 import static com.android.tools.build.bundletool.model.OptimizationDimension.SCREEN_DENSITY;
 import static com.android.tools.build.bundletool.model.OptimizationDimension.TEXTURE_COMPRESSION_FORMAT;
@@ -35,6 +36,11 @@ import static com.android.tools.build.bundletool.testing.DeviceFactory.sdkVersio
 import static com.android.tools.build.bundletool.testing.FakeSystemEnvironmentProvider.ANDROID_HOME;
 import static com.android.tools.build.bundletool.testing.FakeSystemEnvironmentProvider.ANDROID_SERIAL;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifest;
+import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withMinSdkVersion;
+import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withSdkLibraryElement;
+import static com.android.tools.build.bundletool.testing.TestUtils.addKeyToKeystore;
+import static com.android.tools.build.bundletool.testing.TestUtils.createDebugKeystore;
+import static com.android.tools.build.bundletool.testing.TestUtils.createKeystore;
 import static com.android.tools.build.bundletool.testing.TestUtils.expectMissingRequiredBuilderPropertyException;
 import static com.android.tools.build.bundletool.testing.TestUtils.expectMissingRequiredFlagException;
 import static com.google.common.base.Preconditions.checkState;
@@ -57,8 +63,10 @@ import com.android.tools.build.bundletool.device.AdbServer;
 import com.android.tools.build.bundletool.flags.FlagParser;
 import com.android.tools.build.bundletool.flags.FlagParser.FlagParseException;
 import com.android.tools.build.bundletool.flags.ParsedFlags;
+import com.android.tools.build.bundletool.io.ApkSerializer;
 import com.android.tools.build.bundletool.io.AppBundleSerializer;
-import com.android.tools.build.bundletool.io.StandaloneApkSerializer;
+import com.android.tools.build.bundletool.io.SdkBundleSerializer;
+import com.android.tools.build.bundletool.io.ZipBuilder;
 import com.android.tools.build.bundletool.model.AndroidManifest;
 import com.android.tools.build.bundletool.model.ApksigSigningConfiguration;
 import com.android.tools.build.bundletool.model.BundleMetadata;
@@ -75,8 +83,10 @@ import com.android.tools.build.bundletool.model.utils.SystemEnvironmentProvider;
 import com.android.tools.build.bundletool.model.utils.files.FileUtils;
 import com.android.tools.build.bundletool.testing.Aapt2Helper;
 import com.android.tools.build.bundletool.testing.AppBundleBuilder;
+import com.android.tools.build.bundletool.testing.BundleModuleBuilder;
 import com.android.tools.build.bundletool.testing.CertificateFactory;
 import com.android.tools.build.bundletool.testing.FakeSystemEnvironmentProvider;
+import com.android.tools.build.bundletool.testing.SdkBundleBuilder;
 import com.android.tools.build.bundletool.testing.TestModule;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
@@ -86,7 +96,6 @@ import com.google.protobuf.util.JsonFormat;
 import dagger.Component;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
@@ -97,12 +106,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
-import java.security.KeyStore;
-import java.security.KeyStoreException;
-import java.security.NoSuchAlgorithmException;
 import java.security.PrivateKey;
-import java.security.cert.Certificate;
-import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
 import java.util.Optional;
 import java.util.Properties;
@@ -154,13 +158,15 @@ public class BuildApksCommandTest {
   private Path keystorePath;
   private Path stampKeystorePath;
   private Path oldestSignerPropertiesPath;
+  private Path sdkBundlePath1;
+  private Path sdkBundlePath2;
 
   private final AdbServer fakeAdbServer = mock(AdbServer.class);
   private final SystemEnvironmentProvider systemEnvironmentProvider =
       new FakeSystemEnvironmentProvider(
           ImmutableMap.of(ANDROID_HOME, "/android/home", ANDROID_SERIAL, DEVICE_ID));
 
-  @Inject StandaloneApkSerializer standaloneApkSerializer;
+  @Inject ApkSerializer apkSerializer;
 
   @BeforeClass
   public static void setUpClass() throws Exception {
@@ -194,12 +200,12 @@ public class BuildApksCommandTest {
     bundlePath = tmpDir.resolve("bundle.aab");
     outputFilePath = tmpDir.resolve("output.apks");
 
-    // KeyStore.
+    // Keystore.
     keystorePath = tmpDir.resolve("keystore.jks");
-    createKeyStore(keystorePath, KEYSTORE_PASSWORD);
-    addKeyToKeyStore(
+    createKeystore(keystorePath, KEYSTORE_PASSWORD);
+    addKeyToKeystore(
         keystorePath, KEYSTORE_PASSWORD, KEY_ALIAS, KEY_PASSWORD, privateKey, certificate);
-    addKeyToKeyStore(
+    addKeyToKeystore(
         keystorePath,
         KEYSTORE_PASSWORD,
         STAMP_KEY_ALIAS,
@@ -207,17 +213,17 @@ public class BuildApksCommandTest {
         stampPrivateKey,
         stampCertificate);
 
-    // Stamp KeyStore.
+    // Stamp Keystore.
     stampKeystorePath = tmpDir.resolve("stamp-keystore.jks");
-    createKeyStore(stampKeystorePath, STAMP_KEYSTORE_PASSWORD);
-    addKeyToKeyStore(
+    createKeystore(stampKeystorePath, STAMP_KEYSTORE_PASSWORD);
+    addKeyToKeystore(
         stampKeystorePath,
         STAMP_KEYSTORE_PASSWORD,
         STAMP_KEY_ALIAS,
         STAMP_KEY_PASSWORD,
         stampPrivateKey,
         stampCertificate);
-    addKeyToKeyStore(
+    addKeyToKeystore(
         stampKeystorePath,
         STAMP_KEYSTORE_PASSWORD,
         KEY_ALIAS,
@@ -225,10 +231,10 @@ public class BuildApksCommandTest {
         stampPrivateKey,
         stampCertificate);
 
-    // Oldest signer KeyStore.
+    // Oldest signer Keystore.
     Path oldestSignerKeystorePath = tmpDir.resolve("oldest-signer-keystore.jks");
-    createKeyStore(oldestSignerKeystorePath, OLDEST_SIGNER_KEYSTORE_PASSWORD);
-    addKeyToKeyStore(
+    createKeystore(oldestSignerKeystorePath, OLDEST_SIGNER_KEYSTORE_PASSWORD);
+    addKeyToKeystore(
         oldestSignerKeystorePath,
         OLDEST_SIGNER_KEYSTORE_PASSWORD,
         OLDEST_SIGNER_KEY_ALIAS,
@@ -243,6 +249,10 @@ public class BuildApksCommandTest {
             OLDEST_SIGNER_KEY_PASSWORD);
 
     fakeAdbServer.init(Paths.get("path/to/adb"));
+
+    // Runtime-enabled-SDK-related fields.
+    sdkBundlePath1 = tmpDir.resolve("bundle1.asb");
+    sdkBundlePath2 = tmpDir.resolve("bundle2.asb");
   }
 
   @Test
@@ -648,6 +658,35 @@ public class BuildApksCommandTest {
   }
 
   @Test
+  public void buildingViaFlagsAndBuilderHasSameResult_7zipPath() throws Exception {
+    ByteArrayOutputStream output = new ByteArrayOutputStream();
+    BuildApksCommand commandViaFlags =
+        BuildApksCommand.fromFlags(
+            new FlagParser()
+                .parse(
+                    "--bundle=" + bundlePath,
+                    "--output=" + outputFilePath,
+                    "--aapt2=" + AAPT2_PATH,
+                    // Optional values.
+                    "--7zip=/path/to/7za"),
+            new PrintStream(output),
+            systemEnvironmentProvider,
+            fakeAdbServer);
+    BuildApksCommand.Builder commandViaBuilder =
+        BuildApksCommand.builder()
+            .setBundlePath(bundlePath)
+            .setOutputFile(outputFilePath)
+            // Must copy instance of the internal executor service.
+            .setAapt2Command(commandViaFlags.getAapt2Command().get())
+            .setExecutorServiceInternal(commandViaFlags.getExecutorService())
+            .setExecutorServiceCreatedByBundleTool(true)
+            .setOutputPrintStream(commandViaFlags.getOutputPrintStream().get())
+            .setP7ZipCommand(commandViaFlags.getP7ZipCommand().get());
+
+    assertThat(commandViaBuilder.build()).isEqualTo(commandViaFlags);
+  }
+
+  @Test
   public void outputNotSet_throws() throws Exception {
     expectMissingRequiredBuilderPropertyException(
         "outputFile",
@@ -771,7 +810,7 @@ public class BuildApksCommandTest {
   }
 
   @Test
-  public void keyStoreFlags_keyAliasNotSet() {
+  public void keystoreFlags_keyAliasNotSet() {
     InvalidCommandException e =
         assertThrows(
             InvalidCommandException.class,
@@ -788,7 +827,7 @@ public class BuildApksCommandTest {
   }
 
   @Test
-  public void keyStoreFlags_keyStoreNotSet() {
+  public void keystoreFlags_keystoreNotSet() {
     InvalidCommandException e =
         assertThrows(
             InvalidCommandException.class,
@@ -833,7 +872,8 @@ public class BuildApksCommandTest {
   public void noKeystoreProvidedPrintsWarning_debugKeystore() throws Exception {
     Path debugKeystorePath = tmpDir.resolve(".android").resolve("debug.keystore");
     FileUtils.createParentDirectories(debugKeystorePath);
-    createDebugKeystore(debugKeystorePath);
+    createDebugKeystore(
+        debugKeystorePath, DEBUG_KEYSTORE_PASSWORD, DEBUG_KEY_ALIAS, DEBUG_KEY_PASSWORD);
 
     SystemEnvironmentProvider provider =
         new FakeSystemEnvironmentProvider(
@@ -1082,7 +1122,9 @@ public class BuildApksCommandTest {
   public void buildingViaFlagsAndBuilderHasSameResult_stamp_debugKey() throws Exception {
     Path debugKeystorePath = tmpDir.resolve(".android").resolve("debug.keystore");
     FileUtils.createParentDirectories(debugKeystorePath);
-    SigningConfiguration signingConfiguration = createDebugKeystore(debugKeystorePath);
+    SigningConfiguration signingConfiguration =
+        createDebugKeystore(
+            debugKeystorePath, DEBUG_KEYSTORE_PASSWORD, DEBUG_KEY_ALIAS, DEBUG_KEY_PASSWORD);
     SystemEnvironmentProvider provider =
         new FakeSystemEnvironmentProvider(
             /* variables= */ ImmutableMap.of(
@@ -1217,6 +1259,36 @@ public class BuildApksCommandTest {
   }
 
   @Test
+  public void buildingViaFlagsAndBuilderHasSameResult_runtimeEnabledSdkBundlesSet()
+      throws Exception {
+    ByteArrayOutputStream output = new ByteArrayOutputStream();
+    BuildApksCommand commandViaFlags =
+        BuildApksCommand.fromFlags(
+            new FlagParser()
+                .parse(
+                    "--bundle=" + bundlePath,
+                    "--output=" + outputFilePath,
+                    "--sdk-bundles=" + sdkBundlePath1 + "," + sdkBundlePath2),
+            new PrintStream(output),
+            systemEnvironmentProvider,
+            fakeAdbServer);
+
+    BuildApksCommand.Builder commandViaBuilder =
+        BuildApksCommand.builder()
+            .setBundlePath(bundlePath)
+            .setOutputFile(outputFilePath)
+            .setExecutorServiceInternal(commandViaFlags.getExecutorService())
+            .setExecutorServiceCreatedByBundleTool(true)
+            .setRuntimeEnabledSdkBundlePaths(ImmutableSet.of(sdkBundlePath1, sdkBundlePath2))
+            .setOutputPrintStream(commandViaFlags.getOutputPrintStream().get());
+
+    DebugKeystoreUtils.getDebugSigningConfiguration(systemEnvironmentProvider)
+        .ifPresent(commandViaBuilder::setSigningConfiguration);
+
+    assertThat(commandViaBuilder.build()).isEqualTo(commandViaFlags);
+  }
+
+  @Test
   public void missingBundleFile_throws() throws Exception {
     Path bundlePath = tmpDir.resolve("bundle.aab");
     ParsedFlags flags =
@@ -1331,6 +1403,31 @@ public class BuildApksCommandTest {
 
     SigningConfiguration signingConfiguration = commandViaFlags.getSigningConfiguration().get();
     assertThat(signingConfiguration.getMinimumV3RotationApiVersion()).hasValue(minV3Api);
+  }
+
+  @Test
+  public void populateRotationMinSdkVersion() {
+    ByteArrayOutputStream output = new ByteArrayOutputStream();
+    int rotationMinSdkVersion = 30;
+
+    BuildApksCommand commandViaFlags =
+        BuildApksCommand.fromFlags(
+            new FlagParser()
+                .parse(
+                    "--bundle=" + bundlePath,
+                    "--output=" + outputFilePath,
+                    "--aapt2=" + AAPT2_PATH,
+                    "--ks=" + keystorePath,
+                    "--ks-key-alias=" + KEY_ALIAS,
+                    "--ks-pass=pass:" + KEYSTORE_PASSWORD,
+                    "--key-pass=pass:" + KEY_PASSWORD,
+                    "--rotation-min-sdk-version=" + rotationMinSdkVersion),
+            new PrintStream(output),
+            systemEnvironmentProvider,
+            fakeAdbServer);
+
+    SigningConfiguration signingConfiguration = commandViaFlags.getSigningConfiguration().get();
+    assertThat(signingConfiguration.getRotationMinSdkVersion()).hasValue(rotationMinSdkVersion);
   }
 
   @Test
@@ -1556,6 +1653,100 @@ public class BuildApksCommandTest {
             "Only one of SigningConfiguration or SigningConfigurationProvider should be set.");
   }
 
+  @Test
+  public void sdkBundleFileDoesNotExist_throws() throws Exception {
+    // Creating SDK bundle for sdkBundlePath1, but not for SdkBundlePath2.
+    createSdkBundle(sdkBundlePath1);
+    createAppBundle(bundlePath);
+    BuildApksCommand command =
+        BuildApksCommand.fromFlags(
+            new FlagParser()
+                .parse(
+                    "--bundle=" + bundlePath,
+                    "--output=" + outputFilePath,
+                    "--sdk-bundles=" + sdkBundlePath1 + "," + sdkBundlePath2),
+            fakeAdbServer);
+
+    Exception e = assertThrows(IllegalArgumentException.class, command::execute);
+    assertThat(e).hasMessageThat().contains("not found");
+  }
+
+  @Test
+  public void badSdkBundleFileExtension_throws() throws Exception {
+    Path badSdkBundlePath = tmpDir.resolve("sdk_bundle.aab");
+    createSdkBundle(badSdkBundlePath);
+    createSdkBundle(sdkBundlePath1);
+    createAppBundle(bundlePath);
+    BuildApksCommand command =
+        BuildApksCommand.fromFlags(
+            new FlagParser()
+                .parse(
+                    "--bundle=" + bundlePath,
+                    "--output=" + outputFilePath,
+                    "--sdk-bundles=" + sdkBundlePath1 + "," + badSdkBundlePath),
+            fakeAdbServer);
+
+    Exception e = assertThrows(IllegalArgumentException.class, command::execute);
+    assertThat(e)
+        .hasMessageThat()
+        .contains("ASB file 'sdk_bundle.aab' is expected to have '.asb' extension.");
+  }
+
+  @Test
+  public void sdkBundleZipMissingManifest_sdkBundleZipFileValidationFails() throws Exception {
+    new ZipBuilder()
+        .addFileWithContent(ZipPath.create("base/dex/classes.dex"), new byte[1])
+        .addFileWithContent(ZipPath.create("BundleConfig.pb"), new byte[1])
+        .writeTo(sdkBundlePath1);
+    createAppBundle(bundlePath);
+    BuildApksCommand command =
+        BuildApksCommand.fromFlags(
+            new FlagParser()
+                .parse(
+                    "--bundle=" + bundlePath,
+                    "--output=" + outputFilePath,
+                    "--sdk-bundles=" + sdkBundlePath1),
+            fakeAdbServer);
+
+    Exception e = assertThrows(InvalidBundleException.class, command::execute);
+    assertThat(e)
+        .hasMessageThat()
+        .contains("Module 'base' is missing mandatory file 'manifest/AndroidManifest.xml'.");
+  }
+
+  @Test
+  public void sdkBundleHasInvalidManifestEntry_sdkBundleValidationFails() throws Exception {
+    new SdkBundleSerializer()
+        .writeToDisk(
+            new SdkBundleBuilder()
+                .setModule(
+                    new BundleModuleBuilder("base")
+                        .setManifest(
+                            androidManifest(
+                                "package.name",
+                                withMinSdkVersion(32),
+                                // Major version must be a long.
+                                withSdkLibraryElement("MajorVersionNotLong")))
+                        .build())
+                .build(),
+            sdkBundlePath1);
+    createAppBundle(bundlePath);
+    BuildApksCommand command =
+        BuildApksCommand.fromFlags(
+            new FlagParser()
+                .parse(
+                    "--bundle=" + bundlePath,
+                    "--output=" + outputFilePath,
+                    "--sdk-bundles=" + sdkBundlePath1),
+            fakeAdbServer);
+
+    Exception e = assertThrows(InvalidBundleException.class, command::execute);
+    assertThat(e)
+        .hasMessageThat()
+        .contains(
+            "SDK Major version in <" + SDK_LIBRARY_ELEMENT_NAME + "> cannot be parsed to a Long.");
+  }
+
   private void createAppBundle(Path path) throws Exception {
     createAppBundle(path, /* codeTransparency= */ Optional.empty());
   }
@@ -1575,42 +1766,8 @@ public class BuildApksCommandTest {
     new AppBundleSerializer().writeToDisk(appBundle.build(), path);
   }
 
-  private static void createKeyStore(Path keystorePath, String keystorePassword)
-      throws KeyStoreException, CertificateException, NoSuchAlgorithmException, IOException {
-    KeyStore keystore = KeyStore.getInstance("JKS");
-    keystore.load(/* stream= */ null, keystorePassword.toCharArray());
-    keystore.store(new FileOutputStream(keystorePath.toFile()), keystorePassword.toCharArray());
-  }
-
-  private static void addKeyToKeyStore(
-      Path keystorePath,
-      String keystorePassword,
-      String keyAlias,
-      String keyPassword,
-      PrivateKey privateKey,
-      X509Certificate certificate)
-      throws KeyStoreException, CertificateException, NoSuchAlgorithmException, IOException {
-    KeyStore keystore = KeyStore.getInstance("JKS");
-    keystore.load(new FileInputStream(keystorePath.toFile()), keystorePassword.toCharArray());
-    keystore.setKeyEntry(
-        keyAlias, privateKey, keyPassword.toCharArray(), new Certificate[] {certificate});
-    keystore.store(new FileOutputStream(keystorePath.toFile()), keystorePassword.toCharArray());
-  }
-
-  private static SigningConfiguration createDebugKeystore(Path path) throws Exception {
-    KeyPair keyPair = KeyPairGenerator.getInstance("RSA").genKeyPair();
-    PrivateKey privateKey = keyPair.getPrivate();
-    X509Certificate certificate =
-        CertificateFactory.buildSelfSignedCertificate(keyPair, "CN=Android Debug,O=Android,C=US");
-    KeyStore keystore = KeyStore.getInstance("JKS");
-    keystore.load(/* stream= */ null, DEBUG_KEYSTORE_PASSWORD.toCharArray());
-    keystore.setKeyEntry(
-        DEBUG_KEY_ALIAS,
-        privateKey,
-        DEBUG_KEY_PASSWORD.toCharArray(),
-        new Certificate[] {certificate});
-    keystore.store(new FileOutputStream(path.toFile()), DEBUG_KEYSTORE_PASSWORD.toCharArray());
-    return SigningConfiguration.builder().setSignerConfig(privateKey, certificate).build();
+  private void createSdkBundle(Path path) throws Exception {
+    new SdkBundleSerializer().writeToDisk(new SdkBundleBuilder().build(), path);
   }
 
   private Path createKeystorePropertiesFile(
@@ -1634,11 +1791,11 @@ public class BuildApksCommandTest {
   /** Create an arbitrary but valid APK file. */
   private Path createMinimalistSignedApkFile() {
     checkState(
-        standaloneApkSerializer != null,
+        apkSerializer != null,
         "The test must call TestComponent.useTestModule() to inject the required objects.");
     Path outPath = tmp.getRoot().toPath();
     ZipPath zipPath = ZipPath.create("minimalist-apk.apk");
-    standaloneApkSerializer.writeToDisk(createMinimalistModuleSplit(), outPath, zipPath);
+    apkSerializer.serialize(outPath, zipPath.toString(), createMinimalistModuleSplit());
     return outPath.resolve(zipPath.toString());
   }
 

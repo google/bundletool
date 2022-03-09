@@ -43,6 +43,8 @@ import static com.android.tools.build.bundletool.model.AndroidManifest.IS_SPLIT_
 import static com.android.tools.build.bundletool.model.AndroidManifest.IS_SPLIT_REQUIRED_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.LABEL_ATTRIBUTE_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.LABEL_RESOURCE_ID;
+import static com.android.tools.build.bundletool.model.AndroidManifest.LOCALE_CONFIG_ATTRIBUTE_NAME;
+import static com.android.tools.build.bundletool.model.AndroidManifest.LOCALE_CONFIG_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.MAX_SDK_VERSION_ATTRIBUTE_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.MAX_SDK_VERSION_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.META_DATA_ELEMENT_NAME;
@@ -81,8 +83,8 @@ import com.android.tools.build.bundletool.model.utils.xmlproto.XmlProtoNodeBuild
 import com.android.tools.build.bundletool.model.version.Version;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
+import com.google.errorprone.annotations.CheckReturnValue;
 import java.util.Optional;
-import javax.annotation.CheckReturnValue;
 
 /** Modifies the manifest in the protocol buffer format. */
 public class ManifestEditor {
@@ -192,6 +194,11 @@ public class ManifestEditor {
             SHARED_USER_LABEL_ATTRIBUTE_NAME, SHARED_USER_LABEL_RESOURCE_ID)
         .setValueAsRefId(valueRefId);
     return this;
+  }
+
+  public ManifestEditor setLocaleConfig(int resourceId) {
+    return setApplcationAttributeRefId(
+        LOCALE_CONFIG_ATTRIBUTE_NAME, LOCALE_CONFIG_RESOURCE_ID, resourceId);
   }
 
   public ManifestEditor addMetaDataString(String key, String value) {
@@ -399,6 +406,20 @@ public class ManifestEditor {
     manifestElement
         .getOrCreateChildElement(APPLICATION_ELEMENT_NAME)
         .addChildElement(receiver.asXmlProtoElement().toBuilder());
+    return this;
+  }
+
+  public ManifestEditor copyPermissions(AndroidManifest manifest) {
+    manifest
+        .getPermissions()
+        .forEach(permission -> manifestElement.addChildElement(permission.toBuilder()));
+    return this;
+  }
+
+  public ManifestEditor copyPermissionGroups(AndroidManifest manifest) {
+    manifest
+        .getPermissionGroups()
+        .forEach(permissionGroup -> manifestElement.addChildElement(permissionGroup.toBuilder()));
     return this;
   }
 

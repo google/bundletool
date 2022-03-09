@@ -29,6 +29,7 @@ import static com.android.tools.build.bundletool.commands.BuildApksCommand.ApkBu
 import static com.android.tools.build.bundletool.commands.BuildApksCommand.ApkBuildMode.SYSTEM;
 import static com.android.tools.build.bundletool.commands.BuildApksCommand.ApkBuildMode.UNIVERSAL;
 import static com.android.tools.build.bundletool.commands.BuildApksCommand.OutputFormat.DIRECTORY;
+import static com.android.tools.build.bundletool.commands.ExtractApksCommand.ALL_MODULES_SHORTCUT;
 import static com.android.tools.build.bundletool.model.AndroidManifest.DEVELOPMENT_SDK_VERSION;
 import static com.android.tools.build.bundletool.model.BundleModule.ASSETS_DIRECTORY;
 import static com.android.tools.build.bundletool.model.OptimizationDimension.ABI;
@@ -37,7 +38,7 @@ import static com.android.tools.build.bundletool.model.OptimizationDimension.TEX
 import static com.android.tools.build.bundletool.model.SourceStamp.STAMP_SOURCE_METADATA_KEY;
 import static com.android.tools.build.bundletool.model.utils.ResourcesUtils.MDPI_VALUE;
 import static com.android.tools.build.bundletool.model.utils.ResultUtils.apexApkVariants;
-import static com.android.tools.build.bundletool.model.utils.ResultUtils.hibernatedApkVariants;
+import static com.android.tools.build.bundletool.model.utils.ResultUtils.archivedApkVariants;
 import static com.android.tools.build.bundletool.model.utils.ResultUtils.instantApkVariants;
 import static com.android.tools.build.bundletool.model.utils.ResultUtils.splitApkVariants;
 import static com.android.tools.build.bundletool.model.utils.ResultUtils.standaloneApkVariants;
@@ -109,6 +110,7 @@ import static com.android.tools.build.bundletool.testing.TargetingUtils.toAbi;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.variantAbiTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.variantMultiAbiTargetingFromAllTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.variantSdkTargeting;
+import static com.android.tools.build.bundletool.testing.TestUtils.extractAndroidManifest;
 import static com.android.tools.build.bundletool.testing.TestUtils.filesUnderPath;
 import static com.android.tools.build.bundletool.testing.truth.zip.TruthZip.assertThat;
 import static com.google.common.collect.ImmutableList.toImmutableList;
@@ -126,7 +128,6 @@ import static org.junit.Assert.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.android.aapt.ConfigurationOuterClass.Configuration;
-import com.android.aapt.Resources.XmlNode;
 import com.android.apex.ApexManifestProto.ApexManifest;
 import com.android.apksig.ApkVerifier;
 import com.android.bundle.CodeTransparencyOuterClass.CodeRelatedFile;
@@ -177,13 +178,13 @@ import com.android.tools.build.bundletool.model.BundleMetadata;
 import com.android.tools.build.bundletool.model.SigningConfiguration;
 import com.android.tools.build.bundletool.model.SourceStamp;
 import com.android.tools.build.bundletool.model.ZipPath;
+import com.android.tools.build.bundletool.model.exceptions.InvalidBundleException;
 import com.android.tools.build.bundletool.model.exceptions.InvalidCommandException;
 import com.android.tools.build.bundletool.model.exceptions.InvalidVersionCodeException;
 import com.android.tools.build.bundletool.model.utils.CertificateHelper;
 import com.android.tools.build.bundletool.model.utils.files.FilePreconditions;
 import com.android.tools.build.bundletool.model.version.BundleToolVersion;
 import com.android.tools.build.bundletool.model.version.Version;
-import com.android.tools.build.bundletool.testing.Aapt2Helper;
 import com.android.tools.build.bundletool.testing.ApkSetUtils;
 import com.android.tools.build.bundletool.testing.AppBundleBuilder;
 import com.android.tools.build.bundletool.testing.BundleConfigBuilder;
@@ -207,13 +208,11 @@ import com.google.common.io.Closer;
 import com.google.common.truth.Correspondence;
 import com.google.common.util.concurrent.ListeningExecutorService;
 import com.google.common.util.concurrent.MoreExecutors;
-import com.google.protobuf.ExtensionRegistry;
 import com.google.protobuf.Int32Value;
 import dagger.Component;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.io.UncheckedIOException;
 import java.nio.charset.Charset;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -292,12 +291,16 @@ public class BuildApksManagerTest {
   @Inject BuildApksManager buildApksManager;
   @Inject BuildApksCommand command;
 
+  protected TestModule.Builder createTestModuleBuilder() {
+    return TestModule.builder();
+  }
+
   @BeforeClass
   public static void setUpClass() throws Exception {
     // Creating a new key takes in average 75ms (with peaks at 200ms), so creating a single one for
     // all the tests.
     KeyPairGenerator kpg = KeyPairGenerator.getInstance("RSA");
-    kpg.initialize(/* keySize= */ 3072);
+    kpg.initialize(/* keysize= */ 3072);
     KeyPair keyPair = kpg.genKeyPair();
     privateKey = keyPair.getPrivate();
     certificate = CertificateFactory.buildSelfSignedCertificate(keyPair, "CN=BuildApksCommandTest");
@@ -305,7 +308,7 @@ public class BuildApksManagerTest {
 
   @Before
   public void setUp() throws Exception {
-    TestComponent.useTestModule(this, TestModule.builder().build());
+    TestComponent.useTestModule(this, createTestModuleBuilder().build());
     tmpDir = tmp.getRoot().toPath();
 
     outputDir = tmp.newFolder("output").toPath();
@@ -333,7 +336,7 @@ public class BuildApksManagerTest {
   public void parallelExecutionSucceeds() throws Exception {
     TestComponent.useTestModule(
         this,
-        TestModule.builder()
+        createTestModuleBuilder()
             .withExecutorService(MoreExecutors.listeningDecorator(Executors.newFixedThreadPool(3)))
             .build());
 
@@ -373,7 +376,8 @@ public class BuildApksManagerTest {
                                 withTitle("@string/test_label", TEST_LABEL_RESOURCE_ID))))
             .build();
     TestComponent.useTestModule(
-        this, TestModule.builder().withAppBundle(appBundle).withOutputPath(outputFilePath).build());
+        this,
+        createTestModuleBuilder().withAppBundle(appBundle).withOutputPath(outputFilePath).build());
 
     buildApksManager.execute();
 
@@ -410,7 +414,7 @@ public class BuildApksManagerTest {
     AppBundle appBundle = createAppBundleWithBaseAndFeatureModules("ar", "vr");
     TestComponent.useTestModule(
         this,
-        TestModule.builder()
+        createTestModuleBuilder()
             .withAppBundle(appBundle)
             .withOutputPath(outputFilePath)
             .withApkBuildMode(UNIVERSAL)
@@ -436,11 +440,40 @@ public class BuildApksManagerTest {
   }
 
   @Test
+  public void selectsRightModules_universalMode_withModulesFlag_allModulesShortcut()
+      throws Exception {
+    AppBundle appBundle = createAppBundleWithBaseAndFeatureModules("ar", "vr");
+    TestComponent.useTestModule(
+        this,
+        createTestModuleBuilder()
+            .withAppBundle(appBundle)
+            .withOutputPath(outputFilePath)
+            .withApkBuildMode(UNIVERSAL)
+            .withModules(ALL_MODULES_SHORTCUT)
+            .build());
+
+    buildApksManager.execute();
+
+    ZipFile apkSetFile = openZipFile(outputFilePath.toFile());
+    BuildApksResult result = extractTocFromApkSetFile(apkSetFile, outputDir);
+    assertThat(apkDescriptions(standaloneApkVariants(result)))
+        .ignoringRepeatedFieldOrder()
+        .containsExactly(
+            ApkDescription.newBuilder()
+                .setPath("universal.apk")
+                .setTargeting(ApkTargeting.getDefaultInstance())
+                .setStandaloneApkMetadata(
+                    StandaloneApkMetadata.newBuilder()
+                        .addAllFusedModuleName(ImmutableList.of("base", "vr", "ar")))
+                .build());
+  }
+
+  @Test
   public void selectsRightModules_systemMode_withModulesFlag() throws Exception {
     AppBundle appBundle = createAppBundleWithBaseAndFeatureModules("ar", "vr");
     TestComponent.useTestModule(
         this,
-        TestModule.builder()
+        createTestModuleBuilder()
             .withAppBundle(appBundle)
             .withOutputPath(outputFilePath)
             .withApkBuildMode(SYSTEM)
@@ -497,7 +530,7 @@ public class BuildApksManagerTest {
             .build();
     TestComponent.useTestModule(
         this,
-        TestModule.builder()
+        createTestModuleBuilder()
             .withAppBundle(appBundle)
             .withOutputPath(outputFilePath)
             .withApkBuildMode(SYSTEM)
@@ -559,7 +592,7 @@ public class BuildApksManagerTest {
             .build();
     TestComponent.useTestModule(
         this,
-        TestModule.builder()
+        createTestModuleBuilder()
             .withAppBundle(appBundle)
             .withOutputPath(outputFilePath)
             .withApkBuildMode(SYSTEM)
@@ -645,7 +678,7 @@ public class BuildApksManagerTest {
             .build();
     TestComponent.useTestModule(
         this,
-        TestModule.builder()
+        createTestModuleBuilder()
             .withAppBundle(appBundle)
             .withOutputPath(outputFilePath)
             .withApkBuildMode(SYSTEM)
@@ -727,7 +760,7 @@ public class BuildApksManagerTest {
             .build();
     TestComponent.useTestModule(
         this,
-        TestModule.builder()
+        createTestModuleBuilder()
             .withAppBundle(appBundle)
             .withOutputPath(outputFilePath)
             .withApkBuildMode(SYSTEM)
@@ -781,7 +814,8 @@ public class BuildApksManagerTest {
                     builder.addFile("dex/classes.dex").setManifest(androidManifest("com.test.app")))
             .build();
     TestComponent.useTestModule(
-        this, TestModule.builder().withAppBundle(appBundle).withOutputPath(outputFilePath).build());
+        this,
+        createTestModuleBuilder().withAppBundle(appBundle).withOutputPath(outputFilePath).build());
 
     buildApksManager.execute();
 
@@ -803,7 +837,8 @@ public class BuildApksManagerTest {
                         androidManifest("com.test.app", withMinSdkVersion(ANDROID_L_API_VERSION))))
             .build();
     TestComponent.useTestModule(
-        this, TestModule.builder().withAppBundle(appBundle).withOutputPath(outputFilePath).build());
+        this,
+        createTestModuleBuilder().withAppBundle(appBundle).withOutputPath(outputFilePath).build());
 
     buildApksManager.execute();
     ZipFile apkSetFile = openZipFile(outputFilePath.toFile());
@@ -828,7 +863,8 @@ public class BuildApksManagerTest {
             .build();
 
     TestComponent.useTestModule(
-        this, TestModule.builder().withAppBundle(appBundle).withOutputPath(outputFilePath).build());
+        this,
+        createTestModuleBuilder().withAppBundle(appBundle).withOutputPath(outputFilePath).build());
 
     buildApksManager.execute();
 
@@ -852,7 +888,8 @@ public class BuildApksManagerTest {
                         androidManifest("com.app", withMinSdkVersion(15), withMaxSdkVersion(20))))
             .build();
     TestComponent.useTestModule(
-        this, TestModule.builder().withAppBundle(appBundle).withOutputPath(outputFilePath).build());
+        this,
+        createTestModuleBuilder().withAppBundle(appBundle).withOutputPath(outputFilePath).build());
 
     buildApksManager.execute();
 
@@ -877,7 +914,8 @@ public class BuildApksManagerTest {
                         androidManifest("com.app", withMinSdkVersion(21), withMaxSdkVersion(25))))
             .build();
     TestComponent.useTestModule(
-        this, TestModule.builder().withAppBundle(appBundle).withOutputPath(outputFilePath).build());
+        this,
+        createTestModuleBuilder().withAppBundle(appBundle).withOutputPath(outputFilePath).build());
 
     buildApksManager.execute();
 
@@ -902,7 +940,7 @@ public class BuildApksManagerTest {
 
     TestComponent.useTestModule(
         this,
-        TestModule.builder()
+        createTestModuleBuilder()
             .withAppBundle(appBundle)
             .withOutputPath(outputFilePath)
             .withApkBuildMode(INSTANT)
@@ -930,7 +968,7 @@ public class BuildApksManagerTest {
 
     TestComponent.useTestModule(
         this,
-        TestModule.builder()
+        createTestModuleBuilder()
             .withAppBundle(appBundle)
             .withOutputPath(outputFilePath)
             .withApkBuildMode(PERSISTENT)
@@ -962,7 +1000,7 @@ public class BuildApksManagerTest {
             .build();
     TestComponent.useTestModule(
         this,
-        TestModule.builder()
+        createTestModuleBuilder()
             .withAppBundle(appBundle)
             .withOutputPath(outputFilePath)
             .withApkBuildMode(INSTANT)
@@ -989,7 +1027,7 @@ public class BuildApksManagerTest {
             .build();
     TestComponent.useTestModule(
         this,
-        TestModule.builder()
+        createTestModuleBuilder()
             .withAppBundle(appBundle)
             .withOutputPath(outputFilePath)
             .withApkBuildMode(PERSISTENT)
@@ -1037,7 +1075,7 @@ public class BuildApksManagerTest {
             .build();
     TestComponent.useTestModule(
         this,
-        TestModule.builder()
+        createTestModuleBuilder()
             .withAppBundle(appBundle)
             .withOutputPath(outputFilePath)
             .withApkBuildMode(UNIVERSAL)
@@ -1106,7 +1144,7 @@ public class BuildApksManagerTest {
             .build();
     TestComponent.useTestModule(
         this,
-        TestModule.builder()
+        createTestModuleBuilder()
             .withAppBundle(appBundle)
             .withOutputPath(outputFilePath)
             .withApkBuildMode(UNIVERSAL)
@@ -1125,7 +1163,7 @@ public class BuildApksManagerTest {
     assertThat(universalApk.getStandaloneApkMetadata().getFusedModuleNameList())
         .containsExactly("base", "feature");
     File universalApkFile = extractFromApkSetFile(apkSetFile, universalApk.getPath(), outputDir);
-    AndroidManifest manifest = extractAndroidManifest(universalApkFile);
+    AndroidManifest manifest = extractAndroidManifest(universalApkFile, tmpDir);
 
     Map<String, Integer> refIdByActivity =
         transformValues(
@@ -1184,7 +1222,7 @@ public class BuildApksManagerTest {
             .build();
     TestComponent.useTestModule(
         this,
-        TestModule.builder()
+        createTestModuleBuilder()
             .withAppBundle(appBundle)
             .withOutputPath(outputFilePath)
             .withApkBuildMode(UNIVERSAL)
@@ -1204,7 +1242,7 @@ public class BuildApksManagerTest {
         .containsExactly("base", "feature");
     File universalApkFile = extractFromApkSetFile(apkSetFile, universalApk.getPath(), outputDir);
 
-    AndroidManifest manifest = extractAndroidManifest(universalApkFile);
+    AndroidManifest manifest = extractAndroidManifest(universalApkFile, tmpDir);
     Map<String, Integer> refIdByActivity =
         transformValues(
             manifest.getActivitiesByName(),
@@ -1253,7 +1291,7 @@ public class BuildApksManagerTest {
             .build();
     TestComponent.useTestModule(
         this,
-        TestModule.builder()
+        createTestModuleBuilder()
             .withAppBundle(appBundle)
             .withOutputPath(outputFilePath)
             .withApkBuildMode(UNIVERSAL)
@@ -1314,7 +1352,7 @@ public class BuildApksManagerTest {
             .build();
     TestComponent.useTestModule(
         this,
-        TestModule.builder()
+        createTestModuleBuilder()
             .withAppBundle(appBundle)
             .withOutputPath(outputFilePath)
             .withApkBuildMode(UNIVERSAL)
@@ -1377,7 +1415,7 @@ public class BuildApksManagerTest {
 
     TestComponent.useTestModule(
         this,
-        TestModule.builder()
+        createTestModuleBuilder()
             .withAppBundle(appBundle)
             .withOutputPath(outputFilePath)
             .withApkBuildMode(UNIVERSAL)
@@ -1436,7 +1474,7 @@ public class BuildApksManagerTest {
             .build();
     TestComponent.useTestModule(
         this,
-        TestModule.builder()
+        createTestModuleBuilder()
             .withAppBundle(appBundle)
             .withOutputPath(outputFilePath)
             .withApkBuildMode(UNIVERSAL)
@@ -1498,7 +1536,7 @@ public class BuildApksManagerTest {
             .build();
     TestComponent.useTestModule(
         this,
-        TestModule.builder()
+        createTestModuleBuilder()
             .withAppBundle(appBundle)
             .withOutputPath(outputFilePath)
             .withApkBuildMode(UNIVERSAL)
@@ -1560,7 +1598,7 @@ public class BuildApksManagerTest {
             .build();
     TestComponent.useTestModule(
         this,
-        TestModule.builder()
+        createTestModuleBuilder()
             .withAppBundle(appBundle)
             .withOutputPath(outputFilePath)
             .withApkBuildMode(UNIVERSAL)
@@ -1619,7 +1657,7 @@ public class BuildApksManagerTest {
 
     TestComponent.useTestModule(
         this,
-        TestModule.builder()
+        createTestModuleBuilder()
             .withAppBundle(appBundle)
             .withOutputPath(outputFilePath)
             .withApkBuildMode(UNIVERSAL)
@@ -1690,7 +1728,7 @@ public class BuildApksManagerTest {
             .build();
     TestComponent.useTestModule(
         this,
-        TestModule.builder()
+        createTestModuleBuilder()
             .withAppBundle(appBundle)
             .withOutputPath(outputFilePath)
             .withApkBuildMode(SYSTEM)
@@ -1746,7 +1784,7 @@ public class BuildApksManagerTest {
             .build();
     TestComponent.useTestModule(
         this,
-        TestModule.builder()
+        createTestModuleBuilder()
             .withAppBundle(appBundle)
             .withOutputPath(outputFilePath)
             .withApkBuildMode(UNIVERSAL)
@@ -1789,7 +1827,8 @@ public class BuildApksManagerTest {
                             withFusingAttribute(true))))
             .build();
     TestComponent.useTestModule(
-        this, TestModule.builder().withAppBundle(appBundle).withOutputPath(outputFilePath).build());
+        this,
+        createTestModuleBuilder().withAppBundle(appBundle).withOutputPath(outputFilePath).build());
 
     buildApksManager.execute();
 
@@ -1828,7 +1867,8 @@ public class BuildApksManagerTest {
                     builder.addFile("dex/classes.dex").setManifest(androidManifest("com.test.app")))
             .build();
     TestComponent.useTestModule(
-        this, TestModule.builder().withAppBundle(appBundle).withOutputPath(outputFilePath).build());
+        this,
+        createTestModuleBuilder().withAppBundle(appBundle).withOutputPath(outputFilePath).build());
 
     buildApksManager.execute();
 
@@ -1858,7 +1898,8 @@ public class BuildApksManagerTest {
                         .setManifest(androidManifest("com.test.app", withMinSdkVersion(25))))
             .build();
     TestComponent.useTestModule(
-        this, TestModule.builder().withAppBundle(appBundle).withOutputPath(outputFilePath).build());
+        this,
+        createTestModuleBuilder().withAppBundle(appBundle).withOutputPath(outputFilePath).build());
 
     buildApksManager.execute();
 
@@ -1889,7 +1930,8 @@ public class BuildApksManagerTest {
                         .setManifest(androidManifest("com.test.app", withMaxSdkVersion(21))))
             .build();
     TestComponent.useTestModule(
-        this, TestModule.builder().withAppBundle(appBundle).withOutputPath(outputFilePath).build());
+        this,
+        createTestModuleBuilder().withAppBundle(appBundle).withOutputPath(outputFilePath).build());
 
     buildApksManager.execute();
 
@@ -1913,7 +1955,8 @@ public class BuildApksManagerTest {
                     builder.addFile("dex/classes.dex").setManifest(androidManifest("com.test.app")))
             .build();
     TestComponent.useTestModule(
-        this, TestModule.builder().withAppBundle(appBundle).withOutputPath(outputFilePath).build());
+        this,
+        createTestModuleBuilder().withAppBundle(appBundle).withOutputPath(outputFilePath).build());
 
     buildApksManager.execute();
 
@@ -1949,7 +1992,8 @@ public class BuildApksManagerTest {
                 BundleConfigBuilder.create().setUncompressNativeLibraries(false).build())
             .build();
     TestComponent.useTestModule(
-        this, TestModule.builder().withAppBundle(appBundle).withOutputPath(outputFilePath).build());
+        this,
+        createTestModuleBuilder().withAppBundle(appBundle).withOutputPath(outputFilePath).build());
 
     buildApksManager.execute();
 
@@ -1981,7 +2025,8 @@ public class BuildApksManagerTest {
             .setBundleConfig(BundleConfigBuilder.create().build())
             .build();
     TestComponent.useTestModule(
-        this, TestModule.builder().withAppBundle(appBundle).withOutputPath(outputFilePath).build());
+        this,
+        createTestModuleBuilder().withAppBundle(appBundle).withOutputPath(outputFilePath).build());
 
     buildApksManager.execute();
 
@@ -2014,7 +2059,8 @@ public class BuildApksManagerTest {
             .setBundleConfig(BundleConfigBuilder.create().setVersion("0.5.1").build())
             .build();
     TestComponent.useTestModule(
-        this, TestModule.builder().withAppBundle(appBundle).withOutputPath(outputFilePath).build());
+        this,
+        createTestModuleBuilder().withAppBundle(appBundle).withOutputPath(outputFilePath).build());
 
     buildApksManager.execute();
 
@@ -2047,7 +2093,8 @@ public class BuildApksManagerTest {
                 BundleConfigBuilder.create().setUncompressNativeLibraries(true).build())
             .build();
     TestComponent.useTestModule(
-        this, TestModule.builder().withAppBundle(appBundle).withOutputPath(outputFilePath).build());
+        this,
+        createTestModuleBuilder().withAppBundle(appBundle).withOutputPath(outputFilePath).build());
 
     buildApksManager.execute();
 
@@ -2082,7 +2129,8 @@ public class BuildApksManagerTest {
                 BundleConfigBuilder.create().setUncompressNativeLibraries(true).build())
             .build();
     TestComponent.useTestModule(
-        this, TestModule.builder().withAppBundle(appBundle).withOutputPath(outputFilePath).build());
+        this,
+        createTestModuleBuilder().withAppBundle(appBundle).withOutputPath(outputFilePath).build());
 
     buildApksManager.execute();
 
@@ -2098,6 +2146,104 @@ public class BuildApksManagerTest {
             sdkVersionTargeting(P_SDK_VERSION, ImmutableSet.of(LOWEST_SDK_VERSION, L_SDK_VERSION)));
   }
 
+  @Test
+  public void enabledDexCompressionSplitter_enabledUncompressedDex_multipleSplitVariants()
+      throws Exception {
+    AppBundle appBundle =
+        new AppBundleBuilder()
+            .addModule(
+                "base",
+                builder ->
+                    builder.addFile("dex/classes.dex").setManifest(androidManifest("com.test.app")))
+            .setBundleConfig(BundleConfigBuilder.create().setUncompressDexFiles(true).build())
+            .build();
+    TestComponent.useTestModule(
+        this,
+        createTestModuleBuilder().withAppBundle(appBundle).withOutputPath(outputFilePath).build());
+
+    buildApksManager.execute();
+
+    ZipFile apkSetFile = openZipFile(outputFilePath.toFile());
+    BuildApksResult result = extractTocFromApkSetFile(apkSetFile, outputDir);
+
+    ImmutableList<Variant> splitApkVariants = splitApkVariants(result);
+    assertThat(
+            splitApkVariants.stream()
+                .map(variant -> variant.getTargeting().getSdkVersionTargeting()))
+        .containsExactly(
+            sdkVersionTargeting(L_SDK_VERSION, ImmutableSet.of(LOWEST_SDK_VERSION, Q_SDK_VERSION)),
+            sdkVersionTargeting(Q_SDK_VERSION, ImmutableSet.of(LOWEST_SDK_VERSION, L_SDK_VERSION)));
+  }
+
+  @Test
+  public void enabledDexCompressionSplitter_disabledUncompressedDex_noUncompressedDexVariant()
+      throws Exception {
+    AppBundle appBundle =
+        new AppBundleBuilder()
+            .addModule(
+                "base",
+                builder ->
+                    builder.addFile("dex/classes.dex").setManifest(androidManifest("com.test.app")))
+            .setBundleConfig(BundleConfigBuilder.create().setUncompressDexFiles(false).build())
+            .build();
+    TestComponent.useTestModule(
+        this,
+        createTestModuleBuilder().withAppBundle(appBundle).withOutputPath(outputFilePath).build());
+
+    buildApksManager.execute();
+
+    ZipFile apkSetFile = openZipFile(outputFilePath.toFile());
+    BuildApksResult result = extractTocFromApkSetFile(apkSetFile, outputDir);
+
+    ImmutableList<Variant> splitApkVariants = splitApkVariants(result);
+    assertThat(
+            splitApkVariants.stream()
+                .map(variant -> variant.getTargeting().getSdkVersionTargeting()))
+        .containsExactly(sdkVersionTargeting(L_SDK_VERSION, ImmutableSet.of(LOWEST_SDK_VERSION)));
+  }
+
+  @Test
+  public void enableNativeLibsDexCompressionSplitterEnabled_multipleSplitVariants()
+      throws Exception {
+    AppBundle appBundle =
+        new AppBundleBuilder()
+            .addModule(
+                "base",
+                builder ->
+                    builder
+                        .addFile("dex/classes.dex")
+                        .addFile("lib/x86/libsome.so")
+                        .setNativeConfig(
+                            nativeLibraries(
+                                targetedNativeDirectory("lib/x86", nativeDirectoryTargeting(X86))))
+                        .setManifest(androidManifest("com.test.app")))
+            .setBundleConfig(
+                BundleConfigBuilder.create()
+                    .setUncompressNativeLibraries(true)
+                    .setUncompressDexFiles(true)
+                    .build())
+            .build();
+    TestComponent.useTestModule(
+        this,
+        createTestModuleBuilder().withAppBundle(appBundle).withOutputPath(outputFilePath).build());
+
+    buildApksManager.execute();
+
+    ZipFile apkSetFile = openZipFile(outputFilePath.toFile());
+    BuildApksResult result = extractTocFromApkSetFile(apkSetFile, outputDir);
+
+    ImmutableList<Variant> splitApkVariants = splitApkVariants(result);
+    assertThat(
+            splitApkVariants.stream()
+                .map(variant -> variant.getTargeting().getSdkVersionTargeting()))
+        .containsExactly(
+            sdkVersionTargeting(
+                L_SDK_VERSION, ImmutableSet.of(LOWEST_SDK_VERSION, M_SDK_VERSION, Q_SDK_VERSION)),
+            sdkVersionTargeting(
+                M_SDK_VERSION, ImmutableSet.of(LOWEST_SDK_VERSION, L_SDK_VERSION, Q_SDK_VERSION)),
+            sdkVersionTargeting(
+                Q_SDK_VERSION, ImmutableSet.of(LOWEST_SDK_VERSION, L_SDK_VERSION, M_SDK_VERSION)));
+  }
 
   @Test
   public void buildApksCommand_standalone_oneModuleManyVariants() throws Exception {
@@ -2122,7 +2268,7 @@ public class BuildApksManagerTest {
             .build();
     TestComponent.useTestModule(
         this,
-        TestModule.builder()
+        createTestModuleBuilder()
             .withAppBundle(appBundle)
             .withOutputPath(outputFilePath)
             .withOptimizationDimensions(ABI)
@@ -2200,7 +2346,7 @@ public class BuildApksManagerTest {
             .build();
     TestComponent.useTestModule(
         this,
-        TestModule.builder()
+        createTestModuleBuilder()
             .withAppBundle(appBundle)
             .withOutputPath(outputFilePath)
             .withApkBuildMode(SYSTEM)
@@ -2264,7 +2410,7 @@ public class BuildApksManagerTest {
             .build();
     TestComponent.useTestModule(
         this,
-        TestModule.builder()
+        createTestModuleBuilder()
             .withAppBundle(appBundle)
             .withOutputPath(outputFilePath)
             .withApkBuildMode(SYSTEM)
@@ -2376,7 +2522,7 @@ public class BuildApksManagerTest {
             .build();
     TestComponent.useTestModule(
         this,
-        TestModule.builder()
+        createTestModuleBuilder()
             .withAppBundle(appBundle)
             .withOutputPath(outputFilePath)
             .withApkBuildMode(SYSTEM)
@@ -2489,7 +2635,7 @@ public class BuildApksManagerTest {
             .build();
     TestComponent.useTestModule(
         this,
-        TestModule.builder()
+        createTestModuleBuilder()
             .withAppBundle(appBundle)
             .withOutputPath(outputFilePath)
             .withOptimizationDimensions(ABI)
@@ -2567,7 +2713,7 @@ public class BuildApksManagerTest {
             .build();
     TestComponent.useTestModule(
         this,
-        TestModule.builder()
+        createTestModuleBuilder()
             .withAppBundle(appBundle)
             .withOutputPath(outputFilePath)
             .withOptimizationDimensions(TEXTURE_COMPRESSION_FORMAT)
@@ -2633,7 +2779,7 @@ public class BuildApksManagerTest {
             .build();
     TestComponent.useTestModule(
         this,
-        TestModule.builder()
+        createTestModuleBuilder()
             .withAppBundle(appBundle)
             .withOutputPath(outputFilePath)
             .withOptimizationDimensions(TEXTURE_COMPRESSION_FORMAT)
@@ -2704,7 +2850,7 @@ public class BuildApksManagerTest {
             .build();
     TestComponent.useTestModule(
         this,
-        TestModule.builder()
+        createTestModuleBuilder()
             .withAppBundle(appBundle)
             .withOutputPath(outputFilePath)
             .withOptimizationDimensions(TEXTURE_COMPRESSION_FORMAT)
@@ -2771,7 +2917,7 @@ public class BuildApksManagerTest {
             .build();
     TestComponent.useTestModule(
         this,
-        TestModule.builder()
+        createTestModuleBuilder()
             .withAppBundle(appBundle)
             .withOutputPath(outputFilePath)
             .withOptimizationDimensions(TEXTURE_COMPRESSION_FORMAT)
@@ -2849,7 +2995,7 @@ public class BuildApksManagerTest {
             .build();
     TestComponent.useTestModule(
         this,
-        TestModule.builder()
+        createTestModuleBuilder()
             .withAppBundle(appBundle)
             .withOutputPath(outputFilePath)
             .withOptimizationDimensions(TEXTURE_COMPRESSION_FORMAT)
@@ -2923,7 +3069,7 @@ public class BuildApksManagerTest {
             .build();
     TestComponent.useTestModule(
         this,
-        TestModule.builder()
+        createTestModuleBuilder()
             .withAppBundle(appBundle)
             .withOutputPath(outputFilePath)
             .withOptimizationDimensions(TEXTURE_COMPRESSION_FORMAT)
@@ -3008,13 +3154,14 @@ public class BuildApksManagerTest {
             .build();
     TestComponent.useTestModule(
         this,
-        TestModule.builder()
+        createTestModuleBuilder()
             .withAppBundle(appBundle)
             .withOutputPath(outputFilePath)
             .withOptimizationDimensions(TEXTURE_COMPRESSION_FORMAT)
             .build());
 
-    Exception e = assertThrows(IllegalStateException.class, () -> buildApksManager.execute());
+    InvalidBundleException e =
+        assertThrows(InvalidBundleException.class, () -> buildApksManager.execute());
     assertThat(e)
         .hasMessageThat()
         .contains("Encountered conflicting targeting values while merging assets config.");
@@ -3077,13 +3224,14 @@ public class BuildApksManagerTest {
             .build();
     TestComponent.useTestModule(
         this,
-        TestModule.builder()
+        createTestModuleBuilder()
             .withAppBundle(appBundle)
             .withOutputPath(outputFilePath)
             .withOptimizationDimensions(TEXTURE_COMPRESSION_FORMAT)
             .build());
 
-    Exception e = assertThrows(IllegalStateException.class, () -> buildApksManager.execute());
+    InvalidBundleException e =
+        assertThrows(InvalidBundleException.class, () -> buildApksManager.execute());
     assertThat(e)
         .hasMessageThat()
         .contains("Encountered conflicting targeting values while merging assets config.");
@@ -3112,7 +3260,8 @@ public class BuildApksManagerTest {
                                 withTitle("@string/test_label", TEST_LABEL_RESOURCE_ID))))
             .build();
     TestComponent.useTestModule(
-        this, TestModule.builder().withAppBundle(appBundle).withOutputPath(outputFilePath).build());
+        this,
+        createTestModuleBuilder().withAppBundle(appBundle).withOutputPath(outputFilePath).build());
 
     buildApksManager.execute();
 
@@ -3172,7 +3321,8 @@ public class BuildApksManagerTest {
                 "com.android.tools.build.bundletool", "mainDexList.txt", mainDexListFile)
             .build();
     TestComponent.useTestModule(
-        this, TestModule.builder().withAppBundle(appBundle).withOutputPath(outputFilePath).build());
+        this,
+        createTestModuleBuilder().withAppBundle(appBundle).withOutputPath(outputFilePath).build());
 
     buildApksManager.execute();
 
@@ -3239,7 +3389,8 @@ public class BuildApksManagerTest {
                     .build())
             .build();
     TestComponent.useTestModule(
-        this, TestModule.builder().withAppBundle(appBundle).withOutputPath(outputFilePath).build());
+        this,
+        createTestModuleBuilder().withAppBundle(appBundle).withOutputPath(outputFilePath).build());
 
     buildApksManager.execute();
 
@@ -3284,7 +3435,7 @@ public class BuildApksManagerTest {
             .build();
     TestComponent.useTestModule(
         this,
-        TestModule.builder()
+        createTestModuleBuilder()
             .withAppBundle(appBundle)
             .withOutputPath(outputFilePath)
             .withOptimizationDimensions(ABI)
@@ -3367,7 +3518,8 @@ public class BuildApksManagerTest {
                         .setManifest(androidManifest("com.test.app")))
             .build();
     TestComponent.useTestModule(
-        this, TestModule.builder().withAppBundle(appBundle).withOutputPath(outputFilePath).build());
+        this,
+        createTestModuleBuilder().withAppBundle(appBundle).withOutputPath(outputFilePath).build());
 
     buildApksManager.execute();
 
@@ -3458,7 +3610,8 @@ public class BuildApksManagerTest {
                                 withMinSdkVersion("Q.fingerprint"))))
             .build();
     TestComponent.useTestModule(
-        this, TestModule.builder().withAppBundle(appBundle).withOutputPath(outputFilePath).build());
+        this,
+        createTestModuleBuilder().withAppBundle(appBundle).withOutputPath(outputFilePath).build());
 
     buildApksManager.execute();
 
@@ -3515,7 +3668,8 @@ public class BuildApksManagerTest {
                         .setManifest(androidManifest("com.test.app")))
             .build();
     TestComponent.useTestModule(
-        this, TestModule.builder().withAppBundle(appBundle).withOutputPath(outputFilePath).build());
+        this,
+        createTestModuleBuilder().withAppBundle(appBundle).withOutputPath(outputFilePath).build());
 
     buildApksManager.execute();
 
@@ -3581,7 +3735,8 @@ public class BuildApksManagerTest {
                         .addFile("assets/images/image2.jpg"))
             .build();
     TestComponent.useTestModule(
-        this, TestModule.builder().withAppBundle(appBundle).withOutputPath(outputFilePath).build());
+        this,
+        createTestModuleBuilder().withAppBundle(appBundle).withOutputPath(outputFilePath).build());
 
     buildApksManager.execute();
 
@@ -3666,7 +3821,7 @@ public class BuildApksManagerTest {
             .build();
     TestComponent.useTestModule(
         this,
-        TestModule.builder()
+        createTestModuleBuilder()
             .withAppBundle(appBundle)
             .withBundleConfig(
                 BundleConfig.newBuilder()
@@ -3794,7 +3949,7 @@ public class BuildApksManagerTest {
 
     TestComponent.useTestModule(
         this,
-        TestModule.builder()
+        createTestModuleBuilder()
             .withAppBundle(appBundle)
             .withOutputPath(outputFilePath)
             .withExecutorService(
@@ -3905,7 +4060,8 @@ public class BuildApksManagerTest {
             .setBundleConfig(BundleConfigBuilder.create().setVersion("1.0.0").build())
             .build();
     TestComponent.useTestModule(
-        this, TestModule.builder().withAppBundle(appBundle).withOutputPath(outputFilePath).build());
+        this,
+        createTestModuleBuilder().withAppBundle(appBundle).withOutputPath(outputFilePath).build());
 
     buildApksManager.execute();
 
@@ -3955,7 +4111,8 @@ public class BuildApksManagerTest {
             .setBundleConfig(BundleConfigBuilder.create().setVersion("1.0.0").build())
             .build();
     TestComponent.useTestModule(
-        this, TestModule.builder().withAppBundle(appBundle).withOutputPath(outputFilePath).build());
+        this,
+        createTestModuleBuilder().withAppBundle(appBundle).withOutputPath(outputFilePath).build());
 
     buildApksManager.execute();
 
@@ -3993,7 +4150,7 @@ public class BuildApksManagerTest {
             .build();
     TestComponent.useTestModule(
         this,
-        TestModule.builder()
+        createTestModuleBuilder()
             .withAppBundle(appBundle)
             .withOutputPath(outputFilePath)
             .withOptimizationDimensions(ABI)
@@ -4044,7 +4201,8 @@ public class BuildApksManagerTest {
                                     assetsDirectoryTargeting(alternativeLanguageTargeting("es"))))))
             .build();
     TestComponent.useTestModule(
-        this, TestModule.builder().withAppBundle(appBundle).withOutputPath(outputFilePath).build());
+        this,
+        createTestModuleBuilder().withAppBundle(appBundle).withOutputPath(outputFilePath).build());
 
     buildApksManager.execute();
 
@@ -4067,7 +4225,10 @@ public class BuildApksManagerTest {
 
     TestComponent.useTestModule(
         this,
-        TestModule.builder().withBundlePath(bundlePath).withOutputPath(outputFilePath).build());
+        createTestModuleBuilder()
+            .withBundlePath(bundlePath)
+            .withOutputPath(outputFilePath)
+            .build());
 
     buildApksManager.execute();
 
@@ -4136,7 +4297,8 @@ public class BuildApksManagerTest {
                     .build())
             .build();
     TestComponent.useTestModule(
-        this, TestModule.builder().withAppBundle(appBundle).withOutputPath(outputFilePath).build());
+        this,
+        createTestModuleBuilder().withAppBundle(appBundle).withOutputPath(outputFilePath).build());
 
     buildApksManager.execute();
 
@@ -4219,7 +4381,8 @@ public class BuildApksManagerTest {
                     .build())
             .build();
     TestComponent.useTestModule(
-        this, TestModule.builder().withAppBundle(appBundle).withOutputPath(outputFilePath).build());
+        this,
+        createTestModuleBuilder().withAppBundle(appBundle).withOutputPath(outputFilePath).build());
 
     buildApksManager.execute();
 
@@ -4299,7 +4462,8 @@ public class BuildApksManagerTest {
                     .build())
             .build();
     TestComponent.useTestModule(
-        this, TestModule.builder().withAppBundle(appBundle).withOutputPath(outputFilePath).build());
+        this,
+        createTestModuleBuilder().withAppBundle(appBundle).withOutputPath(outputFilePath).build());
 
     buildApksManager.execute();
 
@@ -4348,7 +4512,10 @@ public class BuildApksManagerTest {
 
     TestComponent.useTestModule(
         this,
-        TestModule.builder().withBundlePath(bundlePath).withOutputPath(outputFilePath).build());
+        createTestModuleBuilder()
+            .withBundlePath(bundlePath)
+            .withOutputPath(outputFilePath)
+            .build());
 
     buildApksManager.execute();
 
@@ -4394,7 +4561,10 @@ public class BuildApksManagerTest {
 
     TestComponent.useTestModule(
         this,
-        TestModule.builder().withBundlePath(bundlePath).withOutputPath(outputFilePath).build());
+        createTestModuleBuilder()
+            .withBundlePath(bundlePath)
+            .withOutputPath(outputFilePath)
+            .build());
 
     buildApksManager.execute();
 
@@ -4493,7 +4663,8 @@ public class BuildApksManagerTest {
                     .build())
             .build();
     TestComponent.useTestModule(
-        this, TestModule.builder().withAppBundle(appBundle).withOutputPath(outputFilePath).build());
+        this,
+        createTestModuleBuilder().withAppBundle(appBundle).withOutputPath(outputFilePath).build());
 
     buildApksManager.execute();
 
@@ -4576,7 +4747,8 @@ public class BuildApksManagerTest {
                     .build())
             .build();
     TestComponent.useTestModule(
-        this, TestModule.builder().withAppBundle(appBundle).withOutputPath(outputFilePath).build());
+        this,
+        createTestModuleBuilder().withAppBundle(appBundle).withOutputPath(outputFilePath).build());
 
     buildApksManager.execute();
 
@@ -4649,7 +4821,7 @@ public class BuildApksManagerTest {
             .build();
     TestComponent.useTestModule(
         this,
-        TestModule.builder()
+        createTestModuleBuilder()
             .withAppBundle(appBundle)
             .withOutputPath(outputFilePath)
             .withDeviceSpec(
@@ -4722,7 +4894,7 @@ public class BuildApksManagerTest {
             .build();
     TestComponent.useTestModule(
         this,
-        TestModule.builder()
+        createTestModuleBuilder()
             .withAppBundle(appBundle)
             .withOutputPath(outputFilePath)
             .withDeviceSpec(
@@ -4777,7 +4949,8 @@ public class BuildApksManagerTest {
             .build();
 
     TestComponent.useTestModule(
-        this, TestModule.builder().withAppBundle(appBundle).withOutputPath(outputFilePath).build());
+        this,
+        createTestModuleBuilder().withAppBundle(appBundle).withOutputPath(outputFilePath).build());
 
     buildApksManager.execute();
 
@@ -4799,7 +4972,7 @@ public class BuildApksManagerTest {
   public void apksSigned() throws Exception {
     TestComponent.useTestModule(
         this,
-        TestModule.builder()
+        createTestModuleBuilder()
             .withOutputPath(outputFilePath)
             .withSigningConfig(
                 SigningConfiguration.builder().setSignerConfig(privateKey, certificate).build())
@@ -4871,7 +5044,7 @@ public class BuildApksManagerTest {
             .build();
     TestComponent.useTestModule(
         this,
-        TestModule.builder()
+        createTestModuleBuilder()
             .withAppBundle(appBundle)
             .withOutputPath(outputDir)
             .withOptimizationDimensions(ABI, LANGUAGE)
@@ -4892,7 +5065,7 @@ public class BuildApksManagerTest {
   public void bundleToolVersionSet() throws Exception {
     TestComponent.useTestModule(
         this,
-        TestModule.builder()
+        createTestModuleBuilder()
             .withOutputPath(outputFilePath)
             .withOptimizationDimensions(ABI, LANGUAGE)
             .build());
@@ -4912,7 +5085,7 @@ public class BuildApksManagerTest {
 
     TestComponent.useTestModule(
         this,
-        TestModule.builder()
+        createTestModuleBuilder()
             .withOutputPath(outputFilePath)
             .withCustomBuildApksCommandSetter(command -> command.setOverwriteOutput(true))
             .build());
@@ -4927,7 +5100,7 @@ public class BuildApksManagerTest {
     ListeningExecutorService listeningExecutorService =
         MoreExecutors.listeningDecorator(Executors.newSingleThreadExecutor());
     TestComponent.useTestModule(
-        this, TestModule.builder().withExecutorService(listeningExecutorService).build());
+        this, createTestModuleBuilder().withExecutorService(listeningExecutorService).build());
 
     buildApksManager.execute();
     assertThat(listeningExecutorService.isShutdown()).isFalse();
@@ -4937,7 +5110,7 @@ public class BuildApksManagerTest {
   public void apkModifier_modifyingVersionCode() throws Exception {
     TestComponent.useTestModule(
         this,
-        TestModule.builder()
+        createTestModuleBuilder()
             .withOutputPath(outputFilePath)
             .withApkModifier(
                 new ApkModifier() {
@@ -4995,7 +5168,8 @@ public class BuildApksManagerTest {
                             withFusingAttribute(true))))
             .build();
     TestComponent.useTestModule(
-        this, TestModule.builder().withAppBundle(appBundle).withOutputPath(outputFilePath).build());
+        this,
+        createTestModuleBuilder().withAppBundle(appBundle).withOutputPath(outputFilePath).build());
 
     buildApksManager.execute();
 
@@ -5037,7 +5211,10 @@ public class BuildApksManagerTest {
 
     TestComponent.useTestModule(
         this,
-        TestModule.builder().withFirstVariantNumber(100).withOutputPath(outputFilePath).build());
+        createTestModuleBuilder()
+            .withFirstVariantNumber(100)
+            .withOutputPath(outputFilePath)
+            .build());
 
     buildApksManager.execute();
 
@@ -5082,7 +5259,8 @@ public class BuildApksManagerTest {
                         .setManifest(androidManifest("com.test.app", withInstant(true))))
             .build();
     TestComponent.useTestModule(
-        this, TestModule.builder().withAppBundle(appBundle).withOutputPath(outputFilePath).build());
+        this,
+        createTestModuleBuilder().withAppBundle(appBundle).withOutputPath(outputFilePath).build());
 
     buildApksManager.execute();
 
@@ -5108,7 +5286,8 @@ public class BuildApksManagerTest {
                         .setManifest(androidManifest("com.test.app", withInstant(true))))
             .build();
     TestComponent.useTestModule(
-        this, TestModule.builder().withAppBundle(appBundle).withOutputPath(outputFilePath).build());
+        this,
+        createTestModuleBuilder().withAppBundle(appBundle).withOutputPath(outputFilePath).build());
 
     buildApksManager.execute();
 
@@ -5164,7 +5343,8 @@ public class BuildApksManagerTest {
             .setBundleConfig(BundleConfigBuilder.create().setVersion("0.8.1").build())
             .build();
     TestComponent.useTestModule(
-        this, TestModule.builder().withAppBundle(appBundle).withOutputPath(outputFilePath).build());
+        this,
+        createTestModuleBuilder().withAppBundle(appBundle).withOutputPath(outputFilePath).build());
 
     buildApksManager.execute();
 
@@ -5230,7 +5410,8 @@ public class BuildApksManagerTest {
                 BundleConfigBuilder.create().setVersion(bundleVersion.toString()).build())
             .build();
     TestComponent.useTestModule(
-        this, TestModule.builder().withAppBundle(appBundle).withOutputPath(outputFilePath).build());
+        this,
+        createTestModuleBuilder().withAppBundle(appBundle).withOutputPath(outputFilePath).build());
 
     buildApksManager.execute();
 
@@ -5290,7 +5471,8 @@ public class BuildApksManagerTest {
                     .build())
             .build();
     TestComponent.useTestModule(
-        this, TestModule.builder().withAppBundle(appBundle).withOutputPath(outputFilePath).build());
+        this,
+        createTestModuleBuilder().withAppBundle(appBundle).withOutputPath(outputFilePath).build());
 
     buildApksManager.execute();
 
@@ -5341,7 +5523,7 @@ public class BuildApksManagerTest {
             .build();
     TestComponent.useTestModule(
         this,
-        TestModule.builder()
+        createTestModuleBuilder()
             .withAppBundle(appBundle)
             .withOutputPath(outputFilePath)
             .withSigningConfig(
@@ -5376,7 +5558,7 @@ public class BuildApksManagerTest {
 
     TestComponent.useTestModule(
         this,
-        TestModule.builder()
+        createTestModuleBuilder()
             .withAppBundle(appBundle)
             .withOutputPath(outputFilePath)
             .withSigningConfig(
@@ -5411,7 +5593,7 @@ public class BuildApksManagerTest {
 
     TestComponent.useTestModule(
         this,
-        TestModule.builder()
+        createTestModuleBuilder()
             .withAppBundle(appBundle)
             .withOutputPath(outputFilePath)
             .withSigningConfig(
@@ -5439,7 +5621,7 @@ public class BuildApksManagerTest {
 
     TestComponent.useTestModule(
         this,
-        TestModule.builder()
+        createTestModuleBuilder()
             .withOutputPath(outputFilePath)
             .withSigningConfig(signingConfiguration)
             .withSourceStamp(
@@ -5462,7 +5644,7 @@ public class BuildApksManagerTest {
           assertThat(verifierResult.isSourceStampVerified()).isTrue();
           assertThat(verifierResult.getSourceStampInfo().getCertificate()).isEqualTo(certificate);
 
-          AndroidManifest manifest = extractAndroidManifest(apk);
+          AndroidManifest manifest = extractAndroidManifest(apk, tmpDir);
           assertThat(manifest.getMetadataValue(STAMP_SOURCE_METADATA_KEY)).hasValue(stampSource);
 
           try (ZipFile apkZip = new ZipFile(apk)) {
@@ -5483,7 +5665,7 @@ public class BuildApksManagerTest {
   public void packageNameIsPropagatedToBuildResult() throws Exception {
     TestComponent.useTestModule(
         this,
-        TestModule.builder()
+        createTestModuleBuilder()
             .withOutputPath(outputFilePath)
             .withAppBundle(
                 new AppBundleBuilder()
@@ -5578,8 +5760,7 @@ public class BuildApksManagerTest {
 
     TestComponent.useTestModule(
         this,
-        TestModule.builder()
-            .withCustomBuildApksCommandSetter(command -> command.setEnableNewApkSerializer(true))
+        createTestModuleBuilder()
             .withOutputPath(outputFilePath)
             .withAppBundle(appBundle.build())
             .build());
@@ -5628,7 +5809,7 @@ public class BuildApksManagerTest {
   }
 
   @Test
-  public void buildApksCommand_hibernation_success() throws Exception {
+  public void buildApksCommand_archive_success() throws Exception {
     AppBundle appBundle =
         new AppBundleBuilder()
             .addModule("base", builder -> builder.setManifest(androidManifest("com.test.app")))
@@ -5636,7 +5817,7 @@ public class BuildApksManagerTest {
             .build();
     TestComponent.useTestModule(
         this,
-        TestModule.builder()
+        createTestModuleBuilder()
             .withAppBundle(appBundle)
             .withOutputPath(outputFilePath)
             .withApkBuildMode(ARCHIVE)
@@ -5651,25 +5832,25 @@ public class BuildApksManagerTest {
     assertThat(splitApkVariants(result)).isEmpty();
     assertThat(standaloneApkVariants(result)).isEmpty();
     assertThat(systemApkVariants(result)).isEmpty();
-    assertThat(hibernatedApkVariants(result)).hasSize(1);
-    Variant hibernatedVariant = hibernatedApkVariants(result).get(0);
-    assertThat(hibernatedVariant.getTargeting()).isEqualToDefaultInstance();
+    assertThat(archivedApkVariants(result)).hasSize(1);
+    Variant archivedVariant = archivedApkVariants(result).get(0);
+    assertThat(archivedVariant.getTargeting()).isEqualToDefaultInstance();
 
-    assertThat(apkDescriptions(hibernatedVariant)).hasSize(1);
-    assertThat(hibernatedVariant.getApkSetList()).hasSize(1);
-    ApkSet apkSet = hibernatedVariant.getApkSet(0);
+    assertThat(apkDescriptions(archivedVariant)).hasSize(1);
+    assertThat(archivedVariant.getApkSetList()).hasSize(1);
+    ApkSet apkSet = archivedVariant.getApkSet(0);
     assertThat(
             apkSet.getApkDescriptionList().stream()
                 .map(ApkDescription::getPath)
                 .collect(toImmutableSet()))
-        .containsExactly("hibernation/hibernation.apk");
+        .containsExactly("archive/archive.apk");
     apkSet
         .getApkDescriptionList()
         .forEach(apkDescription -> assertThat(apkSetFile).hasFile(apkDescription.getPath()));
   }
 
   @Test
-  public void buildApksCommand_hibernation_apex_hibernatedNotGenerated() throws Exception {
+  public void buildApksCommand_archive_apex_archivedNotGenerated() throws Exception {
     ApexImages apexConfig =
         apexImages(targetedApexImage("apex/x86_64.img", apexImageTargeting("x86_64")));
     AppBundle appBundle =
@@ -5682,7 +5863,7 @@ public class BuildApksManagerTest {
             .build();
     TestComponent.useTestModule(
         this,
-        TestModule.builder()
+        createTestModuleBuilder()
             .withAppBundle(appBundle)
             .withOutputPath(outputFilePath)
             .withApkBuildMode(ARCHIVE)
@@ -5693,7 +5874,7 @@ public class BuildApksManagerTest {
   }
 
   @Test
-  public void buildApksCommand_hibernation_assetOnly_hibernatedNotGenerated() throws Exception {
+  public void buildApksCommand_archive_assetOnly_archivedNotGenerated() throws Exception {
     AppBundle appBundle =
         new AppBundleBuilder()
             .addModule("base", builder -> builder.setManifest(androidManifest("com.test.app")))
@@ -5701,7 +5882,7 @@ public class BuildApksManagerTest {
             .build();
     TestComponent.useTestModule(
         this,
-        TestModule.builder()
+        createTestModuleBuilder()
             .withAppBundle(appBundle)
             .withBundleConfig(BundleConfig.newBuilder().setType(BundleType.ASSET_ONLY))
             .withOutputPath(outputFilePath)
@@ -5713,7 +5894,7 @@ public class BuildApksManagerTest {
     ZipFile apkSetFile = openZipFile(outputFilePath.toFile());
     BuildApksResult result = extractTocFromApkSetFile(apkSetFile, outputDir);
 
-    assertThat(hibernatedApkVariants(result)).isEmpty();
+    assertThat(archivedApkVariants(result)).isEmpty();
   }
 
   private static ImmutableList<ApkDescription> apkDescriptions(List<Variant> variants) {
@@ -5792,26 +5973,9 @@ public class BuildApksManagerTest {
   }
 
   private int extractVersionCode(File apk) {
-    return extractAndroidManifest(apk)
+    return extractAndroidManifest(apk, tmpDir)
         .getVersionCode()
         .orElseThrow(InvalidVersionCodeException::createMissingVersionCodeException);
-  }
-
-  private AndroidManifest extractAndroidManifest(File apk) {
-    Path protoApkPath = tmpDir.resolve("proto.apk");
-    Aapt2Helper.convertBinaryApkToProtoApk(apk.toPath(), protoApkPath);
-    try {
-      try (ZipFile protoApk = new ZipFile(protoApkPath.toFile())) {
-        return AndroidManifest.create(
-            XmlNode.parseFrom(
-                protoApk.getInputStream(protoApk.getEntry("AndroidManifest.xml")),
-                ExtensionRegistry.getEmptyRegistry()));
-      } finally {
-        Files.deleteIfExists(protoApkPath);
-      }
-    } catch (IOException e) {
-      throw new UncheckedIOException(e);
-    }
   }
 
   private static ImmutableList<String> getServicesFromManifest(AndroidManifest manifest) {

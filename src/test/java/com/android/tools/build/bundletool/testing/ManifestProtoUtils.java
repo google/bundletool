@@ -44,9 +44,14 @@ import static com.android.tools.build.bundletool.model.AndroidManifest.NAME_ATTR
 import static com.android.tools.build.bundletool.model.AndroidManifest.NAME_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.NATIVE_ACTIVITY_LIB_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.NO_NAMESPACE_URI;
+import static com.android.tools.build.bundletool.model.AndroidManifest.PERMISSION_ELEMENT_NAME;
+import static com.android.tools.build.bundletool.model.AndroidManifest.PERMISSION_GROUP_ELEMENT_NAME;
+import static com.android.tools.build.bundletool.model.AndroidManifest.PERMISSION_TREE_ELEMENT_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.PROVIDER_ELEMENT_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.RECEIVER_ELEMENT_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.RESOURCE_RESOURCE_ID;
+import static com.android.tools.build.bundletool.model.AndroidManifest.SDK_LIBRARY_ELEMENT_NAME;
+import static com.android.tools.build.bundletool.model.AndroidManifest.SDK_MAJOR_VERSION_ATTRIBUTE_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.SERVICE_ELEMENT_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.SPLIT_NAME_ATTRIBUTE_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.SPLIT_NAME_RESOURCE_ID;
@@ -948,6 +953,40 @@ public final class ManifestProtoUtils {
                                 XmlProtoAttributeBuilder.createAndroidAttribute(
                                         VALUE_ATTRIBUTE_NAME, VALUE_RESOURCE_ID)
                                     .setValueAsString(libName))));
+  }
+
+  /**
+   * Adds an {@value
+   * com.android.tools.build.bundletool.model.AndroidManifest#SDK_LIBRARY_ELEMENT_NAME} element for
+   * SDK Bundle manifests.
+   */
+  public static ManifestMutator withSdkLibraryElement(String majorVersion) {
+    return manifestElement ->
+        manifestElement
+            .getOrCreateChildElement(APPLICATION_ELEMENT_NAME)
+            .getOrCreateChildElement(SDK_LIBRARY_ELEMENT_NAME)
+            .getOrCreateAttribute(ANDROID_NAMESPACE_URI, SDK_MAJOR_VERSION_ATTRIBUTE_NAME)
+            .setValueAsString(majorVersion);
+  }
+
+  /** Adds a {@value #PERMISSION_ELEMENT_NAME} element to the manifest. */
+  public static ManifestMutator withPermission() {
+    return manifestElement ->
+        manifestElement.addChildElement(XmlProtoElementBuilder.create(PERMISSION_ELEMENT_NAME));
+  }
+
+  /** Adds a {@value #PERMISSION_GROUP_ELEMENT_NAME} element to the manifest. */
+  public static ManifestMutator withPermissionGroup() {
+    return manifestElement ->
+        manifestElement.addChildElement(
+            XmlProtoElementBuilder.create(PERMISSION_GROUP_ELEMENT_NAME));
+  }
+
+  /** Adds a {@value #PERMISSION_TREE_ELEMENT_NAME} element to the manifest. */
+  public static ManifestMutator withPermissionTree() {
+    return manifestElement ->
+        manifestElement.addChildElement(
+            XmlProtoElementBuilder.create(PERMISSION_TREE_ELEMENT_NAME));
   }
 
   /** Defined solely for readability. */

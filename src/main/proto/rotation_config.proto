@@ -6,11 +6,16 @@ option java_package = "com.android.bundle";
 
 // Specifies the config that gets applied to the rotation aspect of the signing
 // process of the App Bundle.
-// Next tag: 2
+// Next tag: 3
 message RotationConfig {
   // The SHA256 fingerprint of the expected certificate to sign the APKs
   // generated from the Bundle.
   // Example:
   // FE:C0:E6:5B:F3:76:5D:A1:C2:56:13:C7:A3:60:35:A9:26:BC:3B:3A:39:9B:C8:55:40:F1:6D:55:17:3F:F5:9B
   string signing_certificate_sha256_fingerprint = 1;
+
+  // The minimum API level for which an APK's rotated signing key should be used
+  // to produce the APK's signature. The original signing key for the APK will
+  // be used for all previous platform versions.
+  int32 rotation_min_sdk_version = 2;
 }

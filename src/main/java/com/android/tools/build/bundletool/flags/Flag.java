@@ -94,6 +94,11 @@ public abstract class Flag<T> {
     return new ListFlag<>(new PathFlag(name));
   }
 
+  /** Path flag holding a set of comma-delimited values. */
+  public static Flag<ImmutableSet<Path>> pathSet(String name) {
+    return new SetFlag<>(new PathFlag(name));
+  }
+
   /** Positive integer flag holding a single value. */
   public static Flag<Integer> positiveInteger(String name) {
     return new IntegerFlag(

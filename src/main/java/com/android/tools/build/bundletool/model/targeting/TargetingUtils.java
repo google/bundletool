@@ -20,6 +20,7 @@ import static com.android.tools.build.bundletool.model.utils.TargetingProtoUtils
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.ImmutableSet.toImmutableSet;
+import static com.google.common.collect.MoreCollectors.toOptional;
 
 import com.android.bundle.Targeting.ApkTargeting;
 import com.android.bundle.Targeting.AssetsDirectoryTargeting;
@@ -256,10 +257,18 @@ public final class TargetingUtils {
   public static ImmutableSet<Integer> extractDeviceTiers(
       ImmutableSet<TargetedDirectory> targetedDirectories) {
     return targetedDirectories.stream()
-        .map(directory -> directory.getTargeting(TargetingDimension.DEVICE_TIER))
+        .map(TargetingUtils::extractDeviceTier)
         .flatMap(Streams::stream)
-        .flatMap(targeting -> targeting.getDeviceTier().getValueList().stream())
-        .map(Int32Value::getValue)
         .collect(toImmutableSet());
+  }
+
+  public static Optional<Integer> extractDeviceTier(TargetedDirectory targetedDirectory) {
+    return targetedDirectory
+        .getTargeting(TargetingDimension.DEVICE_TIER)
+        .flatMap(
+            targeting ->
+                targeting.getDeviceTier().getValueList().stream()
+                    .map(Int32Value::getValue)
+                    .collect(toOptional()));
   }
 }

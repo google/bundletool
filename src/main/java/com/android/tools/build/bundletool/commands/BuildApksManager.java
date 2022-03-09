@@ -17,6 +17,7 @@ package com.android.tools.build.bundletool.commands;
 
 import static com.android.tools.build.bundletool.commands.BuildApksCommand.ApkBuildMode.ARCHIVE;
 import static com.android.tools.build.bundletool.commands.BuildApksCommand.ApkBuildMode.SYSTEM;
+import static com.android.tools.build.bundletool.commands.ExtractApksCommand.ALL_MODULES_SHORTCUT;
 import static com.android.tools.build.bundletool.model.version.VersionGuardedFeature.RESOURCES_REFERENCED_IN_MANIFEST_TO_MASTER_SPLIT;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.ImmutableSet.toImmutableSet;
@@ -24,15 +25,12 @@ import static com.google.common.collect.ImmutableSet.toImmutableSet;
 import com.android.bundle.Commands.LocalTestingInfo;
 import com.android.bundle.Config.BundleConfig;
 import com.android.bundle.Devices.DeviceSpec;
+import com.android.tools.build.bundletool.archive.ArchivedApksGenerator;
 import com.android.tools.build.bundletool.commands.BuildApksCommand.ApkBuildMode;
 import com.android.tools.build.bundletool.commands.BuildApksCommand.SystemApkOption;
 import com.android.tools.build.bundletool.device.ApkMatcher;
-import com.android.tools.build.bundletool.internal.HibernatedApksGenerator;
 import com.android.tools.build.bundletool.io.ApkSerializerManager;
-import com.android.tools.build.bundletool.io.ApkSetBuilderFactory;
-import com.android.tools.build.bundletool.io.ApkSetBuilderFactory.ApkSetBuilder;
-import com.android.tools.build.bundletool.io.SplitApkSerializer;
-import com.android.tools.build.bundletool.io.StandaloneApkSerializer;
+import com.android.tools.build.bundletool.io.ApkSetWriter;
 import com.android.tools.build.bundletool.io.TempDirectory;
 import com.android.tools.build.bundletool.mergers.BundleModuleMerger;
 import com.android.tools.build.bundletool.model.AppBundle;
@@ -45,6 +43,7 @@ import com.android.tools.build.bundletool.model.ModuleSplit;
 import com.android.tools.build.bundletool.model.exceptions.IncompatibleDeviceException;
 import com.android.tools.build.bundletool.model.exceptions.InvalidCommandException;
 import com.android.tools.build.bundletool.model.targeting.AlternativeVariantTargetingPopulator;
+import com.android.tools.build.bundletool.model.utils.LocaleConfigXmlInjector;
 import com.android.tools.build.bundletool.model.utils.ModuleDependenciesUtils;
 import com.android.tools.build.bundletool.model.utils.SplitsXmlInjector;
 import com.android.tools.build.bundletool.model.utils.Versions;
@@ -61,9 +60,12 @@ import com.android.tools.build.bundletool.validation.AppBundleValidator;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Sets;
+import com.google.common.io.MoreFiles;
+import com.google.common.io.RecursiveDeleteOption;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Collection;
 import java.util.Optional;
 import java.util.stream.Stream;
 import javax.inject.Inject;
@@ -77,13 +79,11 @@ public final class BuildApksManager {
   private final Optional<DeviceSpec> deviceSpec;
   private final TempDirectory tempDir;
 
-  private final SplitApkSerializer splitApkSerializer;
-  private final StandaloneApkSerializer standaloneApkSerializer;
   private final ApkSerializerManager apkSerializerManager;
   private final SplitApksGenerator splitApksGenerator;
   private final ShardedApksFacade shardedApksFacade;
   private final ApkOptimizations apkOptimizations;
-  private final HibernatedApksGenerator hibernatedApksGenerator;
+  private final ArchivedApksGenerator archivedApksGenerator;
 
   @Inject
   BuildApksManager(
@@ -92,25 +92,21 @@ public final class BuildApksManager {
       Version bundletoolVersion,
       Optional<DeviceSpec> deviceSpec,
       TempDirectory tempDir,
-      SplitApkSerializer splitApkSerializer,
-      StandaloneApkSerializer standaloneApkSerializer,
       ApkSerializerManager apkSerializerManager,
       SplitApksGenerator splitApksGenerator,
       ShardedApksFacade shardedApksFacade,
       ApkOptimizations apkOptimizations,
-      HibernatedApksGenerator hibernatedApksGenerator) {
+      ArchivedApksGenerator archivedApksGenerator) {
     this.appBundle = appBundle;
     this.command = command;
     this.bundletoolVersion = bundletoolVersion;
     this.deviceSpec = deviceSpec;
     this.tempDir = tempDir;
-    this.splitApkSerializer = splitApkSerializer;
-    this.standaloneApkSerializer = standaloneApkSerializer;
     this.splitApksGenerator = splitApksGenerator;
     this.apkSerializerManager = apkSerializerManager;
     this.shardedApksFacade = shardedApksFacade;
     this.apkOptimizations = apkOptimizations;
-    this.hibernatedApksGenerator = hibernatedApksGenerator;
+    this.archivedApksGenerator = archivedApksGenerator;
   }
 
   public void execute() throws IOException {
@@ -170,9 +166,9 @@ public final class BuildApksManager {
       generatedApksBuilder.setSystemApks(generateSystemApks(appBundle, requestedModules));
     }
 
-    // Hibernated APKs
-    if (apksToGenerate.generateHibernatedApks()) {
-      generatedApksBuilder.setHibernatedApks(generateHibernatedApks(appBundle));
+    // Archived APKs
+    if (apksToGenerate.generateArchivedApks()) {
+      generatedApksBuilder.setArchivedApks(generateArchivedApks(appBundle));
     }
 
     // Asset Slices
@@ -188,8 +184,24 @@ public final class BuildApksManager {
                 ? Optional.empty()
                 : appBundle.getBaseModule().getAndroidManifest().getMaxSdkVersion());
 
-    SplitsXmlInjector splitsXmlInjector = new SplitsXmlInjector();
-    generatedApks = splitsXmlInjector.process(generatedApks);
+    // A variant is a set of APKs. One device is guaranteed to receive only APKs from the same. This
+    // is why we are processing new entries like split.xml for each variant separately.
+    generatedApks =
+        GeneratedApks.fromModuleSplits(
+            generatedApks.getAllApksGroupedByOrderedVariants().asMap().entrySet().stream()
+                .map(
+                    keySplit -> {
+                      SplitsXmlInjector splitsXmlInjector = new SplitsXmlInjector();
+                      ImmutableList<ModuleSplit> moduleSplits =
+                          splitsXmlInjector.process(keySplit.getKey(), keySplit.getValue());
+                      LocaleConfigXmlInjector localeConfigXmlInjector =
+                          new LocaleConfigXmlInjector();
+                      moduleSplits =
+                          localeConfigXmlInjector.process(keySplit.getKey(), moduleSplits);
+                      return moduleSplits;
+                    })
+                .flatMap(Collection::stream)
+                .collect(toImmutableList()));
 
     if (deviceSpec.isPresent()) {
       // It is easier to fully check device compatibility once the splits have been generated (in
@@ -198,22 +210,18 @@ public final class BuildApksManager {
       checkDeviceCompatibilityWithBundle(generatedApks, deviceSpec.get());
     }
 
-    ApkSetBuilder apkSetBuilder = createApkSetBuilder(tempDir.getPath());
+    if (command.getOverwriteOutput() && Files.exists(command.getOutputFile())) {
+      MoreFiles.deleteRecursively(command.getOutputFile(), RecursiveDeleteOption.ALLOW_INSECURE);
+    }
 
     // Create variants and serialize APKs.
-    apkSerializerManager.populateApkSetBuilder(
-        apkSetBuilder,
+    apkSerializerManager.serializeApkSet(
+        createApkSetWriter(tempDir.getPath()),
         generatedApks,
         generatedAssetSlices.build(),
-        command.getApkBuildMode(),
         deviceSpec,
         getLocalTestingInfo(appBundle),
         permanentlyFusedModules);
-
-    if (command.getOverwriteOutput()) {
-      Files.deleteIfExists(command.getOutputFile());
-    }
-    apkSetBuilder.writeTo(command.getOutputFile());
   }
 
   private ImmutableList<ModuleSplit> generateStandaloneApks(AppBundle appBundle) {
@@ -277,9 +285,8 @@ public final class BuildApksManager {
         getSystemApkOptimizations());
   }
 
-  private ImmutableList<ModuleSplit> generateHibernatedApks(AppBundle appBundle)
-      throws IOException {
-    return ImmutableList.of(hibernatedApksGenerator.generateHibernatedApk(appBundle));
+  private ImmutableList<ModuleSplit> generateArchivedApks(AppBundle appBundle) throws IOException {
+    return ImmutableList.of(archivedApksGenerator.generateArchivedApk(appBundle));
   }
 
   private static void checkDeviceCompatibilityWithBundle(
@@ -288,14 +295,12 @@ public final class BuildApksManager {
     generatedApks.getAllApksStream().forEach(apkMatcher::checkCompatibleWithApkTargeting);
   }
 
-  private ApkSetBuilder createApkSetBuilder(Path tempDir) {
+  private ApkSetWriter createApkSetWriter(Path tempDir) {
     switch (command.getOutputFormat()) {
       case APK_SET:
-        return ApkSetBuilderFactory.createApkSetBuilder(
-            splitApkSerializer, standaloneApkSerializer, tempDir);
+        return ApkSetWriter.zip(tempDir, command.getOutputFile());
       case DIRECTORY:
-        return ApkSetBuilderFactory.createApkSetWithoutArchiveBuilder(
-            splitApkSerializer, standaloneApkSerializer, command.getOutputFile());
+        return ApkSetWriter.directory(command.getOutputFile());
     }
     throw InvalidCommandException.builder()
         .withInternalMessage("Unsupported output format '%s'.", command.getOutputFormat())
@@ -313,6 +318,8 @@ public final class BuildApksManager {
 
     apkGenerationConfiguration.setEnableUncompressedNativeLibraries(
         apkOptimizations.getUncompressNativeLibraries());
+    apkGenerationConfiguration.setEnableDexCompressionSplitter(
+        apkOptimizations.getUncompressDexFiles());
 
     apkGenerationConfiguration.setInstallableOnExternalStorage(
         appBundle
@@ -371,6 +378,9 @@ public final class BuildApksManager {
 
   private static ImmutableList<BundleModule> getBundleModules(
       AppBundle appBundle, ImmutableSet<String> moduleNames) {
+    if (moduleNames.contains(ALL_MODULES_SHORTCUT)) {
+      return appBundle.getModules().values().asList();
+    }
     return moduleNames.stream()
         .map(BundleModuleName::create)
         .map(appBundle::getModule)
@@ -467,7 +477,7 @@ public final class BuildApksManager {
               || generateInstantApks()
               || generateUniversalApk()
               || generateSystemApks()
-              || generateHibernatedApks()
+              || generateArchivedApks()
               || generateAssetSlices();
       if (!generatesAtLeastOneApk) {
         throw InvalidCommandException.builder().withInternalMessage("No APKs to generate.").build();
@@ -540,7 +550,7 @@ public final class BuildApksManager {
       return apkBuildMode.equals(SYSTEM);
     }
 
-    public boolean generateHibernatedApks() {
+    public boolean generateArchivedApks() {
       if (appBundle.isApex() || appBundle.isAssetOnly()) {
         return false;
       }

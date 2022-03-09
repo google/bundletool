@@ -18,13 +18,14 @@ package com.android.tools.build.bundletool.validation;
 
 import com.android.tools.build.bundletool.model.AppBundle;
 import com.android.tools.build.bundletool.model.BundleModule;
+import com.android.tools.build.bundletool.model.SdkBundle;
 import com.android.tools.build.bundletool.model.ZipPath;
 import com.google.common.collect.ImmutableList;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 
 /**
- * Validates a particular property of the {@link AppBundle}.
+ * Validates a particular property of the bundle.
  *
  * <p>Sub-classes override some of the methods that is/are most convenient for the particular type
  * of validation.
@@ -41,9 +42,13 @@ public abstract class SubValidator {
 
   public void validateBundleZipEntry(ZipFile bundleFile, ZipEntry zipEntry) {}
 
-  // Validations of the AppBundle object and it's internals.
+  // Validations of the AppBundle object and its internals.
 
+  /** Validates an AppBundle object. */
   public void validateBundle(AppBundle bundle) {}
+
+  /** Validates an SdkBundle object. */
+  public void validateSdkBundle(SdkBundle bundle) {}
 
   public void validateAllModules(ImmutableList<BundleModule> modules) {}
 

@@ -18,8 +18,8 @@ package com.android.tools.build.bundletool.model;
 import com.android.bundle.Targeting.ApkTargeting;
 import com.android.bundle.Targeting.VariantTargeting;
 import com.google.auto.value.AutoValue;
+import com.google.errorprone.annotations.CheckReturnValue;
 import com.google.errorprone.annotations.Immutable;
-import javax.annotation.CheckReturnValue;
 
 /** Modifier of APKs. */
 public abstract class ApkModifier {

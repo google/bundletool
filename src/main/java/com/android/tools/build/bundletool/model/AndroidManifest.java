@@ -43,12 +43,13 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Splitter;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Range;
 import com.google.common.primitives.Ints;
+import com.google.errorprone.annotations.CheckReturnValue;
 import com.google.errorprone.annotations.Immutable;
 import java.util.Optional;
 import java.util.stream.Stream;
-import javax.annotation.CheckReturnValue;
 
 /**
  * Represents Android manifest.
@@ -78,6 +79,9 @@ public abstract class AndroidManifest {
   public static final String PROVIDER_ELEMENT_NAME = "provider";
   public static final String SUPPORTS_GL_TEXTURE_ELEMENT_NAME = "supports-gl-texture";
   public static final String ACTION_ELEMENT_NAME = "action";
+  public static final String PERMISSION_ELEMENT_NAME = "permission";
+  public static final String PERMISSION_GROUP_ELEMENT_NAME = "permission-group";
+  public static final String PERMISSION_TREE_ELEMENT_NAME = "permission-tree";
 
   public static final String DEBUGGABLE_ATTRIBUTE_NAME = "debuggable";
   public static final String EXTRACT_NATIVE_LIBS_ATTRIBUTE_NAME = "extractNativeLibs";
@@ -113,6 +117,12 @@ public abstract class AndroidManifest {
   public static final String BACKUP_AGENT_ATTRIBUTE_NAME = "backupAgent";
   public static final String DATA_EXTRACTION_RULES_ATTRIBUTE_NAME = "dataExtractionRules";
   public static final String EXPORTED_ATTRIBUTE_NAME = "exported";
+  public static final String LOCALE_CONFIG_ATTRIBUTE_NAME = "localeConfig";
+  public static final String SDK_LIBRARY_ELEMENT_NAME = "sdk-library";
+  public static final String SDK_MAJOR_VERSION_ATTRIBUTE_NAME = "versionMajor";
+  public static final String SDK_PATCH_VERSION_ATTRIBUTE_NAME =
+      "com.android.vending.sdkPatchVersion";
+  public static final Integer SDK_SANDBOX_MIN_VERSION = 32;
 
   public static final String MODULE_TYPE_FEATURE_VALUE = "feature";
   public static final String MODULE_TYPE_ASSET_VALUE = "asset-pack";
@@ -153,6 +163,7 @@ public abstract class AndroidManifest {
   public static final int BACKUP_AGENT_RESOURCE_ID = 0x0101027f;
   public static final int DATA_EXTRACTION_RULES_RESOURCE_ID = 0x0101063e;
   public static final int EXPORTED_RESOURCE_ID = 0x01010010;
+  public static final int LOCALE_CONFIG_RESOURCE_ID = 0x01df0009;
 
   // Matches the value of android.os.Build.VERSION_CODES.CUR_DEVELOPMENT, used when turning
   // a manifest attribute which references a prerelease API version (e.g., "Q") into an integer.
@@ -602,6 +613,13 @@ public abstract class AndroidManifest {
     return hasApplicationAttributeAsRefId(LABEL_RESOURCE_ID);
   }
 
+  public boolean hasLocaleConfig() {
+    return getManifestElement()
+        .getOptionalChildElement(APPLICATION_ELEMENT_NAME)
+        .flatMap(app -> app.getAndroidAttribute(LOCALE_CONFIG_RESOURCE_ID))
+        .isPresent();
+  }
+
   public Optional<String> getLabelString() {
     return getApplicationAttribute(LABEL_RESOURCE_ID);
   }
@@ -765,6 +783,27 @@ public abstract class AndroidManifest {
     return NO_INITIAL_INSTALL;
   }
 
+  /** Returns a list of the <permission> XML elements. */
+  public ImmutableList<XmlProtoElement> getPermissions() {
+    return getManifestElement()
+        .getChildrenElements(PERMISSION_ELEMENT_NAME)
+        .collect(toImmutableList());
+  }
+
+  /** Returns a list of the <permission-group> XML elements. */
+  public ImmutableList<XmlProtoElement> getPermissionGroups() {
+    return getManifestElement()
+        .getChildrenElements(PERMISSION_GROUP_ELEMENT_NAME)
+        .collect(toImmutableList());
+  }
+
+  /** Returns a list of the <permission-tree> XML elements. */
+  public ImmutableList<XmlProtoElement> getPermissionTrees() {
+    return getManifestElement()
+        .getChildrenElements(PERMISSION_TREE_ELEMENT_NAME)
+        .collect(toImmutableList());
+  }
+
   /** Returns a stream of the <meta-data> XML elements under the <application> tag. */
   private Stream<XmlProtoElement> getMetadataElements() {
     return getManifestElement()
@@ -820,11 +859,33 @@ public abstract class AndroidManifest {
         .orElse(false);
   }
 
+  public ImmutableList<XmlProtoElement> getSdkLibraryElements() {
+    return getManifestRoot()
+        .getElement()
+        .getChildElement(APPLICATION_ELEMENT_NAME)
+        .getChildrenElements()
+        .filter(elem -> elem.getName().equals(SDK_LIBRARY_ELEMENT_NAME))
+        .collect(toImmutableList());
+  }
+
   private boolean hasApplicationAttributeAsRefId(int resourceId) {
     return getManifestElement()
         .getOptionalChildElement(APPLICATION_ELEMENT_NAME)
         .flatMap(app -> app.getAndroidAttribute(resourceId))
         .map(XmlProtoAttribute::hasRefIdValue)
         .orElse(false);
+  }
+
+  /** Checks whether any component elements are declared. */
+  public boolean hasComponents() {
+    ImmutableSet<String> componentNames =
+        ImmutableSet.of(
+            ACTIVITY_ELEMENT_NAME,
+            SERVICE_ELEMENT_NAME,
+            PROVIDER_ELEMENT_NAME,
+            RECEIVER_ELEMENT_NAME);
+    return stream(getManifestElement().getOptionalChildElement(APPLICATION_ELEMENT_NAME))
+        .flatMap(app -> app.getChildrenElements())
+        .anyMatch(component -> componentNames.contains(component.getName()));
   }
 }

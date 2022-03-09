@@ -26,11 +26,11 @@ import static com.google.common.collect.ImmutableList.toImmutableList;
 import com.android.bundle.Commands.ApexApkMetadata;
 import com.android.bundle.Commands.ApkDescription;
 import com.android.bundle.Commands.ApkSet;
+import com.android.bundle.Commands.ArchivedApkMetadata;
 import com.android.bundle.Commands.AssetModuleMetadata;
 import com.android.bundle.Commands.AssetSliceSet;
 import com.android.bundle.Commands.BuildApksResult;
 import com.android.bundle.Commands.DeliveryType;
-import com.android.bundle.Commands.HibernatedApkMetadata;
 import com.android.bundle.Commands.ModuleMetadata;
 import com.android.bundle.Commands.SplitApkMetadata;
 import com.android.bundle.Commands.StandaloneApkMetadata;
@@ -260,8 +260,8 @@ public final class ApksArchiveHelpers {
         .build();
   }
 
-  public static ApkSet createHibernatedApkSet(ApkTargeting apkTargeting, ZipPath apkPath) {
-    // Note: Hibernated APK is represented as a module named "base".
+  public static ApkSet createArchivedApkSet(ApkTargeting apkTargeting, ZipPath apkPath) {
+    // Note: Archived APK is represented as a module named "base".
     return ApkSet.newBuilder()
         .setModuleMetadata(
             ModuleMetadata.newBuilder().setName("base").setDeliveryType(DeliveryType.INSTALL_TIME))
@@ -269,7 +269,7 @@ public final class ApksArchiveHelpers {
             ApkDescription.newBuilder()
                 .setPath(apkPath.toString())
                 .setTargeting(apkTargeting)
-                .setHibernatedApkMetadata(HibernatedApkMetadata.getDefaultInstance()))
+                .setArchivedApkMetadata(ArchivedApkMetadata.getDefaultInstance()))
         .build();
   }
 

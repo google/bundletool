@@ -20,6 +20,7 @@ import static com.google.common.truth.Truth.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.android.tools.build.bundletool.io.ZipBuilder;
+import com.android.tools.build.bundletool.model.AppBundle;
 import com.android.tools.build.bundletool.model.ZipPath;
 import com.android.tools.build.bundletool.model.exceptions.InvalidBundleException;
 import java.nio.file.Path;
@@ -55,7 +56,9 @@ public class MandatoryFilesPresenceValidatorTest {
       InvalidBundleException exception =
           assertThrows(
               InvalidBundleException.class,
-              () -> new MandatoryFilesPresenceValidator().validateModuleZipFile(moduleZip));
+              () ->
+                  new MandatoryFilesPresenceValidator(AppBundle.NON_MODULE_DIRECTORIES)
+                      .validateModuleZipFile(moduleZip));
 
       assertThat(exception)
           .hasMessageThat()
@@ -71,7 +74,8 @@ public class MandatoryFilesPresenceValidatorTest {
             .writeTo(tempFolder.resolve("base.zip"));
 
     try (ZipFile moduleZip = new ZipFile(modulePath.toFile())) {
-      new MandatoryFilesPresenceValidator().validateModuleZipFile(moduleZip);
+      new MandatoryFilesPresenceValidator(AppBundle.NON_MODULE_DIRECTORIES)
+          .validateModuleZipFile(moduleZip);
     }
   }
 
@@ -86,7 +90,9 @@ public class MandatoryFilesPresenceValidatorTest {
       InvalidBundleException exception =
           assertThrows(
               InvalidBundleException.class,
-              () -> new MandatoryFilesPresenceValidator().validateBundleZipFile(bundleZip));
+              () ->
+                  new MandatoryFilesPresenceValidator(AppBundle.NON_MODULE_DIRECTORIES)
+                      .validateBundleZipFile(bundleZip));
 
       assertThat(exception).hasMessageThat().contains("missing required file 'BundleConfig.pb'");
     }
@@ -104,7 +110,9 @@ public class MandatoryFilesPresenceValidatorTest {
       InvalidBundleException exception =
           assertThrows(
               InvalidBundleException.class,
-              () -> new MandatoryFilesPresenceValidator().validateBundleZipFile(bundleZip));
+              () ->
+                  new MandatoryFilesPresenceValidator(AppBundle.NON_MODULE_DIRECTORIES)
+                      .validateBundleZipFile(bundleZip));
 
       assertThat(exception)
           .hasMessageThat()
@@ -121,7 +129,8 @@ public class MandatoryFilesPresenceValidatorTest {
             .writeTo(tempFolder.resolve("bundle.aab"));
 
     try (ZipFile bundleZip = new ZipFile(bundlePath.toFile())) {
-      new MandatoryFilesPresenceValidator().validateBundleZipFile(bundleZip);
+      new MandatoryFilesPresenceValidator(AppBundle.NON_MODULE_DIRECTORIES)
+          .validateBundleZipFile(bundleZip);
     }
   }
 }

@@ -110,6 +110,14 @@ public class AppBundleSerializer {
                       moduleDir.resolve(SpecialModuleEntry.APEX_TABLE.getPath()),
                       apexConfig,
                       compression));
+      module
+          .getRuntimeEnabledSdkConfig()
+          .ifPresent(
+              runtimeEnabledSdkConfig ->
+                  zipBuilder.addFileWithProtoContent(
+                      moduleDir.resolve(SpecialModuleEntry.RUNTIME_ENABLED_SDK_CONFIG.getPath()),
+                      runtimeEnabledSdkConfig,
+                      compression));
     }
 
     zipBuilder.writeTo(pathOnDisk);

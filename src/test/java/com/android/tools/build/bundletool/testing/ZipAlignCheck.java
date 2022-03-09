@@ -15,10 +15,8 @@
  */
 package com.android.tools.build.bundletool.testing;
 
-import com.android.tools.build.apkzlib.zip.CentralDirectoryHeader;
-import com.android.tools.build.apkzlib.zip.CompressionMethod;
-import com.android.tools.build.apkzlib.zip.StoredEntry;
-import com.android.tools.build.apkzlib.zip.ZFile;
+import com.android.zipflinger.Entry;
+import com.android.zipflinger.ZipMap;
 import java.io.File;
 import java.io.IOException;
 import java.util.regex.Pattern;
@@ -39,29 +37,21 @@ public final class ZipAlignCheck {
    * @return {@code true} if the file has been correctly zipaligned.
    */
   public static boolean checkAlignment(File zip) throws IOException {
-    try (ZFile zfile = new ZFile(zip)) {
-      for (StoredEntry entry : zfile.entries()) {
-        CentralDirectoryHeader header = entry.getCentralDirectoryHeader();
-
-        // Alignment only applies to uncompressed files.
-        if (header.getCompressionInfoWithWait().getMethod().equals(CompressionMethod.STORE)) {
-          int expectedAligment =
-              NATIVE_LIB_PATTERN.matcher(header.getName()).matches()
-                  ? PAGE_ALIGNMENT
-                  : FOUR_BYTE_ALIGNMENT;
-
-          long dataOffset = header.getOffset() + entry.getLocalHeaderSize();
-          if (dataOffset % expectedAligment != 0) {
-            System.out.println(
-                String.format(
-                    "File '%s' is not aligned. dataOffset=%d, expectedAlignment=%d",
-                    header.getName(), dataOffset, expectedAligment));
-            return false;
-          }
+    ZipMap zipMap = ZipMap.from(zip.toPath());
+    for (Entry entry : zipMap.getEntries().values()) {
+      int expectedAligment =
+          NATIVE_LIB_PATTERN.matcher(entry.getName()).matches()
+              ? PAGE_ALIGNMENT
+              : FOUR_BYTE_ALIGNMENT;
+      if (!entry.isCompressed()) {
+        if (entry.getPayloadLocation().first % expectedAligment != 0) {
+          System.out.printf(
+              "File '%s' is not aligned. dataOffset=%d, expectedAlignment=%d%n",
+              entry.getName(), entry.getPayloadLocation().first, expectedAligment);
+          return false;
         }
       }
     }
-
     return true;
   }
 

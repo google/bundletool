@@ -21,6 +21,7 @@ import static com.google.common.collect.ImmutableList.toImmutableList;
 import com.android.tools.build.bundletool.model.AppBundle;
 import com.android.tools.build.bundletool.model.BundleModule;
 import com.android.tools.build.bundletool.model.ModuleEntry;
+import com.android.tools.build.bundletool.model.SdkBundle;
 import com.android.tools.build.bundletool.model.ZipPath;
 import com.google.common.collect.ImmutableList;
 import java.util.Enumeration;
@@ -58,6 +59,11 @@ public class ValidatorRunner {
     subValidators.forEach(subValidator -> validateBundleUsingSubValidator(bundle, subValidator));
   }
 
+  /** Validates the given SDK Bundle. */
+  void validateSdkBundle(SdkBundle bundle) {
+    subValidators.forEach(subValidator -> validateSdkBundleUsingSubValidator(bundle, subValidator));
+  }
+
   /** Interprets given modules as a bundle and validates it. */
   public void validateBundleModules(ImmutableList<BundleModule> modules) {
     subValidators.forEach(
@@ -68,6 +74,18 @@ public class ValidatorRunner {
     subValidator.validateBundle(bundle);
     validateBundleModulesUsingSubValidator(
         ImmutableList.copyOf(bundle.getModules().values()), subValidator);
+  }
+
+  private static void validateSdkBundleUsingSubValidator(
+      SdkBundle bundle, SubValidator subValidator) {
+    subValidator.validateSdkBundle(bundle);
+
+    BundleModule module = bundle.getModule();
+    subValidator.validateModule(module);
+
+    for (ZipPath moduleFile : getModuleFiles(module)) {
+      subValidator.validateModuleFile(moduleFile);
+    }
   }
 
   private static void validateBundleModulesUsingSubValidator(

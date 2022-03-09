@@ -24,6 +24,7 @@ import com.google.common.collect.ComparisonChain;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSortedSet;
 import com.google.common.collect.Iterables;
+import com.google.errorprone.annotations.CheckReturnValue;
 import com.google.errorprone.annotations.FormatMethod;
 import com.google.errorprone.annotations.FormatString;
 import com.google.errorprone.annotations.Immutable;
@@ -33,7 +34,6 @@ import java.util.Comparator;
 import java.util.Locale;
 import java.util.Optional;
 import java.util.StringJoiner;
-import javax.annotation.CheckReturnValue;
 
 /** Helper to print command helps in the console. */
 @Immutable

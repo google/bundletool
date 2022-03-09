@@ -6,7 +6,7 @@ option java_package = "com.android.bundle";
 
 // Specifies integrity protection options that should be applied to an app
 // bundle.
-// Next tag: 7.
+// Next tag: 8.
 message AppIntegrityConfig {
   bool enabled = 1;
   LicenseCheck license_check = 2;
@@ -16,6 +16,7 @@ message AppIntegrityConfig {
   // Optional. If present, java/kotlin code will be obfuscated according to the
   // config.
   DexProtectionConfig dex_protection_config = 6;
+  string version_label = 7;
 }
 
 // Next tag: 4.
@@ -35,6 +36,7 @@ message InstallerCheck {
 // Next tag: 2
 message DebuggerCheck {
   option deprecated = true;
+
   bool enabled = 1;
 }
 

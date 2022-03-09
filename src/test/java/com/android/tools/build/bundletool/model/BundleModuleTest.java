@@ -52,6 +52,8 @@ import com.android.bundle.Files.NativeLibraries;
 import com.android.bundle.Files.TargetedApexImage;
 import com.android.bundle.Files.TargetedAssetsDirectory;
 import com.android.bundle.Files.TargetedNativeDirectory;
+import com.android.bundle.RuntimeEnabledSdkConfigProto.RuntimeEnabledSdk;
+import com.android.bundle.RuntimeEnabledSdkConfigProto.RuntimeEnabledSdkConfig;
 import com.android.bundle.Targeting.ModuleTargeting;
 import com.android.tools.build.bundletool.model.BundleModule.ModuleType;
 import com.android.tools.build.bundletool.testing.BundleConfigBuilder;
@@ -534,6 +536,47 @@ public class BundleModuleTest {
 
     ModuleTargeting moduleTargeting = bundleModule.getModuleMetadata().getTargeting();
     assertThat(moduleTargeting).isEqualToDefaultInstance();
+  }
+
+  @Test
+  public void missingRuntimeEnabledSdkConfigFile_returnsEmptyProto() {
+    BundleModule bundleModule = createMinimalModuleBuilder().build();
+
+    assertThat(bundleModule.getRuntimeEnabledSdkConfig()).isEmpty();
+  }
+
+  @Test
+  public void correctRuntimeEnabledSdkConfigFile_parsedAndReturned() {
+    RuntimeEnabledSdkConfig runtimeEnabledSdkConfig =
+        RuntimeEnabledSdkConfig.newBuilder()
+            .addRuntimeEnabledSdk(
+                RuntimeEnabledSdk.newBuilder()
+                    .setPackageName("sdk.package.name")
+                    .setVersionMajor(1234)
+                    .setCertificateDigest("AA:BB:CC:DD"))
+            .build();
+
+    BundleModule bundleModule =
+        createMinimalModuleBuilder()
+            .addEntry(
+                createModuleEntryForFile(
+                    "runtime_enabled_sdk_config.pb", runtimeEnabledSdkConfig.toByteArray()))
+            .build();
+
+    assertThat(bundleModule.getRuntimeEnabledSdkConfig()).hasValue(runtimeEnabledSdkConfig);
+  }
+
+  @Test
+  public void incorrectRuntimeEnabledSdkConfigFile_throws() {
+    byte[] badRuntimeEnabledSdkConfig = new byte[] {'b', 'a', 'd'};
+
+    assertThrows(
+        UncheckedIOException.class,
+        () ->
+            createMinimalModuleBuilder()
+                .addEntry(
+                    createModuleEntryForFile(
+                        "runtime_enabled_sdk_config.pb", badRuntimeEnabledSdkConfig)));
   }
 
   private static BundleModule.Builder createMinimalModuleBuilder() {

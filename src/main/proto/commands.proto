@@ -36,6 +36,35 @@ message BuildApksResult {
   repeated PermanentlyFusedModule permanently_fused_modules = 8;
 }
 
+message BuildSdkApksResult {
+  // The package name of the SDK.
+  //
+  // For instance, for SDK “com.foo.bar” with major version “15”,
+  // the package name stored here is simply “com.foo.bar”.
+  // This is different from the package name that is installed in Android
+  // PackageManager on sandbox-enabled devices (which is “com.foo.bar_15”).
+  string package_name = 1;
+
+  // Variants generated for the SDK.
+  // At the moment, there is always a single variant.
+  repeated Variant variant = 2;
+
+  Bundletool bundletool = 3;
+
+  SdkVersionInformation version = 4;
+}
+
+message SdkVersionInformation {
+  // Major version of the SDK.
+  uint64 major = 1;
+
+  // Patch version of the SDK.
+  uint64 patch = 2;
+
+  // A unique version code assigned to the SDK by the caller of build-sdk-apks.
+  uint32 version_code = 3;
+}
+
 // Variant is a group of APKs that covers a part of the device configuration
 // space. APKs from multiple variants are never combined on one device.
 message Variant {
@@ -181,8 +210,8 @@ message ApkDescription {
     SplitApkMetadata asset_slice_metadata = 7;
     // Set only for APEX APKs.
     ApexApkMetadata apex_apk_metadata = 8;
-    // Set only for hibernated APKs.
-    HibernatedApkMetadata hibernated_apk_metadata = 9;
+    // Set only for archived APKs.
+    ArchivedApkMetadata archived_apk_metadata = 9;
   }
 }
 
@@ -216,8 +245,8 @@ message ApexApkMetadata {
   repeated ApexEmbeddedApkConfig apex_embedded_apk_config = 1;
 }
 
-// Holds data specific to Hibernated APKs.
-message HibernatedApkMetadata {}
+// Holds data specific to Archived APKs.
+message ArchivedApkMetadata {}
 
 message LocalTestingInfo {
   // Indicates if the bundle is built in local testing mode.

@@ -36,6 +36,7 @@ import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 import com.google.common.collect.Streams;
 import com.google.common.primitives.Ints;
+import com.google.errorprone.annotations.CheckReturnValue;
 import com.google.protobuf.Descriptors.FieldDescriptor;
 import com.google.protobuf.Descriptors.FieldDescriptor.JavaType;
 import com.google.protobuf.Message;
@@ -45,7 +46,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.function.BiFunction;
 import java.util.function.Function;
-import javax.annotation.CheckReturnValue;
 
 /**
  * Recursively merges two resource tables.

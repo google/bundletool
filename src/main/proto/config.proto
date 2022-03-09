@@ -60,6 +60,23 @@ message Compression {
   // asset modules; the content of on-demand and fast-follow asset modules is
   // always kept uncompressed.
   AssetModuleCompression install_time_asset_module_default_compression = 2;
+
+  enum ApkCompressionAlgorithm {
+    // Default in the current version of bundletool is zlib deflate algorithm
+    // with compression level 9 for the application's resources and compression
+    // level 6 for other entries.
+    //
+    // This is a good trade-off between size of final APK and size of patches
+    // which are used to update the application from previous to next version.
+    DEFAULT_APK_COMPRESSION_ALGORITHM = 0;
+
+    // 7zip implementation of deflate algorithm which gives smaller APK size
+    // but size of patches required to update the application are larger.
+    P7ZIP = 1;
+  }
+
+  // Compression algorithm which is used to compress entries in final APKs.
+  ApkCompressionAlgorithm apk_compression_algorithm = 3;
 }
 
 // Resources to keep in the master split.

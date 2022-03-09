@@ -287,7 +287,6 @@ public final class ZipEntrySource extends Source {
 
   /** A {@link Payload} read from a zip and uncompressed on the fly. */
   private static final class UncompressedPayload extends Payload {
-    private static final int BUFFER_SIZE_BYTES = 8192;
 
     private final ZipReader zipReader;
     private final Entry entry;
@@ -299,7 +298,7 @@ public final class ZipEntrySource extends Source {
 
     @Override
     public long writeTo(ZipWriter writer) throws IOException {
-      ByteBuffer buffer = ByteBuffer.allocate(BUFFER_SIZE_BYTES);
+      ByteBuffer buffer = ByteBuffer.allocate(ZipReader.BUFFER_SIZE_BYTES);
 
       int totalBytes = 0;
       try (InputStream in = zipReader.getUncompressedPayload(entry.getName())) {

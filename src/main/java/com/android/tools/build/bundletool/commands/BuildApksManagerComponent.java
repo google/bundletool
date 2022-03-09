@@ -27,7 +27,7 @@ import javax.inject.Qualifier;
 
 /** Dagger component to create a {@link BuildApksManager}. */
 @CommandScoped
-@Component(modules = BuildApksModule.class)
+@Component(modules = {BuildApksModule.class, AppBundleModule.class})
 public interface BuildApksManagerComponent {
   BuildApksManager create();
 

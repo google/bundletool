@@ -28,8 +28,8 @@ import com.google.common.collect.ImmutableCollection;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Sets;
+import com.google.errorprone.annotations.CheckReturnValue;
 import java.util.Set;
-import javax.annotation.CheckReturnValue;
 import javax.inject.Inject;
 
 /** Identify embedded APKs which should be signed with the same key as generated APKs. */

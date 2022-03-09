@@ -65,6 +65,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.util.Collection;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -316,7 +317,12 @@ public class ModuleSplitsToShardMerger {
         dexFilesToMergeByModule.keys().stream()
             .distinct()
             .filter(moduleName -> !BASE_MODULE_NAME.equals(moduleName))
-            .flatMap(moduleName -> dexFilesToMergeByModule.get(moduleName).stream());
+            // Sort module .dex files by their index to ensure in the final output they are in the
+            // same order as were defined in module.
+            .flatMap(
+                moduleName ->
+                    dexFilesToMergeByModule.get(moduleName).stream()
+                        .sorted(Comparator.comparingInt(ModuleSplitsToShardMerger::getDexIndex)));
 
     Stream<ModuleEntry> renamedDexFiles =
         Streams.mapWithIndex(
@@ -331,6 +337,19 @@ public class ModuleSplitsToShardMerger {
                     .build());
 
     return Stream.concat(dexFilesFromBase, renamedDexFiles).collect(toImmutableList());
+  }
+
+  private static int getDexIndex(ModuleEntry entry) {
+    String fileName = entry.getPath().getFileName().toString();
+    if (!(fileName.startsWith("classes") && fileName.endsWith(".dex"))) {
+      return -1;
+    }
+    // Magic numbers: 7 - length of "classes" and 4 - length of ".dex"
+    String index = fileName.substring(7, fileName.length() - 4);
+    if (!index.chars().allMatch(Character::isDigit)) {
+      return -1;
+    }
+    return index.isEmpty() ? 1 : Integer.parseInt(index);
   }
 
   private ImmutableList<Path> mergeDexFiles(

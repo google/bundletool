@@ -28,7 +28,9 @@ public class AppBundleValidator {
   @VisibleForTesting
   static final ImmutableList<SubValidator> DEFAULT_BUNDLE_FILE_SUB_VALIDATORS =
       // Keep order of common validators in sync with BundleModulesValidator.
-      ImmutableList.of(new BundleZipValidator(), new MandatoryFilesPresenceValidator());
+      ImmutableList.of(
+          new BundleZipValidator(),
+          new MandatoryFilesPresenceValidator(AppBundle.NON_MODULE_DIRECTORIES));
 
   /** Validators run on the internal representation of bundle and bundle modules. */
   @VisibleForTesting

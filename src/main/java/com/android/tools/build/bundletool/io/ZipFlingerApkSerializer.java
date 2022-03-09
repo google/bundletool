@@ -15,6 +15,8 @@
  */
 package com.android.tools.build.bundletool.io;
 
+import static com.android.tools.build.bundletool.io.ApkSerializerHelper.NO_COMPRESSION_EXTENSIONS;
+import static com.android.tools.build.bundletool.io.ApkSerializerHelper.requiresAapt2Conversion;
 import static com.android.tools.build.bundletool.model.BundleModule.MANIFEST_FILENAME;
 import static com.android.tools.build.bundletool.model.CompressionLevel.BEST_COMPRESSION;
 import static com.android.tools.build.bundletool.model.CompressionLevel.DEFAULT_COMPRESSION;
@@ -32,10 +34,13 @@ import static com.google.common.collect.ImmutableSet.toImmutableSet;
 import static com.google.common.collect.ImmutableSortedSet.toImmutableSortedSet;
 import static java.util.Comparator.naturalOrder;
 
+import com.android.bundle.Commands.ApkDescription;
 import com.android.bundle.Config.BundleConfig;
 import com.android.bundle.Config.ResourceOptimizations.SparseEncoding;
 import com.android.tools.build.bundletool.androidtools.Aapt2Command;
 import com.android.tools.build.bundletool.commands.BuildApksManagerComponent.UseBundleCompression;
+import com.android.tools.build.bundletool.commands.BuildApksModule.VerboseLogs;
+import com.android.tools.build.bundletool.model.ApkListener;
 import com.android.tools.build.bundletool.model.BundleModule.SpecialModuleEntry;
 import com.android.tools.build.bundletool.model.CompressionLevel;
 import com.android.tools.build.bundletool.model.ModuleEntry;
@@ -51,6 +56,9 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.ImmutableSortedSet;
+import com.google.common.collect.Maps;
+import com.google.common.util.concurrent.ListenableFuture;
+import com.google.common.util.concurrent.ListeningExecutorService;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
@@ -62,7 +70,7 @@ import java.util.stream.Stream;
 import javax.inject.Inject;
 
 /** Serializes APKs to Proto or Binary format. */
-final class ZipFlingerApkSerializerHelper extends ApkSerializerHelper {
+public final class ZipFlingerApkSerializer extends ApkSerializer {
 
   /** Suffix for native libraries. */
   private static final String NATIVE_LIBRARIES_SUFFIX = ".so";
@@ -75,6 +83,7 @@ final class ZipFlingerApkSerializerHelper extends ApkSerializerHelper {
   private final Aapt2Command aapt2;
   private final Version bundletoolVersion;
   private final boolean enableSparseEncoding;
+  private final ListeningExecutorService executorService;
 
   /**
    * Whether to re-use the compression of the entries in the App Bundle.
@@ -85,13 +94,17 @@ final class ZipFlingerApkSerializerHelper extends ApkSerializerHelper {
   private final boolean useBundleCompression;
 
   @Inject
-  ZipFlingerApkSerializerHelper(
+  ZipFlingerApkSerializer(
+      Optional<ApkListener> apkListener,
+      @VerboseLogs boolean verbose,
       ZipReader bundleZipReader,
       BundleConfig bundleConfig,
       Aapt2Command aapt2,
       Version bundletoolVersion,
       ApkSigner apkSigner,
-      @UseBundleCompression boolean useBundleCompression) {
+      @UseBundleCompression boolean useBundleCompression,
+      ListeningExecutorService executorService) {
+    super(apkListener, verbose);
     this.bundleZipReader = bundleZipReader;
     this.bundleConfig = bundleConfig;
     this.aapt2 = aapt2;
@@ -104,9 +117,27 @@ final class ZipFlingerApkSerializerHelper extends ApkSerializerHelper {
             .getResourceOptimizations()
             .getSparseEncoding()
             .equals(SparseEncoding.ENFORCED);
+    this.executorService = executorService;
   }
 
   @Override
+  public ImmutableMap<ZipPath, ApkDescription> serialize(
+      Path outputDirectory, ImmutableMap<ZipPath, ModuleSplit> splitsByRelativePath) {
+    Map<ZipPath, ListenableFuture<ApkDescription>> serializedSplits =
+        Maps.transformEntries(
+            splitsByRelativePath,
+            (relativePath, split) ->
+                executorService.submit(
+                    () -> {
+                      writeToZipFile(split, outputDirectory.resolve(relativePath.toString()));
+                      ApkDescription apkDescription =
+                          ApkDescriptionHelper.createApkDescription(relativePath, split);
+                      notifyApkSerialized(apkDescription, split.getSplitType());
+                      return apkDescription;
+                    }));
+    return ConcurrencyUtils.waitForAll(serializedSplits);
+  }
+
   public Path writeToZipFile(ModuleSplit split, Path outputPath) {
     try (TempDirectory tempDir = new TempDirectory(getClass().getSimpleName())) {
       writeToZipFile(split, outputPath, tempDir);

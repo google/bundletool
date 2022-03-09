@@ -18,9 +18,9 @@ package com.android.tools.build.bundletool.model.exceptions;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
+import com.google.errorprone.annotations.CheckReturnValue;
 import com.google.errorprone.annotations.FormatMethod;
 import com.google.errorprone.annotations.FormatString;
-import javax.annotation.CheckReturnValue;
 import javax.annotation.Nullable;
 
 public class InternalExceptionBuilder<T extends BundleToolException> {

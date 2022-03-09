@@ -31,6 +31,7 @@ import com.android.bundle.Config.BundleConfig;
 import com.android.bundle.Files.ApexImages;
 import com.android.bundle.Files.Assets;
 import com.android.bundle.Files.NativeLibraries;
+import com.android.bundle.RuntimeEnabledSdkConfigProto.RuntimeEnabledSdkConfig;
 import com.android.bundle.Targeting.ModuleTargeting;
 import com.android.tools.build.bundletool.model.exceptions.InvalidBundleException;
 import com.android.tools.build.bundletool.model.version.BundleToolVersion;
@@ -110,7 +111,7 @@ public abstract class BundleModule {
     }
   }
 
-  /** The version of Bundletool that built this module, taken from BundleConfig. */
+  /** BundleConfig of the bundle that this module belongs to. */
   public abstract BundleConfig getBundleConfig();
 
   abstract XmlNode getAndroidManifestProto();
@@ -128,6 +129,8 @@ public abstract class BundleModule {
   public abstract Optional<NativeLibraries> getNativeConfig();
 
   public abstract Optional<ApexImages> getApexConfig();
+
+  public abstract Optional<RuntimeEnabledSdkConfig> getRuntimeEnabledSdkConfig();
 
   /**
    * Returns entries of the module, indexed by their module path.
@@ -311,6 +314,9 @@ public abstract class BundleModule {
 
     public abstract Builder setApexConfig(ApexImages apexConfig);
 
+    public abstract Builder setRuntimeEnabledSdkConfig(
+        RuntimeEnabledSdkConfig runtimeEnabledSdkConfig);
+
     abstract ImmutableMap.Builder<ZipPath, ModuleEntry> entryMapBuilder();
 
     abstract Builder setEntryMap(ImmutableMap<ZipPath, ModuleEntry> entryMap);
@@ -408,6 +414,12 @@ public abstract class BundleModule {
       @Override
       void addToModule(BundleModule.Builder module, InputStream inputStream) throws IOException {
         module.setApexConfig(ApexImages.parseFrom(inputStream));
+      }
+    },
+    RUNTIME_ENABLED_SDK_CONFIG("runtime_enabled_sdk_config.pb") {
+      @Override
+      void addToModule(BundleModule.Builder module, InputStream inputStream) throws IOException {
+        module.setRuntimeEnabledSdkConfig(RuntimeEnabledSdkConfig.parseFrom(inputStream));
       }
     };
 

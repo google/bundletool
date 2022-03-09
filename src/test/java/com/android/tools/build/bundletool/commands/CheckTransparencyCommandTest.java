@@ -34,7 +34,7 @@ import com.android.tools.build.bundletool.device.AdbServer;
 import com.android.tools.build.bundletool.flags.Flag.RequiredFlagNotSetException;
 import com.android.tools.build.bundletool.flags.FlagParser;
 import com.android.tools.build.bundletool.flags.ParsedFlags.UnknownFlagsException;
-import com.android.tools.build.bundletool.io.ApkSerializerHelper;
+import com.android.tools.build.bundletool.io.ApkSerializer;
 import com.android.tools.build.bundletool.io.AppBundleSerializer;
 import com.android.tools.build.bundletool.io.ZipBuilder;
 import com.android.tools.build.bundletool.model.AndroidManifest;
@@ -90,7 +90,7 @@ public final class CheckTransparencyCommandTest {
 
   @Rule public final TemporaryFolder tmp = new TemporaryFolder();
 
-  @Inject ApkSerializerHelper apkSerializerHelper;
+  @Inject ApkSerializer apkSerializer;
 
   private Path tmpDir;
   private Path bundlePath;
@@ -111,7 +111,7 @@ public final class CheckTransparencyCommandTest {
   public void setUp() throws Exception {
     tmpDir = tmp.getRoot().toPath();
     kpg = KeyPairGenerator.getInstance("RSA");
-    kpg.initialize(/* keySize= */ 3072);
+    kpg.initialize(/* keysize= */ 3072);
 
     KeyPair keyPair = kpg.genKeyPair();
     transparencyPrivateKey = keyPair.getPrivate();
@@ -137,11 +137,7 @@ public final class CheckTransparencyCommandTest {
             .build();
 
     TestComponent.useTestModule(
-        this,
-        TestModule.builder()
-            .withCustomBuildApksCommandSetter(command -> command.setEnableNewApkSerializer(true))
-            .withSigningConfig(apkSigningConfig)
-            .build());
+        this, TestModule.builder().withSigningConfig(apkSigningConfig).build());
 
     bundlePath = tmpDir.resolve("bundle.aab");
     apkZipPath = tmpDir.resolve("apks.zip");
@@ -803,7 +799,7 @@ public final class CheckTransparencyCommandTest {
                         CharSource.wrap(serializedJws).asByteSource(Charset.defaultCharset()))
                     .build())
             .build();
-    apkSerializerHelper.writeToZipFile(baseModuleSplit, apkPath);
+    apkSerializer.serialize(apkPath, baseModuleSplit);
     ZipBuilder zipBuilder =
         new ZipBuilder()
             .addFileWithContent(
@@ -866,7 +862,7 @@ public final class CheckTransparencyCommandTest {
                         CharSource.wrap(serializedJws).asByteSource(Charset.defaultCharset()))
                     .build())
             .build();
-    apkSerializerHelper.writeToZipFile(baseModuleSplit, apkPath);
+    apkSerializer.serialize(apkPath, baseModuleSplit);
     ZipBuilder zipBuilder =
         new ZipBuilder()
             .addFileWithContent(
@@ -941,7 +937,7 @@ public final class CheckTransparencyCommandTest {
                         CharSource.wrap(serializedJws).asByteSource(Charset.defaultCharset()))
                     .build())
             .build();
-    apkSerializerHelper.writeToZipFile(baseModuleSplit, apkPath);
+    apkSerializer.serialize(apkPath, baseModuleSplit);
     ZipBuilder zipBuilder =
         new ZipBuilder()
             .addFileWithContent(
@@ -1013,7 +1009,7 @@ public final class CheckTransparencyCommandTest {
                         CharSource.wrap(serializedJws).asByteSource(Charset.defaultCharset()))
                     .build())
             .build();
-    apkSerializerHelper.writeToZipFile(baseModuleSplit, apkPath);
+    apkSerializer.serialize(apkPath, baseModuleSplit);
     ZipBuilder zipBuilder =
         new ZipBuilder()
             .addFileWithContent(
@@ -1087,7 +1083,7 @@ public final class CheckTransparencyCommandTest {
                         CharSource.wrap(serializedJws).asByteSource(Charset.defaultCharset()))
                     .build())
             .build();
-    apkSerializerHelper.writeToZipFile(baseModuleSplit, apkPath);
+    apkSerializer.serialize(apkPath, baseModuleSplit);
     ZipBuilder zipBuilder =
         new ZipBuilder()
             .addFileWithContent(

@@ -17,6 +17,7 @@ package com.android.tools.build.bundletool.io;
 
 import static java.util.stream.Collectors.toList;
 
+import com.android.tools.build.bundletool.commands.BuildApksCommand.ApkBuildMode;
 import com.android.tools.build.bundletool.model.ModuleSplit;
 import com.android.tools.build.bundletool.model.ModuleSplit.SplitType;
 import com.android.tools.build.bundletool.model.ZipPath;
@@ -51,12 +52,16 @@ public class ApkPathManager {
 
   private static final Joiner NAME_PARTS_JOINER = Joiner.on('-');
 
+  private final ApkBuildMode apkBuildMode;
+
   /** Paths of APKs that have already been allocated. */
   @GuardedBy("this")
   private final Set<ZipPath> usedPaths = new HashSet<>();
 
   @Inject
-  ApkPathManager() {}
+  ApkPathManager(ApkBuildMode apkBuildMode) {
+    this.apkBuildMode = apkBuildMode;
+  }
 
   /**
    * Returns a unique file path for the given ModuleSplit.
@@ -65,6 +70,9 @@ public class ApkPathManager {
    * each returned value is unique.
    */
   public ZipPath getApkPath(ModuleSplit moduleSplit) {
+    if (apkBuildMode.equals(ApkBuildMode.UNIVERSAL)) {
+      return ZipPath.create("universal.apk");
+    }
     String moduleName = moduleSplit.getModuleName().getName();
     String targetingSuffix = getTargetingSuffix(moduleSplit);
 
@@ -96,9 +104,9 @@ public class ApkPathManager {
         directory = ZipPath.create("asset-slices");
         apkFileName = buildName(moduleName, targetingSuffix);
         break;
-      case HIBERNATION:
-        directory = ZipPath.create("hibernation");
-        apkFileName = buildName("hibernation");
+      case ARCHIVE:
+        directory = ZipPath.create("archive");
+        apkFileName = buildName("archive");
         break;
       default:
         throw new IllegalStateException("Unrecognized split type: " + moduleSplit.getSplitType());

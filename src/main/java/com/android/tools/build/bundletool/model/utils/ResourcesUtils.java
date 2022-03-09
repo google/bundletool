@@ -234,6 +234,13 @@ public final class ResourcesUtils {
         .collect(toImmutableSet());
   }
 
+  /** Returns all locales present in a given resource table. */
+  public static ImmutableSet<String> getAllLocales(ResourceTable table) {
+    return configValues(table)
+        .map(configValue -> configValue.getConfig().getLocale())
+        .collect(toImmutableSet());
+  }
+
   /** Returns the smallest screen density from the ones given. */
   public static DensityAlias getLowestDensity(ImmutableCollection<DensityAlias> densities) {
     return densities.stream().min(comparing(DENSITY_ALIAS_TO_DPI_MAP::get)).get();

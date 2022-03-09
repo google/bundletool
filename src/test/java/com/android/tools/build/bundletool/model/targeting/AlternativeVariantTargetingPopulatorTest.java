@@ -218,18 +218,17 @@ public class AlternativeVariantTargetingPopulatorTest {
     assertThat(processedApks.getInstantApks()).isEmpty();
     assertThat(processedApks.getStandaloneApks()).isEmpty();
     assertThat(processedApks.getSplitApks()).isEmpty();
-    assertThat(processedApks.getHibernatedApks()).isEmpty();
+    assertThat(processedApks.getArchivedApks()).isEmpty();
     assertThat(processedApks.getSystemApks()).isEqualTo(systemSplits);
   }
 
   @Test
-  public void hibernatedApksPassThrough() {
+  public void archivedApksPassThrough() {
     VariantTargeting emptySdkTargeting = variantSdkTargeting(SdkVersion.getDefaultInstance());
-    ImmutableList<ModuleSplit> hibernatedSplits =
-        ImmutableList.of(createModuleSplit(emptySdkTargeting, SplitType.HIBERNATION));
+    ImmutableList<ModuleSplit> archivedSplits =
+        ImmutableList.of(createModuleSplit(emptySdkTargeting, SplitType.ARCHIVE));
 
-    GeneratedApks generatedApks =
-        GeneratedApks.builder().setHibernatedApks(hibernatedSplits).build();
+    GeneratedApks generatedApks = GeneratedApks.builder().setArchivedApks(archivedSplits).build();
 
     GeneratedApks processedApks =
         AlternativeVariantTargetingPopulator.populateAlternativeVariantTargeting(generatedApks);
@@ -239,7 +238,7 @@ public class AlternativeVariantTargetingPopulatorTest {
     assertThat(processedApks.getStandaloneApks()).isEmpty();
     assertThat(processedApks.getSplitApks()).isEmpty();
     assertThat(processedApks.getSystemApks()).isEmpty();
-    assertThat(processedApks.getHibernatedApks()).isEqualTo(hibernatedSplits);
+    assertThat(processedApks.getArchivedApks()).isEqualTo(archivedSplits);
   }
 
   @Test

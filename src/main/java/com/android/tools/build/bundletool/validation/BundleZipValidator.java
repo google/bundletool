@@ -28,7 +28,7 @@ public class BundleZipValidator extends SubValidator {
     if (zipEntry.isDirectory()) {
       throw InvalidBundleException.builder()
           .withUserMessage(
-              "The App Bundle zip file contains directory zip entry '%s' which is not allowed.",
+              "The bundle zip file contains directory zip entry '%s' which is not allowed.",
               zipEntry.getName())
           .build();
     }

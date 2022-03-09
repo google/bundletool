@@ -24,12 +24,12 @@ import com.android.aapt.Resources.FileReference;
 import com.android.aapt.Resources.Item;
 import com.android.aapt.Resources.Value;
 import com.android.aapt.Resources.XmlNode;
-import com.android.tools.build.bundletool.model.GeneratedApks;
 import com.android.tools.build.bundletool.model.ModuleEntry;
 import com.android.tools.build.bundletool.model.ModuleSplit;
 import com.android.tools.build.bundletool.model.ResourceId;
 import com.android.tools.build.bundletool.model.ResourceInjector;
 import com.android.tools.build.bundletool.model.SplitsProtoXmlBuilder;
+import com.android.tools.build.bundletool.model.VariantKey;
 import com.android.tools.build.bundletool.model.ZipPath;
 import com.google.common.collect.ImmutableList;
 import com.google.common.io.ByteSource;
@@ -47,36 +47,27 @@ public class SplitsXmlInjector {
   private static final String XML_PATH_PATTERN = "res/xml/splits%s.xml";
   private static final String METADATA_KEY = "com.android.vending.splits";
 
-  public GeneratedApks process(GeneratedApks generatedApks) {
-    // A variant is a set of APKs. One device is guaranteed to receive only APKs from the same. This
-    // is why we are processing split.xml for each variant separately.
-    return GeneratedApks.fromModuleSplits(
-        generatedApks.getAllApksGroupedByOrderedVariants().asMap().entrySet().stream()
-            .map(
-                keySplit -> {
-                  switch (keySplit.getKey().getSplitType()) {
-                    case SYSTEM:
-                      // Injection for system APK variant is same as split APK variant as both
-                      // contain single base-master split which is always installed and additional
-                      // splits. In case of system APK variant base-master split is the fused system
-                      // split and splits are unmatched language splits.
-                    case SPLIT:
-                      return processSplitApkVariant(keySplit.getValue());
-                    case STANDALONE:
-                    case HIBERNATION:
-                      return keySplit.getValue().stream()
-                          .map(SplitsXmlInjector::processStandaloneVariant)
-                          .collect(toImmutableList());
-                    case INSTANT:
-                      return keySplit.getValue();
-                    case ASSET_SLICE:
-                      throw new IllegalStateException("Unexpected Asset Slice inside variant.");
-                  }
-                  throw new IllegalStateException(
-                      String.format("Unknown split type %s", keySplit.getKey().getSplitType()));
-                })
-            .flatMap(Collection::stream)
-            .collect(toImmutableList()));
+  public ImmutableList<ModuleSplit> process(VariantKey variantKey, Collection<ModuleSplit> splits) {
+    switch (variantKey.getSplitType()) {
+      case SYSTEM:
+        // Injection for system APK variant is same as split APK variant as both
+        // contain single base-master split which is always installed and additional
+        // splits. In case of system APK variant base-master split is the fused system
+        // split and splits are unmatched language splits.
+      case SPLIT:
+        return processSplitApkVariant(splits);
+      case STANDALONE:
+        return splits.stream()
+            .map(SplitsXmlInjector::processStandaloneVariant)
+            .collect(toImmutableList());
+      case INSTANT:
+      case ARCHIVE:
+        return ImmutableList.copyOf(splits);
+      case ASSET_SLICE:
+        throw new IllegalStateException("Unexpected Asset Slice inside variant.");
+    }
+    throw new IllegalStateException(
+        String.format("Unknown split type %s", variantKey.getSplitType()));
   }
 
   private static ModuleSplit processStandaloneVariant(ModuleSplit split) {

@@ -24,6 +24,7 @@ import com.android.bundle.Config.BundleConfig;
 import com.android.bundle.Files.ApexImages;
 import com.android.bundle.Files.Assets;
 import com.android.bundle.Files.NativeLibraries;
+import com.android.bundle.RuntimeEnabledSdkConfigProto.RuntimeEnabledSdkConfig;
 import com.android.tools.build.bundletool.model.BundleModule;
 import com.android.tools.build.bundletool.model.BundleModuleName;
 import com.android.tools.build.bundletool.model.ModuleEntry;
@@ -125,6 +126,12 @@ public class BundleModuleBuilder {
 
   public BundleModuleBuilder setApexConfig(ApexImages apexConfig) {
     addFile("apex.pb", apexConfig.toByteArray());
+    return this;
+  }
+
+  public BundleModuleBuilder setRuntimeEnabledSdkConfig(
+      RuntimeEnabledSdkConfig runtimeEnabledSdkConfig) {
+    addFile("runtime_enabled_sdk_config.pb", runtimeEnabledSdkConfig.toByteArray());
     return this;
   }
 

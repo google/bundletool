@@ -46,6 +46,7 @@ import com.android.bundle.Targeting.VariantTargeting;
 import com.android.tools.build.bundletool.model.AndroidManifest;
 import com.android.tools.build.bundletool.model.BundleModuleName;
 import com.android.tools.build.bundletool.model.ModuleSplit;
+import com.android.tools.build.bundletool.model.exceptions.InvalidBundleException;
 import com.google.common.collect.ImmutableCollection;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
@@ -445,7 +446,7 @@ public class SameTargetingMergerTest {
 
     Throwable exception =
         assertThrows(
-            IllegalStateException.class,
+            InvalidBundleException.class,
             () -> new SameTargetingMerger().merge(ImmutableList.of(split1, split2)));
 
     assertThat(exception)

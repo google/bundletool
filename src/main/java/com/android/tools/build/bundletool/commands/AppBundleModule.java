@@ -18,13 +18,15 @@ package com.android.tools.build.bundletool.commands;
 
 import com.android.bundle.Config.BundleConfig;
 import com.android.tools.build.bundletool.model.AppBundle;
+import com.android.tools.build.bundletool.model.Bundle;
 import com.android.tools.build.bundletool.model.BundleMetadata;
+import dagger.Binds;
 import dagger.Module;
 import dagger.Provides;
 
 /** Dagger module for components that manipulate an App Bundle. */
 @Module
-public final class AppBundleModule {
+public abstract class AppBundleModule {
 
   @CommandScoped
   @Provides
@@ -39,4 +41,7 @@ public final class AppBundleModule {
   }
 
   private AppBundleModule() {}
+
+  @Binds
+  abstract Bundle bundle(AppBundle bundle);
 }

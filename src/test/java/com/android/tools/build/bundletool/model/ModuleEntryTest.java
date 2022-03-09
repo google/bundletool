@@ -19,6 +19,9 @@ package com.android.tools.build.bundletool.model;
 import static com.google.common.truth.Truth.assertThat;
 
 import com.google.common.io.ByteSource;
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
+import java.io.InputStream;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
@@ -82,7 +85,42 @@ public class ModuleEntryTest {
     assertThat(entry.equals(entry)).isTrue();
   }
 
+  @Test
+  public void equals_ensureEntryContentIsReadOnce() throws Exception {
+    ZipPath zipPath = ZipPath.create("a");
+    CountingByteSource content1 = new CountingByteSource(new byte[] {'a'});
+    CountingByteSource content2 = new CountingByteSource(new byte[] {'a'});
+
+    ModuleEntry entry1 = ModuleEntry.builder().setPath(zipPath).setContent(content1).build();
+    ModuleEntry entry2 = ModuleEntry.builder().setPath(zipPath).setContent(content2).build();
+
+    for (int i = 0; i < 10; i++) {
+      assertThat(entry1.equals(entry2)).isTrue();
+    }
+    assertThat(content1.getOpenStreamCount()).isEqualTo(1);
+    assertThat(content2.getOpenStreamCount()).isEqualTo(1);
+  }
+
   private static ModuleEntry createEntry(ZipPath path, byte[] content) throws Exception {
     return ModuleEntry.builder().setPath(path).setContent(ByteSource.wrap(content)).build();
+  }
+
+  private static class CountingByteSource extends ByteSource {
+    private final byte[] content;
+    private int count;
+
+    CountingByteSource(byte[] content) {
+      this.content = content;
+    }
+
+    int getOpenStreamCount() {
+      return count;
+    }
+
+    @Override
+    public InputStream openStream() throws IOException {
+      count++;
+      return new ByteArrayInputStream(content);
+    }
   }
 }

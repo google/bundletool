@@ -94,6 +94,29 @@ public class ValidatorRunnerTest {
   }
 
   @Test
+  public void validateSdkBundleZipFile_invokesRightSubValidatorMethods() throws Exception {
+    Path bundlePath =
+        new ZipBuilder()
+            .addDirectory(ZipPath.create("directory"))
+            .addFileWithContent(ZipPath.create("file.txt"), DUMMY_CONTENT)
+            .writeTo(tempFolder.resolve("bundle.asb"));
+
+    try (ZipFile bundleZip = new ZipFile(bundlePath.toFile())) {
+      new ValidatorRunner(ImmutableList.of(validator)).validateBundleZipFile(bundleZip);
+
+      ArgumentCaptor<ZipEntry> zipEntryArgs = ArgumentCaptor.forClass(ZipEntry.class);
+
+      verify(validator).validateBundleZipFile(eq(bundleZip));
+      verify(validator, atLeastOnce())
+          .validateBundleZipEntry(eq(bundleZip), zipEntryArgs.capture());
+      verifyNoMoreInteractions(validator);
+
+      assertThat(zipEntryArgs.getAllValues().stream().map(ZipEntry::getName))
+          .containsExactly("directory/", "file.txt");
+    }
+  }
+
+  @Test
   public void validateBundle_invokesRightSubValidatorMethods() throws Exception {
     Path bundlePath =
         new ZipBuilder()

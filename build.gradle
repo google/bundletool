@@ -8,15 +8,15 @@ buildscript {
         }
     }
     dependencies {
-        classpath "com.google.protobuf:protobuf-gradle-plugin:0.8.8"
-        classpath "com.github.jengelman.gradle.plugins:shadow:4.0.4"
+        classpath "com.google.protobuf:protobuf-gradle-plugin:0.8.13"
+        classpath "gradle.plugin.com.github.johnrengelman:shadow:7.1.1"
     }
 }
 
 apply plugin: "com.github.johnrengelman.shadow"
 apply plugin: "com.google.protobuf"
 apply plugin: "java"
-apply plugin: "maven"
+apply plugin: "maven-publish"
 
 repositories {
     mavenCentral()
@@ -24,19 +24,18 @@ repositories {
 }
 
 configurations {
-    compileWindows
-    compileMacOs
-    compileLinux
+    implementationWindows
+    implementationMacOs
+    implementationLinux
 }
 
 // The repackaging rules are defined in the "shadowJar" task below.
 dependencies {
-    compile "com.android.tools:common:30.1.0-alpha07"
-    compile "com.android.tools:r8:2.2.64"
-    compile "com.android.tools.build:apkzlib:4.2.0-alpha13"
-    compile "com.android.tools.build:apksig:4.2.0-alpha13"
-    compile "com.android.tools.ddms:ddmlib:30.1.0-alpha07"
-    compile "com.android:zipflinger:7.1.0-alpha07"
+    implementation "com.android.tools:common:30.1.0-alpha07"
+    implementation "com.android.tools:r8:2.2.64"
+    implementation "com.android.tools.build:apksig:4.2.0-alpha13"
+    implementation "com.android.tools.ddms:ddmlib:30.1.0-alpha07"
+    implementation "com.android:zipflinger:7.1.0-alpha07"
 
     shadow "com.android.tools.build:aapt2-proto:7.0.0-beta04-7396180"
     shadow "com.google.auto.value:auto-value-annotations:1.6.2"
@@ -53,39 +52,43 @@ dependencies {
     }
     shadow "org.slf4j:slf4j-api:1.7.30"
 
-    compileWindows "com.android.tools.build:aapt2:7.0.0-beta04-7396180:windows"
-    compileMacOs "com.android.tools.build:aapt2:7.0.0-beta04-7396180:osx"
-    compileLinux "com.android.tools.build:aapt2:7.0.0-beta04-7396180:linux"
+    implementationWindows "com.android.tools.build:aapt2:7.0.0-beta04-7396180:windows"
+    implementationMacOs "com.android.tools.build:aapt2:7.0.0-beta04-7396180:osx"
+    implementationLinux "com.android.tools.build:aapt2:7.0.0-beta04-7396180:linux"
 
-    runtime "org.slf4j:slf4j-jdk14:1.7.30"
+    compileOnly "org.bouncycastle:bcprov-jdk15on:1.56"
+    compileOnly "org.bouncycastle:bcpkix-jdk15on:1.56"
+    runtimeOnly "org.slf4j:slf4j-jdk14:1.7.30"
 
-    testCompile "com.android.tools.build:aapt2-proto:7.0.0-beta04-7396180"
-    testCompile "com.google.auto.value:auto-value-annotations:1.6.2"
+    testImplementation "com.android.tools.build:aapt2-proto:7.0.0-beta04-7396180"
+    testImplementation "com.google.auto.value:auto-value-annotations:1.6.2"
     testAnnotationProcessor "com.google.auto.value:auto-value:1.6.2"
-    testCompile "com.google.errorprone:error_prone_annotations:2.3.1"
-    testCompile "com.google.guava:guava:30.1-jre"
-    testCompile "com.google.truth.extensions:truth-java8-extension:0.45"
-    testCompile "com.google.truth.extensions:truth-proto-extension:0.45"
-    testCompile "com.google.jimfs:jimfs:1.1"
-    testCompile "com.google.protobuf:protobuf-java:3.10.0"
-    testCompile "com.google.protobuf:protobuf-java-util:3.10.0"
-    testCompile "org.mockito:mockito-core:2.18.3"
-    testCompile "junit:junit:4.12"
-    testCompile "org.junit.jupiter:junit-jupiter-api:5.2.0"
-    testCompile "org.junit.vintage:junit-vintage-engine:5.2.0"
-    testRuntime "org.junit.jupiter:junit-jupiter-engine:5.2.0"
-    testCompile "org.junit.platform:junit-platform-runner:1.2.0"
-    testCompile "com.google.dagger:dagger:2.28.3"
+    testImplementation "com.google.errorprone:error_prone_annotations:2.3.1"
+    testImplementation "com.google.guava:guava:30.1-jre"
+    testImplementation "com.google.truth.extensions:truth-java8-extension:0.45"
+    testImplementation "com.google.truth.extensions:truth-proto-extension:0.45"
+    testImplementation "com.google.jimfs:jimfs:1.1"
+    testImplementation "com.google.protobuf:protobuf-java:3.10.0"
+    testImplementation "com.google.protobuf:protobuf-java-util:3.10.0"
+    testImplementation "org.mockito:mockito-core:2.18.3"
+    testImplementation "junit:junit:4.12"
+    testImplementation "org.bouncycastle:bcprov-jdk15on:1.56"
+    testImplementation "org.bouncycastle:bcpkix-jdk15on:1.56"
+    testImplementation "org.junit.jupiter:junit-jupiter-api:5.2.0"
+    testImplementation "org.junit.vintage:junit-vintage-engine:5.2.0"
+    testRuntimeOnly "org.junit.jupiter:junit-jupiter-engine:5.2.0"
+    testImplementation "org.junit.platform:junit-platform-runner:1.2.0"
+    testImplementation "com.google.dagger:dagger:2.28.3"
     testAnnotationProcessor "com.google.dagger:dagger-compiler:2.28.3"
-    testCompile "javax.inject:javax.inject:1"
-    testCompile("org.smali:dexlib2:2.3.4") {
+    testImplementation "javax.inject:javax.inject:1"
+    testImplementation("org.smali:dexlib2:2.3.4") {
         exclude group: "com.google.guava", module: "guava"
     }
-    testCompile("org.bitbucket.b_c:jose4j:0.7.0") {
+    testImplementation("org.bitbucket.b_c:jose4j:0.7.0") {
         exclude group: "org.slf4j", module: "slf4j-api"
     }
-    testCompile "org.slf4j:slf4j-api:1.7.30"
-    testRuntime "org.slf4j:slf4j-jdk14:1.7.30"
+    testImplementation "org.slf4j:slf4j-api:1.7.30"
+    testRuntimeOnly "org.slf4j:slf4j-jdk14:1.7.30"
 }
 
 def osName = System.getProperty("os.name").toLowerCase()
@@ -122,25 +125,45 @@ protobuf {
     }
 }
 
-uploadShadow {
-    repositories {
-        mavenDeployer {
-            def localRepo = project.hasProperty('localRepo') ?
-                    project.localRepo : "$buildDir/repo"
-            repository(url: "file://" + localRepo)
-            pom.project {
-                groupId 'com.android.tools.build'
-                artifactId 'bundletool'
-                version project.release_version
+publishing {
+    publications {
+        shadow(MavenPublication) { publication ->
+            project.shadow.component(publication)
 
+            groupId = 'com.android.tools.build'
+            artifactId = 'bundletool'
+            version = project.release_version
+
+            pom {
                 licenses {
                     license {
-                        name 'The Apache Software License, Version 2.0'
-                        url 'http://www.apache.org/licenses/LICENSE-2.0.txt'
-                        distribution 'repo'
+                        name = 'The Apache Software License, Version 2.0'
+                        url = 'http://www.apache.org/licenses/LICENSE-2.0.txt'
+                        distribution = 'repo'
                     }
                 }
             }
+
+            pom.withXml { xml ->
+                def jose4jDependencyNode = xml.asNode().dependencies.'*'.find {
+                    it.artifactId.text() == 'jose4j'
+                }
+                if (jose4jDependencyNode != null) {
+                    def exclusionNode = jose4jDependencyNode
+                            .appendNode('exclusions')
+                            .appendNode('exclusion');
+                    exclusionNode.appendNode('groupId', 'org.slf4j')
+                    exclusionNode.appendNode('artifactId', 'slf4j-api')
+                }
+            }
+        }
+    }
+    repositories {
+        maven {
+            def localRepo = project.hasProperty('localRepo') ?
+                    project.localRepo : "$buildDir/repo"
+
+            url = "file://$localRepo"
         }
     }
 }
@@ -183,11 +206,11 @@ task executableJar(type: ShadowJar) {
     baseName = 'bundletool'
     classifier = 'all'
     from sourceSets.main.output
-    from({ zipTree(project.configurations.compileWindows.singleFile) }) { into 'windows/' }
-    from({ zipTree(project.configurations.compileMacOs.singleFile) }) { into 'macos/' }
-    from({ zipTree(project.configurations.compileLinux.singleFile) }) { into 'linux/' }
+    from({ zipTree(project.configurations.implementationWindows.singleFile) }) { into 'windows/' }
+    from({ zipTree(project.configurations.implementationMacOs.singleFile) }) { into 'macos/' }
+    from({ zipTree(project.configurations.implementationLinux.singleFile) }) { into 'linux/' }
     configurations = [
-            project.configurations.runtime,
+            project.configurations.runtimeClasspath,
             project.configurations.shadow
     ]
     manifest {
@@ -201,19 +224,23 @@ task executableJar(type: ShadowJar) {
 // Unzip the aapt2 dependency jar.
 task unzipAapt2Jar(type: Copy) {
     if (osName.contains("linux")) {
-        from zipTree(project.configurations.compileLinux.singleFile)
+        from zipTree(project.configurations.implementationLinux.singleFile)
         into('build/resources/main/linux')
     }
 
     if (osName.contains("windows")) {
-        from zipTree(project.configurations.compileWindows.singleFile)
+        from zipTree(project.configurations.implementationWindows.singleFile)
         into('build/resources/main/windows')
     }
 
     if (osName.contains("mac")) {
-        from zipTree(project.configurations.compileMacOs.singleFile)
+        from zipTree(project.configurations.implementationMacOs.singleFile)
         into('build/resources/main/macos')
     }
+}
+
+task uploadShadow {
+    dependsOn ':publishShadowPublicationToMavenRepository'
 }
 
 compileTestJava.dependsOn(unzipAapt2Jar)

@@ -40,9 +40,13 @@ import static com.android.tools.build.bundletool.model.AndroidManifest.IS_GAME_A
 import static com.android.tools.build.bundletool.model.AndroidManifest.IS_GAME_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.LABEL_ATTRIBUTE_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.LABEL_RESOURCE_ID;
+import static com.android.tools.build.bundletool.model.AndroidManifest.LOCALE_CONFIG_ATTRIBUTE_NAME;
+import static com.android.tools.build.bundletool.model.AndroidManifest.LOCALE_CONFIG_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.MODULE_TYPE_ASSET_VALUE;
 import static com.android.tools.build.bundletool.model.AndroidManifest.MODULE_TYPE_FEATURE_VALUE;
 import static com.android.tools.build.bundletool.model.AndroidManifest.NAME_RESOURCE_ID;
+import static com.android.tools.build.bundletool.model.AndroidManifest.PERMISSION_ELEMENT_NAME;
+import static com.android.tools.build.bundletool.model.AndroidManifest.PERMISSION_GROUP_ELEMENT_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.RESOURCE_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.SHARED_USER_ID_ATTRIBUTE_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.SHARED_USER_ID_RESOURCE_ID;
@@ -95,6 +99,7 @@ import com.android.aapt.Resources.XmlNode;
 import com.android.tools.build.bundletool.TestData;
 import com.android.tools.build.bundletool.model.exceptions.InvalidBundleException;
 import com.android.tools.build.bundletool.model.utils.xmlproto.UnexpectedAttributeTypeException;
+import com.android.tools.build.bundletool.model.utils.xmlproto.XmlProtoElement;
 import com.android.tools.build.bundletool.model.utils.xmlproto.XmlProtoNode;
 import com.android.tools.build.bundletool.model.version.Version;
 import com.google.common.collect.ImmutableList;
@@ -1434,6 +1439,85 @@ public class AndroidManifestTest {
     assertThat(androidManifest.hasBackupAgent()).isFalse();
   }
 
+  @Test
+  public void getPermissions_success() {
+    XmlProtoElement permission1 =
+        new XmlProtoElement(
+            xmlElement(
+                PERMISSION_ELEMENT_NAME,
+                xmlAttribute(ANDROID_NAMESPACE_URI, "name", NAME_RESOURCE_ID, "SEND_SMS")));
+    XmlProtoElement permission2 =
+        new XmlProtoElement(
+            xmlElement(
+                PERMISSION_ELEMENT_NAME,
+                ImmutableList.of(
+                    xmlAttribute(
+                        ANDROID_NAMESPACE_URI,
+                        "name",
+                        NAME_RESOURCE_ID,
+                        "com.some.other.PERMISSION"),
+                    xmlResourceReferenceAttribute(
+                        ANDROID_NAMESPACE_URI, ICON_ATTRIBUTE_NAME, ICON_RESOURCE_ID, 12341234),
+                    xmlResourceReferenceAttribute(
+                        ANDROID_NAMESPACE_URI, LABEL_ATTRIBUTE_NAME, LABEL_RESOURCE_ID, 0x12345678),
+                    xmlResourceReferenceAttribute(
+                        ANDROID_NAMESPACE_URI,
+                        DESCRIPTION_ATTRIBUTE_NAME,
+                        DESCRIPTION_RESOURCE_ID,
+                        0x87654321),
+                    xmlAttribute(ANDROID_NAMESPACE_URI, "protectionLevel", "normal|signature"),
+                    xmlAttribute(ANDROID_NAMESPACE_URI, "permissionGroup", "group1"))));
+    AndroidManifest androidManifest =
+        AndroidManifest.create(
+            xmlNode(
+                xmlElement(
+                    "manifest", xmlNode(permission1.getProto()), xmlNode(permission2.getProto()))));
+
+    assertThat(androidManifest.getPermissions()).containsExactly(permission1, permission2);
+  }
+
+  @Test
+  public void getPermissionGroups_success() {
+    XmlProtoElement permisisonGroup1 =
+        new XmlProtoElement(
+            xmlElement(
+                PERMISSION_GROUP_ELEMENT_NAME,
+                xmlAttribute(ANDROID_NAMESPACE_URI, "name", NAME_RESOURCE_ID, "group.name.1")));
+    XmlProtoElement permisisonGroup2 =
+        new XmlProtoElement(
+            xmlElement(
+                PERMISSION_GROUP_ELEMENT_NAME,
+                ImmutableList.of(
+                    xmlAttribute(ANDROID_NAMESPACE_URI, "name", NAME_RESOURCE_ID, "group.name.2"),
+                    xmlResourceReferenceAttribute(
+                        ANDROID_NAMESPACE_URI, ICON_ATTRIBUTE_NAME, ICON_RESOURCE_ID, 12341234),
+                    xmlResourceReferenceAttribute(
+                        ANDROID_NAMESPACE_URI, LABEL_ATTRIBUTE_NAME, LABEL_RESOURCE_ID, 0x12345678),
+                    xmlResourceReferenceAttribute(
+                        ANDROID_NAMESPACE_URI,
+                        DESCRIPTION_ATTRIBUTE_NAME,
+                        DESCRIPTION_RESOURCE_ID,
+                        0x87654321))));
+    AndroidManifest androidManifest =
+        AndroidManifest.create(
+            xmlNode(
+                xmlElement(
+                    "manifest",
+                    xmlNode(permisisonGroup1.getProto()),
+                    xmlNode(permisisonGroup2.getProto()))));
+
+    assertThat(androidManifest.getPermissionGroups())
+        .containsExactly(permisisonGroup1, permisisonGroup2);
+  }
+
+  @Test
+  public void getPermissions_isEmpty() {
+    AndroidManifest androidManifest =
+        AndroidManifest.create(xmlNode(xmlElement("manifest", xmlNode(xmlElement("application")))));
+
+    assertThat(androidManifest.getPermissionGroups()).isEmpty();
+  }
+
   private AndroidManifest createManifestWithApplicationAttribute(
       String name, int resourceId, String value) {
     return AndroidManifest.create(
@@ -1469,5 +1553,22 @@ public class AndroidManifestTest {
                         "application",
                         xmlResourceReferenceAttribute(
                             ANDROID_NAMESPACE_URI, name, resourceId, value))))));
+  }
+
+  @Test
+  public void hasLocaleConfig_missing_returnsFalse() {
+    AndroidManifest androidManifest =
+        AndroidManifest.create(xmlNode(xmlElement("manifest", xmlNode(xmlElement("application")))));
+
+    assertThat(androidManifest.hasLocaleConfig()).isFalse();
+  }
+
+  @Test
+  public void hasLocaleConfig_present() {
+    AndroidManifest androidManifest =
+        createManifestWithApplicationRefIdAttribute(
+            LOCALE_CONFIG_ATTRIBUTE_NAME, LOCALE_CONFIG_RESOURCE_ID, 0x12345678);
+
+    assertThat(androidManifest.hasLocaleConfig()).isTrue();
   }
 }
