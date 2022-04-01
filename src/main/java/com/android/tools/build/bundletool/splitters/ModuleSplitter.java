@@ -74,6 +74,7 @@ public class ModuleSplitter {
   private final VariantTargeting variantTargeting;
   private final Optional<String> stampSource;
   private final StampType stampType;
+  private final AppBundle appBundle;
 
   private final AbiPlaceholderInjector abiPlaceholderInjector;
   private final PinSpecInjector pinSpecInjector;
@@ -144,6 +145,7 @@ public class ModuleSplitter {
       StampType stampType) {
     this.module = checkNotNull(module);
     this.bundleVersion = checkNotNull(bundleVersion);
+    this.appBundle = appBundle;
     this.apkGenerationConfiguration = checkNotNull(apkGenerationConfiguration);
     this.variantTargeting = checkNotNull(variantTargeting);
     this.abiPlaceholderInjector =
@@ -166,6 +168,7 @@ public class ModuleSplitter {
       return splitModuleInternal().stream()
           .map(this::removeSplitName)
           .map(this::addPlaceHolderNativeLibsToBaseModule)
+          .map(this::addUsesSdkLibraryTagsToMainSplitOfBaseModule)
           .collect(toImmutableList());
     }
   }
@@ -178,6 +181,17 @@ public class ModuleSplitter {
     } else {
       return moduleSplit;
     }
+  }
+
+  private ModuleSplit addUsesSdkLibraryTagsToMainSplitOfBaseModule(ModuleSplit moduleSplit) {
+    if (!appBundle.getRuntimeEnabledSdkDependencies().isEmpty()
+        && variantTargeting.getSdkRuntimeTargeting().getRequiresSdkRuntime()
+        && moduleSplit.isBaseModuleSplit()
+        && moduleSplit.isMasterSplit()) {
+      return moduleSplit.addUsesSdkLibraryElements(
+          appBundle.getRuntimeEnabledSdkDependencies().values());
+    }
+    return moduleSplit;
   }
 
   /** Common modifications to both the instant and installed splits. */

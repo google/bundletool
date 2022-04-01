@@ -1,0 +1,15 @@
+{
+  "ram":1152921504606846976,
+  "device_id": {
+    "build_brand":"google",
+    "build_device":"pipit"
+  },
+  "system_features": [
+    {
+      "name":"android.hardware.bluetooth"
+    },
+    {
+      "name":"android.hardware.camera"
+    }
+  ]
+}

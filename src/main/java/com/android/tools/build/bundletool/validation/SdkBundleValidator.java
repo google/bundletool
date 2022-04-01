@@ -45,7 +45,8 @@ public class SdkBundleValidator {
           new DexFilesValidator(),
           new SdkAndroidManifestValidator(),
           // Other.
-          new ResourceTableValidator());
+          new ResourceTableValidator(),
+          new SdkBundleModuleResourceIdValidator());
 
   private final ImmutableList<SubValidator> allBundleFileSubValidators;
   private final ImmutableList<SubValidator> allBundleSubValidators;

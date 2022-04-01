@@ -18,16 +18,23 @@ package com.android.tools.build.bundletool.io;
 import com.android.bundle.Commands.ApexApkMetadata;
 import com.android.bundle.Commands.ApkDescription;
 import com.android.bundle.Commands.ArchivedApkMetadata;
+import com.android.bundle.Commands.SigningDescription;
 import com.android.bundle.Commands.SplitApkMetadata;
 import com.android.bundle.Commands.StandaloneApkMetadata;
 import com.android.bundle.Commands.SystemApkMetadata;
 import com.android.tools.build.bundletool.model.ModuleSplit;
 import com.android.tools.build.bundletool.model.ZipPath;
+import java.util.Optional;
 
 /** Helper class which creates ApkDescription for module splits. */
 class ApkDescriptionHelper {
 
   static ApkDescription createApkDescription(ZipPath relativePath, ModuleSplit split) {
+    return createApkDescription(relativePath, split, /* signingDescription= */ Optional.empty());
+  }
+
+  static ApkDescription createApkDescription(
+      ZipPath relativePath, ModuleSplit split, Optional<SigningDescription> signingDescription) {
     ApkDescription.Builder resultBuilder =
         ApkDescription.newBuilder()
             .setPath(relativePath.toString())
@@ -60,6 +67,7 @@ class ApkDescriptionHelper {
         resultBuilder.setArchivedApkMetadata(ArchivedApkMetadata.getDefaultInstance());
         break;
     }
+    signingDescription.ifPresent(resultBuilder::setSigningDescription);
     return resultBuilder.build();
   }
 

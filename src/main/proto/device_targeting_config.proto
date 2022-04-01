@@ -1,0 +1,135 @@
+syntax = "proto3";
+
+package android.bundle;
+
+option java_package = "com.android.bundle";
+option java_multiple_files = true;
+
+// Configuration describing device targeting criteria for the content of an app.
+message DeviceTierConfig {
+  // Definition of device groups for the app.
+  repeated DeviceGroup device_groups = 1;
+
+  // Definition of the set of device tiers for the app.
+  DeviceTierSet device_tier_set = 2;
+}
+
+// A group of devices.
+//
+// A group is defined by a set of device selectors. A device belongs to the
+// group if it matches any selector (logical OR).
+message DeviceGroup {
+  // The name of the group.
+  string name = 1;
+
+  // Device selectors for this group. A device matching any of the selectors
+  // is included in this group.
+  repeated DeviceSelector device_selectors = 2;
+}
+
+// A set of device tiers.
+//
+// A tier set determines what variation of app content gets served to a specific
+// device, for device-targeted content.
+//
+// You should assign a priority level to each tier, which determines the
+// ordering by which they are evaluated by Play. See the documentation of
+// DeviceTier.level for more details.
+message DeviceTierSet {
+  // Device tiers belonging to the set.
+  repeated DeviceTier device_tiers = 1;
+}
+
+// A single device tier.
+//
+// Devices matching any of the device groups in device_group_names are
+// considered to match the tier.
+message DeviceTier {
+  // Groups of devices included in this tier.
+  // These groups must be defined explicitly under device_groups in this
+  // configuration.
+  repeated string device_group_names = 1;
+
+  // The priority level of the tier.
+  //
+  // Tiers are evaluated in descending order of level: the highest level tier
+  // has the highest priority. The highest tier matching a given device is
+  // selected for that device.
+  //
+  // You should use a contiguous range of levels for your tiers in a tier set;
+  // tier levels in a tier set must be unique.
+  // For instance, if your tier set has 4 tiers (including the global fallback),
+  // you should define tiers 1, 2 and 3 in this configuration.
+  //
+  // Note: tier 0 is implicitly defined as a global fallback and selected for
+  // devices that don't match any of the tiers explicitly defined here. You
+  // mustn't define level 0 explicitly in this configuration.
+  int32 level = 2;
+}
+
+// Selector for a device group.
+// A selector consists of a set of conditions on the device that should all
+// match (logical AND) to determine a device group eligibility.
+//
+// For instance, if a selector specifies RAM conditions, device model inclusion
+// and device model exclusion, a device is considered to match if:
+// device matches RAM conditions
+// AND
+// device matches one of the included device models
+// AND
+// device doesn't match excluded device models
+message DeviceSelector {
+  // Conditions on the device's RAM.
+  DeviceRam device_ram = 1;
+
+  // Device models included by this selector.
+  repeated DeviceId included_device_ids = 2;
+
+  // Device models excluded by this selector, even if they match all other
+  // conditions.
+  repeated DeviceId excluded_device_ids = 3;
+
+  // A device needs to have all these system features to be
+  // included by the selector.
+  repeated SystemFeature required_system_features = 4;
+
+  // A device that has any of these system features is excluded by
+  // this selector, even if it matches all other conditions.
+  repeated SystemFeature forbidden_system_features = 5;
+}
+
+// Conditions about a device's RAM capabilities.
+message DeviceRam {
+  // Minimum RAM in bytes (bound included).
+  int64 min_bytes = 1;
+
+  // Maximum RAM in bytes (bound excluded).
+  int64 max_bytes = 2;
+}
+
+// Identifier of a device.
+message DeviceId {
+  // Value of Build.BRAND.
+  string build_brand = 1;
+
+  // Value of Build.DEVICE.
+  string build_device = 2;
+}
+
+// Representation of a system feature.
+message SystemFeature {
+  // The name of the feature.
+  string name = 1;
+}
+
+// Properties of a particular device.
+message DeviceProperties {
+  // Device RAM in bytes.
+  int64 ram = 1;
+
+  // Device ID of device.
+  DeviceId device_id = 2;
+
+  // System features in device.
+  repeated SystemFeature system_features = 3;
+}

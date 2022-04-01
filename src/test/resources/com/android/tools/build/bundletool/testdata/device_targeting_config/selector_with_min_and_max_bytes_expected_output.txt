@@ -1,0 +1,5 @@
+Group 'very_specific_ram':
+  (
+    10 B <= RAM < 11 B
+  )
+

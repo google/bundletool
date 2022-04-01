@@ -1,0 +1,2 @@
+Tier: 3
+Groups: 'very_high_ram', 'high_ram', 'mid_ram'

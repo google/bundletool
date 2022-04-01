@@ -15,10 +15,12 @@
  */
 package com.android.tools.build.bundletool.transparency;
 
+import static com.google.common.collect.ImmutableList.toImmutableList;
 import static java.util.stream.Collectors.joining;
 
 import com.android.tools.build.bundletool.model.exceptions.CommandExecutionException;
 import com.android.tools.build.bundletool.model.exceptions.InvalidCommandException;
+import com.google.common.collect.ImmutableList;
 import com.google.common.hash.Hashing;
 import com.google.common.io.ByteSource;
 import com.google.common.primitives.Bytes;
@@ -106,9 +108,22 @@ public final class CodeTransparencyCryptoUtils {
 
   /** Reads {@link X509Certificate} from the given path. */
   public static X509Certificate getX509Certificate(Path certificatePath) {
+    ImmutableList<X509Certificate> certificates = getX509Certificates(certificatePath);
+    if (certificates.isEmpty()) {
+      throw InvalidCommandException.builder()
+          .withInternalMessage("Unable to read public key certificate from the provided path.")
+          .build();
+    }
+    return certificates.get(0);
+  }
+
+  /** Reads {@link X509Certificate} chain from the given path. */
+  public static ImmutableList<X509Certificate> getX509Certificates(Path certificatePath) {
     try (InputStream inputStream = Files.newInputStream(certificatePath)) {
       CertificateFactory certificateFactory = CertificateFactory.getInstance("X.509");
-      return (X509Certificate) certificateFactory.generateCertificate(inputStream);
+      return certificateFactory.generateCertificates(inputStream).stream()
+          .map(certificate -> (X509Certificate) certificate)
+          .collect(toImmutableList());
     } catch (IOException e) {
       throw InvalidCommandException.builder()
           .withInternalMessage("Unable to read public key certificate from the provided path.")

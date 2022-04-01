@@ -29,6 +29,7 @@ import com.android.aapt.Resources.ResourceTable;
 import com.android.bundle.Files.ApexImages;
 import com.android.bundle.Files.NativeLibraries;
 import com.android.bundle.Files.TargetedApexImage;
+import com.android.bundle.RuntimeEnabledSdkConfigProto.RuntimeEnabledSdkConfig;
 import com.android.tools.build.bundletool.model.BundleModule;
 import com.android.tools.build.bundletool.model.exceptions.InvalidBundleException;
 import com.android.tools.build.bundletool.testing.BundleModuleBuilder;
@@ -141,5 +142,22 @@ public final class AssetModuleFilesValidatorTest {
     assertThat(exception)
         .hasMessageThat()
         .matches("Apex config not allowed in asset packs, but found in 'assetmodule'.");
+  }
+
+  @Test
+  public void moduleWithRuntimeEnabledSdkConfig_throws() {
+    BundleModule module =
+        new BundleModuleBuilder(MODULE_NAME)
+            .setManifest(androidManifestForAssetModule(PKG_NAME))
+            .setRuntimeEnabledSdkConfig(RuntimeEnabledSdkConfig.getDefaultInstance())
+            .build();
+    InvalidBundleException exception =
+        assertThrows(
+            InvalidBundleException.class,
+            () -> new AssetModuleFilesValidator().validateModule(module));
+    assertThat(exception)
+        .hasMessageThat()
+        .matches(
+            "Runtime-enabled SDK config not allowed in asset packs, but found in 'assetmodule'.");
   }
 }

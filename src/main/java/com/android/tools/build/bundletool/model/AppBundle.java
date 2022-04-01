@@ -30,11 +30,13 @@ import com.android.bundle.Config.BundleConfig;
 import com.android.bundle.Config.BundleConfig.BundleType;
 import com.android.bundle.Config.StandaloneConfig.DexMergingStrategy;
 import com.android.bundle.Files.TargetedNativeDirectory;
+import com.android.bundle.RuntimeEnabledSdkConfigProto.RuntimeEnabledSdk;
 import com.android.bundle.Targeting.Abi;
 import com.android.bundle.Targeting.NativeDirectoryTargeting;
 import com.android.tools.build.bundletool.model.BundleModule.ModuleType;
 import com.android.tools.build.bundletool.model.version.Version;
 import com.google.auto.value.AutoValue;
+import com.google.auto.value.extension.memoized.Memoized;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
@@ -212,6 +214,22 @@ public abstract class AppBundle implements Bundle {
   public boolean storeArchiveEnabled() {
     return getBundleConfig().getOptimizations().hasStoreArchive()
         && getBundleConfig().getOptimizations().getStoreArchive().getEnabled();
+  }
+
+  /**
+   * Returns runtime-enabled SDK dependencies of this bundle, keyed by SDK package name.
+   *
+   * <p>Note, that this method flattens dependencies across all modules, forgetting the association
+   * of the runtime-enabled SDK dependencies with specific app bundle modules.
+   */
+  @Memoized
+  public ImmutableMap<String, RuntimeEnabledSdk> getRuntimeEnabledSdkDependencies() {
+    return getFeatureModules().values().stream()
+        .filter(module -> module.getRuntimeEnabledSdkConfig().isPresent())
+        .map(module -> module.getRuntimeEnabledSdkConfig().get())
+        .flatMap(
+            runtimeEnabledSdkConfig -> runtimeEnabledSdkConfig.getRuntimeEnabledSdkList().stream())
+        .collect(toImmutableMap(RuntimeEnabledSdk::getPackageName, identity()));
   }
 
   public abstract Builder toBuilder();

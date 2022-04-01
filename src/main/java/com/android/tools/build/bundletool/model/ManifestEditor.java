@@ -21,6 +21,8 @@ import static com.android.tools.build.bundletool.model.AndroidManifest.ALLOW_BAC
 import static com.android.tools.build.bundletool.model.AndroidManifest.ALLOW_BACKUP_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.ANDROID_NAMESPACE_URI;
 import static com.android.tools.build.bundletool.model.AndroidManifest.APPLICATION_ELEMENT_NAME;
+import static com.android.tools.build.bundletool.model.AndroidManifest.CERTIFICATE_DIGEST_ATTRIBUTE_NAME;
+import static com.android.tools.build.bundletool.model.AndroidManifest.CERTIFICATE_DIGEST_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.DATA_EXTRACTION_RULES_ATTRIBUTE_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.DATA_EXTRACTION_RULES_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.DESCRIPTION_ATTRIBUTE_NAME;
@@ -52,22 +54,27 @@ import static com.android.tools.build.bundletool.model.AndroidManifest.META_DATA
 import static com.android.tools.build.bundletool.model.AndroidManifest.META_DATA_KEY_SPLITS_REQUIRED;
 import static com.android.tools.build.bundletool.model.AndroidManifest.MIN_SDK_VERSION_ATTRIBUTE_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.MIN_SDK_VERSION_RESOURCE_ID;
+import static com.android.tools.build.bundletool.model.AndroidManifest.NAME_ATTRIBUTE_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.NAME_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.NO_NAMESPACE_URI;
 import static com.android.tools.build.bundletool.model.AndroidManifest.PROVIDER_ELEMENT_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.RESOURCE_RESOURCE_ID;
+import static com.android.tools.build.bundletool.model.AndroidManifest.SDK_MAJOR_VERSION_ATTRIBUTE_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.SERVICE_ELEMENT_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.SHARED_USER_ID_ATTRIBUTE_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.SHARED_USER_ID_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.SHARED_USER_LABEL_ATTRIBUTE_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.SHARED_USER_LABEL_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.SPLIT_NAME_RESOURCE_ID;
+import static com.android.tools.build.bundletool.model.AndroidManifest.TARGET_SANDBOX_VERSION_ATTRIBUTE_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.TARGET_SANDBOX_VERSION_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.TARGET_SDK_VERSION_ATTRIBUTE_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.TARGET_SDK_VERSION_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.USES_SDK_ELEMENT_NAME;
+import static com.android.tools.build.bundletool.model.AndroidManifest.USES_SDK_LIBRARY_ELEMENT_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.VALUE_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.VERSION_CODE_RESOURCE_ID;
+import static com.android.tools.build.bundletool.model.AndroidManifest.VERSION_MAJOR_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.VERSION_NAME_ATTRIBUTE_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.VERSION_NAME_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.utils.xmlproto.XmlProtoAttributeBuilder.createAndroidAttribute;
@@ -176,7 +183,8 @@ public class ManifestEditor {
 
   public ManifestEditor setTargetSandboxVersion(int version) {
     manifestElement
-        .getOrCreateAndroidAttribute("targetSandboxVersion", TARGET_SANDBOX_VERSION_RESOURCE_ID)
+        .getOrCreateAndroidAttribute(
+            TARGET_SANDBOX_VERSION_ATTRIBUTE_NAME, TARGET_SANDBOX_VERSION_RESOURCE_ID)
         .setValueAsDecimalInteger(version);
     return this;
   }
@@ -420,6 +428,27 @@ public class ManifestEditor {
     manifest
         .getPermissionGroups()
         .forEach(permissionGroup -> manifestElement.addChildElement(permissionGroup.toBuilder()));
+    return this;
+  }
+
+  /** Adds uses-sdk-library tag to the manifest. */
+  public ManifestEditor addUsesSdkLibraryElement(
+      String name, long versionMajor, String certDigest) {
+    manifestElement
+        .getOrCreateChildElement(APPLICATION_ELEMENT_NAME)
+        .addChildElement(
+            XmlProtoElementBuilder.create(USES_SDK_LIBRARY_ELEMENT_NAME)
+                .addAttribute(
+                    createAndroidAttribute(NAME_ATTRIBUTE_NAME, NAME_RESOURCE_ID)
+                        .setValueAsString(name))
+                .addAttribute(
+                    createAndroidAttribute(
+                            SDK_MAJOR_VERSION_ATTRIBUTE_NAME, VERSION_MAJOR_RESOURCE_ID)
+                        .setValueAsString(String.valueOf(versionMajor)))
+                .addAttribute(
+                    createAndroidAttribute(
+                            CERTIFICATE_DIGEST_ATTRIBUTE_NAME, CERTIFICATE_DIGEST_RESOURCE_ID)
+                        .setValueAsString(certDigest)));
     return this;
   }
 

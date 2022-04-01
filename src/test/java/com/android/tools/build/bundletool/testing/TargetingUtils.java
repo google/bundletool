@@ -49,6 +49,7 @@ import com.android.bundle.Targeting.SanitizerTargeting;
 import com.android.bundle.Targeting.ScreenDensity;
 import com.android.bundle.Targeting.ScreenDensity.DensityAlias;
 import com.android.bundle.Targeting.ScreenDensityTargeting;
+import com.android.bundle.Targeting.SdkRuntimeTargeting;
 import com.android.bundle.Targeting.SdkVersion;
 import com.android.bundle.Targeting.SdkVersionTargeting;
 import com.android.bundle.Targeting.TextureCompressionFormat;
@@ -928,6 +929,16 @@ public final class TargetingUtils {
 
   public static VariantTargeting lPlusVariantTargeting() {
     return variantMinSdkTargeting(Versions.ANDROID_L_API_VERSION);
+  }
+
+  public static VariantTargeting sdkRuntimeVariantTargeting() {
+    return VariantTargeting.newBuilder()
+        .setSdkRuntimeTargeting(SdkRuntimeTargeting.newBuilder().setRequiresSdkRuntime(true))
+        .setSdkVersionTargeting(
+            sdkVersionTargeting(
+                sdkVersionFrom(Versions.ANDROID_T_API_VERSION),
+                /* alternatives= */ ImmutableSet.of()))
+        .build();
   }
 
   // Not meant to be instantiated.

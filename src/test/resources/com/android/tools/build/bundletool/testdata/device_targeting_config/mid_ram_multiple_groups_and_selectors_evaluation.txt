@@ -1,0 +1,2 @@
+Tier: 1
+Groups: 'mid_ram'

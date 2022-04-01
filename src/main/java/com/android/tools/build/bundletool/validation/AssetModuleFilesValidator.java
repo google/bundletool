@@ -44,6 +44,7 @@ public class AssetModuleFilesValidator extends SubValidator {
     validateNoResourceTable(module);
     validateOnlyAssetsAndManifest(module);
     validateNoNativeOrApexConfig(module);
+    validateNoRuntimeEnabledSdkConfig(module);
   }
 
   private void validateNoResourceTable(BundleModule module) {
@@ -76,6 +77,13 @@ public class AssetModuleFilesValidator extends SubValidator {
     validate(
         !module.getApexConfig().isPresent(),
         "Apex config not allowed in asset packs, but found in '%s'.",
+        module.getName());
+  }
+
+  private void validateNoRuntimeEnabledSdkConfig(BundleModule module) {
+    validate(
+        !module.getRuntimeEnabledSdkConfig().isPresent(),
+        "Runtime-enabled SDK config not allowed in asset packs, but found in '%s'.",
         module.getName());
   }
 

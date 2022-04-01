@@ -197,4 +197,30 @@ public class ResourceInjectorTest {
         CommandExecutionException.class,
         () -> resourceInjector.addResource(/* entryType= */ "layout", Entry.getDefaultInstance()));
   }
+
+  @Test
+  public void addStringResource_entryCreatedInMatchedClass() {
+    ResourceTable.Builder resourceTable =
+        ResourceTable.newBuilder()
+            .addPackage(
+                Package.newBuilder()
+                    .setPackageId(PackageId.newBuilder().setId(0x12))
+                    .setPackageName(PACKAGE_NAME)
+                    .addType(
+                        Type.newBuilder()
+                            .setTypeId(TypeId.newBuilder().setId(0x01))
+                            .setName("string")
+                            .addEntry(
+                                Entry.newBuilder()
+                                    .setEntryId(EntryId.newBuilder().setId(0x0000)))));
+    ResourceInjector resourceInjector = new ResourceInjector(resourceTable, PACKAGE_NAME);
+
+    resourceInjector.addStringResource(/* name= */ "resourceName", /* value= */ "resourceValue");
+
+    ResourceTable resultTable = resourceInjector.build();
+    Entry addedResource = resultTable.getPackage(0).getType(0).getEntry(1);
+    assertThat(addedResource.getName()).isEqualTo("resourceName");
+    assertThat(addedResource.getConfigValue(0).getValue().getItem().getStr().getValue())
+        .isEqualTo("resourceValue");
+  }
 }

@@ -13,6 +13,7 @@ message VariantTargeting {
   ScreenDensityTargeting screen_density_targeting = 3;
   MultiAbiTargeting multi_abi_targeting = 4;
   TextureCompressionFormatTargeting texture_compression_format_targeting = 5;
+  SdkRuntimeTargeting sdk_runtime_targeting = 6;
 }
 
 // Targeting on the level of individual APKs.
@@ -209,4 +210,10 @@ message DeviceTierTargeting {
 // Targets conditional modules to a set of device groups.
 message DeviceGroupModuleTargeting {
   repeated string value = 1;
+}
+
+// Variant targeting based on SDK Runtime availability on device.
+message SdkRuntimeTargeting {
+  // Whether the variant requires SDK Runtime to be available on the device.
+  bool requires_sdk_runtime = 1;
 }

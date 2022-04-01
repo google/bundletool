@@ -1,0 +1,59 @@
+Group 'exabyte_ram':
+  (
+    RAM >= 1073741824.00 GB
+  )
+
+Group 'megabyte_ram':
+  (
+    RAM >= 1.00 MB
+  )
+
+Group 'potato_ram':
+  (
+    2 B <= RAM < 1.00 MB
+  )
+
+Tier 3:
+  (
+    (
+      RAM >= 1073741824.00 GB
+    )
+  )
+
+Tier 2:
+  (
+    (
+      RAM >= 1073741824.00 GB
+    ) OR (
+      RAM >= 1.00 MB
+    )
+  ) AND NOT (
+    (
+      RAM >= 1073741824.00 GB
+    )
+  )
+
+Tier 1:
+  (
+    (
+      2 B <= RAM < 1.00 MB
+    )
+  ) AND NOT (
+    (
+      RAM >= 1073741824.00 GB
+    ) OR (
+      RAM >= 1.00 MB
+    )
+  )
+
+Tier 0 (default):
+  NOT (
+    (
+      2 B <= RAM < 1.00 MB
+    ) OR (
+      RAM >= 1073741824.00 GB
+    ) OR (
+      RAM >= 1.00 MB
+    )
+  )
+

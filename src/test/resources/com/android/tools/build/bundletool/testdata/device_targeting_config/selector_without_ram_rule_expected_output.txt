@@ -1,0 +1,7 @@
+Group 'cool_device_group':
+  (
+    device IN ('cool_brand cool_device')
+      AND
+    device NOT IN ('other_brand other_device')
+  )
+

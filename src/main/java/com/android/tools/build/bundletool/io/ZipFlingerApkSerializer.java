@@ -35,6 +35,7 @@ import static com.google.common.collect.ImmutableSortedSet.toImmutableSortedSet;
 import static java.util.Comparator.naturalOrder;
 
 import com.android.bundle.Commands.ApkDescription;
+import com.android.bundle.Commands.SigningDescription;
 import com.android.bundle.Config.BundleConfig;
 import com.android.bundle.Config.ResourceOptimizations.SparseEncoding;
 import com.android.tools.build.bundletool.androidtools.Aapt2Command;
@@ -129,9 +130,14 @@ public final class ZipFlingerApkSerializer extends ApkSerializer {
             (relativePath, split) ->
                 executorService.submit(
                     () -> {
-                      writeToZipFile(split, outputDirectory.resolve(relativePath.toString()));
-                      ApkDescription apkDescription =
-                          ApkDescriptionHelper.createApkDescription(relativePath, split);
+                      ApkDescription.Builder apkDescriptionBuilder =
+                          ApkDescriptionHelper.createApkDescription(relativePath, split)
+                              .toBuilder();
+                      writeToZipFile(
+                          split,
+                          outputDirectory.resolve(relativePath.toString()),
+                          Optional.of(apkDescriptionBuilder));
+                      ApkDescription apkDescription = apkDescriptionBuilder.build();
                       notifyApkSerialized(apkDescription, split.getSplitType());
                       return apkDescription;
                     }));
@@ -139,15 +145,24 @@ public final class ZipFlingerApkSerializer extends ApkSerializer {
   }
 
   public Path writeToZipFile(ModuleSplit split, Path outputPath) {
+    return writeToZipFile(split, outputPath, /* apkDescriptionBuilder= */ Optional.empty());
+  }
+
+  private Path writeToZipFile(
+      ModuleSplit split, Path outputPath, Optional<ApkDescription.Builder> apkDescriptionBuilder) {
     try (TempDirectory tempDir = new TempDirectory(getClass().getSimpleName())) {
-      writeToZipFile(split, outputPath, tempDir);
+      writeToZipFile(split, outputPath, tempDir, apkDescriptionBuilder);
     } catch (IOException e) {
       throw new UncheckedIOException(e);
     }
     return outputPath;
   }
 
-  private void writeToZipFile(ModuleSplit split, Path outputPath, TempDirectory tempDir)
+  private void writeToZipFile(
+      ModuleSplit split,
+      Path outputPath,
+      TempDirectory tempDir,
+      Optional<ApkDescription.Builder> apkDescriptionBuilder)
       throws IOException {
     checkFileDoesNotExist(outputPath);
     createParentDirectories(outputPath);
@@ -201,7 +216,10 @@ public final class ZipFlingerApkSerializer extends ApkSerializer {
       }
     }
 
-    apkSigner.signApk(outputPath, split);
+    Optional<SigningDescription> signingDescription = apkSigner.signApk(outputPath, split);
+    signingDescription.ifPresent(
+        signingDesc ->
+            apkDescriptionBuilder.ifPresent(builder -> builder.setSigningDescription(signingDesc)));
   }
 
   private final class ApkEntrySerializer {

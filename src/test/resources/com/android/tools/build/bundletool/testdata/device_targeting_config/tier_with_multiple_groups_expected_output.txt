@@ -1,0 +1,56 @@
+Group 'very_high_ram':
+  (
+    RAM >= 4.00 GB
+  )
+
+Group 'high_ram_and_quantum_computing':
+  (
+    RAM >= 2.00 GB
+      AND
+    device HAS ALL FEATURES IN ('android.hardware.quantum')
+  )
+
+Group 'high_ram':
+  (
+    RAM >= 2.00 GB
+  )
+
+Tier 2:
+  (
+    (
+      RAM >= 4.00 GB
+    ) OR (
+      RAM >= 2.00 GB
+        AND
+      device HAS ALL FEATURES IN ('android.hardware.quantum')
+    )
+  )
+
+Tier 1:
+  (
+    (
+      RAM >= 2.00 GB
+    )
+  ) AND NOT (
+    (
+      RAM >= 4.00 GB
+    ) OR (
+      RAM >= 2.00 GB
+        AND
+      device HAS ALL FEATURES IN ('android.hardware.quantum')
+    )
+  )
+
+Tier 0 (default):
+  NOT (
+    (
+      RAM >= 2.00 GB
+    ) OR (
+      RAM >= 4.00 GB
+    ) OR (
+      RAM >= 2.00 GB
+        AND
+      device HAS ALL FEATURES IN ('android.hardware.quantum')
+    )
+  )
+

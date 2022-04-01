@@ -38,9 +38,19 @@ public final class CodeTransparencyTestUtils {
       PrivateKey privateKey,
       String algorithmIdentifier)
       throws Exception {
+    return createJwsToken(
+        codeTransparency, new X509Certificate[] {certificate}, privateKey, algorithmIdentifier);
+  }
+
+  public static String createJwsToken(
+      CodeTransparency codeTransparency,
+      X509Certificate[] certificates,
+      PrivateKey privateKey,
+      String algorithmIdentifier)
+      throws Exception {
     JsonWebSignature jws = new JsonWebSignature();
     jws.setAlgorithmHeaderValue(algorithmIdentifier);
-    jws.setCertificateChainHeaderValue(certificate);
+    jws.setCertificateChainHeaderValue(certificates);
     jws.setPayload(JsonFormat.printer().print(codeTransparency));
     jws.setKey(privateKey);
     return jws.getCompactSerialization();

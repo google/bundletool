@@ -19,6 +19,7 @@ package com.android.tools.build.bundletool.commands;
 import com.android.bundle.Config.BundleConfig;
 import com.android.bundle.Devices.DeviceSpec;
 import com.android.tools.build.bundletool.androidtools.Aapt2Command;
+import com.android.tools.build.bundletool.androidtools.P7ZipCommand;
 import com.android.tools.build.bundletool.commands.BuildApksCommand.ApkBuildMode;
 import com.android.tools.build.bundletool.io.ApkSerializer;
 import com.android.tools.build.bundletool.io.TempDirectory;
@@ -89,6 +90,9 @@ public abstract class BuildSdkApksModule {
 
   @BindsOptionalOf
   abstract ApkModifier bindOptionalApkModifier();
+
+  @BindsOptionalOf
+  abstract P7ZipCommand bindOptionalP7ZipCommand();
 
   @Provides
   static ApkOptimizations provideApkOptimizations() {

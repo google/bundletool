@@ -286,7 +286,8 @@ public final class BuildApksManager {
   }
 
   private ImmutableList<ModuleSplit> generateArchivedApks(AppBundle appBundle) throws IOException {
-    return ImmutableList.of(archivedApksGenerator.generateArchivedApk(appBundle));
+    return ImmutableList.of(
+        archivedApksGenerator.generateArchivedApk(appBundle, command.getAppStorePackageName()));
   }
 
   private static void checkDeviceCompatibilityWithBundle(

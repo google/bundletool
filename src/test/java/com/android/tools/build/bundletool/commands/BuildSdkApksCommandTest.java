@@ -73,7 +73,6 @@ import java.util.concurrent.Executors;
 import java.util.stream.Stream;
 import org.junit.Before;
 import org.junit.BeforeClass;
-import org.junit.Ignore;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
@@ -371,14 +370,17 @@ public class BuildSdkApksCommandTest {
   }
 
   @Test
-  @Ignore("b/222682673")
   public void noKeystoreProvidedPrintsWarning() throws Exception {
+    SystemEnvironmentProvider provider =
+        new FakeSystemEnvironmentProvider(
+            /* variables= */ ImmutableMap.of(
+                ANDROID_HOME, "/android/home", ANDROID_SERIAL, DEVICE_ID),
+            /* properties= */ ImmutableMap.of(USER_HOME.key(), "/"));
+
     try (ByteArrayOutputStream outputByteArrayStream = new ByteArrayOutputStream();
         PrintStream outputPrintStream = new PrintStream(outputByteArrayStream)) {
       BuildSdkApksCommand.fromFlags(
-          getDefaultFlagsWithAdditionalFlags(),
-          outputPrintStream,
-          new DefaultSystemEnvironmentProvider());
+          getDefaultFlagsWithAdditionalFlags(), outputPrintStream, provider);
 
       assertThat(new String(outputByteArrayStream.toByteArray(), UTF_8))
           .contains("WARNING: The APKs won't be signed");

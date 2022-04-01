@@ -1,0 +1,15 @@
+{
+  "device_groups":[
+    {
+      "name":"very_specific_ram",
+      "device_selectors":[
+        {
+          "device_ram":{
+            "min_bytes":10,
+            "max_bytes":11
+          }
+        }
+      ]
+    }
+  ]
+}

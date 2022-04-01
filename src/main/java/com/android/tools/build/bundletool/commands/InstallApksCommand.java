@@ -55,7 +55,6 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
-import java.util.function.Consumer;
 import java.util.Optional;
 
 /** Installs APKs on a connected device. */
@@ -226,27 +225,25 @@ public abstract class InstallApksCommand {
 
   private void cleanUpEmulatedSplits(AdbRunner adbRunner, BuildApksResult toc) {
     if (getDeviceId().isPresent()) {
-      adbRunner.run(removeRemotePath(toc), getDeviceId().get());
+      adbRunner.run(device -> removeRemotePath(device, toc), getDeviceId().get());
     } else {
-      adbRunner.run(removeRemotePath(toc));
+      adbRunner.run(device -> removeRemotePath(device, toc));
     }
   }
 
-  private Consumer<Device> removeRemotePath(BuildApksResult toc){
-    return device -> {
-      try {
-        device.removeRemotePath(
-            LocalTestingPathResolver.getLocalTestingWorkingDir(toc.getPackageName()),
-            Optional.of(toc.getPackageName()),
-            getTimeout());
-      } catch (IOException e) {
-        System.err.println(
-            "Failed to remove working directory with local testing splits. Your app might"
-                + " still have been installed correctly but have previous version of"
-                + " dynamic feature modules. If you see legacy versions of dynamic feature"
-                + " modules installed try to uninstall and install the app again.");
-      }
-    };
+  private void removeRemotePath(Device device, BuildApksResult toc) {
+    try {
+      device.removeRemotePath(
+          LocalTestingPathResolver.getLocalTestingWorkingDir(toc.getPackageName()),
+          Optional.of(toc.getPackageName()),
+          getTimeout());
+    } catch (IOException e) {
+      System.err.println(
+          "Failed to remove working directory with local testing splits. Your app might"
+              + " still have been installed correctly but have previous version of"
+              + " dynamic feature modules. If you see legacy versions of dynamic feature"
+              + " modules installed try to uninstall and install the app again.");
+    }
   }
 
   /** Extracts the apks that will be installed. */

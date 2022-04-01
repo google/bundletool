@@ -15,13 +15,16 @@
  */
 package com.android.tools.build.bundletool.io;
 
+import com.android.tools.build.bundletool.androidtools.P7ZipCommand;
 import com.android.tools.build.bundletool.model.utils.SystemEnvironmentProvider;
+import com.android.tools.build.bundletool.model.utils.files.FileUtils;
 import com.android.zipflinger.Source;
 import com.android.zipflinger.Sources;
 import com.android.zipflinger.ZipArchive;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.io.ByteSource;
+import com.google.common.io.MoreFiles;
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.ListeningExecutorService;
@@ -29,6 +32,7 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Path;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.concurrent.Future;
 import java.util.zip.Deflater;
 
@@ -89,6 +93,21 @@ interface Zipper {
         for (Future<Source> source : Futures.inCompletionOrder(largeSources.build())) {
           archive.add(Futures.getUnchecked(source));
         }
+      } catch (IOException e) {
+        throw new UncheckedIOException(e);
+      }
+    };
+  }
+
+  /** Creates instance of {@link Zipper} which creates ZIP using 7zip command-line tool. */
+  static Zipper compressedZip(P7ZipCommand p7ZipCommand, Path tempDirectory) {
+    return (outputZip, entries) -> {
+      try {
+        FileUtils.createDirectories(tempDirectory);
+        for (Entry<String, ByteSource> content : entries.entrySet()) {
+          content.getValue().copyTo(MoreFiles.asByteSink(tempDirectory.resolve(content.getKey())));
+        }
+        p7ZipCommand.compress(outputZip, tempDirectory);
       } catch (IOException e) {
         throw new UncheckedIOException(e);
       }

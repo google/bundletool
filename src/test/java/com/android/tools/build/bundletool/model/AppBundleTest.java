@@ -32,12 +32,15 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import com.android.aapt.Resources.XmlNode;
 import com.android.bundle.Config.BundleConfig;
 import com.android.bundle.Config.BundleConfig.BundleType;
+import com.android.bundle.RuntimeEnabledSdkConfigProto.RuntimeEnabledSdk;
+import com.android.bundle.RuntimeEnabledSdkConfigProto.RuntimeEnabledSdkConfig;
 import com.android.bundle.Targeting.Abi.AbiAlias;
 import com.android.tools.build.bundletool.io.ZipBuilder;
 import com.android.tools.build.bundletool.model.ModuleEntry.ModuleEntryBundleLocation;
 import com.android.tools.build.bundletool.model.exceptions.InvalidBundleException;
 import com.android.tools.build.bundletool.testing.AppBundleBuilder;
 import com.android.tools.build.bundletool.testing.BundleConfigBuilder;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.io.ByteSource;
 import java.nio.file.Path;
 import java.util.Optional;
@@ -475,6 +478,57 @@ public class AppBundleTest {
             .addModule("base", builder -> builder.setManifest(MANIFEST))
             .build();
     assertThat(appBundle.storeArchiveEnabled()).isFalse();
+  }
+
+  @Test
+  public void getRuntimeEnabledSdkDependencies_empty() {
+    AppBundle appBundle =
+        new AppBundleBuilder().addModule("base", builder -> builder.setManifest(MANIFEST)).build();
+
+    assertThat(appBundle.getRuntimeEnabledSdkDependencies()).isEmpty();
+  }
+
+  @Test
+  public void getRuntimeEnabledSdkDependencies_notEmpty() {
+    RuntimeEnabledSdk runtimeEnabledSdk1 =
+        RuntimeEnabledSdk.newBuilder()
+            .setPackageName("com.test.sdk1")
+            .setVersionMajor(12345)
+            .setCertificateDigest("AA:BB:CC")
+            .build();
+    RuntimeEnabledSdk runtimeEnabledSdk2 =
+        RuntimeEnabledSdk.newBuilder()
+            .setPackageName("com.test.sdk2")
+            .setVersionMajor(12345)
+            .setCertificateDigest("AA:BB:CC")
+            .build();
+    AppBundle appBundle =
+        new AppBundleBuilder()
+            .addModule(
+                "base",
+                builder ->
+                    builder
+                        .setManifest(MANIFEST)
+                        .setRuntimeEnabledSdkConfig(
+                            RuntimeEnabledSdkConfig.newBuilder()
+                                .addRuntimeEnabledSdk(runtimeEnabledSdk1)
+                                .build()))
+            .addModule(
+                "feature1",
+                featureModule ->
+                    featureModule
+                        .setManifest(androidManifestForFeature(PACKAGE_NAME))
+                        .setRuntimeEnabledSdkConfig(
+                            RuntimeEnabledSdkConfig.newBuilder()
+                                .addRuntimeEnabledSdk(runtimeEnabledSdk2)
+                                .build()))
+            .build();
+
+    assertThat(appBundle.getRuntimeEnabledSdkDependencies().entrySet())
+        .containsExactlyElementsIn(
+            ImmutableMap.of(
+                    "com.test.sdk1", runtimeEnabledSdk1, "com.test.sdk2", runtimeEnabledSdk2)
+                .entrySet());
   }
 
   private static ZipBuilder createBasicZipBuilder(BundleConfig config) {

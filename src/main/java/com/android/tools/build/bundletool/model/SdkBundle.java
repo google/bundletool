@@ -32,6 +32,7 @@ import com.android.tools.build.bundletool.model.version.Version;
 import com.google.auto.value.AutoValue;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
+import com.google.common.primitives.Longs;
 import com.google.errorprone.annotations.Immutable;
 import java.util.zip.ZipFile;
 
@@ -93,6 +94,11 @@ public abstract class SdkBundle implements Bundle {
         .getAttribute(ANDROID_NAMESPACE_URI, SDK_MAJOR_VERSION_ATTRIBUTE_NAME)
         .get()
         .getValueAsString();
+  }
+
+  /** Gets the Major Version of the SDK bundle. */
+  public long getMajorVersionAsLong() {
+    return Longs.tryParse(getMajorVersion());
   }
 
   /**

@@ -24,7 +24,8 @@ import java.util.stream.Stream;
  * Generates additional variant targetings that would be created from the {@link BundleModule}.
  *
  * <p>Each variant generator generates set of variant targetings, skipping the default variant
- * targeting. These targetings are later merged together in the {@link VariantGenerator}.
+ * targeting. These targetings are later merged together in the {@link
+ * PerModuleVariantTargetingGenerator}.
  */
 public interface BundleModuleVariantGenerator {
   Stream<VariantTargeting> generate(BundleModule module);

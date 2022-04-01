@@ -1,0 +1,43 @@
+Group 'specific_group':
+  (
+    RAM >= 4.00 GB
+      AND
+    device IN ('google pipit')
+      AND
+    device NOT IN ('google raven')
+      AND
+    device HAS ALL FEATURES IN ('android.hardware.bluetooth', 'android.hardware.camera')
+      AND
+    device HAS NO FEATURES IN ('android.hardware.greentooth')
+  )
+
+Tier 1:
+  (
+    (
+      RAM >= 4.00 GB
+        AND
+      device IN ('google pipit')
+        AND
+      device NOT IN ('google raven')
+        AND
+      device HAS ALL FEATURES IN ('android.hardware.bluetooth', 'android.hardware.camera')
+        AND
+      device HAS NO FEATURES IN ('android.hardware.greentooth')
+    )
+  )
+
+Tier 0 (default):
+  NOT (
+    (
+      RAM >= 4.00 GB
+        AND
+      device IN ('google pipit')
+        AND
+      device NOT IN ('google raven')
+        AND
+      device HAS ALL FEATURES IN ('android.hardware.bluetooth', 'android.hardware.camera')
+        AND
+      device HAS NO FEATURES IN ('android.hardware.greentooth')
+    )
+  )
+

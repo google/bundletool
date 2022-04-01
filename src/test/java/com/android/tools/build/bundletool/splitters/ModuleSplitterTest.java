@@ -75,6 +75,7 @@ import static com.android.tools.build.bundletool.testing.TargetingUtils.language
 import static com.android.tools.build.bundletool.testing.TargetingUtils.mergeApkTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.nativeDirectoryTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.nativeLibraries;
+import static com.android.tools.build.bundletool.testing.TargetingUtils.sdkRuntimeVariantTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.targetedAssetsDirectory;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.targetedNativeDirectory;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.textureCompressionTargeting;
@@ -102,6 +103,8 @@ import com.android.aapt.Resources.XmlNode;
 import com.android.bundle.Config.SuffixStripping;
 import com.android.bundle.Files.Assets;
 import com.android.bundle.Files.NativeLibraries;
+import com.android.bundle.RuntimeEnabledSdkConfigProto.RuntimeEnabledSdk;
+import com.android.bundle.RuntimeEnabledSdkConfigProto.RuntimeEnabledSdkConfig;
 import com.android.bundle.Targeting.Abi.AbiAlias;
 import com.android.bundle.Targeting.ApkTargeting;
 import com.android.bundle.Targeting.ScreenDensity.DensityAlias;
@@ -146,6 +149,9 @@ public class ModuleSplitterTest {
   private static final ApkTargeting DEFAULT_MASTER_SPLIT_SDK_TARGETING = apkMinSdkTargeting(21);
 
   private static final Version BUNDLETOOL_VERSION = BundleToolVersion.getCurrentVersion();
+
+  private static final String VALID_CERT_DIGEST =
+      "96:C7:EC:89:3E:69:2A:25:BA:4D:EE:C1:84:E8:33:3F:34:7D:6D:12:26:A1:C1:AA:70:A2:8A:DB:75:3E:02:0A";
 
   private static final AppBundle APP_BUNDLE = new AppBundleBuilder().build();
 
@@ -2037,6 +2043,113 @@ public class ModuleSplitterTest {
                             .count())
                 .distinct())
         .containsExactly(1L);
+  }
+
+  @Test
+  public void bundleHasRuntimeEnabledSdkDeps_sdkRuntimeVariant_baseModule_usesSdkLibrary() {
+    RuntimeEnabledSdkConfig runtimeEnabledSdkConfig =
+        RuntimeEnabledSdkConfig.newBuilder()
+            .addRuntimeEnabledSdk(
+                RuntimeEnabledSdk.newBuilder()
+                    .setPackageName("com.test.sdk")
+                    .setVersionMajor(1)
+                    .setVersionMinor(2)
+                    .setCertificateDigest(VALID_CERT_DIGEST))
+            .build();
+    NativeLibraries nativeConfig =
+        nativeLibraries(targetedNativeDirectory("lib/x86", nativeDirectoryTargeting("x86")));
+    BundleModule testModule =
+        new BundleModuleBuilder("base")
+            .setManifest(androidManifest("com.test.app"))
+            .setRuntimeEnabledSdkConfig(runtimeEnabledSdkConfig)
+            .setNativeConfig(nativeConfig)
+            .addFile("lib/x86/liba.so")
+            .build();
+    AppBundle appBundle = new AppBundleBuilder().addModule(testModule).build();
+    ModuleSplitter moduleSplitter =
+        ModuleSplitter.createNoStamp(
+            testModule,
+            BUNDLETOOL_VERSION,
+            appBundle,
+            ApkGenerationConfiguration.builder()
+                .setOptimizationDimensions(ImmutableSet.of(ABI))
+                .setEnableUncompressedNativeLibraries(true)
+                .build(),
+            sdkRuntimeVariantTargeting(),
+            ImmutableSet.of("base"));
+
+    ImmutableList<ModuleSplit> splits = moduleSplitter.splitModule();
+
+    assertThat(splits).hasSize(2);
+    ModuleSplit mainSplit = splits.stream().filter(ModuleSplit::isMasterSplit).findAny().get();
+    assertThat(mainSplit.getAndroidManifest().getUsesSdkLibraryElements()).hasSize(1);
+    ModuleSplit configSplit =
+        splits.stream().filter(split -> !split.isMasterSplit()).findAny().get();
+    assertThat(configSplit.getAndroidManifest().getUsesSdkLibraryElements()).isEmpty();
+  }
+
+  @Test
+  public void bundleHasRuntimeEnabledSdkDeps_sdkRuntimeVariant_featureModule_noUsesSdkLibraryTag() {
+    RuntimeEnabledSdkConfig runtimeEnabledSdkConfig =
+        RuntimeEnabledSdkConfig.newBuilder()
+            .addRuntimeEnabledSdk(
+                RuntimeEnabledSdk.newBuilder()
+                    .setPackageName("com.test.sdk")
+                    .setVersionMajor(1)
+                    .setVersionMinor(2)
+                    .setCertificateDigest(VALID_CERT_DIGEST))
+            .build();
+    BundleModule testModule =
+        new BundleModuleBuilder("feature")
+            .setManifest(androidManifest("com.test.app"))
+            .setRuntimeEnabledSdkConfig(runtimeEnabledSdkConfig)
+            .build();
+    AppBundle appBundle = new AppBundleBuilder().addModule(testModule).build();
+    ModuleSplitter moduleSplitter =
+        ModuleSplitter.createNoStamp(
+            testModule,
+            BUNDLETOOL_VERSION,
+            appBundle,
+            ApkGenerationConfiguration.getDefaultInstance(),
+            sdkRuntimeVariantTargeting(),
+            ImmutableSet.of("feature"));
+
+    ImmutableList<ModuleSplit> splits = moduleSplitter.splitModule();
+
+    assertThat(splits).hasSize(1);
+    assertThat(splits.get(0).getAndroidManifest().getUsesSdkLibraryElements()).isEmpty();
+  }
+
+  @Test
+  public void bundleHasRuntimeEnabledSdkDeps_notSdkRuntimeVariant_baseModule_noUsesSdkLibraryTag() {
+    RuntimeEnabledSdkConfig runtimeEnabledSdkConfig =
+        RuntimeEnabledSdkConfig.newBuilder()
+            .addRuntimeEnabledSdk(
+                RuntimeEnabledSdk.newBuilder()
+                    .setPackageName("com.test.sdk")
+                    .setVersionMajor(1)
+                    .setVersionMinor(2)
+                    .setCertificateDigest(VALID_CERT_DIGEST))
+            .build();
+    BundleModule testModule =
+        new BundleModuleBuilder("base")
+            .setManifest(androidManifest("com.test.app"))
+            .setRuntimeEnabledSdkConfig(runtimeEnabledSdkConfig)
+            .build();
+    AppBundle appBundle = new AppBundleBuilder().addModule(testModule).build();
+    ModuleSplitter moduleSplitter =
+        ModuleSplitter.createNoStamp(
+            testModule,
+            BUNDLETOOL_VERSION,
+            appBundle,
+            ApkGenerationConfiguration.getDefaultInstance(),
+            lPlusVariantTargeting(),
+            ImmutableSet.of("base"));
+
+    ImmutableList<ModuleSplit> splits = moduleSplitter.splitModule();
+
+    assertThat(splits).hasSize(1);
+    assertThat(splits.get(0).getAndroidManifest().getUsesSdkLibraryElements()).isEmpty();
   }
 
   private ModuleSplit checkAndReturnTheOnlyMasterSplit(List<ModuleSplit> splits) {

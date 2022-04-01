@@ -1,0 +1,31 @@
+{
+  "device_groups":[
+    {
+      "name":"no_teeth",
+      "device_selectors":[
+        {
+          "forbidden_system_features": [
+            {
+              "name":"android.hardware.bluetooth"
+            },
+            {
+              "name":"android.hardware.browntooth"
+            },
+            {
+              "name":"android.hardware.yellowtooth"
+            },
+            {
+              "name":"android.hardware.pinktooth"
+            },
+            {
+              "name":"android.hardware.greentooth"
+            },
+            {
+              "name":"android.hardware.redtooth"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

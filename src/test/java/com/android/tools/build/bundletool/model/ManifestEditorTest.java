@@ -19,6 +19,7 @@ package com.android.tools.build.bundletool.model;
 import static com.android.tools.build.bundletool.model.AndroidManifest.ACTIVITY_ELEMENT_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.ALLOW_BACKUP_ATTRIBUTE_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.ALLOW_BACKUP_RESOURCE_ID;
+import static com.android.tools.build.bundletool.model.AndroidManifest.CERTIFICATE_DIGEST_ATTRIBUTE_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.DATA_EXTRACTION_RULES_ATTRIBUTE_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.DATA_EXTRACTION_RULES_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.DESCRIPTION_ATTRIBUTE_NAME;
@@ -46,6 +47,7 @@ import static com.android.tools.build.bundletool.model.AndroidManifest.MIN_SDK_V
 import static com.android.tools.build.bundletool.model.AndroidManifest.NAME_ATTRIBUTE_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.NAME_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.PROVIDER_ELEMENT_NAME;
+import static com.android.tools.build.bundletool.model.AndroidManifest.SDK_MAJOR_VERSION_ATTRIBUTE_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.SERVICE_ELEMENT_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.SHARED_USER_ID_ATTRIBUTE_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.SHARED_USER_ID_RESOURCE_ID;
@@ -55,6 +57,7 @@ import static com.android.tools.build.bundletool.model.AndroidManifest.SPLIT_NAM
 import static com.android.tools.build.bundletool.model.AndroidManifest.SPLIT_NAME_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.TARGET_SANDBOX_VERSION_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.TARGET_SDK_VERSION_RESOURCE_ID;
+import static com.android.tools.build.bundletool.model.AndroidManifest.USES_SDK_LIBRARY_ELEMENT_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.VALUE_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.VERSION_CODE_RESOURCE_ID;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifest;
@@ -95,6 +98,8 @@ import org.junit.runners.JUnit4;
 public class ManifestEditorTest {
 
   private static final String ANDROID_NAMESPACE_URI = "http://schemas.android.com/apk/res/android";
+  private static final String VALID_CERT_DIGEST =
+      "96:C7:EC:89:3E:69:2A:25:BA:4D:EE:C1:84:E8:33:3F:34:7D:6D:12:26:A1:C1:AA:70:A2:8A:DB:75:3E:02:0A";
 
   @Test
   public void setMinSdkVersion_nonExistingElement_created() throws Exception {
@@ -1037,6 +1042,42 @@ public class ManifestEditorTest {
             .filter(childElement -> childElement.getName().equals("permission-group"))
             .collect(toImmutableList());
     assertThat(copiedPermissionGroups).isEmpty();
+  }
+
+  @Test
+  public void addUsesSdkLibraryElement() {
+    AndroidManifest androidManifest = AndroidManifest.create(androidManifest("com.test.app"));
+
+    AndroidManifest editedManifest =
+        androidManifest
+            .toEditor()
+            .addUsesSdkLibraryElement("sdk.name.1", 1, VALID_CERT_DIGEST)
+            .addUsesSdkLibraryElement("sdk.name.2", 2, VALID_CERT_DIGEST)
+            .save();
+
+    XmlElement applicationElement = getApplicationElement(editedManifest);
+    assertThat(applicationElement.getChildList()).hasSize(2);
+    XmlElement usesSdkLibraryElement1 = applicationElement.getChild(0).getElement();
+    assertThat(usesSdkLibraryElement1.getName()).isEqualTo(USES_SDK_LIBRARY_ELEMENT_NAME);
+    XmlElement usesSdkLibraryElement2 = applicationElement.getChild(1).getElement();
+    assertThat(usesSdkLibraryElement2.getName()).isEqualTo(USES_SDK_LIBRARY_ELEMENT_NAME);
+    assertThat(usesSdkLibraryElement2.getAttribute(2).getValue()).isEqualTo(VALID_CERT_DIGEST);
+    assertUsesSdkLibraryAttributes(usesSdkLibraryElement1, "sdk.name.1", 1, VALID_CERT_DIGEST);
+    assertUsesSdkLibraryAttributes(usesSdkLibraryElement2, "sdk.name.2", 2, VALID_CERT_DIGEST);
+  }
+
+  private static void assertUsesSdkLibraryAttributes(
+      XmlElement usesSdkLibraryElement, String name, long versionMajor, String certDigest) {
+    assertThat(usesSdkLibraryElement.getAttributeList()).hasSize(3);
+    assertThat(usesSdkLibraryElement.getAttribute(0).getName()).isEqualTo(NAME_ATTRIBUTE_NAME);
+    assertThat(usesSdkLibraryElement.getAttribute(0).getValue()).isEqualTo(name);
+    assertThat(usesSdkLibraryElement.getAttribute(1).getName())
+        .isEqualTo(SDK_MAJOR_VERSION_ATTRIBUTE_NAME);
+    assertThat(usesSdkLibraryElement.getAttribute(1).getValue())
+        .isEqualTo(String.valueOf(versionMajor));
+    assertThat(usesSdkLibraryElement.getAttribute(2).getName())
+        .isEqualTo(CERTIFICATE_DIGEST_ATTRIBUTE_NAME);
+    assertThat(usesSdkLibraryElement.getAttribute(2).getValue()).isEqualTo(certDigest);
   }
 
   private static void assertOnlyMetadataElement(

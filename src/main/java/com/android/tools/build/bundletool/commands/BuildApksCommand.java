@@ -31,13 +31,15 @@ import static com.android.tools.build.bundletool.model.utils.files.FilePrecondit
 import static com.android.tools.build.bundletool.model.utils.files.FilePreconditions.checkFileHasExtension;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
-import static com.google.common.collect.ImmutableSet.toImmutableSet;
+import static com.google.common.collect.ImmutableListMultimap.toImmutableListMultimap;
+import static java.util.function.Function.identity;
 
 import com.android.apksig.SigningCertificateLineage;
 import com.android.apksig.apk.ApkFormatException;
 import com.android.apksig.util.DataSource;
 import com.android.apksig.util.DataSources;
 import com.android.bundle.Devices.DeviceSpec;
+import com.android.bundle.RuntimeEnabledSdkConfigProto.RuntimeEnabledSdk;
 import com.android.tools.build.bundletool.androidtools.Aapt2Command;
 import com.android.tools.build.bundletool.androidtools.P7ZipCommand;
 import com.android.tools.build.bundletool.commands.CommandHelp.CommandDescription;
@@ -75,7 +77,10 @@ import com.google.auto.value.AutoValue;
 import com.google.common.base.Ascii;
 import com.google.common.base.Function;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.Iterables;
+import com.google.common.collect.Maps;
 import com.google.common.io.Closer;
 import com.google.common.io.MoreFiles;
 import com.google.common.util.concurrent.ListeningExecutorService;
@@ -89,6 +94,7 @@ import java.nio.ByteOrder;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Optional;
 import java.util.concurrent.Executors;
 import java.util.logging.Logger;
@@ -195,6 +201,9 @@ public abstract class BuildApksCommand {
   private static final Flag<ImmutableSet<Path>> RUNTIME_ENABLED_SDK_BUNDLE_LOCATIONS_FLAG =
       Flag.pathSet("sdk-bundles");
 
+  // Archive APK related flags.
+  private static final Flag<String> APP_STORE_PACKAGE_NAME_FLAG = Flag.string("store-package");
+
   private static final String APK_SET_ARCHIVE_EXTENSION = "apks";
 
   private static final SystemEnvironmentProvider DEFAULT_PROVIDER =
@@ -273,6 +282,8 @@ public abstract class BuildApksCommand {
   public abstract Optional<P7ZipCommand> getP7ZipCommand();
 
   public abstract ImmutableSet<Path> getRuntimeEnabledSdkBundlePaths();
+
+  public abstract Optional<String> getAppStorePackageName();
 
   public static Builder builder() {
     return new AutoValue_BuildApksCommand.Builder()
@@ -498,6 +509,14 @@ public abstract class BuildApksCommand {
      */
     public abstract Builder setRuntimeEnabledSdkBundlePaths(ImmutableSet<Path> sdkBundlePaths);
 
+    /**
+     * Sets package name of an app store that will be called by archived app to redownload the
+     * application.
+     *
+     * <p>PlayStore package is used by default.
+     */
+    public abstract Builder setAppStorePackageName(String appStorePackageName);
+
     abstract BuildApksCommand autoBuild();
 
     public BuildApksCommand build() {
@@ -710,6 +729,8 @@ public abstract class BuildApksCommand {
         .getValue(flags)
         .ifPresent(buildApksCommand::setRuntimeEnabledSdkBundlePaths);
 
+    APP_STORE_PACKAGE_NAME_FLAG.getValue(flags).ifPresent(buildApksCommand::setAppStorePackageName);
+
     flags.checkNoUnknownFlags();
 
     return buildApksCommand.build();
@@ -751,7 +772,8 @@ public abstract class BuildApksCommand {
         AppBundle appBundle = AppBundle.buildFromZip(bundleZip);
         bundleValidator.validate(appBundle);
 
-        validateSdkBundles(closer);
+        ImmutableMap<String, SdkBundle> sdkBundles = getValidatedSdkBundlesByPackageName(closer);
+        validateSdkBundlesMatchAppBundleDependencies(appBundle, sdkBundles);
 
         AppBundlePreprocessorManager appBundlePreprocessorManager =
             DaggerAppBundlePreprocessorComponent.builder()
@@ -825,7 +847,8 @@ public abstract class BuildApksCommand {
             });
   }
 
-  private void validateSdkBundles(Closer closer) throws IOException {
+  private ImmutableMap<String, SdkBundle> getValidatedSdkBundlesByPackageName(Closer closer)
+      throws IOException {
     SdkBundleValidator sdkBundleValidator = SdkBundleValidator.create();
     ImmutableSet.Builder<ZipFile> sdkBundleZipsBuilder = ImmutableSet.builder();
     for (Path sdkBundlePath : getRuntimeEnabledSdkBundlePaths()) {
@@ -835,13 +858,74 @@ public abstract class BuildApksCommand {
     ImmutableSet<ZipFile> sdkBundleZips = sdkBundleZipsBuilder.build();
     sdkBundleZips.forEach(sdkBundleValidator::validateFile);
 
-    ImmutableSet<SdkBundle> sdkBundles =
+    ImmutableMap<String, Collection<SdkBundle>> sdkBundlesPerPackageName =
         sdkBundleZips.stream()
             // SdkBundle#getVersionCode is not used in `build-apks`. It does not matter what
             // value we set here, so we are just setting 0.
             .map(sdkBundleZip -> SdkBundle.buildFromZip(sdkBundleZip, /* versionCode= */ 0))
-            .collect(toImmutableSet());
-    sdkBundles.forEach(sdkBundleValidator::validate);
+            .collect(toImmutableListMultimap(SdkBundle::getPackageName, identity()))
+            .asMap();
+    sdkBundlesPerPackageName
+        .entrySet()
+        .forEach(
+            entry -> {
+              // App can not depend on multiple SDK bundles with the same package name.
+              if (entry.getValue().size() > 1) {
+                throw InvalidCommandException.builder()
+                    .withInternalMessage(
+                        "Received multiple SDK bundles with the same package name: %s.",
+                        entry.getKey())
+                    .build();
+              }
+              // Validate format of each SDK bundle.
+              sdkBundleValidator.validate(Iterables.getOnlyElement(entry.getValue()));
+            });
+    return ImmutableMap.copyOf(
+        Maps.transformValues(sdkBundlesPerPackageName, Iterables::getOnlyElement));
+  }
+
+  private static void validateSdkBundlesMatchAppBundleDependencies(
+      AppBundle appBundle, ImmutableMap<String, SdkBundle> sdkBundles) {
+    appBundle
+        .getRuntimeEnabledSdkDependencies()
+        .keySet()
+        .forEach(
+            sdkPackageName -> {
+              if (!sdkBundles.containsKey(sdkPackageName)) {
+                throw InvalidCommandException.builder()
+                    .withInternalMessage(
+                        "App bundle depends on SDK '%s', but no SDK bundle was provided.",
+                        sdkPackageName)
+                    .build();
+              }
+              RuntimeEnabledSdk sdkDependencyFromAppBundle =
+                  appBundle.getRuntimeEnabledSdkDependencies().get(sdkPackageName);
+              SdkBundle sdkBundle = sdkBundles.get(sdkPackageName);
+              if (sdkDependencyFromAppBundle.getVersionMajor()
+                  != sdkBundle.getMajorVersionAsLong()) {
+                throw InvalidCommandException.builder()
+                    .withInternalMessage(
+                        "App bundle depends on SDK '%s' with major version '%d', but provided SDK"
+                            + " bundle has major version '%d'.",
+                        sdkPackageName,
+                        sdkDependencyFromAppBundle.getVersionMajor(),
+                        sdkBundle.getMajorVersionAsLong())
+                    .build();
+              }
+            });
+
+    sdkBundles
+        .keySet()
+        .forEach(
+            sdkPackageName -> {
+              if (!appBundle.getRuntimeEnabledSdkDependencies().containsKey(sdkPackageName)) {
+                throw InvalidCommandException.builder()
+                    .withInternalMessage(
+                        "App bundle does not depend on SDK '%s', but SDK bundle was provided.",
+                        sdkPackageName)
+                    .build();
+              }
+            });
   }
 
   /**
@@ -1227,6 +1311,15 @@ public abstract class BuildApksCommand {
                     "Experimental flag for specifying paths to SDK bundles for the runtime-enabled"
                         + " SDKs that the App Bundle depends on, separated by commas. Each SDK"
                         + " bundle must have an extension .asb.")
+                .build())
+        .addFlag(
+            FlagDescription.builder()
+                .setFlagName(APP_STORE_PACKAGE_NAME_FLAG.getName())
+                .setExampleValue("com.android.vending")
+                .setOptional(true)
+                .setDescription(
+                    "Package name of an app store that will be called by archived app to redownload"
+                        + " the application. Play Store is called by default.")
                 .build())
         .build();
   }

@@ -1,0 +1,19 @@
+Group 'devices_with_cameras':
+  (
+    device HAS ALL FEATURES IN ('android.hardware.camera')
+  )
+
+Tier 1:
+  (
+    (
+      device HAS ALL FEATURES IN ('android.hardware.camera')
+    )
+  )
+
+Tier 0 (default):
+  NOT (
+    (
+      device HAS ALL FEATURES IN ('android.hardware.camera')
+    )
+  )
+

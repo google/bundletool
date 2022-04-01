@@ -1,0 +1,26 @@
+{
+  "device_groups":[
+    {
+      "name":"devices_with_cameras",
+      "device_selectors":[
+        {
+          "required_system_features": [
+            {
+              "name":"android.hardware.camera"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "device_tier_set":{
+    "device_tiers":[
+      {
+        "level":1,
+        "device_group_names":[
+          "devices_with_cameras"
+        ]
+      }
+    ]
+  }
+}

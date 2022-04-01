@@ -333,6 +333,8 @@ public class LocaleConfigXmlInjectorTest {
 
   private static XmlProtoElementBuilder createAttributes(String locale) {
     return XmlProtoElementBuilder.create("locale")
-        .addAttribute(XmlProtoAttributeBuilder.create("android:name").setValueAsString(locale));
+        .addAttribute(
+            XmlProtoAttributeBuilder.createAndroidAttribute("name", 0x01010003)
+                .setValueAsString(locale));
   }
 }

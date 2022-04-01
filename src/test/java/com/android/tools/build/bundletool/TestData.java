@@ -20,11 +20,15 @@ import static com.google.common.base.Preconditions.checkArgument;
 import static java.nio.charset.StandardCharsets.UTF_8;
 
 import com.google.common.io.ByteStreams;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.Reader;
 import java.io.UncheckedIOException;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import org.junit.rules.TemporaryFolder;
 
 /**
  * Provides centralized access to testdata files.
@@ -51,6 +55,16 @@ public class TestData {
       throw new UncheckedIOException(
           String.format("Failed to read contents of testdata file '%s'.", fileName), e);
     }
+  }
+
+  /** Copies the testdata resource into the temporary directory. */
+  public static Path copyToTempDir(TemporaryFolder tmp, String testDataPath) throws Exception {
+    Path testDataFilename = Paths.get(testDataPath).getFileName();
+    Path outputFile = tmp.newFolder().toPath().resolve(testDataFilename);
+    try (FileOutputStream fileOutputStream = new FileOutputStream(outputFile.toFile())) {
+      ByteStreams.copy(openStream(testDataPath), fileOutputStream);
+    }
+    return outputFile;
   }
 
   private TestData() {}

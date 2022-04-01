@@ -1,0 +1,49 @@
+Group 'A_or_B':
+  (
+    device HAS ALL FEATURES IN ('A')
+  ) OR (
+    device HAS ALL FEATURES IN ('B')
+  )
+
+Group 'B_or_C':
+  (
+    device HAS ALL FEATURES IN ('B')
+  ) OR (
+    device HAS ALL FEATURES IN ('C')
+  )
+
+Tier 2:
+  (
+    (
+      device HAS ALL FEATURES IN ('A')
+    ) OR (
+      device HAS ALL FEATURES IN ('B')
+    )
+  )
+
+Tier 1:
+  (
+    (
+      device HAS ALL FEATURES IN ('B')
+    ) OR (
+      device HAS ALL FEATURES IN ('C')
+    )
+  ) AND NOT (
+    (
+      device HAS ALL FEATURES IN ('A')
+    ) OR (
+      device HAS ALL FEATURES IN ('B')
+    )
+  )
+
+Tier 0 (default):
+  NOT (
+    (
+      device HAS ALL FEATURES IN ('B')
+    ) OR (
+      device HAS ALL FEATURES IN ('C')
+    ) OR (
+      device HAS ALL FEATURES IN ('A')
+    )
+  )
+

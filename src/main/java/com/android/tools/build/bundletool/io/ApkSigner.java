@@ -20,6 +20,7 @@ import static java.nio.file.StandardCopyOption.REPLACE_EXISTING;
 
 import com.android.apksig.ApkSigner.SignerConfig;
 import com.android.apksig.apk.ApkFormatException;
+import com.android.bundle.Commands.SigningDescription;
 import com.android.tools.build.bundletool.commands.BuildApksModule.ApkSigningConfigProvider;
 import com.android.tools.build.bundletool.commands.BuildApksModule.StampSigningConfig;
 import com.android.tools.build.bundletool.model.ApksigSigningConfiguration;
@@ -64,9 +65,9 @@ class ApkSigner {
     this.tempDirectory = tempDirectory;
   }
 
-  public void signApk(Path apkPath, ModuleSplit split) {
+  public Optional<SigningDescription> signApk(Path apkPath, ModuleSplit split) {
     if (!signingConfigProvider.isPresent()) {
-      return;
+      return Optional.empty();
     }
 
     ApksigSigningConfiguration signingConfig =
@@ -97,6 +98,7 @@ class ApkSigner {
           .ifPresent(apkSigner::setSourceStampSignerConfig);
       apkSigner.build().sign();
       Files.move(signedApkPath, apkPath, REPLACE_EXISTING);
+      return Optional.of(signingDescription(signingConfig));
     } catch (IOException
         | ApkFormatException
         | NoSuchAlgorithmException
@@ -107,6 +109,15 @@ class ApkSigner {
           .withInternalMessage("Unable to sign APK.")
           .build();
     }
+  }
+
+  private SigningDescription signingDescription(ApksigSigningConfiguration signingConfig) {
+    boolean usesKeyRotation =
+        signingConfig
+            .getSigningCertificateLineage()
+            .map(lineage -> lineage.size() > 1)
+            .orElse(false);
+    return SigningDescription.newBuilder().setSignedWithRotatedKey(usesKeyRotation).build();
   }
 
   /**

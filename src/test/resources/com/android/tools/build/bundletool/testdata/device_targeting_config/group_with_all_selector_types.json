@@ -1,0 +1,49 @@
+{
+  "device_groups":[
+    {
+      "name":"specific_group",
+      "device_selectors":[
+        {
+          "device_ram":{
+            "min_bytes":4294967296
+          },
+          "included_device_ids":[
+            {
+              "build_brand":"google",
+              "build_device":"pipit"
+            }
+          ],
+          "excluded_device_ids":[
+            {
+              "build_brand":"google",
+              "build_device":"raven"
+            }
+          ],
+          "required_system_features": [
+            {
+              "name":"android.hardware.bluetooth"
+            },
+            {
+              "name":"android.hardware.camera"
+            }
+          ],
+          "forbidden_system_features": [
+            {
+              "name":"android.hardware.greentooth"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "device_tier_set":{
+    "device_tiers":[
+      {
+        "level":1,
+        "device_group_names":[
+          "specific_group"
+        ]
+      }
+    ]
+  }
+}

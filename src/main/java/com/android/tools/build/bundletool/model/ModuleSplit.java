@@ -24,6 +24,7 @@ import static com.android.tools.build.bundletool.model.BundleModule.DEX_DIRECTOR
 import static com.android.tools.build.bundletool.model.BundleModule.LIB_DIRECTORY;
 import static com.android.tools.build.bundletool.model.BundleModule.RESOURCES_DIRECTORY;
 import static com.android.tools.build.bundletool.model.BundleModule.ROOT_DIRECTORY;
+import static com.android.tools.build.bundletool.model.RuntimeEnabledSdkVersionEncoder.encodeSdkMajorAndMinorVersion;
 import static com.android.tools.build.bundletool.model.SourceStamp.STAMP_SOURCE_METADATA_KEY;
 import static com.android.tools.build.bundletool.model.SourceStamp.STAMP_TYPE_METADATA_KEY;
 import static com.android.tools.build.bundletool.model.utils.ResourcesUtils.SCREEN_DENSITY_TO_PROTO_VALUE_MAP;
@@ -39,6 +40,7 @@ import com.android.bundle.Config.ApexEmbeddedApkConfig;
 import com.android.bundle.Files.ApexImages;
 import com.android.bundle.Files.Assets;
 import com.android.bundle.Files.NativeLibraries;
+import com.android.bundle.RuntimeEnabledSdkConfigProto.RuntimeEnabledSdk;
 import com.android.bundle.Targeting.Abi;
 import com.android.bundle.Targeting.AbiTargeting;
 import com.android.bundle.Targeting.ApkTargeting;
@@ -59,6 +61,7 @@ import com.google.common.base.Ascii;
 import com.google.common.base.Joiner;
 import com.google.common.base.Predicate;
 import com.google.common.base.Predicates;
+import com.google.common.collect.ImmutableCollection;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Multimap;
@@ -360,6 +363,22 @@ public abstract class ModuleSplit {
     return this;
   }
 
+  /**
+   * Adds uses-sdk-library elements that correspond to the given {@link RuntimeEnabledSdk}s to the
+   * manifest.
+   */
+  public ModuleSplit addUsesSdkLibraryElements(
+      ImmutableCollection<RuntimeEnabledSdk> runtimeEnabledSdks) {
+    ManifestEditor manifestEditor = getAndroidManifest().toEditor();
+    runtimeEnabledSdks.forEach(
+        sdk ->
+            manifestEditor.addUsesSdkLibraryElement(
+                sdk.getPackageName(),
+                encodeSdkMajorAndMinorVersion(sdk.getVersionMajor(), sdk.getVersionMinor()),
+                sdk.getCertificateDigest()));
+    return toBuilder().setAndroidManifest(manifestEditor.save()).build();
+  }
+
   private String generateSplitId(String resolvedSuffix) {
     String masterSplitId = getSplitIdForMasterSplit();
     if (isMasterSplit()) {
@@ -521,7 +540,7 @@ public abstract class ModuleSplit {
   public static ModuleSplit forArchive(
       BundleModule bundleModule,
       AndroidManifest archivedManifest,
-      Optional<ResourceTable> archivedResourceTable,
+      ResourceTable archivedResourceTable,
       Path archivedClassesDexFile) {
     ModuleSplit.Builder archivedSplit =
         ModuleSplit.builder()
@@ -531,11 +550,9 @@ public abstract class ModuleSplit {
             .setAndroidManifest(archivedManifest)
             .setApkTargeting(ApkTargeting.getDefaultInstance())
             .setVariantTargeting(VariantTargeting.getDefaultInstance());
-    if (archivedResourceTable.isPresent()) {
-      archivedSplit.setResourceTable(archivedResourceTable.get());
-      archivedSplit.setEntries(
-          filterResourceEntries(bundleModule.getEntries().asList(), archivedResourceTable.get()));
-    }
+    archivedSplit.setResourceTable(archivedResourceTable);
+    archivedSplit.setEntries(
+        filterResourceEntries(bundleModule.getEntries().asList(), archivedResourceTable));
     archivedSplit.addEntry(
         ModuleEntry.builder()
             .setPath(DEX_DIRECTORY.resolve("classes.dex"))

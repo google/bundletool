@@ -16,8 +16,10 @@ message RuntimeEnabledSdk {
   // Package name of the runtime-enabled SDK.
   string package_name = 1;
   // Major version of the runtime-enabled SDK.
-  uint64 version_major = 2;
+  int32 version_major = 2;
+  // Minor version of the runtime-enabled SDK.
+  int32 version_minor = 3;
   // SHA-256 hash of the runtime-enabled SDK's signing certificate, represented
   // as a string of bytes in hexadecimal form, with ':' separating the bytes.
-  string certificate_digest = 3;
+  string certificate_digest = 4;
 }

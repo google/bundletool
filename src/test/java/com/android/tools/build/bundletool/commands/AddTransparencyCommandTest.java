@@ -59,6 +59,7 @@ import com.google.common.io.CharSource;
 import com.google.protobuf.util.JsonFormat;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.math.BigInteger;
 import java.nio.charset.Charset;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -68,9 +69,21 @@ import java.security.KeyStore;
 import java.security.PrivateKey;
 import java.security.Signature;
 import java.security.cert.Certificate;
+import java.security.cert.X509Certificate;
+import java.time.Duration;
+import java.time.Instant;
+import java.util.Date;
 import java.util.List;
 import java.util.Optional;
 import java.util.zip.ZipFile;
+import org.bouncycastle.asn1.x500.X500Name;
+import org.bouncycastle.asn1.x509.BasicConstraints;
+import org.bouncycastle.asn1.x509.Extension;
+import org.bouncycastle.cert.X509CertificateHolder;
+import org.bouncycastle.cert.jcajce.JcaX509CertificateConverter;
+import org.bouncycastle.cert.jcajce.JcaX509v3CertificateBuilder;
+import org.bouncycastle.operator.ContentSigner;
+import org.bouncycastle.operator.jcajce.JcaContentSignerBuilder;
 import org.jose4j.jws.JsonWebSignature;
 import org.junit.Before;
 import org.junit.Rule;
@@ -302,7 +315,7 @@ public final class AddTransparencyCommandTest {
             .setMode(Mode.GENERATE_CODE_TRANSPARENCY_FILE)
             .setBundlePath(bundlePath)
             .setOutputPath(outputUnsignedTransparencyFilePath)
-            .setTransparencyKeyCertificate(signerConfig.getCertificates().get(0))
+            .setTransparencyKeyCertificates(signerConfig.getCertificates())
             .build();
 
     assertThat(commandViaBuilder).isEqualTo(commandViaFlags);
@@ -359,7 +372,7 @@ public final class AddTransparencyCommandTest {
             .setBundlePath(bundlePath)
             .setOutputPath(outputBundlePath)
             .setTransparencySignaturePath(transparencySignatureFilePath)
-            .setTransparencyKeyCertificate(signerConfig.getCertificates().get(0))
+            .setTransparencyKeyCertificates(signerConfig.getCertificates())
             .build();
 
     assertThat(commandViaBuilder).isEqualTo(commandViaFlags);
@@ -571,6 +584,41 @@ public final class AddTransparencyCommandTest {
   }
 
   @Test
+  public void execute_defaultMode_success_certificateChain() throws Exception {
+    createBundle(bundlePath);
+    SignerConfig signerConfigWithChain = createSignerConfigCertificateChain();
+
+    AddTransparencyCommand addTransparencyCommand =
+        AddTransparencyCommand.builder()
+            .setMode(Mode.DEFAULT)
+            .setBundlePath(bundlePath)
+            .setOutputPath(outputBundlePath)
+            .setSignerConfig(signerConfigWithChain)
+            .build();
+
+    addTransparencyCommand.execute();
+
+    AppBundle outputBundle = AppBundle.buildFromZip(new ZipFile(outputBundlePath.toFile()));
+    Optional<ByteSource> signedTransparencyFile =
+        outputBundle
+            .getBundleMetadata()
+            .getFileAsByteSource(
+                BUNDLETOOL_NAMESPACE, BundleMetadata.TRANSPARENCY_SIGNED_FILE_NAME);
+    assertThat(signedTransparencyFile).isPresent();
+    JsonWebSignature jws =
+        (JsonWebSignature)
+            JsonWebSignature.fromCompactSerialization(
+                signedTransparencyFile.get().asCharSource(Charset.defaultCharset()).read());
+    assertThat(jws.getAlgorithmHeaderValue()).isEqualTo(RSA_USING_SHA256);
+    assertThat(jws.getCertificateChainHeaderValue())
+        .isEqualTo(signerConfigWithChain.getCertificates());
+    // jws.getPayload method will do signature verification using the public key set below.
+    jws.setKey(signerConfigWithChain.getCertificates().get(0).getPublicKey());
+    CodeTransparency transparencyProto = getTransparencyProto(jws.getPayload());
+    assertThat(transparencyProto).isEqualTo(expectedTransparencyProto());
+  }
+
+  @Test
   public void execute_defaultMode_dexMergingChoiceContinue_success() throws Exception {
     createBundle(bundlePath, /* hasSharedUserId= */ false, /* minSdkVersion= */ 19);
     AddTransparencyCommand addTransparencyCommand =
@@ -618,7 +666,7 @@ public final class AddTransparencyCommandTest {
             .setMode(Mode.GENERATE_CODE_TRANSPARENCY_FILE)
             .setBundlePath(bundlePath)
             .setOutputPath(outputUnsignedTransparencyFilePath)
-            .setTransparencyKeyCertificate(signerConfig.getCertificates().get(0))
+            .setTransparencyKeyCertificates(signerConfig.getCertificates())
             .build();
 
     addTransparencyCommand.execute();
@@ -648,6 +696,37 @@ public final class AddTransparencyCommandTest {
   }
 
   @Test
+  public void execute_generateCodeTransparencyFileMode_certificateChain() throws Exception {
+    createBundle(bundlePath);
+    SignerConfig signerConfigWithChain = createSignerConfigCertificateChain();
+    AddTransparencyCommand addTransparencyCommand =
+        AddTransparencyCommand.builder()
+            .setMode(Mode.GENERATE_CODE_TRANSPARENCY_FILE)
+            .setBundlePath(bundlePath)
+            .setOutputPath(outputUnsignedTransparencyFilePath)
+            .setTransparencyKeyCertificates(signerConfigWithChain.getCertificates())
+            .build();
+
+    addTransparencyCommand.execute();
+
+    List<String> outputFileLines = Files.readAllLines(outputUnsignedTransparencyFilePath);
+    assertThat(outputFileLines).hasSize(1);
+    String unsignedJwt = outputFileLines.get(0);
+    ImmutableList<String> jwtComponents = ImmutableList.copyOf(Splitter.on(".").split(unsignedJwt));
+    assertThat(jwtComponents).hasSize(2);
+
+    String expectedFinalJws =
+        createJwsToken(
+            expectedTransparencyProto(),
+            signerConfigWithChain.getCertificates().toArray(new X509Certificate[0]),
+            signerConfigWithChain.getPrivateKey(),
+            RSA_USING_SHA256);
+    ImmutableList<String> expectedFinalJwtComponents =
+        ImmutableList.copyOf(Splitter.on(".").split(expectedFinalJws));
+    assertThat(jwtComponents.get(0)).isEqualTo(expectedFinalJwtComponents.get(0));
+  }
+
+  @Test
   public void execute_generateCodeTransparencyFileMode_unsupportedAlgorithm() throws Exception {
     createBundle(bundlePath);
     createSignerConfigWithUnsupportedAlgorithm(keystorePath, /* keySize= */ 1024);
@@ -656,7 +735,7 @@ public final class AddTransparencyCommandTest {
             .setMode(Mode.GENERATE_CODE_TRANSPARENCY_FILE)
             .setBundlePath(bundlePath)
             .setOutputPath(outputUnsignedTransparencyFilePath)
-            .setTransparencyKeyCertificate(signerConfig.getCertificates().get(0))
+            .setTransparencyKeyCertificates(signerConfig.getCertificates())
             .build();
 
     Throwable e = assertThrows(IllegalArgumentException.class, addTransparencyCommand::execute);
@@ -674,7 +753,7 @@ public final class AddTransparencyCommandTest {
             .setMode(Mode.GENERATE_CODE_TRANSPARENCY_FILE)
             .setBundlePath(bundlePath)
             .setOutputPath(outputUnsignedTransparencyFilePath)
-            .setTransparencyKeyCertificate(signerConfig.getCertificates().get(0))
+            .setTransparencyKeyCertificates(signerConfig.getCertificates())
             .build();
 
     Throwable e = assertThrows(IllegalArgumentException.class, addTransparencyCommand::execute);
@@ -687,6 +766,7 @@ public final class AddTransparencyCommandTest {
   public void execute_injectSignature() throws Exception {
     // create bundle.
     createBundle(bundlePath);
+    signerConfig = createSignerConfigCertificateChain();
     // add transparency file in default mode.
     Path tmpOutputBundlePath = tmpDir.resolve("tmp_output_bundle.aab");
     AddTransparencyCommand.builder()
@@ -713,7 +793,7 @@ public final class AddTransparencyCommandTest {
         .setMode(Mode.INJECT_SIGNATURE)
         .setBundlePath(bundlePath)
         .setOutputPath(outputBundlePath)
-        .setTransparencyKeyCertificate(signerConfig.getCertificates().get(0))
+        .setTransparencyKeyCertificates(signerConfig.getCertificates())
         .setTransparencySignaturePath(transparencySignatureFilePath)
         .build()
         .execute();
@@ -751,7 +831,7 @@ public final class AddTransparencyCommandTest {
                     .setMode(Mode.INJECT_SIGNATURE)
                     .setBundlePath(bundlePath)
                     .setOutputPath(outputBundlePath)
-                    .setTransparencyKeyCertificate(signerConfig.getCertificates().get(0))
+                    .setTransparencyKeyCertificates(signerConfig.getCertificates())
                     .setTransparencySignaturePath(transparencySignatureFilePath)
                     .build()
                     .execute());
@@ -773,7 +853,7 @@ public final class AddTransparencyCommandTest {
                 .print(
                     CodeTransparencyFactory.createCodeTransparencyMetadata(
                         AppBundle.buildFromZip(new ZipFile(bundlePath.toFile())))),
-            signerConfig.getCertificates().get(0));
+            signerConfig.getCertificates());
     byte[] unsignedTransparencyFileBytes =
         CharSource.wrap(unsignedTransparencyToken).asByteSource(Charset.defaultCharset()).read();
     Files.write(outputUnsignedTransparencyFilePath, unsignedTransparencyFileBytes);
@@ -792,7 +872,7 @@ public final class AddTransparencyCommandTest {
                     .setMode(Mode.INJECT_SIGNATURE)
                     .setBundlePath(bundlePath)
                     .setOutputPath(outputBundlePath)
-                    .setTransparencyKeyCertificate(signerConfig.getCertificates().get(0))
+                    .setTransparencyKeyCertificates(signerConfig.getCertificates())
                     .setTransparencySignaturePath(transparencySignatureFilePath)
                     .build()
                     .execute());
@@ -810,7 +890,7 @@ public final class AddTransparencyCommandTest {
         .setMode(Mode.GENERATE_CODE_TRANSPARENCY_FILE)
         .setBundlePath(bundlePath)
         .setOutputPath(outputUnsignedTransparencyFilePath)
-        .setTransparencyKeyCertificate(signerConfig.getCertificates().get(0))
+        .setTransparencyKeyCertificates(signerConfig.getCertificates())
         .build()
         .execute();
     // update signer config so that a new key pair is generated, which does not match the
@@ -830,7 +910,7 @@ public final class AddTransparencyCommandTest {
                     .setMode(Mode.INJECT_SIGNATURE)
                     .setBundlePath(bundlePath)
                     .setOutputPath(outputBundlePath)
-                    .setTransparencyKeyCertificate(signerConfig.getCertificates().get(0))
+                    .setTransparencyKeyCertificates(signerConfig.getCertificates())
                     .setTransparencySignaturePath(transparencySignatureFilePath)
                     .build()
                     .execute());
@@ -981,5 +1061,72 @@ public final class AddTransparencyCommandTest {
     CodeTransparency.Builder transparencyProto = CodeTransparency.newBuilder();
     JsonFormat.parser().merge(transparencyPayload, transparencyProto);
     return transparencyProto.build();
+  }
+
+  private static SignerConfig createSignerConfigCertificateChain() throws Exception {
+    KeyPairGenerator keyGen = KeyPairGenerator.getInstance("RSA");
+    keyGen.initialize(MIN_RSA_KEY_LENGTH);
+    KeyPair rootKeyPair = keyGen.generateKeyPair();
+    KeyPair leafKeyPair = keyGen.generateKeyPair();
+
+    X509Certificate rootCertificate =
+        createCertificate(
+            "AddTransparencyCommandRoot",
+            rootKeyPair,
+            /* issuerCertificate= */ Optional.empty(),
+            /* issuerPrivateKey= */ Optional.empty());
+    X509Certificate leafCertificate =
+        createCertificate(
+            "AddTransparencyCommandLeaf",
+            leafKeyPair,
+            Optional.of(rootCertificate),
+            Optional.of(rootKeyPair.getPrivate()));
+
+    return SignerConfig.builder()
+        .setPrivateKey(leafKeyPair.getPrivate())
+        .setCertificates(ImmutableList.of(leafCertificate, rootCertificate))
+        .build();
+  }
+
+  private static X509Certificate createCertificate(
+      String cnName,
+      KeyPair certKeyPair,
+      Optional<X509Certificate> issuerCertificate,
+      Optional<PrivateKey> issuerPrivateKey)
+      throws Exception {
+    X500Name name = new X500Name("CN=" + cnName);
+    BigInteger serialNumber = BigInteger.valueOf(System.currentTimeMillis());
+    Instant validFrom = Instant.now();
+    Instant validUntil = validFrom.plus(Duration.ofDays(10 * 360));
+
+    // If there is no issuer, we self-sign our certificate.
+    X500Name issuerName;
+    PrivateKey issuerKey;
+    if (issuerCertificate.isPresent()) {
+      issuerName = new X500Name(issuerCertificate.get().getSubjectDN().getName());
+      issuerKey = issuerPrivateKey.get();
+    } else {
+      issuerName = name;
+      issuerKey = certKeyPair.getPrivate();
+    }
+
+    // The cert builder to build up our certificate information
+    JcaX509v3CertificateBuilder builder =
+        new JcaX509v3CertificateBuilder(
+            issuerName,
+            serialNumber,
+            Date.from(validFrom),
+            Date.from(validUntil),
+            name,
+            certKeyPair.getPublic());
+
+    // Make the cert to a Cert Authority to sign more certs when needed
+    if (!issuerCertificate.isPresent()) {
+      builder.addExtension(Extension.basicConstraints, true, new BasicConstraints(true));
+    }
+
+    ContentSigner signer = new JcaContentSignerBuilder("SHA256WithRSA").build(issuerKey);
+    X509CertificateHolder certHolder = builder.build(signer);
+    return new JcaX509CertificateConverter().getCertificate(certHolder);
   }
 }

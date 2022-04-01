@@ -60,6 +60,7 @@ public final class ArchivedAndroidManifestUtils {
     manifest.getMinSdkVersion().ifPresent(editor::setMinSdkVersion);
     manifest.getMaxSdkVersion().ifPresent(editor::setMaxSdkVersion);
     manifest.getTargetSdkVersion().ifPresent(editor::setTargetSdkVersion);
+    manifest.getTargetSandboxVersion().ifPresent(editor::setTargetSandboxVersion);
 
     if (manifest.hasApplicationElement()) {
       manifest.getDescription().ifPresent(editor::setDescription);

@@ -1,0 +1,5 @@
+Group 'unusual_ram':
+  (
+    37.21 MB <= RAM < 12.29 GB
+  )
+

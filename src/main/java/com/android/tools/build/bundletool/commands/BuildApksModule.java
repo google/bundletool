@@ -20,6 +20,7 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
 import com.android.bundle.Config.BundleConfig;
 import com.android.bundle.Devices.DeviceSpec;
+import com.android.tools.build.bundletool.androidtools.P7ZipCommand;
 import com.android.tools.build.bundletool.commands.BuildApksCommand.ApkBuildMode;
 import com.android.tools.build.bundletool.device.AdbServer;
 import com.android.tools.build.bundletool.device.DeviceAnalyzer;
@@ -81,6 +82,12 @@ public final class BuildApksModule {
   @Provides
   static ListeningExecutorService provideExecutorService(BuildApksCommand command) {
     return command.getExecutorService();
+  }
+
+  @CommandScoped
+  @Provides
+  static Optional<P7ZipCommand> provideP7ZipCommand(BuildApksCommand command) {
+    return command.getP7ZipCommand();
   }
 
   @CommandScoped

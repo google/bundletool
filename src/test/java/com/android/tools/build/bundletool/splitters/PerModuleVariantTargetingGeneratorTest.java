@@ -43,7 +43,7 @@ import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 
 @RunWith(JUnit4.class)
-public class VariantGeneratorTest {
+public class PerModuleVariantTargetingGeneratorTest {
   @Test
   public void targetsPreLOnlyInManifest_throws() throws Exception {
     int preL = 20;
@@ -55,7 +55,7 @@ public class VariantGeneratorTest {
     CommandExecutionException exception =
         assertThrows(
             CommandExecutionException.class,
-            () -> new VariantGenerator().generateVariants(bundleModule));
+            () -> new PerModuleVariantTargetingGenerator().generateVariants(bundleModule));
 
     assertThat(exception)
         .hasMessageThat()
@@ -64,7 +64,7 @@ public class VariantGeneratorTest {
 
   @Test
   public void variantsWithNativeLibsDexFiles_allOptimizationsDisabled() throws Exception {
-    VariantGenerator variantGenerator = new VariantGenerator();
+    PerModuleVariantTargetingGenerator variantGenerator = new PerModuleVariantTargetingGenerator();
 
     ImmutableCollection<VariantTargeting> splits =
         variantGenerator.generateVariants(createSingleLibraryDexModule());
@@ -74,7 +74,7 @@ public class VariantGeneratorTest {
   @Test
   public void variantsWithNativeLibsDexFiles_withNativeLibsOptimization() throws Exception {
 
-    VariantGenerator variantGenerator = new VariantGenerator();
+    PerModuleVariantTargetingGenerator variantGenerator = new PerModuleVariantTargetingGenerator();
 
     ImmutableCollection<VariantTargeting> splits =
         variantGenerator.generateVariants(
@@ -88,7 +88,7 @@ public class VariantGeneratorTest {
 
   @Test
   public void variantsWithNativeLibsDexFiles_withDexOptimization() throws Exception {
-    VariantGenerator variantGenerator = new VariantGenerator();
+    PerModuleVariantTargetingGenerator variantGenerator = new PerModuleVariantTargetingGenerator();
 
     ImmutableCollection<VariantTargeting> splits =
         variantGenerator.generateVariants(
@@ -100,7 +100,7 @@ public class VariantGeneratorTest {
 
   @Test
   public void variantsWithNativeLibsDexFiles_withNativeLibsAndDexOptimization() throws Exception {
-    VariantGenerator variantGenerator = new VariantGenerator();
+    PerModuleVariantTargetingGenerator variantGenerator = new PerModuleVariantTargetingGenerator();
 
     ImmutableCollection<VariantTargeting> splits =
         variantGenerator.generateVariants(
@@ -118,7 +118,7 @@ public class VariantGeneratorTest {
 
   @Test
   public void variantsWithAllOptimizations_minSdkAffectsLPlusVariant() throws Exception {
-    VariantGenerator variantGenerator = new VariantGenerator();
+    PerModuleVariantTargetingGenerator variantGenerator = new PerModuleVariantTargetingGenerator();
 
     ImmutableCollection<VariantTargeting> splits =
         variantGenerator.generateVariants(
@@ -136,7 +136,7 @@ public class VariantGeneratorTest {
 
   @Test
   public void variantsWithAllOptimizations_minSdkRemovesLPlusVariant() throws Exception {
-    VariantGenerator variantGenerator = new VariantGenerator();
+    PerModuleVariantTargetingGenerator variantGenerator = new PerModuleVariantTargetingGenerator();
 
     ImmutableCollection<VariantTargeting> splits =
         variantGenerator.generateVariants(
@@ -153,7 +153,7 @@ public class VariantGeneratorTest {
 
   @Test
   public void variantsWithAllOptimizations_maxSdkRemovesDexVariant() throws Exception {
-    VariantGenerator variantGenerator = new VariantGenerator();
+    PerModuleVariantTargetingGenerator variantGenerator = new PerModuleVariantTargetingGenerator();
 
     ImmutableCollection<VariantTargeting> splits =
         variantGenerator.generateVariants(
@@ -168,7 +168,7 @@ public class VariantGeneratorTest {
 
   @Test
   public void variantsWithAllOptimizations_sdkRangeCropsVariants() throws Exception {
-    VariantGenerator variantGenerator = new VariantGenerator();
+    PerModuleVariantTargetingGenerator variantGenerator = new PerModuleVariantTargetingGenerator();
 
     ImmutableCollection<VariantTargeting> splits =
         variantGenerator.generateVariants(
@@ -188,7 +188,7 @@ public class VariantGeneratorTest {
   public void variantsWithNativeLibsDexFiles_withInstantModule_allOptimizationsDisabled()
       throws Exception {
 
-    VariantGenerator variantGenerator = new VariantGenerator();
+    PerModuleVariantTargetingGenerator variantGenerator = new PerModuleVariantTargetingGenerator();
 
     ImmutableCollection<VariantTargeting> splits =
         variantGenerator.generateVariants(
@@ -200,7 +200,7 @@ public class VariantGeneratorTest {
   @Test
   public void variantsWithNativeLibsDexFiles_withInstantModule_withNativeLibsAndDexOptimization()
       throws Exception {
-    VariantGenerator variantGenerator = new VariantGenerator();
+    PerModuleVariantTargetingGenerator variantGenerator = new PerModuleVariantTargetingGenerator();
 
     ImmutableCollection<VariantTargeting> splits =
         variantGenerator.generateVariants(
@@ -218,7 +218,7 @@ public class VariantGeneratorTest {
     BundleModule bundleModule =
         new BundleModuleBuilder("testModule").setManifest(androidManifest("com.test.app")).build();
 
-    VariantGenerator variantGenerator = new VariantGenerator();
+    PerModuleVariantTargetingGenerator variantGenerator = new PerModuleVariantTargetingGenerator();
     ImmutableCollection<VariantTargeting> splits =
         variantGenerator.generateVariants(
             bundleModule,
@@ -237,7 +237,7 @@ public class VariantGeneratorTest {
                 androidManifest("com.test.app", withMinSdkVersion(ANDROID_R_API_VERSION + 1)))
             .build();
 
-    VariantGenerator variantGenerator = new VariantGenerator();
+    PerModuleVariantTargetingGenerator variantGenerator = new PerModuleVariantTargetingGenerator();
     ImmutableCollection<VariantTargeting> splits =
         variantGenerator.generateVariants(
             bundleModule,
@@ -255,7 +255,7 @@ public class VariantGeneratorTest {
                 androidManifest("com.test.app", withMaxSdkVersion(ANDROID_R_API_VERSION - 1)))
             .build();
 
-    VariantGenerator variantGenerator = new VariantGenerator();
+    PerModuleVariantTargetingGenerator variantGenerator = new PerModuleVariantTargetingGenerator();
     ImmutableCollection<VariantTargeting> splits =
         variantGenerator.generateVariants(
             bundleModule,

@@ -18,12 +18,16 @@ package com.android.tools.build.bundletool.io;
 import static com.android.tools.build.bundletool.io.ApkSerializerHelper.requiresAapt2Conversion;
 import static com.android.tools.build.bundletool.io.ApkSerializerHelper.toApkEntryPath;
 import static com.android.tools.build.bundletool.model.version.VersionGuardedFeature.NO_DEFAULT_UNCOMPRESS_EXTENSIONS;
+import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.ImmutableMap.toImmutableMap;
 import static java.util.function.Function.identity;
 
 import com.android.bundle.Commands.ApkDescription;
+import com.android.bundle.Commands.SigningDescription;
 import com.android.bundle.Config.BundleConfig;
+import com.android.bundle.Config.Compression.ApkCompressionAlgorithm;
+import com.android.tools.build.bundletool.androidtools.P7ZipCommand;
 import com.android.tools.build.bundletool.commands.BuildApksModule.VerboseLogs;
 import com.android.tools.build.bundletool.model.ApkListener;
 import com.android.tools.build.bundletool.model.BundleModule.SpecialModuleEntry;
@@ -61,9 +65,11 @@ public class ModuleSplitSerializer extends ApkSerializer {
 
   private final Aapt2ResourceConverter aapt2ResourceConverter;
   private final ApkSigner apkSigner;
-  private final ImmutableList<PathMatcher> uncompressedPathMatchers;
+  private final CacheablePathMatcher uncompressedPathMatchers;
   private final Version bundletoolVersion;
   private final ListeningExecutorService executorService;
+  private final boolean use7ZipCompression;
+  private final Optional<P7ZipCommand> p7ZipCommand;
 
   @Inject
   ModuleSplitSerializer(
@@ -73,16 +79,24 @@ public class ModuleSplitSerializer extends ApkSerializer {
       ApkSigner apkSigner,
       BundleConfig bundleConfig,
       Version bundletoolVersion,
-      ListeningExecutorService executorService) {
+      ListeningExecutorService executorService,
+      Optional<P7ZipCommand> p7ZipCommand) {
     super(apkListener, verbose);
     this.aapt2ResourceConverter = aapt2ResourceConverterFactory;
     this.apkSigner = apkSigner;
     this.uncompressedPathMatchers =
-        bundleConfig.getCompression().getUncompressedGlobList().stream()
-            .map(PathMatcher::createFromGlob)
-            .collect(toImmutableList());
+        new CacheablePathMatcher(
+            bundleConfig.getCompression().getUncompressedGlobList().stream()
+                .map(PathMatcher::createFromGlob)
+                .collect(toImmutableList()));
+    this.use7ZipCompression =
+        bundleConfig
+            .getCompression()
+            .getApkCompressionAlgorithm()
+            .equals(ApkCompressionAlgorithm.P7ZIP);
     this.bundletoolVersion = bundletoolVersion;
     this.executorService = executorService;
+    this.p7ZipCommand = p7ZipCommand;
   }
 
   /**
@@ -115,10 +129,7 @@ public class ModuleSplitSerializer extends ApkSerializer {
       // compressed' means that for these entries we will decide later should they be compressed
       // or not based on whether we gain enough savings from compression.
       ModuleEntriesPack maybeCompressedEntriesPack =
-          buildCompressedEntriesPack(
-              filesManager.getCompressedResourceEntriesPackPath(),
-              filesManager.getCompressedEntriesPackPath(),
-              binarySplits);
+          buildCompressedEntriesPack(filesManager, binarySplits);
 
       // Build a pack with entries that are uncompressed in final APKs: force uncompressed entries
       // + entries that have very low compression ratio.
@@ -161,16 +172,43 @@ public class ModuleSplitSerializer extends ApkSerializer {
     }
   }
 
+  private ModuleEntriesPack buildCompressedEntriesPack(
+      SerializationFilesManager filesManager, Collection<ModuleSplit> splits) {
+    return use7ZipCompression
+        ? build7ZipCompressedEntriesPack(filesManager, splits)
+        : buildDeflateCompressedEntriesPack(filesManager, splits);
+  }
+
+  /** Builds pack with compressed entries using 7zip native tool. */
+  private ModuleEntriesPack build7ZipCompressedEntriesPack(
+      SerializationFilesManager filesManager, Collection<ModuleSplit> splits) {
+    checkState(
+        p7ZipCommand.isPresent(), "'p7ZipCommand' is required when 7zip compression is used.");
+    ModuleEntriesPacker entriesPacker =
+        new ModuleEntriesPacker(
+            filesManager.getCompressedEntriesPackPath(), /* namePrefix= */ "c_");
+    splits.stream()
+        .flatMap(split -> split.getEntries().stream())
+        .filter(entry -> !entry.getForceUncompressed())
+        .forEach(entriesPacker::add);
+
+    try (TempDirectory tempDirectory = new TempDirectory()) {
+      return entriesPacker.pack(Zipper.compressedZip(p7ZipCommand.get(), tempDirectory.getPath()));
+    }
+  }
+
   /**
    * Builds pack with compressed entries, resource entries are compressed with the best compression
    * level (9) and all others with default compression level (6).
    */
-  private ModuleEntriesPack buildCompressedEntriesPack(
-      Path resourcesOutputPath, Path compressedOutputPath, Collection<ModuleSplit> splits) {
+  private ModuleEntriesPack buildDeflateCompressedEntriesPack(
+      SerializationFilesManager filesManager, Collection<ModuleSplit> splits) {
     ModuleEntriesPacker otherEntriesPacker =
-        new ModuleEntriesPacker(compressedOutputPath, /* namePrefix= */ "c_");
+        new ModuleEntriesPacker(
+            filesManager.getCompressedEntriesPackPath(), /* namePrefix= */ "c_");
     ModuleEntriesPacker resourceEntriesPacker =
-        new ModuleEntriesPacker(resourcesOutputPath, /* namePrefix= */ "r_");
+        new ModuleEntriesPacker(
+            filesManager.getCompressedResourceEntriesPackPath(), /* namePrefix= */ "r_");
     splits.stream()
         .flatMap(split -> split.getEntries().stream())
         .filter(entry -> !entry.getForceUncompressed())
@@ -213,11 +251,12 @@ public class ModuleSplitSerializer extends ApkSerializer {
       ModuleEntriesPack allEntriesPack,
       ModuleEntriesPack uncompressedEntriesPack) {
     Path outputPath = outputDirectory.resolve(apkRelativePath.toString());
-    ApkDescription apkDescription =
-        ApkDescriptionHelper.createApkDescription(apkRelativePath, split);
 
     serializeSplit(outputPath, split, allEntriesPack, uncompressedEntriesPack);
-    apkSigner.signApk(outputPath, split);
+    Optional<SigningDescription> signingDescription = apkSigner.signApk(outputPath, split);
+
+    ApkDescription apkDescription =
+        ApkDescriptionHelper.createApkDescription(apkRelativePath, split, signingDescription);
     notifyApkSerialized(apkDescription, split.getSplitType());
 
     return apkDescription;
@@ -341,7 +380,7 @@ public class ModuleSplitSerializer extends ApkSerializer {
     }
 
     String path = toApkEntryPath(entry.getPath()).toString();
-    if (uncompressedPathMatchers.stream().anyMatch(pathMatcher -> pathMatcher.matches(path))) {
+    if (uncompressedPathMatchers.matches(path)) {
       return true;
     }
     // Common extensions that should remain uncompressed because compression doesn't provide any

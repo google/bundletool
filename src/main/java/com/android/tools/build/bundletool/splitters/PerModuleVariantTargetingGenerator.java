@@ -36,10 +36,10 @@ import javax.inject.Inject;
  * <p>Pre-L variants are out of scope of this generator. Standalone APKs create a single variant per
  * APK.
  */
-public final class VariantGenerator {
+public final class PerModuleVariantTargetingGenerator {
 
   @Inject
-  VariantGenerator() {}
+  PerModuleVariantTargetingGenerator() {}
 
   public ImmutableSet<VariantTargeting> generateVariants(BundleModule module) {
    return generateVariants(module, ApkGenerationConfiguration.getDefaultInstance());

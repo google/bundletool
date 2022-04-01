@@ -213,6 +213,14 @@ message ApkDescription {
     // Set only for archived APKs.
     ArchivedApkMetadata archived_apk_metadata = 9;
   }
+
+  SigningDescription signing_description = 10;
+}
+
+// Holds data specific to signing configuration applied on the APKs.
+message SigningDescription {
+  // Denotes if the generated APK to be signed with the rotated key.
+  bool signed_with_rotated_key = 1;
 }
 
 // Holds data specific to Split APKs.

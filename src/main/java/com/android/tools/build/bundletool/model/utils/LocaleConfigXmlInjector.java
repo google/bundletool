@@ -16,6 +16,8 @@
 
 package com.android.tools.build.bundletool.model.utils;
 
+import static com.android.tools.build.bundletool.model.AndroidManifest.NAME_ATTRIBUTE_NAME;
+import static com.android.tools.build.bundletool.model.AndroidManifest.NAME_RESOURCE_ID;
 import static com.google.common.collect.ImmutableSet.toImmutableSet;
 
 import com.android.aapt.Resources.ConfigValue;
@@ -55,7 +57,6 @@ public class LocaleConfigXmlInjector {
   private static final String RESOURCE_FILE_NAME = "locales_config";
   private static final String LOCALE_CONFIG_ELEMENT = "locale-config";
   private static final String LOCALE_ELEMENT = "locale";
-  private static final String LOCALE_ATTRIBUTE_NAME = "android:name";
 
   public ImmutableList<ModuleSplit> process(
       VariantKey variantKey, ImmutableList<ModuleSplit> splits) {
@@ -180,7 +181,9 @@ public class LocaleConfigXmlInjector {
   private static XmlProtoElementBuilder createAttributes(String locale) {
     return XmlProtoElementBuilder.create(LOCALE_ELEMENT)
         .addAttribute(
-            XmlProtoAttributeBuilder.create(LOCALE_ATTRIBUTE_NAME).setValueAsString(locale));
+            XmlProtoAttributeBuilder.createAndroidAttribute(
+                NAME_ATTRIBUTE_NAME, NAME_RESOURCE_ID)
+                .setValueAsString(locale));
   }
 
   private static Entry createXmlEntry() {

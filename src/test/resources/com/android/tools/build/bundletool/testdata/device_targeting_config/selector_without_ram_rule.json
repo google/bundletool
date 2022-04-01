@@ -1,0 +1,23 @@
+{
+  "device_groups":[
+    {
+      "name":"cool_device_group",
+      "device_selectors":[
+        {
+          "excluded_device_ids":[
+            {
+              "build_brand":"other_brand",
+              "build_device":"other_device"
+            }
+          ],
+          "included_device_ids":[
+            {
+              "build_brand":"cool_brand",
+              "build_device":"cool_device"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

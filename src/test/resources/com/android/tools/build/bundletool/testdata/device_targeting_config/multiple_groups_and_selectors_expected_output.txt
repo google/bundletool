@@ -1,0 +1,77 @@
+Group 'very_high_ram':
+  (
+    RAM >= 4.00 GB
+      AND
+    device NOT IN ('google raven')
+  ) OR (
+    device IN ('google pipit')
+  )
+
+Group 'high_ram':
+  (
+    RAM >= 2.00 GB
+  )
+
+Group 'mid_ram':
+  (
+    RAM >= 1.00 GB
+  )
+
+Tier 3:
+  (
+    (
+      RAM >= 4.00 GB
+        AND
+      device NOT IN ('google raven')
+    ) OR (
+      device IN ('google pipit')
+    )
+  )
+
+Tier 2:
+  (
+    (
+      RAM >= 2.00 GB
+    )
+  ) AND NOT (
+    (
+      RAM >= 4.00 GB
+        AND
+      device NOT IN ('google raven')
+    ) OR (
+      device IN ('google pipit')
+    )
+  )
+
+Tier 1:
+  (
+    (
+      RAM >= 1.00 GB
+    )
+  ) AND NOT (
+    (
+      RAM >= 2.00 GB
+    ) OR (
+      RAM >= 4.00 GB
+        AND
+      device NOT IN ('google raven')
+    ) OR (
+      device IN ('google pipit')
+    )
+  )
+
+Tier 0 (default):
+  NOT (
+    (
+      RAM >= 1.00 GB
+    ) OR (
+      RAM >= 2.00 GB
+    ) OR (
+      RAM >= 4.00 GB
+        AND
+      device NOT IN ('google raven')
+    ) OR (
+      device IN ('google pipit')
+    )
+  )
+

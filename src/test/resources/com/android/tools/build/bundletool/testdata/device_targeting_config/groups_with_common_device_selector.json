@@ -1,0 +1,58 @@
+{
+  "device_groups":[
+    {
+      "name":"A_or_B",
+      "device_selectors":[
+        {
+          "required_system_features": [
+            {
+              "name":"A"
+            }
+          ]
+        },
+        {
+          "required_system_features": [
+            {
+              "name":"B"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name":"B_or_C",
+      "device_selectors":[
+        {
+          "required_system_features": [
+            {
+              "name":"B"
+            }
+          ]
+        },
+        {
+          "required_system_features": [
+            {
+              "name":"C"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "device_tier_set":{
+    "device_tiers":[
+      {
+        "level":2,
+        "device_group_names":[
+          "A_or_B"
+        ]
+      },
+      {
+        "level":1,
+        "device_group_names":[
+          "B_or_C"
+        ]
+      }
+    ]
+  }
+}

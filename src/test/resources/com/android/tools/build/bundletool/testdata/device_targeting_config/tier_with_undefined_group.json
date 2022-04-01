@@ -1,0 +1,24 @@
+{
+  "device_groups":[
+    {
+      "name":"my_cool_group",
+      "device_selectors":[
+        {
+          "device_ram":{
+            "min_bytes":2147483648
+          }
+        }
+      ]
+    }
+  ],
+  "device_tier_set":{
+    "device_tiers":[
+      {
+        "level":1,
+        "device_group_names":[
+          "undefined_group"
+        ]
+      }
+    ]
+  }
+}

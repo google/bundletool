@@ -16,6 +16,7 @@
 
 package com.google.android.archive;
 
+import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.ActivityNotFoundException;
@@ -23,13 +24,19 @@ import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.pm.PackageManager.NameNotFoundException;
 import android.net.Uri;
+import android.os.Bundle;
 
 /** Activity that triggers the reactivation of an app through the app store. */
 public class ReactivateActivity extends Activity implements DialogInterface.OnClickListener {
 
-  public static final String STORE_PACKAGE_NAME = "com.android.vending";
-
+  private String appStorePackageName;
   private boolean processingError;
+
+  @Override
+  protected void onCreate(Bundle savedInstanceState) {
+    super.onCreate(savedInstanceState);
+    appStorePackageName = getAppStorePackageName();
+  }
 
   @Override
   public void onResume() {
@@ -41,7 +48,7 @@ public class ReactivateActivity extends Activity implements DialogInterface.OnCl
     }
     Intent intent = new Intent();
     intent.setAction("com.google.android.STORE_ARCHIVE");
-    intent.setPackage(STORE_PACKAGE_NAME);
+    intent.setPackage(appStorePackageName);
     try {
       startActivityForResult(intent, /* flags= */ 0);
     } catch (ActivityNotFoundException e) {
@@ -52,7 +59,7 @@ public class ReactivateActivity extends Activity implements DialogInterface.OnCl
   /** Returns true if the targeted Store is installed and enabled. */
   private boolean isStoreInstalled() {
     try {
-      return getPackageManager().getApplicationInfo(STORE_PACKAGE_NAME, 0).enabled;
+      return getPackageManager().getApplicationInfo(appStorePackageName, 0).enabled;
     } catch (NameNotFoundException e) {
       return false;
     }
@@ -99,7 +106,7 @@ public class ReactivateActivity extends Activity implements DialogInterface.OnCl
   private void openStorePageForApp() {
     Intent intent =
         new Intent(Intent.ACTION_VIEW)
-            .setPackage(STORE_PACKAGE_NAME)
+            .setPackage(appStorePackageName)
             .setData(Uri.parse(String.format("market://details?id=%s", getPackageName())));
 
     startActivity(intent);
@@ -115,5 +122,17 @@ public class ReactivateActivity extends Activity implements DialogInterface.OnCl
       // if there is some delay here we don't want to show an empty activity.
       finish();
     }
+  }
+
+  /**
+   * Getting resource by id does not work because classes.dex is prebuild and
+   * reactivation_app_store_package_name resource is added dynamically with the next available id.
+   */
+  @SuppressLint("DiscouragedApi")
+  private String getAppStorePackageName() {
+    return getResources()
+        .getString(
+            getResources()
+                .getIdentifier("reactivation_app_store_package_name", "string", getPackageName()));
   }
 }

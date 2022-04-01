@@ -16,7 +16,6 @@
 
 package com.android.tools.build.bundletool.splitters;
 
-import static com.android.tools.build.bundletool.model.targeting.TargetingUtils.generateAllVariantTargetings;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.ImmutableSet.toImmutableSet;
 
@@ -37,41 +36,30 @@ public final class SplitApksGenerator {
 
   private final Version bundletoolVersion;
   private final Optional<SourceStamp> stampSource;
-  private final VariantGenerator variantGenerator;
+  private final VariantTargetingGenerator variantTargetingGenerator;
   private final AppBundle appBundle;
 
   @Inject
   public SplitApksGenerator(
       Version bundletoolVersion,
       Optional<SourceStamp> stampSource,
-      VariantGenerator variantGenerator,
+      VariantTargetingGenerator variantTargetingGenerator,
       AppBundle appBundle) {
     this.bundletoolVersion = bundletoolVersion;
     this.stampSource = stampSource;
-    this.variantGenerator = variantGenerator;
+    this.variantTargetingGenerator = variantTargetingGenerator;
     this.appBundle = appBundle;
   }
 
   public ImmutableList<ModuleSplit> generateSplits(
       ImmutableList<BundleModule> modules, ApkGenerationConfiguration apkGenerationConfiguration) {
-    ImmutableSet<VariantTargeting> variantTargetings =
-        generateVariants(modules, apkGenerationConfiguration);
-    return variantTargetings.stream()
+    return variantTargetingGenerator
+        .generateVariantTargetings(modules, apkGenerationConfiguration)
+        .stream()
         .flatMap(
             variantTargeting ->
                 generateSplitApks(modules, apkGenerationConfiguration, variantTargeting).stream())
         .collect(toImmutableList());
-  }
-
-  private ImmutableSet<VariantTargeting> generateVariants(
-      ImmutableList<BundleModule> modules, ApkGenerationConfiguration apkGenerationConfiguration) {
-    ImmutableSet.Builder<VariantTargeting> builder = ImmutableSet.builder();
-    for (BundleModule module : modules) {
-      ImmutableSet<VariantTargeting> splitApks =
-          variantGenerator.generateVariants(module, apkGenerationConfiguration);
-      builder.addAll(splitApks);
-    }
-    return generateAllVariantTargetings(builder.build());
   }
 
   private ImmutableList<ModuleSplit> generateSplitApks(

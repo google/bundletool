@@ -1,0 +1,5 @@
+Group 'no_teeth':
+  (
+    device HAS NO FEATURES IN (android.hardware.bluetooth, android.hardware.browntooth, ..., android.hardware.redtooth)
+  )
+

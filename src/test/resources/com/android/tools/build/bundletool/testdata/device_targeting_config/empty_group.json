@@ -1,0 +1,8 @@
+{
+  "device_groups":[
+    {
+      "name":"empty_group",
+      "device_selectors":[]
+    }
+  ]
+}

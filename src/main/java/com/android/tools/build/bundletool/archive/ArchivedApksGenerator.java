@@ -26,6 +26,7 @@ import com.android.tools.build.bundletool.model.AppBundle;
 import com.android.tools.build.bundletool.model.BundleModule;
 import com.android.tools.build.bundletool.model.ModuleSplit;
 import com.android.tools.build.bundletool.model.ResourceId;
+import com.android.tools.build.bundletool.model.ResourceInjector;
 import com.android.tools.build.bundletool.model.ResourceTableEntry;
 import com.android.tools.build.bundletool.model.exceptions.InvalidCommandException;
 import com.android.tools.build.bundletool.model.utils.ResourcesUtils;
@@ -45,6 +46,10 @@ import javax.inject.Inject;
  * resources and two custom actions to clear app cache and to wake up an app.
  */
 public final class ArchivedApksGenerator {
+  public static final String APP_STORE_PACKAGE_NAME_RESOURCE_NAME =
+      "reactivation_app_store_package_name";
+  public static final String PLAY_STORE_PACKAGE_NAME = "com.android.vending";
+
   private static final String ARCHIVED_CLASSES_DEX_PATH = "dex/classes.dex";
 
   private final TempDirectory globalTempDir;
@@ -54,15 +59,17 @@ public final class ArchivedApksGenerator {
     this.globalTempDir = globalTempDir;
   }
 
-  public ModuleSplit generateArchivedApk(AppBundle appBundle) throws IOException {
+  public ModuleSplit generateArchivedApk(
+      AppBundle appBundle, Optional<String> customAppStorePackageName) throws IOException {
     validateRequest(appBundle);
 
     BundleModule baseModule = appBundle.getBaseModule();
 
     AndroidManifest archivedManifest =
         ArchivedAndroidManifestUtils.createArchivedManifest(baseModule.getAndroidManifest());
-    Optional<ResourceTable> archivedResourceTable =
-        getArchivedResourceTable(appBundle, baseModule, archivedManifest);
+    ResourceTable archivedResourceTable =
+        getArchivedResourceTable(
+            appBundle, baseModule, archivedManifest, customAppStorePackageName);
     Path archivedClassesDexFile = getArchivedClassesDexFile();
 
     return ModuleSplit.forArchive(
@@ -90,22 +97,33 @@ public final class ArchivedApksGenerator {
     }
   }
 
-  private Optional<ResourceTable> getArchivedResourceTable(
-      AppBundle appBundle, BundleModule bundleModule, AndroidManifest archivedManifest)
+  private ResourceTable getArchivedResourceTable(
+      AppBundle appBundle,
+      BundleModule bundleModule,
+      AndroidManifest archivedManifest,
+      Optional<String> customAppStorePackageName)
       throws IOException {
-    if (!bundleModule.getResourceTable().isPresent()) {
-      return Optional.empty();
-    }
-
+    ResourceTable.Builder archivedResourceTable = ResourceTable.newBuilder();
+    if (bundleModule.getResourceTable().isPresent()) {
     ImmutableSet<ResourceId> referredResources =
         new ResourceAnalyzer(appBundle).findAllAppResourcesReachableFromManifest(archivedManifest);
-    ResourceTable archivedResourceTable =
-        ResourcesUtils.filterResourceTable(
-            bundleModule.getResourceTable().get(),
-            /* removeEntryPredicate= */ entry -> !referredResources.contains(entry.getResourceId()),
-            /* configValuesFilterFn= */ ResourceTableEntry::getEntry);
+      archivedResourceTable =
+          ResourcesUtils.filterResourceTable(
+              bundleModule.getResourceTable().get(),
+              /* removeEntryPredicate= */ entry ->
+                  !referredResources.contains(entry.getResourceId()),
+              /* configValuesFilterFn= */ ResourceTableEntry::getEntry)
+              .toBuilder();
+    }
+    ResourceInjector resourceInjector =
+        new ResourceInjector(archivedResourceTable, appBundle.getPackageName());
+    resourceInjector.addStringResource(
+        APP_STORE_PACKAGE_NAME_RESOURCE_NAME, getAppStorePackageName(customAppStorePackageName));
+    return resourceInjector.build();
+  }
 
-    return Optional.of(archivedResourceTable);
+  private static String getAppStorePackageName(Optional<String> customAppStorePackageName) {
+    return customAppStorePackageName.orElse(PLAY_STORE_PACKAGE_NAME);
   }
 
   private Path getArchivedClassesDexFile() throws IOException {

@@ -1,0 +1,7 @@
+{
+  "ram":10,
+  "device_id": {
+    "build_brand":"brick",
+    "build_device":"device"
+  }
+}

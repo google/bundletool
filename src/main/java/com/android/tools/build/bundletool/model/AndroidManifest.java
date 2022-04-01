@@ -73,7 +73,7 @@ public abstract class AndroidManifest {
   public static final String USES_SDK_ELEMENT_NAME = "uses-sdk";
   public static final String ACTIVITY_ELEMENT_NAME = "activity";
   public static final String ACTIVITY_ALIAS_ELEMENT_NAME = "activity-alias";
-  public static final String INTENT_FILTER_ELEMENT_NAME = "intent-filder";
+  public static final String INTENT_FILTER_ELEMENT_NAME = "intent-filter";
   public static final String SERVICE_ELEMENT_NAME = "service";
   public static final String RECEIVER_ELEMENT_NAME = "receiver";
   public static final String PROVIDER_ELEMENT_NAME = "provider";
@@ -123,6 +123,9 @@ public abstract class AndroidManifest {
   public static final String SDK_PATCH_VERSION_ATTRIBUTE_NAME =
       "com.android.vending.sdkPatchVersion";
   public static final Integer SDK_SANDBOX_MIN_VERSION = 32;
+  public static final String USES_SDK_LIBRARY_ELEMENT_NAME = "uses-sdk-library";
+  public static final String CERTIFICATE_DIGEST_ATTRIBUTE_NAME = "certDigest";
+  public static final String TARGET_SANDBOX_VERSION_ATTRIBUTE_NAME = "targetSandboxVersion";
 
   public static final String MODULE_TYPE_FEATURE_VALUE = "feature";
   public static final String MODULE_TYPE_ASSET_VALUE = "asset-pack";
@@ -163,7 +166,9 @@ public abstract class AndroidManifest {
   public static final int BACKUP_AGENT_RESOURCE_ID = 0x0101027f;
   public static final int DATA_EXTRACTION_RULES_RESOURCE_ID = 0x0101063e;
   public static final int EXPORTED_RESOURCE_ID = 0x01010010;
-  public static final int LOCALE_CONFIG_RESOURCE_ID = 0x01df0009;
+  public static final int LOCALE_CONFIG_RESOURCE_ID = 0x01df000e;
+  public static final int VERSION_MAJOR_RESOURCE_ID = 0x01010577;
+  public static final int CERTIFICATE_DIGEST_RESOURCE_ID = 0x01010548;
 
   // Matches the value of android.os.Build.VERSION_CODES.CUR_DEVELOPMENT, used when turning
   // a manifest attribute which references a prerelease API version (e.g., "Q") into an integer.
@@ -860,11 +865,20 @@ public abstract class AndroidManifest {
   }
 
   public ImmutableList<XmlProtoElement> getSdkLibraryElements() {
+    return getApplicationElementChildElements(SDK_LIBRARY_ELEMENT_NAME);
+  }
+
+  public ImmutableList<XmlProtoElement> getUsesSdkLibraryElements() {
+    return getApplicationElementChildElements(USES_SDK_LIBRARY_ELEMENT_NAME);
+  }
+
+  private ImmutableList<XmlProtoElement> getApplicationElementChildElements(
+      String childElementName) {
     return getManifestRoot()
         .getElement()
         .getChildElement(APPLICATION_ELEMENT_NAME)
         .getChildrenElements()
-        .filter(elem -> elem.getName().equals(SDK_LIBRARY_ELEMENT_NAME))
+        .filter(element -> element.getName().equals(childElementName))
         .collect(toImmutableList());
   }
 

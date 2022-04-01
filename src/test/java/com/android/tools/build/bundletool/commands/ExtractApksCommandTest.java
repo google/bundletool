@@ -91,12 +91,10 @@ import com.google.common.base.Splitter;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
-import com.google.common.io.ByteStreams;
 import com.google.common.io.MoreFiles;
 import com.google.protobuf.Int32Value;
 import com.google.protobuf.util.JsonFormat;
 import java.io.ByteArrayOutputStream;
-import java.io.FileOutputStream;
 import java.io.PrintStream;
 import java.io.Reader;
 import java.nio.file.Files;
@@ -306,7 +304,7 @@ public class ExtractApksCommandTest {
     BuildApksResult tableOfContentsProto = minimalApkSet();
     Path apksArchiveFile =
         createApksArchiveFile(tableOfContentsProto, tmpDir.resolve("bundle.apks"));
-    Path deviceSpecFile = copyToTempDir("testdata/device/pixel2_spec.json");
+    Path deviceSpecFile = TestData.copyToTempDir(tmp, "testdata/device/pixel2_spec.json");
 
     ExtractApksCommand command =
         ExtractApksCommand.fromFlags(
@@ -2130,16 +2128,6 @@ public class ExtractApksCommandTest {
                     createMasterApkDescription(
                         ApkTargeting.getDefaultInstance(), ZipPath.create("base-master.apk")))))
         .build();
-  }
-
-  /** Copies the testdata resource into the temporary directory. */
-  private Path copyToTempDir(String testDataPath) throws Exception {
-    Path testDataFilename = Paths.get(testDataPath).getFileName();
-    Path outputFile = tmp.newFolder().toPath().resolve(testDataFilename);
-    try (FileOutputStream fileOutputStream = new FileOutputStream(outputFile.toFile())) {
-      ByteStreams.copy(TestData.openStream(testDataPath), fileOutputStream);
-    }
-    return outputFile;
   }
 
   private Path inOutputDirectory(ZipPath file) {

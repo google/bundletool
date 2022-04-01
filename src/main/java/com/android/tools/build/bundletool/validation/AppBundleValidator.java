@@ -58,7 +58,8 @@ public class AppBundleValidator {
           new ModuleTitleValidator(),
           new ResourceTableValidator(),
           new AssetModuleFilesValidator(),
-          new CodeTransparencyValidator());
+          new CodeTransparencyValidator(),
+          new RuntimeEnabledSdkConfigValidator());
 
   private final ImmutableList<SubValidator> allBundleSubValidators;
   private final ImmutableList<SubValidator> allBundleFileSubValidators;

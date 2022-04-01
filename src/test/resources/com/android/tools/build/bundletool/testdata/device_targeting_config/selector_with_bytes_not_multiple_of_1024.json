@@ -1,0 +1,15 @@
+{
+  "device_groups":[
+    {
+      "name":"unusual_ram",
+      "device_selectors":[
+        {
+          "device_ram":{
+            "min_bytes":39012343,
+            "max_bytes":13201234343
+          }
+        }
+      ]
+    }
+  ]
+}

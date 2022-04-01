@@ -15,7 +15,7 @@
  */
 package com.android.tools.build.bundletool.commands;
 
-import static com.android.tools.build.bundletool.transparency.CodeTransparencyCryptoUtils.getX509Certificate;
+import static com.android.tools.build.bundletool.transparency.CodeTransparencyCryptoUtils.getX509Certificates;
 import static java.util.Arrays.stream;
 import static java.util.stream.Collectors.joining;
 import static org.jose4j.jws.AlgorithmIdentifiers.RSA_USING_SHA256;
@@ -40,6 +40,7 @@ import com.google.auto.value.AutoValue;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Ascii;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableList;
 import com.google.common.io.BaseEncoding;
 import com.google.common.io.ByteSource;
 import com.google.common.io.CharSource;
@@ -53,6 +54,7 @@ import java.nio.file.Path;
 import java.security.cert.X509Certificate;
 import java.security.interfaces.RSAPrivateKey;
 import java.security.interfaces.RSAPublicKey;
+import java.util.List;
 import java.util.Optional;
 import java.util.zip.ZipException;
 import java.util.zip.ZipFile;
@@ -127,14 +129,15 @@ public abstract class AddTransparencyCommand {
 
   public abstract Optional<SignerConfig> getSignerConfig();
 
-  public abstract Optional<X509Certificate> getTransparencyKeyCertificate();
+  public abstract ImmutableList<X509Certificate> getTransparencyKeyCertificates();
 
   public abstract Optional<Path> getTransparencySignaturePath();
 
   public static AddTransparencyCommand.Builder builder() {
     return new AutoValue_AddTransparencyCommand.Builder()
         .setMode(Mode.DEFAULT)
-        .setDexMergingChoice(DexMergingChoice.ASK_IN_CONSOLE);
+        .setDexMergingChoice(DexMergingChoice.ASK_IN_CONSOLE)
+        .setTransparencyKeyCertificates(ImmutableList.of());
   }
 
   /** Builder for the {@link AddTransparencyCommand}. */
@@ -157,8 +160,8 @@ public abstract class AddTransparencyCommand {
     public abstract Builder setSignerConfig(SignerConfig signerConfig);
 
     /** Sets the public key certificate of the code transparency key. */
-    public abstract Builder setTransparencyKeyCertificate(
-        X509Certificate transparencyKeyCertificate);
+    public abstract Builder setTransparencyKeyCertificates(
+        List<X509Certificate> transparencyKeyCertificates);
 
     /** Sets path to the file containing code transparency signature. */
     public abstract Builder setTransparencySignaturePath(Path transparencySignaturePath);
@@ -211,8 +214,8 @@ public abstract class AddTransparencyCommand {
             .setMode(Mode.GENERATE_CODE_TRANSPARENCY_FILE)
             .setBundlePath(BUNDLE_LOCATION_FLAG.getRequiredValue(flags))
             .setOutputPath(OUTPUT_FLAG.getRequiredValue(flags))
-            .setTransparencyKeyCertificate(
-                getX509Certificate(
+            .setTransparencyKeyCertificates(
+                getX509Certificates(
                     TRANSPARENCY_KEY_CERTIFICATE_LOCATION_FLAG.getRequiredValue(flags)));
     flags.checkNoUnknownFlags();
     return addTransparencyCommandBuilder.build();
@@ -226,8 +229,8 @@ public abstract class AddTransparencyCommand {
             .setOutputPath(OUTPUT_FLAG.getRequiredValue(flags))
             .setTransparencySignaturePath(
                 TRANSPARENCY_SIGNATURE_LOCATION_FLAG.getRequiredValue(flags))
-            .setTransparencyKeyCertificate(
-                getX509Certificate(
+            .setTransparencyKeyCertificates(
+                getX509Certificates(
                     TRANSPARENCY_KEY_CERTIFICATE_LOCATION_FLAG.getRequiredValue(flags)));
     flags.checkNoUnknownFlags();
     return addTransparencyCommandBuilder.build();
@@ -312,8 +315,7 @@ public abstract class AddTransparencyCommand {
             .addFile(
                 BundleMetadata.BUNDLETOOL_NAMESPACE,
                 BundleMetadata.TRANSPARENCY_SIGNED_FILE_NAME,
-                toBytes(
-                    createSignedJwt(jsonText, getSignerConfig().get().getCertificates().get(0))))
+                toBytes(createSignedJwt(jsonText, getSignerConfig().get().getCertificates())))
             .build());
     new AppBundleSerializer().writeToDisk(bundleBuilder.build(), getOutputPath());
   }
@@ -326,7 +328,7 @@ public abstract class AddTransparencyCommand {
         getOutputPath(),
         toBytes(
                 createJwtWithoutSignature(
-                    codeTransparencyMetadata, getTransparencyKeyCertificate().get()))
+                    codeTransparencyMetadata, getTransparencyKeyCertificates()))
             .read());
   }
 
@@ -337,7 +339,7 @@ public abstract class AddTransparencyCommand {
     String codeTransparencyMetadata =
         toJsonText(CodeTransparencyFactory.createCodeTransparencyMetadata(inputBundle));
     String transparencyFileWithoutSignature =
-        createJwtWithoutSignature(codeTransparencyMetadata, getTransparencyKeyCertificate().get());
+        createJwtWithoutSignature(codeTransparencyMetadata, getTransparencyKeyCertificates());
     AppBundle bundleWithTransparency =
         inputBundle.toBuilder()
             .setBundleMetadata(
@@ -486,22 +488,24 @@ public abstract class AddTransparencyCommand {
         .build();
   }
 
-  private String createSignedJwt(String payload, X509Certificate certificate) throws JoseException {
-    JsonWebSignature jws = createJwsCommon(payload, certificate);
+  private String createSignedJwt(String payload, List<X509Certificate> certificates)
+      throws JoseException {
+    JsonWebSignature jws = createJwsCommon(payload, certificates);
     jws.setKey(getSignerConfig().get().getPrivateKey());
     return jws.getCompactSerialization();
   }
 
   @VisibleForTesting
-  static String createJwtWithoutSignature(String payload, X509Certificate certificate) {
-    JsonWebSignature jws = createJwsCommon(payload, certificate);
+  static String createJwtWithoutSignature(String payload, List<X509Certificate> certificates) {
+    JsonWebSignature jws = createJwsCommon(payload, certificates);
     return jws.getHeaders().getEncodedHeader() + "." + jws.getEncodedPayload();
   }
 
-  private static JsonWebSignature createJwsCommon(String payload, X509Certificate certificate) {
+  private static JsonWebSignature createJwsCommon(
+      String payload, List<X509Certificate> certificates) {
     JsonWebSignature jws = new JsonWebSignature();
     jws.setAlgorithmHeaderValue(RSA_USING_SHA256);
-    jws.setCertificateChainHeaderValue(certificate);
+    jws.setCertificateChainHeaderValue(certificates.toArray(new X509Certificate[0]));
     jws.setPayload(payload);
     return jws;
   }
@@ -550,13 +554,14 @@ public abstract class AddTransparencyCommand {
 
   private void validateTransparencyKeyCertificate() {
     Preconditions.checkArgument(
-        getTransparencyKeyCertificate().get().getPublicKey().getAlgorithm().equals(RsaKeyUtil.RSA),
+        !getTransparencyKeyCertificates().isEmpty(),
+        "Transparency signing key certificates must be provided.");
+    X509Certificate leafCertificate = getTransparencyKeyCertificates().get(0);
+    Preconditions.checkArgument(
+        leafCertificate.getPublicKey().getAlgorithm().equals(RsaKeyUtil.RSA),
         "Transparency signing key must be an RSA key, but %s key was provided.",
-        getTransparencyKeyCertificate().get().getPublicKey().getAlgorithm());
-    int keyLength =
-        ((RSAPublicKey) getTransparencyKeyCertificate().get().getPublicKey())
-            .getModulus()
-            .bitLength();
+        leafCertificate.getPublicKey().getAlgorithm());
+    int keyLength = ((RSAPublicKey) leafCertificate.getPublicKey()).getModulus().bitLength();
     Preconditions.checkArgument(
         keyLength >= MIN_RSA_KEY_LENGTH,
         "Minimum required key length is %s bits, but %s bit key was provided.",
