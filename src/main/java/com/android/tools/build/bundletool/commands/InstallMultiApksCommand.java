@@ -27,6 +27,7 @@ import static com.google.common.collect.ImmutableListMultimap.toImmutableListMul
 import static com.google.common.collect.ImmutableMap.toImmutableMap;
 import static com.google.common.collect.Streams.stream;
 import static java.util.Comparator.comparing;
+import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.groupingBy;
 import static java.util.stream.Collectors.maxBy;
 
@@ -304,7 +305,8 @@ public abstract class InstallMultiApksCommand {
       return true;
     }
 
-    InstalledPackageInfo existingPackage = existingPackages.get(apk.getPackageName());
+    InstalledPackageInfo existingPackage =
+        requireNonNull(existingPackages.get(apk.getPackageName()));
 
     if (existingPackage.getVersionCode() <= apk.getVersionCode()) {
       return true;
@@ -464,7 +466,13 @@ public abstract class InstallMultiApksCommand {
               .filter(
                   zipEntry ->
                       !zipEntry.isDirectory()
-                          && zipEntry.getName().toLowerCase(Locale.ROOT).endsWith(".apks"))
+                          && zipEntry.getName().toLowerCase(Locale.ROOT).endsWith(".apks")
+                          // Compressed .apks cannot be installed via bundletool, only included in
+                          // System Images.
+                          && !zipEntry
+                              .getName()
+                              .toLowerCase(Locale.ROOT)
+                              .endsWith("compressed.apks"))
               .collect(toImmutableList());
       for (ZipEntry apksToExtract : apksToExtractList) {
         Path extractedApksPath =

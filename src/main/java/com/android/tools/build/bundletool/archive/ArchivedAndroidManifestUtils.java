@@ -17,6 +17,8 @@
 package com.android.tools.build.bundletool.archive;
 
 import static com.android.tools.build.bundletool.model.AndroidManifest.ANDROID_NAMESPACE_URI;
+import static com.android.tools.build.bundletool.model.AndroidManifest.LAUNCHER_CATEGORY_NAME;
+import static com.android.tools.build.bundletool.model.AndroidManifest.MAIN_ACTION_NAME;
 import static com.google.common.base.Preconditions.checkNotNull;
 
 import com.android.tools.build.bundletool.model.AndroidManifest;
@@ -37,8 +39,6 @@ public final class ArchivedAndroidManifestUtils {
       "com.google.android.archive.ReactivateActivity";
   public static final String HOLO_LIGHT_NO_ACTION_BAR_THEME =
       "@android:style/Theme.Holo.Light.NoActionBar";
-  public static final String MAIN_ACTION_NAME = "android.intent.action.MAIN";
-  public static final String LAUNCHER_CATEGORY_NAME = "android.intent.category.LAUNCHER";
 
   public static final String UPDATE_BROADCAST_RECEIVER_NAME =
       "com.google.android.archive.UpdateBroadcastReceiver";
@@ -67,6 +67,7 @@ public final class ArchivedAndroidManifestUtils {
       manifest.getHasFragileUserData().ifPresent(editor::setHasFragileUserData);
       manifest.getIsGame().ifPresent(editor::setIsGame);
       manifest.getIcon().ifPresent(editor::setIcon);
+      manifest.getBanner().ifPresent(editor::setBanner);
       if (manifest.hasLabelString()) {
         manifest.getLabelString().ifPresent(editor::setLabelAsString);
       }
@@ -77,10 +78,14 @@ public final class ArchivedAndroidManifestUtils {
       manifest.getFullBackupOnly().ifPresent(editor::setFullBackupOnly);
       manifest.getFullBackupContent().ifPresent(editor::setFullBackupContent);
       manifest.getDataExtractionRules().ifPresent(editor::setDataExtractionRules);
+      manifest.getRestrictedAccountType().ifPresent(editor::setRestrictedAccountType);
+      manifest.getRequiredAccountType().ifPresent(editor::setRequiredAccountType);
+      manifest.getLargeHeap().ifPresent(editor::setLargeHeap);
     }
 
     editor.copyPermissions(manifest);
     editor.copyPermissionGroups(manifest);
+    editor.copyPermissionTrees(manifest);
 
     editor.addActivity(createReactivateActivity());
     editor.addReceiver(createUpdateBroadcastReceiver());

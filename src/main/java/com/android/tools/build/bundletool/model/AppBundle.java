@@ -26,6 +26,7 @@ import static com.google.common.collect.ImmutableSet.toImmutableSet;
 import static com.google.common.collect.MoreCollectors.onlyElement;
 import static java.util.function.Function.identity;
 
+import com.android.bundle.Config.ApexConfig;
 import com.android.bundle.Config.BundleConfig;
 import com.android.bundle.Config.BundleConfig.BundleType;
 import com.android.bundle.Config.StandaloneConfig.DexMergingStrategy;
@@ -43,6 +44,7 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Maps;
 import com.google.errorprone.annotations.Immutable;
 import java.util.Collection;
+import java.util.Optional;
 import java.util.stream.Stream;
 import java.util.zip.ZipFile;
 
@@ -67,8 +69,16 @@ public abstract class AppBundle implements Bundle {
   /** Builds an {@link AppBundle} from an App Bundle on disk. */
   public static AppBundle buildFromZip(ZipFile bundleFile) {
     BundleConfig bundleConfig = readBundleConfig(bundleFile);
+    Optional<ApexConfig> apexConfig =
+        bundleConfig.hasApexConfig() ? Optional.of(bundleConfig.getApexConfig()) : Optional.empty();
     return buildFromModules(
-        sanitize(extractModules(bundleFile, bundleConfig, NON_MODULE_DIRECTORIES)),
+        sanitize(
+            extractModules(
+                bundleFile,
+                bundleConfig.getType(),
+                Version.of(bundleConfig.getBundletool().getVersion()),
+                apexConfig,
+                NON_MODULE_DIRECTORIES)),
         bundleConfig,
         readBundleMetadata(bundleFile));
   }
@@ -107,7 +117,6 @@ public abstract class AppBundle implements Bundle {
    */
   public abstract ImmutableSet<String> getMasterPinnedResourceNames();
 
-  @Override
   public abstract BundleConfig getBundleConfig();
 
   @Override
@@ -133,6 +142,10 @@ public abstract class AppBundle implements Bundle {
 
   public BundleModule getBaseModule() {
     return getModule(BundleModuleName.BASE_MODULE_NAME);
+  }
+
+  public boolean hasBaseModule() {
+    return getModules().containsKey(BundleModuleName.BASE_MODULE_NAME);
   }
 
   @Override
@@ -210,10 +223,11 @@ public abstract class AppBundle implements Bundle {
     return getBundleConfig().getOptimizations().getStandaloneConfig().getDexMergingStrategy();
   }
 
-  /** Returns {@code true} if app bundle has the store archive feature enabled. */
-  public boolean storeArchiveEnabled() {
+  /** Returns value of the store archive setting. */
+  public Optional<Boolean> getStoreArchive() {
     return getBundleConfig().getOptimizations().hasStoreArchive()
-        && getBundleConfig().getOptimizations().getStoreArchive().getEnabled();
+        ? Optional.of(getBundleConfig().getOptimizations().getStoreArchive().getEnabled())
+        : Optional.empty();
   }
 
   /**

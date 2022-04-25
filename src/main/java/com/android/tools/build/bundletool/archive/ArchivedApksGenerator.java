@@ -17,6 +17,7 @@
 package com.android.tools.build.bundletool.archive;
 
 import static com.android.tools.build.bundletool.model.version.VersionGuardedFeature.ARCHIVED_APK_GENERATION;
+import static com.android.tools.build.bundletool.model.version.VersionGuardedFeature.STORE_ARCHIVE_ENABLED_BY_DEFAULT;
 import static com.google.common.base.Preconditions.checkNotNull;
 
 import com.android.aapt.Resources.ResourceTable;
@@ -31,6 +32,7 @@ import com.android.tools.build.bundletool.model.ResourceTableEntry;
 import com.android.tools.build.bundletool.model.exceptions.InvalidCommandException;
 import com.android.tools.build.bundletool.model.utils.ResourcesUtils;
 import com.android.tools.build.bundletool.model.version.BundleToolVersion;
+import com.android.tools.build.bundletool.model.version.Version;
 import com.android.tools.build.bundletool.splitters.ResourceAnalyzer;
 import com.google.common.collect.ImmutableSet;
 import java.io.IOException;
@@ -78,9 +80,9 @@ public final class ArchivedApksGenerator {
 
   private void validateRequest(AppBundle appBundle) {
     checkNotNull(appBundle);
-
-    if (!ARCHIVED_APK_GENERATION.enabledForVersion(
-        BundleToolVersion.getVersionFromBundleConfig(appBundle.getBundleConfig()))) {
+    Version bundletoolVersion =
+        BundleToolVersion.getVersionFromBundleConfig(appBundle.getBundleConfig());
+    if (!ARCHIVED_APK_GENERATION.enabledForVersion(bundletoolVersion)) {
       throw InvalidCommandException.builder()
           .withInternalMessage(
               String.format(
@@ -89,10 +91,20 @@ public final class ArchivedApksGenerator {
           .build();
     }
 
-    if (!appBundle.storeArchiveEnabled()) {
+    Optional<Boolean> storeArchiveConfig = appBundle.getStoreArchive();
+    boolean isStoreArchiveEnabledByDefault =
+        STORE_ARCHIVE_ENABLED_BY_DEFAULT.enabledForVersion(bundletoolVersion);
+    if (!storeArchiveConfig.orElse(isStoreArchiveEnabledByDefault)) {
       throw InvalidCommandException.builder()
           .withInternalMessage(
               "Archived APK cannot be generated when Store Archive configuration is disabled.")
+          .build();
+    }
+
+    if (appBundle.getBaseModule().getAndroidManifest().isHeadless()) {
+      throw InvalidCommandException.builder()
+          .withInternalMessage(
+              "Archived APK can not be generated for applications without a launcher activity.")
           .build();
     }
   }

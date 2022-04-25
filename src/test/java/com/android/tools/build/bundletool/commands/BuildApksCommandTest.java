@@ -23,11 +23,10 @@ import static com.android.tools.build.bundletool.commands.BuildApksCommand.ApkBu
 import static com.android.tools.build.bundletool.commands.BuildApksCommand.ApkBuildMode.UNIVERSAL;
 import static com.android.tools.build.bundletool.commands.BuildApksCommand.OutputFormat.DIRECTORY;
 import static com.android.tools.build.bundletool.commands.BuildApksCommand.SystemApkOption.UNCOMPRESSED_NATIVE_LIBRARIES;
-import static com.android.tools.build.bundletool.model.AndroidManifest.SDK_LIBRARY_ELEMENT_NAME;
-import static com.android.tools.build.bundletool.model.AndroidManifest.SDK_PATCH_VERSION_ATTRIBUTE_NAME;
 import static com.android.tools.build.bundletool.model.OptimizationDimension.ABI;
 import static com.android.tools.build.bundletool.model.OptimizationDimension.SCREEN_DENSITY;
 import static com.android.tools.build.bundletool.model.OptimizationDimension.TEXTURE_COMPRESSION_FORMAT;
+import static com.android.tools.build.bundletool.model.utils.BundleParser.EXTRACTED_SDK_MODULES_FILE_NAME;
 import static com.android.tools.build.bundletool.testing.Aapt2Helper.AAPT2_PATH;
 import static com.android.tools.build.bundletool.testing.DeviceFactory.abis;
 import static com.android.tools.build.bundletool.testing.DeviceFactory.createDeviceSpecFile;
@@ -38,12 +37,13 @@ import static com.android.tools.build.bundletool.testing.DeviceFactory.sdkVersio
 import static com.android.tools.build.bundletool.testing.FakeSystemEnvironmentProvider.ANDROID_HOME;
 import static com.android.tools.build.bundletool.testing.FakeSystemEnvironmentProvider.ANDROID_SERIAL;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifest;
-import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withMetadataValue;
-import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withMinSdkVersion;
-import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withSdkLibraryElement;
 import static com.android.tools.build.bundletool.testing.TestUtils.addKeyToKeystore;
 import static com.android.tools.build.bundletool.testing.TestUtils.createDebugKeystore;
+import static com.android.tools.build.bundletool.testing.TestUtils.createInvalidSdkAndroidManifest;
 import static com.android.tools.build.bundletool.testing.TestUtils.createKeystore;
+import static com.android.tools.build.bundletool.testing.TestUtils.createZipBuilderForModulesWithoutManifest;
+import static com.android.tools.build.bundletool.testing.TestUtils.createZipBuilderForSdkBundle;
+import static com.android.tools.build.bundletool.testing.TestUtils.createZipBuilderForSdkBundleWithModules;
 import static com.android.tools.build.bundletool.testing.TestUtils.expectMissingRequiredBuilderPropertyException;
 import static com.android.tools.build.bundletool.testing.TestUtils.expectMissingRequiredFlagException;
 import static com.google.common.base.Preconditions.checkState;
@@ -72,7 +72,6 @@ import com.android.tools.build.bundletool.flags.ParsedFlags;
 import com.android.tools.build.bundletool.io.ApkSerializer;
 import com.android.tools.build.bundletool.io.AppBundleSerializer;
 import com.android.tools.build.bundletool.io.SdkBundleSerializer;
-import com.android.tools.build.bundletool.io.ZipBuilder;
 import com.android.tools.build.bundletool.model.AndroidManifest;
 import com.android.tools.build.bundletool.model.ApksigSigningConfiguration;
 import com.android.tools.build.bundletool.model.AppBundle;
@@ -169,6 +168,7 @@ public class BuildApksCommandTest {
   private Path oldestSignerPropertiesPath;
   private Path sdkBundlePath1;
   private Path sdkBundlePath2;
+  private Path sdkBundleModulesPath;
 
   private final AdbServer fakeAdbServer = mock(AdbServer.class);
   private final SystemEnvironmentProvider systemEnvironmentProvider =
@@ -262,6 +262,7 @@ public class BuildApksCommandTest {
     // Runtime-enabled-SDK-related fields.
     sdkBundlePath1 = tmpDir.resolve("bundle1.asb");
     sdkBundlePath2 = tmpDir.resolve("bundle2.asb");
+    sdkBundleModulesPath = tmpDir.resolve(EXTRACTED_SDK_MODULES_FILE_NAME);
   }
 
   @Test
@@ -1695,7 +1696,7 @@ public class BuildApksCommandTest {
   @Test
   public void sdkBundleFileDoesNotExist_throws() throws Exception {
     // Creating SDK bundle for sdkBundlePath1, but not for SdkBundlePath2.
-    createSdkBundle(sdkBundlePath1, "com.test.sdk", /* majorVersion= */ 1);
+    createSdkBundle(sdkBundlePath1, "com.test.sdk", /* majorVersion= */ 1, /* minorVersion= */ 2);
     createAppBundleWithRuntimeEnabledSdkConfig(
         bundlePath,
         RuntimeEnabledSdkConfig.newBuilder()
@@ -1722,8 +1723,9 @@ public class BuildApksCommandTest {
   @Test
   public void badSdkBundleFileExtension_throws() throws Exception {
     Path badSdkBundlePath = tmpDir.resolve("sdk_bundle.aab");
-    createSdkBundle(badSdkBundlePath, "com.test.sdk1", /* majorVersion= */ 1);
-    createSdkBundle(sdkBundlePath1, "com.test.sdk2", /* majorVersion= */ 2);
+    createSdkBundle(
+        badSdkBundlePath, "com.test.sdk1", /* majorVersion= */ 1, /* minorVersion= */ 2);
+    createSdkBundle(sdkBundlePath1, "com.test.sdk2", /* majorVersion= */ 2, /* minorVersion= */ 3);
     createAppBundleWithRuntimeEnabledSdkConfig(
         bundlePath,
         RuntimeEnabledSdkConfig.newBuilder()
@@ -1756,10 +1758,39 @@ public class BuildApksCommandTest {
   }
 
   @Test
-  public void sdkBundleZipMissingManifest_sdkBundleZipFileValidationFails() throws Exception {
-    new ZipBuilder()
-        .addFileWithContent(ZipPath.create("base/dex/classes.dex"), new byte[1])
-        .addFileWithContent(ZipPath.create("BundleConfig.pb"), new byte[1])
+  public void sdkBundleZipMissingModulesFile_sdkBundleZipFileValidationFails() throws Exception {
+    createZipBuilderForSdkBundle().writeTo(sdkBundlePath1);
+    createAppBundleWithRuntimeEnabledSdkConfig(
+        bundlePath,
+        RuntimeEnabledSdkConfig.newBuilder()
+            .addRuntimeEnabledSdk(
+                RuntimeEnabledSdk.newBuilder()
+                    .setPackageName("com.test.sdk1")
+                    .setVersionMajor(1)
+                    .setVersionMinor(2)
+                    .setCertificateDigest(VALID_CERT_FINGERPRINT))
+            .build());
+    BuildApksCommand command =
+        BuildApksCommand.fromFlags(
+            new FlagParser()
+                .parse(
+                    "--bundle=" + bundlePath,
+                    "--output=" + outputFilePath,
+                    "--sdk-bundles=" + sdkBundlePath1),
+            fakeAdbServer);
+
+    Exception e = assertThrows(InvalidBundleException.class, command::execute);
+    assertThat(e)
+        .hasMessageThat()
+        .isEqualTo(
+            "The archive doesn't seem to be an SDK Bundle, it is missing required file"
+                + " 'modules.resm'.");
+  }
+
+  @Test
+  public void sdkModulesZipMissingManifest_sdkModulesZipFileValidationFails() throws Exception {
+    createZipBuilderForSdkBundleWithModules(
+            createZipBuilderForModulesWithoutManifest(), sdkBundleModulesPath)
         .writeTo(sdkBundlePath1);
     createAppBundleWithRuntimeEnabledSdkConfig(
         bundlePath,
@@ -1793,12 +1824,7 @@ public class BuildApksCommandTest {
             new SdkBundleBuilder()
                 .setModule(
                     new BundleModuleBuilder("base")
-                        .setManifest(
-                            androidManifest(
-                                "com.test.sdk1",
-                                withMinSdkVersion(32),
-                                // Major version must be a long.
-                                withSdkLibraryElement("MajorVersionNotLong")))
+                        .setManifest(createInvalidSdkAndroidManifest())
                         .build())
                 .build(),
             sdkBundlePath1);
@@ -1825,13 +1851,13 @@ public class BuildApksCommandTest {
     assertThat(e)
         .hasMessageThat()
         .contains(
-            "SDK Major version in <" + SDK_LIBRARY_ELEMENT_NAME + "> cannot be parsed to a Long.");
+            "installLocation' in <manifest> must be 'internalOnly' for SDK bundles if it is set.");
   }
 
   @Test
   public void multipleSdkBundlesWithSamePackageName_validationFails() throws Exception {
-    createSdkBundle(sdkBundlePath1, "com.test.sdk1", /* majorVersion= */ 1);
-    createSdkBundle(sdkBundlePath2, "com.test.sdk1", /* majorVersion= */ 2);
+    createSdkBundle(sdkBundlePath1, "com.test.sdk1", /* majorVersion= */ 1, /* minorVersion= */ 2);
+    createSdkBundle(sdkBundlePath2, "com.test.sdk1", /* majorVersion= */ 2, /* minorVersion= */ 3);
     createAppBundleWithRuntimeEnabledSdkConfig(
         bundlePath,
         RuntimeEnabledSdkConfig.newBuilder()
@@ -1859,7 +1885,7 @@ public class BuildApksCommandTest {
 
   @Test
   public void missingSdkBundleInInput_throws() throws Exception {
-    createSdkBundle(sdkBundlePath1, "com.test.sdk1", /* majorVersion= */ 1);
+    createSdkBundle(sdkBundlePath1, "com.test.sdk1", /* majorVersion= */ 1, /* minorVersion= */ 2);
     createAppBundleWithRuntimeEnabledSdkConfig(
         bundlePath,
         RuntimeEnabledSdkConfig.newBuilder()
@@ -1893,8 +1919,8 @@ public class BuildApksCommandTest {
 
   @Test
   public void extraSdkBundleInInput_throws() throws Exception {
-    createSdkBundle(sdkBundlePath1, "com.test.sdk1", /* majorVersion= */ 1);
-    createSdkBundle(sdkBundlePath2, "com.test.sdk2", /* majorVersion= */ 2);
+    createSdkBundle(sdkBundlePath1, "com.test.sdk1", /* majorVersion= */ 1, /* minorVersion= */ 2);
+    createSdkBundle(sdkBundlePath2, "com.test.sdk2", /* majorVersion= */ 2, /* minorVersion= */ 0);
     createAppBundleWithRuntimeEnabledSdkConfig(
         bundlePath,
         RuntimeEnabledSdkConfig.newBuilder()
@@ -1923,7 +1949,7 @@ public class BuildApksCommandTest {
 
   @Test
   public void sdkBundleMajorVersionMismatchWithAppBundleDependency_throws() throws Exception {
-    createSdkBundle(sdkBundlePath1, "com.test.sdk1", /* majorVersion= */ 1);
+    createSdkBundle(sdkBundlePath1, "com.test.sdk1", /* majorVersion= */ 1, /* minorVersion= */ 3);
     createAppBundleWithRuntimeEnabledSdkConfig(
         bundlePath,
         RuntimeEnabledSdkConfig.newBuilder()
@@ -1952,8 +1978,37 @@ public class BuildApksCommandTest {
   }
 
   @Test
+  public void sdkBundleMinorVersionMismatchWithAppBundleDependency_throws() throws Exception {
+    createSdkBundle(sdkBundlePath1, "com.test.sdk1", /* majorVersion= */ 0, /* minorVersion= */ 2);
+    createAppBundleWithRuntimeEnabledSdkConfig(
+        bundlePath,
+        RuntimeEnabledSdkConfig.newBuilder()
+            .addRuntimeEnabledSdk(
+                RuntimeEnabledSdk.newBuilder()
+                    .setPackageName("com.test.sdk1")
+                    .setVersionMinor(3)
+                    .setCertificateDigest(VALID_CERT_FINGERPRINT))
+            .build());
+    BuildApksCommand command =
+        BuildApksCommand.fromFlags(
+            new FlagParser()
+                .parse(
+                    "--bundle=" + bundlePath,
+                    "--output=" + outputFilePath,
+                    "--sdk-bundles=" + sdkBundlePath1),
+            fakeAdbServer);
+
+    Exception e = assertThrows(InvalidCommandException.class, command::execute);
+    assertThat(e)
+        .hasMessageThat()
+        .contains(
+            "App bundle depends on SDK 'com.test.sdk1' with minor version '3', but provided SDK"
+                + " bundle has minor version '2'.");
+  }
+
+  @Test
   public void validateRuntimeEnabledSdkConfig_missingRequiredField_throws() throws Exception {
-    createSdkBundle(sdkBundlePath1, "com.test.sdk1", /* majorVersion= */ 1);
+    createSdkBundle(sdkBundlePath1, "com.test.sdk1", /* majorVersion= */ 1, /* minorVersion= */ 2);
     AppBundleBuilder appBundle =
         new AppBundleBuilder()
             .addModule(
@@ -1989,7 +2044,7 @@ public class BuildApksCommandTest {
 
   @Test
   public void validateRuntimeEnabledSdkConfig_duplicateSdkPackageNames_throws() throws Exception {
-    createSdkBundle(sdkBundlePath1, "com.test.sdk1", /* majorVersion= */ 1);
+    createSdkBundle(sdkBundlePath1, "com.test.sdk1", /* majorVersion= */ 1, /* minorVersion= */ 2);
     createAppBundleWithRuntimeEnabledSdkConfig(
         bundlePath,
         RuntimeEnabledSdkConfig.newBuilder()
@@ -2019,6 +2074,43 @@ public class BuildApksCommandTest {
     assertThat(e)
         .hasMessageThat()
         .contains("Found multiple dependencies on the same runtime-enabled SDK 'com.test.sdk1'.");
+  }
+
+  @Test
+  public void packageStoreWithDefault_throws() throws Exception {
+    InvalidCommandException builderException =
+        assertThrows(
+            InvalidCommandException.class,
+            () ->
+                BuildApksCommand.builder()
+                    .setBundlePath(bundlePath)
+                    .setOutputFile(outputFilePath)
+                    .setApkBuildMode(DEFAULT)
+                    .setAppStorePackageName("my.store")
+                    .build());
+    assertThat(builderException)
+        .hasMessageThat()
+        .contains(
+            "Providing custom store package is only possible when running with 'archive' mode"
+                + " flag.");
+
+    InvalidCommandException flagsException =
+        assertThrows(
+            InvalidCommandException.class,
+            () ->
+                BuildApksCommand.fromFlags(
+                    new FlagParser()
+                        .parse(
+                            "--bundle=" + bundlePath,
+                            "--output=" + outputFilePath,
+                            "--store-package=my.store",
+                            "--mode=DEFAULT"),
+                    fakeAdbServer));
+    assertThat(flagsException)
+        .hasMessageThat()
+        .contains(
+            "Providing custom store package is only possible when running with 'archive' mode"
+                + " flag.");
   }
 
   private void createAppBundle(Path path) throws Exception {
@@ -2059,19 +2151,17 @@ public class BuildApksCommandTest {
     createAppBundle(path, appBundle.build());
   }
 
-  private void createSdkBundle(Path path, String packageName, int majorVersion) throws Exception {
+  private void createSdkBundle(Path path, String packageName, int majorVersion, int minorVersion)
+      throws Exception {
     new SdkBundleSerializer()
         .writeToDisk(
             new SdkBundleBuilder()
-                .setModule(
-                    new BundleModuleBuilder("base")
-                        .setManifest(
-                            androidManifest(
-                                packageName,
-                                withMinSdkVersion(32),
-                                withSdkLibraryElement(Integer.toString(majorVersion)),
-                                withMetadataValue(SDK_PATCH_VERSION_ATTRIBUTE_NAME, "5")))
-                        .build())
+                .setSdkModulesConfig(
+                    /* bundletoolVersion= */ "1.9.1",
+                    packageName,
+                    majorVersion,
+                    minorVersion,
+                    /* patch= */ 0)
                 .build(),
             path);
   }

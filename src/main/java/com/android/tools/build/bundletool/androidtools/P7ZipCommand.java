@@ -42,15 +42,14 @@ public interface P7ZipCommand {
               "a",
               "-tzip",
               "-mtc=off",
-              String.format("-mx=%d", numThreads),
+              "-mx=9",
+              String.format("-mmt=%d", numThreads),
               "-bso0",
               "-bsp0",
               "-r",
               outputPath.toAbsolutePath().normalize().toString(),
               String.join(
-                  File.pathSeparator,
-                  inputDirectoryPath.toAbsolutePath().normalize().toString(),
-                  "*"));
+                  File.separator, inputDirectoryPath.toAbsolutePath().normalize().toString(), "*"));
       new DefaultCommandExecutor()
           .execute(command, CommandOptions.builder().setTimeout(Duration.ofMinutes(10)).build());
     };

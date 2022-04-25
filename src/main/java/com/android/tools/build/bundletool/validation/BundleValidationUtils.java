@@ -65,14 +65,13 @@ public final class BundleValidationUtils {
 
   public static boolean isAssetOnlyBundle(ImmutableList<BundleModule> modules) {
     return modules.stream()
-        .map(BundleModule::getBundleConfig)
-        // All modules are assumed to be part of the same bundle, with identical BundleConfig.
+        .map(BundleModule::getBundleType)
+        // All modules are assumed to be part of the same bundle, with identical BundleType.
         .distinct()
         .collect(toOptional())
         .orElseThrow(
             () ->
                 InvalidBundleException.builder().withUserMessage("Bundle without modules.").build())
-        .getType()
         .equals(BundleConfig.BundleType.ASSET_ONLY);
   }
 

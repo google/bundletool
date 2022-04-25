@@ -16,18 +16,16 @@
 
 package com.android.tools.build.bundletool.commands;
 
-import static com.android.tools.build.bundletool.model.AndroidManifest.SDK_PATCH_VERSION_ATTRIBUTE_NAME;
+import static com.android.tools.build.bundletool.model.AndroidManifest.NAME_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.SDK_SANDBOX_MIN_VERSION;
 import static com.android.tools.build.bundletool.model.AndroidManifest.VERSION_CODE_RESOURCE_ID;
+import static com.android.tools.build.bundletool.model.AndroidManifest.VERSION_MAJOR_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.VERSION_NAME_RESOURCE_ID;
-import static com.android.tools.build.bundletool.model.ModuleSplit.DEFAULT_SDK_PATCH_VERSION;
 import static com.android.tools.build.bundletool.testing.ApkSetUtils.extractFromApkSetFile;
 import static com.android.tools.build.bundletool.testing.ApkSetUtils.extractTocFromSdkApkSetFile;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifest;
-import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withMetadataValue;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withMinSdkVersion;
-import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withSdkLibraryElement;
-import static com.android.tools.build.bundletool.testing.SdkBundleBuilder.DEFAULT_BUNDLE_CONFIG;
+import static com.android.tools.build.bundletool.testing.SdkBundleBuilder.DEFAULT_SDK_MODULES_CONFIG;
 import static com.android.tools.build.bundletool.testing.SdkBundleBuilder.PACKAGE_NAME;
 import static com.android.tools.build.bundletool.testing.TestUtils.addKeyToKeystore;
 import static com.android.tools.build.bundletool.testing.TestUtils.createKeystore;
@@ -43,8 +41,8 @@ import com.android.bundle.Commands.Variant;
 import com.android.tools.build.bundletool.flags.FlagParser;
 import com.android.tools.build.bundletool.io.SdkBundleSerializer;
 import com.android.tools.build.bundletool.io.TempDirectory;
-import com.android.tools.build.bundletool.io.ZipReader;
 import com.android.tools.build.bundletool.model.AndroidManifest;
+import com.android.tools.build.bundletool.model.RuntimeEnabledSdkVersionEncoder;
 import com.android.tools.build.bundletool.model.SdkBundle;
 import com.android.tools.build.bundletool.testing.BundleModuleBuilder;
 import com.android.tools.build.bundletool.testing.CertificateFactory;
@@ -114,13 +112,22 @@ public class BuildSdkApksManagerTest {
     assertThat(result.getVariantCount()).isEqualTo(1);
     assertThat(result.getPackageName()).isEqualTo(PACKAGE_NAME);
     assertThat(result.getBundletool().getVersion())
-        .isEqualTo(DEFAULT_BUNDLE_CONFIG.getBundletool().getVersion());
+        .isEqualTo(DEFAULT_SDK_MODULES_CONFIG.getBundletool().getVersion());
   }
 
   @Test
   public void manifestIsMutated() throws Exception {
     Integer versionCode = 1253;
-    execute(new SdkBundleBuilder().setVersionCode(versionCode).build());
+    String packageName = "com.ads.foo";
+    int major = 15;
+    int minor = 0;
+    int patch = 5;
+    SdkBundle sdkBundle =
+        new SdkBundleBuilder()
+            .setVersionCode(versionCode)
+            .setSdkModulesConfig(/* bundletoolVersion= */ "1.9.1", packageName, major, minor, patch)
+            .build();
+    execute(sdkBundle);
     ZipFile apkSetFile = new ZipFile(outputFilePath.toFile());
     BuildSdkApksResult result = extractTocFromSdkApkSetFile(apkSetFile, tmpDir);
 
@@ -131,7 +138,12 @@ public class BuildSdkApksManagerTest {
     File apkFile = extractFromApkSetFile(apkSetFile, apkDescription.getPath(), tmpDir);
     AndroidManifest manifest = extractAndroidManifest(apkFile, tmpDir);
 
-    assertThat(manifest.getMinSdkVersion()).hasValue(SDK_SANDBOX_MIN_VERSION);
+    // <manifest> mutations.
+    assertThat(manifest.getPackageName())
+        .isEqualTo(
+            packageName
+                + "_"
+                + RuntimeEnabledSdkVersionEncoder.encodeSdkMajorAndMinorVersion(major, minor));
     assertThat(
             manifest
                 .getManifestRoot()
@@ -139,7 +151,7 @@ public class BuildSdkApksManagerTest {
                 .getAndroidAttribute(VERSION_NAME_RESOURCE_ID)
                 .get()
                 .getValueAsString())
-        .isEqualTo("15.0.5");
+        .isEqualTo(major + "." + minor + "." + patch);
     assertThat(
             manifest
                 .getManifestRoot()
@@ -148,6 +160,30 @@ public class BuildSdkApksManagerTest {
                 .get()
                 .getValueAsDecimalInteger())
         .isEqualTo(versionCode);
+
+    // <uses-sdk> mutations.
+    assertThat(manifest.getMinSdkVersion()).hasValue(SDK_SANDBOX_MIN_VERSION);
+
+    // <sdk-library> mutations.
+    assertThat(
+            manifest
+                .getSdkLibraryElements()
+                .get(0)
+                .getAndroidAttribute(NAME_RESOURCE_ID)
+                .get()
+                .getValueAsString())
+        .isEqualTo(packageName);
+    assertThat(
+            manifest
+                .getSdkLibraryElements()
+                .get(0)
+                .getAndroidAttribute(VERSION_MAJOR_RESOURCE_ID)
+                .get()
+                .getValueAsDecimalInteger())
+        .isEqualTo(RuntimeEnabledSdkVersionEncoder.encodeSdkMajorAndMinorVersion(major, minor));
+
+    // <property> mutations.
+    assertThat(manifest.getSdkPatchVersionProperty()).hasValue(patch);
   }
 
   @Test
@@ -158,10 +194,7 @@ public class BuildSdkApksManagerTest {
                 new BundleModuleBuilder("base")
                     .setManifest(
                         androidManifest(
-                            PACKAGE_NAME,
-                            withMinSdkVersion(SDK_SANDBOX_MIN_VERSION + 5),
-                            withSdkLibraryElement("20"),
-                            withMetadataValue(SDK_PATCH_VERSION_ATTRIBUTE_NAME, "12")))
+                            PACKAGE_NAME, withMinSdkVersion(SDK_SANDBOX_MIN_VERSION + 5)))
                     .build())
             .build();
 
@@ -177,29 +210,6 @@ public class BuildSdkApksManagerTest {
     AndroidManifest manifest = extractAndroidManifest(apkFile, tmpDir);
 
     assertThat(manifest.getMinSdkVersion()).hasValue(SDK_SANDBOX_MIN_VERSION + 5);
-  }
-
-  @Test
-  public void sdkManifestMutation_patchVersionNotSet_defaultPatchVersionAdded() throws Exception {
-    SdkBundle sdkBundle =
-        new SdkBundleBuilder()
-            .setModule(
-                new BundleModuleBuilder("base")
-                    .setManifest(androidManifest(PACKAGE_NAME, withSdkLibraryElement("20")))
-                    .build())
-            .build();
-
-    execute(sdkBundle);
-
-    ZipFile apkSetFile = new ZipFile(outputFilePath.toFile());
-    BuildSdkApksResult result = extractTocFromSdkApkSetFile(apkSetFile, tmpDir);
-    Variant variant = result.getVariant(0);
-    ApkDescription apkDescription = variant.getApkSet(0).getApkDescription(0);
-    File apkFile = extractFromApkSetFile(apkSetFile, apkDescription.getPath(), tmpDir);
-    AndroidManifest manifest = extractAndroidManifest(apkFile, tmpDir);
-
-    assertThat(manifest.getMetadataValue(SDK_PATCH_VERSION_ATTRIBUTE_NAME))
-        .hasValue(DEFAULT_SDK_PATCH_VERSION);
   }
 
   @Test
@@ -219,17 +229,19 @@ public class BuildSdkApksManagerTest {
 
   @Test
   public void sdkVersionInformationIsSet() throws Exception {
+    Integer versionCode = 1253;
+    int major = 15;
+    int minor = 0;
+    int patch = 5;
     SdkBundle sdkBundle =
         new SdkBundleBuilder()
-            .setModule(
-                new BundleModuleBuilder("base")
-                    .setManifest(
-                        androidManifest(
-                            PACKAGE_NAME,
-                            withSdkLibraryElement("100"),
-                            withMetadataValue(SDK_PATCH_VERSION_ATTRIBUTE_NAME, "132")))
-                    .build())
-            .setVersionCode(99)
+            .setVersionCode(versionCode)
+            .setSdkModulesConfig(
+                /* bundletoolVersion= */ "1.9.1",
+                /* packageName= */ "com.foo.bar",
+                major,
+                minor,
+                patch)
             .build();
 
     execute(sdkBundle);
@@ -238,28 +250,10 @@ public class BuildSdkApksManagerTest {
 
     SdkVersionInformation version = result.getVersion();
 
-    assertThat(version.getVersionCode()).isEqualTo(99);
-    assertThat(version.getMajor()).isEqualTo(100);
-    assertThat(version.getPatch()).isEqualTo(132);
-  }
-
-  @Test
-  public void sdkPatchVersionIsSetToDefaultValue() throws Exception {
-    SdkBundle sdkBundle =
-        new SdkBundleBuilder()
-            .setModule(
-                new BundleModuleBuilder("base")
-                    .setManifest(androidManifest(PACKAGE_NAME, withSdkLibraryElement("1181894")))
-                    .build())
-            .build();
-
-    execute(sdkBundle);
-    ZipFile apkSetFile = new ZipFile(outputFilePath.toFile());
-    BuildSdkApksResult result = extractTocFromSdkApkSetFile(apkSetFile, tmpDir);
-
-    SdkVersionInformation version = result.getVersion();
-
-    assertThat(version.getPatch()).isEqualTo(Long.parseLong(DEFAULT_SDK_PATCH_VERSION));
+    assertThat(version.getVersionCode()).isEqualTo(versionCode);
+    assertThat(version.getMajor()).isEqualTo(major);
+    assertThat(version.getMinor()).isEqualTo(minor);
+    assertThat(version.getPatch()).isEqualTo(patch);
   }
 
   private BuildSdkApksCommand createCommand() {
@@ -277,16 +271,12 @@ public class BuildSdkApksManagerTest {
   private void execute(SdkBundle sdkBundle) throws Exception {
     new SdkBundleSerializer().writeToDisk(sdkBundle, sdkBundlePath);
 
-    try (ZipReader zipReader = ZipReader.createFromFile(sdkBundlePath)) {
-      DaggerBuildSdkApksManagerComponent.builder()
-          .setBuildSdkApksCommand(createCommand())
-          .setTempDirectory(new TempDirectory(getClass().getSimpleName()))
-          .setSdkBundle(sdkBundle)
-          .setZipReader(zipReader)
-          .setUseBundleCompression(false)
-          .build()
-          .create()
-          .execute();
-    }
+    DaggerBuildSdkApksManagerComponent.builder()
+        .setBuildSdkApksCommand(createCommand())
+        .setTempDirectory(new TempDirectory(getClass().getSimpleName()))
+        .setSdkBundle(sdkBundle)
+        .build()
+        .create()
+        .execute();
   }
 }

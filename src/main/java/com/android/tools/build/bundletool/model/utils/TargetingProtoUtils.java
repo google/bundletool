@@ -26,6 +26,7 @@ import com.android.bundle.Targeting.AssetsDirectoryTargeting;
 import com.android.bundle.Targeting.MultiAbi;
 import com.android.bundle.Targeting.ScreenDensity;
 import com.android.bundle.Targeting.ScreenDensityTargeting;
+import com.android.bundle.Targeting.SdkRuntimeTargeting;
 import com.android.bundle.Targeting.SdkVersion;
 import com.android.bundle.Targeting.SdkVersionTargeting;
 import com.android.bundle.Targeting.TextureCompressionFormat;
@@ -198,6 +199,12 @@ public final class TargetingProtoUtils {
 
   public static VariantTargeting lPlusVariantTargeting() {
     return variantTargeting(sdkVersionTargeting(sdkVersionFrom(ANDROID_L_API_VERSION)));
+  }
+
+  public static VariantTargeting sdkRuntimeVariantTargeting(int sdkVersion) {
+    return variantTargeting(sdkVersionTargeting(sdkVersionFrom(sdkVersion))).toBuilder()
+        .setSdkRuntimeTargeting(SdkRuntimeTargeting.newBuilder().setRequiresSdkRuntime(true))
+        .build();
   }
 
   public static Optional<Integer> getScreenDensityDpi(

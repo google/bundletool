@@ -49,6 +49,8 @@ public class D8DexMerger implements DexMerger {
   private static final String CORE_DESUGARING_PREFIX = "j$.";
   private static final String CORE_DESUGARING_LIBRARY_EXCEPTION =
       "Merging dex file containing classes with prefix 'j$.'";
+  private static final String CORE_DESUGARING_LIBRARY_EXCEPTION_NEW =
+      "Merging DEX file containing classes with prefix 'j$.'";
   private static final String DEX_OVERFLOW_MSG =
       "Cannot fit requested classes in a single dex file";
 
@@ -150,7 +152,10 @@ public class D8DexMerger implements DexMerger {
   private static boolean isCoreDesugaringException(CompilationFailedException d8Exception) {
     return ThrowableUtils.anyInCausalChainOrSuppressedMatches(
         d8Exception,
-        t -> t.getMessage() != null && t.getMessage().contains(CORE_DESUGARING_LIBRARY_EXCEPTION));
+        t ->
+            t.getMessage() != null
+                && (t.getMessage().contains(CORE_DESUGARING_LIBRARY_EXCEPTION)
+                    || t.getMessage().contains(CORE_DESUGARING_LIBRARY_EXCEPTION_NEW)));
   }
 
   private ImmutableList<Path> mergeAppDexFilesAndRenameCoreDesugaringDex(
@@ -195,7 +200,7 @@ public class D8DexMerger implements DexMerger {
 
   private static boolean isCoreDesugaringDex(Path dexFile) {
     try {
-      boolean[] isDesugaringDex = new boolean[] {true};
+      boolean[] isDesugaringDex = new boolean[] {false};
       D8Command.Builder builder =
           D8Command.builder()
               .addProgramFiles(dexFile)
@@ -206,10 +211,10 @@ public class D8DexMerger implements DexMerger {
                   clazz ->
                       isDesugaringDex[0] =
                           isDesugaringDex[0]
-                              && clazz
-                                  .getClassReference()
-                                  .getTypeName()
-                                  .startsWith(CORE_DESUGARING_PREFIX)));
+                              || clazz
+                                      .getClassReference()
+                                      .getTypeName()
+                                      .startsWith(CORE_DESUGARING_PREFIX)));
       D8.run(builder.build());
       return isDesugaringDex[0];
     } catch (CompilationFailedException e) {

@@ -16,24 +16,19 @@
 
 package com.android.tools.build.bundletool.model;
 
-import static com.android.tools.build.bundletool.model.AndroidManifest.ANDROID_NAMESPACE_URI;
-import static com.android.tools.build.bundletool.model.AndroidManifest.SDK_MAJOR_VERSION_ATTRIBUTE_NAME;
-import static com.android.tools.build.bundletool.model.AndroidManifest.SDK_PATCH_VERSION_ATTRIBUTE_NAME;
-import static com.android.tools.build.bundletool.model.ModuleSplit.DEFAULT_SDK_PATCH_VERSION;
 import static com.android.tools.build.bundletool.model.utils.BundleParser.extractModules;
-import static com.android.tools.build.bundletool.model.utils.BundleParser.readBundleConfig;
 import static com.android.tools.build.bundletool.model.utils.BundleParser.readBundleMetadata;
+import static com.android.tools.build.bundletool.model.utils.BundleParser.readSdkModulesConfig;
 import static com.android.tools.build.bundletool.model.utils.BundleParser.sanitize;
 import static com.google.common.base.Preconditions.checkState;
 
-import com.android.bundle.Config.BundleConfig;
-import com.android.tools.build.bundletool.model.utils.xmlproto.XmlProtoElement;
+import com.android.bundle.Config.BundleConfig.BundleType;
+import com.android.bundle.SdkModulesConfigOuterClass.SdkModulesConfig;
 import com.android.tools.build.bundletool.model.version.Version;
 import com.google.auto.value.AutoValue;
 import com.google.common.collect.ImmutableSet;
-import com.google.common.collect.Iterables;
-import com.google.common.primitives.Longs;
 import com.google.errorprone.annotations.Immutable;
+import java.util.Optional;
 import java.util.zip.ZipFile;
 
 /** Represents an SDK bundle. */
@@ -41,19 +36,22 @@ import java.util.zip.ZipFile;
 @AutoValue
 public abstract class SdkBundle implements Bundle {
 
-  /** Top-level directory names that are not recognized as modules. */
-  public static final ImmutableSet<ZipPath> NON_MODULE_DIRECTORIES =
-      ImmutableSet.of(
-          ZipPath.create("BUNDLE-METADATA"), ZipPath.create("META-INF"), ZipPath.create("aar"));
-
   /** Builds an {@link SdkBundle} from an SDK Bundle on disk. */
-  public static SdkBundle buildFromZip(ZipFile bundleFile, Integer versionCode) {
-    BundleConfig bundleConfig = readBundleConfig(bundleFile);
+  public static SdkBundle buildFromZip(
+      ZipFile bundleFile, ZipFile modulesFile, Integer versionCode) {
+    SdkModulesConfig sdkModulesConfig = readSdkModulesConfig(modulesFile);
 
     return builder()
         .setModule(
-            sanitize(extractModules(bundleFile, bundleConfig, NON_MODULE_DIRECTORIES)).get(0))
-        .setBundleConfig(bundleConfig)
+            sanitize(
+                    extractModules(
+                        modulesFile,
+                        BundleType.REGULAR,
+                        Version.of(sdkModulesConfig.getBundletool().getVersion()),
+                        /* apexConfig= */ Optional.empty(),
+                        /* nonModuleDirectories= */ ImmutableSet.of()))
+                .get(0))
+        .setSdkModulesConfig(sdkModulesConfig)
         .setBundleMetadata(readBundleMetadata(bundleFile))
         .setVersionCode(versionCode)
         .build();
@@ -67,8 +65,7 @@ public abstract class SdkBundle implements Bundle {
     return getModule();
   }
 
-  @Override
-  public abstract BundleConfig getBundleConfig();
+  public abstract SdkModulesConfig getSdkModulesConfig();
 
   @Override
   public abstract BundleMetadata getBundleMetadata();
@@ -76,40 +73,60 @@ public abstract class SdkBundle implements Bundle {
   public abstract Integer getVersionCode();
 
   public Version getBundletoolVersion() {
-    return Version.of(getBundleConfig().getBundletool().getVersion());
+    return Version.of(getSdkModulesConfig().getBundletool().getVersion());
   }
 
+  /**
+   * Gets the SDK package name.
+   *
+   * <p>Note that this is different from the package name used in the APK AndroidManifest, which is
+   * a combination of the SDK package name and its Android version major.
+   */
   @Override
   public String getPackageName() {
-    return getModule().getAndroidManifest().getPackageName();
+    return getSdkModulesConfig().getSdkPackageName();
+  }
+
+  /** Gets the major version of the SDK bundle. */
+  public int getMajorVersion() {
+    return getSdkModulesConfig().getSdkVersion().getMajor();
+  }
+
+  /** Gets the minor version of the SDK bundle. */
+  public int getMinorVersion() {
+    return getSdkModulesConfig().getSdkVersion().getMinor();
+  }
+
+  /** Gets the patch version of the SDK bundle. */
+  public int getPatchVersion() {
+    return getSdkModulesConfig().getSdkVersion().getPatch();
   }
 
   /**
-   * Gets the Major Version of the SDK bundle. The Major Version is returned as String, but will
-   * always be parseable as a long.
+   * Gets the android:versionMajor as represented in the <sdk-library> tag.
+   *
+   * <p>This is a combination of the SDK major and minor version.
+   *
+   * <p>For instance, for an SDK with version 2.3.4, the android:versionMajor is 20003.
    */
-  public String getMajorVersion() {
-    XmlProtoElement sdkLibraryTag = getSdkLibraryTag();
-    return sdkLibraryTag
-        .getAttribute(ANDROID_NAMESPACE_URI, SDK_MAJOR_VERSION_ATTRIBUTE_NAME)
-        .get()
-        .getValueAsString();
+  public int getSdkAndroidVersionMajor() {
+    return RuntimeEnabledSdkVersionEncoder.encodeSdkMajorAndMinorVersion(
+        getMajorVersion(), getMinorVersion());
   }
 
-  /** Gets the Major Version of the SDK bundle. */
-  public long getMajorVersionAsLong() {
-    return Longs.tryParse(getMajorVersion());
+  /** Gets the version name of the SDK bundle. */
+  public String getVersionName() {
+    return getMajorVersion() + "." + getMinorVersion() + "." + getPatchVersion();
   }
 
   /**
-   * Gets the Patch Version of the SDK bundle. If Patch Version is not set, {@value
-   * #DEFAULT_SDK_PATCH_VERSION} is returned.
+   * Gets the SDK package name concatenated with the SDK Android version major.
+   *
+   * <p>For instance, for an SDK with package name com.foo.bar and version 2.3.4, the manifest
+   * package name is com.foo.bar_20003.
    */
-  public String getPatchVersion() {
-    return getModule()
-        .getAndroidManifest()
-        .getMetadataValue(SDK_PATCH_VERSION_ATTRIBUTE_NAME)
-        .orElse(DEFAULT_SDK_PATCH_VERSION);
+  public String getManifestPackageName() {
+    return getPackageName() + "_" + getSdkAndroidVersionMajor();
   }
 
   public abstract Builder toBuilder();
@@ -123,16 +140,12 @@ public abstract class SdkBundle implements Bundle {
   public abstract static class Builder {
     public abstract Builder setModule(BundleModule module);
 
-    public abstract Builder setBundleConfig(BundleConfig bundleConfig);
+    public abstract Builder setSdkModulesConfig(SdkModulesConfig sdkModulesConfig);
 
     public abstract Builder setBundleMetadata(BundleMetadata bundleMetadata);
 
     public abstract Builder setVersionCode(Integer versionCode);
 
     public abstract SdkBundle build();
-  }
-
-  private XmlProtoElement getSdkLibraryTag() {
-    return Iterables.getOnlyElement(getModule().getAndroidManifest().getSdkLibraryElements());
   }
 }

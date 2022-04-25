@@ -16,13 +16,9 @@
 
 package com.android.tools.build.bundletool.model;
 
-import com.android.bundle.Config.BundleConfig;
-
 /** Interface for bundles. */
 public interface Bundle {
   String getPackageName();
-
-  BundleConfig getBundleConfig();
 
   BundleModule getModule(BundleModuleName moduleName);
 

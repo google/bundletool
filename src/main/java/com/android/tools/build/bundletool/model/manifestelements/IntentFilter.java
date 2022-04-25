@@ -17,6 +17,8 @@
 package com.android.tools.build.bundletool.model.manifestelements;
 
 import static com.android.tools.build.bundletool.model.AndroidManifest.ACTION_ELEMENT_NAME;
+import static com.android.tools.build.bundletool.model.AndroidManifest.CATEGORY_ELEMENT_NAME;
+import static com.android.tools.build.bundletool.model.AndroidManifest.INTENT_FILTER_ELEMENT_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.NAME_ATTRIBUTE_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.NAME_RESOURCE_ID;
 
@@ -37,9 +39,6 @@ import java.util.Optional;
 @AutoValue
 @AutoValue.CopyAnnotations
 public abstract class IntentFilter {
-  public static final String INTENT_FILTER_ELEMENT_NAME = "intent-filter";
-  public static final String CATEGORY_ELEMENT_NAME = "category";
-
   abstract Optional<String> getActionName();
 
   abstract Optional<String> getCategoryName();

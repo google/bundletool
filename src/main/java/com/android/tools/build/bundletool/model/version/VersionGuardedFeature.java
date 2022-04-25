@@ -96,7 +96,10 @@ public enum VersionGuardedFeature {
   MERGE_INSTALL_TIME_MODULES_INTO_BASE("1.0.0"),
 
   /* Enabling generation of archived apk. */
-  ARCHIVED_APK_GENERATION("1.8.2");
+  ARCHIVED_APK_GENERATION("1.8.2"),
+
+  /* StoreArchive setting is enabled if not explicitly disabled in BundleConfig. */
+  STORE_ARCHIVE_ENABLED_BY_DEFAULT("1.10.0");
 
   /** Version from which the given feature should be enabled by default. */
   private final Version enabledSinceVersion;

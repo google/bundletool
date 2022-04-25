@@ -26,6 +26,7 @@ import com.android.tools.build.bundletool.model.BundleModuleName;
 import com.android.tools.build.bundletool.model.ModuleEntry;
 import com.android.tools.build.bundletool.model.ZipPath;
 import com.android.tools.build.bundletool.model.utils.ZipUtils;
+import com.android.tools.build.bundletool.model.version.Version;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
 import java.util.zip.ZipEntry;
@@ -86,12 +87,13 @@ public class BundleModulesValidator {
   }
 
   private BundleModule toBundleModule(ZipFile moduleZipFile, BundleConfig bundleConfig) {
-    BundleModule bundleModule =
+    BundleModule.Builder bundleModuleBuilder =
         BundleModule.builder()
             // Assigning a temporary name because the real one will be extracted from the
             // manifest, but this requires the BundleModule to be built.
             .setName(BundleModuleName.create("TEMPORARY_MODULE_NAME"))
-            .setBundleConfig(bundleConfig)
+            .setBundleType(bundleConfig.getType())
+            .setBundletoolVersion(Version.of(bundleConfig.getBundletool().getVersion()))
             .addEntries(
                 moduleZipFile.stream()
                     .filter(not(ZipEntry::isDirectory))
@@ -101,16 +103,20 @@ public class BundleModulesValidator {
                                 .setPath(ZipPath.create(zipEntry.getName()))
                                 .setContent(ZipUtils.asByteSource(moduleZipFile, zipEntry))
                                 .build())
-                    .collect(toImmutableList()))
-            .build();
+                    .collect(toImmutableList()));
+
+    if (bundleConfig.hasApexConfig()) {
+      bundleModuleBuilder.setBundleApexConfig(bundleConfig.getApexConfig());
+    }
 
     BundleModuleName actualModuleName =
-        bundleModule
+        bundleModuleBuilder
+            .build()
             .getAndroidManifest()
             .getSplitId()
             .map(BundleModuleName::create)
             .orElse(BundleModuleName.BASE_MODULE_NAME);
 
-    return bundleModule.toBuilder().setName(actualModuleName).build();
+    return bundleModuleBuilder.setName(actualModuleName).build();
   }
 }

@@ -81,13 +81,15 @@ public class BuildSdkApksManager {
         .generateSplits(sdkBundle.getModule(), apkOptimizations.getStandaloneDimensions())
         .stream()
         .map(StandaloneApksGenerator::setVariantTargetingAndSplitType)
+        .map(moduleSplit -> moduleSplit.writeSdkVersionName(sdkBundle.getVersionName()))
+        .map(moduleSplit -> moduleSplit.writeSdkVersionCode(sdkBundle.getVersionCode()))
+        .map(moduleSplit -> moduleSplit.writeManifestPackage(sdkBundle.getManifestPackageName()))
         .map(
             moduleSplit ->
-                moduleSplit.writeSdkVersionName(
-                    sdkBundle.getMajorVersion() + ".0." + sdkBundle.getPatchVersion()))
-        .map(moduleSplit -> moduleSplit.writeSdkVersionCode(sdkBundle.getVersionCode()))
+                moduleSplit.writeSdkLibraryElement(
+                    sdkBundle.getPackageName(), sdkBundle.getSdkAndroidVersionMajor()))
         .map(ModuleSplit::overrideMinSdkVersionForSdkSandbox)
-        .map(ModuleSplit::addDefaultPatchVersionIfNotSet)
+        .map(moduleSplit -> moduleSplit.writePatchVersion(sdkBundle.getPatchVersion()))
         .collect(toImmutableList());
   }
 }

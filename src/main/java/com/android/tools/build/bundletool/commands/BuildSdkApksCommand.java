@@ -18,6 +18,8 @@ package com.android.tools.build.bundletool.commands;
 
 import static com.android.tools.build.bundletool.commands.BuildSdkApksCommand.OutputFormat.APK_SET;
 import static com.android.tools.build.bundletool.commands.BuildSdkApksCommand.OutputFormat.DIRECTORY;
+import static com.android.tools.build.bundletool.model.utils.BundleParser.EXTRACTED_SDK_MODULES_FILE_NAME;
+import static com.android.tools.build.bundletool.model.utils.BundleParser.getModulesZip;
 import static com.android.tools.build.bundletool.model.utils.files.FilePreconditions.checkFileDoesNotExist;
 import static com.google.common.base.Preconditions.checkArgument;
 
@@ -27,7 +29,6 @@ import com.android.tools.build.bundletool.commands.CommandHelp.FlagDescription;
 import com.android.tools.build.bundletool.flags.Flag;
 import com.android.tools.build.bundletool.flags.ParsedFlags;
 import com.android.tools.build.bundletool.io.TempDirectory;
-import com.android.tools.build.bundletool.io.ZipReader;
 import com.android.tools.build.bundletool.model.Password;
 import com.android.tools.build.bundletool.model.SdkBundle;
 import com.android.tools.build.bundletool.model.SignerConfig;
@@ -237,25 +238,25 @@ public abstract class BuildSdkApksCommand {
     validateInput();
 
     try (ZipFile bundleZip = new ZipFile(getSdkBundlePath().toFile());
-        ZipReader zipReader = ZipReader.createFromFile(getSdkBundlePath());
         TempDirectory tempDir = new TempDirectory(getClass().getSimpleName())) {
 
       SdkBundleValidator bundleValidator = SdkBundleValidator.create();
       bundleValidator.validateFile(bundleZip);
 
-      SdkBundle sdkBundle = SdkBundle.buildFromZip(bundleZip, getVersionCode());
-      bundleValidator.validate(sdkBundle);
+      Path modulesPath = tempDir.getPath().resolve(EXTRACTED_SDK_MODULES_FILE_NAME);
+      try (ZipFile modulesZip = getModulesZip(bundleZip, modulesPath)) {
+        bundleValidator.validateModulesFile(modulesZip);
+        SdkBundle sdkBundle = SdkBundle.buildFromZip(bundleZip, modulesZip, getVersionCode());
+        bundleValidator.validate(sdkBundle);
 
-      DaggerBuildSdkApksManagerComponent.builder()
-          .setBuildSdkApksCommand(this)
-          .setTempDirectory(tempDir)
-          .setSdkBundle(sdkBundle)
-          .setZipReader(zipReader)
-          .setUseBundleCompression(false)
-          .build()
-          .create()
-          .execute();
-
+        DaggerBuildSdkApksManagerComponent.builder()
+            .setBuildSdkApksCommand(this)
+            .setTempDirectory(tempDir)
+            .setSdkBundle(sdkBundle)
+            .build()
+            .create()
+            .execute();
+      }
     } catch (ZipException e) {
       throw InvalidBundleException.builder()
           .withCause(e)

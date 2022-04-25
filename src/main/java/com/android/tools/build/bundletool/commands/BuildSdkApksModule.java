@@ -18,12 +18,13 @@ package com.android.tools.build.bundletool.commands;
 
 import com.android.bundle.Config.BundleConfig;
 import com.android.bundle.Devices.DeviceSpec;
+import com.android.bundle.SdkModulesConfigOuterClass.SdkModulesConfig;
 import com.android.tools.build.bundletool.androidtools.Aapt2Command;
 import com.android.tools.build.bundletool.androidtools.P7ZipCommand;
 import com.android.tools.build.bundletool.commands.BuildApksCommand.ApkBuildMode;
 import com.android.tools.build.bundletool.io.ApkSerializer;
+import com.android.tools.build.bundletool.io.ModuleSplitSerializer;
 import com.android.tools.build.bundletool.io.TempDirectory;
-import com.android.tools.build.bundletool.io.ZipFlingerApkSerializer;
 import com.android.tools.build.bundletool.model.ApkListener;
 import com.android.tools.build.bundletool.model.ApkModifier;
 import com.android.tools.build.bundletool.model.Bundle;
@@ -52,13 +53,22 @@ public abstract class BuildSdkApksModule {
   }
 
   @Provides
-  static Version provideBundletoolVersion(BundleConfig bundleConfig) {
-    return Version.of(bundleConfig.getBundletool().getVersion());
+  static Version provideBundletoolVersion(SdkModulesConfig sdkModulesConfig) {
+    return Version.of(sdkModulesConfig.getBundletool().getVersion());
   }
 
   @Provides
-  static BundleConfig provideBundleConfig(SdkBundle sdkBundle) {
-    return sdkBundle.getBundleConfig();
+  static SdkModulesConfig provideSdkModulesConfig(SdkBundle sdkBundle) {
+    return sdkBundle.getSdkModulesConfig();
+  }
+
+  // BundleConfig.pb files are not included in Android SDK Bundles. However, BundleConfig is
+  // injected in both ModuleSplitterForShards (to determine which optimizations to use) and
+  // ZipFlingerApkSerializer (to determine which compression to use), which are required for SDK APK
+  // generation. Hence, we must still provide BundleConfig here.
+  @Provides
+  static BundleConfig provideBundleConfig(SdkModulesConfig sdkModulesConfig) {
+    return BundleConfig.newBuilder().setBundletool(sdkModulesConfig.getBundletool()).build();
   }
 
   @Binds
@@ -117,5 +127,5 @@ public abstract class BuildSdkApksModule {
   }
 
   @Binds
-  abstract ApkSerializer apkSerializerHelper(ZipFlingerApkSerializer apkSerializerHelper);
+  abstract ApkSerializer apkSerializerHelper(ModuleSplitSerializer apkSerializerHelper);
 }

@@ -35,6 +35,9 @@ import javax.inject.Inject;
  *
  * <p>Pre-L variants are out of scope of this generator. Standalone APKs create a single variant per
  * APK.
+ *
+ * <p>Variants targeting devices with SDK Runtime support are out of scope of this generator. SDK
+ * Runtime variant targetings are generated in {@link SdkRuntimeVariantGenerator}.
  */
 public final class PerModuleVariantTargetingGenerator {
 
@@ -42,7 +45,7 @@ public final class PerModuleVariantTargetingGenerator {
   PerModuleVariantTargetingGenerator() {}
 
   public ImmutableSet<VariantTargeting> generateVariants(BundleModule module) {
-   return generateVariants(module, ApkGenerationConfiguration.getDefaultInstance());
+    return generateVariants(module, ApkGenerationConfiguration.getDefaultInstance());
   }
 
   public ImmutableSet<VariantTargeting> generateVariants(

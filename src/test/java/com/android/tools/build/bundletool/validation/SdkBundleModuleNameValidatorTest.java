@@ -21,10 +21,11 @@ import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.andr
 import static com.google.common.truth.Truth.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
-import com.android.bundle.Config.BundleConfig;
+import com.android.bundle.Config.BundleConfig.BundleType;
 import com.android.tools.build.bundletool.model.BundleModule;
 import com.android.tools.build.bundletool.model.BundleModuleName;
 import com.android.tools.build.bundletool.model.exceptions.InvalidBundleException;
+import com.android.tools.build.bundletool.model.version.BundleToolVersion;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
@@ -37,8 +38,9 @@ public class SdkBundleModuleNameValidatorTest {
     BundleModule base =
         BundleModule.builder()
             .setName(BundleModuleName.create("invalidModuleName"))
+            .setBundleType(BundleType.REGULAR)
+            .setBundletoolVersion(BundleToolVersion.getCurrentVersion())
             .setAndroidManifestProto(androidManifest("com.foo.bar"))
-            .setBundleConfig(BundleConfig.getDefaultInstance())
             .build();
 
     InvalidBundleException expected =
@@ -56,8 +58,9 @@ public class SdkBundleModuleNameValidatorTest {
     BundleModule base =
         BundleModule.builder()
             .setName(BASE_MODULE_NAME)
+            .setBundleType(BundleType.REGULAR)
+            .setBundletoolVersion(BundleToolVersion.getCurrentVersion())
             .setAndroidManifestProto(androidManifest("com.foo.bar"))
-            .setBundleConfig(BundleConfig.getDefaultInstance())
             .build();
 
     new SdkBundleModuleNameValidator().validateModule(base);

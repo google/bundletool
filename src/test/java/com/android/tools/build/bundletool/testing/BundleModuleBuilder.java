@@ -32,6 +32,8 @@ import com.android.tools.build.bundletool.model.ModuleEntry.ModuleEntryBundleLoc
 import com.android.tools.build.bundletool.model.ZipPath;
 import com.android.tools.build.bundletool.model.utils.xmlproto.XmlProtoNode;
 import com.android.tools.build.bundletool.model.utils.xmlproto.XmlProtoNodeBuilder;
+import com.android.tools.build.bundletool.model.version.BundleToolVersion;
+import com.android.tools.build.bundletool.model.version.Version;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.io.ByteSource;
 import java.nio.file.Path;
@@ -158,10 +160,20 @@ public class BundleModuleBuilder {
       addFile("manifest/AndroidManifest.xml", manifestBuilder.build().getProto().toByteArray());
     }
 
-    return BundleModule.builder()
-        .setName(moduleName)
-        .addEntries(entries.build())
-        .setBundleConfig(bundleConfig)
-        .build();
+    BundleModule.Builder bundleModuleBuilder =
+        BundleModule.builder()
+            .setName(moduleName)
+            .addEntries(entries.build())
+            .setBundleType(bundleConfig.getType())
+            .setBundletoolVersion(BundleToolVersion.getCurrentVersion());
+
+    if (!bundleConfig.getBundletool().getVersion().isEmpty()) {
+      bundleModuleBuilder.setBundletoolVersion(
+          Version.of(bundleConfig.getBundletool().getVersion()));
+    }
+    if (bundleConfig.hasApexConfig()) {
+      bundleModuleBuilder.setBundleApexConfig(bundleConfig.getApexConfig());
+    }
+    return bundleModuleBuilder.build();
   }
 }

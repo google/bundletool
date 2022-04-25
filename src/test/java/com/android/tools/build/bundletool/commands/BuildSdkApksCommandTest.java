@@ -16,17 +16,17 @@
 
 package com.android.tools.build.bundletool.commands;
 
-import static com.android.tools.build.bundletool.model.AndroidManifest.SDK_LIBRARY_ELEMENT_NAME;
-import static com.android.tools.build.bundletool.model.AndroidManifest.SDK_PATCH_VERSION_ATTRIBUTE_NAME;
+import static com.android.tools.build.bundletool.model.utils.BundleParser.EXTRACTED_SDK_MODULES_FILE_NAME;
+import static com.android.tools.build.bundletool.model.utils.BundleParser.SDK_MODULES_FILE_NAME;
 import static com.android.tools.build.bundletool.testing.FakeSystemEnvironmentProvider.ANDROID_HOME;
 import static com.android.tools.build.bundletool.testing.FakeSystemEnvironmentProvider.ANDROID_SERIAL;
-import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifest;
-import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withMetadataValue;
-import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withMinSdkVersion;
-import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withSdkLibraryElement;
 import static com.android.tools.build.bundletool.testing.TestUtils.addKeyToKeystore;
 import static com.android.tools.build.bundletool.testing.TestUtils.createDebugKeystore;
 import static com.android.tools.build.bundletool.testing.TestUtils.createKeystore;
+import static com.android.tools.build.bundletool.testing.TestUtils.createSdkAndroidManifest;
+import static com.android.tools.build.bundletool.testing.TestUtils.createZipBuilderForModules;
+import static com.android.tools.build.bundletool.testing.TestUtils.createZipBuilderForModulesWithInvalidManifest;
+import static com.android.tools.build.bundletool.testing.TestUtils.createZipBuilderForSdkBundleWithModules;
 import static com.android.tools.build.bundletool.testing.TestUtils.expectMissingRequiredBuilderPropertyException;
 import static com.android.tools.build.bundletool.testing.TestUtils.expectMissingRequiredFlagException;
 import static com.google.common.base.StandardSystemProperty.USER_HOME;
@@ -35,11 +35,7 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.util.Arrays.stream;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
-import com.android.aapt.Resources.ResourceTable;
-import com.android.aapt.Resources.XmlNode;
 import com.android.bundle.Config.BundleConfig;
-import com.android.bundle.Files.Assets;
-import com.android.bundle.Files.NativeLibraries;
 import com.android.tools.build.bundletool.commands.BuildSdkApksCommand.OutputFormat;
 import com.android.tools.build.bundletool.flags.Flag.RequiredFlagNotSetException;
 import com.android.tools.build.bundletool.flags.FlagParser;
@@ -57,7 +53,6 @@ import com.android.tools.build.bundletool.model.utils.files.FileUtils;
 import com.android.tools.build.bundletool.testing.BundleConfigBuilder;
 import com.android.tools.build.bundletool.testing.CertificateFactory;
 import com.android.tools.build.bundletool.testing.FakeSystemEnvironmentProvider;
-import com.android.tools.build.bundletool.testing.ResourceTableBuilder;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.util.concurrent.MoreExecutors;
@@ -93,20 +88,14 @@ public class BuildSdkApksCommandTest {
   @Rule public final TemporaryFolder tmp = new TemporaryFolder();
 
   private static final byte[] DUMMY_CONTENT = new byte[1];
-  private static final String PACKAGE_NAME = "com.test.sdk.detail";
   private static final BundleConfig BUNDLE_CONFIG = BundleConfigBuilder.create().build();
-  private static final NativeLibraries NATIVE_CONFIG = NativeLibraries.getDefaultInstance();
-  private static final ResourceTable RESOURCE_TABLE =
-      new ResourceTableBuilder().addPackage("com.app").build();
-  private static final Assets ASSETS_CONFIG = Assets.getDefaultInstance();
-
-  private static final XmlNode MANIFEST = createSdkAndroidManifest();
 
   private static PrivateKey privateKey;
   private static X509Certificate certificate;
 
   private Path tmpDir;
   private Path sdkBundlePath;
+  private Path modulesPath;
   private Path outputFilePath;
   private Path keystorePath;
 
@@ -126,6 +115,7 @@ public class BuildSdkApksCommandTest {
   public void setUp() throws Exception {
     tmpDir = tmp.getRoot().toPath();
     sdkBundlePath = tmpDir.resolve("SdkBundle.asb");
+    modulesPath = tmpDir.resolve(EXTRACTED_SDK_MODULES_FILE_NAME);
     outputFilePath = tmpDir.resolve("output.apks");
 
     // Keystore.
@@ -225,7 +215,8 @@ public class BuildSdkApksCommandTest {
 
   @Test
   public void overwriteSetForDirectoryOutputFormat_throws() throws Exception {
-    createBasicZipBuilderWithManifest().writeTo(sdkBundlePath);
+    createZipBuilderForSdkBundleWithModules(createZipBuilderForModules(), modulesPath)
+        .writeTo(sdkBundlePath);
     ParsedFlags flags =
         getDefaultFlagsWithAdditionalFlags("--overwrite", "--output-format=directory");
     BuildSdkApksCommand command = BuildSdkApksCommand.fromFlags(flags);
@@ -236,7 +227,8 @@ public class BuildSdkApksCommandTest {
 
   @Test
   public void overwriteNotSetOutputFileAlreadyExists_throws() throws Exception {
-    createBasicZipBuilderWithManifest().writeTo(sdkBundlePath);
+    createZipBuilderForSdkBundleWithModules(createZipBuilderForModules(), modulesPath)
+        .writeTo(sdkBundlePath);
     new ZipBuilder()
         .addFileWithContent(ZipPath.create("BundleConfig.pb"), BUNDLE_CONFIG.toByteArray())
         .writeTo(outputFilePath);
@@ -289,6 +281,7 @@ public class BuildSdkApksCommandTest {
     assertThat(e).hasMessageThat().contains("not found");
   }
 
+  // Ensures that validations are run on the bundle zip file.
   @Test
   public void bundleMissingFiles_throws() throws Exception {
     ZipBuilder zipBuilder = new ZipBuilder();
@@ -297,20 +290,24 @@ public class BuildSdkApksCommandTest {
         BuildSdkApksCommand.fromFlags(getDefaultFlagsWithAdditionalFlags());
 
     Exception e = assertThrows(InvalidBundleException.class, command::execute);
-    assertThat(e).hasMessageThat().contains("missing required file");
+    assertThat(e)
+        .hasMessageThat()
+        .isEqualTo(
+            "The archive doesn't seem to be an SDK Bundle, it is missing required file '"
+                + SDK_MODULES_FILE_NAME
+                + "'.");
   }
 
-  // Ensures that validations are run on the bundle zip file.
+  // Ensures that validations are run on the module zip file.
   @Test
   public void bundleMultipleModules_throws() throws Exception {
-    createBasicZipBuilderWithManifest()
-        .addFileWithProtoContent(ZipPath.create("feature/manifest/AndroidManifest.xml"), MANIFEST)
-        .addFileWithContent(ZipPath.create("feature/dex/classes.dex"), DUMMY_CONTENT)
-        .addFileWithContent(ZipPath.create("feature/assets.pb"), ASSETS_CONFIG.toByteArray())
-        .addFileWithContent(ZipPath.create("feature/native.pb"), NATIVE_CONFIG.toByteArray())
-        .addFileWithContent(ZipPath.create("feature/resources.pb"), RESOURCE_TABLE.toByteArray())
-        .addFileWithContent(ZipPath.create("feature/lib/x86/libfoo.so"), DUMMY_CONTENT)
-        .writeTo(sdkBundlePath);
+    ZipBuilder modules =
+        createZipBuilderForModules()
+            .addFileWithProtoContent(
+                ZipPath.create("feature/manifest/AndroidManifest.xml"), createSdkAndroidManifest())
+            .addFileWithContent(ZipPath.create("feature/dex/classes.dex"), DUMMY_CONTENT);
+    createZipBuilderForSdkBundleWithModules(modules, modulesPath).writeTo(sdkBundlePath);
+
     BuildSdkApksCommand command =
         BuildSdkApksCommand.fromFlags(getDefaultFlagsWithAdditionalFlags());
 
@@ -321,27 +318,31 @@ public class BuildSdkApksCommandTest {
   // Ensures that validations are run on the bundle object.
   @Test
   public void invalidManifest_throws() throws Exception {
-    createZipBuilderWithInvalidManifest().writeTo(sdkBundlePath);
+    createZipBuilderForSdkBundleWithModules(
+            createZipBuilderForModulesWithInvalidManifest(), modulesPath)
+        .writeTo(sdkBundlePath);
     BuildSdkApksCommand command =
         BuildSdkApksCommand.fromFlags(getDefaultFlagsWithAdditionalFlags());
 
     Exception e = assertThrows(InvalidBundleException.class, command::execute);
     assertThat(e)
         .hasMessageThat()
-        .contains(
-            "SDK Major version in <" + SDK_LIBRARY_ELEMENT_NAME + "> cannot be parsed to a Long.");
+        .isEqualTo(
+            "'installLocation' in <manifest> must be 'internalOnly' for SDK bundles if it is set.");
   }
 
   @Test
   public void executeCreatesFile() throws Exception {
-    createBasicZipBuilderWithManifest().writeTo(sdkBundlePath);
+    createZipBuilderForSdkBundleWithModules(createZipBuilderForModules(), modulesPath)
+        .writeTo(sdkBundlePath);
     BuildSdkApksCommand.fromFlags(getDefaultFlagsWithAdditionalFlags()).execute();
     assertThat(Files.exists(outputFilePath)).isTrue();
   }
 
   @Test
   public void internalExecutorIsShutDownAfterExecute() throws Exception {
-    createBasicZipBuilderWithManifest().writeTo(sdkBundlePath);
+    createZipBuilderForSdkBundleWithModules(createZipBuilderForModules(), modulesPath)
+        .writeTo(sdkBundlePath);
     BuildSdkApksCommand command =
         BuildSdkApksCommand.fromFlags(getDefaultFlagsWithAdditionalFlags("--max-threads=16"));
     command.execute();
@@ -351,7 +352,8 @@ public class BuildSdkApksCommandTest {
 
   @Test
   public void externalExecutorIsNotShutDownAfterExecute() throws Exception {
-    createBasicZipBuilderWithManifest().writeTo(sdkBundlePath);
+    createZipBuilderForSdkBundleWithModules(createZipBuilderForModules(), modulesPath)
+        .writeTo(sdkBundlePath);
     BuildSdkApksCommand command =
         BuildSdkApksCommand.builder()
             .setSdkBundlePath(sdkBundlePath)
@@ -432,44 +434,6 @@ public class BuildSdkApksCommandTest {
         BuildSdkApksCommand.fromFlags(getDefaultFlagsWithAdditionalFlags());
 
     assertThat(command.getVerbose()).isFalse();
-  }
-
-  private ZipBuilder createBasicZipBuilderWithManifest() {
-    ZipBuilder zipBuilder = new ZipBuilder();
-    zipBuilder
-        .addFileWithContent(ZipPath.create("BundleConfig.pb"), BUNDLE_CONFIG.toByteArray())
-        .addFileWithProtoContent(ZipPath.create("base/manifest/AndroidManifest.xml"), MANIFEST)
-        .addFileWithContent(ZipPath.create("base/dex/classes.dex"), DUMMY_CONTENT)
-        .addFileWithContent(ZipPath.create("base/assets.pb"), ASSETS_CONFIG.toByteArray())
-        .addFileWithContent(ZipPath.create("base/native.pb"), NATIVE_CONFIG.toByteArray())
-        .addFileWithContent(ZipPath.create("base/resources.pb"), RESOURCE_TABLE.toByteArray())
-        .addFileWithContent(ZipPath.create("base/lib/x86/libfoo.so"), DUMMY_CONTENT)
-        .addFileWithContent(
-            ZipPath.create("BUNDLE-METADATA/some.namespace/metadata1"), new byte[] {0x01});
-    return zipBuilder;
-  }
-
-  private static XmlNode createSdkAndroidManifest() {
-    return androidManifest(
-        PACKAGE_NAME,
-        withMinSdkVersion(32),
-        withSdkLibraryElement("15"),
-        withMetadataValue(SDK_PATCH_VERSION_ATTRIBUTE_NAME, "5"));
-  }
-
-  private ZipBuilder createZipBuilderWithInvalidManifest() {
-    XmlNode invalidManifest =
-        androidManifest(
-            PACKAGE_NAME,
-            withMinSdkVersion(32),
-            withSdkLibraryElement("NotALong"),
-            withMetadataValue(SDK_PATCH_VERSION_ATTRIBUTE_NAME, "5"));
-    return new ZipBuilder()
-        .addFileWithContent(ZipPath.create("BundleConfig.pb"), BUNDLE_CONFIG.toByteArray())
-        .addFileWithProtoContent(
-            ZipPath.create("base/manifest/AndroidManifest.xml"), invalidManifest)
-        .addFileWithContent(
-            ZipPath.create("BUNDLE-METADATA/some.namespace/metadata1"), new byte[] {0x01});
   }
 
   private ParsedFlags getDefaultFlagsWithAdditionalFlags(String... additionalFlags) {

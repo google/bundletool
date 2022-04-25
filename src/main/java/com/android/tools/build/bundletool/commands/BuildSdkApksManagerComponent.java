@@ -16,9 +16,7 @@
 
 package com.android.tools.build.bundletool.commands;
 
-import com.android.tools.build.bundletool.commands.BuildApksManagerComponent.UseBundleCompression;
 import com.android.tools.build.bundletool.io.TempDirectory;
-import com.android.tools.build.bundletool.io.ZipReader;
 import com.android.tools.build.bundletool.model.SdkBundle;
 import dagger.BindsInstance;
 import dagger.Component;
@@ -41,11 +39,5 @@ public interface BuildSdkApksManagerComponent {
 
     @BindsInstance
     Builder setSdkBundle(SdkBundle appBundle);
-
-    @BindsInstance
-    Builder setZipReader(ZipReader zipReader);
-
-    @BindsInstance
-    Builder setUseBundleCompression(@UseBundleCompression boolean useBundleCompression);
   }
 }

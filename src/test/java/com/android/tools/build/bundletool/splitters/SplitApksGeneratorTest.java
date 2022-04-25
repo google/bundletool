@@ -16,9 +16,11 @@
 
 package com.android.tools.build.bundletool.splitters;
 
+import static com.android.tools.build.bundletool.model.utils.TargetingProtoUtils.sdkRuntimeVariantTargeting;
 import static com.android.tools.build.bundletool.model.utils.Versions.ANDROID_L_API_VERSION;
 import static com.android.tools.build.bundletool.model.utils.Versions.ANDROID_M_API_VERSION;
 import static com.android.tools.build.bundletool.model.utils.Versions.ANDROID_Q_API_VERSION;
+import static com.android.tools.build.bundletool.model.utils.Versions.ANDROID_T_API_VERSION;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifest;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.apkAbiTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.apkMinSdkTargeting;
@@ -29,20 +31,25 @@ import static com.android.tools.build.bundletool.testing.TargetingUtils.nativeLi
 import static com.android.tools.build.bundletool.testing.TargetingUtils.targetedNativeDirectory;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.variantMinSdkTargeting;
 import static com.android.tools.build.bundletool.testing.TestUtils.extractPaths;
+import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.ImmutableSet.toImmutableSet;
 import static com.google.common.truth.Truth.assertThat;
 import static com.google.common.truth.extensions.proto.ProtoTruth.assertThat;
 
+import com.android.bundle.RuntimeEnabledSdkConfigProto.RuntimeEnabledSdk;
+import com.android.bundle.RuntimeEnabledSdkConfigProto.RuntimeEnabledSdkConfig;
 import com.android.bundle.Targeting.Abi.AbiAlias;
 import com.android.bundle.Targeting.ApkTargeting;
 import com.android.bundle.Targeting.VariantTargeting;
 import com.android.tools.build.bundletool.commands.BuildApksModule;
 import com.android.tools.build.bundletool.commands.CommandScoped;
+import com.android.tools.build.bundletool.model.AppBundle;
 import com.android.tools.build.bundletool.model.BundleMetadata;
 import com.android.tools.build.bundletool.model.BundleModule;
 import com.android.tools.build.bundletool.model.ModuleSplit;
 import com.android.tools.build.bundletool.model.ModuleSplit.SplitType;
 import com.android.tools.build.bundletool.model.OptimizationDimension;
+import com.android.tools.build.bundletool.testing.AppBundleBuilder;
 import com.android.tools.build.bundletool.testing.BundleModuleBuilder;
 import com.android.tools.build.bundletool.testing.TestModule;
 import com.google.common.collect.ImmutableList;
@@ -441,6 +448,52 @@ public class SplitApksGeneratorTest {
         .containsExactly("assets/test.txt", "dex/classes.dex");
     assertThat(testModule.getVariantTargeting()).isEqualTo(lPlusVariantTargeting());
     assertThat(getForceUncompressed(testModule, "dex/classes.dex")).isFalse();
+  }
+
+  @Test
+  public void appBundleHasRuntimeEnabledSdkDeps_generatesSdkRuntimeVariant() {
+    AppBundle appBundleWithRuntimeEnabledSdkDeps =
+        new AppBundleBuilder()
+            .addModule(
+                new BundleModuleBuilder("base")
+                    .setManifest(androidManifest("com.test.app"))
+                    .setRuntimeEnabledSdkConfig(
+                        RuntimeEnabledSdkConfig.newBuilder()
+                            .addRuntimeEnabledSdk(
+                                RuntimeEnabledSdk.newBuilder()
+                                    .setPackageName("com.test.sdk")
+                                    .setVersionMajor(1)
+                                    .setCertificateDigest("AA:BB:CC"))
+                            .build())
+                    .build())
+            .build();
+    TestComponent.useTestModule(
+        this, TestModule.builder().withAppBundle(appBundleWithRuntimeEnabledSdkDeps).build());
+
+    ImmutableList<ModuleSplit> moduleSplits =
+        splitApksGenerator.generateSplits(
+            appBundleWithRuntimeEnabledSdkDeps.getModules().values().asList(),
+            ApkGenerationConfiguration.getDefaultInstance());
+
+    assertThat(moduleSplits).hasSize(2);
+    assertThat(
+            moduleSplits.stream().map(ModuleSplit::getVariantTargeting).collect(toImmutableList()))
+        .containsExactly(
+            lPlusVariantTargeting(), sdkRuntimeVariantTargeting(ANDROID_T_API_VERSION));
+    ImmutableMap<VariantTargeting, ModuleSplit> moduleSplitMap =
+        Maps.uniqueIndex(moduleSplits, ModuleSplit::getVariantTargeting);
+    assertThat(
+            moduleSplitMap
+                .get(lPlusVariantTargeting())
+                .getAndroidManifest()
+                .getUsesSdkLibraryElements())
+        .isEmpty();
+    assertThat(
+            moduleSplitMap
+                .get(sdkRuntimeVariantTargeting(ANDROID_T_API_VERSION))
+                .getAndroidManifest()
+                .getUsesSdkLibraryElements())
+        .hasSize(1);
   }
 
   private static ModuleSplit getModuleSplit(

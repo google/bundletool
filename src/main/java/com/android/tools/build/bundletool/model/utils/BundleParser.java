@@ -19,7 +19,10 @@ package com.android.tools.build.bundletool.model.utils;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.ImmutableSet.toImmutableSet;
 
+import com.android.bundle.Config.ApexConfig;
 import com.android.bundle.Config.BundleConfig;
+import com.android.bundle.Config.BundleConfig.BundleType;
+import com.android.bundle.SdkModulesConfigOuterClass.SdkModulesConfig;
 import com.android.tools.build.bundletool.model.BundleMetadata;
 import com.android.tools.build.bundletool.model.BundleModule;
 import com.android.tools.build.bundletool.model.BundleModuleName;
@@ -28,12 +31,16 @@ import com.android.tools.build.bundletool.model.ModuleEntry;
 import com.android.tools.build.bundletool.model.ModuleEntry.ModuleEntryBundleLocation;
 import com.android.tools.build.bundletool.model.ZipPath;
 import com.android.tools.build.bundletool.model.exceptions.InvalidBundleException;
+import com.android.tools.build.bundletool.model.version.Version;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.errorprone.annotations.CheckReturnValue;
 import com.google.protobuf.InvalidProtocolBufferException;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.UncheckedIOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Collection;
 import java.util.Enumeration;
@@ -51,6 +58,20 @@ public class BundleParser {
   public static final ZipPath METADATA_DIRECTORY = ZipPath.create("BUNDLE-METADATA");
 
   public static final String BUNDLE_CONFIG_FILE_NAME = "BundleConfig.pb";
+
+  public static final String SDK_MODULES_CONFIG_FILE_NAME = "SdkModulesConfig.pb";
+
+  /**
+   * File name of the zip that contains runtime enabled SDK modules. This zip is located in the top
+   * level of an ASB zip.
+   */
+  public static final String SDK_MODULES_FILE_NAME = "modules.resm";
+
+  /**
+   * File name of the zip which is created when {@value SDK_MODULES_FILE_NAME} is extracted in order
+   * to be processed.
+   */
+  public static final String EXTRACTED_SDK_MODULES_FILE_NAME = "extracted-modules.resm";
 
   /**
    * Returns the {@link BundleModuleName} corresponding to the provided zip entry. If the zip entry
@@ -81,7 +102,11 @@ public class BundleParser {
 
   /** Extracts all modules from bundle zip file and returns them in a list */
   public static ImmutableList<BundleModule> extractModules(
-      ZipFile bundleFile, BundleConfig bundleConfig, ImmutableSet<ZipPath> nonModuleDirectories) {
+      ZipFile bundleFile,
+      BundleType bundleType,
+      Version bundletoolVersion,
+      Optional<ApexConfig> apexConfig,
+      ImmutableSet<ZipPath> nonModuleDirectories) {
     Map<BundleModuleName, BundleModule.Builder> moduleBuilders = new HashMap<>();
     Enumeration<? extends ZipEntry> entries = bundleFile.entries();
     while (entries.hasMoreElements()) {
@@ -98,7 +123,15 @@ public class BundleParser {
       BundleModule.Builder moduleBuilder =
           moduleBuilders.computeIfAbsent(
               moduleName.get(),
-              name -> BundleModule.builder().setName(name).setBundleConfig(bundleConfig));
+              name -> {
+                BundleModule.Builder bundleModuleBuilder =
+                    BundleModule.builder()
+                        .setName(name)
+                        .setBundleType(bundleType)
+                        .setBundletoolVersion(bundletoolVersion);
+                apexConfig.ifPresent(bundleModuleBuilder::setBundleApexConfig);
+                return bundleModuleBuilder;
+              });
 
       moduleBuilder.addEntry(
           ModuleEntry.builder()
@@ -135,6 +168,7 @@ public class BundleParser {
   }
 
   /** Loads BundleConfig.pb from zip file into {@link BundleConfig} */
+  @SuppressWarnings("ProtoParseWithRegistry")
   public static BundleConfig readBundleConfig(ZipFile bundleFile) {
     ZipEntry bundleConfigEntry = bundleFile.getEntry(BUNDLE_CONFIG_FILE_NAME);
     if (bundleConfigEntry == null) {
@@ -153,6 +187,31 @@ public class BundleParser {
     } catch (IOException e) {
       throw new UncheckedIOException(
           String.format("Error reading file '%s'.", BUNDLE_CONFIG_FILE_NAME), e);
+    }
+  }
+
+  /** Loads {@value #SDK_MODULES_CONFIG_FILE_NAME} from zip file into {@link SdkModulesConfig}. */
+  @SuppressWarnings("ProtoParseWithRegistry")
+  public static SdkModulesConfig readSdkModulesConfig(ZipFile modulesFile) {
+    ZipEntry sdkModulesConfigEntry = modulesFile.getEntry(SDK_MODULES_CONFIG_FILE_NAME);
+    if (sdkModulesConfigEntry == null) {
+      throw InvalidBundleException.builder()
+          .withUserMessage("File '%s' was not found.", SDK_MODULES_CONFIG_FILE_NAME)
+          .build();
+    }
+
+    try {
+      return SdkModulesConfig.parseFrom(
+          ZipUtils.asByteSource(modulesFile, sdkModulesConfigEntry).read());
+    } catch (InvalidProtocolBufferException e) {
+      throw InvalidBundleException.builder()
+          .withCause(e)
+          .withUserMessage(
+              "SDK modules config file '%s' could not be parsed.", SDK_MODULES_CONFIG_FILE_NAME)
+          .build();
+    } catch (IOException e) {
+      throw new UncheckedIOException(
+          String.format("Error reading file '%s'.", SDK_MODULES_CONFIG_FILE_NAME), e);
     }
   }
 
@@ -181,5 +240,23 @@ public class BundleParser {
         modules.stream().map(new ClassesDexNameSanitizer()::sanitize).collect(toImmutableList());
 
     return modules;
+  }
+
+  /**
+   * Performs the following steps:
+   *
+   * <ol>
+   *   <li>Extracts the {@value BundleParser#SDK_MODULES_FILE_NAME} zip from within an Android SDK
+   *       Bundle zip.
+   *   <li>Writes the {@value BundleParser#SDK_MODULES_FILE_NAME} zip to the provided {@code Path}.
+   *   <li>Returns the {@code ZipFile} that has been written to the {@code Path}.
+   * </ol>
+   */
+  public static ZipFile getModulesZip(ZipFile bundleZip, Path modulesPath) throws IOException {
+    ZipEntry modulesEntry = bundleZip.getEntry(SDK_MODULES_FILE_NAME);
+    try (InputStream modulesInputStream = bundleZip.getInputStream(modulesEntry)) {
+      Files.copy(modulesInputStream, modulesPath);
+      return new ZipFile(modulesPath.toFile());
+    }
   }
 }

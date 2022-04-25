@@ -15,24 +15,15 @@
  */
 package com.android.tools.build.bundletool.io;
 
-import com.android.tools.build.bundletool.commands.BuildApksCommand;
+import dagger.Binds;
 import dagger.Module;
-import dagger.Provides;
-import javax.inject.Provider;
 
 /** Dagger module responsible for choosing the {@link ApkSerializer}. */
 @Module
 public abstract class ApkSerializerModule {
 
-  @Provides
-  static ApkSerializer provideApkSerializer(
-      BuildApksCommand command,
-      Provider<ZipFlingerApkSerializer> zipFlingerApkSerializerHelper,
-      Provider<ModuleSplitSerializer> moduleSplitSerializerProvider) {
-    return command.getEnableApkSerializerWithoutBundleRecompression()
-        ? moduleSplitSerializerProvider.get()
-        : zipFlingerApkSerializerHelper.get();
-  }
+  @Binds
+  abstract ApkSerializer provideApkSerializer(ModuleSplitSerializer moduleSplitSerializerProvider);
 
   private ApkSerializerModule() {}
 }

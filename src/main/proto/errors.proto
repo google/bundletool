@@ -33,6 +33,8 @@ message BundleToolError {
     INVALID_COMMAND_ERROR = 5;
     // Indicates that something happened during command execution.
     COMMAND_EXECUTION_ERROR = 6;
+    // Indicates invalid signing configuration.
+    INVALID_SIGNING_CONFIGURATION_ERROR = 7;
   }
 }
 

@@ -17,22 +17,21 @@
 package com.android.tools.build.bundletool.validation;
 
 import static com.android.tools.build.bundletool.model.AndroidManifest.INSTALL_LOCATION_ATTRIBUTE_NAME;
-import static com.android.tools.build.bundletool.model.AndroidManifest.META_DATA_ELEMENT_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.PERMISSION_ELEMENT_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.PERMISSION_GROUP_ELEMENT_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.PERMISSION_TREE_ELEMENT_NAME;
+import static com.android.tools.build.bundletool.model.AndroidManifest.PROPERTY_ELEMENT_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.SDK_LIBRARY_ELEMENT_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.SDK_PATCH_VERSION_ATTRIBUTE_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.SHARED_USER_ID_ATTRIBUTE_NAME;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifest;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withInstallLocation;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withMainActivity;
-import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withMetadataValue;
-import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withMinSdkVersion;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withPermission;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withPermissionGroup;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withPermissionTree;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withSdkLibraryElement;
+import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withSdkPatchVersionProperty;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withSharedUserId;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withSplitId;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withSplitNameService;
@@ -53,14 +52,12 @@ public class SdkAndroidManifestValidatorTest {
   private static final String PKG_NAME = "com.test.app";
 
   @Test
-  public void manifest_withoutSdkLibrary_throws() {
+  public void manifest_withSdkLibraryElement_throws() {
     BundleModule module =
         new BundleModuleBuilder(BASE_MODULE_NAME)
             .setManifest(
                 androidManifest(
-                    PKG_NAME,
-                    withMinSdkVersion(32),
-                    withMetadataValue(SDK_PATCH_VERSION_ATTRIBUTE_NAME, "5")))
+                    PKG_NAME, withSdkLibraryElement(PKG_NAME, /* versionMajor= */ 13499)))
             .build();
 
     Throwable exception =
@@ -69,19 +66,18 @@ public class SdkAndroidManifestValidatorTest {
             () -> new SdkAndroidManifestValidator().validateModule(module));
     assertThat(exception)
         .hasMessageThat()
-        .contains("There must be exactly one <" + SDK_LIBRARY_ELEMENT_NAME + "> element.");
+        .isEqualTo(
+            "<"
+                + SDK_LIBRARY_ELEMENT_NAME
+                + "> cannot be declared in the manifest of an SDK bundle.");
   }
 
   @Test
-  public void manifest_majorVersionIsNotLong_throws() {
+  public void manifest_withSdkPatchVersionProperty_throws() {
     BundleModule module =
         new BundleModuleBuilder(BASE_MODULE_NAME)
             .setManifest(
-                androidManifest(
-                    PKG_NAME,
-                    withMinSdkVersion(32),
-                    withSdkLibraryElement("Foo16"),
-                    withMetadataValue(SDK_PATCH_VERSION_ATTRIBUTE_NAME, "5")))
+                androidManifest(PKG_NAME, withSdkPatchVersionProperty(/* patchVersion= */ 14)))
             .build();
 
     Throwable exception =
@@ -90,39 +86,19 @@ public class SdkAndroidManifestValidatorTest {
             () -> new SdkAndroidManifestValidator().validateModule(module));
     assertThat(exception)
         .hasMessageThat()
-        .contains(
-            "SDK Major version in <" + SDK_LIBRARY_ELEMENT_NAME + "> cannot be parsed to a Long.");
-  }
-
-  @Test
-  public void manifest_patchVersionIsNotLong_throws() {
-    BundleModule module =
-        new BundleModuleBuilder(BASE_MODULE_NAME)
-            .setManifest(
-                androidManifest(
-                    PKG_NAME,
-                    withMinSdkVersion(32),
-                    withSdkLibraryElement("99"),
-                    withMetadataValue(SDK_PATCH_VERSION_ATTRIBUTE_NAME, "20bar")))
-            .build();
-
-    Throwable exception =
-        assertThrows(
-            InvalidBundleException.class,
-            () -> new SdkAndroidManifestValidator().validateModule(module));
-    assertThat(exception)
-        .hasMessageThat()
-        .contains(
-            "SDK Patch version in <" + META_DATA_ELEMENT_NAME + "> cannot be parsed to a Long.");
+        .isEqualTo(
+            "<"
+                + PROPERTY_ELEMENT_NAME
+                + "> cannot be declared with name='"
+                + SDK_PATCH_VERSION_ATTRIBUTE_NAME
+                + "' in the manifest of an SDK bundle.");
   }
 
   @Test
   public void manifest_withPreferExternal_throws() {
     BundleModule module =
         new BundleModuleBuilder(BASE_MODULE_NAME)
-            .setManifest(
-                androidManifest(
-                    PKG_NAME, withSdkLibraryElement("99"), withInstallLocation("preferExternal")))
+            .setManifest(androidManifest(PKG_NAME, withInstallLocation("preferExternal")))
             .build();
 
     Throwable exception =
@@ -141,7 +117,7 @@ public class SdkAndroidManifestValidatorTest {
   public void manifest_withPermission_throws() {
     BundleModule module =
         new BundleModuleBuilder(BASE_MODULE_NAME)
-            .setManifest(androidManifest(PKG_NAME, withSdkLibraryElement("99"), withPermission()))
+            .setManifest(androidManifest(PKG_NAME, withPermission()))
             .build();
 
     Throwable exception =
@@ -160,8 +136,7 @@ public class SdkAndroidManifestValidatorTest {
   public void manifest_withPermissionGroup_throws() {
     BundleModule module =
         new BundleModuleBuilder(BASE_MODULE_NAME)
-            .setManifest(
-                androidManifest(PKG_NAME, withSdkLibraryElement("21321"), withPermissionGroup()))
+            .setManifest(androidManifest(PKG_NAME, withPermissionGroup()))
             .build();
 
     Throwable exception =
@@ -180,8 +155,7 @@ public class SdkAndroidManifestValidatorTest {
   public void manifest_withPermissionTree_throws() {
     BundleModule module =
         new BundleModuleBuilder(BASE_MODULE_NAME)
-            .setManifest(
-                androidManifest(PKG_NAME, withSdkLibraryElement("6456"), withPermissionTree()))
+            .setManifest(androidManifest(PKG_NAME, withPermissionTree()))
             .build();
 
     Throwable exception =
@@ -200,9 +174,7 @@ public class SdkAndroidManifestValidatorTest {
   public void manifest_withSharedUserId_throws() {
     BundleModule module =
         new BundleModuleBuilder(BASE_MODULE_NAME)
-            .setManifest(
-                androidManifest(
-                    PKG_NAME, withSdkLibraryElement("99"), withSharedUserId("sharedUserId")))
+            .setManifest(androidManifest(PKG_NAME, withSharedUserId("sharedUserId")))
             .build();
 
     Throwable exception =
@@ -221,9 +193,7 @@ public class SdkAndroidManifestValidatorTest {
   public void manifest_withActivityComponent_throws() {
     BundleModule module =
         new BundleModuleBuilder(BASE_MODULE_NAME)
-            .setManifest(
-                androidManifest(
-                    PKG_NAME, withSdkLibraryElement("99"), withMainActivity("myFunActivity")))
+            .setManifest(androidManifest(PKG_NAME, withMainActivity("myFunActivity")))
             .build();
 
     Throwable exception =
@@ -244,7 +214,6 @@ public class SdkAndroidManifestValidatorTest {
             .setManifest(
                 androidManifest(
                     PKG_NAME,
-                    withSdkLibraryElement("1"),
                     withSplitNameService("serviceName", "splitName")))
             .build();
 
@@ -263,9 +232,7 @@ public class SdkAndroidManifestValidatorTest {
   public void manifest_withSplitId_throws() {
     BundleModule module =
         new BundleModuleBuilder(BASE_MODULE_NAME)
-            .setManifest(
-                androidManifest(
-                    PKG_NAME, withSdkLibraryElement("432094390"), withSplitId(BASE_MODULE_NAME)))
+            .setManifest(androidManifest(PKG_NAME, withSplitId(BASE_MODULE_NAME)))
             .build();
 
     Throwable exception =
@@ -278,27 +245,9 @@ public class SdkAndroidManifestValidatorTest {
   }
 
   @Test
-  public void manifest_withoutPatchVersionSet_ok() {
-    BundleModule module =
-        new BundleModuleBuilder(BASE_MODULE_NAME)
-            .setManifest(
-                androidManifest(PKG_NAME, withMinSdkVersion(32), withSdkLibraryElement("16")))
-            .build();
-
-    new SdkAndroidManifestValidator().validateModule(module);
-  }
-
-  @Test
   public void manifest_valid_ok() {
     BundleModule module =
-        new BundleModuleBuilder(BASE_MODULE_NAME)
-            .setManifest(
-                androidManifest(
-                    PKG_NAME,
-                    withMinSdkVersion(30),
-                    withMetadataValue(SDK_PATCH_VERSION_ATTRIBUTE_NAME, "100"),
-                    withSdkLibraryElement("1")))
-            .build();
+        new BundleModuleBuilder(BASE_MODULE_NAME).setManifest(androidManifest(PKG_NAME)).build();
 
     new SdkAndroidManifestValidator().validateModule(module);
   }

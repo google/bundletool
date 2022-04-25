@@ -21,6 +21,7 @@ import static com.android.tools.build.bundletool.testing.TestUtils.createModuleE
 import static com.google.common.truth.Truth.assertThat;
 
 import com.android.bundle.Config.BundleConfig;
+import com.android.tools.build.bundletool.model.version.Version;
 import com.android.tools.build.bundletool.testing.BundleConfigBuilder;
 import java.io.IOException;
 import org.junit.Test;
@@ -77,7 +78,8 @@ public final class ClassDexNameSanitizerTest {
   private static BundleModule.Builder createBasicModule() throws IOException {
     return BundleModule.builder()
         .setName(BundleModuleName.create("module"))
-        .setBundleConfig(DEFAULT_BUNDLE_CONFIG)
+        .setBundleType(DEFAULT_BUNDLE_CONFIG.getType())
+        .setBundletoolVersion(Version.of(DEFAULT_BUNDLE_CONFIG.getBundletool().getVersion()))
         .addEntry(createModuleEntryForFile("assets/hello", new byte[] {0xD, 0xE, 0xA, 0xD}))
         .addEntry(createModuleEntryForFile("assets/world", new byte[] {0xB, 0xE, 0xE, 0xF}))
         .setAndroidManifestProto(androidManifest("com.test.app", withSplitId("module")));

@@ -16,10 +16,8 @@
 
 package com.android.tools.build.bundletool.validation;
 
-import static com.google.common.base.Predicates.not;
 import static com.google.common.collect.ImmutableSet.toImmutableSet;
 
-import com.android.tools.build.bundletool.model.SdkBundle;
 import com.android.tools.build.bundletool.model.ZipPath;
 import com.android.tools.build.bundletool.model.exceptions.InvalidBundleException;
 import com.google.common.collect.ImmutableSet;
@@ -27,16 +25,16 @@ import java.util.Collections;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 
-/** Validates that an SDK bundle has only one module. */
+/** Validates that an SDK bundle modules file has only one module. */
 public class SdkBundleHasOneModuleValidator extends SubValidator {
 
   @Override
-  public void validateBundleZipFile(ZipFile bundleFile) {
-    checkSdkHasSingleModule(bundleFile);
+  public void validateSdkModulesZipFile(ZipFile modulesFile) {
+    checkSdkHasSingleModule(modulesFile);
   }
 
-  private void checkSdkHasSingleModule(ZipFile bundleFile) {
-    ImmutableSet<ZipPath> moduleDirectories = getModuleDirectories(bundleFile);
+  private void checkSdkHasSingleModule(ZipFile modulesFile) {
+    ImmutableSet<ZipPath> moduleDirectories = getModuleDirectories(modulesFile);
     if (moduleDirectories.size() != 1) {
       throw InvalidBundleException.builder()
           .withUserMessage(
@@ -45,13 +43,12 @@ public class SdkBundleHasOneModuleValidator extends SubValidator {
     }
   }
 
-  private ImmutableSet<ZipPath> getModuleDirectories(ZipFile bundleFile) {
-    return Collections.list(bundleFile.entries()).stream()
+  private ImmutableSet<ZipPath> getModuleDirectories(ZipFile modulesFile) {
+    return Collections.list(modulesFile.entries()).stream()
         .map(ZipEntry::getName)
         .map(ZipPath::create)
         .filter(entryPath -> entryPath.getNameCount() > 1)
         .map(entryPath -> entryPath.getName(0))
-        .filter(not(SdkBundle.NON_MODULE_DIRECTORIES::contains))
         .collect(toImmutableSet());
   }
 }

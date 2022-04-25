@@ -16,14 +16,12 @@
 
 package com.android.tools.build.bundletool.model;
 
-import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifest;
-import static com.google.common.truth.Truth.assertThat;
+import static com.android.tools.build.bundletool.model.utils.BundleParser.EXTRACTED_SDK_MODULES_FILE_NAME;
+import static com.android.tools.build.bundletool.testing.TestUtils.createZipBuilderForModules;
+import static com.android.tools.build.bundletool.testing.TestUtils.createZipBuilderForSdkBundleWithModules;
 import static com.google.common.truth.Truth8.assertThat;
 
-import com.android.aapt.Resources.XmlNode;
-import com.android.bundle.Config.BundleConfig;
 import com.android.tools.build.bundletool.io.ZipBuilder;
-import com.android.tools.build.bundletool.testing.BundleConfigBuilder;
 import java.nio.file.Path;
 import java.util.zip.ZipFile;
 import org.junit.Before;
@@ -38,65 +36,33 @@ import org.junit.runners.JUnit4;
 public class SdkBundleTest {
 
   private static final byte[] DUMMY_CONTENT = new byte[1];
-  private static final String PACKAGE_NAME = "com.test.sdk.detail";
-  private static final BundleConfig BUNDLE_CONFIG = BundleConfigBuilder.create().build();
-  public static final XmlNode MANIFEST = androidManifest(PACKAGE_NAME);
 
   @Rule public TemporaryFolder tmp = new TemporaryFolder();
 
   private Path bundleFile;
+  private Path modulesFile;
 
   @Before
   public void setUp() {
     bundleFile = tmp.getRoot().toPath().resolve("bundle.asb");
-  }
-
-  @Test
-  public void buildFromZipDoesNotCrash() throws Exception {
-
-    createBasicZipBuilderWithManifest().writeTo(bundleFile);
-
-    try (ZipFile sdkBundleZip = new ZipFile(bundleFile.toFile())) {
-      SdkBundle.buildFromZip(sdkBundleZip, 1);
-    }
+    modulesFile = tmp.getRoot().toPath().resolve(EXTRACTED_SDK_MODULES_FILE_NAME);
   }
 
   @Test
   public void buildFromZipCreatesExpectedEntries() throws Exception {
-    createBasicZipBuilderWithManifest()
-        .addFileWithContent(ZipPath.create("base/dex/classes1.dex"), DUMMY_CONTENT)
-        .addFileWithContent(ZipPath.create("base/dex/classes2.dex"), DUMMY_CONTENT)
-        .writeTo(bundleFile);
+    ZipBuilder modulesBuilder =
+        createZipBuilderForModules()
+            .addFileWithContent(ZipPath.create("base/dex/classes1.dex"), DUMMY_CONTENT)
+            .addFileWithContent(ZipPath.create("base/dex/classes2.dex"), DUMMY_CONTENT);
+    createZipBuilderForSdkBundleWithModules(modulesBuilder, modulesFile).writeTo(bundleFile);
 
-    try (ZipFile sdkBundleZip = new ZipFile(bundleFile.toFile())) {
-      SdkBundle sdkBundle = SdkBundle.buildFromZip(sdkBundleZip, 1);
+    try (ZipFile sdkBundleZip = new ZipFile(bundleFile.toFile());
+        ZipFile modulesZip = new ZipFile(modulesFile.toFile())) {
+      SdkBundle sdkBundle = SdkBundle.buildFromZip(sdkBundleZip, modulesZip, 1);
       assertThat(sdkBundle.getModule().getEntry(ZipPath.create("dex/classes.dex"))).isPresent();
       assertThat(sdkBundle.getModule().getEntry(ZipPath.create("dex/classes2.dex"))).isPresent();
       assertThat(sdkBundle.getBundleMetadata().getFileAsByteSource("some.namespace", "metadata1"))
           .isPresent();
     }
-  }
-
-  @Test
-  public void buildFromZip_aarNotLoadedAsModule() throws Exception {
-    createBasicZipBuilderWithManifest()
-        .addFileWithContent(ZipPath.create("aar/library.aar"), DUMMY_CONTENT)
-        .writeTo(bundleFile);
-
-    try (ZipFile sdkBundleZip = new ZipFile(bundleFile.toFile())) {
-      SdkBundle sdkBundle = SdkBundle.buildFromZip(sdkBundleZip, 1);
-      assertThat(sdkBundle.getModule().getName().toString()).isEqualTo("base");
-    }
-  }
-
-  private ZipBuilder createBasicZipBuilderWithManifest() {
-    ZipBuilder zipBuilder = new ZipBuilder();
-    zipBuilder
-        .addFileWithContent(ZipPath.create("BundleConfig.pb"), BUNDLE_CONFIG.toByteArray())
-        .addFileWithProtoContent(ZipPath.create("base/manifest/AndroidManifest.xml"), MANIFEST)
-        .addFileWithContent(ZipPath.create("base/dex/classes.dex"), DUMMY_CONTENT)
-        .addFileWithContent(
-            ZipPath.create("BUNDLE-METADATA/some.namespace/metadata1"), new byte[] {0x01});
-    return zipBuilder;
   }
 }

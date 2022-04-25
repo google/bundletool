@@ -17,16 +17,14 @@
 package com.android.tools.build.bundletool.validation;
 
 import static com.android.tools.build.bundletool.model.AndroidManifest.ACTIVITY_ELEMENT_NAME;
-import static com.android.tools.build.bundletool.model.AndroidManifest.ANDROID_NAMESPACE_URI;
 import static com.android.tools.build.bundletool.model.AndroidManifest.INSTALL_LOCATION_ATTRIBUTE_NAME;
-import static com.android.tools.build.bundletool.model.AndroidManifest.META_DATA_ELEMENT_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.PERMISSION_ELEMENT_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.PERMISSION_GROUP_ELEMENT_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.PERMISSION_TREE_ELEMENT_NAME;
+import static com.android.tools.build.bundletool.model.AndroidManifest.PROPERTY_ELEMENT_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.PROVIDER_ELEMENT_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.RECEIVER_ELEMENT_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.SDK_LIBRARY_ELEMENT_NAME;
-import static com.android.tools.build.bundletool.model.AndroidManifest.SDK_MAJOR_VERSION_ATTRIBUTE_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.SDK_PATCH_VERSION_ATTRIBUTE_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.SERVICE_ELEMENT_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.SHARED_USER_ID_ATTRIBUTE_NAME;
@@ -34,8 +32,6 @@ import static com.android.tools.build.bundletool.model.AndroidManifest.SHARED_US
 import com.android.tools.build.bundletool.model.AndroidManifest;
 import com.android.tools.build.bundletool.model.BundleModule;
 import com.android.tools.build.bundletool.model.exceptions.InvalidBundleException;
-import com.android.tools.build.bundletool.model.utils.xmlproto.XmlProtoElement;
-import com.google.common.collect.ImmutableList;
 
 /** Validates {@code AndroidManifest.xml} file for the SDK module. */
 public class SdkAndroidManifestValidator extends SubValidator {
@@ -43,8 +39,8 @@ public class SdkAndroidManifestValidator extends SubValidator {
   @Override
   public void validateModule(BundleModule module) {
     AndroidManifest manifest = module.getAndroidManifest();
-    validateSingleSdkLibrary(manifest);
-    validateVersioningTagsSet(manifest);
+    validateNoSdkLibraryElement(manifest);
+    validateNoSdkPatchVersionProperty(manifest);
     validateInternalOnlyIfInstallLocationSet(manifest);
     validateNoPermissions(manifest);
     validateNoSharedUserId(manifest);
@@ -52,52 +48,22 @@ public class SdkAndroidManifestValidator extends SubValidator {
     validateNoSplitId(manifest);
   }
 
-  private void validateSingleSdkLibrary(AndroidManifest manifest) {
-    ImmutableList<XmlProtoElement> sdkLibraryTags = manifest.getSdkLibraryElements();
-    if (sdkLibraryTags.size() != 1) {
+  private void validateNoSdkLibraryElement(AndroidManifest manifest) {
+    if (!manifest.getSdkLibraryElements().isEmpty()) {
       throw InvalidBundleException.builder()
           .withUserMessage(
-              "There must be exactly one <%s> element. %d were found.",
-              SDK_LIBRARY_ELEMENT_NAME, sdkLibraryTags.size())
+              "<%s> cannot be declared in the manifest of an SDK bundle.", SDK_LIBRARY_ELEMENT_NAME)
           .build();
     }
   }
 
-  private void validateVersioningTagsSet(AndroidManifest manifest) {
-    XmlProtoElement sdkLibraryTag = manifest.getSdkLibraryElements().get(0);
-    if (!sdkLibraryTag
-        .getAttribute(ANDROID_NAMESPACE_URI, SDK_MAJOR_VERSION_ATTRIBUTE_NAME)
-        .isPresent()) {
+  private void validateNoSdkPatchVersionProperty(AndroidManifest manifest) {
+    if (manifest.getSdkPatchVersionProperty().isPresent()) {
       throw InvalidBundleException.builder()
           .withUserMessage(
-              "SDK Major version must be set within the <%s> element.", SDK_LIBRARY_ELEMENT_NAME)
+              "<%s> cannot be declared with name='%s' in the manifest of an SDK bundle.",
+              PROPERTY_ELEMENT_NAME, SDK_PATCH_VERSION_ATTRIBUTE_NAME)
           .build();
-    }
-
-    try {
-      Long.parseLong(
-          sdkLibraryTag
-              .getAttribute(ANDROID_NAMESPACE_URI, SDK_MAJOR_VERSION_ATTRIBUTE_NAME)
-              .get()
-              .getValueAsString());
-    } catch (NumberFormatException e) {
-      throw InvalidBundleException.builder()
-          .withCause(e)
-          .withUserMessage(
-              "SDK Major version in <%s> cannot be parsed to a Long.", SDK_LIBRARY_ELEMENT_NAME)
-          .build();
-    }
-
-    if (manifest.getMetadataValue(SDK_PATCH_VERSION_ATTRIBUTE_NAME).isPresent()) {
-      try {
-        Long.parseLong(manifest.getMetadataValue(SDK_PATCH_VERSION_ATTRIBUTE_NAME).get());
-      } catch (NumberFormatException e) {
-        throw InvalidBundleException.builder()
-            .withCause(e)
-            .withUserMessage(
-                "SDK Patch version in <%s> cannot be parsed to a Long.", META_DATA_ELEMENT_NAME)
-            .build();
-      }
     }
   }
 

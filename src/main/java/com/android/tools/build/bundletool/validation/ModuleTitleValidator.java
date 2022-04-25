@@ -25,7 +25,6 @@ import com.android.tools.build.bundletool.model.BundleModule;
 import com.android.tools.build.bundletool.model.BundleModule.ModuleType;
 import com.android.tools.build.bundletool.model.ModuleDeliveryType;
 import com.android.tools.build.bundletool.model.exceptions.InvalidBundleException;
-import com.android.tools.build.bundletool.model.version.BundleToolVersion;
 import com.android.tools.build.bundletool.model.version.Version;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
@@ -48,9 +47,8 @@ public class ModuleTitleValidator extends SubValidator {
     boolean isolatedSplits = baseModule.getAndroidManifest().getIsolatedSplits().orElse(false);
 
     // For bundles built using older versions we haven't strictly enforced module Title Validation.
-    Version bundleVersion =
-        BundleToolVersion.getVersionFromBundleConfig(baseModule.getBundleConfig());
-    if (!MODULE_TITLE_VALIDATION_ENFORCED.enabledForVersion(bundleVersion)) {
+    Version bundletoolVersion = baseModule.getBundletoolVersion();
+    if (!MODULE_TITLE_VALIDATION_ENFORCED.enabledForVersion(bundletoolVersion)) {
       return;
     }
     ResourceTable table = baseModule.getResourceTable().orElse(ResourceTable.getDefaultInstance());

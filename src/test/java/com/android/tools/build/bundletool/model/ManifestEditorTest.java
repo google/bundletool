@@ -47,7 +47,7 @@ import static com.android.tools.build.bundletool.model.AndroidManifest.MIN_SDK_V
 import static com.android.tools.build.bundletool.model.AndroidManifest.NAME_ATTRIBUTE_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.NAME_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.PROVIDER_ELEMENT_NAME;
-import static com.android.tools.build.bundletool.model.AndroidManifest.SDK_MAJOR_VERSION_ATTRIBUTE_NAME;
+import static com.android.tools.build.bundletool.model.AndroidManifest.SDK_VERSION_MAJOR_ATTRIBUTE_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.SERVICE_ELEMENT_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.SHARED_USER_ID_ATTRIBUTE_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.SHARED_USER_ID_RESOURCE_ID;
@@ -1072,7 +1072,7 @@ public class ManifestEditorTest {
     assertThat(usesSdkLibraryElement.getAttribute(0).getName()).isEqualTo(NAME_ATTRIBUTE_NAME);
     assertThat(usesSdkLibraryElement.getAttribute(0).getValue()).isEqualTo(name);
     assertThat(usesSdkLibraryElement.getAttribute(1).getName())
-        .isEqualTo(SDK_MAJOR_VERSION_ATTRIBUTE_NAME);
+        .isEqualTo(SDK_VERSION_MAJOR_ATTRIBUTE_NAME);
     assertThat(usesSdkLibraryElement.getAttribute(1).getValue())
         .isEqualTo(String.valueOf(versionMajor));
     assertThat(usesSdkLibraryElement.getAttribute(2).getName())

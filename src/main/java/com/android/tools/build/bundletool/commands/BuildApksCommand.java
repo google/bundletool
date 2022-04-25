@@ -23,6 +23,7 @@ import static com.android.tools.build.bundletool.commands.BuildApksCommand.ApkBu
 import static com.android.tools.build.bundletool.commands.BuildApksCommand.OutputFormat.APK_SET;
 import static com.android.tools.build.bundletool.commands.BuildApksCommand.OutputFormat.DIRECTORY;
 import static com.android.tools.build.bundletool.commands.CommandUtils.ANDROID_SERIAL_VARIABLE;
+import static com.android.tools.build.bundletool.model.utils.BundleParser.getModulesZip;
 import static com.android.tools.build.bundletool.model.utils.SdkToolsLocator.ANDROID_HOME_VARIABLE;
 import static com.android.tools.build.bundletool.model.utils.SdkToolsLocator.SYSTEM_PATH_VARIABLE;
 import static com.android.tools.build.bundletool.model.utils.files.FilePreconditions.checkFileDoesNotExist;
@@ -31,8 +32,6 @@ import static com.android.tools.build.bundletool.model.utils.files.FilePrecondit
 import static com.android.tools.build.bundletool.model.utils.files.FilePreconditions.checkFileHasExtension;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
-import static com.google.common.collect.ImmutableListMultimap.toImmutableListMultimap;
-import static java.util.function.Function.identity;
 
 import com.android.apksig.SigningCertificateLineage;
 import com.android.apksig.apk.ApkFormatException;
@@ -49,7 +48,6 @@ import com.android.tools.build.bundletool.device.DeviceSpecParser;
 import com.android.tools.build.bundletool.flags.Flag;
 import com.android.tools.build.bundletool.flags.ParsedFlags;
 import com.android.tools.build.bundletool.io.TempDirectory;
-import com.android.tools.build.bundletool.io.ZipReader;
 import com.android.tools.build.bundletool.model.ApkListener;
 import com.android.tools.build.bundletool.model.ApkModifier;
 import com.android.tools.build.bundletool.model.AppBundle;
@@ -68,7 +66,6 @@ import com.android.tools.build.bundletool.model.utils.DefaultSystemEnvironmentPr
 import com.android.tools.build.bundletool.model.utils.SystemEnvironmentProvider;
 import com.android.tools.build.bundletool.model.utils.files.FileUtils;
 import com.android.tools.build.bundletool.preprocessors.AppBundlePreprocessorManager;
-import com.android.tools.build.bundletool.preprocessors.AppBundleRecompressor;
 import com.android.tools.build.bundletool.preprocessors.DaggerAppBundlePreprocessorComponent;
 import com.android.tools.build.bundletool.validation.AppBundleValidator;
 import com.android.tools.build.bundletool.validation.SdkBundleValidator;
@@ -77,6 +74,7 @@ import com.google.auto.value.AutoValue;
 import com.google.common.base.Ascii;
 import com.google.common.base.Function;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableListMultimap;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
@@ -297,7 +295,7 @@ public abstract class BuildApksCommand {
         .setModules(ImmutableSet.of())
         .setExtraValidators(ImmutableList.of())
         .setSystemApkOptions(ImmutableSet.of())
-        .setEnableApkSerializerWithoutBundleRecompression(false)
+        .setEnableApkSerializerWithoutBundleRecompression(true)
         .setRuntimeEnabledSdkBundlePaths(ImmutableSet.of());
   }
 
@@ -513,7 +511,9 @@ public abstract class BuildApksCommand {
      * Sets package name of an app store that will be called by archived app to redownload the
      * application.
      *
-     * <p>PlayStore package is used by default.
+     * <p>Can only be used in ARCHIVE mode.
+     *
+     * <p>PlayStore package (com.android.vending) is used by default.
      */
     public abstract Builder setAppStorePackageName(String appStorePackageName);
 
@@ -632,6 +632,15 @@ public abstract class BuildApksCommand {
                 UNIVERSAL.getLowerCaseName(), SYSTEM.getLowerCaseName())
             .build();
       }
+
+      if (command.getAppStorePackageName().isPresent()
+          && !command.getApkBuildMode().equals(ARCHIVE)) {
+        throw InvalidCommandException.builder()
+            .withInternalMessage(
+                "Providing custom store package is only possible when running with '%s' mode flag.",
+                ARCHIVE.getLowerCaseName())
+            .build();
+      }
       return command;
     }
   }
@@ -746,64 +755,43 @@ public abstract class BuildApksCommand {
       FileUtils.createDirectories(outputDirectory);
     }
 
-    try (TempDirectory tempDir = new TempDirectory(getClass().getSimpleName())) {
-      Path bundlePath;
-      // The old APK serializer relies on the compression of entries in the App Bundle.
-      // Unfortunately, we don't know the compression level that was used when the bundle was built,
-      // so we re-compress all entries with our desired compression level.
-      // Exception is made when the device spec is specified, we only need a fraction of the
-      // entries, so re-compressing all entries would be a waste of CPU.
-      boolean recompressAppBundle =
-          !getDeviceSpec().isPresent() && !getEnableApkSerializerWithoutBundleRecompression();
-      if (recompressAppBundle) {
-        bundlePath = tempDir.getPath().resolve("recompressed.aab");
-        new AppBundleRecompressor(getExecutorService())
-            .recompressAppBundle(getBundlePath().toFile(), bundlePath.toFile());
-      } else {
-        bundlePath = getBundlePath();
-      }
+    try (TempDirectory tempDir = new TempDirectory(getClass().getSimpleName());
+        ZipFile bundleZip = new ZipFile(getBundlePath().toFile());
+        Closer closer = Closer.create()) {
+      AppBundleValidator bundleValidator = AppBundleValidator.create(getExtraValidators());
+      bundleValidator.validateFile(bundleZip);
 
-      try (ZipFile bundleZip = new ZipFile(bundlePath.toFile());
-          ZipReader zipReader = ZipReader.createFromFile(bundlePath);
-          Closer closer = Closer.create()) {
-        AppBundleValidator bundleValidator = AppBundleValidator.create(getExtraValidators());
-        bundleValidator.validateFile(bundleZip);
+      AppBundle appBundle = AppBundle.buildFromZip(bundleZip);
+      bundleValidator.validate(appBundle);
 
-        AppBundle appBundle = AppBundle.buildFromZip(bundleZip);
-        bundleValidator.validate(appBundle);
+      ImmutableMap<String, SdkBundle> sdkBundles =
+          getValidatedSdkBundlesByPackageName(closer, tempDir);
+      validateSdkBundlesMatchAppBundleDependencies(appBundle, sdkBundles);
 
-        ImmutableMap<String, SdkBundle> sdkBundles = getValidatedSdkBundlesByPackageName(closer);
-        validateSdkBundlesMatchAppBundleDependencies(appBundle, sdkBundles);
+      AppBundlePreprocessorManager appBundlePreprocessorManager =
+          DaggerAppBundlePreprocessorComponent.builder().setBuildApksCommand(this).build().create();
+      AppBundle preprocessedAppBundle = appBundlePreprocessorManager.processAppBundle(appBundle);
 
-        AppBundlePreprocessorManager appBundlePreprocessorManager =
-            DaggerAppBundlePreprocessorComponent.builder()
-                .setBuildApksCommand(this)
-                .build()
-                .create();
-        AppBundle preprocessedAppBundle = appBundlePreprocessorManager.processAppBundle(appBundle);
+      BuildApksManager buildApksManager =
+          DaggerBuildApksManagerComponent.builder()
+              .setBuildApksCommand(this)
+              .setTempDirectory(tempDir)
+              .setAppBundle(preprocessedAppBundle)
+              .build()
+              .create();
+      buildApksManager.execute();
+    } catch (ZipException e) {
+      throw InvalidBundleException.builder()
+          .withCause(e)
+          .withUserMessage("The App Bundle is not a valid zip file.")
+          .build();
 
-        BuildApksManager buildApksManager =
-            DaggerBuildApksManagerComponent.builder()
-                .setBuildApksCommand(this)
-                .setTempDirectory(tempDir)
-                .setAppBundle(preprocessedAppBundle)
-                .setZipReader(zipReader)
-                .setUseBundleCompression(recompressAppBundle)
-                .build()
-                .create();
-        buildApksManager.execute();
-      } catch (ZipException e) {
-        throw InvalidBundleException.builder()
-            .withCause(e)
-            .withUserMessage("The App Bundle is not a valid zip file.")
-            .build();
-      } finally {
-        if (isExecutorServiceCreatedByBundleTool()) {
-          getExecutorService().shutdown();
-        }
-      }
     } catch (IOException e) {
       throw new UncheckedIOException("An error occurred when processing the App Bundle.", e);
+    } finally {
+      if (isExecutorServiceCreatedByBundleTool()) {
+        getExecutorService().shutdown();
+      }
     }
 
     return getOutputFile();
@@ -847,24 +835,31 @@ public abstract class BuildApksCommand {
             });
   }
 
-  private ImmutableMap<String, SdkBundle> getValidatedSdkBundlesByPackageName(Closer closer)
-      throws IOException {
+  private ImmutableMap<String, SdkBundle> getValidatedSdkBundlesByPackageName(
+      Closer closer, TempDirectory tempDir) throws IOException {
     SdkBundleValidator sdkBundleValidator = SdkBundleValidator.create();
-    ImmutableSet.Builder<ZipFile> sdkBundleZipsBuilder = ImmutableSet.builder();
-    for (Path sdkBundlePath : getRuntimeEnabledSdkBundlePaths()) {
-      sdkBundleZipsBuilder.add(closer.register(new ZipFile(sdkBundlePath.toFile())));
+    ImmutableListMultimap.Builder<String, SdkBundle> sdkBundlesPerPackageNameBuilder =
+        ImmutableListMultimap.builder();
+    ImmutableList<Path> sdkBundlePaths = getRuntimeEnabledSdkBundlePaths().asList();
+    for (int index = 0; index < sdkBundlePaths.size(); index++) {
+      Path sdkBundlePath = sdkBundlePaths.get(index);
+      ZipFile sdkBundleZip = closer.register(new ZipFile(sdkBundlePath.toFile()));
+      sdkBundleValidator.validateFile(sdkBundleZip);
+
+      ZipFile sdkModulesZip =
+          closer.register(getModulesZip(sdkBundleZip, tempDir.getPath().resolve("tmp" + index)));
+      sdkBundleValidator.validateModulesFile(sdkModulesZip);
+
+      // SdkBundle#getVersionCode is not used in `build-apks`. It does not matter what
+      // value we set here, so we are just setting 0.
+      SdkBundle sdkBundle =
+          SdkBundle.buildFromZip(sdkBundleZip, sdkModulesZip, /* versionCode= */ 0);
+      sdkBundlesPerPackageNameBuilder.put(sdkBundle.getPackageName(), sdkBundle);
     }
 
-    ImmutableSet<ZipFile> sdkBundleZips = sdkBundleZipsBuilder.build();
-    sdkBundleZips.forEach(sdkBundleValidator::validateFile);
-
     ImmutableMap<String, Collection<SdkBundle>> sdkBundlesPerPackageName =
-        sdkBundleZips.stream()
-            // SdkBundle#getVersionCode is not used in `build-apks`. It does not matter what
-            // value we set here, so we are just setting 0.
-            .map(sdkBundleZip -> SdkBundle.buildFromZip(sdkBundleZip, /* versionCode= */ 0))
-            .collect(toImmutableListMultimap(SdkBundle::getPackageName, identity()))
-            .asMap();
+        sdkBundlesPerPackageNameBuilder.build().asMap();
+
     sdkBundlesPerPackageName
         .entrySet()
         .forEach(
@@ -901,15 +896,24 @@ public abstract class BuildApksCommand {
               RuntimeEnabledSdk sdkDependencyFromAppBundle =
                   appBundle.getRuntimeEnabledSdkDependencies().get(sdkPackageName);
               SdkBundle sdkBundle = sdkBundles.get(sdkPackageName);
-              if (sdkDependencyFromAppBundle.getVersionMajor()
-                  != sdkBundle.getMajorVersionAsLong()) {
+              if (sdkDependencyFromAppBundle.getVersionMajor() != sdkBundle.getMajorVersion()) {
                 throw InvalidCommandException.builder()
                     .withInternalMessage(
                         "App bundle depends on SDK '%s' with major version '%d', but provided SDK"
                             + " bundle has major version '%d'.",
                         sdkPackageName,
                         sdkDependencyFromAppBundle.getVersionMajor(),
-                        sdkBundle.getMajorVersionAsLong())
+                        sdkBundle.getMajorVersion())
+                    .build();
+              }
+              if (sdkDependencyFromAppBundle.getVersionMinor() != sdkBundle.getMinorVersion()) {
+                throw InvalidCommandException.builder()
+                    .withInternalMessage(
+                        "App bundle depends on SDK '%s' with minor version '%d', but provided SDK"
+                            + " bundle has minor version '%d'.",
+                        sdkPackageName,
+                        sdkDependencyFromAppBundle.getVersionMinor(),
+                        sdkBundle.getMinorVersion())
                     .build();
               }
             });
@@ -1319,7 +1323,8 @@ public abstract class BuildApksCommand {
                 .setOptional(true)
                 .setDescription(
                     "Package name of an app store that will be called by archived app to redownload"
-                        + " the application. Play Store is called by default.")
+                        + " the application. Play Store is called by default."
+                        + " Can only be provided for ARCHIVE mode.")
                 .build())
         .build();
   }

@@ -47,6 +47,7 @@ import static com.android.tools.build.bundletool.model.utils.Versions.ANDROID_M_
 import static com.android.tools.build.bundletool.model.utils.Versions.ANDROID_N_API_VERSION;
 import static com.android.tools.build.bundletool.model.utils.Versions.ANDROID_P_API_VERSION;
 import static com.android.tools.build.bundletool.model.utils.Versions.ANDROID_Q_API_VERSION;
+import static com.android.tools.build.bundletool.model.utils.Versions.ANDROID_T_API_VERSION;
 import static com.android.tools.build.bundletool.testing.ApkSetUtils.extractFromApkSetFile;
 import static com.android.tools.build.bundletool.testing.ApkSetUtils.extractTocFromApkSetFile;
 import static com.android.tools.build.bundletool.testing.ApkSetUtils.parseTocFromFile;
@@ -70,6 +71,7 @@ import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.with
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withInstallTimeRemovableElement;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withInstant;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withInstantOnDemandDelivery;
+import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withMainActivity;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withMaxSdkVersion;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withMinSdkVersion;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withNativeActivity;
@@ -123,6 +125,7 @@ import static com.google.common.collect.MoreCollectors.onlyElement;
 import static com.google.common.truth.Truth.assertThat;
 import static com.google.common.truth.Truth8.assertThat;
 import static com.google.common.truth.extensions.proto.ProtoTruth.assertThat;
+import static java.util.Comparator.comparing;
 import static junit.framework.TestCase.fail;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -154,6 +157,8 @@ import com.android.bundle.Config.Optimizations;
 import com.android.bundle.Config.SplitDimension.Value;
 import com.android.bundle.Config.StandaloneConfig;
 import com.android.bundle.Files.ApexImages;
+import com.android.bundle.RuntimeEnabledSdkConfigProto.RuntimeEnabledSdk;
+import com.android.bundle.RuntimeEnabledSdkConfigProto.RuntimeEnabledSdkConfig;
 import com.android.bundle.Targeting.Abi;
 import com.android.bundle.Targeting.Abi.AbiAlias;
 import com.android.bundle.Targeting.ApkTargeting;
@@ -162,6 +167,7 @@ import com.android.bundle.Targeting.DeviceTierTargeting;
 import com.android.bundle.Targeting.LanguageTargeting;
 import com.android.bundle.Targeting.ScreenDensity;
 import com.android.bundle.Targeting.ScreenDensity.DensityAlias;
+import com.android.bundle.Targeting.SdkRuntimeTargeting;
 import com.android.bundle.Targeting.SdkVersion;
 import com.android.bundle.Targeting.SdkVersionTargeting;
 import com.android.bundle.Targeting.TextureCompressionFormat;
@@ -188,6 +194,7 @@ import com.android.tools.build.bundletool.model.version.Version;
 import com.android.tools.build.bundletool.testing.ApkSetUtils;
 import com.android.tools.build.bundletool.testing.AppBundleBuilder;
 import com.android.tools.build.bundletool.testing.BundleConfigBuilder;
+import com.android.tools.build.bundletool.testing.BundleModuleBuilder;
 import com.android.tools.build.bundletool.testing.CertificateFactory;
 import com.android.tools.build.bundletool.testing.FakeAdbServer;
 import com.android.tools.build.bundletool.testing.FileUtils;
@@ -5812,7 +5819,11 @@ public class BuildApksManagerTest {
   public void buildApksCommand_archive_success() throws Exception {
     AppBundle appBundle =
         new AppBundleBuilder()
-            .addModule("base", builder -> builder.setManifest(androidManifest("com.test.app")))
+            .addModule(
+                "base",
+                builder ->
+                    builder.setManifest(
+                        androidManifest("com.test.app", withMainActivity("com.test.app.Main"))))
             .setBundleConfig(BundleConfigBuilder.create().setStoreArchive(true).build())
             .build();
     TestComponent.useTestModule(
@@ -5895,6 +5906,59 @@ public class BuildApksManagerTest {
     BuildApksResult result = extractTocFromApkSetFile(apkSetFile, outputDir);
 
     assertThat(archivedApkVariants(result)).isEmpty();
+  }
+
+  @Test
+  public void appBundleHasRuntimeEnabledSdkDeps_generatesSdkRuntimeVariant() throws Exception {
+    String validCertDigest =
+        "96:C7:EC:89:3E:69:2A:25:BA:4D:EE:C1:84:E8:33:3F:34:7D:6D:12:26:A1:C1:AA:70:A2:8A:DB:75:3E:02:0A";
+    AppBundle appBundleWithRuntimeEnabledSdkDeps =
+        new AppBundleBuilder()
+            .addModule(
+                new BundleModuleBuilder("base")
+                    .setManifest(
+                        androidManifest("com.test.app", withMinSdkVersion(ANDROID_L_API_VERSION)))
+                    .setRuntimeEnabledSdkConfig(
+                        RuntimeEnabledSdkConfig.newBuilder()
+                            .addRuntimeEnabledSdk(
+                                RuntimeEnabledSdk.newBuilder()
+                                    .setPackageName("com.test.sdk")
+                                    .setVersionMajor(1)
+                                    .setCertificateDigest(validCertDigest))
+                            .build())
+                    .build())
+            .build();
+    TestComponent.useTestModule(
+        this,
+        createTestModuleBuilder()
+            .withAppBundle(appBundleWithRuntimeEnabledSdkDeps)
+            .withOutputPath(outputFilePath)
+            .build());
+
+    buildApksManager.execute();
+
+    ZipFile apkSetFile = openZipFile(outputFilePath.toFile());
+    BuildApksResult result = extractTocFromApkSetFile(apkSetFile, outputDir);
+
+    assertThat(result.getVariantList()).hasSize(2);
+    ImmutableList<Variant> sortedVariantList =
+        ImmutableList.sortedCopyOf(comparing(Variant::getVariantNumber), result.getVariantList());
+    assertThat(sortedVariantList.get(0).getVariantNumber()).isEqualTo(0);
+    assertThat(sortedVariantList.get(0).getTargeting())
+        .isEqualTo(
+            variantSdkTargeting(
+                ANDROID_L_API_VERSION,
+                /* alternativeMinSdkVersions= */ ImmutableSet.of(ANDROID_T_API_VERSION)));
+    assertThat(sortedVariantList.get(1).getVariantNumber()).isEqualTo(1);
+    assertThat(sortedVariantList.get(1).getTargeting())
+        .isEqualTo(
+            variantSdkTargeting(
+                    ANDROID_T_API_VERSION,
+                    /* alternativeMinSdkVersions= */ ImmutableSet.of(ANDROID_L_API_VERSION))
+                .toBuilder()
+                .setSdkRuntimeTargeting(
+                    SdkRuntimeTargeting.newBuilder().setRequiresSdkRuntime(true))
+                .build());
   }
 
   private static ImmutableList<ApkDescription> apkDescriptions(List<Variant> variants) {

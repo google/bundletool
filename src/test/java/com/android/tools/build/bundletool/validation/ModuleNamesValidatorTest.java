@@ -27,6 +27,7 @@ import com.android.bundle.Config.BundleConfig.BundleType;
 import com.android.tools.build.bundletool.model.BundleModule;
 import com.android.tools.build.bundletool.model.BundleModuleName;
 import com.android.tools.build.bundletool.model.exceptions.InvalidBundleException;
+import com.android.tools.build.bundletool.model.version.BundleToolVersion;
 import com.android.tools.build.bundletool.testing.BundleModuleBuilder;
 import com.google.common.collect.ImmutableList;
 import org.junit.Test;
@@ -171,6 +172,7 @@ public final class ModuleNamesValidatorTest {
   private static BundleModule.Builder buildBundleModule(String moduleName) {
     return BundleModule.builder()
         .setName(BundleModuleName.create(moduleName))
-        .setBundleConfig(BundleConfig.getDefaultInstance());
+        .setBundleType(BundleType.REGULAR)
+        .setBundletoolVersion(BundleToolVersion.getCurrentVersion());
   }
 }

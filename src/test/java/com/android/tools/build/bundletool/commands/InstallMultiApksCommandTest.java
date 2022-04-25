@@ -305,6 +305,66 @@ public class InstallMultiApksCommandTest {
   }
 
   @Test
+  public void execute_extractZip_excludeCompressed() throws Exception {
+    // GIVEN a zip file containing fake .apks files, including a compressed.apks file.
+    BuildApksResult tableOfContent1 = fakeTableOfContents(PKG_NAME_1);
+    Path package1Apks = createApksArchiveFile(tableOfContent1, tmpDir.resolve("package1.apks"));
+    BuildApksResult tableOfContent2 = fakeTableOfContents(PKG_NAME_2);
+    Path package2Apks = createApksArchiveFile(tableOfContent2, tmpDir.resolve("package2.apks"));
+    BuildApksResult tableOfContentCompressed = fakeTableOfContents("foo");
+    Path packageCompressedApks =
+        createApksArchiveFile(tableOfContentCompressed, tmpDir.resolve("package2_compressed.apks"));
+    ZipBuilder bundleBuilder = new ZipBuilder();
+    bundleBuilder
+        .addFileFromDisk(ZipPath.create("package1.apks"), package1Apks.toFile())
+        .addFileFromDisk(ZipPath.create("package2.apks"), package2Apks.toFile())
+        .addFileFromDisk(
+            ZipPath.create("package2_compressed.apks"), packageCompressedApks.toFile());
+    Path zipBundle = bundleBuilder.writeTo(tmpDir.resolve("bundle.zip"));
+
+    InstallMultiApksCommand command =
+        InstallMultiApksCommand.builder()
+            .setAdbServer(fakeServerOneDevice(device))
+            .setDeviceId(DEVICE_ID)
+            .setAdbPath(adbPath)
+            .setApksArchiveZipPath(zipBundle)
+            .setAapt2Command(
+                createFakeAapt2Command(
+                    ImmutableMap.of(
+                        PKG_NAME_1, 1L,
+                        PKG_NAME_2, 2L)))
+            .setAdbCommand(
+                createFakeAdbCommand(
+                    ImmutableListMultimap.<String, String>builder()
+                        .putAll(
+                            PKG_NAME_1,
+                            ImmutableList.of(
+                                Paths.get(PKG_NAME_1, PKG_NAME_1 + "base-master.apk").toString(),
+                                Paths.get(PKG_NAME_1, PKG_NAME_1 + "feature1-master.apk")
+                                    .toString(),
+                                Paths.get(PKG_NAME_1, PKG_NAME_1 + "feature2-master.apk")
+                                    .toString()))
+                        .putAll(
+                            PKG_NAME_2,
+                            Paths.get(PKG_NAME_2, PKG_NAME_2 + "base-master.apk").toString(),
+                            Paths.get(PKG_NAME_2, PKG_NAME_2 + "feature1-master.apk").toString(),
+                            Paths.get(PKG_NAME_2, PKG_NAME_2 + "feature2-master.apk").toString())
+                        .build(),
+                    /* expectedStaged= */ false,
+                    /* expectedEnableRollback= */ false,
+                    Optional.of(DEVICE_ID)))
+            .build();
+
+    // EXPECT
+    // 1) Get existing packages.
+    device.injectShellCommandOutput("pm list packages --show-versioncode", () -> "");
+    device.injectShellCommandOutput("pm list packages --apex-only --show-versioncode", () -> "");
+    // 2) Install command (above)
+    command.execute();
+    assertAdbCommandExecuted();
+  }
+
+  @Test
   public void execute_extractZipWithSdkDirectories() throws Exception {
     // GIVEN a zip file containing fake .apks files
     BuildApksResult tableOfContent1 = fakeTableOfContents(PKG_NAME_1);

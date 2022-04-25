@@ -33,13 +33,29 @@ import javax.inject.Inject;
 public class VariantTargetingGenerator {
 
   private final PerModuleVariantTargetingGenerator perModuleVariantTargetingGenerator;
+  private final SdkRuntimeVariantGenerator sdkRuntimeVariantGenerator;
 
   @Inject
-  VariantTargetingGenerator(PerModuleVariantTargetingGenerator perModuleVariantTargetingGenerator) {
+  VariantTargetingGenerator(
+      PerModuleVariantTargetingGenerator perModuleVariantTargetingGenerator,
+      SdkRuntimeVariantGenerator sdkRuntimeVariantGenerator) {
     this.perModuleVariantTargetingGenerator = perModuleVariantTargetingGenerator;
+    this.sdkRuntimeVariantGenerator = sdkRuntimeVariantGenerator;
   }
 
   public ImmutableSet<VariantTargeting> generateVariantTargetings(
+      ImmutableList<BundleModule> modules, ApkGenerationConfiguration apkGenerationConfiguration) {
+    ImmutableSet<VariantTargeting> nonSdkRuntimeVariantTargetings =
+        generateNonSdkRuntimeVariantTargetings(modules, apkGenerationConfiguration);
+    ImmutableSet<VariantTargeting> sdkRuntimeVariantTargetings =
+        sdkRuntimeVariantGenerator.generate(nonSdkRuntimeVariantTargetings);
+    return ImmutableSet.<VariantTargeting>builder()
+        .addAll(nonSdkRuntimeVariantTargetings)
+        .addAll(sdkRuntimeVariantTargetings)
+        .build();
+  }
+
+  private ImmutableSet<VariantTargeting> generateNonSdkRuntimeVariantTargetings(
       ImmutableList<BundleModule> modules, ApkGenerationConfiguration apkGenerationConfiguration) {
     ImmutableSet.Builder<VariantTargeting> builder = ImmutableSet.builder();
     for (BundleModule module : modules) {

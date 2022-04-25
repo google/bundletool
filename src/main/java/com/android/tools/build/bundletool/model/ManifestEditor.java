@@ -21,6 +21,8 @@ import static com.android.tools.build.bundletool.model.AndroidManifest.ALLOW_BAC
 import static com.android.tools.build.bundletool.model.AndroidManifest.ALLOW_BACKUP_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.ANDROID_NAMESPACE_URI;
 import static com.android.tools.build.bundletool.model.AndroidManifest.APPLICATION_ELEMENT_NAME;
+import static com.android.tools.build.bundletool.model.AndroidManifest.BANNER_ATTRIBUTE_NAME;
+import static com.android.tools.build.bundletool.model.AndroidManifest.BANNER_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.CERTIFICATE_DIGEST_ATTRIBUTE_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.CERTIFICATE_DIGEST_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.DATA_EXTRACTION_RULES_ATTRIBUTE_NAME;
@@ -45,6 +47,8 @@ import static com.android.tools.build.bundletool.model.AndroidManifest.IS_SPLIT_
 import static com.android.tools.build.bundletool.model.AndroidManifest.IS_SPLIT_REQUIRED_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.LABEL_ATTRIBUTE_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.LABEL_RESOURCE_ID;
+import static com.android.tools.build.bundletool.model.AndroidManifest.LARGE_HEAP_ATTRIBUTE_NAME;
+import static com.android.tools.build.bundletool.model.AndroidManifest.LARGE_HEAP_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.LOCALE_CONFIG_ATTRIBUTE_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.LOCALE_CONFIG_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.MAX_SDK_VERSION_ATTRIBUTE_NAME;
@@ -57,9 +61,16 @@ import static com.android.tools.build.bundletool.model.AndroidManifest.MIN_SDK_V
 import static com.android.tools.build.bundletool.model.AndroidManifest.NAME_ATTRIBUTE_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.NAME_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.NO_NAMESPACE_URI;
+import static com.android.tools.build.bundletool.model.AndroidManifest.PROPERTY_ELEMENT_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.PROVIDER_ELEMENT_NAME;
+import static com.android.tools.build.bundletool.model.AndroidManifest.REQUIRED_ACCOUNT_TYPE_ATTRIBUTE_NAME;
+import static com.android.tools.build.bundletool.model.AndroidManifest.REQUIRED_ACCOUNT_TYPE_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.RESOURCE_RESOURCE_ID;
-import static com.android.tools.build.bundletool.model.AndroidManifest.SDK_MAJOR_VERSION_ATTRIBUTE_NAME;
+import static com.android.tools.build.bundletool.model.AndroidManifest.RESTRICTED_ACCOUNT_TYPE_ATTRIBUTE_NAME;
+import static com.android.tools.build.bundletool.model.AndroidManifest.RESTRICTED_ACCOUNT_TYPE_RESOURCE_ID;
+import static com.android.tools.build.bundletool.model.AndroidManifest.SDK_LIBRARY_ELEMENT_NAME;
+import static com.android.tools.build.bundletool.model.AndroidManifest.SDK_PATCH_VERSION_ATTRIBUTE_NAME;
+import static com.android.tools.build.bundletool.model.AndroidManifest.SDK_VERSION_MAJOR_ATTRIBUTE_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.SERVICE_ELEMENT_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.SHARED_USER_ID_ATTRIBUTE_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.SHARED_USER_ID_RESOURCE_ID;
@@ -72,6 +83,7 @@ import static com.android.tools.build.bundletool.model.AndroidManifest.TARGET_SD
 import static com.android.tools.build.bundletool.model.AndroidManifest.TARGET_SDK_VERSION_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.USES_SDK_ELEMENT_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.USES_SDK_LIBRARY_ELEMENT_NAME;
+import static com.android.tools.build.bundletool.model.AndroidManifest.VALUE_ATTRIBUTE_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.VALUE_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.VERSION_CODE_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.VERSION_MAJOR_RESOURCE_ID;
@@ -319,6 +331,10 @@ public class ManifestEditor {
     return setApplcationAttributeRefId(ICON_ATTRIBUTE_NAME, ICON_RESOURCE_ID, refIdValue);
   }
 
+  public ManifestEditor setBanner(Integer refIdValue) {
+    return setApplcationAttributeRefId(BANNER_ATTRIBUTE_NAME, BANNER_RESOURCE_ID, refIdValue);
+  }
+
   public ManifestEditor setAllowBackup(Boolean value) {
     return setApplcationAttributeBoolean(
         ALLOW_BACKUP_ATTRIBUTE_NAME, ALLOW_BACKUP_RESOURCE_ID, value);
@@ -337,6 +353,20 @@ public class ManifestEditor {
   public ManifestEditor setDataExtractionRules(Integer value) {
     return setApplcationAttributeRefId(
         DATA_EXTRACTION_RULES_ATTRIBUTE_NAME, DATA_EXTRACTION_RULES_RESOURCE_ID, value);
+  }
+
+  public ManifestEditor setRestrictedAccountType(String value) {
+    return setApplcationAttributeString(
+        RESTRICTED_ACCOUNT_TYPE_ATTRIBUTE_NAME, RESTRICTED_ACCOUNT_TYPE_RESOURCE_ID, value);
+  }
+
+  public ManifestEditor setRequiredAccountType(String value) {
+    return setApplcationAttributeString(
+        REQUIRED_ACCOUNT_TYPE_ATTRIBUTE_NAME, REQUIRED_ACCOUNT_TYPE_RESOURCE_ID, value);
+  }
+
+  public ManifestEditor setLargeHeap(Boolean value) {
+    return setApplcationAttributeBoolean(LARGE_HEAP_ATTRIBUTE_NAME, LARGE_HEAP_RESOURCE_ID, value);
   }
 
   private ManifestEditor setApplcationAttributeString(
@@ -431,6 +461,13 @@ public class ManifestEditor {
     return this;
   }
 
+  public ManifestEditor copyPermissionTrees(AndroidManifest manifest) {
+    manifest
+        .getPermissionTrees()
+        .forEach(permissionTree -> manifestElement.addChildElement(permissionTree.toBuilder()));
+    return this;
+  }
+
   /** Adds uses-sdk-library tag to the manifest. */
   public ManifestEditor addUsesSdkLibraryElement(
       String name, long versionMajor, String certDigest) {
@@ -443,12 +480,44 @@ public class ManifestEditor {
                         .setValueAsString(name))
                 .addAttribute(
                     createAndroidAttribute(
-                            SDK_MAJOR_VERSION_ATTRIBUTE_NAME, VERSION_MAJOR_RESOURCE_ID)
+                            SDK_VERSION_MAJOR_ATTRIBUTE_NAME, VERSION_MAJOR_RESOURCE_ID)
                         .setValueAsString(String.valueOf(versionMajor)))
                 .addAttribute(
                     createAndroidAttribute(
                             CERTIFICATE_DIGEST_ATTRIBUTE_NAME, CERTIFICATE_DIGEST_RESOURCE_ID)
                         .setValueAsString(certDigest)));
+    return this;
+  }
+
+  /**
+   * Creates an <sdk-library> element and populates it with SDK package name and Android version
+   * major.
+   */
+  public ManifestEditor setSdkLibraryElement(String sdkPackageName, int versionMajor) {
+    manifestElement
+        .getOrCreateChildElement(APPLICATION_ELEMENT_NAME)
+        .getOrCreateChildElement(SDK_LIBRARY_ELEMENT_NAME)
+        .addAttribute(
+            createAndroidAttribute(NAME_ATTRIBUTE_NAME, NAME_RESOURCE_ID)
+                .setValueAsString(sdkPackageName))
+        .addAttribute(
+            createAndroidAttribute(SDK_VERSION_MAJOR_ATTRIBUTE_NAME, VERSION_MAJOR_RESOURCE_ID)
+                .setValueAsDecimalInteger(versionMajor));
+    return this;
+  }
+
+  /** Creates a <property> element and populates it with SDK patch version. */
+  public ManifestEditor setSdkPatchVersionProperty(int patchVersion) {
+    manifestElement
+        .getOrCreateChildElement(APPLICATION_ELEMENT_NAME)
+        .addChildElement(
+            XmlProtoElementBuilder.create(PROPERTY_ELEMENT_NAME)
+                .addAttribute(
+                    createAndroidAttribute(NAME_ATTRIBUTE_NAME, NAME_RESOURCE_ID)
+                        .setValueAsString(SDK_PATCH_VERSION_ATTRIBUTE_NAME))
+                .addAttribute(
+                    createAndroidAttribute(VALUE_ATTRIBUTE_NAME, VALUE_RESOURCE_ID)
+                        .setValueAsDecimalInteger(patchVersion)));
     return this;
   }
 

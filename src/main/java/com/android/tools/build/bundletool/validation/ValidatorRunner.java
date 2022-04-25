@@ -54,6 +54,11 @@ public class ValidatorRunner {
     subValidators.forEach(subValidator -> subValidator.validateModuleZipFile(moduleFile));
   }
 
+  /** Validates the given SDK modules zip file. */
+  public void validateSdkModulesZipFile(ZipFile moduleFile) {
+    subValidators.forEach(subValidator -> subValidator.validateSdkModulesZipFile(moduleFile));
+  }
+
   /** Validates the given App Bundle. */
   public void validateBundle(AppBundle bundle) {
     subValidators.forEach(subValidator -> validateBundleUsingSubValidator(bundle, subValidator));
@@ -78,8 +83,6 @@ public class ValidatorRunner {
 
   private static void validateSdkBundleUsingSubValidator(
       SdkBundle bundle, SubValidator subValidator) {
-    subValidator.validateSdkBundle(bundle);
-
     BundleModule module = bundle.getModule();
     subValidator.validateModule(module);
 

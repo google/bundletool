@@ -16,8 +16,10 @@
 
 package com.android.tools.build.bundletool.io;
 
-import static com.android.tools.build.bundletool.model.AppBundle.BUNDLE_CONFIG_FILE_NAME;
 import static com.android.tools.build.bundletool.model.AppBundle.METADATA_DIRECTORY;
+import static com.android.tools.build.bundletool.model.utils.BundleParser.EXTRACTED_SDK_MODULES_FILE_NAME;
+import static com.android.tools.build.bundletool.model.utils.BundleParser.SDK_MODULES_CONFIG_FILE_NAME;
+import static com.android.tools.build.bundletool.model.utils.BundleParser.SDK_MODULES_FILE_NAME;
 
 import com.android.tools.build.bundletool.model.BundleModule;
 import com.android.tools.build.bundletool.model.BundleModule.SpecialModuleEntry;
@@ -33,52 +35,65 @@ import java.util.Map.Entry;
 public class SdkBundleSerializer {
 
   /** Writes the SDK Bundle on disk at the given location. */
-  public void writeToDisk(SdkBundle bundle, Path pathOnDisk) throws IOException {
+  public void writeToDisk(SdkBundle sdkBundle, Path pathOnDisk) throws IOException {
     ZipBuilder zipBuilder = new ZipBuilder();
-
-    zipBuilder.addFileWithProtoContent(
-        ZipPath.create(BUNDLE_CONFIG_FILE_NAME), bundle.getBundleConfig());
 
     // BUNDLE-METADATA
     for (Entry<ZipPath, ByteSource> metadataEntry :
-        bundle.getBundleMetadata().getFileContentMap().entrySet()) {
+        sdkBundle.getBundleMetadata().getFileContentMap().entrySet()) {
       zipBuilder.addFile(
           METADATA_DIRECTORY.resolve(metadataEntry.getKey()), metadataEntry.getValue());
     }
 
+    // Modules
+    try (TempDirectory tempDir = new TempDirectory(getClass().getSimpleName())) {
+      Path modulesPath = tempDir.getPath().resolve(EXTRACTED_SDK_MODULES_FILE_NAME);
+      getModulesBuilder(sdkBundle).writeTo(modulesPath);
+      zipBuilder.addFileFromDisk(ZipPath.create(SDK_MODULES_FILE_NAME), modulesPath.toFile());
+      zipBuilder.writeTo(pathOnDisk);
+    }
+  }
+
+  private ZipBuilder getModulesBuilder(SdkBundle sdkBundle) {
+    ZipBuilder modulesBuilder = new ZipBuilder();
+
+    // SdkModulesConfig.pb
+    modulesBuilder.addFileWithProtoContent(
+        ZipPath.create(SDK_MODULES_CONFIG_FILE_NAME), sdkBundle.getSdkModulesConfig());
+
     // Base module (the only module in an ASB)
-    BundleModule module = bundle.getModule();
+    BundleModule module = sdkBundle.getModule();
     ZipPath moduleDir = ZipPath.create(module.getName().toString());
 
     for (ModuleEntry entry : module.getEntries()) {
       ZipPath entryPath = moduleDir.resolve(entry.getPath());
-      zipBuilder.addFile(entryPath, entry.getContent());
+      modulesBuilder.addFile(entryPath, entry.getContent());
     }
 
     // Special module files are not represented as module entries (above).
-    zipBuilder.addFileWithProtoContent(
+    modulesBuilder.addFileWithProtoContent(
         moduleDir.resolve(SpecialModuleEntry.ANDROID_MANIFEST.getPath()),
         module.getAndroidManifest().getManifestRoot().getProto());
     module
         .getAssetsConfig()
         .ifPresent(
             assetsConfig ->
-                zipBuilder.addFileWithProtoContent(
+                modulesBuilder.addFileWithProtoContent(
                     moduleDir.resolve(SpecialModuleEntry.ASSETS_TABLE.getPath()), assetsConfig));
     module
         .getNativeConfig()
         .ifPresent(
             nativeConfig ->
-                zipBuilder.addFileWithProtoContent(
+                modulesBuilder.addFileWithProtoContent(
                     moduleDir.resolve(SpecialModuleEntry.NATIVE_LIBS_TABLE.getPath()),
                     nativeConfig));
     module
         .getResourceTable()
         .ifPresent(
             resourceTable ->
-                zipBuilder.addFileWithProtoContent(
+                modulesBuilder.addFileWithProtoContent(
                     moduleDir.resolve(SpecialModuleEntry.RESOURCE_TABLE.getPath()), resourceTable));
 
-    zipBuilder.writeTo(pathOnDisk);
+    return modulesBuilder;
   }
 }

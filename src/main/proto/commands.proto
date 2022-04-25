@@ -3,6 +3,7 @@ syntax = "proto3";
 package android.bundle;
 
 import "config.proto";
+import "runtime_enabled_sdk_config.proto";
 import "targeting.proto";
 
 option java_package = "com.android.bundle";
@@ -56,13 +57,16 @@ message BuildSdkApksResult {
 
 message SdkVersionInformation {
   // Major version of the SDK.
-  uint64 major = 1;
+  int32 major = 1;
+
+  // Minor version of the SDK.
+  int32 minor = 2;
 
   // Patch version of the SDK.
-  uint64 patch = 2;
+  int32 patch = 3;
 
   // A unique version code assigned to the SDK by the caller of build-sdk-apks.
-  uint32 version_code = 3;
+  int32 version_code = 4;
 }
 
 // Variant is a group of APKs that covers a part of the device configuration
@@ -117,6 +121,9 @@ message ApkSet {
 
   // APKs.
   repeated ApkDescription apk_description = 2;
+
+  // Information about runtime-enabled SDKs that this module depends on.
+  RuntimeEnabledSdkConfig runtime_enabled_sdk_config = 3;
 }
 
 message ModuleMetadata {

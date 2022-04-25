@@ -16,12 +16,11 @@
 
 package com.android.tools.build.bundletool.validation;
 
-import static com.android.tools.build.bundletool.model.utils.BundleParser.EXTRACTED_SDK_MODULES_FILE_NAME;
-import static com.android.tools.build.bundletool.testing.TestUtils.createZipBuilderForModules;
+import static com.android.tools.build.bundletool.model.utils.BundleParser.SDK_MODULES_FILE_NAME;
+import static com.android.tools.build.bundletool.testing.TestUtils.createZipBuilderForSdkBundle;
 import static com.google.common.truth.Truth.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
-import com.android.tools.build.bundletool.model.ZipPath;
 import com.android.tools.build.bundletool.model.exceptions.InvalidBundleException;
 import java.nio.file.Path;
 import java.util.zip.ZipFile;
@@ -33,9 +32,7 @@ import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 
 @RunWith(JUnit4.class)
-public class SdkBundleHasOneModuleValidatorTest {
-
-  private static final byte[] DUMMY_CONTENT = new byte[1];
+public class SdkBundleMandatoryFilesPresenceValidatorTest {
 
   @Rule public TemporaryFolder tmp = new TemporaryFolder();
   private Path tempFolder;
@@ -46,20 +43,22 @@ public class SdkBundleHasOneModuleValidatorTest {
   }
 
   @Test
-  public void sdkModulesZipFile_multipleModules_throws() throws Exception {
-    Path modulesPath =
-        createZipBuilderForModules()
-            .addFileWithContent(
-                ZipPath.create("feature/manifest/AndroidManifest.xml"), DUMMY_CONTENT)
-            .writeTo(tempFolder.resolve(EXTRACTED_SDK_MODULES_FILE_NAME));
+  public void sdkBundleZipFile_noModulesFile_throws() throws Exception {
+    Path bundlePath = createZipBuilderForSdkBundle().writeTo(tempFolder.resolve("bundle.asb"));
 
-    try (ZipFile modulesZip = new ZipFile(modulesPath.toFile())) {
+    try (ZipFile bundleZip = new ZipFile(bundlePath.toFile())) {
       InvalidBundleException exception =
           assertThrows(
               InvalidBundleException.class,
-              () -> new SdkBundleHasOneModuleValidator().validateSdkModulesZipFile(modulesZip));
+              () ->
+                  new SdkBundleMandatoryFilesPresenceValidator().validateBundleZipFile(bundleZip));
 
-      assertThat(exception).hasMessageThat().contains("SDK bundles need exactly one module");
+      assertThat(exception)
+          .hasMessageThat()
+          .isEqualTo(
+              "The archive doesn't seem to be an SDK Bundle, it is missing required file '"
+                  + SDK_MODULES_FILE_NAME
+                  + "'.");
     }
   }
 }

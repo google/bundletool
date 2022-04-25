@@ -54,6 +54,7 @@ import com.android.tools.build.bundletool.device.ApkMatcher;
 import com.android.tools.build.bundletool.model.AndroidManifest;
 import com.android.tools.build.bundletool.model.ApkModifier;
 import com.android.tools.build.bundletool.model.ApkModifier.ApkDescription.ApkType;
+import com.android.tools.build.bundletool.model.AppBundle;
 import com.android.tools.build.bundletool.model.Bundle;
 import com.android.tools.build.bundletool.model.BundleModule;
 import com.android.tools.build.bundletool.model.BundleModuleName;
@@ -172,11 +173,11 @@ public class ApkSerializerManager {
                     .setVersion(BundleToolVersion.getCurrentVersion().toString()))
             .addAllAssetSliceSet(allAssetSliceSets)
             .setLocalTestingInfo(localTestingInfo);
-    if (bundle.getBundleConfig().hasAssetModulesConfig()) {
-      apksResult.setAssetModulesInfo(
-          getAssetModulesInfo(bundle.getBundleConfig().getAssetModulesConfig()));
+    BundleConfig bundleConfig = ((AppBundle) bundle).getBundleConfig();
+    if (bundleConfig.hasAssetModulesConfig()) {
+      apksResult.setAssetModulesInfo(getAssetModulesInfo(bundleConfig.getAssetModulesConfig()));
     }
-    apksResult.addAllDefaultTargetingValue(getDefaultTargetingValues(bundle.getBundleConfig()));
+    apksResult.addAllDefaultTargetingValue(getDefaultTargetingValues(bundleConfig));
     permanentlyFusedModules.forEach(
         moduleName ->
             apksResult.addPermanentlyFusedModules(
@@ -197,8 +198,9 @@ public class ApkSerializerManager {
         .setVersion(
             SdkVersionInformation.newBuilder()
                 .setVersionCode(sdkBundle.getVersionCode())
-                .setMajor(Long.parseLong(sdkBundle.getMajorVersion()))
-                .setPatch(Long.parseLong(sdkBundle.getPatchVersion()))
+                .setMajor(sdkBundle.getMajorVersion())
+                .setMinor(sdkBundle.getMinorVersion())
+                .setPatch(sdkBundle.getPatchVersion())
                 .build())
         .build();
   }

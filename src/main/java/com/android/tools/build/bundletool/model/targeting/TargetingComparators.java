@@ -19,6 +19,7 @@ package com.android.tools.build.bundletool.model.targeting;
 import static com.android.tools.build.bundletool.model.utils.TargetingProtoUtils.getScreenDensityDpi;
 import static com.google.common.collect.Comparators.emptiesFirst;
 import static com.google.common.collect.ImmutableSet.toImmutableSet;
+import static com.google.common.primitives.Booleans.falseFirst;
 import static java.util.Comparator.comparing;
 
 import com.android.bundle.Targeting.Abi;
@@ -89,6 +90,11 @@ public final class TargetingComparators {
           TargetingComparators::getTextureCompressionFormat,
           emptiesFirst(TEXTURE_COMPRESSION_FORMAT_ORDERING));
 
+  private static final Comparator<VariantTargeting> SDK_RUNTIME_COMPARATOR =
+      comparing(
+          variantTargeting -> variantTargeting.getSdkRuntimeTargeting().getRequiresSdkRuntime(),
+          falseFirst());
+
   /**
    * Comparator for sets of AbiAliases, according to ARCHITECTURE_ORDERING.
    *
@@ -110,6 +116,7 @@ public final class TargetingComparators {
 
   public static final Comparator<VariantTargeting> VARIANT_TARGETING_COMPARATOR =
       SDK_COMPARATOR
+          .thenComparing(SDK_RUNTIME_COMPARATOR)
           .thenComparing(ABI_COMPARATOR)
           .thenComparing(MULTI_ABI_COMPARATOR)
           .thenComparing(SCREEN_DENSITY_COMPARATOR)

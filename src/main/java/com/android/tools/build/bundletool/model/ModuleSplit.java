@@ -16,7 +16,6 @@
 
 package com.android.tools.build.bundletool.model;
 
-import static com.android.tools.build.bundletool.model.AndroidManifest.SDK_PATCH_VERSION_ATTRIBUTE_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.SDK_SANDBOX_MIN_VERSION;
 import static com.android.tools.build.bundletool.model.BundleModule.APEX_DIRECTORY;
 import static com.android.tools.build.bundletool.model.BundleModule.ASSETS_DIRECTORY;
@@ -84,8 +83,6 @@ import java.util.stream.Stream;
 public abstract class ModuleSplit {
 
   private static final Joiner MULTI_ABI_SUFFIX_JOINER = Joiner.on('.');
-
-  public static final String DEFAULT_SDK_PATCH_VERSION = "0";
 
   /** The split type being represented by this split. */
   public enum SplitType {
@@ -329,10 +326,23 @@ public abstract class ModuleSplit {
     return toBuilder().setAndroidManifest(apkManifest).build();
   }
 
-  /** Writes SDK version name ("majorVersion.0.patchVersion") to Android Manifest. */
+  /** Writes SDK version name ("majorVersion.minorVersion.patchVersion") to Android Manifest. */
   public ModuleSplit writeSdkVersionName(String versionName) {
     AndroidManifest apkManifest =
         getAndroidManifest().toEditor().setVersionName(versionName).save();
+    return toBuilder().setAndroidManifest(apkManifest).build();
+  }
+
+  /** Writes the APK package name in the 'package' attribute in the AndroidManifest. */
+  public ModuleSplit writeManifestPackage(String packageName) {
+    AndroidManifest apkManifest = getAndroidManifest().toEditor().setPackage(packageName).save();
+    return toBuilder().setAndroidManifest(apkManifest).build();
+  }
+
+  /** Writes the SDK package name and Android version major to the <sdk-library> element. */
+  public ModuleSplit writeSdkLibraryElement(String packageName, int versionMajor) {
+    AndroidManifest apkManifest =
+        getAndroidManifest().toEditor().setSdkLibraryElement(packageName, versionMajor).save();
     return toBuilder().setAndroidManifest(apkManifest).build();
   }
 
@@ -350,17 +360,11 @@ public abstract class ModuleSplit {
     return this;
   }
 
-  /** Sets the SDK Patch version to 0 if it is not already set. */
-  public ModuleSplit addDefaultPatchVersionIfNotSet() {
-    if (!getAndroidManifest().getMetadataValue(SDK_PATCH_VERSION_ATTRIBUTE_NAME).isPresent()) {
-      AndroidManifest apkManifest =
-          getAndroidManifest()
-              .toEditor()
-              .addMetaDataString(SDK_PATCH_VERSION_ATTRIBUTE_NAME, DEFAULT_SDK_PATCH_VERSION)
-              .save();
-      return toBuilder().setAndroidManifest(apkManifest).build();
-    }
-    return this;
+  /** Writes the SDK Patch version to the <property> element. */
+  public ModuleSplit writePatchVersion(int patchVersion) {
+    AndroidManifest apkManifest =
+        getAndroidManifest().toEditor().setSdkPatchVersionProperty(patchVersion).save();
+    return toBuilder().setAndroidManifest(apkManifest).build();
   }
 
   /**
@@ -584,9 +588,6 @@ public abstract class ModuleSplit {
             .setMasterSplit(true)
             .setSplitType(getSplitTypeFromModuleType(bundleModule.getModuleType()))
             .setApkTargeting(ApkTargeting.getDefaultInstance())
-            .setApexEmbeddedApkConfigs(
-                ImmutableList.copyOf(
-                    bundleModule.getBundleConfig().getApexConfig().getApexEmbeddedApkConfigList()))
             .setVariantTargeting(variantTargeting);
 
     bundleModule.getNativeConfig().ifPresent(splitBuilder::setNativeConfig);
@@ -594,6 +595,11 @@ public abstract class ModuleSplit {
     bundleModule.getApexConfig().ifPresent(splitBuilder::setApexConfig);
     if (setResourceTable) {
       bundleModule.getResourceTable().ifPresent(splitBuilder::setResourceTable);
+    }
+    if (bundleModule.getBundleApexConfig().isPresent()) {
+      splitBuilder.setApexEmbeddedApkConfigs(
+          ImmutableList.copyOf(
+              bundleModule.getBundleApexConfig().get().getApexEmbeddedApkConfigList()));
     }
     return splitBuilder.build();
   }

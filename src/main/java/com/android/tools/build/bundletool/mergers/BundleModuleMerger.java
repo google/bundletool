@@ -79,7 +79,11 @@ public class BundleModuleMerger {
     BundleModule.Builder mergedBaseModule =
         BundleModule.builder()
             .setName(BundleModuleName.BASE_MODULE_NAME)
-            .setBundleConfig(appBundle.getBundleConfig());
+            .setBundleType(appBundle.getBundleConfig().getType())
+            .setBundletoolVersion(appBundle.getVersion());
+    if (appBundle.getBundleConfig().hasApexConfig()) {
+      mergedBaseModule.setBundleApexConfig(appBundle.getBundleConfig().getApexConfig());
+    }
 
     mergeApexTable(bundleModulesToFuse).ifPresent(mergedBaseModule::setApexConfig);
     mergeAssetsTable(bundleModulesToFuse).ifPresent(mergedBaseModule::setAssetsConfig);

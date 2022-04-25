@@ -451,13 +451,13 @@ public class AppBundleTest {
   }
 
   @Test
-  public void storeArchiveEnabled_notPresent_false() throws Exception {
+  public void storeArchiveEnabled_notPresent_empty() throws Exception {
     AppBundle appBundle =
         new AppBundleBuilder()
             .setBundleConfig(BundleConfigBuilder.create().build())
             .addModule("base", builder -> builder.setManifest(MANIFEST))
             .build();
-    assertThat(appBundle.storeArchiveEnabled()).isFalse();
+    assertThat(appBundle.getStoreArchive()).isEmpty();
   }
 
   @Test
@@ -467,7 +467,7 @@ public class AppBundleTest {
             .setBundleConfig(BundleConfigBuilder.create().setStoreArchive(true).build())
             .addModule("base", builder -> builder.setManifest(MANIFEST))
             .build();
-    assertThat(appBundle.storeArchiveEnabled()).isTrue();
+    assertThat(appBundle.getStoreArchive().get()).isTrue();
   }
 
   @Test
@@ -477,7 +477,7 @@ public class AppBundleTest {
             .setBundleConfig(BundleConfigBuilder.create().setStoreArchive(false).build())
             .addModule("base", builder -> builder.setManifest(MANIFEST))
             .build();
-    assertThat(appBundle.storeArchiveEnabled()).isFalse();
+    assertThat(appBundle.getStoreArchive().get()).isFalse();
   }
 
   @Test

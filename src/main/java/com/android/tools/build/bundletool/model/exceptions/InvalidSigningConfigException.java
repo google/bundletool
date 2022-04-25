@@ -13,18 +13,19 @@
  * See the License for the specific language governing permissions and
  * limitations under the License
  */
-package com.android.tools.build.bundletool.commands;
+package com.android.tools.build.bundletool.model.exceptions;
 
+import com.android.bundle.Errors.BundleToolError.ErrorType;
 
-import com.android.tools.build.bundletool.testing.TestModule;
-import org.junit.experimental.theories.Theories;
-import org.junit.runner.RunWith;
+/** Indicates that the Signing Configuration provided is invalid. */
+public class InvalidSigningConfigException extends BundleToolException {
 
-@RunWith(Theories.class)
-public class BuildApksManagerOldSerializerTest extends BuildApksManagerTest {
+  public InvalidSigningConfigException(
+      String userMessage, String internalMessage, Throwable cause) {
+    super(ErrorType.INVALID_SIGNING_CONFIGURATION_ERROR, userMessage, internalMessage, cause);
+  }
 
-  @Override
-  protected TestModule.Builder createTestModuleBuilder() {
-    return TestModule.builder().withEnableApkSerializerWithoutBundleRecompression(false);
+  public static UserExceptionBuilder<InvalidSigningConfigException> builder() {
+    return new UserExceptionBuilder<>(InvalidSigningConfigException::new);
   }
 }

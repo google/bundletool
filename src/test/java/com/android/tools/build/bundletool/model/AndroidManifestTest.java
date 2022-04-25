@@ -20,6 +20,8 @@ import static com.android.tools.build.bundletool.model.AndroidManifest.ALLOW_BAC
 import static com.android.tools.build.bundletool.model.AndroidManifest.ALLOW_BACKUP_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.BACKUP_AGENT_ATTRIBUTE_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.BACKUP_AGENT_RESOURCE_ID;
+import static com.android.tools.build.bundletool.model.AndroidManifest.BANNER_ATTRIBUTE_NAME;
+import static com.android.tools.build.bundletool.model.AndroidManifest.BANNER_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.DATA_EXTRACTION_RULES_ATTRIBUTE_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.DATA_EXTRACTION_RULES_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.DEBUGGABLE_RESOURCE_ID;
@@ -40,6 +42,8 @@ import static com.android.tools.build.bundletool.model.AndroidManifest.IS_GAME_A
 import static com.android.tools.build.bundletool.model.AndroidManifest.IS_GAME_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.LABEL_ATTRIBUTE_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.LABEL_RESOURCE_ID;
+import static com.android.tools.build.bundletool.model.AndroidManifest.LARGE_HEAP_ATTRIBUTE_NAME;
+import static com.android.tools.build.bundletool.model.AndroidManifest.LARGE_HEAP_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.LOCALE_CONFIG_ATTRIBUTE_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.LOCALE_CONFIG_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.MODULE_TYPE_ASSET_VALUE;
@@ -47,7 +51,11 @@ import static com.android.tools.build.bundletool.model.AndroidManifest.MODULE_TY
 import static com.android.tools.build.bundletool.model.AndroidManifest.NAME_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.PERMISSION_ELEMENT_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.PERMISSION_GROUP_ELEMENT_NAME;
+import static com.android.tools.build.bundletool.model.AndroidManifest.REQUIRED_ACCOUNT_TYPE_ATTRIBUTE_NAME;
+import static com.android.tools.build.bundletool.model.AndroidManifest.REQUIRED_ACCOUNT_TYPE_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.RESOURCE_RESOURCE_ID;
+import static com.android.tools.build.bundletool.model.AndroidManifest.RESTRICTED_ACCOUNT_TYPE_ATTRIBUTE_NAME;
+import static com.android.tools.build.bundletool.model.AndroidManifest.RESTRICTED_ACCOUNT_TYPE_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.SHARED_USER_ID_ATTRIBUTE_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.SHARED_USER_ID_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.SHARED_USER_LABEL_ATTRIBUTE_NAME;
@@ -1097,6 +1105,26 @@ public class AndroidManifestTest {
     assertThat(androidManifest2.hasSharedUserId()).isTrue();
   }
 
+  @Test
+  public void isHeadless_true() {
+    AndroidManifest manifest =
+        AndroidManifest.create(androidManifest("com.package.test", withNativeActivity("libA")));
+
+    assertThat(manifest.isHeadless()).isTrue();
+  }
+
+  @Test
+  public void isHeadless_false() {
+    AndroidManifest manifest =
+        AndroidManifest.create(
+            androidManifest(
+                "com.package.test",
+                withMainActivity("com.package.test.MainActivity"),
+                withNativeActivity("libA")));
+
+    assertThat(manifest.isHeadless()).isFalse();
+  }
+
   private XmlNode metadataWithValue(String key, String value) {
     return xmlNode(
         xmlElement(
@@ -1355,6 +1383,23 @@ public class AndroidManifestTest {
   }
 
   @Test
+  public void getBanner_present() {
+    AndroidManifest androidManifest =
+        createManifestWithApplicationRefIdAttribute(
+            BANNER_ATTRIBUTE_NAME, BANNER_RESOURCE_ID, 0x12345678);
+
+    assertThat(androidManifest.getBanner()).hasValue(0x12345678);
+  }
+
+  @Test
+  public void getBanner_missing_isEmpty() {
+    AndroidManifest androidManifest =
+        AndroidManifest.create(xmlNode(xmlElement("manifest", xmlNode(xmlElement("application")))));
+
+    assertThat(androidManifest.getBanner()).isEmpty();
+  }
+
+  @Test
   public void getAllowBackup_present() {
     AndroidManifest androidManifest =
         createManifestWithApplicationBooleanAttribute(
@@ -1570,5 +1615,60 @@ public class AndroidManifestTest {
             LOCALE_CONFIG_ATTRIBUTE_NAME, LOCALE_CONFIG_RESOURCE_ID, 0x12345678);
 
     assertThat(androidManifest.hasLocaleConfig()).isTrue();
+  }
+
+  @Test
+  public void getRestrictedAccountType_present() {
+    AndroidManifest androidManifest =
+        createManifestWithApplicationAttribute(
+            RESTRICTED_ACCOUNT_TYPE_ATTRIBUTE_NAME,
+            RESTRICTED_ACCOUNT_TYPE_RESOURCE_ID,
+            "restricted.account");
+
+    assertThat(androidManifest.getRestrictedAccountType()).hasValue("restricted.account");
+  }
+
+  @Test
+  public void getRestrictedAccountType_missing_isEmpty() {
+    AndroidManifest androidManifest =
+        AndroidManifest.create(xmlNode(xmlElement("manifest", xmlNode(xmlElement("application")))));
+
+    assertThat(androidManifest.getRestrictedAccountType()).isEmpty();
+  }
+
+  @Test
+  public void getRequiredAccountType_present() {
+    AndroidManifest androidManifest =
+        createManifestWithApplicationAttribute(
+            REQUIRED_ACCOUNT_TYPE_ATTRIBUTE_NAME,
+            REQUIRED_ACCOUNT_TYPE_RESOURCE_ID,
+            "required.account");
+
+    assertThat(androidManifest.getRequiredAccountType()).hasValue("required.account");
+  }
+
+  @Test
+  public void getRequiredAccountType_missing_isEmpty() {
+    AndroidManifest androidManifest =
+        AndroidManifest.create(xmlNode(xmlElement("manifest", xmlNode(xmlElement("application")))));
+
+    assertThat(androidManifest.getRequiredAccountType()).isEmpty();
+  }
+
+  @Test
+  public void getLargeHeap_present() {
+    AndroidManifest androidManifest =
+        createManifestWithApplicationBooleanAttribute(
+            LARGE_HEAP_ATTRIBUTE_NAME, LARGE_HEAP_RESOURCE_ID, true);
+
+    assertThat(androidManifest.getLargeHeap()).hasValue(true);
+  }
+
+  @Test
+  public void getLargeHeap_missing_isEmpty() {
+    AndroidManifest androidManifest =
+        AndroidManifest.create(xmlNode(xmlElement("manifest", xmlNode(xmlElement("application")))));
+
+    assertThat(androidManifest.getLargeHeap()).isEmpty();
   }
 }

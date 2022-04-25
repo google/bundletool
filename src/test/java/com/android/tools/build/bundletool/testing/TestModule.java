@@ -23,12 +23,10 @@ import com.android.bundle.Config.Bundletool;
 import com.android.bundle.Devices.DeviceSpec;
 import com.android.tools.build.bundletool.commands.BuildApksCommand;
 import com.android.tools.build.bundletool.commands.BuildApksCommand.ApkBuildMode;
-import com.android.tools.build.bundletool.commands.BuildApksManagerComponent.UseBundleCompression;
 import com.android.tools.build.bundletool.commands.CommandScoped;
 import com.android.tools.build.bundletool.io.AppBundleSerializer;
 import com.android.tools.build.bundletool.io.SdkBundleSerializer;
 import com.android.tools.build.bundletool.io.TempDirectory;
-import com.android.tools.build.bundletool.io.ZipReader;
 import com.android.tools.build.bundletool.model.ApkListener;
 import com.android.tools.build.bundletool.model.ApkModifier;
 import com.android.tools.build.bundletool.model.AppBundle;
@@ -58,13 +56,10 @@ public class TestModule {
 
   private final BuildApksCommand buildApksCommand;
   private final Bundle bundle;
-  private final boolean useBundleCompression;
 
-  private TestModule(
-      BuildApksCommand buildApksCommand, Bundle bundle, boolean useBundleCompression) {
+  private TestModule(BuildApksCommand buildApksCommand, Bundle bundle) {
     this.buildApksCommand = buildApksCommand;
     this.bundle = bundle;
-    this.useBundleCompression = useBundleCompression;
   }
 
   @Provides
@@ -84,18 +79,17 @@ public class TestModule {
 
   @Provides
   BundleConfig provideBundleConfig() {
-    return bundle.getBundleConfig();
+    if (bundle instanceof AppBundle) {
+      return ((AppBundle) bundle).getBundleConfig();
+    }
+    return BundleConfig.newBuilder()
+        .setBundletool(((SdkBundle) bundle).getSdkModulesConfig().getBundletool())
+        .build();
   }
 
   @Provides
   BundleMetadata provideBundleMetadata() {
     return bundle.getBundleMetadata();
-  }
-
-  @SuppressWarnings({"CloseableProvides", "MustBeClosedChecker"}) // Only for tests.
-  @Provides
-  ZipReader provideZipReader(BuildApksCommand command) {
-    return ZipReader.createFromFile(command.getBundlePath());
   }
 
   @Provides
@@ -107,12 +101,6 @@ public class TestModule {
   @CommandScoped
   TempDirectory provideTempDirectory() {
     return new TempDirectory();
-  }
-
-  @Provides
-  @UseBundleCompression
-  boolean provideUseBundleCompression() {
-    return useBundleCompression;
   }
 
   public static Builder builder() {
@@ -150,8 +138,6 @@ public class TestModule {
     @Nullable private PrintStream printStream;
     @Nullable private Boolean localTestingEnabled;
     @Nullable private SourceStamp sourceStamp;
-    private boolean useBundleCompression = true;
-    private boolean enableApkSerializerWithoutBundleRecompression = true;
     private BundleMetadata bundleMetadata = DEFAULT_BUNDLE_METADATA;
 
     public Builder withAppBundle(AppBundle appBundle) {
@@ -270,16 +256,6 @@ public class TestModule {
       return this;
     }
 
-    public Builder useBundleCompression(boolean useBundleCompression) {
-      this.useBundleCompression = useBundleCompression;
-      return this;
-    }
-
-    public Builder withEnableApkSerializerWithoutBundleRecompression(boolean enable) {
-      this.enableApkSerializerWithoutBundleRecompression = enable;
-      return this;
-    }
-
     public Builder withSdkBundle(SdkBundle sdkBundle) {
       this.bundle = sdkBundle;
       return this;
@@ -310,12 +286,11 @@ public class TestModule {
           }
         } else {
           if (!bundleConfig.equals(DEFAULT_BUNDLE_CONFIG)) {
-            BundleConfig newBundleConfig =
-                bundle.getBundleConfig().toBuilder().mergeFrom(bundleConfig).build();
             if (bundle instanceof AppBundle) {
+              BundleConfig newBundleConfig =
+                  ((AppBundle) bundle)
+                      .getBundleConfig().toBuilder().mergeFrom(bundleConfig).build();
               bundle = ((AppBundle) bundle).toBuilder().setBundleConfig(newBundleConfig).build();
-            } else {
-              bundle = ((SdkBundle) bundle).toBuilder().setBundleConfig(newBundleConfig).build();
             }
           }
         }
@@ -341,8 +316,6 @@ public class TestModule {
 
         BuildApksCommand.Builder command =
             BuildApksCommand.builder()
-                .setEnableApkSerializerWithoutBundleRecompression(
-                    enableApkSerializerWithoutBundleRecompression)
                 .setAapt2Command(Aapt2Helper.getAapt2Command())
                 .setBundlePath(bundlePath)
                 .setOutputFile(outputPath);
@@ -389,7 +362,7 @@ public class TestModule {
           buildApksCommandSetter.accept(command);
         }
 
-        return new TestModule(command.build(), bundle, useBundleCompression);
+        return new TestModule(command.build(), bundle);
       } catch (IOException e) {
         throw new UncheckedIOException(e);
       }

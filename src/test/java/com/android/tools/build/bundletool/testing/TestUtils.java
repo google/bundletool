@@ -16,16 +16,23 @@
 
 package com.android.tools.build.bundletool.testing;
 
+import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifest;
+import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withInstallLocation;
+import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withMinSdkVersion;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.truth.Truth.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.android.aapt.Resources.XmlNode;
+import com.android.bundle.Config.Bundletool;
+import com.android.bundle.SdkModulesConfigOuterClass.SdkModulesConfig;
 import com.android.tools.build.bundletool.flags.Flag.RequiredFlagNotSetException;
+import com.android.tools.build.bundletool.io.ZipBuilder;
 import com.android.tools.build.bundletool.model.AndroidManifest;
 import com.android.tools.build.bundletool.model.ModuleEntry;
 import com.android.tools.build.bundletool.model.SigningConfiguration;
 import com.android.tools.build.bundletool.model.ZipPath;
+import com.android.tools.build.bundletool.model.version.BundleToolVersion;
 import com.google.common.collect.ImmutableList;
 import com.google.common.io.ByteSource;
 import com.google.protobuf.ExtensionRegistry;
@@ -52,6 +59,11 @@ import org.junit.jupiter.api.function.Executable;
 
 /** Some misc utility methods for tests. */
 public final class TestUtils {
+
+  private static final byte[] DUMMY_CONTENT = new byte[1];
+  private static final SdkModulesConfig SDK_MODULES_CONFIG = getSdkModulesConfig();
+  private static final String PACKAGE_NAME = "com.test.sdk.detail";
+  private static final XmlNode MANIFEST = createSdkAndroidManifest();
 
   /** Tests that missing mandatory property is detected by an AutoValue.Builder. */
   public static void expectMissingRequiredBuilderPropertyException(
@@ -173,5 +185,58 @@ public final class TestUtils {
       keystore.store(keystoreOutputStream, keystorePassword.toCharArray());
     }
     return SigningConfiguration.builder().setSignerConfig(privateKey, certificate).build();
+  }
+
+  public static ZipBuilder createZipBuilderForSdkBundleWithModules(
+      ZipBuilder modules, Path modulesPath) throws IOException {
+    modules.writeTo(modulesPath);
+    return createZipBuilderForSdkBundle()
+        .addFileFromDisk(ZipPath.create("modules.resm"), modulesPath.toFile());
+  }
+
+  public static ZipBuilder createZipBuilderForSdkBundle() {
+    return new ZipBuilder()
+        .addFileWithContent(
+            ZipPath.create("BUNDLE-METADATA/some.namespace/metadata1"), new byte[] {0x01});
+  }
+
+  public static ZipBuilder createZipBuilderForModules() {
+    return new ZipBuilder()
+        .addFileWithProtoContent(ZipPath.create("base/manifest/AndroidManifest.xml"), MANIFEST)
+        .addFileWithContent(ZipPath.create("base/dex/classes.dex"), DUMMY_CONTENT)
+        .addFileWithContent(
+            ZipPath.create("SdkModulesConfig.pb"), SDK_MODULES_CONFIG.toByteArray());
+  }
+
+  public static ZipBuilder createZipBuilderForModulesWithoutManifest() {
+    return new ZipBuilder()
+        .addFileWithContent(ZipPath.create("base/dex/classes.dex"), DUMMY_CONTENT)
+        .addFileWithContent(
+            ZipPath.create("SdkModulesConfig.pb"), SDK_MODULES_CONFIG.toByteArray());
+  }
+
+  public static ZipBuilder createZipBuilderForModulesWithInvalidManifest() {
+    return new ZipBuilder()
+        .addFileWithProtoContent(
+            ZipPath.create("base/manifest/AndroidManifest.xml"), createInvalidSdkAndroidManifest())
+        .addFileWithContent(ZipPath.create("base/dex/classes.dex"), DUMMY_CONTENT)
+        .addFileWithContent(
+            ZipPath.create("SdkModulesConfig.pb"), SDK_MODULES_CONFIG.toByteArray());
+  }
+
+  private static SdkModulesConfig getSdkModulesConfig() {
+    return SdkModulesConfig.newBuilder()
+        .setBundletool(
+            Bundletool.newBuilder().setVersion(BundleToolVersion.getCurrentVersion().toString()))
+        .build();
+  }
+
+  public static XmlNode createSdkAndroidManifest() {
+    return androidManifest(PACKAGE_NAME, withMinSdkVersion(32));
+  }
+
+  public static XmlNode createInvalidSdkAndroidManifest() {
+    return androidManifest(
+        PACKAGE_NAME, withMinSdkVersion(32), withInstallLocation("preferExternal"));
   }
 }

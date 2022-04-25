@@ -79,13 +79,16 @@ public abstract class AndroidManifest {
   public static final String PROVIDER_ELEMENT_NAME = "provider";
   public static final String SUPPORTS_GL_TEXTURE_ELEMENT_NAME = "supports-gl-texture";
   public static final String ACTION_ELEMENT_NAME = "action";
+  public static final String CATEGORY_ELEMENT_NAME = "category";
   public static final String PERMISSION_ELEMENT_NAME = "permission";
   public static final String PERMISSION_GROUP_ELEMENT_NAME = "permission-group";
   public static final String PERMISSION_TREE_ELEMENT_NAME = "permission-tree";
+  public static final String PROPERTY_ELEMENT_NAME = "property";
 
   public static final String DEBUGGABLE_ATTRIBUTE_NAME = "debuggable";
   public static final String EXTRACT_NATIVE_LIBS_ATTRIBUTE_NAME = "extractNativeLibs";
   public static final String ICON_ATTRIBUTE_NAME = "icon";
+  public static final String BANNER_ATTRIBUTE_NAME = "banner";
   public static final String MAX_SDK_VERSION_ATTRIBUTE_NAME = "maxSdkVersion";
   public static final String MIN_SDK_VERSION_ATTRIBUTE_NAME = "minSdkVersion";
   public static final String TARGET_SDK_VERSION_ATTRIBUTE_NAME = "targetSdkVersion";
@@ -119,13 +122,16 @@ public abstract class AndroidManifest {
   public static final String EXPORTED_ATTRIBUTE_NAME = "exported";
   public static final String LOCALE_CONFIG_ATTRIBUTE_NAME = "localeConfig";
   public static final String SDK_LIBRARY_ELEMENT_NAME = "sdk-library";
-  public static final String SDK_MAJOR_VERSION_ATTRIBUTE_NAME = "versionMajor";
+  public static final String SDK_VERSION_MAJOR_ATTRIBUTE_NAME = "versionMajor";
   public static final String SDK_PATCH_VERSION_ATTRIBUTE_NAME =
-      "com.android.vending.sdkPatchVersion";
+      "com.android.vending.sdk.version.patch";
   public static final Integer SDK_SANDBOX_MIN_VERSION = 32;
   public static final String USES_SDK_LIBRARY_ELEMENT_NAME = "uses-sdk-library";
   public static final String CERTIFICATE_DIGEST_ATTRIBUTE_NAME = "certDigest";
   public static final String TARGET_SANDBOX_VERSION_ATTRIBUTE_NAME = "targetSandboxVersion";
+  public static final String REQUIRED_ACCOUNT_TYPE_ATTRIBUTE_NAME = "requiredAccountType";
+  public static final String RESTRICTED_ACCOUNT_TYPE_ATTRIBUTE_NAME = "restrictedAccountType";
+  public static final String LARGE_HEAP_ATTRIBUTE_NAME = "largeHeap";
 
   public static final String MODULE_TYPE_FEATURE_VALUE = "feature";
   public static final String MODULE_TYPE_ASSET_VALUE = "asset-pack";
@@ -138,6 +144,7 @@ public abstract class AndroidManifest {
   public static final int EXTRACT_NATIVE_LIBS_RESOURCE_ID = 0x10104ea;
   public static final int HAS_CODE_RESOURCE_ID = 0x101000c;
   public static final int ICON_RESOURCE_ID = 0x01010002;
+  public static final int BANNER_RESOURCE_ID = 0x010103f2;
   public static final int MAX_SDK_VERSION_RESOURCE_ID = 0x01010271;
   public static final int MIN_SDK_VERSION_RESOURCE_ID = 0x0101020c;
   public static final int TARGET_SDK_VERSION_RESOURCE_ID = 0x01010270;
@@ -169,6 +176,9 @@ public abstract class AndroidManifest {
   public static final int LOCALE_CONFIG_RESOURCE_ID = 0x01df000e;
   public static final int VERSION_MAJOR_RESOURCE_ID = 0x01010577;
   public static final int CERTIFICATE_DIGEST_RESOURCE_ID = 0x01010548;
+  public static final int REQUIRED_ACCOUNT_TYPE_RESOURCE_ID = 0x010103d6;
+  public static final int RESTRICTED_ACCOUNT_TYPE_RESOURCE_ID = 0x010103d5;
+  public static final int LARGE_HEAP_RESOURCE_ID = 0x0101035a;
 
   // Matches the value of android.os.Build.VERSION_CODES.CUR_DEVELOPMENT, used when turning
   // a manifest attribute which references a prerelease API version (e.g., "Q") into an integer.
@@ -184,6 +194,9 @@ public abstract class AndroidManifest {
    * <p>Written in master split of the base module.
    */
   public static final String META_DATA_KEY_SPLITS_REQUIRED = "com.android.vending.splits.required";
+
+  public static final String MAIN_ACTION_NAME = "android.intent.action.MAIN";
+  public static final String LAUNCHER_CATEGORY_NAME = "android.intent.category.LAUNCHER";
 
   public abstract XmlProtoNode getManifestRoot();
 
@@ -637,6 +650,10 @@ public abstract class AndroidManifest {
     return getApplicationAttributeAsRefId(ICON_RESOURCE_ID);
   }
 
+  public Optional<Integer> getBanner() {
+    return getApplicationAttributeAsRefId(BANNER_RESOURCE_ID);
+  }
+
   public Optional<Boolean> getAllowBackup() {
     return getApplicationAttributeAsBoolean(ALLOW_BACKUP_RESOURCE_ID);
   }
@@ -651,6 +668,18 @@ public abstract class AndroidManifest {
 
   public Optional<Boolean> getFullBackupOnly() {
     return getApplicationAttributeAsBoolean(FULL_BACKUP_ONLY_RESOURCE_ID);
+  }
+
+  public Optional<String> getRestrictedAccountType() {
+    return getApplicationAttribute(RESTRICTED_ACCOUNT_TYPE_RESOURCE_ID);
+  }
+
+  public Optional<String> getRequiredAccountType() {
+    return getApplicationAttribute(REQUIRED_ACCOUNT_TYPE_RESOURCE_ID);
+  }
+
+  public Optional<Boolean> getLargeHeap() {
+    return getApplicationAttributeAsBoolean(LARGE_HEAP_RESOURCE_ID);
   }
 
   public boolean hasBackupAgent() {
@@ -809,6 +838,29 @@ public abstract class AndroidManifest {
         .collect(toImmutableList());
   }
 
+  public boolean isHeadless() {
+    return getActivitiesByName().entrySet().stream()
+        .flatMap(activity -> activity.getValue().getChildrenElements(INTENT_FILTER_ELEMENT_NAME))
+        .noneMatch(
+            intent ->
+                hasChildWithNameAttribute(intent, ACTION_ELEMENT_NAME, MAIN_ACTION_NAME)
+                    && hasChildWithNameAttribute(
+                        intent, CATEGORY_ELEMENT_NAME, LAUNCHER_CATEGORY_NAME));
+  }
+
+  private static boolean hasChildWithNameAttribute(
+      XmlProtoElement element, String childElementName, String nameAttributeValue) {
+    return element
+        .getChildrenElements(childElementName)
+        .anyMatch(
+            category ->
+                category
+                    .getAttribute(ANDROID_NAMESPACE_URI, NAME_ATTRIBUTE_NAME)
+                    .map(XmlProtoAttribute::getValueAsString)
+                    .orElse("")
+                    .equals(nameAttributeValue));
+  }
+
   /** Returns a stream of the <meta-data> XML elements under the <application> tag. */
   private Stream<XmlProtoElement> getMetadataElements() {
     return getManifestElement()
@@ -866,6 +918,35 @@ public abstract class AndroidManifest {
 
   public ImmutableList<XmlProtoElement> getSdkLibraryElements() {
     return getApplicationElementChildElements(SDK_LIBRARY_ELEMENT_NAME);
+  }
+
+  /**
+   * Gets the SDK patch version if it is set in the AndroidManifest. If there are multiple
+   * <property> elements with android:name={@value SDK_PATCH_VERSION_ATTRIBUTE_NAME}, return the
+   * first one.
+   */
+  public Optional<Integer> getSdkPatchVersionProperty() {
+    return getApplicationElementChildElements(PROPERTY_ELEMENT_NAME).stream()
+        .filter(element -> element.getAndroidAttribute(NAME_RESOURCE_ID).isPresent())
+        .filter(
+            element ->
+                element
+                    .getAndroidAttribute(NAME_RESOURCE_ID)
+                    .get()
+                    .getValueAsString()
+                    .equals(SDK_PATCH_VERSION_ATTRIBUTE_NAME))
+        .map(
+            element ->
+                element
+                    .getAndroidAttribute(VALUE_RESOURCE_ID)
+                    .orElseThrow(
+                        () ->
+                            InvalidBundleException.createWithUserMessage(
+                                "<property> element found with"
+                                    + " 'android:name=com.android.vending.sdk.version.patch' but no"
+                                    + " 'android:value=SDK_PATCH_VERSION'."))
+                    .getValueAsInteger())
+        .findFirst();
   }
 
   public ImmutableList<XmlProtoElement> getUsesSdkLibraryElements() {

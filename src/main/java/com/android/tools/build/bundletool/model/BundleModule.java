@@ -27,14 +27,15 @@ import com.android.aapt.Resources.XmlNode;
 import com.android.bundle.Commands.DeliveryType;
 import com.android.bundle.Commands.FeatureModuleType;
 import com.android.bundle.Commands.ModuleMetadata;
-import com.android.bundle.Config.BundleConfig;
+import com.android.bundle.Config.ApexConfig;
+import com.android.bundle.Config.BundleConfig.BundleType;
 import com.android.bundle.Files.ApexImages;
 import com.android.bundle.Files.Assets;
 import com.android.bundle.Files.NativeLibraries;
 import com.android.bundle.RuntimeEnabledSdkConfigProto.RuntimeEnabledSdkConfig;
 import com.android.bundle.Targeting.ModuleTargeting;
 import com.android.tools.build.bundletool.model.exceptions.InvalidBundleException;
-import com.android.tools.build.bundletool.model.version.BundleToolVersion;
+import com.android.tools.build.bundletool.model.version.Version;
 import com.google.auto.value.AutoValue;
 import com.google.auto.value.extension.memoized.Memoized;
 import com.google.common.base.Splitter;
@@ -111,16 +112,21 @@ public abstract class BundleModule {
     }
   }
 
-  /** BundleConfig of the bundle that this module belongs to. */
-  public abstract BundleConfig getBundleConfig();
+  /** BundleType of the bundle that this module belongs to. */
+  public abstract BundleType getBundleType();
+
+  /** Version of Bundeltool used to build the bundle that this module belongs to. */
+  public abstract Version getBundletoolVersion();
 
   abstract XmlNode getAndroidManifestProto();
 
   @Memoized
   public AndroidManifest getAndroidManifest() {
-    return AndroidManifest.create(
-        getAndroidManifestProto(), BundleToolVersion.getVersionFromBundleConfig(getBundleConfig()));
+    return AndroidManifest.create(getAndroidManifestProto(), getBundletoolVersion());
   }
+
+  /** ApexConfig of the bundle that this module belongs to. */
+  public abstract Optional<ApexConfig> getBundleApexConfig();
 
   public abstract Optional<ResourceTable> getResourceTable();
 
@@ -298,7 +304,11 @@ public abstract class BundleModule {
   public abstract static class Builder {
     public abstract Builder setName(BundleModuleName value);
 
-    public abstract Builder setBundleConfig(BundleConfig value);
+    public abstract Builder setBundleType(BundleType bundleType);
+
+    public abstract Builder setBundletoolVersion(Version version);
+
+    public abstract Builder setBundleApexConfig(ApexConfig apexConfig);
 
     public abstract Builder setResourceTable(ResourceTable resourceTable);
 

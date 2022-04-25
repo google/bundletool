@@ -56,6 +56,7 @@ import com.android.bundle.RuntimeEnabledSdkConfigProto.RuntimeEnabledSdk;
 import com.android.bundle.RuntimeEnabledSdkConfigProto.RuntimeEnabledSdkConfig;
 import com.android.bundle.Targeting.ModuleTargeting;
 import com.android.tools.build.bundletool.model.BundleModule.ModuleType;
+import com.android.tools.build.bundletool.model.version.Version;
 import com.android.tools.build.bundletool.testing.BundleConfigBuilder;
 import java.io.UncheckedIOException;
 import java.util.Arrays;
@@ -168,13 +169,8 @@ public class BundleModuleTest {
 
   @Test
   public void missingProtoManifestFile_throws() {
-    BundleModule.Builder minimalModuleWithoutManifest =
-        BundleModule.builder()
-            .setName(BundleModuleName.create("testModule"))
-            .setBundleConfig(DEFAULT_BUNDLE_CONFIG);
-
     IllegalStateException exception =
-        assertThrows(IllegalStateException.class, () -> minimalModuleWithoutManifest.build());
+        assertThrows(IllegalStateException.class, () -> createModuleWithoutManifest().build());
 
     assertThat(exception).hasMessageThat().contains("Missing required properties: androidManifest");
   }
@@ -184,9 +180,7 @@ public class BundleModuleTest {
     XmlNode manifestXml = androidManifest("com.test.app");
 
     BundleModule bundleModule =
-        BundleModule.builder()
-            .setName(BundleModuleName.create("testModule"))
-            .setBundleConfig(DEFAULT_BUNDLE_CONFIG)
+        createModuleWithoutManifest()
             .addEntry(
                 createModuleEntryForFile("manifest/AndroidManifest.xml", manifestXml.toByteArray()))
             .build();
@@ -244,9 +238,7 @@ public class BundleModuleTest {
   @Test
   public void specialFiles_areNotStoredAsEntries() throws Exception {
     BundleModule bundleModule =
-        BundleModule.builder()
-            .setName(BundleModuleName.create("testModule"))
-            .setBundleConfig(DEFAULT_BUNDLE_CONFIG)
+        createModuleWithoutManifest()
             .addEntry(
                 createModuleEntryForFile(
                     "manifest/AndroidManifest.xml", androidManifest("com.test.app").toByteArray()))
@@ -580,9 +572,14 @@ public class BundleModuleTest {
   }
 
   private static BundleModule.Builder createMinimalModuleBuilder() {
+    return createModuleWithoutManifest()
+        .setAndroidManifestProto(androidManifest("com.test.app", withSplitId("testModule")));
+  }
+
+  private static BundleModule.Builder createModuleWithoutManifest() {
     return BundleModule.builder()
         .setName(BundleModuleName.create("testModule"))
-        .setAndroidManifestProto(androidManifest("com.test.app", withSplitId("testModule")))
-        .setBundleConfig(DEFAULT_BUNDLE_CONFIG);
+        .setBundleType(DEFAULT_BUNDLE_CONFIG.getType())
+        .setBundletoolVersion(Version.of(DEFAULT_BUNDLE_CONFIG.getBundletool().getVersion()));
   }
 }
