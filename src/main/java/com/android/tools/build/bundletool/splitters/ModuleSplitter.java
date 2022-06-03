@@ -79,6 +79,7 @@ public class ModuleSplitter {
   private final AbiPlaceholderInjector abiPlaceholderInjector;
   private final PinSpecInjector pinSpecInjector;
   private final CodeTransparencyInjector codeTransparencyInjector;
+  private final BaselineProfileInjector baselineProfileInjector;
 
   @VisibleForTesting
   public static ModuleSplitter createForTest(BundleModule module, Version bundleVersion) {
@@ -152,6 +153,7 @@ public class ModuleSplitter {
         new AbiPlaceholderInjector(apkGenerationConfiguration.getAbisForPlaceholderLibs());
     this.pinSpecInjector = new PinSpecInjector(module);
     this.codeTransparencyInjector = new CodeTransparencyInjector(appBundle);
+    baselineProfileInjector = new BaselineProfileInjector(appBundle);
     this.allModuleNames = allModuleNames;
     this.stampSource = stampSource;
     this.stampType = stampType;
@@ -200,6 +202,7 @@ public class ModuleSplitter {
         runSplitters().stream()
             .map(pinSpecInjector::inject)
             .map(codeTransparencyInjector::inject)
+            .map(baselineProfileInjector::inject)
             .map(this::addApkTargetingForSigningConfiguration)
             .map(this::addLPlusApkTargeting)
             .map(this::writeSplitIdInManifest)

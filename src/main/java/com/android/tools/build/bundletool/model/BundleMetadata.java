@@ -21,6 +21,7 @@ import static com.google.common.base.Preconditions.checkArgument;
 import com.android.tools.build.bundletool.model.ModuleEntry.ModuleEntryBundleLocation;
 import com.google.auto.value.AutoValue;
 import com.google.auto.value.extension.memoized.Memoized;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.io.ByteSource;
 import com.google.errorprone.annotations.Immutable;
@@ -46,6 +47,13 @@ public abstract class BundleMetadata {
 
   public static final String TRANSPARENCY_SIGNED_FILE_NAME = "code_transparency_signed.jwt";
 
+  public static final String BASELINE_PROFILE_NAMESPACE = "com.android.tools.build.profiles";
+  public static final String DEPRECATED_BASELINE_PROFILE_NAMESPACE = "assets.dexopt";
+
+  public static final String BASELINE_PROFILE_DIRECTORY_IN_APK = "assets/dexopt";
+  public static final String BASELINE_PROFILE_FILE = "baseline.prof";
+  public static final String BASELINE_PROFILE_FILE_METADATA = "baseline.profm";
+
   /**
    * Returns the raw metadata map.
    *
@@ -66,19 +74,47 @@ public abstract class BundleMetadata {
 
   @Memoized
   public Optional<ModuleEntry> getModuleEntryForSignedTransparencyFile() {
-    return getFileAsByteSource(BUNDLETOOL_NAMESPACE, TRANSPARENCY_SIGNED_FILE_NAME)
+    return getFileFromBundle(BUNDLETOOL_NAMESPACE, TRANSPARENCY_SIGNED_FILE_NAME,
+            "META-INF", TRANSPARENCY_SIGNED_FILE_NAME);
+  }
+
+  public ImmutableList<Optional<ModuleEntry>> getBaselineProfiles() {
+    Optional<ModuleEntry> deprecatedBaselineProf = getFileFromBundle(DEPRECATED_BASELINE_PROFILE_NAMESPACE,
+            BASELINE_PROFILE_FILE, BASELINE_PROFILE_DIRECTORY_IN_APK, BASELINE_PROFILE_FILE);
+    Optional<ModuleEntry> deprecatedBaselineProfm = getFileFromBundle(DEPRECATED_BASELINE_PROFILE_NAMESPACE,
+            BASELINE_PROFILE_FILE_METADATA, BASELINE_PROFILE_DIRECTORY_IN_APK, BASELINE_PROFILE_FILE_METADATA);
+    Optional<ModuleEntry> baselineProf = getFileFromBundle(BASELINE_PROFILE_NAMESPACE,
+            BASELINE_PROFILE_FILE, BASELINE_PROFILE_DIRECTORY_IN_APK, BASELINE_PROFILE_FILE);
+    Optional<ModuleEntry> baselineProfm = getFileFromBundle(BASELINE_PROFILE_NAMESPACE,
+            BASELINE_PROFILE_FILE_METADATA, BASELINE_PROFILE_DIRECTORY_IN_APK, BASELINE_PROFILE_FILE_METADATA);
+
+    if (!deprecatedBaselineProf.isEmpty()) {
+      if (!baselineProf.isEmpty()) {
+        throw new IllegalStateException("Expected only one baseline.prof in bundle.");
+      }
+      return ImmutableList.of(deprecatedBaselineProf, deprecatedBaselineProfm);
+    } else if (!baselineProf.isEmpty()) {
+      return ImmutableList.of(baselineProf, baselineProfm);
+    } else {
+      return ImmutableList.of();
+    }
+  }
+
+  private Optional<ModuleEntry> getFileFromBundle(String namespaceInBundleMetadata, String fileNameInBundle,
+                                                  String targetDirectoryInApk, String targetNameInApk) {
+    return getFileAsByteSource(namespaceInBundleMetadata, fileNameInBundle)
         .map(
-            transparencySignedFileContent ->
+            fileContent ->
                 ModuleEntry.builder()
-                    .setContent(transparencySignedFileContent)
+                    .setContent(fileContent)
                     // TODO(b/186621568): Set bundle path.
                     .setBundleLocation(
                         ModuleEntryBundleLocation.create(
                             Paths.get(""),
                             ZipPath.create("BUNDLE-METADATA")
-                                .resolve(BUNDLETOOL_NAMESPACE)
-                                .resolve(TRANSPARENCY_SIGNED_FILE_NAME)))
-                    .setPath(ZipPath.create("META-INF").resolve(TRANSPARENCY_SIGNED_FILE_NAME))
+                                .resolve(namespaceInBundleMetadata)
+                                .resolve(fileNameInBundle)))
+                    .setPath(ZipPath.create(targetDirectoryInApk).resolve(targetNameInApk))
                     .build());
   }
 

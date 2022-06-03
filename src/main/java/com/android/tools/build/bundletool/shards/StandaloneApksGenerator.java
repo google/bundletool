@@ -28,6 +28,7 @@ import com.android.tools.build.bundletool.model.ModuleSplit.SplitType;
 import com.android.tools.build.bundletool.model.SourceStamp;
 import com.android.tools.build.bundletool.model.SourceStamp.StampType;
 import com.android.tools.build.bundletool.optimizations.ApkOptimizations;
+import com.android.tools.build.bundletool.splitters.BaselineProfileInjector;
 import com.android.tools.build.bundletool.splitters.CodeTransparencyInjector;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
@@ -45,6 +46,7 @@ public class StandaloneApksGenerator {
   private final Sharder sharder;
   private final ModuleSplitsToShardMerger shardsMerger;
   private final CodeTransparencyInjector codeTransparencyInjector;
+  private final BaselineProfileInjector baselineProfileInjector;
 
   @Inject
   public StandaloneApksGenerator(
@@ -58,6 +60,7 @@ public class StandaloneApksGenerator {
     this.sharder = sharder;
     this.shardsMerger = shardsMerger;
     this.codeTransparencyInjector = new CodeTransparencyInjector(appBundle);
+    baselineProfileInjector = new BaselineProfileInjector(appBundle);
   }
 
   /**
@@ -99,6 +102,7 @@ public class StandaloneApksGenerator {
         .map(StandaloneApksGenerator::setVariantTargetingAndSplitType)
         .map(this::writeSourceStampInManifest)
         .map(codeTransparencyInjector::inject)
+        .map(baselineProfileInjector::inject)
         .collect(toImmutableList());
   }
 
