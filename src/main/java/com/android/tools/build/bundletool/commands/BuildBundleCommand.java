@@ -16,11 +16,13 @@
 
 package com.android.tools.build.bundletool.commands;
 
+import static com.android.tools.build.bundletool.model.targeting.TargetingUtils.generateApexImagesTargeting;
+import static com.android.tools.build.bundletool.model.targeting.TargetingUtils.generateAssetsTargeting;
+import static com.android.tools.build.bundletool.model.targeting.TargetingUtils.generateNativeLibrariesTargeting;
 import static com.android.tools.build.bundletool.model.utils.files.FilePreconditions.checkFileDoesNotExist;
 import static com.android.tools.build.bundletool.model.utils.files.FilePreconditions.checkFileExistsAndReadable;
 import static com.android.tools.build.bundletool.model.utils.files.FilePreconditions.checkFileHasExtension;
 import static com.google.common.base.Preconditions.checkState;
-import static com.google.common.collect.ImmutableList.toImmutableList;
 
 import com.android.bundle.Config.BundleConfig;
 import com.android.bundle.Config.Bundletool;
@@ -35,11 +37,9 @@ import com.android.tools.build.bundletool.io.AppBundleSerializer;
 import com.android.tools.build.bundletool.model.AppBundle;
 import com.android.tools.build.bundletool.model.BundleMetadata;
 import com.android.tools.build.bundletool.model.BundleModule;
-import com.android.tools.build.bundletool.model.ModuleEntry;
 import com.android.tools.build.bundletool.model.ZipPath;
 import com.android.tools.build.bundletool.model.exceptions.CommandExecutionException;
 import com.android.tools.build.bundletool.model.exceptions.InvalidCommandException;
-import com.android.tools.build.bundletool.model.targeting.TargetingGenerator;
 import com.android.tools.build.bundletool.model.utils.files.BufferedIo;
 import com.android.tools.build.bundletool.model.utils.files.FileUtils;
 import com.android.tools.build.bundletool.model.version.BundleToolVersion;
@@ -282,68 +282,6 @@ public abstract class BuildBundleCommand {
     if (!getOverwriteOutput()) {
       checkFileDoesNotExist(getOutputPath());
     }
-  }
-
-  private static Optional<Assets> generateAssetsTargeting(BundleModule module) {
-    ImmutableList<ZipPath> assetDirectories =
-        module
-            .findEntriesUnderPath(BundleModule.ASSETS_DIRECTORY)
-            .map(ModuleEntry::getPath)
-            .filter(path -> path.getNameCount() > 1)
-            .map(ZipPath::getParent)
-            .distinct()
-            .collect(toImmutableList());
-
-    if (assetDirectories.isEmpty()) {
-      return Optional.empty();
-    }
-
-    return Optional.of(new TargetingGenerator().generateTargetingForAssets(assetDirectories));
-  }
-
-  private static Optional<NativeLibraries> generateNativeLibrariesTargeting(BundleModule module) {
-    // Validation ensures that files under "lib/" conform to pattern "lib/<abi-dir>/file.so".
-    // We extract the distinct "lib/<abi-dir>" directories.
-    ImmutableList<String> libAbiDirs =
-        module
-            .findEntriesUnderPath(BundleModule.LIB_DIRECTORY)
-            .map(ModuleEntry::getPath)
-            .filter(path -> path.getNameCount() > 2)
-            .map(path -> path.subpath(0, 2))
-            .map(ZipPath::toString)
-            .distinct()
-            .collect(toImmutableList());
-
-    if (libAbiDirs.isEmpty()) {
-      return Optional.empty();
-    }
-
-    return Optional.of(new TargetingGenerator().generateTargetingForNativeLibraries(libAbiDirs));
-  }
-
-  private static Optional<ApexImages> generateApexImagesTargeting(BundleModule module) {
-    // Validation ensures that image files under "apex/" conform to the pattern
-    // "apex/<abi1>.<abi2>...<abiN>.img".
-    ImmutableList<ZipPath> apexImageFiles =
-        module
-            .findEntriesUnderPath(BundleModule.APEX_DIRECTORY)
-            .map(ModuleEntry::getPath)
-            .filter(p -> p.toString().endsWith(BundleModule.APEX_IMAGE_SUFFIX))
-            .collect(toImmutableList());
-
-    // Validation ensures if build info is present then we have one per image.
-    boolean hasBuildInfo =
-        module
-            .findEntriesUnderPath(BundleModule.APEX_DIRECTORY)
-            .map(ModuleEntry::getPath)
-            .anyMatch(p -> p.toString().endsWith(BundleModule.BUILD_INFO_SUFFIX));
-
-    if (apexImageFiles.isEmpty()) {
-      return Optional.empty();
-    }
-
-    return Optional.of(
-        new TargetingGenerator().generateTargetingForApexImages(apexImageFiles, hasBuildInfo));
   }
 
   private static BundleConfig parseBundleConfigJson(Path bundleConfigJsonPath) {

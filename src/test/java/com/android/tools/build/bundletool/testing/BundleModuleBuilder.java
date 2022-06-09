@@ -26,6 +26,7 @@ import com.android.bundle.Files.Assets;
 import com.android.bundle.Files.NativeLibraries;
 import com.android.bundle.RuntimeEnabledSdkConfigProto.RuntimeEnabledSdkConfig;
 import com.android.tools.build.bundletool.model.BundleModule;
+import com.android.tools.build.bundletool.model.BundleModule.ModuleType;
 import com.android.tools.build.bundletool.model.BundleModuleName;
 import com.android.tools.build.bundletool.model.ModuleEntry;
 import com.android.tools.build.bundletool.model.ModuleEntry.ModuleEntryBundleLocation;
@@ -37,6 +38,7 @@ import com.android.tools.build.bundletool.model.version.Version;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.io.ByteSource;
 import java.nio.file.Path;
+import java.util.Optional;
 
 /** Builder to build a {@link BundleModule}. */
 public class BundleModuleBuilder {
@@ -48,6 +50,8 @@ public class BundleModuleBuilder {
   private BundleConfig bundleConfig = DEFAULT_BUNDLE_CONFIG;
 
   private XmlNode androidManifest = null;
+
+  private Optional<ModuleType> moduleTypeOptional = Optional.empty();
 
   public BundleModuleBuilder(String moduleName) {
     checkNotNull(moduleName);
@@ -142,6 +146,11 @@ public class BundleModuleBuilder {
     return this;
   }
 
+  public BundleModuleBuilder setModuleType(ModuleType moduleType) {
+    this.moduleTypeOptional = Optional.of(moduleType);
+    return this;
+  }
+
   public BundleModule build() {
     if (androidManifest != null) {
       XmlProtoNodeBuilder manifestBuilder = new XmlProtoNode(androidManifest).toBuilder();
@@ -166,6 +175,7 @@ public class BundleModuleBuilder {
             .addEntries(entries.build())
             .setBundleType(bundleConfig.getType())
             .setBundletoolVersion(BundleToolVersion.getCurrentVersion());
+    moduleTypeOptional.ifPresent(bundleModuleBuilder::setModuleType);
 
     if (!bundleConfig.getBundletool().getVersion().isEmpty()) {
       bundleModuleBuilder.setBundletoolVersion(

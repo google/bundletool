@@ -67,12 +67,16 @@ public final class RuntimeEnabledSdkConfigValidatorTest {
                         RuntimeEnabledSdk.newBuilder()
                             .setPackageName("package.name.1")
                             .setVersionMajor(1234)
-                            .setCertificateDigest(VALID_CERT_FINGERPRINT))
+                            .setVersionMinor(2345)
+                            .setBuildTimeVersionPatch(3456)
+                            .setCertificateDigest(VALID_CERT_FINGERPRINT)
+                            .setResourcesPackageId(2))
                     .addRuntimeEnabledSdk(
                         RuntimeEnabledSdk.newBuilder()
                             .setPackageName("package.name.2")
                             .setVersionMajor(1234)
-                            .setCertificateDigest(VALID_CERT_FINGERPRINT))
+                            .setCertificateDigest(VALID_CERT_FINGERPRINT)
+                            .setResourcesPackageId(3))
                     .build())
             .build();
 
@@ -90,12 +94,14 @@ public final class RuntimeEnabledSdkConfigValidatorTest {
                         RuntimeEnabledSdk.newBuilder()
                             // not setting package name.
                             .setVersionMajor(1234)
-                            .setCertificateDigest(VALID_CERT_FINGERPRINT))
+                            .setCertificateDigest(VALID_CERT_FINGERPRINT)
+                            .setResourcesPackageId(2))
                     .addRuntimeEnabledSdk(
                         RuntimeEnabledSdk.newBuilder()
                             .setPackageName("package.name.2")
                             .setVersionMajor(1234)
-                            .setCertificateDigest(VALID_CERT_FINGERPRINT))
+                            .setCertificateDigest(VALID_CERT_FINGERPRINT)
+                            .setResourcesPackageId(3))
                     .build())
             .build();
 
@@ -122,12 +128,14 @@ public final class RuntimeEnabledSdkConfigValidatorTest {
                             // setting emtpy package name.
                             .setPackageName("")
                             .setVersionMajor(1234)
-                            .setCertificateDigest(VALID_CERT_FINGERPRINT))
+                            .setCertificateDigest(VALID_CERT_FINGERPRINT)
+                            .setResourcesPackageId(2))
                     .addRuntimeEnabledSdk(
                         RuntimeEnabledSdk.newBuilder()
                             .setPackageName("package.name.2")
                             .setVersionMajor(1234)
-                            .setCertificateDigest(VALID_CERT_FINGERPRINT))
+                            .setCertificateDigest(VALID_CERT_FINGERPRINT)
+                            .setResourcesPackageId(3))
                     .build())
             .build();
 
@@ -154,12 +162,14 @@ public final class RuntimeEnabledSdkConfigValidatorTest {
                             // not setting major version.
                             .setPackageName("package.name.1")
                             .setVersionMajor(-1)
-                            .setCertificateDigest(VALID_CERT_FINGERPRINT))
+                            .setCertificateDigest(VALID_CERT_FINGERPRINT)
+                            .setResourcesPackageId(2))
                     .addRuntimeEnabledSdk(
                         RuntimeEnabledSdk.newBuilder()
                             .setPackageName("package.name.2")
                             .setVersionMajor(1234)
-                            .setCertificateDigest(VALID_CERT_FINGERPRINT))
+                            .setCertificateDigest(VALID_CERT_FINGERPRINT)
+                            .setResourcesPackageId(3))
                     .build())
             .build();
 
@@ -188,12 +198,14 @@ public final class RuntimeEnabledSdkConfigValidatorTest {
                             .setPackageName("package.name.1")
                             .setVersionMajor(VERSION_MAJOR_MAX_VALUE + 1)
                             .setVersionMinor(0)
-                            .setCertificateDigest(VALID_CERT_FINGERPRINT))
+                            .setCertificateDigest(VALID_CERT_FINGERPRINT)
+                            .setResourcesPackageId(2))
                     .addRuntimeEnabledSdk(
                         RuntimeEnabledSdk.newBuilder()
                             .setPackageName("package.name.2")
                             .setVersionMajor(1234)
-                            .setCertificateDigest(VALID_CERT_FINGERPRINT))
+                            .setCertificateDigest(VALID_CERT_FINGERPRINT)
+                            .setResourcesPackageId(3))
                     .build())
             .build();
 
@@ -223,12 +235,14 @@ public final class RuntimeEnabledSdkConfigValidatorTest {
                             .setPackageName("package.name.1")
                             .setVersionMajor(0)
                             .setVersionMinor(-1)
-                            .setCertificateDigest(VALID_CERT_FINGERPRINT))
+                            .setCertificateDigest(VALID_CERT_FINGERPRINT)
+                            .setResourcesPackageId(2))
                     .addRuntimeEnabledSdk(
                         RuntimeEnabledSdk.newBuilder()
                             .setPackageName("package.name.2")
                             .setVersionMajor(1234)
-                            .setCertificateDigest(VALID_CERT_FINGERPRINT))
+                            .setCertificateDigest(VALID_CERT_FINGERPRINT)
+                            .setResourcesPackageId(3))
                     .build())
             .build();
 
@@ -246,6 +260,43 @@ public final class RuntimeEnabledSdkConfigValidatorTest {
   }
 
   @Test
+  public void validateAllModules_negativeVersionPatchInRuntimeEnabledSdkConfig_throws() {
+    BundleModule module =
+        new BundleModuleBuilder("module")
+            .setManifest(androidManifest("com.test.app"))
+            .setRuntimeEnabledSdkConfig(
+                RuntimeEnabledSdkConfig.newBuilder()
+                    .addRuntimeEnabledSdk(
+                        RuntimeEnabledSdk.newBuilder()
+                            .setPackageName("package.name.1")
+                            .setVersionMajor(0)
+                            .setVersionMinor(1)
+                            .setBuildTimeVersionPatch(-1)
+                            .setCertificateDigest(VALID_CERT_FINGERPRINT)
+                            .setResourcesPackageId(2))
+                    .addRuntimeEnabledSdk(
+                        RuntimeEnabledSdk.newBuilder()
+                            .setPackageName("package.name.2")
+                            .setVersionMajor(1234)
+                            .setCertificateDigest(VALID_CERT_FINGERPRINT)
+                            .setResourcesPackageId(3))
+                    .build())
+            .build();
+
+    InvalidBundleException exception =
+        assertThrows(
+            InvalidBundleException.class,
+            () ->
+                new RuntimeEnabledSdkConfigValidator()
+                    .validateAllModules(ImmutableList.of(module)));
+    assertThat(exception)
+        .hasMessageThat()
+        .contains(
+            "Found dependency on runtime-enabled SDK 'package.name.1' with a negative patch"
+                + " version.");
+  }
+
+  @Test
   public void validateAllModules_versionMinorTooBigInRuntimeEnabledSdkConfig_throws() {
     BundleModule module =
         new BundleModuleBuilder("module")
@@ -257,12 +308,14 @@ public final class RuntimeEnabledSdkConfigValidatorTest {
                             .setPackageName("package.name.1")
                             .setVersionMajor(0)
                             .setVersionMinor(VERSION_MINOR_MAX_VALUE + 1)
-                            .setCertificateDigest(VALID_CERT_FINGERPRINT))
+                            .setCertificateDigest(VALID_CERT_FINGERPRINT)
+                            .setResourcesPackageId(2))
                     .addRuntimeEnabledSdk(
                         RuntimeEnabledSdk.newBuilder()
                             .setPackageName("package.name.2")
                             .setVersionMajor(1234)
-                            .setCertificateDigest(VALID_CERT_FINGERPRINT))
+                            .setCertificateDigest(VALID_CERT_FINGERPRINT)
+                            .setResourcesPackageId(3))
                     .build())
             .build();
 
@@ -291,12 +344,14 @@ public final class RuntimeEnabledSdkConfigValidatorTest {
                         RuntimeEnabledSdk.newBuilder()
                             // not setting certificate digest.
                             .setPackageName("package.name.1")
-                            .setVersionMajor(1234))
+                            .setVersionMajor(1234)
+                            .setResourcesPackageId(2))
                     .addRuntimeEnabledSdk(
                         RuntimeEnabledSdk.newBuilder()
                             .setPackageName("package.name.2")
                             .setVersionMajor(1234)
-                            .setCertificateDigest(VALID_CERT_FINGERPRINT))
+                            .setCertificateDigest(VALID_CERT_FINGERPRINT)
+                            .setResourcesPackageId(3))
                     .build())
             .build();
 
@@ -325,12 +380,14 @@ public final class RuntimeEnabledSdkConfigValidatorTest {
                             // setting certificate digest with bad format.
                             .setPackageName("package.name.1")
                             .setVersionMajor(1234)
-                            .setCertificateDigest("abcd"))
+                            .setCertificateDigest("abcd")
+                            .setResourcesPackageId(2))
                     .addRuntimeEnabledSdk(
                         RuntimeEnabledSdk.newBuilder()
                             .setPackageName("package.name.2")
                             .setVersionMajor(1234)
-                            .setCertificateDigest(VALID_CERT_FINGERPRINT))
+                            .setCertificateDigest(VALID_CERT_FINGERPRINT)
+                            .setResourcesPackageId(3))
                     .build())
             .build();
 
@@ -348,24 +405,25 @@ public final class RuntimeEnabledSdkConfigValidatorTest {
   }
 
   @Test
-  public void validateAllModules_duplicateRuntimeEnabledSdkPackageNames_throws() {
-    RuntimeEnabledSdkConfig runtimeEnabledSdkConfig =
-        RuntimeEnabledSdkConfig.newBuilder()
-            .addRuntimeEnabledSdk(
-                RuntimeEnabledSdk.newBuilder()
-                    .setPackageName("package.name.1")
-                    .setVersionMajor(1234)
-                    .setCertificateDigest(VALID_CERT_FINGERPRINT))
-            .build();
-    BundleModule module1 =
+  public void validateAllModules_illegalResourcesPackageId_throws() {
+    BundleModule module =
         new BundleModuleBuilder("module")
             .setManifest(androidManifest("com.test.app"))
-            .setRuntimeEnabledSdkConfig(runtimeEnabledSdkConfig)
-            .build();
-    BundleModule module2 =
-        new BundleModuleBuilder("module")
-            .setManifest(androidManifest("com.test.app"))
-            .setRuntimeEnabledSdkConfig(runtimeEnabledSdkConfig)
+            .setRuntimeEnabledSdkConfig(
+                RuntimeEnabledSdkConfig.newBuilder()
+                    .addRuntimeEnabledSdk(
+                        RuntimeEnabledSdk.newBuilder()
+                            .setPackageName("package.name.1")
+                            .setVersionMajor(1234)
+                            .setCertificateDigest(VALID_CERT_FINGERPRINT)
+                            .setResourcesPackageId(2))
+                    .addRuntimeEnabledSdk(
+                        RuntimeEnabledSdk.newBuilder()
+                            .setPackageName("package.name.2")
+                            .setVersionMajor(1234)
+                            .setCertificateDigest(VALID_CERT_FINGERPRINT)
+                            .setResourcesPackageId(-1))
+                    .build())
             .build();
 
     InvalidBundleException exception =
@@ -373,9 +431,47 @@ public final class RuntimeEnabledSdkConfigValidatorTest {
             InvalidBundleException.class,
             () ->
                 new RuntimeEnabledSdkConfigValidator()
-                    .validateAllModules(ImmutableList.of(module1, module2)));
+                    .validateAllModules(ImmutableList.of(module)));
     assertThat(exception)
         .hasMessageThat()
-        .contains("Found multiple dependencies on the same runtime-enabled SDK 'package.name.1'.");
+        .contains(
+            "Illegal value of resources_package_id in RuntimeEnabledSdkConfig for SDK"
+                + " 'package.name.2': value must be an integer between 2 and 255, but was -1");
+  }
+
+  @Test
+  public void validateAllModules_duplicateResourcesPackageIds_throws() {
+    BundleModule module =
+        new BundleModuleBuilder("module")
+            .setManifest(androidManifest("com.test.app"))
+            .setRuntimeEnabledSdkConfig(
+                RuntimeEnabledSdkConfig.newBuilder()
+                    .addRuntimeEnabledSdk(
+                        RuntimeEnabledSdk.newBuilder()
+                            .setPackageName("package.name.1")
+                            .setVersionMajor(1234)
+                            .setCertificateDigest(VALID_CERT_FINGERPRINT)
+                            .setResourcesPackageId(2))
+                    .addRuntimeEnabledSdk(
+                        RuntimeEnabledSdk.newBuilder()
+                            .setPackageName("package.name.2")
+                            .setVersionMajor(1234)
+                            .setCertificateDigest(VALID_CERT_FINGERPRINT)
+                            .setResourcesPackageId(2))
+                    .build())
+            .build();
+
+    InvalidBundleException exception =
+        assertThrows(
+            InvalidBundleException.class,
+            () ->
+                new RuntimeEnabledSdkConfigValidator()
+                    .validateAllModules(ImmutableList.of(module)));
+    assertThat(exception)
+        .hasMessageThat()
+        .contains(
+            "Found dependencies on runtime-enabled SDKs 'package.name.1, package.name.2', which"
+                + " specify the same 'resources_package_id' value 2. resources_package_id values"
+                + " must be unique across all runtime-enabled SDK dependencies.");
   }
 }

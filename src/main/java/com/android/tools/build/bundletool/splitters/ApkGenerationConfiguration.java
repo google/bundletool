@@ -40,6 +40,8 @@ public abstract class ApkGenerationConfiguration {
 
   public abstract boolean getEnableDexCompressionSplitter();
 
+  public abstract boolean getEnableSparseEncodingVariant();
+
   public abstract boolean isInstallableOnExternalStorage();
 
   /**
@@ -80,6 +82,7 @@ public abstract class ApkGenerationConfiguration {
         .setForInstantAppVariants(false)
         .setEnableUncompressedNativeLibraries(false)
         .setEnableDexCompressionSplitter(false)
+        .setEnableSparseEncodingVariant(false)
         .setInstallableOnExternalStorage(false)
         .setAbisForPlaceholderLibs(ImmutableSet.of())
         .setOptimizationDimensions(ImmutableSet.of())
@@ -108,6 +111,8 @@ public abstract class ApkGenerationConfiguration {
         boolean enableUncompressedNativeLibraries);
 
     public abstract Builder setEnableDexCompressionSplitter(boolean enableDexCompressionSplitter);
+
+    public abstract Builder setEnableSparseEncodingVariant(boolean enableSparseEncoding);
 
     public abstract Builder setAbisForPlaceholderLibs(ImmutableSet<Abi> abis);
 

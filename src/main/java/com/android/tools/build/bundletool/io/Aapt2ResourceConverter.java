@@ -146,7 +146,8 @@ class Aapt2ResourceConverter {
      */
     private Path convertAndOptimizeProtoApk(ModuleSplit split, Path protoApkPath) {
       Path binaryApkPath = filesManager.getNextAapt2BinaryApkPath();
-      if (enableSparseEncoding && split.getResourceTable().isPresent()) {
+      if ((enableSparseEncoding || split.getSparseEncoding())
+          && split.getResourceTable().isPresent()) {
         Path interimApkPath = filesManager.getNextAapt2BinaryApkPath();
         aapt2Command.convertApkProtoToBinary(protoApkPath, interimApkPath);
         aapt2Command.optimizeToSparseResourceTables(interimApkPath, binaryApkPath);

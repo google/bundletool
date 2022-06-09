@@ -40,6 +40,8 @@ import com.android.tools.build.bundletool.model.ModuleEntry.ModuleEntryBundleLoc
 import com.android.tools.build.bundletool.model.exceptions.InvalidBundleException;
 import com.android.tools.build.bundletool.testing.AppBundleBuilder;
 import com.android.tools.build.bundletool.testing.BundleConfigBuilder;
+import com.android.tools.build.bundletool.testing.BundleModuleBuilder;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.io.ByteSource;
 import java.nio.file.Path;
@@ -481,6 +483,36 @@ public class AppBundleTest {
   }
 
   @Test
+  public void localeConfigEnabled_notPresent_false() throws Exception {
+    AppBundle appBundle =
+        new AppBundleBuilder()
+            .setBundleConfig(BundleConfigBuilder.create().build())
+            .addModule("base", builder -> builder.setManifest(MANIFEST))
+            .build();
+    assertThat(appBundle.injectLocaleConfig()).isFalse();
+  }
+
+  @Test
+  public void localeConfigEnabled_true() throws Exception {
+    AppBundle appBundle =
+        new AppBundleBuilder()
+            .setBundleConfig(BundleConfigBuilder.create().setInjectLocaleConfig(true).build())
+            .addModule("base", builder -> builder.setManifest(MANIFEST))
+            .build();
+    assertThat(appBundle.injectLocaleConfig()).isTrue();
+  }
+
+  @Test
+  public void localeConfigEnabled_false() throws Exception {
+    AppBundle appBundle =
+        new AppBundleBuilder()
+            .setBundleConfig(BundleConfigBuilder.create().setInjectLocaleConfig(false).build())
+            .addModule("base", builder -> builder.setManifest(MANIFEST))
+            .build();
+    assertThat(appBundle.injectLocaleConfig()).isFalse();
+  }
+
+  @Test
   public void getRuntimeEnabledSdkDependencies_empty() {
     AppBundle appBundle =
         new AppBundleBuilder().addModule("base", builder -> builder.setManifest(MANIFEST)).build();
@@ -529,6 +561,40 @@ public class AppBundleTest {
             ImmutableMap.of(
                     "com.test.sdk1", runtimeEnabledSdk1, "com.test.sdk2", runtimeEnabledSdk2)
                 .entrySet());
+  }
+
+  @Test
+  public void duplicateRuntimeEnabledSdkDependencies_buildThrows() {
+    RuntimeEnabledSdkConfig runtimeEnabledSdkConfig =
+        RuntimeEnabledSdkConfig.newBuilder()
+            .addRuntimeEnabledSdk(
+                RuntimeEnabledSdk.newBuilder()
+                    .setPackageName("com.test.sdk")
+                    .setVersionMajor(12345)
+                    .setCertificateDigest("AA:BB:CC"))
+            .build();
+    BundleModule module1 =
+        new BundleModuleBuilder("base")
+            .setManifest(MANIFEST)
+            .setRuntimeEnabledSdkConfig(runtimeEnabledSdkConfig)
+            .build();
+    BundleModule module2 =
+        new BundleModuleBuilder("feature")
+            .setManifest(MANIFEST)
+            .setRuntimeEnabledSdkConfig(runtimeEnabledSdkConfig)
+            .build();
+
+    Throwable e =
+        assertThrows(
+            InvalidBundleException.class,
+            () ->
+                AppBundle.buildFromModules(
+                    ImmutableList.of(module1, module2),
+                    BundleConfig.getDefaultInstance(),
+                    BundleMetadata.builder().build()));
+    assertThat(e)
+        .hasMessageThat()
+        .contains("Found multiple dependencies on the same runtime-enabled SDK 'com.test.sdk'.");
   }
 
   private static ZipBuilder createBasicZipBuilder(BundleConfig config) {

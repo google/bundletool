@@ -16,23 +16,23 @@
 
 package com.android.tools.build.bundletool.testing;
 
+import static com.android.tools.build.bundletool.model.utils.BundleParser.SDK_BUNDLE_CONFIG_FILE_NAME;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifest;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withInstallLocation;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withMinSdkVersion;
+import static com.android.tools.build.bundletool.testing.SdkBundleBuilder.DEFAULT_SDK_MODULES_CONFIG;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.truth.Truth.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.android.aapt.Resources.XmlNode;
-import com.android.bundle.Config.Bundletool;
-import com.android.bundle.SdkModulesConfigOuterClass.SdkModulesConfig;
+import com.android.bundle.SdkBundleConfigProto.SdkBundleConfig;
 import com.android.tools.build.bundletool.flags.Flag.RequiredFlagNotSetException;
 import com.android.tools.build.bundletool.io.ZipBuilder;
 import com.android.tools.build.bundletool.model.AndroidManifest;
 import com.android.tools.build.bundletool.model.ModuleEntry;
 import com.android.tools.build.bundletool.model.SigningConfiguration;
 import com.android.tools.build.bundletool.model.ZipPath;
-import com.android.tools.build.bundletool.model.version.BundleToolVersion;
 import com.google.common.collect.ImmutableList;
 import com.google.common.io.ByteSource;
 import com.google.protobuf.ExtensionRegistry;
@@ -61,7 +61,6 @@ import org.junit.jupiter.api.function.Executable;
 public final class TestUtils {
 
   private static final byte[] DUMMY_CONTENT = new byte[1];
-  private static final SdkModulesConfig SDK_MODULES_CONFIG = getSdkModulesConfig();
   private static final String PACKAGE_NAME = "com.test.sdk.detail";
   private static final XmlNode MANIFEST = createSdkAndroidManifest();
 
@@ -197,7 +196,9 @@ public final class TestUtils {
   public static ZipBuilder createZipBuilderForSdkBundle() {
     return new ZipBuilder()
         .addFileWithContent(
-            ZipPath.create("BUNDLE-METADATA/some.namespace/metadata1"), new byte[] {0x01});
+            ZipPath.create("BUNDLE-METADATA/some.namespace/metadata1"), new byte[] {0x01})
+        .addFileWithProtoContent(
+            ZipPath.create(SDK_BUNDLE_CONFIG_FILE_NAME), SdkBundleConfig.getDefaultInstance());
   }
 
   public static ZipBuilder createZipBuilderForModules() {
@@ -205,14 +206,14 @@ public final class TestUtils {
         .addFileWithProtoContent(ZipPath.create("base/manifest/AndroidManifest.xml"), MANIFEST)
         .addFileWithContent(ZipPath.create("base/dex/classes.dex"), DUMMY_CONTENT)
         .addFileWithContent(
-            ZipPath.create("SdkModulesConfig.pb"), SDK_MODULES_CONFIG.toByteArray());
+            ZipPath.create("SdkModulesConfig.pb"), DEFAULT_SDK_MODULES_CONFIG.toByteArray());
   }
 
   public static ZipBuilder createZipBuilderForModulesWithoutManifest() {
     return new ZipBuilder()
         .addFileWithContent(ZipPath.create("base/dex/classes.dex"), DUMMY_CONTENT)
         .addFileWithContent(
-            ZipPath.create("SdkModulesConfig.pb"), SDK_MODULES_CONFIG.toByteArray());
+            ZipPath.create("SdkModulesConfig.pb"), DEFAULT_SDK_MODULES_CONFIG.toByteArray());
   }
 
   public static ZipBuilder createZipBuilderForModulesWithInvalidManifest() {
@@ -221,14 +222,7 @@ public final class TestUtils {
             ZipPath.create("base/manifest/AndroidManifest.xml"), createInvalidSdkAndroidManifest())
         .addFileWithContent(ZipPath.create("base/dex/classes.dex"), DUMMY_CONTENT)
         .addFileWithContent(
-            ZipPath.create("SdkModulesConfig.pb"), SDK_MODULES_CONFIG.toByteArray());
-  }
-
-  private static SdkModulesConfig getSdkModulesConfig() {
-    return SdkModulesConfig.newBuilder()
-        .setBundletool(
-            Bundletool.newBuilder().setVersion(BundleToolVersion.getCurrentVersion().toString()))
-        .build();
+            ZipPath.create("SdkModulesConfig.pb"), DEFAULT_SDK_MODULES_CONFIG.toByteArray());
   }
 
   public static XmlNode createSdkAndroidManifest() {

@@ -18,11 +18,13 @@ package com.android.tools.build.bundletool.model;
 
 import static com.android.tools.build.bundletool.model.utils.BundleParser.extractModules;
 import static com.android.tools.build.bundletool.model.utils.BundleParser.readBundleMetadata;
+import static com.android.tools.build.bundletool.model.utils.BundleParser.readSdkBundleConfig;
 import static com.android.tools.build.bundletool.model.utils.BundleParser.readSdkModulesConfig;
 import static com.android.tools.build.bundletool.model.utils.BundleParser.sanitize;
 import static com.google.common.base.Preconditions.checkState;
 
 import com.android.bundle.Config.BundleConfig.BundleType;
+import com.android.bundle.SdkBundleConfigProto.SdkBundleConfig;
 import com.android.bundle.SdkModulesConfigOuterClass.SdkModulesConfig;
 import com.android.tools.build.bundletool.model.version.Version;
 import com.google.auto.value.AutoValue;
@@ -40,6 +42,7 @@ public abstract class SdkBundle implements Bundle {
   public static SdkBundle buildFromZip(
       ZipFile bundleFile, ZipFile modulesFile, Integer versionCode) {
     SdkModulesConfig sdkModulesConfig = readSdkModulesConfig(modulesFile);
+    SdkBundleConfig sdkBundleConfig = readSdkBundleConfig(bundleFile);
 
     return builder()
         .setModule(
@@ -52,6 +55,7 @@ public abstract class SdkBundle implements Bundle {
                         /* nonModuleDirectories= */ ImmutableSet.of()))
                 .get(0))
         .setSdkModulesConfig(sdkModulesConfig)
+        .setSdkBundleConfig(sdkBundleConfig)
         .setBundleMetadata(readBundleMetadata(bundleFile))
         .setVersionCode(versionCode)
         .build();
@@ -67,10 +71,12 @@ public abstract class SdkBundle implements Bundle {
 
   public abstract SdkModulesConfig getSdkModulesConfig();
 
+  public abstract SdkBundleConfig getSdkBundleConfig();
+
   @Override
   public abstract BundleMetadata getBundleMetadata();
 
-  public abstract Integer getVersionCode();
+  public abstract Optional<Integer> getVersionCode();
 
   public Version getBundletoolVersion() {
     return Version.of(getSdkModulesConfig().getBundletool().getVersion());
@@ -100,6 +106,11 @@ public abstract class SdkBundle implements Bundle {
   /** Gets the patch version of the SDK bundle. */
   public int getPatchVersion() {
     return getSdkModulesConfig().getSdkVersion().getPatch();
+  }
+
+  /** Gets the SDK provider class name. */
+  public String getProviderClassName() {
+    return getSdkModulesConfig().getSdkProviderClassName();
   }
 
   /**
@@ -141,6 +152,8 @@ public abstract class SdkBundle implements Bundle {
     public abstract Builder setModule(BundleModule module);
 
     public abstract Builder setSdkModulesConfig(SdkModulesConfig sdkModulesConfig);
+
+    public abstract Builder setSdkBundleConfig(SdkBundleConfig sdkBundleConfig);
 
     public abstract Builder setBundleMetadata(BundleMetadata bundleMetadata);
 

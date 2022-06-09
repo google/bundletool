@@ -18,7 +18,11 @@ package com.android.tools.build.bundletool.archive;
 
 import static com.android.tools.build.bundletool.model.AndroidManifest.ANDROID_NAMESPACE_URI;
 import static com.android.tools.build.bundletool.model.AndroidManifest.LAUNCHER_CATEGORY_NAME;
+import static com.android.tools.build.bundletool.model.AndroidManifest.LEANBACK_FEATURE_NAME;
+import static com.android.tools.build.bundletool.model.AndroidManifest.LEANBACK_LAUNCHER_CATEGORY_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.MAIN_ACTION_NAME;
+import static com.android.tools.build.bundletool.model.AndroidManifest.META_DATA_GMS_VERSION;
+import static com.android.tools.build.bundletool.model.AndroidManifest.TOUCHSCREEN_FEATURE_NAME;
 import static com.google.common.base.Preconditions.checkNotNull;
 
 import com.android.tools.build.bundletool.model.AndroidManifest;
@@ -29,6 +33,7 @@ import com.android.tools.build.bundletool.model.manifestelements.Receiver;
 import com.android.tools.build.bundletool.model.utils.xmlproto.XmlProtoElementBuilder;
 import com.android.tools.build.bundletool.model.utils.xmlproto.XmlProtoNode;
 import com.android.tools.build.bundletool.model.version.BundleToolVersion;
+import com.google.common.collect.ImmutableList;
 import java.util.Optional;
 
 /** Utility methods for creation of archived manifest. */
@@ -45,6 +50,39 @@ public final class ArchivedAndroidManifestUtils {
   public static final String MY_PACKAGE_REPLACED_ACTION_NAME =
       "android.intent.action.MY_PACKAGE_REPLACED";
 
+  // Resource IDs
+  public static final ImmutableList<Integer> MANIFEST_ATTRIBUTES_TO_KEEP =
+      ImmutableList.of(
+          AndroidManifest.VERSION_CODE_RESOURCE_ID,
+          AndroidManifest.VERSION_NAME_RESOURCE_ID,
+          AndroidManifest.SHARED_USER_ID_RESOURCE_ID,
+          AndroidManifest.SHARED_USER_LABEL_RESOURCE_ID,
+          AndroidManifest.TARGET_SANDBOX_VERSION_RESOURCE_ID);
+
+  // Resource IDs
+  public static final ImmutableList<Integer> APPLICATION_ATTRIBUTES_TO_KEEP =
+      ImmutableList.of(
+          AndroidManifest.DESCRIPTION_RESOURCE_ID,
+          AndroidManifest.HAS_FRAGILE_USER_DATA_RESOURCE_ID,
+          AndroidManifest.IS_GAME_RESOURCE_ID,
+          AndroidManifest.ICON_RESOURCE_ID,
+          AndroidManifest.BANNER_RESOURCE_ID,
+          AndroidManifest.LABEL_RESOURCE_ID,
+          AndroidManifest.FULL_BACKUP_ONLY_RESOURCE_ID,
+          AndroidManifest.FULL_BACKUP_CONTENT_RESOURCE_ID,
+          AndroidManifest.DATA_EXTRACTION_RULES_RESOURCE_ID,
+          AndroidManifest.RESTRICTED_ACCOUNT_TYPE_RESOURCE_ID,
+          AndroidManifest.REQUIRED_ACCOUNT_TYPE_RESOURCE_ID,
+          AndroidManifest.LARGE_HEAP_RESOURCE_ID);
+
+  // Names
+  public static final ImmutableList<String> CHILDREN_ELEMENTS_TO_KEEP =
+      ImmutableList.of(
+          AndroidManifest.USES_SDK_ELEMENT_NAME,
+          AndroidManifest.PERMISSION_ELEMENT_NAME,
+          AndroidManifest.PERMISSION_GROUP_ELEMENT_NAME,
+          AndroidManifest.PERMISSION_TREE_ELEMENT_NAME);
+
   public static AndroidManifest createArchivedManifest(AndroidManifest manifest) {
     checkNotNull(manifest);
 
@@ -53,42 +91,26 @@ public final class ArchivedAndroidManifestUtils {
             .setPackage(manifest.getPackageName())
             .addMetaDataBoolean(META_DATA_KEY_ARCHIVED, true);
 
-    manifest.getVersionCode().ifPresent(editor::setVersionCode);
-    manifest.getVersionName().ifPresent(editor::setVersionName);
-    manifest.getSharedUserId().ifPresent(editor::setSharedUserId);
-    manifest.getSharedUserLabel().ifPresent(editor::setSharedUserLabel);
-    manifest.getMinSdkVersion().ifPresent(editor::setMinSdkVersion);
-    manifest.getMaxSdkVersion().ifPresent(editor::setMaxSdkVersion);
-    manifest.getTargetSdkVersion().ifPresent(editor::setTargetSdkVersion);
-    manifest.getTargetSandboxVersion().ifPresent(editor::setTargetSandboxVersion);
+    MANIFEST_ATTRIBUTES_TO_KEEP.forEach(
+        attrResourceId -> editor.copyManifestElementAndroidAttribute(manifest, attrResourceId));
 
     if (manifest.hasApplicationElement()) {
-      manifest.getDescription().ifPresent(editor::setDescription);
-      manifest.getHasFragileUserData().ifPresent(editor::setHasFragileUserData);
-      manifest.getIsGame().ifPresent(editor::setIsGame);
-      manifest.getIcon().ifPresent(editor::setIcon);
-      manifest.getBanner().ifPresent(editor::setBanner);
-      if (manifest.hasLabelString()) {
-        manifest.getLabelString().ifPresent(editor::setLabelAsString);
-      }
-      if (manifest.hasLabelRefId()) {
-        manifest.getLabelRefId().ifPresent(editor::setLabelAsRefId);
-      }
+      APPLICATION_ATTRIBUTES_TO_KEEP.forEach(
+          attrResourceId ->
+              editor.copyApplicationElementAndroidAttribute(manifest, attrResourceId));
       getArchivedAllowBackup(manifest).ifPresent(editor::setAllowBackup);
-      manifest.getFullBackupOnly().ifPresent(editor::setFullBackupOnly);
-      manifest.getFullBackupContent().ifPresent(editor::setFullBackupContent);
-      manifest.getDataExtractionRules().ifPresent(editor::setDataExtractionRules);
-      manifest.getRestrictedAccountType().ifPresent(editor::setRestrictedAccountType);
-      manifest.getRequiredAccountType().ifPresent(editor::setRequiredAccountType);
-      manifest.getLargeHeap().ifPresent(editor::setLargeHeap);
     }
 
-    editor.copyPermissions(manifest);
-    editor.copyPermissionGroups(manifest);
-    editor.copyPermissionTrees(manifest);
+    manifest
+        .getMetadataElement(META_DATA_GMS_VERSION)
+        .ifPresent(editor::addApplicationChildElement);
 
-    editor.addActivity(createReactivateActivity());
+    CHILDREN_ELEMENTS_TO_KEEP.forEach(
+        elementName -> editor.copyChildrenElements(manifest, elementName));
+
+    editor.addActivity(createReactivateActivity(manifest));
     editor.addReceiver(createUpdateBroadcastReceiver());
+    addTvSupportIfRequired(editor, manifest);
 
     return editor.save();
   }
@@ -110,18 +132,25 @@ public final class ArchivedAndroidManifestUtils {
             .build());
   }
 
-  private static Activity createReactivateActivity() {
+  private static Activity createReactivateActivity(AndroidManifest manifest) {
+    IntentFilter.Builder intentFilterBuilder =
+        IntentFilter.builder().addActionName(MAIN_ACTION_NAME);
+    // At least one of hasMainActivity and hasMainTvActivity is true, otherwise the app is headless
+    // and archived APK cannot be generated.
+    if (manifest.hasMainActivity()) {
+      intentFilterBuilder.addCategoryName(LAUNCHER_CATEGORY_NAME);
+    }
+    if (manifest.hasMainTvActivity()) {
+      intentFilterBuilder.addCategoryName(LEANBACK_LAUNCHER_CATEGORY_NAME);
+    }
+
     return Activity.builder()
         .setName(REACTIVATE_ACTIVITY_NAME)
         .setTheme(HOLO_LIGHT_NO_ACTION_BAR_THEME)
         .setExported(true)
         .setExcludeFromRecents(true)
         .setStateNotNeeded(true)
-        .setIntentFilter(
-            IntentFilter.builder()
-                .setActionName(MAIN_ACTION_NAME)
-                .setCategoryName(LAUNCHER_CATEGORY_NAME)
-                .build())
+        .setIntentFilter(intentFilterBuilder.build())
         .build();
   }
 
@@ -130,9 +159,20 @@ public final class ArchivedAndroidManifestUtils {
         .setName(UPDATE_BROADCAST_RECEIVER_NAME)
         .setExported(true)
         .setIntentFilter(
-            IntentFilter.builder().setActionName(MY_PACKAGE_REPLACED_ACTION_NAME).build())
+            IntentFilter.builder().addActionName(MY_PACKAGE_REPLACED_ACTION_NAME).build())
         .build();
   }
+
+  private static void addTvSupportIfRequired(
+      ManifestEditor editor, AndroidManifest originalManifest) {
+    if (!originalManifest.hasMainTvActivity()) {
+      return;
+    }
+
+    editor.addUsesFeatureElement(LEANBACK_FEATURE_NAME, /* isRequired= */ false);
+    editor.addUsesFeatureElement(TOUCHSCREEN_FEATURE_NAME, /* isRequired= */ false);
+  }
+
 
   private ArchivedAndroidManifestUtils() {}
 }

@@ -95,11 +95,15 @@ public abstract class BuildSdkApksModule {
     return command.getExecutorService();
   }
 
-  @BindsOptionalOf
-  abstract ApkListener bindOptionalApkListener();
+  @Provides
+  static Optional<ApkListener> provideApkListener(BuildSdkApksCommand command) {
+    return command.getApkListener();
+  }
 
-  @BindsOptionalOf
-  abstract ApkModifier bindOptionalApkModifier();
+  @Provides
+  static Optional<ApkModifier> provideApkModifier(BuildSdkApksCommand command) {
+    return command.getApkModifier();
+  }
 
   @BindsOptionalOf
   abstract P7ZipCommand bindOptionalP7ZipCommand();
@@ -116,8 +120,8 @@ public abstract class BuildSdkApksModule {
 
   @BuildApksModule.FirstVariantNumber
   @Provides
-  static Optional<Integer> provideFirstVariantNumber() {
-    return Optional.of(0);
+  static Optional<Integer> provideFirstVariantNumber(BuildSdkApksCommand command) {
+    return command.getFirstVariantNumber();
   }
 
   @Provides

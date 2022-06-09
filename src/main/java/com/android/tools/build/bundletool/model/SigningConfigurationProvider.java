@@ -40,7 +40,7 @@ public interface SigningConfigurationProvider {
 
     /**
      * Minimum platform API version that the APK will be installed on. This is derived as the
-     * highest version out of the minSdkVersion (from Android manifest) and the ApkTargeting.
+     * highest version out of the minSdkVersion (from Android manifest), and the ApkTargeting
      */
     public int getMinSdkVersionTargeting() {
       int minApkTargetingSdkVersion = getMinSdk(getApkTargeting().getSdkVersionTargeting());

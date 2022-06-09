@@ -94,7 +94,8 @@ import com.android.tools.build.bundletool.testing.TestModule;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
-import com.google.common.collect.Maps;
+import com.google.common.collect.ListMultimap;
+import com.google.common.collect.Multimaps;
 import dagger.Component;
 import java.nio.file.Path;
 import java.util.HashMap;
@@ -950,8 +951,9 @@ public class ModuleSplitsToShardMergerTest {
     return mergedDexEntry.getContent().read();
   }
 
-  private static Map<String, Integer> extractActivityThemeRefIds(AndroidManifest manifest) {
-    return Maps.transformValues(
+  private static ListMultimap<String, Integer> extractActivityThemeRefIds(
+      AndroidManifest manifest) {
+    return Multimaps.transformValues(
         manifest.getActivitiesByName(),
         el -> el.getAndroidAttribute(THEME_RESOURCE_ID).get().getValueAsRefId());
   }

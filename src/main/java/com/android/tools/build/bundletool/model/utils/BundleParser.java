@@ -22,6 +22,7 @@ import static com.google.common.collect.ImmutableSet.toImmutableSet;
 import com.android.bundle.Config.ApexConfig;
 import com.android.bundle.Config.BundleConfig;
 import com.android.bundle.Config.BundleConfig.BundleType;
+import com.android.bundle.SdkBundleConfigProto.SdkBundleConfig;
 import com.android.bundle.SdkModulesConfigOuterClass.SdkModulesConfig;
 import com.android.tools.build.bundletool.model.BundleMetadata;
 import com.android.tools.build.bundletool.model.BundleModule;
@@ -60,6 +61,8 @@ public class BundleParser {
   public static final String BUNDLE_CONFIG_FILE_NAME = "BundleConfig.pb";
 
   public static final String SDK_MODULES_CONFIG_FILE_NAME = "SdkModulesConfig.pb";
+
+  public static final String SDK_BUNDLE_CONFIG_FILE_NAME = "SdkBundleConfig.pb";
 
   /**
    * File name of the zip that contains runtime enabled SDK modules. This zip is located in the top
@@ -212,6 +215,29 @@ public class BundleParser {
     } catch (IOException e) {
       throw new UncheckedIOException(
           String.format("Error reading file '%s'.", SDK_MODULES_CONFIG_FILE_NAME), e);
+    }
+  }
+
+  /** Loads {@value #SDK_BUNDLE_CONFIG_FILE_NAME} from zip file into {@link SdkBundleConfig}. */
+  @SuppressWarnings("ProtoParseWithRegistry")
+  public static SdkBundleConfig readSdkBundleConfig(ZipFile bundleFile) {
+    ZipEntry sdkBundleConfigEntry = bundleFile.getEntry(SDK_BUNDLE_CONFIG_FILE_NAME);
+    if (sdkBundleConfigEntry == null) {
+      return SdkBundleConfig.getDefaultInstance();
+    }
+
+    try {
+      return SdkBundleConfig.parseFrom(
+          ZipUtils.asByteSource(bundleFile, sdkBundleConfigEntry).read());
+    } catch (InvalidProtocolBufferException e) {
+      throw InvalidBundleException.builder()
+          .withCause(e)
+          .withUserMessage(
+              "SDK bundle config file '%s' could not be parsed.", SDK_BUNDLE_CONFIG_FILE_NAME)
+          .build();
+    } catch (IOException e) {
+      throw new UncheckedIOException(
+          String.format("Error reading file '%s'.", SDK_BUNDLE_CONFIG_FILE_NAME), e);
     }
   }
 

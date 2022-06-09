@@ -18,6 +18,7 @@ package com.android.tools.build.bundletool.validation;
 
 import com.android.tools.build.bundletool.model.AppBundle;
 import com.android.tools.build.bundletool.model.BundleModule;
+import com.android.tools.build.bundletool.model.SdkBundle;
 import com.android.tools.build.bundletool.model.ZipPath;
 import com.google.common.collect.ImmutableList;
 import java.util.zip.ZipEntry;
@@ -52,6 +53,9 @@ public abstract class SubValidator {
   public void validateAllModules(ImmutableList<BundleModule> modules) {}
 
   public void validateModule(BundleModule module) {}
+
+  /** Validates an SdkBundle object. */
+  public void validateSdkBundle(SdkBundle bundle) {}
 
   /**
    * Validates path of the file.

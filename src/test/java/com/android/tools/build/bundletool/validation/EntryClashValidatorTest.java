@@ -88,9 +88,13 @@ public class EntryClashValidatorTest {
   @Test
   public void differentManifests_ok() throws Exception {
     String filePath = "manifest/AndroidManifest.xml";
-    byte[] fileContentA = XmlNode.getDefaultInstance().toByteArray();
-    byte[] fileContentB =
+    byte[] fileContentA =
         XmlNode.newBuilder().setElement(XmlElement.getDefaultInstance()).build().toByteArray();
+    byte[] fileContentB =
+        XmlNode.newBuilder()
+            .setElement(XmlElement.newBuilder().addChild(XmlNode.getDefaultInstance()))
+            .build()
+            .toByteArray();
     assertThat(fileContentA).isNotEqualTo(fileContentB);
     BundleModule moduleA = new BundleModuleBuilder("a").addFile(filePath, fileContentA).build();
     BundleModule moduleB = new BundleModuleBuilder("b").addFile(filePath, fileContentB).build();

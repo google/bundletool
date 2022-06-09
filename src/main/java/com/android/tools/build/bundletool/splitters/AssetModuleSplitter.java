@@ -20,6 +20,7 @@ import static com.android.tools.build.bundletool.model.utils.Versions.ANDROID_L_
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.collect.ImmutableList.toImmutableList;
+import static java.lang.Math.max;
 
 import com.android.bundle.Targeting.SdkVersion;
 import com.android.bundle.Targeting.SdkVersionTargeting;
@@ -52,8 +53,16 @@ public class AssetModuleSplitter {
 
     ImmutableList<ModuleSplit> splits = splitsBuilder.build();
     if (module.getDeliveryType().equals(ModuleDeliveryType.ALWAYS_INITIAL_INSTALL)) {
+      int masterSplitMinSdk =
+          splits.stream()
+              .filter(ModuleSplit::isMasterSplit)
+              .findFirst()
+              .map(split -> split.getAndroidManifest().getEffectiveMinSdkVersion())
+              .orElse(1);
       splits =
-          splits.stream().map(AssetModuleSplitter::addLPlusApkTargeting).collect(toImmutableList());
+          splits.stream()
+              .map(split -> addDefaultSdkApkTargeting(split, masterSplitMinSdk))
+              .collect(toImmutableList());
     }
     return splits.stream().map(this::setAssetSliceManifest).collect(toImmutableList());
   }
@@ -79,7 +88,7 @@ public class AssetModuleSplitter {
     return new SplittingPipeline(assetsSplitters.build());
   }
 
-  private static ModuleSplit addLPlusApkTargeting(ModuleSplit split) {
+  private static ModuleSplit addDefaultSdkApkTargeting(ModuleSplit split, int masterSplitMinSdk) {
     if (split.getApkTargeting().hasSdkVersionTargeting()) {
       checkState(
           split.getApkTargeting().getSdkVersionTargeting().getValue(0).getMin().getValue()
@@ -88,6 +97,7 @@ public class AssetModuleSplitter {
       return split;
     }
 
+    int defaultSdkVersion = max(masterSplitMinSdk, ANDROID_L_API_VERSION);
     return split.toBuilder()
         .setApkTargeting(
             split.getApkTargeting().toBuilder()
@@ -95,7 +105,7 @@ public class AssetModuleSplitter {
                     SdkVersionTargeting.newBuilder()
                         .addValue(
                             SdkVersion.newBuilder()
-                                .setMin(Int32Value.newBuilder().setValue(ANDROID_L_API_VERSION))))
+                                .setMin(Int32Value.newBuilder().setValue(defaultSdkVersion))))
                 .build())
         .build();
   }

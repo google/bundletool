@@ -924,18 +924,7 @@ public final class ManifestProtoUtils {
                                 .setValueAsString(name))));
   }
 
-  public static ManifestMutator withCustomThemeActivity(String name, int themeRefId) {
-    return withActivity(
-        name,
-        activityBuilder -> {
-          activityBuilder
-              .getOrCreateAndroidAttribute(THEME_ATTRIBUTE_NAME, THEME_RESOURCE_ID)
-              .setValueAsRefId(themeRefId);
-          return activityBuilder;
-        });
-  }
-
-  public static ManifestMutator withMainActivity(String activityName) {
+  private static ManifestMutator withActivity(String activityName, String categoryName) {
     return withActivity(
         activityName,
         activity ->
@@ -952,7 +941,26 @@ public final class ManifestProtoUtils {
                             .addAttribute(
                                 XmlProtoAttributeBuilder.createAndroidAttribute(
                                         NAME_ATTRIBUTE_NAME, NAME_RESOURCE_ID)
-                                    .setValueAsString("android.intent.category.LAUNCHER")))));
+                                    .setValueAsString(categoryName)))));
+  }
+
+  public static ManifestMutator withCustomThemeActivity(String name, int themeRefId) {
+    return withActivity(
+        name,
+        activityBuilder -> {
+          activityBuilder
+              .getOrCreateAndroidAttribute(THEME_ATTRIBUTE_NAME, THEME_RESOURCE_ID)
+              .setValueAsRefId(themeRefId);
+          return activityBuilder;
+        });
+  }
+
+  public static ManifestMutator withMainActivity(String activityName) {
+    return withActivity(activityName, "android.intent.category.LAUNCHER");
+  }
+
+  public static ManifestMutator withMainTvActivity(String activityName) {
+    return withActivity(activityName, "android.intent.category.LEANBACK_LAUNCHER");
   }
 
   public static ManifestMutator withNativeActivity(String libName) {

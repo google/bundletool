@@ -44,10 +44,10 @@ import com.android.tools.build.bundletool.testing.ManifestProtoUtils.ManifestMut
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.ImmutableSetMultimap;
-import com.google.common.collect.Maps;
+import com.google.common.collect.ListMultimap;
+import com.google.common.collect.Multimaps;
 import com.google.common.collect.SetMultimap;
 import java.util.List;
-import java.util.Map;
 import org.junit.Test;
 import org.junit.experimental.theories.Theories;
 import org.junit.experimental.theories.Theory;
@@ -79,10 +79,11 @@ public class FusingAndroidManifestMergerTest {
 
     AndroidManifest merged = createMerger(mode).merge(manifests);
 
-    Map<String, Integer> refIdByActivity =
-        Maps.transformValues(
+    ListMultimap<String, Integer> refIdByActivity =
+        Multimaps.transformValues(
             merged.getActivitiesByName(),
-            activity -> activity.getAndroidAttribute(THEME_RESOURCE_ID).get().getValueAsRefId());
+            activities ->
+                activities.getAndroidAttribute(THEME_RESOURCE_ID).get().getValueAsRefId());
 
     assertThat(merged.getPackageName()).isEqualTo("com.testapp");
     assertThat(refIdByActivity)

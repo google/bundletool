@@ -47,6 +47,7 @@ import static com.android.tools.build.bundletool.model.utils.Versions.ANDROID_M_
 import static com.android.tools.build.bundletool.model.utils.Versions.ANDROID_N_API_VERSION;
 import static com.android.tools.build.bundletool.model.utils.Versions.ANDROID_P_API_VERSION;
 import static com.android.tools.build.bundletool.model.utils.Versions.ANDROID_Q_API_VERSION;
+import static com.android.tools.build.bundletool.model.utils.Versions.ANDROID_S_V2_API_VERSION;
 import static com.android.tools.build.bundletool.model.utils.Versions.ANDROID_T_API_VERSION;
 import static com.android.tools.build.bundletool.testing.ApkSetUtils.extractFromApkSetFile;
 import static com.android.tools.build.bundletool.testing.ApkSetUtils.extractTocFromApkSetFile;
@@ -120,8 +121,8 @@ import static com.google.common.collect.ImmutableMap.toImmutableMap;
 import static com.google.common.collect.ImmutableMultiset.toImmutableMultiset;
 import static com.google.common.collect.ImmutableSet.toImmutableSet;
 import static com.google.common.collect.Iterables.getOnlyElement;
-import static com.google.common.collect.Maps.transformValues;
 import static com.google.common.collect.MoreCollectors.onlyElement;
+import static com.google.common.collect.Multimaps.transformValues;
 import static com.google.common.truth.Truth.assertThat;
 import static com.google.common.truth.Truth8.assertThat;
 import static com.google.common.truth.extensions.proto.ProtoTruth.assertThat;
@@ -206,6 +207,7 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableMultiset;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
+import com.google.common.collect.ListMultimap;
 import com.google.common.collect.Maps;
 import com.google.common.hash.Hashing;
 import com.google.common.io.ByteSource;
@@ -275,6 +277,7 @@ public class BuildApksManagerTest {
   private static final SdkVersion N_SDK_VERSION = sdkVersionFrom(ANDROID_N_API_VERSION);
   private static final SdkVersion P_SDK_VERSION = sdkVersionFrom(ANDROID_P_API_VERSION);
   private static final SdkVersion Q_SDK_VERSION = sdkVersionFrom(ANDROID_Q_API_VERSION);
+  private static final SdkVersion S2_V2_SDK_VERSION = sdkVersionFrom(ANDROID_S_V2_API_VERSION);
 
   @Rule public final TemporaryFolder tmp = new TemporaryFolder();
 
@@ -1172,7 +1175,7 @@ public class BuildApksManagerTest {
     File universalApkFile = extractFromApkSetFile(apkSetFile, universalApk.getPath(), outputDir);
     AndroidManifest manifest = extractAndroidManifest(universalApkFile, tmpDir);
 
-    Map<String, Integer> refIdByActivity =
+    ListMultimap<String, Integer> refIdByActivity =
         transformValues(
             manifest.getActivitiesByName(),
             activity ->
@@ -1250,7 +1253,7 @@ public class BuildApksManagerTest {
     File universalApkFile = extractFromApkSetFile(apkSetFile, universalApk.getPath(), outputDir);
 
     AndroidManifest manifest = extractAndroidManifest(universalApkFile, tmpDir);
-    Map<String, Integer> refIdByActivity =
+    ListMultimap<String, Integer> refIdByActivity =
         transformValues(
             manifest.getActivitiesByName(),
             activity ->
@@ -1953,6 +1956,87 @@ public class BuildApksManagerTest {
   }
 
   @Test
+  public void buildApksCommand_splitApks_localeConfigXmlNotGenerated() throws Exception {
+    AppBundle appBundle =
+        new AppBundleBuilder()
+            .addModule("base",
+                builder ->
+                    builder
+                        .setManifest(androidManifest("com.test.app"))
+                        .setResourceTable(
+                            new ResourceTableBuilder()
+                                .addPackage("com.test.app")
+                                .addStringResourceForMultipleLocales(
+                                    "module", ImmutableMap.of("ru-RU", "module ru-RU"))
+                                .build()))
+            .build();
+
+    TestComponent.useTestModule(
+        this,
+        createTestModuleBuilder().withAppBundle(appBundle).withOutputPath(outputFilePath).build());
+    buildApksManager.execute();
+
+    ZipFile apkSetFile = openZipFile(outputFilePath.toFile());
+    BuildApksResult result = extractTocFromApkSetFile(apkSetFile, outputDir);
+
+    for (Variant splitApkVariant : splitApkVariants(result)) {
+      ApkSet baseModule =
+          splitApkVariant.getApkSetList().stream()
+              .filter(apkSet -> apkSet.getModuleMetadata().getName().equals("base"))
+              .collect(onlyElement());
+
+      ApkDescription baseMasterSplit =
+          baseModule.getApkDescriptionList().stream()
+              .filter(apkDescription -> apkDescription.getSplitApkMetadata().getIsMasterSplit())
+              .collect(onlyElement());
+
+      assertThat(filesInApks(ImmutableList.of(baseMasterSplit), apkSetFile))
+          .doesNotContain("res/xml/locales_config.xml");
+    }
+  }
+
+  @Test
+  public void buildApksCommand_splitApks_localeConfigXmlGenerated() throws Exception {
+    AppBundle appBundle =
+        new AppBundleBuilder()
+          .addModule("base",
+              builder ->
+                  builder
+                      .setManifest(androidManifest("com.test.app"))
+                      .setResourceTable(
+                        new ResourceTableBuilder()
+                            .addPackage("com.test.app")
+                            .addStringResourceForMultipleLocales(
+                                "module", ImmutableMap.of("ru-RU", "module ru-RU"))
+                            .build()))
+          .setBundleConfig(BundleConfigBuilder.create().setInjectLocaleConfig(true).build())
+          .build();
+
+    TestComponent.useTestModule(
+        this,
+        createTestModuleBuilder().withAppBundle(appBundle).withOutputPath(outputFilePath).build());
+    buildApksManager.execute();
+
+    ZipFile apkSetFile = openZipFile(outputFilePath.toFile());
+    BuildApksResult result = extractTocFromApkSetFile(apkSetFile, outputDir);
+
+    for (Variant splitApkVariant : splitApkVariants(result)) {
+      ApkSet baseModule =
+          splitApkVariant.getApkSetList().stream()
+              .filter(apkSet -> apkSet.getModuleMetadata().getName().equals("base"))
+              .collect(onlyElement());
+
+      ApkDescription baseMasterSplit =
+          baseModule.getApkDescriptionList().stream()
+              .filter(apkDescription -> apkDescription.getSplitApkMetadata().getIsMasterSplit())
+              .collect(onlyElement());
+
+     assertThat(filesInApks(ImmutableList.of(baseMasterSplit), apkSetFile))
+          .contains("res/xml/locales_config.xml");
+    }
+  }
+
+  @Test
   public void buildApksCommand_standalone_oneModuleOneVariant() throws Exception {
     AppBundle appBundle =
         new AppBundleBuilder()
@@ -2207,6 +2291,37 @@ public class BuildApksManagerTest {
             splitApkVariants.stream()
                 .map(variant -> variant.getTargeting().getSdkVersionTargeting()))
         .containsExactly(sdkVersionTargeting(L_SDK_VERSION, ImmutableSet.of(LOWEST_SDK_VERSION)));
+  }
+
+  @Test
+  public void enabledSparseEncodingVariant() throws Exception {
+    AppBundle appBundle =
+        new AppBundleBuilder()
+            .addModule(
+                "base",
+                builder ->
+                    builder.setManifest(
+                        androidManifest("com.test.app", withTargetSdkVersion("O.fingerprint"))))
+            .setBundleConfig(BundleConfigBuilder.create().setSparseEncodingForSdk32().build())
+            .build();
+    TestComponent.useTestModule(
+        this,
+        createTestModuleBuilder().withAppBundle(appBundle).withOutputPath(outputFilePath).build());
+
+    buildApksManager.execute();
+
+    ZipFile apkSetFile = openZipFile(outputFilePath.toFile());
+    BuildApksResult result = extractTocFromApkSetFile(apkSetFile, outputDir);
+
+    ImmutableList<Variant> splitApkVariants = splitApkVariants(result);
+    assertThat(
+            splitApkVariants.stream()
+                .map(variant -> variant.getTargeting().getSdkVersionTargeting()))
+        .containsExactly(
+            sdkVersionTargeting(
+                L_SDK_VERSION, ImmutableSet.of(LOWEST_SDK_VERSION, S2_V2_SDK_VERSION)),
+            sdkVersionTargeting(
+                S2_V2_SDK_VERSION, ImmutableSet.of(LOWEST_SDK_VERSION, L_SDK_VERSION)));
   }
 
   @Test
@@ -5924,7 +6039,8 @@ public class BuildApksManagerTest {
                                 RuntimeEnabledSdk.newBuilder()
                                     .setPackageName("com.test.sdk")
                                     .setVersionMajor(1)
-                                    .setCertificateDigest(validCertDigest))
+                                    .setCertificateDigest(validCertDigest)
+                                    .setResourcesPackageId(2))
                             .build())
                     .build())
             .build();

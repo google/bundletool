@@ -21,66 +21,45 @@ import static com.android.tools.build.bundletool.model.AndroidManifest.ALLOW_BAC
 import static com.android.tools.build.bundletool.model.AndroidManifest.ALLOW_BACKUP_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.ANDROID_NAMESPACE_URI;
 import static com.android.tools.build.bundletool.model.AndroidManifest.APPLICATION_ELEMENT_NAME;
-import static com.android.tools.build.bundletool.model.AndroidManifest.BANNER_ATTRIBUTE_NAME;
-import static com.android.tools.build.bundletool.model.AndroidManifest.BANNER_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.CERTIFICATE_DIGEST_ATTRIBUTE_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.CERTIFICATE_DIGEST_RESOURCE_ID;
-import static com.android.tools.build.bundletool.model.AndroidManifest.DATA_EXTRACTION_RULES_ATTRIBUTE_NAME;
-import static com.android.tools.build.bundletool.model.AndroidManifest.DATA_EXTRACTION_RULES_RESOURCE_ID;
-import static com.android.tools.build.bundletool.model.AndroidManifest.DESCRIPTION_ATTRIBUTE_NAME;
-import static com.android.tools.build.bundletool.model.AndroidManifest.DESCRIPTION_RESOURCE_ID;
+import static com.android.tools.build.bundletool.model.AndroidManifest.DELIVERY_ELEMENT_NAME;
+import static com.android.tools.build.bundletool.model.AndroidManifest.DISTRIBUTION_NAMESPACE_URI;
 import static com.android.tools.build.bundletool.model.AndroidManifest.EXTRACT_NATIVE_LIBS_ATTRIBUTE_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.EXTRACT_NATIVE_LIBS_RESOURCE_ID;
-import static com.android.tools.build.bundletool.model.AndroidManifest.FULL_BACKUP_CONTENT_ATTRIBUTE_NAME;
-import static com.android.tools.build.bundletool.model.AndroidManifest.FULL_BACKUP_CONTENT_RESOURCE_ID;
-import static com.android.tools.build.bundletool.model.AndroidManifest.FULL_BACKUP_ONLY_ATTRIBUTE_NAME;
-import static com.android.tools.build.bundletool.model.AndroidManifest.FULL_BACKUP_ONLY_RESOURCE_ID;
+import static com.android.tools.build.bundletool.model.AndroidManifest.FUSING_ELEMENT_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.HAS_CODE_RESOURCE_ID;
-import static com.android.tools.build.bundletool.model.AndroidManifest.HAS_FRAGILE_USER_DATA_ATTRIBUTE_NAME;
-import static com.android.tools.build.bundletool.model.AndroidManifest.HAS_FRAGILE_USER_DATA_RESOURCE_ID;
-import static com.android.tools.build.bundletool.model.AndroidManifest.ICON_ATTRIBUTE_NAME;
-import static com.android.tools.build.bundletool.model.AndroidManifest.ICON_RESOURCE_ID;
+import static com.android.tools.build.bundletool.model.AndroidManifest.INCLUDE_ATTRIBUTE_NAME;
+import static com.android.tools.build.bundletool.model.AndroidManifest.INSTALL_TIME_ELEMENT_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.IS_FEATURE_SPLIT_RESOURCE_ID;
-import static com.android.tools.build.bundletool.model.AndroidManifest.IS_GAME_ATTRIBUTE_NAME;
-import static com.android.tools.build.bundletool.model.AndroidManifest.IS_GAME_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.IS_SPLIT_REQUIRED_ATTRIBUTE_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.IS_SPLIT_REQUIRED_RESOURCE_ID;
-import static com.android.tools.build.bundletool.model.AndroidManifest.LABEL_ATTRIBUTE_NAME;
-import static com.android.tools.build.bundletool.model.AndroidManifest.LABEL_RESOURCE_ID;
-import static com.android.tools.build.bundletool.model.AndroidManifest.LARGE_HEAP_ATTRIBUTE_NAME;
-import static com.android.tools.build.bundletool.model.AndroidManifest.LARGE_HEAP_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.LOCALE_CONFIG_ATTRIBUTE_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.LOCALE_CONFIG_RESOURCE_ID;
-import static com.android.tools.build.bundletool.model.AndroidManifest.MAX_SDK_VERSION_ATTRIBUTE_NAME;
-import static com.android.tools.build.bundletool.model.AndroidManifest.MAX_SDK_VERSION_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.META_DATA_ELEMENT_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.META_DATA_KEY_FUSED_MODULE_NAMES;
 import static com.android.tools.build.bundletool.model.AndroidManifest.META_DATA_KEY_SPLITS_REQUIRED;
 import static com.android.tools.build.bundletool.model.AndroidManifest.MIN_SDK_VERSION_ATTRIBUTE_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.MIN_SDK_VERSION_RESOURCE_ID;
+import static com.android.tools.build.bundletool.model.AndroidManifest.MODULE_ELEMENT_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.NAME_ATTRIBUTE_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.NAME_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.NO_NAMESPACE_URI;
 import static com.android.tools.build.bundletool.model.AndroidManifest.PROPERTY_ELEMENT_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.PROVIDER_ELEMENT_NAME;
-import static com.android.tools.build.bundletool.model.AndroidManifest.REQUIRED_ACCOUNT_TYPE_ATTRIBUTE_NAME;
-import static com.android.tools.build.bundletool.model.AndroidManifest.REQUIRED_ACCOUNT_TYPE_RESOURCE_ID;
+import static com.android.tools.build.bundletool.model.AndroidManifest.REMOVABLE_ELEMENT_NAME;
+import static com.android.tools.build.bundletool.model.AndroidManifest.REQUIRED_ATTRIBUTE_NAME;
+import static com.android.tools.build.bundletool.model.AndroidManifest.REQUIRED_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.RESOURCE_RESOURCE_ID;
-import static com.android.tools.build.bundletool.model.AndroidManifest.RESTRICTED_ACCOUNT_TYPE_ATTRIBUTE_NAME;
-import static com.android.tools.build.bundletool.model.AndroidManifest.RESTRICTED_ACCOUNT_TYPE_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.SDK_LIBRARY_ELEMENT_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.SDK_PATCH_VERSION_ATTRIBUTE_NAME;
+import static com.android.tools.build.bundletool.model.AndroidManifest.SDK_PROVIDER_CLASS_NAME_ATTRIBUTE_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.SDK_VERSION_MAJOR_ATTRIBUTE_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.SERVICE_ELEMENT_NAME;
-import static com.android.tools.build.bundletool.model.AndroidManifest.SHARED_USER_ID_ATTRIBUTE_NAME;
-import static com.android.tools.build.bundletool.model.AndroidManifest.SHARED_USER_ID_RESOURCE_ID;
-import static com.android.tools.build.bundletool.model.AndroidManifest.SHARED_USER_LABEL_ATTRIBUTE_NAME;
-import static com.android.tools.build.bundletool.model.AndroidManifest.SHARED_USER_LABEL_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.SPLIT_NAME_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.TARGET_SANDBOX_VERSION_ATTRIBUTE_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.TARGET_SANDBOX_VERSION_RESOURCE_ID;
-import static com.android.tools.build.bundletool.model.AndroidManifest.TARGET_SDK_VERSION_ATTRIBUTE_NAME;
-import static com.android.tools.build.bundletool.model.AndroidManifest.TARGET_SDK_VERSION_RESOURCE_ID;
+import static com.android.tools.build.bundletool.model.AndroidManifest.USES_FEATURE_ELEMENT_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.USES_SDK_ELEMENT_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.USES_SDK_LIBRARY_ELEMENT_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.VALUE_ATTRIBUTE_NAME;
@@ -95,7 +74,9 @@ import static java.util.stream.Collectors.joining;
 
 import com.android.tools.build.bundletool.model.manifestelements.Activity;
 import com.android.tools.build.bundletool.model.manifestelements.Receiver;
+import com.android.tools.build.bundletool.model.utils.xmlproto.XmlProtoAttribute;
 import com.android.tools.build.bundletool.model.utils.xmlproto.XmlProtoAttributeBuilder;
+import com.android.tools.build.bundletool.model.utils.xmlproto.XmlProtoElement;
 import com.android.tools.build.bundletool.model.utils.xmlproto.XmlProtoElementBuilder;
 import com.android.tools.build.bundletool.model.utils.xmlproto.XmlProtoNode;
 import com.android.tools.build.bundletool.model.utils.xmlproto.XmlProtoNodeBuilder;
@@ -129,18 +110,6 @@ public class ManifestEditor {
   public ManifestEditor setMinSdkVersion(int minSdkVersion) {
     return setUsesSdkAttribute(
         MIN_SDK_VERSION_ATTRIBUTE_NAME, MIN_SDK_VERSION_RESOURCE_ID, minSdkVersion);
-  }
-
-  /** Sets the maxSdkVersion attribute. */
-  public ManifestEditor setMaxSdkVersion(int maxSdkVersion) {
-    return setUsesSdkAttribute(
-        MAX_SDK_VERSION_ATTRIBUTE_NAME, MAX_SDK_VERSION_RESOURCE_ID, maxSdkVersion);
-  }
-
-  /** Sets the targetSdkVersion attribute. */
-  public ManifestEditor setTargetSdkVersion(int targetSdkVersion) {
-    return setUsesSdkAttribute(
-        TARGET_SDK_VERSION_ATTRIBUTE_NAME, TARGET_SDK_VERSION_RESOURCE_ID, targetSdkVersion);
   }
 
   /** Sets split id and related manifest entries for feature/master split. */
@@ -201,21 +170,6 @@ public class ManifestEditor {
     return this;
   }
 
-  public ManifestEditor setSharedUserId(String value) {
-    manifestElement
-        .getOrCreateAndroidAttribute(SHARED_USER_ID_ATTRIBUTE_NAME, SHARED_USER_ID_RESOURCE_ID)
-        .setValueAsString(value);
-    return this;
-  }
-
-  public ManifestEditor setSharedUserLabel(Integer valueRefId) {
-    manifestElement
-        .getOrCreateAndroidAttribute(
-            SHARED_USER_LABEL_ATTRIBUTE_NAME, SHARED_USER_LABEL_RESOURCE_ID)
-        .setValueAsRefId(valueRefId);
-    return this;
-  }
-
   public ManifestEditor setLocaleConfig(int resourceId) {
     return setApplcationAttributeRefId(
         LOCALE_CONFIG_ATTRIBUTE_NAME, LOCALE_CONFIG_RESOURCE_ID, resourceId);
@@ -249,6 +203,13 @@ public class ManifestEditor {
                 .addAttribute(
                     createAndroidAttribute("name", NAME_RESOURCE_ID).setValueAsString(key))
                 .addAttribute(valueAttribute));
+    return this;
+  }
+
+  public ManifestEditor addApplicationChildElement(XmlProtoElement element) {
+    manifestElement
+        .getOrCreateChildElement(APPLICATION_ELEMENT_NAME)
+        .addChildElement(element.toBuilder());
     return this;
   }
 
@@ -305,77 +266,9 @@ public class ManifestEditor {
     return this;
   }
 
-  public ManifestEditor setDescription(Integer refIdValue) {
-    return setApplcationAttributeRefId(
-        DESCRIPTION_ATTRIBUTE_NAME, DESCRIPTION_RESOURCE_ID, refIdValue);
-  }
-
-  public ManifestEditor setHasFragileUserData(Boolean value) {
-    return setApplcationAttributeBoolean(
-        HAS_FRAGILE_USER_DATA_ATTRIBUTE_NAME, HAS_FRAGILE_USER_DATA_RESOURCE_ID, value);
-  }
-
-  public ManifestEditor setIsGame(Boolean value) {
-    return setApplcationAttributeBoolean(IS_GAME_ATTRIBUTE_NAME, IS_GAME_RESOURCE_ID, value);
-  }
-
-  public ManifestEditor setLabelAsString(String value) {
-    return setApplcationAttributeString(LABEL_ATTRIBUTE_NAME, LABEL_RESOURCE_ID, value);
-  }
-
-  public ManifestEditor setLabelAsRefId(Integer refIdValue) {
-    return setApplcationAttributeRefId(LABEL_ATTRIBUTE_NAME, LABEL_RESOURCE_ID, refIdValue);
-  }
-
-  public ManifestEditor setIcon(Integer refIdValue) {
-    return setApplcationAttributeRefId(ICON_ATTRIBUTE_NAME, ICON_RESOURCE_ID, refIdValue);
-  }
-
-  public ManifestEditor setBanner(Integer refIdValue) {
-    return setApplcationAttributeRefId(BANNER_ATTRIBUTE_NAME, BANNER_RESOURCE_ID, refIdValue);
-  }
-
   public ManifestEditor setAllowBackup(Boolean value) {
     return setApplcationAttributeBoolean(
         ALLOW_BACKUP_ATTRIBUTE_NAME, ALLOW_BACKUP_RESOURCE_ID, value);
-  }
-
-  public ManifestEditor setFullBackupOnly(Boolean value) {
-    return setApplcationAttributeBoolean(
-        FULL_BACKUP_ONLY_ATTRIBUTE_NAME, FULL_BACKUP_ONLY_RESOURCE_ID, value);
-  }
-
-  public ManifestEditor setFullBackupContent(Integer value) {
-    return setApplcationAttributeRefId(
-        FULL_BACKUP_CONTENT_ATTRIBUTE_NAME, FULL_BACKUP_CONTENT_RESOURCE_ID, value);
-  }
-
-  public ManifestEditor setDataExtractionRules(Integer value) {
-    return setApplcationAttributeRefId(
-        DATA_EXTRACTION_RULES_ATTRIBUTE_NAME, DATA_EXTRACTION_RULES_RESOURCE_ID, value);
-  }
-
-  public ManifestEditor setRestrictedAccountType(String value) {
-    return setApplcationAttributeString(
-        RESTRICTED_ACCOUNT_TYPE_ATTRIBUTE_NAME, RESTRICTED_ACCOUNT_TYPE_RESOURCE_ID, value);
-  }
-
-  public ManifestEditor setRequiredAccountType(String value) {
-    return setApplcationAttributeString(
-        REQUIRED_ACCOUNT_TYPE_ATTRIBUTE_NAME, REQUIRED_ACCOUNT_TYPE_RESOURCE_ID, value);
-  }
-
-  public ManifestEditor setLargeHeap(Boolean value) {
-    return setApplcationAttributeBoolean(LARGE_HEAP_ATTRIBUTE_NAME, LARGE_HEAP_RESOURCE_ID, value);
-  }
-
-  private ManifestEditor setApplcationAttributeString(
-      String attributeName, int resourceId, String value) {
-    manifestElement
-        .getOrCreateChildElement(APPLICATION_ELEMENT_NAME)
-        .getOrCreateAndroidAttribute(attributeName, resourceId)
-        .setValueAsString(value);
-    return this;
   }
 
   private ManifestEditor setApplcationAttributeBoolean(
@@ -447,27 +340,6 @@ public class ManifestEditor {
     return this;
   }
 
-  public ManifestEditor copyPermissions(AndroidManifest manifest) {
-    manifest
-        .getPermissions()
-        .forEach(permission -> manifestElement.addChildElement(permission.toBuilder()));
-    return this;
-  }
-
-  public ManifestEditor copyPermissionGroups(AndroidManifest manifest) {
-    manifest
-        .getPermissionGroups()
-        .forEach(permissionGroup -> manifestElement.addChildElement(permissionGroup.toBuilder()));
-    return this;
-  }
-
-  public ManifestEditor copyPermissionTrees(AndroidManifest manifest) {
-    manifest
-        .getPermissionTrees()
-        .forEach(permissionTree -> manifestElement.addChildElement(permissionTree.toBuilder()));
-    return this;
-  }
-
   /** Adds uses-sdk-library tag to the manifest. */
   public ManifestEditor addUsesSdkLibraryElement(
       String name, long versionMajor, String certDigest) {
@@ -518,6 +390,115 @@ public class ManifestEditor {
                 .addAttribute(
                     createAndroidAttribute(VALUE_ATTRIBUTE_NAME, VALUE_RESOURCE_ID)
                         .setValueAsDecimalInteger(patchVersion)));
+    return this;
+  }
+
+  /** Creates a <property> element and populates it with the SDK provider class name. */
+  public ManifestEditor setSdkProviderClassName(String sdkProviderClassName) {
+    manifestElement
+        .getOrCreateChildElement(APPLICATION_ELEMENT_NAME)
+        .addChildElement(
+            XmlProtoElementBuilder.create(PROPERTY_ELEMENT_NAME)
+                .addAttribute(
+                    createAndroidAttribute(NAME_ATTRIBUTE_NAME, NAME_RESOURCE_ID)
+                        .setValueAsString(SDK_PROVIDER_CLASS_NAME_ATTRIBUTE_NAME))
+                .addAttribute(
+                    createAndroidAttribute(VALUE_ATTRIBUTE_NAME, VALUE_RESOURCE_ID)
+                        .setValueAsString(sdkProviderClassName)));
+    return this;
+  }
+
+  /**
+   * Sets delivery options that are required for a removable install-time module, which will be
+   * fused in standalone variants.
+   */
+  public ManifestEditor setDeliveryOptionsForRuntimeEnabledSdkModule() {
+    manifestElement
+        .getOrCreateChildElement(DISTRIBUTION_NAMESPACE_URI, MODULE_ELEMENT_NAME)
+        .addChildElement(
+            XmlProtoElementBuilder.create(DISTRIBUTION_NAMESPACE_URI, DELIVERY_ELEMENT_NAME)
+                .addChildElement(
+                    XmlProtoElementBuilder.create(
+                            DISTRIBUTION_NAMESPACE_URI, INSTALL_TIME_ELEMENT_NAME)
+                        .addChildElement(
+                            XmlProtoElementBuilder.create(
+                                    DISTRIBUTION_NAMESPACE_URI, REMOVABLE_ELEMENT_NAME)
+                                .addAttribute(
+                                    XmlProtoAttributeBuilder.create(
+                                            DISTRIBUTION_NAMESPACE_URI, VALUE_ATTRIBUTE_NAME)
+                                        .setResourceId(VALUE_RESOURCE_ID)
+                                        .setValueAsBoolean(true)))))
+        .addChildElement(
+            XmlProtoElementBuilder.create(DISTRIBUTION_NAMESPACE_URI, FUSING_ELEMENT_NAME)
+                .addAttribute(
+                    XmlProtoAttributeBuilder.create(
+                            DISTRIBUTION_NAMESPACE_URI, INCLUDE_ATTRIBUTE_NAME)
+                        .setValueAsBoolean(true)));
+    return this;
+  }
+
+  public ManifestEditor removeUsesSdkElement() {
+    manifestElement.removeChildrenElementsIf(
+        childElement ->
+            childElement.isElement()
+                && childElement.getElement().getName().equals(USES_SDK_ELEMENT_NAME));
+    return this;
+  }
+
+  public ManifestEditor addUsesFeatureElement(String featureName, boolean isRequired) {
+    manifestElement.addChildElement(
+        XmlProtoElementBuilder.create(USES_FEATURE_ELEMENT_NAME)
+            .addAttribute(
+                createAndroidAttribute(NAME_ATTRIBUTE_NAME, NAME_RESOURCE_ID)
+                    .setValueAsString(featureName))
+            .addAttribute(
+                createAndroidAttribute(REQUIRED_ATTRIBUTE_NAME, REQUIRED_RESOURCE_ID)
+                    .setValueAsBoolean(isRequired)));
+    return this;
+  }
+
+  /**
+   * Copies an android attribute with resource id {@code attrResourceId} from 'manifest' element of
+   * android manifest {@code from} into current.
+   */
+  public ManifestEditor copyManifestElementAndroidAttribute(
+      AndroidManifest from, int attrResourceId) {
+    Optional<XmlProtoAttribute> attribute =
+        from.getManifestElement().getAndroidAttribute(attrResourceId);
+    if (attribute.isPresent()) {
+      manifestElement.addAttribute(attribute.get().toBuilder());
+    }
+
+    return this;
+  }
+
+  /**
+   * Copies an android attribute with resource id {@code attrResourceId} from 'application' element
+   * of android manifest {@code from} into current manifest.
+   */
+  public ManifestEditor copyApplicationElementAndroidAttribute(
+      AndroidManifest from, int attrResourceId) {
+    Optional<XmlProtoAttribute> attribute =
+        from.getManifestElement()
+            .getOptionalChildElement(APPLICATION_ELEMENT_NAME)
+            .flatMap(applicationElement -> applicationElement.getAndroidAttribute(attrResourceId));
+    if (attribute.isPresent()) {
+      manifestElement
+          .getOrCreateChildElement(APPLICATION_ELEMENT_NAME)
+          .addAttribute(attribute.get().toBuilder());
+    }
+
+    return this;
+  }
+
+  /**
+   * Copies children elements with name {@code elementsName} from 'manifest' element of android
+   * manifest {@code from}.
+   */
+  public ManifestEditor copyChildrenElements(AndroidManifest from, String elementsName) {
+    from.getManifestElement()
+        .getChildrenElements(elementsName)
+        .forEach(element -> manifestElement.addChildElement(element.toBuilder()));
     return this;
   }
 

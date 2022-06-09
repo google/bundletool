@@ -24,6 +24,8 @@ import static com.android.tools.build.bundletool.testing.TestUtils.createZipBuil
 import static com.google.common.truth.Truth.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
+import com.android.bundle.Config.Bundletool;
+import com.android.bundle.SdkModulesConfigOuterClass.RuntimeEnabledSdkVersion;
 import com.android.bundle.SdkModulesConfigOuterClass.SdkModulesConfig;
 import com.android.tools.build.bundletool.io.ZipBuilder;
 import com.android.tools.build.bundletool.model.ZipPath;
@@ -53,61 +55,62 @@ public class SdkModulesConfigValidatorTest {
   @Test
   public void majorVersionTooBig_throws() throws IOException {
     assertExceptionThrown(
-        /* bundletoolVersion= */ "1.9.1",
-        /* major= */ VERSION_MAJOR_MAX_VALUE + 1,
-        /* minor= */ 2,
-        /* patch= */ 3,
+        createSdkModulesConfig()
+            .setSdkVersion(
+                RuntimeEnabledSdkVersion.newBuilder().setMajor(VERSION_MAJOR_MAX_VALUE + 1)),
         "SDK major version must be an integer between 0 and " + VERSION_MAJOR_MAX_VALUE);
   }
 
   @Test
   public void majorVersionNegative_throws() throws IOException {
     assertExceptionThrown(
-        /* bundletoolVersion= */ "1.9.1",
-        /* major= */ -1,
-        /* minor= */ 2,
-        /* patch= */ 3,
+        createSdkModulesConfig().setSdkVersion(RuntimeEnabledSdkVersion.newBuilder().setMajor(-1)),
         "SDK major version must be an integer between 0 and " + VERSION_MAJOR_MAX_VALUE);
   }
 
   @Test
   public void minorVersionTooBig_throws() throws IOException {
     assertExceptionThrown(
-        /* bundletoolVersion= */ "1.9.1",
-        /* major= */ 1,
-        /* minor= */ VERSION_MINOR_MAX_VALUE + 2,
-        /* patch= */ 3,
+        createSdkModulesConfig()
+            .setSdkVersion(
+                RuntimeEnabledSdkVersion.newBuilder().setMinor(VERSION_MINOR_MAX_VALUE + 2)),
         "SDK minor version must be an integer between 0 and " + VERSION_MINOR_MAX_VALUE);
   }
 
   @Test
   public void minorVersionNegative_throws() throws IOException {
     assertExceptionThrown(
-        /* bundletoolVersion= */ "1.9.1",
-        /* major= */ 1,
-        /* minor= */ -2,
-        /* patch= */ 3,
+        createSdkModulesConfig().setSdkVersion(RuntimeEnabledSdkVersion.newBuilder().setMinor(-2)),
         "SDK minor version must be an integer between 0 and " + VERSION_MINOR_MAX_VALUE);
   }
 
   @Test
   public void patchVersionNegative_throws() throws IOException {
     assertExceptionThrown(
-        /* bundletoolVersion= */ "1.9.1",
-        /* major= */ 1,
-        /* minor= */ 2,
-        /* patch= */ -3,
+        createSdkModulesConfig().setSdkVersion(RuntimeEnabledSdkVersion.newBuilder().setPatch(-3)),
         "SDK patch version must be a non-negative integer");
   }
 
   @Test
   public void invalidBundletoolVersion_throws() throws IOException {
     assertExceptionThrown(
-        /* bundletoolVersion= */ "invalidVersion",
-        /* major= */ 1,
-        /* minor= */ 2,
-        /* patch= */ 3,
+        createSdkModulesConfig()
+            .setBundletool(Bundletool.newBuilder().setVersion("invalidVersion")),
         "Invalid Bundletool version in the SdkModulesConfig.pb file: 'invalidVersion'");
+  }
+
+  @Test
+  public void emptyPackageName_throws() throws IOException {
+    assertExceptionThrown(
+        createSdkModulesConfig().setSdkPackageName(""),
+        "SDK package name cannot be an empty string");
+  }
+
+  @Test
+  public void emptySdkProviderClassName_throws() throws IOException {
+    assertExceptionThrown(
+        createSdkModulesConfig().setSdkProviderClassName(""),
+        "SDK provider class name cannot be an empty string");
   }
 
   @Test
@@ -119,10 +122,9 @@ public class SdkModulesConfigValidatorTest {
     }
   }
 
-  private void assertExceptionThrown(
-      String bundletoolVersion, int major, int minor, int patch, String errorMessage)
+  private void assertExceptionThrown(SdkModulesConfig.Builder sdkModulesConfig, String errorMessage)
       throws IOException {
-    writeModulesZip(bundletoolVersion, major, minor, patch);
+    writeModulesZip(sdkModulesConfig.build());
 
     try (ZipFile modulesZip = new ZipFile(sdkModulesPath.toFile())) {
       InvalidBundleException exception =
@@ -134,10 +136,7 @@ public class SdkModulesConfigValidatorTest {
     }
   }
 
-  private void writeModulesZip(String bundletoolVersion, int major, int minor, int patch)
-      throws IOException {
-    SdkModulesConfig sdkModulesConfig =
-        createSdkModulesConfig(bundletoolVersion, "packageName", major, minor, patch);
+  private void writeModulesZip(SdkModulesConfig sdkModulesConfig) throws IOException {
     new ZipBuilder()
         .addFileWithContent(ZipPath.create("SdkModulesConfig.pb"), sdkModulesConfig.toByteArray())
         .writeTo(sdkModulesPath);

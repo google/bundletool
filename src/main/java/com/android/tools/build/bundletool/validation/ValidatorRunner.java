@@ -83,6 +83,7 @@ public class ValidatorRunner {
 
   private static void validateSdkBundleUsingSubValidator(
       SdkBundle bundle, SubValidator subValidator) {
+    subValidator.validateSdkBundle(bundle);
     BundleModule module = bundle.getModule();
     subValidator.validateModule(module);
 

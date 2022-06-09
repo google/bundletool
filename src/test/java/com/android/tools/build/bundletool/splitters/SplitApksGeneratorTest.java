@@ -22,6 +22,13 @@ import static com.android.tools.build.bundletool.model.utils.Versions.ANDROID_M_
 import static com.android.tools.build.bundletool.model.utils.Versions.ANDROID_Q_API_VERSION;
 import static com.android.tools.build.bundletool.model.utils.Versions.ANDROID_T_API_VERSION;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifest;
+import static com.android.tools.build.bundletool.testing.ResourcesTableFactory.HDPI;
+import static com.android.tools.build.bundletool.testing.ResourcesTableFactory.USER_PACKAGE_OFFSET;
+import static com.android.tools.build.bundletool.testing.ResourcesTableFactory.entry;
+import static com.android.tools.build.bundletool.testing.ResourcesTableFactory.fileReference;
+import static com.android.tools.build.bundletool.testing.ResourcesTableFactory.pkg;
+import static com.android.tools.build.bundletool.testing.ResourcesTableFactory.resourceTable;
+import static com.android.tools.build.bundletool.testing.ResourcesTableFactory.type;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.apkAbiTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.apkMinSdkTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.lPlusVariantTargeting;
@@ -32,10 +39,14 @@ import static com.android.tools.build.bundletool.testing.TargetingUtils.targeted
 import static com.android.tools.build.bundletool.testing.TargetingUtils.variantMinSdkTargeting;
 import static com.android.tools.build.bundletool.testing.TestUtils.extractPaths;
 import static com.google.common.collect.ImmutableList.toImmutableList;
+import static com.google.common.collect.ImmutableListMultimap.toImmutableListMultimap;
 import static com.google.common.collect.ImmutableSet.toImmutableSet;
 import static com.google.common.truth.Truth.assertThat;
+import static com.google.common.truth.Truth8.assertThat;
 import static com.google.common.truth.extensions.proto.ProtoTruth.assertThat;
 
+import com.android.aapt.ConfigurationOuterClass.Configuration;
+import com.android.aapt.Resources.ResourceTable;
 import com.android.bundle.RuntimeEnabledSdkConfigProto.RuntimeEnabledSdk;
 import com.android.bundle.RuntimeEnabledSdkConfigProto.RuntimeEnabledSdkConfig;
 import com.android.bundle.Targeting.Abi.AbiAlias;
@@ -46,6 +57,8 @@ import com.android.tools.build.bundletool.commands.CommandScoped;
 import com.android.tools.build.bundletool.model.AppBundle;
 import com.android.tools.build.bundletool.model.BundleMetadata;
 import com.android.tools.build.bundletool.model.BundleModule;
+import com.android.tools.build.bundletool.model.BundleModule.ModuleType;
+import com.android.tools.build.bundletool.model.BundleModuleName;
 import com.android.tools.build.bundletool.model.ModuleSplit;
 import com.android.tools.build.bundletool.model.ModuleSplit.SplitType;
 import com.android.tools.build.bundletool.model.OptimizationDimension;
@@ -55,9 +68,12 @@ import com.android.tools.build.bundletool.testing.TestModule;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.Iterables;
 import com.google.common.collect.Maps;
 import com.google.common.io.ByteSource;
 import dagger.Component;
+import java.util.Collection;
+import java.util.function.Function;
 import javax.inject.Inject;
 import org.junit.Before;
 import org.junit.Test;
@@ -463,7 +479,8 @@ public class SplitApksGeneratorTest {
                                 RuntimeEnabledSdk.newBuilder()
                                     .setPackageName("com.test.sdk")
                                     .setVersionMajor(1)
-                                    .setCertificateDigest("AA:BB:CC"))
+                                    .setCertificateDigest("AA:BB:CC")
+                                    .setResourcesPackageId(2))
                             .build())
                     .build())
             .build();
@@ -494,6 +511,166 @@ public class SplitApksGeneratorTest {
                 .getAndroidManifest()
                 .getUsesSdkLibraryElements())
         .hasSize(1);
+  }
+
+  @Test
+  public void appBundleWithSdkDependencyModule_sdkModuleIncludedInNonSdkRuntimeVariantOnly() {
+    AppBundle appBundleWithRuntimeEnabledSdkDeps =
+        new AppBundleBuilder()
+            .addModule(
+                new BundleModuleBuilder("base")
+                    .setManifest(androidManifest("com.test.app"))
+                    .setRuntimeEnabledSdkConfig(
+                        RuntimeEnabledSdkConfig.newBuilder()
+                            .addRuntimeEnabledSdk(
+                                RuntimeEnabledSdk.newBuilder()
+                                    .setPackageName("com.test.sdk")
+                                    .setVersionMajor(1)
+                                    .setCertificateDigest("AA:BB:CC")
+                                    .setResourcesPackageId(2))
+                            .build())
+                    .build())
+            .addModule(
+                new BundleModuleBuilder("comTestSdk")
+                    .setModuleType(ModuleType.SDK_DEPENDENCY_MODULE)
+                    .setManifest(androidManifest("com.test.sdk"))
+                    .build())
+            .build();
+    TestComponent.useTestModule(
+        this, TestModule.builder().withAppBundle(appBundleWithRuntimeEnabledSdkDeps).build());
+
+    ImmutableList<ModuleSplit> moduleSplits =
+        splitApksGenerator.generateSplits(
+            appBundleWithRuntimeEnabledSdkDeps.getModules().values().asList(),
+            ApkGenerationConfiguration.getDefaultInstance());
+
+    assertThat(moduleSplits).hasSize(3);
+    assertThat(
+            moduleSplits.stream().map(ModuleSplit::getVariantTargeting).collect(toImmutableSet()))
+        .containsExactly(
+            lPlusVariantTargeting(), sdkRuntimeVariantTargeting(ANDROID_T_API_VERSION));
+    ImmutableMap<VariantTargeting, Collection<ModuleSplit>> moduleSplitMap =
+        moduleSplits.stream()
+            .collect(toImmutableListMultimap(ModuleSplit::getVariantTargeting, Function.identity()))
+            .asMap();
+    assertThat(moduleSplitMap.get(lPlusVariantTargeting())).hasSize(2);
+    assertThat(
+            moduleSplitMap.get(lPlusVariantTargeting()).stream()
+                .map(ModuleSplit::getModuleName)
+                .map(BundleModuleName::getName))
+        .containsExactly("base", "comTestSdk");
+    assertThat(moduleSplitMap.get(sdkRuntimeVariantTargeting(ANDROID_T_API_VERSION))).hasSize(1);
+    assertThat(
+            moduleSplitMap.get(sdkRuntimeVariantTargeting(ANDROID_T_API_VERSION)).stream()
+                .map(ModuleSplit::getModuleName)
+                .map(BundleModuleName::getName))
+        .containsExactly("base");
+  }
+
+  @Test
+  public void appBundleWithSdkDependencyModuleAndDensityTargeting_noDensitySplitsForSdkModule() {
+    ResourceTable appResourceTable =
+        resourceTable(
+            pkg(
+                USER_PACKAGE_OFFSET,
+                "com.test.app",
+                type(
+                    0x01,
+                    "drawable",
+                    entry(
+                        0x01,
+                        "title_image",
+                        fileReference("res/drawable-hdpi/title_image.jpg", HDPI),
+                        fileReference(
+                            "res/drawable/title_image.jpg", Configuration.getDefaultInstance())))));
+    ResourceTable sdkResourceTable =
+        resourceTable(
+            pkg(
+                USER_PACKAGE_OFFSET + 1,
+                "com.test.sdk",
+                type(
+                    0x01,
+                    "drawable",
+                    entry(
+                        0x01,
+                        "title_image",
+                        fileReference("res/drawable-hdpi/title_image.jpg", HDPI),
+                        fileReference(
+                            "res/drawable/title_image.jpg", Configuration.getDefaultInstance())))));
+    AppBundle appBundleWithRuntimeEnabledSdkDeps =
+        new AppBundleBuilder()
+            .addModule(
+                new BundleModuleBuilder("base")
+                    .setManifest(androidManifest("com.test.app"))
+                    .setResourceTable(appResourceTable)
+                    .setRuntimeEnabledSdkConfig(
+                        RuntimeEnabledSdkConfig.newBuilder()
+                            .addRuntimeEnabledSdk(
+                                RuntimeEnabledSdk.newBuilder()
+                                    .setPackageName("com.test.sdk")
+                                    .setVersionMajor(1)
+                                    .setCertificateDigest("AA:BB:CC")
+                                    .setResourcesPackageId(2))
+                            .build())
+                    .build())
+            .addModule(
+                new BundleModuleBuilder("comTestSdk")
+                    .setModuleType(ModuleType.SDK_DEPENDENCY_MODULE)
+                    .setManifest(androidManifest("com.test.sdk"))
+                    .setResourceTable(sdkResourceTable)
+                    .build())
+            .build();
+    TestComponent.useTestModule(
+        this, TestModule.builder().withAppBundle(appBundleWithRuntimeEnabledSdkDeps).build());
+
+    ImmutableList<ModuleSplit> moduleSplits =
+        splitApksGenerator.generateSplits(
+            appBundleWithRuntimeEnabledSdkDeps.getModules().values().asList(),
+            ApkGenerationConfiguration.builder()
+                .setOptimizationDimensions(ImmutableSet.of(OptimizationDimension.SCREEN_DENSITY))
+                .build());
+
+    assertThat(
+            moduleSplits.stream().map(ModuleSplit::getVariantTargeting).collect(toImmutableSet()))
+        .containsExactly(
+            lPlusVariantTargeting(), sdkRuntimeVariantTargeting(ANDROID_T_API_VERSION));
+    ImmutableMap<VariantTargeting, Collection<ModuleSplit>> moduleSplitMap =
+        moduleSplits.stream()
+            .collect(toImmutableListMultimap(ModuleSplit::getVariantTargeting, Function.identity()))
+            .asMap();
+    assertThat(
+            moduleSplitMap.get(lPlusVariantTargeting()).stream()
+                .map(ModuleSplit::getModuleName)
+                .map(BundleModuleName::getName)
+                .distinct())
+        .containsExactly("base", "comTestSdk");
+    ImmutableSet<ModuleSplit> sdkModuleSplits =
+        moduleSplitMap.get(lPlusVariantTargeting()).stream()
+            .filter(moduleSplit -> moduleSplit.getModuleName().getName().equals("comTestSdk"))
+            .collect(toImmutableSet());
+    // Only main split for SDK dependency module - no config splits.
+    assertThat(sdkModuleSplits).hasSize(1);
+    assertThat(
+            Iterables.getOnlyElement(sdkModuleSplits).getApkTargeting().hasScreenDensityTargeting())
+        .isFalse();
+    ImmutableSet<ModuleSplit> nonSdkRuntimeVariantBaseModuleSplits =
+        moduleSplitMap.get(lPlusVariantTargeting()).stream()
+            .filter(moduleSplit -> moduleSplit.getModuleName().getName().equals("base"))
+            .collect(toImmutableSet());
+    // 1 main split + 7 config splits: 1 per each screen density.
+    assertThat(nonSdkRuntimeVariantBaseModuleSplits).hasSize(8);
+    assertThat(
+            moduleSplitMap.get(sdkRuntimeVariantTargeting(ANDROID_T_API_VERSION)).stream()
+                .map(ModuleSplit::getModuleName)
+                .map(BundleModuleName::getName)
+                .distinct())
+        .containsExactly("base");
+    ImmutableSet<ModuleSplit> sdkRuntimeVariantSplits =
+        moduleSplitMap.get(sdkRuntimeVariantTargeting(ANDROID_T_API_VERSION)).stream()
+            .filter(moduleSplit -> moduleSplit.getModuleName().getName().equals("base"))
+            .collect(toImmutableSet());
+    // 1 main split + 7 config splits: 1 per each screen density.
+    assertThat(sdkRuntimeVariantSplits).hasSize(8);
   }
 
   private static ModuleSplit getModuleSplit(

@@ -50,6 +50,7 @@ import com.android.tools.build.bundletool.model.exceptions.InvalidBundleExceptio
 import com.google.common.collect.ImmutableCollection;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.Iterables;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
@@ -452,5 +453,49 @@ public class SameTargetingMergerTest {
     assertThat(exception)
         .hasMessageThat()
         .contains("conflicting targeting values while merging assets config");
+  }
+
+  @Test
+  public void mergeTwoSplits_oneWithSparseEncoding() throws Exception {
+    ModuleSplit split1 = createModuleSplitBuilder().setSparseEncoding(true).build();
+    ModuleSplit split2 = createModuleSplitBuilder().build();
+
+    Throwable exception =
+        assertThrows(
+            IllegalStateException.class,
+            () -> new SameTargetingMerger().merge(ImmutableList.of(split1, split2)));
+    assertThat(exception)
+        .hasMessageThat()
+        .contains("Encountered different sparse encoding values while merging.");
+  }
+
+  @Test
+  public void mergeTwoSplits_noSparseEncoding() throws Exception {
+    ModuleSplit moduleSplit =
+        createModuleSplitBuilder().setApkTargeting(ApkTargeting.getDefaultInstance()).build();
+    ModuleSplit moduleSplit2 =
+        createModuleSplitBuilder().setApkTargeting(ApkTargeting.getDefaultInstance()).build();
+
+    ImmutableList<ModuleSplit> splits =
+        new SameTargetingMerger().merge(ImmutableList.of(moduleSplit, moduleSplit2));
+    assertThat(Iterables.getOnlyElement(splits).getSparseEncoding()).isFalse();
+  }
+
+  @Test
+  public void mergeTwoSplits_bothWithSparseEncoding() throws Exception {
+    ModuleSplit moduleSplit =
+        createModuleSplitBuilder()
+            .setApkTargeting(ApkTargeting.getDefaultInstance())
+            .setSparseEncoding(true)
+            .build();
+    ModuleSplit moduleSplit2 =
+        createModuleSplitBuilder()
+            .setSparseEncoding(true)
+            .setApkTargeting(ApkTargeting.getDefaultInstance())
+            .build();
+
+    ImmutableList<ModuleSplit> splits =
+        new SameTargetingMerger().merge(ImmutableList.of(moduleSplit, moduleSplit2));
+    assertThat(Iterables.getOnlyElement(splits).getSparseEncoding()).isTrue();
   }
 }

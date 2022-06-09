@@ -120,6 +120,8 @@ public abstract class ModuleSplit {
    */
   public abstract ImmutableList<ModuleEntry> getEntries();
 
+  public abstract boolean getSparseEncoding();
+
   public abstract Optional<ResourceTable> getResourceTable();
 
   public abstract AndroidManifest getAndroidManifest();
@@ -360,10 +362,17 @@ public abstract class ModuleSplit {
     return this;
   }
 
-  /** Writes the SDK Patch version to the <property> element. */
+  /** Writes the SDK Patch version to a new <property> element. */
   public ModuleSplit writePatchVersion(int patchVersion) {
     AndroidManifest apkManifest =
         getAndroidManifest().toEditor().setSdkPatchVersionProperty(patchVersion).save();
+    return toBuilder().setAndroidManifest(apkManifest).build();
+  }
+
+  /** Writes the SDK provider class name to a new <property> element. */
+  public ModuleSplit writeSdkProviderClassName(String sdkProviderClassName) {
+    AndroidManifest apkManifest =
+        getAndroidManifest().toEditor().setSdkProviderClassName(sdkProviderClassName).save();
     return toBuilder().setAndroidManifest(apkManifest).build();
   }
 
@@ -408,6 +417,7 @@ public abstract class ModuleSplit {
     return new AutoValue_ModuleSplit.Builder()
         .setEntries(ImmutableList.of())
         .setSplitType(SplitType.SPLIT)
+        .setSparseEncoding(false)
         .setApexEmbeddedApkConfigs(ImmutableList.of());
   }
 
@@ -608,9 +618,12 @@ public abstract class ModuleSplit {
     switch (moduleType) {
       case FEATURE_MODULE:
       case ML_MODULE:
+      case SDK_DEPENDENCY_MODULE:
         return SplitType.SPLIT;
       case ASSET_MODULE:
         return SplitType.ASSET_SLICE;
+      case UNKNOWN_MODULE_TYPE:
+        throw new IllegalStateException();
     }
     throw new IllegalStateException();
   }
@@ -672,6 +685,8 @@ public abstract class ModuleSplit {
     public abstract Builder setModuleName(BundleModuleName moduleName);
 
     public abstract Builder setMasterSplit(boolean isMasterSplit);
+
+    public abstract Builder setSparseEncoding(boolean sparseEncoding);
 
     public abstract Builder setNativeConfig(NativeLibraries nativeConfig);
 

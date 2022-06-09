@@ -18,15 +18,19 @@ package com.android.tools.build.bundletool.validation;
 
 import static com.android.tools.build.bundletool.model.utils.BundleParser.SDK_MODULES_FILE_NAME;
 
+import com.android.tools.build.bundletool.model.BundleModule.SpecialModuleEntry;
+import com.android.tools.build.bundletool.model.ZipPath;
 import com.android.tools.build.bundletool.model.exceptions.InvalidBundleException;
-import com.android.tools.build.bundletool.model.utils.BundleParser;
+import com.google.common.io.Files;
 import java.util.zip.ZipFile;
 
-/**
- * Validates the that the SDK bundle archive contains a {@value BundleParser#SDK_MODULES_FILE_NAME}
- * archive file.
- */
+/** Validates the presence of mandatory files in ASB zips and ASB module zips. */
 public class SdkBundleMandatoryFilesPresenceValidator extends SubValidator {
+
+  @Override
+  public void validateModuleZipFile(ZipFile moduleFile) {
+    checkModuleHasAndroidManifest(moduleFile);
+  }
 
   @Override
   public void validateBundleZipFile(ZipFile bundleFile) {
@@ -35,6 +39,19 @@ public class SdkBundleMandatoryFilesPresenceValidator extends SubValidator {
           .withUserMessage(
               "The archive doesn't seem to be an SDK Bundle, it is missing required file '%s'.",
               SDK_MODULES_FILE_NAME)
+          .build();
+    }
+  }
+
+  private static void checkModuleHasAndroidManifest(ZipFile zipFile) {
+    ZipPath moduleManifestPath = SpecialModuleEntry.ANDROID_MANIFEST.getPath();
+    String moduleName = Files.getNameWithoutExtension(zipFile.getName());
+
+    if (zipFile.getEntry(moduleManifestPath.toString()) == null) {
+      throw InvalidBundleException.builder()
+          .withUserMessage(
+              "Module '%s' is missing mandatory file '%s'.",
+              moduleName, SpecialModuleEntry.ANDROID_MANIFEST.getPath())
           .build();
     }
   }

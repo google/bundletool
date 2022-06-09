@@ -29,6 +29,8 @@ import com.android.tools.build.bundletool.commands.CommandHelp.FlagDescription;
 import com.android.tools.build.bundletool.flags.Flag;
 import com.android.tools.build.bundletool.flags.ParsedFlags;
 import com.android.tools.build.bundletool.io.TempDirectory;
+import com.android.tools.build.bundletool.model.ApkListener;
+import com.android.tools.build.bundletool.model.ApkModifier;
 import com.android.tools.build.bundletool.model.Password;
 import com.android.tools.build.bundletool.model.SdkBundle;
 import com.android.tools.build.bundletool.model.SignerConfig;
@@ -61,7 +63,8 @@ public abstract class BuildSdkApksCommand {
 
   private static final Integer DEFAULT_SDK_VERSION_CODE = 1;
 
-  enum OutputFormat {
+  /** Output format for generated APKs. */
+  public enum OutputFormat {
     /** Generated APKs are stored inside created APK Set archive. */
     APK_SET,
     /** Generated APKs are stored inside specified directory. */
@@ -111,7 +114,14 @@ public abstract class BuildSdkApksCommand {
 
   abstract Optional<SigningConfiguration> getSigningConfiguration();
 
-  static BuildSdkApksCommand.Builder builder() {
+  public abstract Optional<ApkListener> getApkListener();
+
+  public abstract Optional<ApkModifier> getApkModifier();
+
+  public abstract Optional<Integer> getFirstVariantNumber();
+
+  /** Creates a builder for the {@link BuildSdkApksCommand} with some default settings. */
+  public static BuildSdkApksCommand.Builder builder() {
     return new AutoValue_BuildSdkApksCommand.Builder()
         .setOverwriteOutput(false)
         .setOutputFormat(APK_SET)
@@ -121,12 +131,12 @@ public abstract class BuildSdkApksCommand {
 
   /** Builder for the {@link BuildSdkApksCommand}. */
   @AutoValue.Builder
-  abstract static class Builder {
+  public abstract static class Builder {
     /** Sets the path to the input SDK bundle. Must have the extension ".asb". */
-    abstract Builder setSdkBundlePath(Path sdkBundlePath);
+    public abstract Builder setSdkBundlePath(Path sdkBundlePath);
 
     /** Sets the SDK version code */
-    abstract Builder setVersionCode(Integer versionCode);
+    public abstract Builder setVersionCode(Integer versionCode);
 
     /**
      * Sets path to the output produced by the command. Depends on the output format:
@@ -137,7 +147,7 @@ public abstract class BuildSdkApksCommand {
      *   <li>'DIRECTORY', path to the directory where generated APKs will be stored.
      * </ul>
      */
-    abstract Builder setOutputFile(Path outputFile);
+    public abstract Builder setOutputFile(Path outputFile);
 
     /**
      * Sets whether to overwrite the contents of the output file.
@@ -148,13 +158,13 @@ public abstract class BuildSdkApksCommand {
     public abstract Builder setOverwriteOutput(boolean overwriteOutput);
 
     /** Sets the output format. */
-    abstract Builder setOutputFormat(OutputFormat outputFormat);
+    public abstract Builder setOutputFormat(OutputFormat outputFormat);
 
     /** Provides a wrapper around the execution of the aapt2 command. */
-    abstract Builder setAapt2Command(Aapt2Command aapt2Command);
+    public abstract Builder setAapt2Command(Aapt2Command aapt2Command);
 
     /** Sets the signing configuration to be used for all generated APKs. */
-    abstract Builder setSigningConfiguration(SigningConfiguration signingConfiguration);
+    public abstract Builder setSigningConfiguration(SigningConfiguration signingConfiguration);
 
     /**
      * Allows to set an executor service for parallelization.
@@ -162,7 +172,7 @@ public abstract class BuildSdkApksCommand {
      * <p>Optional. The caller is responsible for providing a service that accepts new tasks, and
      * for shutting it down afterwards.
      */
-    Builder setExecutorService(ListeningExecutorService executorService) {
+    public Builder setExecutorService(ListeningExecutorService executorService) {
       setExecutorServiceInternal(executorService);
       setExecutorServiceCreatedByBundleTool(false);
       return this;
@@ -186,9 +196,38 @@ public abstract class BuildSdkApksCommand {
      */
     public abstract Builder setVerbose(boolean enableVerbose);
 
+    /**
+     * Provides an {@link ApkListener} that will be notified at defined stages of APK creation.
+     *
+     * <p>The {@link ApkListener} must be thread-safe.
+     */
+    public abstract Builder setApkListener(ApkListener apkListener);
+
+    /**
+     * Provides an {@link ApkModifier} that will be invoked just before the APKs are finalized,
+     * serialized on disk and signed.
+     *
+     * <p>The {@link ApkModifier} must be thread-safe as it may in the future be invoked
+     * concurrently for the different APKs.
+     */
+    public abstract Builder setApkModifier(ApkModifier apkModifier);
+
+    /**
+     * Provides the lowest variant number to use.
+     *
+     * <p>By default, variants are numbered from 0 to {@code variantNum - 1}. By setting a value
+     * here, the variants will be numbered from {@code firstVariantNumber} and up.
+     */
+    public abstract Builder setFirstVariantNumber(int firstVariantNumber);
+
     abstract BuildSdkApksCommand autoBuild();
 
-    BuildSdkApksCommand build() {
+    /**
+     * Builds a {@link BuildSdkApksCommand}.
+     *
+     * <p>Sets a default {@link ListeningExecutorService} if not already set.
+     */
+    public BuildSdkApksCommand build() {
       if (!getExecutorServiceInternal().isPresent()) {
         setExecutorServiceInternal(createInternalExecutorService(DEFAULT_THREAD_POOL_SIZE));
         setExecutorServiceCreatedByBundleTool(true);
@@ -234,7 +273,7 @@ public abstract class BuildSdkApksCommand {
     return sdkApksCommandBuilder.build();
   }
 
-  public void execute() {
+  public Path execute() {
     validateInput();
 
     try (ZipFile bundleZip = new ZipFile(getSdkBundlePath().toFile());
@@ -269,6 +308,8 @@ public abstract class BuildSdkApksCommand {
         getExecutorService().shutdown();
       }
     }
+
+    return getOutputFile();
   }
 
   private void validateInput() {

@@ -1,0 +1,31 @@
+syntax = "proto3";
+
+package android.bundle;
+
+option java_package = "com.android.bundle";
+option java_outer_classname = "SdkBundleConfigProto";
+
+message SdkBundleConfig {
+  // Runtime-enabled SDKs this SDK depends on.
+  repeated SdkBundle sdk_dependencies = 1;
+}
+
+message SdkBundle {
+  // Package name of the SDK bundle.
+  string package_name = 1;
+  // Major version of the SDK bundle.
+  int32 version_major = 2;
+  // Minor version of the SDK bundle.
+  int32 version_minor = 3;
+  // Patch version of the SDK bundle.
+  // The dependency on a specific patch version is a build-time soft dependency,
+  // that ensures reproducibility of local builds; it does not imply that all
+  // app stores will honour it when delivering apps to end-users. For instance,
+  // some stores may just honour the dependency on a specific major and minor,
+  // while serve the latest available patch for the given major.minor version of
+  // the SDK.
+  int32 build_time_version_patch = 4;
+  // SHA-256 hash of the SDK's signing certificate, represented as a string of
+  // bytes in hexadecimal form, with ':' separating the bytes.
+  string certificate_digest = 5;
+}

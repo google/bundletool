@@ -18,9 +18,12 @@ package com.android.tools.build.bundletool;
 import com.android.tools.build.bundletool.commands.AddTransparencyCommand;
 import com.android.tools.build.bundletool.commands.BuildApksCommand;
 import com.android.tools.build.bundletool.commands.BuildBundleCommand;
+import com.android.tools.build.bundletool.commands.BuildSdkApksCommand;
+import com.android.tools.build.bundletool.commands.BuildSdkBundleCommand;
 import com.android.tools.build.bundletool.commands.CheckTransparencyCommand;
 import com.android.tools.build.bundletool.commands.CommandHelp;
 import com.android.tools.build.bundletool.commands.DumpCommand;
+import com.android.tools.build.bundletool.commands.EvaluateDeviceTargetingConfigCommand;
 import com.android.tools.build.bundletool.commands.ExtractApksCommand;
 import com.android.tools.build.bundletool.commands.GetDeviceSpecCommand;
 import com.android.tools.build.bundletool.commands.GetSizeCommand;
@@ -76,6 +79,12 @@ public class BundleToolMain {
           try (AdbServer adbServer = DdmlibAdbServer.getInstance()) {
             BuildApksCommand.fromFlags(flags, adbServer).execute();
           }
+          break;
+        case BuildSdkBundleCommand.COMMAND_NAME:
+          BuildSdkBundleCommand.fromFlags(flags).execute();
+          break;
+        case BuildSdkApksCommand.COMMAND_NAME:
+          BuildSdkApksCommand.fromFlags(flags).execute();
           break;
         case ExtractApksCommand.COMMAND_NAME:
           ExtractApksCommand.fromFlags(flags).execute();

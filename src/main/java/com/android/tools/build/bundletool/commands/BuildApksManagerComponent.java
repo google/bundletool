@@ -22,7 +22,7 @@ import dagger.Component;
 
 /** Dagger component to create a {@link BuildApksManager}. */
 @CommandScoped
-@Component(modules = {BuildApksModule.class, AppBundleModule.class})
+@Component(modules = {BuildApksModule.class})
 public interface BuildApksManagerComponent {
   BuildApksManager create();
 

@@ -72,6 +72,7 @@ public class SameTargetingMerger implements ModuleSplitMerger {
     BundleModuleName mergedModuleName = null;
     Boolean mergedIsMasterSplit = null;
     VariantTargeting mergedVariantTargeting = null;
+    Boolean sparseEncoding = null;
 
     for (ModuleSplit split : splits) {
       mergedManifest =
@@ -135,11 +136,17 @@ public class SameTargetingMerger implements ModuleSplitMerger {
       split
           .getAssetsConfig()
           .ifPresent(
-              assetsConfig -> {
-                mergeTargetedAssetsDirectories(
-                    mergedAssetsConfig, assetsConfig.getDirectoryList());
-              });
+              assetsConfig ->
+                  mergeTargetedAssetsDirectories(
+                      mergedAssetsConfig, assetsConfig.getDirectoryList()));
+      sparseEncoding =
+          getSameValueOrNonNull(sparseEncoding, split.getSparseEncoding())
+              .orElseThrow(
+                  () ->
+                      new IllegalStateException(
+                          "Encountered different sparse encoding values while merging."));
     }
+    builder.setSparseEncoding(Boolean.valueOf(sparseEncoding));
 
     if (mergedManifest != null) {
       builder.setAndroidManifest(mergedManifest);

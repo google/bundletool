@@ -19,6 +19,7 @@ package com.android.tools.build.bundletool.mergers;
 import static com.android.tools.build.bundletool.model.utils.files.FilePreconditions.checkDirectoryExistsAndEmpty;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 
+import com.android.tools.build.bundletool.commands.BuildApksModule.VerboseLogs;
 import com.android.tools.build.bundletool.model.exceptions.CommandExecutionException;
 import com.android.tools.build.bundletool.model.utils.ThrowableUtils;
 import com.android.tools.build.bundletool.model.utils.files.FilePreconditions;
@@ -54,8 +55,16 @@ public class D8DexMerger implements DexMerger {
   private static final String DEX_OVERFLOW_MSG =
       "Cannot fit requested classes in a single dex file";
 
+  private final boolean verbose;
+
   @Inject
-  D8DexMerger() {}
+  D8DexMerger(@VerboseLogs boolean verbose) {
+    this.verbose = verbose;
+  }
+
+  D8DexMerger() {
+    this(false);
+  }
 
   @Override
   public ImmutableList<Path> merge(
@@ -77,12 +86,24 @@ public class D8DexMerger implements DexMerger {
                   new DiagnosticsHandler() {
                     @Override
                     public void error(Diagnostic error) {
-                      if (error
-                          .getDiagnosticMessage()
-                          .contains(CORE_DESUGARING_LIBRARY_EXCEPTION)) {
+                      if (isCoreDesugaringMessage(error.getDiagnosticMessage())) {
                         return;
                       }
                       DiagnosticsHandler.super.error(error);
+                    }
+
+                    @Override
+                    public void warning(Diagnostic warning) {
+                      if (verbose) {
+                        DiagnosticsHandler.super.warning(warning);
+                      }
+                    }
+
+                    @Override
+                    public void info(Diagnostic info) {
+                      if (verbose) {
+                        DiagnosticsHandler.super.info(info);
+                      }
                     }
                   })
               .setOutput(outputDir, OutputMode.DexIndexed)
@@ -151,11 +172,12 @@ public class D8DexMerger implements DexMerger {
 
   private static boolean isCoreDesugaringException(CompilationFailedException d8Exception) {
     return ThrowableUtils.anyInCausalChainOrSuppressedMatches(
-        d8Exception,
-        t ->
-            t.getMessage() != null
-                && (t.getMessage().contains(CORE_DESUGARING_LIBRARY_EXCEPTION)
-                    || t.getMessage().contains(CORE_DESUGARING_LIBRARY_EXCEPTION_NEW)));
+        d8Exception, t -> t.getMessage() != null && isCoreDesugaringMessage(t.getMessage()));
+  }
+
+  private static boolean isCoreDesugaringMessage(String message) {
+    return message.contains(CORE_DESUGARING_LIBRARY_EXCEPTION)
+        || message.contains(CORE_DESUGARING_LIBRARY_EXCEPTION_NEW);
   }
 
   private ImmutableList<Path> mergeAppDexFilesAndRenameCoreDesugaringDex(
@@ -212,9 +234,9 @@ public class D8DexMerger implements DexMerger {
                       isDesugaringDex[0] =
                           isDesugaringDex[0]
                               || clazz
-                                      .getClassReference()
-                                      .getTypeName()
-                                      .startsWith(CORE_DESUGARING_PREFIX)));
+                                  .getClassReference()
+                                  .getTypeName()
+                                  .startsWith(CORE_DESUGARING_PREFIX)));
       D8.run(builder.build());
       return isDesugaringDex[0];
     } catch (CompilationFailedException e) {

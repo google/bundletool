@@ -22,6 +22,7 @@ import static com.android.tools.build.bundletool.model.utils.BundleParser.readSd
 
 import com.android.bundle.SdkModulesConfigOuterClass.RuntimeEnabledSdkVersion;
 import com.android.bundle.SdkModulesConfigOuterClass.SdkModulesConfig;
+import com.android.tools.build.bundletool.model.SdkBundle;
 import com.android.tools.build.bundletool.model.exceptions.InvalidBundleException;
 import com.android.tools.build.bundletool.model.version.Version;
 import java.util.zip.ZipFile;
@@ -30,11 +31,22 @@ import java.util.zip.ZipFile;
 public class SdkModulesConfigValidator extends SubValidator {
 
   @Override
+  public void validateSdkBundle(SdkBundle sdkBundle) {
+    validateSdkModulesConfig(sdkBundle.getSdkModulesConfig());
+  }
+
+  @Override
   public void validateSdkModulesZipFile(ZipFile modulesFile) {
     SdkModulesConfig sdkModulesConfig = readSdkModulesConfig(modulesFile);
 
+    validateSdkModulesConfig(sdkModulesConfig);
+  }
+
+  private void validateSdkModulesConfig(SdkModulesConfig sdkModulesConfig) {
     validateSdkVersion(sdkModulesConfig);
     validateBundletoolVersion(sdkModulesConfig);
+    validateSdkPackageName(sdkModulesConfig);
+    validateSdkProviderClassName(sdkModulesConfig);
   }
 
   private void validateSdkVersion(SdkModulesConfig sdkModulesConfig) {
@@ -70,6 +82,22 @@ public class SdkModulesConfigValidator extends SubValidator {
           .withUserMessage(
               "Invalid Bundletool version in the SdkModulesConfig.pb file: '%s'",
               sdkModulesConfig.getBundletool().getVersion())
+          .build();
+    }
+  }
+
+  private void validateSdkPackageName(SdkModulesConfig sdkModulesConfig) {
+    if (sdkModulesConfig.getSdkPackageName().isEmpty()) {
+      throw InvalidBundleException.builder()
+          .withUserMessage("SDK package name cannot be an empty string")
+          .build();
+    }
+  }
+
+  private void validateSdkProviderClassName(SdkModulesConfig sdkModulesConfig) {
+    if (sdkModulesConfig.getSdkProviderClassName().isEmpty()) {
+      throw InvalidBundleException.builder()
+          .withUserMessage("SDK provider class name cannot be an empty string")
           .build();
     }
   }

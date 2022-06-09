@@ -212,8 +212,7 @@ public class BuildApksResourcePinningTest {
               "res/drawable/image1.jpg",
               "res/drawable-fr/image1.jpg",
               "res/drawable/image2.jpg",
-              "res/xml/splits0.xml",
-              "res/xml/locales_config.xml");
+              "res/xml/splits0.xml");
     }
 
     ApkDescription baseFr = apkBaseMaster.get(/* isMasterSplit= */ false);

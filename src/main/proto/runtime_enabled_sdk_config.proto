@@ -19,7 +19,18 @@ message RuntimeEnabledSdk {
   int32 version_major = 2;
   // Minor version of the runtime-enabled SDK.
   int32 version_minor = 3;
+  // Patch version of the runtime-enabled SDK.
+  // The dependency on a specific patch version is a build-time soft dependency,
+  // that ensures reproducibility of local builds; it does not imply that all
+  // app stores will honour it when delivering apps to end-users. For instance,
+  // some stores may just honour the dependency on a specific major and minor,
+  // while serve the latest available patch for the given major.minor version of
+  // the SDK.
+  int32 build_time_version_patch = 6;
   // SHA-256 hash of the runtime-enabled SDK's signing certificate, represented
   // as a string of bytes in hexadecimal form, with ':' separating the bytes.
   string certificate_digest = 4;
+  // Package ID that the resource IDs of this runtime-enabled SDK must be
+  // remapped to.
+  int32 resources_package_id = 5;
 }

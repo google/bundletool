@@ -19,7 +19,7 @@ package com.android.tools.build.bundletool.testing;
 import static com.android.tools.build.bundletool.testing.TestUtils.createSdkAndroidManifest;
 
 import com.android.bundle.Config.Bundletool;
-import com.android.bundle.SdkModulesConfigOuterClass.RuntimeEnabledSdkVersion;
+import com.android.bundle.SdkBundleConfigProto.SdkBundleConfig;
 import com.android.bundle.SdkModulesConfigOuterClass.SdkModulesConfig;
 import com.android.tools.build.bundletool.model.BundleMetadata;
 import com.android.tools.build.bundletool.model.BundleModule;
@@ -38,7 +38,12 @@ public class SdkBundleBuilder {
 
   public static final SdkModulesConfig DEFAULT_SDK_MODULES_CONFIG = getSdkModulesConfig();
 
+  public static final SdkBundleConfig DEFAULT_SDK_BUNDLE_CONFIG = getSdkBundleConfig();
+
   public static final String PACKAGE_NAME = "com.test.sdk";
+
+  private static final String SDK_PROVIDER_CLASS_NAME =
+      "com.example.sandboxservice.MyAdsSdkEntryPoint";
 
   private static final BundleMetadata METADATA = BundleMetadata.builder().build();
 
@@ -47,6 +52,8 @@ public class SdkBundleBuilder {
   private Integer versionCode = 1;
 
   private SdkModulesConfig sdkModulesConfig = DEFAULT_SDK_MODULES_CONFIG;
+
+  private SdkBundleConfig sdkBundleConfig = DEFAULT_SDK_BUNDLE_CONFIG;
 
   private static BundleModule defaultModule() {
     return new BundleModuleBuilder("base").setManifest(createSdkAndroidManifest()).build();
@@ -62,37 +69,40 @@ public class SdkBundleBuilder {
     return this;
   }
 
-  public SdkBundleBuilder setSdkModulesConfig(
-      String bundletoolVersion, String packageName, int major, int minor, int patch) {
-    this.sdkModulesConfig =
-        createSdkModulesConfig(bundletoolVersion, packageName, major, minor, patch);
+  public SdkBundleBuilder setSdkModulesConfig(SdkModulesConfig sdkModulesConfig) {
+    this.sdkModulesConfig = sdkModulesConfig;
     return this;
   }
 
-  public static SdkModulesConfig createSdkModulesConfig(
-      String bundletoolVersion, String packageName, int major, int minor, int patch) {
+  public SdkBundleBuilder setSdkBundleConfig(SdkBundleConfig sdkBundleConfig) {
+    this.sdkBundleConfig = sdkBundleConfig;
+    return this;
+  }
+
+  /** Creates an {@link SdkModulesConfig.Builder } with example default values. */
+  public static SdkModulesConfig.Builder createSdkModulesConfig() {
     return SdkModulesConfig.newBuilder()
-        .setSdkPackageName(packageName)
-        .setBundletool(Bundletool.newBuilder().setVersion(bundletoolVersion))
-        .setSdkVersion(
-            RuntimeEnabledSdkVersion.newBuilder().setMajor(major).setMinor(minor).setPatch(patch))
-        .build();
+        .setSdkPackageName(PACKAGE_NAME)
+        .setSdkProviderClassName(SDK_PROVIDER_CLASS_NAME)
+        .setBundletool(
+            Bundletool.newBuilder().setVersion(BundleToolVersion.getCurrentVersion().toString()));
   }
 
   public SdkBundle build() {
     return SdkBundle.builder()
         .setModule(module)
         .setSdkModulesConfig(sdkModulesConfig)
+        .setSdkBundleConfig(sdkBundleConfig)
         .setBundleMetadata(METADATA)
         .setVersionCode(versionCode)
         .build();
   }
 
   private static SdkModulesConfig getSdkModulesConfig() {
-    return SdkModulesConfig.newBuilder()
-        .setSdkPackageName(PACKAGE_NAME)
-        .setBundletool(
-            Bundletool.newBuilder().setVersion(BundleToolVersion.getCurrentVersion().toString()))
-        .build();
+    return createSdkModulesConfig().build();
+  }
+
+  private static SdkBundleConfig getSdkBundleConfig() {
+    return SdkBundleConfig.getDefaultInstance();
   }
 }

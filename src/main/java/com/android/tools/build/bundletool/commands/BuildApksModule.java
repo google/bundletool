@@ -48,7 +48,8 @@ import javax.inject.Qualifier;
     includes = {
       BundleConfigModule.class,
       BundletoolModule.class,
-      ApkSerializerModule.class
+      ApkSerializerModule.class,
+      AppBundleModule.class
     })
 public final class BuildApksModule {
 

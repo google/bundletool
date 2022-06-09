@@ -24,6 +24,7 @@ import static com.google.common.collect.ImmutableSet.toImmutableSet;
 
 import com.android.bundle.Commands.LocalTestingInfo;
 import com.android.bundle.Config.BundleConfig;
+import com.android.bundle.Config.ResourceOptimizations.SparseEncoding;
 import com.android.bundle.Devices.DeviceSpec;
 import com.android.tools.build.bundletool.archive.ArchivedApksGenerator;
 import com.android.tools.build.bundletool.commands.BuildApksCommand.ApkBuildMode;
@@ -194,10 +195,12 @@ public final class BuildApksManager {
                       SplitsXmlInjector splitsXmlInjector = new SplitsXmlInjector();
                       ImmutableList<ModuleSplit> moduleSplits =
                           splitsXmlInjector.process(keySplit.getKey(), keySplit.getValue());
-                      LocaleConfigXmlInjector localeConfigXmlInjector =
-                          new LocaleConfigXmlInjector();
-                      moduleSplits =
-                          localeConfigXmlInjector.process(keySplit.getKey(), moduleSplits);
+                      if (appBundle.injectLocaleConfig()) {
+                        LocaleConfigXmlInjector localeConfigXmlInjector =
+                            new LocaleConfigXmlInjector();
+                        moduleSplits =
+                            localeConfigXmlInjector.process(keySplit.getKey(), moduleSplits);
+                      }
                       return moduleSplits;
                     })
                 .flatMap(Collection::stream)
@@ -321,6 +324,12 @@ public final class BuildApksManager {
         apkOptimizations.getUncompressNativeLibraries());
     apkGenerationConfiguration.setEnableDexCompressionSplitter(
         apkOptimizations.getUncompressDexFiles());
+    apkGenerationConfiguration.setEnableSparseEncodingVariant(
+        bundleConfig
+            .getOptimizations()
+            .getResourceOptimizations()
+            .getSparseEncoding()
+            .equals(SparseEncoding.VARIANT_FOR_SDK_32));
 
     apkGenerationConfiguration.setInstallableOnExternalStorage(
         appBundle

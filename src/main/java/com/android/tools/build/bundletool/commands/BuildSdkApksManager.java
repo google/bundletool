@@ -16,6 +16,7 @@
 
 package com.android.tools.build.bundletool.commands;
 
+import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 
 import com.android.tools.build.bundletool.io.ApkSerializerManager;
@@ -29,6 +30,10 @@ import com.android.tools.build.bundletool.optimizations.ApkOptimizations;
 import com.android.tools.build.bundletool.shards.ModuleSplitterForShards;
 import com.android.tools.build.bundletool.shards.StandaloneApksGenerator;
 import com.google.common.collect.ImmutableList;
+import com.google.common.io.MoreFiles;
+import com.google.common.io.RecursiveDeleteOption;
+import java.io.IOException;
+import java.nio.file.Files;
 import javax.inject.Inject;
 
 /** Executes the "build-sdk-apks" command. */
@@ -56,9 +61,13 @@ public class BuildSdkApksManager {
     this.moduleSplitterForShards = moduleSplitterForShards;
   }
 
-  void execute() {
+  void execute() throws IOException {
     ImmutableList<ModuleSplit> sdkApks = generateSdkApks();
     GeneratedApks generatedApks = GeneratedApks.builder().setStandaloneApks(sdkApks).build();
+
+    if (command.getOverwriteOutput() && Files.exists(command.getOutputFile())) {
+      MoreFiles.deleteRecursively(command.getOutputFile(), RecursiveDeleteOption.ALLOW_INSECURE);
+    }
 
     // Create variants and serialize APKs.
     apkSerializerManager.serializeSdkApkSet(createApkSetWriter(), generatedApks);
@@ -77,12 +86,13 @@ public class BuildSdkApksManager {
   }
 
   private ImmutableList<ModuleSplit> generateSdkApks() {
+    checkState(sdkBundle.getVersionCode().isPresent(), "Missing version code for SDK Bundle.");
     return moduleSplitterForShards
         .generateSplits(sdkBundle.getModule(), apkOptimizations.getStandaloneDimensions())
         .stream()
         .map(StandaloneApksGenerator::setVariantTargetingAndSplitType)
         .map(moduleSplit -> moduleSplit.writeSdkVersionName(sdkBundle.getVersionName()))
-        .map(moduleSplit -> moduleSplit.writeSdkVersionCode(sdkBundle.getVersionCode()))
+        .map(moduleSplit -> moduleSplit.writeSdkVersionCode(sdkBundle.getVersionCode().get()))
         .map(moduleSplit -> moduleSplit.writeManifestPackage(sdkBundle.getManifestPackageName()))
         .map(
             moduleSplit ->
@@ -90,6 +100,7 @@ public class BuildSdkApksManager {
                     sdkBundle.getPackageName(), sdkBundle.getSdkAndroidVersionMajor()))
         .map(ModuleSplit::overrideMinSdkVersionForSdkSandbox)
         .map(moduleSplit -> moduleSplit.writePatchVersion(sdkBundle.getPatchVersion()))
+        .map(moduleSplit -> moduleSplit.writeSdkProviderClassName(sdkBundle.getProviderClassName()))
         .collect(toImmutableList());
   }
 }

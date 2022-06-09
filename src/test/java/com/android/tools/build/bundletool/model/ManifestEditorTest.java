@@ -20,44 +20,33 @@ import static com.android.tools.build.bundletool.model.AndroidManifest.ACTIVITY_
 import static com.android.tools.build.bundletool.model.AndroidManifest.ALLOW_BACKUP_ATTRIBUTE_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.ALLOW_BACKUP_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.CERTIFICATE_DIGEST_ATTRIBUTE_NAME;
-import static com.android.tools.build.bundletool.model.AndroidManifest.DATA_EXTRACTION_RULES_ATTRIBUTE_NAME;
-import static com.android.tools.build.bundletool.model.AndroidManifest.DATA_EXTRACTION_RULES_RESOURCE_ID;
-import static com.android.tools.build.bundletool.model.AndroidManifest.DESCRIPTION_ATTRIBUTE_NAME;
-import static com.android.tools.build.bundletool.model.AndroidManifest.DESCRIPTION_RESOURCE_ID;
-import static com.android.tools.build.bundletool.model.AndroidManifest.FULL_BACKUP_CONTENT_ATTRIBUTE_NAME;
-import static com.android.tools.build.bundletool.model.AndroidManifest.FULL_BACKUP_CONTENT_RESOURCE_ID;
-import static com.android.tools.build.bundletool.model.AndroidManifest.FULL_BACKUP_ONLY_ATTRIBUTE_NAME;
-import static com.android.tools.build.bundletool.model.AndroidManifest.FULL_BACKUP_ONLY_RESOURCE_ID;
+import static com.android.tools.build.bundletool.model.AndroidManifest.DELIVERY_ELEMENT_NAME;
+import static com.android.tools.build.bundletool.model.AndroidManifest.DISTRIBUTION_NAMESPACE_URI;
+import static com.android.tools.build.bundletool.model.AndroidManifest.FUSING_ELEMENT_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.HAS_CODE_RESOURCE_ID;
-import static com.android.tools.build.bundletool.model.AndroidManifest.HAS_FRAGILE_USER_DATA_ATTRIBUTE_NAME;
-import static com.android.tools.build.bundletool.model.AndroidManifest.HAS_FRAGILE_USER_DATA_RESOURCE_ID;
-import static com.android.tools.build.bundletool.model.AndroidManifest.ICON_ATTRIBUTE_NAME;
-import static com.android.tools.build.bundletool.model.AndroidManifest.ICON_RESOURCE_ID;
+import static com.android.tools.build.bundletool.model.AndroidManifest.INCLUDE_ATTRIBUTE_NAME;
+import static com.android.tools.build.bundletool.model.AndroidManifest.INSTALL_TIME_ELEMENT_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.IS_FEATURE_SPLIT_RESOURCE_ID;
-import static com.android.tools.build.bundletool.model.AndroidManifest.IS_GAME_ATTRIBUTE_NAME;
-import static com.android.tools.build.bundletool.model.AndroidManifest.IS_GAME_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.IS_SPLIT_REQUIRED_ATTRIBUTE_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.IS_SPLIT_REQUIRED_RESOURCE_ID;
-import static com.android.tools.build.bundletool.model.AndroidManifest.LABEL_ATTRIBUTE_NAME;
-import static com.android.tools.build.bundletool.model.AndroidManifest.LABEL_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.LOCALE_CONFIG_ATTRIBUTE_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.LOCALE_CONFIG_RESOURCE_ID;
-import static com.android.tools.build.bundletool.model.AndroidManifest.MAX_SDK_VERSION_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.MIN_SDK_VERSION_RESOURCE_ID;
+import static com.android.tools.build.bundletool.model.AndroidManifest.MODULE_ELEMENT_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.NAME_ATTRIBUTE_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.NAME_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.PROVIDER_ELEMENT_NAME;
+import static com.android.tools.build.bundletool.model.AndroidManifest.REMOVABLE_ELEMENT_NAME;
+import static com.android.tools.build.bundletool.model.AndroidManifest.REQUIRED_ATTRIBUTE_NAME;
+import static com.android.tools.build.bundletool.model.AndroidManifest.REQUIRED_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.SDK_VERSION_MAJOR_ATTRIBUTE_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.SERVICE_ELEMENT_NAME;
-import static com.android.tools.build.bundletool.model.AndroidManifest.SHARED_USER_ID_ATTRIBUTE_NAME;
-import static com.android.tools.build.bundletool.model.AndroidManifest.SHARED_USER_ID_RESOURCE_ID;
-import static com.android.tools.build.bundletool.model.AndroidManifest.SHARED_USER_LABEL_ATTRIBUTE_NAME;
-import static com.android.tools.build.bundletool.model.AndroidManifest.SHARED_USER_LABEL_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.SPLIT_NAME_ATTRIBUTE_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.SPLIT_NAME_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.TARGET_SANDBOX_VERSION_RESOURCE_ID;
-import static com.android.tools.build.bundletool.model.AndroidManifest.TARGET_SDK_VERSION_RESOURCE_ID;
+import static com.android.tools.build.bundletool.model.AndroidManifest.USES_FEATURE_ELEMENT_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.USES_SDK_LIBRARY_ELEMENT_NAME;
+import static com.android.tools.build.bundletool.model.AndroidManifest.VALUE_ATTRIBUTE_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.VALUE_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.VERSION_CODE_RESOURCE_ID;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifest;
@@ -123,28 +112,6 @@ public class ManifestEditorTest {
                         123))));
   }
 
-  @Test
-  public void setMaxSdkVersion_nonExistingAttribute_created() throws Exception {
-    AndroidManifest androidManifest =
-        AndroidManifest.create(xmlNode(xmlElement("manifest", xmlNode(xmlElement("uses-sdk")))));
-
-    AndroidManifest editedManifest = androidManifest.toEditor().setMaxSdkVersion(123).save();
-
-    XmlNode editedManifestRoot = editedManifest.getManifestRoot().getProto();
-    assertThat(editedManifestRoot.hasElement()).isTrue();
-    XmlElement manifestElement = editedManifestRoot.getElement();
-    assertThat(manifestElement.getName()).isEqualTo("manifest");
-    assertThat(manifestElement.getChildList())
-        .containsExactly(
-            xmlNode(
-                xmlElement(
-                    "uses-sdk",
-                    xmlDecimalIntegerAttribute(
-                        ANDROID_NAMESPACE_URI,
-                        "maxSdkVersion",
-                        MAX_SDK_VERSION_RESOURCE_ID,
-                        123))));
-  }
 
   @Test
   public void setMinSdkVersion_existingAttribute_adjusted() throws Exception {
@@ -177,40 +144,6 @@ public class ManifestEditorTest {
                         ANDROID_NAMESPACE_URI,
                         "minSdkVersion",
                         MIN_SDK_VERSION_RESOURCE_ID,
-                        123))));
-  }
-
-  @Test
-  public void setTargetSdkVersion_existingAttribute_adjusted() throws Exception {
-    AndroidManifest androidManifest =
-        AndroidManifest.create(
-            xmlNode(
-                xmlElement(
-                    "manifest",
-                    xmlNode(
-                        xmlElement(
-                            "uses-sdk",
-                            xmlDecimalIntegerAttribute(
-                                ANDROID_NAMESPACE_URI,
-                                "targetSdkVersion",
-                                TARGET_SDK_VERSION_RESOURCE_ID,
-                                1))))));
-
-    AndroidManifest editedManifest = androidManifest.toEditor().setTargetSdkVersion(123).save();
-
-    XmlNode editedManifestRoot = editedManifest.getManifestRoot().getProto();
-    assertThat(editedManifestRoot.hasElement()).isTrue();
-    XmlElement manifestElement = editedManifestRoot.getElement();
-    assertThat(manifestElement.getName()).isEqualTo("manifest");
-    assertThat(manifestElement.getChildList())
-        .containsExactly(
-            xmlNode(
-                xmlElement(
-                    "uses-sdk",
-                    xmlDecimalIntegerAttribute(
-                        ANDROID_NAMESPACE_URI,
-                        "targetSdkVersion",
-                        TARGET_SDK_VERSION_RESOURCE_ID,
                         123))));
   }
 
@@ -755,132 +688,6 @@ public class ManifestEditorTest {
   }
 
   @Test
-  public void setSharedUserId() {
-    AndroidManifest androidManifest = createManifestWithApplicationElement();
-    AndroidManifest editedManifest =
-        androidManifest.toEditor().setSharedUserId("shared_user_id").save();
-
-    XmlNode manifestRoot = editedManifest.getManifestRoot().getProto();
-    assertThat(manifestRoot.getElement().getAttributeList())
-        .containsExactly(
-            xmlAttribute(
-                ANDROID_NAMESPACE_URI,
-                SHARED_USER_ID_ATTRIBUTE_NAME,
-                SHARED_USER_ID_RESOURCE_ID,
-                "shared_user_id"));
-  }
-
-  @Test
-  public void setSharedUserLabel() {
-    AndroidManifest androidManifest = createManifestWithApplicationElement();
-    AndroidManifest editedManifest =
-        androidManifest.toEditor().setSharedUserLabel(0x12345678).save();
-
-    XmlNode manifestRoot = editedManifest.getManifestRoot().getProto();
-    assertThat(manifestRoot.getElement().getAttributeList())
-        .containsExactly(
-            xmlResourceReferenceAttribute(
-                ANDROID_NAMESPACE_URI,
-                SHARED_USER_LABEL_ATTRIBUTE_NAME,
-                SHARED_USER_LABEL_RESOURCE_ID,
-                0x12345678));
-  }
-
-  @Test
-  public void setDescription() throws Exception {
-    AndroidManifest androidManifest = createManifestWithApplicationElement();
-
-    AndroidManifest editedManifest = androidManifest.toEditor().setDescription(0x12345678).save();
-
-    assertThat(getApplicationElement(editedManifest).getAttributeList())
-        .containsExactly(
-            xmlResourceReferenceAttribute(
-                ANDROID_NAMESPACE_URI,
-                DESCRIPTION_ATTRIBUTE_NAME,
-                DESCRIPTION_RESOURCE_ID,
-                0x12345678));
-  }
-
-  @Test
-  public void setHasFragileUserData() throws Exception {
-    AndroidManifest androidManifest = createManifestWithApplicationElement();
-
-    AndroidManifest editedManifest = androidManifest.toEditor().setHasFragileUserData(true).save();
-
-    assertThat(getApplicationElement(editedManifest).getAttributeList())
-        .containsExactly(
-            xmlBooleanAttribute(
-                ANDROID_NAMESPACE_URI,
-                HAS_FRAGILE_USER_DATA_ATTRIBUTE_NAME,
-                HAS_FRAGILE_USER_DATA_RESOURCE_ID,
-                true));
-  }
-
-  @Test
-  public void setIsGame() throws Exception {
-    AndroidManifest androidManifest = createManifestWithApplicationElement();
-
-    AndroidManifest editedManifest = androidManifest.toEditor().setIsGame(true).save();
-
-    assertThat(getApplicationElement(editedManifest).getAttributeList())
-        .containsExactly(
-            xmlBooleanAttribute(
-                ANDROID_NAMESPACE_URI, IS_GAME_ATTRIBUTE_NAME, IS_GAME_RESOURCE_ID, true));
-  }
-
-  @Test
-  public void setLabelAsString() throws Exception {
-    AndroidManifest androidManifest = createManifestWithApplicationElement();
-
-    AndroidManifest editedManifest =
-        androidManifest.toEditor().setLabelAsString("app label").save();
-
-    assertThat(getApplicationElement(editedManifest).getAttributeList())
-        .containsExactly(
-            xmlAttribute(
-                ANDROID_NAMESPACE_URI, LABEL_ATTRIBUTE_NAME, LABEL_RESOURCE_ID, "app label"));
-  }
-
-  @Test
-  public void setLabelAsRefId() throws Exception {
-    AndroidManifest androidManifest = createManifestWithApplicationElement();
-
-    AndroidManifest editedManifest = androidManifest.toEditor().setLabelAsRefId(0x12345678).save();
-
-    assertThat(getApplicationElement(editedManifest).getAttributeList())
-        .containsExactly(
-            xmlResourceReferenceAttribute(
-                ANDROID_NAMESPACE_URI, LABEL_ATTRIBUTE_NAME, LABEL_RESOURCE_ID, 0x12345678));
-  }
-
-  @Test
-  public void setLocaleConfig() throws Exception {
-    AndroidManifest androidManifest = createManifestWithApplicationElement();
-
-    AndroidManifest editedManifest = androidManifest.toEditor().setLocaleConfig(0x12345678).save();
-
-    assertThat(getApplicationElement(editedManifest).getAttributeList())
-        .containsExactly(
-            xmlResourceReferenceAttribute(
-                ANDROID_NAMESPACE_URI,
-                LOCALE_CONFIG_ATTRIBUTE_NAME,
-                LOCALE_CONFIG_RESOURCE_ID,
-                0x12345678));
-  }
-
-  @Test
-  public void setIcon() throws Exception {
-    AndroidManifest androidManifest = createManifestWithApplicationElement();
-
-    AndroidManifest editedManifest = androidManifest.toEditor().setIcon(0x12345678).save();
-
-    assertThat(getApplicationElement(editedManifest).getAttributeList())
-        .containsExactly(
-            xmlResourceReferenceAttribute(
-                ANDROID_NAMESPACE_URI, ICON_ATTRIBUTE_NAME, ICON_RESOURCE_ID, 0x12345678));
-  }
-
-  @Test
   public void setAllowBackup() throws Exception {
     AndroidManifest androidManifest = createManifestWithApplicationElement();
 
@@ -896,50 +703,18 @@ public class ManifestEditorTest {
   }
 
   @Test
-  public void setFullBackupOnly() throws Exception {
+  public void setLocaleConfig() throws Exception {
     AndroidManifest androidManifest = createManifestWithApplicationElement();
 
-    AndroidManifest editedManifest = androidManifest.toEditor().setFullBackupOnly(true).save();
-
-    assertThat(getApplicationElement(editedManifest).getAttributeList())
-        .containsExactly(
-            xmlBooleanAttribute(
-                ANDROID_NAMESPACE_URI,
-                FULL_BACKUP_ONLY_ATTRIBUTE_NAME,
-                FULL_BACKUP_ONLY_RESOURCE_ID,
-                true));
-  }
-
-  @Test
-  public void setFullBackupContent() throws Exception {
-    AndroidManifest androidManifest = createManifestWithApplicationElement();
-
-    AndroidManifest editedManifest =
-        androidManifest.toEditor().setFullBackupContent(0x12341234).save();
+    AndroidManifest editedManifest = androidManifest.toEditor().setLocaleConfig(0x12345678).save();
 
     assertThat(getApplicationElement(editedManifest).getAttributeList())
         .containsExactly(
             xmlResourceReferenceAttribute(
                 ANDROID_NAMESPACE_URI,
-                FULL_BACKUP_CONTENT_ATTRIBUTE_NAME,
-                FULL_BACKUP_CONTENT_RESOURCE_ID,
-                0x12341234));
-  }
-
-  @Test
-  public void setDataExtractionRules() throws Exception {
-    AndroidManifest androidManifest = createManifestWithApplicationElement();
-
-    AndroidManifest editedManifest =
-        androidManifest.toEditor().setDataExtractionRules(0x12341234).save();
-
-    assertThat(getApplicationElement(editedManifest).getAttributeList())
-        .containsExactly(
-            xmlResourceReferenceAttribute(
-                ANDROID_NAMESPACE_URI,
-                DATA_EXTRACTION_RULES_ATTRIBUTE_NAME,
-                DATA_EXTRACTION_RULES_RESOURCE_ID,
-                0x12341234));
+                LOCALE_CONFIG_ATTRIBUTE_NAME,
+                LOCALE_CONFIG_RESOURCE_ID,
+                0x12345678));
   }
 
   @Test
@@ -969,82 +744,6 @@ public class ManifestEditorTest {
   }
 
   @Test
-  public void copyPermissions() throws Exception {
-    XmlElement permisisonElement =
-        xmlElement(
-            "permission",
-            xmlAttribute(ANDROID_NAMESPACE_URI, "name", NAME_RESOURCE_ID, "SEND_SMS"));
-    AndroidManifest manifestWithPermissions =
-        AndroidManifest.create(xmlNode(xmlElement("manifest", xmlNode(permisisonElement))));
-    AndroidManifest manifestToUpdate = AndroidManifest.create(androidManifest("com.test.app"));
-
-    AndroidManifest updatedManifest =
-        manifestToUpdate.toEditor().copyPermissions(manifestWithPermissions).save();
-
-    ImmutableList<XmlElement> copiedPermissions =
-        updatedManifest.getManifestRoot().getProto().getElement().getChildList().stream()
-            .map(XmlNode::getElement)
-            .filter(childElement -> childElement.getName().equals("permission"))
-            .collect(toImmutableList());
-    assertThat(copiedPermissions).containsExactly(permisisonElement);
-  }
-
-  @Test
-  public void copyPermissions_noPermissions() throws Exception {
-    AndroidManifest manifestWithoutPermissions =
-        AndroidManifest.create(xmlNode(xmlElement("manifest")));
-    AndroidManifest manifestToUpdate = AndroidManifest.create(androidManifest("com.test.app"));
-
-    AndroidManifest updatedManifest =
-        manifestToUpdate.toEditor().copyPermissions(manifestWithoutPermissions).save();
-
-    ImmutableList<XmlElement> copiedPermissions =
-        updatedManifest.getManifestRoot().getProto().getElement().getChildList().stream()
-            .map(XmlNode::getElement)
-            .filter(childElement -> childElement.getName().equals("permission"))
-            .collect(toImmutableList());
-    assertThat(copiedPermissions).isEmpty();
-  }
-
-  @Test
-  public void copyPermissionGroups() throws Exception {
-    XmlElement permisisonGroupElement =
-        xmlElement(
-            "permission-group",
-            xmlAttribute(ANDROID_NAMESPACE_URI, "name", NAME_RESOURCE_ID, "group.1"));
-    AndroidManifest manifestWithPermissionGroups =
-        AndroidManifest.create(xmlNode(xmlElement("manifest", xmlNode(permisisonGroupElement))));
-    AndroidManifest manifestToUpdate = AndroidManifest.create(androidManifest("com.test.app"));
-
-    AndroidManifest updatedManifest =
-        manifestToUpdate.toEditor().copyPermissionGroups(manifestWithPermissionGroups).save();
-
-    ImmutableList<XmlElement> copiedPermissionGroups =
-        updatedManifest.getManifestRoot().getProto().getElement().getChildList().stream()
-            .map(XmlNode::getElement)
-            .filter(childElement -> childElement.getName().equals("permission-group"))
-            .collect(toImmutableList());
-    assertThat(copiedPermissionGroups).containsExactly(permisisonGroupElement);
-  }
-
-  @Test
-  public void copyPermissionGroups_noPermissionGroups() throws Exception {
-    AndroidManifest manifestWithoutPermissionGroups =
-        AndroidManifest.create(xmlNode(xmlElement("manifest")));
-    AndroidManifest manifestToUpdate = AndroidManifest.create(androidManifest("com.test.app"));
-
-    AndroidManifest updatedManifest =
-        manifestToUpdate.toEditor().copyPermissionGroups(manifestWithoutPermissionGroups).save();
-
-    ImmutableList<XmlElement> copiedPermissionGroups =
-        updatedManifest.getManifestRoot().getProto().getElement().getChildList().stream()
-            .map(XmlNode::getElement)
-            .filter(childElement -> childElement.getName().equals("permission-group"))
-            .collect(toImmutableList());
-    assertThat(copiedPermissionGroups).isEmpty();
-  }
-
-  @Test
   public void addUsesSdkLibraryElement() {
     AndroidManifest androidManifest = AndroidManifest.create(androidManifest("com.test.app"));
 
@@ -1064,6 +763,412 @@ public class ManifestEditorTest {
     assertThat(usesSdkLibraryElement2.getAttribute(2).getValue()).isEqualTo(VALID_CERT_DIGEST);
     assertUsesSdkLibraryAttributes(usesSdkLibraryElement1, "sdk.name.1", 1, VALID_CERT_DIGEST);
     assertUsesSdkLibraryAttributes(usesSdkLibraryElement2, "sdk.name.2", 2, VALID_CERT_DIGEST);
+  }
+
+  @Test
+  public void copyManifestElementAndroidAttribute_success() {
+    String attrName = "attr_name";
+    int attrResourceId = 0x00001234;
+    String attrValue = "attr_value";
+    AndroidManifest manifestFrom =
+        AndroidManifest.create(
+            xmlNode(
+                xmlElement(
+                    "manifest",
+                    xmlAttribute(ANDROID_NAMESPACE_URI, attrName, attrResourceId, attrValue))));
+    AndroidManifest manifestTo = AndroidManifest.create(xmlNode(xmlElement("manifest")));
+
+    AndroidManifest editedManifest =
+        manifestTo
+            .toEditor()
+            .copyManifestElementAndroidAttribute(manifestFrom, attrResourceId)
+            .save();
+
+    assertThat(editedManifest.getManifestElement().getProto().getAttributeList())
+        .containsExactly(xmlAttribute(ANDROID_NAMESPACE_URI, attrName, attrResourceId, attrValue));
+  }
+
+  @Test
+  public void copyManifestElementAndroidAttribute_doesNotExist_noChanges() {
+    AndroidManifest manifestFrom = AndroidManifest.create(xmlNode(xmlElement("manifest")));
+    AndroidManifest manifestTo = AndroidManifest.create(xmlNode(xmlElement("manifest")));
+
+    AndroidManifest editedManifest =
+        manifestTo.toEditor().copyManifestElementAndroidAttribute(manifestFrom, 0x00001234).save();
+
+    assertThat(editedManifest.getManifestElement().getProto().getAttributeList()).isEmpty();
+  }
+
+  @Test
+  public void copyManifestElementAndroidAttribute_doesNotRemove_success() {
+    String attrName = "attr_name";
+    int attrResourceId = 0x00001234;
+    String attrValue = "attr_value";
+    AndroidManifest manifestFrom =
+        AndroidManifest.create(
+            xmlNode(
+                xmlElement(
+                    "manifest",
+                    xmlAttribute(ANDROID_NAMESPACE_URI, attrName, attrResourceId, attrValue))));
+    AndroidManifest manifestTo =
+        AndroidManifest.create(
+            xmlNode(
+                xmlElement(
+                    "manifest",
+                    xmlAttribute(
+                        ANDROID_NAMESPACE_URI, "existingAttr", 0x12341234, "existingValue"))));
+
+    AndroidManifest editedManifest =
+        manifestTo
+            .toEditor()
+            .copyManifestElementAndroidAttribute(manifestFrom, attrResourceId)
+            .save();
+
+    assertThat(editedManifest.getManifestElement().getProto().getAttributeList())
+        .containsExactly(
+            xmlAttribute(ANDROID_NAMESPACE_URI, attrName, attrResourceId, attrValue),
+            xmlAttribute(ANDROID_NAMESPACE_URI, "existingAttr", 0x12341234, "existingValue"));
+  }
+
+  @Test
+  public void copyManifestElementAndroidAttribute_allTypes_success() {
+    AndroidManifest manifestFrom =
+        AndroidManifest.create(
+            xmlNode(
+                xmlElement(
+                    "manifest",
+                    ImmutableList.of(
+                        xmlAttribute(ANDROID_NAMESPACE_URI, "str_attr", 0x00000001, "str_value"),
+                        xmlBooleanAttribute(ANDROID_NAMESPACE_URI, "bool_attr", 0x00000002, true),
+                        xmlDecimalIntegerAttribute(
+                            ANDROID_NAMESPACE_URI, "int_attr", 0x00000003, 123),
+                        xmlResourceReferenceAttribute(
+                            ANDROID_NAMESPACE_URI, "ref_attr", 0x00000004, 0x12345678)))));
+    AndroidManifest manifestTo = AndroidManifest.create(xmlNode(xmlElement("manifest")));
+
+    AndroidManifest editedManifest =
+        manifestTo
+            .toEditor()
+            .copyManifestElementAndroidAttribute(manifestFrom, 0x00000001)
+            .copyManifestElementAndroidAttribute(manifestFrom, 0x00000002)
+            .copyManifestElementAndroidAttribute(manifestFrom, 0x00000003)
+            .copyManifestElementAndroidAttribute(manifestFrom, 0x00000004)
+            .save();
+
+    assertThat(editedManifest.getManifestElement().getProto().getAttributeList())
+        .containsExactly(
+            xmlAttribute(ANDROID_NAMESPACE_URI, "str_attr", 0x00000001, "str_value"),
+            xmlBooleanAttribute(ANDROID_NAMESPACE_URI, "bool_attr", 0x00000002, true),
+            xmlDecimalIntegerAttribute(ANDROID_NAMESPACE_URI, "int_attr", 0x00000003, 123),
+            xmlResourceReferenceAttribute(
+                ANDROID_NAMESPACE_URI, "ref_attr", 0x00000004, 0x12345678));
+  }
+
+  @Test
+  public void copyApplicationElementAndroidAttribute_success() {
+    String attrName = "attr_name";
+    int attrResourceId = 0x00001234;
+    String attrValue = "attr_value";
+    AndroidManifest manifestFrom =
+        AndroidManifest.create(
+            xmlNode(
+                xmlElement(
+                    "manifest",
+                    xmlNode(
+                        xmlElement(
+                            "application",
+                            xmlAttribute(
+                                ANDROID_NAMESPACE_URI, attrName, attrResourceId, attrValue))))));
+    AndroidManifest manifestTo = AndroidManifest.create(xmlNode(xmlElement("manifest")));
+
+    AndroidManifest editedManifest =
+        manifestTo
+            .toEditor()
+            .copyApplicationElementAndroidAttribute(manifestFrom, attrResourceId)
+            .save();
+
+    assertThat(getApplicationElement(editedManifest).getAttributeList())
+        .containsExactly(xmlAttribute(ANDROID_NAMESPACE_URI, attrName, attrResourceId, attrValue));
+  }
+
+  @Test
+  public void copyApplicationElementAndroidAttribute_doesNotExist_noChanges() {
+    AndroidManifest manifestFrom = AndroidManifest.create(xmlNode(xmlElement("manifest")));
+    AndroidManifest manifestTo = AndroidManifest.create(xmlNode(xmlElement("manifest")));
+
+    AndroidManifest editedManifest =
+        manifestTo
+            .toEditor()
+            .copyApplicationElementAndroidAttribute(manifestFrom, 0x00001234)
+            .save();
+
+    assertThat(editedManifest.getManifestElement().getProto().getChildList()).isEmpty();
+  }
+
+  @Test
+  public void copyApplicationElementAndroidAttribute_doesNotRemove_success() {
+    String attrName = "attr_name";
+    int attrResourceId = 0x00001234;
+    String attrValue = "attr_value";
+    AndroidManifest manifestFrom =
+        AndroidManifest.create(
+            xmlNode(
+                xmlElement(
+                    "manifest",
+                    xmlNode(
+                        xmlElement(
+                            "application",
+                            xmlAttribute(
+                                ANDROID_NAMESPACE_URI, attrName, attrResourceId, attrValue))))));
+    AndroidManifest manifestTo =
+        AndroidManifest.create(
+            xmlNode(
+                xmlElement(
+                    "manifest",
+                    xmlNode(
+                        xmlElement(
+                            "application",
+                            xmlAttribute(
+                                ANDROID_NAMESPACE_URI,
+                                "existingAttr",
+                                0x12341234,
+                                "existingValue"))))));
+
+    AndroidManifest editedManifest =
+        manifestTo
+            .toEditor()
+            .copyApplicationElementAndroidAttribute(manifestFrom, attrResourceId)
+            .save();
+
+    assertThat(getApplicationElement(editedManifest).getAttributeList())
+        .containsExactly(
+            xmlAttribute(ANDROID_NAMESPACE_URI, attrName, attrResourceId, attrValue),
+            xmlAttribute(ANDROID_NAMESPACE_URI, "existingAttr", 0x12341234, "existingValue"));
+  }
+
+  @Test
+  public void copyApplicationElementAndroidAttribute_allTypes_success() {
+    AndroidManifest manifestFrom =
+        AndroidManifest.create(
+            xmlNode(
+                xmlElement(
+                    "manifest",
+                    xmlNode(
+                        xmlElement(
+                            "application",
+                            ImmutableList.of(
+                                xmlAttribute(
+                                    ANDROID_NAMESPACE_URI, "str_attr", 0x00000001, "str_value"),
+                                xmlBooleanAttribute(
+                                    ANDROID_NAMESPACE_URI, "bool_attr", 0x00000002, true),
+                                xmlDecimalIntegerAttribute(
+                                    ANDROID_NAMESPACE_URI, "int_attr", 0x00000003, 123),
+                                xmlResourceReferenceAttribute(
+                                    ANDROID_NAMESPACE_URI,
+                                    "ref_attr",
+                                    0x00000004,
+                                    0x12345678)))))));
+    AndroidManifest manifestTo = AndroidManifest.create(xmlNode(xmlElement("manifest")));
+
+    AndroidManifest editedManifest =
+        manifestTo
+            .toEditor()
+            .copyApplicationElementAndroidAttribute(manifestFrom, 0x00000001)
+            .copyApplicationElementAndroidAttribute(manifestFrom, 0x00000002)
+            .copyApplicationElementAndroidAttribute(manifestFrom, 0x00000003)
+            .copyApplicationElementAndroidAttribute(manifestFrom, 0x00000004)
+            .save();
+
+    assertThat(getApplicationElement(editedManifest).getAttributeList())
+        .containsExactly(
+            xmlAttribute(ANDROID_NAMESPACE_URI, "str_attr", 0x00000001, "str_value"),
+            xmlBooleanAttribute(ANDROID_NAMESPACE_URI, "bool_attr", 0x00000002, true),
+            xmlDecimalIntegerAttribute(ANDROID_NAMESPACE_URI, "int_attr", 0x00000003, 123),
+            xmlResourceReferenceAttribute(
+                ANDROID_NAMESPACE_URI, "ref_attr", 0x00000004, 0x12345678));
+  }
+
+  @Test
+  public void copyChildrenElements_single_success() {
+    String elementName = "elementA";
+    AndroidManifest manifestFrom =
+        AndroidManifest.create(xmlNode(xmlElement("manifest", xmlNode(xmlElement(elementName)))));
+    AndroidManifest manifestTo = AndroidManifest.create(xmlNode(xmlElement("manifest")));
+
+    AndroidManifest editedManifest =
+        manifestTo.toEditor().copyChildrenElements(manifestFrom, elementName).save();
+
+    assertThat(editedManifest.getManifestElement().getProto().getChildList())
+        .containsExactly(xmlNode(xmlElement(elementName)));
+  }
+
+  @Test
+  public void copyChildrenElements_multiple_success() {
+    String elementName = "elementA";
+    AndroidManifest manifestFrom =
+        AndroidManifest.create(
+            xmlNode(
+                xmlElement(
+                    "manifest",
+                    xmlNode(xmlElement(elementName)),
+                    xmlNode(xmlElement(elementName)))));
+    AndroidManifest manifestTo = AndroidManifest.create(xmlNode(xmlElement("manifest")));
+
+    AndroidManifest editedManifest =
+        manifestTo.toEditor().copyChildrenElements(manifestFrom, elementName).save();
+
+    assertThat(editedManifest.getManifestElement().getProto().getChildList())
+        .containsExactly(xmlNode(xmlElement(elementName)), xmlNode(xmlElement(elementName)));
+  }
+
+  @Test
+  public void copyChildrenElements_doesNotExist_noChanges() {
+    AndroidManifest manifestFrom = AndroidManifest.create(xmlNode(xmlElement("manifest")));
+    AndroidManifest manifestTo = AndroidManifest.create(xmlNode(xmlElement("manifest")));
+
+    AndroidManifest editedManifest =
+        manifestTo.toEditor().copyChildrenElements(manifestFrom, "elementA").save();
+
+    assertThat(editedManifest.getManifestElement().getProto().getChildList()).isEmpty();
+  }
+
+  @Test
+  public void copyChildrenElements_doesNotRemoveExisting_success() {
+    String elementName = "elementA";
+    AndroidManifest manifestFrom =
+        AndroidManifest.create(xmlNode(xmlElement("manifest", xmlNode(xmlElement(elementName)))));
+    AndroidManifest manifestTo =
+        AndroidManifest.create(
+            xmlNode(xmlElement("manifest", xmlNode(xmlElement("existingElement")))));
+
+    AndroidManifest editedManifest =
+        manifestTo.toEditor().copyChildrenElements(manifestFrom, elementName).save();
+
+    assertThat(editedManifest.getManifestElement().getProto().getChildList())
+        .containsExactly(xmlNode(xmlElement(elementName)), xmlNode(xmlElement("existingElement")));
+  }
+
+  @Test
+  public void setDeliveryOptionsForRuntimeEnabledSdkModule() {
+    AndroidManifest androidManifest = AndroidManifest.create(xmlNode(xmlElement("manifest")));
+
+    AndroidManifest editedManifest =
+        androidManifest.toEditor().setDeliveryOptionsForRuntimeEnabledSdkModule().save();
+
+    XmlNode editedManifestRoot = editedManifest.getManifestRoot().getProto();
+    assertThat(editedManifestRoot.hasElement()).isTrue();
+    XmlElement manifestElement = editedManifestRoot.getElement();
+    assertThat(manifestElement.getName()).isEqualTo("manifest");
+    assertThat(manifestElement.getChildList())
+        .containsExactly(
+            xmlNode(
+                xmlElement(
+                    DISTRIBUTION_NAMESPACE_URI,
+                    MODULE_ELEMENT_NAME,
+                    xmlNode(
+                        xmlElement(
+                            DISTRIBUTION_NAMESPACE_URI,
+                            DELIVERY_ELEMENT_NAME,
+                            xmlNode(
+                                xmlElement(
+                                    DISTRIBUTION_NAMESPACE_URI,
+                                    INSTALL_TIME_ELEMENT_NAME,
+                                    xmlNode(
+                                        xmlElement(
+                                            DISTRIBUTION_NAMESPACE_URI,
+                                            REMOVABLE_ELEMENT_NAME,
+                                            xmlBooleanAttribute(
+                                                DISTRIBUTION_NAMESPACE_URI,
+                                                VALUE_ATTRIBUTE_NAME,
+                                                VALUE_RESOURCE_ID,
+                                                true))))))),
+                    xmlNode(
+                        xmlElement(
+                            DISTRIBUTION_NAMESPACE_URI,
+                            FUSING_ELEMENT_NAME,
+                            xmlBooleanAttribute(
+                                DISTRIBUTION_NAMESPACE_URI, INCLUDE_ATTRIBUTE_NAME, true))))));
+  }
+
+  @Test
+  public void removeUsesSdkElement() {
+    AndroidManifest androidManifest =
+        AndroidManifest.create(
+            xmlNode(
+                xmlElement(
+                    "manifest",
+                    xmlNode(
+                        xmlElement(
+                            "uses-sdk",
+                            xmlDecimalIntegerAttribute(
+                                ANDROID_NAMESPACE_URI,
+                                "minSdkVersion",
+                                MIN_SDK_VERSION_RESOURCE_ID,
+                                1))))));
+
+    AndroidManifest editedManifest = androidManifest.toEditor().removeUsesSdkElement().save();
+
+    XmlNode editedManifestRoot = editedManifest.getManifestRoot().getProto();
+    assertThat(editedManifestRoot.hasElement()).isTrue();
+    XmlElement manifestElement = editedManifestRoot.getElement();
+    assertThat(manifestElement.getName()).isEqualTo("manifest");
+    assertThat(manifestElement.getChildList()).isEmpty();
+  }
+
+  @Test
+  public void addUsesFeatureElement_required() {
+    AndroidManifest androidManifest = AndroidManifest.create(xmlNode(xmlElement("manifest")));
+
+    AndroidManifest editedManifest =
+        androidManifest
+            .toEditor()
+            .addUsesFeatureElement("requiredFeatureName", /* isRequired= */ true)
+            .save();
+
+    assertThat(editedManifest.getManifestElement().getProto().getChildList())
+        .containsExactly(
+            xmlNode(
+                xmlElement(
+                    USES_FEATURE_ELEMENT_NAME,
+                    ImmutableList.of(
+                        xmlAttribute(
+                            ANDROID_NAMESPACE_URI,
+                            NAME_ATTRIBUTE_NAME,
+                            NAME_RESOURCE_ID,
+                            "requiredFeatureName"),
+                        xmlBooleanAttribute(
+                            ANDROID_NAMESPACE_URI,
+                            REQUIRED_ATTRIBUTE_NAME,
+                            REQUIRED_RESOURCE_ID,
+                            true)))));
+  }
+
+  @Test
+  public void addUsesFeatureElement_notRequired() {
+    AndroidManifest androidManifest = AndroidManifest.create(xmlNode(xmlElement("manifest")));
+
+    AndroidManifest editedManifest =
+        androidManifest
+            .toEditor()
+            .addUsesFeatureElement("notRequiredFeatureName", /* isRequired= */ false)
+            .save();
+
+    assertThat(editedManifest.getManifestElement().getProto().getChildList())
+        .containsExactly(
+            xmlNode(
+                xmlElement(
+                    USES_FEATURE_ELEMENT_NAME,
+                    ImmutableList.of(
+                        xmlAttribute(
+                            ANDROID_NAMESPACE_URI,
+                            NAME_ATTRIBUTE_NAME,
+                            NAME_RESOURCE_ID,
+                            "notRequiredFeatureName"),
+                        xmlBooleanAttribute(
+                            ANDROID_NAMESPACE_URI,
+                            REQUIRED_ATTRIBUTE_NAME,
+                            REQUIRED_RESOURCE_ID,
+                            false)))));
   }
 
   private static void assertUsesSdkLibraryAttributes(

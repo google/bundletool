@@ -23,7 +23,7 @@ import static com.android.tools.build.bundletool.model.version.VersionGuardedFea
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.collect.ImmutableList.toImmutableList;
-import static com.google.common.collect.ImmutableMap.toImmutableMap;
+import static com.google.common.collect.ImmutableListMultimap.toImmutableListMultimap;
 import static com.google.common.collect.Streams.stream;
 import static java.util.function.Function.identity;
 
@@ -42,7 +42,7 @@ import com.google.auto.value.extension.memoized.Memoized;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Splitter;
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableListMultimap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Range;
 import com.google.common.primitives.Ints;
@@ -84,6 +84,12 @@ public abstract class AndroidManifest {
   public static final String PERMISSION_GROUP_ELEMENT_NAME = "permission-group";
   public static final String PERMISSION_TREE_ELEMENT_NAME = "permission-tree";
   public static final String PROPERTY_ELEMENT_NAME = "property";
+  public static final String USES_FEATURE_ELEMENT_NAME = "uses-feature";
+  public static final String MODULE_ELEMENT_NAME = "module";
+  public static final String DELIVERY_ELEMENT_NAME = "delivery";
+  public static final String INSTALL_TIME_ELEMENT_NAME = "install-time";
+  public static final String REMOVABLE_ELEMENT_NAME = "removable";
+  public static final String FUSING_ELEMENT_NAME = "fusing";
 
   public static final String DEBUGGABLE_ATTRIBUTE_NAME = "debuggable";
   public static final String EXTRACT_NATIVE_LIBS_ATTRIBUTE_NAME = "extractNativeLibs";
@@ -125,6 +131,9 @@ public abstract class AndroidManifest {
   public static final String SDK_VERSION_MAJOR_ATTRIBUTE_NAME = "versionMajor";
   public static final String SDK_PATCH_VERSION_ATTRIBUTE_NAME =
       "com.android.vending.sdk.version.patch";
+  public static final String SDK_PROVIDER_CLASS_NAME_ATTRIBUTE_NAME =
+      "android.sdksandbox.PROPERTY_SDK_PROVIDER_CLASS_NAME";
+  public static final String REQUIRED_ATTRIBUTE_NAME = "required";
   public static final Integer SDK_SANDBOX_MIN_VERSION = 32;
   public static final String USES_SDK_LIBRARY_ELEMENT_NAME = "uses-sdk-library";
   public static final String CERTIFICATE_DIGEST_ATTRIBUTE_NAME = "certDigest";
@@ -132,6 +141,10 @@ public abstract class AndroidManifest {
   public static final String REQUIRED_ACCOUNT_TYPE_ATTRIBUTE_NAME = "requiredAccountType";
   public static final String RESTRICTED_ACCOUNT_TYPE_ATTRIBUTE_NAME = "restrictedAccountType";
   public static final String LARGE_HEAP_ATTRIBUTE_NAME = "largeHeap";
+  public static final String INCLUDE_ATTRIBUTE_NAME = "include";
+
+  public static final String LEANBACK_FEATURE_NAME = "android.software.leanback";
+  public static final String TOUCHSCREEN_FEATURE_NAME = "android.hardware.touchscreen";
 
   public static final String MODULE_TYPE_FEATURE_VALUE = "feature";
   public static final String MODULE_TYPE_ASSET_VALUE = "asset-pack";
@@ -142,6 +155,7 @@ public abstract class AndroidManifest {
 
   public static final int DEBUGGABLE_RESOURCE_ID = 0x0101000f;
   public static final int EXTRACT_NATIVE_LIBS_RESOURCE_ID = 0x10104ea;
+  public static final int REQUIRED_RESOURCE_ID = 0x0101028e;
   public static final int HAS_CODE_RESOURCE_ID = 0x101000c;
   public static final int ICON_RESOURCE_ID = 0x01010002;
   public static final int BANNER_RESOURCE_ID = 0x010103f2;
@@ -195,8 +209,12 @@ public abstract class AndroidManifest {
    */
   public static final String META_DATA_KEY_SPLITS_REQUIRED = "com.android.vending.splits.required";
 
+  public static final String META_DATA_GMS_VERSION = "com.google.android.gms.version";
+
   public static final String MAIN_ACTION_NAME = "android.intent.action.MAIN";
   public static final String LAUNCHER_CATEGORY_NAME = "android.intent.category.LAUNCHER";
+  public static final String LEANBACK_LAUNCHER_CATEGORY_NAME =
+      "android.intent.category.LEANBACK_LAUNCHER";
 
   public abstract XmlProtoNode getManifestRoot();
 
@@ -275,7 +293,7 @@ public abstract class AndroidManifest {
     return editor.save();
   }
 
-  private static XmlProtoNode createMinimalManifestTag() {
+  public static XmlProtoNode createMinimalManifestTag() {
     return XmlProtoNode.createElementNode(
         XmlProtoElementBuilder.create("manifest")
             .addNamespaceDeclaration("android", ANDROID_NAMESPACE_URI)
@@ -305,12 +323,12 @@ public abstract class AndroidManifest {
     return getApplicationAttributeAsBoolean(DEBUGGABLE_RESOURCE_ID);
   }
 
-  public ImmutableMap<String, XmlProtoElement> getActivitiesByName() {
+  public ImmutableListMultimap<String, XmlProtoElement> getActivitiesByName() {
     return stream(getManifestElement().getOptionalChildElement(APPLICATION_ELEMENT_NAME))
         .flatMap(app -> app.getChildrenElements(ACTIVITY_ELEMENT_NAME))
         .filter(activity -> activity.getAndroidAttribute(NAME_RESOURCE_ID).isPresent())
         .collect(
-            toImmutableMap(
+            toImmutableListMultimap(
                 activity -> activity.getAndroidAttribute(NAME_RESOURCE_ID).get().getValueAsString(),
                 identity()));
   }
@@ -319,16 +337,20 @@ public abstract class AndroidManifest {
     return getUsesSdkAttribute(MIN_SDK_VERSION_RESOURCE_ID);
   }
 
+  public Optional<Integer> getTargetingSdkVersion() {
+    return getUsesSdkAttribute(TARGET_SDK_VERSION_RESOURCE_ID);
+  }
+
+  public int getEffectiveTargetingSdkVersion() {
+    return getTargetingSdkVersion().orElse(getEffectiveMinSdkVersion());
+  }
+
   public int getEffectiveMinSdkVersion() {
     return getMinSdkVersion().orElse(1);
   }
 
   public Optional<Integer> getMaxSdkVersion() {
     return getUsesSdkAttribute(MAX_SDK_VERSION_RESOURCE_ID);
-  }
-
-  public Optional<Integer> getTargetSdkVersion() {
-    return getUsesSdkAttribute(TARGET_SDK_VERSION_RESOURCE_ID);
   }
 
   /** Returns SDK level range this {@link AndroidManifest} declares as supported. */
@@ -533,18 +555,6 @@ public abstract class AndroidManifest {
             });
   }
 
-  public Optional<String> getSharedUserId() {
-    return getManifestElement()
-        .getAndroidAttribute(SHARED_USER_ID_RESOURCE_ID)
-        .map(XmlProtoAttribute::getValueAsString);
-  }
-
-  public Optional<Integer> getSharedUserLabel() {
-    return getManifestElement()
-        .getAndroidAttribute(SHARED_USER_LABEL_RESOURCE_ID)
-        .map(XmlProtoAttribute::getValueAsRefId);
-  }
-
   /**
    * Returns whether the module delivery settings are explicitly declared.
    *
@@ -611,26 +621,6 @@ public abstract class AndroidManifest {
                     .isPresent());
   }
 
-  public Optional<Integer> getDescription() {
-    return getApplicationAttributeAsRefId(DESCRIPTION_RESOURCE_ID);
-  }
-
-  public Optional<Boolean> getHasFragileUserData() {
-    return getApplicationAttributeAsBoolean(HAS_FRAGILE_USER_DATA_RESOURCE_ID);
-  }
-
-  public Optional<Boolean> getIsGame() {
-    return getApplicationAttributeAsBoolean(IS_GAME_RESOURCE_ID);
-  }
-
-  public boolean hasLabelString() {
-    return hasApplicationAttributeAsString(LABEL_RESOURCE_ID);
-  }
-
-  public boolean hasLabelRefId() {
-    return hasApplicationAttributeAsRefId(LABEL_RESOURCE_ID);
-  }
-
   public boolean hasLocaleConfig() {
     return getManifestElement()
         .getOptionalChildElement(APPLICATION_ELEMENT_NAME)
@@ -638,48 +628,12 @@ public abstract class AndroidManifest {
         .isPresent();
   }
 
-  public Optional<String> getLabelString() {
-    return getApplicationAttribute(LABEL_RESOURCE_ID);
-  }
-
-  public Optional<Integer> getLabelRefId() {
-    return getApplicationAttributeAsRefId(LABEL_RESOURCE_ID);
-  }
-
-  public Optional<Integer> getIcon() {
-    return getApplicationAttributeAsRefId(ICON_RESOURCE_ID);
-  }
-
-  public Optional<Integer> getBanner() {
-    return getApplicationAttributeAsRefId(BANNER_RESOURCE_ID);
-  }
-
   public Optional<Boolean> getAllowBackup() {
     return getApplicationAttributeAsBoolean(ALLOW_BACKUP_RESOURCE_ID);
   }
 
-  public Optional<Integer> getFullBackupContent() {
-    return getApplicationAttributeAsRefId(FULL_BACKUP_CONTENT_RESOURCE_ID);
-  }
-
-  public Optional<Integer> getDataExtractionRules() {
-    return getApplicationAttributeAsRefId(DATA_EXTRACTION_RULES_RESOURCE_ID);
-  }
-
   public Optional<Boolean> getFullBackupOnly() {
     return getApplicationAttributeAsBoolean(FULL_BACKUP_ONLY_RESOURCE_ID);
-  }
-
-  public Optional<String> getRestrictedAccountType() {
-    return getApplicationAttribute(RESTRICTED_ACCOUNT_TYPE_RESOURCE_ID);
-  }
-
-  public Optional<String> getRequiredAccountType() {
-    return getApplicationAttribute(REQUIRED_ACCOUNT_TYPE_RESOURCE_ID);
-  }
-
-  public Optional<Boolean> getLargeHeap() {
-    return getApplicationAttributeAsBoolean(LARGE_HEAP_RESOURCE_ID);
   }
 
   public boolean hasBackupAgent() {
@@ -754,7 +708,7 @@ public abstract class AndroidManifest {
    * <p>Throws an {@link ValidationException} if there is more than one meta-data element with this
    * name.
    */
-  private Optional<XmlProtoElement> getMetadataElement(String name) {
+  public Optional<XmlProtoElement> getMetadataElement(String name) {
     ImmutableList<XmlProtoElement> metadataElements =
         getMetadataElements()
             .filter(
@@ -839,13 +793,33 @@ public abstract class AndroidManifest {
   }
 
   public boolean isHeadless() {
-    return getActivitiesByName().entrySet().stream()
-        .flatMap(activity -> activity.getValue().getChildrenElements(INTENT_FILTER_ELEMENT_NAME))
-        .noneMatch(
+    return !hasMainActivity() && !hasMainTvActivity();
+  }
+
+  public boolean hasMainActivity() {
+    return getActivities().stream()
+        .flatMap(activity -> activity.getChildrenElements(INTENT_FILTER_ELEMENT_NAME))
+        .anyMatch(
             intent ->
                 hasChildWithNameAttribute(intent, ACTION_ELEMENT_NAME, MAIN_ACTION_NAME)
                     && hasChildWithNameAttribute(
                         intent, CATEGORY_ELEMENT_NAME, LAUNCHER_CATEGORY_NAME));
+  }
+
+  public boolean hasMainTvActivity() {
+    return getActivities().stream()
+        .flatMap(activity -> activity.getChildrenElements(INTENT_FILTER_ELEMENT_NAME))
+        .anyMatch(
+            intent ->
+                hasChildWithNameAttribute(intent, ACTION_ELEMENT_NAME, MAIN_ACTION_NAME)
+                    && hasChildWithNameAttribute(
+                        intent, CATEGORY_ELEMENT_NAME, LEANBACK_LAUNCHER_CATEGORY_NAME));
+  }
+
+  private ImmutableList<XmlProtoElement> getActivities() {
+    return stream(getManifestElement().getOptionalChildElement(APPLICATION_ELEMENT_NAME))
+        .flatMap(app -> app.getChildrenElements(ACTIVITY_ELEMENT_NAME))
+        .collect(toImmutableList());
   }
 
   private static boolean hasChildWithNameAttribute(
@@ -887,25 +861,11 @@ public abstract class AndroidManifest {
         .isPresent();
   }
 
-  private Optional<String> getApplicationAttribute(int resourceId) {
-    return getManifestElement()
-        .getOptionalChildElement(APPLICATION_ELEMENT_NAME)
-        .flatMap(app -> app.getAndroidAttribute(resourceId))
-        .map(XmlProtoAttribute::getValueAsString);
-  }
-
   private Optional<Boolean> getApplicationAttributeAsBoolean(int resourceId) {
     return getManifestElement()
         .getOptionalChildElement(APPLICATION_ELEMENT_NAME)
         .flatMap(app -> app.getAndroidAttribute(resourceId))
         .map(XmlProtoAttribute::getValueAsBoolean);
-  }
-
-  private Optional<Integer> getApplicationAttributeAsRefId(int resourceId) {
-    return getManifestElement()
-        .getOptionalChildElement(APPLICATION_ELEMENT_NAME)
-        .flatMap(app -> app.getAndroidAttribute(resourceId))
-        .map(XmlProtoAttribute::getValueAsRefId);
   }
 
   private boolean hasApplicationAttributeAsString(int resourceId) {
@@ -926,6 +886,21 @@ public abstract class AndroidManifest {
    * first one.
    */
   public Optional<Integer> getSdkPatchVersionProperty() {
+    return getPropertyValue(SDK_PATCH_VERSION_ATTRIBUTE_NAME)
+        .map(XmlProtoAttribute::getValueAsInteger);
+  }
+
+  /**
+   * Gets the SDK provider class name if it is set in the AndroidManifest. If there are multiple
+   * <property> elements with android:name={@value SDK_PROVIDER_CLASS_NAME_ATTRIBUTE_NAME}, return
+   * the first one.
+   */
+  public Optional<String> getSdkProviderClassNameProperty() {
+    return getPropertyValue(SDK_PROVIDER_CLASS_NAME_ATTRIBUTE_NAME)
+        .map(XmlProtoAttribute::getValueAsString);
+  }
+
+  private Optional<XmlProtoAttribute> getPropertyValue(String attributeName) {
     return getApplicationElementChildElements(PROPERTY_ELEMENT_NAME).stream()
         .filter(element -> element.getAndroidAttribute(NAME_RESOURCE_ID).isPresent())
         .filter(
@@ -934,7 +909,7 @@ public abstract class AndroidManifest {
                     .getAndroidAttribute(NAME_RESOURCE_ID)
                     .get()
                     .getValueAsString()
-                    .equals(SDK_PATCH_VERSION_ATTRIBUTE_NAME))
+                    .equals(attributeName))
         .map(
             element ->
                 element
@@ -943,9 +918,10 @@ public abstract class AndroidManifest {
                         () ->
                             InvalidBundleException.createWithUserMessage(
                                 "<property> element found with"
-                                    + " 'android:name=com.android.vending.sdk.version.patch' but no"
-                                    + " 'android:value=SDK_PATCH_VERSION'."))
-                    .getValueAsInteger())
+                                    + " android:name='"
+                                    + attributeName
+                                    + "' but no"
+                                    + " 'android:value'.")))
         .findFirst();
   }
 
@@ -961,14 +937,6 @@ public abstract class AndroidManifest {
         .getChildrenElements()
         .filter(element -> element.getName().equals(childElementName))
         .collect(toImmutableList());
-  }
-
-  private boolean hasApplicationAttributeAsRefId(int resourceId) {
-    return getManifestElement()
-        .getOptionalChildElement(APPLICATION_ELEMENT_NAME)
-        .flatMap(app -> app.getAndroidAttribute(resourceId))
-        .map(XmlProtoAttribute::hasRefIdValue)
-        .orElse(false);
   }
 
   /** Checks whether any component elements are declared. */

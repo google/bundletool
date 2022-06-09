@@ -761,11 +761,11 @@ public abstract class BuildApksCommand {
       AppBundleValidator bundleValidator = AppBundleValidator.create(getExtraValidators());
       bundleValidator.validateFile(bundleZip);
 
+      ImmutableMap<String, SdkBundle> sdkBundles =
+          getValidatedSdkBundlesByPackageName(closer, tempDir);
       AppBundle appBundle = AppBundle.buildFromZip(bundleZip);
       bundleValidator.validate(appBundle);
 
-      ImmutableMap<String, SdkBundle> sdkBundles =
-          getValidatedSdkBundlesByPackageName(closer, tempDir);
       validateSdkBundlesMatchAppBundleDependencies(appBundle, sdkBundles);
 
       AppBundlePreprocessorManager appBundlePreprocessorManager =

@@ -18,29 +18,28 @@ package com.android.tools.build.bundletool.splitters;
 
 import static com.android.tools.build.bundletool.model.utils.Versions.ANDROID_M_API_VERSION;
 import static com.android.tools.build.bundletool.model.utils.Versions.ANDROID_Q_API_VERSION;
+import static com.android.tools.build.bundletool.model.utils.Versions.ANDROID_S_V2_API_VERSION;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifest;
+import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withTargetSdkVersion;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.lPlusVariantTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.nativeDirectoryTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.nativeLibraries;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.sdkRuntimeVariantTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.targetedNativeDirectory;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.variantMinSdkTargeting;
-import static com.google.common.collect.ImmutableMap.toImmutableMap;
 import static com.google.common.truth.extensions.proto.ProtoTruth.assertThat;
-import static java.util.function.Function.identity;
 
 import com.android.aapt.Resources.XmlNode;
 import com.android.bundle.Files.NativeLibraries;
 import com.android.bundle.RuntimeEnabledSdkConfigProto.RuntimeEnabledSdk;
-import com.android.bundle.RuntimeEnabledSdkConfigProto.RuntimeEnabledSdkConfig;
 import com.android.bundle.Targeting.VariantTargeting;
 import com.android.tools.build.bundletool.model.AppBundle;
 import com.android.tools.build.bundletool.model.BundleModule;
 import com.android.tools.build.bundletool.testing.AppBundleBuilder;
 import com.android.tools.build.bundletool.testing.BundleModuleBuilder;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
-import java.util.stream.Stream;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
@@ -93,27 +92,20 @@ public class VariantTargetingGeneratorTest {
 
   @Test
   public void generateVariantTargetings_generatesSdkRuntimeVariant() {
-    BundleModule baseModuleWithSdkRuntimeConfig =
-        new BundleModuleBuilder("base")
-            .setManifest(ANDROID_MANIFEST)
-            .setRuntimeEnabledSdkConfig(
-                RuntimeEnabledSdkConfig.newBuilder()
-                    .addRuntimeEnabledSdk(
-                        RuntimeEnabledSdk.newBuilder()
-                            .setPackageName("com.test.sdk")
-                            .setVersionMajor(1234)
-                            .setVersionMinor(123)
-                            .setCertificateDigest("AA:BB:CC"))
-                    .build())
+    RuntimeEnabledSdk runtimeEnabledSdk =
+        RuntimeEnabledSdk.newBuilder()
+            .setPackageName("com.test.sdk")
+            .setVersionMajor(1234)
+            .setVersionMinor(123)
+            .setCertificateDigest("AA:BB:CC")
             .build();
     VariantTargetingGenerator variantTargetingGenerator =
         new VariantTargetingGenerator(
             new PerModuleVariantTargetingGenerator(),
             new SdkRuntimeVariantGenerator(
                 APP_BUNDLE.toBuilder()
-                    .setModules(
-                        Stream.of(baseModuleWithSdkRuntimeConfig, SINGLE_LIBRARY_MODULE)
-                            .collect(toImmutableMap(BundleModule::getName, identity())))
+                    .setRuntimeEnabledSdkDependencies(
+                        ImmutableMap.of("com.test.sdk", runtimeEnabledSdk))
                     .build()));
     ApkGenerationConfiguration apkGenerationConfiguration =
         ApkGenerationConfiguration.builder()
@@ -123,8 +115,7 @@ public class VariantTargetingGeneratorTest {
 
     ImmutableSet<VariantTargeting> splits =
         variantTargetingGenerator.generateVariantTargetings(
-            ImmutableList.of(baseModuleWithSdkRuntimeConfig, SINGLE_LIBRARY_MODULE),
-            apkGenerationConfiguration);
+            ImmutableList.of(SINGLE_LIBRARY_MODULE), apkGenerationConfiguration);
 
     assertThat(splits)
         .comparingExpectedFieldsOnly()
@@ -135,5 +126,74 @@ public class VariantTargetingGeneratorTest {
             variantMinSdkTargeting(ANDROID_M_API_VERSION),
             // SDK Runtime variant generated for base module, which contains RuntimeEnabledSdkConfig
             sdkRuntimeVariantTargeting());
+  }
+
+  @Test
+  public void
+      generateVariantTargetings_combinesVariantTargetingsFromMultipleModules_withSparseEncoding() {
+    VariantTargetingGenerator variantTargetingGenerator =
+        new VariantTargetingGenerator(
+            new PerModuleVariantTargetingGenerator(), new SdkRuntimeVariantGenerator(APP_BUNDLE));
+    ApkGenerationConfiguration apkGenerationConfiguration =
+        ApkGenerationConfiguration.builder().setEnableSparseEncodingVariant(true).build();
+
+    ImmutableSet<VariantTargeting> splits =
+        variantTargetingGenerator.generateVariantTargetings(
+            ImmutableList.of(getModuleWithTargetingSdk26()), apkGenerationConfiguration);
+
+    assertThat(splits)
+        .comparingExpectedFieldsOnly()
+        .containsExactly(
+            // L+ variant is always generated.
+            lPlusVariantTargeting(),
+            // S_V2+ variant generated for the module with sparse encoding
+            variantMinSdkTargeting(ANDROID_S_V2_API_VERSION));
+  }
+
+  @Test
+  public void generateVariantTargetings_generatesSdkRuntimeVariant_withSparseEncoding() {
+    BundleModule baseModule =
+        new BundleModuleBuilder("base")
+            .setManifest(androidManifest("com.test.app", withTargetSdkVersion("O.fingerprint")))
+            .build();
+    RuntimeEnabledSdk runtimeEnabledSdk =
+        RuntimeEnabledSdk.newBuilder()
+            .setPackageName("com.test.sdk")
+            .setVersionMajor(1234)
+            .setVersionMinor(123)
+            .setCertificateDigest("AA:BB:CC")
+            .build();
+    VariantTargetingGenerator variantTargetingGenerator =
+        new VariantTargetingGenerator(
+            new PerModuleVariantTargetingGenerator(),
+            new SdkRuntimeVariantGenerator(
+                APP_BUNDLE.toBuilder()
+                    .setRawModules(ImmutableSet.of(baseModule, getModuleWithTargetingSdk26()))
+                    .setRuntimeEnabledSdkDependencies(
+                        ImmutableMap.of("com.test.sdk", runtimeEnabledSdk))
+                    .build()));
+    ApkGenerationConfiguration apkGenerationConfiguration =
+        ApkGenerationConfiguration.builder().setEnableSparseEncodingVariant(true).build();
+
+    ImmutableSet<VariantTargeting> splits =
+        variantTargetingGenerator.generateVariantTargetings(
+            ImmutableList.of(baseModule, getModuleWithTargetingSdk26()),
+            apkGenerationConfiguration);
+
+    assertThat(splits)
+        .comparingExpectedFieldsOnly()
+        .containsExactly(
+            // L+ variant is always generated.
+            lPlusVariantTargeting(),
+            // S_V2+ variant generated for the module with sparse encoding
+            variantMinSdkTargeting(ANDROID_S_V2_API_VERSION),
+            // SDK Runtime variant generated for base module, which contains RuntimeEnabledSdkConfig
+            sdkRuntimeVariantTargeting());
+  }
+
+  private BundleModule getModuleWithTargetingSdk26() {
+    return new BundleModuleBuilder("testModule")
+        .setManifest(androidManifest("com.test.app", withTargetSdkVersion("O.fingerprint")))
+        .build();
   }
 }

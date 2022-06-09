@@ -49,6 +49,8 @@ public class SdkBundleValidator {
           // More specific file validations.
           new DexFilesValidator(),
           new SdkAndroidManifestValidator(),
+          new SdkBundleConfigValidator(),
+          new SdkModulesConfigValidator(),
           // Other.
           new ResourceTableValidator(),
           new SdkBundleModuleResourceIdValidator());

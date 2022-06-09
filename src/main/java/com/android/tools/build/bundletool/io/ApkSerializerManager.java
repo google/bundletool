@@ -19,6 +19,7 @@ import static com.android.tools.build.bundletool.commands.BuildApksCommand.ApkBu
 import static com.android.tools.build.bundletool.model.utils.CollectorUtils.groupingByDeterministic;
 import static com.android.tools.build.bundletool.model.utils.CollectorUtils.groupingBySortedKeys;
 import static com.google.common.base.Preconditions.checkArgument;
+import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.base.Predicates.alwaysTrue;
 import static com.google.common.collect.ImmutableBiMap.toImmutableBiMap;
 import static com.google.common.collect.ImmutableList.toImmutableList;
@@ -190,6 +191,7 @@ public class ApkSerializerManager {
     ImmutableList<Variant> allVariantsWithTargeting =
         serializeApks(outputDirectory, generatedApks, /* deviceSpec= */ Optional.empty());
     SdkBundle sdkBundle = (SdkBundle) bundle;
+    checkState(sdkBundle.getVersionCode().isPresent(), "Missing version code for SDK Bundle.");
     return BuildSdkApksResult.newBuilder()
         .setPackageName(sdkBundle.getPackageName())
         .addAllVariant(allVariantsWithTargeting)
@@ -197,7 +199,7 @@ public class ApkSerializerManager {
             Bundletool.newBuilder().setVersion(BundleToolVersion.getCurrentVersion().toString()))
         .setVersion(
             SdkVersionInformation.newBuilder()
-                .setVersionCode(sdkBundle.getVersionCode())
+                .setVersionCode(sdkBundle.getVersionCode().get())
                 .setMajor(sdkBundle.getMajorVersion())
                 .setMinor(sdkBundle.getMinorVersion())
                 .setPatch(sdkBundle.getPatchVersion())

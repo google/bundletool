@@ -37,6 +37,7 @@ import static com.android.tools.build.bundletool.testing.DeviceFactory.sdkVersio
 import static com.android.tools.build.bundletool.testing.FakeSystemEnvironmentProvider.ANDROID_HOME;
 import static com.android.tools.build.bundletool.testing.FakeSystemEnvironmentProvider.ANDROID_SERIAL;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifest;
+import static com.android.tools.build.bundletool.testing.SdkBundleBuilder.createSdkModulesConfig;
 import static com.android.tools.build.bundletool.testing.TestUtils.addKeyToKeystore;
 import static com.android.tools.build.bundletool.testing.TestUtils.createDebugKeystore;
 import static com.android.tools.build.bundletool.testing.TestUtils.createInvalidSdkAndroidManifest;
@@ -60,6 +61,7 @@ import com.android.bundle.CodeTransparencyOuterClass.CodeRelatedFile;
 import com.android.bundle.CodeTransparencyOuterClass.CodeTransparency;
 import com.android.bundle.RuntimeEnabledSdkConfigProto.RuntimeEnabledSdk;
 import com.android.bundle.RuntimeEnabledSdkConfigProto.RuntimeEnabledSdkConfig;
+import com.android.bundle.SdkModulesConfigOuterClass.RuntimeEnabledSdkVersion;
 import com.android.bundle.Targeting.ApkTargeting;
 import com.android.bundle.Targeting.ScreenDensity.DensityAlias;
 import com.android.bundle.Targeting.VariantTargeting;
@@ -1768,7 +1770,8 @@ public class BuildApksCommandTest {
                     .setPackageName("com.test.sdk1")
                     .setVersionMajor(1)
                     .setVersionMinor(2)
-                    .setCertificateDigest(VALID_CERT_FINGERPRINT))
+                    .setCertificateDigest(VALID_CERT_FINGERPRINT)
+                    .setResourcesPackageId(2))
             .build());
     BuildApksCommand command =
         BuildApksCommand.fromFlags(
@@ -1800,7 +1803,8 @@ public class BuildApksCommandTest {
                     .setPackageName("com.test.sdk1")
                     .setVersionMajor(1)
                     .setVersionMinor(2)
-                    .setCertificateDigest(VALID_CERT_FINGERPRINT))
+                    .setCertificateDigest(VALID_CERT_FINGERPRINT)
+                    .setResourcesPackageId(2))
             .build());
     BuildApksCommand command =
         BuildApksCommand.fromFlags(
@@ -1836,7 +1840,8 @@ public class BuildApksCommandTest {
                     .setPackageName("com.test.sdk1")
                     .setVersionMajor(1)
                     .setVersionMinor(2)
-                    .setCertificateDigest(VALID_CERT_FINGERPRINT))
+                    .setCertificateDigest(VALID_CERT_FINGERPRINT)
+                    .setResourcesPackageId(2))
             .build());
     BuildApksCommand command =
         BuildApksCommand.fromFlags(
@@ -1866,7 +1871,8 @@ public class BuildApksCommandTest {
                     .setPackageName("com.test.sdk1")
                     .setVersionMajor(1)
                     .setVersionMinor(2)
-                    .setCertificateDigest(VALID_CERT_FINGERPRINT))
+                    .setCertificateDigest(VALID_CERT_FINGERPRINT)
+                    .setResourcesPackageId(2))
             .build());
     BuildApksCommand command =
         BuildApksCommand.fromFlags(
@@ -1894,13 +1900,15 @@ public class BuildApksCommandTest {
                     .setPackageName("com.test.sdk1")
                     .setVersionMajor(1)
                     .setVersionMinor(2)
-                    .setCertificateDigest(VALID_CERT_FINGERPRINT))
+                    .setCertificateDigest(VALID_CERT_FINGERPRINT)
+                    .setResourcesPackageId(2))
             .addRuntimeEnabledSdk(
                 RuntimeEnabledSdk.newBuilder()
                     .setPackageName("com.test.sdk2")
                     .setVersionMajor(2)
                     .setVersionMinor(3)
-                    .setCertificateDigest(VALID_CERT_FINGERPRINT))
+                    .setCertificateDigest(VALID_CERT_FINGERPRINT)
+                    .setResourcesPackageId(3))
             .build());
     BuildApksCommand command =
         BuildApksCommand.fromFlags(
@@ -1929,7 +1937,8 @@ public class BuildApksCommandTest {
                     .setPackageName("com.test.sdk1")
                     .setVersionMajor(1)
                     .setVersionMinor(2)
-                    .setCertificateDigest(VALID_CERT_FINGERPRINT))
+                    .setCertificateDigest(VALID_CERT_FINGERPRINT)
+                    .setResourcesPackageId(2))
             .build());
     BuildApksCommand command =
         BuildApksCommand.fromFlags(
@@ -1958,7 +1967,8 @@ public class BuildApksCommandTest {
                     .setPackageName("com.test.sdk1")
                     .setVersionMajor(2)
                     .setVersionMinor(3)
-                    .setCertificateDigest(VALID_CERT_FINGERPRINT))
+                    .setCertificateDigest(VALID_CERT_FINGERPRINT)
+                    .setResourcesPackageId(2))
             .build());
     BuildApksCommand command =
         BuildApksCommand.fromFlags(
@@ -1987,7 +1997,8 @@ public class BuildApksCommandTest {
                 RuntimeEnabledSdk.newBuilder()
                     .setPackageName("com.test.sdk1")
                     .setVersionMinor(3)
-                    .setCertificateDigest(VALID_CERT_FINGERPRINT))
+                    .setCertificateDigest(VALID_CERT_FINGERPRINT)
+                    .setResourcesPackageId(2))
             .build());
     BuildApksCommand command =
         BuildApksCommand.fromFlags(
@@ -2040,40 +2051,6 @@ public class BuildApksCommandTest {
     assertThat(e)
         .hasMessageThat()
         .contains("Found dependency on runtime-enabled SDK with an empty package name.");
-  }
-
-  @Test
-  public void validateRuntimeEnabledSdkConfig_duplicateSdkPackageNames_throws() throws Exception {
-    createSdkBundle(sdkBundlePath1, "com.test.sdk1", /* majorVersion= */ 1, /* minorVersion= */ 2);
-    createAppBundleWithRuntimeEnabledSdkConfig(
-        bundlePath,
-        RuntimeEnabledSdkConfig.newBuilder()
-            .addRuntimeEnabledSdk(
-                RuntimeEnabledSdk.newBuilder()
-                    .setPackageName("com.test.sdk1")
-                    .setVersionMajor(1)
-                    .setVersionMinor(2)
-                    .setCertificateDigest(VALID_CERT_FINGERPRINT))
-            .addRuntimeEnabledSdk(
-                RuntimeEnabledSdk.newBuilder()
-                    .setPackageName("com.test.sdk1")
-                    .setVersionMajor(2)
-                    .setVersionMinor(3)
-                    .setCertificateDigest(VALID_CERT_FINGERPRINT))
-            .build());
-    BuildApksCommand command =
-        BuildApksCommand.fromFlags(
-            new FlagParser()
-                .parse(
-                    "--bundle=" + bundlePath,
-                    "--output=" + outputFilePath,
-                    "--sdk-bundles=" + sdkBundlePath1),
-            fakeAdbServer);
-
-    Exception e = assertThrows(InvalidBundleException.class, command::execute);
-    assertThat(e)
-        .hasMessageThat()
-        .contains("Found multiple dependencies on the same runtime-enabled SDK 'com.test.sdk1'.");
   }
 
   @Test
@@ -2157,11 +2134,13 @@ public class BuildApksCommandTest {
         .writeToDisk(
             new SdkBundleBuilder()
                 .setSdkModulesConfig(
-                    /* bundletoolVersion= */ "1.9.1",
-                    packageName,
-                    majorVersion,
-                    minorVersion,
-                    /* patch= */ 0)
+                    createSdkModulesConfig()
+                        .setSdkPackageName(packageName)
+                        .setSdkVersion(
+                            RuntimeEnabledSdkVersion.newBuilder()
+                                .setMajor(majorVersion)
+                                .setMinor(minorVersion))
+                        .build())
                 .build(),
             path);
   }

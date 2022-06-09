@@ -96,9 +96,11 @@ public abstract class BundleModule {
 
   /** Describes the content type of the module. */
   public enum ModuleType {
+    UNKNOWN_MODULE_TYPE(false),
     FEATURE_MODULE(true),
     ASSET_MODULE(false),
-    ML_MODULE(true);
+    ML_MODULE(true),
+    SDK_DEPENDENCY_MODULE(true);
 
     private final boolean isFeatureModule;
 
@@ -106,7 +108,10 @@ public abstract class BundleModule {
       this.isFeatureModule = isFeatureModule;
     }
 
-    /** Returns whether the module is a feature, including ML modules. */
+    /**
+     * Returns whether the module is a feature, including ML modules and AAB modules generated from
+     * runtime-enabled SDK dependencies.
+     */
     public boolean isFeatureModule() {
       return isFeatureModule;
     }
@@ -146,6 +151,8 @@ public abstract class BundleModule {
    */
   abstract ImmutableMap<ZipPath, ModuleEntry> getEntryMap();
 
+  public abstract ModuleType getModuleType();
+
   /**
    * Returns entries of the module.
    *
@@ -169,12 +176,6 @@ public abstract class BundleModule {
       return Optional.empty();
     }
     return Optional.of(getAndroidManifest().getInstantModuleDeliveryType());
-  }
-
-  public ModuleType getModuleType() {
-    // If the module type is not defined in the manifest, default to feature module for backwards
-    // compatibility.
-    return getAndroidManifest().getModuleType();
   }
 
   public boolean isIncludedInFusing() {
@@ -284,17 +285,19 @@ public abstract class BundleModule {
   private static Optional<FeatureModuleType> moduleTypeToFeatureModuleType(ModuleType moduleType) {
     switch (moduleType) {
       case FEATURE_MODULE:
+      case SDK_DEPENDENCY_MODULE:
         return Optional.of(FeatureModuleType.FEATURE_MODULE);
       case ML_MODULE:
         return Optional.of(FeatureModuleType.ML_MODULE);
       case ASSET_MODULE:
+      case UNKNOWN_MODULE_TYPE:
         return Optional.empty();
     }
     throw new IllegalArgumentException("Unknown module type: " + moduleType);
   }
 
   public static Builder builder() {
-    return new AutoValue_BundleModule.Builder();
+    return new AutoValue_BundleModule.Builder().setModuleType(ModuleType.UNKNOWN_MODULE_TYPE);
   }
 
   public abstract Builder toBuilder();
@@ -326,6 +329,8 @@ public abstract class BundleModule {
 
     public abstract Builder setRuntimeEnabledSdkConfig(
         RuntimeEnabledSdkConfig runtimeEnabledSdkConfig);
+
+    public abstract Builder setModuleType(ModuleType moduleType);
 
     abstract ImmutableMap.Builder<ZipPath, ModuleEntry> entryMapBuilder();
 
@@ -387,7 +392,19 @@ public abstract class BundleModule {
 
     public abstract BundleModuleName getName();
 
-    public abstract BundleModule build();
+    abstract BundleModule autoBuild();
+
+    public final BundleModule build() {
+      BundleModule bundleModule = autoBuild();
+      // If module type is not explicitly set, we are reading it from the manifest.
+      if (bundleModule.getModuleType().equals(ModuleType.UNKNOWN_MODULE_TYPE)) {
+        bundleModule =
+            bundleModule.toBuilder()
+                .setModuleType(bundleModule.getAndroidManifest().getModuleType())
+                .build();
+      }
+      return bundleModule;
+    }
   }
 
   /**

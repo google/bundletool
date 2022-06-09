@@ -18,6 +18,7 @@ package com.android.tools.build.bundletool.io;
 
 import static com.android.tools.build.bundletool.model.AppBundle.METADATA_DIRECTORY;
 import static com.android.tools.build.bundletool.model.utils.BundleParser.EXTRACTED_SDK_MODULES_FILE_NAME;
+import static com.android.tools.build.bundletool.model.utils.BundleParser.SDK_BUNDLE_CONFIG_FILE_NAME;
 import static com.android.tools.build.bundletool.model.utils.BundleParser.SDK_MODULES_CONFIG_FILE_NAME;
 import static com.android.tools.build.bundletool.model.utils.BundleParser.SDK_MODULES_FILE_NAME;
 
@@ -44,6 +45,10 @@ public class SdkBundleSerializer {
       zipBuilder.addFile(
           METADATA_DIRECTORY.resolve(metadataEntry.getKey()), metadataEntry.getValue());
     }
+
+    // SdkBundleConfig
+    zipBuilder.addFileWithProtoContent(
+        ZipPath.create(SDK_BUNDLE_CONFIG_FILE_NAME), sdkBundle.getSdkBundleConfig());
 
     // Modules
     try (TempDirectory tempDir = new TempDirectory(getClass().getSimpleName())) {
