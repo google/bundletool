@@ -15,11 +15,11 @@
  */
 package com.android.tools.build.bundletool.splitters;
 
-import static com.android.tools.build.bundletool.model.utils.TargetingProtoUtils.sdkRuntimeVariantTargeting;
 import static com.android.tools.build.bundletool.model.utils.Versions.ANDROID_R_API_VERSION;
 import static com.android.tools.build.bundletool.model.utils.Versions.ANDROID_S_API_VERSION;
 import static com.android.tools.build.bundletool.model.utils.Versions.ANDROID_T_API_VERSION;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifest;
+import static com.android.tools.build.bundletool.testing.TargetingUtils.sdkRuntimeVariantTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.variantMinSdkTargeting;
 import static com.google.common.truth.Truth.assertThat;
 
@@ -63,7 +63,9 @@ public class SdkRuntimeVariantGeneratorTest {
             .generate(/* sdkVersionVariantTargetings= */ ImmutableSet.of());
 
     assertThat(sdkRuntimeVariantTargetings)
-        .containsExactly(sdkRuntimeVariantTargeting(ANDROID_T_API_VERSION));
+        .containsExactly(
+            sdkRuntimeVariantTargeting(
+                ANDROID_T_API_VERSION, /* alternativeSdkVersions= */ ImmutableSet.of()));
   }
 
   @Test
@@ -82,7 +84,9 @@ public class SdkRuntimeVariantGeneratorTest {
             .generate(/* sdkVersionVariantTargetings= */ ImmutableSet.of());
 
     assertThat(sdkRuntimeVariantTargetings)
-        .containsExactly(sdkRuntimeVariantTargeting(ANDROID_T_API_VERSION));
+        .containsExactly(
+            sdkRuntimeVariantTargeting(
+                ANDROID_T_API_VERSION, /* alternativeSdkVersions= */ ImmutableSet.of()));
   }
 
   @Test
@@ -95,7 +99,9 @@ public class SdkRuntimeVariantGeneratorTest {
                     variantMinSdkTargeting(ANDROID_S_API_VERSION)));
 
     assertThat(sdkRuntimeVariantTargetings)
-        .containsExactly(sdkRuntimeVariantTargeting(ANDROID_T_API_VERSION));
+        .containsExactly(
+            sdkRuntimeVariantTargeting(
+                ANDROID_T_API_VERSION, /* alternativeSdkVersions= */ ImmutableSet.of()));
   }
 
   @Test
@@ -105,7 +111,9 @@ public class SdkRuntimeVariantGeneratorTest {
             .generate(ImmutableSet.of(variantMinSdkTargeting(ANDROID_T_API_VERSION)));
 
     assertThat(sdkRuntimeVariantTargetings)
-        .containsExactly(sdkRuntimeVariantTargeting(ANDROID_T_API_VERSION));
+        .containsExactly(
+            sdkRuntimeVariantTargeting(
+                ANDROID_T_API_VERSION, /* alternativeSdkVersions= */ ImmutableSet.of()));
   }
 
   @Test
@@ -120,10 +128,24 @@ public class SdkRuntimeVariantGeneratorTest {
 
     assertThat(sdkRuntimeVariantTargetings)
         .containsExactly(
-            sdkRuntimeVariantTargeting(ANDROID_T_API_VERSION),
-            sdkRuntimeVariantTargeting(ANDROID_T_API_VERSION + 1),
-            sdkRuntimeVariantTargeting(ANDROID_T_API_VERSION + 2),
-            sdkRuntimeVariantTargeting(ANDROID_T_API_VERSION + 3));
+            sdkRuntimeVariantTargeting(
+                ANDROID_T_API_VERSION,
+                /* alternativeSdkVersions= */ ImmutableSet.of(
+                    ANDROID_T_API_VERSION + 1,
+                    ANDROID_T_API_VERSION + 2,
+                    ANDROID_T_API_VERSION + 3)),
+            sdkRuntimeVariantTargeting(
+                ANDROID_T_API_VERSION + 1,
+                /* alternativeSdkVersions= */ ImmutableSet.of(
+                    ANDROID_T_API_VERSION, ANDROID_T_API_VERSION + 2, ANDROID_T_API_VERSION + 3)),
+            sdkRuntimeVariantTargeting(
+                ANDROID_T_API_VERSION + 2,
+                /* alternativeSdkVersions= */ ImmutableSet.of(
+                    ANDROID_T_API_VERSION, ANDROID_T_API_VERSION + 1, ANDROID_T_API_VERSION + 3)),
+            sdkRuntimeVariantTargeting(
+                ANDROID_T_API_VERSION + 3,
+                /* alternativeSdkVersions= */ ImmutableSet.of(
+                    ANDROID_T_API_VERSION, ANDROID_T_API_VERSION + 1, ANDROID_T_API_VERSION + 2)));
   }
 
   @Test
@@ -137,7 +159,11 @@ public class SdkRuntimeVariantGeneratorTest {
 
     assertThat(sdkRuntimeVariantTargetings)
         .containsExactly(
-            sdkRuntimeVariantTargeting(ANDROID_T_API_VERSION),
-            sdkRuntimeVariantTargeting(ANDROID_T_API_VERSION + 1));
+            sdkRuntimeVariantTargeting(
+                ANDROID_T_API_VERSION,
+                /* alternativeSdkVersions= */ ImmutableSet.of(ANDROID_T_API_VERSION + 1)),
+            sdkRuntimeVariantTargeting(
+                ANDROID_T_API_VERSION + 1,
+                /* alternativeSdkVersions= */ ImmutableSet.of(ANDROID_T_API_VERSION)));
   }
 }

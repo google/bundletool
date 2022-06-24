@@ -59,8 +59,8 @@ import org.junit.runners.JUnit4;
 /** Tests for the {@link BundleModuleMerger} class. */
 @RunWith(JUnit4.class)
 public class BundleModuleMergerTest {
-  private static final byte[] DUMMY_CONTENT = new byte[1];
-  private static final byte[] DUMMY_CONTENT_2 = new byte[2];
+  private static final byte[] TEST_CONTENT = new byte[1];
+  private static final byte[] TEST_CONTENT_2 = new byte[2];
   private static final BundleConfig BUNDLE_CONFIG_1_0_0 =
       BundleConfigBuilder.create().setVersion("1.0.0").build();
   private static final BundleConfig BUNDLE_CONFIG_1_8_0 =
@@ -84,11 +84,11 @@ public class BundleModuleMergerTest {
         androidManifestForFeature("com.test.app.detail", withInstallTimeDelivery());
     createBasicZipBuilder(BUNDLE_CONFIG_1_0_0)
         .addFileWithProtoContent(ZipPath.create("base/manifest/AndroidManifest.xml"), MANIFEST)
-        .addFileWithContent(ZipPath.create("base/dex/classes.dex"), DUMMY_CONTENT)
-        .addFileWithContent(ZipPath.create("base/assets/baseAssetfile.txt"), DUMMY_CONTENT)
+        .addFileWithContent(ZipPath.create("base/dex/classes.dex"), TEST_CONTENT)
+        .addFileWithContent(ZipPath.create("base/assets/baseAssetfile.txt"), TEST_CONTENT)
         .addFileWithProtoContent(
             ZipPath.create("detail/manifest/AndroidManifest.xml"), installTimeModuleManifest)
-        .addFileWithContent(ZipPath.create("detail/assets/detailsAssetfile.txt"), DUMMY_CONTENT)
+        .addFileWithContent(ZipPath.create("detail/assets/detailsAssetfile.txt"), TEST_CONTENT)
         .writeTo(bundleFile);
 
     try (ZipFile appBundleZip = new ZipFile(bundleFile.toFile())) {
@@ -108,15 +108,15 @@ public class BundleModuleMergerTest {
         androidManifestForFeature("com.test.app.detail", withInstallTimeDelivery());
     createBasicZipBuilder(BUNDLE_CONFIG_1_0_0)
         .addFileWithProtoContent(ZipPath.create("base/manifest/AndroidManifest.xml"), MANIFEST)
-        .addFileWithContent(ZipPath.create("base/dex/classes.dex"), DUMMY_CONTENT)
-        .addFileWithContent(ZipPath.create("base/assets/baseAssetfile.txt"), DUMMY_CONTENT)
+        .addFileWithContent(ZipPath.create("base/dex/classes.dex"), TEST_CONTENT)
+        .addFileWithContent(ZipPath.create("base/assets/baseAssetfile.txt"), TEST_CONTENT)
         .addFileWithProtoContent(
             ZipPath.create("detail1/manifest/AndroidManifest.xml"), installTimeModuleManifest)
-        .addFileWithContent(ZipPath.create("detail1/assets/detailsAssetfile.txt"), DUMMY_CONTENT)
+        .addFileWithContent(ZipPath.create("detail1/assets/detailsAssetfile.txt"), TEST_CONTENT)
         .addFileWithProtoContent(
             ZipPath.create("detail2/manifest/AndroidManifest.xml"), installTimeModuleManifest)
-        .addFileWithContent(ZipPath.create("detail2/assets/baseAssetfile.txt"), DUMMY_CONTENT)
-        .addFileWithContent(ZipPath.create("detail2/assets/detailsAssetfile.txt"), DUMMY_CONTENT)
+        .addFileWithContent(ZipPath.create("detail2/assets/baseAssetfile.txt"), TEST_CONTENT)
+        .addFileWithContent(ZipPath.create("detail2/assets/detailsAssetfile.txt"), TEST_CONTENT)
         .writeTo(bundleFile);
 
     try (ZipFile appBundleZip = new ZipFile(bundleFile.toFile())) {
@@ -136,14 +136,14 @@ public class BundleModuleMergerTest {
         androidManifestForFeature("com.test.app.detail", withInstallTimeDelivery());
     createBasicZipBuilder(BUNDLE_CONFIG_1_0_0)
         .addFileWithProtoContent(ZipPath.create("base/manifest/AndroidManifest.xml"), MANIFEST)
-        .addFileWithContent(ZipPath.create("base/dex/classes.dex"), DUMMY_CONTENT)
-        .addFileWithContent(ZipPath.create("base/assets/baseAssetfile.txt"), DUMMY_CONTENT)
+        .addFileWithContent(ZipPath.create("base/dex/classes.dex"), TEST_CONTENT)
+        .addFileWithContent(ZipPath.create("base/assets/baseAssetfile.txt"), TEST_CONTENT)
         .addFileWithProtoContent(
             ZipPath.create("detail1/manifest/AndroidManifest.xml"), installTimeModuleManifest)
-        .addFileWithContent(ZipPath.create("detail1/assets/detailsAssetfile.txt"), DUMMY_CONTENT)
+        .addFileWithContent(ZipPath.create("detail1/assets/detailsAssetfile.txt"), TEST_CONTENT)
         .addFileWithProtoContent(
             ZipPath.create("detail2/manifest/AndroidManifest.xml"), installTimeModuleManifest)
-        .addFileWithContent(ZipPath.create("detail2/assets/baseAssetfile.txt"), DUMMY_CONTENT_2)
+        .addFileWithContent(ZipPath.create("detail2/assets/baseAssetfile.txt"), TEST_CONTENT_2)
         .writeTo(bundleFile);
 
     try (ZipFile appBundleZip = new ZipFile(bundleFile.toFile())) {
@@ -167,11 +167,11 @@ public class BundleModuleMergerTest {
         androidManifestForFeature("com.test.app.detail", withInstallTimeDelivery());
     createBasicZipBuilder(BUNDLE_CONFIG_0_14_0)
         .addFileWithProtoContent(ZipPath.create("base/manifest/AndroidManifest.xml"), MANIFEST)
-        .addFileWithContent(ZipPath.create("base/dex/classes.dex"), DUMMY_CONTENT)
-        .addFileWithContent(ZipPath.create("base/assets/baseAssetfile.txt"), DUMMY_CONTENT)
+        .addFileWithContent(ZipPath.create("base/dex/classes.dex"), TEST_CONTENT)
+        .addFileWithContent(ZipPath.create("base/assets/baseAssetfile.txt"), TEST_CONTENT)
         .addFileWithProtoContent(
             ZipPath.create("detail/manifest/AndroidManifest.xml"), installTimeModuleManifest)
-        .addFileWithContent(ZipPath.create("detail/assets/detailsAssetfile.txt"), DUMMY_CONTENT)
+        .addFileWithContent(ZipPath.create("detail/assets/detailsAssetfile.txt"), TEST_CONTENT)
         .writeTo(bundleFile);
 
     try (ZipFile appBundleZip = new ZipFile(bundleFile.toFile())) {
@@ -190,11 +190,11 @@ public class BundleModuleMergerTest {
         androidManifestForFeature("com.test.app.detail", withInstallTimeDelivery());
     createBasicZipBuilder(BUNDLE_CONFIG_0_14_0)
         .addFileWithProtoContent(ZipPath.create("base/manifest/AndroidManifest.xml"), MANIFEST)
-        .addFileWithContent(ZipPath.create("base/dex/classes.dex"), DUMMY_CONTENT)
-        .addFileWithContent(ZipPath.create("base/assets/baseAssetfile.txt"), DUMMY_CONTENT)
+        .addFileWithContent(ZipPath.create("base/dex/classes.dex"), TEST_CONTENT)
+        .addFileWithContent(ZipPath.create("base/assets/baseAssetfile.txt"), TEST_CONTENT)
         .addFileWithProtoContent(
             ZipPath.create("detail/manifest/AndroidManifest.xml"), installTimeModuleManifest)
-        .addFileWithContent(ZipPath.create("detail/assets/detailsAssetfile.txt"), DUMMY_CONTENT)
+        .addFileWithContent(ZipPath.create("detail/assets/detailsAssetfile.txt"), TEST_CONTENT)
         .writeTo(bundleFile);
 
     try (ZipFile appBundleZip = new ZipFile(bundleFile.toFile())) {
@@ -221,20 +221,20 @@ public class BundleModuleMergerTest {
         androidManifestForFeature("com.test.app.detail", withInstallTimeRemovableElement(true));
     createBasicZipBuilder(BUNDLE_CONFIG_1_0_0)
         .addFileWithProtoContent(ZipPath.create("base/manifest/AndroidManifest.xml"), MANIFEST)
-        .addFileWithContent(ZipPath.create("base/dex/classes.dex"), DUMMY_CONTENT)
-        .addFileWithContent(ZipPath.create("base/assets/baseAssetfile.txt"), DUMMY_CONTENT)
+        .addFileWithContent(ZipPath.create("base/dex/classes.dex"), TEST_CONTENT)
+        .addFileWithContent(ZipPath.create("base/assets/baseAssetfile.txt"), TEST_CONTENT)
         // merged by default
         .addFileWithProtoContent(
             ZipPath.create("detail/manifest/AndroidManifest.xml"), installTimeModuleManifest)
-        .addFileWithContent(ZipPath.create("detail/assets/detailsAssetfile.txt"), DUMMY_CONTENT)
+        .addFileWithContent(ZipPath.create("detail/assets/detailsAssetfile.txt"), TEST_CONTENT)
         .addFileWithProtoContent(
             ZipPath.create("detail2/manifest/AndroidManifest.xml"),
             installTimeNonRemovableModuleManifest)
-        .addFileWithContent(ZipPath.create("detail2/assets/detailsAssetfile.txt"), DUMMY_CONTENT)
+        .addFileWithContent(ZipPath.create("detail2/assets/detailsAssetfile.txt"), TEST_CONTENT)
         .addFileWithProtoContent(
             ZipPath.create("detail3/manifest/AndroidManifest.xml"),
             installTimeRemovableModuleManifest)
-        .addFileWithContent(ZipPath.create("detail3/assets/detailsAssetfile.txt"), DUMMY_CONTENT)
+        .addFileWithContent(ZipPath.create("detail3/assets/detailsAssetfile.txt"), TEST_CONTENT)
         .writeTo(bundleFile);
 
     try (ZipFile appBundleZip = new ZipFile(bundleFile.toFile())) {
@@ -254,11 +254,11 @@ public class BundleModuleMergerTest {
         androidManifestForAssetModule("com.test.app.detail", withInstallTimeDelivery());
     createBasicZipBuilder(BUNDLE_CONFIG_1_0_0)
         .addFileWithProtoContent(ZipPath.create("base/manifest/AndroidManifest.xml"), MANIFEST)
-        .addFileWithContent(ZipPath.create("base/dex/classes.dex"), DUMMY_CONTENT)
-        .addFileWithContent(ZipPath.create("base/assets/baseAssetfile.txt"), DUMMY_CONTENT)
+        .addFileWithContent(ZipPath.create("base/dex/classes.dex"), TEST_CONTENT)
+        .addFileWithContent(ZipPath.create("base/assets/baseAssetfile.txt"), TEST_CONTENT)
         .addFileWithProtoContent(
             ZipPath.create("detail/manifest/AndroidManifest.xml"), assetModuleManifest)
-        .addFileWithContent(ZipPath.create("detail/assets/detailsAssetfile.txt"), DUMMY_CONTENT)
+        .addFileWithContent(ZipPath.create("detail/assets/detailsAssetfile.txt"), TEST_CONTENT)
         .writeTo(bundleFile);
 
     try (ZipFile appBundleZip = new ZipFile(bundleFile.toFile())) {
@@ -281,11 +281,11 @@ public class BundleModuleMergerTest {
         androidManifestForMlModule("com.test.app.detail", withInstallTimeDelivery());
     createBasicZipBuilder(BUNDLE_CONFIG_1_0_0)
         .addFileWithProtoContent(ZipPath.create("base/manifest/AndroidManifest.xml"), MANIFEST)
-        .addFileWithContent(ZipPath.create("base/dex/classes.dex"), DUMMY_CONTENT)
-        .addFileWithContent(ZipPath.create("base/assets/baseAssetfile.txt"), DUMMY_CONTENT)
+        .addFileWithContent(ZipPath.create("base/dex/classes.dex"), TEST_CONTENT)
+        .addFileWithContent(ZipPath.create("base/assets/baseAssetfile.txt"), TEST_CONTENT)
         .addFileWithProtoContent(
             ZipPath.create("detail/manifest/AndroidManifest.xml"), installTimeModuleManifest)
-        .addFileWithContent(ZipPath.create("detail/assets/detailsAssetfile.txt"), DUMMY_CONTENT)
+        .addFileWithContent(ZipPath.create("detail/assets/detailsAssetfile.txt"), TEST_CONTENT)
         .writeTo(bundleFile);
 
     try (ZipFile appBundleZip = new ZipFile(bundleFile.toFile())) {
@@ -305,11 +305,11 @@ public class BundleModuleMergerTest {
         androidManifestForFeature("com.test.app.detail", withInstallTimeRemovableElement(false));
     createBasicZipBuilder(BUNDLE_CONFIG_1_0_0)
         .addFileWithProtoContent(ZipPath.create("base/manifest/AndroidManifest.xml"), MANIFEST)
-        .addFileWithContent(ZipPath.create("base/dex/classes.dex"), DUMMY_CONTENT)
-        .addFileWithContent(ZipPath.create("base/assets/baseAssetfile.txt"), DUMMY_CONTENT)
+        .addFileWithContent(ZipPath.create("base/dex/classes.dex"), TEST_CONTENT)
+        .addFileWithContent(ZipPath.create("base/assets/baseAssetfile.txt"), TEST_CONTENT)
         .addFileWithProtoContent(
             ZipPath.create("detail/manifest/AndroidManifest.xml"), installTimeModuleManifest)
-        .addFileWithContent(ZipPath.create("detail/assets/detailsAssetfile.txt"), DUMMY_CONTENT)
+        .addFileWithContent(ZipPath.create("detail/assets/detailsAssetfile.txt"), TEST_CONTENT)
         .writeTo(bundleFile);
 
     try (ZipFile appBundleZip = new ZipFile(bundleFile.toFile())) {
@@ -338,11 +338,11 @@ public class BundleModuleMergerTest {
         androidManifestForFeature("com.test.app.detail", withInstallTimeRemovableElement(true));
     createBasicZipBuilder(BUNDLE_CONFIG_1_0_0)
         .addFileWithProtoContent(ZipPath.create("base/manifest/AndroidManifest.xml"), MANIFEST)
-        .addFileWithContent(ZipPath.create("base/dex/classes.dex"), DUMMY_CONTENT)
-        .addFileWithContent(ZipPath.create("base/assets/baseAssetfile.txt"), DUMMY_CONTENT)
+        .addFileWithContent(ZipPath.create("base/dex/classes.dex"), TEST_CONTENT)
+        .addFileWithContent(ZipPath.create("base/assets/baseAssetfile.txt"), TEST_CONTENT)
         .addFileWithProtoContent(
             ZipPath.create("detail/manifest/AndroidManifest.xml"), installTimeModuleManifest)
-        .addFileWithContent(ZipPath.create("detail/assets/detailsAssetfile.txt"), DUMMY_CONTENT)
+        .addFileWithContent(ZipPath.create("detail/assets/detailsAssetfile.txt"), TEST_CONTENT)
         .writeTo(bundleFile);
 
     try (ZipFile appBundleZip = new ZipFile(bundleFile.toFile())) {
@@ -362,11 +362,11 @@ public class BundleModuleMergerTest {
         androidManifestForFeature("com.test.app.detail", withOnDemandDelivery());
     createBasicZipBuilder(BUNDLE_CONFIG_1_0_0)
         .addFileWithProtoContent(ZipPath.create("base/manifest/AndroidManifest.xml"), MANIFEST)
-        .addFileWithContent(ZipPath.create("base/dex/classes.dex"), DUMMY_CONTENT)
-        .addFileWithContent(ZipPath.create("base/assets/baseAssetfile.txt"), DUMMY_CONTENT)
+        .addFileWithContent(ZipPath.create("base/dex/classes.dex"), TEST_CONTENT)
+        .addFileWithContent(ZipPath.create("base/assets/baseAssetfile.txt"), TEST_CONTENT)
         .addFileWithProtoContent(
             ZipPath.create("detail/manifest/AndroidManifest.xml"), onDemandModuleManifest)
-        .addFileWithContent(ZipPath.create("detail/assets/detailsAssetfile.txt"), DUMMY_CONTENT)
+        .addFileWithContent(ZipPath.create("detail/assets/detailsAssetfile.txt"), TEST_CONTENT)
         .writeTo(bundleFile);
 
     try (ZipFile appBundleZip = new ZipFile(bundleFile.toFile())) {
@@ -387,11 +387,11 @@ public class BundleModuleMergerTest {
             "com.test.app.detail", withMinSdkVersion(24), withFeatureCondition("android.feature"));
     createBasicZipBuilder(BUNDLE_CONFIG_1_0_0)
         .addFileWithProtoContent(ZipPath.create("base/manifest/AndroidManifest.xml"), MANIFEST)
-        .addFileWithContent(ZipPath.create("base/dex/classes.dex"), DUMMY_CONTENT)
-        .addFileWithContent(ZipPath.create("base/assets/baseAssetfile.txt"), DUMMY_CONTENT)
+        .addFileWithContent(ZipPath.create("base/dex/classes.dex"), TEST_CONTENT)
+        .addFileWithContent(ZipPath.create("base/assets/baseAssetfile.txt"), TEST_CONTENT)
         .addFileWithProtoContent(
             ZipPath.create("detail/manifest/AndroidManifest.xml"), conditionalModuleManifest)
-        .addFileWithContent(ZipPath.create("detail/assets/detailsAssetfile.txt"), DUMMY_CONTENT)
+        .addFileWithContent(ZipPath.create("detail/assets/detailsAssetfile.txt"), TEST_CONTENT)
         .writeTo(bundleFile);
 
     try (ZipFile appBundleZip = new ZipFile(bundleFile.toFile())) {
@@ -411,12 +411,12 @@ public class BundleModuleMergerTest {
         androidManifestForFeature("com.test.app.detail", withInstallTimeDelivery());
     createBasicZipBuilder(BUNDLE_CONFIG_1_0_0)
         .addFileWithProtoContent(ZipPath.create("base/manifest/AndroidManifest.xml"), MANIFEST)
-        .addFileWithContent(ZipPath.create("base/dex/classes.dex"), DUMMY_CONTENT)
-        .addFileWithContent(ZipPath.create("base/assets/baseAssetfile.txt"), DUMMY_CONTENT)
+        .addFileWithContent(ZipPath.create("base/dex/classes.dex"), TEST_CONTENT)
+        .addFileWithContent(ZipPath.create("base/assets/baseAssetfile.txt"), TEST_CONTENT)
         .addFileWithProtoContent(
             ZipPath.create("detail/manifest/AndroidManifest.xml"), installTimeModuleManifest)
-        .addFileWithContent(ZipPath.create("detail/assets/detailsAssetfile.txt"), DUMMY_CONTENT)
-        .addFileWithContent(ZipPath.create("detail/dex/classes.dex"), DUMMY_CONTENT)
+        .addFileWithContent(ZipPath.create("detail/assets/detailsAssetfile.txt"), TEST_CONTENT)
+        .addFileWithContent(ZipPath.create("detail/dex/classes.dex"), TEST_CONTENT)
         .writeTo(bundleFile);
 
     try (ZipFile appBundleZip = new ZipFile(bundleFile.toFile())) {

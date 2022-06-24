@@ -18,7 +18,7 @@ package com.android.tools.build.bundletool.model;
 
 import static com.google.common.base.Preconditions.checkArgument;
 
-import com.android.tools.build.bundletool.model.ModuleEntry.ModuleEntryBundleLocation;
+import com.android.tools.build.bundletool.model.ModuleEntry.ModuleEntryLocationInZipSource;
 import com.google.auto.value.AutoValue;
 import com.google.auto.value.extension.memoized.Memoized;
 import com.google.common.collect.ImmutableMap;
@@ -72,8 +72,8 @@ public abstract class BundleMetadata {
                 ModuleEntry.builder()
                     .setContent(transparencySignedFileContent)
                     // TODO(b/186621568): Set bundle path.
-                    .setBundleLocation(
-                        ModuleEntryBundleLocation.create(
+                    .setFileLocation(
+                        ModuleEntryLocationInZipSource.create(
                             Paths.get(""),
                             ZipPath.create("BUNDLE-METADATA")
                                 .resolve(BUNDLETOOL_NAMESPACE)

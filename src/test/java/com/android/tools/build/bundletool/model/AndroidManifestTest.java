@@ -16,16 +16,10 @@
 
 package com.android.tools.build.bundletool.model;
 
-import static com.android.tools.build.bundletool.model.AndroidManifest.ALLOW_BACKUP_ATTRIBUTE_NAME;
-import static com.android.tools.build.bundletool.model.AndroidManifest.ALLOW_BACKUP_RESOURCE_ID;
-import static com.android.tools.build.bundletool.model.AndroidManifest.BACKUP_AGENT_ATTRIBUTE_NAME;
-import static com.android.tools.build.bundletool.model.AndroidManifest.BACKUP_AGENT_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.DEBUGGABLE_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.DESCRIPTION_ATTRIBUTE_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.DESCRIPTION_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.DEVELOPMENT_SDK_VERSION;
-import static com.android.tools.build.bundletool.model.AndroidManifest.FULL_BACKUP_ONLY_ATTRIBUTE_NAME;
-import static com.android.tools.build.bundletool.model.AndroidManifest.FULL_BACKUP_ONLY_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.HAS_CODE_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.ICON_ATTRIBUTE_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.ICON_RESOURCE_ID;
@@ -1289,46 +1283,19 @@ public class AndroidManifestTest {
   }
 
   @Test
-  public void getAllowBackup_present() {
+  public void hasApplicationAttribute_present() {
     AndroidManifest androidManifest =
-        createManifestWithApplicationBooleanAttribute(
-            ALLOW_BACKUP_ATTRIBUTE_NAME, ALLOW_BACKUP_RESOURCE_ID, true);
+        createManifestWithApplicationAttribute("myAttributeName", 0x12341234, "value");
 
-    assertThat(androidManifest.getAllowBackup()).hasValue(true);
+    assertThat(androidManifest.hasApplicationAttribute(0x12341234)).isTrue();
   }
 
   @Test
-  public void getFullBackupOnly_present() {
-    AndroidManifest androidManifest =
-        createManifestWithApplicationBooleanAttribute(
-            FULL_BACKUP_ONLY_ATTRIBUTE_NAME, FULL_BACKUP_ONLY_RESOURCE_ID, true);
-
-    assertThat(androidManifest.getFullBackupOnly()).hasValue(true);
-  }
-
-  @Test
-  public void getFullBackupOnly_missing_isEmpty() {
+  public void hasApplicationAttribute_missing_returnsFalse() {
     AndroidManifest androidManifest =
         AndroidManifest.create(xmlNode(xmlElement("manifest", xmlNode(xmlElement("application")))));
 
-    assertThat(androidManifest.getFullBackupOnly()).isEmpty();
-  }
-
-  @Test
-  public void hasBackupAgent_present() {
-    AndroidManifest androidManifest =
-        createManifestWithApplicationAttribute(
-            BACKUP_AGENT_ATTRIBUTE_NAME, BACKUP_AGENT_RESOURCE_ID, "backup agent");
-
-    assertThat(androidManifest.hasBackupAgent()).isTrue();
-  }
-
-  @Test
-  public void hasBackupAgent_missing_returnsFalse() {
-    AndroidManifest androidManifest =
-        AndroidManifest.create(xmlNode(xmlElement("manifest", xmlNode(xmlElement("application")))));
-
-    assertThat(androidManifest.hasBackupAgent()).isFalse();
+    assertThat(androidManifest.hasApplicationAttribute(0x12341234)).isFalse();
   }
 
   @Test
@@ -1420,18 +1387,6 @@ public class AndroidManifestTest {
                     xmlElement(
                         "application",
                         xmlAttribute(ANDROID_NAMESPACE_URI, name, resourceId, value))))));
-  }
-
-  private AndroidManifest createManifestWithApplicationBooleanAttribute(
-      String name, int resourceId, boolean value) {
-    return AndroidManifest.create(
-        xmlNode(
-            xmlElement(
-                "manifest",
-                xmlNode(
-                    xmlElement(
-                        "application",
-                        xmlBooleanAttribute(ANDROID_NAMESPACE_URI, name, resourceId, value))))));
   }
 
   private AndroidManifest createManifestWithApplicationRefIdAttribute(

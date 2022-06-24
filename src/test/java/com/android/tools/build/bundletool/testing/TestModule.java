@@ -127,6 +127,7 @@ public class TestModule {
     @Nullable private ApkBuildMode apkBuildMode;
     @Nullable private String[] moduleNames;
     @Nullable private DeviceSpec deviceSpec;
+    @Nullable private Boolean fuseOnlyDeviceMatchingModules;
     @Nullable private Consumer<BuildApksCommand.Builder> buildApksCommandSetter;
     @Nullable private OptimizationDimension[] optimizationDimensions;
     @Nullable private PrintStream printStream;
@@ -211,6 +212,11 @@ public class TestModule {
 
     public Builder withApkBuildMode(ApkBuildMode apkBuildMode) {
       this.apkBuildMode = apkBuildMode;
+      return this;
+    }
+
+    public Builder withFuseOnlyDeviceMatchingModules(boolean enabled) {
+      this.fuseOnlyDeviceMatchingModules = enabled;
       return this;
     }
 
@@ -350,6 +356,9 @@ public class TestModule {
         }
         if (deviceSpec != null) {
           command.setDeviceSpec(deviceSpec);
+        }
+        if (fuseOnlyDeviceMatchingModules != null) {
+          command.setFuseOnlyDeviceMatchingModules(fuseOnlyDeviceMatchingModules);
         }
         if (optimizationDimensions != null) {
           command.setOptimizationDimensions(ImmutableSet.copyOf(optimizationDimensions));

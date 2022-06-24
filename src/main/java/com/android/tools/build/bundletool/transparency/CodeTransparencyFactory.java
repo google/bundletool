@@ -68,10 +68,10 @@ public final class CodeTransparencyFactory {
   }
 
   private static CodeRelatedFile createCodeRelatedFile(ModuleEntry moduleEntry) {
-    checkArgument(moduleEntry.getBundleLocation().isPresent());
+    checkArgument(moduleEntry.getFileLocation().isPresent());
     CodeRelatedFile.Builder codeRelatedFile =
         CodeRelatedFile.newBuilder()
-            .setPath(moduleEntry.getBundleLocation().get().entryPathInBundle().toString());
+            .setPath(moduleEntry.getFileLocation().get().entryPathInFile().toString());
     if (moduleEntry.getPath().startsWith(BundleModule.LIB_DIRECTORY)) {
       codeRelatedFile.setType(CodeRelatedFile.Type.NATIVE_LIBRARY);
       codeRelatedFile.setApkPath(moduleEntry.getPath().toString());

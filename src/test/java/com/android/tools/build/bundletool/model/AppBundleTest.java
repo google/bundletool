@@ -36,7 +36,7 @@ import com.android.bundle.RuntimeEnabledSdkConfigProto.RuntimeEnabledSdk;
 import com.android.bundle.RuntimeEnabledSdkConfigProto.RuntimeEnabledSdkConfig;
 import com.android.bundle.Targeting.Abi.AbiAlias;
 import com.android.tools.build.bundletool.io.ZipBuilder;
-import com.android.tools.build.bundletool.model.ModuleEntry.ModuleEntryBundleLocation;
+import com.android.tools.build.bundletool.model.ModuleEntry.ModuleEntryLocationInZipSource;
 import com.android.tools.build.bundletool.model.exceptions.InvalidBundleException;
 import com.android.tools.build.bundletool.testing.AppBundleBuilder;
 import com.android.tools.build.bundletool.testing.BundleConfigBuilder;
@@ -58,7 +58,7 @@ import org.junit.runners.JUnit4;
 @RunWith(JUnit4.class)
 public class AppBundleTest {
 
-  private static final byte[] DUMMY_CONTENT = new byte[1];
+  private static final byte[] TEST_CONTENT = new byte[1];
   private static final String PACKAGE_NAME = "com.test.app.detail";
   private static final BundleConfig BUNDLE_CONFIG = BundleConfigBuilder.create().build();
   public static final XmlNode MANIFEST = androidManifest(PACKAGE_NAME);
@@ -76,7 +76,7 @@ public class AppBundleTest {
   @Test
   public void testSingleModuleBundle() throws Exception {
     createBasicZipBuilderWithManifest()
-        .addFileWithContent(ZipPath.create("base/dex/classes.dex"), DUMMY_CONTENT)
+        .addFileWithContent(ZipPath.create("base/dex/classes.dex"), TEST_CONTENT)
         .writeTo(bundleFile);
 
     try (ZipFile appBundleZip = new ZipFile(bundleFile.toFile())) {
@@ -90,10 +90,10 @@ public class AppBundleTest {
   public void testMultipleModules() throws Exception {
     createBasicZipBuilder(BUNDLE_CONFIG)
         .addFileWithProtoContent(ZipPath.create("base/manifest/AndroidManifest.xml"), MANIFEST)
-        .addFileWithContent(ZipPath.create("base/dex/classes.dex"), DUMMY_CONTENT)
-        .addFileWithContent(ZipPath.create("base/assets/file.txt"), DUMMY_CONTENT)
+        .addFileWithContent(ZipPath.create("base/dex/classes.dex"), TEST_CONTENT)
+        .addFileWithContent(ZipPath.create("base/assets/file.txt"), TEST_CONTENT)
         .addFileWithProtoContent(ZipPath.create("detail/manifest/AndroidManifest.xml"), MANIFEST)
-        .addFileWithContent(ZipPath.create("detail/assets/file.txt"), DUMMY_CONTENT)
+        .addFileWithContent(ZipPath.create("detail/assets/file.txt"), TEST_CONTENT)
         .writeTo(bundleFile);
 
     try (ZipFile appBundleZip = new ZipFile(bundleFile.toFile())) {
@@ -106,9 +106,9 @@ public class AppBundleTest {
   @Test
   public void classFilesNotAddedToModule() throws Exception {
     createBasicZipBuilderWithManifest()
-        .addFileWithContent(ZipPath.create("base/root/Foo.classes"), DUMMY_CONTENT)
-        .addFileWithContent(ZipPath.create("base/root/class.txt"), DUMMY_CONTENT)
-        .addFileWithContent(ZipPath.create("base/root/Foo.class"), DUMMY_CONTENT)
+        .addFileWithContent(ZipPath.create("base/root/Foo.classes"), TEST_CONTENT)
+        .addFileWithContent(ZipPath.create("base/root/class.txt"), TEST_CONTENT)
+        .addFileWithContent(ZipPath.create("base/root/Foo.class"), TEST_CONTENT)
         .writeTo(bundleFile);
 
     try (ZipFile appBundleZip = new ZipFile(bundleFile.toFile())) {
@@ -120,13 +120,13 @@ public class AppBundleTest {
     }
   }
 
-  // Ensures that the ClassesDexNameSanitizer is invoked.
+  // Ensures that the ClassesDexEntriesMutator is invoked.
   @Test
   public void wronglyNamedDexFilesAreRenamed() throws Exception {
     createBasicZipBuilderWithManifest()
-        .addFileWithContent(ZipPath.create("base/dex/classes.dex"), DUMMY_CONTENT)
-        .addFileWithContent(ZipPath.create("base/dex/classes1.dex"), DUMMY_CONTENT)
-        .addFileWithContent(ZipPath.create("base/dex/classes2.dex"), DUMMY_CONTENT)
+        .addFileWithContent(ZipPath.create("base/dex/classes.dex"), TEST_CONTENT)
+        .addFileWithContent(ZipPath.create("base/dex/classes1.dex"), TEST_CONTENT)
+        .addFileWithContent(ZipPath.create("base/dex/classes2.dex"), TEST_CONTENT)
         .writeTo(bundleFile);
 
     try (ZipFile appBundleZip = new ZipFile(bundleFile.toFile())) {
@@ -181,7 +181,7 @@ public class AppBundleTest {
   public void bundleMetadataDirectoryNotAModule() throws Exception {
     createBasicZipBuilderWithManifest()
         .addFileWithContent(
-            ZipPath.create("BUNDLE-METADATA/some.namespace/metadata-file.txt"), DUMMY_CONTENT)
+            ZipPath.create("BUNDLE-METADATA/some.namespace/metadata-file.txt"), TEST_CONTENT)
         .writeTo(bundleFile);
 
     try (ZipFile appBundleZip = new ZipFile(bundleFile.toFile())) {
@@ -194,8 +194,8 @@ public class AppBundleTest {
   @Test
   public void metaInfDirectoryNotAModule() throws Exception {
     createBasicZipBuilderWithManifest()
-        .addFileWithContent(ZipPath.create("META-INF/GOOG.RSA"), DUMMY_CONTENT)
-        .addFileWithContent(ZipPath.create("META-INF/MANIFEST.SF"), DUMMY_CONTENT)
+        .addFileWithContent(ZipPath.create("META-INF/GOOG.RSA"), TEST_CONTENT)
+        .addFileWithContent(ZipPath.create("META-INF/MANIFEST.SF"), TEST_CONTENT)
         .writeTo(bundleFile);
 
     try (ZipFile appBundleZip = new ZipFile(bundleFile.toFile())) {
@@ -218,7 +218,7 @@ public class AppBundleTest {
   @Test
   public void manifestRequired() throws Exception {
     createBasicZipBuilder(BUNDLE_CONFIG)
-        .addFileWithContent(ZipPath.create("base/dex/classes.dex"), DUMMY_CONTENT)
+        .addFileWithContent(ZipPath.create("base/dex/classes.dex"), TEST_CONTENT)
         .writeTo(bundleFile);
 
     try (ZipFile appBundleZip = new ZipFile(bundleFile.toFile())) {
@@ -233,10 +233,10 @@ public class AppBundleTest {
             .addModule(
                 "base",
                 baseModule ->
-                    baseModule.setManifest(MANIFEST).addFile("dex/classes.dex", DUMMY_CONTENT))
+                    baseModule.setManifest(MANIFEST).addFile("dex/classes.dex", TEST_CONTENT))
             .addModule(
                 "detail",
-                module -> module.setManifest(MANIFEST).addFile("dex/classes.dex", DUMMY_CONTENT))
+                module -> module.setManifest(MANIFEST).addFile("dex/classes.dex", TEST_CONTENT))
             .build();
 
     assertThat(appBundle.getTargetedAbis()).isEmpty();
@@ -251,9 +251,9 @@ public class AppBundleTest {
                 baseModule ->
                     baseModule
                         .setManifest(MANIFEST)
-                        .addFile("dex/classes.dex", DUMMY_CONTENT)
-                        .addFile("lib/x86_64/libfoo.so", DUMMY_CONTENT)
-                        .addFile("lib/armeabi/libfoo.so", DUMMY_CONTENT)
+                        .addFile("dex/classes.dex", TEST_CONTENT)
+                        .addFile("lib/x86_64/libfoo.so", TEST_CONTENT)
+                        .addFile("lib/armeabi/libfoo.so", TEST_CONTENT)
                         .setNativeConfig(
                             nativeLibraries(
                                 targetedNativeDirectory(
@@ -265,9 +265,9 @@ public class AppBundleTest {
                 module ->
                     module
                         .setManifest(MANIFEST)
-                        .addFile("dex/classes.dex", DUMMY_CONTENT)
-                        .addFile("lib/x86_64/libbar.so", DUMMY_CONTENT)
-                        .addFile("lib/armeabi/libbar.so", DUMMY_CONTENT)
+                        .addFile("dex/classes.dex", TEST_CONTENT)
+                        .addFile("lib/x86_64/libbar.so", TEST_CONTENT)
+                        .addFile("lib/armeabi/libbar.so", TEST_CONTENT)
                         .setNativeConfig(
                             nativeLibraries(
                                 targetedNativeDirectory(
@@ -287,15 +287,15 @@ public class AppBundleTest {
             .addModule(
                 "base",
                 baseModule ->
-                    baseModule.setManifest(MANIFEST).addFile("dex/classes.dex", DUMMY_CONTENT))
+                    baseModule.setManifest(MANIFEST).addFile("dex/classes.dex", TEST_CONTENT))
             .addModule(
                 "detail",
                 module ->
                     module
                         .setManifest(MANIFEST)
-                        .addFile("dex/classes.dex", DUMMY_CONTENT)
-                        .addFile("lib/arm64-v8a/libbar.so", DUMMY_CONTENT)
-                        .addFile("lib/x86/libbar.so", DUMMY_CONTENT)
+                        .addFile("dex/classes.dex", TEST_CONTENT)
+                        .addFile("lib/arm64-v8a/libbar.so", TEST_CONTENT)
+                        .addFile("lib/x86/libbar.so", TEST_CONTENT)
                         .setNativeConfig(
                             nativeLibraries(
                                 targetedNativeDirectory(
@@ -315,13 +315,13 @@ public class AppBundleTest {
             .addModule(
                 "base",
                 baseModule ->
-                    baseModule.setManifest(MANIFEST).addFile("dex/classes.dex", DUMMY_CONTENT))
+                    baseModule.setManifest(MANIFEST).addFile("dex/classes.dex", TEST_CONTENT))
             .addModule(
                 "some_asset_module",
                 module ->
                     module
                         .setManifest(ASSET_MODULE_MANIFEST)
-                        .addFile("assets/img1.png", DUMMY_CONTENT))
+                        .addFile("assets/img1.png", TEST_CONTENT))
             .build();
 
     assertThat(appBundle.getFeatureModules().keySet())
@@ -334,11 +334,11 @@ public class AppBundleTest {
   public void baseAndAssetModule_fromZipFile_areSeparated() throws Exception {
     createBasicZipBuilder(BUNDLE_CONFIG)
         .addFileWithProtoContent(ZipPath.create("base/manifest/AndroidManifest.xml"), MANIFEST)
-        .addFileWithContent(ZipPath.create("base/dex/classes.dex"), DUMMY_CONTENT)
-        .addFileWithContent(ZipPath.create("base/assets/file.txt"), DUMMY_CONTENT)
+        .addFileWithContent(ZipPath.create("base/dex/classes.dex"), TEST_CONTENT)
+        .addFileWithContent(ZipPath.create("base/assets/file.txt"), TEST_CONTENT)
         .addFileWithProtoContent(
             ZipPath.create("asset_module/manifest/AndroidManifest.xml"), ASSET_MODULE_MANIFEST)
-        .addFileWithContent(ZipPath.create("asset_module/assets/file.txt"), DUMMY_CONTENT)
+        .addFileWithContent(ZipPath.create("asset_module/assets/file.txt"), TEST_CONTENT)
         .writeTo(bundleFile);
 
     try (ZipFile appBundleZip = new ZipFile(bundleFile.toFile())) {
@@ -422,7 +422,7 @@ public class AppBundleTest {
     ZipPath dexModuleEntryPath = ZipPath.create("dex/classes.dex");
 
     createBasicZipBuilderWithManifest()
-        .addFileWithContent(ZipPath.create(dexZipEntry), DUMMY_CONTENT)
+        .addFileWithContent(ZipPath.create(dexZipEntry), TEST_CONTENT)
         .writeTo(bundleFile);
 
     try (ZipFile appBundleZip = new ZipFile(bundleFile.toFile())) {
@@ -430,8 +430,8 @@ public class AppBundleTest {
       assertThat(appBundle.getFeatureModules().keySet())
           .containsExactly(BundleModuleName.create("base"));
       assertThat(appBundle.getBaseModule().getEntry(dexModuleEntryPath)).isPresent();
-      assertThat(appBundle.getBaseModule().getEntry(dexModuleEntryPath).get().getBundleLocation())
-          .hasValue(ModuleEntryBundleLocation.create(bundleFile, ZipPath.create(dexZipEntry)));
+      assertThat(appBundle.getBaseModule().getEntry(dexModuleEntryPath).get().getFileLocation())
+          .hasValue(ModuleEntryLocationInZipSource.create(bundleFile, ZipPath.create(dexZipEntry)));
     }
   }
 
@@ -444,11 +444,7 @@ public class AppBundleTest {
             .build();
     assertThat(appBundle.getBaseModule().getEntry(ZipPath.create(dexFilePath))).isPresent();
     assertThat(
-            appBundle
-                .getBaseModule()
-                .getEntry(ZipPath.create(dexFilePath))
-                .get()
-                .getBundleLocation())
+            appBundle.getBaseModule().getEntry(ZipPath.create(dexFilePath)).get().getFileLocation())
         .isEmpty();
   }
 

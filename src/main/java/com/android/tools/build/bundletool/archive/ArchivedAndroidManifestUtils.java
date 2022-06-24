@@ -16,7 +16,9 @@
 
 package com.android.tools.build.bundletool.archive;
 
+import static com.android.tools.build.bundletool.model.AndroidManifest.ALLOW_BACKUP_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.ANDROID_NAMESPACE_URI;
+import static com.android.tools.build.bundletool.model.AndroidManifest.BACKUP_AGENT_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.LAUNCHER_CATEGORY_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.LEANBACK_FEATURE_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.LEANBACK_LAUNCHER_CATEGORY_NAME;
@@ -34,7 +36,6 @@ import com.android.tools.build.bundletool.model.utils.xmlproto.XmlProtoElementBu
 import com.android.tools.build.bundletool.model.utils.xmlproto.XmlProtoNode;
 import com.android.tools.build.bundletool.model.version.BundleToolVersion;
 import com.google.common.collect.ImmutableList;
-import java.util.Optional;
 
 /** Utility methods for creation of archived manifest. */
 public final class ArchivedAndroidManifestUtils {
@@ -98,7 +99,17 @@ public final class ArchivedAndroidManifestUtils {
       APPLICATION_ATTRIBUTES_TO_KEEP.forEach(
           attrResourceId ->
               editor.copyApplicationElementAndroidAttribute(manifest, attrResourceId));
-      getArchivedAllowBackup(manifest).ifPresent(editor::setAllowBackup);
+
+      // Backup needs to be disabled if Backup Agent is provided. Custom backup agent cannot be
+      // kept because it relies on app code that is not present in its archived variant.
+      // FullBackupOnly attribute value cannot be checked due to complicated and ambigous process
+      // of resolving attribute value (because boolean type is not being enforced and any other type
+      // such as resource refrenece can be acceptable).
+      if (!manifest.hasApplicationAttribute(BACKUP_AGENT_RESOURCE_ID)) {
+        editor.copyApplicationElementAndroidAttribute(manifest, ALLOW_BACKUP_RESOURCE_ID);
+      } else {
+        editor.setAllowBackup(false);
+      }
     }
 
     manifest
@@ -113,16 +124,6 @@ public final class ArchivedAndroidManifestUtils {
     addTvSupportIfRequired(editor, manifest);
 
     return editor.save();
-  }
-
-  private static Optional<Boolean> getArchivedAllowBackup(AndroidManifest manifest) {
-    // Backup needs to be disabled if Backup Agent is provided and Full Backup Only is disabled.
-    // Custom backup agent cannot be kept because it relies on app code that is not present in its
-    // archived variant.
-    return manifest.getAllowBackup().orElse(true)
-            && (!manifest.hasBackupAgent() || manifest.getFullBackupOnly().orElse(false))
-        ? manifest.getAllowBackup()
-        : Optional.of(Boolean.FALSE);
   }
 
   private static XmlProtoNode createMinimalManifestTag() {

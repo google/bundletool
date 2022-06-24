@@ -111,7 +111,7 @@ import org.junit.runner.RunWith;
 @RunWith(Theories.class)
 public final class GetSizeCommandTest {
 
-  private static final byte[] DUMMY_BYTES = new byte[100];
+  private static final byte[] TEST_BYTES = new byte[100];
 
   @Rule public final TemporaryFolder tmp = new TemporaryFolder();
   private Path tmpDir;
@@ -120,7 +120,7 @@ public final class GetSizeCommandTest {
   @Before
   public void setUp() throws Exception {
     tmpDir = tmp.getRoot().toPath();
-    compressedApkSize = GZipUtils.calculateGzipCompressedSize(ByteSource.wrap(DUMMY_BYTES));
+    compressedApkSize = GZipUtils.calculateGzipCompressedSize(ByteSource.wrap(TEST_BYTES));
   }
 
   @Test
@@ -461,10 +461,10 @@ public final class GetSizeCommandTest {
                     /* isMasterSplit= */ false)));
 
     ZipBuilder archiveBuilder = new ZipBuilder();
-    archiveBuilder.addFileWithContent(ZipPath.create("base-master.apk"), DUMMY_BYTES);
+    archiveBuilder.addFileWithContent(ZipPath.create("base-master.apk"), TEST_BYTES);
     archiveBuilder.addFileWithContent(
         ZipPath.create("base-x86.apk"),
-        DUMMY_BYTES,
+        TEST_BYTES,
         EntryOption.UNCOMPRESSED); // APK stored uncompressed in the APKs zip.
     archiveBuilder.addFileWithContent(ZipPath.create("base-x86_64.apk"), new byte[10000]);
     archiveBuilder.addFileWithProtoContent(
@@ -573,7 +573,7 @@ public final class GetSizeCommandTest {
             ZipPath.create("preL.apk"));
 
     ZipBuilder archiveBuilder = new ZipBuilder();
-    archiveBuilder.addFileWithContent(ZipPath.create("base-master.apk"), DUMMY_BYTES);
+    archiveBuilder.addFileWithContent(ZipPath.create("base-master.apk"), TEST_BYTES);
     archiveBuilder.addFileWithContent(ZipPath.create("preL.apk"), new byte[10000]);
     archiveBuilder.addFileWithProtoContent(
         ZipPath.create("toc.pb"),

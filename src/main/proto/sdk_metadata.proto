@@ -1,0 +1,21 @@
+syntax = "proto3";
+
+package android.bundle;
+
+import "sdk_modules_config.proto";
+
+option java_package = "com.android.bundle";
+
+// Information that uniquely identifies this runtime-enabled SDK version.
+// This will be stored inside the ASAR for an SDK.
+message SdkMetadata {
+  // Package name of the runtime-enabled SDK.
+  string package_name = 1;
+
+  // Version information for the runtime-enabled SDK.
+  RuntimeEnabledSdkVersion sdk_version = 2;
+
+  // SHA-256 hash of the runtime-enabled SDK's signing certificate, represented
+  // as a string of bytes in hexadecimal form, with ':' separating the bytes.
+  string certificate_digest = 3;
+}

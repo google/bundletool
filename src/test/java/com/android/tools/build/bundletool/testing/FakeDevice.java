@@ -77,9 +77,10 @@ public class FakeDevice extends Device {
       int density,
       ImmutableList<String> features,
       ImmutableList<String> glExtensions,
-      ImmutableMap<String, String> properties) {
+      ImmutableMap<String, String> properties,
+      Optional<String> androidVersionCodeName) {
     this.state = state;
-    this.androidVersion = new AndroidVersion(sdkVersion);
+    this.androidVersion = new AndroidVersion(sdkVersion, androidVersionCodeName.orElse(null));
     this.abis = abis;
     this.density = density;
     this.serialNumber = serialNumber;
@@ -102,7 +103,10 @@ public class FakeDevice extends Device {
             deviceSpec.getScreenDensity(),
             ImmutableList.copyOf(deviceSpec.getDeviceFeaturesList()),
             ImmutableList.copyOf(deviceSpec.getGlExtensionsList()),
-            properties);
+            properties,
+            deviceSpec.getCodename().isEmpty()
+                ? Optional.empty()
+                : Optional.of(deviceSpec.getCodename()));
     device.injectShellCommandOutput(
         "pm list features",
         () ->
@@ -176,7 +180,8 @@ public class FakeDevice extends Device {
         /* density= */ -1,
         ImmutableList.of(),
         ImmutableList.of(),
-        ImmutableMap.of());
+        ImmutableMap.of(),
+        Optional.empty());
   }
 
   @Override

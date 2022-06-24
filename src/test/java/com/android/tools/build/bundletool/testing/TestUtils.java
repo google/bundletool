@@ -16,6 +16,7 @@
 
 package com.android.tools.build.bundletool.testing;
 
+import static com.android.tools.build.bundletool.model.SdkAsar.SDK_METADATA_FILE_NAME;
 import static com.android.tools.build.bundletool.model.utils.BundleParser.SDK_BUNDLE_CONFIG_FILE_NAME;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifest;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withInstallLocation;
@@ -27,6 +28,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.android.aapt.Resources.XmlNode;
 import com.android.bundle.SdkBundleConfigProto.SdkBundleConfig;
+import com.android.bundle.SdkMetadataOuterClass.SdkMetadata;
 import com.android.tools.build.bundletool.flags.Flag.RequiredFlagNotSetException;
 import com.android.tools.build.bundletool.io.ZipBuilder;
 import com.android.tools.build.bundletool.model.AndroidManifest;
@@ -60,9 +62,10 @@ import org.junit.jupiter.api.function.Executable;
 /** Some misc utility methods for tests. */
 public final class TestUtils {
 
-  private static final byte[] DUMMY_CONTENT = new byte[1];
+  private static final byte[] TEST_CONTENT = new byte[1];
   private static final String PACKAGE_NAME = "com.test.sdk.detail";
   private static final XmlNode MANIFEST = createSdkAndroidManifest();
+  public static final SdkMetadata DEFAULT_SDK_METADATA = getSdkMetadata();
 
   /** Tests that missing mandatory property is detected by an AutoValue.Builder. */
   public static void expectMissingRequiredBuilderPropertyException(
@@ -193,6 +196,18 @@ public final class TestUtils {
         .addFileFromDisk(ZipPath.create("modules.resm"), modulesPath.toFile());
   }
 
+  public static ZipBuilder createZipBuilderForSdkAsarWithModules(
+      ZipBuilder modules, Path modulesPath) throws IOException {
+    return createZipBuilderForSdkAsarWithModules(modules, DEFAULT_SDK_METADATA, modulesPath);
+  }
+
+  public static ZipBuilder createZipBuilderForSdkAsarWithModules(
+      ZipBuilder modules, SdkMetadata sdkMetadata, Path modulesPath) throws IOException {
+    modules.writeTo(modulesPath);
+    return createZipBuilderForSdkAsar(sdkMetadata)
+        .addFileFromDisk(ZipPath.create("modules.resm"), modulesPath.toFile());
+  }
+
   public static ZipBuilder createZipBuilderForSdkBundle() {
     return new ZipBuilder()
         .addFileWithContent(
@@ -201,17 +216,26 @@ public final class TestUtils {
             ZipPath.create(SDK_BUNDLE_CONFIG_FILE_NAME), SdkBundleConfig.getDefaultInstance());
   }
 
+  public static ZipBuilder createZipBuilderForSdkAsar() {
+    return createZipBuilderForSdkAsar(DEFAULT_SDK_METADATA);
+  }
+
+  public static ZipBuilder createZipBuilderForSdkAsar(SdkMetadata sdkMetadata) {
+    return new ZipBuilder()
+        .addFileWithProtoContent(ZipPath.create(SDK_METADATA_FILE_NAME), sdkMetadata);
+  }
+
   public static ZipBuilder createZipBuilderForModules() {
     return new ZipBuilder()
         .addFileWithProtoContent(ZipPath.create("base/manifest/AndroidManifest.xml"), MANIFEST)
-        .addFileWithContent(ZipPath.create("base/dex/classes.dex"), DUMMY_CONTENT)
+        .addFileWithContent(ZipPath.create("base/dex/classes.dex"), TEST_CONTENT)
         .addFileWithContent(
             ZipPath.create("SdkModulesConfig.pb"), DEFAULT_SDK_MODULES_CONFIG.toByteArray());
   }
 
   public static ZipBuilder createZipBuilderForModulesWithoutManifest() {
     return new ZipBuilder()
-        .addFileWithContent(ZipPath.create("base/dex/classes.dex"), DUMMY_CONTENT)
+        .addFileWithContent(ZipPath.create("base/dex/classes.dex"), TEST_CONTENT)
         .addFileWithContent(
             ZipPath.create("SdkModulesConfig.pb"), DEFAULT_SDK_MODULES_CONFIG.toByteArray());
   }
@@ -220,7 +244,7 @@ public final class TestUtils {
     return new ZipBuilder()
         .addFileWithProtoContent(
             ZipPath.create("base/manifest/AndroidManifest.xml"), createInvalidSdkAndroidManifest())
-        .addFileWithContent(ZipPath.create("base/dex/classes.dex"), DUMMY_CONTENT)
+        .addFileWithContent(ZipPath.create("base/dex/classes.dex"), TEST_CONTENT)
         .addFileWithContent(
             ZipPath.create("SdkModulesConfig.pb"), DEFAULT_SDK_MODULES_CONFIG.toByteArray());
   }
@@ -232,5 +256,12 @@ public final class TestUtils {
   public static XmlNode createInvalidSdkAndroidManifest() {
     return androidManifest(
         PACKAGE_NAME, withMinSdkVersion(32), withInstallLocation("preferExternal"));
+  }
+
+  private static SdkMetadata getSdkMetadata() {
+    return SdkMetadata.newBuilder()
+        .setPackageName(PACKAGE_NAME)
+        .setSdkVersion(DEFAULT_SDK_MODULES_CONFIG.getSdkVersion())
+        .build();
   }
 }

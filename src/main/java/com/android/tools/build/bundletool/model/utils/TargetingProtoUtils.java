@@ -201,9 +201,14 @@ public final class TargetingProtoUtils {
     return variantTargeting(sdkVersionTargeting(sdkVersionFrom(ANDROID_L_API_VERSION)));
   }
 
-  public static VariantTargeting sdkRuntimeVariantTargeting(int sdkVersion) {
-    return variantTargeting(sdkVersionTargeting(sdkVersionFrom(sdkVersion))).toBuilder()
+  public static VariantTargeting sdkRuntimeVariantTargeting(
+      SdkVersion sdkVersion, ImmutableSet<SdkVersion> alternativeSdkVersions) {
+    return VariantTargeting.newBuilder()
         .setSdkRuntimeTargeting(SdkRuntimeTargeting.newBuilder().setRequiresSdkRuntime(true))
+        .setSdkVersionTargeting(
+            SdkVersionTargeting.newBuilder()
+                .addValue(sdkVersion)
+                .addAllAlternatives(alternativeSdkVersions))
         .build();
   }
 

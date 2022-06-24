@@ -51,7 +51,7 @@ import org.junit.runners.JUnit4;
 @RunWith(JUnit4.class)
 public class SuffixStripperTest {
 
-  private static final byte[] DUMMY_CONTENT = new byte[1];
+  private static final byte[] TEST_CONTENT = new byte[1];
 
   @Test
   public void applySuffixStripping_tcf_suffixStrippingEnabled() {
@@ -65,11 +65,11 @@ public class SuffixStripperTest {
             .setEntries(
                 ImmutableList.of(
                     createModuleEntryForFile(
-                        "assets/textures/untargeted_texture.dat", DUMMY_CONTENT),
+                        "assets/textures/untargeted_texture.dat", TEST_CONTENT),
                     createModuleEntryForFile(
-                        "assets/textures#tcf_etc1/etc1_texture.dat", DUMMY_CONTENT),
+                        "assets/textures#tcf_etc1/etc1_texture.dat", TEST_CONTENT),
                     createModuleEntryForFile(
-                        "assets/textures#tcf_atc/atc_texture.dat", DUMMY_CONTENT)))
+                        "assets/textures#tcf_atc/atc_texture.dat", TEST_CONTENT)))
             .setAssetsConfig(
                 assets(
                     targetedAssetsDirectory(
@@ -117,11 +117,11 @@ public class SuffixStripperTest {
             .setEntries(
                 ImmutableList.of(
                     createModuleEntryForFile(
-                        "assets/textures/untargeted_texture.dat", DUMMY_CONTENT),
+                        "assets/textures/untargeted_texture.dat", TEST_CONTENT),
                     createModuleEntryForFile(
-                        "assets/textures#tcf_etc1/etc1_texture.dat", DUMMY_CONTENT),
+                        "assets/textures#tcf_etc1/etc1_texture.dat", TEST_CONTENT),
                     createModuleEntryForFile(
-                        "assets/textures#tcf_atc/atc_texture.dat", DUMMY_CONTENT)))
+                        "assets/textures#tcf_atc/atc_texture.dat", TEST_CONTENT)))
             .setAssetsConfig(
                 assets(
                     targetedAssetsDirectory(
@@ -167,11 +167,11 @@ public class SuffixStripperTest {
             .setEntries(
                 ImmutableList.of(
                     createModuleEntryForFile(
-                        "assets/textures/untargeted_texture.dat", DUMMY_CONTENT),
+                        "assets/textures/untargeted_texture.dat", TEST_CONTENT),
                     createModuleEntryForFile(
-                        "assets/textures#tcf_etc1/etc1_texture.dat", DUMMY_CONTENT),
+                        "assets/textures#tcf_etc1/etc1_texture.dat", TEST_CONTENT),
                     createModuleEntryForFile(
-                        "assets/textures#tcf_atc/atc_texture.dat", DUMMY_CONTENT)))
+                        "assets/textures#tcf_atc/atc_texture.dat", TEST_CONTENT)))
             .setAssetsConfig(
                 assets(
                     targetedAssetsDirectory(
@@ -217,9 +217,8 @@ public class SuffixStripperTest {
             .setMasterSplit(true)
             .setEntries(
                 ImmutableList.of(
-                    createModuleEntryForFile("assets/img#tier_0/low_res_image.dat", DUMMY_CONTENT),
-                    createModuleEntryForFile(
-                        "assets/img#tier_1/high_res_image.dat", DUMMY_CONTENT)))
+                    createModuleEntryForFile("assets/img#tier_0/low_res_image.dat", TEST_CONTENT),
+                    createModuleEntryForFile("assets/img#tier_1/high_res_image.dat", TEST_CONTENT)))
             .setAssetsConfig(
                 assets(
                     targetedAssetsDirectory(
@@ -263,9 +262,8 @@ public class SuffixStripperTest {
             .setMasterSplit(true)
             .setEntries(
                 ImmutableList.of(
-                    createModuleEntryForFile("assets/img#tier_0/low_res_image.dat", DUMMY_CONTENT),
-                    createModuleEntryForFile(
-                        "assets/img#tier_1/high_res_image.dat", DUMMY_CONTENT)))
+                    createModuleEntryForFile("assets/img#tier_0/low_res_image.dat", TEST_CONTENT),
+                    createModuleEntryForFile("assets/img#tier_1/high_res_image.dat", TEST_CONTENT)))
             .setAssetsConfig(
                 assets(
                     targetedAssetsDirectory(
@@ -310,10 +308,10 @@ public class SuffixStripperTest {
             .setMasterSplit(true)
             .setEntries(
                 ImmutableList.of(
-                    createModuleEntryForFile("assets/untargeted_texture.dat", DUMMY_CONTENT),
-                    createModuleEntryForFile("assets/textures#tcf_etc1/texture.dat", DUMMY_CONTENT),
+                    createModuleEntryForFile("assets/untargeted_texture.dat", TEST_CONTENT),
+                    createModuleEntryForFile("assets/textures#tcf_etc1/texture.dat", TEST_CONTENT),
                     createModuleEntryForFile(
-                        "assets/textures#tcf_etc1/other_texture.dat", DUMMY_CONTENT)))
+                        "assets/textures#tcf_etc1/other_texture.dat", TEST_CONTENT)))
             .setAssetsConfig(
                 assets(
                     targetedAssetsDirectory(

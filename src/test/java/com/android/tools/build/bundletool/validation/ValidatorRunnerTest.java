@@ -55,7 +55,7 @@ import org.mockito.MockitoAnnotations;
 @RunWith(JUnit4.class)
 public class ValidatorRunnerTest {
 
-  private static final byte[] DUMMY_CONTENT = new byte[1];
+  private static final byte[] TEST_CONTENT = new byte[1];
   public static final BundleConfig BUNDLE_CONFIG = BundleConfigBuilder.create().build();
 
   @Rule public TemporaryFolder tmp = new TemporaryFolder();
@@ -75,7 +75,7 @@ public class ValidatorRunnerTest {
     Path bundlePath =
         new ZipBuilder()
             .addDirectory(ZipPath.create("directory"))
-            .addFileWithContent(ZipPath.create("file.txt"), DUMMY_CONTENT)
+            .addFileWithContent(ZipPath.create("file.txt"), TEST_CONTENT)
             .writeTo(tempFolder.resolve("bundle.aab"));
 
     try (ZipFile bundleZip = new ZipFile(bundlePath.toFile())) {
@@ -98,7 +98,7 @@ public class ValidatorRunnerTest {
     Path bundlePath =
         new ZipBuilder()
             .addDirectory(ZipPath.create("directory"))
-            .addFileWithContent(ZipPath.create("file.txt"), DUMMY_CONTENT)
+            .addFileWithContent(ZipPath.create("file.txt"), TEST_CONTENT)
             .writeTo(tempFolder.resolve("bundle.asb"));
 
     try (ZipFile bundleZip = new ZipFile(bundlePath.toFile())) {
@@ -130,12 +130,12 @@ public class ValidatorRunnerTest {
                 ZipPath.create("moduleX/native.pb"), NativeLibraries.getDefaultInstance())
             .addFileWithProtoContent(
                 ZipPath.create("moduleX/resources.pb"), ResourceTable.getDefaultInstance())
-            .addFileWithContent(ZipPath.create("moduleX/res/drawable/icon.png"), DUMMY_CONTENT)
-            .addFileWithContent(ZipPath.create("moduleX/lib/x86/libX.so"), DUMMY_CONTENT)
+            .addFileWithContent(ZipPath.create("moduleX/res/drawable/icon.png"), TEST_CONTENT)
+            .addFileWithContent(ZipPath.create("moduleX/lib/x86/libX.so"), TEST_CONTENT)
             .addFileWithProtoContent(
                 ZipPath.create("moduleY/manifest/AndroidManifest.xml"),
                 androidManifest("com.test.app", withSplitId("moduleY")))
-            .addFileWithContent(ZipPath.create("moduleY/assets/file.txt"), DUMMY_CONTENT)
+            .addFileWithContent(ZipPath.create("moduleY/assets/file.txt"), TEST_CONTENT)
             .writeTo(tempFolder.resolve("bundle.aab"));
 
     try (ZipFile bundleZip = new ZipFile(bundlePath.toFile())) {
@@ -171,11 +171,11 @@ public class ValidatorRunnerTest {
             .addFileWithProtoContent(
                 ZipPath.create("moduleX/manifest/AndroidManifest.xml"),
                 androidManifest("com.test.app", withSplitId("moduleX")))
-            .addFileWithContent(ZipPath.create("moduleX/assets/file.txt"), DUMMY_CONTENT)
+            .addFileWithContent(ZipPath.create("moduleX/assets/file.txt"), TEST_CONTENT)
             .addFileWithProtoContent(
                 ZipPath.create("moduleY/manifest/AndroidManifest.xml"),
                 androidManifest("com.test.app", withSplitId("moduleY")))
-            .addFileWithContent(ZipPath.create("moduleY/assets/file.txt"), DUMMY_CONTENT)
+            .addFileWithContent(ZipPath.create("moduleY/assets/file.txt"), TEST_CONTENT)
             .writeTo(tempFolder.resolve("bundle.aab"));
 
     try (ZipFile bundleZip = new ZipFile(bundlePath.toFile())) {
@@ -206,7 +206,7 @@ public class ValidatorRunnerTest {
     Path modulePath =
         new ZipBuilder()
             .addDirectory(ZipPath.create("module"))
-            .addFileWithContent(ZipPath.create("module/file.txt"), DUMMY_CONTENT)
+            .addFileWithContent(ZipPath.create("module/file.txt"), TEST_CONTENT)
             .writeTo(tempFolder.resolve("module.zip"));
 
     try (ZipFile moduleZip = new ZipFile(modulePath.toFile())) {

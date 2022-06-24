@@ -19,6 +19,7 @@ import com.android.tools.build.bundletool.commands.AddTransparencyCommand;
 import com.android.tools.build.bundletool.commands.BuildApksCommand;
 import com.android.tools.build.bundletool.commands.BuildBundleCommand;
 import com.android.tools.build.bundletool.commands.BuildSdkApksCommand;
+import com.android.tools.build.bundletool.commands.BuildSdkAsarCommand;
 import com.android.tools.build.bundletool.commands.BuildSdkBundleCommand;
 import com.android.tools.build.bundletool.commands.CheckTransparencyCommand;
 import com.android.tools.build.bundletool.commands.CommandHelp;
@@ -29,6 +30,7 @@ import com.android.tools.build.bundletool.commands.GetDeviceSpecCommand;
 import com.android.tools.build.bundletool.commands.GetSizeCommand;
 import com.android.tools.build.bundletool.commands.InstallApksCommand;
 import com.android.tools.build.bundletool.commands.InstallMultiApksCommand;
+import com.android.tools.build.bundletool.commands.PrintDeviceTargetingConfigCommand;
 import com.android.tools.build.bundletool.commands.ValidateBundleCommand;
 import com.android.tools.build.bundletool.commands.VersionCommand;
 import com.android.tools.build.bundletool.device.AdbServer;
@@ -85,6 +87,9 @@ public class BundleToolMain {
           break;
         case BuildSdkApksCommand.COMMAND_NAME:
           BuildSdkApksCommand.fromFlags(flags).execute();
+          break;
+        case BuildSdkAsarCommand.COMMAND_NAME:
+          BuildSdkAsarCommand.fromFlags(flags).execute();
           break;
         case ExtractApksCommand.COMMAND_NAME:
           ExtractApksCommand.fromFlags(flags).execute();
@@ -181,6 +186,15 @@ public class BundleToolMain {
         break;
       case BuildApksCommand.COMMAND_NAME:
         commandHelp = BuildApksCommand.help();
+        break;
+      case BuildSdkBundleCommand.COMMAND_NAME:
+        commandHelp = BuildSdkBundleCommand.help();
+        break;
+      case BuildSdkApksCommand.COMMAND_NAME:
+        commandHelp = BuildSdkApksCommand.help();
+        break;
+      case BuildSdkAsarCommand.COMMAND_NAME:
+        commandHelp = BuildSdkAsarCommand.help();
         break;
       case ExtractApksCommand.COMMAND_NAME:
         commandHelp = ExtractApksCommand.help();

@@ -30,6 +30,7 @@ import com.android.tools.build.bundletool.archive.ArchivedApksGenerator;
 import com.android.tools.build.bundletool.commands.BuildApksCommand.ApkBuildMode;
 import com.android.tools.build.bundletool.commands.BuildApksCommand.SystemApkOption;
 import com.android.tools.build.bundletool.device.ApkMatcher;
+import com.android.tools.build.bundletool.device.ModuleMatcher;
 import com.android.tools.build.bundletool.io.ApkSerializerManager;
 import com.android.tools.build.bundletool.io.ApkSetWriter;
 import com.android.tools.build.bundletool.io.TempDirectory;
@@ -362,8 +363,20 @@ public final class BuildApksManager {
         .build();
   }
 
-  private static ImmutableList<BundleModule> modulesToFuse(ImmutableList<BundleModule> modules) {
-    return modules.stream().filter(BundleModule::isIncludedInFusing).collect(toImmutableList());
+  private ImmutableList<BundleModule> modulesToFuse(ImmutableList<BundleModule> modules) {
+    return modules.stream()
+        .filter(BundleModule::isIncludedInFusing)
+        .filter(
+            module -> !command.getFuseOnlyDeviceMatchingModules() || matchModuleToDevice(module))
+        .collect(toImmutableList());
+  }
+
+  private boolean matchModuleToDevice(BundleModule module) {
+    if (!this.deviceSpec.isPresent()) {
+      return false;
+    }
+    return new ModuleMatcher(this.deviceSpec.get())
+        .matchesModuleTargeting(module.getModuleMetadata().getTargeting());
   }
 
   private ApkOptimizations getSystemApkOptimizations() {

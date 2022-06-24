@@ -49,7 +49,7 @@ import org.junit.runners.JUnit4;
 @RunWith(JUnit4.class)
 public class ResourceTableMergerTest {
 
-  private static final byte[] DUMMY_BYTES = new byte[1];
+  private static final byte[] TEST_BYTES = new byte[1];
 
   @Test
   public void packagesWithMatchingIds_merged() throws Exception {
@@ -204,9 +204,8 @@ public class ResourceTableMergerTest {
   public void sourcePools_different_okAndSourcePoolOfFirstTablePreserved() throws Exception {
     ResourceTable table1 = ResourceTable.getDefaultInstance();
     ResourceTable table2 =
-        table1
-            .toBuilder()
-            .setSourcePool(StringPool.newBuilder().setData(ByteString.copyFrom(DUMMY_BYTES)))
+        table1.toBuilder()
+            .setSourcePool(StringPool.newBuilder().setData(ByteString.copyFrom(TEST_BYTES)))
             .build();
 
     ResourceTable merged = new ResourceTableMerger().merge(table1, table2);
@@ -226,7 +225,7 @@ public class ResourceTableMergerTest {
                 type(0x11, "type", entry(0x21, "entry", value("ldpi", LDPI, source1)))));
     ResourceTable table2 =
         resourceTable(
-            StringPool.newBuilder().setData(ByteString.copyFrom(DUMMY_BYTES)).build(),
+            StringPool.newBuilder().setData(ByteString.copyFrom(TEST_BYTES)).build(),
             pkg(
                 0x02,
                 "package",
@@ -251,7 +250,7 @@ public class ResourceTableMergerTest {
   @Test
   public void sourcePools_equal_sourceReferencesPreserved() throws Exception {
     StringPool commonSourcePool =
-        StringPool.newBuilder().setData(ByteString.copyFrom(DUMMY_BYTES)).build();
+        StringPool.newBuilder().setData(ByteString.copyFrom(TEST_BYTES)).build();
     Source source1 = Source.newBuilder().setPathIdx(42).build();
     Source source2 = Source.newBuilder().setPathIdx(24).build();
     ResourceTable table1 =

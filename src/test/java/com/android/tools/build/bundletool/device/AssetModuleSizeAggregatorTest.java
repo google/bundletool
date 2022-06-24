@@ -52,10 +52,10 @@ import org.junit.runners.JUnit4;
 @RunWith(JUnit4.class)
 public final class AssetModuleSizeAggregatorTest {
 
-  private static final long ASSET_1_MASTER_SIZE = 1 << 0;
+  private static final long ASSET_1_MAIN_SIZE = 1 << 0;
   private static final long ASSET_1_ETC2_SIZE = 1 << 1;
   private static final long ASSET_1_ASTC_SIZE = 1 << 2;
-  private static final long ASSET_2_MASTER_SIZE = 1 << 3;
+  private static final long ASSET_2_MAIN_SIZE = 1 << 3;
   private static final long ASSET_2_ETC2_SIZE = 1 << 4;
   private static final long ASSET_2_ASTC_SIZE = 1 << 5;
   private static final AssetSliceSet ASSET_MODULE_1 =
@@ -63,7 +63,7 @@ public final class AssetModuleSizeAggregatorTest {
           "asset1",
           DeliveryType.INSTALL_TIME,
           createMasterApkDescription(
-              apkSdkTargeting(sdkVersionFrom(21)), ZipPath.create("asset1-master.apk")),
+              apkSdkTargeting(sdkVersionFrom(21)), ZipPath.create("asset1-main.apk")),
           createApkDescription(
               mergeApkTargeting(
                   apkTextureTargeting(ETC2, ImmutableSet.of(ASTC)),
@@ -81,7 +81,7 @@ public final class AssetModuleSizeAggregatorTest {
           "asset2",
           DeliveryType.INSTALL_TIME,
           createMasterApkDescription(
-              apkSdkTargeting(sdkVersionFrom(21)), ZipPath.create("asset2-master.apk")),
+              apkSdkTargeting(sdkVersionFrom(21)), ZipPath.create("asset2-main.apk")),
           createApkDescription(
               mergeApkTargeting(
                   apkTextureTargeting(ETC2, ImmutableSet.of(ASTC)),
@@ -96,17 +96,17 @@ public final class AssetModuleSizeAggregatorTest {
               /* isMasterSplit= */ false));
   private static final ImmutableMap<String, Long> SIZE_BY_APK_PATHS =
       ImmutableMap.<String, Long>builder()
-          .put("asset1-master.apk", ASSET_1_MASTER_SIZE)
+          .put("asset1-main.apk", ASSET_1_MAIN_SIZE)
           .put("asset1-tcf_etc2.apk", ASSET_1_ETC2_SIZE)
           .put("asset1-tcf_astc.apk", ASSET_1_ASTC_SIZE)
-          .put("asset2-master.apk", ASSET_2_MASTER_SIZE)
+          .put("asset2-main.apk", ASSET_2_MAIN_SIZE)
           .put("asset2-tcf_etc2.apk", ASSET_2_ETC2_SIZE)
           .put("asset2-tcf_astc.apk", ASSET_2_ASTC_SIZE)
           .build();
 
   private final GetSizeCommand.Builder getSizeCommand =
       GetSizeCommand.builder()
-          .setApksArchivePath(Paths.get("dummy.apks"))
+          .setApksArchivePath(Paths.get("test.apks"))
           .setGetSizeSubCommand(GetSizeSubcommand.TOTAL);
 
   @Test
@@ -132,9 +132,9 @@ public final class AssetModuleSizeAggregatorTest {
                 "asset1",
                 DeliveryType.INSTALL_TIME,
                 createMasterApkDescription(
-                    ApkTargeting.getDefaultInstance(), ZipPath.create("asset1-master.apk"))));
+                    ApkTargeting.getDefaultInstance(), ZipPath.create("asset1-main.apk"))));
     VariantTargeting variantTargeting = VariantTargeting.getDefaultInstance();
-    ImmutableMap<String, Long> sizeByApkPaths = ImmutableMap.of("asset1-master.apk", 10L);
+    ImmutableMap<String, Long> sizeByApkPaths = ImmutableMap.of("asset1-main.apk", 10L);
     ConfigurationSizes configurationSizes =
         new AssetModuleSizeAggregator(
                 assetModules, variantTargeting, sizeByApkPaths, getSizeCommand.build())
@@ -159,15 +159,15 @@ public final class AssetModuleSizeAggregatorTest {
     assertThat(configurationSizes.getMinSizeConfigurationMap())
         .containsExactly(
             SizeConfiguration.builder().setTextureCompressionFormat("etc2").build(),
-            ASSET_1_MASTER_SIZE + ASSET_1_ETC2_SIZE + ASSET_2_MASTER_SIZE + ASSET_2_ETC2_SIZE,
+            ASSET_1_MAIN_SIZE + ASSET_1_ETC2_SIZE + ASSET_2_MAIN_SIZE + ASSET_2_ETC2_SIZE,
             SizeConfiguration.builder().setTextureCompressionFormat("astc").build(),
-            ASSET_1_MASTER_SIZE + ASSET_1_ASTC_SIZE + ASSET_2_MASTER_SIZE + ASSET_2_ASTC_SIZE);
+            ASSET_1_MAIN_SIZE + ASSET_1_ASTC_SIZE + ASSET_2_MAIN_SIZE + ASSET_2_ASTC_SIZE);
     assertThat(configurationSizes.getMaxSizeConfigurationMap())
         .containsExactly(
             SizeConfiguration.builder().setTextureCompressionFormat("etc2").build(),
-            ASSET_1_MASTER_SIZE + ASSET_1_ETC2_SIZE + ASSET_2_MASTER_SIZE + ASSET_2_ETC2_SIZE,
+            ASSET_1_MAIN_SIZE + ASSET_1_ETC2_SIZE + ASSET_2_MAIN_SIZE + ASSET_2_ETC2_SIZE,
             SizeConfiguration.builder().setTextureCompressionFormat("astc").build(),
-            ASSET_1_MASTER_SIZE + ASSET_1_ASTC_SIZE + ASSET_2_MASTER_SIZE + ASSET_2_ASTC_SIZE);
+            ASSET_1_MAIN_SIZE + ASSET_1_ASTC_SIZE + ASSET_2_MAIN_SIZE + ASSET_2_ASTC_SIZE);
   }
 
   @Test
@@ -190,13 +190,13 @@ public final class AssetModuleSizeAggregatorTest {
                 .setTextureCompressionFormat("etc2")
                 .setSdkVersion("21")
                 .build(),
-            ASSET_1_MASTER_SIZE + ASSET_1_ETC2_SIZE + ASSET_2_MASTER_SIZE + ASSET_2_ETC2_SIZE);
+            ASSET_1_MAIN_SIZE + ASSET_1_ETC2_SIZE + ASSET_2_MAIN_SIZE + ASSET_2_ETC2_SIZE);
     assertThat(configurationSizes.getMaxSizeConfigurationMap())
         .containsExactly(
             SizeConfiguration.builder()
                 .setTextureCompressionFormat("etc2")
                 .setSdkVersion("21")
                 .build(),
-            ASSET_1_MASTER_SIZE + ASSET_1_ETC2_SIZE + ASSET_2_MASTER_SIZE + ASSET_2_ETC2_SIZE);
+            ASSET_1_MAIN_SIZE + ASSET_1_ETC2_SIZE + ASSET_2_MAIN_SIZE + ASSET_2_ETC2_SIZE);
   }
 }

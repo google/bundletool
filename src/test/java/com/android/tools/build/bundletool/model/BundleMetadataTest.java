@@ -20,7 +20,7 @@ import static com.google.common.truth.Truth.assertThat;
 import static com.google.common.truth.Truth8.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
-import com.android.tools.build.bundletool.model.ModuleEntry.ModuleEntryBundleLocation;
+import com.android.tools.build.bundletool.model.ModuleEntry.ModuleEntryLocationInZipSource;
 import com.google.common.io.ByteSource;
 import com.google.common.io.CharSource;
 import java.nio.charset.Charset;
@@ -32,13 +32,13 @@ import org.junit.runners.JUnit4;
 @RunWith(JUnit4.class)
 public class BundleMetadataTest {
 
-  private static final ByteSource DUMMY_DATA = ByteSource.wrap(new byte[0]);
+  private static final ByteSource TEST_DATA = ByteSource.wrap(new byte[0]);
 
   @Test
   public void addFile_plainNamespacedDirectory() throws Exception {
     BundleMetadata metadata =
         BundleMetadata.builder()
-            .addFile(/* namespacedDir= */ "com.namespace", /* fileName= */ "filename", DUMMY_DATA)
+            .addFile(/* namespacedDir= */ "com.namespace", /* fileName= */ "filename", TEST_DATA)
             .build();
 
     assertThat(metadata.getFileContentMap().keySet())
@@ -52,7 +52,7 @@ public class BundleMetadataTest {
             .addFile(
                 /* namespacedDir= */ "com.namespace/dir/sub-dir",
                 /* fileName= */ "filename",
-                DUMMY_DATA)
+                TEST_DATA)
             .build();
 
     assertThat(metadata.getFileContentMap().keySet())
@@ -64,7 +64,7 @@ public class BundleMetadataTest {
     IllegalArgumentException exception =
         assertThrows(
             IllegalArgumentException.class,
-            () -> BundleMetadata.builder().addFile(ZipPath.create("com.namespace"), DUMMY_DATA));
+            () -> BundleMetadata.builder().addFile(ZipPath.create("com.namespace"), TEST_DATA));
 
     assertThat(exception).hasMessageThat().contains("too shallow");
   }
@@ -74,7 +74,7 @@ public class BundleMetadataTest {
     IllegalArgumentException exception =
         assertThrows(
             IllegalArgumentException.class,
-            () -> BundleMetadata.builder().addFile(ZipPath.create("no_dot/filename"), DUMMY_DATA));
+            () -> BundleMetadata.builder().addFile(ZipPath.create("no_dot/filename"), TEST_DATA));
 
     assertThat(exception)
         .hasMessageThat()
@@ -85,7 +85,7 @@ public class BundleMetadataTest {
   public void getModuleEntryForSignedTransparencyFile_empty() {
     BundleMetadata metadata =
         BundleMetadata.builder()
-            .addFile(/* namespacedDir= */ "com.namespace", /* fileName= */ "filename", DUMMY_DATA)
+            .addFile(/* namespacedDir= */ "com.namespace", /* fileName= */ "filename", TEST_DATA)
             .build();
 
     assertThat(metadata.getModuleEntryForSignedTransparencyFile()).isEmpty();
@@ -108,8 +108,8 @@ public class BundleMetadataTest {
             ModuleEntry.builder()
                 .setContent(transparencyContents)
                 // TODO(b/186621568): Fix. Bundle location is ignored in ModuleEntry.equals.
-                .setBundleLocation(
-                    ModuleEntryBundleLocation.create(
+                .setFileLocation(
+                    ModuleEntryLocationInZipSource.create(
                         Paths.get(""),
                         ZipPath.create("BUNDLE-METADATA")
                             .resolve(BundleMetadata.BUNDLETOOL_NAMESPACE)

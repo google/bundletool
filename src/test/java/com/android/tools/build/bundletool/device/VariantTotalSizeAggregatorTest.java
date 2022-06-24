@@ -79,7 +79,7 @@ public class VariantTotalSizeAggregatorTest {
 
   private final GetSizeCommand.Builder getSizeCommand =
       GetSizeCommand.builder()
-          .setApksArchivePath(Paths.get("dummy.apks"))
+          .setApksArchivePath(Paths.get("test.apks"))
           .setGetSizeSubCommand(GetSizeSubcommand.TOTAL);
 
   @Test

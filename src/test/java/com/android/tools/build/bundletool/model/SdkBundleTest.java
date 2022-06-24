@@ -35,7 +35,7 @@ import org.junit.runners.JUnit4;
 @RunWith(JUnit4.class)
 public class SdkBundleTest {
 
-  private static final byte[] DUMMY_CONTENT = new byte[1];
+  private static final byte[] TEST_CONTENT = new byte[1];
 
   @Rule public TemporaryFolder tmp = new TemporaryFolder();
 
@@ -52,8 +52,8 @@ public class SdkBundleTest {
   public void buildFromZipCreatesExpectedEntries() throws Exception {
     ZipBuilder modulesBuilder =
         createZipBuilderForModules()
-            .addFileWithContent(ZipPath.create("base/dex/classes1.dex"), DUMMY_CONTENT)
-            .addFileWithContent(ZipPath.create("base/dex/classes2.dex"), DUMMY_CONTENT);
+            .addFileWithContent(ZipPath.create("base/dex/classes1.dex"), TEST_CONTENT)
+            .addFileWithContent(ZipPath.create("base/dex/classes2.dex"), TEST_CONTENT);
     createZipBuilderForSdkBundleWithModules(modulesBuilder, modulesFile).writeTo(bundleFile);
 
     try (ZipFile sdkBundleZip = new ZipFile(bundleFile.toFile());

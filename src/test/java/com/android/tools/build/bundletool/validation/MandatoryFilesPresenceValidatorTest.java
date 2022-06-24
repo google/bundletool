@@ -35,7 +35,7 @@ import org.junit.runners.JUnit4;
 @RunWith(JUnit4.class)
 public class MandatoryFilesPresenceValidatorTest {
 
-  private static final byte[] DUMMY_CONTENT = new byte[1];
+  private static final byte[] TEST_CONTENT = new byte[1];
 
   @Rule public TemporaryFolder tmp = new TemporaryFolder();
   private Path tempFolder;
@@ -49,7 +49,7 @@ public class MandatoryFilesPresenceValidatorTest {
   public void moduleZipFile_withoutAndroidManifest_throws() throws Exception {
     Path modulePath =
         new ZipBuilder()
-            .addFileWithContent(ZipPath.create("assets/file.txt"), DUMMY_CONTENT)
+            .addFileWithContent(ZipPath.create("assets/file.txt"), TEST_CONTENT)
             .writeTo(tempFolder.resolve("base.zip"));
 
     try (ZipFile moduleZip = new ZipFile(modulePath.toFile())) {
@@ -70,7 +70,7 @@ public class MandatoryFilesPresenceValidatorTest {
   public void moduleZipFile_withAllMandatoryFiles_ok() throws Exception {
     Path modulePath =
         new ZipBuilder()
-            .addFileWithContent(ZipPath.create("manifest/AndroidManifest.xml"), DUMMY_CONTENT)
+            .addFileWithContent(ZipPath.create("manifest/AndroidManifest.xml"), TEST_CONTENT)
             .writeTo(tempFolder.resolve("base.zip"));
 
     try (ZipFile moduleZip = new ZipFile(modulePath.toFile())) {
@@ -83,7 +83,7 @@ public class MandatoryFilesPresenceValidatorTest {
   public void bundleZipFile_withoutBundleConfig_throws() throws Exception {
     Path bundlePath =
         new ZipBuilder()
-            .addFileWithContent(ZipPath.create("base/manifest/AndroidManifest.xml"), DUMMY_CONTENT)
+            .addFileWithContent(ZipPath.create("base/manifest/AndroidManifest.xml"), TEST_CONTENT)
             .writeTo(tempFolder.resolve("bundle.aab"));
 
     try (ZipFile bundleZip = new ZipFile(bundlePath.toFile())) {
@@ -102,8 +102,8 @@ public class MandatoryFilesPresenceValidatorTest {
   public void bundleZipFile_withoutAndroidManifestInModule_throws() throws Exception {
     Path bundlePath =
         new ZipBuilder()
-            .addFileWithContent(ZipPath.create("base/assets/file.txt"), DUMMY_CONTENT)
-            .addFileWithContent(ZipPath.create("BundleConfig.pb"), DUMMY_CONTENT)
+            .addFileWithContent(ZipPath.create("base/assets/file.txt"), TEST_CONTENT)
+            .addFileWithContent(ZipPath.create("BundleConfig.pb"), TEST_CONTENT)
             .writeTo(tempFolder.resolve("bundle.aab"));
 
     try (ZipFile bundleZip = new ZipFile(bundlePath.toFile())) {
@@ -124,8 +124,8 @@ public class MandatoryFilesPresenceValidatorTest {
   public void bundleZipFile_withAllMandatoryFiles_ok() throws Exception {
     Path bundlePath =
         new ZipBuilder()
-            .addFileWithContent(ZipPath.create("base/manifest/AndroidManifest.xml"), DUMMY_CONTENT)
-            .addFileWithContent(ZipPath.create("BundleConfig.pb"), DUMMY_CONTENT)
+            .addFileWithContent(ZipPath.create("base/manifest/AndroidManifest.xml"), TEST_CONTENT)
+            .addFileWithContent(ZipPath.create("BundleConfig.pb"), TEST_CONTENT)
             .writeTo(tempFolder.resolve("bundle.aab"));
 
     try (ZipFile bundleZip = new ZipFile(bundlePath.toFile())) {

@@ -53,7 +53,7 @@ import java.util.stream.Stream;
 /** Helpers related to creating APKs archives in tests. */
 public final class ApksArchiveHelpers {
 
-  private static final byte[] DUMMY_BYTES = new byte[100];
+  private static final byte[] TEST_BYTES = new byte[100];
 
   public static Path createApksArchiveFile(BuildApksResult result, Path location) throws Exception {
     ZipBuilder archiveBuilder = new ZipBuilder();
@@ -61,7 +61,7 @@ public final class ApksArchiveHelpers {
     apkDescriptionStream(result)
         .forEach(
             apkDesc ->
-                archiveBuilder.addFileWithContent(ZipPath.create(apkDesc.getPath()), DUMMY_BYTES));
+                archiveBuilder.addFileWithContent(ZipPath.create(apkDesc.getPath()), TEST_BYTES));
     archiveBuilder.addFileWithProtoContent(ZipPath.create("toc.pb"), result);
 
     return archiveBuilder.writeTo(location);
@@ -74,7 +74,7 @@ public final class ApksArchiveHelpers {
     for (ApkDescription apkDescription : apkDescriptions) {
       Path apkPath = location.resolve(apkDescription.getPath());
       Files.createDirectories(apkPath.getParent());
-      Files.write(apkPath, DUMMY_BYTES);
+      Files.write(apkPath, TEST_BYTES);
     }
     Files.write(location.resolve("toc.pb"), result.toByteArray());
 

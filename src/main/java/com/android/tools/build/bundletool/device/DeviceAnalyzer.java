@@ -53,8 +53,12 @@ public class DeviceAnalyzer {
       Device device = getAndValidateDevice(deviceId);
 
       // device.getVersion().getApiLevel() returns 1 in case of failure.
-      int deviceSdkVersion = device.getVersion().getApiLevel();
-      checkState(deviceSdkVersion > 1, "Error retrieving device SDK version. Please try again.");
+      checkState(
+          device.getVersion().getApiLevel() > 1,
+          "Error retrieving device SDK version. Please try again.");
+      // We want to consider device's feature level instead of API level so that targeting matching
+      // is done properly on preview builds.
+      int deviceSdkVersion = device.getVersion().getFeatureLevel();
       String codename = device.getVersion().getCodename();
       int deviceDensity = device.getDensity();
       checkState(deviceDensity > 0, "Error retrieving device density. Please try again.");

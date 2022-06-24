@@ -32,5 +32,13 @@ public class BundleZipValidator extends SubValidator {
               zipEntry.getName())
           .build();
     }
+    if (zipEntry.getName().startsWith("/")) {
+      throw InvalidBundleException.builder()
+          .withUserMessage(
+              "The bundle zip file contains a zip entry starting with /, which is not "
+                  + "allowed: '%s'.",
+              zipEntry.getName())
+          .build();
+    }
   }
 }

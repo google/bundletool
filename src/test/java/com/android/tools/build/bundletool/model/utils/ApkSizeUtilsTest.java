@@ -49,7 +49,7 @@ import org.junit.runners.JUnit4;
 @RunWith(JUnit4.class)
 public class ApkSizeUtilsTest {
 
-  private static final byte[] DUMMY_BYTES = new byte[100];
+  private static final byte[] TEST_BYTES = new byte[100];
   @Rule public final TemporaryFolder tmp = new TemporaryFolder();
   private Path tmpDir;
 
@@ -161,10 +161,10 @@ public class ApkSizeUtilsTest {
                 apkTwo));
 
     ZipBuilder archiveBuilder = new ZipBuilder();
-    archiveBuilder.addFileWithContent(ZipPath.create(apkOne.toString()), DUMMY_BYTES);
+    archiveBuilder.addFileWithContent(ZipPath.create(apkOne.toString()), TEST_BYTES);
     archiveBuilder.addFileWithContent(
         ZipPath.create(apkTwo.toString()),
-        DUMMY_BYTES,
+        TEST_BYTES,
         EntryOption.UNCOMPRESSED); // APK stored uncompressed in the APKs zip.
     archiveBuilder.addFileWithProtoContent(
         ZipPath.create("toc.pb"), BuildApksResult.newBuilder().addAllVariant(variants).build());

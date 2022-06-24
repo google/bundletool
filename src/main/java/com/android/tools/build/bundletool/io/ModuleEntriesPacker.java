@@ -16,7 +16,7 @@
 package com.android.tools.build.bundletool.io;
 
 import com.android.tools.build.bundletool.model.ModuleEntry;
-import com.android.tools.build.bundletool.model.ModuleEntry.ModuleEntryBundleLocation;
+import com.android.tools.build.bundletool.model.ModuleEntry.ModuleEntryLocationInZipSource;
 import com.android.zipflinger.ZipMap;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
@@ -34,7 +34,7 @@ class ModuleEntriesPacker {
   private final Path outputZip;
   private final IdentityHashMap<ModuleEntry, String> entryNameByModuleEntry;
   private final Map<String, ByteSource> contentByEntryName;
-  private final Map<ModuleEntryBundleLocation, String> assignedEntryNameByBundleLocation;
+  private final Map<ModuleEntryLocationInZipSource, String> assignedEntryNameByBundleLocation;
 
   private final NameAssigner nameAssigner;
 
@@ -57,7 +57,7 @@ class ModuleEntriesPacker {
       return this;
     }
     String entryName =
-        entry.getBundleLocation().isPresent()
+        entry.getFileLocation().isPresent()
             ? assignedByBundleLocation(entry)
             : nameAssigner.nextName();
     entryNameByModuleEntry.put(entry, entryName);
@@ -84,7 +84,7 @@ class ModuleEntriesPacker {
 
   private String assignedByBundleLocation(ModuleEntry entry) {
     return assignedEntryNameByBundleLocation.computeIfAbsent(
-        entry.getBundleLocation().get(), (location) -> nameAssigner.nextName());
+        entry.getFileLocation().get(), (location) -> nameAssigner.nextName());
   }
 
   /** Helper class that allows to generate zip entry names. */

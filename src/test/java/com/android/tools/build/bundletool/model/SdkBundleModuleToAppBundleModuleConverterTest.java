@@ -19,12 +19,24 @@ import static com.android.tools.build.bundletool.model.AndroidManifest.DISTRIBUT
 import static com.android.tools.build.bundletool.model.AndroidManifest.SDK_SANDBOX_MIN_VERSION;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifest;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withMinSdkVersion;
+import static com.android.tools.build.bundletool.testing.ResourcesTableFactory.USER_PACKAGE_OFFSET;
+import static com.android.tools.build.bundletool.testing.ResourcesTableFactory.entry;
+import static com.android.tools.build.bundletool.testing.ResourcesTableFactory.pkg;
+import static com.android.tools.build.bundletool.testing.ResourcesTableFactory.resourceTable;
+import static com.android.tools.build.bundletool.testing.ResourcesTableFactory.type;
 import static com.google.common.truth.Truth.assertThat;
 import static com.google.common.truth.Truth8.assertThat;
+import static com.google.common.truth.extensions.proto.ProtoTruth.assertThat;
 
-import com.android.aapt.Resources.Package;
-import com.android.aapt.Resources.PackageId;
+import com.android.aapt.Resources.ConfigValue;
+import com.android.aapt.Resources.FileReference;
+import com.android.aapt.Resources.Item;
+import com.android.aapt.Resources.Reference;
 import com.android.aapt.Resources.ResourceTable;
+import com.android.aapt.Resources.Value;
+import com.android.aapt.Resources.XmlAttribute;
+import com.android.aapt.Resources.XmlElement;
+import com.android.aapt.Resources.XmlNode;
 import com.android.bundle.RuntimeEnabledSdkConfigProto.RuntimeEnabledSdk;
 import com.android.tools.build.bundletool.model.BundleModule.ModuleType;
 import com.android.tools.build.bundletool.testing.BundleModuleBuilder;
@@ -38,6 +50,7 @@ import org.junit.runners.JUnit4;
 public final class SdkBundleModuleToAppBundleModuleConverterTest {
 
   private static final String PACKAGE_NAME = "com.test.sdk";
+  private static final int NEW_PACKAGE_ID = 0x82;
 
   @Test
   public void convert_modifiesModuleName_modifiesManifest_setsIsSdkDependencyModule() {
@@ -51,8 +64,9 @@ public final class SdkBundleModuleToAppBundleModuleConverterTest {
             .build();
 
     BundleModule modifiedModule =
-        SdkBundleModuleToAppBundleModuleConverter.getAppBundleModule(
-            sdkBundle, RuntimeEnabledSdk.getDefaultInstance());
+        new SdkBundleModuleToAppBundleModuleConverter(
+                sdkBundle, RuntimeEnabledSdk.getDefaultInstance())
+            .convert();
 
     // Verify that module name was modified.
     assertThat(modifiedModule.getName()).isNotEqualTo(sdkBundle.getModule().getName());
@@ -75,30 +89,118 @@ public final class SdkBundleModuleToAppBundleModuleConverterTest {
 
   @Test
   public void convert_remapsResourceIdsInResourceTable() {
-    int originalResourcesPackageId = 1;
-    int newResourcesPackageId = 2;
     SdkBundle sdkBundle =
         new SdkBundleBuilder()
             .setModule(
                 new BundleModuleBuilder("base")
                     .setManifest(
                         androidManifest(PACKAGE_NAME, withMinSdkVersion(SDK_SANDBOX_MIN_VERSION)))
-                    .setResourceTable(
-                        ResourceTable.newBuilder()
-                            .addPackage(
-                                Package.newBuilder()
-                                    .setPackageId(
-                                        PackageId.newBuilder().setId(originalResourcesPackageId)))
-                            .build())
+                    .setResourceTable(resourceTable(pkg(USER_PACKAGE_OFFSET, PACKAGE_NAME)))
                     .build())
             .build();
 
     BundleModule modifiedModule =
-        SdkBundleModuleToAppBundleModuleConverter.getAppBundleModule(
-            sdkBundle,
-            RuntimeEnabledSdk.newBuilder().setResourcesPackageId(newResourcesPackageId).build());
+        new SdkBundleModuleToAppBundleModuleConverter(
+                sdkBundle,
+                RuntimeEnabledSdk.newBuilder().setResourcesPackageId(NEW_PACKAGE_ID).build())
+            .convert();
 
     assertThat(modifiedModule.getResourceTable().get().getPackage(0).getPackageId().getId())
-        .isEqualTo(newResourcesPackageId);
+        .isEqualTo(NEW_PACKAGE_ID);
+  }
+
+  @Test
+  public void convert_removesLastDexFile() {
+    SdkBundle sdkBundle =
+        new SdkBundleBuilder()
+            .setModule(
+                new BundleModuleBuilder("base")
+                    .setManifest(
+                        androidManifest(PACKAGE_NAME, withMinSdkVersion(SDK_SANDBOX_MIN_VERSION)))
+                    .addFile("dex/classes.dex")
+                    .addFile("dex/classes2.dex")
+                    .build())
+            .build();
+
+    BundleModule modifiedModule =
+        new SdkBundleModuleToAppBundleModuleConverter(
+                sdkBundle, RuntimeEnabledSdk.getDefaultInstance())
+            .convert();
+
+    assertThat(modifiedModule.getEntry(ZipPath.create("dex/classes.dex"))).isPresent();
+    assertThat(modifiedModule.getEntry(ZipPath.create("dex/classes2.dex"))).isEmpty();
+  }
+
+  @Test
+  public void convert_remapsResourceIdsInXmlResources() throws Exception {
+    String xmlResourcePath = "res/layout/main.xml";
+    ResourceTable resourceTable = resourceTableWithFileReferences(xmlResourcePath);
+    SdkBundle sdkBundle =
+        new SdkBundleBuilder()
+            .setModule(
+                new BundleModuleBuilder("base")
+                    .setManifest(
+                        androidManifest(PACKAGE_NAME, withMinSdkVersion(SDK_SANDBOX_MIN_VERSION)))
+                    .setResourceTable(resourceTable)
+                    .addFile(
+                        xmlResourcePath,
+                        xmlNodeWithResourceReference(USER_PACKAGE_OFFSET).toByteArray())
+                    .build())
+            .build();
+
+    BundleModule modifiedModule =
+        new SdkBundleModuleToAppBundleModuleConverter(
+                sdkBundle,
+                RuntimeEnabledSdk.newBuilder().setResourcesPackageId(NEW_PACKAGE_ID).build())
+            .convert();
+
+    assertThat(
+            XmlNode.parseFrom(
+                modifiedModule
+                    .getEntry(ZipPath.create(xmlResourcePath))
+                    .get()
+                    .getContent()
+                    .openStream()))
+        .isEqualTo(xmlNodeWithResourceReference(NEW_PACKAGE_ID));
+  }
+
+  private static ResourceTable resourceTableWithFileReferences(String path) {
+    return resourceTable(
+        pkg(
+            USER_PACKAGE_OFFSET,
+            "pkg",
+            type(
+                /* id= */ 1,
+                "type1",
+                entry(
+                    /* id= */ 1,
+                    "entry1",
+                    ConfigValue.newBuilder()
+                        .setValue(
+                            Value.newBuilder()
+                                .setItem(
+                                    Item.newBuilder()
+                                        .setFile(
+                                            FileReference.newBuilder()
+                                                .setType(FileReference.Type.PROTO_XML)
+                                                .setPath(path)
+                                                .build())))
+                        .build()))));
+  }
+
+  private static XmlNode xmlNodeWithResourceReference(int packageId) {
+    return XmlNode.newBuilder()
+        .setElement(
+            XmlElement.newBuilder()
+                .addAttribute(
+                    XmlAttribute.newBuilder()
+                        .setCompiledItem(Item.newBuilder().setRef(reference(packageId)))))
+        .build();
+  }
+
+  private static Reference reference(int packageId) {
+    int typeId = 1;
+    int entryId = 2;
+    return Reference.newBuilder().setId(0x1000000 * packageId + 0x10000 * typeId + entryId).build();
   }
 }

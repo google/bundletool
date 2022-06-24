@@ -404,7 +404,7 @@ public class ModuleSplitSerializer extends ApkSerializer {
 
     // Copying logic from aapt2: require at least 10% gains in savings.
     if (moduleEntry.getPath().startsWith("res")) {
-      return compressedSize + compressedSize / 10 > uncompressedSize;
+      return uncompressedSize == 0 || (compressedSize + compressedSize / 10 > uncompressedSize);
     }
     return compressedSize >= uncompressedSize;
   }

@@ -82,7 +82,7 @@ import org.junit.runners.JUnit4;
 @RunWith(JUnit4.class)
 public final class BuildApksPreprocessingTest {
 
-  private static final byte[] DUMMY_CONTENT = new byte[100];
+  private static final byte[] TEST_CONTENT = new byte[100];
 
   @Rule public final TemporaryFolder temporaryFolder = new TemporaryFolder();
 
@@ -277,8 +277,8 @@ public final class BuildApksPreprocessingTest {
                 "base",
                 module ->
                     module
-                        .addFile("dex/classes.dex", DUMMY_CONTENT)
-                        .addFile("assets/images/image.jpg", DUMMY_CONTENT)
+                        .addFile("dex/classes.dex", TEST_CONTENT)
+                        .addFile("assets/images/image.jpg", TEST_CONTENT)
                         .setManifest(
                             androidManifest(
                                 "com.test.app", withMinSdkVersion(15), withMaxSdkVersion(27)))
@@ -290,7 +290,7 @@ public final class BuildApksPreprocessingTest {
                         .setManifest(
                             androidManifestForAssetModule(
                                 "com.test.app", withInstallTimeDelivery()))
-                        .addFile("assets/textures/texture.etc", DUMMY_CONTENT))
+                        .addFile("assets/textures/texture.etc", TEST_CONTENT))
             .build();
     new AppBundleSerializer().writeToDisk(appBundle, bundlePath);
 

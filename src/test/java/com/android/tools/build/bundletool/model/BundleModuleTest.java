@@ -68,7 +68,7 @@ import org.junit.runners.JUnit4;
 public class BundleModuleTest {
 
   private static final BundleConfig DEFAULT_BUNDLE_CONFIG = BundleConfigBuilder.create().build();
-  private static final byte[] DUMMY_CONTENT = new byte[0];
+  private static final byte[] TEST_CONTENT = new byte[0];
 
   @Test
   public void missingAssetsProtoFile_returnsEmptyProto() {
@@ -284,9 +284,9 @@ public class BundleModuleTest {
   /** Tests that we skip directories that contain a directory that we want to find entries under. */
   @Test
   public void entriesUnderPath_withPrefixDirectory() throws Exception {
-    ModuleEntry entry1 = createModuleEntryForFile("dir1/entry1", DUMMY_CONTENT);
-    ModuleEntry entry2 = createModuleEntryForFile("dir1/entry2", DUMMY_CONTENT);
-    ModuleEntry entry3 = createModuleEntryForFile("dir1longer/entry3", DUMMY_CONTENT);
+    ModuleEntry entry1 = createModuleEntryForFile("dir1/entry1", TEST_CONTENT);
+    ModuleEntry entry2 = createModuleEntryForFile("dir1/entry2", TEST_CONTENT);
+    ModuleEntry entry3 = createModuleEntryForFile("dir1longer/entry3", TEST_CONTENT);
 
     BundleModule bundleModule =
         createMinimalModuleBuilder().addEntries(Arrays.asList(entry1, entry2, entry3)).build();
@@ -297,7 +297,7 @@ public class BundleModuleTest {
 
   @Test
   public void getEntry_existing_found() throws Exception {
-    ModuleEntry entry = createModuleEntryForFile("dir/entry", DUMMY_CONTENT);
+    ModuleEntry entry = createModuleEntryForFile("dir/entry", TEST_CONTENT);
 
     BundleModule bundleModule =
         createMinimalModuleBuilder().addEntries(Arrays.asList(entry)).build();
@@ -450,8 +450,8 @@ public class BundleModuleTest {
     BundleModule bundleModule =
         createMinimalModuleBuilder()
             .setAndroidManifestProto(androidManifest("com.test.app"))
-            .addEntry(createModuleEntryForFile("dex/classes.dex", DUMMY_CONTENT))
-            .addEntry(createModuleEntryForFile("res/raw/yuv2rgb.bc", DUMMY_CONTENT))
+            .addEntry(createModuleEntryForFile("dex/classes.dex", TEST_CONTENT))
+            .addEntry(createModuleEntryForFile("res/raw/yuv2rgb.bc", TEST_CONTENT))
             .build();
 
     assertThat(bundleModule.hasRenderscript32Bitcode()).isTrue();
@@ -462,7 +462,7 @@ public class BundleModuleTest {
     BundleModule bundleModule =
         createMinimalModuleBuilder()
             .setAndroidManifestProto(androidManifest("com.test.app"))
-            .addEntry(createModuleEntryForFile("dex/classes.dex", DUMMY_CONTENT))
+            .addEntry(createModuleEntryForFile("dex/classes.dex", TEST_CONTENT))
             .build();
 
     assertThat(bundleModule.hasRenderscript32Bitcode()).isFalse();

@@ -47,13 +47,12 @@ public abstract class ModuleEntry {
   public abstract ZipPath getPath();
 
   /**
-   * Location of the module entry in the App Bundle file, if the entry comes from an on-disk App
-   * Bundle.
+   * Location of the module entry in the on-disk file.
    *
    * <p>If the content of the entry was generated or modified by bundletool, then this method should
    * return an empty {@link Optional}.
    */
-  public abstract Optional<ModuleEntryBundleLocation> getBundleLocation();
+  public abstract Optional<ModuleEntryLocationInZipSource> getFileLocation();
 
   /** Returns whether entry should always be left uncompressed in generated archives. */
   public abstract boolean getForceUncompressed();
@@ -124,9 +123,9 @@ public abstract class ModuleEntry {
   public abstract static class Builder {
     public abstract Builder setPath(ZipPath path);
 
-    public abstract Builder setBundleLocation(Optional<ModuleEntryBundleLocation> location);
+    public abstract Builder setFileLocation(Optional<ModuleEntryLocationInZipSource> location);
 
-    public abstract Builder setBundleLocation(ModuleEntryBundleLocation location);
+    public abstract Builder setFileLocation(ModuleEntryLocationInZipSource location);
 
     public abstract Builder setForceUncompressed(boolean forcedUncompressed);
 
@@ -136,30 +135,31 @@ public abstract class ModuleEntry {
     public abstract Builder setContent(ByteSource content);
 
     public Builder setContent(Path path) {
-      setBundleLocation(Optional.empty());
+      setFileLocation(Optional.empty());
       return setContent(MoreFiles.asByteSource(path));
     }
 
     public Builder setContent(File file) {
-      setBundleLocation(Optional.empty());
+      setFileLocation(Optional.empty());
       return setContent(Files.asByteSource(file));
     }
 
     public abstract ModuleEntry build();
   }
 
-  /** Location of a module entry in an on-disk App Bundle. */
-  // TODO(b/185874979): Ideally this information should be encoded in the content of a ModuleEntry.
+  /** Location of a module entry in an on-disk file. */
   @AutoValue
-  public abstract static class ModuleEntryBundleLocation {
-    public static ModuleEntryBundleLocation create(Path pathToBundle, ZipPath entryPathInBundle) {
-      return new AutoValue_ModuleEntry_ModuleEntryBundleLocation(pathToBundle, entryPathInBundle);
+  public abstract static class ModuleEntryLocationInZipSource {
+    public static ModuleEntryLocationInZipSource create(
+        Path pathToBundle, ZipPath entryPathInBundle) {
+      return new AutoValue_ModuleEntry_ModuleEntryLocationInZipSource(
+          pathToBundle, entryPathInBundle);
     }
 
-    /** File path to the on-disk bundle. */
-    public abstract Path pathToBundle();
+    /** File path to the on-disk file. */
+    public abstract Path pathToFile();
 
-    /** Full path inside the bundle, including module name. */
-    public abstract ZipPath entryPathInBundle();
+    /** Full path inside the file, including module name. */
+    public abstract ZipPath entryPathInFile();
   }
 }

@@ -29,7 +29,7 @@ import com.android.tools.build.bundletool.model.BundleModule;
 import com.android.tools.build.bundletool.model.BundleModule.ModuleType;
 import com.android.tools.build.bundletool.model.BundleModuleName;
 import com.android.tools.build.bundletool.model.ModuleEntry;
-import com.android.tools.build.bundletool.model.ModuleEntry.ModuleEntryBundleLocation;
+import com.android.tools.build.bundletool.model.ModuleEntry.ModuleEntryLocationInZipSource;
 import com.android.tools.build.bundletool.model.ZipPath;
 import com.android.tools.build.bundletool.model.utils.xmlproto.XmlProtoNode;
 import com.android.tools.build.bundletool.model.utils.xmlproto.XmlProtoNodeBuilder;
@@ -87,7 +87,7 @@ public class BundleModuleBuilder {
         ModuleEntry.builder()
             .setContent(ByteSource.empty())
             .setPath(ZipPath.create(relativePath))
-            .setBundleLocation(ModuleEntryBundleLocation.create(zipFilePath, entryFullZipPath))
+            .setFileLocation(ModuleEntryLocationInZipSource.create(zipFilePath, entryFullZipPath))
             .build());
     return this;
   }
@@ -106,7 +106,7 @@ public class BundleModuleBuilder {
         ModuleEntry.builder()
             .setContent(ByteSource.wrap(content))
             .setPath(ZipPath.create(relativePath))
-            .setBundleLocation(ModuleEntryBundleLocation.create(zipFilePath, entryFullZipPath))
+            .setFileLocation(ModuleEntryLocationInZipSource.create(zipFilePath, entryFullZipPath))
             .build());
     return this;
   }

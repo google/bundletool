@@ -15,6 +15,8 @@
  */
 package com.android.tools.build.bundletool.model;
 
+import static com.android.tools.build.bundletool.model.ClassesDexEntriesMutator.R_PACKAGE_DEX_ENTRY_REMOVER;
+
 import com.android.bundle.RuntimeEnabledSdkConfigProto.RuntimeEnabledSdk;
 import com.android.tools.build.bundletool.model.BundleModule.ModuleType;
 
@@ -25,19 +27,48 @@ import com.android.tools.build.bundletool.model.BundleModule.ModuleType;
  */
 public final class SdkBundleModuleToAppBundleModuleConverter {
 
+  private final SdkBundle sdkBundle;
+  private final ResourceTablePackageIdRemapper resourceTablePackageIdRemapper;
+  private final XmlPackageIdRemapper xmlPackageIdRemapper;
+  private final ClassesDexEntriesMutator classesDexEntriesMutator;
+
+  public SdkBundleModuleToAppBundleModuleConverter(
+      SdkBundle sdkBundle, RuntimeEnabledSdk dependencyConfig) {
+    this.sdkBundle = sdkBundle;
+    this.resourceTablePackageIdRemapper =
+        new ResourceTablePackageIdRemapper(dependencyConfig.getResourcesPackageId());
+    this.xmlPackageIdRemapper = new XmlPackageIdRemapper(dependencyConfig.getResourcesPackageId());
+    this.classesDexEntriesMutator = new ClassesDexEntriesMutator();
+  }
+
   /**
    * Returns {@link SdkBundle#getModule()}, modified so that it can be added to an Android App
    * Bundle as a removable install-time module.
    */
-  public static BundleModule getAppBundleModule(
-      SdkBundle sdkBundle, RuntimeEnabledSdk dependencyConfig) {
+  public BundleModule convert() {
+    return convertNameTypeAndManifest(
+        removeRPackageDexFile(
+            remapResourceIdsInXmlResources(
+                remapResourceIdsInResourceTable(sdkBundle.getModule()))));
+  }
+
+  private BundleModule remapResourceIdsInResourceTable(BundleModule module) {
+    return resourceTablePackageIdRemapper.remap(module);
+  }
+
+  private BundleModule remapResourceIdsInXmlResources(BundleModule module) {
+    return xmlPackageIdRemapper.remap(module);
+  }
+
+  private BundleModule removeRPackageDexFile(BundleModule module) {
+    return classesDexEntriesMutator.applyMutation(module, R_PACKAGE_DEX_ENTRY_REMOVER);
+  }
+
+  private BundleModule convertNameTypeAndManifest(BundleModule module) {
     // We are using modified SDK package name as a new module name. Dots are removed because special
     // characters are not allowed in module names.
     String sdkModuleName = sdkBundle.getPackageName().replace(".", "");
-    BundleModule sdkModule =
-        ResourceIdRemapper.remapResourceIds(
-            sdkBundle.getModule(), dependencyConfig.getResourcesPackageId());
-    return sdkModule.toBuilder()
+    return module.toBuilder()
         .setName(BundleModuleName.create(sdkModuleName))
         .setModuleType(ModuleType.SDK_DEPENDENCY_MODULE)
         .setAndroidManifest(
@@ -51,6 +82,4 @@ public final class SdkBundleModuleToAppBundleModuleConverter {
                 .save())
         .build();
   }
-
-  private SdkBundleModuleToAppBundleModuleConverter() {}
 }

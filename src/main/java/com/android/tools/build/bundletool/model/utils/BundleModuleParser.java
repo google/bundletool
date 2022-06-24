@@ -26,8 +26,10 @@ import com.android.bundle.SdkModulesConfigOuterClass.SdkModulesConfig;
 import com.android.tools.build.bundletool.model.BundleModule;
 import com.android.tools.build.bundletool.model.BundleModuleName;
 import com.android.tools.build.bundletool.model.ModuleEntry;
+import com.android.tools.build.bundletool.model.ModuleEntry.ModuleEntryLocationInZipSource;
 import com.android.tools.build.bundletool.model.ZipPath;
 import com.android.tools.build.bundletool.model.version.Version;
+import java.nio.file.Paths;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 
@@ -67,6 +69,10 @@ public class BundleModuleParser {
                     .map(
                         zipEntry ->
                             ModuleEntry.builder()
+                                .setFileLocation(
+                                    ModuleEntryLocationInZipSource.create(
+                                        Paths.get(moduleZipFile.getName()),
+                                        ZipPath.create(zipEntry.getName())))
                                 .setPath(ZipPath.create(zipEntry.getName()))
                                 .setContent(ZipUtils.asByteSource(moduleZipFile, zipEntry))
                                 .build())

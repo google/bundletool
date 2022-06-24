@@ -97,7 +97,7 @@ import org.junit.runners.JUnit4;
 @RunWith(JUnit4.class)
 public class ModuleSplitTest {
 
-  private static final byte[] DUMMY_CONTENT = new byte[1];
+  private static final byte[] TEST_CONTENT = new byte[1];
 
   private static final int VERSION_CODE_RESOURCE_ID = 0x0101021b;
 
@@ -477,12 +477,12 @@ public class ModuleSplitTest {
     BundleModule module =
         new BundleModuleBuilder("testModule")
             .setManifest(androidManifest("com.test.app"))
-            .addFile("res/drawable/background.jpg", DUMMY_CONTENT)
+            .addFile("res/drawable/background.jpg", TEST_CONTENT)
             .build();
     AndroidManifest archivedManifest =
         AndroidManifest.create(
             androidManifest("com.test.app", ManifestProtoUtils.withVersionCode(123)));
-    Path archivedClassesDexFile = createTempClassesDexFile(DUMMY_CONTENT);
+    Path archivedClassesDexFile = createTempClassesDexFile(TEST_CONTENT);
 
     ModuleSplit split =
         ModuleSplit.forArchive(
@@ -500,7 +500,7 @@ public class ModuleSplitTest {
     BundleModule module =
         new BundleModuleBuilder("testModule")
             .setManifest(androidManifest("com.test.app"))
-            .addFile("res/drawable/icon.jpg", DUMMY_CONTENT)
+            .addFile("res/drawable/icon.jpg", TEST_CONTENT)
             .build();
     AndroidManifest archivedManifest =
         AndroidManifest.create(
@@ -510,7 +510,7 @@ public class ModuleSplitTest {
             .addPackage("com.test.app")
             .addDrawableResource("icon", "res/drawable/icon.jpg")
             .build();
-    Path archivedClassesDexFile = createTempClassesDexFile(DUMMY_CONTENT);
+    Path archivedClassesDexFile = createTempClassesDexFile(TEST_CONTENT);
 
     ModuleSplit split =
         ModuleSplit.forArchive(
@@ -526,8 +526,8 @@ public class ModuleSplitTest {
     BundleModule module =
         new BundleModuleBuilder("testModule")
             .setManifest(androidManifest("com.test.app"))
-            .addFile("res/drawable/icon.jpg", DUMMY_CONTENT)
-            .addFile("res/drawable/background.jpg", DUMMY_CONTENT)
+            .addFile("res/drawable/icon.jpg", TEST_CONTENT)
+            .addFile("res/drawable/background.jpg", TEST_CONTENT)
             .build();
     AndroidManifest archivedManifest =
         AndroidManifest.create(
@@ -537,7 +537,7 @@ public class ModuleSplitTest {
             .addPackage("com.test.app")
             .addDrawableResource("icon", "res/drawable/icon.jpg")
             .build();
-    Path archivedClassesDexFile = createTempClassesDexFile(DUMMY_CONTENT);
+    Path archivedClassesDexFile = createTempClassesDexFile(TEST_CONTENT);
 
     ModuleSplit split =
         ModuleSplit.forArchive(
@@ -553,7 +553,7 @@ public class ModuleSplitTest {
     BundleModule module =
         new BundleModuleBuilder("testModule")
             .setManifest(androidManifest("com.test.app"))
-            .addFile("dex/classes.dex", DUMMY_CONTENT)
+            .addFile("dex/classes.dex", TEST_CONTENT)
             .build();
     AndroidManifest archivedManifest =
         AndroidManifest.create(
@@ -643,7 +643,7 @@ public class ModuleSplitTest {
 
   private ImmutableList<ModuleEntry> fakeEntriesOf(String... entries) {
     return Arrays.stream(entries)
-        .map(entry -> createModuleEntryForFile(entry, DUMMY_CONTENT))
+        .map(entry -> createModuleEntryForFile(entry, TEST_CONTENT))
         .collect(toImmutableList());
   }
 

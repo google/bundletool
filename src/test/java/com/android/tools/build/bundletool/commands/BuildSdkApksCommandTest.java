@@ -88,7 +88,7 @@ public class BuildSdkApksCommandTest {
 
   @Rule public final TemporaryFolder tmp = new TemporaryFolder();
 
-  private static final byte[] DUMMY_CONTENT = new byte[1];
+  private static final byte[] TEST_CONTENT = new byte[1];
   private static final BundleConfig BUNDLE_CONFIG = BundleConfigBuilder.create().build();
 
   private static PrivateKey privateKey;
@@ -306,7 +306,7 @@ public class BuildSdkApksCommandTest {
         createZipBuilderForModules()
             .addFileWithProtoContent(
                 ZipPath.create("feature/manifest/AndroidManifest.xml"), createSdkAndroidManifest())
-            .addFileWithContent(ZipPath.create("feature/dex/classes.dex"), DUMMY_CONTENT);
+            .addFileWithContent(ZipPath.create("feature/dex/classes.dex"), TEST_CONTENT);
     createZipBuilderForSdkBundleWithModules(modules, modulesPath).writeTo(sdkBundlePath);
 
     BuildSdkApksCommand command =

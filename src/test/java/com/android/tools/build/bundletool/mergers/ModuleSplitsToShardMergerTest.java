@@ -110,7 +110,7 @@ import org.mockito.Mockito;
 @RunWith(JUnit4.class)
 public class ModuleSplitsToShardMergerTest {
 
-  private static final byte[] DUMMY_CONTENT = new byte[1];
+  private static final byte[] TEST_CONTENT = new byte[1];
   private static final String FEATURE_MODULE_NAME = "feature";
 
   private static final AndroidManifest DEFAULT_MANIFEST =
@@ -165,14 +165,14 @@ public class ModuleSplitsToShardMergerTest {
     ModuleSplit baseModuleSplit =
         createModuleSplitBuilder()
             .setEntries(
-                ImmutableList.of(createModuleEntryForFile("assets/some_asset.txt", DUMMY_CONTENT)))
+                ImmutableList.of(createModuleEntryForFile("assets/some_asset.txt", TEST_CONTENT)))
             .build();
     ModuleSplit featureModuleSplit =
         createModuleSplitBuilder()
             .setModuleName(BundleModuleName.create(FEATURE_MODULE_NAME))
             .setEntries(
                 ImmutableList.of(
-                    createModuleEntryForFile("assets/some_other_asset.txt", DUMMY_CONTENT)))
+                    createModuleEntryForFile("assets/some_other_asset.txt", TEST_CONTENT)))
             .build();
 
     ModuleSplit merged =
@@ -193,7 +193,7 @@ public class ModuleSplitsToShardMergerTest {
         createModuleSplitBuilder()
             .setEntries(
                 ImmutableList.of(
-                    createModuleEntryForFile("assets/some_assets/file.txt", DUMMY_CONTENT)))
+                    createModuleEntryForFile("assets/some_assets/file.txt", TEST_CONTENT)))
             .setAssetsConfig(
                 Assets.newBuilder()
                     .addDirectory(
@@ -205,7 +205,7 @@ public class ModuleSplitsToShardMergerTest {
             .setModuleName(BundleModuleName.create(FEATURE_MODULE_NAME))
             .setEntries(
                 ImmutableList.of(
-                    createModuleEntryForFile("assets/some_other_assets/file.txt", DUMMY_CONTENT)))
+                    createModuleEntryForFile("assets/some_other_assets/file.txt", TEST_CONTENT)))
             .setAssetsConfig(
                 Assets.newBuilder()
                     .addDirectory(
@@ -234,7 +234,7 @@ public class ModuleSplitsToShardMergerTest {
         createModuleSplitBuilder()
             .setEntries(
                 ImmutableList.of(
-                    createModuleEntryForFile("assets/some_assets/file.txt", DUMMY_CONTENT)))
+                    createModuleEntryForFile("assets/some_assets/file.txt", TEST_CONTENT)))
             .setAssetsConfig(
                 Assets.newBuilder()
                     .addDirectory(
@@ -249,8 +249,8 @@ public class ModuleSplitsToShardMergerTest {
             .setModuleName(BundleModuleName.create(FEATURE_MODULE_NAME))
             .setEntries(
                 ImmutableList.of(
-                    createModuleEntryForFile("assets/some_assets/file.txt", DUMMY_CONTENT),
-                    createModuleEntryForFile("assets/some_other_assets/file.txt", DUMMY_CONTENT)))
+                    createModuleEntryForFile("assets/some_assets/file.txt", TEST_CONTENT),
+                    createModuleEntryForFile("assets/some_other_assets/file.txt", TEST_CONTENT)))
             .setAssetsConfig(
                 Assets.newBuilder()
                     .addDirectory(
@@ -284,7 +284,7 @@ public class ModuleSplitsToShardMergerTest {
         createModuleSplitBuilder()
             .setEntries(
                 ImmutableList.of(
-                    createModuleEntryForFile("assets/some_assets/file.txt", DUMMY_CONTENT)))
+                    createModuleEntryForFile("assets/some_assets/file.txt", TEST_CONTENT)))
             .setAssetsConfig(
                 Assets.newBuilder()
                     .addDirectory(
@@ -298,7 +298,7 @@ public class ModuleSplitsToShardMergerTest {
         createModuleSplitBuilder()
             .setEntries(
                 ImmutableList.of(
-                    createModuleEntryForFile("assets/some_assets/file.txt", DUMMY_CONTENT)))
+                    createModuleEntryForFile("assets/some_assets/file.txt", TEST_CONTENT)))
             .setAssetsConfig(
                 Assets.newBuilder()
                     .addDirectory(
@@ -585,7 +585,7 @@ public class ModuleSplitsToShardMergerTest {
             .setResourceTable(
                 resourceTable(pkg(USER_PACKAGE_OFFSET, "com.test.app", drawablesType)))
             .setEntries(
-                ImmutableList.of(createModuleEntryForFile("res/drawable/image.jpg", DUMMY_CONTENT)))
+                ImmutableList.of(createModuleEntryForFile("res/drawable/image.jpg", TEST_CONTENT)))
             .build();
 
     ModuleSplit merged =

@@ -628,18 +628,6 @@ public abstract class AndroidManifest {
         .isPresent();
   }
 
-  public Optional<Boolean> getAllowBackup() {
-    return getApplicationAttributeAsBoolean(ALLOW_BACKUP_RESOURCE_ID);
-  }
-
-  public Optional<Boolean> getFullBackupOnly() {
-    return getApplicationAttributeAsBoolean(FULL_BACKUP_ONLY_RESOURCE_ID);
-  }
-
-  public boolean hasBackupAgent() {
-    return hasApplicationAttributeAsString(BACKUP_AGENT_RESOURCE_ID);
-  }
-
   /**
    * Extracts names of the fused modules.
    *
@@ -861,19 +849,18 @@ public abstract class AndroidManifest {
         .isPresent();
   }
 
-  private Optional<Boolean> getApplicationAttributeAsBoolean(int resourceId) {
+  private Optional<XmlProtoAttribute> getApplicationAttribute(int resourceId) {
     return getManifestElement()
         .getOptionalChildElement(APPLICATION_ELEMENT_NAME)
-        .flatMap(app -> app.getAndroidAttribute(resourceId))
-        .map(XmlProtoAttribute::getValueAsBoolean);
+        .flatMap(app -> app.getAndroidAttribute(resourceId));
   }
 
-  private boolean hasApplicationAttributeAsString(int resourceId) {
-    return getManifestElement()
-        .getOptionalChildElement(APPLICATION_ELEMENT_NAME)
-        .flatMap(app -> app.getAndroidAttribute(resourceId))
-        .map(XmlProtoAttribute::hasStringValue)
-        .orElse(false);
+  private Optional<Boolean> getApplicationAttributeAsBoolean(int resourceId) {
+    return getApplicationAttribute(resourceId).map(XmlProtoAttribute::getValueAsBoolean);
+  }
+
+  public boolean hasApplicationAttribute(int resourceId) {
+    return getApplicationAttribute(resourceId).isPresent();
   }
 
   public ImmutableList<XmlProtoElement> getSdkLibraryElements() {

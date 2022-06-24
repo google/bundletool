@@ -18,6 +18,7 @@ package com.android.tools.build.bundletool.device;
 
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.MoreCollectors.toOptional;
+import static java.util.stream.Collectors.partitioningBy;
 
 import com.android.bundle.Commands.ApkDescription;
 import com.android.bundle.Commands.BuildApksResult;
@@ -25,6 +26,7 @@ import com.android.bundle.Commands.Variant;
 import com.android.bundle.Devices.DeviceSpec;
 import com.android.bundle.Targeting.VariantTargeting;
 import com.google.common.collect.ImmutableList;
+import java.util.Map;
 import java.util.Optional;
 import java.util.function.Supplier;
 import java.util.stream.Stream;
@@ -75,10 +77,29 @@ public class VariantMatcher {
    * can match a full device-spec (generated from device-spec command).
    */
   public ImmutableList<Variant> getAllMatchingVariants(BuildApksResult buildApksResult) {
+    // Separate SDK runtime and non-sdk runtime variants.
+    Map<Boolean, ImmutableList<Variant>> partitionedVariants =
+        buildApksResult.getVariantList().stream()
+            .collect(
+                partitioningBy(
+                    variant ->
+                        variant.getTargeting().getSdkRuntimeTargeting().getRequiresSdkRuntime(),
+                    toImmutableList()));
+
+    // Currently, DeviceSpec does not specify whether it has SDK runtime support or not. Until it
+    // does, VariantMatcher will assume that all devices have it and try to match variants with SDK
+    // runtime targeting. If no SDK Runtime variant matches the device, we fall back to non-sdk
+    // runtime variants.
+    ImmutableList<Variant> matchingSdkRuntimeVariants =
+        getAllMatchingVariants(partitionedVariants.get(true));
+    return matchingSdkRuntimeVariants.isEmpty()
+        ? getAllMatchingVariants(partitionedVariants.get(false))
+        : matchingSdkRuntimeVariants;
+  }
+
+  private ImmutableList<Variant> getAllMatchingVariants(ImmutableList<Variant> variants) {
     Supplier<Stream<Variant>> variantsToMatch =
-        () ->
-            buildApksResult.getVariantList().stream()
-                .filter(variant -> isVariantInstant(variant) == matchInstant);
+        () -> variants.stream().filter(variant -> isVariantInstant(variant) == matchInstant);
 
     // Check if the device is compatible with the variants.
     variantsToMatch.get().forEach(this::checkCompatibleWithVariant);

@@ -35,7 +35,7 @@ import org.junit.runners.JUnit4;
 @RunWith(JUnit4.class)
 public class SdkBundleHasOneModuleValidatorTest {
 
-  private static final byte[] DUMMY_CONTENT = new byte[1];
+  private static final byte[] TEST_CONTENT = new byte[1];
 
   @Rule public TemporaryFolder tmp = new TemporaryFolder();
   private Path tempFolder;
@@ -50,7 +50,7 @@ public class SdkBundleHasOneModuleValidatorTest {
     Path modulesPath =
         createZipBuilderForModules()
             .addFileWithContent(
-                ZipPath.create("feature/manifest/AndroidManifest.xml"), DUMMY_CONTENT)
+                ZipPath.create("feature/manifest/AndroidManifest.xml"), TEST_CONTENT)
             .writeTo(tempFolder.resolve(EXTRACTED_SDK_MODULES_FILE_NAME));
 
     try (ZipFile modulesZip = new ZipFile(modulesPath.toFile())) {
