@@ -92,6 +92,7 @@ dependencies {
 }
 
 def osName = System.getProperty("os.name").toLowerCase()
+def archName = System.getProperty("os.arch").toLowerCase()
 
 // Use utf-8 instead of the platform default encoding.
 compileJava.options.encoding = "UTF-8"
@@ -121,7 +122,11 @@ test {
 
 protobuf {
     protoc {
-        artifact = "com.google.protobuf:protoc:3.4.0"
+        if (osName.contains("mac") && archName.contains("arch64")) {
+            artifact = "com.google.protobuf:protoc:3.4.0:osx-x86_64"
+        } else {
+            artifact = "com.google.protobuf:protoc:3.4.0"
+        }
     }
 }
 

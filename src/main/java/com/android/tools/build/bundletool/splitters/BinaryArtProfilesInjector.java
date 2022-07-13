@@ -43,7 +43,7 @@ public final class BinaryArtProfilesInjector {
   }
 
   public ModuleSplit inject(ModuleSplit split) {
-    if (!split.isMasterSplit() || !split.isBaseModuleSplit()) {
+    if (split.getSplitType() != ModuleSplit.SplitType.STANDALONE && (!split.isMasterSplit() || !split.isBaseModuleSplit())) {
       return split;
     }
     if (!binaryArtProfileMetadata.isPresent() && !binaryArtProfile.isPresent()) {
