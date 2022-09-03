@@ -29,9 +29,12 @@ import static com.google.common.truth.Truth.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.android.bundle.Files.Assets;
+import com.android.bundle.Targeting.Abi;
+import com.android.bundle.Targeting.Abi.AbiAlias;
 import com.android.bundle.Targeting.AbiTargeting;
 import com.android.bundle.Targeting.AssetsDirectoryTargeting;
 import com.android.bundle.Targeting.LanguageTargeting;
+import com.android.bundle.Targeting.TextureCompressionFormat;
 import com.android.bundle.Targeting.TextureCompressionFormat.TextureCompressionFormatAlias;
 import com.android.bundle.Targeting.TextureCompressionFormatTargeting;
 import com.android.tools.build.bundletool.model.BundleModule;
@@ -230,5 +233,108 @@ public class AssetsTargetingValidatorTest {
             () -> new AssetsTargetingValidator().validateModule(module));
 
     assertThat(e).hasMessageThat().contains("set but empty Texture Compression Format targeting");
+  }
+
+  @Test
+  public void conflictingValuesAndAlternatives_abi() {
+    Assets config =
+        assets(
+            targetedAssetsDirectory(
+                "assets/dir",
+                AssetsDirectoryTargeting.newBuilder()
+                    .setAbi(
+                        AbiTargeting.newBuilder()
+                            .addValue(Abi.newBuilder().setAlias(X86))
+                            .addAlternatives(Abi.newBuilder().setAlias(X86))
+                            .addAlternatives(Abi.newBuilder().setAlias(AbiAlias.ARM64_V8A)))
+                    .build()));
+    BundleModule module =
+        new BundleModuleBuilder("testModule")
+            .addFile("assets/dir/raw.dat")
+            .setAssetsConfig(config)
+            .setManifest(androidManifestForAssetModule("com.test.app"))
+            .build();
+
+    InvalidBundleException e =
+        assertThrows(
+            InvalidBundleException.class,
+            () -> new AssetsTargetingValidator().validateModule(module));
+
+    assertThat(e)
+        .hasMessageThat()
+        .contains(
+            "Expected targeting values and alternatives to be mutually exclusive, but directory"
+                + " 'assets/dir' has ABI targeting that contains [X86] in both.");
+  }
+
+  @Test
+  public void conflictingValuesAndAlternatives_language() {
+    Assets config =
+        assets(
+            targetedAssetsDirectory(
+                "assets/dir",
+                AssetsDirectoryTargeting.newBuilder()
+                    .setLanguage(
+                        LanguageTargeting.newBuilder()
+                            .addValue("en")
+                            .addAlternatives("en")
+                            .addAlternatives("es"))
+                    .build()));
+    BundleModule module =
+        new BundleModuleBuilder("testModule")
+            .addFile("assets/dir/raw.dat")
+            .setAssetsConfig(config)
+            .setManifest(androidManifestForAssetModule("com.test.app"))
+            .build();
+
+    InvalidBundleException e =
+        assertThrows(
+            InvalidBundleException.class,
+            () -> new AssetsTargetingValidator().validateModule(module));
+
+    assertThat(e)
+        .hasMessageThat()
+        .contains(
+            "Expected targeting values and alternatives to be mutually exclusive, but directory"
+                + " 'assets/dir' has language targeting that contains [en] in both.");
+  }
+
+  @Test
+  public void conflictingValuesAndAlternatives_textureCompressionFormat() {
+    Assets config =
+        assets(
+            targetedAssetsDirectory(
+                "assets/dir",
+                AssetsDirectoryTargeting.newBuilder()
+                    .setTextureCompressionFormat(
+                        TextureCompressionFormatTargeting.newBuilder()
+                            .addValue(
+                                TextureCompressionFormat.newBuilder()
+                                    .setAlias(TextureCompressionFormatAlias.ASTC))
+                            .addAlternatives(
+                                TextureCompressionFormat.newBuilder()
+                                    .setAlias(TextureCompressionFormatAlias.ASTC))
+                            .addAlternatives(
+                                TextureCompressionFormat.newBuilder()
+                                    .setAlias(TextureCompressionFormatAlias.ATC)))
+                    .build()));
+    BundleModule module =
+        new BundleModuleBuilder("testModule")
+            .addFile("assets/dir/raw.dat")
+            .setAssetsConfig(config)
+            .setManifest(androidManifestForAssetModule("com.test.app"))
+            .build();
+
+    InvalidBundleException e =
+        assertThrows(
+            InvalidBundleException.class,
+            () -> new AssetsTargetingValidator().validateModule(module));
+
+    assertThat(e)
+        .hasMessageThat()
+        .contains(
+            "Expected targeting values and alternatives to be mutually exclusive, but directory"
+                + " 'assets/dir' has texture compression format targeting that contains [ASTC] in"
+                + " both.");
   }
 }

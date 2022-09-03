@@ -16,6 +16,8 @@
 
 package com.android.tools.build.bundletool.archive;
 
+import static com.android.tools.build.bundletool.archive.ArchivedResourcesUtils.ARCHIVED_ICON_DRAWABLE_NAME;
+import static com.android.tools.build.bundletool.archive.ArchivedResourcesUtils.ARCHIVED_ROUND_ICON_DRAWABLE_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.ALLOW_BACKUP_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.ANDROID_NAMESPACE_URI;
 import static com.android.tools.build.bundletool.model.AndroidManifest.BACKUP_AGENT_RESOURCE_ID;
@@ -36,6 +38,7 @@ import com.android.tools.build.bundletool.model.utils.xmlproto.XmlProtoElementBu
 import com.android.tools.build.bundletool.model.utils.xmlproto.XmlProtoNode;
 import com.android.tools.build.bundletool.model.version.BundleToolVersion;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 
 /** Utility methods for creation of archived manifest. */
 public final class ArchivedAndroidManifestUtils {
@@ -67,6 +70,7 @@ public final class ArchivedAndroidManifestUtils {
           AndroidManifest.HAS_FRAGILE_USER_DATA_RESOURCE_ID,
           AndroidManifest.IS_GAME_RESOURCE_ID,
           AndroidManifest.ICON_RESOURCE_ID,
+          AndroidManifest.ROUND_ICON_RESOURCE_ID,
           AndroidManifest.BANNER_RESOURCE_ID,
           AndroidManifest.LABEL_RESOURCE_ID,
           AndroidManifest.FULL_BACKUP_ONLY_RESOURCE_ID,
@@ -131,6 +135,24 @@ public final class ArchivedAndroidManifestUtils {
         XmlProtoElementBuilder.create("manifest")
             .addNamespaceDeclaration("android", ANDROID_NAMESPACE_URI)
             .build());
+  }
+
+  public static AndroidManifest updateArchivedIcons(
+      AndroidManifest manifest, ImmutableMap<String, Integer> resourceNameToIdMap) {
+    ManifestEditor archivedManifestEditor = manifest.toEditor();
+
+    if (manifest.getIconAttribute().isPresent()
+        && resourceNameToIdMap.containsKey(ARCHIVED_ICON_DRAWABLE_NAME)) {
+      archivedManifestEditor.setIcon(resourceNameToIdMap.get(ARCHIVED_ICON_DRAWABLE_NAME));
+    }
+
+    if (manifest.getRoundIconAttribute().isPresent()
+        && resourceNameToIdMap.containsKey(ARCHIVED_ROUND_ICON_DRAWABLE_NAME)) {
+      archivedManifestEditor.setRoundIcon(
+          resourceNameToIdMap.get(ARCHIVED_ROUND_ICON_DRAWABLE_NAME));
+    }
+
+    return archivedManifestEditor.save();
   }
 
   private static Activity createReactivateActivity(AndroidManifest manifest) {

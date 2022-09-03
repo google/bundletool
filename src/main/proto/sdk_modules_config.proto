@@ -18,8 +18,14 @@ message SdkModulesConfig {
   // Version of the runtime-enabled SDK.
   RuntimeEnabledSdkVersion sdk_version = 3;
 
-  // The fully qualified name for the SDK provider entrypoint class.
+  // The fully qualified name for the platform SDK provider entrypoint class.
   string sdk_provider_class_name = 4;
+
+  // The fully qualified name for the compatibility SDK provider entrypoint
+  // class.
+  // Expected to be set for SDKs that support devices without the privacy
+  // sandbox.
+  string compat_sdk_provider_class_name = 5;
 }
 
 message RuntimeEnabledSdkVersion {

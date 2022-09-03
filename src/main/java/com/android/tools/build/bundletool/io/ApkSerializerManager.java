@@ -16,6 +16,7 @@
 package com.android.tools.build.bundletool.io;
 
 import static com.android.tools.build.bundletool.commands.BuildApksCommand.ApkBuildMode.SYSTEM;
+import static com.android.tools.build.bundletool.model.BundleModule.DEX_DIRECTORY;
 import static com.android.tools.build.bundletool.model.utils.CollectorUtils.groupingByDeterministic;
 import static com.android.tools.build.bundletool.model.utils.CollectorUtils.groupingBySortedKeys;
 import static com.google.common.base.Preconditions.checkArgument;
@@ -41,6 +42,7 @@ import com.android.bundle.Commands.LocalTestingInfo;
 import com.android.bundle.Commands.PermanentlyFusedModule;
 import com.android.bundle.Commands.SdkVersionInformation;
 import com.android.bundle.Commands.Variant;
+import com.android.bundle.Commands.VariantProperties;
 import com.android.bundle.Config.AssetModulesConfig;
 import com.android.bundle.Config.BundleConfig;
 import com.android.bundle.Config.Bundletool;
@@ -62,6 +64,7 @@ import com.android.tools.build.bundletool.model.BundleModuleName;
 import com.android.tools.build.bundletool.model.GeneratedApks;
 import com.android.tools.build.bundletool.model.GeneratedAssetSlices;
 import com.android.tools.build.bundletool.model.ManifestDeliveryElement;
+import com.android.tools.build.bundletool.model.ModuleEntry;
 import com.android.tools.build.bundletool.model.ModuleSplit;
 import com.android.tools.build.bundletool.model.ModuleSplit.SplitType;
 import com.android.tools.build.bundletool.model.OptimizationDimension;
@@ -262,7 +265,8 @@ public class ApkSerializerManager {
       Variant.Builder variant =
           Variant.newBuilder()
               .setVariantNumber(variantNumberByVariantKey.get(variantKey))
-              .setTargeting(variantKey.getVariantTargeting());
+              .setTargeting(variantKey.getVariantTargeting())
+              .setVariantProperties(getVariantProperties(finalSplitsByVariant.get(variantKey)));
 
       Multimap<BundleModuleName, ModuleSplit> splitsByModuleName =
           finalSplitsByVariant.get(variantKey).stream()
@@ -271,7 +275,14 @@ public class ApkSerializerManager {
       for (BundleModuleName moduleName : splitsByModuleName.keySet()) {
         variant.addApkSet(
             ApkSet.newBuilder()
-                .setModuleMetadata(bundle.getModule(moduleName).getModuleMetadata())
+                .setModuleMetadata(
+                    bundle
+                        .getModule(moduleName)
+                        .getModuleMetadata(
+                            variant
+                                .getTargeting()
+                                .getSdkRuntimeTargeting()
+                                .getRequiresSdkRuntime()))
                 .addAllApkDescription(
                     splitsByModuleName.get(moduleName).stream()
                         .map(split -> splitsByRelativePath.inverse().get(split))
@@ -320,6 +331,31 @@ public class ApkSerializerManager {
                     .addAllApkDescription(entry.getValue())
                     .build())
         .collect(toImmutableList());
+  }
+
+  private VariantProperties getVariantProperties(ImmutableList<ModuleSplit> modules) {
+    ImmutableList<ModuleEntry> nativeLibEntries =
+        modules.stream()
+            .filter(module -> module.getNativeConfig().isPresent())
+            .flatMap(
+                module ->
+                    module.getNativeConfig().get().getDirectoryList().stream()
+                        .flatMap(dir -> module.findEntriesUnderPath(dir.getPath())))
+            .collect(toImmutableList());
+    ImmutableList<ModuleEntry> dexEntries =
+        modules.stream()
+            .flatMap(module -> module.getEntries().stream())
+            .filter(entry -> entry.getPath().startsWith(DEX_DIRECTORY))
+            .collect(toImmutableList());
+    return VariantProperties.newBuilder()
+        .setUncompressedDex(
+            !dexEntries.isEmpty()
+                && dexEntries.stream().allMatch(ModuleEntry::getForceUncompressed))
+        .setUncompressedNativeLibraries(
+            !nativeLibEntries.isEmpty()
+                && nativeLibEntries.stream().allMatch(ModuleEntry::getForceUncompressed))
+        .setSparseEncoding(modules.stream().allMatch(ModuleSplit::getSparseEncoding))
+        .build();
   }
 
   private AssetModuleMetadata getAssetModuleMetadata(BundleModule module) {

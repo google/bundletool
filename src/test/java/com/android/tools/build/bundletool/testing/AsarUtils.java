@@ -18,6 +18,7 @@ package com.android.tools.build.bundletool.testing;
 
 import static com.android.tools.build.bundletool.model.BundleModule.MANIFEST_FILENAME;
 import static com.android.tools.build.bundletool.model.SdkAsar.SDK_METADATA_FILE_NAME;
+import static com.android.tools.build.bundletool.model.utils.BundleParser.SDK_INTERFACE_DESCRIPTORS_FILE_NAME;
 import static com.android.tools.build.bundletool.model.utils.BundleParser.SDK_MODULES_FILE_NAME;
 import static java.nio.charset.StandardCharsets.UTF_8;
 
@@ -47,6 +48,12 @@ public final class AsarUtils {
 
   public static byte[] extractSdkModuleData(ZipFile asarFile) throws Exception {
     ZipEntry moduleEntry = asarFile.getEntry(SDK_MODULES_FILE_NAME);
+    InputStream data = asarFile.getInputStream(moduleEntry);
+    return ByteStreams.toByteArray(data);
+  }
+
+  public static byte[] extractSdkInterfaceDescriptors(ZipFile asarFile) throws Exception {
+    ZipEntry moduleEntry = asarFile.getEntry(SDK_INTERFACE_DESCRIPTORS_FILE_NAME);
     InputStream data = asarFile.getInputStream(moduleEntry);
     return ByteStreams.toByteArray(data);
   }

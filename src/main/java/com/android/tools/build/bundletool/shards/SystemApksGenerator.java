@@ -37,6 +37,7 @@ import com.android.tools.build.bundletool.model.ModuleSplit.SplitType;
 import com.android.tools.build.bundletool.model.SuffixManager;
 import com.android.tools.build.bundletool.model.ZipPath;
 import com.android.tools.build.bundletool.optimizations.ApkOptimizations;
+import com.android.tools.build.bundletool.splitters.BinaryArtProfilesInjector;
 import com.android.tools.build.bundletool.splitters.CodeTransparencyInjector;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
@@ -56,6 +57,7 @@ public class SystemApksGenerator {
   private final ModuleSplitsToShardMerger shardsMerger;
   private final Optional<DeviceSpec> deviceSpec;
   private final CodeTransparencyInjector codeTransparencyInjector;
+  private final BinaryArtProfilesInjector binaryArtProfilesInjector;
 
   @Inject
   public SystemApksGenerator(
@@ -69,6 +71,7 @@ public class SystemApksGenerator {
     this.shardsMerger = shardsMerger;
     this.deviceSpec = deviceSpec;
     this.codeTransparencyInjector = new CodeTransparencyInjector(appBundle);
+    binaryArtProfilesInjector = new BinaryArtProfilesInjector(appBundle);
   }
 
   /**
@@ -98,6 +101,7 @@ public class SystemApksGenerator {
     return processSplitsOfSystemShard(systemShard, modulesToFuse).stream()
         .map(module -> applyUncompressedOptimizations(module, apkOptimizations))
         .map(codeTransparencyInjector::inject)
+        .map(binaryArtProfilesInjector::inject)
         .collect(toImmutableList());
   }
 

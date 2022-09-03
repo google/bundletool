@@ -128,8 +128,7 @@ public final class SdkVersionMatcher extends TargetingDimensionMatcher<SdkVersio
     if (!anyMatch) {
       throw IncompatibleDeviceException.builder()
           .withUserMessage(
-              "The app doesn't support SDK version of the device: (%d).",
-              getDeviceSpec().getSdkVersion())
+              "SDK version (%d) of the device is not supported.", getDeviceSpec().getSdkVersion())
           .build();
     }
   }

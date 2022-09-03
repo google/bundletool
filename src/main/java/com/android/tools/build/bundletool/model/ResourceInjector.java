@@ -20,6 +20,7 @@ import com.android.aapt.Resources;
 import com.android.aapt.Resources.ConfigValue;
 import com.android.aapt.Resources.Entry;
 import com.android.aapt.Resources.EntryId;
+import com.android.aapt.Resources.FileReference;
 import com.android.aapt.Resources.Item;
 import com.android.aapt.Resources.Package;
 import com.android.aapt.Resources.PackageId;
@@ -45,6 +46,7 @@ public class ResourceInjector {
 
   private static final int BASE_RESOURCE_TABLE_PACKAGE_ID = 0x7f;
   private static final String STRING_ENTRY_TYPE = "string";
+  private static final String DRAWABLE_ENTRY_TYPE = "drawable";
 
   private final ResourceTable.Builder resourceTable;
   private final String packageName;
@@ -76,6 +78,24 @@ public class ResourceInjector {
                                     .setStr(Resources.String.newBuilder().setValue(value)))))
             .build();
     return addResource(STRING_ENTRY_TYPE, resourceEntry);
+  }
+
+  public ResourceId addXmlDrawableResource(String drawableName, String fileReference) {
+    Entry drawableEntity =
+        Entry.newBuilder()
+            .setName(drawableName)
+            .addConfigValue(
+                ConfigValue.newBuilder()
+                    .setValue(
+                        Value.newBuilder()
+                            .setItem(
+                                Item.newBuilder()
+                                    .setFile(
+                                        FileReference.newBuilder()
+                                            .setPath(fileReference)
+                                            .setType(FileReference.Type.PROTO_XML)))))
+            .build();
+    return addResource(DRAWABLE_ENTRY_TYPE, drawableEntity);
   }
 
   public ResourceId addResource(String entryType, Entry entry) {

@@ -62,15 +62,17 @@ import com.google.common.base.Predicate;
 import com.google.common.base.Predicates;
 import com.google.common.collect.ImmutableCollection;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Multimap;
 import com.google.common.collect.Multimaps;
+import com.google.common.io.ByteSource;
+import com.google.errorprone.annotations.CanIgnoreReturnValue;
 import com.google.errorprone.annotations.CheckReturnValue;
 import com.google.errorprone.annotations.Immutable;
 import java.net.MalformedURLException;
 import java.net.URISyntaxException;
 import java.net.URL;
-import java.nio.file.Path;
 import java.util.List;
 import java.util.Optional;
 import java.util.StringJoiner;
@@ -376,6 +378,13 @@ public abstract class ModuleSplit {
     return toBuilder().setAndroidManifest(apkManifest).build();
   }
 
+  /** Writes the compatibility SDK provider class name to a new <property> element. */
+  public ModuleSplit writeCompatSdkProviderClassName(String sdkProviderClassName) {
+    AndroidManifest apkManifest =
+        getAndroidManifest().toEditor().setCompatSdkProviderClassName(sdkProviderClassName).save();
+    return toBuilder().setAndroidManifest(apkManifest).build();
+  }
+
   /**
    * Adds uses-sdk-library elements that correspond to the given {@link RuntimeEnabledSdk}s to the
    * manifest.
@@ -555,7 +564,7 @@ public abstract class ModuleSplit {
       BundleModule bundleModule,
       AndroidManifest archivedManifest,
       ResourceTable archivedResourceTable,
-      Path archivedClassesDexFile) {
+      ImmutableMap<ZipPath, ByteSource> additionalResourcesByByteSource) {
     ModuleSplit.Builder archivedSplit =
         ModuleSplit.builder()
             .setModuleName(bundleModule.getName())
@@ -567,11 +576,12 @@ public abstract class ModuleSplit {
     archivedSplit.setResourceTable(archivedResourceTable);
     archivedSplit.setEntries(
         filterResourceEntries(bundleModule.getEntries().asList(), archivedResourceTable));
-    archivedSplit.addEntry(
-        ModuleEntry.builder()
-            .setPath(DEX_DIRECTORY.resolve("classes.dex"))
-            .setContent(archivedClassesDexFile)
-            .build());
+
+    additionalResourcesByByteSource.forEach(
+        (destinationPath, fileContent) ->
+            archivedSplit.addEntry(
+                ModuleEntry.builder().setPath(destinationPath).setContent(fileContent).build()));
+
     return archivedSplit.build();
   }
 
@@ -714,6 +724,7 @@ public abstract class ModuleSplit {
 
     abstract ImmutableList.Builder<ModuleEntry> entriesBuilder();
 
+    @CanIgnoreReturnValue
     public Builder addEntry(ModuleEntry moduleEntry) {
       entriesBuilder().add(moduleEntry);
       return this;
@@ -725,6 +736,7 @@ public abstract class ModuleSplit {
 
     abstract ImmutableList.Builder<ManifestMutator> masterManifestMutatorsBuilder();
 
+    @CanIgnoreReturnValue
     public Builder addMasterManifestMutator(ManifestMutator manifestMutator) {
       masterManifestMutatorsBuilder().add(manifestMutator);
       return this;

@@ -36,6 +36,7 @@ import com.android.tools.build.bundletool.model.exceptions.InvalidBundleExceptio
 import com.android.tools.build.bundletool.model.version.Version;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
+import com.google.common.io.ByteSource;
 import com.google.errorprone.annotations.CheckReturnValue;
 import com.google.protobuf.InvalidProtocolBufferException;
 import java.io.IOException;
@@ -64,6 +65,8 @@ public class BundleParser {
   public static final String SDK_MODULES_CONFIG_FILE_NAME = "SdkModulesConfig.pb";
 
   public static final String SDK_BUNDLE_CONFIG_FILE_NAME = "SdkBundleConfig.pb";
+
+  public static final String SDK_INTERFACE_DESCRIPTORS_FILE_NAME = "sdk-interface-descriptors.jar";
 
   /**
    * File name of the zip that contains runtime enabled SDK modules. This zip is located in the top
@@ -255,6 +258,11 @@ public class BundleParser {
               metadata.addFile(metadataPath, ZipUtils.asByteSource(bundleFile, zipEntry));
             });
     return metadata.build();
+  }
+
+  public static Optional<ByteSource> readSdkInterfaceDescriptors(ZipFile bundleFile) {
+    ZipEntry entry = bundleFile.getEntry(SDK_INTERFACE_DESCRIPTORS_FILE_NAME);
+    return Optional.ofNullable(entry).map(value -> ZipUtils.asByteSource(bundleFile, value));
   }
 
   /**

@@ -16,16 +16,24 @@
 
 package com.android.tools.build.bundletool.validation;
 
+import static com.google.common.collect.ImmutableSet.toImmutableSet;
 import static com.google.common.collect.MoreCollectors.toOptional;
 
 import com.android.bundle.Config.BundleConfig;
+import com.android.bundle.Targeting.Abi;
+import com.android.bundle.Targeting.Abi.AbiAlias;
 import com.android.bundle.Targeting.AbiTargeting;
 import com.android.bundle.Targeting.LanguageTargeting;
+import com.android.bundle.Targeting.TextureCompressionFormat;
+import com.android.bundle.Targeting.TextureCompressionFormat.TextureCompressionFormatAlias;
 import com.android.bundle.Targeting.TextureCompressionFormatTargeting;
 import com.android.tools.build.bundletool.model.BundleModule;
 import com.android.tools.build.bundletool.model.ZipPath;
 import com.android.tools.build.bundletool.model.exceptions.InvalidBundleException;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.Sets;
+import com.google.common.collect.Sets.SetView;
 
 /** Misc bundle validation functions. */
 public final class BundleValidationUtils {
@@ -54,6 +62,58 @@ public final class BundleValidationUtils {
           .withUserMessage(
               "Directory '%s' has set but empty Texture Compression Format targeting.",
               directoryPath)
+          .build();
+    }
+  }
+
+  public static void checkValuesAndAlternativeHaveNoOverlap(
+      AbiTargeting targeting, String directoryPath) {
+    SetView<AbiAlias> intersection =
+        Sets.intersection(
+            targeting.getValueList().stream().map(Abi::getAlias).collect(toImmutableSet()),
+            targeting.getAlternativesList().stream().map(Abi::getAlias).collect(toImmutableSet()));
+    if (!intersection.isEmpty()) {
+      throw InvalidBundleException.builder()
+          .withUserMessage(
+              "Expected targeting values and alternatives to be mutually exclusive, but directory"
+                  + " '%s' has ABI targeting that contains %s in both.",
+              directoryPath, intersection)
+          .build();
+    }
+  }
+
+  public static void checkValuesAndAlternativeHaveNoOverlap(
+      LanguageTargeting targeting, String directoryPath) {
+    SetView<String> intersection =
+        Sets.intersection(
+            ImmutableSet.copyOf(targeting.getValueList()),
+            ImmutableSet.copyOf(targeting.getAlternativesList()));
+    if (!intersection.isEmpty()) {
+      throw InvalidBundleException.builder()
+          .withUserMessage(
+              "Expected targeting values and alternatives to be mutually exclusive, but directory"
+                  + " '%s' has language targeting that contains %s in both.",
+              directoryPath, intersection)
+          .build();
+    }
+  }
+
+  public static void checkValuesAndAlternativeHaveNoOverlap(
+      TextureCompressionFormatTargeting targeting, String directoryPath) {
+    SetView<TextureCompressionFormatAlias> intersection =
+        Sets.intersection(
+            targeting.getValueList().stream()
+                .map(TextureCompressionFormat::getAlias)
+                .collect(toImmutableSet()),
+            targeting.getAlternativesList().stream()
+                .map(TextureCompressionFormat::getAlias)
+                .collect(toImmutableSet()));
+    if (!intersection.isEmpty()) {
+      throw InvalidBundleException.builder()
+          .withUserMessage(
+              "Expected targeting values and alternatives to be mutually exclusive, but directory"
+                  + " '%s' has texture compression format targeting that contains %s in both.",
+              directoryPath, intersection)
           .build();
     }
   }

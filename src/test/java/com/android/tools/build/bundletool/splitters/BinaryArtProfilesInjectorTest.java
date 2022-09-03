@@ -84,6 +84,42 @@ public class BinaryArtProfilesInjectorTest {
   }
 
   @Test
+  public void standalone_artProfileInjected() {
+    AppBundle appBundle =
+        createAppBundleBuilder()
+            .addMetadataFile(
+                METADATA_NAMESPACE,
+                BINARY_ART_PROFILE_NAME,
+                ByteSource.wrap(BINARY_ART_PROFILE_CONTENT))
+            .addMetadataFile(
+                METADATA_NAMESPACE,
+                BINARY_ART_PROFILE_METADATA_NAME,
+                ByteSource.wrap(BINARY_ART_PROFILE_METADATA_CONTENT))
+            .build();
+
+    BinaryArtProfilesInjector injector = new BinaryArtProfilesInjector(appBundle);
+
+    ModuleSplit moduleSplit =
+        createModuleSplitBuilder()
+            .setSplitType(SplitType.STANDALONE)
+            .setModuleName(BundleModuleName.BASE_MODULE_NAME)
+            .setMasterSplit(false)
+            .addEntry(
+                ModuleEntry.builder()
+                    .setPath(ZipPath.create("some.bin"))
+                    .setContent(ByteSource.wrap(new byte[] {10, 9, 8}))
+                    .build())
+            .build();
+    ModuleSplit result = injector.inject(moduleSplit);
+
+    assertThat(getEntryContent(result, ZipPath.create("assets/dexopt/baseline.prof")))
+        .hasValue(BINARY_ART_PROFILE_CONTENT);
+    assertThat(getEntryContent(result, ZipPath.create("assets/dexopt/baseline.profm")))
+        .hasValue(BINARY_ART_PROFILE_METADATA_CONTENT);
+    assertThat(getEntryContent(result, ZipPath.create("some.bin"))).hasValue(new byte[] {10, 9, 8});
+  }
+
+  @Test
   public void mainSplitOfTheBaseModule_legacyNamespace_artProfileInjected() {
     AppBundle appBundle =
         createAppBundleBuilder()

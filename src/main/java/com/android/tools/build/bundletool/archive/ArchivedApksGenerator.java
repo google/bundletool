@@ -21,7 +21,7 @@ import static com.android.tools.build.bundletool.model.version.VersionGuardedFea
 import static com.google.common.base.Preconditions.checkNotNull;
 
 import com.android.aapt.Resources.ResourceTable;
-import com.android.tools.build.bundletool.io.TempDirectory;
+import com.android.tools.build.bundletool.commands.BuildApksModule.UpdateIconInArchiveMode;
 import com.android.tools.build.bundletool.model.AndroidManifest;
 import com.android.tools.build.bundletool.model.AppBundle;
 import com.android.tools.build.bundletool.model.BundleModule;
@@ -29,17 +29,17 @@ import com.android.tools.build.bundletool.model.ModuleSplit;
 import com.android.tools.build.bundletool.model.ResourceId;
 import com.android.tools.build.bundletool.model.ResourceInjector;
 import com.android.tools.build.bundletool.model.ResourceTableEntry;
+import com.android.tools.build.bundletool.model.ZipPath;
 import com.android.tools.build.bundletool.model.exceptions.InvalidCommandException;
 import com.android.tools.build.bundletool.model.utils.ResourcesUtils;
+import com.android.tools.build.bundletool.model.utils.xmlproto.XmlProtoAttribute;
 import com.android.tools.build.bundletool.model.version.BundleToolVersion;
 import com.android.tools.build.bundletool.model.version.Version;
 import com.android.tools.build.bundletool.splitters.ResourceAnalyzer;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
+import com.google.common.io.ByteSource;
 import java.io.IOException;
-import java.io.InputStream;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.StandardCopyOption;
 import java.util.Optional;
 import javax.inject.Inject;
 
@@ -48,17 +48,11 @@ import javax.inject.Inject;
  * resources and two custom actions to clear app cache and to wake up an app.
  */
 public final class ArchivedApksGenerator {
-  public static final String APP_STORE_PACKAGE_NAME_RESOURCE_NAME =
-      "reactivation_app_store_package_name";
-  public static final String PLAY_STORE_PACKAGE_NAME = "com.android.vending";
-
-  private static final String ARCHIVED_CLASSES_DEX_PATH = "dex/classes.dex";
-
-  private final TempDirectory globalTempDir;
+  private final boolean updateIconInArchiveMode;
 
   @Inject
-  ArchivedApksGenerator(TempDirectory globalTempDir) {
-    this.globalTempDir = globalTempDir;
+  ArchivedApksGenerator(@UpdateIconInArchiveMode boolean updateIconInArchiveMode) {
+    this.updateIconInArchiveMode = updateIconInArchiveMode;
   }
 
   public ModuleSplit generateArchivedApk(
@@ -70,12 +64,42 @@ public final class ArchivedApksGenerator {
     AndroidManifest archivedManifest =
         ArchivedAndroidManifestUtils.createArchivedManifest(baseModule.getAndroidManifest());
     ResourceTable archivedResourceTable =
-        getArchivedResourceTable(
-            appBundle, baseModule, archivedManifest, customAppStorePackageName);
-    Path archivedClassesDexFile = getArchivedClassesDexFile();
+        getArchivedResourceTable(appBundle, baseModule, archivedManifest);
+
+    Optional<XmlProtoAttribute> iconAttribute = archivedManifest.getIconAttribute();
+    Optional<XmlProtoAttribute> roundIconAttribute = archivedManifest.getRoundIconAttribute();
+    ResourceInjector resourceInjector =
+        new ResourceInjector(archivedResourceTable.toBuilder(), appBundle.getPackageName());
+
+    ImmutableMap<ZipPath, ByteSource> additionalResourcesByByteSource = ImmutableMap.of();
+    if (updateIconInArchiveMode) {
+      ImmutableMap<String, Integer> extraResourceNameToIdMap =
+          ArchivedResourcesUtils.injectExtraResources(
+              resourceInjector, customAppStorePackageName, iconAttribute, roundIconAttribute);
+
+      additionalResourcesByByteSource =
+          ArchivedResourcesUtils.buildAdditionalResourcesByByteSourceMap(
+              extraResourceNameToIdMap.get(ArchivedResourcesUtils.CLOUD_SYMBOL_DRAWABLE_NAME),
+              extraResourceNameToIdMap.get(ArchivedResourcesUtils.OPACITY_LAYER_DRAWABLE_NAME),
+              iconAttribute,
+              roundIconAttribute);
+
+      archivedManifest =
+          ArchivedAndroidManifestUtils.updateArchivedIcons(
+              archivedManifest, extraResourceNameToIdMap);
+    } else {
+      resourceInjector.addStringResource(
+          ArchivedResourcesUtils.APP_STORE_PACKAGE_NAME_RESOURCE_NAME,
+          ArchivedResourcesUtils.getAppStorePackageName(customAppStorePackageName));
+      additionalResourcesByByteSource =
+          ImmutableMap.of(
+              BundleModule.DEX_DIRECTORY.resolve("classes.dex"),
+              ArchivedResourcesUtils.getResourceByteSource(
+                  ArchivedResourcesUtils.ARCHIVED_CLASSES_DEX_PATH));
+    }
 
     return ModuleSplit.forArchive(
-        baseModule, archivedManifest, archivedResourceTable, archivedClassesDexFile);
+        baseModule, archivedManifest, resourceInjector.build(), additionalResourcesByByteSource);
   }
 
   private void validateRequest(AppBundle appBundle) {
@@ -110,15 +134,13 @@ public final class ArchivedApksGenerator {
   }
 
   private ResourceTable getArchivedResourceTable(
-      AppBundle appBundle,
-      BundleModule bundleModule,
-      AndroidManifest archivedManifest,
-      Optional<String> customAppStorePackageName)
+      AppBundle appBundle, BundleModule bundleModule, AndroidManifest archivedManifest)
       throws IOException {
     ResourceTable.Builder archivedResourceTable = ResourceTable.newBuilder();
     if (bundleModule.getResourceTable().isPresent()) {
-    ImmutableSet<ResourceId> referredResources =
-        new ResourceAnalyzer(appBundle).findAllAppResourcesReachableFromManifest(archivedManifest);
+      ImmutableSet<ResourceId> referredResources =
+          new ResourceAnalyzer(appBundle)
+              .findAllAppResourcesReachableFromManifest(archivedManifest);
       archivedResourceTable =
           ResourcesUtils.filterResourceTable(
               bundleModule.getResourceTable().get(),
@@ -127,26 +149,6 @@ public final class ArchivedApksGenerator {
               /* configValuesFilterFn= */ ResourceTableEntry::getEntry)
               .toBuilder();
     }
-    ResourceInjector resourceInjector =
-        new ResourceInjector(archivedResourceTable, appBundle.getPackageName());
-    resourceInjector.addStringResource(
-        APP_STORE_PACKAGE_NAME_RESOURCE_NAME, getAppStorePackageName(customAppStorePackageName));
-    return resourceInjector.build();
-  }
-
-  private static String getAppStorePackageName(Optional<String> customAppStorePackageName) {
-    return customAppStorePackageName.orElse(PLAY_STORE_PACKAGE_NAME);
-  }
-
-  private Path getArchivedClassesDexFile() throws IOException {
-    Path archivedDexFilePath = Files.createTempFile(globalTempDir.getPath(), "classes", ".dex");
-    try (InputStream inputStream = readArchivedClassesDexFile()) {
-      Files.copy(inputStream, archivedDexFilePath, StandardCopyOption.REPLACE_EXISTING);
-    }
-    return archivedDexFilePath;
-  }
-
-  private static InputStream readArchivedClassesDexFile() {
-    return ArchivedApksGenerator.class.getResourceAsStream(ARCHIVED_CLASSES_DEX_PATH);
+    return archivedResourceTable.build();
   }
 }

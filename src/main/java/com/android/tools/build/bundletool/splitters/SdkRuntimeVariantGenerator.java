@@ -15,7 +15,6 @@
  */
 package com.android.tools.build.bundletool.splitters;
 
-import static com.android.tools.build.bundletool.model.utils.TargetingProtoUtils.sdkRuntimeVariantTargeting;
 import static com.android.tools.build.bundletool.model.utils.TargetingProtoUtils.sdkVersionFrom;
 import static com.android.tools.build.bundletool.model.utils.Versions.ANDROID_T_API_VERSION;
 import static com.google.common.collect.ImmutableSet.toImmutableSet;
@@ -24,9 +23,9 @@ import com.android.bundle.Targeting.SdkVersion;
 import com.android.bundle.Targeting.SdkVersionTargeting;
 import com.android.bundle.Targeting.VariantTargeting;
 import com.android.tools.build.bundletool.model.AppBundle;
+import com.android.tools.build.bundletool.model.utils.TargetingProtoUtils;
 import com.android.tools.build.bundletool.model.utils.Versions;
 import com.google.common.collect.ImmutableSet;
-import com.google.common.collect.Sets;
 import com.google.common.collect.Streams;
 import java.util.stream.Stream;
 import javax.inject.Inject;
@@ -80,11 +79,7 @@ public final class SdkRuntimeVariantGenerator {
             .collect(toImmutableSet());
 
     return sdkVersions.stream()
-        .map(
-            sdkVersion ->
-                sdkRuntimeVariantTargeting(
-                    sdkVersion,
-                    Sets.difference(sdkVersions, ImmutableSet.of(sdkVersion)).immutableCopy()))
+        .map(TargetingProtoUtils::sdkRuntimeVariantTargeting)
         .collect(toImmutableSet());
   }
 }

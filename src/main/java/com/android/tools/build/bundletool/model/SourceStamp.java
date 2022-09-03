@@ -47,8 +47,10 @@ public abstract class SourceStamp {
    */
   public abstract String getSource();
 
+  public abstract boolean getIncludeTimestamp();
+
   public static Builder builder() {
-    return new AutoValue_SourceStamp.Builder().setSource(LOCAL_SOURCE);
+    return new AutoValue_SourceStamp.Builder().setSource(LOCAL_SOURCE).setIncludeTimestamp(true);
   }
 
   /** Builder of {@link SourceStamp} instances. */
@@ -57,6 +59,8 @@ public abstract class SourceStamp {
     public abstract Builder setSigningConfiguration(SigningConfiguration signingConfiguration);
 
     public abstract Builder setSource(String source);
+
+    public abstract Builder setIncludeTimestamp(boolean includeTimestamp);
 
     public abstract SourceStamp build();
   }

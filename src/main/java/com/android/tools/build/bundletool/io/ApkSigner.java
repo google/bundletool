@@ -22,13 +22,12 @@ import com.android.apksig.ApkSigner.SignerConfig;
 import com.android.apksig.apk.ApkFormatException;
 import com.android.bundle.Commands.SigningDescription;
 import com.android.tools.build.bundletool.commands.BuildApksModule.ApkSigningConfigProvider;
-import com.android.tools.build.bundletool.commands.BuildApksModule.StampSigningConfig;
 import com.android.tools.build.bundletool.model.ApksigSigningConfiguration;
 import com.android.tools.build.bundletool.model.ModuleEntry;
 import com.android.tools.build.bundletool.model.ModuleSplit;
-import com.android.tools.build.bundletool.model.SigningConfiguration;
 import com.android.tools.build.bundletool.model.SigningConfigurationProvider;
 import com.android.tools.build.bundletool.model.SigningConfigurationProvider.ApkDescription;
+import com.android.tools.build.bundletool.model.SourceStamp;
 import com.android.tools.build.bundletool.model.WearApkLocator;
 import com.android.tools.build.bundletool.model.ZipPath;
 import com.android.tools.build.bundletool.model.exceptions.CommandExecutionException;
@@ -52,13 +51,13 @@ class ApkSigner {
   private static final String SIGNER_CONFIG_NAME = "BNDLTOOL";
 
   private final Optional<SigningConfigurationProvider> signingConfigProvider;
-  private final Optional<SigningConfiguration> sourceStampSigningConfig;
+  private final Optional<SourceStamp> sourceStampSigningConfig;
   private final TempDirectory tempDirectory;
 
   @Inject
   ApkSigner(
       @ApkSigningConfigProvider Optional<SigningConfigurationProvider> signingConfigProvider,
-      @StampSigningConfig Optional<SigningConfiguration> sourceStampSigningConfig,
+      Optional<SourceStamp> sourceStampSigningConfig,
       TempDirectory tempDirectory) {
     this.signingConfigProvider = signingConfigProvider;
     this.sourceStampSigningConfig = sourceStampSigningConfig;
@@ -92,10 +91,12 @@ class ApkSigner {
           .ifPresent(apkSigner::setSigningCertificateLineage);
 
 
-      sourceStampSigningConfig
-          .map(SigningConfiguration::getSignerConfig)
-          .map(ApkSigner::convertToApksigSignerConfig)
-          .ifPresent(apkSigner::setSourceStampSignerConfig);
+      sourceStampSigningConfig.ifPresent(
+          stampConfig -> {
+            apkSigner.setSourceStampSignerConfig(
+                convertToApksigSignerConfig(
+                    stampConfig.getSigningConfiguration().getSignerConfig()));
+          });
       apkSigner.build().sign();
       Files.move(signedApkPath, apkPath, REPLACE_EXISTING);
       return Optional.of(signingDescription(signingConfig));

@@ -19,10 +19,12 @@ package com.android.tools.build.bundletool.device;
 import static com.android.tools.build.bundletool.device.LocalTestingPathResolver.resolveLocalTestingPath;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.collect.ImmutableList.toImmutableList;
+import static com.google.common.collect.ImmutableSet.toImmutableSet;
 import static java.util.Arrays.stream;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static java.util.concurrent.TimeUnit.MINUTES;
 
+import com.android.bundle.Devices.InstalledSdk;
 import com.android.ddmlib.AdbCommandRejectedException;
 import com.android.ddmlib.DdmPreferences;
 import com.android.ddmlib.IDevice;
@@ -35,7 +37,9 @@ import com.android.ddmlib.SyncException;
 import com.android.ddmlib.TimeoutException;
 import com.android.sdklib.AndroidVersion;
 import com.android.tools.build.bundletool.model.exceptions.CommandExecutionException;
+import com.google.common.base.Splitter;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.primitives.Ints;
 import com.google.errorprone.annotations.FormatMethod;
@@ -58,6 +62,8 @@ public class DdmlibDevice extends Device {
   private static final int ADB_TIMEOUT_MS = 60000;
   private static final String DEVICE_FEATURES_COMMAND = "pm list features";
   private static final String GL_EXTENSIONS_COMMAND = "dumpsys SurfaceFlinger";
+  private static final String RUNTIME_ENABLED_SDKS_COMMAND = "pm list sdks";
+  private static final String SDK_PREFIX = "sdk:";
 
   private final DeviceFeaturesParser deviceFeaturesParser = new DeviceFeaturesParser();
   private final GlExtensionsParser glExtensionsParser = new GlExtensionsParser();
@@ -146,6 +152,13 @@ public class DdmlibDevice extends Device {
   public ImmutableList<String> getGlExtensions() {
     return glExtensionsParser.parse(
         new AdbShellCommandTask(this, GL_EXTENSIONS_COMMAND).execute(ADB_TIMEOUT_MS, MILLISECONDS));
+  }
+
+  @Override
+  public ImmutableSet<InstalledSdk> getRuntimeEnabledSdks() {
+    return parseRuntimeEnabledSdks(
+        new AdbShellCommandTask(this, RUNTIME_ENABLED_SDKS_COMMAND)
+            .execute(ADB_TIMEOUT_MS, MILLISECONDS));
   }
 
   @Override
@@ -379,5 +392,29 @@ public class DdmlibDevice extends Device {
       sb.append(part);
     }
     return sb.toString();
+  }
+
+  private static ImmutableSet<InstalledSdk> parseRuntimeEnabledSdks(
+      ImmutableList<String> listSdksOutput) {
+    return listSdksOutput.stream()
+        .filter(line -> line.startsWith(SDK_PREFIX))
+        .map(
+            sdk -> {
+              ImmutableList<String> sdkDetails =
+                  ImmutableList.copyOf(Splitter.on(":").splitToList(sdk));
+              if (sdkDetails.size() != 3) {
+                throw CommandExecutionException.builder()
+                    .withInternalMessage(
+                        "Pacakge manager should list SDKs as 'sdk:PACKAGE_NAME:VERSION_MAJOR',"
+                            + " found '%s'",
+                        sdk)
+                    .build();
+              }
+              return InstalledSdk.newBuilder()
+                  .setPackageName(sdkDetails.get(1))
+                  .setVersionMajor(Integer.parseInt(sdkDetails.get(2)))
+                  .build();
+            })
+        .collect(toImmutableSet());
   }
 }

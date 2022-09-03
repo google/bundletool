@@ -87,7 +87,7 @@ public abstract class BuildSdkAsarCommand {
      */
     public abstract Builder setOverwriteOutput(boolean overwriteOutput);
 
-    abstract BuildSdkAsarCommand build();
+    public abstract BuildSdkAsarCommand build();
   }
 
   public static BuildSdkAsarCommand fromFlags(ParsedFlags flags) {

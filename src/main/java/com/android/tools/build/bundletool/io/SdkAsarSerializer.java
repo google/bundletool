@@ -18,6 +18,7 @@ package com.android.tools.build.bundletool.io;
 
 import static com.android.tools.build.bundletool.model.BundleModule.MANIFEST_FILENAME;
 import static com.android.tools.build.bundletool.model.SdkAsar.SDK_METADATA_FILE_NAME;
+import static com.android.tools.build.bundletool.model.utils.BundleParser.SDK_INTERFACE_DESCRIPTORS_FILE_NAME;
 import static com.android.tools.build.bundletool.model.utils.BundleParser.SDK_MODULES_FILE_NAME;
 import static java.nio.charset.StandardCharsets.UTF_8;
 
@@ -41,6 +42,11 @@ public class SdkAsarSerializer {
     zipBuilder.addFileFromDisk(ZipPath.create(SDK_MODULES_FILE_NAME), asar.getModulesFile());
     zipBuilder.addFileWithProtoContent(
         ZipPath.create(SDK_METADATA_FILE_NAME), asar.getSdkMetadata());
+    asar.getSdkInterfaceDescriptors()
+        .ifPresent(
+            apiDescriptors ->
+                zipBuilder.addFile(
+                    ZipPath.create(SDK_INTERFACE_DESCRIPTORS_FILE_NAME), apiDescriptors));
 
     zipBuilder.writeTo(pathOnDisk);
   }

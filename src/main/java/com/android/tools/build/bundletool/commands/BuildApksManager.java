@@ -325,6 +325,8 @@ public final class BuildApksManager {
         apkOptimizations.getUncompressNativeLibraries());
     apkGenerationConfiguration.setEnableDexCompressionSplitter(
         apkOptimizations.getUncompressDexFiles());
+    apkGenerationConfiguration.setDexCompressionSplitterForTargetSdk(
+        apkOptimizations.getUncompressedDexTargetSdk());
     apkGenerationConfiguration.setEnableSparseEncodingVariant(
         bundleConfig
             .getOptimizations()

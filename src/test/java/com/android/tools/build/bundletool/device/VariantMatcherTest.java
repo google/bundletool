@@ -31,6 +31,7 @@ import static com.android.tools.build.bundletool.testing.DeviceFactory.abis;
 import static com.android.tools.build.bundletool.testing.DeviceFactory.density;
 import static com.android.tools.build.bundletool.testing.DeviceFactory.locales;
 import static com.android.tools.build.bundletool.testing.DeviceFactory.mergeSpecs;
+import static com.android.tools.build.bundletool.testing.DeviceFactory.sdkRuntimeSupported;
 import static com.android.tools.build.bundletool.testing.DeviceFactory.sdkVersion;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.apkAbiTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.apkDensityTargeting;
@@ -278,7 +279,7 @@ public class VariantMatcherTest {
                 splitApkDescription(ApkTargeting.getDefaultInstance(), mainApk)));
     Variant nonSdkRuntimeVariant =
         createVariant(
-            variantSdkTargeting(Versions.ANDROID_T_API_VERSION),
+            variantSdkTargeting(Versions.ANDROID_L_API_VERSION),
             splitApkSet(
                 /* moduleName= */ "base",
                 splitApkDescription(ApkTargeting.getDefaultInstance(), mainApk)));
@@ -286,17 +287,45 @@ public class VariantMatcherTest {
         BuildApksResult.newBuilder()
             .addAllVariant(ImmutableList.of(sdkRuntimeVariant, nonSdkRuntimeVariant))
             .build();
-    DeviceSpec postLDevice = sdkVersion(Versions.ANDROID_T_API_VERSION);
-    VariantMatcher variantMatcher = new VariantMatcher(postLDevice);
+    DeviceSpec deviceWithSdkRuntime =
+        mergeSpecs(
+            sdkVersion(Versions.ANDROID_T_API_VERSION), sdkRuntimeSupported(/* supported= */ true));
+    VariantMatcher variantMatcher = new VariantMatcher(deviceWithSdkRuntime);
 
     assertThat(variantMatcher.getMatchingVariant(buildApksResult)).hasValue(sdkRuntimeVariant);
+  }
+
+  @Test
+  public void getMatchingVariant_androidLDeviceWithSdkRuntimeVariant_noSdkRuntimeReturned() {
+    ZipPath mainApk = ZipPath.create("main.apk");
+    Variant sdkRuntimeVariant =
+        createVariant(
+            sdkRuntimeVariantTargeting(Versions.ANDROID_T_API_VERSION),
+            splitApkSet(
+                /* moduleName= */ "base",
+                splitApkDescription(ApkTargeting.getDefaultInstance(), mainApk)));
+    Variant nonSdkRuntimeVariant =
+        createVariant(
+            variantSdkTargeting(Versions.ANDROID_L_API_VERSION),
+            splitApkSet(
+                /* moduleName= */ "base",
+                splitApkDescription(ApkTargeting.getDefaultInstance(), mainApk)));
+    BuildApksResult buildApksResult =
+        BuildApksResult.newBuilder()
+            .addAllVariant(ImmutableList.of(sdkRuntimeVariant, nonSdkRuntimeVariant))
+            .build();
+    DeviceSpec deviceWithoutSdkRuntime = mergeSpecs(sdkVersion(Versions.ANDROID_L_API_VERSION));
+    VariantMatcher variantMatcher = new VariantMatcher(deviceWithoutSdkRuntime);
+
+    assertThat(variantMatcher.getMatchingVariant(buildApksResult)).hasValue(nonSdkRuntimeVariant);
   }
 
   @Test
   public void getMatchingVariant_differentSdkVersionSameSdkRuntime_bestSdkVersionMatched() {
     ZipPath mainApk = ZipPath.create("main.apk");
     int androidU = Versions.ANDROID_T_API_VERSION + 1;
-    DeviceSpec androidUDevice = sdkVersion(androidU);
+    DeviceSpec androidUDevice =
+        mergeSpecs(sdkVersion(androidU), sdkRuntimeSupported(/* supported= */ true));
     Variant sdkRuntimeVariantWithNonOptimalAndroidVersion =
         createVariant(
             sdkRuntimeVariantTargeting(

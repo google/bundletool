@@ -22,6 +22,7 @@ import static com.android.tools.build.bundletool.model.utils.files.FilePrecondit
 import static com.android.tools.build.bundletool.model.utils.files.FilePreconditions.checkFileExistsAndReadable;
 import static com.android.tools.build.bundletool.model.utils.files.FilePreconditions.checkFileHasExtension;
 import static com.google.common.collect.ImmutableList.toImmutableList;
+import static com.google.common.io.Files.asByteSource;
 
 import com.android.bundle.Config.Bundletool;
 import com.android.bundle.Files.Assets;
@@ -76,6 +77,8 @@ public abstract class BuildSdkBundleCommand {
   private static final Flag<Path> SDK_BUNDLE_CONFIG_FLAG = Flag.path("sdk-bundle-config");
   private static final Flag<Path> SDK_MODULES_CONFIG_FLAG = Flag.path("sdk-modules-config");
   private static final Flag<ImmutableList<Path>> MODULES_FLAG = Flag.pathList("modules");
+  private static final Flag<Path> SDK_INTERFACE_DESCRIPTORS_FLAG =
+      Flag.path("sdk-interface-descriptors");
   private static final Flag<ImmutableMap<ZipPath, Path>> METADATA_FILES_FLAG =
       Flag.mapCollector("metadata-file", ZipPath.class, Path.class);
 
@@ -88,6 +91,8 @@ public abstract class BuildSdkBundleCommand {
   public abstract Optional<SdkBundleConfig> getSdkBundleConfig();
 
   public abstract SdkModulesConfig getSdkModulesConfig();
+
+  public abstract Optional<Path> getSdkInterfaceDescriptors();
 
   public abstract BundleMetadata getBundleMetadata();
 
@@ -126,6 +131,8 @@ public abstract class BuildSdkBundleCommand {
       return setSdkModulesConfig(parseSdkModulesConfigJson(sdkModulesConfigFile));
     }
 
+    public abstract Builder setSdkInterfaceDescriptors(Path sdkInterfaceDescriptors);
+
     abstract BundleMetadata.Builder bundleMetadataBuilder();
 
     /**
@@ -152,8 +159,7 @@ public abstract class BuildSdkBundleCommand {
             .withInternalMessage("Metadata file '%s' does not exist.", file)
             .build();
       }
-      bundleMetadataBuilder()
-          .addFile(metadataPath, com.google.common.io.Files.asByteSource(file.toFile()));
+      bundleMetadataBuilder().addFile(metadataPath, asByteSource(file.toFile()));
     }
 
     public abstract BuildSdkBundleCommand build();
@@ -169,6 +175,7 @@ public abstract class BuildSdkBundleCommand {
     // Optional flags.
     OVERWRITE_OUTPUT_FLAG.getValue(flags).ifPresent(builder::setOverwriteOutput);
     SDK_BUNDLE_CONFIG_FLAG.getValue(flags).ifPresent(builder::setSdkBundleConfig);
+    SDK_INTERFACE_DESCRIPTORS_FLAG.getValue(flags).ifPresent(builder::setSdkInterfaceDescriptors);
     METADATA_FILES_FLAG
         .getValue(flags)
         .ifPresent(metadataFiles -> metadataFiles.forEach(builder::addMetadataFileInternal));
@@ -223,13 +230,18 @@ public abstract class BuildSdkBundleCommand {
 
       BundleModule baseModule = parseModuleTargeting(Iterables.getOnlyElement(modules));
 
-      SdkBundle sdkBundle =
+      SdkBundle.Builder sdkBundleBuilder =
           SdkBundle.builder()
               .setModule(baseModule)
               .setSdkModulesConfig(sdkModulesConfig)
               .setSdkBundleConfig(sdkBundleConfig)
-              .setBundleMetadata(getBundleMetadata())
-              .build();
+              .setBundleMetadata(getBundleMetadata());
+
+      getSdkInterfaceDescriptors()
+          .map(descriptorPath -> asByteSource(descriptorPath.toFile()))
+          .ifPresent(sdkBundleBuilder::setSdkInterfaceDescriptors);
+
+      SdkBundle sdkBundle = sdkBundleBuilder.build();
 
       SdkBundleValidator.create().validate(sdkBundle);
 
@@ -254,6 +266,12 @@ public abstract class BuildSdkBundleCommand {
         .forEach(
             path -> {
               checkFileHasExtension("File", path, ".zip");
+              checkFileExistsAndReadable(path);
+            });
+    getSdkInterfaceDescriptors()
+        .ifPresent(
+            path -> {
+              checkFileHasExtension("SDK interface descriptors", path, ".jar");
               checkFileExistsAndReadable(path);
             });
     if (!getOverwriteOutput()) {
@@ -312,7 +330,7 @@ public abstract class BuildSdkBundleCommand {
         .setCommandDescription(
             CommandDescription.builder()
                 .setShortDescription(
-                    "Builds an Android App Bundle from a set of Bundle modules provided as zip "
+                    "Builds an Android SDK Bundle from a set of Bundle modules provided as zip "
                         + "files.")
                 .addAdditionalParagraph(
                     "Note that the resource table, the AndroidManifest.xml and the resources must "
@@ -321,8 +339,8 @@ public abstract class BuildSdkBundleCommand {
         .addFlag(
             FlagDescription.builder()
                 .setFlagName(OUTPUT_FLAG.getName())
-                .setExampleValue("bundle.aab")
-                .setDescription("Path to the where the Android App Bundle should be built.")
+                .setExampleValue("bundle.asb")
+                .setDescription("Path to the where the Android SDK Bundle should be built.")
                 .build())
         .addFlag(
             FlagDescription.builder()
@@ -335,7 +353,7 @@ public abstract class BuildSdkBundleCommand {
                 .setFlagName(MODULES_FLAG.getName())
                 .setExampleValue("path/to/module1.zip,path/to/module2.zip,...")
                 .setDescription(
-                    "The list of module files to build the final Android App Bundle from.")
+                    "The list of module files to build the final Android SDK Bundle from.")
                 .build())
         .addFlag(
             FlagDescription.builder()
@@ -355,12 +373,19 @@ public abstract class BuildSdkBundleCommand {
                 .build())
         .addFlag(
             FlagDescription.builder()
+                .setFlagName(SDK_INTERFACE_DESCRIPTORS_FLAG.getName())
+                .setExampleValue("path/to/sdk_api_descriptors.jar")
+                .setDescription("The packaged public API stubs of this SDK.")
+                .setOptional(true)
+                .build())
+        .addFlag(
+            FlagDescription.builder()
                 .setFlagName(METADATA_FILES_FLAG.getName())
                 .setExampleValue("com.some.namespace/file-name:path/to/file")
                 .setDescription(
-                    "Specifies a file that will be included as metadata in the Android App Bundle. "
+                    "Specifies a file that will be included as metadata in the Android SDK Bundle. "
                         + "The format of the flag value is '<bundle-path>:<physical-file>' where "
-                        + "'bundle-path' denotes the file location inside the App Bundle's "
+                        + "'bundle-path' denotes the file location inside the SDK Bundle's "
                         + "metadata directory, and 'physical-file' is an existing file containing "
                         + "the raw data to be stored. The flag can be repeated.")
                 .setOptional(true)

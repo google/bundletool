@@ -18,6 +18,7 @@ package com.android.tools.build.bundletool.androidtools;
 import static com.google.common.truth.Truth.assertThat;
 
 import com.android.tools.build.bundletool.androidtools.AdbCommand.DefaultAdbCommand;
+import com.android.tools.build.bundletool.model.utils.OsPlatform;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableListMultimap;
 import java.nio.file.Paths;
@@ -30,6 +31,8 @@ import org.junit.runners.JUnit4;
 @RunWith(JUnit4.class)
 public class AdbCommandTest {
   private static final String DEVICE_ID = "device_id";
+  private static final String SPLIT_CHARACTER =
+      (OsPlatform.getCurrentPlatform() == OsPlatform.WINDOWS) ? ";" : ":";
 
   @Test
   public void installMultiPackage_withDevice_withRollback() {
@@ -50,7 +53,7 @@ public class AdbCommandTest {
                     DEVICE_ID,
                     "install-multi-package",
                     "--enable-rollback",
-                    "foo1.apk:foo2.apk",
+                    "foo1.apk" + SPLIT_CHARACTER + "foo2.apk",
                     "bar.apex")));
   }
 
@@ -73,7 +76,7 @@ public class AdbCommandTest {
                     DEVICE_ID,
                     "install-multi-package",
                     "--staged",
-                    "foo1.apk:foo2.apk",
+                    "foo1.apk" + SPLIT_CHARACTER + "foo2.apk",
                     "bar.apex")));
   }
 
@@ -98,7 +101,7 @@ public class AdbCommandTest {
                     "--staged",
                     "--staged-ready-timeout",
                     "3000",
-                    "foo1.apk:foo2.apk",
+                    "foo1.apk" + SPLIT_CHARACTER + "foo2.apk",
                     "bar.apex")));
   }
 
@@ -115,7 +118,11 @@ public class AdbCommandTest {
             /* timeout= */ Optional.empty(),
             /* deviceId= */ Optional.empty(),
             new FakeCommandExecutor(
-                ImmutableList.of("adb", "install-multi-package", "foo1.apk:foo2.apk", "bar.apex")));
+                ImmutableList.of(
+                    "adb",
+                    "install-multi-package",
+                    "foo1.apk" + SPLIT_CHARACTER + "foo2.apk",
+                    "bar.apex")));
   }
 
   static class FakeCommandExecutor implements CommandExecutor {

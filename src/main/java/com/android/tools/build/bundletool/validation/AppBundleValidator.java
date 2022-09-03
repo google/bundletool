@@ -54,6 +54,7 @@ public class AppBundleValidator {
           new AssetsTargetingValidator(),
           new NativeTargetingValidator(),
           // Other.
+          new ArchiveEntriesValidator(),
           new ModuleDependencyValidator(),
           new ModuleTitleValidator(),
           new ResourceTableValidator(),

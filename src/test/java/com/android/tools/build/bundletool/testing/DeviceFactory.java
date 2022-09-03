@@ -18,11 +18,17 @@ package com.android.tools.build.bundletool.testing;
 
 import static com.android.tools.build.bundletool.model.utils.ProtoUtils.mergeFromProtos;
 import static com.android.tools.build.bundletool.model.utils.ResourcesUtils.DENSITY_ALIAS_TO_DPI_MAP;
+import static com.google.common.collect.ImmutableSet.toImmutableSet;
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static java.util.Arrays.stream;
 
 import com.android.bundle.Devices.DeviceSpec;
+import com.android.bundle.Devices.InstalledSdk;
+import com.android.bundle.Devices.SdkRuntime;
 import com.android.bundle.Targeting.ScreenDensity.DensityAlias;
 import com.android.tools.build.bundletool.model.utils.Versions;
+import com.google.common.base.Splitter;
+import com.google.common.collect.ImmutableSet;
 import com.google.protobuf.Int32Value;
 import com.google.protobuf.util.JsonFormat;
 import java.nio.file.Files;
@@ -144,6 +150,34 @@ public final class DeviceFactory {
 
   public static DeviceSpec deviceGroups(String... deviceGroups) {
     return DeviceSpec.newBuilder().addAllDeviceGroups(Arrays.asList(deviceGroups)).build();
+  }
+
+  public static DeviceSpec sdkRuntimeSupported(boolean supported) {
+    return DeviceSpec.newBuilder()
+        .setSdkRuntime(SdkRuntime.newBuilder().setSupported(supported))
+        .build();
+  }
+
+  /**
+   * Creates a DeviceSpec with installed SDKs.
+   *
+   * @param sdks list of runtime-enabled SDKs that are installed on the device. Must be formatted
+   *     like "package_name:version_major"
+   */
+  public static DeviceSpec installedSdks(String... sdks) {
+    ImmutableSet<InstalledSdk> installedSdks =
+        stream(sdks)
+            .map(
+                sdk ->
+                    InstalledSdk.newBuilder()
+                        .setPackageName(Splitter.on(':').splitToList(sdk).get(0))
+                        .setVersionMajor(Integer.parseInt(Splitter.on(':').splitToList(sdk).get(1)))
+                        .build())
+            .collect(toImmutableSet());
+    return DeviceSpec.newBuilder()
+        .setSdkRuntime(
+            SdkRuntime.newBuilder().setSupported(true).addAllInstalledSdks(installedSdks))
+        .build();
   }
 
   public static DeviceSpec mergeSpecs(DeviceSpec deviceSpec, DeviceSpec... specParts) {

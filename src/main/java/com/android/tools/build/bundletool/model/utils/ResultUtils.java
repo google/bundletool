@@ -23,11 +23,13 @@ import static com.google.common.collect.ImmutableSet.toImmutableSet;
 import com.android.bundle.Commands.ApkDescription;
 import com.android.bundle.Commands.ApkSet;
 import com.android.bundle.Commands.BuildApksResult;
+import com.android.bundle.Commands.BuildSdkApksResult;
 import com.android.bundle.Commands.Variant;
 import com.android.tools.build.bundletool.model.BundleModuleName;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Streams;
+import com.google.protobuf.InvalidProtocolBufferException;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
@@ -55,8 +57,14 @@ public final class ResultUtils {
   private static BuildApksResult readTableOfContentFromApksArchive(Path apksArchivePath)
       throws IOException {
     try (ZipFile apksArchive = new ZipFile(apksArchivePath.toFile())) {
-      return BuildApksResult.parseFrom(
-          ZipUtils.asByteSource(apksArchive, new ZipEntry(TABLE_OF_CONTENTS_FILE)).read());
+      byte[] tocBytes =
+          ZipUtils.asByteSource(apksArchive, new ZipEntry(TABLE_OF_CONTENTS_FILE)).read();
+      try {
+        return BuildApksResult.parseFrom(tocBytes);
+      } catch (InvalidProtocolBufferException e) {
+        // If loading the toc.pb into BuildApksResult fails, try to load it into BuildSdksApksResult
+        return toBuildApksResult(BuildSdkApksResult.parseFrom(tocBytes));
+      }
     }
   }
 
@@ -185,6 +193,16 @@ public final class ResultUtils {
         .filter(apkDescription -> apkDescription.getSplitApkMetadata().getIsMasterSplit())
         .map(ApkDescription::getPath)
         .collect(toImmutableSet());
+  }
+
+  private static BuildApksResult toBuildApksResult(BuildSdkApksResult result) {
+    // Converting BuildSdkApksResult to BuildApksResult allows us to reuse evaluation of shared
+    // underlying fields, such as variant, in commands like extract-apks.
+    return BuildApksResult.newBuilder()
+        .setBundletool(result.getBundletool())
+        .setPackageName(result.getPackageName())
+        .addAllVariant(result.getVariantList())
+        .build();
   }
 
   private ResultUtils() {}

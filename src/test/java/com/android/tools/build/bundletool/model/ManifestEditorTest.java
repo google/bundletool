@@ -19,6 +19,8 @@ package com.android.tools.build.bundletool.model;
 import static com.android.tools.build.bundletool.model.AndroidManifest.ACTIVITY_ELEMENT_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.ALLOW_BACKUP_ATTRIBUTE_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.ALLOW_BACKUP_RESOURCE_ID;
+import static com.android.tools.build.bundletool.model.AndroidManifest.APPLICATION_ELEMENT_NAME;
+import static com.android.tools.build.bundletool.model.AndroidManifest.CATEGORY_ELEMENT_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.CERTIFICATE_DIGEST_ATTRIBUTE_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.DELIVERY_ELEMENT_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.DISTRIBUTION_NAMESPACE_URI;
@@ -35,15 +37,18 @@ import static com.android.tools.build.bundletool.model.AndroidManifest.MIN_SDK_V
 import static com.android.tools.build.bundletool.model.AndroidManifest.MODULE_ELEMENT_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.NAME_ATTRIBUTE_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.NAME_RESOURCE_ID;
+import static com.android.tools.build.bundletool.model.AndroidManifest.PERMISSION_ELEMENT_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.PROVIDER_ELEMENT_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.REMOVABLE_ELEMENT_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.REQUIRED_ATTRIBUTE_NAME;
+import static com.android.tools.build.bundletool.model.AndroidManifest.REQUIRED_BY_PRIVACY_SANDBOX_SDK_ATTRIBUTE_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.REQUIRED_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.SDK_VERSION_MAJOR_ATTRIBUTE_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.SERVICE_ELEMENT_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.SPLIT_NAME_ATTRIBUTE_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.SPLIT_NAME_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.TARGET_SANDBOX_VERSION_RESOURCE_ID;
+import static com.android.tools.build.bundletool.model.AndroidManifest.TOOLS_NAMESPACE_URI;
 import static com.android.tools.build.bundletool.model.AndroidManifest.USES_FEATURE_ELEMENT_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.USES_SDK_LIBRARY_ELEMENT_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.VALUE_ATTRIBUTE_NAME;
@@ -1169,6 +1174,178 @@ public class ManifestEditorTest {
                             REQUIRED_ATTRIBUTE_NAME,
                             REQUIRED_RESOURCE_ID,
                             false)))));
+  }
+
+  @Test
+  public void removeElementsRequiredByPrivacySandboxSdk() {
+    AndroidManifest originalManifest =
+        AndroidManifest.create(
+            xmlNode(
+                xmlElement(
+                    "manifest",
+                    xmlNode(
+                        xmlElement(
+                            PERMISSION_ELEMENT_NAME,
+                            /* namespaces= */ ImmutableList.of(),
+                            ImmutableList.of(
+                                xmlAttribute(
+                                    ANDROID_NAMESPACE_URI,
+                                    NAME_ATTRIBUTE_NAME,
+                                    "android.permission.WAKE_LOCK"),
+                                xmlBooleanAttribute(
+                                    TOOLS_NAMESPACE_URI,
+                                    REQUIRED_BY_PRIVACY_SANDBOX_SDK_ATTRIBUTE_NAME,
+                                    true)))),
+                    xmlNode(
+                        xmlElement(
+                            PERMISSION_ELEMENT_NAME,
+                            /* namespaces= */ ImmutableList.of(),
+                            ImmutableList.of(
+                                xmlAttribute(
+                                    ANDROID_NAMESPACE_URI,
+                                    NAME_ATTRIBUTE_NAME,
+                                    "android.permission.ACCESS_WIFI_STATE"),
+                                xmlBooleanAttribute(
+                                    TOOLS_NAMESPACE_URI,
+                                    REQUIRED_BY_PRIVACY_SANDBOX_SDK_ATTRIBUTE_NAME,
+                                    false)))),
+                    xmlNode(
+                        xmlElement(
+                            APPLICATION_ELEMENT_NAME,
+                            xmlNode(
+                                xmlElement(
+                                    CATEGORY_ELEMENT_NAME,
+                                    xmlBooleanAttribute(
+                                        TOOLS_NAMESPACE_URI,
+                                        REQUIRED_BY_PRIVACY_SANDBOX_SDK_ATTRIBUTE_NAME,
+                                        false),
+                                    xmlNode(
+                                        xmlElement(
+                                            REMOVABLE_ELEMENT_NAME,
+                                            xmlBooleanAttribute(
+                                                TOOLS_NAMESPACE_URI,
+                                                REQUIRED_BY_PRIVACY_SANDBOX_SDK_ATTRIBUTE_NAME,
+                                                true))))))))));
+
+    AndroidManifest editedManifest =
+        originalManifest.toEditor().removeElementsRequiredByPrivacySandboxSdk().save();
+
+    assertThat(editedManifest)
+        .isEqualTo(
+            AndroidManifest.create(
+                xmlNode(
+                    xmlElement(
+                        "manifest",
+                        xmlNode(
+                            xmlElement(
+                                PERMISSION_ELEMENT_NAME,
+                                /* namespaces= */ ImmutableList.of(),
+                                ImmutableList.of(
+                                    xmlAttribute(
+                                        ANDROID_NAMESPACE_URI,
+                                        NAME_ATTRIBUTE_NAME,
+                                        "android.permission.ACCESS_WIFI_STATE"),
+                                    xmlBooleanAttribute(
+                                        TOOLS_NAMESPACE_URI,
+                                        REQUIRED_BY_PRIVACY_SANDBOX_SDK_ATTRIBUTE_NAME,
+                                        false)))),
+                        xmlNode(
+                            xmlElement(
+                                APPLICATION_ELEMENT_NAME,
+                                xmlNode(
+                                    xmlElement(
+                                        CATEGORY_ELEMENT_NAME,
+                                        xmlBooleanAttribute(
+                                            TOOLS_NAMESPACE_URI,
+                                            REQUIRED_BY_PRIVACY_SANDBOX_SDK_ATTRIBUTE_NAME,
+                                            false)))))))));
+  }
+
+  @Test
+  public void removeRequiredByPrivacySandboxSdkAttributes() {
+    AndroidManifest originalManifest =
+        AndroidManifest.create(
+            xmlNode(
+                xmlElement(
+                    "manifest",
+                    xmlNode(
+                        xmlElement(
+                            PERMISSION_ELEMENT_NAME,
+                            /* namespaces= */ ImmutableList.of(),
+                            ImmutableList.of(
+                                xmlAttribute(
+                                    ANDROID_NAMESPACE_URI,
+                                    NAME_ATTRIBUTE_NAME,
+                                    "android.permission.WAKE_LOCK"),
+                                xmlBooleanAttribute(
+                                    TOOLS_NAMESPACE_URI,
+                                    REQUIRED_BY_PRIVACY_SANDBOX_SDK_ATTRIBUTE_NAME,
+                                    true)))),
+                    xmlNode(
+                        xmlElement(
+                            PERMISSION_ELEMENT_NAME,
+                            /* namespaces= */ ImmutableList.of(),
+                            ImmutableList.of(
+                                xmlAttribute(
+                                    ANDROID_NAMESPACE_URI,
+                                    NAME_ATTRIBUTE_NAME,
+                                    "android.permission.ACCESS_WIFI_STATE"),
+                                xmlBooleanAttribute(
+                                    TOOLS_NAMESPACE_URI,
+                                    REQUIRED_BY_PRIVACY_SANDBOX_SDK_ATTRIBUTE_NAME,
+                                    false)))),
+                    xmlNode(
+                        xmlElement(
+                            APPLICATION_ELEMENT_NAME,
+                            xmlNode(
+                                xmlElement(
+                                    CATEGORY_ELEMENT_NAME,
+                                    xmlBooleanAttribute(
+                                        TOOLS_NAMESPACE_URI,
+                                        REQUIRED_BY_PRIVACY_SANDBOX_SDK_ATTRIBUTE_NAME,
+                                        false),
+                                    xmlNode(
+                                        xmlElement(
+                                            REMOVABLE_ELEMENT_NAME,
+                                            xmlBooleanAttribute(
+                                                TOOLS_NAMESPACE_URI,
+                                                REQUIRED_BY_PRIVACY_SANDBOX_SDK_ATTRIBUTE_NAME,
+                                                true))))))))));
+
+    AndroidManifest editedManifest =
+        originalManifest.toEditor().removeRequiredByPrivacySandboxSdkAttributes().save();
+
+    assertThat(editedManifest)
+        .isEqualTo(
+            AndroidManifest.create(
+                xmlNode(
+                    xmlElement(
+                        "manifest",
+                        xmlNode(
+                            xmlElement(
+                                PERMISSION_ELEMENT_NAME,
+                                /* namespaces= */ ImmutableList.of(),
+                                ImmutableList.of(
+                                    xmlAttribute(
+                                        ANDROID_NAMESPACE_URI,
+                                        NAME_ATTRIBUTE_NAME,
+                                        "android.permission.WAKE_LOCK")))),
+                        xmlNode(
+                            xmlElement(
+                                PERMISSION_ELEMENT_NAME,
+                                /* namespaces= */ ImmutableList.of(),
+                                ImmutableList.of(
+                                    xmlAttribute(
+                                        ANDROID_NAMESPACE_URI,
+                                        NAME_ATTRIBUTE_NAME,
+                                        "android.permission.ACCESS_WIFI_STATE")))),
+                        xmlNode(
+                            xmlElement(
+                                APPLICATION_ELEMENT_NAME,
+                                xmlNode(
+                                    xmlElement(
+                                        CATEGORY_ELEMENT_NAME,
+                                        xmlNode(xmlElement(REMOVABLE_ELEMENT_NAME))))))))));
   }
 
   private static void assertUsesSdkLibraryAttributes(

@@ -54,6 +54,7 @@ import com.android.tools.build.bundletool.testing.ManifestProtoUtils.ManifestMut
 import com.android.tools.build.bundletool.testing.ResourceTableBuilder;
 import com.android.tools.build.bundletool.testing.truth.zip.TruthZip;
 import com.google.common.collect.ImmutableList;
+import com.google.common.io.ByteSource;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -278,6 +279,31 @@ public class BuildSdkBundleCommandTest {
                     "--modules=" + baseModulePath,
                     "--sdk-modules-config=" + sdkModulesConfigPath,
                     "--overwrite"));
+
+    assertThat(commandViaBuilder).isEqualTo(commandViaFlags);
+  }
+
+  @Test
+  public void buildingViaFlagsAndBuilderHasSameResult_optionalSdkInterfaceDescriptors()
+      throws Exception {
+    Path baseModulePath = buildSimpleModule("base");
+    Path sdkInterfaceDescriptorsPath = buildSdkInterfaceDescriptors("sdk-api.jar");
+    BuildSdkBundleCommand commandViaBuilder =
+        BuildSdkBundleCommand.builder()
+            .setOutputPath(bundlePath)
+            .setSdkModulesConfig(sdkModulesConfigPath)
+            .setModulesPaths(ImmutableList.of(baseModulePath))
+            .setSdkInterfaceDescriptors(sdkInterfaceDescriptorsPath)
+            .build();
+
+    BuildSdkBundleCommand commandViaFlags =
+        BuildSdkBundleCommand.fromFlags(
+            new FlagParser()
+                .parse(
+                    "--output=" + bundlePath,
+                    "--modules=" + baseModulePath,
+                    "--sdk-modules-config=" + sdkModulesConfigPath,
+                    "--sdk-interface-descriptors=" + sdkInterfaceDescriptorsPath));
 
     assertThat(commandViaBuilder).isEqualTo(commandViaFlags);
   }
@@ -659,11 +685,13 @@ public class BuildSdkBundleCommandTest {
             .addFileWithContent(ZipPath.create("res/drawable/icon.png"), "image".getBytes(UTF_8))
             .addFileWithProtoContent(ZipPath.create("resources.pb"), resourceTable)
             .writeTo(tmpDir.resolve("base.zip"));
+    Path sdkInterfaceDescriptorsPath = buildSdkInterfaceDescriptors("sdk-api.jar");
 
     BuildSdkBundleCommand.builder()
         .setOutputPath(bundlePath)
         .setModulesPaths(ImmutableList.of(module))
         .setSdkModulesConfig(sdkModulesConfigPath)
+        .setSdkInterfaceDescriptors(sdkInterfaceDescriptorsPath)
         .build()
         .execute();
 
@@ -700,6 +728,9 @@ public class BuildSdkBundleCommandTest {
       TruthZip.assertThat(bundle)
           .hasFile("SdkBundleConfig.pb")
           .withContent(SdkBundleConfig.getDefaultInstance().toByteArray());
+      TruthZip.assertThat(bundle)
+          .hasFile("sdk-interface-descriptors.jar")
+          .withContent(Files.readAllBytes(sdkInterfaceDescriptorsPath));
     }
   }
 
@@ -882,5 +913,11 @@ public class BuildSdkBundleCommandTest {
             ZipPath.create("manifest/AndroidManifest.xml"),
             androidManifest(PKG_NAME, manifestMutators))
         .writeTo(tmpDir.resolve(fileName + ".zip"));
+  }
+
+  private Path buildSdkInterfaceDescriptors(String fileName) throws IOException {
+    return new ZipBuilder()
+        .addFile(ZipPath.create("MyInterface.class"), ByteSource.wrap(new byte[] {1, 2, 3}))
+        .writeTo(tmpDir.resolve(fileName + ".jar"));
   }
 }

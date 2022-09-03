@@ -22,6 +22,8 @@ import static com.google.common.collect.ImmutableList.toImmutableList;
 import static java.nio.charset.StandardCharsets.UTF_8;
 
 import com.android.bundle.Devices.DeviceSpec;
+import com.android.bundle.Devices.InstalledSdk;
+import com.android.bundle.Devices.SdkRuntime;
 import com.android.ddmlib.AdbCommandRejectedException;
 import com.android.ddmlib.IDevice.DeviceState;
 import com.android.ddmlib.IShellOutputReceiver;
@@ -34,6 +36,7 @@ import com.google.common.base.Joiner;
 import com.google.common.base.Splitter;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableSet;
 import com.google.common.io.ByteStreams;
 import java.io.IOException;
 import java.io.InputStream;
@@ -60,6 +63,7 @@ public class FakeDevice extends Device {
   private final ImmutableList<String> glExtensions;
   private final String serialNumber;
   private final ImmutableMap<String, String> properties;
+  private final SdkRuntime sdkRuntime;
   private final Map<String, FakeShellCommandAction> commandInjections = new HashMap<>();
   private Optional<SideEffect<InstallOptions>> installApksSideEffect = Optional.empty();
   private Optional<SideEffect<PushOptions>> pushSideEffect = Optional.empty();
@@ -78,7 +82,8 @@ public class FakeDevice extends Device {
       ImmutableList<String> features,
       ImmutableList<String> glExtensions,
       ImmutableMap<String, String> properties,
-      Optional<String> androidVersionCodeName) {
+      Optional<String> androidVersionCodeName,
+      SdkRuntime sdkRuntime) {
     this.state = state;
     this.androidVersion = new AndroidVersion(sdkVersion, androidVersionCodeName.orElse(null));
     this.abis = abis;
@@ -87,6 +92,7 @@ public class FakeDevice extends Device {
     this.properties = properties;
     this.glExtensions = glExtensions;
     this.features = features;
+    this.sdkRuntime = sdkRuntime;
   }
 
   public static FakeDevice fromDeviceSpecWithProperties(
@@ -106,7 +112,8 @@ public class FakeDevice extends Device {
             properties,
             deviceSpec.getCodename().isEmpty()
                 ? Optional.empty()
-                : Optional.of(deviceSpec.getCodename()));
+                : Optional.of(deviceSpec.getCodename()),
+            deviceSpec.getSdkRuntime());
     device.injectShellCommandOutput(
         "pm list features",
         () ->
@@ -134,6 +141,13 @@ public class FakeDevice extends Device {
                     "EGL implementation : 1.4",
                     "GLES: FakeDevice, OpenGL ES 3.0",
                     DASH_JOINER.join(deviceSpec.getGlExtensionsList()))));
+    device.injectShellCommandOutput(
+        "pm list sdks",
+        () ->
+            LINE_JOINER.join(
+                deviceSpec.getSdkRuntime().getInstalledSdksList().stream()
+                    .map(sdk -> "sdk:" + sdk.getPackageName() + ":" + sdk.getVersionMajor())
+                    .collect(toImmutableList())));
     return device;
   }
 
@@ -181,7 +195,8 @@ public class FakeDevice extends Device {
         ImmutableList.of(),
         ImmutableList.of(),
         ImmutableMap.of(),
-        Optional.empty());
+        Optional.empty(),
+        SdkRuntime.getDefaultInstance());
   }
 
   @Override
@@ -222,6 +237,11 @@ public class FakeDevice extends Device {
   @Override
   public ImmutableList<String> getGlExtensions() {
     return glExtensions;
+  }
+
+  @Override
+  public ImmutableSet<InstalledSdk> getRuntimeEnabledSdks() {
+    return ImmutableSet.copyOf(sdkRuntime.getInstalledSdksList());
   }
 
   @Override

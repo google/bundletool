@@ -76,7 +76,7 @@ public final class FilePreconditions {
   /** Checks whether the given path denotes an existing directory. */
   public static void checkDirectoryExists(Path path) {
     checkArgument(Files.exists(path), "Directory '%s' was not found.", path);
-    checkArgument(Files.isDirectory(path), "'%s' is not a directory.");
+    checkArgument(Files.isDirectory(path), "'%s' is not a directory.", path);
   }
 
   /** Checks whether the given path denotes an existing empty directory. */

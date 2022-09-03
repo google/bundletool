@@ -69,6 +69,7 @@ import com.android.tools.build.bundletool.model.utils.files.FileUtils;
 import com.android.tools.build.bundletool.preprocessors.AppBundlePreprocessorManager;
 import com.android.tools.build.bundletool.preprocessors.DaggerAppBundlePreprocessorComponent;
 import com.android.tools.build.bundletool.validation.AppBundleValidator;
+import com.android.tools.build.bundletool.validation.SdkAsarValidator;
 import com.android.tools.build.bundletool.validation.SdkBundleValidator;
 import com.android.tools.build.bundletool.validation.SubValidator;
 import com.google.auto.value.AutoValue;
@@ -84,6 +85,7 @@ import com.google.common.io.Closer;
 import com.google.common.io.MoreFiles;
 import com.google.common.util.concurrent.ListeningExecutorService;
 import com.google.common.util.concurrent.MoreExecutors;
+import com.google.errorprone.annotations.CanIgnoreReturnValue;
 import java.io.File;
 import java.io.IOException;
 import java.io.PrintStream;
@@ -189,6 +191,8 @@ public abstract class BuildApksCommand {
   private static final Flag<String> STAMP_KEY_ALIAS_FLAG = Flag.string("stamp-key-alias");
   private static final Flag<Password> STAMP_KEY_PASSWORD_FLAG = Flag.password("stamp-key-pass");
   private static final Flag<String> STAMP_SOURCE_FLAG = Flag.string("stamp-source");
+  private static final Flag<Boolean> STAMP_EXCLUDE_TIMESTAMP =
+      Flag.booleanFlag("stamp-exclude-timestamp");
 
   // Key-rotation-related flags.
   private static final Flag<Integer> MINIMUM_V3_ROTATION_API_VERSION_FLAG =
@@ -444,6 +448,7 @@ public abstract class BuildApksCommand {
      * <p>Optional. The caller is responsible for providing a service that accepts new tasks, and
      * for shutting it down afterwards.
      */
+    @CanIgnoreReturnValue
     public Builder setExecutorService(ListeningExecutorService executorService) {
       setExecutorServiceInternal(executorService);
       setExecutorServiceCreatedByBundleTool(false);
@@ -551,6 +556,7 @@ public abstract class BuildApksCommand {
       checkState(
           !getSigningConfiguration().isPresent() || !getSigningConfigurationProvider().isPresent(),
           "Only one of SigningConfiguration or SigningConfigurationProvider should be set.");
+
       getSigningConfiguration()
           .flatMap(SigningConfiguration::getMinimumV3RotationApiVersion)
           .ifPresent(this::setMinSdkForAdditionalVariantWithV3Rotation);
@@ -898,14 +904,14 @@ public abstract class BuildApksCommand {
       Closer closer, TempDirectory tempDir, AppBundle appBundle) throws IOException {
     if (!getRuntimeEnabledSdkArchivePaths().isEmpty()) {
       validateSdkAsarsMatchAppBundleDependencies(
-          appBundle, getSdkAsarsByPackageName(closer, tempDir));
+          appBundle, getValidatedSdkAsarsByPackageName(closer, tempDir));
     } else {
       validateSdkBundlesMatchAppBundleDependencies(
           appBundle, getValidatedSdkBundlesByPackageName(closer, tempDir));
     }
   }
 
-  private ImmutableMap<String, SdkAsar> getSdkAsarsByPackageName(
+  private ImmutableMap<String, SdkAsar> getValidatedSdkAsarsByPackageName(
       Closer closer, TempDirectory tempDir) throws IOException {
     ImmutableListMultimap.Builder<String, SdkAsar> sdkArchivesPerPackageNameBuilder =
         ImmutableListMultimap.builder();
@@ -913,8 +919,11 @@ public abstract class BuildApksCommand {
     ImmutableList<Path> sdkArchivePaths = getRuntimeEnabledSdkArchivePaths().asList();
     for (int index = 0; index < sdkArchivePaths.size(); index++) {
       ZipFile sdkArchiveZip = closer.register(new ZipFile(sdkArchivePaths.get(index).toFile()));
+
       Path sdkModulesZipPath = tempDir.getPath().resolve("tmp" + index);
       ZipFile sdkModulesZip = closer.register(getModulesZip(sdkArchiveZip, sdkModulesZipPath));
+      SdkAsarValidator.validateModulesFile(sdkModulesZip);
+
       SdkAsar sdkArchive = SdkAsar.buildFromZip(sdkArchiveZip, sdkModulesZip, sdkModulesZipPath);
       sdkArchivesPerPackageNameBuilder.put(sdkArchive.getPackageName(), sdkArchive);
     }
@@ -1485,6 +1494,15 @@ public abstract class BuildApksCommand {
                 .build())
         .addFlag(
             FlagDescription.builder()
+                .setFlagName(STAMP_EXCLUDE_TIMESTAMP.getName())
+                .setExampleValue("true")
+                .setOptional(true)
+                .setDescription(
+                    "If set, a timestamp indicating the time of signing will be excluded from the"
+                        + " generated stamp embedded in the generated APKs.")
+                .build())
+        .addFlag(
+            FlagDescription.builder()
                 .setFlagName(RUNTIME_ENABLED_SDK_BUNDLE_LOCATIONS_FLAG.getName())
                 .setExampleValue("path/to/bundle1.asb,path/to/bundle2.asb")
                 .setOptional(true)
@@ -1635,6 +1653,7 @@ public abstract class BuildApksCommand {
       SystemEnvironmentProvider systemEnvironmentProvider) {
     boolean createStamp = CREATE_STAMP_FLAG.getValue(flags).orElse(false);
     Optional<String> stampSource = STAMP_SOURCE_FLAG.getValue(flags);
+    Optional<Boolean> stampExcludeTimestamp = STAMP_EXCLUDE_TIMESTAMP.getValue(flags);
 
     if (!createStamp) {
       return;
@@ -1645,6 +1664,8 @@ public abstract class BuildApksCommand {
     sourceStamp.setSigningConfiguration(
         getStampSigningConfiguration(flags, out, systemEnvironmentProvider));
     stampSource.ifPresent(sourceStamp::setSource);
+    stampExcludeTimestamp.ifPresent(
+        excludeTimestamp -> sourceStamp.setIncludeTimestamp(!excludeTimestamp));
 
     buildApksCommand.setSourceStamp(sourceStamp.build());
   }

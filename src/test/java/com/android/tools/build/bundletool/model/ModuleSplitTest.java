@@ -74,19 +74,14 @@ import com.android.tools.build.bundletool.testing.BundleModuleBuilder;
 import com.android.tools.build.bundletool.testing.ManifestProtoUtils;
 import com.android.tools.build.bundletool.testing.ResourceTableBuilder;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
-import java.io.ByteArrayInputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.StandardCopyOption;
+import com.google.common.io.ByteSource;
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
 import java.security.PrivateKey;
 import java.security.cert.X509Certificate;
 import java.util.Arrays;
-import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Rule;
 import org.junit.Test;
@@ -104,7 +99,6 @@ public class ModuleSplitTest {
   private static SigningConfiguration stampSigningConfig;
 
   @Rule public final TemporaryFolder tmp = new TemporaryFolder();
-  private Path tmpDir;
 
   @BeforeClass
   public static void setUpClass() throws Exception {
@@ -113,11 +107,6 @@ public class ModuleSplitTest {
     X509Certificate certificate = buildSelfSignedCertificate(keyPair, "CN=ModuleSplitTest");
     stampSigningConfig =
         SigningConfiguration.builder().setSignerConfig(privateKey, certificate).build();
-  }
-
-  @Before
-  public void setUp() {
-    tmpDir = tmp.getRoot().toPath();
   }
 
   @Test
@@ -482,17 +471,32 @@ public class ModuleSplitTest {
     AndroidManifest archivedManifest =
         AndroidManifest.create(
             androidManifest("com.test.app", ManifestProtoUtils.withVersionCode(123)));
-    Path archivedClassesDexFile = createTempClassesDexFile(TEST_CONTENT);
+    ByteSource testContentByteSource = ByteSource.wrap(TEST_CONTENT);
 
     ModuleSplit split =
         ModuleSplit.forArchive(
-            module, archivedManifest, ResourceTable.getDefaultInstance(), archivedClassesDexFile);
+            module,
+            archivedManifest,
+            ResourceTable.getDefaultInstance(),
+            ImmutableMap.<ZipPath, ByteSource>builder()
+                .put(ZipPath.create("dex").resolve("classes.dex"), testContentByteSource)
+                .put(
+                    ZipPath.create("drawable").resolve("cloud_symbol_xml.proto"),
+                    testContentByteSource)
+                .put(
+                    ZipPath.create("drawable").resolve("opacity_layer_xml.proto"),
+                    testContentByteSource)
+                .build());
 
     assertThat(split.getSplitType()).isEqualTo(SplitType.ARCHIVE);
     assertThat(split.getModuleName().getName()).isEqualTo("testModule");
     assertThat(split.getAndroidManifest().getVersionCode()).hasValue(123);
     assertThat(split.getResourceTable()).hasValue(ResourceTable.getDefaultInstance());
-    assertThat(extractPaths(split.getEntries())).containsExactly("dex/classes.dex");
+    assertThat(extractPaths(split.getEntries()))
+        .containsExactly(
+            "dex/classes.dex",
+            "drawable/cloud_symbol_xml.proto",
+            "drawable/opacity_layer_xml.proto");
   }
 
   @Test
@@ -510,11 +514,14 @@ public class ModuleSplitTest {
             .addPackage("com.test.app")
             .addDrawableResource("icon", "res/drawable/icon.jpg")
             .build();
-    Path archivedClassesDexFile = createTempClassesDexFile(TEST_CONTENT);
+    ByteSource testContentByteSource = ByteSource.wrap(TEST_CONTENT);
 
     ModuleSplit split =
         ModuleSplit.forArchive(
-            module, archivedManifest, archivedResourceTable, archivedClassesDexFile);
+            module,
+            archivedManifest,
+            archivedResourceTable,
+            ImmutableMap.of(ZipPath.create("dex").resolve("classes.dex"), testContentByteSource));
 
     assertThat(split.getResourceTable().get()).isEqualTo(archivedResourceTable);
     assertThat(extractPaths(split.getEntries()))
@@ -537,11 +544,14 @@ public class ModuleSplitTest {
             .addPackage("com.test.app")
             .addDrawableResource("icon", "res/drawable/icon.jpg")
             .build();
-    Path archivedClassesDexFile = createTempClassesDexFile(TEST_CONTENT);
+    ByteSource testContentByteSource = ByteSource.wrap(TEST_CONTENT);
 
     ModuleSplit split =
         ModuleSplit.forArchive(
-            module, archivedManifest, archivedResourceTable, archivedClassesDexFile);
+            module,
+            archivedManifest,
+            archivedResourceTable,
+            ImmutableMap.of(ZipPath.create("dex").resolve("classes.dex"), testContentByteSource));
 
     assertThat(split.getResourceTable().get()).isEqualTo(archivedResourceTable);
     assertThat(extractPaths(split.getEntries()))
@@ -559,11 +569,15 @@ public class ModuleSplitTest {
         AndroidManifest.create(
             androidManifest("com.test.app", ManifestProtoUtils.withVersionCode(123)));
     byte[] archivedClassesDexFileContent = {1, 2};
-    Path archivedClassesDexFile = createTempClassesDexFile(archivedClassesDexFileContent);
+    ByteSource archivedClassesDexByteSource = ByteSource.wrap(archivedClassesDexFileContent);
 
     ModuleSplit split =
         ModuleSplit.forArchive(
-            module, archivedManifest, ResourceTable.getDefaultInstance(), archivedClassesDexFile);
+            module,
+            archivedManifest,
+            ResourceTable.getDefaultInstance(),
+            ImmutableMap.of(
+                ZipPath.create("dex").resolve("classes.dex"), archivedClassesDexByteSource));
 
     assertThat(extractPaths(split.getEntries())).containsExactly("dex/classes.dex");
     assertThat(split.getEntries().get(0).getContent().read())
@@ -645,13 +659,5 @@ public class ModuleSplitTest {
     return Arrays.stream(entries)
         .map(entry -> createModuleEntryForFile(entry, TEST_CONTENT))
         .collect(toImmutableList());
-  }
-
-  private Path createTempClassesDexFile(byte[] content) throws IOException {
-    Path tempDexFilePath = Files.createTempFile(tmpDir, "classes", ".dex");
-    try (InputStream inputStream = new ByteArrayInputStream(content)) {
-      Files.copy(inputStream, tempDexFilePath, StandardCopyOption.REPLACE_EXISTING);
-    }
-    return tempDexFilePath;
   }
 }

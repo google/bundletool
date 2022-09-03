@@ -47,6 +47,7 @@ import static com.android.tools.build.bundletool.model.utils.Versions.ANDROID_M_
 import static com.android.tools.build.bundletool.model.utils.Versions.ANDROID_N_API_VERSION;
 import static com.android.tools.build.bundletool.model.utils.Versions.ANDROID_P_API_VERSION;
 import static com.android.tools.build.bundletool.model.utils.Versions.ANDROID_Q_API_VERSION;
+import static com.android.tools.build.bundletool.model.utils.Versions.ANDROID_S_API_VERSION;
 import static com.android.tools.build.bundletool.model.utils.Versions.ANDROID_S_V2_API_VERSION;
 import static com.android.tools.build.bundletool.model.utils.Versions.ANDROID_T_API_VERSION;
 import static com.android.tools.build.bundletool.testing.ApkSetUtils.extractFromApkSetFile;
@@ -102,6 +103,7 @@ import static com.android.tools.build.bundletool.testing.TargetingUtils.mergeVar
 import static com.android.tools.build.bundletool.testing.TargetingUtils.moduleDeviceGroupsTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.nativeDirectoryTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.nativeLibraries;
+import static com.android.tools.build.bundletool.testing.TargetingUtils.sdkRuntimeVariantTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.sdkVersionFrom;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.sdkVersionTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.targetedApexImage;
@@ -127,6 +129,7 @@ import static com.google.common.truth.Truth.assertThat;
 import static com.google.common.truth.Truth8.assertThat;
 import static com.google.common.truth.extensions.proto.ProtoTruth.assertThat;
 import static java.util.Comparator.comparing;
+import static java.util.function.Function.identity;
 import static junit.framework.TestCase.fail;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -146,10 +149,12 @@ import com.android.bundle.Commands.DeliveryType;
 import com.android.bundle.Commands.InstantMetadata;
 import com.android.bundle.Commands.ModuleMetadata;
 import com.android.bundle.Commands.PermanentlyFusedModule;
+import com.android.bundle.Commands.RuntimeEnabledSdkDependency;
 import com.android.bundle.Commands.SplitApkMetadata;
 import com.android.bundle.Commands.StandaloneApkMetadata;
 import com.android.bundle.Commands.SystemApkMetadata;
 import com.android.bundle.Commands.Variant;
+import com.android.bundle.Commands.VariantProperties;
 import com.android.bundle.Config.AssetModulesConfig;
 import com.android.bundle.Config.BundleConfig;
 import com.android.bundle.Config.BundleConfig.BundleType;
@@ -157,6 +162,7 @@ import com.android.bundle.Config.Bundletool;
 import com.android.bundle.Config.Optimizations;
 import com.android.bundle.Config.SplitDimension.Value;
 import com.android.bundle.Config.StandaloneConfig;
+import com.android.bundle.Config.UncompressDexFiles.UncompressedDexTargetSdk;
 import com.android.bundle.Files.ApexImages;
 import com.android.bundle.RuntimeEnabledSdkConfigProto.RuntimeEnabledSdk;
 import com.android.bundle.RuntimeEnabledSdkConfigProto.RuntimeEnabledSdkConfig;
@@ -277,6 +283,7 @@ public class BuildApksManagerTest {
   private static final SdkVersion N_SDK_VERSION = sdkVersionFrom(ANDROID_N_API_VERSION);
   private static final SdkVersion P_SDK_VERSION = sdkVersionFrom(ANDROID_P_API_VERSION);
   private static final SdkVersion Q_SDK_VERSION = sdkVersionFrom(ANDROID_Q_API_VERSION);
+  private static final SdkVersion S_SDK_VERSION = sdkVersionFrom(ANDROID_S_API_VERSION);
   private static final SdkVersion S2_V2_SDK_VERSION = sdkVersionFrom(ANDROID_S_V2_API_VERSION);
 
   @Rule public final TemporaryFolder tmp = new TemporaryFolder();
@@ -2078,7 +2085,8 @@ public class BuildApksManagerTest {
   public void buildApksCommand_splitApks_localeConfigXmlNotGenerated() throws Exception {
     AppBundle appBundle =
         new AppBundleBuilder()
-            .addModule("base",
+            .addModule(
+                "base",
                 builder ->
                     builder
                         .setManifest(androidManifest("com.test.app"))
@@ -2118,18 +2126,19 @@ public class BuildApksManagerTest {
   public void buildApksCommand_splitApks_localeConfigXmlGenerated() throws Exception {
     AppBundle appBundle =
         new AppBundleBuilder()
-          .addModule("base",
-              builder ->
-                  builder
-                      .setManifest(androidManifest("com.test.app"))
-                      .setResourceTable(
-                        new ResourceTableBuilder()
-                            .addPackage("com.test.app")
-                            .addStringResourceForMultipleLocales(
-                                "module", ImmutableMap.of("ru-RU", "module ru-RU"))
-                            .build()))
-          .setBundleConfig(BundleConfigBuilder.create().setInjectLocaleConfig(true).build())
-          .build();
+            .addModule(
+                "base",
+                builder ->
+                    builder
+                        .setManifest(androidManifest("com.test.app"))
+                        .setResourceTable(
+                            new ResourceTableBuilder()
+                                .addPackage("com.test.app")
+                                .addStringResourceForMultipleLocales(
+                                    "module", ImmutableMap.of("ru-RU", "module ru-RU"))
+                                .build()))
+            .setBundleConfig(BundleConfigBuilder.create().setInjectLocaleConfig(true).build())
+            .build();
 
     TestComponent.useTestModule(
         this,
@@ -2150,7 +2159,7 @@ public class BuildApksManagerTest {
               .filter(apkDescription -> apkDescription.getSplitApkMetadata().getIsMasterSplit())
               .collect(onlyElement());
 
-     assertThat(filesInApks(ImmutableList.of(baseMasterSplit), apkSetFile))
+      assertThat(filesInApks(ImmutableList.of(baseMasterSplit), apkSetFile))
           .contains("res/xml/locales_config.xml");
     }
   }
@@ -2318,6 +2327,21 @@ public class BuildApksManagerTest {
         .containsExactly(
             sdkVersionTargeting(L_SDK_VERSION, ImmutableSet.of(LOWEST_SDK_VERSION, N_SDK_VERSION)),
             sdkVersionTargeting(N_SDK_VERSION, ImmutableSet.of(LOWEST_SDK_VERSION, L_SDK_VERSION)));
+    VariantProperties expectedVariantProperties =
+        VariantProperties.newBuilder().setUncompressedNativeLibraries(true).build();
+    assertThat(
+            splitApkVariants.stream()
+                .filter(
+                    variant ->
+                        variant
+                            .getTargeting()
+                            .getSdkVersionTargeting()
+                            .getValue(0)
+                            .equals(N_SDK_VERSION))
+                .findAny()
+                .get()
+                .getVariantProperties())
+        .isEqualTo(expectedVariantProperties);
   }
 
   @Test
@@ -2357,6 +2381,40 @@ public class BuildApksManagerTest {
   }
 
   @Test
+  public void
+      enabledDexCompressionSplitter_enabledUncompressedDexForSVariant_multipleSplitVariants()
+          throws Exception {
+    AppBundle appBundle =
+        new AppBundleBuilder()
+            .addModule(
+                "base",
+                builder ->
+                    builder.addFile("dex/classes.dex").setManifest(androidManifest("com.test.app")))
+            .setBundleConfig(
+                BundleConfigBuilder.create()
+                    .setUncompressDexFilesForVariant(UncompressedDexTargetSdk.SDK_31)
+                    .setUncompressDexFiles(true)
+                    .build())
+            .build();
+    TestComponent.useTestModule(
+        this,
+        createTestModuleBuilder().withAppBundle(appBundle).withOutputPath(outputFilePath).build());
+
+    buildApksManager.execute();
+
+    ZipFile apkSetFile = openZipFile(outputFilePath.toFile());
+    BuildApksResult result = extractTocFromApkSetFile(apkSetFile, outputDir);
+
+    ImmutableList<Variant> splitApkVariants = splitApkVariants(result);
+    assertThat(
+            splitApkVariants.stream()
+                .map(variant -> variant.getTargeting().getSdkVersionTargeting()))
+        .containsExactly(
+            sdkVersionTargeting(L_SDK_VERSION, ImmutableSet.of(LOWEST_SDK_VERSION, S_SDK_VERSION)),
+            sdkVersionTargeting(S_SDK_VERSION, ImmutableSet.of(LOWEST_SDK_VERSION, L_SDK_VERSION)));
+  }
+
+  @Test
   public void enabledDexCompressionSplitter_enabledUncompressedDex_multipleSplitVariants()
       throws Exception {
     AppBundle appBundle =
@@ -2383,6 +2441,21 @@ public class BuildApksManagerTest {
         .containsExactly(
             sdkVersionTargeting(L_SDK_VERSION, ImmutableSet.of(LOWEST_SDK_VERSION, Q_SDK_VERSION)),
             sdkVersionTargeting(Q_SDK_VERSION, ImmutableSet.of(LOWEST_SDK_VERSION, L_SDK_VERSION)));
+    VariantProperties expectedVariantProperties =
+        VariantProperties.newBuilder().setUncompressedDex(true).build();
+    assertThat(
+            splitApkVariants.stream()
+                .filter(
+                    variant ->
+                        variant
+                            .getTargeting()
+                            .getSdkVersionTargeting()
+                            .getValue(0)
+                            .equals(Q_SDK_VERSION))
+                .findAny()
+                .get()
+                .getVariantProperties())
+        .isEqualTo(expectedVariantProperties);
   }
 
   @Test
@@ -2441,6 +2514,152 @@ public class BuildApksManagerTest {
                 L_SDK_VERSION, ImmutableSet.of(LOWEST_SDK_VERSION, S2_V2_SDK_VERSION)),
             sdkVersionTargeting(
                 S2_V2_SDK_VERSION, ImmutableSet.of(LOWEST_SDK_VERSION, L_SDK_VERSION)));
+    VariantProperties expectedVariantProperties =
+        VariantProperties.newBuilder().setSparseEncoding(true).build();
+    assertThat(
+            splitApkVariants.stream()
+                .filter(
+                    variant ->
+                        variant
+                            .getTargeting()
+                            .getSdkVersionTargeting()
+                            .getValue(0)
+                            .equals(S2_V2_SDK_VERSION))
+                .findAny()
+                .get()
+                .getVariantProperties())
+        .isEqualTo(expectedVariantProperties);
+  }
+
+  @Test
+  public void
+      enableNativeLibsDexCompressionSparseEncodingSplitterEnabled_multipleSplitVariants_correctVariantProperties()
+          throws Exception {
+    AppBundle appBundle =
+        new AppBundleBuilder()
+            .addModule(
+                "base",
+                builder ->
+                    builder
+                        .addFile("dex/classes.dex")
+                        .addFile("lib/x86/libsome.so")
+                        .setNativeConfig(
+                            nativeLibraries(
+                                targetedNativeDirectory("lib/x86", nativeDirectoryTargeting(X86))))
+                        .setManifest(
+                            androidManifest("com.test.app", withTargetSdkVersion("O.fingerprint"))))
+            .setBundleConfig(
+                BundleConfigBuilder.create()
+                    .setSparseEncodingForSdk32()
+                    .setUncompressNativeLibraries(true)
+                    .setUncompressDexFiles(true)
+                    .build())
+            .build();
+    TestComponent.useTestModule(
+        this,
+        createTestModuleBuilder().withAppBundle(appBundle).withOutputPath(outputFilePath).build());
+
+    buildApksManager.execute();
+
+    ZipFile apkSetFile = openZipFile(outputFilePath.toFile());
+    BuildApksResult result = extractTocFromApkSetFile(apkSetFile, outputDir);
+
+    ImmutableList<Variant> splitApkVariants = splitApkVariants(result);
+    VariantProperties variantLProperties =
+        splitApkVariants.stream()
+            .filter(
+                variant ->
+                    variant
+                        .getTargeting()
+                        .getSdkVersionTargeting()
+                        .getValue(0)
+                        .equals(L_SDK_VERSION))
+            .findAny()
+            .get()
+            .getVariantProperties();
+    VariantProperties variantMProperties =
+        splitApkVariants.stream()
+            .filter(
+                variant ->
+                    variant
+                        .getTargeting()
+                        .getSdkVersionTargeting()
+                        .getValue(0)
+                        .equals(M_SDK_VERSION))
+            .findAny()
+            .get()
+            .getVariantProperties();
+    VariantProperties variantQProperties =
+        splitApkVariants.stream()
+            .filter(
+                variant ->
+                    variant
+                        .getTargeting()
+                        .getSdkVersionTargeting()
+                        .getValue(0)
+                        .equals(Q_SDK_VERSION))
+            .findAny()
+            .get()
+            .getVariantProperties();
+    VariantProperties variantSV2Properties =
+        splitApkVariants.stream()
+            .filter(
+                variant ->
+                    variant
+                        .getTargeting()
+                        .getSdkVersionTargeting()
+                        .getValue(0)
+                        .equals(S2_V2_SDK_VERSION))
+            .findAny()
+            .get()
+            .getVariantProperties();
+    VariantProperties variantLExpectedProperties =
+        VariantProperties.newBuilder()
+            .setUncompressedDex(false)
+            .setSparseEncoding(false)
+            .setUncompressedNativeLibraries(false)
+            .build();
+    VariantProperties variantMExpectedProperties =
+        VariantProperties.newBuilder()
+            .setUncompressedDex(false)
+            .setSparseEncoding(false)
+            .setUncompressedNativeLibraries(true)
+            .build();
+    VariantProperties variantQExpectedProperties =
+        VariantProperties.newBuilder()
+            .setUncompressedDex(true)
+            .setSparseEncoding(false)
+            .setUncompressedNativeLibraries(true)
+            .build();
+    VariantProperties variantSV2ExpectedProperties =
+        VariantProperties.newBuilder()
+            .setUncompressedDex(true)
+            .setSparseEncoding(true)
+            .setUncompressedNativeLibraries(true)
+            .build();
+    assertThat(variantLProperties).isEqualTo(variantLExpectedProperties);
+    assertThat(variantMProperties).isEqualTo(variantMExpectedProperties);
+    assertThat(variantQProperties).isEqualTo(variantQExpectedProperties);
+    assertThat(variantSV2Properties).isEqualTo(variantSV2ExpectedProperties);
+  }
+
+  @Test
+  public void noOptimizations_correctVariantProperties() throws Exception {
+    AppBundle appBundle =
+        new AppBundleBuilder()
+            .addModule("base", builder -> builder.setManifest(androidManifest("com.test.app")))
+            .build();
+    TestComponent.useTestModule(
+        this,
+        createTestModuleBuilder().withAppBundle(appBundle).withOutputPath(outputFilePath).build());
+
+    buildApksManager.execute();
+
+    ZipFile apkSetFile = openZipFile(outputFilePath.toFile());
+    BuildApksResult result = extractTocFromApkSetFile(apkSetFile, outputDir);
+    ImmutableList<Variant> splitApkVariants = splitApkVariants(result);
+    assertThat(splitApkVariants).hasSize(1);
+    assertThat(splitApkVariants.get(0).getVariantProperties()).isEqualToDefaultInstance();
   }
 
   @Test
@@ -6152,14 +6371,33 @@ public class BuildApksManagerTest {
                 new BundleModuleBuilder("base")
                     .setManifest(
                         androidManifest("com.test.app", withMinSdkVersion(ANDROID_L_API_VERSION)))
+                    .setResourceTable(resourceTableWithTestLabel("Test feature"))
                     .setRuntimeEnabledSdkConfig(
                         RuntimeEnabledSdkConfig.newBuilder()
                             .addRuntimeEnabledSdk(
                                 RuntimeEnabledSdk.newBuilder()
-                                    .setPackageName("com.test.sdk")
+                                    .setPackageName("com.test.sdk1")
                                     .setVersionMajor(1)
+                                    .setVersionMinor(1)
                                     .setCertificateDigest(validCertDigest)
                                     .setResourcesPackageId(2))
+                            .build())
+                    .build())
+            .addModule(
+                new BundleModuleBuilder("feature")
+                    .setManifest(
+                        androidManifestForFeature(
+                            "com.test.app",
+                            withTitle("@string/test_label", TEST_LABEL_RESOURCE_ID)))
+                    .setRuntimeEnabledSdkConfig(
+                        RuntimeEnabledSdkConfig.newBuilder()
+                            .addRuntimeEnabledSdk(
+                                RuntimeEnabledSdk.newBuilder()
+                                    .setPackageName("com.test.sdk2")
+                                    .setVersionMajor(2)
+                                    .setVersionMinor(2)
+                                    .setCertificateDigest(validCertDigest)
+                                    .setResourcesPackageId(3))
                             .build())
                     .build())
             .build();
@@ -6178,21 +6416,36 @@ public class BuildApksManagerTest {
     assertThat(result.getVariantList()).hasSize(2);
     ImmutableList<Variant> sortedVariantList =
         ImmutableList.sortedCopyOf(comparing(Variant::getVariantNumber), result.getVariantList());
-    assertThat(sortedVariantList.get(0).getVariantNumber()).isEqualTo(0);
-    assertThat(sortedVariantList.get(0).getTargeting())
+    Variant nonSdkRuntimeVariant = sortedVariantList.get(0);
+    assertThat(nonSdkRuntimeVariant.getVariantNumber()).isEqualTo(0);
+    assertThat(nonSdkRuntimeVariant.getTargeting())
+        .isEqualTo(variantSdkTargeting(ANDROID_L_API_VERSION));
+    Variant sdkRuntimeVariant = sortedVariantList.get(1);
+    assertThat(sdkRuntimeVariant.getVariantNumber()).isEqualTo(1);
+    assertThat(sdkRuntimeVariant.getTargeting())
         .isEqualTo(
-            variantSdkTargeting(
-                ANDROID_L_API_VERSION,
-                /* alternativeMinSdkVersions= */ ImmutableSet.of(ANDROID_T_API_VERSION)));
-    assertThat(sortedVariantList.get(1).getVariantNumber()).isEqualTo(1);
-    assertThat(sortedVariantList.get(1).getTargeting())
-        .isEqualTo(
-            variantSdkTargeting(
-                    ANDROID_T_API_VERSION,
-                    /* alternativeMinSdkVersions= */ ImmutableSet.of(ANDROID_L_API_VERSION))
-                .toBuilder()
+            sdkRuntimeVariantTargeting(ANDROID_T_API_VERSION).toBuilder()
                 .setSdkRuntimeTargeting(
                     SdkRuntimeTargeting.newBuilder().setRequiresSdkRuntime(true))
+                .build());
+    ImmutableMap<String, ModuleMetadata> sdkRuntimeModulesMetadata =
+        sdkRuntimeVariant.getApkSetList().stream()
+            .map(ApkSet::getModuleMetadata)
+            .collect(toImmutableMap(ModuleMetadata::getName, identity()));
+    assertThat(sdkRuntimeModulesMetadata).hasSize(2);
+    assertThat(sdkRuntimeModulesMetadata.get("base").getRuntimeEnabledSdkDependenciesList())
+        .containsExactly(
+            RuntimeEnabledSdkDependency.newBuilder()
+                .setPackageName("com.test.sdk1")
+                .setMajorVersion(1)
+                .setMinorVersion(1)
+                .build());
+    assertThat(sdkRuntimeModulesMetadata.get("feature").getRuntimeEnabledSdkDependenciesList())
+        .containsExactly(
+            RuntimeEnabledSdkDependency.newBuilder()
+                .setPackageName("com.test.sdk2")
+                .setMajorVersion(2)
+                .setMinorVersion(2)
                 .build());
   }
 

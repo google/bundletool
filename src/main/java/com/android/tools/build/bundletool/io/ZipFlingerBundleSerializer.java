@@ -20,6 +20,7 @@ import static com.android.tools.build.bundletool.model.AppBundle.BUNDLE_CONFIG_F
 import static com.android.tools.build.bundletool.model.AppBundle.METADATA_DIRECTORY;
 import static com.android.tools.build.bundletool.model.utils.BundleParser.EXTRACTED_SDK_MODULES_FILE_NAME;
 import static com.android.tools.build.bundletool.model.utils.BundleParser.SDK_BUNDLE_CONFIG_FILE_NAME;
+import static com.android.tools.build.bundletool.model.utils.BundleParser.SDK_INTERFACE_DESCRIPTORS_FILE_NAME;
 import static com.android.tools.build.bundletool.model.utils.BundleParser.SDK_MODULES_CONFIG_FILE_NAME;
 import static com.android.tools.build.bundletool.model.utils.BundleParser.SDK_MODULES_FILE_NAME;
 import static com.google.common.base.Preconditions.checkState;
@@ -133,6 +134,15 @@ public final class ZipFlingerBundleSerializer {
               ZipPath.create(SDK_BUNDLE_CONFIG_FILE_NAME),
               sdkBundle.getSdkBundleConfig(),
               DEFAULT_COMPRESSION_LEVEL));
+
+      // sdk-interface-descriptors.jar
+      if (sdkBundle.getSdkInterfaceDescriptors().isPresent()) {
+        zipArchive.add(
+            new BytesSource(
+                sdkBundle.getSdkInterfaceDescriptors().get().openStream(),
+                SDK_INTERFACE_DESCRIPTORS_FILE_NAME,
+                DEFAULT_COMPRESSION_LEVEL));
+      }
 
       // BUNDLE-METADATA
       for (Entry<ZipPath, ByteSource> metadataEntry :

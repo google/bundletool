@@ -16,9 +16,11 @@
 
 package com.android.tools.build.bundletool.device;
 
+import static com.android.tools.build.bundletool.model.AndroidManifest.SDK_SANDBOX_MIN_VERSION;
 import static com.google.common.base.Preconditions.checkState;
 
 import com.android.bundle.Devices.DeviceSpec;
+import com.android.bundle.Devices.SdkRuntime;
 import com.android.ddmlib.IDevice.DeviceState;
 import com.android.tools.build.bundletool.device.activitymanager.ActivityManagerRunner;
 import com.android.tools.build.bundletool.model.exceptions.CommandExecutionException;
@@ -89,6 +91,14 @@ public class DeviceAnalyzer {
       if (codename != null) {
         builder.setCodename(codename);
       }
+
+      if (deviceSdkVersion >= SDK_SANDBOX_MIN_VERSION) {
+        builder.setSdkRuntime(
+            SdkRuntime.newBuilder()
+                .setSupported(true)
+                .addAllInstalledSdks(device.getRuntimeEnabledSdks()));
+      }
+
       return builder.build();
     } catch (TimeoutException e) {
       throw CommandExecutionException.builder()

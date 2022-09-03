@@ -17,16 +17,23 @@ package com.android.tools.build.bundletool.commands;
 
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifest;
 import static com.google.common.truth.Truth.assertThat;
+import static com.google.common.truth.extensions.proto.ProtoTruth.assertThat;
+import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.android.aapt.Resources.ResourceTable;
+import com.android.bundle.RuntimeEnabledSdkConfigProto.RuntimeEnabledSdk;
+import com.android.bundle.RuntimeEnabledSdkConfigProto.RuntimeEnabledSdkConfig;
 import com.android.tools.build.bundletool.commands.DumpCommand.DumpTarget;
 import com.android.tools.build.bundletool.flags.FlagParser;
 import com.android.tools.build.bundletool.io.AppBundleSerializer;
 import com.android.tools.build.bundletool.model.AppBundle;
 import com.android.tools.build.bundletool.model.exceptions.InvalidCommandException;
 import com.android.tools.build.bundletool.testing.AppBundleBuilder;
+import com.google.protobuf.util.JsonFormat;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.PrintStream;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import org.junit.Before;
@@ -176,6 +183,21 @@ public final class DumpCommandTest {
   }
 
   @Test
+  public void buildingViaFlagsAndBuilderHasSameResult_runtimeEnabledSdkConfig() {
+    DumpCommand commandViaFlags =
+        DumpCommand.fromFlags(
+            new FlagParser().parse("dump", "runtime-enabled-sdk-config", "--bundle=" + bundlePath));
+
+    DumpCommand commandViaBuilder =
+        DumpCommand.builder()
+            .setDumpTarget(DumpTarget.RUNTIME_ENABLED_SDK_CONFIG)
+            .setBundlePath(bundlePath)
+            .build();
+
+    assertThat(commandViaBuilder).isEqualTo(commandViaFlags);
+  }
+
+  @Test
   public void dumpFileThatDoesNotExist() {
     DumpCommand command =
         DumpCommand.builder()
@@ -282,6 +304,76 @@ public final class DumpCommandTest {
     assertThat(exception)
         .hasMessageThat()
         .contains("Printing resource values can only be requested when dumping resources.");
+  }
+
+  @Test
+  public void dumpRuntimeEnabledSdkConfig_empty() throws Exception {
+    createBundle(bundlePath);
+    ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+
+    DumpCommand.builder()
+        .setBundlePath(bundlePath)
+        .setDumpTarget(DumpTarget.RUNTIME_ENABLED_SDK_CONFIG)
+        .setOutputStream(new PrintStream(outputStream))
+        .build()
+        .execute();
+
+    RuntimeEnabledSdkConfig.Builder result = RuntimeEnabledSdkConfig.newBuilder();
+    JsonFormat.parser().merge(new String(outputStream.toByteArray(), UTF_8), result);
+    assertThat(result.build()).isEqualToDefaultInstance();
+  }
+
+  @Test
+  public void dumpRuntimeEnabledSdkConfig_printsAllModuleDependencies() throws Exception {
+    RuntimeEnabledSdk sdk1 =
+        RuntimeEnabledSdk.newBuilder()
+            .setPackageName("com.test.sdk1")
+            .setVersionMajor(1)
+            .setVersionMinor(2)
+            .setBuildTimeVersionPatch(3)
+            .setCertificateDigest("AA:BB:CC")
+            .setResourcesPackageId(4)
+            .build();
+    RuntimeEnabledSdk sdk2 = sdk1.toBuilder().setPackageName("com.test.sdk2").build();
+    AppBundle appBundle =
+        new AppBundleBuilder()
+            .addModule(
+                "base",
+                module ->
+                    module
+                        .setManifest(androidManifest("com.app"))
+                        .setRuntimeEnabledSdkConfig(
+                            RuntimeEnabledSdkConfig.newBuilder()
+                                .addRuntimeEnabledSdk(sdk1)
+                                .build()))
+            .addModule(
+                "feature",
+                module ->
+                    module
+                        .setManifest(androidManifest("com.app"))
+                        .setRuntimeEnabledSdkConfig(
+                            RuntimeEnabledSdkConfig.newBuilder()
+                                .addRuntimeEnabledSdk(sdk2)
+                                .build()))
+            .build();
+    new AppBundleSerializer().writeToDisk(appBundle, bundlePath);
+    ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+
+    DumpCommand.builder()
+        .setBundlePath(bundlePath)
+        .setDumpTarget(DumpTarget.RUNTIME_ENABLED_SDK_CONFIG)
+        .setOutputStream(new PrintStream(outputStream))
+        .build()
+        .execute();
+
+    RuntimeEnabledSdkConfig.Builder result = RuntimeEnabledSdkConfig.newBuilder();
+    JsonFormat.parser().merge(new String(outputStream.toByteArray(), UTF_8), result);
+    assertThat(result.build())
+        .isEqualTo(
+            RuntimeEnabledSdkConfig.newBuilder()
+                .addRuntimeEnabledSdk(sdk1)
+                .addRuntimeEnabledSdk(sdk2)
+                .build());
   }
 
   private static void createBundle(Path bundlePath) throws IOException {

@@ -66,6 +66,7 @@ public abstract class AndroidManifest {
   public static final String ANDROID_NAMESPACE_URI = "http://schemas.android.com/apk/res/android";
   public static final String DISTRIBUTION_NAMESPACE_URI =
       "http://schemas.android.com/apk/distribution";
+  public static final String TOOLS_NAMESPACE_URI = "http://schemas.android.com/tools";
   public static final String NO_NAMESPACE_URI = "";
 
   public static final String APPLICATION_ELEMENT_NAME = "application";
@@ -94,6 +95,7 @@ public abstract class AndroidManifest {
   public static final String DEBUGGABLE_ATTRIBUTE_NAME = "debuggable";
   public static final String EXTRACT_NATIVE_LIBS_ATTRIBUTE_NAME = "extractNativeLibs";
   public static final String ICON_ATTRIBUTE_NAME = "icon";
+  public static final String ROUND_ICON_ATTRIBUTE_NAME = "roundIcon";
   public static final String BANNER_ATTRIBUTE_NAME = "banner";
   public static final String MAX_SDK_VERSION_ATTRIBUTE_NAME = "maxSdkVersion";
   public static final String MIN_SDK_VERSION_ATTRIBUTE_NAME = "minSdkVersion";
@@ -133,6 +135,8 @@ public abstract class AndroidManifest {
       "com.android.vending.sdk.version.patch";
   public static final String SDK_PROVIDER_CLASS_NAME_ATTRIBUTE_NAME =
       "android.sdksandbox.PROPERTY_SDK_PROVIDER_CLASS_NAME";
+  public static final String COMPAT_SDK_PROVIDER_CLASS_NAME_ATTRIBUTE_NAME =
+      "android.sdksandbox.PROPERTY_COMPAT_SDK_PROVIDER_CLASS_NAME";
   public static final String REQUIRED_ATTRIBUTE_NAME = "required";
   public static final Integer SDK_SANDBOX_MIN_VERSION = 32;
   public static final String USES_SDK_LIBRARY_ELEMENT_NAME = "uses-sdk-library";
@@ -142,6 +146,8 @@ public abstract class AndroidManifest {
   public static final String RESTRICTED_ACCOUNT_TYPE_ATTRIBUTE_NAME = "restrictedAccountType";
   public static final String LARGE_HEAP_ATTRIBUTE_NAME = "largeHeap";
   public static final String INCLUDE_ATTRIBUTE_NAME = "include";
+  public static final String REQUIRED_BY_PRIVACY_SANDBOX_SDK_ATTRIBUTE_NAME =
+      "requiredByPrivacySandboxSdk";
 
   public static final String LEANBACK_FEATURE_NAME = "android.software.leanback";
   public static final String TOUCHSCREEN_FEATURE_NAME = "android.hardware.touchscreen";
@@ -158,6 +164,7 @@ public abstract class AndroidManifest {
   public static final int REQUIRED_RESOURCE_ID = 0x0101028e;
   public static final int HAS_CODE_RESOURCE_ID = 0x101000c;
   public static final int ICON_RESOURCE_ID = 0x01010002;
+  public static final int ROUND_ICON_RESOURCE_ID = 0x0101052C;
   public static final int BANNER_RESOURCE_ID = 0x010103f2;
   public static final int MAX_SDK_VERSION_RESOURCE_ID = 0x01010271;
   public static final int MIN_SDK_VERSION_RESOURCE_ID = 0x0101020c;
@@ -193,6 +200,7 @@ public abstract class AndroidManifest {
   public static final int REQUIRED_ACCOUNT_TYPE_RESOURCE_ID = 0x010103d6;
   public static final int RESTRICTED_ACCOUNT_TYPE_RESOURCE_ID = 0x010103d5;
   public static final int LARGE_HEAP_RESOURCE_ID = 0x0101035a;
+  public static final int DRAWABLE_RESOURCE_ID = 0x01010199;
 
   // Matches the value of android.os.Build.VERSION_CODES.CUR_DEVELOPMENT, used when turning
   // a manifest attribute which references a prerelease API version (e.g., "Q") into an integer.
@@ -878,12 +886,22 @@ public abstract class AndroidManifest {
   }
 
   /**
-   * Gets the SDK provider class name if it is set in the AndroidManifest. If there are multiple
-   * <property> elements with android:name={@value SDK_PROVIDER_CLASS_NAME_ATTRIBUTE_NAME}, return
-   * the first one.
+   * Gets the platform SDK provider class name if it is set in the AndroidManifest. If there are
+   * multiple <property> elements with android:name={@value SDK_PROVIDER_CLASS_NAME_ATTRIBUTE_NAME},
+   * return the first one.
    */
   public Optional<String> getSdkProviderClassNameProperty() {
     return getPropertyValue(SDK_PROVIDER_CLASS_NAME_ATTRIBUTE_NAME)
+        .map(XmlProtoAttribute::getValueAsString);
+  }
+
+  /**
+   * Gets the compat SDK provider class name if it is set in the AndroidManifest. If there are
+   * multiple <property> elements with android:name={@value
+   * COMPAT_SDK_PROVIDER_CLASS_NAME_ATTRIBUTE_NAME}, return the first one.
+   */
+  public Optional<String> getCompatSdkProviderClassNameProperty() {
+    return getPropertyValue(COMPAT_SDK_PROVIDER_CLASS_NAME_ATTRIBUTE_NAME)
         .map(XmlProtoAttribute::getValueAsString);
   }
 
@@ -937,5 +955,19 @@ public abstract class AndroidManifest {
     return stream(getManifestElement().getOptionalChildElement(APPLICATION_ELEMENT_NAME))
         .flatMap(app -> app.getChildrenElements())
         .anyMatch(component -> componentNames.contains(component.getName()));
+  }
+
+  public Optional<XmlProtoAttribute> getIconAttribute() {
+    return getManifestRoot()
+        .getElement()
+        .getChildElement(APPLICATION_ELEMENT_NAME)
+        .getAndroidAttribute(ICON_RESOURCE_ID);
+  }
+
+  public Optional<XmlProtoAttribute> getRoundIconAttribute() {
+    return getManifestRoot()
+        .getElement()
+        .getChildElement(APPLICATION_ELEMENT_NAME)
+        .getAndroidAttribute(ROUND_ICON_RESOURCE_ID);
   }
 }

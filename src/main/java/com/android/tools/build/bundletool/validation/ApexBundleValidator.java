@@ -30,6 +30,7 @@ import static com.google.common.collect.ImmutableSet.toImmutableSet;
 import static java.nio.charset.StandardCharsets.UTF_8;
 
 import com.android.apex.ApexManifestProto.ApexManifest;
+import com.android.bundle.Config.ApexConfig;
 import com.android.bundle.Files.ApexImages;
 import com.android.bundle.Files.TargetedApexImage;
 import com.android.tools.build.bundletool.model.AbiName;
@@ -163,8 +164,22 @@ public class ApexBundleValidator extends SubValidator {
           .build();
     }
 
-    if (REQUIRED_ONE_OF_ABI_SETS.stream()
-        .anyMatch(one_of -> one_of.stream().noneMatch(allAbiNameSets::contains))) {
+    // When bundle config declares supported ABIs, the bundle should have the exact list of images.
+    ImmutableSet<ImmutableSet<AbiName>> supportedAbis = declaredSupportedAbis(module);
+    if (!supportedAbis.isEmpty() && !supportedAbis.equals(allAbiNameSets)) {
+      throw InvalidBundleException.builder()
+          .withUserMessage(
+              "If supported_abi_set is set in config then it should match with APEX image files:\n"
+                  + " Expected %s\n"
+                  + " Found %s.",
+              supportedAbis, allAbiNameSets)
+          .build();
+    }
+
+    // When config doesn't declare supported abi list, the bundle should have all required abis.
+    if (supportedAbis.isEmpty()
+        && REQUIRED_ONE_OF_ABI_SETS.stream()
+            .anyMatch(oneOf -> oneOf.stream().noneMatch(allAbiNameSets::contains))) {
       throw InvalidBundleException.builder()
           .withUserMessage(
               "APEX bundle must contain one of %s.",
@@ -173,6 +188,31 @@ public class ApexBundleValidator extends SubValidator {
     }
 
     module.getApexConfig().ifPresent(targeting -> validateTargeting(apexImages, targeting));
+  }
+
+  private static ImmutableSet<ImmutableSet<AbiName>> declaredSupportedAbis(BundleModule module) {
+    final Optional<ApexConfig> apexConfig = module.getBundleApexConfig();
+    if (!apexConfig.isPresent()) {
+      return ImmutableSet.of();
+    }
+
+    return apexConfig.get().getSupportedAbiSetList().stream()
+        .map(
+            abiSet ->
+                abiSet.getAbiList().stream()
+                    .map(
+                        abi ->
+                            AbiName.fromPlatformName(abi)
+                                .orElseThrow(
+                                    () ->
+                                        InvalidBundleException.builder()
+                                            .withUserMessage(
+                                                "Unrecognized ABI '%s' in"
+                                                    + " config.supported_abi_set.",
+                                                abi)
+                                            .build()))
+                    .collect(toImmutableSet()))
+        .collect(toImmutableSet());
   }
 
   private static ImmutableSet<AbiName> abiNamesFromFile(String fileName) {

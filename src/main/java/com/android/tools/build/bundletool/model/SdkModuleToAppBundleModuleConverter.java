@@ -21,20 +21,22 @@ import com.android.bundle.RuntimeEnabledSdkConfigProto.RuntimeEnabledSdk;
 import com.android.tools.build.bundletool.model.BundleModule.ModuleType;
 
 /**
- * Transforms Android SDK Bundle module so that it can be included in an Android App Bundle.
+ * Transforms Runtime-enabled SDK module so that it can be included in an Android App Bundle.
  *
  * <p>The SDK module will be delivered as the app module on devices with no SDK Runtime support.
  */
-public final class SdkBundleModuleToAppBundleModuleConverter {
+public final class SdkModuleToAppBundleModuleConverter {
 
-  private final SdkBundle sdkBundle;
+  private final String sdkPackageName;
+  private final BundleModule sdkModule;
   private final ResourceTablePackageIdRemapper resourceTablePackageIdRemapper;
   private final XmlPackageIdRemapper xmlPackageIdRemapper;
   private final ClassesDexEntriesMutator classesDexEntriesMutator;
 
-  public SdkBundleModuleToAppBundleModuleConverter(
-      SdkBundle sdkBundle, RuntimeEnabledSdk dependencyConfig) {
-    this.sdkBundle = sdkBundle;
+  public SdkModuleToAppBundleModuleConverter(
+      String sdkPackageName, BundleModule sdkModule, RuntimeEnabledSdk dependencyConfig) {
+    this.sdkPackageName = sdkPackageName;
+    this.sdkModule = sdkModule;
     this.resourceTablePackageIdRemapper =
         new ResourceTablePackageIdRemapper(dependencyConfig.getResourcesPackageId());
     this.xmlPackageIdRemapper = new XmlPackageIdRemapper(dependencyConfig.getResourcesPackageId());
@@ -48,8 +50,7 @@ public final class SdkBundleModuleToAppBundleModuleConverter {
   public BundleModule convert() {
     return convertNameTypeAndManifest(
         removeRPackageDexFile(
-            remapResourceIdsInXmlResources(
-                remapResourceIdsInResourceTable(sdkBundle.getModule()))));
+            remapResourceIdsInXmlResources(remapResourceIdsInResourceTable(sdkModule))));
   }
 
   private BundleModule remapResourceIdsInResourceTable(BundleModule module) {
@@ -67,13 +68,12 @@ public final class SdkBundleModuleToAppBundleModuleConverter {
   private BundleModule convertNameTypeAndManifest(BundleModule module) {
     // We are using modified SDK package name as a new module name. Dots are removed because special
     // characters are not allowed in module names.
-    String sdkModuleName = sdkBundle.getPackageName().replace(".", "");
+    String sdkModuleName = sdkPackageName.replace(".", "");
     return module.toBuilder()
         .setName(BundleModuleName.create(sdkModuleName))
         .setModuleType(ModuleType.SDK_DEPENDENCY_MODULE)
         .setAndroidManifest(
-            sdkBundle
-                .getModule()
+            sdkModule
                 .getAndroidManifest()
                 .toEditor()
                 .removeUsesSdkElement()

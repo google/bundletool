@@ -30,14 +30,6 @@ public class SdkBundleValidator {
       // Keep order of common validators in sync with BundleModulesValidator.
       ImmutableList.of(new BundleZipValidator(), new SdkBundleMandatoryFilesPresenceValidator());
 
-  /** Validators run on the modules.resm zip file. */
-  @VisibleForTesting
-  static final ImmutableList<SubValidator> DEFAULT_MODULES_FILE_SUB_VALIDATORS =
-      ImmutableList.of(
-          new SdkBundleModulesMandatoryFilesPresenceValidator(),
-          new SdkBundleHasOneModuleValidator(),
-          new SdkModulesConfigValidator());
-
   /** Validators run on the internal representation of bundle and bundle modules. */
   @VisibleForTesting
   static final ImmutableList<SubValidator> DEFAULT_BUNDLE_SUB_VALIDATORS =
@@ -56,16 +48,16 @@ public class SdkBundleValidator {
           new SdkBundleModuleResourceIdValidator());
 
   private final ImmutableList<SubValidator> allBundleFileSubValidators;
-  private final ImmutableList<SubValidator> allModulesFileSubValidators;
   private final ImmutableList<SubValidator> allBundleSubValidators;
+  private final ImmutableList<SubValidator> extraModulesFileSubValidators;
 
   private SdkBundleValidator(
       ImmutableList<SubValidator> allBundleSubValidators,
-      ImmutableList<SubValidator> allModulesFileSubValidators,
-      ImmutableList<SubValidator> allBundleFileSubValidators) {
+      ImmutableList<SubValidator> allBundleFileSubValidators,
+      ImmutableList<SubValidator> extraModulesFileSubValidators) {
     this.allBundleSubValidators = allBundleSubValidators;
-    this.allModulesFileSubValidators = allModulesFileSubValidators;
     this.allBundleFileSubValidators = allBundleFileSubValidators;
+    this.extraModulesFileSubValidators = extraModulesFileSubValidators;
   }
 
   public static SdkBundleValidator create() {
@@ -79,13 +71,10 @@ public class SdkBundleValidator {
             .addAll(extraSubValidators)
             .build(),
         ImmutableList.<SubValidator>builder()
-            .addAll(DEFAULT_MODULES_FILE_SUB_VALIDATORS)
-            .addAll(extraSubValidators)
-            .build(),
-        ImmutableList.<SubValidator>builder()
             .addAll(DEFAULT_BUNDLE_FILE_SUB_VALIDATORS)
             .addAll(extraSubValidators)
-            .build());
+            .build(),
+        extraSubValidators);
   }
 
   /** Validates the given Sdk Bundle zip file. */
@@ -94,7 +83,7 @@ public class SdkBundleValidator {
   }
 
   public void validateModulesFile(ZipFile modulesFile) {
-    new ValidatorRunner(allModulesFileSubValidators).validateSdkModulesZipFile(modulesFile);
+    SdkModulesFileValidator.create(extraModulesFileSubValidators).validate(modulesFile);
   }
 
   /** Validates the given Sdk Bundle. */

@@ -20,6 +20,8 @@ import static com.android.tools.build.bundletool.model.AndroidManifest.ACTIVITY_
 import static com.android.tools.build.bundletool.model.AndroidManifest.ACTIVITY_ELEMENT_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.ANDROID_NAMESPACE_URI;
 import static com.android.tools.build.bundletool.model.AndroidManifest.APPLICATION_ELEMENT_NAME;
+import static com.android.tools.build.bundletool.model.AndroidManifest.CERTIFICATE_DIGEST_ATTRIBUTE_NAME;
+import static com.android.tools.build.bundletool.model.AndroidManifest.CERTIFICATE_DIGEST_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.CONDITION_DEVICE_GROUPS_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.DEBUGGABLE_ATTRIBUTE_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.DEBUGGABLE_RESOURCE_ID;
@@ -52,7 +54,10 @@ import static com.android.tools.build.bundletool.model.AndroidManifest.PERMISSIO
 import static com.android.tools.build.bundletool.model.AndroidManifest.PROPERTY_ELEMENT_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.PROVIDER_ELEMENT_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.RECEIVER_ELEMENT_NAME;
+import static com.android.tools.build.bundletool.model.AndroidManifest.REQUIRED_BY_PRIVACY_SANDBOX_SDK_ATTRIBUTE_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.RESOURCE_RESOURCE_ID;
+import static com.android.tools.build.bundletool.model.AndroidManifest.ROUND_ICON_ATTRIBUTE_NAME;
+import static com.android.tools.build.bundletool.model.AndroidManifest.ROUND_ICON_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.SDK_LIBRARY_ELEMENT_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.SDK_PATCH_VERSION_ATTRIBUTE_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.SDK_VERSION_MAJOR_ATTRIBUTE_NAME;
@@ -65,7 +70,9 @@ import static com.android.tools.build.bundletool.model.AndroidManifest.TARGET_SD
 import static com.android.tools.build.bundletool.model.AndroidManifest.TARGET_SDK_VERSION_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.THEME_ATTRIBUTE_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.THEME_RESOURCE_ID;
+import static com.android.tools.build.bundletool.model.AndroidManifest.TOOLS_NAMESPACE_URI;
 import static com.android.tools.build.bundletool.model.AndroidManifest.USES_SDK_ELEMENT_NAME;
+import static com.android.tools.build.bundletool.model.AndroidManifest.USES_SDK_LIBRARY_ELEMENT_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.VALUE_ATTRIBUTE_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.VALUE_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.VERSION_CODE_RESOURCE_ID;
@@ -357,6 +364,16 @@ public final class ManifestProtoUtils {
             .addAttribute(
                 XmlProtoAttributeBuilder.createAndroidAttribute(
                         ICON_ATTRIBUTE_NAME, ICON_RESOURCE_ID)
+                    .setValueAsRefId(refId));
+  }
+
+  public static ManifestMutator withAppRoundIcon(int refId) {
+    return manifestElement ->
+        manifestElement
+            .getOrCreateChildElement(APPLICATION_ELEMENT_NAME)
+            .addAttribute(
+                XmlProtoAttributeBuilder.createAndroidAttribute(
+                        ROUND_ICON_ATTRIBUTE_NAME, ROUND_ICON_RESOURCE_ID)
                     .setValueAsRefId(refId));
   }
 
@@ -828,6 +845,21 @@ public final class ManifestProtoUtils {
     return withUserCountriesConditionInternal(codes, Optional.empty());
   }
 
+  /**
+   * Adds the given element with {@link
+   * AndroidManifest#REQUIRED_BY_PRIVACY_SANDBOX_SDK_ATTRIBUTE_NAME} boolean attribute.
+   */
+  public static ManifestMutator withRequiredByPrivacySandboxElement(
+      String elementName, boolean requiredByPrivacySandboxSdkValue) {
+    return manifestElement ->
+        manifestElement.addChildElement(
+            XmlProtoElementBuilder.create(elementName)
+                .addAttribute(
+                    XmlProtoAttributeBuilder.create(
+                            TOOLS_NAMESPACE_URI, REQUIRED_BY_PRIVACY_SANDBOX_SDK_ATTRIBUTE_NAME)
+                        .setValueAsBoolean(requiredByPrivacySandboxSdkValue)));
+  }
+
   private static ManifestMutator withUserCountriesConditionInternal(
       ImmutableList<String> codes, Optional<Boolean> exclude) {
     XmlProtoElementBuilder userCountries =
@@ -997,6 +1029,25 @@ public final class ManifestProtoUtils {
             .addAttribute(
                 createAndroidAttribute(SDK_VERSION_MAJOR_ATTRIBUTE_NAME, VERSION_MAJOR_RESOURCE_ID)
                     .setValueAsDecimalInteger(versionMajor));
+  }
+
+  /** Adds an <uses-sdk-library> element. */
+  public static ManifestMutator withUsesSdkLibraryElement(
+      String sdkPackageName, int versionMajor, String certDigest) {
+    return manifestElement ->
+        manifestElement
+            .getOrCreateChildElement(APPLICATION_ELEMENT_NAME)
+            .getOrCreateChildElement(USES_SDK_LIBRARY_ELEMENT_NAME)
+            .addAttribute(
+                createAndroidAttribute(NAME_ATTRIBUTE_NAME, NAME_RESOURCE_ID)
+                    .setValueAsString(sdkPackageName))
+            .addAttribute(
+                createAndroidAttribute(SDK_VERSION_MAJOR_ATTRIBUTE_NAME, VERSION_MAJOR_RESOURCE_ID)
+                    .setValueAsString(String.valueOf(versionMajor)))
+            .addAttribute(
+                createAndroidAttribute(
+                        CERTIFICATE_DIGEST_ATTRIBUTE_NAME, CERTIFICATE_DIGEST_RESOURCE_ID)
+                    .setValueAsString(certDigest));
   }
 
   /** Adds a <property> element to an SDK Bundle manifest. */

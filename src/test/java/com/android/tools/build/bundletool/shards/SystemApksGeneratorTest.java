@@ -81,6 +81,7 @@ import com.android.tools.build.bundletool.model.ModuleEntry;
 import com.android.tools.build.bundletool.model.ModuleSplit;
 import com.android.tools.build.bundletool.model.ModuleSplit.SplitType;
 import com.android.tools.build.bundletool.model.OptimizationDimension;
+import com.android.tools.build.bundletool.model.ZipPath;
 import com.android.tools.build.bundletool.optimizations.ApkOptimizations;
 import com.android.tools.build.bundletool.testing.BundleModuleBuilder;
 import com.android.tools.build.bundletool.testing.ResourceTableBuilder;
@@ -1072,6 +1073,48 @@ public class SystemApksGeneratorTest {
     ModuleSplit fatApk = shards.get(0);
     assertThat(fatApk.findEntry("dex/classes.dex").map(ModuleEntry::getForceUncompressed))
         .hasValue(false);
+  }
+
+  @Test
+  public void systemApks_injectBinaryArtProfiles() throws Exception {
+    byte[] content = new byte[] {1, 4, 3, 2};
+    TestComponent.useTestModule(
+        this,
+        TestModule.builder()
+            .withDeviceSpec(DEVICE_SPEC)
+            .withBundleMetadata(
+                BundleMetadata.builder()
+                    .addFile(
+                        "com.android.tools.build.profiles",
+                        "baseline.prof",
+                        ByteSource.wrap(content))
+                    .build())
+            .build());
+    BundleModule baseModule =
+        new BundleModuleBuilder("base")
+            .addFile("dex/classes.dex")
+            .setManifest(androidManifest("com.test.app"))
+            .build();
+
+    ImmutableList<ModuleSplit> shards =
+        systemApksGenerator.generateSystemApks(
+            /* modules= */ ImmutableList.of(baseModule),
+            /* modulesToFuse= */ ImmutableSet.of(BASE_MODULE_NAME),
+            splitOptimizations());
+
+    assertThat(shards).hasSize(1);
+    assertThat(shards.get(0).getSplitType()).isEqualTo(SplitType.SYSTEM);
+    assertThat(extractPaths(shards.get(0).getEntries()))
+        .containsAtLeast("dex/classes.dex", "assets/dexopt/baseline.prof");
+
+    byte[] actualContent =
+        shards
+            .get(0)
+            .findEntry(ZipPath.create("assets/dexopt/baseline.prof"))
+            .get()
+            .getContent()
+            .read();
+    assertThat(actualContent).isEqualTo(content);
   }
 
   private static ApkOptimizations splitOptimizations(OptimizationDimension... dimensions) {

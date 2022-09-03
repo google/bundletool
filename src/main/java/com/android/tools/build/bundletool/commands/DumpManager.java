@@ -23,6 +23,8 @@ import com.android.aapt.Resources.ConfigValue;
 import com.android.aapt.Resources.ResourceTable;
 import com.android.aapt.Resources.XmlNode;
 import com.android.bundle.Config.BundleConfig;
+import com.android.bundle.RuntimeEnabledSdkConfigProto.RuntimeEnabledSdkConfig;
+import com.android.tools.build.bundletool.model.AppBundle;
 import com.android.tools.build.bundletool.model.BundleModule.SpecialModuleEntry;
 import com.android.tools.build.bundletool.model.BundleModuleName;
 import com.android.tools.build.bundletool.model.ResourceTableEntry;
@@ -131,6 +133,19 @@ final class DumpManager {
       BundleConfig bundleConfig =
           extractAndParse(zipFile, ZipPath.create("BundleConfig.pb"), BundleConfig::parseFrom);
       printStream.println(JsonFormat.printer().print(bundleConfig));
+    } catch (IOException e) {
+      throw new UncheckedIOException("Error occurred when reading the bundle.", e);
+    }
+  }
+
+  void printRuntimeEnabledSdkConfig() {
+    try (ZipFile zipFile = new ZipFile(bundlePath.toFile())) {
+      AppBundle appBundle = AppBundle.buildFromZip(zipFile);
+      RuntimeEnabledSdkConfig allRuntimeEnabledSdks =
+          RuntimeEnabledSdkConfig.newBuilder()
+              .addAllRuntimeEnabledSdk(appBundle.getRuntimeEnabledSdkDependencies().values())
+              .build();
+      printStream.println(JsonFormat.printer().print(allRuntimeEnabledSdks));
     } catch (IOException e) {
       throw new UncheckedIOException("Error occurred when reading the bundle.", e);
     }

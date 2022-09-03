@@ -157,6 +157,9 @@ public abstract class DumpCommand {
         new DumpManager(getOutputStream(), getBundlePath())
             .printResources(parseResourcePredicate(), getPrintValues().orElse(false));
         break;
+
+      case RUNTIME_ENABLED_SDK_CONFIG:
+        new DumpManager(getOutputStream(), getBundlePath()).printRuntimeEnabledSdkConfig();
     }
   }
 
@@ -233,7 +236,8 @@ public abstract class DumpCommand {
   public enum DumpTarget {
     MANIFEST("manifest"),
     RESOURCES("resources"),
-    CONFIG("config");
+    CONFIG("config"),
+    RUNTIME_ENABLED_SDK_CONFIG("runtime-enabled-sdk-config");
 
     static final ImmutableMap<String, DumpTarget> SUBCOMMAND_TO_TARGET =
         Arrays.stream(DumpTarget.values())
@@ -299,6 +303,10 @@ public abstract class DumpCommand {
                     String.format(
                         "6. Prints the content of the bundle configuration file:%n"
                             + "$ bundletool dump config --bundle=/tmp/app.aab"))
+                .addAdditionalParagraph(
+                    String.format(
+                        "7. Prints the content of the runtime-enabled SDK configuration file:%n"
+                            + "$ bundletool dump runtime-enabled-sdk-config --bundle=/tmp/app.aab"))
                 .build())
         .addFlag(
             FlagDescription.builder()

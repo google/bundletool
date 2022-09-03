@@ -59,7 +59,7 @@ public class SdkVersionMatcherTest {
                     sdkVersionTargeting(sdkVersionFrom(22), ImmutableSet.of())));
     assertThat(exception)
         .hasMessageThat()
-        .contains("The app doesn't support SDK version of the device: (21).");
+        .contains("SDK version (21) of the device is not supported.");
 
     exception =
         assertThrows(
@@ -71,7 +71,7 @@ public class SdkVersionMatcherTest {
                         ImmutableSet.of(sdkVersionFrom(22), sdkVersionFrom(27)))));
     assertThat(exception)
         .hasMessageThat()
-        .contains("The app doesn't support SDK version of the device: (21).");
+        .contains("SDK version (21) of the device is not supported.");
   }
 
   @Test
@@ -136,7 +136,7 @@ public class SdkVersionMatcherTest {
                     sdkVersionTargeting(sdkVersionFrom(10_000), ImmutableSet.of())));
     assertThat(exception)
         .hasMessageThat()
-        .contains("The app doesn't support SDK version of the device: (29).");
+        .contains("SDK version (29) of the device is not supported.");
   }
 
   @Test

@@ -16,8 +16,8 @@
 package com.android.tools.build.bundletool.preprocessors;
 
 import static com.android.tools.build.bundletool.model.BundleModule.RESOURCES_DIRECTORY;
-import static com.android.utils.ImmutableCollectors.toImmutableSet;
 import static com.google.common.collect.ImmutableList.toImmutableList;
+import static com.google.common.collect.ImmutableSet.toImmutableSet;
 
 import com.android.aapt.Resources;
 import com.android.aapt.Resources.ConfigValue;

@@ -27,6 +27,7 @@ import static com.android.tools.build.bundletool.testing.ApksArchiveHelpers.crea
 import static com.android.tools.build.bundletool.testing.ApksArchiveHelpers.createConditionalApkSet;
 import static com.android.tools.build.bundletool.testing.ApksArchiveHelpers.createInstantApkSet;
 import static com.android.tools.build.bundletool.testing.ApksArchiveHelpers.createMasterApkDescription;
+import static com.android.tools.build.bundletool.testing.ApksArchiveHelpers.createSdkApksArchiveFile;
 import static com.android.tools.build.bundletool.testing.ApksArchiveHelpers.createSplitApkSet;
 import static com.android.tools.build.bundletool.testing.ApksArchiveHelpers.createStandaloneApkSet;
 import static com.android.tools.build.bundletool.testing.ApksArchiveHelpers.createVariant;
@@ -61,16 +62,22 @@ import static com.google.common.truth.extensions.proto.ProtoTruth.assertThat;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
+import com.android.bundle.Commands.ApkDescription;
+import com.android.bundle.Commands.ApkSet;
 import com.android.bundle.Commands.AssetModuleMetadata;
 import com.android.bundle.Commands.AssetSliceSet;
 import com.android.bundle.Commands.BuildApksResult;
+import com.android.bundle.Commands.BuildSdkApksResult;
 import com.android.bundle.Commands.DefaultTargetingValue;
 import com.android.bundle.Commands.DeliveryType;
 import com.android.bundle.Commands.ExtractApksResult;
 import com.android.bundle.Commands.ExtractedApk;
+import com.android.bundle.Commands.FeatureModuleType;
 import com.android.bundle.Commands.LocalTestingInfo;
 import com.android.bundle.Commands.LocalTestingInfoForMetadata;
+import com.android.bundle.Commands.ModuleMetadata;
 import com.android.bundle.Commands.PermanentlyFusedModule;
+import com.android.bundle.Commands.Variant;
 import com.android.bundle.Config.Bundletool;
 import com.android.bundle.Config.SplitDimension.Value;
 import com.android.bundle.Devices.DeviceSpec;
@@ -79,6 +86,7 @@ import com.android.bundle.Targeting.ApkTargeting;
 import com.android.bundle.Targeting.MultiAbiTargeting;
 import com.android.bundle.Targeting.ScreenDensity.DensityAlias;
 import com.android.bundle.Targeting.SdkVersion;
+import com.android.bundle.Targeting.SdkVersionTargeting;
 import com.android.bundle.Targeting.VariantTargeting;
 import com.android.tools.build.bundletool.TestData;
 import com.android.tools.build.bundletool.flags.FlagParser;
@@ -813,7 +821,7 @@ public class ExtractApksCommandTest {
     Throwable exception = assertThrows(IncompatibleDeviceException.class, command::execute);
     assertThat(exception)
         .hasMessageThat()
-        .contains("The app doesn't support SDK version of the device: (19).");
+        .contains("SDK version (19) of the device is not supported.");
   }
 
   @Test
@@ -2099,6 +2107,82 @@ public class ExtractApksCommandTest {
     assertThat(parseExtractApksResult(metadataFile))
         .ignoringRepeatedFieldOrder()
         .isEqualTo(expectedResult);
+  }
+
+  @Test
+  public void extractApks_sdkApkSetMatching() throws Exception {
+    String standaloneApk = "standalone.apk";
+    Variant variant =
+        Variant.newBuilder()
+            .addApkSet(
+                ApkSet.newBuilder()
+                    .setModuleMetadata(
+                        ModuleMetadata.newBuilder()
+                            .setName("base")
+                            .setDeliveryType(DeliveryType.INSTALL_TIME)
+                            .setModuleType(FeatureModuleType.FEATURE_MODULE))
+                    .addApkDescription(
+                        ApkDescription.newBuilder().setPath("standalones/" + standaloneApk)))
+            .setTargeting(
+                VariantTargeting.newBuilder()
+                    .setSdkVersionTargeting(
+                        SdkVersionTargeting.newBuilder()
+                            .addValue(SdkVersion.newBuilder().setMin(Int32Value.of(33)))))
+            .build();
+    BuildSdkApksResult tableOfContentsProto =
+        BuildSdkApksResult.newBuilder()
+            .addVariant(variant)
+            .setBundletool(Bundletool.newBuilder().setVersion("1.10.1"))
+            .build();
+    Path apksArchiveFile =
+        createSdkApksArchiveFile(tableOfContentsProto, tmpDir.resolve("sdk.apks"));
+    Path deviceSpecFile = createDeviceSpecFile(deviceWithSdk(34), tmpDir.resolve("device.json"));
+    ExtractApksCommand command =
+        ExtractApksCommand.fromFlags(
+            new FlagParser().parse("--device-spec=" + deviceSpecFile, "--apks=" + apksArchiveFile));
+
+    ImmutableList<Path> matchedApks = command.execute();
+
+    assertThat(matchedApks.stream().map(apk -> apk.getFileName().toString()))
+        .containsExactly(standaloneApk);
+  }
+
+  @Test
+  public void extractApks_sdkApkSetNotMatching_throws() throws Exception {
+    Variant variant =
+        Variant.newBuilder()
+            .addApkSet(
+                ApkSet.newBuilder()
+                    .setModuleMetadata(
+                        ModuleMetadata.newBuilder()
+                            .setName("base")
+                            .setDeliveryType(DeliveryType.INSTALL_TIME)
+                            .setModuleType(FeatureModuleType.FEATURE_MODULE))
+                    .addApkDescription(
+                        ApkDescription.newBuilder().setPath("standalones/standalone.apk")))
+            .setTargeting(
+                VariantTargeting.newBuilder()
+                    .setSdkVersionTargeting(
+                        SdkVersionTargeting.newBuilder()
+                            .addValue(SdkVersion.newBuilder().setMin(Int32Value.of(33)))))
+            .build();
+    BuildSdkApksResult tableOfContentsProto =
+        BuildSdkApksResult.newBuilder()
+            .addVariant(variant)
+            .setBundletool(Bundletool.newBuilder().setVersion("1.10.1"))
+            .build();
+    Path apksArchiveFile =
+        createSdkApksArchiveFile(tableOfContentsProto, tmpDir.resolve("sdk.apks"));
+    Path deviceSpecFile = createDeviceSpecFile(deviceWithSdk(21), tmpDir.resolve("device.json"));
+    ExtractApksCommand command =
+        ExtractApksCommand.fromFlags(
+            new FlagParser().parse("--device-spec=" + deviceSpecFile, "--apks=" + apksArchiveFile));
+
+    Throwable exception = assertThrows(IncompatibleDeviceException.class, command::execute);
+
+    assertThat(exception)
+        .hasMessageThat()
+        .contains("SDK version (21) of the device is not supported.");
   }
 
   private static ExtractApksResult parseExtractApksResult(Path file) throws Exception {

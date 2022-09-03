@@ -20,9 +20,18 @@ message CodeRelatedFile {
     NATIVE_LIBRARY = 1;
     DEX = 2;
   }
-  // Path to file in the bundle.
+  // Code related file may come from either Android App Bundle (AAB) or
+  // bundletool repo. Bundletool repo is used as a source for a DEX file for an
+  // archived APK which is not the part AAB and is injected when APKs are
+  // generated from the AAB.
   // Required.
-  string path = 1;
+  oneof source {
+    // Path to file in the bundle.
+    string path = 1;
+    // Path to a file that will be injected at build time.
+    // Contained in the bundletool source code.
+    string bundletool_repo_path = 5;
+  };
   // Type of code-related file.
   // Required.
   Type type = 2;

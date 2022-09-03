@@ -17,6 +17,7 @@
 package com.android.tools.build.bundletool.androidtools;
 
 import com.android.tools.build.bundletool.androidtools.CommandExecutor.CommandOptions;
+import com.android.tools.build.bundletool.model.utils.OsPlatform;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableListMultimap;
@@ -88,12 +89,14 @@ public interface AdbCommand {
             .add("--staged-ready-timeout")
             .add(String.format("%d", timeout.get().toMillis()));
       }
+      String splitCharacter = (OsPlatform.getCurrentPlatform() == OsPlatform.WINDOWS) ? ";" : ":";
       // Splits of a single package must be installed together.
       apkToInstallByPackage
           .keySet()
           .forEach(
               packageName ->
-                  commandBuilder.add(String.join(":", apkToInstallByPackage.get(packageName))));
+                  commandBuilder.add(
+                      String.join(splitCharacter, apkToInstallByPackage.get(packageName))));
 
       logger.info(String.format("Executing: %s", String.join(" ", commandBuilder.build())));
 

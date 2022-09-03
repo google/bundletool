@@ -18,6 +18,7 @@ package com.android.tools.build.bundletool.validation;
 
 import static com.android.tools.build.bundletool.model.BundleModule.ASSETS_DIRECTORY;
 import static com.android.tools.build.bundletool.validation.BundleValidationUtils.checkHasValuesOrAlternatives;
+import static com.android.tools.build.bundletool.validation.BundleValidationUtils.checkValuesAndAlternativeHaveNoOverlap;
 import static com.google.common.collect.ImmutableSet.toImmutableSet;
 
 import com.android.bundle.Files.Assets;
@@ -57,6 +58,7 @@ public class AssetsTargetingValidator extends SubValidator {
       }
 
       checkNoDimensionWithoutValuesAndAlternatives(targetedDirectory);
+      checkNoOverlapInValuesAndAlternatives(targetedDirectory);
     }
 
     if (module.getModuleType().equals(ModuleType.ASSET_MODULE)
@@ -89,5 +91,14 @@ public class AssetsTargetingValidator extends SubValidator {
       checkHasValuesOrAlternatives(
           targeting.getTextureCompressionFormat(), targetedDirectory.getPath());
     }
+  }
+
+  private static void checkNoOverlapInValuesAndAlternatives(
+      TargetedAssetsDirectory targetedDirectory) {
+    AssetsDirectoryTargeting targeting = targetedDirectory.getTargeting();
+    checkValuesAndAlternativeHaveNoOverlap(targeting.getAbi(), targetedDirectory.getPath());
+    checkValuesAndAlternativeHaveNoOverlap(targeting.getLanguage(), targetedDirectory.getPath());
+    checkValuesAndAlternativeHaveNoOverlap(
+        targeting.getTextureCompressionFormat(), targetedDirectory.getPath());
   }
 }

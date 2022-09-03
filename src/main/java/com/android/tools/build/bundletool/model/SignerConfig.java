@@ -22,9 +22,9 @@ import com.android.tools.build.bundletool.model.exceptions.CommandExecutionExcep
 import com.google.auto.value.AutoValue;
 import com.google.common.collect.ImmutableList;
 import com.google.errorprone.annotations.Immutable;
-import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.security.KeyStore;
 import java.security.KeyStore.PasswordProtection;
@@ -98,7 +98,7 @@ public abstract class SignerConfig {
 
     PasswordProtection keystorePassword = null;
     PasswordProtection keyPassword = null;
-    try (InputStream keystoreInputStream = new FileInputStream(keystorePath.toFile())) {
+    try (InputStream keystoreInputStream = Files.newInputStream(keystorePath)) {
       // 1. Prompt for the keystore password if it wasn't provided.
       keystorePassword =
           optionalKeystorePassword

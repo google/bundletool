@@ -116,6 +116,8 @@ public final class OptimizationsMerger {
         .setSplitDimensions(splitDimensions)
         .setUncompressNativeLibraries(uncompressNativeLibraries)
         .setUncompressDexFiles(uncompressDexFiles)
+        .setUncompressedDexTargetSdk(
+            requestedOptimizations.getUncompressDexFiles().getUncompressedDexTargetSdk())
         .setStandaloneDimensions(standaloneDimensions)
         .setSuffixStrippings(suffixStrippings)
         .build();

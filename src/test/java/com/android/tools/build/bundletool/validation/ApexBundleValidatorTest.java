@@ -17,16 +17,21 @@
 package com.android.tools.build.bundletool.validation;
 
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifest;
+import static com.google.common.collect.ImmutableSet.toImmutableSet;
 import static com.google.common.truth.Truth.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.android.apex.ApexManifestProto.ApexManifest;
+import com.android.bundle.Config.ApexConfig;
+import com.android.bundle.Config.BundleConfig;
+import com.android.bundle.Config.SupportedAbiSet;
 import com.android.bundle.Files.ApexImages;
 import com.android.bundle.Files.TargetedApexImage;
 import com.android.tools.build.bundletool.model.BundleModule;
 import com.android.tools.build.bundletool.model.exceptions.InvalidBundleException;
 import com.android.tools.build.bundletool.testing.BundleModuleBuilder;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableSet;
 import java.io.IOException;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -136,6 +141,84 @@ public class ApexBundleValidatorTest {
             () -> new ApexBundleValidator().validateModule(apexModule));
 
     assertThat(exception).hasMessageThat().contains("Found APEX image files that are not targeted");
+  }
+
+  private static BundleConfig bundleConfigWithSupportedAbis(
+      ImmutableSet<ImmutableSet<String>> setOfAbis) {
+    ImmutableSet<SupportedAbiSet> supportedAbiSets =
+        setOfAbis.stream()
+            .map(abis -> SupportedAbiSet.newBuilder().addAllAbi(abis).build())
+            .collect(toImmutableSet());
+    return BundleConfig.newBuilder()
+        .setApexConfig(ApexConfig.newBuilder().addAllSupportedAbiSet(supportedAbiSets).build())
+        .build();
+  }
+
+  @Test
+  public void validateModule_singleAbiWithSupportedAbis_succeeds() throws Exception {
+    ApexImages apexConfig =
+        ApexImages.newBuilder()
+            .addImage(TargetedApexImage.newBuilder().setPath("apex/arm64-v8a.img"))
+            .build();
+    BundleConfig bundleConfig =
+        bundleConfigWithSupportedAbis(ImmutableSet.of(ImmutableSet.of("arm64-v8a")));
+    BundleModule apexModule =
+        new BundleModuleBuilder("apexTestModule", bundleConfig)
+            .setManifest(androidManifest(PKG_NAME))
+            .setApexConfig(apexConfig)
+            .addFile(APEX_MANIFEST_PATH, APEX_MANIFEST)
+            .addFile("apex/arm64-v8a.img")
+            .build();
+
+    new ApexBundleValidator().validateModule(apexModule);
+  }
+
+  @Test
+  public void validateModule_imageFilesMismatchWithSupportedAbis_throws() throws Exception {
+    ApexImages apexConfig =
+        ApexImages.newBuilder()
+            .addImage(TargetedApexImage.newBuilder().setPath("apex/x86_64.img"))
+            .build();
+    BundleConfig bundleConfig =
+        bundleConfigWithSupportedAbis(ImmutableSet.of(ImmutableSet.of("arm64-v8a")));
+    BundleModule apexModule =
+        new BundleModuleBuilder("apexTestModule", bundleConfig)
+            .setManifest(androidManifest(PKG_NAME))
+            .setApexConfig(apexConfig)
+            .addFile(APEX_MANIFEST_PATH, APEX_MANIFEST)
+            .addFile("apex/x86_64.img")
+            .build();
+
+    InvalidBundleException exception =
+        assertThrows(
+            InvalidBundleException.class,
+            () -> new ApexBundleValidator().validateModule(apexModule));
+
+    assertThat(exception).hasMessageThat().contains("it should match with APEX image files");
+  }
+
+  @Test
+  public void validateModule_wrongAbiNamesInApexSupportedAbis() throws Exception {
+    ApexImages apexConfig =
+        ApexImages.newBuilder()
+            .addImage(TargetedApexImage.newBuilder().setPath("apex/arm64-v8a.img"))
+            .build();
+    BundleConfig bundleConfig =
+        bundleConfigWithSupportedAbis(ImmutableSet.of(ImmutableSet.of("arm64-v8a", "invalid_abi")));
+    BundleModule apexModule =
+        new BundleModuleBuilder("apexTestModule", bundleConfig)
+            .setManifest(androidManifest(PKG_NAME))
+            .setApexConfig(apexConfig)
+            .addFile(APEX_MANIFEST_PATH, APEX_MANIFEST)
+            .addFile("apex/arm64-v8a.img")
+            .build();
+
+    InvalidBundleException exception =
+        assertThrows(
+            InvalidBundleException.class,
+            () -> new ApexBundleValidator().validateModule(apexModule));
+
+    assertThat(exception).hasMessageThat().contains("Unrecognized ABI 'invalid_abi'");
   }
 
   @Test

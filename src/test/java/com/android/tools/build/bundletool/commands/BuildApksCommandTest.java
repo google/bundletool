@@ -1278,6 +1278,49 @@ public class BuildApksCommandTest {
   }
 
   @Test
+  public void buildingViaFlagsAndBuilderHasSameResult_stamp_withNoTimestamp() {
+    ByteArrayOutputStream output = new ByteArrayOutputStream();
+    BuildApksCommand commandViaFlags =
+        BuildApksCommand.fromFlags(
+            new FlagParser()
+                .parse(
+                    "--bundle=" + bundlePath,
+                    "--output=" + outputFilePath,
+                    "--aapt2=" + AAPT2_PATH,
+                    "--create-stamp=" + true,
+                    "--stamp-ks=" + stampKeystorePath,
+                    "--stamp-key-alias=" + STAMP_KEY_ALIAS,
+                    "--stamp-ks-pass=pass:" + STAMP_KEYSTORE_PASSWORD,
+                    "--stamp-key-pass=pass:" + STAMP_KEY_PASSWORD,
+                    "--stamp-exclude-timestamp=" + true),
+            new PrintStream(output),
+            systemEnvironmentProvider,
+            fakeAdbServer);
+    SigningConfiguration stampSigningConfiguration =
+        SigningConfiguration.builder().setSignerConfig(stampPrivateKey, stampCertificate).build();
+
+    BuildApksCommand.Builder commandViaBuilder =
+        BuildApksCommand.builder()
+            .setBundlePath(bundlePath)
+            .setOutputFile(outputFilePath)
+            // Stamp
+            .setSourceStamp(
+                SourceStamp.builder()
+                    .setSigningConfiguration(stampSigningConfiguration)
+                    .setIncludeTimestamp(false)
+                    .build())
+            // Must copy instance of the internal executor service.
+            .setAapt2Command(commandViaFlags.getAapt2Command().get())
+            .setExecutorServiceInternal(commandViaFlags.getExecutorService())
+            .setExecutorServiceCreatedByBundleTool(true)
+            .setOutputPrintStream(commandViaFlags.getOutputPrintStream().get());
+    DebugKeystoreUtils.getDebugSigningConfiguration(systemEnvironmentProvider)
+        .ifPresent(commandViaBuilder::setSigningConfiguration);
+
+    assertThat(commandViaBuilder.build()).isEqualTo(commandViaFlags);
+  }
+
+  @Test
   public void buildingViaFlagsAndBuilderHasSameResult_runtimeEnabledSdkBundlesSet() {
     ByteArrayOutputStream output = new ByteArrayOutputStream();
     BuildApksCommand commandViaFlags =
@@ -1951,7 +1994,8 @@ public class BuildApksCommandTest {
   }
 
   @Test
-  public void sdkModulesZipMissingManifest_sdkModulesZipFileValidationFails() throws Exception {
+  public void modulesZipMissingManifestInsideSdkBundle_modulesZipFileValidationFails()
+      throws Exception {
     createZipBuilderForSdkBundleWithModules(
             createZipBuilderForModulesWithoutManifest(), extractedSdkBundleModulesPath)
         .writeTo(sdkBundlePath1);
@@ -2017,6 +2061,37 @@ public class BuildApksCommandTest {
         .hasMessageThat()
         .contains(
             "installLocation' in <manifest> must be 'internalOnly' for SDK bundles if it is set.");
+  }
+
+  @Test
+  public void modulesZipMissingManifestInAsar_modulesZipFileValidationFails() throws Exception {
+    createZipBuilderForSdkAsarWithModules(
+            createZipBuilderForModulesWithoutManifest(), extractedSdkBundleModulesPath)
+        .writeTo(sdkArchivePath1);
+    createAppBundleWithRuntimeEnabledSdkConfig(
+        bundlePath,
+        RuntimeEnabledSdkConfig.newBuilder()
+            .addRuntimeEnabledSdk(
+                RuntimeEnabledSdk.newBuilder()
+                    .setPackageName("com.test.sdk1")
+                    .setVersionMajor(1)
+                    .setVersionMinor(2)
+                    .setCertificateDigest(VALID_CERT_FINGERPRINT)
+                    .setResourcesPackageId(2))
+            .build());
+    BuildApksCommand command =
+        BuildApksCommand.fromFlags(
+            new FlagParser()
+                .parse(
+                    "--bundle=" + bundlePath,
+                    "--output=" + outputFilePath,
+                    "--sdk-archives=" + sdkArchivePath1),
+            fakeAdbServer);
+
+    Exception e = assertThrows(InvalidBundleException.class, command::execute);
+    assertThat(e)
+        .hasMessageThat()
+        .contains("Module 'base' is missing mandatory file 'manifest/AndroidManifest.xml'.");
   }
 
   @Test

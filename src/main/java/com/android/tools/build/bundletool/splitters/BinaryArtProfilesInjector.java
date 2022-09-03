@@ -19,6 +19,7 @@ import com.android.tools.build.bundletool.model.AppBundle;
 import com.android.tools.build.bundletool.model.BundleMetadata;
 import com.android.tools.build.bundletool.model.ModuleEntry;
 import com.android.tools.build.bundletool.model.ModuleSplit;
+import com.android.tools.build.bundletool.model.ModuleSplit.SplitType;
 import com.android.tools.build.bundletool.model.ZipPath;
 import com.google.common.io.ByteSource;
 import java.util.Optional;
@@ -43,12 +44,13 @@ public final class BinaryArtProfilesInjector {
   }
 
   public ModuleSplit inject(ModuleSplit split) {
-    if (!split.isMasterSplit() || !split.isBaseModuleSplit()) {
-      return split;
-    }
     if (!binaryArtProfileMetadata.isPresent() && !binaryArtProfile.isPresent()) {
       return split;
     }
+    if (!shouldInjectBinaryArtProfile(split)) {
+      return split;
+    }
+
     ModuleSplit.Builder builder = split.toBuilder();
     binaryArtProfile.ifPresent(
         content ->
@@ -65,6 +67,11 @@ public final class BinaryArtProfilesInjector {
                     .setPath(ZipPath.create(APK_LOCATION).resolve(BINARY_ART_PROFILE_METADATA_NAME))
                     .build()));
     return builder.build();
+  }
+
+  private static boolean shouldInjectBinaryArtProfile(ModuleSplit split) {
+    return split.getSplitType().equals(SplitType.STANDALONE)
+        || (split.isMasterSplit() && split.isBaseModuleSplit());
   }
 
   private static Optional<ByteSource> extract(BundleMetadata metadata, String entryName) {

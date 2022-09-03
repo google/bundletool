@@ -101,6 +101,15 @@ public class BuildSdkApksManager {
         .map(ModuleSplit::overrideMinSdkVersionForSdkSandbox)
         .map(moduleSplit -> moduleSplit.writePatchVersion(sdkBundle.getPatchVersion()))
         .map(moduleSplit -> moduleSplit.writeSdkProviderClassName(sdkBundle.getProviderClassName()))
+        .map(this::writeCompatSdkProviderClassNameIfPresent)
         .collect(toImmutableList());
+  }
+
+  private ModuleSplit writeCompatSdkProviderClassNameIfPresent(ModuleSplit moduleSplit) {
+    if (sdkBundle.getCompatProviderClassName().isPresent()) {
+      return moduleSplit.writeCompatSdkProviderClassName(
+          sdkBundle.getCompatProviderClassName().get());
+    }
+    return moduleSplit;
   }
 }

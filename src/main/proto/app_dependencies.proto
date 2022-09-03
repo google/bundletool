@@ -36,11 +36,14 @@ message ModuleDependencies {
   repeated int32 dependency_index = 2;
 }
 
+// Next ID: 5
 message Library {
-  // Oneof allows for support of other library identification systems in the
-  // future.
+  // Type of library dependency.
   oneof library_oneof {
+    // A library downloaded from a Maven repository.
     MavenLibrary maven_library = 1;
+    // A library downloaded from a Unity repository.
+    UnityLibrary unity_library = 4;
   }
 
   // This message contains various digests of the library contents.
@@ -64,12 +67,23 @@ message MavenLibrary {
   optional string version = 5;
 }
 
+message UnityLibrary {
+  // Corresponds to the "name" field in the package.json, uniquely identifying
+  // the library.
+  optional string package_name = 1;
+
+  // Corresponds to the "version" field in the package.json file of the version
+  // of the library actually compiled in the app.
+  optional string version = 2;
+}
+
 // A repository for resolving artifacts and metadata.
 message Repository {
   // The type of the repository, and any type-specific configuration info.
   oneof repo_oneof {
     MavenRepo maven_repo = 1;
     IvyRepo ivy_repo = 2;
+    UnityRepo unity_repo = 3;
   }
 }
 
@@ -79,6 +93,11 @@ message MavenRepo {
 }
 
 message IvyRepo {
+  // The root url for the repository.
+  optional string url = 1;
+}
+
+message UnityRepo {
   // The root url for the repository.
   optional string url = 1;
 }

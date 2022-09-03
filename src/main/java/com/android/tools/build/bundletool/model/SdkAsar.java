@@ -29,6 +29,7 @@ import com.android.tools.build.bundletool.model.version.Version;
 import com.google.auto.value.AutoValue;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
+import com.google.common.io.ByteSource;
 import com.google.protobuf.InvalidProtocolBufferException;
 import java.io.File;
 import java.io.IOException;
@@ -87,6 +88,8 @@ public abstract class SdkAsar {
 
   public abstract SdkMetadata getSdkMetadata();
 
+  public abstract Optional<ByteSource> getSdkInterfaceDescriptors();
+
   /**
    * Gets the SDK package name.
    *
@@ -133,6 +136,8 @@ public abstract class SdkAsar {
     public abstract Builder setModulesFile(File modulesFile);
 
     public abstract Builder setSdkMetadata(SdkMetadata sdkMetadata);
+
+    public abstract Builder setSdkInterfaceDescriptors(ByteSource source);
 
     public abstract SdkAsar build();
   }

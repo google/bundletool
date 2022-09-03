@@ -63,6 +63,7 @@ public class SdkBundleTest {
       assertThat(sdkBundle.getModule().getEntry(ZipPath.create("dex/classes2.dex"))).isPresent();
       assertThat(sdkBundle.getBundleMetadata().getFileAsByteSource("some.namespace", "metadata1"))
           .isPresent();
+      assertThat(sdkBundle.getSdkInterfaceDescriptors()).isPresent();
     }
   }
 }

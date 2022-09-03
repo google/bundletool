@@ -175,6 +175,7 @@ public class ModuleSplitter {
           .map(this::removeSplitName)
           .map(this::addPlaceHolderNativeLibsToBaseModule)
           .map(this::addUsesSdkLibraryTagsToMainSplitOfBaseModule)
+          .map(this::sanitizeManifestEntriesRequiredByPrivacySandboxSdk)
           .collect(toImmutableList());
     }
   }
@@ -198,6 +199,44 @@ public class ModuleSplitter {
           appBundle.getRuntimeEnabledSdkDependencies().values());
     }
     return moduleSplit;
+  }
+
+  /**
+   * If the variant is SdkRuntime variant, this method deletes elements that have {@link
+   * AndroidManifest#REQUIRED_BY_PRIVACY_SANDBOX_SDK_ATTRIBUTE_NAME} attribute with value {@code
+   * true} from the manifest of the main split of the base module.
+   *
+   * <p>For any variant, this method also deletes {@link
+   * AndroidManifest#REQUIRED_BY_PRIVACY_SANDBOX_SDK_ATTRIBUTE_NAME} attributes from the manifest of
+   * the main split of the base module.
+   *
+   * <p>This method is no-op if split is not the main split of the base module.
+   */
+  private ModuleSplit sanitizeManifestEntriesRequiredByPrivacySandboxSdk(ModuleSplit moduleSplit) {
+    if (appBundle.getRuntimeEnabledSdkDependencies().isEmpty()
+        || !moduleSplit.isBaseModuleSplit()
+        || !moduleSplit.isMasterSplit()) {
+      return moduleSplit;
+    }
+    if (variantTargeting.getSdkRuntimeTargeting().getRequiresSdkRuntime()) {
+      return removeRequiredByPrivacySandboxSdkAttributes(
+          removeElementsRequiredByPrivacySandboxSdk(moduleSplit));
+    }
+    return removeRequiredByPrivacySandboxSdkAttributes(moduleSplit);
+  }
+
+  private ModuleSplit removeElementsRequiredByPrivacySandboxSdk(ModuleSplit moduleSplit) {
+    AndroidManifest manifest = moduleSplit.getAndroidManifest();
+    ManifestEditor editor = manifest.toEditor();
+    editor.removeElementsRequiredByPrivacySandboxSdk();
+    return moduleSplit.toBuilder().setAndroidManifest(editor.save()).build();
+  }
+
+  private ModuleSplit removeRequiredByPrivacySandboxSdkAttributes(ModuleSplit moduleSplit) {
+    AndroidManifest manifest = moduleSplit.getAndroidManifest();
+    ManifestEditor editor = manifest.toEditor();
+    editor.removeRequiredByPrivacySandboxSdkAttributes();
+    return moduleSplit.toBuilder().setAndroidManifest(editor.save()).build();
   }
 
   /** Common modifications to both the instant and installed splits. */

@@ -95,7 +95,7 @@ message Optimizations {
   // This is for uncompressing native libraries on M+ devices (L+ devices on
   // instant apps).
   UncompressNativeLibraries uncompress_native_libraries = 2;
-  // This is for uncompressing dex files on P+ devices.
+  // This is for uncompressing dex files.
   UncompressDexFiles uncompress_dex_files = 3;
   // Configuration for the generation of standalone APKs.
   // If no StandaloneConfig is set, the configuration is inherited from
@@ -134,15 +134,28 @@ message UncompressNativeLibraries {
 }
 
 message UncompressDexFiles {
+  //  A new variant with uncompressed dex will be generated. The sdk targeting
+  //  of the variant is determined by 'uncompressed_dex_target_sdk'.
   bool enabled = 1;
+
+  //  If 'enabled' field is set, this will determine the sdk targeting of the
+  //  generated variant.
+  UncompressedDexTargetSdk uncompressed_dex_target_sdk = 2;
+
+  enum UncompressedDexTargetSdk {
+    // Q+ variant will be generated.
+    UNSPECIFIED = 0;
+    // S+ variant will be generated.
+    SDK_31 = 1;
+  }
 }
 
 message StoreArchive {
   // Archive is an app state that allows an official app store to reclaim device
   // storage and disable app functionality temporarily until the user interacts
   // with the app again. Upon interaction the latest available version of the
-  // app will be restored while leaving user data unaffected. Disabled by
-  // default.
+  // app will be restored while leaving user data unaffected.
+  // Enabled by default.
   bool enabled = 1;
 }
 
@@ -235,6 +248,15 @@ message SuffixStripping {
 message ApexConfig {
   // Configuration for processing of APKs embedded in an APEX image.
   repeated ApexEmbeddedApkConfig apex_embedded_apk_config = 1;
+
+  // Explicit list of supported ABIs.
+  // Default: See ApexBundleValidator.REQUIRED_ONE_OF_ABI_SETS
+  repeated SupportedAbiSet supported_abi_set = 2;
+}
+
+// Represents a set of ABIs which must be supported by a single APEX image.
+message SupportedAbiSet {
+  repeated string abi = 1;
 }
 
 message ApexEmbeddedApkConfig {

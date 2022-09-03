@@ -426,7 +426,7 @@ public class InstallApksCommandTest {
     Throwable exception = assertThrows(IncompatibleDeviceException.class, command::execute);
     assertThat(exception)
         .hasMessageThat()
-        .contains("The app doesn't support SDK version of the device: (19).");
+        .contains("SDK version (19) of the device is not supported.");
   }
 
   @Test

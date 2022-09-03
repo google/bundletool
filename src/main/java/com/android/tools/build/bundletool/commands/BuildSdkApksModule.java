@@ -30,8 +30,8 @@ import com.android.tools.build.bundletool.model.ApkModifier;
 import com.android.tools.build.bundletool.model.Bundle;
 import com.android.tools.build.bundletool.model.DefaultSigningConfigurationProvider;
 import com.android.tools.build.bundletool.model.SdkBundle;
-import com.android.tools.build.bundletool.model.SigningConfiguration;
 import com.android.tools.build.bundletool.model.SigningConfigurationProvider;
+import com.android.tools.build.bundletool.model.SourceStamp;
 import com.android.tools.build.bundletool.model.version.Version;
 import com.android.tools.build.bundletool.optimizations.ApkOptimizations;
 import com.google.common.util.concurrent.ListeningExecutorService;
@@ -75,8 +75,7 @@ public abstract class BuildSdkApksModule {
   abstract Bundle bundle(SdkBundle bundle);
 
   @BindsOptionalOf
-  @BuildApksModule.StampSigningConfig
-  abstract SigningConfiguration bindOptionalSigningConfiguration();
+  abstract SourceStamp bindOptionalSigningConfiguration();
 
   @Provides
   @BuildApksModule.ApkSigningConfigProvider

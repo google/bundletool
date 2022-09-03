@@ -935,9 +935,22 @@ public final class TargetingUtils {
     return sdkRuntimeVariantTargeting(Versions.ANDROID_T_API_VERSION);
   }
 
+  public static VariantTargeting sdkRuntimeVariantTargeting(SdkVersion androidSdkVersion) {
+    return sdkRuntimeVariantTargeting(androidSdkVersion.getMin().getValue());
+  }
+
   public static VariantTargeting sdkRuntimeVariantTargeting(int androidSdkVersion) {
     return sdkRuntimeVariantTargeting(
         androidSdkVersion, /* alternativeSdkVersions= */ ImmutableSet.of());
+  }
+
+  public static VariantTargeting sdkRuntimeVariantTargeting(
+      SdkVersion androidSdkVersion, ImmutableSet<SdkVersion> alternativeSdkVersions) {
+    return sdkRuntimeVariantTargeting(
+        androidSdkVersion.getMin().getValue(),
+        alternativeSdkVersions.stream()
+            .map(sdkVersion -> sdkVersion.getMin().getValue())
+            .collect(toImmutableSet()));
   }
 
   public static VariantTargeting sdkRuntimeVariantTargeting(

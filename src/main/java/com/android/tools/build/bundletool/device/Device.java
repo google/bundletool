@@ -16,6 +16,7 @@
 
 package com.android.tools.build.bundletool.device;
 
+import com.android.bundle.Devices.InstalledSdk;
 import com.android.ddmlib.AdbCommandRejectedException;
 import com.android.ddmlib.IDevice.DeviceState;
 import com.android.ddmlib.IShellOutputReceiver;
@@ -25,6 +26,7 @@ import com.android.ddmlib.TimeoutException;
 import com.android.sdklib.AndroidVersion;
 import com.google.auto.value.AutoValue;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableSet;
 import com.google.errorprone.annotations.Immutable;
 import java.io.IOException;
 import java.nio.file.Path;
@@ -53,6 +55,9 @@ public abstract class Device {
   public abstract ImmutableList<String> getDeviceFeatures();
 
   public abstract ImmutableList<String> getGlExtensions();
+
+  /** Gets set of runtime-enabled SDKs currently installed on the device. */
+  public abstract ImmutableSet<InstalledSdk> getRuntimeEnabledSdks();
 
   public abstract void executeShellCommand(
       String command,

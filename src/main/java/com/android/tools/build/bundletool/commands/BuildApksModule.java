@@ -28,7 +28,6 @@ import com.android.tools.build.bundletool.io.ApkSerializerModule;
 import com.android.tools.build.bundletool.model.ApkListener;
 import com.android.tools.build.bundletool.model.ApkModifier;
 import com.android.tools.build.bundletool.model.DefaultSigningConfigurationProvider;
-import com.android.tools.build.bundletool.model.SigningConfiguration;
 import com.android.tools.build.bundletool.model.SigningConfigurationProvider;
 import com.android.tools.build.bundletool.model.SourceStamp;
 import com.android.tools.build.bundletool.model.version.Version;
@@ -64,13 +63,6 @@ public final class BuildApksModule {
     return command
         .getSigningConfiguration()
         .map(signingConfig -> new DefaultSigningConfigurationProvider(signingConfig, version));
-  }
-
-  @CommandScoped
-  @Provides
-  @StampSigningConfig
-  static Optional<SigningConfiguration> provideStampSigningConfiguration(BuildApksCommand command) {
-    return command.getSourceStamp().map(SourceStamp::getSigningConfiguration);
   }
 
   @CommandScoped
@@ -133,6 +125,15 @@ public final class BuildApksModule {
 
   @CommandScoped
   @Provides
+  @UpdateIconInArchiveMode
+  static boolean provideUpdateIconInArchiveMode(BuildApksCommand command) {
+    @SuppressWarnings("unused")
+    boolean updateIconInArchiveMode = false;
+    return updateIconInArchiveMode;
+  }
+
+  @CommandScoped
+  @Provides
   static Optional<DeviceSpec> provideDeviceSpec(BuildApksCommand command) {
     Optional<DeviceSpec> deviceSpec = command.getDeviceSpec();
     if (command.getGenerateOnlyForConnectedDevice()) {
@@ -188,12 +189,10 @@ public final class BuildApksModule {
   @Retention(RUNTIME)
   public @interface ApkSigningConfigProvider {}
 
-  /**
-   * Qualifying annotation of a {@code SigningConfiguration} for the Stamp signing configuration.
-   */
+  /** Qualifying annotation a {@code boolean} on whether to update archived apps icon. */
   @Qualifier
   @Retention(RUNTIME)
-  public @interface StampSigningConfig {}
+  public @interface UpdateIconInArchiveMode {}
 
   private BuildApksModule() {}
 }

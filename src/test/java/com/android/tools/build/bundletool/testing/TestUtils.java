@@ -18,6 +18,7 @@ package com.android.tools.build.bundletool.testing;
 
 import static com.android.tools.build.bundletool.model.SdkAsar.SDK_METADATA_FILE_NAME;
 import static com.android.tools.build.bundletool.model.utils.BundleParser.SDK_BUNDLE_CONFIG_FILE_NAME;
+import static com.android.tools.build.bundletool.model.utils.BundleParser.SDK_INTERFACE_DESCRIPTORS_FILE_NAME;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifest;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withInstallLocation;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withMinSdkVersion;
@@ -213,7 +214,8 @@ public final class TestUtils {
         .addFileWithContent(
             ZipPath.create("BUNDLE-METADATA/some.namespace/metadata1"), new byte[] {0x01})
         .addFileWithProtoContent(
-            ZipPath.create(SDK_BUNDLE_CONFIG_FILE_NAME), SdkBundleConfig.getDefaultInstance());
+            ZipPath.create(SDK_BUNDLE_CONFIG_FILE_NAME), SdkBundleConfig.getDefaultInstance())
+        .addFileWithContent(ZipPath.create(SDK_INTERFACE_DESCRIPTORS_FILE_NAME), TEST_CONTENT);
   }
 
   public static ZipBuilder createZipBuilderForSdkAsar() {

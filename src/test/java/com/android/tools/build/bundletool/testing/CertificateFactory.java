@@ -95,11 +95,11 @@ public final class CertificateFactory {
     SecureRandom rng = new SecureRandom();
     try {
       return new JcaX509v3CertificateBuilder(
-              principal /* issuer */,
+              /* issuer= */ principal,
               generateRandomSerialNumber(rng),
               new Date(notBefore.toEpochMilli()),
               new Date(notAfter.toEpochMilli()),
-              principal /* subject */,
+              /* subject= */ principal,
               keyPair.getPublic())
           // Basic constraints: subject type = CA
           .addExtension(

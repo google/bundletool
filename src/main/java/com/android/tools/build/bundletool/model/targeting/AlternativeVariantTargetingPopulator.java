@@ -21,6 +21,7 @@ import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.ImmutableSet.toImmutableSet;
+import static java.util.stream.Collectors.partitioningBy;
 
 import com.android.bundle.Targeting.Abi;
 import com.android.bundle.Targeting.ScreenDensity;
@@ -39,6 +40,7 @@ import com.google.errorprone.annotations.CheckReturnValue;
 import com.google.protobuf.Message;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Map;
 import java.util.Optional;
 
 /** Adds alternative targeting in the {@code T} dimension. */
@@ -61,11 +63,27 @@ public abstract class AlternativeVariantTargetingPopulator<T extends Message> {
     standaloneApks =
         new ScreenDensityAlternativesPopulator().addAlternativeVariantTargeting(standaloneApks);
 
+    Map<Boolean, ImmutableList<ModuleSplit>> partitionedRuntimeEnabledAndRegularSplits =
+        generatedApks.getSplitApks().stream()
+            .collect(
+                partitioningBy(
+                    moduleSplit ->
+                        moduleSplit
+                            .getVariantTargeting()
+                            .getSdkRuntimeTargeting()
+                            .getRequiresSdkRuntime(),
+                    toImmutableList()));
+
     ImmutableList<ModuleSplit> moduleSplits =
         ImmutableList.<ModuleSplit>builder()
             .addAll(
                 new SdkVersionAlternativesPopulator(maxSdkVersion)
-                    .addAlternativeVariantTargeting(generatedApks.getSplitApks(), standaloneApks))
+                    .addAlternativeVariantTargeting(
+                        partitionedRuntimeEnabledAndRegularSplits.get(true)))
+            .addAll(
+                new SdkVersionAlternativesPopulator(maxSdkVersion)
+                    .addAlternativeVariantTargeting(
+                        partitionedRuntimeEnabledAndRegularSplits.get(false), standaloneApks))
             .addAll(generatedApks.getInstantApks())
             .addAll(generatedApks.getSystemApks())
             .addAll(generatedApks.getArchivedApks())

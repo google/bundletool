@@ -36,6 +36,7 @@ public class VariantMatcher {
 
   private final ImmutableList<? extends TargetingDimensionMatcher<?>> variantMatchers;
   private final boolean matchInstant;
+  private final boolean supportsSdkRuntime;
 
   public VariantMatcher(DeviceSpec deviceSpec) {
     this(deviceSpec, /* matchInstant= */ false);
@@ -52,6 +53,7 @@ public class VariantMatcher {
         new MultiAbiMatcher(deviceSpec),
         new ScreenDensityMatcher(deviceSpec),
         new TextureCompressionFormatMatcher(deviceSpec),
+        new SdkRuntimeMatcher(deviceSpec),
         matchInstant);
   }
 
@@ -61,6 +63,7 @@ public class VariantMatcher {
       MultiAbiMatcher multiAbiMatcher,
       ScreenDensityMatcher screenDensityMatcher,
       TextureCompressionFormatMatcher textureCompressionFormatMatcher,
+      SdkRuntimeMatcher sdkRuntimeMatcher,
       boolean matchInstant) {
     this.variantMatchers =
         ImmutableList.of(
@@ -68,8 +71,10 @@ public class VariantMatcher {
             abiMatcher,
             multiAbiMatcher,
             screenDensityMatcher,
-            textureCompressionFormatMatcher);
+            textureCompressionFormatMatcher,
+            sdkRuntimeMatcher);
     this.matchInstant = matchInstant;
+    this.supportsSdkRuntime = sdkRuntimeMatcher.deviceSupportsSdkRuntime();
   }
 
   /**
@@ -86,15 +91,18 @@ public class VariantMatcher {
                         variant.getTargeting().getSdkRuntimeTargeting().getRequiresSdkRuntime(),
                     toImmutableList()));
 
-    // Currently, DeviceSpec does not specify whether it has SDK runtime support or not. Until it
-    // does, VariantMatcher will assume that all devices have it and try to match variants with SDK
-    // runtime targeting. If no SDK Runtime variant matches the device, we fall back to non-sdk
-    // runtime variants.
-    ImmutableList<Variant> matchingSdkRuntimeVariants =
-        getAllMatchingVariants(partitionedVariants.get(true));
-    return matchingSdkRuntimeVariants.isEmpty()
-        ? getAllMatchingVariants(partitionedVariants.get(false))
-        : matchingSdkRuntimeVariants;
+    // First, try to match variants with SDK runtime targeting. If no SDK Runtime variant matches
+    // the device, we fall back to non-sdk runtime variants. This ordering is required because the
+    // SdkRuntimeMatcher will match a non-SDK runtime variant to a device that supports the SDK
+    // runtime, which is not optimal if there is another variant that targets the SDK runtime.
+    if (supportsSdkRuntime) {
+      ImmutableList<Variant> matchingSdkRuntimeVariants =
+          getAllMatchingVariants(partitionedVariants.get(true));
+      if (!matchingSdkRuntimeVariants.isEmpty()) {
+        return matchingSdkRuntimeVariants;
+      }
+    }
+    return getAllMatchingVariants(partitionedVariants.get(false));
   }
 
   private ImmutableList<Variant> getAllMatchingVariants(ImmutableList<Variant> variants) {

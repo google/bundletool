@@ -40,36 +40,31 @@ import com.android.aapt.Resources.XmlNode;
 import com.android.bundle.RuntimeEnabledSdkConfigProto.RuntimeEnabledSdk;
 import com.android.tools.build.bundletool.model.BundleModule.ModuleType;
 import com.android.tools.build.bundletool.testing.BundleModuleBuilder;
-import com.android.tools.build.bundletool.testing.SdkBundleBuilder;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 
-/** Tests for {@link SdkBundleModuleToAppBundleModuleConverter}. */
+/** Tests for {@link SdkModuleToAppBundleModuleConverter}. */
 @RunWith(JUnit4.class)
-public final class SdkBundleModuleToAppBundleModuleConverterTest {
+public final class SdkModuleToAppBundleModuleConverterTest {
 
   private static final String PACKAGE_NAME = "com.test.sdk";
   private static final int NEW_PACKAGE_ID = 0x82;
 
   @Test
   public void convert_modifiesModuleName_modifiesManifest_setsIsSdkDependencyModule() {
-    SdkBundle sdkBundle =
-        new SdkBundleBuilder()
-            .setModule(
-                new BundleModuleBuilder("base")
-                    .setManifest(
-                        androidManifest(PACKAGE_NAME, withMinSdkVersion(SDK_SANDBOX_MIN_VERSION)))
-                    .build())
+    BundleModule sdkModule =
+        new BundleModuleBuilder("base")
+            .setManifest(androidManifest(PACKAGE_NAME, withMinSdkVersion(SDK_SANDBOX_MIN_VERSION)))
             .build();
 
     BundleModule modifiedModule =
-        new SdkBundleModuleToAppBundleModuleConverter(
-                sdkBundle, RuntimeEnabledSdk.getDefaultInstance())
+        new SdkModuleToAppBundleModuleConverter(
+                PACKAGE_NAME, sdkModule, RuntimeEnabledSdk.getDefaultInstance())
             .convert();
 
     // Verify that module name was modified.
-    assertThat(modifiedModule.getName()).isNotEqualTo(sdkBundle.getModule().getName());
+    assertThat(modifiedModule.getName()).isNotEqualTo(sdkModule.getName());
     assertThat(modifiedModule.getName().getName()).isEqualTo("comtestsdk");
 
     // Verify the manifest.
@@ -89,19 +84,16 @@ public final class SdkBundleModuleToAppBundleModuleConverterTest {
 
   @Test
   public void convert_remapsResourceIdsInResourceTable() {
-    SdkBundle sdkBundle =
-        new SdkBundleBuilder()
-            .setModule(
-                new BundleModuleBuilder("base")
-                    .setManifest(
-                        androidManifest(PACKAGE_NAME, withMinSdkVersion(SDK_SANDBOX_MIN_VERSION)))
-                    .setResourceTable(resourceTable(pkg(USER_PACKAGE_OFFSET, PACKAGE_NAME)))
-                    .build())
+    BundleModule sdkModule =
+        new BundleModuleBuilder("base")
+            .setManifest(androidManifest(PACKAGE_NAME, withMinSdkVersion(SDK_SANDBOX_MIN_VERSION)))
+            .setResourceTable(resourceTable(pkg(USER_PACKAGE_OFFSET, PACKAGE_NAME)))
             .build();
 
     BundleModule modifiedModule =
-        new SdkBundleModuleToAppBundleModuleConverter(
-                sdkBundle,
+        new SdkModuleToAppBundleModuleConverter(
+                PACKAGE_NAME,
+                sdkModule,
                 RuntimeEnabledSdk.newBuilder().setResourcesPackageId(NEW_PACKAGE_ID).build())
             .convert();
 
@@ -111,20 +103,16 @@ public final class SdkBundleModuleToAppBundleModuleConverterTest {
 
   @Test
   public void convert_removesLastDexFile() {
-    SdkBundle sdkBundle =
-        new SdkBundleBuilder()
-            .setModule(
-                new BundleModuleBuilder("base")
-                    .setManifest(
-                        androidManifest(PACKAGE_NAME, withMinSdkVersion(SDK_SANDBOX_MIN_VERSION)))
-                    .addFile("dex/classes.dex")
-                    .addFile("dex/classes2.dex")
-                    .build())
+    BundleModule sdkModule =
+        new BundleModuleBuilder("base")
+            .setManifest(androidManifest(PACKAGE_NAME, withMinSdkVersion(SDK_SANDBOX_MIN_VERSION)))
+            .addFile("dex/classes.dex")
+            .addFile("dex/classes2.dex")
             .build();
 
     BundleModule modifiedModule =
-        new SdkBundleModuleToAppBundleModuleConverter(
-                sdkBundle, RuntimeEnabledSdk.getDefaultInstance())
+        new SdkModuleToAppBundleModuleConverter(
+                PACKAGE_NAME, sdkModule, RuntimeEnabledSdk.getDefaultInstance())
             .convert();
 
     assertThat(modifiedModule.getEntry(ZipPath.create("dex/classes.dex"))).isPresent();
@@ -135,22 +123,18 @@ public final class SdkBundleModuleToAppBundleModuleConverterTest {
   public void convert_remapsResourceIdsInXmlResources() throws Exception {
     String xmlResourcePath = "res/layout/main.xml";
     ResourceTable resourceTable = resourceTableWithFileReferences(xmlResourcePath);
-    SdkBundle sdkBundle =
-        new SdkBundleBuilder()
-            .setModule(
-                new BundleModuleBuilder("base")
-                    .setManifest(
-                        androidManifest(PACKAGE_NAME, withMinSdkVersion(SDK_SANDBOX_MIN_VERSION)))
-                    .setResourceTable(resourceTable)
-                    .addFile(
-                        xmlResourcePath,
-                        xmlNodeWithResourceReference(USER_PACKAGE_OFFSET).toByteArray())
-                    .build())
+    BundleModule sdkModule =
+        new BundleModuleBuilder("base")
+            .setManifest(androidManifest(PACKAGE_NAME, withMinSdkVersion(SDK_SANDBOX_MIN_VERSION)))
+            .setResourceTable(resourceTable)
+            .addFile(
+                xmlResourcePath, xmlNodeWithResourceReference(USER_PACKAGE_OFFSET).toByteArray())
             .build();
 
     BundleModule modifiedModule =
-        new SdkBundleModuleToAppBundleModuleConverter(
-                sdkBundle,
+        new SdkModuleToAppBundleModuleConverter(
+                PACKAGE_NAME,
+                sdkModule,
                 RuntimeEnabledSdk.newBuilder().setResourcesPackageId(NEW_PACKAGE_ID).build())
             .convert();
 

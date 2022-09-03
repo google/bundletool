@@ -69,14 +69,15 @@ public class BuildSdkAsarManager {
         .map(BuildSdkAsarManager::getFormattedCertificateDigest)
         .ifPresent(metadata::setCertificateDigest);
 
-
-    return SdkAsar.builder()
-        .setManifest(manifestDoc)
-        .setModule(sdkBundle.getModule())
-        .setSdkModulesConfig(sdkModulesConfig)
-        .setModulesFile(extractedModulesFilePath.toFile())
-        .setSdkMetadata(metadata.build())
-        .build();
+    SdkAsar.Builder asar =
+        SdkAsar.builder()
+            .setManifest(manifestDoc)
+            .setModule(sdkBundle.getModule())
+            .setSdkModulesConfig(sdkModulesConfig)
+            .setModulesFile(extractedModulesFilePath.toFile())
+            .setSdkMetadata(metadata.build());
+    sdkBundle.getSdkInterfaceDescriptors().ifPresent(asar::setSdkInterfaceDescriptors);
+    return asar.build();
   }
 
   private static String getFormattedCertificateDigest(X509Certificate certificate) {

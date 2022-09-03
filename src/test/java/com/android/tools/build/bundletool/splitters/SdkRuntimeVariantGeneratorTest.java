@@ -128,24 +128,10 @@ public class SdkRuntimeVariantGeneratorTest {
 
     assertThat(sdkRuntimeVariantTargetings)
         .containsExactly(
-            sdkRuntimeVariantTargeting(
-                ANDROID_T_API_VERSION,
-                /* alternativeSdkVersions= */ ImmutableSet.of(
-                    ANDROID_T_API_VERSION + 1,
-                    ANDROID_T_API_VERSION + 2,
-                    ANDROID_T_API_VERSION + 3)),
-            sdkRuntimeVariantTargeting(
-                ANDROID_T_API_VERSION + 1,
-                /* alternativeSdkVersions= */ ImmutableSet.of(
-                    ANDROID_T_API_VERSION, ANDROID_T_API_VERSION + 2, ANDROID_T_API_VERSION + 3)),
-            sdkRuntimeVariantTargeting(
-                ANDROID_T_API_VERSION + 2,
-                /* alternativeSdkVersions= */ ImmutableSet.of(
-                    ANDROID_T_API_VERSION, ANDROID_T_API_VERSION + 1, ANDROID_T_API_VERSION + 3)),
-            sdkRuntimeVariantTargeting(
-                ANDROID_T_API_VERSION + 3,
-                /* alternativeSdkVersions= */ ImmutableSet.of(
-                    ANDROID_T_API_VERSION, ANDROID_T_API_VERSION + 1, ANDROID_T_API_VERSION + 2)));
+            sdkRuntimeVariantTargeting(ANDROID_T_API_VERSION),
+            sdkRuntimeVariantTargeting(ANDROID_T_API_VERSION + 1),
+            sdkRuntimeVariantTargeting(ANDROID_T_API_VERSION + 2),
+            sdkRuntimeVariantTargeting(ANDROID_T_API_VERSION + 3));
   }
 
   @Test
@@ -159,11 +145,7 @@ public class SdkRuntimeVariantGeneratorTest {
 
     assertThat(sdkRuntimeVariantTargetings)
         .containsExactly(
-            sdkRuntimeVariantTargeting(
-                ANDROID_T_API_VERSION,
-                /* alternativeSdkVersions= */ ImmutableSet.of(ANDROID_T_API_VERSION + 1)),
-            sdkRuntimeVariantTargeting(
-                ANDROID_T_API_VERSION + 1,
-                /* alternativeSdkVersions= */ ImmutableSet.of(ANDROID_T_API_VERSION)));
+            sdkRuntimeVariantTargeting(ANDROID_T_API_VERSION),
+            sdkRuntimeVariantTargeting(ANDROID_T_API_VERSION + 1));
   }
 }

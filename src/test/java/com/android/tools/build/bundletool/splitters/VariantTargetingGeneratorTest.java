@@ -18,6 +18,7 @@ package com.android.tools.build.bundletool.splitters;
 
 import static com.android.tools.build.bundletool.model.utils.Versions.ANDROID_M_API_VERSION;
 import static com.android.tools.build.bundletool.model.utils.Versions.ANDROID_Q_API_VERSION;
+import static com.android.tools.build.bundletool.model.utils.Versions.ANDROID_S_API_VERSION;
 import static com.android.tools.build.bundletool.model.utils.Versions.ANDROID_S_V2_API_VERSION;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifest;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withTargetSdkVersion;
@@ -30,6 +31,7 @@ import static com.android.tools.build.bundletool.testing.TargetingUtils.variantM
 import static com.google.common.truth.extensions.proto.ProtoTruth.assertThat;
 
 import com.android.aapt.Resources.XmlNode;
+import com.android.bundle.Config.UncompressDexFiles.UncompressedDexTargetSdk;
 import com.android.bundle.Files.NativeLibraries;
 import com.android.bundle.RuntimeEnabledSdkConfigProto.RuntimeEnabledSdk;
 import com.android.bundle.Targeting.VariantTargeting;
@@ -88,6 +90,69 @@ public class VariantTargetingGeneratorTest {
             variantMinSdkTargeting(ANDROID_M_API_VERSION),
             // Q+ variant generated for the module with the dex file.
             variantMinSdkTargeting(ANDROID_Q_API_VERSION));
+  }
+
+  @Test
+  public void generateVariantTargetings_generatesSVariantForUncompressedDex() {
+    VariantTargetingGenerator variantTargetingGenerator =
+        new VariantTargetingGenerator(
+            new PerModuleVariantTargetingGenerator(), new SdkRuntimeVariantGenerator(APP_BUNDLE));
+    ApkGenerationConfiguration apkGenerationConfiguration =
+        ApkGenerationConfiguration.builder()
+            .setEnableDexCompressionSplitter(true)
+            .setDexCompressionSplitterForTargetSdk(UncompressedDexTargetSdk.SDK_31)
+            .build();
+
+    ImmutableSet<VariantTargeting> splits =
+        variantTargetingGenerator.generateVariantTargetings(
+            ImmutableList.of(SINGLE_LIBRARY_MODULE, SINGLE_DEX_MODULE), apkGenerationConfiguration);
+
+    assertThat(splits)
+        .comparingExpectedFieldsOnly()
+        .containsExactly(
+            // L+ variant is always generated.
+            lPlusVariantTargeting(),
+            // S+ variant generated for the module with the dex file.
+            variantMinSdkTargeting(ANDROID_S_API_VERSION));
+  }
+
+  @Test
+  public void
+      generateVariantTargetings_generatesSdkRuntimeVariant_generatesSVariantForUncompressedDex() {
+    RuntimeEnabledSdk runtimeEnabledSdk =
+        RuntimeEnabledSdk.newBuilder()
+            .setPackageName("com.test.sdk")
+            .setVersionMajor(1234)
+            .setVersionMinor(123)
+            .setCertificateDigest("AA:BB:CC")
+            .build();
+    VariantTargetingGenerator variantTargetingGenerator =
+        new VariantTargetingGenerator(
+            new PerModuleVariantTargetingGenerator(),
+            new SdkRuntimeVariantGenerator(
+                APP_BUNDLE.toBuilder()
+                    .setRuntimeEnabledSdkDependencies(
+                        ImmutableMap.of("com.test.sdk", runtimeEnabledSdk))
+                    .build()));
+    ApkGenerationConfiguration apkGenerationConfiguration =
+        ApkGenerationConfiguration.builder()
+            .setDexCompressionSplitterForTargetSdk(UncompressedDexTargetSdk.SDK_31)
+            .setEnableDexCompressionSplitter(true)
+            .build();
+
+    ImmutableSet<VariantTargeting> splits =
+        variantTargetingGenerator.generateVariantTargetings(
+            ImmutableList.of(SINGLE_DEX_MODULE), apkGenerationConfiguration);
+
+    assertThat(splits)
+        .comparingExpectedFieldsOnly()
+        .containsExactly(
+            // L+ variant is always generated.
+            lPlusVariantTargeting(),
+            // S+ variant generated for the module with the dex file.
+            variantMinSdkTargeting(ANDROID_S_API_VERSION),
+            // SDK Runtime variant generated for base module, which contains RuntimeEnabledSdkConfig
+            sdkRuntimeVariantTargeting());
   }
 
   @Test

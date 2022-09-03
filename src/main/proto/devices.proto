@@ -35,4 +35,23 @@ message DeviceSpec {
 
   // Device groups the device belongs to.
   repeated string device_groups = 9;
+
+  // Information about the runtime-enabled SDK capabilities of the device.
+  SdkRuntime sdk_runtime = 10;
+}
+
+message SdkRuntime {
+  // Whether runtime-enabled SDKs can run on the device
+  bool supported = 1;
+
+  // List of runtime-enabled SDKs installed on the device.
+  repeated InstalledSdk installed_sdks = 2;
+}
+
+message InstalledSdk {
+  // Package name of the runtime-enabled SDK.
+  string package_name = 1;
+
+  // Injective encoding of the SDK major version and minor version.
+  int32 version_major = 2;
 }

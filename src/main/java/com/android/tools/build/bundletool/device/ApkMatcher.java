@@ -122,6 +122,7 @@ public class ApkMatcher {
             multiAbiMatcher,
             screenDensityMatcher,
             textureCompressionFormatMatcher,
+            new SdkRuntimeMatcher(deviceSpec),
             matchInstant);
   }
 

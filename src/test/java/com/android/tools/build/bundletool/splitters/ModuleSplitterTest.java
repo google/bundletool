@@ -23,6 +23,8 @@ import static com.android.tools.build.bundletool.model.AndroidManifest.ACTIVITY_
 import static com.android.tools.build.bundletool.model.AndroidManifest.ANDROID_NAMESPACE_URI;
 import static com.android.tools.build.bundletool.model.AndroidManifest.APPLICATION_ELEMENT_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.NAME_RESOURCE_ID;
+import static com.android.tools.build.bundletool.model.AndroidManifest.PERMISSION_ELEMENT_NAME;
+import static com.android.tools.build.bundletool.model.AndroidManifest.PROPERTY_ELEMENT_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.SPLIT_NAME_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.ManifestMutator.withExtractNativeLibs;
 import static com.android.tools.build.bundletool.model.OptimizationDimension.ABI;
@@ -30,6 +32,7 @@ import static com.android.tools.build.bundletool.model.OptimizationDimension.DEV
 import static com.android.tools.build.bundletool.model.OptimizationDimension.LANGUAGE;
 import static com.android.tools.build.bundletool.model.OptimizationDimension.SCREEN_DENSITY;
 import static com.android.tools.build.bundletool.model.OptimizationDimension.TEXTURE_COMPRESSION_FORMAT;
+import static com.android.tools.build.bundletool.model.RuntimeEnabledSdkVersionEncoder.encodeSdkMajorAndMinorVersion;
 import static com.android.tools.build.bundletool.model.SourceStamp.STAMP_SOURCE_METADATA_KEY;
 import static com.android.tools.build.bundletool.model.SourceStamp.STAMP_TYPE_METADATA_KEY;
 import static com.android.tools.build.bundletool.model.utils.Versions.ANDROID_L_API_VERSION;
@@ -44,7 +47,9 @@ import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.with
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withMaxSdkVersion;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withMetadataResource;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withMinSdkVersion;
+import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withRequiredByPrivacySandboxElement;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withSplitNameActivity;
+import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withUsesSdkLibraryElement;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.xmlAttribute;
 import static com.android.tools.build.bundletool.testing.ModuleSplitUtils.applyManifestMutators;
 import static com.android.tools.build.bundletool.testing.ModuleSplitUtils.createModuleSplitBuilder;
@@ -2232,6 +2237,122 @@ public class ModuleSplitterTest {
 
     assertThat(splits).hasSize(1);
     assertThat(splits.get(0).getAndroidManifest().getUsesSdkLibraryElements()).isEmpty();
+  }
+
+  @Test
+  public void hasReSdkDeps_sdkRuntimeVariant_mainSplitOfBaseModule_removesElementRequiredBySdk() {
+    RuntimeEnabledSdkConfig runtimeEnabledSdkConfig =
+        RuntimeEnabledSdkConfig.newBuilder()
+            .addRuntimeEnabledSdk(
+                RuntimeEnabledSdk.newBuilder()
+                    .setPackageName("com.test.sdk")
+                    .setVersionMajor(1)
+                    .setVersionMinor(2)
+                    .setCertificateDigest(VALID_CERT_DIGEST))
+            .build();
+    BundleModule testModule =
+        new BundleModuleBuilder("base")
+            .setManifest(
+                androidManifest(
+                    "com.test.app",
+                    withRequiredByPrivacySandboxElement(
+                        PERMISSION_ELEMENT_NAME, /* requiredByPrivacySandboxSdkValue= */ true),
+                    withRequiredByPrivacySandboxElement(
+                        PROPERTY_ELEMENT_NAME, /* requiredByPrivacySandboxSdkValue= */ false)))
+            .setRuntimeEnabledSdkConfig(runtimeEnabledSdkConfig)
+            .build();
+    AppBundle appBundle = new AppBundleBuilder().addModule(testModule).build();
+    ModuleSplitter moduleSplitter =
+        ModuleSplitter.createNoStamp(
+            testModule,
+            BUNDLETOOL_VERSION,
+            appBundle,
+            ApkGenerationConfiguration.getDefaultInstance(),
+            sdkRuntimeVariantTargeting(),
+            ImmutableSet.of("base"));
+
+    ImmutableList<ModuleSplit> splits = moduleSplitter.splitModule();
+
+    assertThat(splits).hasSize(1);
+    assertThat(splits.get(0).getAndroidManifest().getManifestRoot().getProto())
+        .isEqualTo(
+            androidManifest(
+                "com.test.app",
+                withUsesSdkLibraryElement(
+                    "com.test.sdk",
+                    encodeSdkMajorAndMinorVersion(/* versionMajor= */ 1, /* versionMinor= */ 2),
+                    VALID_CERT_DIGEST),
+                manifestElement -> manifestElement.getOrCreateChildElement(PROPERTY_ELEMENT_NAME)));
+  }
+
+  @Test
+  public void hasReSdkDeps_nonSdkRuntimeVariant_mainSplitOfBaseModule_removesRequiredBySdkAttrs() {
+    RuntimeEnabledSdkConfig runtimeEnabledSdkConfig =
+        RuntimeEnabledSdkConfig.newBuilder()
+            .addRuntimeEnabledSdk(
+                RuntimeEnabledSdk.newBuilder()
+                    .setPackageName("com.test.sdk")
+                    .setVersionMajor(1)
+                    .setVersionMinor(2)
+                    .setCertificateDigest(VALID_CERT_DIGEST))
+            .build();
+    BundleModule testModule =
+        new BundleModuleBuilder("base")
+            .setManifest(
+                androidManifest(
+                    "com.test.app",
+                    withRequiredByPrivacySandboxElement(
+                        PERMISSION_ELEMENT_NAME, /* requiredByPrivacySandboxSdkValue= */ true),
+                    withRequiredByPrivacySandboxElement(
+                        PROPERTY_ELEMENT_NAME, /* requiredByPrivacySandboxSdkValue= */ false)))
+            .setRuntimeEnabledSdkConfig(runtimeEnabledSdkConfig)
+            .build();
+    AppBundle appBundle = new AppBundleBuilder().addModule(testModule).build();
+    ModuleSplitter moduleSplitter =
+        ModuleSplitter.createNoStamp(
+            testModule,
+            BUNDLETOOL_VERSION,
+            appBundle,
+            ApkGenerationConfiguration.getDefaultInstance(),
+            lPlusVariantTargeting(),
+            ImmutableSet.of("base"));
+
+    ImmutableList<ModuleSplit> splits = moduleSplitter.splitModule();
+
+    assertThat(splits).hasSize(1);
+    assertThat(splits.get(0).getAndroidManifest().getManifestRoot().getProto())
+        .isEqualTo(
+            androidManifest(
+                "com.test.app",
+                manifestElement -> manifestElement.getOrCreateChildElement(PERMISSION_ELEMENT_NAME),
+                manifestElement -> manifestElement.getOrCreateChildElement(PROPERTY_ELEMENT_NAME)));
+  }
+
+  @Test
+  public void hasNoReSdkDeps_doesNotModifyRequiredByPrivacySandboxSdkAttributes() {
+    XmlNode androidManifest =
+        androidManifest(
+            "com.test.app",
+            withRequiredByPrivacySandboxElement(
+                PERMISSION_ELEMENT_NAME, /* requiredByPrivacySandboxSdkValue= */ true),
+            withRequiredByPrivacySandboxElement(
+                PROPERTY_ELEMENT_NAME, /* requiredByPrivacySandboxSdkValue= */ false));
+    BundleModule testModule = new BundleModuleBuilder("base").setManifest(androidManifest).build();
+    AppBundle appBundle = new AppBundleBuilder().addModule(testModule).build();
+    ModuleSplitter moduleSplitter =
+        ModuleSplitter.createNoStamp(
+            testModule,
+            BUNDLETOOL_VERSION,
+            appBundle,
+            ApkGenerationConfiguration.getDefaultInstance(),
+            lPlusVariantTargeting(),
+            ImmutableSet.of("base"));
+
+    ImmutableList<ModuleSplit> splits = moduleSplitter.splitModule();
+
+    assertThat(splits).hasSize(1);
+    assertThat(splits.get(0).getAndroidManifest().getManifestRoot().getProto())
+        .isEqualTo(androidManifest);
   }
 
   private ModuleSplit checkAndReturnTheOnlyMasterSplit(List<ModuleSplit> splits) {

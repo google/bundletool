@@ -225,7 +225,7 @@ public class ApkMatcherTest {
             () -> new ApkMatcher(deviceWithSdk(19)).getMatchingApks(buildApksResult));
     assertThat(exception)
         .hasMessageThat()
-        .contains("The app doesn't support SDK version of the device: (19).");
+        .contains("SDK version (19) of the device is not supported.");
   }
 
   @Test
@@ -258,7 +258,7 @@ public class ApkMatcherTest {
             () -> new ApkMatcher(deviceWithSdk(19)).getMatchingApks(buildApksResult));
     assertThat(exception)
         .hasMessageThat()
-        .contains("The app doesn't support SDK version of the device: (19).");
+        .contains("SDK version (19) of the device is not supported.");
   }
 
   @Test

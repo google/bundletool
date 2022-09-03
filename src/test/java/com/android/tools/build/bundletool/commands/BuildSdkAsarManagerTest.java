@@ -17,6 +17,7 @@
 package com.android.tools.build.bundletool.commands;
 
 import static com.android.tools.build.bundletool.model.utils.BundleParser.getModulesZip;
+import static com.android.tools.build.bundletool.testing.AsarUtils.extractSdkInterfaceDescriptors;
 import static com.android.tools.build.bundletool.testing.AsarUtils.extractSdkManifest;
 import static com.android.tools.build.bundletool.testing.AsarUtils.extractSdkMetadata;
 import static com.android.tools.build.bundletool.testing.AsarUtils.extractSdkModuleData;
@@ -41,6 +42,7 @@ import com.android.tools.build.bundletool.testing.SdkBundleBuilder;
 import com.android.tools.build.bundletool.xml.XmlProtoToXmlConverter;
 import com.android.tools.build.bundletool.xml.XmlUtils;
 import com.google.common.collect.ImmutableList;
+import com.google.common.io.ByteSource;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.security.KeyPair;
@@ -123,6 +125,17 @@ public class BuildSdkAsarManagerTest {
         .isEqualTo(
             XmlUtils.documentToString(
                 XmlProtoToXmlConverter.convert(new XmlProtoNode(sdkManifest))));
+  }
+
+  @Test
+  public void sdkInterfaceDescriptorsAreCopiedToAsar() throws Exception {
+    ByteSource apiDescriptors = ByteSource.wrap(new byte[] {1, 2, 3});
+    SdkBundle sdkBundle = new SdkBundleBuilder().setSdkInterfaceDescriptors(apiDescriptors).build();
+
+    execute(sdkBundle);
+
+    ZipFile asarFile = new ZipFile(outputFilePath.toFile());
+    assertThat(extractSdkInterfaceDescriptors(asarFile)).isEqualTo(apiDescriptors.read());
   }
 
   @Test

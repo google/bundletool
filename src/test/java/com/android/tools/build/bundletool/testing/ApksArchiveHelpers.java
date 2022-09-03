@@ -30,6 +30,7 @@ import com.android.bundle.Commands.ArchivedApkMetadata;
 import com.android.bundle.Commands.AssetModuleMetadata;
 import com.android.bundle.Commands.AssetSliceSet;
 import com.android.bundle.Commands.BuildApksResult;
+import com.android.bundle.Commands.BuildSdkApksResult;
 import com.android.bundle.Commands.DeliveryType;
 import com.android.bundle.Commands.ModuleMetadata;
 import com.android.bundle.Commands.SplitApkMetadata;
@@ -55,10 +56,27 @@ public final class ApksArchiveHelpers {
 
   private static final byte[] TEST_BYTES = new byte[100];
 
+  /** Create an app APK set and serialize it to the provided path. */
   public static Path createApksArchiveFile(BuildApksResult result, Path location) throws Exception {
     ZipBuilder archiveBuilder = new ZipBuilder();
 
     apkDescriptionStream(result)
+        .forEach(
+            apkDesc ->
+                archiveBuilder.addFileWithContent(ZipPath.create(apkDesc.getPath()), TEST_BYTES));
+    archiveBuilder.addFileWithProtoContent(ZipPath.create("toc.pb"), result);
+
+    return archiveBuilder.writeTo(location);
+  }
+
+  /** Create an SDK APK set and serialize it to the provided path. */
+  public static Path createSdkApksArchiveFile(BuildSdkApksResult result, Path location)
+      throws Exception {
+    ZipBuilder archiveBuilder = new ZipBuilder();
+
+    result.getVariantList().stream()
+        .flatMap(variant -> variant.getApkSetList().stream())
+        .flatMap(apkSet -> apkSet.getApkDescriptionList().stream())
         .forEach(
             apkDesc ->
                 archiveBuilder.addFileWithContent(ZipPath.create(apkDesc.getPath()), TEST_BYTES));

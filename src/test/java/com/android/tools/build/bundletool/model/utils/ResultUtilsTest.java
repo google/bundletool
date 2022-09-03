@@ -22,6 +22,7 @@ import static com.android.tools.build.bundletool.testing.ApksArchiveHelpers.crea
 import static com.android.tools.build.bundletool.testing.ApksArchiveHelpers.createApksDirectory;
 import static com.android.tools.build.bundletool.testing.ApksArchiveHelpers.createInstantApkSet;
 import static com.android.tools.build.bundletool.testing.ApksArchiveHelpers.createMasterApkDescription;
+import static com.android.tools.build.bundletool.testing.ApksArchiveHelpers.createSdkApksArchiveFile;
 import static com.android.tools.build.bundletool.testing.ApksArchiveHelpers.createSplitApkSet;
 import static com.android.tools.build.bundletool.testing.ApksArchiveHelpers.createStandaloneApkSet;
 import static com.android.tools.build.bundletool.testing.ApksArchiveHelpers.createSystemApkSet;
@@ -34,9 +35,15 @@ import static com.android.tools.build.bundletool.testing.TargetingUtils.variantS
 import static com.google.common.truth.Truth.assertThat;
 import static com.google.common.truth.extensions.proto.ProtoTruth.assertThat;
 
+import com.android.bundle.Commands.ApkDescription;
+import com.android.bundle.Commands.ApkSet;
 import com.android.bundle.Commands.AssetSliceSet;
 import com.android.bundle.Commands.BuildApksResult;
+import com.android.bundle.Commands.BuildSdkApksResult;
+import com.android.bundle.Commands.SdkVersionInformation;
+import com.android.bundle.Commands.SplitApkMetadata;
 import com.android.bundle.Commands.Variant;
+import com.android.bundle.Config.Bundletool;
 import com.android.bundle.Targeting.Abi.AbiAlias;
 import com.android.bundle.Targeting.ApkTargeting;
 import com.android.bundle.Targeting.SdkVersion;
@@ -65,20 +72,31 @@ public class ResultUtilsTest {
 
   @Test
   public void emptyBuildApksResult_readTableOfContents() throws Exception {
-
     Path apksArchiveFile =
         createApksArchiveFile(BuildApksResult.getDefaultInstance(), tmpDir.resolve("bundle.apks"));
 
     BuildApksResult buildApksResult = readTableOfContents(apksArchiveFile);
-    assertThat(buildApksResult).isEqualTo(BuildApksResult.getDefaultInstance());
+
+    assertThat(buildApksResult).isEqualToDefaultInstance();
+  }
+
+  @Test
+  public void emptyBuildSdkApksResult_readTableOfContents() throws Exception {
+    Path sdkApksArchiveFile =
+        createSdkApksArchiveFile(
+            BuildSdkApksResult.getDefaultInstance(), tmpDir.resolve("sdk.apks"));
+
+    BuildApksResult buildApksResult = readTableOfContents(sdkApksArchiveFile);
+
+    assertThat(buildApksResult).isEqualToDefaultInstance();
   }
 
   @Test
   public void emptyBuildApksResult_inDirectory_readTableOfContents() throws Exception {
-
     Path apksDirectory = createApksDirectory(BuildApksResult.getDefaultInstance(), tmpDir);
 
     BuildApksResult buildApksResult = readTableOfContents(apksDirectory);
+
     assertThat(buildApksResult).isEqualToDefaultInstance();
   }
 
@@ -94,12 +112,47 @@ public class ResultUtilsTest {
                         "base",
                         createMasterApkDescription(ApkTargeting.getDefaultInstance(), apkLBase))))
             .build();
-
     Path apksArchiveFile =
         createApksArchiveFile(tableOfContentsProto, tmpDir.resolve("bundle.apks"));
 
     BuildApksResult buildApksResult = readTableOfContents(apksArchiveFile);
+
     assertThat(buildApksResult).isEqualTo(tableOfContentsProto);
+  }
+
+  @Test
+  public void buildSdkApksResult_readTableOfContents() throws Exception {
+    String packageName = "com.re.sdk";
+    Variant variant =
+        Variant.newBuilder()
+            .addApkSet(
+                ApkSet.newBuilder()
+                    .addApkDescription(
+                        ApkDescription.newBuilder()
+                            .setPath("standalones/standalone.apk")
+                            .setSplitApkMetadata(
+                                SplitApkMetadata.newBuilder().setIsMasterSplit(true))))
+            .build();
+    Bundletool bundletool = Bundletool.newBuilder().setVersion("1.10.1").build();
+    BuildSdkApksResult tableOfContentsProto =
+        BuildSdkApksResult.newBuilder()
+            .setPackageName(packageName)
+            .addVariant(variant)
+            .setBundletool(bundletool)
+            .setVersion(SdkVersionInformation.newBuilder().setMajor(99).build())
+            .build();
+    Path apksArchiveFile =
+        createSdkApksArchiveFile(tableOfContentsProto, tmpDir.resolve("sdk.apks"));
+
+    BuildApksResult buildApksResult = readTableOfContents(apksArchiveFile);
+
+    assertThat(buildApksResult)
+        .isEqualTo(
+            BuildApksResult.newBuilder()
+                .setPackageName(packageName)
+                .addVariant(variant)
+                .setBundletool(bundletool)
+                .build());
   }
 
   @Test

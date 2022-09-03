@@ -20,6 +20,7 @@ import static com.android.tools.build.bundletool.model.utils.TargetingProtoUtils
 import static com.android.tools.build.bundletool.model.utils.TargetingProtoUtils.sdkVersionTargeting;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.collect.ImmutableMap.toImmutableMap;
+import static com.google.common.collect.ImmutableSet.toImmutableSet;
 import static java.util.function.Function.identity;
 
 import com.android.aapt.Resources.ResourceTable;
@@ -27,6 +28,7 @@ import com.android.aapt.Resources.XmlNode;
 import com.android.bundle.Commands.DeliveryType;
 import com.android.bundle.Commands.FeatureModuleType;
 import com.android.bundle.Commands.ModuleMetadata;
+import com.android.bundle.Commands.RuntimeEnabledSdkDependency;
 import com.android.bundle.Config.ApexConfig;
 import com.android.bundle.Config.BundleConfig.BundleType;
 import com.android.bundle.Files.ApexImages;
@@ -42,6 +44,8 @@ import com.google.common.base.Splitter;
 import com.google.common.collect.ImmutableCollection;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableSet;
+import com.google.errorprone.annotations.CanIgnoreReturnValue;
 import com.google.errorprone.annotations.Immutable;
 import java.io.IOException;
 import java.io.InputStream;
@@ -71,6 +75,7 @@ public abstract class BundleModule {
   public static final ZipPath MANIFEST_DIRECTORY = ZipPath.create("manifest");
   public static final ZipPath RESOURCES_DIRECTORY = ZipPath.create("res");
   public static final ZipPath ROOT_DIRECTORY = ZipPath.create("root");
+  public static final ZipPath DRAWABLE_RESOURCE_DIRECTORY = ZipPath.create("res/drawable");
 
   /** The top-level directory of an App Bundle module that contains APEX image files. */
   public static final ZipPath APEX_DIRECTORY = ZipPath.create("apex");
@@ -256,6 +261,10 @@ public abstract class BundleModule {
   }
 
   public ModuleMetadata getModuleMetadata() {
+    return getModuleMetadata(/* isSdkRuntimeVariant= */ false);
+  }
+
+  public ModuleMetadata getModuleMetadata(boolean isSdkRuntimeVariant) {
     ModuleMetadata.Builder moduleMetadata =
         ModuleMetadata.newBuilder()
             .setName(getName().getName())
@@ -266,8 +275,28 @@ public abstract class BundleModule {
 
     moduleTypeToFeatureModuleType(getModuleType())
         .ifPresent(moduleType -> moduleMetadata.setModuleType(moduleType));
+    if (isSdkRuntimeVariant) {
+      getRuntimeEnabledSdkConfig()
+          .ifPresent(
+              runtimeEnabledSdkConfig ->
+                  moduleMetadata.addAllRuntimeEnabledSdkDependencies(
+                      runtimeEnabledDependenciesFromConfig(runtimeEnabledSdkConfig)));
+    }
 
     return moduleMetadata.build();
+  }
+
+  private static ImmutableSet<RuntimeEnabledSdkDependency> runtimeEnabledDependenciesFromConfig(
+      RuntimeEnabledSdkConfig runtimeEnabledSdkConfig) {
+    return runtimeEnabledSdkConfig.getRuntimeEnabledSdkList().stream()
+        .map(
+            runtimeEnabledSdk ->
+                RuntimeEnabledSdkDependency.newBuilder()
+                    .setPackageName(runtimeEnabledSdk.getPackageName())
+                    .setMajorVersion(runtimeEnabledSdk.getVersionMajor())
+                    .setMinorVersion(runtimeEnabledSdk.getVersionMinor())
+                    .build())
+        .collect(toImmutableSet());
   }
 
   private static DeliveryType moduleDeliveryTypeToDeliveryType(
@@ -343,6 +372,7 @@ public abstract class BundleModule {
      * Thus, prefer using the {@link #addEntry(ModuleEntry)} method when possible, since it also
      * accepts the special files.
      */
+    @CanIgnoreReturnValue
     public Builder setRawEntries(Collection<ModuleEntry> entries) {
       entries.forEach(
           entry ->
@@ -354,7 +384,10 @@ public abstract class BundleModule {
       return this;
     }
 
-    /** @see #addEntry(ModuleEntry) */
+    /**
+     * @see #addEntry(ModuleEntry)
+     */
+    @CanIgnoreReturnValue
     public Builder addEntries(Collection<ModuleEntry> entries) {
       for (ModuleEntry entry : entries) {
         addEntry(entry);
@@ -368,6 +401,7 @@ public abstract class BundleModule {
      * <p>Certain files (eg. AndroidManifest.xml and several module meta-data files) are immediately
      * parsed and stored in dedicated class fields instead of as entries.
      */
+    @CanIgnoreReturnValue
     public Builder addEntry(ModuleEntry moduleEntry) {
       Optional<SpecialModuleEntry> specialEntry =
           SpecialModuleEntry.getSpecialEntry(moduleEntry.getPath());

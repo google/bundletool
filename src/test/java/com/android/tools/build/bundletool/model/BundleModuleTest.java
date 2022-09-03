@@ -45,6 +45,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import com.android.aapt.Resources.Package;
 import com.android.aapt.Resources.ResourceTable;
 import com.android.aapt.Resources.XmlNode;
+import com.android.bundle.Commands.RuntimeEnabledSdkDependency;
 import com.android.bundle.Config.BundleConfig;
 import com.android.bundle.Files.ApexImages;
 import com.android.bundle.Files.Assets;
@@ -348,6 +349,87 @@ public class BundleModuleTest {
             mergeModuleTargeting(
                 moduleFeatureTargeting("com.android.hardware.feature"),
                 moduleMinSdkVersionTargeting(/* minSdkVersion= */ 24)));
+  }
+
+  @Test
+  public void getModuleMetadataForSdkRuntimeVariant_moduleHasNoRuntimeEnabledSdkDependencies() {
+    BundleModule bundleModule = createMinimalModuleBuilder().build();
+
+    assertThat(
+            bundleModule
+                .getModuleMetadata(/* isSdkRuntimeVariant= */ true)
+                .getRuntimeEnabledSdkDependenciesCount())
+        .isEqualTo(0);
+  }
+
+  @Test
+  public void getModuleMetadataForSdkRuntimeVariant_moduleHasRuntimeEnabledSdkDependencies() {
+    RuntimeEnabledSdkConfig runtimeEnabledSdkConfig =
+        RuntimeEnabledSdkConfig.newBuilder()
+            .addRuntimeEnabledSdk(
+                RuntimeEnabledSdk.newBuilder()
+                    .setPackageName("sdk.package.name1")
+                    .setVersionMajor(1)
+                    .setVersionMinor(1))
+            .addRuntimeEnabledSdk(
+                RuntimeEnabledSdk.newBuilder()
+                    .setPackageName("sdk.package.name2")
+                    .setVersionMajor(2)
+                    .setVersionMinor(2))
+            .build();
+
+    BundleModule bundleModule =
+        createMinimalModuleBuilder()
+            .addEntry(
+                createModuleEntryForFile(
+                    "runtime_enabled_sdk_config.pb", runtimeEnabledSdkConfig.toByteArray()))
+            .build();
+
+    assertThat(
+            bundleModule
+                .getModuleMetadata(/* isSdkRuntimeVariant= */ true)
+                .getRuntimeEnabledSdkDependenciesList())
+        .containsExactly(
+            RuntimeEnabledSdkDependency.newBuilder()
+                .setPackageName("sdk.package.name1")
+                .setMajorVersion(1)
+                .setMinorVersion(1)
+                .build(),
+            RuntimeEnabledSdkDependency.newBuilder()
+                .setPackageName("sdk.package.name2")
+                .setMajorVersion(2)
+                .setMinorVersion(2)
+                .build());
+  }
+
+  @Test
+  public void getModuleMetadataForNonSdkRuntimeVariant_moduleHasRuntimeEnabledSdkDependencies() {
+    RuntimeEnabledSdkConfig runtimeEnabledSdkConfig =
+        RuntimeEnabledSdkConfig.newBuilder()
+            .addRuntimeEnabledSdk(
+                RuntimeEnabledSdk.newBuilder()
+                    .setPackageName("sdk.package.name1")
+                    .setVersionMajor(1)
+                    .setVersionMinor(1))
+            .addRuntimeEnabledSdk(
+                RuntimeEnabledSdk.newBuilder()
+                    .setPackageName("sdk.package.name2")
+                    .setVersionMajor(2)
+                    .setVersionMinor(2))
+            .build();
+
+    BundleModule bundleModule =
+        createMinimalModuleBuilder()
+            .addEntry(
+                createModuleEntryForFile(
+                    "runtime_enabled_sdk_config.pb", runtimeEnabledSdkConfig.toByteArray()))
+            .build();
+
+    assertThat(
+            bundleModule
+                .getModuleMetadata(/* isSdkRuntimeVariant= */ false)
+                .getRuntimeEnabledSdkDependenciesList())
+        .isEmpty();
   }
 
   @Test

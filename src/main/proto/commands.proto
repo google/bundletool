@@ -3,7 +3,6 @@ syntax = "proto3";
 package android.bundle;
 
 import "config.proto";
-import "runtime_enabled_sdk_config.proto";
 import "targeting.proto";
 
 option java_package = "com.android.bundle";
@@ -85,6 +84,22 @@ message Variant {
   // configuration, with higher variant numbers having priority over lower
   // variant numbers.
   uint32 variant_number = 3;
+
+  // Extra information about the variant e.g. has uncompressed dex files or
+  // uncompressed native libraries
+  VariantProperties variant_properties = 4;
+}
+
+// Describes properties of a variant
+message VariantProperties {
+  // Variant has uncompressed dex files
+  bool uncompressed_dex = 1;
+
+  // Variant has uncompressed native libraries
+  bool uncompressed_native_libraries = 2;
+
+  // Variant has sparse encoded resource tables
+  bool sparse_encoding = 3;
 }
 
 // Describes the output of the "extract-apks" command.
@@ -121,9 +136,6 @@ message ApkSet {
 
   // APKs.
   repeated ApkDescription apk_description = 2;
-
-  // Information about runtime-enabled SDKs that this module depends on.
-  RuntimeEnabledSdkConfig runtime_enabled_sdk_config = 3;
 }
 
 message ModuleMetadata {
@@ -149,6 +161,9 @@ message ModuleMetadata {
 
   // Deprecated. Please use delivery_type.
   bool on_demand_deprecated = 2 [deprecated = true];
+
+  // Runtime-enabled SDK dependencies of this module.
+  repeated RuntimeEnabledSdkDependency runtime_enabled_sdk_dependencies = 8;
 }
 
 // Set of asset slices belonging to a single asset module.
@@ -296,4 +311,17 @@ message DefaultTargetingValue {
 message PermanentlyFusedModule {
   // Module name.
   string name = 1;
+}
+
+// Describes a runtime-enabled SDK that the app depends on.
+message RuntimeEnabledSdkDependency {
+  // Package name of the runtime-enabled SDK.
+  // Required.
+  string package_name = 1;
+  // Major version of the runtime-enabled SDK.
+  // Required.
+  int32 major_version = 2;
+  // Minor version of the runtime-enabled SDK.
+  // Required.
+  int32 minor_version = 3;
 }

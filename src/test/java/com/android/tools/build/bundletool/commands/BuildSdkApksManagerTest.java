@@ -201,6 +201,7 @@ public class BuildSdkApksManagerTest {
     // <property> mutations.
     assertThat(manifest.getSdkPatchVersionProperty()).hasValue(patch);
     assertThat(manifest.getSdkProviderClassNameProperty()).hasValue(sdkProviderClassName);
+    assertThat(manifest.getCompatSdkProviderClassNameProperty()).isEmpty();
   }
 
   @Test
@@ -227,6 +228,37 @@ public class BuildSdkApksManagerTest {
     AndroidManifest manifest = extractAndroidManifest(apkFile, tmpDir);
 
     assertThat(manifest.getMinSdkVersion()).hasValue(SDK_SANDBOX_MIN_VERSION + 5);
+  }
+
+  @Test
+  public void sdkManifestMutation_compatSdkProviderClassNameSet() throws Exception {
+    String sdkProviderClassName = "com.example.sandboxservice.MyNewAdsSdkEntryPoint";
+    String compatSdkProviderClassName = "com.example.MyNewAdsSdkCompatEntryPoint";
+    SdkBundle sdkBundle =
+        new SdkBundleBuilder()
+            .setVersionCode(1253)
+            .setSdkModulesConfig(
+                createSdkModulesConfig()
+                    .setSdkPackageName("com.ads.foo")
+                    .setSdkVersion(
+                        RuntimeEnabledSdkVersion.newBuilder().setMajor(15).setMinor(0).setPatch(5))
+                    .setSdkProviderClassName(sdkProviderClassName)
+                    .setCompatSdkProviderClassName(compatSdkProviderClassName)
+                    .build())
+            .build();
+
+    execute(sdkBundle);
+
+    ZipFile apkSetFile = new ZipFile(outputFilePath.toFile());
+    BuildSdkApksResult result = extractTocFromSdkApkSetFile(apkSetFile, tmpDir);
+    Variant variant = result.getVariant(0);
+    ApkDescription apkDescription = variant.getApkSet(0).getApkDescription(0);
+    File apkFile = extractFromApkSetFile(apkSetFile, apkDescription.getPath(), tmpDir);
+    AndroidManifest manifest = extractAndroidManifest(apkFile, tmpDir);
+
+    assertThat(manifest.getSdkProviderClassNameProperty()).hasValue(sdkProviderClassName);
+    assertThat(manifest.getCompatSdkProviderClassNameProperty())
+        .hasValue(compatSdkProviderClassName);
   }
 
   @Test

@@ -24,8 +24,10 @@ import com.android.bundle.Config.ResourceOptimizations.SparseEncoding;
 import com.android.bundle.Config.SplitDimension;
 import com.android.bundle.Config.StandaloneConfig.DexMergingStrategy;
 import com.android.bundle.Config.SuffixStripping;
+import com.android.bundle.Config.UncompressDexFiles.UncompressedDexTargetSdk;
 import com.android.bundle.Config.UnsignedEmbeddedApkConfig;
 import com.android.tools.build.bundletool.model.version.BundleToolVersion;
+import com.google.errorprone.annotations.CanIgnoreReturnValue;
 
 /** Helper to create {@link BundleConfig} instances in tests. */
 public class BundleConfigBuilder {
@@ -82,6 +84,16 @@ public class BundleConfigBuilder {
 
   public BundleConfigBuilder setUncompressDexFiles(boolean enabled) {
     builder.getOptimizationsBuilder().getUncompressDexFilesBuilder().setEnabled(enabled);
+    return this;
+  }
+
+  @CanIgnoreReturnValue
+  public BundleConfigBuilder setUncompressDexFilesForVariant(
+      UncompressedDexTargetSdk uncompressedDexTargetSdk) {
+    builder
+        .getOptimizationsBuilder()
+        .getUncompressDexFilesBuilder()
+        .setUncompressedDexTargetSdk(uncompressedDexTargetSdk);
     return this;
   }
 
