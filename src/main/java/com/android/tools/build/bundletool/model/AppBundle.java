@@ -283,6 +283,11 @@ public abstract class AppBundle implements Bundle {
       return this;
     }
 
+    public Builder addRawModule(BundleModule bundleModule) {
+      modulesBuilder().put(bundleModule.getName(), bundleModule);
+      return this;
+    }
+
     public abstract Builder setMasterPinnedResourceIds(ImmutableSet<ResourceId> pinnedResourceIds);
 
     public abstract Builder setMasterPinnedResourceNames(ImmutableSet<String> pinnedResourceNames);

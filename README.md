@@ -1,9 +1,16 @@
 # bundletool
 
-Bundletool is a tool to manipulate Android App Bundles.
+Bundletool is a tool to manipulate Android App Bundles and Android SDK Bundles.
 
-The **Android App Bundle** is a new format for publishing Android apps in app
-distribution stores such as Google Play.
+The **Android App Bundle** is a
+[format](https://developer.android.com/guide/app-bundle/app-bundle-format) for
+publishing Android apps in app distribution stores such as Google Play.
+
+The **Android SDK Bundle** is a
+[format](https://developer.android.com/studio/command-line/bundletool#asb-format)
+for publishing
+[runtime-enabled SDKs](https://developer.android.com/design-for-safety/privacy-sandbox/sdk-runtime)
+to SDK distribution platforms such as Google Play SDK Console.
 
 Bundletool has a few different responsibilities:
 
@@ -23,6 +30,14 @@ Bundletool has a few different responsibilities:
 *   **Verify code transparency** inside an Android App Bundle, APK files or an
     application installed on a connected device.
 
+*   **Build an Android SDK Bundle** from a pre-compiled module of a project.
+
+*   **Generate an APK Set archive** containing the SDK APKs for all devices.
+
+*   **Generate an
+    [Android SDK archive](https://developer.android.com/studio/command-line/bundletool#asar-format)**,
+    a Maven-friendly representation of an Android SDK Bundle.
+
 Read more about the App Bundle format and Bundletool's usage at
 [g.co/androidappbundle](https://g.co/androidappbundle)
 
@@ -31,4 +46,4 @@ https://developer.android.com/studio/command-line/bundletool
 
 ## Releases
 
-Latest release: [1.11.1](https://github.com/google/bundletool/releases)
+Latest release: [1.11.2](https://github.com/google/bundletool/releases)

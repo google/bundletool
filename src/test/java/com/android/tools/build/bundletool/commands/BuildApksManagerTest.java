@@ -67,6 +67,7 @@ import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.with
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withCustomThemeActivity;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withDelivery;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withDeviceGroupsCondition;
+import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withFeatureCondition;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withFusingAttribute;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withInstallLocation;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withInstallTimeDelivery;
@@ -718,6 +719,128 @@ public class BuildApksManagerTest {
                         sdkVersion(28), abis("x86"), density(DensityAlias.MDPI), locales("en-US"))
                     .toBuilder()
                     .addDeviceGroups("group1")
+                    .build())
+            .build());
+
+    buildApksManager.execute();
+
+    ZipFile apkSetFile = openZipFile(outputFilePath.toFile());
+    BuildApksResult result = extractTocFromApkSetFile(apkSetFile, outputDir);
+
+    // System APKs: Only base and modules marked for fusing must be used.
+    assertThat(systemApkVariants(result)).hasSize(1);
+    ImmutableList<ApkDescription> systemApks = apkDescriptions(systemApkVariants(result));
+
+    assertThat(systemApks)
+        .containsExactly(
+            ApkDescription.newBuilder()
+                .setPath("system/system.apk")
+                .setTargeting(ApkTargeting.getDefaultInstance())
+                .setSystemApkMetadata(
+                    SystemApkMetadata.newBuilder()
+                        .addAllFusedModuleName(ImmutableList.of("base", "with_fuse_and_match")))
+                .build(),
+            ApkDescription.newBuilder()
+                .setPath("splits/not_fused-master.apk")
+                .setTargeting(ApkTargeting.getDefaultInstance())
+                .setSplitApkMetadata(
+                    SplitApkMetadata.newBuilder().setSplitId("not_fused").setIsMasterSplit(true))
+                .build(),
+            ApkDescription.newBuilder()
+                .setPath("splits/without_fuse_and_match-master.apk")
+                .setTargeting(ApkTargeting.getDefaultInstance())
+                .setSplitApkMetadata(
+                    SplitApkMetadata.newBuilder()
+                        .setSplitId("without_fuse_and_match")
+                        .setIsMasterSplit(true))
+                .build(),
+            ApkDescription.newBuilder()
+                .setPath("splits/with_fuse_no_match-master.apk")
+                .setTargeting(ApkTargeting.getDefaultInstance())
+                .setSplitApkMetadata(
+                    SplitApkMetadata.newBuilder()
+                        .setSplitId("with_fuse_no_match")
+                        .setIsMasterSplit(true))
+                .build());
+    File systemApkFile = extractFromApkSetFile(apkSetFile, "system/system.apk", outputDir);
+
+    // Validate that the system APK contains appropriate files.
+    ZipFile systemApkZip = openZipFile(systemApkFile);
+    assertThat(filesUnderPath(systemApkZip, ZipPath.create("assets")))
+        .containsExactly("assets/base.txt", "assets/with_fuse_and_match.txt");
+  }
+
+  @Test
+  @Theory
+  public void
+      fuseConditionalModulesMatchedToGivenDevice_withDeviceFeature_withNoSdkVersion_systemApks()
+          throws Exception {
+    AppBundle appBundle =
+        new AppBundleBuilder()
+            .addModule(
+                "base",
+                module ->
+                    module
+                        .addFile("assets/base.txt")
+                        .setManifest(androidManifest("com.app"))
+                        .setResourceTable(resourceTableWithTestLabel("Test feature")))
+            .addModule(
+                "with_fuse_no_match",
+                module ->
+                    module
+                        .addFile("assets/fused.txt")
+                        .setManifest(
+                            androidManifestForFeature(
+                                "com.app",
+                                withFusingAttribute(true),
+                                withDeviceGroupsCondition(ImmutableList.of("group2")),
+                                withTitle("@string/test_label", TEST_LABEL_RESOURCE_ID))))
+            .addModule(
+                "not_fused",
+                module ->
+                    module
+                        .addFile("assets/not_fused.txt")
+                        .setManifest(
+                            androidManifestForFeature(
+                                "com.app",
+                                withFusingAttribute(false),
+                                withTitle("@string/test_label", TEST_LABEL_RESOURCE_ID))))
+            .addModule(
+                "with_fuse_and_match",
+                module ->
+                    module
+                        .addFile("assets/with_fuse_and_match.txt")
+                        .setManifest(
+                            androidManifestForFeature(
+                                "com.app",
+                                withFusingAttribute(true),
+                                withDeviceGroupsCondition(ImmutableList.of("group1")),
+                                withFeatureCondition("feature1"),
+                                withTitle("@string/test_label", TEST_LABEL_RESOURCE_ID))))
+            .addModule(
+                "without_fuse_and_match",
+                module ->
+                    module
+                        .addFile("assets/without_fuse_and_match.txt")
+                        .setManifest(
+                            androidManifestForFeature(
+                                "com.app",
+                                withFusingAttribute(false),
+                                withDeviceGroupsCondition(ImmutableList.of("group1")),
+                                withFeatureCondition("feature1"),
+                                withTitle("@string/test_label", TEST_LABEL_RESOURCE_ID))))
+            .build();
+    TestComponent.useTestModule(
+        this,
+        createTestModuleBuilder()
+            .withAppBundle(appBundle)
+            .withOutputPath(outputFilePath)
+            .withApkBuildMode(SYSTEM)
+            .withFuseOnlyDeviceMatchingModules(true)
+            .withDeviceSpec(
+                mergeSpecs(abis("x86"), density(DensityAlias.MDPI), locales("en-US")).toBuilder()
+                    .addDeviceGroups("group1")
+                    .addDeviceFeatures("feature1")
                     .build())
             .build());
 

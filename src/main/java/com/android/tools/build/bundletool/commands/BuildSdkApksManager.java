@@ -19,6 +19,7 @@ package com.android.tools.build.bundletool.commands;
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 
+import com.android.bundle.Targeting.SdkRuntimeTargeting;
 import com.android.tools.build.bundletool.io.ApkSerializerManager;
 import com.android.tools.build.bundletool.io.ApkSetWriter;
 import com.android.tools.build.bundletool.io.TempDirectory;
@@ -90,7 +91,6 @@ public class BuildSdkApksManager {
     return moduleSplitterForShards
         .generateSplits(sdkBundle.getModule(), apkOptimizations.getStandaloneDimensions())
         .stream()
-        .map(StandaloneApksGenerator::setVariantTargetingAndSplitType)
         .map(moduleSplit -> moduleSplit.writeSdkVersionName(sdkBundle.getVersionName()))
         .map(moduleSplit -> moduleSplit.writeSdkVersionCode(sdkBundle.getVersionCode().get()))
         .map(moduleSplit -> moduleSplit.writeManifestPackage(sdkBundle.getManifestPackageName()))
@@ -102,6 +102,8 @@ public class BuildSdkApksManager {
         .map(moduleSplit -> moduleSplit.writePatchVersion(sdkBundle.getPatchVersion()))
         .map(moduleSplit -> moduleSplit.writeSdkProviderClassName(sdkBundle.getProviderClassName()))
         .map(this::writeCompatSdkProviderClassNameIfPresent)
+        .map(StandaloneApksGenerator::setVariantTargetingAndSplitType)
+        .map(this::addSdkRuntimeTargeting)
         .collect(toImmutableList());
   }
 
@@ -111,5 +113,15 @@ public class BuildSdkApksManager {
           sdkBundle.getCompatProviderClassName().get());
     }
     return moduleSplit;
+  }
+
+  private ModuleSplit addSdkRuntimeTargeting(ModuleSplit moduleSplit) {
+    return moduleSplit.toBuilder()
+        .setVariantTargeting(
+            moduleSplit.getVariantTargeting().toBuilder()
+                .setSdkRuntimeTargeting(
+                    SdkRuntimeTargeting.newBuilder().setRequiresSdkRuntime(true))
+                .build())
+        .build();
   }
 }

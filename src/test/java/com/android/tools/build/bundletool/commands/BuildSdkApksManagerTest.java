@@ -33,6 +33,7 @@ import static com.android.tools.build.bundletool.testing.TestUtils.createKeystor
 import static com.android.tools.build.bundletool.testing.TestUtils.extractAndroidManifest;
 import static com.google.common.truth.Truth.assertThat;
 import static com.google.common.truth.Truth8.assertThat;
+import static com.google.common.truth.extensions.proto.ProtoTruth.assertThat;
 import static java.util.Arrays.stream;
 
 import com.android.apksig.ApkVerifier;
@@ -41,6 +42,10 @@ import com.android.bundle.Commands.BuildSdkApksResult;
 import com.android.bundle.Commands.SdkVersionInformation;
 import com.android.bundle.Commands.Variant;
 import com.android.bundle.SdkModulesConfigOuterClass.RuntimeEnabledSdkVersion;
+import com.android.bundle.Targeting.SdkRuntimeTargeting;
+import com.android.bundle.Targeting.SdkVersion;
+import com.android.bundle.Targeting.SdkVersionTargeting;
+import com.android.bundle.Targeting.VariantTargeting;
 import com.android.tools.build.bundletool.flags.FlagParser;
 import com.android.tools.build.bundletool.io.SdkBundleSerializer;
 import com.android.tools.build.bundletool.io.TempDirectory;
@@ -51,6 +56,7 @@ import com.android.tools.build.bundletool.testing.BundleModuleBuilder;
 import com.android.tools.build.bundletool.testing.CertificateFactory;
 import com.android.tools.build.bundletool.testing.SdkBundleBuilder;
 import com.google.common.collect.ImmutableList;
+import com.google.protobuf.Int32Value;
 import java.io.File;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -116,6 +122,16 @@ public class BuildSdkApksManagerTest {
     BuildSdkApksResult result = extractTocFromSdkApkSetFile(apkSetFile, tmpDir);
 
     assertThat(result.getVariantCount()).isEqualTo(1);
+    assertThat(result.getVariant(0).getTargeting())
+        .isEqualTo(
+            VariantTargeting.newBuilder()
+                .setSdkRuntimeTargeting(
+                    SdkRuntimeTargeting.newBuilder().setRequiresSdkRuntime(true))
+                .setSdkVersionTargeting(
+                    SdkVersionTargeting.newBuilder()
+                        .addValue(
+                            SdkVersion.newBuilder().setMin(Int32Value.of(SDK_SANDBOX_MIN_VERSION))))
+                .build());
     assertThat(result.getPackageName()).isEqualTo(PACKAGE_NAME);
     assertThat(result.getBundletool().getVersion())
         .isEqualTo(DEFAULT_SDK_MODULES_CONFIG.getBundletool().getVersion());

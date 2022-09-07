@@ -13,12 +13,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License
  */
-package com.android.tools.build.bundletool.model;
-
-import static com.android.tools.build.bundletool.model.ClassesDexEntriesMutator.R_PACKAGE_DEX_ENTRY_REMOVER;
+package com.android.tools.build.bundletool.sdkmodule;
 
 import com.android.bundle.RuntimeEnabledSdkConfigProto.RuntimeEnabledSdk;
+import com.android.bundle.SdkModulesConfigOuterClass.SdkModulesConfig;
+import com.android.tools.build.bundletool.model.BundleModule;
 import com.android.tools.build.bundletool.model.BundleModule.ModuleType;
+import com.android.tools.build.bundletool.model.BundleModuleName;
+import com.android.tools.build.bundletool.model.SdkBundle;
 
 /**
  * Transforms Runtime-enabled SDK module so that it can be included in an Android App Bundle.
@@ -31,16 +33,21 @@ public final class SdkModuleToAppBundleModuleConverter {
   private final BundleModule sdkModule;
   private final ResourceTablePackageIdRemapper resourceTablePackageIdRemapper;
   private final XmlPackageIdRemapper xmlPackageIdRemapper;
-  private final ClassesDexEntriesMutator classesDexEntriesMutator;
+  private final RPackageDexEntryRemover rPackageDexEntryRemover;
+  private final DexAndResourceRepackager dexAndResourceRepackager;
 
   public SdkModuleToAppBundleModuleConverter(
-      String sdkPackageName, BundleModule sdkModule, RuntimeEnabledSdk dependencyConfig) {
+      String sdkPackageName,
+      BundleModule sdkModule,
+      RuntimeEnabledSdk dependencyConfig,
+      SdkModulesConfig sdkModulesConfig) {
     this.sdkPackageName = sdkPackageName;
     this.sdkModule = sdkModule;
     this.resourceTablePackageIdRemapper =
         new ResourceTablePackageIdRemapper(dependencyConfig.getResourcesPackageId());
     this.xmlPackageIdRemapper = new XmlPackageIdRemapper(dependencyConfig.getResourcesPackageId());
-    this.classesDexEntriesMutator = new ClassesDexEntriesMutator();
+    this.rPackageDexEntryRemover = new RPackageDexEntryRemover();
+    this.dexAndResourceRepackager = new DexAndResourceRepackager(sdkModulesConfig);
   }
 
   /**
@@ -49,8 +56,9 @@ public final class SdkModuleToAppBundleModuleConverter {
    */
   public BundleModule convert() {
     return convertNameTypeAndManifest(
-        removeRPackageDexFile(
-            remapResourceIdsInXmlResources(remapResourceIdsInResourceTable(sdkModule))));
+        repackageDexAndJavaResources(
+            removeRPackageDexFile(
+                remapResourceIdsInXmlResources(remapResourceIdsInResourceTable(sdkModule)))));
   }
 
   private BundleModule remapResourceIdsInResourceTable(BundleModule module) {
@@ -62,7 +70,11 @@ public final class SdkModuleToAppBundleModuleConverter {
   }
 
   private BundleModule removeRPackageDexFile(BundleModule module) {
-    return classesDexEntriesMutator.applyMutation(module, R_PACKAGE_DEX_ENTRY_REMOVER);
+    return rPackageDexEntryRemover.applyMutation(module);
+  }
+
+  private BundleModule repackageDexAndJavaResources(BundleModule module) {
+    return dexAndResourceRepackager.repackage(module);
   }
 
   private BundleModule convertNameTypeAndManifest(BundleModule module) {

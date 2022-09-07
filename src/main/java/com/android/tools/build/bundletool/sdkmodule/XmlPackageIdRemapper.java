@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License
  */
-package com.android.tools.build.bundletool.model;
+package com.android.tools.build.bundletool.sdkmodule;
 
 import static com.android.tools.build.bundletool.model.utils.ResourcesUtils.remapPackageIdInResourceId;
 import static com.google.common.collect.ImmutableSet.toImmutableSet;
@@ -23,6 +23,9 @@ import com.android.aapt.Resources.Item;
 import com.android.aapt.Resources.XmlAttribute;
 import com.android.aapt.Resources.XmlElement;
 import com.android.aapt.Resources.XmlNode;
+import com.android.tools.build.bundletool.model.BundleModule;
+import com.android.tools.build.bundletool.model.ModuleEntry;
+import com.android.tools.build.bundletool.model.ZipPath;
 import com.android.tools.build.bundletool.model.exceptions.CommandExecutionException;
 import com.android.tools.build.bundletool.model.utils.ResourcesUtils;
 import com.google.common.collect.ImmutableList;

@@ -70,7 +70,9 @@ public abstract class TargetingDimensionMatcher<T> {
    * fail the matching.
    */
   public Predicate<ModuleTargeting> getModuleTargetingPredicate() {
-    return Predicates.compose(this::matchesTargeting, this::getTargetingValue);
+    return Predicates.compose(
+        targetingValue -> !isDeviceDimensionPresent() || matchesTargeting(targetingValue),
+        this::getTargetingValue);
   }
 
   /**

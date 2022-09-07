@@ -19,6 +19,7 @@ package com.android.tools.build.bundletool.model;
 import static com.android.tools.build.bundletool.model.ModuleDeliveryType.ALWAYS_INITIAL_INSTALL;
 import static com.android.tools.build.bundletool.model.ModuleDeliveryType.CONDITIONAL_INITIAL_INSTALL;
 import static com.android.tools.build.bundletool.model.ModuleDeliveryType.NO_INITIAL_INSTALL;
+import static com.android.tools.build.bundletool.model.utils.Versions.ANDROID_T_API_VERSION;
 import static com.android.tools.build.bundletool.model.version.VersionGuardedFeature.NAMESPACE_ON_INCLUDE_ATTRIBUTE_REQUIRED;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
@@ -138,7 +139,7 @@ public abstract class AndroidManifest {
   public static final String COMPAT_SDK_PROVIDER_CLASS_NAME_ATTRIBUTE_NAME =
       "android.sdksandbox.PROPERTY_COMPAT_SDK_PROVIDER_CLASS_NAME";
   public static final String REQUIRED_ATTRIBUTE_NAME = "required";
-  public static final Integer SDK_SANDBOX_MIN_VERSION = 32;
+  public static final int SDK_SANDBOX_MIN_VERSION = ANDROID_T_API_VERSION;
   public static final String USES_SDK_LIBRARY_ELEMENT_NAME = "uses-sdk-library";
   public static final String CERTIFICATE_DIGEST_ATTRIBUTE_NAME = "certDigest";
   public static final String TARGET_SANDBOX_VERSION_ATTRIBUTE_NAME = "targetSandboxVersion";
@@ -229,7 +230,7 @@ public abstract class AndroidManifest {
   abstract Version getBundleToolVersion();
 
   @Memoized
-  XmlProtoElement getManifestElement() {
+  public XmlProtoElement getManifestElement() {
     return getManifestRoot().getElement();
   }
 

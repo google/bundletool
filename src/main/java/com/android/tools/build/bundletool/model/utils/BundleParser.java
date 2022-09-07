@@ -16,7 +16,6 @@
 
 package com.android.tools.build.bundletool.model.utils;
 
-import static com.android.tools.build.bundletool.model.ClassesDexEntriesMutator.CLASSES_DEX_NAME_SANITIZER;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.ImmutableSet.toImmutableSet;
 
@@ -28,7 +27,7 @@ import com.android.bundle.SdkModulesConfigOuterClass.SdkModulesConfig;
 import com.android.tools.build.bundletool.model.BundleMetadata;
 import com.android.tools.build.bundletool.model.BundleModule;
 import com.android.tools.build.bundletool.model.BundleModuleName;
-import com.android.tools.build.bundletool.model.ClassesDexEntriesMutator;
+import com.android.tools.build.bundletool.model.ClassesDexSanitizer;
 import com.android.tools.build.bundletool.model.ModuleEntry;
 import com.android.tools.build.bundletool.model.ModuleEntry.ModuleEntryLocationInZipSource;
 import com.android.tools.build.bundletool.model.ZipPath;
@@ -273,10 +272,7 @@ public class BundleParser {
   public static ImmutableList<BundleModule> sanitize(ImmutableList<BundleModule> modules) {
     modules =
         modules.stream()
-            .map(
-                module ->
-                    new ClassesDexEntriesMutator()
-                        .applyMutation(module, CLASSES_DEX_NAME_SANITIZER))
+            .map(module -> new ClassesDexSanitizer().applyMutation(module))
             .collect(toImmutableList());
 
     return modules;

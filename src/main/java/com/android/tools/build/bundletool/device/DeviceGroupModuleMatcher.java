@@ -44,7 +44,8 @@ public class DeviceGroupModuleMatcher
 
   @Override
   protected boolean isDeviceDimensionPresent() {
-    return !getDeviceSpec().getDeviceGroupsList().isEmpty();
+    // Always true, because groups empty list is considered present.
+    return true;
   }
 
   @Override

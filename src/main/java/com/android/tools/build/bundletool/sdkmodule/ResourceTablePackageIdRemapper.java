@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License
  */
-package com.android.tools.build.bundletool.model;
+package com.android.tools.build.bundletool.sdkmodule;
 
 import static com.android.tools.build.bundletool.model.utils.ResourcesUtils.remapPackageIdInResourceId;
 import static com.google.common.base.Preconditions.checkArgument;
@@ -33,6 +33,7 @@ import com.android.aapt.Resources.Style;
 import com.android.aapt.Resources.Styleable;
 import com.android.aapt.Resources.Type;
 import com.android.aapt.Resources.Value;
+import com.android.tools.build.bundletool.model.BundleModule;
 
 /**
  * Remaps resource IDs in the resource table of the given {@link BundleModule} with a new package

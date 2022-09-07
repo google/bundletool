@@ -107,4 +107,13 @@ public class ModuleMatcherTest {
 
     assertThat(moduleMatcher.matchesModuleTargeting(targeting)).isFalse();
   }
+
+  @Test
+  public void matchesModuleTargeting_specWithoutSdk_positive() {
+    ModuleTargeting targeting = ModuleTargeting.getDefaultInstance();
+    DeviceSpec deviceSpec = mergeSpecs(deviceFeatures("feature1"));
+    ModuleMatcher moduleMatcher = new ModuleMatcher(deviceSpec);
+
+    assertThat(moduleMatcher.matchesModuleTargeting(targeting)).isTrue();
+  }
 }

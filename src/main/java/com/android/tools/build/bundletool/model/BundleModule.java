@@ -128,7 +128,7 @@ public abstract class BundleModule {
   /** Version of Bundeltool used to build the bundle that this module belongs to. */
   public abstract Version getBundletoolVersion();
 
-  abstract XmlNode getAndroidManifestProto();
+  public abstract XmlNode getAndroidManifestProto();
 
   @Memoized
   public AndroidManifest getAndroidManifest() {
