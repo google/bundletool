@@ -16,10 +16,11 @@
 
 package com.android.tools.build.bundletool.device;
 
+import static com.android.tools.build.bundletool.model.AndroidManifest.SDK_SANDBOX_MIN_VERSION;
+
 import com.android.bundle.Devices.DeviceSpec;
 import com.android.bundle.Targeting.SdkRuntimeTargeting;
 import com.android.bundle.Targeting.VariantTargeting;
-import com.android.tools.build.bundletool.model.AndroidManifest;
 
 /** A {@link TargetingDimensionMatcher} that provides matching on SDK runtime. */
 public final class SdkRuntimeMatcher extends TargetingDimensionMatcher<SdkRuntimeTargeting> {
@@ -49,8 +50,12 @@ public final class SdkRuntimeMatcher extends TargetingDimensionMatcher<SdkRuntim
   }
 
   boolean deviceSupportsSdkRuntime() {
-    return getDeviceSpec().getSdkRuntime().getSupported()
-        || (!getDeviceSpec().hasSdkRuntime()
-            && getDeviceSpec().getSdkVersion() >= AndroidManifest.SDK_SANDBOX_MIN_VERSION);
+    if (getDeviceSpec().hasSdkRuntime()) {
+      return getDeviceSpec().getSdkRuntime().getSupported();
+    }
+    // SDK version of 0 means it has not been specified, which is often the case for unreleased
+    // versions.
+    return getDeviceSpec().getSdkVersion() == 0
+        || getDeviceSpec().getSdkVersion() >= SDK_SANDBOX_MIN_VERSION;
   }
 }

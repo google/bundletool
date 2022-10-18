@@ -28,8 +28,7 @@ public final class Aapt2Helper {
 
   private static final Duration AAPT_TIMEOUT = Duration.ofMinutes(5);
 
-  public static final String AAPT2_PATH =
-      System.getenv("AAPT2_PATH");
+  public static final String AAPT2_PATH = System.getenv("AAPT2_PATH");
 
   public static Aapt2Command getAapt2Command() {
     return Aapt2Command.createFromExecutablePath(Paths.get(AAPT2_PATH));

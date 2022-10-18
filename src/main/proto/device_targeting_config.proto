@@ -12,6 +12,9 @@ message DeviceTierConfig {
 
   // Definition of the set of device tiers for the app.
   DeviceTierSet device_tier_set = 2;
+
+  // Definition of user country sets for the app.
+  repeated UserCountrySet user_country_sets = 5;
 }
 
 // A group of devices.
@@ -38,6 +41,20 @@ message DeviceGroup {
 message DeviceTierSet {
   // Device tiers belonging to the set.
   repeated DeviceTier device_tiers = 1;
+}
+
+// A set of user countries.
+//
+// A country set determines what variation of app content gets served to a
+// specific location.
+message UserCountrySet {
+  // Country set name.
+  string name = 1;
+
+  // List of country codes representing countries.
+  // A Country code is represented in ISO 3166 alpha-2 format.
+  // For Example:- "IT" for Italy, "GE" for Georgia.
+  repeated string country_codes = 2;
 }
 
 // A single device tier.

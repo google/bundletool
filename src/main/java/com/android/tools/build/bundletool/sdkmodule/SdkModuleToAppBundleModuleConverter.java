@@ -16,7 +16,7 @@
 package com.android.tools.build.bundletool.sdkmodule;
 
 import com.android.bundle.RuntimeEnabledSdkConfigProto.RuntimeEnabledSdk;
-import com.android.bundle.SdkModulesConfigOuterClass.SdkModulesConfig;
+import com.android.tools.build.bundletool.model.AndroidManifest;
 import com.android.tools.build.bundletool.model.BundleModule;
 import com.android.tools.build.bundletool.model.BundleModule.ModuleType;
 import com.android.tools.build.bundletool.model.BundleModuleName;
@@ -29,25 +29,26 @@ import com.android.tools.build.bundletool.model.SdkBundle;
  */
 public final class SdkModuleToAppBundleModuleConverter {
 
-  private final String sdkPackageName;
   private final BundleModule sdkModule;
   private final ResourceTablePackageIdRemapper resourceTablePackageIdRemapper;
   private final XmlPackageIdRemapper xmlPackageIdRemapper;
   private final RPackageDexEntryRemover rPackageDexEntryRemover;
   private final DexAndResourceRepackager dexAndResourceRepackager;
+  private final AndroidManifest appBaseModuleManifest;
 
   public SdkModuleToAppBundleModuleConverter(
-      String sdkPackageName,
       BundleModule sdkModule,
-      RuntimeEnabledSdk dependencyConfig,
-      SdkModulesConfig sdkModulesConfig) {
-    this.sdkPackageName = sdkPackageName;
+      RuntimeEnabledSdk sdkDependencyConfig,
+      AndroidManifest appBaseModuleManifest) {
     this.sdkModule = sdkModule;
     this.resourceTablePackageIdRemapper =
-        new ResourceTablePackageIdRemapper(dependencyConfig.getResourcesPackageId());
-    this.xmlPackageIdRemapper = new XmlPackageIdRemapper(dependencyConfig.getResourcesPackageId());
+        new ResourceTablePackageIdRemapper(sdkDependencyConfig.getResourcesPackageId());
+    this.xmlPackageIdRemapper =
+        new XmlPackageIdRemapper(sdkDependencyConfig.getResourcesPackageId());
     this.rPackageDexEntryRemover = new RPackageDexEntryRemover();
-    this.dexAndResourceRepackager = new DexAndResourceRepackager(sdkModulesConfig);
+    this.dexAndResourceRepackager =
+        new DexAndResourceRepackager(sdkModule.getSdkModulesConfig().get());
+    this.appBaseModuleManifest = appBaseModuleManifest;
   }
 
   /**
@@ -55,10 +56,10 @@ public final class SdkModuleToAppBundleModuleConverter {
    * Bundle as a removable install-time module.
    */
   public BundleModule convert() {
-    return convertNameTypeAndManifest(
-        repackageDexAndJavaResources(
-            removeRPackageDexFile(
-                remapResourceIdsInXmlResources(remapResourceIdsInResourceTable(sdkModule)))));
+    return repackageDexAndJavaResources(
+        removeRPackageDexFile(
+            remapResourceIdsInResourceTable(
+                remapResourceIdsInXmlResources(convertNameTypeAndManifest(sdkModule)))));
   }
 
   private BundleModule remapResourceIdsInResourceTable(BundleModule module) {
@@ -80,15 +81,20 @@ public final class SdkModuleToAppBundleModuleConverter {
   private BundleModule convertNameTypeAndManifest(BundleModule module) {
     // We are using modified SDK package name as a new module name. Dots are removed because special
     // characters are not allowed in module names.
-    String sdkModuleName = sdkPackageName.replace(".", "");
+    String sdkModuleName =
+        sdkModule.getSdkModulesConfig().get().getSdkPackageName().replace(".", "");
     return module.toBuilder()
         .setName(BundleModuleName.create(sdkModuleName))
         .setModuleType(ModuleType.SDK_DEPENDENCY_MODULE)
         .setAndroidManifest(
-            sdkModule
+            module
                 .getAndroidManifest()
                 .toEditor()
+                .setPackage(appBaseModuleManifest.getPackageName())
+                .setVersionCode(appBaseModuleManifest.getVersionCode().get())
                 .removeUsesSdkElement()
+                .setMinSdkVersion(appBaseModuleManifest.getMinSdkVersion().get())
+                .setHasCode(false)
                 .setSplitIdForFeatureSplit(sdkModuleName)
                 .setDeliveryOptionsForRuntimeEnabledSdkModule()
                 .save())

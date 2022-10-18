@@ -18,7 +18,7 @@ package com.android.tools.build.bundletool.validation;
 
 import static com.google.common.collect.ImmutableList.toImmutableList;
 
-import com.android.tools.build.bundletool.archive.ArchivedResourcesUtils;
+import com.android.tools.build.bundletool.archive.ArchivedResourcesHelper;
 import com.android.tools.build.bundletool.model.BundleModule;
 import com.android.tools.build.bundletool.model.exceptions.InvalidBundleException;
 import com.google.common.base.Joiner;
@@ -43,19 +43,26 @@ public class ArchiveEntriesValidator extends SubValidator {
         ImmutableSet.of(
             BundleModule.DRAWABLE_RESOURCE_DIRECTORY
                 .resolve(
-                    String.format("%s.xml", ArchivedResourcesUtils.OPACITY_LAYER_DRAWABLE_NAME))
-                .toString(),
-            BundleModule.DRAWABLE_RESOURCE_DIRECTORY
-                .resolve(String.format("%s.xml", ArchivedResourcesUtils.CLOUD_SYMBOL_DRAWABLE_NAME))
+                    String.format("%s.xml", ArchivedResourcesHelper.OPACITY_LAYER_DRAWABLE_NAME))
                 .toString(),
             BundleModule.DRAWABLE_RESOURCE_DIRECTORY
                 .resolve(
-                    String.format("%s.xml", ArchivedResourcesUtils.ARCHIVED_ICON_DRAWABLE_NAME))
+                    String.format("%s.xml", ArchivedResourcesHelper.CLOUD_SYMBOL_DRAWABLE_NAME))
+                .toString(),
+            BundleModule.DRAWABLE_RESOURCE_DIRECTORY
+                .resolve(
+                    String.format("%s.xml", ArchivedResourcesHelper.ARCHIVED_ICON_DRAWABLE_NAME))
                 .toString(),
             BundleModule.DRAWABLE_RESOURCE_DIRECTORY
                 .resolve(
                     String.format(
-                        "%s.xml", ArchivedResourcesUtils.ARCHIVED_ROUND_ICON_DRAWABLE_NAME))
+                        "%s.xml", ArchivedResourcesHelper.ARCHIVED_ROUND_ICON_DRAWABLE_NAME))
+                .toString(),
+            BundleModule.RESOURCES_DIRECTORY
+                .resolve(
+                    String.format(
+                        "layout/%s.xml",
+                        ArchivedResourcesHelper.ARCHIVED_SPLASH_SCREEN_LAYOUT_NAME))
                 .toString());
     ImmutableList<String> nameConflictingEntries =
         baseModule.getEntries().stream()

@@ -74,6 +74,8 @@ public abstract class AndroidManifest {
   public static final String META_DATA_ELEMENT_NAME = "meta-data";
   public static final String USES_SDK_ELEMENT_NAME = "uses-sdk";
   public static final String ACTIVITY_ELEMENT_NAME = "activity";
+  public static final String FRAME_LAYOUT_ELEMENT_NAME = "FrameLayout";
+  public static final String IMAGE_VIEW_ELEMENT_NAME = "ImageView";
   public static final String ACTIVITY_ALIAS_ELEMENT_NAME = "activity-alias";
   public static final String INTENT_FILTER_ELEMENT_NAME = "intent-filter";
   public static final String SERVICE_ELEMENT_NAME = "service";
@@ -149,6 +151,12 @@ public abstract class AndroidManifest {
   public static final String INCLUDE_ATTRIBUTE_NAME = "include";
   public static final String REQUIRED_BY_PRIVACY_SANDBOX_SDK_ATTRIBUTE_NAME =
       "requiredByPrivacySandboxSdk";
+  public static final String LAYOUT_WIDTH_ATTRIBUTE_NAME = "layout_width";
+  public static final String LAYOUT_HEIGHT_ATTRIBUTE_NAME = "layout_height";
+  public static final String LAYOUT_GRAVITY_ATTRIBUTE_NAME = "layout_gravity";
+  public static final String ANIMATE_LAYOUT_CHANGES_ATTRIBUTE_NAME = "animateLayoutChanges";
+  public static final String FITS_SYSTEM_WINDOWS_ATTRIBUTE_NAME = "fitsSystemWindows";
+  public static final String SRC_ATTRIBUTE_NAME = "src";
 
   public static final String LEANBACK_FEATURE_NAME = "android.software.leanback";
   public static final String TOUCHSCREEN_FEATURE_NAME = "android.hardware.touchscreen";
@@ -202,6 +210,13 @@ public abstract class AndroidManifest {
   public static final int RESTRICTED_ACCOUNT_TYPE_RESOURCE_ID = 0x010103d5;
   public static final int LARGE_HEAP_RESOURCE_ID = 0x0101035a;
   public static final int DRAWABLE_RESOURCE_ID = 0x01010199;
+  public static final int DEVICE_NO_ACTION_BAR_FULL_SCREEN_THEME = 0x0103012a;
+  public static final int LAYOUT_WIDTH_RESOURCE_ID = 0x010100f4;
+  public static final int LAYOUT_HEIGHT_RESOURCE_ID = 0x010100f5;
+  public static final int LAYOUT_GRAVITY_RESOURCE_ID = 0x010100b3;
+  public static final int ANIMATE_LAYOUT_CHANGES_RESOURCE_ID = 0x010102f2;
+  public static final int FITS_SYSTEM_WINDOWS_RESOURCE_ID = 0x010100dd;
+  public static final int SRC_RESOURCE_ID = 0x01010119;
 
   // Matches the value of android.os.Build.VERSION_CODES.CUR_DEVELOPMENT, used when turning
   // a manifest attribute which references a prerelease API version (e.g., "Q") into an integer.

@@ -84,6 +84,43 @@ public final class RuntimeEnabledSdkConfigValidatorTest {
   }
 
   @Test
+  public void validateAllModules_sameSdkPackageNameMultipleTimes_throws() {
+    RuntimeEnabledSdk runtimeEnabledSdk =
+        RuntimeEnabledSdk.newBuilder()
+            .setPackageName("com.test.sdk")
+            .setVersionMajor(1234)
+            .setCertificateDigest(VALID_CERT_FINGERPRINT)
+            .setResourcesPackageId(2)
+            .build();
+    BundleModule module1 =
+        new BundleModuleBuilder("module1")
+            .setManifest(androidManifest("com.test.app"))
+            .setRuntimeEnabledSdkConfig(
+                RuntimeEnabledSdkConfig.newBuilder()
+                    .addRuntimeEnabledSdk(runtimeEnabledSdk)
+                    .build())
+            .build();
+    BundleModule module2 =
+        new BundleModuleBuilder("module2")
+            .setManifest(androidManifest("com.test.app"))
+            .setRuntimeEnabledSdkConfig(
+                RuntimeEnabledSdkConfig.newBuilder()
+                    .addRuntimeEnabledSdk(runtimeEnabledSdk)
+                    .build())
+            .build();
+
+    InvalidBundleException exception =
+        assertThrows(
+            InvalidBundleException.class,
+            () ->
+                new RuntimeEnabledSdkConfigValidator()
+                    .validateAllModules(ImmutableList.of(module1, module2)));
+    assertThat(exception)
+        .hasMessageThat()
+        .contains("Found multiple dependencies on the same runtime-enabled SDK 'com.test.sdk'.");
+  }
+
+  @Test
   public void validateAllModules_missingPackageNameInRuntimeEnabledSdkConfig_throws() {
     BundleModule module =
         new BundleModuleBuilder("module")

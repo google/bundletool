@@ -43,6 +43,7 @@ import static com.android.tools.build.bundletool.testing.DeviceFactory.lDevice;
 import static com.android.tools.build.bundletool.testing.DeviceFactory.lDeviceWithLocales;
 import static com.android.tools.build.bundletool.testing.DeviceFactory.locales;
 import static com.android.tools.build.bundletool.testing.DeviceFactory.mergeSpecs;
+import static com.android.tools.build.bundletool.testing.DeviceFactory.sdkRuntimeSupported;
 import static com.android.tools.build.bundletool.testing.DeviceFactory.sdkVersion;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.apkAbiTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.apkDensityTargeting;
@@ -85,6 +86,7 @@ import com.android.bundle.Targeting.Abi.AbiAlias;
 import com.android.bundle.Targeting.ApkTargeting;
 import com.android.bundle.Targeting.MultiAbiTargeting;
 import com.android.bundle.Targeting.ScreenDensity.DensityAlias;
+import com.android.bundle.Targeting.SdkRuntimeTargeting;
 import com.android.bundle.Targeting.SdkVersion;
 import com.android.bundle.Targeting.SdkVersionTargeting;
 import com.android.bundle.Targeting.VariantTargeting;
@@ -2107,6 +2109,131 @@ public class ExtractApksCommandTest {
     assertThat(parseExtractApksResult(metadataFile))
         .ignoringRepeatedFieldOrder()
         .isEqualTo(expectedResult);
+  }
+
+  @Test
+  public void extractApks_appWithRuntimeSdkVariant_noSdkRuntimeInSpec() throws Exception {
+    String withSdkRuntimeApk = "with_sdk_runtime.apk";
+    String withoutSdkRuntimeApk = "without_sdk_runtime.apk";
+    Variant variantWithSdkRuntime =
+        Variant.newBuilder()
+            .addApkSet(
+                ApkSet.newBuilder()
+                    .setModuleMetadata(
+                        ModuleMetadata.newBuilder()
+                            .setName("base")
+                            .setDeliveryType(DeliveryType.INSTALL_TIME)
+                            .setModuleType(FeatureModuleType.FEATURE_MODULE))
+                    .addApkDescription(
+                        ApkDescription.newBuilder().setPath("standalones/" + withSdkRuntimeApk)))
+            .setTargeting(
+                VariantTargeting.newBuilder()
+                    .setSdkVersionTargeting(
+                        SdkVersionTargeting.newBuilder()
+                            .addValue(SdkVersion.newBuilder().setMin(Int32Value.of(33))))
+                    .setSdkRuntimeTargeting(
+                        SdkRuntimeTargeting.newBuilder().setRequiresSdkRuntime(true)))
+            .build();
+    Variant variantWithoutSdkRuntime =
+        Variant.newBuilder()
+            .addApkSet(
+                ApkSet.newBuilder()
+                    .setModuleMetadata(
+                        ModuleMetadata.newBuilder()
+                            .setName("base")
+                            .setDeliveryType(DeliveryType.INSTALL_TIME)
+                            .setModuleType(FeatureModuleType.FEATURE_MODULE))
+                    .addApkDescription(
+                        ApkDescription.newBuilder().setPath("standalones/" + withoutSdkRuntimeApk)))
+            .setTargeting(
+                VariantTargeting.newBuilder()
+                    .setSdkVersionTargeting(
+                        SdkVersionTargeting.newBuilder()
+                            .addValue(SdkVersion.newBuilder().setMin(Int32Value.of(33))))
+                    .setSdkRuntimeTargeting(
+                        SdkRuntimeTargeting.newBuilder().setRequiresSdkRuntime(false)))
+            .build();
+
+    BuildApksResult tableOfContentsProto =
+        BuildApksResult.newBuilder()
+            .addVariant(variantWithSdkRuntime)
+            .addVariant(variantWithoutSdkRuntime)
+            .setBundletool(Bundletool.newBuilder().setVersion("1.10.1"))
+            .build();
+    Path apksArchiveFile = createApksArchiveFile(tableOfContentsProto, tmpDir.resolve("app.apks"));
+    Path deviceSpecFile = createDeviceSpecFile(deviceWithSdk(34), tmpDir.resolve("device.json"));
+    ExtractApksCommand command =
+        ExtractApksCommand.fromFlags(
+            new FlagParser().parse("--device-spec=" + deviceSpecFile, "--apks=" + apksArchiveFile));
+
+    ImmutableList<Path> matchedApks = command.execute();
+
+    assertThat(matchedApks.stream().map(apk -> apk.getFileName().toString()))
+        .containsExactly(withSdkRuntimeApk);
+  }
+
+  @Test
+  public void extractApks_appWithRuntimeSdkVariant_withSdkRuntimeInSpec() throws Exception {
+    String withSdkRuntimeApk = "with_sdk_runtime.apk";
+    String withoutSdkRuntimeApk = "without_sdk_runtime.apk";
+    Variant variantWithSdkRuntime =
+        Variant.newBuilder()
+            .addApkSet(
+                ApkSet.newBuilder()
+                    .setModuleMetadata(
+                        ModuleMetadata.newBuilder()
+                            .setName("base")
+                            .setDeliveryType(DeliveryType.INSTALL_TIME)
+                            .setModuleType(FeatureModuleType.FEATURE_MODULE))
+                    .addApkDescription(
+                        ApkDescription.newBuilder().setPath("standalones/" + withSdkRuntimeApk)))
+            .setTargeting(
+                VariantTargeting.newBuilder()
+                    .setSdkVersionTargeting(
+                        SdkVersionTargeting.newBuilder()
+                            .addValue(SdkVersion.newBuilder().setMin(Int32Value.of(33))))
+                    .setSdkRuntimeTargeting(
+                        SdkRuntimeTargeting.newBuilder().setRequiresSdkRuntime(true)))
+            .build();
+    Variant variantWithoutSdkRuntime =
+        Variant.newBuilder()
+            .addApkSet(
+                ApkSet.newBuilder()
+                    .setModuleMetadata(
+                        ModuleMetadata.newBuilder()
+                            .setName("base")
+                            .setDeliveryType(DeliveryType.INSTALL_TIME)
+                            .setModuleType(FeatureModuleType.FEATURE_MODULE))
+                    .addApkDescription(
+                        ApkDescription.newBuilder().setPath("standalones/" + withoutSdkRuntimeApk)))
+            .setTargeting(
+                VariantTargeting.newBuilder()
+                    .setSdkVersionTargeting(
+                        SdkVersionTargeting.newBuilder()
+                            .addValue(SdkVersion.newBuilder().setMin(Int32Value.of(33))))
+                    .setSdkRuntimeTargeting(
+                        SdkRuntimeTargeting.newBuilder().setRequiresSdkRuntime(false)))
+            .build();
+
+    BuildApksResult tableOfContentsProto =
+        BuildApksResult.newBuilder()
+            .addVariant(variantWithSdkRuntime)
+            .addVariant(variantWithoutSdkRuntime)
+            .setBundletool(Bundletool.newBuilder().setVersion("1.10.1"))
+            .build();
+    Path apksArchiveFile = createApksArchiveFile(tableOfContentsProto, tmpDir.resolve("app.apks"));
+    Path deviceSpecFile =
+        createDeviceSpecFile(
+            mergeSpecs(deviceWithSdk(34), sdkRuntimeSupported(false)),
+            tmpDir.resolve("device.json"));
+    ExtractApksCommand command =
+        ExtractApksCommand.fromFlags(
+            new FlagParser().parse("--device-spec=" + deviceSpecFile, "--apks=" + apksArchiveFile));
+
+    ImmutableList<Path> matchedApks = command.execute();
+
+    assertThat(matchedApks.stream().map(apk -> apk.getFileName().toString()))
+        .containsExactly(withoutSdkRuntimeApk);
   }
 
   @Test

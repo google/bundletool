@@ -116,12 +116,14 @@ message ResourceOptimizations {
   SparseEncoding sparse_encoding = 1;
 
   enum SparseEncoding {
+    // Previously 'ENFORCED'. This option is deprecated because of issues found
+    // in Android O up to Android Sv2 and causes segfaults in
+    // Resources#getIdentifier.
+    reserved 1;
+    reserved "ENFORCED";
+
     // Disables sparse encoding.
     UNSPECIFIED = 0;
-    // Forces sparse resource tables in all produced variants. This mode is
-    // available only for applications with minSdk >= 26 because sparse
-    // resource table support was added in Android O.
-    ENFORCED = 1;
     // Generates special APKs for Android SDK +32 with sparse resource tables.
     // Devices with Android SDK below 32 will still receive APKs with regular
     // resource tables.

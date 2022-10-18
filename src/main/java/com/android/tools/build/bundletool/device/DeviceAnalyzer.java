@@ -80,6 +80,9 @@ public class DeviceAnalyzer {
       }
       checkState(!supportedAbis.isEmpty(), "Error retrieving device ABIs. Please try again.");
 
+      SdkRuntime sdkRuntime =
+          SdkRuntime.newBuilder().setSupported(deviceSdkVersion >= SDK_SANDBOX_MIN_VERSION).build();
+
       DeviceSpec.Builder builder =
           DeviceSpec.newBuilder()
               .setSdkVersion(deviceSdkVersion)
@@ -87,18 +90,11 @@ public class DeviceAnalyzer {
               .addAllSupportedLocales(deviceLocales)
               .setScreenDensity(deviceDensity)
               .addAllDeviceFeatures(deviceFeatures)
-              .addAllGlExtensions(glExtensions);
+              .addAllGlExtensions(glExtensions)
+              .setSdkRuntime(sdkRuntime);
       if (codename != null) {
         builder.setCodename(codename);
       }
-
-      if (deviceSdkVersion >= SDK_SANDBOX_MIN_VERSION) {
-        builder.setSdkRuntime(
-            SdkRuntime.newBuilder()
-                .setSupported(true)
-                .addAllInstalledSdks(device.getRuntimeEnabledSdks()));
-      }
-
       return builder.build();
     } catch (TimeoutException e) {
       throw CommandExecutionException.builder()

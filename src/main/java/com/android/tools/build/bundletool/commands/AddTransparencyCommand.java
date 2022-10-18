@@ -119,6 +119,9 @@ public abstract class AddTransparencyCommand {
   private static final Flag<DexMergingChoice> DEX_MERGING_CHOICE_FLAG =
       Flag.enumFlag("dex-merging-choice", DexMergingChoice.class);
 
+  private static final Flag<Boolean> ALLOW_SHARED_USER_ID_FLAG =
+      Flag.booleanFlag("allow-shared-user-id");
+
   public abstract Mode getMode();
 
   public abstract Path getBundlePath();
@@ -132,6 +135,8 @@ public abstract class AddTransparencyCommand {
   public abstract ImmutableList<X509Certificate> getTransparencyKeyCertificates();
 
   public abstract Optional<Path> getTransparencySignaturePath();
+
+  public abstract Optional<Boolean> getAllowSharedUserId();
 
   public static AddTransparencyCommand.Builder builder() {
     return new AutoValue_AddTransparencyCommand.Builder()
@@ -172,6 +177,8 @@ public abstract class AddTransparencyCommand {
      */
     public abstract Builder setDexMergingChoice(DexMergingChoice value);
 
+    public abstract Builder setAllowSharedUserId(Boolean value);
+
     public abstract AddTransparencyCommand build();
   }
 
@@ -195,6 +202,7 @@ public abstract class AddTransparencyCommand {
     Optional<Password> keyPassword = KEY_PASSWORD_FLAG.getValue(flags);
     SignerConfig signerConfig =
         SignerConfig.extractFromKeystore(keystorePath, keyAlias, keystorePassword, keyPassword);
+    Optional<Boolean> allowSharedUserId = ALLOW_SHARED_USER_ID_FLAG.getValue(flags);
     AddTransparencyCommand.Builder addTransparencyCommandBuilder =
         AddTransparencyCommand.builder()
             .setMode(Mode.DEFAULT)
@@ -203,12 +211,14 @@ public abstract class AddTransparencyCommand {
             .setDexMergingChoice(
                 DEX_MERGING_CHOICE_FLAG.getValue(flags).orElse(DexMergingChoice.ASK_IN_CONSOLE))
             .setSignerConfig(signerConfig);
+    allowSharedUserId.ifPresent(addTransparencyCommandBuilder::setAllowSharedUserId);
     flags.checkNoUnknownFlags();
     return addTransparencyCommandBuilder.build();
   }
 
   private static AddTransparencyCommand fromFlagsInGenerateGenerateCodeTransparencyFileMode(
       ParsedFlags flags) {
+    Optional<Boolean> allowSharedUserId = ALLOW_SHARED_USER_ID_FLAG.getValue(flags);
     AddTransparencyCommand.Builder addTransparencyCommandBuilder =
         AddTransparencyCommand.builder()
             .setMode(Mode.GENERATE_CODE_TRANSPARENCY_FILE)
@@ -217,11 +227,13 @@ public abstract class AddTransparencyCommand {
             .setTransparencyKeyCertificates(
                 getX509Certificates(
                     TRANSPARENCY_KEY_CERTIFICATE_LOCATION_FLAG.getRequiredValue(flags)));
+    allowSharedUserId.ifPresent(addTransparencyCommandBuilder::setAllowSharedUserId);
     flags.checkNoUnknownFlags();
     return addTransparencyCommandBuilder.build();
   }
 
   private static AddTransparencyCommand fromFlagsInInjectSignatureMode(ParsedFlags flags) {
+    Optional<Boolean> allowSharedUserId = ALLOW_SHARED_USER_ID_FLAG.getValue(flags);
     AddTransparencyCommand.Builder addTransparencyCommandBuilder =
         AddTransparencyCommand.builder()
             .setMode(Mode.INJECT_SIGNATURE)
@@ -232,6 +244,7 @@ public abstract class AddTransparencyCommand {
             .setTransparencyKeyCertificates(
                 getX509Certificates(
                     TRANSPARENCY_KEY_CERTIFICATE_LOCATION_FLAG.getRequiredValue(flags)));
+    allowSharedUserId.ifPresent(addTransparencyCommandBuilder::setAllowSharedUserId);
     flags.checkNoUnknownFlags();
     return addTransparencyCommandBuilder.build();
   }
@@ -241,11 +254,13 @@ public abstract class AddTransparencyCommand {
 
     try (ZipFile bundleZip = new ZipFile(getBundlePath().toFile())) {
       AppBundle inputBundle = AppBundle.buildFromZip(bundleZip);
-      if (inputBundle.hasSharedUserId()) {
+      Boolean allowSharedUserId = getAllowSharedUserId().orElse(false);
+      if (inputBundle.hasSharedUserId() && !allowSharedUserId) {
         throw InvalidBundleException.builder()
             .withUserMessage(
-                "Transparency can not be added because `sharedUserId` attribute is specified in"
-                    + " one of the manifests.")
+                "Transparency can not be added because `sharedUserId` attribute is specified in one"
+                    + " of the manifests and `allow-shared-user-id` flag is either false or not"
+                    + " specified explicitly.")
             .build();
       }
       if (inputBundle.dexMergingEnabled()) {
@@ -484,6 +499,15 @@ public abstract class AddTransparencyCommand {
                         + "choice is required user will be asked in terminal.",
                     DexMergingChoice.CONTINUE.getLowerCaseName(),
                     DexMergingChoice.REJECT.getLowerCaseName())
+                .build())
+        .addFlag(
+            FlagDescription.builder()
+                .setFlagName(ALLOW_SHARED_USER_ID_FLAG.getName())
+                .setExampleValue("true|false")
+                .setOptional(true)
+                .setDescription(
+                    "Allows to use `add-transparency` command when AppBundle has `sharedUserId`. If"
+                        + " the flag is not provided explicitly then its value considered as false")
                 .build())
         .build();
   }

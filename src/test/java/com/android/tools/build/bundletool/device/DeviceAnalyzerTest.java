@@ -21,17 +21,13 @@ import static com.android.tools.build.bundletool.testing.DeviceFactory.abis;
 import static com.android.tools.build.bundletool.testing.DeviceFactory.density;
 import static com.android.tools.build.bundletool.testing.DeviceFactory.deviceFeatures;
 import static com.android.tools.build.bundletool.testing.DeviceFactory.glExtensions;
-import static com.android.tools.build.bundletool.testing.DeviceFactory.installedSdks;
 import static com.android.tools.build.bundletool.testing.DeviceFactory.locales;
 import static com.android.tools.build.bundletool.testing.DeviceFactory.mergeSpecs;
 import static com.android.tools.build.bundletool.testing.DeviceFactory.sdkVersion;
 import static com.google.common.truth.Truth.assertThat;
-import static com.google.common.truth.extensions.proto.ProtoTruth.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.android.bundle.Devices.DeviceSpec;
-import com.android.bundle.Devices.InstalledSdk;
-import com.android.bundle.Devices.SdkRuntime;
 import com.android.ddmlib.IDevice.DeviceState;
 import com.android.tools.build.bundletool.model.exceptions.CommandExecutionException;
 import com.android.tools.build.bundletool.testing.FakeAdbServer;
@@ -458,7 +454,7 @@ public class DeviceAnalyzerTest {
   }
 
   @Test
-  public void getDeviceSpec_deviceVersionNotSandboxMin_sdkRuntimeNotSet() {
+  public void getDeviceSpec_deviceVersionNotSandboxMin_sdkRuntimeNotSupported() {
     String deviceId = "id1";
     FakeDevice fakeDevice =
         FakeDevice.fromDeviceSpec(
@@ -477,40 +473,7 @@ public class DeviceAnalyzerTest {
 
     DeviceSpec deviceSpec = analyzer.getDeviceSpec(Optional.of(deviceId));
 
-    assertThat(deviceSpec.getSdkRuntime()).isEqualToDefaultInstance();
-  }
-
-  @Test
-  public void getDeviceSpec_runtimeEnabledSdksInstalled_allExtracted() {
-    FakeDevice fakeDevice =
-        FakeDevice.fromDeviceSpec(
-            "id423203",
-            DeviceState.ONLINE,
-            mergeSpecs(
-                density(1080),
-                locales("en-UK"),
-                abis("armv64-v8a"),
-                sdkVersion(33),
-                installedSdks("com.nice.sdk:10003", "com.great.sdk:349233")));
-    FakeAdbServer fakeAdbServer =
-        new FakeAdbServer(
-            /* hasInitialDeviceList= */ true, /* devices= */ ImmutableList.of(fakeDevice));
-    fakeAdbServer.init(Paths.get("path/to/adb"));
-    DeviceAnalyzer analyzer = new DeviceAnalyzer(fakeAdbServer);
-
-    DeviceSpec deviceSpec = analyzer.getDeviceSpec(/* deviceId= */ Optional.empty());
-
-    assertThat(deviceSpec.getSdkRuntime())
-        .isEqualTo(
-            SdkRuntime.newBuilder()
-                .setSupported(true)
-                .addInstalledSdks(
-                    InstalledSdk.newBuilder().setPackageName("com.nice.sdk").setVersionMajor(10003))
-                .addInstalledSdks(
-                    InstalledSdk.newBuilder()
-                        .setPackageName("com.great.sdk")
-                        .setVersionMajor(349233))
-                .build());
+    assertThat(deviceSpec.getSdkRuntime().getSupported()).isFalse();
   }
 
   private static Device createUsbEnabledDevice(String serialNumber) {

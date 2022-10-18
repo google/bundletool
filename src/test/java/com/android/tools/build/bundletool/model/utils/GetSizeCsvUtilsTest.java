@@ -21,6 +21,7 @@ import static com.android.tools.build.bundletool.model.GetSizeRequest.Dimension.
 import static com.android.tools.build.bundletool.model.GetSizeRequest.Dimension.LANGUAGE;
 import static com.android.tools.build.bundletool.model.GetSizeRequest.Dimension.SCREEN_DENSITY;
 import static com.android.tools.build.bundletool.model.GetSizeRequest.Dimension.SDK;
+import static com.android.tools.build.bundletool.model.GetSizeRequest.Dimension.SDK_RUNTIME;
 import static com.android.tools.build.bundletool.model.GetSizeRequest.Dimension.TEXTURE_COMPRESSION_FORMAT;
 import static com.android.tools.build.bundletool.model.utils.CsvFormatter.CRLF;
 import static com.android.tools.build.bundletool.model.utils.GetSizeCsvUtils.getSizeTotalOutputInCsv;
@@ -103,6 +104,7 @@ public class GetSizeCsvUtilsTest {
                             .setLocale("en,fr")
                             .setTextureCompressionFormat("ASTC,ETC2")
                             .setDeviceTier(1)
+                            .setSdkRuntime("Not Required")
                             .build(),
                         1L),
                     ImmutableMap.of(
@@ -113,15 +115,22 @@ public class GetSizeCsvUtilsTest {
                             .setLocale("en,fr")
                             .setTextureCompressionFormat("ASTC,ETC2")
                             .setDeviceTier(1)
+                            .setSdkRuntime("Not Required")
                             .build(),
                         6L)),
                 ImmutableSet.of(
-                    SCREEN_DENSITY, ABI, LANGUAGE, SDK, TEXTURE_COMPRESSION_FORMAT, DEVICE_TIER),
+                    SCREEN_DENSITY,
+                    ABI,
+                    LANGUAGE,
+                    SDK,
+                    TEXTURE_COMPRESSION_FORMAT,
+                    DEVICE_TIER,
+                    SDK_RUNTIME),
                 SizeFormatter.rawFormatter()))
         .isEqualTo(
-            "SDK,ABI,SCREEN_DENSITY,LANGUAGE,TEXTURE_COMPRESSION_FORMAT,DEVICE_TIER,MIN,MAX"
+            "SDK,ABI,SCREEN_DENSITY,LANGUAGE,TEXTURE_COMPRESSION_FORMAT,DEVICE_TIER,SDK_RUNTIME,MIN,MAX"
                 + CRLF
-                + "22,\"x86,armeabi-v7a\",480,\"en,fr\",\"ASTC,ETC2\",1,1,6"
+                + "22,\"x86,armeabi-v7a\",480,\"en,fr\",\"ASTC,ETC2\",1,Not Required,1,6"
                 + CRLF);
   }
 }

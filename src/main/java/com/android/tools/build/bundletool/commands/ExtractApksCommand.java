@@ -42,6 +42,7 @@ import com.android.tools.build.bundletool.device.ApkMatcher.GeneratedApk;
 import com.android.tools.build.bundletool.device.DeviceSpecParser;
 import com.android.tools.build.bundletool.flags.Flag;
 import com.android.tools.build.bundletool.flags.ParsedFlags;
+import com.android.tools.build.bundletool.model.AndroidManifest;
 import com.android.tools.build.bundletool.model.exceptions.IncompatibleDeviceException;
 import com.android.tools.build.bundletool.model.exceptions.InvalidCommandException;
 import com.android.tools.build.bundletool.model.utils.FileNames;
@@ -334,21 +335,28 @@ public abstract class ExtractApksCommand {
   }
 
   private static DeviceSpec applyDefaultsToDeviceSpec(DeviceSpec deviceSpec, BuildApksResult toc) {
-    if (deviceSpec.hasDeviceTier()) {
-      return deviceSpec;
+    DeviceSpec.Builder builder = deviceSpec.toBuilder();
+    if (!deviceSpec.hasDeviceTier()) {
+      int defaultDeviceTier =
+          toc.getDefaultTargetingValueList().stream()
+              .filter(
+                  defaultTargetingValue ->
+                      defaultTargetingValue.getDimension().equals(Value.DEVICE_TIER))
+              .map(DefaultTargetingValue::getDefaultValue)
+              // Don't fail if the default value is empty.
+              .filter(defaultValue -> !defaultValue.isEmpty())
+              .map(Integer::parseInt)
+              .collect(toOptional())
+              .orElse(0);
+      builder.setDeviceTier(Int32Value.of(defaultDeviceTier));
     }
-    int defaultDeviceTier =
-        toc.getDefaultTargetingValueList().stream()
-            .filter(
-                defaultTargetingValue ->
-                    defaultTargetingValue.getDimension().equals(Value.DEVICE_TIER))
-            .map(DefaultTargetingValue::getDefaultValue)
-            // Don't fail if the default value is empty.
-            .filter(defaultValue -> !defaultValue.isEmpty())
-            .map(Integer::parseInt)
-            .collect(toOptional())
-            .orElse(0);
-    return deviceSpec.toBuilder().setDeviceTier(Int32Value.of(defaultDeviceTier)).build();
+    if (!deviceSpec.hasSdkRuntime()) {
+      builder
+          .getSdkRuntimeBuilder()
+          .setSupported(deviceSpec.getSdkVersion() >= AndroidManifest.SDK_SANDBOX_MIN_VERSION);
+    }
+
+    return builder.build();
   }
 
   public static CommandHelp help() {

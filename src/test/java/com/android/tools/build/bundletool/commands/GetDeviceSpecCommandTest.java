@@ -21,6 +21,7 @@ import static com.android.tools.build.bundletool.testing.DeviceFactory.density;
 import static com.android.tools.build.bundletool.testing.DeviceFactory.lDeviceWithLocales;
 import static com.android.tools.build.bundletool.testing.DeviceFactory.locales;
 import static com.android.tools.build.bundletool.testing.DeviceFactory.mergeSpecs;
+import static com.android.tools.build.bundletool.testing.DeviceFactory.sdkRuntimeSupported;
 import static com.android.tools.build.bundletool.testing.DeviceFactory.sdkVersion;
 import static com.android.tools.build.bundletool.testing.FakeSystemEnvironmentProvider.ANDROID_HOME;
 import static com.android.tools.build.bundletool.testing.FakeSystemEnvironmentProvider.ANDROID_SERIAL;
@@ -256,7 +257,12 @@ public class GetDeviceSpecCommandTest {
   @Test
   public void oneDevice_noDeviceId_works() throws Exception {
     DeviceSpec deviceSpec =
-        mergeSpecs(sdkVersion(21), abis("x86_64", "x86"), locales("en-GB"), density(360));
+        mergeSpecs(
+            sdkVersion(21),
+            abis("x86_64", "x86"),
+            locales("en-GB"),
+            density(360),
+            sdkRuntimeSupported(/* supported= */ false));
 
     Path outputPath = tmp.getRoot().toPath().resolve("device.json");
     // We set up a fake ADB server because the real one won't work on Forge.
@@ -277,7 +283,13 @@ public class GetDeviceSpecCommandTest {
 
   @Test
   public void nonExistentParentDirectory_works() {
-    DeviceSpec deviceSpec = mergeSpecs(sdkVersion(21), density(480), abis("x86"), locales("en-US"));
+    DeviceSpec deviceSpec =
+        mergeSpecs(
+            sdkVersion(21),
+            density(480),
+            abis("x86"),
+            locales("en-US"),
+            sdkRuntimeSupported(/* supported= */ false));
 
     Path outputPath =
         tmp.getRoot().toPath().resolve("non-existent-parent-directory").resolve("device.json");

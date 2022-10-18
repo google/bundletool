@@ -19,12 +19,10 @@ package com.android.tools.build.bundletool.splitters;
 import static com.android.tools.build.bundletool.model.utils.TargetingProtoUtils.sdkVersionFrom;
 import static com.android.tools.build.bundletool.model.utils.TargetingProtoUtils.sdkVersionTargeting;
 import static com.android.tools.build.bundletool.model.utils.TargetingProtoUtils.variantTargeting;
-import static com.android.tools.build.bundletool.model.utils.Versions.ANDROID_O_API_VERSION;
 import static com.android.tools.build.bundletool.model.utils.Versions.ANDROID_S_V2_API_VERSION;
 
 import com.android.bundle.Targeting.VariantTargeting;
 import com.android.tools.build.bundletool.model.BundleModule;
-import com.android.tools.build.bundletool.model.exceptions.CommandExecutionException;
 import java.util.stream.Stream;
 
 /** Generates a variant targeting based on sparse encodings. */
@@ -38,25 +36,10 @@ public final class SparseEncodingVariantGenerator implements BundleModuleVariant
 
   @Override
   public Stream<VariantTargeting> generate(BundleModule module) {
-    if (!apkGenerationConfiguration.getEnableSparseEncodingVariant()) {
-      return Stream.of();
+    if (apkGenerationConfiguration.getEnableSparseEncodingVariant()) {
+      return Stream.of(
+          variantTargeting(sdkVersionTargeting(sdkVersionFrom(ANDROID_S_V2_API_VERSION))));
     }
-
-    if (targetsPreO(module)) {
-      throw CommandExecutionException.builder()
-          .withInternalMessage(
-              "Cannot generate variants '%s' with sparse encoding, because it does not target"
-                  + " devices on Android O or above.",
-              module.getName())
-          .build();
-    }
-
-    return Stream.of(
-        variantTargeting(sdkVersionTargeting(sdkVersionFrom(ANDROID_S_V2_API_VERSION))));
-  }
-
-  private boolean targetsPreO(BundleModule module) {
-    int targetingSdkVersion = module.getAndroidManifest().getEffectiveTargetingSdkVersion();
-    return targetingSdkVersion < ANDROID_O_API_VERSION;
+    return Stream.of();
   }
 }

@@ -29,8 +29,8 @@ import java.util.Optional;
 /**
  * Utility to merge two {@link ConfigurationSizes} by combining all compatible entries.
  *
- * <p>The resulting sizes for matching configurations are added together. if the configurations
- * target different dimensions, new combinations will be generated using the cartesian product.of
+ * <p>The resulting sizes for matching configurations are added together. If the configurations
+ * target different dimensions, new combinations will be generated using the cartesian product of
  * the disjoint dimensions.
  */
 public class ConfigurationSizesMerger {
@@ -64,7 +64,8 @@ public class ConfigurationSizesMerger {
         && areCompatible(sizeConfig1.getSdkVersion(), sizeConfig2.getSdkVersion())
         && areCompatible(
             sizeConfig1.getTextureCompressionFormat(), sizeConfig2.getTextureCompressionFormat())
-        && areCompatible(sizeConfig1.getDeviceTier(), sizeConfig2.getDeviceTier());
+        && areCompatible(sizeConfig1.getDeviceTier(), sizeConfig2.getDeviceTier())
+        && areCompatible(sizeConfig1.getSdkRuntime(), sizeConfig2.getSdkRuntime());
   }
 
   /**
@@ -95,6 +96,7 @@ public class ConfigurationSizesMerger {
         .getTextureCompressionFormat()
         .ifPresent(configBuilder::setTextureCompressionFormat);
     entry2.getKey().getDeviceTier().ifPresent(configBuilder::setDeviceTier);
+    entry2.getKey().getSdkRuntime().ifPresent(configBuilder::setSdkRuntime);
     return Maps.immutableEntry(configBuilder.build(), entry1.getValue() + entry2.getValue());
   }
 

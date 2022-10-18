@@ -16,12 +16,11 @@
 
 package com.android.tools.build.bundletool.archive;
 
-import static com.android.tools.build.bundletool.model.version.VersionGuardedFeature.ARCHIVED_APK_GENERATION;
-import static com.android.tools.build.bundletool.model.version.VersionGuardedFeature.STORE_ARCHIVE_ENABLED_BY_DEFAULT;
 import static com.google.common.base.Preconditions.checkNotNull;
 
 import com.android.aapt.Resources.ResourceTable;
 import com.android.tools.build.bundletool.commands.BuildApksModule.UpdateIconInArchiveMode;
+import com.android.tools.build.bundletool.io.ResourceReader;
 import com.android.tools.build.bundletool.model.AndroidManifest;
 import com.android.tools.build.bundletool.model.AppBundle;
 import com.android.tools.build.bundletool.model.BundleModule;
@@ -33,9 +32,9 @@ import com.android.tools.build.bundletool.model.ZipPath;
 import com.android.tools.build.bundletool.model.exceptions.InvalidCommandException;
 import com.android.tools.build.bundletool.model.utils.ResourcesUtils;
 import com.android.tools.build.bundletool.model.utils.xmlproto.XmlProtoAttribute;
-import com.android.tools.build.bundletool.model.version.BundleToolVersion;
-import com.android.tools.build.bundletool.model.version.Version;
+import com.android.tools.build.bundletool.splitters.CodeTransparencyInjector;
 import com.android.tools.build.bundletool.splitters.ResourceAnalyzer;
+import com.android.tools.build.bundletool.transparency.BundleTransparencyCheckUtils;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.io.ByteSource;
@@ -49,10 +48,14 @@ import javax.inject.Inject;
  */
 public final class ArchivedApksGenerator {
   private final boolean updateIconInArchiveMode;
+  private final ResourceReader resourceReader;
+  private final ArchivedResourcesHelper archivedResourcesHelper;
 
   @Inject
   ArchivedApksGenerator(@UpdateIconInArchiveMode boolean updateIconInArchiveMode) {
     this.updateIconInArchiveMode = updateIconInArchiveMode;
+    resourceReader = new ResourceReader();
+    archivedResourcesHelper = new ArchivedResourcesHelper(resourceReader);
   }
 
   public ModuleSplit generateArchivedApk(
@@ -74,51 +77,50 @@ public final class ArchivedApksGenerator {
     ImmutableMap<ZipPath, ByteSource> additionalResourcesByByteSource = ImmutableMap.of();
     if (updateIconInArchiveMode) {
       ImmutableMap<String, Integer> extraResourceNameToIdMap =
-          ArchivedResourcesUtils.injectExtraResources(
+          ArchivedResourcesHelper.injectExtraResources(
               resourceInjector, customAppStorePackageName, iconAttribute, roundIconAttribute);
 
       additionalResourcesByByteSource =
-          ArchivedResourcesUtils.buildAdditionalResourcesByByteSourceMap(
-              extraResourceNameToIdMap.get(ArchivedResourcesUtils.CLOUD_SYMBOL_DRAWABLE_NAME),
-              extraResourceNameToIdMap.get(ArchivedResourcesUtils.OPACITY_LAYER_DRAWABLE_NAME),
+          archivedResourcesHelper.buildAdditionalResourcesByByteSourceMap(
+              extraResourceNameToIdMap.get(ArchivedResourcesHelper.CLOUD_SYMBOL_DRAWABLE_NAME),
+              extraResourceNameToIdMap.get(ArchivedResourcesHelper.OPACITY_LAYER_DRAWABLE_NAME),
               iconAttribute,
-              roundIconAttribute);
+              roundIconAttribute,
+              archivedResourcesHelper.getArchivedClassesDexPath(appBundle));
 
       archivedManifest =
           ArchivedAndroidManifestUtils.updateArchivedIcons(
               archivedManifest, extraResourceNameToIdMap);
     } else {
       resourceInjector.addStringResource(
-          ArchivedResourcesUtils.APP_STORE_PACKAGE_NAME_RESOURCE_NAME,
-          ArchivedResourcesUtils.getAppStorePackageName(customAppStorePackageName));
+          ArchivedResourcesHelper.APP_STORE_PACKAGE_NAME_RESOURCE_NAME,
+          ArchivedResourcesHelper.getAppStorePackageName(customAppStorePackageName));
       additionalResourcesByByteSource =
           ImmutableMap.of(
               BundleModule.DEX_DIRECTORY.resolve("classes.dex"),
-              ArchivedResourcesUtils.getResourceByteSource(
-                  ArchivedResourcesUtils.ARCHIVED_CLASSES_DEX_PATH));
+              resourceReader.getResourceByteSource(
+                  archivedResourcesHelper.getArchivedClassesDexPath(appBundle)));
     }
 
-    return ModuleSplit.forArchive(
-        baseModule, archivedManifest, resourceInjector.build(), additionalResourcesByByteSource);
+    ModuleSplit moduleSplit =
+        ModuleSplit.forArchive(
+            baseModule,
+            archivedManifest,
+            resourceInjector.build(),
+            additionalResourcesByByteSource);
+
+    if (BundleTransparencyCheckUtils.isTransparencyEnabled(appBundle)) {
+      CodeTransparencyInjector codeTransparencyInjector = new CodeTransparencyInjector(appBundle);
+      return codeTransparencyInjector.inject(moduleSplit);
+    } else {
+      return moduleSplit;
+    }
   }
 
   private void validateRequest(AppBundle appBundle) {
     checkNotNull(appBundle);
-    Version bundletoolVersion =
-        BundleToolVersion.getVersionFromBundleConfig(appBundle.getBundleConfig());
-    if (!ARCHIVED_APK_GENERATION.enabledForVersion(bundletoolVersion)) {
-      throw InvalidCommandException.builder()
-          .withInternalMessage(
-              String.format(
-                  "Archived APK can only be generated for bundles built with version %s or higher.",
-                  ARCHIVED_APK_GENERATION.getEnabledSinceVersion()))
-          .build();
-    }
 
-    Optional<Boolean> storeArchiveConfig = appBundle.getStoreArchive();
-    boolean isStoreArchiveEnabledByDefault =
-        STORE_ARCHIVE_ENABLED_BY_DEFAULT.enabledForVersion(bundletoolVersion);
-    if (!storeArchiveConfig.orElse(isStoreArchiveEnabledByDefault)) {
+    if (!ArchivedBundleUtils.isStoreArchiveEnabled(appBundle)) {
       throw InvalidCommandException.builder()
           .withInternalMessage(
               "Archived APK cannot be generated when Store Archive configuration is disabled.")

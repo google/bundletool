@@ -48,6 +48,9 @@ import java.util.stream.Stream;
 /** Helpers related to APK resources qualifiers. */
 public final class ResourcesUtils {
 
+  /** Package IDs of system shared libraries and android resources. */
+  private static final ImmutableSet<Integer> ANDROID_PACKAGE_IDS = ImmutableSet.of(0x00, 0x01);
+
   private static final LoadingCache<String, String> localeToLanguageCache =
       CacheBuilder.newBuilder()
           .build(
@@ -256,9 +259,20 @@ public final class ResourcesUtils {
   /**
    * Returns new resource ID which is obtained from setting package ID part of {@code resourceId} to
    * {@code newPackageId}.
+   *
+   * <p>First 8 bits of {@code resourceId} represent the package ID.
    */
   public static int remapPackageIdInResourceId(int resourceId, int newPackageId) {
     return (newPackageId << 24) | (resourceId & 0xffffff);
+  }
+
+  /** Returns `true` if the given resource ID belongs to an Android Framework resource. */
+  public static boolean isAndroidResourceId(int resourceId) {
+    return ANDROID_PACKAGE_IDS.contains(getPackageId(resourceId));
+  }
+  /** Extracts package ID from the given {@code resourceId} (first 8 bits). */
+  private static int getPackageId(int resourceId) {
+    return resourceId >> 24;
   }
 
   private static Stream<FileReference> getAllFileReferencesInternal(ResourceTable resourceTable) {

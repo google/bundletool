@@ -108,6 +108,27 @@ public class OptimizationsMergerTest {
     assertThat(apkOptimizations.getSplitDimensions()).isEqualTo(DEFAULT_SPLIT_DIMENSIONS);
     assertThat(apkOptimizations.getUncompressNativeLibraries()).isFalse();
     assertThat(apkOptimizations.getUncompressDexFiles()).isTrue();
+    assertThat(apkOptimizations.getUncompressedDexTargetSdk())
+        .isEqualTo(UncompressedDexTargetSdk.UNSPECIFIED);
+    assertThat(apkOptimizations.getStandaloneDimensions()).isEqualTo(DEFAULT_STANDALONE_DIMENSIONS);
+  }
+
+  @Test
+  public void mergeOptimizations_withUncompressDexFiles_withUncompressedDexTargetSdk() {
+    ApkOptimizations apkOptimizations =
+        new OptimizationsMerger()
+            .mergeWithDefaults(
+                createBundleConfigBuilder()
+                    .clearOptimizations()
+                    .setUncompressDexFiles(true)
+                    .setUncompressDexFilesForVariant(UncompressedDexTargetSdk.SDK_31)
+                    .build());
+
+    assertThat(apkOptimizations.getSplitDimensions()).isEqualTo(DEFAULT_SPLIT_DIMENSIONS);
+    assertThat(apkOptimizations.getUncompressNativeLibraries()).isFalse();
+    assertThat(apkOptimizations.getUncompressDexFiles()).isTrue();
+    assertThat(apkOptimizations.getUncompressedDexTargetSdk())
+        .isEqualTo(UncompressedDexTargetSdk.SDK_31);
     assertThat(apkOptimizations.getStandaloneDimensions()).isEqualTo(DEFAULT_STANDALONE_DIMENSIONS);
   }
 

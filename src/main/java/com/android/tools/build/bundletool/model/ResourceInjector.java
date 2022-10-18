@@ -47,6 +47,7 @@ public class ResourceInjector {
   private static final int BASE_RESOURCE_TABLE_PACKAGE_ID = 0x7f;
   private static final String STRING_ENTRY_TYPE = "string";
   private static final String DRAWABLE_ENTRY_TYPE = "drawable";
+  private static final String LAYOUT_ENTRY_TYPE = "layout";
 
   private final ResourceTable.Builder resourceTable;
   private final String packageName;
@@ -96,6 +97,24 @@ public class ResourceInjector {
                                             .setType(FileReference.Type.PROTO_XML)))))
             .build();
     return addResource(DRAWABLE_ENTRY_TYPE, drawableEntity);
+  }
+
+  public ResourceId addLayoutResource(String layoutName, String fileReference) {
+    Entry layoutEntry =
+        Entry.newBuilder()
+            .setName(layoutName)
+            .addConfigValue(
+                ConfigValue.newBuilder()
+                    .setValue(
+                        Value.newBuilder()
+                            .setItem(
+                                Item.newBuilder()
+                                    .setFile(
+                                        FileReference.newBuilder()
+                                            .setPath(fileReference)
+                                            .setType(FileReference.Type.PROTO_XML)))))
+            .build();
+    return addResource(LAYOUT_ENTRY_TYPE, layoutEntry);
   }
 
   public ResourceId addResource(String entryType, Entry entry) {

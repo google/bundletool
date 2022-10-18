@@ -25,6 +25,7 @@ import com.android.bundle.Targeting.DeviceTierTargeting;
 import com.android.bundle.Targeting.LanguageTargeting;
 import com.android.bundle.Targeting.ScreenDensity;
 import com.android.bundle.Targeting.ScreenDensityTargeting;
+import com.android.bundle.Targeting.SdkRuntimeTargeting;
 import com.android.bundle.Targeting.SdkVersionTargeting;
 import com.android.bundle.Targeting.TextureCompressionFormatTargeting;
 import com.android.tools.build.bundletool.model.utils.TextureCompressionUtils;
@@ -53,6 +54,8 @@ public abstract class SizeConfiguration {
   public abstract Optional<String> getTextureCompressionFormat();
 
   public abstract Optional<Integer> getDeviceTier();
+
+  public abstract Optional<String> getSdkRuntime();
 
   public abstract Builder toBuilder();
 
@@ -119,6 +122,13 @@ public abstract class SizeConfiguration {
     return Optional.of(Iterables.getOnlyElement(deviceTierTargeting.getValueList()).getValue());
   }
 
+  /**
+   * Returns String indicating the targeting requires the SDK runtime to be supported on the device.
+   */
+  public static String getSdkRuntimeRequired(SdkRuntimeTargeting sdkRuntimeTargeting) {
+    return sdkRuntimeTargeting.getRequiresSdkRuntime() ? "Required" : "Not Required";
+  }
+
   /** Builder for the {@link SizeConfiguration}. */
   @AutoValue.Builder
   public abstract static class Builder {
@@ -133,6 +143,8 @@ public abstract class SizeConfiguration {
     public abstract Builder setTextureCompressionFormat(String textureCompressionFormat);
 
     public abstract Builder setDeviceTier(Integer deviceTier);
+
+    public abstract Builder setSdkRuntime(String required);
 
     public abstract SizeConfiguration build();
   }

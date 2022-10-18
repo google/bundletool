@@ -56,7 +56,7 @@ final class ResourceTablePackageIdRemapper {
     }
     ResourceTable resourceTable = module.getResourceTable().get();
     checkArgument(
-        resourceTable.getPackageCount() == 1,
+        resourceTable.getPackageCount() <= 1,
         "Module '%s' contains resource table with %s 'package' entries, but only 1 entry is"
             + " allowed.",
         module.getName().getName(),

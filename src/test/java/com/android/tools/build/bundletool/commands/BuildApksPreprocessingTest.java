@@ -160,9 +160,10 @@ public final class BuildApksPreprocessingTest {
     assertThat(standaloneApkVariants(result)).hasSize(1);
     assertThat(standaloneApkVariants(result).get(0).getTargeting().getAbiTargeting())
         .isEqualTo(abiTargeting(ARMEABI_V7A));
-    assertThat(splitApkVariants(result)).hasSize(1);
+    assertThat(splitApkVariants(result)).hasSize(2);
     ImmutableSet<AbiTargeting> abiTargetings =
-        splitApkVariants(result).get(0).getApkSetList().stream()
+        splitApkVariants(result).stream()
+            .flatMap(variant -> variant.getApkSetList().stream())
             .map(ApkSet::getApkDescriptionList)
             .flatMap(list -> list.stream().map(ApkDescription::getTargeting))
             .map(ApkTargeting::getAbiTargeting)

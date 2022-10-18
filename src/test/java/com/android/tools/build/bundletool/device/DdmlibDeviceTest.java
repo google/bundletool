@@ -17,7 +17,6 @@ package com.android.tools.build.bundletool.device;
 
 import static com.google.common.truth.Truth.assertThat;
 import static java.nio.charset.StandardCharsets.UTF_8;
-import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyLong;
@@ -26,7 +25,6 @@ import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import com.android.bundle.Devices.InstalledSdk;
 import com.android.ddmlib.IDevice;
 import com.android.ddmlib.IShellOutputReceiver;
 import com.android.ddmlib.SyncException;
@@ -37,9 +35,7 @@ import com.android.tools.build.bundletool.device.DdmlibDevice.RemoteCommandExecu
 import com.android.tools.build.bundletool.device.Device.FilePullParams;
 import com.android.tools.build.bundletool.device.Device.InstallOptions;
 import com.android.tools.build.bundletool.device.Device.PushOptions;
-import com.android.tools.build.bundletool.model.exceptions.CommandExecutionException;
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableSet;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.Clock;
@@ -279,61 +275,6 @@ public final class DdmlibDeviceTest {
     mockAdbShellCommand(
         String.format("run-as '%s' rm -rf '%s' && echo OK", packageName, pathToRemove), "OK\n");
     ddmlibDevice.removeRemotePath(pathToRemove, Optional.of(packageName), Duration.ofMillis(10));
-  }
-
-  @Test
-  public void getSdks_multipleInstalled_allReturned() throws Exception {
-    DdmlibDevice ddmlibDevice = new DdmlibDevice(mockDevice);
-    mockAdbShellCommand(
-        "pm list sdks", "sdk:com.sopho.myrbsdk:10001\nsdk:com.aledov.myrbsdk:12342345");
-
-    ImmutableSet<InstalledSdk> sdks = ddmlibDevice.getRuntimeEnabledSdks();
-
-    assertThat(sdks)
-        .containsExactly(
-            InstalledSdk.newBuilder()
-                .setPackageName("com.sopho.myrbsdk")
-                .setVersionMajor(10001)
-                .build(),
-            InstalledSdk.newBuilder()
-                .setPackageName("com.aledov.myrbsdk")
-                .setVersionMajor(12342345)
-                .build());
-  }
-
-  @Test
-  public void getSdks_noneInstalled_emptyListReturned() throws Exception {
-    DdmlibDevice ddmlibDevice = new DdmlibDevice(mockDevice);
-    mockAdbShellCommand("pm list sdks", "");
-
-    ImmutableSet<InstalledSdk> sdks = ddmlibDevice.getRuntimeEnabledSdks();
-
-    assertThat(sdks).isEmpty();
-  }
-
-  @Test
-  public void getSdks_unknownCommand_empyListReturned() throws Exception {
-    DdmlibDevice ddmlibDevice = new DdmlibDevice(mockDevice);
-    mockAdbShellCommand("pm list sdks", "Error: unknown list type 'sdks'");
-
-    ImmutableSet<InstalledSdk> sdks = ddmlibDevice.getRuntimeEnabledSdks();
-
-    assertThat(sdks).isEmpty();
-  }
-
-  @Test
-  public void getSdks_invalidCommandOutput_throws() throws Exception {
-    DdmlibDevice ddmlibDevice = new DdmlibDevice(mockDevice);
-    mockAdbShellCommand("pm list sdks", "sdk:noVersionMajor");
-
-    CommandExecutionException exception =
-        assertThrows(CommandExecutionException.class, ddmlibDevice::getRuntimeEnabledSdks);
-
-    assertThat(exception)
-        .hasMessageThat()
-        .contains(
-            "Pacakge manager should list SDKs as 'sdk:PACKAGE_NAME:VERSION_MAJOR', found"
-                + " 'sdk:noVersionMajor'");
   }
 
   private void mockAdbShellCommand(String command, String response) throws Exception {

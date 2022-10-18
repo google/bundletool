@@ -32,6 +32,7 @@ import static com.android.tools.build.bundletool.model.utils.files.FilePrecondit
 import static com.android.tools.build.bundletool.model.utils.files.FilePreconditions.checkFileHasExtension;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
+import static com.google.common.collect.ImmutableMap.toImmutableMap;
 
 import com.android.apksig.SigningCertificateLineage;
 import com.android.apksig.apk.ApkFormatException;
@@ -51,6 +52,7 @@ import com.android.tools.build.bundletool.io.TempDirectory;
 import com.android.tools.build.bundletool.model.ApkListener;
 import com.android.tools.build.bundletool.model.ApkModifier;
 import com.android.tools.build.bundletool.model.AppBundle;
+import com.android.tools.build.bundletool.model.BundleModule;
 import com.android.tools.build.bundletool.model.KeystoreProperties;
 import com.android.tools.build.bundletool.model.OptimizationDimension;
 import com.android.tools.build.bundletool.model.Password;
@@ -96,6 +98,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Map.Entry;
 import java.util.Optional;
 import java.util.concurrent.Executors;
 import java.util.logging.Logger;
@@ -825,10 +828,15 @@ public abstract class BuildApksCommand {
 
       AppBundle appBundle = AppBundle.buildFromZip(bundleZip);
       bundleValidator.validate(appBundle);
-      validateRuntimeEnabledSdkDependencies(closer, tempDir, appBundle);
+      ImmutableMap<String, BundleModule> sdkBundleModules =
+          getValidatedSdkModules(closer, tempDir, appBundle);
 
       AppBundlePreprocessorManager appBundlePreprocessorManager =
-          DaggerAppBundlePreprocessorComponent.builder().setBuildApksCommand(this).build().create();
+          DaggerAppBundlePreprocessorComponent.builder()
+              .setBuildApksCommand(this)
+              .setSdkBundleModules(sdkBundleModules)
+              .build()
+              .create();
       AppBundle preprocessedAppBundle = appBundlePreprocessorManager.processAppBundle(appBundle);
 
       BuildApksManager buildApksManager =
@@ -900,15 +908,31 @@ public abstract class BuildApksCommand {
             });
   }
 
-  private void validateRuntimeEnabledSdkDependencies(
+  private ImmutableMap<String, BundleModule> getValidatedSdkModules(
       Closer closer, TempDirectory tempDir, AppBundle appBundle) throws IOException {
     if (!getRuntimeEnabledSdkArchivePaths().isEmpty()) {
-      validateSdkAsarsMatchAppBundleDependencies(
-          appBundle, getValidatedSdkAsarsByPackageName(closer, tempDir));
-    } else {
-      validateSdkBundlesMatchAppBundleDependencies(
-          appBundle, getValidatedSdkBundlesByPackageName(closer, tempDir));
+      ImmutableMap<String, SdkAsar> sdkAsars = getValidatedSdkAsarsByPackageName(closer, tempDir);
+      validateSdkAsarsMatchAppBundleDependencies(appBundle, sdkAsars);
+      return sdkAsars.entrySet().stream()
+          .collect(
+              toImmutableMap(
+                  Entry::getKey,
+                  entry ->
+                      entry.getValue().getModule().toBuilder()
+                          .setSdkModulesConfig(entry.getValue().getSdkModulesConfig())
+                          .build()));
     }
+    ImmutableMap<String, SdkBundle> sdkBundles =
+        getValidatedSdkBundlesByPackageName(closer, tempDir);
+    validateSdkBundlesMatchAppBundleDependencies(appBundle, sdkBundles);
+    return sdkBundles.entrySet().stream()
+        .collect(
+            toImmutableMap(
+                Entry::getKey,
+                entry ->
+                    entry.getValue().getModule().toBuilder()
+                        .setSdkModulesConfig(entry.getValue().getSdkModulesConfig())
+                        .build()));
   }
 
   private ImmutableMap<String, SdkAsar> getValidatedSdkAsarsByPackageName(

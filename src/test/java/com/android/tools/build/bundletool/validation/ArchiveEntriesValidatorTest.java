@@ -15,10 +15,11 @@
  */
 package com.android.tools.build.bundletool.validation;
 
-import static com.android.tools.build.bundletool.archive.ArchivedResourcesUtils.ARCHIVED_ICON_DRAWABLE_NAME;
-import static com.android.tools.build.bundletool.archive.ArchivedResourcesUtils.ARCHIVED_ROUND_ICON_DRAWABLE_NAME;
-import static com.android.tools.build.bundletool.archive.ArchivedResourcesUtils.CLOUD_SYMBOL_DRAWABLE_NAME;
-import static com.android.tools.build.bundletool.archive.ArchivedResourcesUtils.OPACITY_LAYER_DRAWABLE_NAME;
+import static com.android.tools.build.bundletool.archive.ArchivedResourcesHelper.ARCHIVED_ICON_DRAWABLE_NAME;
+import static com.android.tools.build.bundletool.archive.ArchivedResourcesHelper.ARCHIVED_ROUND_ICON_DRAWABLE_NAME;
+import static com.android.tools.build.bundletool.archive.ArchivedResourcesHelper.ARCHIVED_SPLASH_SCREEN_LAYOUT_NAME;
+import static com.android.tools.build.bundletool.archive.ArchivedResourcesHelper.CLOUD_SYMBOL_DRAWABLE_NAME;
+import static com.android.tools.build.bundletool.archive.ArchivedResourcesHelper.OPACITY_LAYER_DRAWABLE_NAME;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifest;
 import static com.google.common.truth.Truth.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -63,17 +64,19 @@ public final class ArchiveEntriesValidatorTest {
   public void hasConflicitingEntries_throws() {
     String filePathDex = "dex/tmp.dex";
     String filePathDrawable = "res/drawable/tmp.xml";
-    String confilictingFilePath1 = "res/drawable/" + CLOUD_SYMBOL_DRAWABLE_NAME + ".xml";
-    String confilictingFilePath2 = "res/drawable/" + OPACITY_LAYER_DRAWABLE_NAME + ".xml";
-    String confilictingFilePath3 = "res/drawable/" + ARCHIVED_ICON_DRAWABLE_NAME + ".xml";
-    String confilictingFilePath4 = "res/drawable/" + ARCHIVED_ROUND_ICON_DRAWABLE_NAME + ".xml";
+    String conflictingFilePath1 = "res/drawable/" + CLOUD_SYMBOL_DRAWABLE_NAME + ".xml";
+    String conflictingFilePath2 = "res/drawable/" + OPACITY_LAYER_DRAWABLE_NAME + ".xml";
+    String conflictingFilePath3 = "res/drawable/" + ARCHIVED_ICON_DRAWABLE_NAME + ".xml";
+    String conflictingFilePath4 = "res/drawable/" + ARCHIVED_ROUND_ICON_DRAWABLE_NAME + ".xml";
+    String conflictingFilePath5 = "res/layout/" + ARCHIVED_SPLASH_SCREEN_LAYOUT_NAME + ".xml";
     BundleModule base =
         new BundleModuleBuilder("base")
             .addFile(filePathDex, FILE_CONTENT)
-            .addFile(confilictingFilePath1, FILE_CONTENT)
-            .addFile(confilictingFilePath2, FILE_CONTENT)
-            .addFile(confilictingFilePath3, FILE_CONTENT)
-            .addFile(confilictingFilePath4, FILE_CONTENT)
+            .addFile(conflictingFilePath1, FILE_CONTENT)
+            .addFile(conflictingFilePath2, FILE_CONTENT)
+            .addFile(conflictingFilePath3, FILE_CONTENT)
+            .addFile(conflictingFilePath4, FILE_CONTENT)
+            .addFile(conflictingFilePath5, FILE_CONTENT)
             .setManifest(androidManifest("com.test.app"))
             .build();
     BundleModule feature1 =
@@ -87,9 +90,19 @@ public final class ArchiveEntriesValidatorTest {
             InvalidBundleException.class,
             () ->
                 new ArchiveEntriesValidator().validateAllModules(ImmutableList.of(base, feature1)));
-    assertThat(exception).hasMessageThat().contains(confilictingFilePath1);
-    assertThat(exception).hasMessageThat().contains(confilictingFilePath2);
-    assertThat(exception).hasMessageThat().contains(confilictingFilePath3);
-    assertThat(exception).hasMessageThat().contains(confilictingFilePath4);
+    ImmutableList<String> validPaths = ImmutableList.of(filePathDex, filePathDrawable);
+    ImmutableList<String> invalidPaths =
+        ImmutableList.of(
+            conflictingFilePath1,
+            conflictingFilePath2,
+            conflictingFilePath3,
+            conflictingFilePath4,
+            conflictingFilePath5);
+    for (String validPath : validPaths) {
+      assertThat(exception).hasMessageThat().doesNotContain(validPath);
+    }
+    for (String invalidPath : invalidPaths) {
+      assertThat(exception).hasMessageThat().contains(invalidPath);
+    }
   }
 }

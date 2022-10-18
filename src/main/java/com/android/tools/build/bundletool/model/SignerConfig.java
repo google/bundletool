@@ -65,7 +65,16 @@ public abstract class SignerConfig {
     /** Sets the certificate corresponding to the private key. */
     public abstract Builder setCertificates(ImmutableList<X509Certificate> certificates);
 
-    public abstract SignerConfig build();
+    abstract SignerConfig autoBuild();
+
+    @SuppressWarnings("CheckReturnValue")
+    public SignerConfig build() {
+      SignerConfig result = autoBuild();
+      // Initialize issuerX500Principal here because implementation of getIssuerX500Principal is
+      // not thread-safe in JDK and we use it from multiple threads.
+      result.getCertificates().forEach(X509Certificate::getIssuerX500Principal);
+      return result;
+    }
   }
 
   /**

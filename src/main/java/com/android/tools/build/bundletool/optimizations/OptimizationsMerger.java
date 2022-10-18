@@ -23,6 +23,7 @@ import com.android.bundle.Config.Optimizations;
 import com.android.bundle.Config.SplitDimension;
 import com.android.bundle.Config.SplitDimension.Value;
 import com.android.bundle.Config.SuffixStripping;
+import com.android.bundle.Config.UncompressDexFiles.UncompressedDexTargetSdk;
 import com.android.tools.build.bundletool.model.OptimizationDimension;
 import com.android.tools.build.bundletool.model.utils.EnumMapper;
 import com.android.tools.build.bundletool.model.version.BundleToolVersion;
@@ -103,10 +104,17 @@ public final class OptimizationsMerger {
             ? requestedOptimizations.getUncompressNativeLibraries().getEnabled()
             : defaultOptimizations.getUncompressNativeLibraries();
 
-    boolean uncompressDexFiles =
-        requestedOptimizations.hasUncompressDexFiles()
-            ? requestedOptimizations.getUncompressDexFiles().getEnabled()
-            : defaultOptimizations.getUncompressDexFiles();
+    boolean uncompressDexFiles;
+    UncompressedDexTargetSdk uncompressedDexTargetSdk;
+
+    if (requestedOptimizations.hasUncompressDexFiles()) {
+      uncompressDexFiles = requestedOptimizations.getUncompressDexFiles().getEnabled();
+      uncompressedDexTargetSdk =
+          requestedOptimizations.getUncompressDexFiles().getUncompressedDexTargetSdk();
+    } else {
+      uncompressDexFiles = defaultOptimizations.getUncompressDexFiles();
+      uncompressedDexTargetSdk = defaultOptimizations.getUncompressedDexTargetSdk();
+    }
 
     ImmutableMap<OptimizationDimension, SuffixStripping> suffixStrippings =
         getSuffixStrippings(
@@ -116,8 +124,7 @@ public final class OptimizationsMerger {
         .setSplitDimensions(splitDimensions)
         .setUncompressNativeLibraries(uncompressNativeLibraries)
         .setUncompressDexFiles(uncompressDexFiles)
-        .setUncompressedDexTargetSdk(
-            requestedOptimizations.getUncompressDexFiles().getUncompressedDexTargetSdk())
+        .setUncompressedDexTargetSdk(uncompressedDexTargetSdk)
         .setStandaloneDimensions(standaloneDimensions)
         .setSuffixStrippings(suffixStrippings)
         .build();

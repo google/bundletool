@@ -35,6 +35,7 @@ import com.android.bundle.Files.ApexImages;
 import com.android.bundle.Files.Assets;
 import com.android.bundle.Files.NativeLibraries;
 import com.android.bundle.RuntimeEnabledSdkConfigProto.RuntimeEnabledSdkConfig;
+import com.android.bundle.SdkModulesConfigOuterClass.SdkModulesConfig;
 import com.android.bundle.Targeting.ModuleTargeting;
 import com.android.tools.build.bundletool.model.exceptions.InvalidBundleException;
 import com.android.tools.build.bundletool.model.version.Version;
@@ -147,6 +148,9 @@ public abstract class BundleModule {
   public abstract Optional<ApexImages> getApexConfig();
 
   public abstract Optional<RuntimeEnabledSdkConfig> getRuntimeEnabledSdkConfig();
+
+  /** Only present for modules of type SDK_DEPENDENCY_MODULE. */
+  public abstract Optional<SdkModulesConfig> getSdkModulesConfig();
 
   /**
    * Returns entries of the module, indexed by their module path.
@@ -358,6 +362,8 @@ public abstract class BundleModule {
 
     public abstract Builder setRuntimeEnabledSdkConfig(
         RuntimeEnabledSdkConfig runtimeEnabledSdkConfig);
+
+    public abstract Builder setSdkModulesConfig(SdkModulesConfig sdkModulesConfig);
 
     public abstract Builder setModuleType(ModuleType moduleType);
 

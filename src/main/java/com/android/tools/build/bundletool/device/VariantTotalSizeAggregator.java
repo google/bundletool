@@ -26,6 +26,7 @@ import com.android.bundle.Targeting.AbiTargeting;
 import com.android.bundle.Targeting.DeviceTierTargeting;
 import com.android.bundle.Targeting.LanguageTargeting;
 import com.android.bundle.Targeting.ScreenDensityTargeting;
+import com.android.bundle.Targeting.SdkRuntimeTargeting;
 import com.android.bundle.Targeting.SdkVersionTargeting;
 import com.android.bundle.Targeting.TextureCompressionFormatTargeting;
 import com.android.bundle.Targeting.VariantTargeting;
@@ -75,7 +76,8 @@ public class VariantTotalSizeAggregator extends AbstractSizeAggregator {
       ScreenDensityTargeting screenDensityTargeting,
       LanguageTargeting languageTargeting,
       TextureCompressionFormatTargeting textureTargeting,
-      DeviceTierTargeting deviceTierTargeting) {
+      DeviceTierTargeting deviceTierTargeting,
+      SdkRuntimeTargeting sdkRuntimeTargeting) {
     return new ApkMatcher(
             getDeviceSpec(
                 getSizeRequest.getDeviceSpec(),
@@ -84,7 +86,8 @@ public class VariantTotalSizeAggregator extends AbstractSizeAggregator {
                 screenDensityTargeting,
                 languageTargeting,
                 textureTargeting,
-                deviceTierTargeting),
+                deviceTierTargeting,
+                sdkRuntimeTargeting),
             getSizeRequest.getModules(),
             getSizeRequest.getInstant(),
             /* ensureDensityAndAbiApksMatched= */ false)
@@ -115,7 +118,8 @@ public class VariantTotalSizeAggregator extends AbstractSizeAggregator {
         languageTargetingOptions,
         screenDensityTargetingOptions,
         textureCompressionFormatTargetingOptions,
-        deviceTierTargetingOptions);
+        deviceTierTargetingOptions,
+        variant.getTargeting().getSdkRuntimeTargeting());
   }
 
   private ConfigurationSizes getSizeStandaloneVariant() {
@@ -138,7 +142,8 @@ public class VariantTotalSizeAggregator extends AbstractSizeAggregator {
                 variantTargeting.getScreenDensityTargeting(),
                 LanguageTargeting.getDefaultInstance(),
                 variantTargeting.getTextureCompressionFormatTargeting(),
-                DeviceTierTargeting.getDefaultInstance()),
+                DeviceTierTargeting.getDefaultInstance(),
+                variantTargeting.getSdkRuntimeTargeting()),
             getSizeRequest.getDeviceSpec());
 
     // Variants of standalone APKs have only one APK each.

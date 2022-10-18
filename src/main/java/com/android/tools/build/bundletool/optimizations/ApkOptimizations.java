@@ -71,6 +71,17 @@ public abstract class ApkOptimizations {
                       .setUncompressNativeLibraries(true)
                       .setStandaloneDimensions(ImmutableSet.of(ABI, SCREEN_DENSITY))
                       .build())
+              .put(
+                  Version.of("1.11.3"),
+                  ApkOptimizations.builder()
+                      .setSplitDimensions(
+                          ImmutableSet.of(
+                              ABI, SCREEN_DENSITY, TEXTURE_COMPRESSION_FORMAT, LANGUAGE))
+                      .setUncompressNativeLibraries(true)
+                      .setStandaloneDimensions(ImmutableSet.of(ABI, SCREEN_DENSITY))
+                      .setUncompressDexFiles(true)
+                      .setUncompressedDexTargetSdk(UncompressedDexTargetSdk.SDK_31)
+                      .build())
               .build();
 
   /** List of dimensions supported by asset modules. */

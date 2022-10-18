@@ -21,11 +21,13 @@ import static com.android.tools.build.bundletool.model.utils.TextureCompressionU
 import static com.google.common.collect.ImmutableSet.toImmutableSet;
 
 import com.android.bundle.Devices.DeviceSpec;
+import com.android.bundle.Devices.SdkRuntime;
 import com.android.bundle.Targeting.AbiTargeting;
 import com.android.bundle.Targeting.DeviceFeatureTargeting;
 import com.android.bundle.Targeting.DeviceTierTargeting;
 import com.android.bundle.Targeting.LanguageTargeting;
 import com.android.bundle.Targeting.ScreenDensityTargeting;
+import com.android.bundle.Targeting.SdkRuntimeTargeting;
 import com.android.bundle.Targeting.SdkVersionTargeting;
 import com.android.bundle.Targeting.TextureCompressionFormat;
 import com.android.bundle.Targeting.TextureCompressionFormat.TextureCompressionFormatAlias;
@@ -36,6 +38,7 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Streams;
+import com.google.errorprone.annotations.CanIgnoreReturnValue;
 import com.google.protobuf.Int32Value;
 import java.util.Optional;
 
@@ -65,6 +68,10 @@ public final class DeviceSpecUtils {
 
   public static boolean isDeviceTierMissing(DeviceSpec deviceSpec) {
     return !deviceSpec.hasDeviceTier();
+  }
+
+  public static boolean isSdkRuntimeUnspecified(DeviceSpec deviceSpec) {
+    return !deviceSpec.hasSdkRuntime();
   }
 
   /** Extracts the GL ES version, if any, form the device features. */
@@ -111,6 +118,7 @@ public final class DeviceSpecUtils {
       this.deviceSpec = deviceSpec.toBuilder();
     }
 
+    @CanIgnoreReturnValue
     DeviceSpecFromTargetingBuilder setSdkVersion(SdkVersionTargeting sdkVersionTargeting) {
       if (!sdkVersionTargeting.equals(SdkVersionTargeting.getDefaultInstance())) {
         deviceSpec.setSdkVersion(
@@ -119,6 +127,7 @@ public final class DeviceSpecUtils {
       return this;
     }
 
+    @CanIgnoreReturnValue
     DeviceSpecFromTargetingBuilder setSupportedAbis(AbiTargeting abiTargeting) {
       if (!abiTargeting.equals(AbiTargeting.getDefaultInstance())) {
         deviceSpec.addSupportedAbis(
@@ -128,11 +137,13 @@ public final class DeviceSpecUtils {
       return this;
     }
 
+    @CanIgnoreReturnValue
     DeviceSpecFromTargetingBuilder setScreenDensity(ScreenDensityTargeting screenDensityTargeting) {
       getScreenDensityDpi(screenDensityTargeting).ifPresent(deviceSpec::setScreenDensity);
       return this;
     }
 
+    @CanIgnoreReturnValue
     DeviceSpecFromTargetingBuilder setSupportedLocales(LanguageTargeting languageTargeting) {
       if (!languageTargeting.equals(LanguageTargeting.getDefaultInstance())
           && languageTargeting.getValueCount() > 0) {
@@ -141,6 +152,7 @@ public final class DeviceSpecUtils {
       return this;
     }
 
+    @CanIgnoreReturnValue
     DeviceSpecFromTargetingBuilder setSupportedTextureCompressionFormats(
         TextureCompressionFormatTargeting textureTargeting) {
       if (!textureTargeting.equals(TextureCompressionFormatTargeting.getDefaultInstance())) {
@@ -162,11 +174,21 @@ public final class DeviceSpecUtils {
       return this;
     }
 
+    @CanIgnoreReturnValue
     DeviceSpecFromTargetingBuilder setDeviceTier(DeviceTierTargeting deviceTierTargeting) {
       if (!deviceTierTargeting.equals(DeviceTierTargeting.getDefaultInstance())) {
         deviceSpec.setDeviceTier(
             Int32Value.of(Iterables.getOnlyElement(deviceTierTargeting.getValueList()).getValue()));
       }
+      return this;
+    }
+
+    @CanIgnoreReturnValue
+    DeviceSpecFromTargetingBuilder setSdkRuntime(SdkRuntimeTargeting sdkRuntimeTargeting) {
+      deviceSpec.setSdkRuntime(
+          SdkRuntime.newBuilder()
+              .setSupported(sdkRuntimeTargeting.getRequiresSdkRuntime())
+              .build());
       return this;
     }
 

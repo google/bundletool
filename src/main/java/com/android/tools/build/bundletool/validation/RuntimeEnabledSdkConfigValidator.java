@@ -18,8 +18,8 @@ package com.android.tools.build.bundletool.validation;
 
 import static com.android.tools.build.bundletool.model.RuntimeEnabledSdkVersionEncoder.VERSION_MAJOR_MAX_VALUE;
 import static com.android.tools.build.bundletool.model.RuntimeEnabledSdkVersionEncoder.VERSION_MINOR_MAX_VALUE;
+import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.ImmutableListMultimap.toImmutableListMultimap;
-import static com.google.common.collect.ImmutableSet.toImmutableSet;
 import static java.util.function.Function.identity;
 import static java.util.stream.Collectors.joining;
 
@@ -29,7 +29,6 @@ import com.android.tools.build.bundletool.model.BundleModule;
 import com.android.tools.build.bundletool.model.exceptions.InvalidBundleException;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
-import com.google.common.collect.ImmutableSet;
 import com.google.errorprone.annotations.FormatMethod;
 import com.google.errorprone.annotations.FormatString;
 import java.util.Collection;
@@ -46,23 +45,38 @@ public final class RuntimeEnabledSdkConfigValidator extends SubValidator {
    */
   @Override
   public void validateAllModules(ImmutableList<BundleModule> modules) {
-    ImmutableSet<RuntimeEnabledSdk> runtimeEnabledSdks =
+    ImmutableList<RuntimeEnabledSdk> runtimeEnabledSdks =
         modules.stream()
             .filter(module -> module.getRuntimeEnabledSdkConfig().isPresent())
             .map(module -> module.getRuntimeEnabledSdkConfig().get())
             .flatMap(
                 runtimeEnabledSdkConfig ->
                     runtimeEnabledSdkConfig.getRuntimeEnabledSdkList().stream())
-            .collect(toImmutableSet());
+            .collect(toImmutableList());
     runtimeEnabledSdks.forEach(
         runtimeEnabledSdk ->
             // Validate that all expected fields are set.
             validateRuntimeEnabledSdk(runtimeEnabledSdk));
+    validateUniqueSdkPackageNames(runtimeEnabledSdks);
     validateUniqueResourcePackageId(runtimeEnabledSdks);
   }
 
+  private static void validateUniqueSdkPackageNames(
+      ImmutableList<RuntimeEnabledSdk> runtimeEnabledSdks) {
+    ImmutableMap<String, Collection<RuntimeEnabledSdk>> runtimeEnabledSdksByPackageName =
+        runtimeEnabledSdks.stream()
+            .collect(toImmutableListMultimap(RuntimeEnabledSdk::getPackageName, identity()))
+            .asMap();
+    runtimeEnabledSdksByPackageName.forEach(
+        (key, value) ->
+            validate(
+                value.size() == 1,
+                "Found multiple dependencies on the same runtime-enabled SDK '%s'.",
+                key));
+  }
+
   private static void validateUniqueResourcePackageId(
-      ImmutableSet<RuntimeEnabledSdk> runtimeEnabledSdks) {
+      ImmutableList<RuntimeEnabledSdk> runtimeEnabledSdks) {
     ImmutableMap<Integer, Collection<RuntimeEnabledSdk>> runtimeEnabledSkdsPerResourcesPackageId =
         runtimeEnabledSdks.stream()
             .collect(toImmutableListMultimap(RuntimeEnabledSdk::getResourcesPackageId, identity()))

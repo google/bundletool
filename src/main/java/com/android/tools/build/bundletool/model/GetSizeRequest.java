@@ -24,13 +24,14 @@ import java.util.Optional;
 public interface GetSizeRequest {
 
   /** Dimensions to expand the sizes against. */
-  public enum Dimension {
+  enum Dimension {
     SDK,
     ABI,
     SCREEN_DENSITY,
     LANGUAGE,
     TEXTURE_COMPRESSION_FORMAT,
     DEVICE_TIER,
+    SDK_RUNTIME,
     ALL
   }
 

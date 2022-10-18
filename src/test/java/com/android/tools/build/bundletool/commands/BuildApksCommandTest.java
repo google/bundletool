@@ -27,6 +27,7 @@ import static com.android.tools.build.bundletool.model.OptimizationDimension.ABI
 import static com.android.tools.build.bundletool.model.OptimizationDimension.SCREEN_DENSITY;
 import static com.android.tools.build.bundletool.model.OptimizationDimension.TEXTURE_COMPRESSION_FORMAT;
 import static com.android.tools.build.bundletool.model.utils.BundleParser.EXTRACTED_SDK_MODULES_FILE_NAME;
+import static com.android.tools.build.bundletool.model.utils.Versions.ANDROID_L_API_VERSION;
 import static com.android.tools.build.bundletool.testing.Aapt2Helper.AAPT2_PATH;
 import static com.android.tools.build.bundletool.testing.DeviceFactory.abis;
 import static com.android.tools.build.bundletool.testing.DeviceFactory.createDeviceSpecFile;
@@ -37,6 +38,7 @@ import static com.android.tools.build.bundletool.testing.DeviceFactory.sdkVersio
 import static com.android.tools.build.bundletool.testing.FakeSystemEnvironmentProvider.ANDROID_HOME;
 import static com.android.tools.build.bundletool.testing.FakeSystemEnvironmentProvider.ANDROID_SERIAL;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifest;
+import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withMinSdkVersion;
 import static com.android.tools.build.bundletool.testing.SdkBundleBuilder.createSdkModulesConfig;
 import static com.android.tools.build.bundletool.testing.TestUtils.addKeyToKeystore;
 import static com.android.tools.build.bundletool.testing.TestUtils.createDebugKeystore;
@@ -53,6 +55,7 @@ import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.base.StandardSystemProperty.USER_HOME;
 import static com.google.common.truth.Truth.assertThat;
 import static com.google.common.truth.Truth8.assertThat;
+import static com.google.common.truth.extensions.proto.ProtoTruth.assertThat;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.jose4j.jws.AlgorithmIdentifiers.RSA_USING_SHA256;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -61,6 +64,10 @@ import static org.mockito.Mockito.mock;
 import com.android.apksig.SigningCertificateLineage;
 import com.android.bundle.CodeTransparencyOuterClass.CodeRelatedFile;
 import com.android.bundle.CodeTransparencyOuterClass.CodeTransparency;
+import com.android.bundle.Commands.ApkSet;
+import com.android.bundle.Commands.BuildApksResult;
+import com.android.bundle.Commands.ModuleMetadata;
+import com.android.bundle.Commands.Variant;
 import com.android.bundle.RuntimeEnabledSdkConfigProto.RuntimeEnabledSdk;
 import com.android.bundle.RuntimeEnabledSdkConfigProto.RuntimeEnabledSdkConfig;
 import com.android.bundle.SdkMetadataOuterClass.SdkMetadata;
@@ -90,6 +97,7 @@ import com.android.tools.build.bundletool.model.ZipPath;
 import com.android.tools.build.bundletool.model.exceptions.CommandExecutionException;
 import com.android.tools.build.bundletool.model.exceptions.InvalidBundleException;
 import com.android.tools.build.bundletool.model.exceptions.InvalidCommandException;
+import com.android.tools.build.bundletool.model.utils.ResultUtils;
 import com.android.tools.build.bundletool.model.utils.SystemEnvironmentProvider;
 import com.android.tools.build.bundletool.model.utils.files.FileUtils;
 import com.android.tools.build.bundletool.testing.Aapt2Helper;
@@ -98,6 +106,7 @@ import com.android.tools.build.bundletool.testing.BundleModuleBuilder;
 import com.android.tools.build.bundletool.testing.CertificateFactory;
 import com.android.tools.build.bundletool.testing.FakeSystemEnvironmentProvider;
 import com.android.tools.build.bundletool.testing.SdkBundleBuilder;
+import com.android.tools.build.bundletool.testing.TargetingUtils;
 import com.android.tools.build.bundletool.testing.TestModule;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
@@ -1580,7 +1589,8 @@ public class BuildApksCommandTest {
                 CodeRelatedFile.newBuilder()
                     .setType(DEX)
                     .setApkPath("non/existent/path/dex.file")
-                    .setSha256("sha-256"))
+                    .setSha256("sha-256")
+                    .setPath("non/existent/path/dex.file"))
             .build());
 
     ParsedFlags flags =
@@ -2493,6 +2503,62 @@ public class BuildApksCommandTest {
   }
 
   @Test
+  public void buildApks_fromAppBundleWithRuntimeEnabledSdkDeps_succeeds() throws Exception {
+    createSdkBundle(sdkBundlePath1, "com.test.sdk1", /* majorVersion= */ 1, /* minorVersion= */ 2);
+    createSdkBundle(sdkBundlePath2, "com.test.sdk2", /* majorVersion= */ 2, /* minorVersion= */ 0);
+    createAppBundleWithRuntimeEnabledSdkConfig(
+        bundlePath,
+        RuntimeEnabledSdkConfig.newBuilder()
+            .addRuntimeEnabledSdk(
+                RuntimeEnabledSdk.newBuilder()
+                    .setPackageName("com.test.sdk1")
+                    .setVersionMajor(1)
+                    .setVersionMinor(2)
+                    .setCertificateDigest(VALID_CERT_FINGERPRINT)
+                    .setResourcesPackageId(2))
+            .addRuntimeEnabledSdk(
+                RuntimeEnabledSdk.newBuilder()
+                    .setPackageName("com.test.sdk2")
+                    .setVersionMajor(2)
+                    .setVersionMinor(0)
+                    .setCertificateDigest(VALID_CERT_FINGERPRINT)
+                    .setResourcesPackageId(3))
+            .build());
+
+    BuildApksCommand.fromFlags(
+            new FlagParser()
+                .parse(
+                    "--bundle=" + bundlePath,
+                    "--output=" + outputFilePath,
+                    "--sdk-bundles=" + sdkBundlePath1 + "," + sdkBundlePath2),
+            fakeAdbServer)
+        .execute();
+
+    BuildApksResult buildApksResult = ResultUtils.readTableOfContents(outputFilePath);
+    // createAppBundleWithRuntimeEnabledSdkConfig sets min SDK version to Android L, so 2 split
+    // variants should be generated: for sdk-runtime and non-sdk-runtime devices.
+    assertThat(buildApksResult.getVariantCount()).isEqualTo(2);
+
+    Variant nonSdkRuntimeVariant = buildApksResult.getVariant(0);
+    assertThat(nonSdkRuntimeVariant.getTargeting())
+        .isEqualTo(TargetingUtils.variantSdkTargeting(ANDROID_L_API_VERSION));
+    // non-sdk-runtime variant contains additional modules - one per SDK dependency.
+    assertThat(nonSdkRuntimeVariant.getApkSetCount()).isEqualTo(3);
+    assertThat(
+            nonSdkRuntimeVariant.getApkSetList().stream()
+                .map(ApkSet::getModuleMetadata)
+                .map(ModuleMetadata::getName))
+        .containsExactly("base", "comtestsdk1", "comtestsdk2");
+
+    Variant sdkRuntimeVariant = buildApksResult.getVariant(1);
+    assertThat(sdkRuntimeVariant.getTargeting())
+        .isEqualTo(TargetingUtils.sdkRuntimeVariantTargeting());
+    // non-sdk-runtime variant contains only the base module - like the original AAB.
+    assertThat(sdkRuntimeVariant.getApkSetCount()).isEqualTo(1);
+    assertThat(sdkRuntimeVariant.getApkSet(0).getModuleMetadata().getName()).isEqualTo("base");
+  }
+
+  @Test
   public void packageStoreWithDefault_throws() throws Exception {
     InvalidCommandException builderException =
         assertThrows(
@@ -2561,7 +2627,8 @@ public class BuildApksCommandTest {
                 "base",
                 module ->
                     module
-                        .setManifest(androidManifest("com.app"))
+                        .setManifest(
+                            androidManifest("com.app", withMinSdkVersion(ANDROID_L_API_VERSION)))
                         .setRuntimeEnabledSdkConfig(runtimeEnabledSdkConfig)
                         .build());
     createAppBundle(path, appBundle.build());

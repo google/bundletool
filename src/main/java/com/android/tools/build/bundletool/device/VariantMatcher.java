@@ -36,7 +36,7 @@ public class VariantMatcher {
 
   private final ImmutableList<? extends TargetingDimensionMatcher<?>> variantMatchers;
   private final boolean matchInstant;
-  private final boolean supportsSdkRuntime;
+  private final SdkRuntimeMatcher sdkRuntimeMatcher;
 
   public VariantMatcher(DeviceSpec deviceSpec) {
     this(deviceSpec, /* matchInstant= */ false);
@@ -74,7 +74,7 @@ public class VariantMatcher {
             textureCompressionFormatMatcher,
             sdkRuntimeMatcher);
     this.matchInstant = matchInstant;
-    this.supportsSdkRuntime = sdkRuntimeMatcher.deviceSupportsSdkRuntime();
+    this.sdkRuntimeMatcher = sdkRuntimeMatcher;
   }
 
   /**
@@ -82,6 +82,11 @@ public class VariantMatcher {
    * can match a full device-spec (generated from device-spec command).
    */
   public ImmutableList<Variant> getAllMatchingVariants(BuildApksResult buildApksResult) {
+    if (!sdkRuntimeMatcher.isDeviceDimensionPresent()
+        && sdkRuntimeMatcher.deviceSupportsSdkRuntime()) {
+      return getAllMatchingVariants(ImmutableList.copyOf(buildApksResult.getVariantList()));
+    }
+
     // Separate SDK runtime and non-sdk runtime variants.
     Map<Boolean, ImmutableList<Variant>> partitionedVariants =
         buildApksResult.getVariantList().stream()
@@ -95,7 +100,7 @@ public class VariantMatcher {
     // the device, we fall back to non-sdk runtime variants. This ordering is required because the
     // SdkRuntimeMatcher will match a non-SDK runtime variant to a device that supports the SDK
     // runtime, which is not optimal if there is another variant that targets the SDK runtime.
-    if (supportsSdkRuntime) {
+    if (sdkRuntimeMatcher.deviceSupportsSdkRuntime()) {
       ImmutableList<Variant> matchingSdkRuntimeVariants =
           getAllMatchingVariants(partitionedVariants.get(true));
       if (!matchingSdkRuntimeVariants.isEmpty()) {

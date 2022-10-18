@@ -29,6 +29,7 @@ import static com.android.tools.build.bundletool.model.SizeConfiguration.getDevi
 import static com.android.tools.build.bundletool.model.SizeConfiguration.getLocaleName;
 import static com.android.tools.build.bundletool.model.SizeConfiguration.getScreenDensityName;
 import static com.android.tools.build.bundletool.model.SizeConfiguration.getSdkName;
+import static com.android.tools.build.bundletool.model.SizeConfiguration.getSdkRuntimeRequired;
 import static com.android.tools.build.bundletool.model.SizeConfiguration.getTextureCompressionFormatName;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.abiTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.deviceTierTargeting;
@@ -37,12 +38,14 @@ import static com.android.tools.build.bundletool.testing.TargetingUtils.screenDe
 import static com.android.tools.build.bundletool.testing.TargetingUtils.sdkVersionFrom;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.sdkVersionTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.textureCompressionTargeting;
+import static com.google.common.truth.Truth.assertThat;
 import static com.google.common.truth.Truth8.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.android.bundle.Targeting.AbiTargeting;
 import com.android.bundle.Targeting.LanguageTargeting;
 import com.android.bundle.Targeting.ScreenDensityTargeting;
+import com.android.bundle.Targeting.SdkRuntimeTargeting;
 import com.android.bundle.Targeting.SdkVersionTargeting;
 import com.android.bundle.Targeting.TextureCompressionFormatTargeting;
 import com.google.common.collect.ImmutableList;
@@ -156,5 +159,17 @@ public class SizeConfigurationTest {
             getDeviceTierLevel(
                 deviceTierTargeting(/* value= */ 1, /* alternatives= */ ImmutableList.of(0))))
         .hasValue(1);
+  }
+
+  @Test
+  public void getSdkRuntime() {
+    assertThat(
+            getSdkRuntimeRequired(
+                SdkRuntimeTargeting.newBuilder().setRequiresSdkRuntime(true).build()))
+        .isEqualTo("Required");
+    assertThat(
+            getSdkRuntimeRequired(
+                SdkRuntimeTargeting.newBuilder().setRequiresSdkRuntime(false).build()))
+        .isEqualTo("Not Required");
   }
 }

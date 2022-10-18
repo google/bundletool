@@ -16,7 +16,6 @@
 
 package com.android.tools.build.bundletool.splitters;
 
-import static com.android.tools.build.bundletool.model.utils.Versions.ANDROID_L_API_VERSION;
 import static com.android.tools.build.bundletool.model.utils.Versions.ANDROID_M_API_VERSION;
 import static com.android.tools.build.bundletool.model.utils.Versions.ANDROID_O_API_VERSION;
 import static com.android.tools.build.bundletool.model.utils.Versions.ANDROID_Q_API_VERSION;
@@ -271,7 +270,7 @@ public class PerModuleVariantTargetingGeneratorTest {
   }
 
   @Test
-  public void variantsWithOnlySparseEnabled_variant26() throws Exception {
+  public void variantsWithSparseEncodingEnabled() throws Exception {
     BundleModule bundleModule = createSingleLibraryDexModuleMinSdk(ANDROID_O_API_VERSION);
     PerModuleVariantTargetingGenerator generator = new PerModuleVariantTargetingGenerator();
     ImmutableSet<VariantTargeting> splits =
@@ -283,27 +282,6 @@ public class PerModuleVariantTargetingGeneratorTest {
         .containsExactly(
             variantMinSdkTargeting(Versions.ANDROID_O_API_VERSION),
             variantMinSdkTargeting(ANDROID_S_V2_API_VERSION));
-  }
-
-  @Test
-  public void variantsWithOnlySparseEnabled_variant21_throws() throws Exception {
-    BundleModule bundleModule = createSingleLibraryDexModuleMinSdk(ANDROID_L_API_VERSION);
-    PerModuleVariantTargetingGenerator generator = new PerModuleVariantTargetingGenerator();
-    CommandExecutionException exception =
-        assertThrows(
-            CommandExecutionException.class,
-            () ->
-                generator.generateVariants(
-                    bundleModule,
-                    ApkGenerationConfiguration.builder()
-                        .setEnableSparseEncodingVariant(true)
-                        .build()));
-
-    assertThat(exception)
-        .hasMessageThat()
-        .contains(
-            "Cannot generate variants 'testModule' with sparse encoding, because it does not target"
-                + " devices on Android O or above.");
   }
 
   /** Creates a minimal module with one native library and dex files. */

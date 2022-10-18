@@ -27,10 +27,27 @@ import com.google.common.collect.MapDifference;
 import com.google.common.collect.Maps;
 import com.google.common.io.ByteSource;
 import java.util.Optional;
+import java.util.logging.Logger;
 import org.jose4j.jws.JsonWebSignature;
 
 /** Shared utilities for verifying code transparency in a given bundle. */
 public final class BundleTransparencyCheckUtils {
+
+  private static final Logger logger =
+      Logger.getLogger(BundleTransparencyCheckUtils.class.getName());
+
+  /**
+   * Verifies if code transparency is enabled for the given {@code AppBundle}, and returns {@code
+   * boolean}.
+   */
+  public static boolean isTransparencyEnabled(AppBundle bundle) {
+    Optional<ByteSource> signedTransparencyFile =
+        bundle
+            .getBundleMetadata()
+            .getFileAsByteSource(
+                BundleMetadata.BUNDLETOOL_NAMESPACE, BundleMetadata.TRANSPARENCY_SIGNED_FILE_NAME);
+    return signedTransparencyFile.isPresent();
+  }
 
   /**
    * Verifies code transparency for the given bundle, and returns {@link TransparencyCheckResult}.
@@ -61,14 +78,6 @@ public final class BundleTransparencyCheckUtils {
    */
   public static TransparencyCheckResult checkTransparency(
       AppBundle bundle, ByteSource signedTransparencyFile) {
-    if (bundle.hasSharedUserId()) {
-      throw InvalidBundleException.builder()
-          .withUserMessage(
-              "Transparency file is present in the bundle, but it can not be verified because"
-                  + " `sharedUserId` attribute is specified in one of the manifests.")
-          .build();
-    }
-
     TransparencyCheckResult.Builder result = TransparencyCheckResult.builder();
 
     JsonWebSignature jws = CodeTransparencyCryptoUtils.parseJws(signedTransparencyFile);
@@ -101,7 +110,9 @@ public final class BundleTransparencyCheckUtils {
       getCodeRelatedFilesFromParsedTransparencyFile(CodeTransparency parsedTransparencyFile) {
     return parsedTransparencyFile.getCodeRelatedFileList().stream()
         .map(BundleTransparencyCheckUtils::addTypeToDexCodeRelatedFiles)
-        .collect(toImmutableMap(CodeRelatedFile::getPath, codeRelatedFile -> codeRelatedFile));
+        .collect(
+            toImmutableMap(
+                BundleTransparencyCheckUtils::getSource, codeRelatedFile -> codeRelatedFile));
   }
 
   // Code transparency files generated using Bundletool with version older than
@@ -119,7 +130,23 @@ public final class BundleTransparencyCheckUtils {
     return CodeTransparencyFactory.createCodeTransparencyMetadata(bundle)
         .getCodeRelatedFileList()
         .stream()
-        .collect(toImmutableMap(CodeRelatedFile::getPath, codeRelatedFile -> codeRelatedFile));
+        .collect(
+            toImmutableMap(
+                BundleTransparencyCheckUtils::getSource, codeRelatedFile -> codeRelatedFile));
+  }
+
+  private static String getSource(CodeRelatedFile codeRelatedFile) {
+    switch (codeRelatedFile.getSourceCase()) {
+      case PATH:
+        return codeRelatedFile.getPath();
+      case BUNDLETOOL_REPO_PATH:
+        return codeRelatedFile.getBundletoolRepoPath();
+      case SOURCE_NOT_SET:
+        logger.warning("CodeRelatedFile has unset `source`: " + codeRelatedFile);
+    }
+    throw InvalidBundleException.builder()
+        .withUserMessage("Failed to get value of `source`")
+        .build();
   }
 
   private static String getDiffAsString(

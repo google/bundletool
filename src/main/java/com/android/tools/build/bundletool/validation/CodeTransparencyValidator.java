@@ -38,6 +38,7 @@ public final class CodeTransparencyValidator extends SubValidator {
     if (!signedTransparencyFile.isPresent()) {
       return;
     }
+
     TransparencyCheckResult transparencyCheckResult =
         checkTransparency(bundle, signedTransparencyFile.get());
     if (!transparencyCheckResult.verified()) {

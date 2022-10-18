@@ -21,6 +21,7 @@ import static com.android.tools.build.bundletool.device.DeviceSpecUtils.isAbiMis
 import static com.android.tools.build.bundletool.device.DeviceSpecUtils.isDeviceTierMissing;
 import static com.android.tools.build.bundletool.device.DeviceSpecUtils.isLocalesMissing;
 import static com.android.tools.build.bundletool.device.DeviceSpecUtils.isScreenDensityMissing;
+import static com.android.tools.build.bundletool.device.DeviceSpecUtils.isSdkRuntimeUnspecified;
 import static com.android.tools.build.bundletool.device.DeviceSpecUtils.isSdkVersionMissing;
 import static com.android.tools.build.bundletool.device.DeviceSpecUtils.isTextureCompressionFormatMissing;
 import static com.android.tools.build.bundletool.model.GetSizeRequest.Dimension.ABI;
@@ -28,6 +29,7 @@ import static com.android.tools.build.bundletool.model.GetSizeRequest.Dimension.
 import static com.android.tools.build.bundletool.model.GetSizeRequest.Dimension.LANGUAGE;
 import static com.android.tools.build.bundletool.model.GetSizeRequest.Dimension.SCREEN_DENSITY;
 import static com.android.tools.build.bundletool.model.GetSizeRequest.Dimension.SDK;
+import static com.android.tools.build.bundletool.model.GetSizeRequest.Dimension.SDK_RUNTIME;
 import static com.android.tools.build.bundletool.model.GetSizeRequest.Dimension.TEXTURE_COMPRESSION_FORMAT;
 import static com.android.tools.build.bundletool.model.utils.TextureCompressionUtils.TARGETING_TO_TEXTURE;
 import static com.google.common.collect.ImmutableList.toImmutableList;
@@ -40,6 +42,7 @@ import com.android.bundle.Targeting.ApkTargeting;
 import com.android.bundle.Targeting.DeviceTierTargeting;
 import com.android.bundle.Targeting.LanguageTargeting;
 import com.android.bundle.Targeting.ScreenDensityTargeting;
+import com.android.bundle.Targeting.SdkRuntimeTargeting;
 import com.android.bundle.Targeting.SdkVersionTargeting;
 import com.android.bundle.Targeting.TextureCompressionFormatTargeting;
 import com.android.tools.build.bundletool.commands.GetSizeCommand;
@@ -89,7 +92,8 @@ public abstract class AbstractSizeAggregator {
       ScreenDensityTargeting screenDensityTargeting,
       LanguageTargeting languageTargeting,
       TextureCompressionFormatTargeting textureTargeting,
-      DeviceTierTargeting deviceTierTargeting);
+      DeviceTierTargeting deviceTierTargeting,
+      SdkRuntimeTargeting sdkRuntimeTargeting);
 
   protected ImmutableSet<SdkVersionTargeting> getAllSdkVersionTargetings(
       ImmutableList<ApkDescription> apkDescriptions) {
@@ -181,7 +185,10 @@ public abstract class AbstractSizeAggregator {
       ImmutableSet<LanguageTargeting> languageTargetingOptions,
       ImmutableSet<ScreenDensityTargeting> screenDensityTargetingOptions,
       ImmutableSet<TextureCompressionFormatTargeting> textureCompressionFormatTargetingOptions,
-      ImmutableSet<DeviceTierTargeting> deviceTierTargetingOptions) {
+      ImmutableSet<DeviceTierTargeting> deviceTierTargetingOptions,
+      // We use a single value instead of a set for SdkRuntimeTargeting since one variant can only
+      // have one value for this dimension.
+      SdkRuntimeTargeting sdkRuntimeTargeting) {
     Map<SizeConfiguration, Long> minSizeByConfiguration = new HashMap<>();
     Map<SizeConfiguration, Long> maxSizeByConfiguration = new HashMap<>();
 
@@ -201,7 +208,8 @@ public abstract class AbstractSizeAggregator {
                             screenDensityTargeting,
                             languageTargeting,
                             textureCompressionFormatTargeting,
-                            deviceTierTargeting),
+                            deviceTierTargeting,
+                            sdkRuntimeTargeting),
                         getSizeRequest.getDeviceSpec());
 
                 long compressedSize =
@@ -212,7 +220,8 @@ public abstract class AbstractSizeAggregator {
                             screenDensityTargeting,
                             languageTargeting,
                             textureCompressionFormatTargeting,
-                            deviceTierTargeting));
+                            deviceTierTargeting,
+                            sdkRuntimeTargeting));
 
                 minSizeByConfiguration.merge(configuration, compressedSize, Math::min);
                 maxSizeByConfiguration.merge(configuration, compressedSize, Math::max);
@@ -234,7 +243,8 @@ public abstract class AbstractSizeAggregator {
       ScreenDensityTargeting screenDensityTargeting,
       LanguageTargeting languageTargeting,
       TextureCompressionFormatTargeting textureCompressionFormatTargeting,
-      DeviceTierTargeting deviceTierTargeting) {
+      DeviceTierTargeting deviceTierTargeting,
+      SdkRuntimeTargeting sdkRuntimeTargeting) {
 
     ImmutableSet<Dimension> dimensions = getSizeRequest.getDimensions();
     SizeConfiguration.Builder sizeConfiguration = SizeConfiguration.builder();
@@ -266,6 +276,10 @@ public abstract class AbstractSizeAggregator {
           .ifPresent(sizeConfiguration::setDeviceTier);
     }
 
+    if (dimensions.contains(SDK_RUNTIME)) {
+      sizeConfiguration.setSdkRuntime(SizeConfiguration.getSdkRuntimeRequired(sdkRuntimeTargeting));
+    }
+
     return sizeConfiguration.build();
   }
 
@@ -276,7 +290,8 @@ public abstract class AbstractSizeAggregator {
       ScreenDensityTargeting screenDensityTargeting,
       LanguageTargeting languageTargeting,
       TextureCompressionFormatTargeting textureTargeting,
-      DeviceTierTargeting deviceTierTargeting) {
+      DeviceTierTargeting deviceTierTargeting,
+      SdkRuntimeTargeting sdkRuntimeTargeting) {
 
     return new DeviceSpecFromTargetingBuilder(deviceSpec)
         .setSdkVersion(sdkVersionTargeting)
@@ -285,6 +300,7 @@ public abstract class AbstractSizeAggregator {
         .setSupportedLocales(languageTargeting)
         .setSupportedTextureCompressionFormats(textureTargeting)
         .setDeviceTier(deviceTierTargeting)
+        .setSdkRuntime(sdkRuntimeTargeting)
         .build();
   }
 
@@ -320,6 +336,11 @@ public abstract class AbstractSizeAggregator {
 
     if (dimensions.contains(DEVICE_TIER) && !isDeviceTierMissing(deviceSpec)) {
       mergedSizeConfiguration.setDeviceTier(deviceSpec.getDeviceTier().getValue());
+    }
+
+    if (dimensions.contains(SDK_RUNTIME) && !isSdkRuntimeUnspecified(deviceSpec)) {
+      mergedSizeConfiguration.setSdkRuntime(
+          deviceSpec.getSdkRuntime().getSupported() ? "Required" : "Not Required");
     }
 
     return mergedSizeConfiguration.build();

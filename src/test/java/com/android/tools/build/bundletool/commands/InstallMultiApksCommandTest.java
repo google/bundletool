@@ -1116,7 +1116,8 @@ public class InstallMultiApksCommandTest {
       ImmutableMap<String, Supplier<ImmutableList<String>>> packageSupplierMap) {
     return new Aapt2Command() {
       @Override
-      public void convertApkProtoToBinary(Path protoApk, Path binaryApk) {
+      public void convertApkProtoToBinary(
+          Path protoApk, Path binaryApk, ConvertOptions convertOptions) {
         throw new UnsupportedOperationException();
       }
 

@@ -20,7 +20,6 @@ import static com.android.tools.build.bundletool.model.targeting.TargetingUtils.
 import static com.android.tools.build.bundletool.model.utils.TargetingProtoUtils.lPlusVariantTargeting;
 import static com.android.tools.build.bundletool.model.utils.TargetingProtoUtils.sdkVersionFrom;
 import static com.android.tools.build.bundletool.model.utils.Versions.ANDROID_L_API_VERSION;
-import static com.android.tools.build.bundletool.model.utils.Versions.ANDROID_O_API_VERSION;
 import static com.android.tools.build.bundletool.model.utils.Versions.ANDROID_S_V2_API_VERSION;
 import static com.android.tools.build.bundletool.model.version.VersionGuardedFeature.PIN_LOWEST_DENSITY_OF_EACH_STYLE_TO_MASTER;
 import static com.google.common.base.Preconditions.checkNotNull;
@@ -176,6 +175,7 @@ public class ModuleSplitter {
           .map(this::addPlaceHolderNativeLibsToBaseModule)
           .map(this::addUsesSdkLibraryTagsToMainSplitOfBaseModule)
           .map(this::sanitizeManifestEntriesRequiredByPrivacySandboxSdk)
+          .map(this::overrideMinSdkVersionOfSdkRuntimeVariant)
           .collect(toImmutableList());
     }
   }
@@ -197,6 +197,14 @@ public class ModuleSplitter {
         && moduleSplit.isMasterSplit()) {
       return moduleSplit.addUsesSdkLibraryElements(
           appBundle.getRuntimeEnabledSdkDependencies().values());
+    }
+    return moduleSplit;
+  }
+
+  private ModuleSplit overrideMinSdkVersionOfSdkRuntimeVariant(ModuleSplit moduleSplit) {
+    if (variantTargeting.getSdkRuntimeTargeting().getRequiresSdkRuntime()
+        && moduleSplit.isMasterSplit()) {
+      return moduleSplit.overrideMinSdkVersionForSdkSandbox();
     }
     return moduleSplit;
   }
@@ -318,26 +326,15 @@ public class ModuleSplitter {
   }
 
   private ModuleSplit applySparseEncoding(ModuleSplit split) {
-    int sdkTargeting =
+    int variantSdkTargeting =
         Iterables.getOnlyElement(
                 split.getVariantTargeting().getSdkVersionTargeting().getValueList())
             .getMin()
             .getValue();
 
-    if (sdkTargeting < ANDROID_S_V2_API_VERSION) {
-      return split;
-    }
-
-    int minSdk = module.getAndroidManifest().getEffectiveMinSdkVersion();
-    return split.toBuilder()
-        .setAndroidManifest(
-            split
-                .getAndroidManifest()
-                .toEditor()
-                .setMinSdkVersion(max(ANDROID_O_API_VERSION, minSdk))
-                .save())
-        .setSparseEncoding(true)
-        .build();
+    return variantSdkTargeting < ANDROID_S_V2_API_VERSION
+        ? split
+        : split.toBuilder().setSparseEncoding(true).build();
   }
 
   /* Writes the final manifest that reflects the Split ID. */

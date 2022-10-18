@@ -48,6 +48,7 @@ import com.android.tools.build.bundletool.model.exceptions.InvalidCommandExcepti
 import com.android.tools.build.bundletool.testing.AppBundleBuilder;
 import com.android.tools.build.bundletool.testing.BundleModuleBuilder;
 import com.android.tools.build.bundletool.testing.CertificateFactory;
+import com.android.tools.build.bundletool.testing.CodeRelatedFileBuilderHelper;
 import com.android.tools.build.bundletool.transparency.CodeTransparencyFactory;
 import com.android.tools.build.bundletool.transparency.CodeTransparencyVersion;
 import com.google.common.base.Splitter;
@@ -497,7 +498,7 @@ public final class AddTransparencyCommandTest {
   }
 
   @Test
-  public void execute_defaultMode_sharedUserIdSpecifiedInManifest() throws Exception {
+  public void execute_defaultMode_hasSharedUserId_denySharedUserId_fail() throws Exception {
     createBundle(bundlePath, /* hasSharedUserId= */ true);
     AddTransparencyCommand addTransparencyCommand =
         AddTransparencyCommand.builder()
@@ -512,7 +513,41 @@ public final class AddTransparencyCommandTest {
         .hasMessageThat()
         .isEqualTo(
             "Transparency can not be added because `sharedUserId` attribute is specified in one of"
-                + " the manifests.");
+                + " the manifests and `allow-shared-user-id` flag is either false or not specified"
+                + " explicitly.");
+  }
+
+  @Test
+  public void execute_defaultMode_hasSharedUserId_allowSharedUserId_success() throws Exception {
+    createBundle(bundlePath, /* hasSharedUserId= */ true);
+    AddTransparencyCommand addTransparencyCommand =
+        AddTransparencyCommand.builder()
+            .setMode(Mode.DEFAULT)
+            .setBundlePath(bundlePath)
+            .setOutputPath(outputBundlePath)
+            .setSignerConfig(signerConfig)
+            .setAllowSharedUserId(true)
+            .build();
+
+    addTransparencyCommand.execute();
+
+    AppBundle outputBundle = AppBundle.buildFromZip(new ZipFile(outputBundlePath.toFile()));
+    Optional<ByteSource> signedTransparencyFile =
+        outputBundle
+            .getBundleMetadata()
+            .getFileAsByteSource(
+                BUNDLETOOL_NAMESPACE, BundleMetadata.TRANSPARENCY_SIGNED_FILE_NAME);
+    assertThat(signedTransparencyFile).isPresent();
+    JsonWebSignature jws =
+        (JsonWebSignature)
+            JsonWebSignature.fromCompactSerialization(
+                signedTransparencyFile.get().asCharSource(Charset.defaultCharset()).read());
+    assertThat(jws.getAlgorithmHeaderValue()).isEqualTo(RSA_USING_SHA256);
+    assertThat(jws.getCertificateChainHeaderValue()).isEqualTo(signerConfig.getCertificates());
+    // jws.getPayload method will do signature verification using the public key set below.
+    jws.setKey(signerConfig.getCertificates().get(0).getPublicKey());
+    CodeTransparency transparencyProto = getTransparencyProto(jws.getPayload());
+    assertThat(transparencyProto).isEqualTo(expectedTransparencyProto());
   }
 
   @Test
@@ -763,6 +798,66 @@ public final class AddTransparencyCommandTest {
   }
 
   @Test
+  public void execute_generateCodeTransparencyFileMode_hasSharedUserId_denySharedUserId_fail()
+      throws Exception {
+    createBundle(bundlePath, /* hasSharedUserId= */ true);
+    AddTransparencyCommand addTransparencyCommand =
+        AddTransparencyCommand.builder()
+            .setMode(Mode.GENERATE_CODE_TRANSPARENCY_FILE)
+            .setBundlePath(bundlePath)
+            .setOutputPath(outputBundlePath)
+            .setSignerConfig(signerConfig)
+            .build();
+
+    Throwable e = assertThrows(InvalidBundleException.class, addTransparencyCommand::execute);
+    assertThat(e)
+        .hasMessageThat()
+        .isEqualTo(
+            "Transparency can not be added because `sharedUserId` attribute is specified in one of"
+                + " the manifests and `allow-shared-user-id` flag is either false or not specified"
+                + " explicitly.");
+  }
+
+  @Test
+  public void execute_generateCodeTransparencyFileMode_hasSharedUserId_allowSharedUserId_success()
+      throws Exception {
+    createBundle(bundlePath, /* hasSharedUserId= */ true);
+    AddTransparencyCommand addTransparencyCommand =
+        AddTransparencyCommand.builder()
+            .setMode(Mode.GENERATE_CODE_TRANSPARENCY_FILE)
+            .setBundlePath(bundlePath)
+            .setOutputPath(outputUnsignedTransparencyFilePath)
+            .setTransparencyKeyCertificates(signerConfig.getCertificates())
+            .setAllowSharedUserId(true)
+            .build();
+
+    addTransparencyCommand.execute();
+
+    List<String> outputFileLines = Files.readAllLines(outputUnsignedTransparencyFilePath);
+    assertThat(outputFileLines).hasSize(1);
+    String unsignedJwt = outputFileLines.get(0);
+    ImmutableList<String> jwtComponents = ImmutableList.copyOf(Splitter.on(".").split(unsignedJwt));
+    assertThat(jwtComponents).hasSize(2);
+    String expectedFinalJws =
+        createJwsToken(
+            expectedTransparencyProto(),
+            signerConfig.getCertificates().get(0),
+            signerConfig.getPrivateKey(),
+            RSA_USING_SHA256);
+    ImmutableList<String> expectedFinalJwtComponents =
+        ImmutableList.copyOf(Splitter.on(".").split(expectedFinalJws));
+    assertThat(jwtComponents.get(0)).isEqualTo(expectedFinalJwtComponents.get(0));
+    CodeTransparency.Builder actualCodeTransparencyContents = CodeTransparency.newBuilder();
+    JsonFormat.parser()
+        .merge(
+            ByteSource.wrap(BaseEncoding.base64().decode(jwtComponents.get(1)))
+                .asCharSource(Charset.defaultCharset())
+                .read(),
+            actualCodeTransparencyContents);
+    assertThat(actualCodeTransparencyContents.build()).isEqualTo(expectedTransparencyProto());
+  }
+
+  @Test
   public void execute_injectSignature() throws Exception {
     // create bundle.
     createBundle(bundlePath);
@@ -922,6 +1017,84 @@ public final class AddTransparencyCommandTest {
   }
 
   @Test
+  public void execute_injectSignature_hasSharedUserId_denySharedUserId_fail() throws Exception {
+    createBundle(bundlePath, /* hasSharedUserId= */ true);
+    AddTransparencyCommand addTransparencyCommand =
+        AddTransparencyCommand.builder()
+            .setMode(Mode.INJECT_SIGNATURE)
+            .setBundlePath(bundlePath)
+            .setOutputPath(outputBundlePath)
+            .setSignerConfig(signerConfig)
+            .build();
+
+    Throwable e = assertThrows(InvalidBundleException.class, addTransparencyCommand::execute);
+    assertThat(e)
+        .hasMessageThat()
+        .isEqualTo(
+            "Transparency can not be added because `sharedUserId` attribute is specified in one of"
+                + " the manifests and `allow-shared-user-id` flag is either false or not specified"
+                + " explicitly.");
+  }
+
+  @Test
+  public void execute_injectSignature_hasSharedUserId_allowSharedUserId_success() throws Exception {
+    // create bundle.
+    createBundle(bundlePath, /* hasSharedUserId= */ true);
+    signerConfig = createSignerConfigCertificateChain();
+    // add transparency file in default mode.
+    Path tmpOutputBundlePath = tmpDir.resolve("tmp_output_bundle.aab");
+    AddTransparencyCommand.builder()
+        .setMode(Mode.DEFAULT)
+        .setBundlePath(bundlePath)
+        .setOutputPath(tmpOutputBundlePath)
+        .setSignerConfig(signerConfig)
+        .setAllowSharedUserId(true)
+        .build()
+        .execute();
+    // get the correct transparency signature bytes.
+    AppBundle tmpOutputBundle = AppBundle.buildFromZip(new ZipFile(tmpOutputBundlePath.toFile()));
+    ByteSource signedTransparencyFile =
+        tmpOutputBundle
+            .getBundleMetadata()
+            .getFileAsByteSource(BUNDLETOOL_NAMESPACE, BundleMetadata.TRANSPARENCY_SIGNED_FILE_NAME)
+            .get();
+    String jws = signedTransparencyFile.asCharSource(Charset.defaultCharset()).read();
+    String signature = ImmutableList.copyOf(Splitter.on(".").split(jws)).get(2);
+    byte[] signatureBytes = BaseEncoding.base64Url().decode(signature);
+    Files.write(transparencySignatureFilePath, signatureBytes);
+
+    // inject signature into the original bundle
+    AddTransparencyCommand.builder()
+        .setMode(Mode.INJECT_SIGNATURE)
+        .setBundlePath(bundlePath)
+        .setOutputPath(outputBundlePath)
+        .setTransparencyKeyCertificates(signerConfig.getCertificates())
+        .setTransparencySignaturePath(transparencySignatureFilePath)
+        .setAllowSharedUserId(true)
+        .build()
+        .execute();
+
+    // verify that the output bundle contains signed code transparency metadata.
+    AppBundle outputBundle = AppBundle.buildFromZip(new ZipFile(outputBundlePath.toFile()));
+    Optional<ByteSource> finalSignedTransparencyFile =
+        outputBundle
+            .getBundleMetadata()
+            .getFileAsByteSource(
+                BUNDLETOOL_NAMESPACE, BundleMetadata.TRANSPARENCY_SIGNED_FILE_NAME);
+    assertThat(finalSignedTransparencyFile).isPresent();
+    JsonWebSignature finalJws =
+        (JsonWebSignature)
+            JsonWebSignature.fromCompactSerialization(
+                finalSignedTransparencyFile.get().asCharSource(Charset.defaultCharset()).read());
+    assertThat(finalJws.getAlgorithmHeaderValue()).isEqualTo(RSA_USING_SHA256);
+    assertThat(finalJws.getCertificateChainHeaderValue()).isEqualTo(signerConfig.getCertificates());
+    // jws.getPayload method will do signature verification using the public key set below.
+    finalJws.setKey(signerConfig.getCertificates().get(0).getPublicKey());
+    CodeTransparency transparencyProto = getTransparencyProto(finalJws.getPayload());
+    assertThat(transparencyProto).isEqualTo(expectedTransparencyProto());
+  }
+
+  @Test
   public void printHelpDoesNotCrash() {
     AddTransparencyCommand.help();
   }
@@ -1007,12 +1180,13 @@ public final class AddTransparencyCommandTest {
         .build();
   }
 
-  private CodeTransparency expectedTransparencyProto() {
+  private CodeTransparency expectedTransparencyProto() throws IOException {
     CodeTransparency.Builder transparencyBuilder =
         CodeTransparency.newBuilder().setVersion(CodeTransparencyVersion.getCurrentVersion());
     addCodeFilesToTransparencyProto(transparencyBuilder, BASE_MODULE);
     addCodeFilesToTransparencyProto(transparencyBuilder, FEATURE_MODULE1);
     addCodeFilesToTransparencyProto(transparencyBuilder, FEATURE_MODULE2);
+    CodeRelatedFileBuilderHelper.addArchivedDexCodeFilesToCodeTransparency(transparencyBuilder);
     return transparencyBuilder.build();
   }
 

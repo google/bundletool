@@ -187,4 +187,73 @@ public final class ConfigurationSizesMergerTest {
     assertThat(actualMergedConfigurationSizes.getMaxSizeConfigurationMap())
         .isEqualTo(expectedMergedConfigurationSizes.getMaxSizeConfigurationMap());
   }
+
+  @Test
+  public void merge_sdkRuntimeWithDensity_allCombinations() {
+    final long runtimeEnabledMin = 1;
+    final long compatMin = 1 << 1;
+    final long runtimeEnabledMax = 1 << 2;
+    final long compatMax = 1 << 3;
+    final long hdpiMin = 1 << 4;
+    final long hdpiMax = 1 << 6;
+    ConfigurationSizes configurationSizes1 =
+        ConfigurationSizes.create(
+            ImmutableMap.of(SizeConfiguration.builder().setScreenDensity("hdpi").build(), hdpiMin),
+            ImmutableMap.of(SizeConfiguration.builder().setScreenDensity("hdpi").build(), hdpiMax));
+    ConfigurationSizes configurationSizes2 =
+        ConfigurationSizes.create(
+            ImmutableMap.of(
+                SizeConfiguration.builder().setSdkRuntime("Required").setSdkVersion("33-").build(),
+                runtimeEnabledMin,
+                SizeConfiguration.builder()
+                    .setSdkRuntime("Not Required")
+                    .setSdkVersion("21-")
+                    .build(),
+                compatMin),
+            ImmutableMap.of(
+                SizeConfiguration.builder().setSdkRuntime("Required").setSdkVersion("33-").build(),
+                runtimeEnabledMax,
+                SizeConfiguration.builder()
+                    .setSdkRuntime("Not Required")
+                    .setSdkVersion("21-")
+                    .build(),
+                compatMax));
+
+    ConfigurationSizes actualMergedConfigurationSizes =
+        ConfigurationSizesMerger.merge(configurationSizes1, configurationSizes2);
+
+    // All combinations of SDK runtime and screen densities should be generated.
+    ConfigurationSizes expectedMergedConfigurationSizes =
+        ConfigurationSizes.create(
+            ImmutableMap.of(
+                SizeConfiguration.builder()
+                    .setSdkRuntime("Required")
+                    .setScreenDensity("hdpi")
+                    .setSdkVersion("33-")
+                    .build(),
+                runtimeEnabledMin + hdpiMin,
+                SizeConfiguration.builder()
+                    .setSdkRuntime("Not Required")
+                    .setScreenDensity("hdpi")
+                    .setSdkVersion("21-")
+                    .build(),
+                compatMin + hdpiMin),
+            ImmutableMap.of(
+                SizeConfiguration.builder()
+                    .setSdkRuntime("Required")
+                    .setScreenDensity("hdpi")
+                    .setSdkVersion("33-")
+                    .build(),
+                runtimeEnabledMax + hdpiMax,
+                SizeConfiguration.builder()
+                    .setSdkRuntime("Not Required")
+                    .setScreenDensity("hdpi")
+                    .setSdkVersion("21-")
+                    .build(),
+                compatMax + hdpiMax));
+    assertThat(actualMergedConfigurationSizes.getMinSizeConfigurationMap())
+        .isEqualTo(expectedMergedConfigurationSizes.getMinSizeConfigurationMap());
+    assertThat(actualMergedConfigurationSizes.getMaxSizeConfigurationMap())
+        .isEqualTo(expectedMergedConfigurationSizes.getMaxSizeConfigurationMap());
+  }
 }

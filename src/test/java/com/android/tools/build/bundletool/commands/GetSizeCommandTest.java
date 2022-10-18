@@ -31,11 +31,13 @@ import static com.android.bundle.Targeting.TextureCompressionFormat.TextureCompr
 import static com.android.tools.build.bundletool.commands.GetSizeCommand.SUPPORTED_DIMENSIONS;
 import static com.android.tools.build.bundletool.model.GetSizeRequest.Dimension.ALL;
 import static com.android.tools.build.bundletool.model.utils.CsvFormatter.CRLF;
+import static com.android.tools.build.bundletool.testing.ApkSetUtils.splitApkSet;
 import static com.android.tools.build.bundletool.testing.ApksArchiveHelpers.createApkDescription;
 import static com.android.tools.build.bundletool.testing.ApksArchiveHelpers.createApksArchiveFile;
 import static com.android.tools.build.bundletool.testing.ApksArchiveHelpers.createAssetSliceSet;
 import static com.android.tools.build.bundletool.testing.ApksArchiveHelpers.createInstantApkSet;
 import static com.android.tools.build.bundletool.testing.ApksArchiveHelpers.createMasterApkDescription;
+import static com.android.tools.build.bundletool.testing.ApksArchiveHelpers.createSdkApksArchiveFile;
 import static com.android.tools.build.bundletool.testing.ApksArchiveHelpers.createSplitApkSet;
 import static com.android.tools.build.bundletool.testing.ApksArchiveHelpers.createVariant;
 import static com.android.tools.build.bundletool.testing.ApksArchiveHelpers.splitApkDescription;
@@ -52,6 +54,7 @@ import static com.android.tools.build.bundletool.testing.TargetingUtils.deviceTi
 import static com.android.tools.build.bundletool.testing.TargetingUtils.lPlusVariantTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.mergeApkTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.mergeVariantTargeting;
+import static com.android.tools.build.bundletool.testing.TargetingUtils.sdkRuntimeVariantTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.sdkVersionFrom;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.variantAbiTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.variantDensityTargeting;
@@ -64,6 +67,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.android.bundle.Commands.AssetSliceSet;
 import com.android.bundle.Commands.BuildApksResult;
+import com.android.bundle.Commands.BuildSdkApksResult;
 import com.android.bundle.Commands.DeliveryType;
 import com.android.bundle.Commands.Variant;
 import com.android.bundle.Config.Bundletool;
@@ -84,6 +88,7 @@ import com.android.tools.build.bundletool.model.ZipPath;
 import com.android.tools.build.bundletool.model.exceptions.InvalidCommandException;
 import com.android.tools.build.bundletool.model.exceptions.InvalidDeviceSpecException;
 import com.android.tools.build.bundletool.model.utils.GZipUtils;
+import com.android.tools.build.bundletool.model.utils.Versions;
 import com.android.tools.build.bundletool.model.version.BundleToolVersion;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
@@ -1441,6 +1446,81 @@ public final class GetSizeCommandTest {
         .containsExactly(
             "SDK,DEVICE_TIER,MIN,MAX",
             String.format("%s,%s,%d,%d", "25", "1", 2 * compressedApkSize, 2 * compressedApkSize));
+  }
+
+  @Test
+  public void getSizeTotal_defaultDeviceAndSdkApkSet_match() throws Exception {
+    Variant sdkVariant =
+        standaloneVariant(
+            sdkRuntimeVariantTargeting(),
+            ApkTargeting.getDefaultInstance(),
+            ZipPath.create("standalones/standalone.apk"));
+    BuildSdkApksResult tableOfContentsProto =
+        BuildSdkApksResult.newBuilder()
+            .addVariant(sdkVariant)
+            .setBundletool(Bundletool.newBuilder().setVersion("1.11.0"))
+            .build();
+    Path sdkApks = createSdkApksArchiveFile(tableOfContentsProto, tmpDir.resolve("sdk.apks"));
+    ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+
+    GetSizeCommand.builder()
+        .setGetSizeSubCommand(GetSizeSubcommand.TOTAL)
+        .setApksArchivePath(sdkApks)
+        .setDimensions(ImmutableSet.of(Dimension.SDK_RUNTIME))
+        .build()
+        .getSizeTotal(new PrintStream(outputStream));
+
+    // toString(Charset) not available in Java 8.
+    assertThat(new String(outputStream.toByteArray(), UTF_8).split(CRLF))
+        .asList()
+        .containsExactly(
+            "SDK_RUNTIME,MIN,MAX",
+            String.format("%s,%d,%d", "Required", compressedApkSize, compressedApkSize));
+  }
+
+  @Test
+  public void getSizeTotal_appApkSetWithSdkRuntimeDimension() throws Exception {
+    Variant sdkRuntimeVariant =
+        createVariant(
+            sdkRuntimeVariantTargeting(Versions.ANDROID_T_API_VERSION),
+            splitApkSet(
+                /* moduleName= */ "base",
+                splitApkDescription(
+                    ApkTargeting.getDefaultInstance(), ZipPath.create("runtime.apk"))));
+    Variant nonSdkRuntimeVariant =
+        createVariant(
+            variantSdkTargeting(Versions.ANDROID_L_API_VERSION),
+            splitApkSet(
+                /* moduleName= */ "base",
+                splitApkDescription(ApkTargeting.getDefaultInstance(), ZipPath.create("main.apk"))),
+            splitApkSet(
+                /* moduleName= */ "feature",
+                splitApkDescription(
+                    ApkTargeting.getDefaultInstance(), ZipPath.create("feature.apk"))));
+    BuildApksResult buildApksResult =
+        BuildApksResult.newBuilder()
+            .addAllVariant(ImmutableList.of(sdkRuntimeVariant, nonSdkRuntimeVariant))
+            .setBundletool(Bundletool.newBuilder().setVersion("1.11.0"))
+            .build();
+    Path appApks = createApksArchiveFile(buildApksResult, tmpDir.resolve("app.apks"));
+    ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+
+    GetSizeCommand.builder()
+        .setGetSizeSubCommand(GetSizeSubcommand.TOTAL)
+        .setApksArchivePath(appApks)
+        .setDimensions(ImmutableSet.of(Dimension.SDK_RUNTIME, Dimension.SDK))
+        .build()
+        .getSizeTotal(new PrintStream(outputStream));
+
+    // toString(Charset) not available in Java 8.
+    assertThat(new String(outputStream.toByteArray(), UTF_8).split(CRLF))
+        .asList()
+        .containsExactly(
+            "SDK,SDK_RUNTIME,MIN,MAX",
+            String.format("%s,%s,%d,%d", "33-", "Required", compressedApkSize, compressedApkSize),
+            String.format(
+                "%s,%s,%d,%d",
+                "21-", "Not Required", 2 * compressedApkSize, 2 * compressedApkSize));
   }
 
   /** Copies the testdata resource into the temporary directory. */

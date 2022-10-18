@@ -19,9 +19,8 @@ import static com.android.tools.build.bundletool.model.BundleModule.MANIFEST_FIL
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.Streams.stream;
 
-import com.android.bundle.Config.BundleConfig;
-import com.android.bundle.Config.ResourceOptimizations.SparseEncoding;
 import com.android.tools.build.bundletool.androidtools.Aapt2Command;
+import com.android.tools.build.bundletool.androidtools.Aapt2Command.ConvertOptions;
 import com.android.tools.build.bundletool.model.BundleModule.SpecialModuleEntry;
 import com.android.tools.build.bundletool.model.ModuleEntry;
 import com.android.tools.build.bundletool.model.ModuleSplit;
@@ -46,22 +45,12 @@ import javax.inject.Inject;
 class Aapt2ResourceConverter {
 
   private final Aapt2Command aapt2Command;
-  private final boolean enableSparseEncoding;
   private final ListeningExecutorService executorService;
 
   @Inject
-  Aapt2ResourceConverter(
-      Aapt2Command aapt2Command,
-      ListeningExecutorService executorService,
-      BundleConfig bundleConfig) {
+  Aapt2ResourceConverter(Aapt2Command aapt2Command, ListeningExecutorService executorService) {
     this.aapt2Command = aapt2Command;
     this.executorService = executorService;
-    this.enableSparseEncoding =
-        bundleConfig
-            .getOptimizations()
-            .getResourceOptimizations()
-            .getSparseEncoding()
-            .equals(SparseEncoding.ENFORCED);
   }
 
   /**
@@ -146,14 +135,10 @@ class Aapt2ResourceConverter {
      */
     private Path convertAndOptimizeProtoApk(ModuleSplit split, Path protoApkPath) {
       Path binaryApkPath = filesManager.getNextAapt2BinaryApkPath();
-      if ((enableSparseEncoding || split.getSparseEncoding())
-          && split.getResourceTable().isPresent()) {
-        Path interimApkPath = filesManager.getNextAapt2BinaryApkPath();
-        aapt2Command.convertApkProtoToBinary(protoApkPath, interimApkPath);
-        aapt2Command.optimizeToSparseResourceTables(interimApkPath, binaryApkPath);
-        return binaryApkPath;
-      }
-      aapt2Command.convertApkProtoToBinary(protoApkPath, binaryApkPath);
+      aapt2Command.convertApkProtoToBinary(
+          protoApkPath,
+          binaryApkPath,
+          ConvertOptions.builder().setForceSparseEncoding(split.getSparseEncoding()).build());
       return binaryApkPath;
     }
 

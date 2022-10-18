@@ -15,6 +15,7 @@
  */
 package com.android.tools.build.bundletool.sdkmodule;
 
+import static com.android.tools.build.bundletool.model.utils.ResourcesUtils.isAndroidResourceId;
 import static com.android.tools.build.bundletool.model.utils.ResourcesUtils.remapPackageIdInResourceId;
 import static com.google.common.collect.ImmutableSet.toImmutableSet;
 import static java.util.stream.Collectors.partitioningBy;
@@ -53,11 +54,7 @@ final class XmlPackageIdRemapper {
    * Updates resource IDs in the XML resources of the given module with the {@code newPackageId}.
    */
   BundleModule remap(BundleModule module) {
-    if (!module.getResourceTable().isPresent()) {
-      return module;
-    }
-    ImmutableSet<ZipPath> xmlResourcePaths =
-        ResourcesUtils.getAllProtoXmlFileReferences(module.getResourceTable().get());
+    ImmutableSet<ZipPath> xmlResourcePaths = getXmlResourcePaths(module);
     // Separate XML resource entries from all other entries.
     Map<Boolean, ImmutableSet<ModuleEntry>> partitionedEntries =
         module.getEntries().stream()
@@ -79,6 +76,13 @@ final class XmlPackageIdRemapper {
         .setAndroidManifestProto(newAndroidManifest)
         .setRawEntries(newEntries)
         .build();
+  }
+
+  private static ImmutableSet<ZipPath> getXmlResourcePaths(BundleModule module) {
+    if (module.getResourceTable().isPresent()) {
+      return ResourcesUtils.getAllProtoXmlFileReferences(module.getResourceTable().get());
+    }
+    return ImmutableSet.of();
   }
 
   private ModuleEntry remapInModuleEntry(ModuleEntry moduleEntry) {
@@ -115,7 +119,8 @@ final class XmlPackageIdRemapper {
   }
 
   private void remapInAttribute(XmlAttribute.Builder xmlAttribute) {
-    if (xmlAttribute.getResourceId() > 0) {
+    // Do not change resource IDs of Android framework attributes.
+    if (!isAndroidResourceId(xmlAttribute.getResourceId())) {
       xmlAttribute.setResourceId(
           remapPackageIdInResourceId(xmlAttribute.getResourceId(), newPackageId));
     }
@@ -125,7 +130,8 @@ final class XmlPackageIdRemapper {
   }
 
   private void remapInCompiledItem(Item.Builder compiledItem) {
-    if (compiledItem.getRef().getId() > 0) {
+    // Do not change resource IDs of Android framework resources.
+    if (!isAndroidResourceId(compiledItem.getRef().getId())) {
       compiledItem
           .getRefBuilder()
           .setId(remapPackageIdInResourceId(compiledItem.getRef().getId(), newPackageId));

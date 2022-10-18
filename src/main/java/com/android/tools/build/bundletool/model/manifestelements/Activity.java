@@ -48,7 +48,7 @@ public abstract class Activity {
 
   abstract Optional<String> getName();
 
-  abstract Optional<String> getTheme();
+  abstract Optional<Integer> getTheme();
 
   abstract Optional<Boolean> getExported();
 
@@ -86,7 +86,7 @@ public abstract class Activity {
     if (getTheme().isPresent()) {
       elementBuilder
           .getOrCreateAndroidAttribute(THEME_ATTRIBUTE_NAME, THEME_RESOURCE_ID)
-          .setValueAsString(getTheme().get());
+          .setValueAsRefId(getTheme().get());
     }
   }
 
@@ -126,7 +126,7 @@ public abstract class Activity {
   public abstract static class Builder {
     public abstract Builder setName(String name);
 
-    public abstract Builder setTheme(String theme);
+    public abstract Builder setTheme(int themeResId);
 
     public abstract Builder setExported(boolean exported);
 

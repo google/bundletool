@@ -45,6 +45,7 @@ import com.android.bundle.Devices.DeviceSpec;
 import com.android.bundle.Targeting.AbiTargeting;
 import com.android.bundle.Targeting.LanguageTargeting;
 import com.android.bundle.Targeting.ScreenDensityTargeting;
+import com.android.bundle.Targeting.SdkRuntimeTargeting;
 import com.android.bundle.Targeting.SdkVersionTargeting;
 import com.android.bundle.Targeting.TextureCompressionFormat.TextureCompressionFormatAlias;
 import com.android.bundle.Targeting.TextureCompressionFormatTargeting;
@@ -172,6 +173,16 @@ public class DeviceSpecUtilsTest {
             .build();
 
     assertThat(deviceSpec.getDeviceTier().getValue()).isEqualTo(2);
+  }
+
+  @Test
+  public void deviceSpecFromTargetingBuilder_setSdkRuntime() {
+    DeviceSpec deviceSpec =
+        new DeviceSpecFromTargetingBuilder(DeviceSpec.getDefaultInstance())
+            .setSdkRuntime(SdkRuntimeTargeting.newBuilder().setRequiresSdkRuntime(true).build())
+            .build();
+
+    assertThat(deviceSpec.getSdkRuntime().getSupported()).isTrue();
   }
 
   @Test

@@ -16,8 +16,8 @@
 
 package com.android.tools.build.bundletool.archive;
 
-import static com.android.tools.build.bundletool.archive.ArchivedResourcesUtils.ARCHIVED_ICON_DRAWABLE_NAME;
-import static com.android.tools.build.bundletool.archive.ArchivedResourcesUtils.ARCHIVED_ROUND_ICON_DRAWABLE_NAME;
+import static com.android.tools.build.bundletool.archive.ArchivedResourcesHelper.ARCHIVED_ICON_DRAWABLE_NAME;
+import static com.android.tools.build.bundletool.archive.ArchivedResourcesHelper.ARCHIVED_ROUND_ICON_DRAWABLE_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.ALLOW_BACKUP_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.ANDROID_NAMESPACE_URI;
 import static com.android.tools.build.bundletool.model.AndroidManifest.BACKUP_AGENT_RESOURCE_ID;
@@ -46,8 +46,7 @@ public final class ArchivedAndroidManifestUtils {
 
   public static final String REACTIVATE_ACTIVITY_NAME =
       "com.google.android.archive.ReactivateActivity";
-  public static final String HOLO_LIGHT_NO_ACTION_BAR_THEME =
-      "@android:style/Theme.Holo.Light.NoActionBar";
+  public static final int HOLO_LIGHT_NO_ACTION_BAR_FULSCREEN_THEME_RES_ID = 0x010300f1;
 
   public static final String UPDATE_BROADCAST_RECEIVER_NAME =
       "com.google.android.archive.UpdateBroadcastReceiver";
@@ -169,7 +168,7 @@ public final class ArchivedAndroidManifestUtils {
 
     return Activity.builder()
         .setName(REACTIVATE_ACTIVITY_NAME)
-        .setTheme(HOLO_LIGHT_NO_ACTION_BAR_THEME)
+        .setTheme(HOLO_LIGHT_NO_ACTION_BAR_FULSCREEN_THEME_RES_ID)
         .setExported(true)
         .setExcludeFromRecents(true)
         .setStateNotNeeded(true)

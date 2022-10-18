@@ -36,6 +36,7 @@ import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.with
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withSupportsGlTexture;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withTargetSandboxVersion;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withTargetSdkVersion;
+import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withUsesSdkLibraryElement;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withVersionCode;
 import static com.google.common.truth.Truth.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -1084,5 +1085,28 @@ public class AndroidManifestValidatorTest {
             .build();
 
     new AndroidManifestValidator().validateAllModules(ImmutableList.of(module));
+  }
+
+  @Test
+  public void usesSdkLibraryTagPresent_throws() {
+    BundleModule module =
+        new BundleModuleBuilder(BASE_MODULE_NAME)
+            .setManifest(
+                androidManifest(
+                    PKG_NAME,
+                    withUsesSdkLibraryElement(
+                        "com.test.sdk", /* versionMajor= */ 1, "cert-digest")))
+            .build();
+
+    InvalidBundleException exception =
+        assertThrows(
+            InvalidBundleException.class,
+            () -> new AndroidManifestValidator().validateModule(module));
+    assertThat(exception)
+        .hasMessageThat()
+        .contains(
+            "<uses-sdk-library> element not allowed in the manifest of App Bundle. An App Bundle"
+                + " should depend on a runtime-enabled SDK by specifying its details in the"
+                + " runtime_enabled_sdk_config.pb, not in its manifest.");
   }
 }

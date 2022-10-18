@@ -22,6 +22,7 @@ import static com.android.tools.build.bundletool.model.OptimizationDimension.SCR
 import static com.android.tools.build.bundletool.model.OptimizationDimension.TEXTURE_COMPRESSION_FORMAT;
 import static com.google.common.truth.Truth.assertThat;
 
+import com.android.bundle.Config.UncompressDexFiles.UncompressedDexTargetSdk;
 import com.android.tools.build.bundletool.model.version.Version;
 import com.google.common.collect.ImmutableSet;
 import org.junit.Test;
@@ -69,6 +70,23 @@ public class ApkOptimizationsTest {
                     ImmutableSet.of(ABI, SCREEN_DENSITY, TEXTURE_COMPRESSION_FORMAT, LANGUAGE))
                 .setUncompressNativeLibraries(true)
                 .setStandaloneDimensions(ImmutableSet.of(ABI, SCREEN_DENSITY))
+                .build());
+  }
+
+  @Test
+  public void
+      getDefaultOptimizations_1_11_3_onlySplitsByAbiDensityTextureLanguageAndUncompressNativeLibsUncompressedDex() {
+    ApkOptimizations defaultOptimizations =
+        ApkOptimizations.getDefaultOptimizationsForVersion(Version.of("1.11.3"));
+    assertThat(defaultOptimizations)
+        .isEqualTo(
+            ApkOptimizations.builder()
+                .setSplitDimensions(
+                    ImmutableSet.of(ABI, SCREEN_DENSITY, TEXTURE_COMPRESSION_FORMAT, LANGUAGE))
+                .setUncompressNativeLibraries(true)
+                .setStandaloneDimensions(ImmutableSet.of(ABI, SCREEN_DENSITY))
+                .setUncompressDexFiles(true)
+                .setUncompressedDexTargetSdk(UncompressedDexTargetSdk.SDK_31)
                 .build());
   }
 

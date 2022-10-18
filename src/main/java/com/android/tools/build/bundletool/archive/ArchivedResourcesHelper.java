@@ -18,23 +18,34 @@ package com.android.tools.build.bundletool.archive;
 
 import static com.android.tools.build.bundletool.model.AndroidManifest.ANDROID_NAMESPACE_URI;
 import static com.android.tools.build.bundletool.model.AndroidManifest.DRAWABLE_RESOURCE_ID;
+import static com.google.common.base.Preconditions.checkState;
+import static com.google.common.collect.ImmutableList.toImmutableList;
+import static java.util.Comparator.reverseOrder;
 
+import com.android.tools.build.bundletool.io.ResourceReader;
+import com.android.tools.build.bundletool.model.AppBundle;
 import com.android.tools.build.bundletool.model.BundleModule;
 import com.android.tools.build.bundletool.model.ResourceInjector;
 import com.android.tools.build.bundletool.model.ZipPath;
+import com.android.tools.build.bundletool.model.exceptions.InvalidBundleException;
 import com.android.tools.build.bundletool.model.utils.xmlproto.XmlProtoAttribute;
 import com.android.tools.build.bundletool.model.utils.xmlproto.XmlProtoAttributeBuilder;
 import com.android.tools.build.bundletool.model.utils.xmlproto.XmlProtoElementBuilder;
 import com.android.tools.build.bundletool.model.utils.xmlproto.XmlProtoNode;
+import com.android.tools.build.bundletool.model.version.BundleToolVersion;
+import com.android.tools.build.bundletool.model.version.Version;
+import com.android.tools.build.bundletool.transparency.BundleTransparencyCheckUtils;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.io.ByteSource;
-import com.google.common.io.ByteStreams;
 import java.io.IOException;
-import java.io.InputStream;
+import java.net.URISyntaxException;
+import java.nio.file.Path;
 import java.util.Optional;
+import java.util.logging.Logger;
 
-/** Utility methods for managing extra resources for archived apps. */
-public final class ArchivedResourcesUtils {
+/** Helper methods for managing extra resources for archived apps. */
+public final class ArchivedResourcesHelper {
   public static final String APP_STORE_PACKAGE_NAME_RESOURCE_NAME =
       "reactivation_app_store_package_name";
   public static final String PLAY_STORE_PACKAGE_NAME = "com.android.vending";
@@ -46,10 +57,84 @@ public final class ArchivedResourcesUtils {
       "com_android_vending_archive_application_icon";
   public static final String ARCHIVED_ROUND_ICON_DRAWABLE_NAME =
       "com_android_vending_archive_application_round_icon";
+  public static final String ARCHIVED_SPLASH_SCREEN_LAYOUT_NAME =
+      "com_android_vending_archive_splash_screen_layout";
 
-  public static final String ARCHIVED_CLASSES_DEX_PATH = "dex/classes.dex";
-  public static final String CLOUD_SYMBOL_PATH = "drawable/cloud_symbol_xml.pb";
-  public static final String OPACITY_LAYER_PATH = "drawable/opacity_layer_xml.pb";
+  public static final String ARCHIVED_CLASSES_DEX_PATH_PREFIX =
+      "/com/android/tools/build/bundletool/archive/dex";
+  private static final String ARCHIVED_CLASSES_DEX_PATH_SUFFIX = "classes.dex";
+  public static final String DEFAULT_ARCHIVED_CLASSES_DEX_PATH =
+      getArchivedClassesDexPath(Version.of("1.8.2"));
+  public static final String CLOUD_SYMBOL_PATH =
+      "/com/android/tools/build/bundletool/archive/drawable/cloud_symbol_xml.pb";
+  public static final String OPACITY_LAYER_PATH =
+      "/com/android/tools/build/bundletool/archive/drawable/opacity_layer_xml.pb";
+
+  private static final Logger logger = Logger.getLogger(ArchivedResourcesHelper.class.getName());
+  private final ResourceReader resourceReader;
+
+  public ArchivedResourcesHelper(ResourceReader resourceReader) {
+    this.resourceReader = resourceReader;
+  }
+
+  /**
+   * Returns a path to the appropriate DEX file for {@link AppBundle}
+   *
+   * @throws IOException if an error occurs during reading resources from {@value
+   *     #ARCHIVED_CLASSES_DEX_PATH_PREFIX} path
+   */
+  public String getArchivedClassesDexPath(AppBundle bundle) throws IOException {
+    Version bundleToolVersion =
+        BundleToolVersion.getVersionFromBundleConfig(bundle.getBundleConfig());
+    boolean transparencyEnabled = BundleTransparencyCheckUtils.isTransparencyEnabled(bundle);
+    return getArchivedClassesDexPath(bundleToolVersion, transparencyEnabled);
+  }
+
+  private String getArchivedClassesDexPath(Version bundleToolVersion, boolean transparencyEnabled)
+      throws IOException {
+    try {
+      ImmutableList<Path> allResources =
+          resourceReader.listResourceFilesInFolder(
+              ArchivedResourcesHelper.ARCHIVED_CLASSES_DEX_PATH_PREFIX);
+      ImmutableList<Version> availableVersions =
+          allResources.stream()
+              .map(dir -> dir.getFileName().toString().replace('_', '.'))
+              .map(Version::of)
+              .sorted(reverseOrder())
+              .collect(toImmutableList());
+      checkState(!availableVersions.isEmpty(), "Archived DEXes are not present in bundletool JAR.");
+
+      Optional<Version> resultVersion;
+
+      if (transparencyEnabled) {
+        resultVersion =
+            availableVersions.stream()
+                .filter(version -> version.compareTo(bundleToolVersion) <= 0)
+                .findFirst();
+      } else {
+        resultVersion = Optional.of(availableVersions.get(0));
+      }
+
+      checkState(
+          resultVersion.isPresent(),
+          "Not found the appropriate version of DEX file for bundletool version: %s",
+          bundleToolVersion.toString());
+      return getArchivedClassesDexPath(resultVersion.get());
+    } catch (URISyntaxException e) {
+      logger.warning("Exception occurred while finding the right archived classes.dex file: " + e);
+      throw InvalidBundleException.builder()
+          .withUserMessage("Failed to find a DEX file for an archived APK")
+          .build();
+    }
+  }
+
+  public static String getArchivedClassesDexPath(Version version) {
+    return String.format(
+        "%s/%s/%s",
+        ARCHIVED_CLASSES_DEX_PATH_PREFIX,
+        version.toString().replace('.', '_'),
+        ARCHIVED_CLASSES_DEX_PATH_SUFFIX);
+  }
 
   public static ImmutableMap<String, Integer> injectExtraResources(
       ResourceInjector resourceInjector,
@@ -84,16 +169,27 @@ public final class ArchivedResourcesUtils {
                             .toString())
                     .getFullResourceId());
     iconAttribute.ifPresent(
-        attribute ->
-            resourceNameToIdMapBuilder.put(
-                ARCHIVED_ICON_DRAWABLE_NAME,
-                resourceInjector
-                    .addXmlDrawableResource(
-                        ARCHIVED_ICON_DRAWABLE_NAME,
-                        BundleModule.DRAWABLE_RESOURCE_DIRECTORY
-                            .resolve(String.format("%s.xml", ARCHIVED_ICON_DRAWABLE_NAME))
-                            .toString())
-                    .getFullResourceId()));
+        attribute -> {
+          resourceNameToIdMapBuilder.put(
+              ARCHIVED_ICON_DRAWABLE_NAME,
+              resourceInjector
+                  .addXmlDrawableResource(
+                      ARCHIVED_ICON_DRAWABLE_NAME,
+                      BundleModule.DRAWABLE_RESOURCE_DIRECTORY
+                          .resolve(String.format("%s.xml", ARCHIVED_ICON_DRAWABLE_NAME))
+                          .toString())
+                  .getFullResourceId());
+          resourceNameToIdMapBuilder.put(
+              ARCHIVED_SPLASH_SCREEN_LAYOUT_NAME,
+              resourceInjector
+                  .addLayoutResource(
+                      ARCHIVED_SPLASH_SCREEN_LAYOUT_NAME,
+                      BundleModule.RESOURCES_DIRECTORY
+                          .resolve(
+                              String.format("layout/%s.xml", ARCHIVED_SPLASH_SCREEN_LAYOUT_NAME))
+                          .toString())
+                  .getFullResourceId());
+        });
     roundIconAttribute.ifPresent(
         attribute ->
             resourceNameToIdMapBuilder.put(
@@ -105,28 +201,30 @@ public final class ArchivedResourcesUtils {
                             .resolve(String.format("%s.xml", ARCHIVED_ROUND_ICON_DRAWABLE_NAME))
                             .toString())
                     .getFullResourceId()));
+
     return resourceNameToIdMapBuilder.build();
   }
 
-  public static ImmutableMap<ZipPath, ByteSource> buildAdditionalResourcesByByteSourceMap(
+  public ImmutableMap<ZipPath, ByteSource> buildAdditionalResourcesByByteSourceMap(
       int cloudResourceId,
       int opacityLayerResourceId,
       Optional<XmlProtoAttribute> iconAttribute,
-      Optional<XmlProtoAttribute> roundIconAttribute)
+      Optional<XmlProtoAttribute> roundIconAttribute,
+      String archivedClassesDexPath)
       throws IOException {
     ImmutableMap.Builder<ZipPath, ByteSource> additionalResourcesByDestinationPathBuilder =
         new ImmutableMap.Builder<ZipPath, ByteSource>()
             .put(
                 BundleModule.DEX_DIRECTORY.resolve("classes.dex"),
-                getResourceByteSource(ARCHIVED_CLASSES_DEX_PATH))
+                resourceReader.getResourceByteSource(archivedClassesDexPath))
             .put(
                 BundleModule.DRAWABLE_RESOURCE_DIRECTORY.resolve(
                     String.format("%s.xml", OPACITY_LAYER_DRAWABLE_NAME)),
-                getResourceByteSource(OPACITY_LAYER_PATH))
+                resourceReader.getResourceByteSource(OPACITY_LAYER_PATH))
             .put(
                 BundleModule.DRAWABLE_RESOURCE_DIRECTORY.resolve(
                     String.format("%s.xml", CLOUD_SYMBOL_DRAWABLE_NAME)),
-                getResourceByteSource(CLOUD_SYMBOL_PATH));
+                resourceReader.getResourceByteSource(CLOUD_SYMBOL_PATH));
     if (iconAttribute.isPresent()) {
       additionalResourcesByDestinationPathBuilder.put(
           BundleModule.DRAWABLE_RESOURCE_DIRECTORY.resolve(
@@ -151,6 +249,18 @@ public final class ArchivedResourcesUtils {
                   .getProto()
                   .toByteArray()));
     }
+
+    if (roundIconAttribute.isPresent() || iconAttribute.isPresent()) {
+      int iconResId =
+          iconAttribute.isPresent()
+              ? iconAttribute.get().getValueAsRefId()
+              : roundIconAttribute.get().getValueAsRefId();
+      XmlProtoNode node = buildFrameLayoutXmlNode(iconResId);
+      additionalResourcesByDestinationPathBuilder.put(
+          BundleModule.RESOURCES_DIRECTORY.resolve(
+              String.format("layout/%s.xml", ARCHIVED_SPLASH_SCREEN_LAYOUT_NAME)),
+          ByteSource.wrap(node.getProto().toByteArray()));
+    }
     return additionalResourcesByDestinationPathBuilder.build();
   }
 
@@ -171,22 +281,26 @@ public final class ArchivedResourcesUtils {
             .build());
   }
 
+  private static XmlProtoNode buildFrameLayoutXmlNode(int imageResId) {
+    // These attributes were carried over from the splashscreen SDK implementation.
+    return XmlProtoNode.createElementNode(
+        ArchivedSplashScreenLayout.builder()
+            .setLayoutWidth(ArchivedSplashScreenLayout.MATCH_PARENT)
+            .setLayoutHeight(ArchivedSplashScreenLayout.MATCH_PARENT)
+            .setAnimateLayoutChanges(false)
+            .setFitsSystemWindows(false)
+            .setImageResourceId(imageResId)
+            .build()
+            .asXmlProtoElement());
+  }
+
   private static XmlProtoAttributeBuilder createDrawableAttribute(int referenceId) {
     return XmlProtoAttributeBuilder.create("drawable")
         .setResourceId(DRAWABLE_RESOURCE_ID)
         .setValueAsRefId(referenceId);
   }
 
-  static ByteSource getResourceByteSource(String resourcePath) throws IOException {
-    try (InputStream fileContentStream =
-        ArchivedApksGenerator.class.getResourceAsStream(resourcePath)) {
-      return ByteSource.wrap(ByteStreams.toByteArray(fileContentStream));
-    }
-  }
-
-  static String getAppStorePackageName(Optional<String> customAppStorePackageName) {
+  public static String getAppStorePackageName(Optional<String> customAppStorePackageName) {
     return customAppStorePackageName.orElse(PLAY_STORE_PACKAGE_NAME);
   }
-
-  private ArchivedResourcesUtils() {}
 }

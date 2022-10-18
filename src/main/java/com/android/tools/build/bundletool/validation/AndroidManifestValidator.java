@@ -217,6 +217,7 @@ public class AndroidManifestValidator extends SubValidator {
     validateMinSdkCondition(module);
     validateNoConditionalTargetingInAssetModules(module);
     validateInstantAndPersistentDeliveryCombinationsForAssetModules(module);
+    validateNoUsesSdkLibraryTags(module);
   }
 
   private static void validateInstant(ImmutableList<BundleModule> modules) {
@@ -460,6 +461,18 @@ public class AndroidManifestValidator extends SubValidator {
       throw InvalidBundleException.builder()
           .withUserMessage(
               "Instant delivery cannot be install-time (module '%s').", module.getName())
+          .build();
+    }
+  }
+
+  private static void validateNoUsesSdkLibraryTags(BundleModule module) {
+    if (module.getAndroidManifest().hasApplicationElement()
+        && !module.getAndroidManifest().getUsesSdkLibraryElements().isEmpty()) {
+      throw InvalidBundleException.builder()
+          .withUserMessage(
+              "<uses-sdk-library> element not allowed in the manifest of App Bundle. An App Bundle"
+                  + " should depend on a runtime-enabled SDK by specifying its details in the"
+                  + " runtime_enabled_sdk_config.pb, not in its manifest.")
           .build();
     }
   }

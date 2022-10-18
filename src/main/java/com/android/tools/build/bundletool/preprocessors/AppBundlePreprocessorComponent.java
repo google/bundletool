@@ -17,6 +17,8 @@ package com.android.tools.build.bundletool.preprocessors;
 
 import com.android.tools.build.bundletool.commands.BuildApksCommand;
 import com.android.tools.build.bundletool.commands.CommandScoped;
+import com.android.tools.build.bundletool.model.BundleModule;
+import com.google.common.collect.ImmutableMap;
 import dagger.BindsInstance;
 import dagger.Component;
 
@@ -33,5 +35,8 @@ public interface AppBundlePreprocessorComponent {
 
     @BindsInstance
     Builder setBuildApksCommand(BuildApksCommand command);
+
+    @BindsInstance
+    Builder setSdkBundleModules(ImmutableMap<String, BundleModule> sdkBundleModules);
   }
 }

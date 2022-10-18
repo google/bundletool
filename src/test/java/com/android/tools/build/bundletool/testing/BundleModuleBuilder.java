@@ -25,6 +25,7 @@ import com.android.bundle.Files.ApexImages;
 import com.android.bundle.Files.Assets;
 import com.android.bundle.Files.NativeLibraries;
 import com.android.bundle.RuntimeEnabledSdkConfigProto.RuntimeEnabledSdkConfig;
+import com.android.bundle.SdkModulesConfigOuterClass.SdkModulesConfig;
 import com.android.tools.build.bundletool.model.BundleModule;
 import com.android.tools.build.bundletool.model.BundleModule.ModuleType;
 import com.android.tools.build.bundletool.model.BundleModuleName;
@@ -37,6 +38,7 @@ import com.android.tools.build.bundletool.model.version.BundleToolVersion;
 import com.android.tools.build.bundletool.model.version.Version;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.io.ByteSource;
+import com.google.errorprone.annotations.CanIgnoreReturnValue;
 import java.nio.file.Path;
 import java.util.Optional;
 
@@ -52,6 +54,8 @@ public class BundleModuleBuilder {
   private XmlNode androidManifest = null;
 
   private Optional<ModuleType> moduleTypeOptional = Optional.empty();
+
+  private Optional<SdkModulesConfig> sdkModulesConfigOptional = Optional.empty();
 
   public BundleModuleBuilder(String moduleName) {
     checkNotNull(moduleName);
@@ -141,6 +145,12 @@ public class BundleModuleBuilder {
     return this;
   }
 
+  @CanIgnoreReturnValue
+  public BundleModuleBuilder setSdkModulesConfig(SdkModulesConfig sdkModulesConfig) {
+    this.sdkModulesConfigOptional = Optional.of(sdkModulesConfig);
+    return this;
+  }
+
   public BundleModuleBuilder setManifest(XmlNode androidManifest) {
     this.androidManifest = androidManifest;
     return this;
@@ -176,6 +186,7 @@ public class BundleModuleBuilder {
             .setBundleType(bundleConfig.getType())
             .setBundletoolVersion(BundleToolVersion.getCurrentVersion());
     moduleTypeOptional.ifPresent(bundleModuleBuilder::setModuleType);
+    sdkModulesConfigOptional.ifPresent(bundleModuleBuilder::setSdkModulesConfig);
 
     if (!bundleConfig.getBundletool().getVersion().isEmpty()) {
       bundleModuleBuilder.setBundletoolVersion(

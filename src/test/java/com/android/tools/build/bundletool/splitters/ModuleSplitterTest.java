@@ -25,6 +25,7 @@ import static com.android.tools.build.bundletool.model.AndroidManifest.APPLICATI
 import static com.android.tools.build.bundletool.model.AndroidManifest.NAME_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.PERMISSION_ELEMENT_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.PROPERTY_ELEMENT_NAME;
+import static com.android.tools.build.bundletool.model.AndroidManifest.SDK_SANDBOX_MIN_VERSION;
 import static com.android.tools.build.bundletool.model.AndroidManifest.SPLIT_NAME_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.ManifestMutator.withExtractNativeLibs;
 import static com.android.tools.build.bundletool.model.OptimizationDimension.ABI;
@@ -2255,6 +2256,7 @@ public class ModuleSplitterTest {
             .setManifest(
                 androidManifest(
                     "com.test.app",
+                    withMinSdkVersion(SDK_SANDBOX_MIN_VERSION),
                     withRequiredByPrivacySandboxElement(
                         PERMISSION_ELEMENT_NAME, /* requiredByPrivacySandboxSdkValue= */ true),
                     withRequiredByPrivacySandboxElement(
@@ -2278,6 +2280,7 @@ public class ModuleSplitterTest {
         .isEqualTo(
             androidManifest(
                 "com.test.app",
+                withMinSdkVersion(SDK_SANDBOX_MIN_VERSION),
                 withUsesSdkLibraryElement(
                     "com.test.sdk",
                     encodeSdkMajorAndMinorVersion(/* versionMajor= */ 1, /* versionMinor= */ 2),
@@ -2353,6 +2356,29 @@ public class ModuleSplitterTest {
     assertThat(splits).hasSize(1);
     assertThat(splits.get(0).getAndroidManifest().getManifestRoot().getProto())
         .isEqualTo(androidManifest);
+  }
+
+  @Test
+  public void sdkRuntimeVariant_overridesMinSdkVersion() {
+    BundleModule testModule =
+        new BundleModuleBuilder("base")
+            .setManifest(androidManifest("com.test.app", withMinSdkVersion(ANDROID_L_API_VERSION)))
+            .build();
+    AppBundle appBundle = new AppBundleBuilder().addModule(testModule).build();
+    ModuleSplitter moduleSplitter =
+        ModuleSplitter.createNoStamp(
+            testModule,
+            BUNDLETOOL_VERSION,
+            appBundle,
+            ApkGenerationConfiguration.getDefaultInstance(),
+            sdkRuntimeVariantTargeting(),
+            ImmutableSet.of("base"));
+
+    ImmutableList<ModuleSplit> splits = moduleSplitter.splitModule();
+
+    assertThat(splits).hasSize(1);
+    assertThat(splits.get(0).getAndroidManifest().getManifestRoot().getProto())
+        .isEqualTo(androidManifest("com.test.app", withMinSdkVersion(SDK_SANDBOX_MIN_VERSION)));
   }
 
   private ModuleSplit checkAndReturnTheOnlyMasterSplit(List<ModuleSplit> splits) {

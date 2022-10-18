@@ -17,6 +17,7 @@
 package com.android.tools.build.bundletool.androidtools;
 
 import com.android.tools.build.bundletool.androidtools.CommandExecutor.CommandOptions;
+import com.google.auto.value.AutoValue;
 import com.google.common.collect.ImmutableList;
 import java.nio.file.Path;
 import java.time.Duration;
@@ -24,7 +25,7 @@ import java.time.Duration;
 /** Exposes aapt2 commands used by Bundle Tool. */
 public interface Aapt2Command {
 
-  void convertApkProtoToBinary(Path protoApk, Path binaryApk);
+  void convertApkProtoToBinary(Path protoApk, Path binaryApk, ConvertOptions convertOptions);
 
   void optimizeToSparseResourceTables(Path originalApk, Path outputApk);
 
@@ -38,19 +39,20 @@ public interface Aapt2Command {
       private final Duration timeoutMillis = Duration.ofMinutes(5);
 
       @Override
-      public void convertApkProtoToBinary(Path protoApk, Path binaryApk) {
-        ImmutableList<String> convertCommand =
-            ImmutableList.of(
-                aapt2Path.toString(),
-                "convert",
-                "--output-format",
-                "binary",
-                "-o",
-                binaryApk.toString(),
-                protoApk.toString());
+      public void convertApkProtoToBinary(
+          Path protoApk, Path binaryApk, ConvertOptions convertOptions) {
+        ImmutableList.Builder<String> convertCommand =
+            ImmutableList.<String>builder().add(aapt2Path.toString()).add("convert");
+        convertCommand
+            .add("--output-format")
+            .add("binary")
+            .add("-o")
+            .add(binaryApk.toString())
+            .add(protoApk.toString());
 
         new DefaultCommandExecutor()
-            .execute(convertCommand, CommandOptions.builder().setTimeout(timeoutMillis).build());
+            .execute(
+                convertCommand.build(), CommandOptions.builder().setTimeout(timeoutMillis).build());
       }
 
       @Override
@@ -76,5 +78,23 @@ public interface Aapt2Command {
                 CommandOptions.builder().setTimeout(timeoutMillis).build());
       }
     };
+  }
+
+  /** Options for 'aapt2 convert' command. */
+  @AutoValue
+  abstract class ConvertOptions {
+    public abstract boolean getForceSparseEncoding();
+
+    public static Builder builder() {
+      return new AutoValue_Aapt2Command_ConvertOptions.Builder().setForceSparseEncoding(false);
+    }
+
+    /** Builder for {@link ConvertOptions}. */
+    @AutoValue.Builder
+    public abstract static class Builder {
+      public abstract Builder setForceSparseEncoding(boolean value);
+
+      public abstract ConvertOptions build();
+    }
   }
 }

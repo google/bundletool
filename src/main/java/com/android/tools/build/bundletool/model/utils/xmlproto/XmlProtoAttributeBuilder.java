@@ -24,6 +24,7 @@ import com.android.aapt.Resources.Item;
 import com.android.aapt.Resources.Primitive;
 import com.android.aapt.Resources.Reference;
 import com.android.aapt.Resources.XmlAttribute;
+import com.google.errorprone.annotations.CanIgnoreReturnValue;
 
 /** Wrapper around the {@link XmlAttribute.Builder} proto, providing a fluent API. */
 public final class XmlProtoAttributeBuilder
@@ -101,6 +102,14 @@ public final class XmlProtoAttributeBuilder
     attribute.setValue(value);
     attribute.setCompiledItem(
         Item.newBuilder().setStr(Resources.String.newBuilder().setValue(value)));
+    return this;
+  }
+
+  @CanIgnoreReturnValue
+  public XmlProtoAttributeBuilder setValueAsDimension(int value) {
+    attribute.setValue(String.valueOf(value));
+    attribute.setCompiledItem(
+        Item.newBuilder().setPrim(Primitive.newBuilder().setDimensionValue(value)));
     return this;
   }
 

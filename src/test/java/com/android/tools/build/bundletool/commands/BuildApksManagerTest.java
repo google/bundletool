@@ -204,6 +204,7 @@ import com.android.tools.build.bundletool.testing.AppBundleBuilder;
 import com.android.tools.build.bundletool.testing.BundleConfigBuilder;
 import com.android.tools.build.bundletool.testing.BundleModuleBuilder;
 import com.android.tools.build.bundletool.testing.CertificateFactory;
+import com.android.tools.build.bundletool.testing.CodeRelatedFileBuilderHelper;
 import com.android.tools.build.bundletool.testing.FakeAdbServer;
 import com.android.tools.build.bundletool.testing.FileUtils;
 import com.android.tools.build.bundletool.testing.ResourceTableBuilder;
@@ -2094,26 +2095,28 @@ public class BuildApksManagerTest {
     ZipFile apkSetFile = openZipFile(outputFilePath.toFile());
     BuildApksResult result = extractTocFromApkSetFile(apkSetFile, outputDir);
 
-    assertThat(splitApkVariants(result)).hasSize(1);
-    Variant splitApkVariant = splitApkVariants(result).get(0);
-    ImmutableMap<String, ApkSet> splitApkSetByModuleName =
-        Maps.uniqueIndex(
-            splitApkVariant.getApkSetList(), apkSet -> apkSet.getModuleMetadata().getName());
-    assertThat(splitApkSetByModuleName).hasSize(2);
+    assertThat(splitApkVariants(result)).hasSize(2);
+    ImmutableList<Variant> splitApkVariants = splitApkVariants(result);
+    for (Variant splitApkVariant : splitApkVariants) {
+      ImmutableMap<String, ApkSet> splitApkSetByModuleName =
+          Maps.uniqueIndex(
+              splitApkVariant.getApkSetList(), apkSet -> apkSet.getModuleMetadata().getName());
+      assertThat(splitApkSetByModuleName).hasSize(2);
 
-    ApkSet baseSplits = splitApkSetByModuleName.get("base");
-    assertThat(baseSplits.getModuleMetadata().getName()).isEqualTo("base");
-    assertThat(baseSplits.getModuleMetadata().getDeliveryType())
-        .isEqualTo(DeliveryType.INSTALL_TIME);
-    assertThat(baseSplits.getApkDescriptionList()).hasSize(1);
-    assertThat(apkSetFile).hasFile(baseSplits.getApkDescription(0).getPath());
+      ApkSet baseSplits = splitApkSetByModuleName.get("base");
+      assertThat(baseSplits.getModuleMetadata().getName()).isEqualTo("base");
+      assertThat(baseSplits.getModuleMetadata().getDeliveryType())
+          .isEqualTo(DeliveryType.INSTALL_TIME);
+      assertThat(baseSplits.getApkDescriptionList()).hasSize(1);
+      assertThat(apkSetFile).hasFile(baseSplits.getApkDescription(0).getPath());
 
-    ApkSet onDemandSplits = splitApkSetByModuleName.get("onDemand");
-    assertThat(onDemandSplits.getModuleMetadata().getName()).isEqualTo("onDemand");
-    assertThat(onDemandSplits.getModuleMetadata().getDeliveryType())
-        .isEqualTo(DeliveryType.ON_DEMAND);
-    assertThat(onDemandSplits.getApkDescriptionList()).hasSize(1);
-    assertThat(apkSetFile).hasFile(onDemandSplits.getApkDescription(0).getPath());
+      ApkSet onDemandSplits = splitApkSetByModuleName.get("onDemand");
+      assertThat(onDemandSplits.getModuleMetadata().getName()).isEqualTo("onDemand");
+      assertThat(onDemandSplits.getModuleMetadata().getDeliveryType())
+          .isEqualTo(DeliveryType.ON_DEMAND);
+      assertThat(onDemandSplits.getApkDescriptionList()).hasSize(1);
+      assertThat(apkSetFile).hasFile(onDemandSplits.getApkDescription(0).getPath());
+    }
   }
 
   @Test
@@ -2134,11 +2137,16 @@ public class BuildApksManagerTest {
     ZipFile apkSetFile = openZipFile(outputFilePath.toFile());
     BuildApksResult result = extractTocFromApkSetFile(apkSetFile, outputDir);
 
-    assertThat(splitApkVariants(result)).hasSize(1);
-    Variant variant = splitApkVariants(result).get(0);
-    assertThat(variant.hasTargeting()).isTrue();
-    assertThat(variant.getTargeting().getSdkVersionTargeting().getValueList())
-        .containsExactly(L_SDK_VERSION);
+    assertThat(splitApkVariants(result)).hasSize(2);
+    ImmutableList<Variant> variants = splitApkVariants(result);
+    variants.forEach(variant -> assertThat(variant.hasTargeting()).isTrue());
+    assertThat(
+            variants.stream()
+                .flatMap(
+                    variant ->
+                        variant.getTargeting().getSdkVersionTargeting().getValueList().stream())
+                .collect(toImmutableList()))
+        .containsExactly(L_SDK_VERSION, S_SDK_VERSION);
   }
 
   @Test
@@ -2165,11 +2173,16 @@ public class BuildApksManagerTest {
     ZipFile apkSetFile = openZipFile(outputFilePath.toFile());
     BuildApksResult result = extractTocFromApkSetFile(apkSetFile, outputDir);
 
-    assertThat(splitApkVariants(result)).hasSize(1);
-    Variant variant = splitApkVariants(result).get(0);
-    assertThat(variant.hasTargeting()).isTrue();
-    assertThat(variant.getTargeting().getSdkVersionTargeting().getValueList())
-        .containsExactly(sdkVersionFrom(25));
+    assertThat(splitApkVariants(result)).hasSize(2);
+    ImmutableList<Variant> variants = splitApkVariants(result);
+    variants.forEach(variant -> assertThat(variant.hasTargeting()).isTrue());
+    assertThat(
+            variants.stream()
+                .flatMap(
+                    variant ->
+                        variant.getTargeting().getSdkVersionTargeting().getValueList().stream())
+                .collect(toImmutableList()))
+        .containsExactly(sdkVersionFrom(25), S_SDK_VERSION);
   }
 
   /** This test verifies uncompressed native libraries variant is not generated if not necessary. */
@@ -2344,9 +2357,14 @@ public class BuildApksManagerTest {
 
     ImmutableList<Variant> splitApkVariants = splitApkVariants(result);
 
-    assertThat(splitApkVariants).hasSize(1);
-    assertThat(splitApkVariants.get(0).getTargeting().getSdkVersionTargeting())
-        .isEqualTo(sdkVersionTargeting(L_SDK_VERSION, ImmutableSet.of(LOWEST_SDK_VERSION)));
+    assertThat(splitApkVariants).hasSize(2);
+    assertThat(
+            splitApkVariants.stream()
+                .map(variant -> variant.getTargeting().getSdkVersionTargeting())
+                .collect(toImmutableList()))
+        .containsExactly(
+            sdkVersionTargeting(L_SDK_VERSION, ImmutableSet.of(LOWEST_SDK_VERSION, S_SDK_VERSION)),
+            sdkVersionTargeting(S_SDK_VERSION, ImmutableSet.of(LOWEST_SDK_VERSION, L_SDK_VERSION)));
   }
 
   @Test
@@ -2380,8 +2398,12 @@ public class BuildApksManagerTest {
             splitApkVariants.stream()
                 .map(variant -> variant.getTargeting().getSdkVersionTargeting()))
         .containsExactly(
-            sdkVersionTargeting(L_SDK_VERSION, ImmutableSet.of(LOWEST_SDK_VERSION, M_SDK_VERSION)),
-            sdkVersionTargeting(M_SDK_VERSION, ImmutableSet.of(LOWEST_SDK_VERSION, L_SDK_VERSION)));
+            sdkVersionTargeting(
+                L_SDK_VERSION, ImmutableSet.of(LOWEST_SDK_VERSION, M_SDK_VERSION, S_SDK_VERSION)),
+            sdkVersionTargeting(
+                M_SDK_VERSION, ImmutableSet.of(LOWEST_SDK_VERSION, L_SDK_VERSION, S_SDK_VERSION)),
+            sdkVersionTargeting(
+                S_SDK_VERSION, ImmutableSet.of(LOWEST_SDK_VERSION, L_SDK_VERSION, M_SDK_VERSION)));
   }
 
   @Test
@@ -2448,8 +2470,12 @@ public class BuildApksManagerTest {
             splitApkVariants.stream()
                 .map(variant -> variant.getTargeting().getSdkVersionTargeting()))
         .containsExactly(
-            sdkVersionTargeting(L_SDK_VERSION, ImmutableSet.of(LOWEST_SDK_VERSION, N_SDK_VERSION)),
-            sdkVersionTargeting(N_SDK_VERSION, ImmutableSet.of(LOWEST_SDK_VERSION, L_SDK_VERSION)));
+            sdkVersionTargeting(
+                L_SDK_VERSION, ImmutableSet.of(LOWEST_SDK_VERSION, N_SDK_VERSION, S_SDK_VERSION)),
+            sdkVersionTargeting(
+                N_SDK_VERSION, ImmutableSet.of(LOWEST_SDK_VERSION, L_SDK_VERSION, S_SDK_VERSION)),
+            sdkVersionTargeting(
+                S_SDK_VERSION, ImmutableSet.of(LOWEST_SDK_VERSION, L_SDK_VERSION, N_SDK_VERSION)));
     VariantProperties expectedVariantProperties =
         VariantProperties.newBuilder().setUncompressedNativeLibraries(true).build();
     assertThat(
@@ -2499,8 +2525,12 @@ public class BuildApksManagerTest {
             splitApkVariants.stream()
                 .map(variant -> variant.getTargeting().getSdkVersionTargeting()))
         .containsExactly(
-            sdkVersionTargeting(L_SDK_VERSION, ImmutableSet.of(LOWEST_SDK_VERSION, P_SDK_VERSION)),
-            sdkVersionTargeting(P_SDK_VERSION, ImmutableSet.of(LOWEST_SDK_VERSION, L_SDK_VERSION)));
+            sdkVersionTargeting(
+                L_SDK_VERSION, ImmutableSet.of(LOWEST_SDK_VERSION, P_SDK_VERSION, S_SDK_VERSION)),
+            sdkVersionTargeting(
+                P_SDK_VERSION, ImmutableSet.of(LOWEST_SDK_VERSION, L_SDK_VERSION, S_SDK_VERSION)),
+            sdkVersionTargeting(
+                S_SDK_VERSION, ImmutableSet.of(LOWEST_SDK_VERSION, L_SDK_VERSION, P_SDK_VERSION)));
   }
 
   @Test
@@ -2606,6 +2636,45 @@ public class BuildApksManagerTest {
             splitApkVariants.stream()
                 .map(variant -> variant.getTargeting().getSdkVersionTargeting()))
         .containsExactly(sdkVersionTargeting(L_SDK_VERSION, ImmutableSet.of(LOWEST_SDK_VERSION)));
+  }
+
+  @Test
+  public void dexCompressionIsNotSet_enabledByDefault() throws Exception {
+    AppBundle appBundle =
+        new AppBundleBuilder()
+            .addModule(
+                "base",
+                builder ->
+                    builder.addFile("dex/classes.dex").setManifest(androidManifest("com.test.app")))
+            .setBundleConfig(BundleConfig.getDefaultInstance())
+            .build();
+    TestComponent.useTestModule(
+        this,
+        createTestModuleBuilder().withAppBundle(appBundle).withOutputPath(outputFilePath).build());
+
+    buildApksManager.execute();
+
+    ZipFile apkSetFile = openZipFile(outputFilePath.toFile());
+    BuildApksResult result = extractTocFromApkSetFile(apkSetFile, outputDir);
+
+    ImmutableList<Variant> splitApkVariants = splitApkVariants(result);
+    assertThat(
+            splitApkVariants.stream()
+                .map(variant -> variant.getTargeting().getSdkVersionTargeting()))
+        .containsExactly(
+            sdkVersionTargeting(L_SDK_VERSION, ImmutableSet.of(LOWEST_SDK_VERSION, S_SDK_VERSION)),
+            sdkVersionTargeting(S_SDK_VERSION, ImmutableSet.of(LOWEST_SDK_VERSION, L_SDK_VERSION)));
+    Variant uncompressedDexVariant =
+        splitApkVariants.stream()
+            .filter(
+                variant ->
+                    variant
+                        .getTargeting()
+                        .getSdkVersionTargeting()
+                        .getValue(0)
+                        .equals(S_SDK_VERSION))
+            .collect(onlyElement());
+    assertThat(uncompressedDexVariant.getVariantProperties().getUncompressedDex()).isTrue();
   }
 
   @Test
@@ -2877,21 +2946,24 @@ public class BuildApksManagerTest {
             mergeVariantTargeting(
                 variantAbiTargeting(X86, ImmutableSet.of(X86_64, MIPS)),
                 variantSdkTargeting(
-                    LOWEST_SDK_VERSION, ImmutableSet.of(L_SDK_VERSION, M_SDK_VERSION))));
+                    LOWEST_SDK_VERSION,
+                    ImmutableSet.of(L_SDK_VERSION, M_SDK_VERSION, S_SDK_VERSION))));
     assertThat(standaloneVariantsByAbi.get(toAbi(X86_64)).getTargeting())
         .ignoringRepeatedFieldOrder()
         .isEqualTo(
             mergeVariantTargeting(
                 variantAbiTargeting(X86_64, ImmutableSet.of(X86, MIPS)),
                 variantSdkTargeting(
-                    LOWEST_SDK_VERSION, ImmutableSet.of(L_SDK_VERSION, M_SDK_VERSION))));
+                    LOWEST_SDK_VERSION,
+                    ImmutableSet.of(L_SDK_VERSION, M_SDK_VERSION, S_SDK_VERSION))));
     assertThat(standaloneVariantsByAbi.get(toAbi(MIPS)).getTargeting())
         .ignoringRepeatedFieldOrder()
         .isEqualTo(
             mergeVariantTargeting(
                 variantAbiTargeting(MIPS, ImmutableSet.of(X86, X86_64)),
                 variantSdkTargeting(
-                    LOWEST_SDK_VERSION, ImmutableSet.of(L_SDK_VERSION, M_SDK_VERSION))));
+                    LOWEST_SDK_VERSION,
+                    ImmutableSet.of(L_SDK_VERSION, M_SDK_VERSION, S_SDK_VERSION))));
     for (Variant variant : standaloneVariantsByAbi.values()) {
       assertThat(variant.getApkSetList()).hasSize(1);
       ApkSet apkSet = variant.getApkSet(0);
@@ -4549,46 +4621,47 @@ public class BuildApksManagerTest {
 
     // Validate split APKs.
     ImmutableList<Variant> splitApkVariants = splitApkVariants(result);
-    assertThat(splitApkVariants).hasSize(1);
-    ImmutableMap<String, List<ApkDescription>> splitApksByModule =
-        splitApkVariants.get(0).getApkSetList().stream()
-            .collect(
-                toImmutableMap(
-                    apkSet -> apkSet.getModuleMetadata().getName(),
-                    apkSet -> apkSet.getApkDescriptionList()));
-    assertThat(splitApksByModule.keySet())
-        .containsExactly("base", "abi_feature", "language_feature");
+    assertThat(splitApkVariants).hasSize(2);
+    for (Variant splitApkVariant : splitApkVariants) {
+      ImmutableMap<String, List<ApkDescription>> splitApksByModule =
+          splitApkVariant.getApkSetList().stream()
+              .collect(
+                  toImmutableMap(
+                      apkSet -> apkSet.getModuleMetadata().getName(),
+                      ApkSet::getApkDescriptionList));
+      assertThat(splitApksByModule.keySet())
+          .containsExactly("base", "abi_feature", "language_feature");
 
-    // Correct number of APKs.
-    // "base" module - master split.
-    assertThat(splitApksByModule.get("base")).hasSize(1);
-    // "abi_feature" module - master split + 2 ABI splits.
-    assertThat(splitApksByModule.get("abi_feature")).hasSize(3);
-    // "language_feature" module - master split + 3 language splits.
-    assertThat(splitApksByModule.get("language_feature")).hasSize(4);
+      // Correct number of APKs.
+      // "base" module - master split.
+      assertThat(splitApksByModule.get("base")).hasSize(1);
+      // "abi_feature" module - master split + 2 ABI splits.
+      assertThat(splitApksByModule.get("abi_feature")).hasSize(3);
+      // "language_feature" module - master split + 3 language splits.
+      assertThat(splitApksByModule.get("language_feature")).hasSize(4);
 
-    // Correct files inside APKs.
-    assertThat(filesInApks(splitApksByModule.get("base"), apkSetFile))
-        .containsExactly(
-            "res/xml/splits0.xml", "resources.arsc", "assets/file.txt", "classes.dex", manifest);
-    assertThat(filesInApks(splitApksByModule.get("abi_feature"), apkSetFile))
-        .isEqualTo(
-            ImmutableMultiset.builder()
-                .add("lib/x86/libsome.so")
-                .add("lib/x86_64/libsome.so")
-                .addCopies(manifest, 3)
-                .build());
-    assertThat(filesInApks(splitApksByModule.get("language_feature"), apkSetFile))
-        .isEqualTo(
-            ImmutableMultiset.builder()
-                .add("res/drawable/image.jpg")
-                .add("res/drawable-cz/image.jpg")
-                .add("res/drawable-fr/image.jpg")
-                .add("res/drawable-pl/image.jpg")
-                .addCopies("resources.arsc", 4)
-                .addCopies(manifest, 4)
-                .build());
-
+      // Correct files inside APKs.
+      assertThat(filesInApks(splitApksByModule.get("base"), apkSetFile))
+          .containsExactly(
+              "res/xml/splits0.xml", "resources.arsc", "assets/file.txt", "classes.dex", manifest);
+      assertThat(filesInApks(splitApksByModule.get("abi_feature"), apkSetFile))
+          .isEqualTo(
+              ImmutableMultiset.builder()
+                  .add("lib/x86/libsome.so")
+                  .add("lib/x86_64/libsome.so")
+                  .addCopies(manifest, 3)
+                  .build());
+      assertThat(filesInApks(splitApksByModule.get("language_feature"), apkSetFile))
+          .isEqualTo(
+              ImmutableMultiset.builder()
+                  .add("res/drawable/image.jpg")
+                  .add("res/drawable-cz/image.jpg")
+                  .add("res/drawable-fr/image.jpg")
+                  .add("res/drawable-pl/image.jpg")
+                  .addCopies("resources.arsc", 4)
+                  .addCopies(manifest, 4)
+                  .build());
+    }
     // Validate standalone APKs.
     ImmutableList<Variant> standaloneVariants = standaloneApkVariants(result);
     // Correct number of APKs.
@@ -4748,18 +4821,31 @@ public class BuildApksManagerTest {
         Maps.uniqueIndex(splitApkVariants(result), Variant::getTargeting);
 
     VariantTargeting lSplitVariantTargeting =
-        variantSdkTargeting(L_SDK_VERSION, ImmutableSet.of(LOWEST_SDK_VERSION, M_SDK_VERSION));
+        variantSdkTargeting(
+            L_SDK_VERSION, ImmutableSet.of(LOWEST_SDK_VERSION, M_SDK_VERSION, S_SDK_VERSION));
     VariantTargeting mSplitVariantTargeting =
-        variantSdkTargeting(M_SDK_VERSION, ImmutableSet.of(LOWEST_SDK_VERSION, L_SDK_VERSION));
+        variantSdkTargeting(
+            M_SDK_VERSION, ImmutableSet.of(LOWEST_SDK_VERSION, L_SDK_VERSION, S_SDK_VERSION));
+    VariantTargeting sSplitVariantTargeting =
+        variantSdkTargeting(
+            S_SDK_VERSION, ImmutableSet.of(LOWEST_SDK_VERSION, L_SDK_VERSION, M_SDK_VERSION));
 
     assertThat(splitVariantsByTargeting.keySet())
-        .containsExactly(lSplitVariantTargeting, mSplitVariantTargeting);
+        .containsExactly(lSplitVariantTargeting, mSplitVariantTargeting, sSplitVariantTargeting);
     assertThat(
             ImmutableSet.builder()
                 .addAll(apkNamesInVariant(splitVariantsByTargeting.get(lSplitVariantTargeting)))
                 .addAll(apkNamesInVariant(splitVariantsByTargeting.get(mSplitVariantTargeting)))
+                .addAll(apkNamesInVariant(splitVariantsByTargeting.get(sSplitVariantTargeting)))
                 .build())
-        .containsExactly("base-master.apk", "base-x86.apk", "base-master_2.apk", "base-x86_2.apk");
+        // for uncompressed dex variant (sdk 31) we don't have "base-x86_3.apk" because it is the
+        // same as "base-x86_2.apk" with  uncompressed native libs
+        .containsExactly(
+            "base-master.apk",
+            "base-x86.apk",
+            "base-master_2.apk",
+            "base-x86_2.apk",
+            "base-master_3.apk");
   }
 
   @Test
@@ -4792,12 +4878,37 @@ public class BuildApksManagerTest {
     ZipFile apkSetFile = openZipFile(outputFilePath.toFile());
     BuildApksResult result = extractTocFromApkSetFile(apkSetFile, outputDir);
 
-    assertThat(splitApkVariants(result)).hasSize(1);
-    Variant splitApkVariant = splitApkVariants(result).get(0);
+    assertThat(splitApkVariants(result)).hasSize(2);
+    ImmutableList<Variant> splitApkVariants = splitApkVariants(result);
 
-    assertThat(splitApkVariant.getApkSetList()).hasSize(1);
-    assertThat(apkNamesInVariant(splitApkVariant))
+    Variant lVariant =
+        splitApkVariants.stream()
+            .filter(
+                variant ->
+                    variant
+                        .getTargeting()
+                        .getSdkVersionTargeting()
+                        .getValueList()
+                        .contains(L_SDK_VERSION))
+            .findFirst()
+            .get();
+    Variant sVariant =
+        splitApkVariants.stream()
+            .filter(
+                variant ->
+                    variant
+                        .getTargeting()
+                        .getSdkVersionTargeting()
+                        .getValueList()
+                        .contains(S_SDK_VERSION))
+            .findFirst()
+            .get();
+    assertThat(lVariant.getApkSetList()).hasSize(1);
+    assertThat(apkNamesInVariant(lVariant))
         .containsExactly("base-master.apk", "base-es.apk", "base-other_lang.apk");
+    assertThat(sVariant.getApkSetList()).hasSize(1);
+    assertThat(apkNamesInVariant(sVariant))
+        .containsExactly("base-master_2.apk", "base-es.apk", "base-other_lang.apk");
   }
 
   @Test
@@ -5885,12 +5996,14 @@ public class BuildApksManagerTest {
     assertThat(apkSetFile).hasFile(apkSet.getApkDescription(0).getPath());
 
     // split apk also exists and has isInstant set on the module level.
-    assertThat(splitApkVariants(result)).hasSize(1);
-    variant = splitApkVariants(result).get(0);
-    assertThat(variant.getApkSetList()).hasSize(1);
-    apkSet = variant.getApkSetList().get(0);
-    assertThat(apkSet.getModuleMetadata().getIsInstant()).isTrue();
-    assertThat(apkSetFile).hasFile(apkSet.getApkDescription(0).getPath());
+    assertThat(splitApkVariants(result)).hasSize(2);
+    ImmutableList<Variant> variants = splitApkVariants(result);
+    for (Variant nonInstantVariant : variants) {
+      assertThat(nonInstantVariant.getApkSetList()).hasSize(1);
+      apkSet = nonInstantVariant.getApkSetList().get(0);
+      assertThat(apkSet.getModuleMetadata().getIsInstant()).isTrue();
+      assertThat(apkSetFile).hasFile(apkSet.getApkDescription(0).getPath());
+    }
   }
 
   @Test
@@ -6296,6 +6409,7 @@ public class BuildApksManagerTest {
                         ByteSource.wrap(dexFileInFeatureModuleContent)
                             .hash(Hashing.sha256())
                             .toString()))
+            .addCodeRelatedFile(CodeRelatedFileBuilderHelper.archivedDexCodeRelatedFile())
             .build();
     Path bundlePath = tmpDir.resolve("bundle.aab");
     AppBundleBuilder appBundle =
@@ -6362,7 +6476,7 @@ public class BuildApksManagerTest {
                     apk.getSplitApkMetadata().getSplitId().isEmpty()
                         && apk.getSplitApkMetadata().getIsMasterSplit())
             .collect(toImmutableList());
-    assertThat(mainSplitsOfBaseModule).hasSize(2);
+    assertThat(mainSplitsOfBaseModule).hasSize(3);
     for (ApkDescription apk : mainSplitsOfBaseModule) {
       ZipFile zipFile = openZipFile(extractFromApkSetFile(apkSetFile, apk.getPath(), outputDir));
       assertThat(filesUnderPath(zipFile, ZipPath.create("META-INF")))
@@ -6374,7 +6488,7 @@ public class BuildApksManagerTest {
         splitApks.stream()
             .filter(apk -> !apk.getSplitApkMetadata().getSplitId().isEmpty())
             .collect(toImmutableList());
-    assertThat(otherSplits).hasSize(4);
+    assertThat(otherSplits).hasSize(6);
     for (ApkDescription apk : otherSplits) {
       ZipFile zipFile = openZipFile(extractFromApkSetFile(apkSetFile, apk.getPath(), outputDir));
       assertThat(filesUnderPath(zipFile, ZipPath.create("META-INF"))).isEmpty();

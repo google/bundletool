@@ -354,4 +354,30 @@ public class VariantMatcherTest {
     assertThat(variantMatcher.getMatchingVariant(buildApksResult))
         .hasValue(sdkRuntimeVariantWithMatchingAndroidVersion);
   }
+
+  @Test
+  public void getMatchingVariant_defaultDeviceSpecWithRuntimeEnabledApp_allVariantsMatched() {
+    ZipPath mainApk = ZipPath.create("main.apk");
+    Variant sdkRuntimeVariant =
+        createVariant(
+            sdkRuntimeVariantTargeting(Versions.ANDROID_T_API_VERSION),
+            splitApkSet(
+                /* moduleName= */ "base",
+                splitApkDescription(ApkTargeting.getDefaultInstance(), mainApk)));
+    Variant nonSdkRuntimeVariant =
+        createVariant(
+            variantSdkTargeting(Versions.ANDROID_L_API_VERSION),
+            splitApkSet(
+                /* moduleName= */ "base",
+                splitApkDescription(ApkTargeting.getDefaultInstance(), mainApk)));
+    BuildApksResult buildApksResult =
+        BuildApksResult.newBuilder()
+            .addAllVariant(ImmutableList.of(sdkRuntimeVariant, nonSdkRuntimeVariant))
+            .build();
+
+    ImmutableList<Variant> matched =
+        new VariantMatcher(DeviceSpec.getDefaultInstance()).getAllMatchingVariants(buildApksResult);
+
+    assertThat(matched).containsExactly(sdkRuntimeVariant, nonSdkRuntimeVariant);
+  }
 }
