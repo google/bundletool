@@ -97,6 +97,11 @@ def osName = System.getProperty("os.name").toLowerCase()
 compileJava.options.encoding = "UTF-8"
 compileTestJava.options.encoding = "UTF-8"
 
+// Compile for Java 8.
+if (JavaVersion.current() != JavaVersion.VERSION_1_8) {
+    compileJava.options.release = 8;
+}
+
 test {
     if (osName.contains("linux")) {
         environment "AAPT2_PATH", "build/resources/main/linux/aapt2"
