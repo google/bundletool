@@ -479,6 +479,19 @@ public class AppBundleTest {
   }
 
   @Test
+  public void storeArchiveEnabled_optedOutArchive_withXmlFile() throws Exception {
+    AppBundle appBundle =
+        new AppBundleBuilder()
+            .setBundleConfig(BundleConfigBuilder.create().build())
+            .addModule(
+                "base",
+                builder ->
+                    builder.setManifest(MANIFEST).addFile(AppBundle.ARCHIVE_OPT_OUT_XML_PATH))
+            .build();
+    assertThat(appBundle.getStoreArchive().get()).isFalse();
+  }
+
+  @Test
   public void localeConfigEnabled_notPresent_false() throws Exception {
     AppBundle appBundle =
         new AppBundleBuilder()

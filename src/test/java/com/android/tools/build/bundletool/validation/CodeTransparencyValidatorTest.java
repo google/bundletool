@@ -29,6 +29,7 @@ import com.android.tools.build.bundletool.io.AppBundleSerializer;
 import com.android.tools.build.bundletool.model.AppBundle;
 import com.android.tools.build.bundletool.model.BundleMetadata;
 import com.android.tools.build.bundletool.model.exceptions.InvalidBundleException;
+import com.android.tools.build.bundletool.model.version.BundleToolVersion;
 import com.android.tools.build.bundletool.testing.AppBundleBuilder;
 import com.android.tools.build.bundletool.testing.CertificateFactory;
 import com.android.tools.build.bundletool.testing.CodeRelatedFileBuilderHelper;
@@ -93,7 +94,9 @@ public final class CodeTransparencyValidatorTest {
                     .setSha256(
                         ByteSource.wrap(NATIVE_LIB_FILE_CONTENT).hash(Hashing.sha256()).toString())
                     .setApkPath(NATIVE_LIB_PATH))
-            .addCodeRelatedFile(CodeRelatedFileBuilderHelper.archivedDexCodeRelatedFile())
+            .addCodeRelatedFile(
+                CodeRelatedFileBuilderHelper.archivedDexCodeRelatedFile(
+                    BundleToolVersion.getCurrentVersion()))
             .build();
   }
 
@@ -139,7 +142,9 @@ public final class CodeTransparencyValidatorTest {
     createBundle(
         bundlePath,
         CodeTransparency.newBuilder()
-            .addCodeRelatedFile(CodeRelatedFileBuilderHelper.archivedDexCodeRelatedFile())
+            .addCodeRelatedFile(
+                CodeRelatedFileBuilderHelper.archivedDexCodeRelatedFile(
+                    BundleToolVersion.getCurrentVersion()))
             .build());
     AppBundle bundle = AppBundle.buildFromZip(new ZipFile(bundlePath.toFile()));
 

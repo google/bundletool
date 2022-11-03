@@ -32,7 +32,6 @@ public final class SdkModuleToAppBundleModuleConverter {
   private final BundleModule sdkModule;
   private final ResourceTablePackageIdRemapper resourceTablePackageIdRemapper;
   private final XmlPackageIdRemapper xmlPackageIdRemapper;
-  private final RPackageDexEntryRemover rPackageDexEntryRemover;
   private final DexAndResourceRepackager dexAndResourceRepackager;
   private final AndroidManifest appBaseModuleManifest;
 
@@ -45,9 +44,8 @@ public final class SdkModuleToAppBundleModuleConverter {
         new ResourceTablePackageIdRemapper(sdkDependencyConfig.getResourcesPackageId());
     this.xmlPackageIdRemapper =
         new XmlPackageIdRemapper(sdkDependencyConfig.getResourcesPackageId());
-    this.rPackageDexEntryRemover = new RPackageDexEntryRemover();
     this.dexAndResourceRepackager =
-        new DexAndResourceRepackager(sdkModule.getSdkModulesConfig().get());
+        new DexAndResourceRepackager(sdkModule.getSdkModulesConfig().get(), sdkDependencyConfig);
     this.appBaseModuleManifest = appBaseModuleManifest;
   }
 
@@ -57,9 +55,8 @@ public final class SdkModuleToAppBundleModuleConverter {
    */
   public BundleModule convert() {
     return repackageDexAndJavaResources(
-        removeRPackageDexFile(
-            remapResourceIdsInResourceTable(
-                remapResourceIdsInXmlResources(convertNameTypeAndManifest(sdkModule)))));
+        remapResourceIdsInResourceTable(
+            remapResourceIdsInXmlResources(convertNameTypeAndManifest(sdkModule))));
   }
 
   private BundleModule remapResourceIdsInResourceTable(BundleModule module) {
@@ -68,10 +65,6 @@ public final class SdkModuleToAppBundleModuleConverter {
 
   private BundleModule remapResourceIdsInXmlResources(BundleModule module) {
     return xmlPackageIdRemapper.remap(module);
-  }
-
-  private BundleModule removeRPackageDexFile(BundleModule module) {
-    return rPackageDexEntryRemover.applyMutation(module);
   }
 
   private BundleModule repackageDexAndJavaResources(BundleModule module) {

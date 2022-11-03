@@ -16,11 +16,15 @@
 
 package com.android.tools.build.bundletool.model;
 
+import com.google.common.collect.ImmutableMap;
+
 /** Interface for bundles. */
 public interface Bundle {
   String getPackageName();
 
   BundleModule getModule(BundleModuleName moduleName);
+
+  ImmutableMap<BundleModuleName, BundleModule> getModules();
 
   BundleMetadata getBundleMetadata();
 }

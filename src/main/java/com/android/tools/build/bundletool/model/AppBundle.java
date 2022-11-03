@@ -68,6 +68,15 @@ public abstract class AppBundle implements Bundle {
   public static final ImmutableSet<ZipPath> NON_MODULE_DIRECTORIES =
       ImmutableSet.of(METADATA_DIRECTORY, ZipPath.create("META-INF"));
 
+  /**
+   * File path for opting out from hibernation. To opt out this file should be included within base
+   * module of the {@link AppBundle}. More information can be found in the <a
+   * href="https://android-developers.googleblog.com/2022/03/freeing-up-60-of-storage-for-apps.html">blog
+   * post</a>.
+   */
+  public static final String ARCHIVE_OPT_OUT_XML_PATH =
+      "res/xml/com_android_vending_archive_opt_out.xml";
+
   /** Builds an {@link AppBundle} from an App Bundle on disk. */
   public static AppBundle buildFromZip(ZipFile bundleFile) {
     BundleConfig bundleConfig = readBundleConfig(bundleFile);
@@ -119,6 +128,7 @@ public abstract class AppBundle implements Bundle {
         .build();
   }
 
+  @Override
   public abstract ImmutableMap<BundleModuleName, BundleModule> getModules();
 
   /**
@@ -248,9 +258,16 @@ public abstract class AppBundle implements Bundle {
 
   /** Returns value of the store archive setting. */
   public Optional<Boolean> getStoreArchive() {
-    return getBundleConfig().getOptimizations().hasStoreArchive()
-        ? Optional.of(getBundleConfig().getOptimizations().getStoreArchive().getEnabled())
-        : Optional.empty();
+    if (getBundleConfig().getOptimizations().hasStoreArchive()) {
+      return Optional.of(getBundleConfig().getOptimizations().getStoreArchive().getEnabled());
+    }
+    if (hasBaseModule()
+        && getBaseModule()
+            .findEntriesUnderPath(BundleModule.RESOURCES_DIRECTORY)
+            .anyMatch(entry -> entry.getPath().equals(ZipPath.create(ARCHIVE_OPT_OUT_XML_PATH)))) {
+      return Optional.of(false);
+    }
+    return Optional.empty();
   }
 
   /** Returns {@code true} if bundletool has to generate a LocaleConfig file. */

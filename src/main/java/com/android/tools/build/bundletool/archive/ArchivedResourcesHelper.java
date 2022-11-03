@@ -23,7 +23,6 @@ import static com.google.common.collect.ImmutableList.toImmutableList;
 import static java.util.Comparator.reverseOrder;
 
 import com.android.tools.build.bundletool.io.ResourceReader;
-import com.android.tools.build.bundletool.model.AppBundle;
 import com.android.tools.build.bundletool.model.BundleModule;
 import com.android.tools.build.bundletool.model.ResourceInjector;
 import com.android.tools.build.bundletool.model.ZipPath;
@@ -32,9 +31,7 @@ import com.android.tools.build.bundletool.model.utils.xmlproto.XmlProtoAttribute
 import com.android.tools.build.bundletool.model.utils.xmlproto.XmlProtoAttributeBuilder;
 import com.android.tools.build.bundletool.model.utils.xmlproto.XmlProtoElementBuilder;
 import com.android.tools.build.bundletool.model.utils.xmlproto.XmlProtoNode;
-import com.android.tools.build.bundletool.model.version.BundleToolVersion;
 import com.android.tools.build.bundletool.model.version.Version;
-import com.android.tools.build.bundletool.transparency.BundleTransparencyCheckUtils;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.io.ByteSource;
@@ -63,8 +60,6 @@ public final class ArchivedResourcesHelper {
   public static final String ARCHIVED_CLASSES_DEX_PATH_PREFIX =
       "/com/android/tools/build/bundletool/archive/dex";
   private static final String ARCHIVED_CLASSES_DEX_PATH_SUFFIX = "classes.dex";
-  public static final String DEFAULT_ARCHIVED_CLASSES_DEX_PATH =
-      getArchivedClassesDexPath(Version.of("1.8.2"));
   public static final String CLOUD_SYMBOL_PATH =
       "/com/android/tools/build/bundletool/archive/drawable/cloud_symbol_xml.pb";
   public static final String OPACITY_LAYER_PATH =
@@ -78,19 +73,13 @@ public final class ArchivedResourcesHelper {
   }
 
   /**
-   * Returns a path to the appropriate DEX file for {@link AppBundle}
+   * Returns a path to the appropriate DEX file based on the bundletool {@link Version} and if
+   * transparency is enabled.
    *
-   * @throws IOException if an error occurs during reading resources from {@value
+   * @throws IOException if an error occurs during reading resources from {@value *
    *     #ARCHIVED_CLASSES_DEX_PATH_PREFIX} path
    */
-  public String getArchivedClassesDexPath(AppBundle bundle) throws IOException {
-    Version bundleToolVersion =
-        BundleToolVersion.getVersionFromBundleConfig(bundle.getBundleConfig());
-    boolean transparencyEnabled = BundleTransparencyCheckUtils.isTransparencyEnabled(bundle);
-    return getArchivedClassesDexPath(bundleToolVersion, transparencyEnabled);
-  }
-
-  private String getArchivedClassesDexPath(Version bundleToolVersion, boolean transparencyEnabled)
+  public String findArchivedClassesDexPath(Version bundleToolVersion, boolean transparencyEnabled)
       throws IOException {
     try {
       ImmutableList<Path> allResources =

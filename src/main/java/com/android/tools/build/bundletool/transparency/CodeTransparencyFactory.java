@@ -20,7 +20,6 @@ import static com.google.common.collect.ImmutableList.toImmutableList;
 
 import com.android.bundle.CodeTransparencyOuterClass.CodeRelatedFile;
 import com.android.bundle.CodeTransparencyOuterClass.CodeTransparency;
-import com.android.tools.build.bundletool.archive.ArchivedBundleUtils;
 import com.android.tools.build.bundletool.archive.ArchivedResourcesHelper;
 import com.android.tools.build.bundletool.io.ResourceReader;
 import com.android.tools.build.bundletool.model.AppBundle;
@@ -53,7 +52,7 @@ public final class CodeTransparencyFactory {
             .setVersion(CodeTransparencyVersion.getCurrentVersion())
             .addAllCodeRelatedFile(codeRelatedFiles);
 
-    if (ArchivedBundleUtils.isStoreArchiveEnabled(bundle)) {
+    if (bundle.getStoreArchive().orElse(true)) {
       codeTransparencyBuilder.addCodeRelatedFile(createArchivedCodeRelatedFile(bundle));
     }
 
@@ -69,7 +68,9 @@ public final class CodeTransparencyFactory {
       ResourceReader resourceReader = new ResourceReader();
       ArchivedResourcesHelper archivedResourcesHelper =
           new ArchivedResourcesHelper(new ResourceReader());
-      String resourcePath = archivedResourcesHelper.getArchivedClassesDexPath(bundle);
+      String resourcePath =
+          archivedResourcesHelper.findArchivedClassesDexPath(
+              bundle.getVersion(), /* transparencyEnabled= */ true);
       codeRelatedFile.setBundletoolRepoPath(resourcePath);
       ByteSource byteSource = resourceReader.getResourceByteSource(resourcePath);
       codeRelatedFile.setSha256(byteSource.hash(Hashing.sha256()).toString());

@@ -32,7 +32,8 @@ import java.util.function.Predicate;
  */
 public class DexRepackager extends ModuleEntriesMutator {
 
-  private static final String ASSETS_SUBDIRECTORY_PREFIX = "assets/RuntimeEnabledSdk-";
+  private static final String ASSETS_DIRECTORY = "assets";
+  private static final String ASSETS_SUBDIRECTORY_PREFIX = "RuntimeEnabledSdk-";
 
   private final SdkModulesConfig sdkModulesConfig;
 
@@ -59,11 +60,15 @@ public class DexRepackager extends ModuleEntriesMutator {
   private ModuleEntry updateDexEntryPath(ModuleEntry dexEntry) {
     String dexFileName = dexEntry.getPath().getFileName().toString();
     return dexEntry.toBuilder()
-        .setPath(ZipPath.create(getNewDexDirectoryPath() + dexFileName))
+        .setPath(ZipPath.create(getNewDexDirectoryPath() + "/" + dexFileName))
         .build();
   }
 
   String getNewDexDirectoryPath() {
-    return ASSETS_SUBDIRECTORY_PREFIX + sdkModulesConfig.getSdkPackageName() + "/dex/";
+    return ASSETS_DIRECTORY + "/" + getNewDexDirectoryPathInsideAssets();
+  }
+
+  String getNewDexDirectoryPathInsideAssets() {
+    return ASSETS_SUBDIRECTORY_PREFIX + sdkModulesConfig.getSdkPackageName() + "/dex";
   }
 }

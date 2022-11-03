@@ -91,6 +91,14 @@ public class BundleToolMain {
         case BuildSdkAsarCommand.COMMAND_NAME:
           BuildSdkAsarCommand.fromFlags(flags).execute();
           break;
+        case PrintDeviceTargetingConfigCommand.COMMAND_NAME:
+          PrintDeviceTargetingConfigCommand.fromFlags(flags).execute();
+          break;
+        case EvaluateDeviceTargetingConfigCommand.COMMAND_NAME:
+          try (AdbServer adbServer = DdmlibAdbServer.getInstance()) {
+            EvaluateDeviceTargetingConfigCommand.fromFlags(flags, adbServer).execute(System.out);
+          }
+          break;
         case ExtractApksCommand.COMMAND_NAME:
           ExtractApksCommand.fromFlags(flags).execute();
           break;
@@ -161,6 +169,11 @@ public class BundleToolMain {
         ImmutableList.of(
             BuildBundleCommand.help(),
             BuildApksCommand.help(),
+            BuildSdkBundleCommand.help(),
+            BuildSdkApksCommand.help(),
+            BuildSdkAsarCommand.help(),
+            PrintDeviceTargetingConfigCommand.help(),
+            EvaluateDeviceTargetingConfigCommand.help(),
             ExtractApksCommand.help(),
             GetDeviceSpecCommand.help(),
             InstallApksCommand.help(),
@@ -195,6 +208,12 @@ public class BundleToolMain {
         break;
       case BuildSdkAsarCommand.COMMAND_NAME:
         commandHelp = BuildSdkAsarCommand.help();
+        break;
+      case PrintDeviceTargetingConfigCommand.COMMAND_NAME:
+        commandHelp = PrintDeviceTargetingConfigCommand.help();
+        break;
+      case EvaluateDeviceTargetingConfigCommand.COMMAND_NAME:
+        commandHelp = EvaluateDeviceTargetingConfigCommand.help();
         break;
       case ExtractApksCommand.COMMAND_NAME:
         commandHelp = ExtractApksCommand.help();

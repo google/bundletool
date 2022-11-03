@@ -21,6 +21,7 @@ import com.google.auto.value.AutoValue;
 import com.google.common.collect.ImmutableList;
 import java.nio.file.Path;
 import java.time.Duration;
+import java.util.Optional;
 
 /** Exposes aapt2 commands used by Bundle Tool. */
 public interface Aapt2Command {
@@ -43,6 +44,22 @@ public interface Aapt2Command {
           Path protoApk, Path binaryApk, ConvertOptions convertOptions) {
         ImmutableList.Builder<String> convertCommand =
             ImmutableList.<String>builder().add(aapt2Path.toString()).add("convert");
+        if (convertOptions.getForceSparseEncoding()) {
+          convertCommand.add("--force-sparse-encoding");
+        }
+        if (convertOptions.getCollapseResourceNames()) {
+          convertCommand.add("--collapse-resource-names");
+        }
+        if (convertOptions.getDeduplicateResourceEntries()) {
+          convertCommand.add("--deduplicate-entry-values");
+        }
+        convertOptions
+            .getResourceConfigPath()
+            .ifPresent(
+                path ->
+                    convertCommand
+                        .add("--resources-config-path")
+                        .add(path.toAbsolutePath().toString()));
         convertCommand
             .add("--output-format")
             .add("binary")
@@ -85,14 +102,29 @@ public interface Aapt2Command {
   abstract class ConvertOptions {
     public abstract boolean getForceSparseEncoding();
 
+    public abstract boolean getCollapseResourceNames();
+
+    public abstract Optional<Path> getResourceConfigPath();
+
+    public abstract boolean getDeduplicateResourceEntries();
+
     public static Builder builder() {
-      return new AutoValue_Aapt2Command_ConvertOptions.Builder().setForceSparseEncoding(false);
+      return new AutoValue_Aapt2Command_ConvertOptions.Builder()
+          .setForceSparseEncoding(false)
+          .setCollapseResourceNames(false)
+          .setDeduplicateResourceEntries(false);
     }
 
     /** Builder for {@link ConvertOptions}. */
     @AutoValue.Builder
     public abstract static class Builder {
       public abstract Builder setForceSparseEncoding(boolean value);
+
+      public abstract Builder setCollapseResourceNames(boolean value);
+
+      public abstract Builder setResourceConfigPath(Optional<Path> resourceConfigPath);
+
+      public abstract Builder setDeduplicateResourceEntries(boolean value);
 
       public abstract ConvertOptions build();
     }

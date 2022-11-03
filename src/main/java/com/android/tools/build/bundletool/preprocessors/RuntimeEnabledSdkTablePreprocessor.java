@@ -15,7 +15,7 @@
  */
 package com.android.tools.build.bundletool.preprocessors;
 
-import static com.android.tools.build.bundletool.sdkmodule.DexAndResourceRepackager.getCompatSdkConfigPath;
+import static com.android.tools.build.bundletool.sdkmodule.DexAndResourceRepackager.getCompatSdkConfigPathInAssets;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static java.nio.charset.StandardCharsets.UTF_8;
 
@@ -37,18 +37,19 @@ import org.w3c.dom.Node;
  * Preprocessor that generates RuntimeEnabledSdkTable.xml config for app bundles that have
  * runtime-enabled SDK dependencies.
  *
- * <p>RuntimeEnabledSdkTable.xml contains paths to compat SDK config files for each SDK that the app
- * depends on. Here is what example RuntimeEnabledSdkTable.xml looks like:
+ * <p>RuntimeEnabledSdkTable.xml contains paths to compat SDK config files inside the assets
+ * directory. There is 1 compat SDK config file per runtime-enabled SDK dependency of the app. Here
+ * is what example RuntimeEnabledSdkTable.xml looks like:
  *
  * <pre>{@code
  * <runtime-enabled-sdk-table>
  *   <runtime-enabled-sdk>
  *     <package-name>com.sdk1</package-name>
- *     <compat-config-path>assets/RuntimeEnabledSdk-com.sdk1/CompatSdkConfig.xml</compat-config-path>
+ *     <compat-config-path>RuntimeEnabledSdk-com.sdk1/CompatSdkConfig.xml</compat-config-path>
  *   </runtime-enabled-sdk>
  *   <runtime-enabled-sdk>
  *     <package-name>com.sdk2</package-name>
- *     <compat-config-path>assets/RuntimeEnabledSdk-com.sdk2/CompatSdkConfig.xml</compat-config-path>
+ *     <compat-config-path>RuntimeEnabledSdk-com.sdk2/CompatSdkConfig.xml</compat-config-path>
  *   </runtime-enabled-sdk>
  * </runtime-enabled-sdk-table>
  * }</pre>
@@ -121,7 +122,7 @@ public class RuntimeEnabledSdkTablePreprocessor implements AppBundlePreprocessor
     Element sdkPackageNameNode = xmlFactory.createElement(SDK_PACKAGE_NAME_ELEMENT_NAME);
     sdkPackageNameNode.setTextContent(sdkPackageName);
     Element compatConfigPathNode = xmlFactory.createElement(COMPAT_CONFIG_PATH_ELEMENT_NAME);
-    compatConfigPathNode.setTextContent(getCompatSdkConfigPath(sdkPackageName));
+    compatConfigPathNode.setTextContent(getCompatSdkConfigPathInAssets(sdkPackageName));
     runtimeEnabledSdkNode.appendChild(sdkPackageNameNode);
     runtimeEnabledSdkNode.appendChild(compatConfigPathNode);
     return runtimeEnabledSdkNode;

@@ -86,7 +86,9 @@ public final class ArchivedApksGenerator {
               extraResourceNameToIdMap.get(ArchivedResourcesHelper.OPACITY_LAYER_DRAWABLE_NAME),
               iconAttribute,
               roundIconAttribute,
-              archivedResourcesHelper.getArchivedClassesDexPath(appBundle));
+              archivedResourcesHelper.findArchivedClassesDexPath(
+                  appBundle.getVersion(),
+                  BundleTransparencyCheckUtils.isTransparencyEnabled(appBundle)));
 
       archivedManifest =
           ArchivedAndroidManifestUtils.updateArchivedIcons(
@@ -99,7 +101,9 @@ public final class ArchivedApksGenerator {
           ImmutableMap.of(
               BundleModule.DEX_DIRECTORY.resolve("classes.dex"),
               resourceReader.getResourceByteSource(
-                  archivedResourcesHelper.getArchivedClassesDexPath(appBundle)));
+                  archivedResourcesHelper.findArchivedClassesDexPath(
+                      appBundle.getVersion(),
+                      BundleTransparencyCheckUtils.isTransparencyEnabled(appBundle))));
     }
 
     ModuleSplit moduleSplit =
@@ -120,7 +124,7 @@ public final class ArchivedApksGenerator {
   private void validateRequest(AppBundle appBundle) {
     checkNotNull(appBundle);
 
-    if (!ArchivedBundleUtils.isStoreArchiveEnabled(appBundle)) {
+    if (!appBundle.getStoreArchive().orElse(true)) {
       throw InvalidCommandException.builder()
           .withInternalMessage(
               "Archived APK cannot be generated when Store Archive configuration is disabled.")

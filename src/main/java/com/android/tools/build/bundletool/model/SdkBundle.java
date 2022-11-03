@@ -29,6 +29,7 @@ import com.android.bundle.SdkBundleConfigProto.SdkBundleConfig;
 import com.android.bundle.SdkModulesConfigOuterClass.SdkModulesConfig;
 import com.android.tools.build.bundletool.model.version.Version;
 import com.google.auto.value.AutoValue;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.io.ByteSource;
 import com.google.errorprone.annotations.Immutable;
@@ -74,6 +75,12 @@ public abstract class SdkBundle implements Bundle {
   public BundleModule getModule(BundleModuleName moduleName) {
     checkState(getModule().getName().equals(moduleName), "Module '%s' not found.", moduleName);
     return getModule();
+  }
+
+  @Override
+  public ImmutableMap<BundleModuleName, BundleModule> getModules() {
+    BundleModule module = getModule();
+    return ImmutableMap.of(module.getName(), module);
   }
 
   public abstract SdkModulesConfig getSdkModulesConfig();

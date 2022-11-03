@@ -32,7 +32,8 @@ import java.util.function.Predicate;
  */
 public class JavaResourceRepackager extends ModuleEntriesMutator {
 
-  private static final String ASSETS_SUBDIRECTORY_PREFIX = "assets/RuntimeEnabledSdk-";
+  private static final String ASSETS_DIRECTORY = "assets";
+  private static final String ASSETS_SUBDIRECTORY_PREFIX = "RuntimeEnabledSdk-";
 
   private final SdkModulesConfig sdkModulesConfig;
 
@@ -59,11 +60,15 @@ public class JavaResourceRepackager extends ModuleEntriesMutator {
   private ModuleEntry updateJavaResourceEntryPath(ModuleEntry javaResourceEntry) {
     String javaResourceFileName = javaResourceEntry.getPath().getFileName().toString();
     return javaResourceEntry.toBuilder()
-        .setPath(ZipPath.create(getNewJavaResourceDirectoryPath() + javaResourceFileName))
+        .setPath(ZipPath.create(getNewJavaResourceDirectoryPath() + "/" + javaResourceFileName))
         .build();
   }
 
   String getNewJavaResourceDirectoryPath() {
-    return ASSETS_SUBDIRECTORY_PREFIX + sdkModulesConfig.getSdkPackageName() + "/javaresources/";
+    return ASSETS_DIRECTORY + "/" + getNewJavaResourceDirectoryPathInsideAssets();
+  }
+
+  String getNewJavaResourceDirectoryPathInsideAssets() {
+    return ASSETS_SUBDIRECTORY_PREFIX + sdkModulesConfig.getSdkPackageName() + "/javaresources";
   }
 }

@@ -52,9 +52,9 @@ dependencies {
     }
     shadow "org.slf4j:slf4j-api:1.7.30"
 
-    implementationWindows "com.android.tools.build:aapt2:7.3.0-alpha07-8248216:windows"
-    implementationMacOs "com.android.tools.build:aapt2:7.3.0-alpha07-8248216:osx"
-    implementationLinux "com.android.tools.build:aapt2:7.3.0-alpha07-8248216:linux"
+    implementationWindows "com.android.tools.build:aapt2:8.0.0-alpha07-9193536:windows"
+    implementationMacOs "com.android.tools.build:aapt2:8.0.0-alpha07-9193536:osx"
+    implementationLinux "com.android.tools.build:aapt2:8.0.0-alpha07-9193536:linux"
 
     compileOnly "org.bouncycastle:bcprov-jdk15on:1.56"
     compileOnly "org.bouncycastle:bcpkix-jdk15on:1.56"

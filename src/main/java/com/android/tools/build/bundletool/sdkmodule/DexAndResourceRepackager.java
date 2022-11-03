@@ -18,6 +18,7 @@ package com.android.tools.build.bundletool.sdkmodule;
 import static com.google.common.base.Preconditions.checkArgument;
 import static java.nio.charset.StandardCharsets.UTF_8;
 
+import com.android.bundle.RuntimeEnabledSdkConfigProto.RuntimeEnabledSdk;
 import com.android.bundle.SdkModulesConfigOuterClass.SdkModulesConfig;
 import com.android.tools.build.bundletool.model.BundleModule;
 import com.android.tools.build.bundletool.model.ModuleEntry;
@@ -41,30 +42,44 @@ public final class DexAndResourceRepackager {
   private static final String COMPAT_ENTRYPOINT_ELEMENT_NAME = "compat-entrypoint";
   private static final String DEX_PATH_ELEMENT_NAME = "dex-path";
   private static final String JAVA_RESOURCE_PATH_ELEMENT_NAME = "java-resource-path";
+  // Element which contains the package ID that SDK resource IDs should be remapped to.
+  private static final String RESOURCES_PACKAGE_ID_ELEMENT_NAME = "resources-package-id";
+  // Element which contains the fully qualified name of the RPackage class of the SDK, where the new
+  // resources package ID should be set at app runtime.
+  private static final String R_PACKAGE_CLASS_NAME_ELEMENT_NAME = "r-package-class";
+
+  private static final String R_PACKAGE_CLASS_NAME = "RPackage";
 
   /**
-   * Name of the config file that contains paths to moved dex files and java resources, as well as
-   * the path to the SDK entrypoint class. Example of what CompatSdkConfig.xml contents look like:
+   * Name of the config file that contains paths to moved dex files and java resources inside assets
+   * folder, as well as the path to the SDK entrypoint class. Example of what CompatSdkConfig.xml
+   * contents look like:
    *
    * <pre>{@code
    * <compat-config>
-   *   <dex-path>assets/RuntimeEnabledSdk-sdk.package.name/classes.dex</dex-path>
-   *   <dex-path>assets/RuntimeEnabledSdk-sdk.package.name/classes2.dex</dex-path>
-   *   <java-resource-path>assets/RuntimeEnabledSdk-sdk.package.name/image.png</java-resource-path>
+   *   <dex-path>RuntimeEnabledSdk-sdk.package.name/classes.dex</dex-path>
+   *   <dex-path>RuntimeEnabledSdk-sdk.package.name/classes2.dex</dex-path>
+   *   <java-resource-path>RuntimeEnabledSdk-sdk.package.name/image.png</java-resource-path>
    *   <compat-entrypoint>com.sdk.EntryPointClass</compat-entrypoint>
+   *   <resources-package-id>123</resources-package-id>
+   *   <r-package-class>sdk.package.name.RPackage</r-package-class>
    * </compat-config>
    * }</pre>
    */
   private static final String COMPAT_SDK_CONFIG_FILE_NAME = "CompatSdkConfig.xml";
 
-  private static final String ASSETS_SUBDIRECTORY_PREFIX = "assets/RuntimeEnabledSdk-";
+  private static final String ASSETS_DIRECTORY = "assets";
+  private static final String ASSETS_SUBDIRECTORY_PREFIX = "RuntimeEnabledSdk-";
 
   private final SdkModulesConfig sdkModulesConfig;
+  private final RuntimeEnabledSdk sdkDependencyConfig;
   private final DexRepackager dexRepackager;
   private final JavaResourceRepackager javaResourceRepackager;
 
-  DexAndResourceRepackager(SdkModulesConfig sdkModulesConfig) {
+  DexAndResourceRepackager(
+      SdkModulesConfig sdkModulesConfig, RuntimeEnabledSdk sdkDependencyConfig) {
     this.sdkModulesConfig = sdkModulesConfig;
+    this.sdkDependencyConfig = sdkDependencyConfig;
     this.dexRepackager = new DexRepackager(sdkModulesConfig);
     this.javaResourceRepackager = new JavaResourceRepackager(sdkModulesConfig);
   }
@@ -80,13 +95,19 @@ public final class DexAndResourceRepackager {
     return module.toBuilder().addEntry(getCompatSdkConfigModuleEntry(module)).build();
   }
 
-  /** Returns path to the CompatSdkConfig.xml file that this class generates. */
-  public static String getCompatSdkConfigPath(String sdkPackageName) {
+  /**
+   * Returns path inside the assets directory to the CompatSdkConfig.xml file that this class
+   * generates.
+   */
+  public static String getCompatSdkConfigPathInAssets(String sdkPackageName) {
     return ASSETS_SUBDIRECTORY_PREFIX + sdkPackageName + "/" + COMPAT_SDK_CONFIG_FILE_NAME;
   }
 
   private ZipPath getCompatSdkConfigPath() {
-    return ZipPath.create(getCompatSdkConfigPath(sdkModulesConfig.getSdkPackageName()));
+    return ZipPath.create(
+        ASSETS_DIRECTORY
+            + "/"
+            + getCompatSdkConfigPathInAssets(sdkModulesConfig.getSdkPackageName()));
   }
 
   private ModuleEntry getCompatSdkConfigModuleEntry(BundleModule repackagedModule) {
@@ -111,14 +132,34 @@ public final class DexAndResourceRepackager {
 
   private Node createCompatConfigXmlNode(Document xmlFactory, BundleModule repackagedModule) {
     Element compatConfigElement = xmlFactory.createElement(COMPAT_CONFIG_ELEMENT_NAME);
+    appendCompatEntrypointElement(compatConfigElement, xmlFactory);
+    appendResourcesPackageIdElement(compatConfigElement, xmlFactory);
+    appendRPackageClassNameElement(compatConfigElement, xmlFactory);
+    appendDexPathsToElement(compatConfigElement, xmlFactory, repackagedModule);
+    appendJavaResourcePathsToElement(compatConfigElement, xmlFactory, repackagedModule);
+    return compatConfigElement;
+  }
+
+  private void appendCompatEntrypointElement(Element compatConfigElement, Document xmlFactory) {
     if (!sdkModulesConfig.getCompatSdkProviderClassName().isEmpty()) {
       Element compatEntrypointElement = xmlFactory.createElement(COMPAT_ENTRYPOINT_ELEMENT_NAME);
       compatEntrypointElement.setTextContent(sdkModulesConfig.getCompatSdkProviderClassName());
       compatConfigElement.appendChild(compatEntrypointElement);
     }
-    appendDexPathsToElement(compatConfigElement, xmlFactory, repackagedModule);
-    appendJavaResourcePathsToElement(compatConfigElement, xmlFactory, repackagedModule);
-    return compatConfigElement;
+  }
+
+  private void appendResourcesPackageIdElement(Element compatConfigElement, Document xmlFactory) {
+    Element resourcesPackageIdElement = xmlFactory.createElement(RESOURCES_PACKAGE_ID_ELEMENT_NAME);
+    resourcesPackageIdElement.setTextContent(
+        Integer.toString(sdkDependencyConfig.getResourcesPackageId()));
+    compatConfigElement.appendChild(resourcesPackageIdElement);
+  }
+
+  private void appendRPackageClassNameElement(Element compatConfigElement, Document xmlFactory) {
+    Element rPackageClassNameElement = xmlFactory.createElement(R_PACKAGE_CLASS_NAME_ELEMENT_NAME);
+    rPackageClassNameElement.setTextContent(
+        sdkModulesConfig.getSdkPackageName() + "." + R_PACKAGE_CLASS_NAME);
+    compatConfigElement.appendChild(rPackageClassNameElement);
   }
 
   private void appendDexPathsToElement(
@@ -128,7 +169,10 @@ public final class DexAndResourceRepackager {
         .map(
             entry -> {
               Element dexPathElement = xmlFactory.createElement(DEX_PATH_ELEMENT_NAME);
-              dexPathElement.setTextContent(entry.getPath().toString());
+              dexPathElement.setTextContent(
+                  dexRepackager.getNewDexDirectoryPathInsideAssets()
+                      + "/"
+                      + entry.getPath().getFileName().toString());
               return dexPathElement;
             })
         .forEach(compatConfigElement::appendChild);
@@ -146,7 +190,10 @@ public final class DexAndResourceRepackager {
             entry -> {
               Element javaResourcePathElement =
                   xmlFactory.createElement(JAVA_RESOURCE_PATH_ELEMENT_NAME);
-              javaResourcePathElement.setTextContent(entry.getPath().toString());
+              javaResourcePathElement.setTextContent(
+                  javaResourceRepackager.getNewJavaResourceDirectoryPathInsideAssets()
+                      + "/"
+                      + entry.getPath().getFileName().toString());
               return javaResourcePathElement;
             })
         .forEach(compatConfigElement::appendChild);

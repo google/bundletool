@@ -110,11 +110,6 @@ message Optimizations {
 }
 
 message ResourceOptimizations {
-  // Whether to use sparse encoding for resource tables.
-  // Resources in sparse resource table are accessed using a binary search tree.
-  // This decreases APK size at the cost of resource retrieval performance.
-  SparseEncoding sparse_encoding = 1;
-
   enum SparseEncoding {
     // Previously 'ENFORCED'. This option is deprecated because of issues found
     // in Android O up to Android Sv2 and causes segfaults in
@@ -129,6 +124,51 @@ message ResourceOptimizations {
     // resource tables.
     VARIANT_FOR_SDK_32 = 2;
   }
+
+  // Pair of resource type and name, like 'layout/foo', 'string/bar'.
+  message ResourceTypeAndName {
+    string type = 1;
+    string name = 2;
+  }
+
+  // Optimizations related to collapsed resource names.
+  message CollapsedResourceNames {
+    // Whether to collapse resource names.
+    // Resources with collapsed resource names are only accessible by their
+    // ids. These names are not stored inside 'resources.arsc'.
+    bool collapse_resource_names = 1;
+
+    // Instructs to not collapse resource names for specific resources which
+    // makes certain resources to be accessible by their names.
+    //
+    // Applicable only if 'collapse_resource_names' is 'true'.
+    repeated ResourceTypeAndName no_collapse_resources = 2;
+
+    // Instructs to not collapse all resources of certain types.
+    //
+    // Applicable only if 'collapse_resource_names' is 'true'.
+    repeated string no_collapse_resource_types = 4;
+
+    // Whether to store only unique resource entries in 'resources.arsc'.
+    //
+    // For example if there are 3 'bool' resources defined with 'true' value
+    // with this flag only one 'true' entry is stored and all 3 resources
+    // are referencing this entry. By default all 3 entries are stored.
+    //
+    // This only works with resources where names are collapsed (either using
+    // 'collapse_resource_names' flag or manually) because resource name is a
+    // part of resource entry and if names are preserved - all entries are
+    // unique.
+    bool deduplicate_resource_entries = 3;
+  }
+
+  // Whether to use sparse encoding for resource tables.
+  // Resources in sparse resource table are accessed using a binary search tree.
+  // This decreases APK size at the cost of resource retrieval performance.
+  SparseEncoding sparse_encoding = 1;
+
+  // Optimizations related to collapsed resource names.
+  CollapsedResourceNames collapsed_resource_names = 2;
 }
 
 message UncompressNativeLibraries {

@@ -17,9 +17,9 @@
 package com.android.tools.build.bundletool.testing;
 
 import com.android.bundle.CodeTransparencyOuterClass.CodeRelatedFile;
-import com.android.bundle.CodeTransparencyOuterClass.CodeTransparency;
 import com.android.tools.build.bundletool.archive.ArchivedResourcesHelper;
 import com.android.tools.build.bundletool.io.ResourceReader;
+import com.android.tools.build.bundletool.model.version.Version;
 import com.google.common.hash.Hashing;
 import com.google.common.io.ByteSource;
 import java.io.IOException;
@@ -27,11 +27,17 @@ import java.io.IOException;
 /** Helps to eliminate boilerplate code in tests */
 public final class CodeRelatedFileBuilderHelper {
   private static final ResourceReader resourceReader = new ResourceReader();
+  private static final ArchivedResourcesHelper archivedResourcesHelper =
+      new ArchivedResourcesHelper(resourceReader);
 
   private CodeRelatedFileBuilderHelper() {}
 
-  public static CodeRelatedFile archivedDexCodeRelatedFile() throws IOException {
-    String bundleToolRepoPath = ArchivedResourcesHelper.DEFAULT_ARCHIVED_CLASSES_DEX_PATH;
+  /** Returns a {@link CodeRelatedFile} for archived DEX file for specific BundleTool version */
+  public static CodeRelatedFile archivedDexCodeRelatedFile(Version bundleToolVersion)
+      throws IOException {
+    String bundleToolRepoPath =
+        archivedResourcesHelper.findArchivedClassesDexPath(
+            bundleToolVersion, /* transparencyEnabled= */ true);
     ByteSource archivedClassesDex = resourceReader.getResourceByteSource(bundleToolRepoPath);
     String fileContentHash = archivedClassesDex.hash(Hashing.sha256()).toString();
     return CodeRelatedFile.newBuilder()
@@ -40,11 +46,5 @@ public final class CodeRelatedFileBuilderHelper {
         .setApkPath("")
         .setSha256(fileContentHash)
         .build();
-  }
-
-  public static void addArchivedDexCodeFilesToCodeTransparency(
-      CodeTransparency.Builder transparencyBuilder) throws IOException {
-    transparencyBuilder.addCodeRelatedFile(
-        CodeRelatedFileBuilderHelper.archivedDexCodeRelatedFile());
   }
 }

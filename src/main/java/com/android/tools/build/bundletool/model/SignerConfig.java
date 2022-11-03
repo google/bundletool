@@ -70,9 +70,20 @@ public abstract class SignerConfig {
     @SuppressWarnings("CheckReturnValue")
     public SignerConfig build() {
       SignerConfig result = autoBuild();
-      // Initialize issuerX500Principal here because implementation of getIssuerX500Principal is
-      // not thread-safe in JDK and we use it from multiple threads.
-      result.getCertificates().forEach(X509Certificate::getIssuerX500Principal);
+      // Initialize issuerX500Principal and calls getEncoded here because implementation of
+      // getIssuerX500Principal and getEncoded are not thread-safe in JDK and we use it from
+      // multiple threads.
+      result
+          .getCertificates()
+          .forEach(
+              cert -> {
+                if (cert.getIssuerX500Principal() != null) {
+                  cert.getIssuerX500Principal().getEncoded();
+                }
+                if (cert.getPublicKey() != null) {
+                  cert.getPublicKey().getEncoded();
+                }
+              });
       return result;
     }
   }

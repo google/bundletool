@@ -161,6 +161,9 @@ import com.android.bundle.Config.BundleConfig;
 import com.android.bundle.Config.BundleConfig.BundleType;
 import com.android.bundle.Config.Bundletool;
 import com.android.bundle.Config.Optimizations;
+import com.android.bundle.Config.ResourceOptimizations;
+import com.android.bundle.Config.ResourceOptimizations.CollapsedResourceNames;
+import com.android.bundle.Config.ResourceOptimizations.ResourceTypeAndName;
 import com.android.bundle.Config.SplitDimension.Value;
 import com.android.bundle.Config.StandaloneConfig;
 import com.android.bundle.Config.UncompressDexFiles.UncompressedDexTargetSdk;
@@ -210,6 +213,7 @@ import com.android.tools.build.bundletool.testing.FileUtils;
 import com.android.tools.build.bundletool.testing.ResourceTableBuilder;
 import com.android.tools.build.bundletool.testing.TestModule;
 import com.android.tools.build.bundletool.testing.truth.zip.TruthZip;
+import com.android.zipflinger.ZipMap;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableMultiset;
@@ -2183,6 +2187,100 @@ public class BuildApksManagerTest {
                         variant.getTargeting().getSdkVersionTargeting().getValueList().stream())
                 .collect(toImmutableList()))
         .containsExactly(sdkVersionFrom(25), S_SDK_VERSION);
+  }
+
+  @Test
+  public void buildApksCommand_splitApks_collapsedResourceNamesOptimization() throws Exception {
+    AppBundle appBundle =
+        new AppBundleBuilder()
+            .addModule(
+                "base",
+                builder ->
+                    builder
+                        .addFile("dex/classes.dex")
+                        .setResourceTable(
+                            new ResourceTableBuilder()
+                                .addPackage("com.test.app")
+                                .addStringResourceForMultipleLocales(
+                                    "application_string",
+                                    ImmutableMap.of("", "str", "es", "es-str", "fr", "fr-str"))
+                                .addStringResourceForMultipleLocales(
+                                    "the_same_string",
+                                    ImmutableMap.of("", "str", "es", "es-str", "fr", "fr-str"))
+                                .addStringResourceForMultipleLocales(
+                                    "no_collapse_string",
+                                    ImmutableMap.of("", "str", "es", "es-str", "fr", "fr-str"))
+                                .addStringResourceForMultipleLocales(
+                                    "another_string",
+                                    ImmutableMap.of("", "oth", "es", "oth", "fr", "oth"))
+                                .build())
+                        .setManifest(androidManifest("com.test.app", withMinSdkVersion(25))))
+            .build();
+    ImmutableList<ResourceTypeAndName> noCollapseList =
+        ImmutableList.of(
+            ResourceTypeAndName.newBuilder()
+                .setType("string")
+                .setName("no_collapse_string")
+                .build());
+
+    Path collapsedAndDeduplicatedApks = outputDir.resolve("collapsed-dedup.apks");
+    TestComponent.useTestModule(
+        this,
+        createTestModuleBuilder()
+            .withBundleConfig(
+                createCollapsedResourceNameConfig(
+                    /* collapseResourceNames= */ true,
+                    /* deduplicateResourceEntries= */ true,
+                    noCollapseList))
+            .withAppBundle(appBundle)
+            .withOutputPath(collapsedAndDeduplicatedApks)
+            .build());
+    buildApksManager.execute();
+
+    Path onlyCollapsedApks = outputDir.resolve("collapsed.apks");
+    TestComponent.useTestModule(
+        this,
+        createTestModuleBuilder()
+            .withBundleConfig(
+                createCollapsedResourceNameConfig(
+                    /* collapseResourceNames= */ true,
+                    /* deduplicateResourceEntries= */ false,
+                    noCollapseList))
+            .withAppBundle(appBundle)
+            .withOutputPath(onlyCollapsedApks)
+            .build());
+    buildApksManager.execute();
+
+    Path notOptimizedApks = outputDir.resolve("not-optimized.apks");
+    TestComponent.useTestModule(
+        this,
+        createTestModuleBuilder()
+            .withBundleConfig(
+                createCollapsedResourceNameConfig(
+                    /* collapseResourceNames= */ false,
+                    /* deduplicateResourceEntries= */ false,
+                    noCollapseList))
+            .withAppBundle(appBundle)
+            .withOutputPath(notOptimizedApks)
+            .build());
+    buildApksManager.execute();
+
+    // 2 resources are deduplicated (stored only once) in main and each language split which
+    // allows 16 bytes size savings.
+    assertThat(getApkSize(collapsedAndDeduplicatedApks, "splits/base-master.apk"))
+        .isEqualTo(getApkSize(onlyCollapsedApks, "splits/base-master.apk") - 16);
+    assertThat(getApkSize(collapsedAndDeduplicatedApks, "splits/base-es.apk"))
+        .isEqualTo(getApkSize(onlyCollapsedApks, "splits/base-es.apk") - 16);
+    assertThat(getApkSize(collapsedAndDeduplicatedApks, "splits/base-fr.apk"))
+        .isEqualTo(getApkSize(onlyCollapsedApks, "splits/base-fr.apk") - 16);
+
+    // Resource names are collapsed which provides size savings.
+    assertThat(getApkSize(onlyCollapsedApks, "splits/base-master.apk"))
+        .isLessThan(getApkSize(notOptimizedApks, "splits/base-master.apk"));
+    assertThat(getApkSize(onlyCollapsedApks, "splits/base-es.apk"))
+        .isLessThan(getApkSize(notOptimizedApks, "splits/base-es.apk"));
+    assertThat(getApkSize(onlyCollapsedApks, "splits/base-fr.apk"))
+        .isLessThan(getApkSize(notOptimizedApks, "splits/base-fr.apk"));
   }
 
   /** This test verifies uncompressed native libraries variant is not generated if not necessary. */
@@ -6409,7 +6507,9 @@ public class BuildApksManagerTest {
                         ByteSource.wrap(dexFileInFeatureModuleContent)
                             .hash(Hashing.sha256())
                             .toString()))
-            .addCodeRelatedFile(CodeRelatedFileBuilderHelper.archivedDexCodeRelatedFile())
+            .addCodeRelatedFile(
+                CodeRelatedFileBuilderHelper.archivedDexCodeRelatedFile(
+                    BundleToolVersion.getCurrentVersion()))
             .build();
     Path bundlePath = tmpDir.resolve("bundle.aab");
     AppBundleBuilder appBundle =
@@ -6834,6 +6934,26 @@ public class BuildApksManagerTest {
                           withTitle("@string/test_label", TEST_LABEL_RESOURCE_ID))));
     }
     return appBundle.build();
+  }
+
+  private static BundleConfig.Builder createCollapsedResourceNameConfig(
+      boolean collapseResourceNames,
+      boolean deduplicateResourceEntries,
+      ImmutableList<ResourceTypeAndName> noCollapse) {
+    return BundleConfig.newBuilder()
+        .setOptimizations(
+            Optimizations.newBuilder()
+                .setResourceOptimizations(
+                    ResourceOptimizations.newBuilder()
+                        .setCollapsedResourceNames(
+                            CollapsedResourceNames.newBuilder()
+                                .setCollapseResourceNames(collapseResourceNames)
+                                .setDeduplicateResourceEntries(deduplicateResourceEntries)
+                                .addAllNoCollapseResources(noCollapse))));
+  }
+
+  private static long getApkSize(Path apksPath, String innerApk) throws IOException {
+    return ZipMap.from(apksPath).getEntries().get(innerApk).getUncompressedSize();
   }
 
   @CommandScoped

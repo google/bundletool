@@ -49,6 +49,7 @@ import com.android.tools.build.bundletool.model.ZipPath;
 import com.android.tools.build.bundletool.model.exceptions.CommandExecutionException;
 import com.android.tools.build.bundletool.model.exceptions.InvalidCommandException;
 import com.android.tools.build.bundletool.model.utils.SystemEnvironmentProvider;
+import com.android.tools.build.bundletool.model.version.BundleToolVersion;
 import com.android.tools.build.bundletool.testing.AppBundleBuilder;
 import com.android.tools.build.bundletool.testing.CertificateFactory;
 import com.android.tools.build.bundletool.testing.CodeRelatedFileBuilderHelper;
@@ -611,7 +612,9 @@ public final class CheckTransparencyCommandTest {
         createJwsToken(
             CodeTransparency.newBuilder()
                 .setVersion(CodeTransparencyVersion.getCurrentVersion())
-                .addCodeRelatedFile(CodeRelatedFileBuilderHelper.archivedDexCodeRelatedFile())
+                .addCodeRelatedFile(
+                    CodeRelatedFileBuilderHelper.archivedDexCodeRelatedFile(
+                        BundleToolVersion.getCurrentVersion()))
                 .build(),
             transparencyKeyCertificate,
             transparencyPrivateKey);
@@ -649,7 +652,9 @@ public final class CheckTransparencyCommandTest {
     String serializedJws =
         createJwsToken(
             CodeTransparency.newBuilder()
-                .addCodeRelatedFile(CodeRelatedFileBuilderHelper.archivedDexCodeRelatedFile())
+                .addCodeRelatedFile(
+                    CodeRelatedFileBuilderHelper.archivedDexCodeRelatedFile(
+                        BundleToolVersion.getCurrentVersion()))
                 .build(),
             transparencyKeyCertificate,
             transparencyPrivateKey);
@@ -688,7 +693,9 @@ public final class CheckTransparencyCommandTest {
         createJwsToken(
             CodeTransparency.newBuilder()
                 .setVersion(CodeTransparencyVersion.getCurrentVersion())
-                .addCodeRelatedFile(CodeRelatedFileBuilderHelper.archivedDexCodeRelatedFile())
+                .addCodeRelatedFile(
+                    CodeRelatedFileBuilderHelper.archivedDexCodeRelatedFile(
+                        BundleToolVersion.getCurrentVersion()))
                 .build(),
             transparencyKeyCertificate,
             transparencyPrivateKey);
@@ -770,7 +777,9 @@ public final class CheckTransparencyCommandTest {
         createJwsToken(
             CodeTransparency.newBuilder()
                 .setVersion(CodeTransparencyVersion.getCurrentVersion())
-                .addCodeRelatedFile(CodeRelatedFileBuilderHelper.archivedDexCodeRelatedFile())
+                .addCodeRelatedFile(
+                    CodeRelatedFileBuilderHelper.archivedDexCodeRelatedFile(
+                        BundleToolVersion.getCurrentVersion()))
                 .build(),
             transparencyKeyCertificate,
             transparencyPrivateKey);

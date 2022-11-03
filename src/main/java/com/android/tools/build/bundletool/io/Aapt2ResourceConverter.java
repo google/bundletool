@@ -19,15 +19,22 @@ import static com.android.tools.build.bundletool.model.BundleModule.MANIFEST_FIL
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.Streams.stream;
 
+import com.android.bundle.Config.BundleConfig;
+import com.android.bundle.Config.ResourceOptimizations.CollapsedResourceNames;
+import com.android.bundle.Config.ResourceOptimizations.ResourceTypeAndName;
 import com.android.tools.build.bundletool.androidtools.Aapt2Command;
 import com.android.tools.build.bundletool.androidtools.Aapt2Command.ConvertOptions;
+import com.android.tools.build.bundletool.model.Bundle;
 import com.android.tools.build.bundletool.model.BundleModule.SpecialModuleEntry;
 import com.android.tools.build.bundletool.model.ModuleEntry;
 import com.android.tools.build.bundletool.model.ModuleSplit;
 import com.android.tools.build.bundletool.model.ZipPath;
 import com.android.tools.build.bundletool.model.utils.ZipUtils;
 import com.android.zipflinger.ZipArchive;
+import com.google.common.base.Supplier;
+import com.google.common.base.Suppliers;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Streams;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.ListeningExecutorService;
@@ -46,11 +53,24 @@ class Aapt2ResourceConverter {
 
   private final Aapt2Command aapt2Command;
   private final ListeningExecutorService executorService;
+  private final CollapsedResourceNames collapsedResourceNames;
+
+  private final Supplier<Optional<Path>> resourceConfigSupplier;
 
   @Inject
-  Aapt2ResourceConverter(Aapt2Command aapt2Command, ListeningExecutorService executorService) {
+  Aapt2ResourceConverter(
+      Aapt2Command aapt2Command,
+      ListeningExecutorService executorService,
+      Bundle bundle,
+      BundleConfig bundleConfig,
+      TempDirectory tempDirectory) {
     this.aapt2Command = aapt2Command;
     this.executorService = executorService;
+    this.collapsedResourceNames =
+        bundleConfig.getOptimizations().getResourceOptimizations().getCollapsedResourceNames();
+    resourceConfigSupplier =
+        Suppliers.memoize(
+            () -> createResourceConfig(tempDirectory, bundle, collapsedResourceNames));
   }
 
   /**
@@ -138,7 +158,12 @@ class Aapt2ResourceConverter {
       aapt2Command.convertApkProtoToBinary(
           protoApkPath,
           binaryApkPath,
-          ConvertOptions.builder().setForceSparseEncoding(split.getSparseEncoding()).build());
+          ConvertOptions.builder()
+              .setForceSparseEncoding(split.getSparseEncoding())
+              .setCollapseResourceNames(collapsedResourceNames.getCollapseResourceNames())
+              .setDeduplicateResourceEntries(collapsedResourceNames.getDeduplicateResourceEntries())
+              .setResourceConfigPath(resourceConfigSupplier.get())
+              .build());
       return binaryApkPath;
     }
 
@@ -191,5 +216,57 @@ class Aapt2ResourceConverter {
               .collect(toImmutableList());
       return split.toBuilder().setEntries(allEntries).build();
     }
+  }
+
+  private static Optional<Path> createResourceConfig(
+      TempDirectory tempDirectory, Bundle bundle, CollapsedResourceNames collapsedResourceNames) {
+    if (!collapsedResourceNames.getCollapseResourceNames()
+        || (collapsedResourceNames.getNoCollapseResourcesCount() == 0
+            && collapsedResourceNames.getNoCollapseResourceTypesCount() == 0)) {
+      return Optional.empty();
+    }
+    try {
+      Path resourceConfigPath =
+          Files.createTempFile(tempDirectory.getPath(), "aapt2-resource", ".cfg");
+
+      ImmutableList<String> configLines =
+          Stream.concat(
+                  collapsedResourceNames.getNoCollapseResourcesList().stream(),
+                  expandExcludedResourceTypes(bundle, collapsedResourceNames).stream())
+              .map(
+                  typeAndName ->
+                      String.format(
+                          "%s/%s#no_collapse", typeAndName.getType(), typeAndName.getName()))
+              .collect(toImmutableList());
+      Files.write(resourceConfigPath, configLines);
+      return Optional.of(resourceConfigPath);
+    } catch (IOException e) {
+      throw new UncheckedIOException(e);
+    }
+  }
+
+  private static ImmutableList<ResourceTypeAndName> expandExcludedResourceTypes(
+      Bundle bundle, CollapsedResourceNames collapsedResourceNames) {
+    if (collapsedResourceNames.getNoCollapseResourceTypesCount() == 0) {
+      return ImmutableList.of();
+    }
+    ImmutableSet<String> excludedTypes =
+        ImmutableSet.copyOf(collapsedResourceNames.getNoCollapseResourceTypesList());
+    return bundle.getModules().values().stream()
+        .filter(bundleModule -> bundleModule.getResourceTable().isPresent())
+        .map(bundleModule -> bundleModule.getResourceTable().get())
+        .flatMap(resourceTable -> resourceTable.getPackageList().stream())
+        .flatMap(resourcePackage -> resourcePackage.getTypeList().stream())
+        .filter(type -> excludedTypes.contains(type.getName()))
+        .flatMap(
+            type ->
+                type.getEntryList().stream()
+                    .map(
+                        entry ->
+                            ResourceTypeAndName.newBuilder()
+                                .setName(entry.getName())
+                                .setType(type.getName())
+                                .build()))
+        .collect(toImmutableList());
   }
 }
