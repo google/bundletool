@@ -29,6 +29,7 @@ import static com.android.tools.build.bundletool.model.AndroidManifest.SDK_SANDB
 import static com.android.tools.build.bundletool.model.AndroidManifest.SPLIT_NAME_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.ManifestMutator.withExtractNativeLibs;
 import static com.android.tools.build.bundletool.model.OptimizationDimension.ABI;
+import static com.android.tools.build.bundletool.model.OptimizationDimension.COUNTRY_SET;
 import static com.android.tools.build.bundletool.model.OptimizationDimension.DEVICE_TIER;
 import static com.android.tools.build.bundletool.model.OptimizationDimension.LANGUAGE;
 import static com.android.tools.build.bundletool.model.OptimizationDimension.SCREEN_DENSITY;
@@ -68,6 +69,7 @@ import static com.android.tools.build.bundletool.testing.ResourcesTableFactory.v
 import static com.android.tools.build.bundletool.testing.TargetingUtils.alternativeLanguageTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.apkAbiTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.apkAlternativeLanguageTargeting;
+import static com.android.tools.build.bundletool.testing.TargetingUtils.apkCountrySetTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.apkDensityTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.apkDeviceTierTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.apkLanguageTargeting;
@@ -75,6 +77,7 @@ import static com.android.tools.build.bundletool.testing.TargetingUtils.apkMinSd
 import static com.android.tools.build.bundletool.testing.TargetingUtils.apkTextureTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.assets;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.assetsDirectoryTargeting;
+import static com.android.tools.build.bundletool.testing.TargetingUtils.countrySetTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.deviceTierTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.getSplitsWithTargetingEqualTo;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.lPlusVariantTargeting;
@@ -1367,6 +1370,69 @@ public class ModuleSplitterTest {
   }
 
   @Test
+  public void countrySetAsset_splitting_and_merging() {
+    BundleModule testModule =
+        new BundleModuleBuilder("testModule")
+            .addFile("assets/main#countries_latam/image.jpg")
+            .addFile("assets/main#countries_sea/image.jpg")
+            .addFile("dex/classes.dex")
+            .setAssetsConfig(
+                assets(
+                    targetedAssetsDirectory(
+                        "assets/main#countries_latam",
+                        assetsDirectoryTargeting(
+                            countrySetTargeting(
+                                ImmutableList.of("latam"), ImmutableList.of("sea")))),
+                    targetedAssetsDirectory(
+                        "assets/main#countries_sea",
+                        assetsDirectoryTargeting(
+                            countrySetTargeting(
+                                ImmutableList.of("sea"), ImmutableList.of("latam"))))))
+            .setManifest(androidManifest("com.test.app"))
+            .build();
+
+    ImmutableList<ModuleSplit> splits = createCountrySetSplitter(testModule).splitModule();
+
+    // expected 3 splits: latam, sea and the master split.
+    assertThat(splits).hasSize(3);
+    assertThat(splits.stream().map(ModuleSplit::getSplitType).distinct().collect(toImmutableSet()))
+        .containsExactly(SplitType.SPLIT);
+    assertThat(
+            splits.stream()
+                .map(ModuleSplit::getVariantTargeting)
+                .distinct()
+                .collect(toImmutableSet()))
+        .containsExactly(lPlusVariantTargeting());
+
+    ImmutableList<ModuleSplit> defaultSplits =
+        getSplitsWithTargetingEqualTo(splits, DEFAULT_MASTER_SPLIT_SDK_TARGETING);
+    assertThat(defaultSplits).hasSize(1);
+    assertThat(extractPaths(defaultSplits.get(0).getEntries())).containsExactly("dex/classes.dex");
+
+    ImmutableList<ModuleSplit> latamSplits =
+        getSplitsWithTargetingEqualTo(
+            splits,
+            mergeApkTargeting(
+                DEFAULT_MASTER_SPLIT_SDK_TARGETING,
+                apkCountrySetTargeting(
+                    countrySetTargeting(ImmutableList.of("latam"), ImmutableList.of("sea")))));
+    assertThat(latamSplits).hasSize(1);
+    assertThat(extractPaths(latamSplits.get(0).getEntries()))
+        .containsExactly("assets/main#countries_latam/image.jpg");
+
+    ImmutableList<ModuleSplit> seaSplits =
+        getSplitsWithTargetingEqualTo(
+            splits,
+            mergeApkTargeting(
+                DEFAULT_MASTER_SPLIT_SDK_TARGETING,
+                apkCountrySetTargeting(
+                    countrySetTargeting(ImmutableList.of("sea"), ImmutableList.of("latam")))));
+    assertThat(seaSplits).hasSize(1);
+    assertThat(extractPaths(seaSplits.get(0).getEntries()))
+        .containsExactly("assets/main#countries_sea/image.jpg");
+  }
+
+  @Test
   public void targetsPreLOnlyInManifest_throws() throws Exception {
     int preL = 20;
     BundleModule bundleModule =
@@ -2411,6 +2477,16 @@ public class ModuleSplitterTest {
         BUNDLETOOL_VERSION,
         APP_BUNDLE,
         withOptimizationDimensions(ImmutableSet.of(DEVICE_TIER)),
+        lPlusVariantTargeting(),
+        ImmutableSet.of(module.getName().getName()));
+  }
+
+  private static ModuleSplitter createCountrySetSplitter(BundleModule module) {
+    return ModuleSplitter.createNoStamp(
+        module,
+        BUNDLETOOL_VERSION,
+        APP_BUNDLE,
+        withOptimizationDimensions(ImmutableSet.of(COUNTRY_SET)),
         lPlusVariantTargeting(),
         ImmutableSet.of(module.getName().getName()));
   }

@@ -85,6 +85,14 @@ public class AssetModuleSplitter {
               apkGenerationConfiguration.shouldStripTargetingSuffix(
                   OptimizationDimension.DEVICE_TIER)));
     }
+    if (apkGenerationConfiguration
+        .getOptimizationDimensions()
+        .contains(OptimizationDimension.COUNTRY_SET)) {
+      assetsSplitters.add(
+          CountrySetAssetsSplitter.create(
+              apkGenerationConfiguration.shouldStripTargetingSuffix(
+                  OptimizationDimension.COUNTRY_SET)));
+    }
     return new SplittingPipeline(assetsSplitters.build());
   }
 

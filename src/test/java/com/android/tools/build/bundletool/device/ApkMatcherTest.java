@@ -1600,6 +1600,29 @@ public class ApkMatcherTest {
             baseMatchedApk(baseApk),
             matchedApk(installTimeMasterApk1, installTimeModule1, INSTALL_TIME),
             matchedApk(installTimeEnApk1, installTimeModule1, INSTALL_TIME),
+            matchedApk(installTimeMasterApk2, installTimeModule2, INSTALL_TIME),
+            matchedApk(installTimeEnApk2, installTimeModule2, INSTALL_TIME),
+            matchedApk(onDemandMasterApk, onDemandModule, ON_DEMAND));
+
+    assertThat(
+            createMatcher(enDevice, Optional.of(ImmutableSet.of(onDemandModule)))
+                .getMatchingApks(buildApksResult))
+        .containsExactly(
+            baseMatchedApk(baseApk),
+            matchedApk(installTimeMasterApk1, installTimeModule1, INSTALL_TIME),
+            matchedApk(installTimeEnApk1, installTimeModule1, INSTALL_TIME),
+            matchedApk(installTimeMasterApk2, installTimeModule2, INSTALL_TIME),
+            matchedApk(installTimeEnApk2, installTimeModule2, INSTALL_TIME),
+            matchedApk(onDemandMasterApk, onDemandModule, ON_DEMAND));
+
+    assertThat(
+            createMatcherExcludingInstallTimeAssetModules(
+                    enDevice, Optional.of(ImmutableSet.of(installTimeModule1, onDemandModule)))
+                .getMatchingApks(buildApksResult))
+        .containsExactly(
+            baseMatchedApk(baseApk),
+            matchedApk(installTimeMasterApk1, installTimeModule1, INSTALL_TIME),
+            matchedApk(installTimeEnApk1, installTimeModule1, INSTALL_TIME),
             matchedApk(onDemandMasterApk, onDemandModule, ON_DEMAND));
   }
 
@@ -1710,18 +1733,40 @@ public class ApkMatcherTest {
 
   private static ApkMatcher createMatcher(DeviceSpec spec, Optional<ImmutableSet<String>> modules) {
     return new ApkMatcher(
-        spec, modules, /* matchInstant= */ false, /* ensureDensityAndAbiApksMatched= */ false);
+        spec,
+        modules,
+        /* includeInstallTimeAssetModules= */ true,
+        /* matchInstant= */ false,
+        /* ensureDensityAndAbiApksMatched= */ false);
+  }
+
+  private static ApkMatcher createMatcherExcludingInstallTimeAssetModules(
+      DeviceSpec spec, Optional<ImmutableSet<String>> modules) {
+    return new ApkMatcher(
+        spec,
+        modules,
+        /* includeInstallTimeAssetModules= */ false,
+        /* matchInstant= */ false,
+        /* ensureDensityAndAbiApksMatched= */ false);
   }
 
   private static ApkMatcher createInstantMatcher(
       DeviceSpec spec, Optional<ImmutableSet<String>> modules) {
     return new ApkMatcher(
-        spec, modules, /* matchInstant= */ true, /* ensureDensityAndAbiApksMatched= */ false);
+        spec,
+        modules,
+        /* includeInstallTimeAssetModules= */ true,
+        /* matchInstant= */ true,
+        /* ensureDensityAndAbiApksMatched= */ false);
   }
 
   private static ApkMatcher createSafeMatcher(
       DeviceSpec spec, Optional<ImmutableSet<String>> modules) {
     return new ApkMatcher(
-        spec, modules, /* matchInstant= */ false, /* ensureDensityAndAbiApksMatched= */ true);
+        spec,
+        modules,
+        /* includeInstallTimeAssetModules= */ true,
+        /* matchInstant= */ false,
+        /* ensureDensityAndAbiApksMatched= */ true);
   }
 }

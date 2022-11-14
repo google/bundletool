@@ -49,7 +49,7 @@ public final class BundleConfigValidator extends SubValidator {
   private static final ImmutableSet<String> FORBIDDEN_CHARS_IN_GLOB = ImmutableSet.of("\n", "\\\\");
 
   private static final ImmutableSet<SplitDimension.Value> SUFFIX_STRIPPING_ENABLED_DIMENSIONS =
-      ImmutableSet.of(Value.TEXTURE_COMPRESSION_FORMAT, Value.DEVICE_TIER);
+      ImmutableSet.of(Value.TEXTURE_COMPRESSION_FORMAT, Value.DEVICE_TIER, Value.COUNTRY_SET);
 
   @Override
   public void validateBundle(AppBundle bundle) {

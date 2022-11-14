@@ -81,6 +81,7 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Multimap;
 import com.google.protobuf.Int32Value;
+import com.google.protobuf.StringValue;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Path;
@@ -219,7 +220,9 @@ public class ApkSerializerManager {
     // To avoid filtering of unmatched language splits we skip device filtering for system mode.
     Predicate<ModuleSplit> deviceFilter =
         deviceSpec.isPresent() && !apkBuildMode.equals(SYSTEM)
-            ? new ApkMatcher(addDefaultDeviceTierIfNecessary(deviceSpec.get()))
+            ? new ApkMatcher(
+                    addDefaultCountrySetIfNecessary(
+                        addDefaultDeviceTierIfNecessary(deviceSpec.get())))
                 ::matchesModuleSplitByTargeting
             : alwaysTrue();
 
@@ -303,7 +306,9 @@ public class ApkSerializerManager {
 
     Predicate<ModuleSplit> deviceFilter =
         deviceSpec.isPresent()
-            ? new ApkMatcher(addDefaultDeviceTierIfNecessary(deviceSpec.get()))
+            ? new ApkMatcher(
+                    addDefaultCountrySetIfNecessary(
+                        addDefaultDeviceTierIfNecessary(deviceSpec.get())))
                 ::matchesModuleSplitByTargeting
             : alwaysTrue();
 
@@ -522,6 +527,28 @@ public class ApkSerializerManager {
                                 ? 0
                                 : Integer.parseInt(suffix.getDefaultSuffix()))
                     .orElse(0)))
+        .build();
+  }
+
+  /**
+   * Adds a default country set to the given {@link DeviceSpec} if it has none.
+   *
+   * <p>The default country set is taken from the optimization settings in the {@link
+   * com.android.bundle.Config.BundleConfig}.
+   */
+  private DeviceSpec addDefaultCountrySetIfNecessary(DeviceSpec deviceSpec) {
+    if (deviceSpec.hasCountrySet()) {
+      return deviceSpec;
+    }
+    Optional<SuffixStripping> countrySetSuffix =
+        Optional.ofNullable(
+            apkOptimizations.getSuffixStrippings().get(OptimizationDimension.COUNTRY_SET));
+    if (!countrySetSuffix.isPresent()) {
+      return deviceSpec;
+    }
+    return deviceSpec.toBuilder()
+        .setCountrySet(
+            StringValue.of(countrySetSuffix.map(SuffixStripping::getDefaultSuffix).orElse("")))
         .build();
   }
 }

@@ -16,13 +16,17 @@
 
 package com.android.tools.build.bundletool.splitters;
 
+import static com.android.tools.build.bundletool.model.OptimizationDimension.COUNTRY_SET;
 import static com.android.tools.build.bundletool.model.OptimizationDimension.LANGUAGE;
 import static com.android.tools.build.bundletool.model.OptimizationDimension.TEXTURE_COMPRESSION_FORMAT;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifestForAssetModule;
+import static com.android.tools.build.bundletool.testing.TargetingUtils.alternativeCountrySetTargeting;
+import static com.android.tools.build.bundletool.testing.TargetingUtils.apkCountrySetTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.apkLanguageTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.apkTextureTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.assets;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.assetsDirectoryTargeting;
+import static com.android.tools.build.bundletool.testing.TargetingUtils.countrySetTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.languageTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.mergeApkTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.mergeAssetsTargeting;
@@ -81,4 +85,98 @@ public class AssetModuleSplitterTest {
         .containsExactly("assets/image.jpg", "assets/image2.jpg");
   }
 
+
+  @Test
+  public void slicesByCountrySet() throws Exception {
+    BundleModule testModule =
+        new BundleModuleBuilder(MODULE_NAME)
+            .addFile("assets/images/image.jpg")
+            .addFile("assets/images#countries_latam/image.jpg")
+            .addFile("assets/images#countries_sea/image.jpg")
+            .setAssetsConfig(
+                assets(
+                    targetedAssetsDirectory(
+                        "assets/images#countries_latam",
+                        assetsDirectoryTargeting(
+                            countrySetTargeting(
+                                ImmutableList.of("latam"), ImmutableList.of("sea")))),
+                    targetedAssetsDirectory(
+                        "assets/images#countries_sea",
+                        assetsDirectoryTargeting(
+                            countrySetTargeting(
+                                ImmutableList.of("sea"), ImmutableList.of("latam")))),
+                    targetedAssetsDirectory(
+                        "assets/images",
+                        assetsDirectoryTargeting(
+                            alternativeCountrySetTargeting(ImmutableList.of("latam", "sea"))))))
+            .setManifest(androidManifestForAssetModule("com.test.app"))
+            .build();
+
+    assertThat(testModule.getModuleType()).isEqualTo(ModuleType.ASSET_MODULE);
+    ImmutableList<ModuleSplit> slices =
+        new AssetModuleSplitter(
+                testModule,
+                ApkGenerationConfiguration.builder()
+                    .setOptimizationDimensions(ImmutableSet.of(COUNTRY_SET))
+                    .build())
+            .splitModule();
+
+    assertThat(slices).hasSize(4);
+
+    ImmutableMap<ApkTargeting, ModuleSplit> slicesByTargeting =
+        Maps.uniqueIndex(slices, ModuleSplit::getApkTargeting);
+
+    assertThat(slicesByTargeting.keySet())
+        .containsExactly(
+            ApkTargeting.getDefaultInstance(),
+            apkCountrySetTargeting(
+                countrySetTargeting(ImmutableList.of("latam"), ImmutableList.of("sea"))),
+            apkCountrySetTargeting(
+                countrySetTargeting(ImmutableList.of("sea"), ImmutableList.of("latam"))),
+            apkCountrySetTargeting(
+                alternativeCountrySetTargeting(ImmutableList.of("latam", "sea"))));
+
+    ModuleSplit masterSplit = slicesByTargeting.get(ApkTargeting.getDefaultInstance());
+    assertThat(masterSplit.getSplitType()).isEqualTo(SplitType.ASSET_SLICE);
+    assertThat(masterSplit.isMasterSplit()).isTrue();
+    assertThat(masterSplit.getAndroidManifest().getSplitId()).hasValue(MODULE_NAME);
+    assertThat(masterSplit.getAndroidManifest().getHasCode()).hasValue(false);
+    assertThat(masterSplit.getEntries()).isEmpty();
+
+    ModuleSplit latamSplit =
+        slicesByTargeting.get(
+            apkCountrySetTargeting(
+                countrySetTargeting(ImmutableList.of("latam"), ImmutableList.of("sea"))));
+    assertThat(latamSplit.getSplitType()).isEqualTo(SplitType.ASSET_SLICE);
+    assertThat(latamSplit.isMasterSplit()).isFalse();
+    assertThat(latamSplit.getAndroidManifest().getSplitId())
+        .hasValue(MODULE_NAME + ".config.countries_latam");
+    assertThat(latamSplit.getAndroidManifest().getHasCode()).hasValue(false);
+    assertThat(extractPaths(latamSplit.getEntries()))
+        .containsExactly("assets/images#countries_latam/image.jpg");
+
+    ModuleSplit seaSplit =
+        slicesByTargeting.get(
+            apkCountrySetTargeting(
+                countrySetTargeting(ImmutableList.of("sea"), ImmutableList.of("latam"))));
+    assertThat(seaSplit.getSplitType()).isEqualTo(SplitType.ASSET_SLICE);
+    assertThat(seaSplit.isMasterSplit()).isFalse();
+    assertThat(seaSplit.getAndroidManifest().getSplitId())
+        .hasValue(MODULE_NAME + ".config.countries_sea");
+    assertThat(seaSplit.getAndroidManifest().getHasCode()).hasValue(false);
+    assertThat(extractPaths(seaSplit.getEntries()))
+        .containsExactly("assets/images#countries_sea/image.jpg");
+
+    ModuleSplit restOfWorldSplit =
+        slicesByTargeting.get(
+            apkCountrySetTargeting(
+                alternativeCountrySetTargeting(ImmutableList.of("latam", "sea"))));
+    assertThat(restOfWorldSplit.getSplitType()).isEqualTo(SplitType.ASSET_SLICE);
+    assertThat(restOfWorldSplit.isMasterSplit()).isFalse();
+    assertThat(restOfWorldSplit.getAndroidManifest().getSplitId())
+        .hasValue(MODULE_NAME + ".config.other_countries");
+    assertThat(restOfWorldSplit.getAndroidManifest().getHasCode()).hasValue(false);
+    assertThat(extractPaths(restOfWorldSplit.getEntries()))
+        .containsExactly("assets/images/image.jpg");
+  }
 }

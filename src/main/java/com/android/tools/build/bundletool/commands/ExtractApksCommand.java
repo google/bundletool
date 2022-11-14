@@ -54,6 +54,7 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.io.ByteStreams;
 import com.google.protobuf.Int32Value;
+import com.google.protobuf.StringValue;
 import com.google.protobuf.util.JsonFormat;
 import java.io.IOException;
 import java.io.InputStream;
@@ -94,6 +95,8 @@ public abstract class ExtractApksCommand {
 
   public abstract Optional<ImmutableSet<String>> getModules();
 
+  public abstract boolean getIncludeInstallTimeAssetModules();
+
   /** Gets whether instant APKs should be extracted. */
   public abstract boolean getInstant();
 
@@ -103,7 +106,8 @@ public abstract class ExtractApksCommand {
   public static Builder builder() {
     return new AutoValue_ExtractApksCommand.Builder()
         .setInstant(false)
-        .setIncludeMetadata(false);
+        .setIncludeMetadata(false)
+        .setIncludeInstallTimeAssetModules(true);
   }
 
   /** Builder for the {@link ExtractApksCommand}. */
@@ -119,7 +123,19 @@ public abstract class ExtractApksCommand {
 
     public abstract Builder setOutputDirectory(Path outputDirectory);
 
+    /**
+     * Sets the required modules to extract.
+     *
+     * <p>All install-time feature modules and asset modules are extracted by default. You can
+     * exclude install-time asset modules by passing {@code false} to {@link
+     * #setIncludeInstallTimeAssetModules}.
+     *
+     * <p>"_ALL_" extracts all modules.
+     */
     public abstract Builder setModules(ImmutableSet<String> modules);
+
+    /** Whether to extract install-time asset modules (default = true). */
+    public abstract Builder setIncludeInstallTimeAssetModules(boolean shouldInclude);
 
     /**
      * Sets whether instant APKs should be extracted.
@@ -195,6 +211,7 @@ public abstract class ExtractApksCommand {
         new ApkMatcher(
             deviceSpec,
             requestedModuleNames,
+            getIncludeInstallTimeAssetModules(),
             getInstant(),
             /* ensureDensityAndAbiApksMatched= */ true);
     ImmutableList<GeneratedApk> generatedApks = apkMatcher.getMatchingApks(toc);
@@ -349,6 +366,18 @@ public abstract class ExtractApksCommand {
               .collect(toOptional())
               .orElse(0);
       builder.setDeviceTier(Int32Value.of(defaultDeviceTier));
+    }
+    if (!deviceSpec.hasCountrySet()) {
+      String defaultCountrySet =
+          toc.getDefaultTargetingValueList().stream()
+              .filter(
+                  defaultTargetingValue ->
+                      defaultTargetingValue.getDimension().equals(Value.COUNTRY_SET))
+              .map(DefaultTargetingValue::getDefaultValue)
+              .filter(defaultValue -> !defaultValue.isEmpty())
+              .collect(toOptional())
+              .orElse("");
+      builder.setCountrySet(StringValue.of(defaultCountrySet));
     }
     if (!deviceSpec.hasSdkRuntime()) {
       builder

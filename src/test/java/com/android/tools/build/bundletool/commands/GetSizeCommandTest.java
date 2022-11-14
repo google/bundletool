@@ -45,11 +45,13 @@ import static com.android.tools.build.bundletool.testing.ApksArchiveHelpers.stan
 import static com.android.tools.build.bundletool.testing.DeviceFactory.createDeviceSpecFile;
 import static com.android.tools.build.bundletool.testing.DeviceFactory.deviceWithSdk;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.apkAbiTargeting;
+import static com.android.tools.build.bundletool.testing.TargetingUtils.apkCountrySetTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.apkDensityTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.apkDeviceTierTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.apkLanguageTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.apkSdkTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.apkTextureTargeting;
+import static com.android.tools.build.bundletool.testing.TargetingUtils.countrySetTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.deviceTierTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.lPlusVariantTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.mergeApkTargeting;
@@ -750,37 +752,19 @@ public final class GetSizeCommandTest {
 
     assertThat(configurationSizes.getMinSizeConfigurationMap())
         .containsExactly(
-            SizeConfiguration.builder()
-                .setSdkVersion("21-")
-                .setScreenDensity("LDPI")
-                .build(),
+            SizeConfiguration.builder().setSdkVersion("21-").setScreenDensity("LDPI").build(),
             2 * compressedApkSize,
-            SizeConfiguration.builder()
-                .setSdkVersion("21-")
-                .setScreenDensity("MDPI")
-                .build(),
+            SizeConfiguration.builder().setSdkVersion("21-").setScreenDensity("MDPI").build(),
             2 * compressedApkSize,
-            SizeConfiguration.builder()
-                .setSdkVersion("15-20")
-                .setAbi("armeabi")
-                .build(),
+            SizeConfiguration.builder().setSdkVersion("15-20").setAbi("armeabi").build(),
             compressedApkSize);
     assertThat(configurationSizes.getMaxSizeConfigurationMap())
         .containsExactly(
-            SizeConfiguration.builder()
-                .setSdkVersion("21-")
-                .setScreenDensity("LDPI")
-                .build(),
+            SizeConfiguration.builder().setSdkVersion("21-").setScreenDensity("LDPI").build(),
             2 * compressedApkSize,
-            SizeConfiguration.builder()
-                .setSdkVersion("21-")
-                .setScreenDensity("MDPI")
-                .build(),
+            SizeConfiguration.builder().setSdkVersion("21-").setScreenDensity("MDPI").build(),
             2 * compressedApkSize,
-            SizeConfiguration.builder()
-                .setSdkVersion("15-20")
-                .setAbi("armeabi")
-                .build(),
+            SizeConfiguration.builder().setSdkVersion("15-20").setAbi("armeabi").build(),
             compressedApkSize);
   }
 
@@ -896,7 +880,6 @@ public final class GetSizeCommandTest {
                 + String.format("%d B,%d B", compressedApkSize, 3 * compressedApkSize)
                 + CRLF);
   }
-
 
   @Test
   public void getSizeTotal_withSelectModules() throws Exception {
@@ -1214,6 +1197,86 @@ public final class GetSizeCommandTest {
   }
 
   @Test
+  public void getSizeTotal_withAssetModules_selectedModules() throws Exception {
+    Variant lVariant =
+        createVariant(
+            lPlusVariantTargeting(),
+            createSplitApkSet(
+                /* moduleName= */ "base",
+                createMasterApkDescription(
+                    ApkTargeting.getDefaultInstance(), ZipPath.create("base-master.apk")),
+                createApkDescription(
+                    apkAbiTargeting(X86, ImmutableSet.of(X86_64)),
+                    ZipPath.create("base-x86.apk"),
+                    /* isMasterSplit= */ false),
+                createApkDescription(
+                    apkAbiTargeting(X86_64, ImmutableSet.of(X86)),
+                    ZipPath.create("base-x86_64.apk"),
+                    /* isMasterSplit= */ false)));
+
+    AssetSliceSet assetModule =
+        createAssetSliceSet(
+            /* moduleName= */ "asset1",
+            DeliveryType.INSTALL_TIME,
+            createMasterApkDescription(
+                ApkTargeting.getDefaultInstance(), ZipPath.create("asset1-master.apk")),
+            createApkDescription(
+                apkTextureTargeting(ETC2, ImmutableSet.of(ASTC)),
+                ZipPath.create("asset1-tcf_etc2.apk"),
+                /* isMasterSplit= */ false),
+            createApkDescription(
+                apkTextureTargeting(ASTC, ImmutableSet.of(ETC2)),
+                ZipPath.create("asset1-tcf_astc.apk"),
+                /* isMasterSplit= */ false));
+    AssetSliceSet onDemandAssetModule =
+        createAssetSliceSet(
+            /* moduleName= */ "asset2",
+            DeliveryType.ON_DEMAND,
+            createMasterApkDescription(
+                ApkTargeting.getDefaultInstance(), ZipPath.create("asset2-master.apk")));
+    BuildApksResult tableOfContentsProto =
+        BuildApksResult.newBuilder()
+            .setBundletool(
+                Bundletool.newBuilder()
+                    .setVersion(BundleToolVersion.getCurrentVersion().toString()))
+            .addVariant(lVariant)
+            .addAssetSliceSet(assetModule)
+            .addAssetSliceSet(onDemandAssetModule)
+            .build();
+    Path apksArchiveFile =
+        createApksArchiveFile(tableOfContentsProto, tmpDir.resolve("bundle.apks"));
+
+    ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+
+    GetSizeCommand.builder()
+        .setGetSizeSubCommand(GetSizeSubcommand.TOTAL)
+        .setApksArchivePath(apksArchiveFile)
+        .setDimensions(
+            ImmutableSet.of(Dimension.ABI, Dimension.TEXTURE_COMPRESSION_FORMAT, Dimension.SDK))
+        .setModules(ImmutableSet.of("asset2"))
+        .build()
+        .getSizeTotal(new PrintStream(outputStream));
+
+    // Selects all install-time modules (base and asset1) and the ones explicitly selected (asset2).
+    assertThat(new String(outputStream.toByteArray(), UTF_8).split(CRLF))
+        .asList()
+        .containsExactly(
+            "SDK,ABI,TEXTURE_COMPRESSION_FORMAT,MIN,MAX",
+            String.format(
+                "%s,%s,%s,%d,%d",
+                "21-", "x86_64", "astc", 5 * compressedApkSize, 5 * compressedApkSize),
+            String.format(
+                "%s,%s,%s,%d,%d",
+                "21-", "x86_64", "etc2", 5 * compressedApkSize, 5 * compressedApkSize),
+            String.format(
+                "%s,%s,%s,%d,%d",
+                "21-", "x86", "astc", 5 * compressedApkSize, 5 * compressedApkSize),
+            String.format(
+                "%s,%s,%s,%d,%d",
+                "21-", "x86", "etc2", 5 * compressedApkSize, 5 * compressedApkSize));
+  }
+
+  @Test
   public void getSizeTotal_withAssetModulesAndDeviceSpec() throws Exception {
     Variant lVariant =
         createVariant(
@@ -1446,6 +1509,74 @@ public final class GetSizeCommandTest {
         .containsExactly(
             "SDK,DEVICE_TIER,MIN,MAX",
             String.format("%s,%s,%d,%d", "25", "1", 2 * compressedApkSize, 2 * compressedApkSize));
+  }
+
+  @Test
+  public void getSizeTotal_withCountrySet() throws Exception {
+    Variant lVariant =
+        createVariant(
+            lPlusVariantTargeting(),
+            createSplitApkSet(
+                /* moduleName= */ "base",
+                createMasterApkDescription(
+                    ApkTargeting.getDefaultInstance(), ZipPath.create("base-master.apk")),
+                splitApkDescription(
+                    apkCountrySetTargeting(
+                        countrySetTargeting(
+                            /* value= */ "latam", /* alternatives= */ ImmutableList.of("sea"))),
+                    ZipPath.create("base-countries_latam.apk")),
+                splitApkDescription(
+                    apkCountrySetTargeting(
+                        countrySetTargeting(
+                            /* value= */ "sea", /* alternatives= */ ImmutableList.of("latam"))),
+                    ZipPath.create("base-countries_sea.apk"))));
+    AssetSliceSet assetSliceSet =
+        createAssetSliceSet(
+            /* moduleName= */ "assetpack1",
+            DeliveryType.INSTALL_TIME,
+            createApkDescription(
+                ApkTargeting.getDefaultInstance(), ZipPath.create("assetpack1-master.apk"), true),
+            createApkDescription(
+                apkCountrySetTargeting(
+                    countrySetTargeting(
+                        /* value= */ "latam", /* alternatives= */ ImmutableList.of("sea"))),
+                ZipPath.create("assetpack1-countries_latam.apk"),
+                false),
+            createApkDescription(
+                apkCountrySetTargeting(
+                    countrySetTargeting(
+                        /* value= */ "sea", /* alternatives= */ ImmutableList.of("latam"))),
+                ZipPath.create("assetpack1-countries_sea.apk"),
+                false));
+
+    BuildApksResult tableOfContentsProto =
+        BuildApksResult.newBuilder()
+            .setBundletool(
+                Bundletool.newBuilder()
+                    .setVersion(BundleToolVersion.getCurrentVersion().toString()))
+            .addVariant(lVariant)
+            .addAssetSliceSet(assetSliceSet)
+            .build();
+    Path apksArchiveFile =
+        createApksArchiveFile(tableOfContentsProto, tmpDir.resolve("bundle.apks"));
+
+    ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+
+    GetSizeCommand.builder()
+        .setGetSizeSubCommand(GetSizeSubcommand.TOTAL)
+        .setApksArchivePath(apksArchiveFile)
+        .setDimensions(ImmutableSet.of(Dimension.COUNTRY_SET, Dimension.SDK))
+        .build()
+        .getSizeTotal(new PrintStream(outputStream));
+
+    assertThat(new String(outputStream.toByteArray(), UTF_8).split(CRLF))
+        .asList()
+        .containsExactly(
+            "SDK,COUNTRY_SET,MIN,MAX",
+            String.format(
+                "%s,%s,%d,%d", "21-", "latam", 4 * compressedApkSize, 4 * compressedApkSize),
+            String.format(
+                "%s,%s,%d,%d", "21-", "sea", 4 * compressedApkSize, 4 * compressedApkSize));
   }
 
   @Test

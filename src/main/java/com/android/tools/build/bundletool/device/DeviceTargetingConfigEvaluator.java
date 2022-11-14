@@ -28,6 +28,7 @@ import com.android.bundle.DeviceRam;
 import com.android.bundle.DeviceSelector;
 import com.android.bundle.DeviceTier;
 import com.android.bundle.DeviceTierConfig;
+import com.android.bundle.UserCountrySet;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
@@ -90,6 +91,15 @@ public class DeviceTargetingConfigEvaluator {
         .map(name -> deviceGroupNameToDeviceGroup.get(name).getDeviceSelectorsList())
         .flatMap(List::stream)
         .collect(toImmutableSet());
+  }
+
+  /** Get the {@link UserCountrySet} that matches the provided user country. */
+  public static String getMatchingCountrySet(DeviceTierConfig config, String countryCode) {
+    return config.getUserCountrySetsList().stream()
+        .filter(countrySet -> countrySet.getCountryCodesList().contains(countryCode))
+        .map(UserCountrySet::getName)
+        .findAny()
+        .orElse("");
   }
 
   private static boolean devicePropertiesMatchDeviceGroup(

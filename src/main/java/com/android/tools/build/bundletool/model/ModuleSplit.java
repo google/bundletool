@@ -33,6 +33,7 @@ import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.MoreCollectors.toOptional;
+import static java.nio.charset.StandardCharsets.UTF_8;
 
 import com.android.aapt.Resources.ResourceTable;
 import com.android.bundle.Config.ApexEmbeddedApkConfig;
@@ -43,6 +44,7 @@ import com.android.bundle.RuntimeEnabledSdkConfigProto.RuntimeEnabledSdk;
 import com.android.bundle.Targeting.Abi;
 import com.android.bundle.Targeting.AbiTargeting;
 import com.android.bundle.Targeting.ApkTargeting;
+import com.android.bundle.Targeting.CountrySetTargeting;
 import com.android.bundle.Targeting.LanguageTargeting;
 import com.android.bundle.Targeting.MultiAbi;
 import com.android.bundle.Targeting.MultiAbiTargeting;
@@ -53,6 +55,7 @@ import com.android.bundle.Targeting.TextureCompressionFormatTargeting;
 import com.android.bundle.Targeting.VariantTargeting;
 import com.android.tools.build.bundletool.model.BundleModule.ModuleType;
 import com.android.tools.build.bundletool.model.SourceStamp.StampType;
+import com.android.tools.build.bundletool.model.targeting.TargetedDirectorySegment;
 import com.android.tools.build.bundletool.model.utils.ResourcesUtils;
 import com.google.auto.value.AutoValue;
 import com.google.auto.value.extension.memoized.Memoized;
@@ -222,6 +225,16 @@ public abstract class ModuleSplit {
         .getValueList()
         .forEach(value -> suffixJoiner.add("tier_" + value.getValue()));
 
+    CountrySetTargeting countrySetTargeting = getApkTargeting().getCountrySetTargeting();
+    if (!countrySetTargeting.getValueList().isEmpty()) {
+      countrySetTargeting
+          .getValueList()
+          .forEach(
+              value -> suffixJoiner.add(TargetedDirectorySegment.COUNTRY_SET_KEY + "_" + value));
+    } else if (!countrySetTargeting.getAlternativesList().isEmpty()) {
+      suffixJoiner.add("other_countries");
+    }
+
     return suffixJoiner.toString();
   }
 
@@ -378,11 +391,23 @@ public abstract class ModuleSplit {
     return toBuilder().setAndroidManifest(apkManifest).build();
   }
 
-  /** Writes the compatibility SDK provider class name to a new <property> element. */
+  /**
+   * Writes the compatibility SDK provider class name to a new <property> element in the manifest,
+   * as well as to a text file under assets/ directory.
+   */
   public ModuleSplit writeCompatSdkProviderClassName(String sdkProviderClassName) {
     AndroidManifest apkManifest =
         getAndroidManifest().toEditor().setCompatSdkProviderClassName(sdkProviderClassName).save();
-    return toBuilder().setAndroidManifest(apkManifest).build();
+    return toBuilder()
+        .setAndroidManifest(apkManifest)
+        // This is a workaround for a platform bug which does not let the compat library parse the
+        // class name from the manifest.
+        .addEntry(
+            ModuleEntry.builder()
+                .setPath(ZipPath.create("assets/SandboxedSdkProviderCompatClassName.txt"))
+                .setContent(ByteSource.wrap(sdkProviderClassName.getBytes(UTF_8)))
+                .build())
+        .build();
   }
 
   /**
@@ -759,10 +784,11 @@ public abstract class ModuleSplit {
                 // was enabled, a default targeting suffix was used.
                 .clearTextureCompressionFormatTargeting()
                 .clearDeviceTierTargeting()
+                .clearCountrySetTargeting()
                 .build()
                 .equals(ApkTargeting.getDefaultInstance()),
             "Master split cannot have any targeting other than SDK version, Texture"
-                + "Compression Format and Device Tier.");
+                + " Compression Format, Device Tier and Country Set.");
       }
       return moduleSplit;
     }

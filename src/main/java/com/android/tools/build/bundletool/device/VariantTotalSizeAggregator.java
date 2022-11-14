@@ -23,6 +23,7 @@ import static com.google.common.collect.ImmutableList.toImmutableList;
 import com.android.bundle.Commands.ApkDescription;
 import com.android.bundle.Commands.Variant;
 import com.android.bundle.Targeting.AbiTargeting;
+import com.android.bundle.Targeting.CountrySetTargeting;
 import com.android.bundle.Targeting.DeviceTierTargeting;
 import com.android.bundle.Targeting.LanguageTargeting;
 import com.android.bundle.Targeting.ScreenDensityTargeting;
@@ -77,6 +78,7 @@ public class VariantTotalSizeAggregator extends AbstractSizeAggregator {
       LanguageTargeting languageTargeting,
       TextureCompressionFormatTargeting textureTargeting,
       DeviceTierTargeting deviceTierTargeting,
+      CountrySetTargeting countrySetTargeting,
       SdkRuntimeTargeting sdkRuntimeTargeting) {
     return new ApkMatcher(
             getDeviceSpec(
@@ -87,8 +89,10 @@ public class VariantTotalSizeAggregator extends AbstractSizeAggregator {
                 languageTargeting,
                 textureTargeting,
                 deviceTierTargeting,
+                countrySetTargeting,
                 sdkRuntimeTargeting),
             getSizeRequest.getModules(),
+            /* includeInstallTimeAssetModules= */ true,
             getSizeRequest.getInstant(),
             /* ensureDensityAndAbiApksMatched= */ false)
         .getMatchingApksFromVariant(variant, bundleVersion);
@@ -111,6 +115,8 @@ public class VariantTotalSizeAggregator extends AbstractSizeAggregator {
         getAllTextureCompressionFormatTargetings(apkDescriptions);
     ImmutableSet<DeviceTierTargeting> deviceTierTargetingOptions =
         getAllDeviceTierTargetings(apkDescriptions);
+    ImmutableSet<CountrySetTargeting> countrySetTargetingOptions =
+        getAllCountrySetTargetings(apkDescriptions);
 
     return getSizesPerConfiguration(
         sdkVersionTargetingOptions,
@@ -119,6 +125,7 @@ public class VariantTotalSizeAggregator extends AbstractSizeAggregator {
         screenDensityTargetingOptions,
         textureCompressionFormatTargetingOptions,
         deviceTierTargetingOptions,
+        countrySetTargetingOptions,
         variant.getTargeting().getSdkRuntimeTargeting());
   }
 
@@ -143,6 +150,7 @@ public class VariantTotalSizeAggregator extends AbstractSizeAggregator {
                 LanguageTargeting.getDefaultInstance(),
                 variantTargeting.getTextureCompressionFormatTargeting(),
                 DeviceTierTargeting.getDefaultInstance(),
+                CountrySetTargeting.getDefaultInstance(),
                 variantTargeting.getSdkRuntimeTargeting()),
             getSizeRequest.getDeviceSpec());
 

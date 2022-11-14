@@ -21,6 +21,7 @@ import static com.android.tools.build.bundletool.model.targeting.TargetingUtils.
 import static com.android.tools.build.bundletool.model.targeting.TargetingUtils.getMinSdk;
 
 import com.android.bundle.Targeting.AbiTargeting;
+import com.android.bundle.Targeting.CountrySetTargeting;
 import com.android.bundle.Targeting.DeviceTierTargeting;
 import com.android.bundle.Targeting.LanguageTargeting;
 import com.android.bundle.Targeting.ScreenDensity;
@@ -54,6 +55,8 @@ public abstract class SizeConfiguration {
   public abstract Optional<String> getTextureCompressionFormat();
 
   public abstract Optional<Integer> getDeviceTier();
+
+  public abstract Optional<String> getCountrySet();
 
   public abstract Optional<String> getSdkRuntime();
 
@@ -108,6 +111,9 @@ public abstract class SizeConfiguration {
   public static Optional<String> getTextureCompressionFormatName(
       TextureCompressionFormatTargeting textureCompressionFormatTargeting) {
     if (textureCompressionFormatTargeting.getValueList().isEmpty()) {
+      if (!textureCompressionFormatTargeting.getAlternativesList().isEmpty()) {
+        return Optional.of("");
+      }
       return Optional.empty();
     }
     return Optional.of(
@@ -120,6 +126,17 @@ public abstract class SizeConfiguration {
       return Optional.empty();
     }
     return Optional.of(Iterables.getOnlyElement(deviceTierTargeting.getValueList()).getValue());
+  }
+
+  public static Optional<String> getCountrySetName(CountrySetTargeting countrySetTargeting) {
+    if (countrySetTargeting.getValueList().isEmpty()) {
+      if (!countrySetTargeting.getAlternativesList().isEmpty()) {
+        // Case of fallback folder, country set name is empty string targeting rest of world
+        return Optional.of("");
+      }
+      return Optional.empty();
+    }
+    return Optional.of(Iterables.getOnlyElement(countrySetTargeting.getValueList()));
   }
 
   /**
@@ -143,6 +160,8 @@ public abstract class SizeConfiguration {
     public abstract Builder setTextureCompressionFormat(String textureCompressionFormat);
 
     public abstract Builder setDeviceTier(Integer deviceTier);
+
+    public abstract Builder setCountrySet(String countrySet);
 
     public abstract Builder setSdkRuntime(String required);
 

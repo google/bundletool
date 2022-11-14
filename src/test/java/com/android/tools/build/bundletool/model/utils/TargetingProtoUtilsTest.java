@@ -17,9 +17,11 @@
 package com.android.tools.build.bundletool.model.utils;
 
 import static com.android.tools.build.bundletool.testing.TargetingUtils.abiTargeting;
+import static com.android.tools.build.bundletool.testing.TargetingUtils.alternativeCountrySetTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.alternativeDeviceTierTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.alternativeLanguageTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.assetsDirectoryTargeting;
+import static com.android.tools.build.bundletool.testing.TargetingUtils.countrySetTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.deviceTierTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.languageTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.mergeAssetsTargeting;
@@ -73,6 +75,15 @@ public class TargetingProtoUtilsTest {
             TargetingProtoUtils.toAlternativeTargeting(
                 assetsDirectoryTargeting(deviceTierTargeting(1))))
         .isEqualTo(assetsDirectoryTargeting(alternativeDeviceTierTargeting(ImmutableList.of(1))));
+  }
+
+  @Test
+  public void toAlternativeTargeting_countrySet() {
+    assertThat(
+            TargetingProtoUtils.toAlternativeTargeting(
+                assetsDirectoryTargeting(countrySetTargeting("latam"))))
+        .isEqualTo(
+            assetsDirectoryTargeting(alternativeCountrySetTargeting(ImmutableList.of("latam"))));
   }
 
   @Test

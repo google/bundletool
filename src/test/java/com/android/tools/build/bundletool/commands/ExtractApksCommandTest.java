@@ -45,10 +45,13 @@ import static com.android.tools.build.bundletool.testing.DeviceFactory.locales;
 import static com.android.tools.build.bundletool.testing.DeviceFactory.mergeSpecs;
 import static com.android.tools.build.bundletool.testing.DeviceFactory.sdkRuntimeSupported;
 import static com.android.tools.build.bundletool.testing.DeviceFactory.sdkVersion;
+import static com.android.tools.build.bundletool.testing.TargetingUtils.alternativeCountrySetTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.apkAbiTargeting;
+import static com.android.tools.build.bundletool.testing.TargetingUtils.apkCountrySetTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.apkDensityTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.apkDeviceTierTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.apkLanguageTargeting;
+import static com.android.tools.build.bundletool.testing.TargetingUtils.countrySetTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.deviceTierTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.mergeModuleTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.moduleFeatureTargeting;
@@ -103,6 +106,7 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.io.MoreFiles;
 import com.google.protobuf.Int32Value;
+import com.google.protobuf.StringValue;
 import com.google.protobuf.util.JsonFormat;
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
@@ -1945,6 +1949,214 @@ public class ExtractApksCommandTest {
             inOutputDirectory(baseHighApk),
             inOutputDirectory(asset1MasterApk),
             inOutputDirectory(asset1HighApk));
+    for (Path matchedApk : matchedApks) {
+      checkFileExistsAndReadable(tmpDir.resolve(matchedApk));
+    }
+  }
+
+  @Test
+  public void bundleWithCountrySetTargeting_noCountrySetSpecifiedNorDefault_usesFallback()
+      throws Exception {
+    ZipPath baseMasterApk = ZipPath.create("base-master.apk");
+    ZipPath baseRestOfWorldApk = ZipPath.create("base-other_countries.apk");
+    ZipPath baseSeaApk = ZipPath.create("base-countries_sea.apk");
+    ZipPath baseLatamApk = ZipPath.create("base-countries_latam.apk");
+    BuildApksResult buildApksResult =
+        BuildApksResult.newBuilder()
+            .setBundletool(
+                Bundletool.newBuilder()
+                    .setVersion(BundleToolVersion.getCurrentVersion().toString()))
+            .addVariant(
+                createVariant(
+                    variantSdkTargeting(
+                        sdkVersionFrom(21), ImmutableSet.of(SdkVersion.getDefaultInstance())),
+                    createSplitApkSet(
+                        "base",
+                        createMasterApkDescription(
+                            ApkTargeting.getDefaultInstance(), baseMasterApk),
+                        splitApkDescription(
+                            apkCountrySetTargeting(
+                                countrySetTargeting(
+                                    /* value= */ "sea",
+                                    /* alternatives= */ ImmutableList.of("latam"))),
+                            baseSeaApk),
+                        splitApkDescription(
+                            apkCountrySetTargeting(
+                                countrySetTargeting(
+                                    /* value= */ "latam",
+                                    /* alternatives= */ ImmutableList.of("sea"))),
+                            baseLatamApk),
+                        splitApkDescription(
+                            apkCountrySetTargeting(
+                                alternativeCountrySetTargeting(ImmutableList.of("sea", "latam"))),
+                            baseRestOfWorldApk))))
+            .addDefaultTargetingValue(
+                DefaultTargetingValue.newBuilder().setDimension(Value.COUNTRY_SET))
+            .build();
+    Path apksArchiveFile = createApksArchiveFile(buildApksResult, tmpDir.resolve("bundle.apks"));
+    DeviceSpec deviceSpec = lDevice();
+
+    ImmutableList<Path> matchedApks =
+        ExtractApksCommand.builder()
+            .setApksArchivePath(apksArchiveFile)
+            .setDeviceSpec(deviceSpec)
+            .setOutputDirectory(tmpDir)
+            .build()
+            .execute();
+
+    assertThat(matchedApks)
+        .containsExactly(inOutputDirectory(baseMasterApk), inOutputDirectory(baseRestOfWorldApk));
+    for (Path matchedApk : matchedApks) {
+      checkFileExistsAndReadable(tmpDir.resolve(matchedApk));
+    }
+  }
+
+  @Test
+  public void bundleWithCountrySetTargeting_noCountrySetSpecified_usesDefaults() throws Exception {
+    ZipPath baseMasterApk = ZipPath.create("base-master.apk");
+    ZipPath baseRestOfWorldApk = ZipPath.create("base-other_countries.apk");
+    ZipPath baseSeaApk = ZipPath.create("base-countries_sea.apk");
+    ZipPath baseLatamApk = ZipPath.create("base-countries_latam.apk");
+    BuildApksResult buildApksResult =
+        BuildApksResult.newBuilder()
+            .setBundletool(
+                Bundletool.newBuilder()
+                    .setVersion(BundleToolVersion.getCurrentVersion().toString()))
+            .addVariant(
+                createVariant(
+                    variantSdkTargeting(
+                        sdkVersionFrom(21), ImmutableSet.of(SdkVersion.getDefaultInstance())),
+                    createSplitApkSet(
+                        "base",
+                        createMasterApkDescription(
+                            ApkTargeting.getDefaultInstance(), baseMasterApk),
+                        splitApkDescription(
+                            apkCountrySetTargeting(
+                                countrySetTargeting(
+                                    /* value= */ "sea",
+                                    /* alternatives= */ ImmutableList.of("latam"))),
+                            baseSeaApk),
+                        splitApkDescription(
+                            apkCountrySetTargeting(
+                                countrySetTargeting(
+                                    /* value= */ "latam",
+                                    /* alternatives= */ ImmutableList.of("sea"))),
+                            baseLatamApk),
+                        splitApkDescription(
+                            apkCountrySetTargeting(
+                                alternativeCountrySetTargeting(ImmutableList.of("sea", "latam"))),
+                            baseRestOfWorldApk))))
+            .addDefaultTargetingValue(
+                DefaultTargetingValue.newBuilder()
+                    .setDimension(Value.COUNTRY_SET)
+                    .setDefaultValue("latam"))
+            .build();
+    Path apksArchiveFile = createApksArchiveFile(buildApksResult, tmpDir.resolve("bundle.apks"));
+    DeviceSpec deviceSpec = lDevice();
+
+    ImmutableList<Path> matchedApks =
+        ExtractApksCommand.builder()
+            .setApksArchivePath(apksArchiveFile)
+            .setDeviceSpec(deviceSpec)
+            .setOutputDirectory(tmpDir)
+            .build()
+            .execute();
+
+    assertThat(matchedApks)
+        .containsExactly(inOutputDirectory(baseMasterApk), inOutputDirectory(baseLatamApk));
+    for (Path matchedApk : matchedApks) {
+      checkFileExistsAndReadable(tmpDir.resolve(matchedApk));
+    }
+  }
+
+  @Test
+  public void bundleWithCountrySetTargeting_countrySetSpecified_filterByCountrySet()
+      throws Exception {
+    ZipPath baseMasterApk = ZipPath.create("base-master.apk");
+    ZipPath baseRestOfWorldApk = ZipPath.create("base-other_countries.apk");
+    ZipPath baseSeaApk = ZipPath.create("base-countries_sea.apk");
+    ZipPath baseLatamApk = ZipPath.create("base-countries_latam.apk");
+    ZipPath asset1MasterApk = ZipPath.create("asset1-master.apk");
+    ZipPath asset1RestOfWorldApk = ZipPath.create("asset1-other_countries.apk");
+    ZipPath asset1SeaApk = ZipPath.create("asset1-countries_sea.apk");
+    ZipPath asset1LatamApk = ZipPath.create("asset1-countries_latam.apk");
+    BuildApksResult buildApksResult =
+        BuildApksResult.newBuilder()
+            .setBundletool(
+                Bundletool.newBuilder()
+                    .setVersion(BundleToolVersion.getCurrentVersion().toString()))
+            .addVariant(
+                createVariant(
+                    variantSdkTargeting(
+                        sdkVersionFrom(21), ImmutableSet.of(SdkVersion.getDefaultInstance())),
+                    createSplitApkSet(
+                        "base",
+                        createMasterApkDescription(
+                            ApkTargeting.getDefaultInstance(), baseMasterApk),
+                        splitApkDescription(
+                            apkCountrySetTargeting(
+                                countrySetTargeting(
+                                    /* value= */ "sea",
+                                    /* alternatives= */ ImmutableList.of("latam"))),
+                            baseSeaApk),
+                        splitApkDescription(
+                            apkCountrySetTargeting(
+                                countrySetTargeting(
+                                    /* value= */ "latam",
+                                    /* alternatives= */ ImmutableList.of("sea"))),
+                            baseLatamApk),
+                        splitApkDescription(
+                            apkCountrySetTargeting(
+                                alternativeCountrySetTargeting(ImmutableList.of("sea", "latam"))),
+                            baseRestOfWorldApk))))
+            .addAssetSliceSet(
+                AssetSliceSet.newBuilder()
+                    .setAssetModuleMetadata(
+                        AssetModuleMetadata.newBuilder()
+                            .setName("asset1")
+                            .setDeliveryType(DeliveryType.INSTALL_TIME))
+                    .addApkDescription(
+                        createMasterApkDescription(
+                            ApkTargeting.getDefaultInstance(), asset1MasterApk))
+                    .addApkDescription(
+                        splitApkDescription(
+                            apkCountrySetTargeting(
+                                countrySetTargeting(
+                                    /* value= */ "latam",
+                                    /* alternatives= */ ImmutableList.of("sea"))),
+                            asset1LatamApk))
+                    .addApkDescription(
+                        splitApkDescription(
+                            apkCountrySetTargeting(
+                                countrySetTargeting(
+                                    /* value= */ "sea",
+                                    /* alternatives= */ ImmutableList.of("latam"))),
+                            asset1SeaApk))
+                    .addApkDescription(
+                        splitApkDescription(
+                            apkCountrySetTargeting(
+                                alternativeCountrySetTargeting(ImmutableList.of("latam", "sea"))),
+                            asset1RestOfWorldApk)))
+            .addDefaultTargetingValue(
+                DefaultTargetingValue.newBuilder().setDimension(Value.COUNTRY_SET))
+            .build();
+    Path apksArchiveFile = createApksArchiveFile(buildApksResult, tmpDir.resolve("bundle.apks"));
+    DeviceSpec deviceSpec = lDevice().toBuilder().setCountrySet(StringValue.of("latam")).build();
+
+    ImmutableList<Path> matchedApks =
+        ExtractApksCommand.builder()
+            .setApksArchivePath(apksArchiveFile)
+            .setDeviceSpec(deviceSpec)
+            .setOutputDirectory(tmpDir)
+            .build()
+            .execute();
+
+    assertThat(matchedApks)
+        .containsExactly(
+            inOutputDirectory(baseMasterApk),
+            inOutputDirectory(baseLatamApk),
+            inOutputDirectory(asset1MasterApk),
+            inOutputDirectory(asset1LatamApk));
     for (Path matchedApk : matchedApks) {
       checkFileExistsAndReadable(tmpDir.resolve(matchedApk));
     }

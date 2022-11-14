@@ -1,0 +1,63 @@
+{
+  "device_groups": [
+    {
+      "name": "high",
+      "device_selectors": [
+        {
+          "device_ram": {
+            "min_bytes": 7516192768
+          },
+          "included_device_ids": [
+            {
+              "build_brand": "google",
+              "build_device": "flame"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "medium",
+      "device_selectors": [
+        {
+          "device_ram": {
+            "min_bytes": 4294967296,
+            "max_bytes": 7516192768
+          }
+        }
+      ]
+    }
+  ],
+  "device_tier_set": {
+    "device_tiers": [
+      {
+        "level": 1,
+        "device_group_names": [
+          "medium"
+        ]
+      },
+      {
+        "level": 2,
+        "device_group_names": [
+          "high"
+        ]
+      }
+    ]
+  },
+  "user_country_sets": [
+    {
+      "name": "latam",
+      "country_codes": [
+        "AR",
+        "BR"
+      ]
+    },
+    {
+      "name": "sea",
+      "country_codes": [
+        "VN",
+        "TW"
+      ]
+    }
+  ]
+}

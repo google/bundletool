@@ -19,11 +19,14 @@ package com.android.tools.build.bundletool.shards;
 import static com.android.bundle.Targeting.TextureCompressionFormat.TextureCompressionFormatAlias.ATC;
 import static com.android.bundle.Targeting.TextureCompressionFormat.TextureCompressionFormatAlias.ETC1_RGB8;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifest;
+import static com.android.tools.build.bundletool.testing.TargetingUtils.alternativeCountrySetTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.alternativeTextureCompressionTargeting;
+import static com.android.tools.build.bundletool.testing.TargetingUtils.apkCountrySetTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.apkDeviceTierTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.apkTextureTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.assets;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.assetsDirectoryTargeting;
+import static com.android.tools.build.bundletool.testing.TargetingUtils.countrySetTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.deviceTierTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.targetedAssetsDirectory;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.textureCompressionTargeting;
@@ -294,6 +297,149 @@ public class SuffixStripperTest {
     // Check that the APK and Variant targeting were applied.
     assertThat(strippedSplit.getApkTargeting())
         .isEqualTo(apkDeviceTierTargeting(deviceTierTargeting(0)));
+    assertThat(strippedSplit.getVariantTargeting()).isEqualToDefaultInstance();
+  }
+
+  @Test
+  public void applySuffixStripping_countrySet_suffixStrippingEnabled() {
+    ModuleSplit split =
+        ModuleSplit.builder()
+            .setModuleName(BundleModuleName.create("base"))
+            .setApkTargeting(ApkTargeting.getDefaultInstance())
+            .setVariantTargeting(VariantTargeting.getDefaultInstance())
+            .setAndroidManifest(AndroidManifest.create(androidManifest("com.test.app")))
+            .setMasterSplit(true)
+            .setEntries(
+                ImmutableList.of(
+                    createModuleEntryForFile(
+                        "assets/img#countries_latam/img_latam.dat", TEST_CONTENT),
+                    createModuleEntryForFile("assets/img#countries_sea/img_sea.dat", TEST_CONTENT)))
+            .setAssetsConfig(
+                assets(
+                    targetedAssetsDirectory(
+                        "assets/img#countries_latam",
+                        assetsDirectoryTargeting(
+                            countrySetTargeting(
+                                ImmutableList.of("latam"), ImmutableList.of("sea")))),
+                    targetedAssetsDirectory(
+                        "assets/img#countries_sea",
+                        assetsDirectoryTargeting(
+                            countrySetTargeting(
+                                ImmutableList.of("sea"), ImmutableList.of("latam"))))))
+            .build();
+
+    ModuleSplit strippedSplit =
+        SuffixStripper.createForDimension(TargetingDimension.COUNTRY_SET)
+            .applySuffixStripping(
+                split,
+                SuffixStripping.newBuilder().setDefaultSuffix("latam").setEnabled(true).build());
+
+    assertThat(strippedSplit.getEntries()).hasSize(1);
+    assertThat(strippedSplit.getEntries().get(0).getPath())
+        .isEqualTo(ZipPath.create("assets/img/img_latam.dat"));
+
+    assertThat(strippedSplit.getAssetsConfig().get().getDirectoryCount()).isEqualTo(1);
+    assertThat(strippedSplit.getAssetsConfig().get().getDirectory(0).getPath())
+        .isEqualTo("assets/img");
+
+    assertThat(strippedSplit.getApkTargeting())
+        .isEqualTo(apkCountrySetTargeting(countrySetTargeting("latam")));
+    assertThat(strippedSplit.getVariantTargeting()).isEqualToDefaultInstance();
+  }
+
+  @Test
+  public void applySuffixStripping_countrySet_suffixStrippingDisabled() {
+    ModuleSplit split =
+        ModuleSplit.builder()
+            .setModuleName(BundleModuleName.create("base"))
+            .setApkTargeting(ApkTargeting.getDefaultInstance())
+            .setVariantTargeting(VariantTargeting.getDefaultInstance())
+            .setAndroidManifest(AndroidManifest.create(androidManifest("com.test.app")))
+            .setMasterSplit(true)
+            .setEntries(
+                ImmutableList.of(
+                    createModuleEntryForFile(
+                        "assets/img#countries_latam/img_latam.dat", TEST_CONTENT),
+                    createModuleEntryForFile("assets/img#countries_sea/img_sea.dat", TEST_CONTENT)))
+            .setAssetsConfig(
+                assets(
+                    targetedAssetsDirectory(
+                        "assets/img#countries_latam",
+                        assetsDirectoryTargeting(
+                            countrySetTargeting(
+                                ImmutableList.of("latam"), ImmutableList.of("sea")))),
+                    targetedAssetsDirectory(
+                        "assets/img#countries_sea",
+                        assetsDirectoryTargeting(
+                            countrySetTargeting(
+                                ImmutableList.of("sea"), ImmutableList.of("latam"))))))
+            .build();
+
+    ModuleSplit strippedSplit =
+        SuffixStripper.createForDimension(TargetingDimension.COUNTRY_SET)
+            .applySuffixStripping(
+                split,
+                SuffixStripping.newBuilder().setDefaultSuffix("latam").setEnabled(false).build());
+
+    assertThat(strippedSplit.getEntries()).hasSize(1);
+    assertThat(strippedSplit.getEntries().get(0).getPath())
+        .isEqualTo(ZipPath.create("assets/img#countries_latam/img_latam.dat"));
+
+    assertThat(strippedSplit.getAssetsConfig().get().getDirectoryCount()).isEqualTo(1);
+    assertThat(strippedSplit.getAssetsConfig().get().getDirectory(0).getPath())
+        .isEqualTo("assets/img#countries_latam");
+
+    assertThat(strippedSplit.getApkTargeting())
+        .isEqualTo(apkCountrySetTargeting(countrySetTargeting("latam")));
+    assertThat(strippedSplit.getVariantTargeting()).isEqualToDefaultInstance();
+  }
+
+  @Test
+  public void applySuffixStripping_countrySet_noDefaultSuffixSpecified_retainsFallbackAssets() {
+    ModuleSplit split =
+        ModuleSplit.builder()
+            .setModuleName(BundleModuleName.create("base"))
+            .setApkTargeting(ApkTargeting.getDefaultInstance())
+            .setVariantTargeting(VariantTargeting.getDefaultInstance())
+            .setAndroidManifest(AndroidManifest.create(androidManifest("com.test.app")))
+            .setMasterSplit(true)
+            .setEntries(
+                ImmutableList.of(
+                    createModuleEntryForFile(
+                        "assets/img#countries_latam/img_latam.dat", TEST_CONTENT),
+                    createModuleEntryForFile("assets/img#countries_sea/img_sea.dat", TEST_CONTENT),
+                    createModuleEntryForFile("assets/img/img_restOfWorld.dat", TEST_CONTENT)))
+            .setAssetsConfig(
+                assets(
+                    targetedAssetsDirectory(
+                        "assets/img#countries_latam",
+                        assetsDirectoryTargeting(
+                            countrySetTargeting(
+                                ImmutableList.of("latam"), ImmutableList.of("sea")))),
+                    targetedAssetsDirectory(
+                        "assets/img#countries_sea",
+                        assetsDirectoryTargeting(
+                            countrySetTargeting(
+                                ImmutableList.of("sea"), ImmutableList.of("latam")))),
+                    targetedAssetsDirectory(
+                        "assets/img",
+                        assetsDirectoryTargeting(
+                            alternativeCountrySetTargeting(ImmutableList.of("latam", "sea"))))))
+            .build();
+
+    ModuleSplit strippedSplit =
+        SuffixStripper.createForDimension(TargetingDimension.COUNTRY_SET)
+            .applySuffixStripping(split, SuffixStripping.newBuilder().setEnabled(true).build());
+
+    assertThat(strippedSplit.getEntries()).hasSize(1);
+    assertThat(strippedSplit.getEntries().get(0).getPath())
+        .isEqualTo(ZipPath.create("assets/img/img_restOfWorld.dat"));
+
+    assertThat(strippedSplit.getAssetsConfig().get().getDirectoryCount()).isEqualTo(1);
+    assertThat(strippedSplit.getAssetsConfig().get().getDirectory(0).getPath())
+        .isEqualTo("assets/img");
+
+    assertThat(strippedSplit.getApkTargeting()).isEqualToDefaultInstance();
     assertThat(strippedSplit.getVariantTargeting()).isEqualToDefaultInstance();
   }
 

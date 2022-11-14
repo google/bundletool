@@ -21,6 +21,7 @@ import static com.google.common.collect.ImmutableList.toImmutableList;
 import com.android.bundle.Commands.ApkDescription;
 import com.android.bundle.Commands.AssetSliceSet;
 import com.android.bundle.Targeting.AbiTargeting;
+import com.android.bundle.Targeting.CountrySetTargeting;
 import com.android.bundle.Targeting.DeviceTierTargeting;
 import com.android.bundle.Targeting.LanguageTargeting;
 import com.android.bundle.Targeting.ScreenDensityTargeting;
@@ -87,6 +88,8 @@ public class AssetModuleSizeAggregator extends AbstractSizeAggregator {
             : getAllTextureCompressionFormatTargetings(apkDescriptions);
     ImmutableSet<DeviceTierTargeting> devicetierTargetingOptions =
         getAllDeviceTierTargetings(apkDescriptions);
+    ImmutableSet<CountrySetTargeting> countrySetTargetingOptions =
+        getAllCountrySetTargetings(apkDescriptions);
 
     return getSizesPerConfiguration(
         sdkVersionTargetingOptions,
@@ -95,6 +98,7 @@ public class AssetModuleSizeAggregator extends AbstractSizeAggregator {
         screenDensityTargetingOptions,
         textureCompressionFormatTargetingOptions,
         devicetierTargetingOptions,
+        countrySetTargetingOptions,
         variantTargeting.getSdkRuntimeTargeting());
   }
 
@@ -106,6 +110,7 @@ public class AssetModuleSizeAggregator extends AbstractSizeAggregator {
       LanguageTargeting languageTargeting,
       TextureCompressionFormatTargeting textureTargeting,
       DeviceTierTargeting deviceTierTargeting,
+      CountrySetTargeting countrySetTargeting,
       SdkRuntimeTargeting sdkRuntimeTargeting) {
     return new ApkMatcher(
             getDeviceSpec(
@@ -116,8 +121,10 @@ public class AssetModuleSizeAggregator extends AbstractSizeAggregator {
                 languageTargeting,
                 textureTargeting,
                 deviceTierTargeting,
+                countrySetTargeting,
                 sdkRuntimeTargeting),
             getSizeRequest.getModules(),
+            /* includeInstallTimeAssetModules= */ true,
             getSizeRequest.getInstant(),
             /* ensureDensityAndAbiApksMatched= */ false)
         .getMatchingApksFromAssetModules(assetModules);

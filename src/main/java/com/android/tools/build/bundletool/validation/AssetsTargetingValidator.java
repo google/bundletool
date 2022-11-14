@@ -91,6 +91,9 @@ public class AssetsTargetingValidator extends SubValidator {
       checkHasValuesOrAlternatives(
           targeting.getTextureCompressionFormat(), targetedDirectory.getPath());
     }
+    if (targeting.hasCountrySet()) {
+      checkHasValuesOrAlternatives(targeting.getCountrySet(), targetedDirectory.getPath());
+    }
   }
 
   private static void checkNoOverlapInValuesAndAlternatives(
@@ -100,5 +103,6 @@ public class AssetsTargetingValidator extends SubValidator {
     checkValuesAndAlternativeHaveNoOverlap(targeting.getLanguage(), targetedDirectory.getPath());
     checkValuesAndAlternativeHaveNoOverlap(
         targeting.getTextureCompressionFormat(), targetedDirectory.getPath());
+    checkValuesAndAlternativeHaveNoOverlap(targeting.getCountrySet(), targetedDirectory.getPath());
   }
 }

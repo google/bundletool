@@ -67,6 +67,7 @@ public class GetDeviceSpecCommandTest {
   private static final int DEVICE_TIER = 1;
   private static final ImmutableSet<String> DEVICE_GROUPS =
       ImmutableSet.of("highRam", "googlePixel");
+  private static final String COUNTRY_SET = "latam";
 
   private SystemEnvironmentProvider systemEnvironmentProvider;
   private Path adbPath;
@@ -145,7 +146,8 @@ public class GetDeviceSpecCommandTest {
                     "--device-id=" + DEVICE_ID,
                     "--output=" + outputPath,
                     "--device-tier=" + DEVICE_TIER,
-                    "--device-groups=" + Joiner.on(",").join(DEVICE_GROUPS)),
+                    "--device-groups=" + Joiner.on(",").join(DEVICE_GROUPS),
+                    "--country-set=" + COUNTRY_SET),
             systemEnvironmentProvider,
             fakeServerOneDevice(lDeviceWithLocales("en-US")));
 
@@ -157,6 +159,7 @@ public class GetDeviceSpecCommandTest {
             .setAdbServer(commandViaFlags.getAdbServer())
             .setDeviceTier(DEVICE_TIER)
             .setDeviceGroups(DEVICE_GROUPS)
+            .setCountrySet(COUNTRY_SET)
             .build();
 
     assertThat(commandViaFlags).isEqualTo(commandViaBuilder);
@@ -356,16 +359,6 @@ public class GetDeviceSpecCommandTest {
     GetDeviceSpecCommand.help();
   }
 
-  private static AdbServer fakeServerOneDevice(DeviceSpec deviceSpec) {
-    return new FakeAdbServer(
-        /* hasInitialDeviceList= */ true,
-        ImmutableList.of(FakeDevice.fromDeviceSpec("id", DeviceState.ONLINE, deviceSpec)));
-  }
-
-  private static AdbServer fakeServerNoDevices() {
-    return new FakeAdbServer(/* hasInitialDeviceList= */ true, /* devices= */ ImmutableList.of());
-  }
-
   @Test
   public void overwriteSet_overwritesFile() throws Exception {
     DeviceSpec deviceSpec = mergeSpecs(sdkVersion(21), density(480), abis("x86"), locales("en-US"));
@@ -397,5 +390,69 @@ public class GetDeviceSpecCommandTest {
 
     Throwable exception = assertThrows(IllegalArgumentException.class, () -> command.execute());
     assertThat(exception).hasMessageThat().contains("File '" + outputPath + "' already exists.");
+  }
+
+  @Test
+  public void countrySet_setInDeviceSpec_whenSpecified() throws Exception {
+    // Arrange
+    DeviceSpec deviceSpec = mergeSpecs(sdkVersion(21), density(480), abis("x86"), locales("en-US"));
+    Path outputPath = tmp.getRoot().toPath().resolve("device.json");
+    Files.createFile(outputPath);
+    GetDeviceSpecCommand command =
+        GetDeviceSpecCommand.builder()
+            .setAdbPath(adbPath)
+            .setAdbServer(fakeServerOneDevice(deviceSpec))
+            .setOutputPath(outputPath)
+            .setCountrySet("latam")
+            .setOverwriteOutput(true)
+            .build();
+
+    // Act
+    command.execute();
+
+    // Assert
+    try (Reader deviceSpecReader = BufferedIo.reader(outputPath)) {
+      DeviceSpec.Builder writtenSpecBuilder = DeviceSpec.newBuilder();
+      JsonFormat.parser().merge(deviceSpecReader, writtenSpecBuilder);
+      DeviceSpec writtenSpec = writtenSpecBuilder.build();
+      assertThat(writtenSpec.hasCountrySet()).isTrue();
+      assertThat(writtenSpec.getCountrySet().getValue()).isEqualTo("latam");
+    }
+  }
+
+  @Test
+  public void countrySet_notSetInDeviceSpec_whenNotSpecified() throws Exception {
+    // Arrange
+    DeviceSpec deviceSpec = mergeSpecs(sdkVersion(21), density(480), abis("x86"), locales("en-US"));
+    Path outputPath = tmp.getRoot().toPath().resolve("device.json");
+    Files.createFile(outputPath);
+    GetDeviceSpecCommand command =
+        GetDeviceSpecCommand.builder()
+            .setAdbPath(adbPath)
+            .setAdbServer(fakeServerOneDevice(deviceSpec))
+            .setOutputPath(outputPath)
+            .setOverwriteOutput(true)
+            .build();
+
+    // Act
+    command.execute();
+
+    // Assert
+    try (Reader deviceSpecReader = BufferedIo.reader(outputPath)) {
+      DeviceSpec.Builder writtenSpecBuilder = DeviceSpec.newBuilder();
+      JsonFormat.parser().merge(deviceSpecReader, writtenSpecBuilder);
+      DeviceSpec writtenSpec = writtenSpecBuilder.build();
+      assertThat(writtenSpec.hasCountrySet()).isFalse();
+    }
+  }
+
+  private static AdbServer fakeServerOneDevice(DeviceSpec deviceSpec) {
+    return new FakeAdbServer(
+        /* hasInitialDeviceList= */ true,
+        ImmutableList.of(FakeDevice.fromDeviceSpec("id", DeviceState.ONLINE, deviceSpec)));
+  }
+
+  private static AdbServer fakeServerNoDevices() {
+    return new FakeAdbServer(/* hasInitialDeviceList= */ true, /* devices= */ ImmutableList.of());
   }
 }

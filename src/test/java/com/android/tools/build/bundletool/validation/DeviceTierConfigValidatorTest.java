@@ -24,6 +24,7 @@ import com.android.bundle.DeviceSelector;
 import com.android.bundle.DeviceTier;
 import com.android.bundle.DeviceTierConfig;
 import com.android.bundle.DeviceTierSet;
+import com.android.bundle.UserCountrySet;
 import com.android.tools.build.bundletool.model.exceptions.CommandExecutionException;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -33,11 +34,12 @@ import org.junit.runners.JUnit4;
 public class DeviceTierConfigValidatorTest {
 
   @Test
-  public void noGroups_throws() {
+  public void noGroups_noCountrySet_throws() {
     DeviceTierConfig deviceTierConfig = DeviceTierConfig.getDefaultInstance();
 
     assertCommandExecutionExceptionIsThrownAndHasMessage(
-        deviceTierConfig, "The device tier config must contain at least one group.");
+        deviceTierConfig,
+        "The device tier config must contain at least one group or user country set.");
   }
 
   @Test
@@ -47,6 +49,81 @@ public class DeviceTierConfigValidatorTest {
 
     assertCommandExecutionExceptionIsThrownAndHasMessage(
         deviceTierConfig, "Device groups must specify a name.");
+  }
+
+  @Test
+  public void emptyCountrySetName_throws() {
+    DeviceTierConfig deviceTierConfig =
+        DeviceTierConfig.newBuilder()
+            .addUserCountrySets(UserCountrySet.getDefaultInstance())
+            .build();
+
+    assertCommandExecutionExceptionIsThrownAndHasMessage(
+        deviceTierConfig, "Country Sets must specify a name.");
+  }
+
+  @Test
+  public void emptyCountryCodesList_throws() {
+    DeviceTierConfig deviceTierConfig =
+        DeviceTierConfig.newBuilder()
+            .addUserCountrySets(UserCountrySet.newBuilder().setName("latam"))
+            .build();
+
+    assertCommandExecutionExceptionIsThrownAndHasMessage(
+        deviceTierConfig, "Country set 'latam' must specify at least one country code.");
+  }
+
+  @Test
+  public void duplicateCountrySetNames_throws() {
+    DeviceTierConfig deviceTierConfig =
+        DeviceTierConfig.newBuilder()
+            .addUserCountrySets(UserCountrySet.newBuilder().setName("latam").addCountryCodes("AR"))
+            .addUserCountrySets(UserCountrySet.newBuilder().setName("latam").addCountryCodes("BR"))
+            .build();
+
+    assertCommandExecutionExceptionIsThrownAndHasMessage(
+        deviceTierConfig,
+        "Country set names should be unique. Found multiple country sets with these names:"
+            + " [latam].");
+  }
+
+  @Test
+  public void duplicateCountryCodes_throws() {
+    DeviceTierConfig deviceTierConfig =
+        DeviceTierConfig.newBuilder()
+            .addUserCountrySets(UserCountrySet.newBuilder().setName("sea").addCountryCodes("AR"))
+            .addUserCountrySets(UserCountrySet.newBuilder().setName("latam").addCountryCodes("AR"))
+            .build();
+
+    assertCommandExecutionExceptionIsThrownAndHasMessage(
+        deviceTierConfig,
+        "A country code can belong to only one country set. Found multiple occurrences of these"
+            + " country codes: [AR].");
+  }
+
+  @Test
+  public void invalidCountrySetName_throws() {
+    DeviceTierConfig deviceTierConfig =
+        DeviceTierConfig.newBuilder()
+            .addUserCountrySets(
+                UserCountrySet.newBuilder().setName("latam#$%").addCountryCodes("AR"))
+            .build();
+
+    assertCommandExecutionExceptionIsThrownAndHasMessage(
+        deviceTierConfig,
+        "Country set name should match the regex '^[a-zA-Z][a-zA-Z0-9_]*$', but found 'latam#$%'.");
+  }
+
+  @Test
+  public void invalidCountryCode_throws() {
+    DeviceTierConfig deviceTierConfig =
+        DeviceTierConfig.newBuilder()
+            .addUserCountrySets(
+                UserCountrySet.newBuilder().setName("latam").addCountryCodes("brazil"))
+            .build();
+
+    assertCommandExecutionExceptionIsThrownAndHasMessage(
+        deviceTierConfig, "Country code should match the regex '^[A-Z]{2}$', but found 'brazil'.");
   }
 
   @Test

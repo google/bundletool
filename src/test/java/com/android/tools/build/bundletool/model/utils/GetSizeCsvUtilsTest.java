@@ -17,6 +17,7 @@
 package com.android.tools.build.bundletool.model.utils;
 
 import static com.android.tools.build.bundletool.model.GetSizeRequest.Dimension.ABI;
+import static com.android.tools.build.bundletool.model.GetSizeRequest.Dimension.COUNTRY_SET;
 import static com.android.tools.build.bundletool.model.GetSizeRequest.Dimension.DEVICE_TIER;
 import static com.android.tools.build.bundletool.model.GetSizeRequest.Dimension.LANGUAGE;
 import static com.android.tools.build.bundletool.model.GetSizeRequest.Dimension.SCREEN_DENSITY;
@@ -104,6 +105,7 @@ public class GetSizeCsvUtilsTest {
                             .setLocale("en,fr")
                             .setTextureCompressionFormat("ASTC,ETC2")
                             .setDeviceTier(1)
+                            .setCountrySet("latam")
                             .setSdkRuntime("Not Required")
                             .build(),
                         1L),
@@ -115,6 +117,7 @@ public class GetSizeCsvUtilsTest {
                             .setLocale("en,fr")
                             .setTextureCompressionFormat("ASTC,ETC2")
                             .setDeviceTier(1)
+                            .setCountrySet("latam")
                             .setSdkRuntime("Not Required")
                             .build(),
                         6L)),
@@ -125,12 +128,13 @@ public class GetSizeCsvUtilsTest {
                     SDK,
                     TEXTURE_COMPRESSION_FORMAT,
                     DEVICE_TIER,
+                    COUNTRY_SET,
                     SDK_RUNTIME),
                 SizeFormatter.rawFormatter()))
         .isEqualTo(
-            "SDK,ABI,SCREEN_DENSITY,LANGUAGE,TEXTURE_COMPRESSION_FORMAT,DEVICE_TIER,SDK_RUNTIME,MIN,MAX"
+            "SDK,ABI,SCREEN_DENSITY,LANGUAGE,TEXTURE_COMPRESSION_FORMAT,DEVICE_TIER,COUNTRY_SET,SDK_RUNTIME,MIN,MAX"
                 + CRLF
-                + "22,\"x86,armeabi-v7a\",480,\"en,fr\",\"ASTC,ETC2\",1,Not Required,1,6"
+                + "22,\"x86,armeabi-v7a\",480,\"en,fr\",\"ASTC,ETC2\",1,latam,Not Required,1,6"
                 + CRLF);
   }
 }

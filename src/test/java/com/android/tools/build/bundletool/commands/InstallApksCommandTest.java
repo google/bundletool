@@ -34,9 +34,12 @@ import static com.android.tools.build.bundletool.testing.DeviceFactory.mergeSpec
 import static com.android.tools.build.bundletool.testing.DeviceFactory.sdkVersion;
 import static com.android.tools.build.bundletool.testing.FakeSystemEnvironmentProvider.ANDROID_HOME;
 import static com.android.tools.build.bundletool.testing.FakeSystemEnvironmentProvider.ANDROID_SERIAL;
+import static com.android.tools.build.bundletool.testing.TargetingUtils.alternativeCountrySetTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.apkAbiTargeting;
+import static com.android.tools.build.bundletool.testing.TargetingUtils.apkCountrySetTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.apkDeviceTierTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.apkLanguageTargeting;
+import static com.android.tools.build.bundletool.testing.TargetingUtils.countrySetTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.deviceTierTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.sdkVersionFrom;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.variantSdkTargeting;
@@ -257,6 +260,27 @@ public class InstallApksCommandTest {
             .setAdbServer(fromFlags.getAdbServer())
             .setDeviceId(DEVICE_ID)
             .setDeviceTier(1)
+            .build();
+
+    assertThat(fromBuilder).isEqualTo(fromFlags);
+  }
+
+  @Test
+  public void fromFlagsEquivalentToBuilder_countrySet() throws Exception {
+    InstallApksCommand fromFlags =
+        InstallApksCommand.fromFlags(
+            new FlagParser()
+                .parse("--apks=" + simpleApksPath, "--adb=" + adbPath, "--country-set=latam"),
+            systemEnvironmentProvider,
+            fakeServerOneDevice(lDeviceWithLocales("en-US")));
+
+    InstallApksCommand fromBuilder =
+        InstallApksCommand.builder()
+            .setApksArchivePath(simpleApksPath)
+            .setAdbPath(adbPath)
+            .setAdbServer(fromFlags.getAdbServer())
+            .setDeviceId(DEVICE_ID)
+            .setCountrySet("latam")
             .build();
 
     assertThat(fromBuilder).isEqualTo(fromFlags);
@@ -841,9 +865,14 @@ public class InstallApksCommandTest {
         .build()
         .execute();
 
+    // Installs base and all install-time modules.
     assertThat(getFileNames(installedApks))
         .containsExactly(
-            baseApk.toString(), installTimeMasterApk1.toString(), installTimeEnApk1.toString());
+            baseApk.toString(),
+            installTimeMasterApk1.toString(),
+            installTimeEnApk1.toString(),
+            installTimeMasterApk2.toString(),
+            installTimeEnApk2.toString());
   }
 
   @Test
@@ -1391,6 +1420,189 @@ public class InstallApksCommandTest {
     assertThat(getFileNames(pushedFiles))
         .containsExactly(
             baseHighApk.toString(), asset1MasterApk.toString(), asset1HighApk.toString());
+  }
+
+  @Test
+  public void bundleWithCountrySetTargeting_noCountrySetSpecifiedNorDefault_usesFallback()
+      throws Exception {
+    ZipPath baseMasterApk = ZipPath.create("base-master.apk");
+    ZipPath baseRestOfWorldApk = ZipPath.create("base-other_countries.apk");
+    ZipPath baseSeaApk = ZipPath.create("base-countries_sea.apk");
+    ZipPath baseLatamApk = ZipPath.create("base-countries_latam.apk");
+    BuildApksResult buildApksResult =
+        BuildApksResult.newBuilder()
+            .setPackageName(PKG_NAME)
+            .setBundletool(
+                Bundletool.newBuilder()
+                    .setVersion(BundleToolVersion.getCurrentVersion().toString()))
+            .addVariant(
+                createVariant(
+                    variantSdkTargeting(
+                        sdkVersionFrom(21), ImmutableSet.of(SdkVersion.getDefaultInstance())),
+                    createSplitApkSet(
+                        "base",
+                        createMasterApkDescription(
+                            ApkTargeting.getDefaultInstance(), baseMasterApk),
+                        splitApkDescription(
+                            apkCountrySetTargeting(
+                                countrySetTargeting(
+                                    /* value= */ "sea",
+                                    /* alternatives= */ ImmutableList.of("latam"))),
+                            baseSeaApk),
+                        splitApkDescription(
+                            apkCountrySetTargeting(
+                                countrySetTargeting(
+                                    /* value= */ "latam",
+                                    /* alternatives= */ ImmutableList.of("sea"))),
+                            baseLatamApk),
+                        splitApkDescription(
+                            apkCountrySetTargeting(
+                                alternativeCountrySetTargeting(ImmutableList.of("sea", "latam"))),
+                            baseRestOfWorldApk))))
+            .addDefaultTargetingValue(
+                DefaultTargetingValue.newBuilder().setDimension(Value.COUNTRY_SET))
+            .build();
+
+    Path apksFile = createApksArchiveFile(buildApksResult, tmpDir.resolve("bundle.apks"));
+
+    List<Path> installedApks = new ArrayList<>();
+    FakeDevice fakeDevice =
+        FakeDevice.fromDeviceSpec(DEVICE_ID, DeviceState.ONLINE, lDeviceWithLocales("en-US"));
+    fakeDevice.setInstallApksSideEffect((apks, installOptions) -> installedApks.addAll(apks));
+    AdbServer adbServer =
+        new FakeAdbServer(/* hasInitialDeviceList= */ true, ImmutableList.of(fakeDevice));
+
+    InstallApksCommand.builder()
+        .setApksArchivePath(apksFile)
+        .setAdbPath(adbPath)
+        .setAdbServer(adbServer)
+        .build()
+        .execute();
+
+    assertThat(getFileNames(installedApks))
+        .containsExactly(baseMasterApk.toString(), baseRestOfWorldApk.toString());
+  }
+
+  @Test
+  public void bundleWithCountrySetTargeting_noCountrySetSpecified_usesDefaults() throws Exception {
+    ZipPath baseMasterApk = ZipPath.create("base-master.apk");
+    ZipPath baseRestOfWorldApk = ZipPath.create("base-other_countries.apk");
+    ZipPath baseSeaApk = ZipPath.create("base-countries_sea.apk");
+    ZipPath baseLatamApk = ZipPath.create("base-countries_latam.apk");
+    BuildApksResult buildApksResult =
+        BuildApksResult.newBuilder()
+            .setBundletool(
+                Bundletool.newBuilder()
+                    .setVersion(BundleToolVersion.getCurrentVersion().toString()))
+            .addVariant(
+                createVariant(
+                    variantSdkTargeting(
+                        sdkVersionFrom(21), ImmutableSet.of(SdkVersion.getDefaultInstance())),
+                    createSplitApkSet(
+                        "base",
+                        createMasterApkDescription(
+                            ApkTargeting.getDefaultInstance(), baseMasterApk),
+                        splitApkDescription(
+                            apkCountrySetTargeting(
+                                countrySetTargeting(
+                                    /* value= */ "sea",
+                                    /* alternatives= */ ImmutableList.of("latam"))),
+                            baseSeaApk),
+                        splitApkDescription(
+                            apkCountrySetTargeting(
+                                countrySetTargeting(
+                                    /* value= */ "latam",
+                                    /* alternatives= */ ImmutableList.of("sea"))),
+                            baseLatamApk),
+                        splitApkDescription(
+                            apkCountrySetTargeting(
+                                alternativeCountrySetTargeting(ImmutableList.of("sea", "latam"))),
+                            baseRestOfWorldApk))))
+            .addDefaultTargetingValue(
+                DefaultTargetingValue.newBuilder()
+                    .setDimension(Value.COUNTRY_SET)
+                    .setDefaultValue("latam"))
+            .build();
+
+    Path apksFile = createApksArchiveFile(buildApksResult, tmpDir.resolve("bundle.apks"));
+    List<Path> installedApks = new ArrayList<>();
+    FakeDevice fakeDevice =
+        FakeDevice.fromDeviceSpec(DEVICE_ID, DeviceState.ONLINE, lDeviceWithLocales("en-US"));
+    fakeDevice.setInstallApksSideEffect((apks, installOptions) -> installedApks.addAll(apks));
+    AdbServer adbServer =
+        new FakeAdbServer(/* hasInitialDeviceList= */ true, ImmutableList.of(fakeDevice));
+
+    InstallApksCommand.builder()
+        .setApksArchivePath(apksFile)
+        .setAdbPath(adbPath)
+        .setAdbServer(adbServer)
+        .build()
+        .execute();
+
+    assertThat(getFileNames(installedApks))
+        .containsExactly(baseMasterApk.toString(), baseLatamApk.toString());
+  }
+
+  @Test
+  public void bundleWithCountrySetTargeting_countrySetSpecified_filterByCountrySet()
+      throws Exception {
+    ZipPath baseMasterApk = ZipPath.create("base-master.apk");
+    ZipPath baseRestOfWorldApk = ZipPath.create("base-other_countries.apk");
+    ZipPath baseSeaApk = ZipPath.create("base-countries_sea.apk");
+    ZipPath baseLatamApk = ZipPath.create("base-countries_latam.apk");
+    BuildApksResult buildApksResult =
+        BuildApksResult.newBuilder()
+            .setBundletool(
+                Bundletool.newBuilder()
+                    .setVersion(BundleToolVersion.getCurrentVersion().toString()))
+            .addVariant(
+                createVariant(
+                    variantSdkTargeting(
+                        sdkVersionFrom(21), ImmutableSet.of(SdkVersion.getDefaultInstance())),
+                    createSplitApkSet(
+                        "base",
+                        createMasterApkDescription(
+                            ApkTargeting.getDefaultInstance(), baseMasterApk),
+                        splitApkDescription(
+                            apkCountrySetTargeting(
+                                countrySetTargeting(
+                                    /* value= */ "sea",
+                                    /* alternatives= */ ImmutableList.of("latam"))),
+                            baseSeaApk),
+                        splitApkDescription(
+                            apkCountrySetTargeting(
+                                countrySetTargeting(
+                                    /* value= */ "latam",
+                                    /* alternatives= */ ImmutableList.of("sea"))),
+                            baseLatamApk),
+                        splitApkDescription(
+                            apkCountrySetTargeting(
+                                alternativeCountrySetTargeting(ImmutableList.of("sea", "latam"))),
+                            baseRestOfWorldApk))))
+            .addDefaultTargetingValue(
+                DefaultTargetingValue.newBuilder()
+                    .setDimension(Value.COUNTRY_SET)
+                    .setDefaultValue("latam"))
+            .build();
+
+    Path apksFile = createApksArchiveFile(buildApksResult, tmpDir.resolve("bundle.apks"));
+    List<Path> installedApks = new ArrayList<>();
+    FakeDevice fakeDevice =
+        FakeDevice.fromDeviceSpec(DEVICE_ID, DeviceState.ONLINE, lDeviceWithLocales("en-US"));
+    fakeDevice.setInstallApksSideEffect((apks, installOptions) -> installedApks.addAll(apks));
+    AdbServer adbServer =
+        new FakeAdbServer(/* hasInitialDeviceList= */ true, ImmutableList.of(fakeDevice));
+
+    InstallApksCommand.builder()
+        .setApksArchivePath(apksFile)
+        .setAdbPath(adbPath)
+        .setAdbServer(adbServer)
+        .setCountrySet("sea")
+        .build()
+        .execute();
+
+    assertThat(getFileNames(installedApks))
+        .containsExactly(baseMasterApk.toString(), baseSeaApk.toString());
   }
 
   @Test

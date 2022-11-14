@@ -27,6 +27,7 @@ message ApkTargeting {
   MultiAbiTargeting multi_abi_targeting = 7;
   SanitizerTargeting sanitizer_targeting = 8;
   DeviceTierTargeting device_tier_targeting = 9;
+  CountrySetTargeting country_set_targeting = 10;
 }
 
 // Targeting on the module level.
@@ -130,6 +131,7 @@ message AssetsDirectoryTargeting {
   TextureCompressionFormatTargeting texture_compression_format = 3;
   LanguageTargeting language = 4;
   DeviceTierTargeting device_tier = 5;
+  CountrySetTargeting country_set = 6;
 }
 
 // Targeting specific for directories under lib/.
@@ -205,6 +207,31 @@ message DeviceTierTargeting {
   repeated google.protobuf.Int32Value alternatives = 4;
 
   reserved 1, 2;
+}
+
+// Targets assets and APKs to a specific country set.
+// For Example:-
+// The values and alternatives for the following files in assets directory
+// targeting would be as follows:
+//    assetpack1/assets/foo#countries_latam/bar.txt ->
+//        { value: [latam], alternatives: [sea] }
+//    assetpack1/assets/foo#countries_sea/bar.txt ->
+//        { value: [sea], alternatives: [latam] }
+//    assetpack1/assets/foo/bar.txt ->
+//        { value: [], alternatives: [sea, latam] }
+// The values and alternatives for the following targeted split apks would be as
+// follows:
+//    splits/base-countries_latam.apk ->
+//        { value: [latam], alternatives: [sea] }
+//    splits/base-countries_sea.apk ->
+//        { value: [sea], alternatives: [latam] }
+//    splits/base-other_countries.apk ->
+//        { value: [], alternatives: [sea, latam] }
+message CountrySetTargeting {
+  // Country set name defined in device tier config.
+  repeated string value = 1;
+  // Targeting of other sibling directories that were in the Bundle.
+  repeated string alternatives = 2;
 }
 
 // Targets conditional modules to a set of device groups.

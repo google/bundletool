@@ -31,6 +31,7 @@ public interface GetSizeRequest {
     LANGUAGE,
     TEXTURE_COMPRESSION_FORMAT,
     DEVICE_TIER,
+    COUNTRY_SET,
     SDK_RUNTIME,
     ALL
   }

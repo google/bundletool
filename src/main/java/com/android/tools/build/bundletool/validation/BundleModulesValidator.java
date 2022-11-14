@@ -55,6 +55,7 @@ public class BundleModulesValidator {
           new AbiParityValidator(),
           new TextureCompressionFormatParityValidator(),
           new DeviceTierParityValidator(),
+          new CountrySetParityValidator(),
           new DexFilesValidator(),
           new ApexBundleValidator(),
           new AssetBundleValidator(),

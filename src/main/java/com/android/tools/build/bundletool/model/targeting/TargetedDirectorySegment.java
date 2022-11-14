@@ -20,6 +20,7 @@ import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
 
 import com.android.bundle.Targeting.AssetsDirectoryTargeting;
+import com.android.bundle.Targeting.CountrySetTargeting;
 import com.android.bundle.Targeting.DeviceTierTargeting;
 import com.android.bundle.Targeting.LanguageTargeting;
 import com.android.tools.build.bundletool.model.exceptions.InvalidBundleException;
@@ -44,10 +45,12 @@ import java.util.regex.Pattern;
 @AutoValue.CopyAnnotations
 public abstract class TargetedDirectorySegment {
 
+  public static final String COUNTRY_SET_KEY = "countries";
+  private static final String COUNTRY_SET_NAME_REGEX_STRING = "^[a-zA-Z][a-zA-Z0-9_]*$";
   private static final Pattern DIRECTORY_SEGMENT_PATTERN =
       Pattern.compile("(?<base>.+?)#(?<key>.+?)_(?<value>.+)");
-
   private static final Pattern LANGUAGE_CODE_PATTERN = Pattern.compile("^[a-zA-Z]{2,3}$");
+  private static final Pattern COUNTRY_SET_PATTERN = Pattern.compile(COUNTRY_SET_NAME_REGEX_STRING);
 
   private static final String LANG_KEY = "lang";
   private static final String TCF_KEY = "tcf";
@@ -58,10 +61,10 @@ public abstract class TargetedDirectorySegment {
           .put(LANG_KEY, TargetingDimension.LANGUAGE)
           .put(TCF_KEY, TargetingDimension.TEXTURE_COMPRESSION_FORMAT)
           .put(DEVICE_TIER_KEY, TargetingDimension.DEVICE_TIER)
+          .put(COUNTRY_SET_KEY, TargetingDimension.COUNTRY_SET)
           .build();
   private static final ImmutableSetMultimap<TargetingDimension, String> DIMENSION_TO_KEY =
       KEY_TO_DIMENSION.asMultimap().inverse();
-
 
   public abstract String getName();
 
@@ -94,6 +97,8 @@ public abstract class TargetedDirectorySegment {
       newTargeting.clearTextureCompressionFormat();
     } else if (dimension.equals(TargetingDimension.DEVICE_TIER) && getTargeting().hasDeviceTier()) {
       newTargeting.clearDeviceTier();
+    } else if (dimension.equals(TargetingDimension.COUNTRY_SET) && getTargeting().hasCountrySet()) {
+      newTargeting.clearCountrySet();
     } else {
       // Nothing to remove, return the existing immutable object.
       return this;
@@ -167,6 +172,8 @@ public abstract class TargetedDirectorySegment {
       return Optional.of(TCF_KEY);
     } else if (targeting.hasDeviceTier()) {
       return Optional.of(DEVICE_TIER_KEY);
+    } else if (targeting.hasCountrySet()) {
+      return Optional.of(COUNTRY_SET_KEY);
     }
 
     return Optional.empty();
@@ -190,6 +197,8 @@ public abstract class TargetedDirectorySegment {
       return Optional.of(
           Integer.toString(
               Iterables.getOnlyElement(targeting.getDeviceTier().getValueList()).getValue()));
+    } else if (targeting.hasCountrySet()) {
+      return Optional.of(Iterables.getOnlyElement(targeting.getCountrySet().getValueList()));
     }
 
     return Optional.empty();
@@ -211,6 +220,8 @@ public abstract class TargetedDirectorySegment {
         return parseTextureCompressionFormat(name, value);
       case DEVICE_TIER:
         return parseDeviceTier(name, value);
+      case COUNTRY_SET:
+        return parseCountrySet(name, value);
       default:
         throw InvalidBundleException.builder()
             .withUserMessage("Unrecognized key: '%s'.", key)
@@ -251,6 +262,20 @@ public abstract class TargetedDirectorySegment {
     return AssetsDirectoryTargeting.newBuilder()
         .setDeviceTier(
             DeviceTierTargeting.newBuilder().addValue(Int32Value.of(Integer.parseInt(value))))
+        .build();
+  }
+
+  private static AssetsDirectoryTargeting parseCountrySet(String name, String value) {
+    Matcher matcher = COUNTRY_SET_PATTERN.matcher(value);
+    if (!matcher.matches()) {
+      throw InvalidBundleException.builder()
+          .withUserMessage(
+              "Country set name should match the regex '%s' but got '%s' for directory '%s'.",
+              COUNTRY_SET_NAME_REGEX_STRING, value, name)
+          .build();
+    }
+    return AssetsDirectoryTargeting.newBuilder()
+        .setCountrySet(CountrySetTargeting.newBuilder().addValue(value))
         .build();
   }
 }

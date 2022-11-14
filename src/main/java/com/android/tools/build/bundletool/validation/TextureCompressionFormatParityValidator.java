@@ -69,7 +69,7 @@ public class TextureCompressionFormatParityValidator extends SubValidator {
 
     @Override
     public final String toString() {
-      return getFormats().toString()
+      return getFormats()
           + (getHasFallback() ? " (with fallback directories)" : " (without fallback directories)");
     }
   }

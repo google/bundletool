@@ -20,6 +20,7 @@ import static com.android.tools.build.bundletool.model.targeting.TargetingUtils.
 import static com.android.tools.build.bundletool.model.targeting.TargetingUtils.getMinSdk;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.abiTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.assetsDirectoryTargeting;
+import static com.android.tools.build.bundletool.testing.TargetingUtils.countrySetTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.deviceTierTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.languageTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.mergeAssetsTargeting;
@@ -80,6 +81,14 @@ public class TargetingUtilsTest {
     assertThat(
             TargetingUtils.getTargetingDimensions(assetsDirectoryTargeting(deviceTierTargeting(0))))
         .containsExactly(TargetingDimension.DEVICE_TIER);
+  }
+
+  @Test
+  public void getDimensions_countrySet() {
+    assertThat(
+            TargetingUtils.getTargetingDimensions(
+                assetsDirectoryTargeting(countrySetTargeting("latam"))))
+        .containsExactly(TargetingDimension.COUNTRY_SET);
   }
 
   @Test

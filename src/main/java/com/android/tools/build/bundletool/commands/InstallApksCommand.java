@@ -51,6 +51,7 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Sets;
 import com.google.protobuf.Int32Value;
+import com.google.protobuf.StringValue;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -72,6 +73,7 @@ public abstract class InstallApksCommand {
   private static final Flag<Integer> DEVICE_TIER_FLAG = Flag.nonNegativeInteger("device-tier");
   private static final Flag<ImmutableSet<String>> DEVICE_GROUPS_FLAG =
       Flag.stringSet("device-groups");
+  private static final Flag<String> COUNTRY_SET_FLAG = Flag.string("country-set");
   private static final Flag<ImmutableList<Path>> ADDITIONAL_LOCAL_TESTING_FILES_FLAG =
       Flag.pathList("additional-local-testing-files");
   private static final Flag<Integer> TIMEOUT_MILLIS_FLAG = Flag.positiveInteger("timeout-millis");
@@ -94,6 +96,8 @@ public abstract class InstallApksCommand {
   public abstract Optional<Integer> getDeviceTier();
 
   public abstract Optional<ImmutableSet<String>> getDeviceGroups();
+
+  public abstract Optional<String> getCountrySet();
 
   public abstract Optional<ImmutableList<Path>> getAdditionalLocalTestingFiles();
 
@@ -130,6 +134,8 @@ public abstract class InstallApksCommand {
 
     public abstract Builder setDeviceGroups(ImmutableSet<String> deviceGroups);
 
+    public abstract Builder setCountrySet(String countrySet);
+
     public abstract Builder setAdditionalLocalTestingFiles(ImmutableList<Path> additionalFiles);
 
     public abstract Builder setTimeout(Duration timeout);
@@ -154,6 +160,7 @@ public abstract class InstallApksCommand {
     Optional<Boolean> allowTestOnly = ALLOW_TEST_ONLY_FLAG.getValue(flags);
     Optional<Integer> deviceTier = DEVICE_TIER_FLAG.getValue(flags);
     Optional<ImmutableSet<String>> deviceGroups = DEVICE_GROUPS_FLAG.getValue(flags);
+    Optional<String> countrySet = COUNTRY_SET_FLAG.getValue(flags);
     Optional<ImmutableList<Path>> additionalLocalTestingFiles =
         ADDITIONAL_LOCAL_TESTING_FILES_FLAG.getValue(flags);
     Optional<Integer> timeoutMillis = TIMEOUT_MILLIS_FLAG.getValue(flags);
@@ -168,6 +175,7 @@ public abstract class InstallApksCommand {
     allowTestOnly.ifPresent(command::setAllowTestOnly);
     deviceTier.ifPresent(command::setDeviceTier);
     deviceGroups.ifPresent(command::setDeviceGroups);
+    countrySet.ifPresent(command::setCountrySet);
     additionalLocalTestingFiles.ifPresent(command::setAdditionalLocalTestingFiles);
     timeoutMillis.ifPresent(timeout -> command.setTimeout(Duration.ofMillis(timeout)));
 
@@ -189,6 +197,10 @@ public abstract class InstallApksCommand {
       }
       if (getDeviceGroups().isPresent()) {
         deviceSpec = deviceSpec.toBuilder().addAllDeviceGroups(getDeviceGroups().get()).build();
+      }
+      if (getCountrySet().isPresent()) {
+        deviceSpec =
+            deviceSpec.toBuilder().setCountrySet(StringValue.of(getCountrySet().get())).build();
       }
 
       final ImmutableList<Path> apksToInstall =
@@ -302,8 +314,15 @@ public abstract class InstallApksCommand {
     ImmutableSet<String> allModules =
         ExtractApksCommand.resolveRequestedModules(
             ImmutableSet.of(ExtractApksCommand.ALL_MODULES_SHORTCUT), toc);
+
+    // We exclude install-time asset modules from the list of requested modules and also force
+    // the extract-apk layer to skip them explicitly.
+    // Install-time asset modules should not be pushed to storage, because they cannot be fetched
+    // through on-demand delivery.
     extractApksCommand.setModules(
         Sets.difference(allModules, installTimeAssetModules).immutableCopy());
+    extractApksCommand.setIncludeInstallTimeAssetModules(false);
+
     return extractApksCommand.build().execute().stream()
         .filter(
             apk ->
@@ -451,6 +470,17 @@ public abstract class InstallApksCommand {
                         + " the correct device group conditional modules to this device."
                         + " This flag is only relevant if the bundle uses device group targeting"
                         + " in conditional modules and should be set in that case.")
+                .build())
+        .addFlag(
+            FlagDescription.builder()
+                .setFlagName(COUNTRY_SET_FLAG.getName())
+                .setExampleValue("country_set_name")
+                .setOptional(true)
+                .setDescription(
+                    "Country set for the user account on the device. This value will be"
+                        + " used to match the correct country set targeted APKs to this device."
+                        + " This flag is only relevant if the bundle uses country set targeting,"
+                        + " and should be set in that case.")
                 .build())
         .addFlag(
             FlagDescription.builder()

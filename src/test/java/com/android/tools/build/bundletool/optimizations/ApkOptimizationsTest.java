@@ -16,6 +16,7 @@
 package com.android.tools.build.bundletool.optimizations;
 
 import static com.android.tools.build.bundletool.model.OptimizationDimension.ABI;
+import static com.android.tools.build.bundletool.model.OptimizationDimension.COUNTRY_SET;
 import static com.android.tools.build.bundletool.model.OptimizationDimension.DEVICE_TIER;
 import static com.android.tools.build.bundletool.model.OptimizationDimension.LANGUAGE;
 import static com.android.tools.build.bundletool.model.OptimizationDimension.SCREEN_DENSITY;
@@ -95,11 +96,12 @@ public class ApkOptimizationsTest {
     ApkOptimizations optimizations =
         ApkOptimizations.builder()
             .setSplitDimensions(
-                ImmutableSet.of(ABI, SCREEN_DENSITY, TEXTURE_COMPRESSION_FORMAT, DEVICE_TIER))
+                ImmutableSet.of(
+                    ABI, SCREEN_DENSITY, TEXTURE_COMPRESSION_FORMAT, DEVICE_TIER, COUNTRY_SET))
             .setStandaloneDimensions(ImmutableSet.of(ABI))
             .build();
 
     assertThat(optimizations.getSplitDimensionsForAssetModules())
-        .containsExactly(TEXTURE_COMPRESSION_FORMAT, DEVICE_TIER);
+        .containsExactly(TEXTURE_COMPRESSION_FORMAT, DEVICE_TIER, COUNTRY_SET);
   }
 }

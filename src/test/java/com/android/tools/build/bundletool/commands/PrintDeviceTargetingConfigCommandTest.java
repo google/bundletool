@@ -146,6 +146,18 @@ public class PrintDeviceTargetingConfigCommandTest {
   }
 
   @Test
+  public void onlyCountrySets_ok() throws Exception {
+    assertOutputIsExpected("only_country_sets.json", "only_country_sets_expected_output.txt");
+  }
+
+  @Test
+  public void countrySetsWithDeviceTiers_ok() throws Exception {
+    assertOutputIsExpected(
+        "country_sets_with_device_tiers.json",
+        "country_sets_with_device_tiers_expected_output.txt");
+  }
+
+  @Test
   public void buildingCommandViaFlags_deviceTargetingConfigPathNotSet_throws() {
     Throwable e =
         assertThrows(

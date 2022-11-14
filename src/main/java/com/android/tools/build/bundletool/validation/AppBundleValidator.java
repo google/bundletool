@@ -47,6 +47,7 @@ public class AppBundleValidator {
           new AbiParityValidator(),
           new TextureCompressionFormatParityValidator(),
           new DeviceTierParityValidator(),
+          new CountrySetParityValidator(),
           new DexFilesValidator(),
           new ApexBundleValidator(),
           new AssetBundleValidator(),

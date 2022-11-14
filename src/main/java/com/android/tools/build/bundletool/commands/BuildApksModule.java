@@ -35,6 +35,7 @@ import com.android.tools.build.bundletool.optimizations.ApkOptimizations;
 import com.android.tools.build.bundletool.optimizations.OptimizationsMerger;
 import com.google.common.util.concurrent.ListeningExecutorService;
 import com.google.protobuf.Int32Value;
+import com.google.protobuf.StringValue;
 import dagger.Module;
 import dagger.Provides;
 import java.io.PrintStream;
@@ -151,6 +152,15 @@ public final class BuildApksModule {
               spec ->
                   spec.toBuilder()
                       .setDeviceTier(Int32Value.of(command.getDeviceTier().get()))
+                      .build());
+    }
+    if (command.getCountrySet().isPresent()) {
+      checkState(deviceSpec.isPresent(), "Country set specified but no device was provided");
+      deviceSpec =
+          deviceSpec.map(
+              spec ->
+                  spec.toBuilder()
+                      .setCountrySet(StringValue.of(command.getCountrySet().get()))
                       .build());
     }
     return deviceSpec;

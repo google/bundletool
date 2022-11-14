@@ -17,6 +17,7 @@
 package com.android.tools.build.bundletool.commands;
 
 import static com.android.tools.build.bundletool.commands.CommandUtils.ANDROID_SERIAL_VARIABLE;
+import static com.android.tools.build.bundletool.device.DeviceTargetingConfigEvaluator.getMatchingCountrySet;
 import static com.android.tools.build.bundletool.device.DeviceTargetingConfigEvaluator.getMatchingDeviceGroups;
 import static com.android.tools.build.bundletool.device.DeviceTargetingConfigEvaluator.getSelectedDeviceTier;
 import static com.android.tools.build.bundletool.model.utils.SdkToolsLocator.ANDROID_HOME_VARIABLE;
@@ -74,6 +75,8 @@ public abstract class EvaluateDeviceTargetingConfigCommand {
 
   private static final Flag<String> DEVICE_ID_FLAG = Flag.string("device-id");
 
+  private static final Flag<String> COUNTRY_CODE_FLAG = Flag.string("country-code");
+
   private static final SystemEnvironmentProvider DEFAULT_PROVIDER =
       new DefaultSystemEnvironmentProvider();
 
@@ -96,6 +99,8 @@ public abstract class EvaluateDeviceTargetingConfigCommand {
 
   public abstract Optional<String> getDeviceId();
 
+  public abstract Optional<String> getCountryCode();
+
   abstract Optional<Path> getAdbPath();
 
   static Builder builder() {
@@ -113,6 +118,8 @@ public abstract class EvaluateDeviceTargetingConfigCommand {
     abstract Builder setAdbServer(AdbServer adbServer);
 
     abstract Builder setDeviceId(Optional<String> id);
+
+    abstract Builder setCountryCode(String countryCode);
 
     abstract EvaluateDeviceTargetingConfigCommand build();
 
@@ -177,6 +184,9 @@ public abstract class EvaluateDeviceTargetingConfigCommand {
           .setConnectedDeviceMode(true)
           .setDeviceId(DEVICE_ID_FLAG.getValue(flags));
     }
+    COUNTRY_CODE_FLAG
+        .getValue(flags)
+        .ifPresent(evaluateDeviceTargetingConfigCommandBuilder::setCountryCode);
 
     return evaluateDeviceTargetingConfigCommandBuilder.build();
   }
@@ -188,6 +198,9 @@ public abstract class EvaluateDeviceTargetingConfigCommand {
       DeviceTierConfig config = configBuilder.build();
 
       DeviceTierConfigValidator.validateDeviceTierConfig(config);
+      if (getCountryCode().isPresent()) {
+        DeviceTierConfigValidator.validateCountryCode(getCountryCode().get());
+      }
 
       DeviceProperties.Builder devicePropertiesBuilder = DeviceProperties.newBuilder();
       if (this.getDevicePropertiesPath().isPresent()) {
@@ -202,6 +215,9 @@ public abstract class EvaluateDeviceTargetingConfigCommand {
 
       printTier(getSelectedDeviceTier(config, deviceProperties), out);
       printGroups(getMatchingDeviceGroups(config, deviceProperties), out);
+      if (getCountryCode().isPresent()) {
+        printCountrySet(getMatchingCountrySet(config, getCountryCode().get()), out);
+      }
     }
   }
 
@@ -246,6 +262,10 @@ public abstract class EvaluateDeviceTargetingConfigCommand {
               + deviceGroups.stream().map(DeviceGroup::getName).collect(joining("', '"))
               + "'");
     }
+  }
+
+  private void printCountrySet(String countrySet, PrintStream out) {
+    out.println("Country Set: '" + countrySet + "'");
   }
 
   public static CommandHelp help() {
@@ -299,6 +319,16 @@ public abstract class EvaluateDeviceTargetingConfigCommand {
                         + "this flag or the environment variable is required when more than one "
                         + "device or emulator is connected. Used only if %s flag is set.",
                     ANDROID_SERIAL_VARIABLE, CONNECTED_DEVICE_FLAG)
+                .build())
+        .addFlag(
+            FlagDescription.builder()
+                .setFlagName(COUNTRY_CODE_FLAG.getName())
+                .setExampleValue("VN")
+                .setOptional(true)
+                .setDescription(
+                    "An ISO 3166 alpha-2 format country code for the country of user account on the"
+                        + " device. This will be used to derive corresponding country set from"
+                        + " device targeting configuration.")
                 .build())
         .build();
   }

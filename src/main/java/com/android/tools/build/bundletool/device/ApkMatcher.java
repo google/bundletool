@@ -55,6 +55,7 @@ public class ApkMatcher {
 
   private final Optional<ImmutableSet<String>> requestedModuleNames;
   private final boolean matchInstant;
+  private final boolean includeInstallTimeAssetModules;
   private final ModuleMatcher moduleMatcher;
   private final VariantMatcher variantMatcher;
   private final boolean ensureDensityAndAbiApksMatched;
@@ -63,6 +64,7 @@ public class ApkMatcher {
     this(
         deviceSpec,
         Optional.empty(),
+        /* includeInstallTimeAssetModules= */ true,
         /* matchInstant= */ false,
         /* ensureDensityAndAbiApksMatched= */ false);
   }
@@ -80,6 +82,7 @@ public class ApkMatcher {
   public ApkMatcher(
       DeviceSpec deviceSpec,
       Optional<ImmutableSet<String>> requestedModuleNames,
+      boolean includeInstallTimeAssetModules,
       boolean matchInstant,
       boolean ensureDensityAndAbiApksMatched) {
     checkArgument(
@@ -95,6 +98,7 @@ public class ApkMatcher {
     TextureCompressionFormatMatcher textureCompressionFormatMatcher =
         new TextureCompressionFormatMatcher(deviceSpec);
     DeviceTierApkMatcher deviceTierApkMatcher = new DeviceTierApkMatcher(deviceSpec);
+    CountrySetApkMatcher countrySetApkMatcher = new CountrySetApkMatcher(deviceSpec);
     DeviceGroupModuleMatcher deviceGroupModuleMatcher = new DeviceGroupModuleMatcher(deviceSpec);
 
     this.apkMatchers =
@@ -105,8 +109,10 @@ public class ApkMatcher {
             screenDensityMatcher,
             languageMatcher,
             textureCompressionFormatMatcher,
-            deviceTierApkMatcher);
+            deviceTierApkMatcher,
+            countrySetApkMatcher);
     this.requestedModuleNames = requestedModuleNames;
+    this.includeInstallTimeAssetModules = includeInstallTimeAssetModules;
     this.matchInstant = matchInstant;
     this.ensureDensityAndAbiApksMatched = ensureDensityAndAbiApksMatched;
     this.moduleMatcher =
@@ -337,8 +343,12 @@ public class ApkMatcher {
 
   public ImmutableList<GeneratedApk> getMatchingApksFromAssetModules(
       Collection<AssetSliceSet> assetModules) {
-    ImmutableSet<String> assetModulesToMatch =
-        requestedModuleNames.orElseGet(() -> getUpfrontAssetModules(assetModules));
+    Set<String> assetModulesToMatch =
+        Sets.union(
+            requestedModuleNames.orElse(ImmutableSet.of()),
+            includeInstallTimeAssetModules
+                ? getUpfrontAssetModules(assetModules)
+                : ImmutableSet.of());
 
     return assetModules.stream()
         .filter(

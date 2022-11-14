@@ -153,9 +153,11 @@ public class Sharder {
                     split.getApkTargeting().toBuilder()
                         .clearTextureCompressionFormatTargeting()
                         .clearDeviceTierTargeting()
+                        .clearCountrySetTargeting()
                         .build()
                         .equals(ApkTargeting.getDefaultInstance())),
-        "Master splits are expected to have default or Texture Compression Format only targeting.");
+        "Master splits can not have any targeting other than Texture Compression Format, Device"
+            + " Tier and Country Set.");
 
     return masterSplits;
   }

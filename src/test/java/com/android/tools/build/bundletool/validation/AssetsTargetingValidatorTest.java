@@ -33,6 +33,7 @@ import com.android.bundle.Targeting.Abi;
 import com.android.bundle.Targeting.Abi.AbiAlias;
 import com.android.bundle.Targeting.AbiTargeting;
 import com.android.bundle.Targeting.AssetsDirectoryTargeting;
+import com.android.bundle.Targeting.CountrySetTargeting;
 import com.android.bundle.Targeting.LanguageTargeting;
 import com.android.bundle.Targeting.TextureCompressionFormat;
 import com.android.bundle.Targeting.TextureCompressionFormat.TextureCompressionFormatAlias;
@@ -236,6 +237,30 @@ public class AssetsTargetingValidatorTest {
   }
 
   @Test
+  public void validateModule_defaultInstanceOfCountrySetTargeting_throws() throws Exception {
+    Assets config =
+        assets(
+            targetedAssetsDirectory(
+                "assets/dir#countries_latam",
+                AssetsDirectoryTargeting.newBuilder()
+                    .setCountrySet(CountrySetTargeting.getDefaultInstance())
+                    .build()));
+    BundleModule module =
+        new BundleModuleBuilder("testModule")
+            .addFile("assets/dir#countries_latam/raw.dat")
+            .setAssetsConfig(config)
+            .setManifest(androidManifestForAssetModule("com.test.app"))
+            .build();
+
+    InvalidBundleException e =
+        assertThrows(
+            InvalidBundleException.class,
+            () -> new AssetsTargetingValidator().validateModule(module));
+
+    assertThat(e).hasMessageThat().contains("set but empty Country Set targeting");
+  }
+
+  @Test
   public void conflictingValuesAndAlternatives_abi() {
     Assets config =
         assets(
@@ -335,6 +360,36 @@ public class AssetsTargetingValidatorTest {
         .contains(
             "Expected targeting values and alternatives to be mutually exclusive, but directory"
                 + " 'assets/dir' has texture compression format targeting that contains [ASTC] in"
+                + " both.");
+  }
+
+  @Test
+  public void conflictingValuesAndAlternatives_countrySet() {
+    Assets config =
+        assets(
+            targetedAssetsDirectory(
+                "assets/dir#countries_latam",
+                AssetsDirectoryTargeting.newBuilder()
+                    .setCountrySet(
+                        CountrySetTargeting.newBuilder().addValue("latam").addAlternatives("latam"))
+                    .build()));
+    BundleModule module =
+        new BundleModuleBuilder("testModule")
+            .addFile("assets/dir#countries_latam/raw.dat")
+            .setAssetsConfig(config)
+            .setManifest(androidManifestForAssetModule("com.test.app"))
+            .build();
+
+    InvalidBundleException e =
+        assertThrows(
+            InvalidBundleException.class,
+            () -> new AssetsTargetingValidator().validateModule(module));
+
+    assertThat(e)
+        .hasMessageThat()
+        .contains(
+            "Expected targeting values and alternatives to be mutually exclusive, but directory"
+                + " 'assets/dir#countries_latam' has country set targeting that contains [latam] in"
                 + " both.");
   }
 }

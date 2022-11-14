@@ -34,6 +34,7 @@ import static com.android.tools.build.bundletool.testing.TestUtils.extractAndroi
 import static com.google.common.truth.Truth.assertThat;
 import static com.google.common.truth.Truth8.assertThat;
 import static com.google.common.truth.extensions.proto.ProtoTruth.assertThat;
+import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.util.Arrays.stream;
 
 import com.android.apksig.ApkVerifier;
@@ -52,6 +53,7 @@ import com.android.tools.build.bundletool.io.TempDirectory;
 import com.android.tools.build.bundletool.model.AndroidManifest;
 import com.android.tools.build.bundletool.model.RuntimeEnabledSdkVersionEncoder;
 import com.android.tools.build.bundletool.model.SdkBundle;
+import com.android.tools.build.bundletool.model.utils.ZipUtils;
 import com.android.tools.build.bundletool.testing.BundleModuleBuilder;
 import com.android.tools.build.bundletool.testing.CertificateFactory;
 import com.android.tools.build.bundletool.testing.SdkBundleBuilder;
@@ -271,10 +273,17 @@ public class BuildSdkApksManagerTest {
     ApkDescription apkDescription = variant.getApkSet(0).getApkDescription(0);
     File apkFile = extractFromApkSetFile(apkSetFile, apkDescription.getPath(), tmpDir);
     AndroidManifest manifest = extractAndroidManifest(apkFile, tmpDir);
+    ZipFile apkZip = new ZipFile(apkFile);
 
     assertThat(manifest.getSdkProviderClassNameProperty()).hasValue(sdkProviderClassName);
     assertThat(manifest.getCompatSdkProviderClassNameProperty())
         .hasValue(compatSdkProviderClassName);
+    String compatSdkProviderClassNameFromFile =
+        ZipUtils.asByteSource(
+                apkZip, apkZip.getEntry("assets/SandboxedSdkProviderCompatClassName.txt"))
+            .asCharSource(UTF_8)
+            .read();
+    assertThat(compatSdkProviderClassNameFromFile).isEqualTo(compatSdkProviderClassName);
   }
 
   @Test

@@ -34,12 +34,14 @@ import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.xmlD
 import static com.android.tools.build.bundletool.testing.TargetingUtils.abiTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.alternativeLanguageTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.apkAbiTargeting;
+import static com.android.tools.build.bundletool.testing.TargetingUtils.apkCountrySetTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.apkDensityTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.apkDeviceTierTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.apkLanguageTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.apkMultiAbiTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.apkSanitizerTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.apkTextureTargeting;
+import static com.android.tools.build.bundletool.testing.TargetingUtils.countrySetTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.deviceTierTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.lPlusVariantTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.languageTargeting;
@@ -255,6 +257,38 @@ public class ModuleSplitTest {
             .build();
     deviceTieredSplit = deviceTieredSplit.writeSplitIdInManifest(deviceTieredSplit.getSuffix());
     assertThat(deviceTieredSplit.getAndroidManifest().getSplitId()).hasValue("config.tier_0");
+  }
+
+  @Test
+  public void moduleCountrySetSplitSuffixAndName() {
+    ModuleSplit countrySetSplit =
+        ModuleSplit.builder()
+            .setModuleName(BundleModuleName.create("base"))
+            .setVariantTargeting(lPlusVariantTargeting())
+            .setApkTargeting(apkCountrySetTargeting(countrySetTargeting("latam")))
+            .setMasterSplit(false)
+            .setAndroidManifest(AndroidManifest.create(androidManifest("com.test.app")))
+            .build();
+    countrySetSplit = countrySetSplit.writeSplitIdInManifest(countrySetSplit.getSuffix());
+    assertThat(countrySetSplit.getAndroidManifest().getSplitId())
+        .hasValue("config.countries_latam");
+  }
+
+  @Test
+  public void moduleCountrySetSplitSuffixAndName_alternatives() {
+    ModuleSplit countrySetSplit =
+        ModuleSplit.builder()
+            .setModuleName(BundleModuleName.create("base"))
+            .setVariantTargeting(lPlusVariantTargeting())
+            .setApkTargeting(
+                apkCountrySetTargeting(
+                    countrySetTargeting(ImmutableList.of(), ImmutableList.of("latam", "sea"))))
+            .setMasterSplit(false)
+            .setAndroidManifest(AndroidManifest.create(androidManifest("com.test.app")))
+            .build();
+    countrySetSplit = countrySetSplit.writeSplitIdInManifest(countrySetSplit.getSuffix());
+    assertThat(countrySetSplit.getAndroidManifest().getSplitId())
+        .hasValue("config.other_countries");
   }
 
   @Test

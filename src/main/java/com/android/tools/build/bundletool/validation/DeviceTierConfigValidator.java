@@ -16,6 +16,7 @@
 
 package com.android.tools.build.bundletool.validation;
 
+import static com.android.tools.build.bundletool.model.utils.CollectorUtils.groupingByDeterministic;
 import static com.google.common.collect.ImmutableListMultimap.toImmutableListMultimap;
 import static com.google.common.collect.ImmutableSet.toImmutableSet;
 import static java.util.Collections.max;
@@ -26,29 +27,133 @@ import com.android.bundle.DeviceSelector;
 import com.android.bundle.DeviceTier;
 import com.android.bundle.DeviceTierConfig;
 import com.android.bundle.DeviceTierSet;
+import com.android.bundle.UserCountrySet;
 import com.android.tools.build.bundletool.model.exceptions.CommandExecutionException;
 import com.google.common.collect.ImmutableListMultimap;
 import com.google.common.collect.ImmutableSet;
 import java.util.List;
+import java.util.function.Function;
+import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 /** Validates the contents of a DeviceTierConfig. */
 public class DeviceTierConfigValidator {
 
+  private static final String COUNTRY_SET_NAME_REGEX_STRING = "^[a-zA-Z][a-zA-Z0-9_]*$";
+  private static final String COUNTRY_CODE_REGEX_STRING = "^[A-Z]{2}$";
+  private static final Pattern COUNTRY_SET_NAME_REGEX =
+      Pattern.compile(COUNTRY_SET_NAME_REGEX_STRING);
+  private static final Pattern COUNTRY_CODE_REGEX = Pattern.compile(COUNTRY_CODE_REGEX_STRING);
+
   private DeviceTierConfigValidator() {}
 
-  /** Validates the DeviceGroups and DeviceTierSet of a DeviceTierConfig. */
+  /** Validates the DeviceGroups, DeviceTierSet and UserCountrySets of a DeviceTierConfig. */
   public static void validateDeviceTierConfig(DeviceTierConfig deviceTierConfig) {
+    if (deviceTierConfig.getUserCountrySetsList().isEmpty()
+        && deviceTierConfig.getDeviceGroupsList().isEmpty()) {
+      throw CommandExecutionException.builder()
+          .withInternalMessage(
+              "The device tier config must contain at least one group or user country set.")
+          .build();
+    }
+
+    validateUserCountrySets(deviceTierConfig.getUserCountrySetsList());
     validateGroups(deviceTierConfig.getDeviceGroupsList());
     validateTiers(deviceTierConfig.getDeviceTierSet(), deviceTierConfig.getDeviceGroupsList());
   }
 
-  private static void validateGroups(List<DeviceGroup> deviceGroups) {
-    if (deviceGroups.isEmpty()) {
+  /**
+   * Validates the given country code. Checks that the given country code matches the regex
+   * '^[A-Z]{2}$'.
+   */
+  public static void validateCountryCode(String countryCode) {
+    if (!COUNTRY_CODE_REGEX.matcher(countryCode).matches()) {
       throw CommandExecutionException.builder()
-          .withInternalMessage("The device tier config must contain at least one group.")
+          .withInternalMessage(
+              "Country code should match the regex '%s', but found '%s'.",
+              COUNTRY_CODE_REGEX, countryCode)
+          .build();
+    }
+  }
+
+  private static void validateUserCountrySets(List<UserCountrySet> userCountrySets) {
+    userCountrySets.forEach(DeviceTierConfigValidator::validateUserCountrySet);
+    validateCountrySetNamesAreUnique(userCountrySets);
+    validateCountryCodesAreUnique(userCountrySets);
+  }
+
+  private static void validateCountrySetNamesAreUnique(List<UserCountrySet> userCountrySets) {
+    ImmutableSet<String> duplicateNames =
+        userCountrySets.stream()
+            .map(UserCountrySet::getName)
+            .collect(groupingByDeterministic(Function.identity(), Collectors.counting()))
+            .entrySet()
+            .stream()
+            .filter(e -> e.getValue() > 1)
+            .map(e -> e.getKey())
+            .collect(toImmutableSet());
+
+    if (!duplicateNames.isEmpty()) {
+      throw CommandExecutionException.builder()
+          .withInternalMessage(
+              "Country set names should be unique. Found multiple country sets with these names:"
+                  + " %s.",
+              duplicateNames)
+          .build();
+    }
+  }
+
+  private static void validateCountryCodesAreUnique(List<UserCountrySet> userCountrySets) {
+    ImmutableSet<String> duplicateCountryCodes =
+        userCountrySets.stream()
+            .flatMap(userCountrySet -> userCountrySet.getCountryCodesList().stream())
+            .collect(groupingByDeterministic(Function.identity(), Collectors.counting()))
+            .entrySet()
+            .stream()
+            .filter(e -> e.getValue() > 1)
+            .map(e -> e.getKey())
+            .collect(toImmutableSet());
+
+    if (!duplicateCountryCodes.isEmpty()) {
+      throw CommandExecutionException.builder()
+          .withInternalMessage(
+              "A country code can belong to only one country set. Found multiple occurrences of"
+                  + " these country codes: %s.",
+              duplicateCountryCodes.toString())
+          .build();
+    }
+  }
+
+  private static void validateUserCountrySet(UserCountrySet userCountrySet) {
+    validateCountrySetName(userCountrySet.getName());
+
+    if (userCountrySet.getCountryCodesList().isEmpty()) {
+      throw CommandExecutionException.builder()
+          .withInternalMessage(
+              "Country set '%s' must specify at least one country code.", userCountrySet.getName())
           .build();
     }
 
+    userCountrySet.getCountryCodesList().forEach(DeviceTierConfigValidator::validateCountryCode);
+  }
+
+  private static void validateCountrySetName(String countrySetName) {
+    if (countrySetName.isEmpty()) {
+      throw CommandExecutionException.builder()
+          .withInternalMessage("Country Sets must specify a name.")
+          .build();
+    }
+
+    if (!COUNTRY_SET_NAME_REGEX.matcher(countrySetName).matches()) {
+      throw CommandExecutionException.builder()
+          .withInternalMessage(
+              "Country set name should match the regex '%s', but found '%s'.",
+              COUNTRY_SET_NAME_REGEX_STRING, countrySetName)
+          .build();
+    }
+  }
+
+  private static void validateGroups(List<DeviceGroup> deviceGroups) {
     for (DeviceGroup deviceGroup : deviceGroups) {
       if (deviceGroup.getName().isEmpty()) {
         throw CommandExecutionException.builder()

@@ -176,6 +176,7 @@ public abstract class BuildApksCommand {
   private static final Flag<ImmutableSet<SystemApkOption>> SYSTEM_APK_OPTIONS =
       Flag.enumSet("system-apk-options", SystemApkOption.class);
   private static final Flag<Integer> DEVICE_TIER_FLAG = Flag.nonNegativeInteger("device-tier");
+  private static final Flag<String> COUNTRY_SET_FLAG = Flag.string("country-set");
 
   private static final Flag<Boolean> VERBOSE_FLAG = Flag.booleanFlag("verbose");
 
@@ -237,6 +238,8 @@ public abstract class BuildApksCommand {
   public abstract boolean getFuseOnlyDeviceMatchingModules();
 
   public abstract Optional<Integer> getDeviceTier();
+
+  public abstract Optional<String> getCountrySet();
 
   public abstract ImmutableSet<SystemApkOption> getSystemApkOptions();
 
@@ -388,6 +391,12 @@ public abstract class BuildApksCommand {
      * device spec.
      */
     public abstract Builder setDeviceTier(Integer deviceTier);
+
+    /**
+     * Sets the country set to use for APK matching. This will override the country set of the given
+     * device spec.
+     */
+    public abstract Builder setCountrySet(String countrySet);
 
     /** Sets options to generated APKs in system mode. */
     public abstract Builder setSystemApkOptions(ImmutableSet<SystemApkOption> options);
@@ -652,6 +661,16 @@ public abstract class BuildApksCommand {
             .build();
       }
 
+      if (command.getCountrySet().isPresent()
+          && !command.getGenerateOnlyForConnectedDevice()
+          && !command.getDeviceSpec().isPresent()) {
+        throw InvalidCommandException.builder()
+            .withInternalMessage(
+                "Setting --country-set requires using either the --connected-device or the"
+                    + " --device-spec flag.")
+            .build();
+      }
+
       if (command.getOutputFormat().equals(APK_SET)) {
         if (!APK_SET_ARCHIVE_EXTENSION.equals(
             MoreFiles.getFileExtension(command.getOutputFile()))) {
@@ -776,6 +795,7 @@ public abstract class BuildApksCommand {
         .map(deviceSpecParser)
         .ifPresent(buildApksCommand::setDeviceSpec);
     DEVICE_TIER_FLAG.getValue(flags).ifPresent(buildApksCommand::setDeviceTier);
+    COUNTRY_SET_FLAG.getValue(flags).ifPresent(buildApksCommand::setCountrySet);
     MODULES_FLAG.getValue(flags).ifPresent(buildApksCommand::setModules);
     VERBOSE_FLAG.getValue(flags).ifPresent(buildApksCommand::setVerbose);
     P7ZIP_PATH_FLAG
@@ -1356,7 +1376,7 @@ public abstract class BuildApksCommand {
                 .setDescription(
                     "If set, will generate APK Set optimized for the connected device. The "
                         + "generated APK Set will only be installable on that specific class of "
-                        + "devices. This flag should be only be set with --%s=%s flag.",
+                        + "devices. This flag should only be set with --%s=%s flag.",
                     BUILD_MODE_FLAG.getName(), DEFAULT.getLowerCaseName())
                 .build())
         .addFlag(
@@ -1399,8 +1419,20 @@ public abstract class BuildApksCommand {
                 .setExampleValue("low")
                 .setOptional(true)
                 .setDescription(
-                    "Device tier to use for APK matching. This flag should be only be set with"
+                    "Device tier to use for APK matching. This flag should only be set with"
                         + " --%s or --%s flags. If a device spec with a device tier is provided,"
+                        + " the value specified here will override the value set in the device"
+                        + " spec.",
+                    DEVICE_SPEC_FLAG.getName(), CONNECTED_DEVICE_FLAG.getName())
+                .build())
+        .addFlag(
+            FlagDescription.builder()
+                .setFlagName(COUNTRY_SET_FLAG.getName())
+                .setExampleValue("country_set_name")
+                .setOptional(true)
+                .setDescription(
+                    "Country set to use for APK matching. This flag should only be set with"
+                        + " --%s or --%s flags. If a device spec with a country set is provided,"
                         + " the value specified here will override the value set in the device"
                         + " spec.",
                     DEVICE_SPEC_FLAG.getName(), CONNECTED_DEVICE_FLAG.getName())

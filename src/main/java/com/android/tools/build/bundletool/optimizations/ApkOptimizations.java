@@ -16,6 +16,7 @@
 package com.android.tools.build.bundletool.optimizations;
 
 import static com.android.tools.build.bundletool.model.OptimizationDimension.ABI;
+import static com.android.tools.build.bundletool.model.OptimizationDimension.COUNTRY_SET;
 import static com.android.tools.build.bundletool.model.OptimizationDimension.DEVICE_TIER;
 import static com.android.tools.build.bundletool.model.OptimizationDimension.LANGUAGE;
 import static com.android.tools.build.bundletool.model.OptimizationDimension.SCREEN_DENSITY;
@@ -86,7 +87,7 @@ public abstract class ApkOptimizations {
 
   /** List of dimensions supported by asset modules. */
   private static final ImmutableSet<OptimizationDimension> DIMENSIONS_SUPPORTED_BY_ASSET_MODULES =
-      ImmutableSet.of(LANGUAGE, TEXTURE_COMPRESSION_FORMAT, DEVICE_TIER);
+      ImmutableSet.of(LANGUAGE, TEXTURE_COMPRESSION_FORMAT, DEVICE_TIER, COUNTRY_SET);
 
   public abstract ImmutableSet<OptimizationDimension> getSplitDimensions();
 

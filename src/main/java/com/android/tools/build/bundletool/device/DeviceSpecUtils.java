@@ -23,6 +23,7 @@ import static com.google.common.collect.ImmutableSet.toImmutableSet;
 import com.android.bundle.Devices.DeviceSpec;
 import com.android.bundle.Devices.SdkRuntime;
 import com.android.bundle.Targeting.AbiTargeting;
+import com.android.bundle.Targeting.CountrySetTargeting;
 import com.android.bundle.Targeting.DeviceFeatureTargeting;
 import com.android.bundle.Targeting.DeviceTierTargeting;
 import com.android.bundle.Targeting.LanguageTargeting;
@@ -40,6 +41,7 @@ import com.google.common.collect.Iterables;
 import com.google.common.collect.Streams;
 import com.google.errorprone.annotations.CanIgnoreReturnValue;
 import com.google.protobuf.Int32Value;
+import com.google.protobuf.StringValue;
 import java.util.Optional;
 
 /** Utils for {@link DeviceSpec}. */
@@ -68,6 +70,10 @@ public final class DeviceSpecUtils {
 
   public static boolean isDeviceTierMissing(DeviceSpec deviceSpec) {
     return !deviceSpec.hasDeviceTier();
+  }
+
+  public static boolean isCountrySetMissing(DeviceSpec deviceSpec) {
+    return !deviceSpec.hasCountrySet();
   }
 
   public static boolean isSdkRuntimeUnspecified(DeviceSpec deviceSpec) {
@@ -179,6 +185,15 @@ public final class DeviceSpecUtils {
       if (!deviceTierTargeting.equals(DeviceTierTargeting.getDefaultInstance())) {
         deviceSpec.setDeviceTier(
             Int32Value.of(Iterables.getOnlyElement(deviceTierTargeting.getValueList()).getValue()));
+      }
+      return this;
+    }
+
+    @CanIgnoreReturnValue
+    DeviceSpecFromTargetingBuilder setCountrySet(CountrySetTargeting countrySetTargeting) {
+      if (!countrySetTargeting.equals(CountrySetTargeting.getDefaultInstance())) {
+        deviceSpec.setCountrySet(
+            StringValue.of(Iterables.getOnlyElement(countrySetTargeting.getValueList(), "")));
       }
       return this;
     }

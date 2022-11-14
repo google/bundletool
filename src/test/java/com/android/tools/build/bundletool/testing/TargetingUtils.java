@@ -34,6 +34,7 @@ import com.android.bundle.Targeting.AbiTargeting;
 import com.android.bundle.Targeting.ApexImageTargeting;
 import com.android.bundle.Targeting.ApkTargeting;
 import com.android.bundle.Targeting.AssetsDirectoryTargeting;
+import com.android.bundle.Targeting.CountrySetTargeting;
 import com.android.bundle.Targeting.DeviceFeature;
 import com.android.bundle.Targeting.DeviceFeatureTargeting;
 import com.android.bundle.Targeting.DeviceGroupModuleTargeting;
@@ -119,6 +120,11 @@ public final class TargetingUtils {
   public static AssetsDirectoryTargeting assetsDirectoryTargeting(
       DeviceTierTargeting deviceTierTargeting) {
     return AssetsDirectoryTargeting.newBuilder().setDeviceTier(deviceTierTargeting).build();
+  }
+
+  public static AssetsDirectoryTargeting assetsDirectoryTargeting(
+      CountrySetTargeting countrySetTargeting) {
+    return AssetsDirectoryTargeting.newBuilder().setCountrySet(countrySetTargeting).build();
   }
 
   // Native.pb helper methods.
@@ -373,6 +379,10 @@ public final class TargetingUtils {
 
   public static ApkTargeting apkDeviceTierTargeting(DeviceTierTargeting deviceTierTargeting) {
     return ApkTargeting.newBuilder().setDeviceTierTargeting(deviceTierTargeting).build();
+  }
+
+  public static ApkTargeting apkCountrySetTargeting(CountrySetTargeting countrySetTargeting) {
+    return ApkTargeting.newBuilder().setCountrySetTargeting(countrySetTargeting).build();
   }
 
   // Variant Targeting helpers. Should be written in terms of existing targeting dimension protos or
@@ -861,6 +871,33 @@ public final class TargetingUtils {
     return DeviceTierTargeting.newBuilder()
         .addAllAlternatives(alternatives.stream().map(Int32Value::of).collect(toImmutableList()))
         .build();
+  }
+
+  // Country Set targeting.
+
+  public static CountrySetTargeting countrySetTargeting(String value) {
+    return CountrySetTargeting.newBuilder().addValue(value).build();
+  }
+
+  public static CountrySetTargeting countrySetTargeting(
+      String value, ImmutableList<String> alternatives) {
+    return CountrySetTargeting.newBuilder()
+        .addValue(value)
+        .addAllAlternatives(alternatives)
+        .build();
+  }
+
+  public static CountrySetTargeting countrySetTargeting(
+      ImmutableList<String> value, ImmutableList<String> alternatives) {
+    return CountrySetTargeting.newBuilder()
+        .addAllValue(value)
+        .addAllAlternatives(alternatives)
+        .build();
+  }
+
+  public static CountrySetTargeting alternativeCountrySetTargeting(
+      ImmutableList<String> alternatives) {
+    return CountrySetTargeting.newBuilder().addAllAlternatives(alternatives).build();
   }
 
   // Device Feature targeting.

@@ -686,6 +686,71 @@ public class BuildApksCommandTest {
   }
 
   @Test
+  public void buildingViaFlagsAndBuilderHasSameResult_optionalCountrySet() throws Exception {
+    Path deviceSpecPath =
+        createDeviceSpecFile(
+            mergeSpecs(sdkVersion(28), density(DensityAlias.HDPI), abis("x86"), locales("en")),
+            tmpDir.resolve("device.json"));
+    final String countrySet = "latam";
+    ByteArrayOutputStream output = new ByteArrayOutputStream();
+    BuildApksCommand commandViaFlags =
+        BuildApksCommand.fromFlags(
+            new FlagParser()
+                .parse(
+                    "--bundle=" + bundlePath,
+                    "--output=" + outputFilePath,
+                    "--aapt2=" + AAPT2_PATH,
+                    // Optional values.
+                    "--device-spec=" + deviceSpecPath,
+                    "--country-set=" + countrySet),
+            new PrintStream(output),
+            systemEnvironmentProvider,
+            fakeAdbServer);
+    BuildApksCommand.Builder commandViaBuilder =
+        BuildApksCommand.builder()
+            .setBundlePath(bundlePath)
+            .setOutputFile(outputFilePath)
+            // Optional values.
+            .setDeviceSpec(deviceSpecPath)
+            .setCountrySet(countrySet)
+            // Must copy instance of the internal executor service.
+            .setAapt2Command(commandViaFlags.getAapt2Command().get())
+            .setExecutorServiceInternal(commandViaFlags.getExecutorService())
+            .setExecutorServiceCreatedByBundleTool(true)
+            .setOutputPrintStream(commandViaFlags.getOutputPrintStream().get());
+    DebugKeystoreUtils.getDebugSigningConfiguration(systemEnvironmentProvider)
+        .ifPresent(commandViaBuilder::setSigningConfiguration);
+
+    assertThat(commandViaBuilder.build()).isEqualTo(commandViaFlags);
+  }
+
+  @Test
+  public void countrySetWithoutDeviceSpecOrConnectedDevice_throws() throws Exception {
+    final String countrySet = "latam";
+    ByteArrayOutputStream output = new ByteArrayOutputStream();
+    InvalidCommandException exception =
+        assertThrows(
+            InvalidCommandException.class,
+            () ->
+                BuildApksCommand.fromFlags(
+                    new FlagParser()
+                        .parse(
+                            "--bundle=" + bundlePath,
+                            "--output=" + outputFilePath,
+                            "--aapt2=" + AAPT2_PATH,
+                            // Optional values.
+                            "--country-set=" + countrySet),
+                    new PrintStream(output),
+                    systemEnvironmentProvider,
+                    fakeAdbServer));
+    assertThat(exception)
+        .hasMessageThat()
+        .contains(
+            "Setting --country-set requires using either the --connected-device or the"
+                + " --device-spec flag.");
+  }
+
+  @Test
   public void buildingViaFlagsAndBuilderHasSameResult_7zipPath() throws Exception {
     ByteArrayOutputStream output = new ByteArrayOutputStream();
     BuildApksCommand commandViaFlags =

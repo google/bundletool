@@ -23,6 +23,7 @@ import com.android.bundle.Config.BundleConfig;
 import com.android.bundle.Targeting.Abi;
 import com.android.bundle.Targeting.Abi.AbiAlias;
 import com.android.bundle.Targeting.AbiTargeting;
+import com.android.bundle.Targeting.CountrySetTargeting;
 import com.android.bundle.Targeting.LanguageTargeting;
 import com.android.bundle.Targeting.TextureCompressionFormat;
 import com.android.bundle.Targeting.TextureCompressionFormat.TextureCompressionFormatAlias;
@@ -62,6 +63,15 @@ public final class BundleValidationUtils {
           .withUserMessage(
               "Directory '%s' has set but empty Texture Compression Format targeting.",
               directoryPath)
+          .build();
+    }
+  }
+
+  public static void checkHasValuesOrAlternatives(
+      CountrySetTargeting targeting, String directoryPath) {
+    if (targeting.getValueCount() == 0 && targeting.getAlternativesCount() == 0) {
+      throw InvalidBundleException.builder()
+          .withUserMessage("Directory '%s' has set but empty Country Set targeting.", directoryPath)
           .build();
     }
   }
@@ -113,6 +123,22 @@ public final class BundleValidationUtils {
           .withUserMessage(
               "Expected targeting values and alternatives to be mutually exclusive, but directory"
                   + " '%s' has texture compression format targeting that contains %s in both.",
+              directoryPath, intersection)
+          .build();
+    }
+  }
+
+  public static void checkValuesAndAlternativeHaveNoOverlap(
+      CountrySetTargeting targeting, String directoryPath) {
+    SetView<String> intersection =
+        Sets.intersection(
+            ImmutableSet.copyOf(targeting.getValueList()),
+            ImmutableSet.copyOf(targeting.getAlternativesList()));
+    if (!intersection.isEmpty()) {
+      throw InvalidBundleException.builder()
+          .withUserMessage(
+              "Expected targeting values and alternatives to be mutually exclusive, but directory"
+                  + " '%s' has country set targeting that contains %s in both.",
               directoryPath, intersection)
           .build();
     }

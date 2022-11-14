@@ -66,6 +66,9 @@ public final class TargetingUtils {
     if (targeting.hasDeviceTier()) {
       dimensions.add(TargetingDimension.DEVICE_TIER);
     }
+    if (targeting.hasCountrySet()) {
+      dimensions.add(TargetingDimension.COUNTRY_SET);
+    }
     return dimensions.build();
   }
 
@@ -275,6 +278,21 @@ public final class TargetingUtils {
                     .collect(toOptional()));
   }
 
+  /**
+   * Extracts all the country sets used in the targeted directories.
+   *
+   * <p>This is only useful when BundleModule assets config is not yet generated (which is the case
+   * when validators are run). Prefer using {@link BundleModule#getAssetsConfig} for all other
+   * cases.
+   */
+  public static ImmutableSet<String> extractCountrySets(
+      ImmutableSet<TargetedDirectory> targetedDirectories) {
+    return targetedDirectories.stream()
+        .map(TargetingUtils::extractCountrySet)
+        .flatMap(Streams::stream)
+        .collect(toImmutableSet());
+  }
+
   public static Optional<Assets> generateAssetsTargeting(BundleModule module) {
     ImmutableList<ZipPath> assetDirectories =
         module
@@ -335,5 +353,12 @@ public final class TargetingUtils {
 
     return Optional.of(
         new TargetingGenerator().generateTargetingForApexImages(apexImageFiles, hasBuildInfo));
+  }
+
+  private static Optional<String> extractCountrySet(TargetedDirectory targetedDirectory) {
+    return targetedDirectory
+        .getTargeting(TargetingDimension.COUNTRY_SET)
+        .flatMap(
+            targeting -> targeting.getCountrySet().getValueList().stream().collect(toOptional()));
   }
 }

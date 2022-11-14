@@ -25,6 +25,7 @@ import static com.android.bundle.Targeting.TextureCompressionFormat.TextureCompr
 import static com.android.bundle.Targeting.TextureCompressionFormat.TextureCompressionFormatAlias.ETC2;
 import static com.android.bundle.Targeting.TextureCompressionFormat.TextureCompressionFormatAlias.PVRTC;
 import static com.android.tools.build.bundletool.model.SizeConfiguration.getAbiName;
+import static com.android.tools.build.bundletool.model.SizeConfiguration.getCountrySetName;
 import static com.android.tools.build.bundletool.model.SizeConfiguration.getDeviceTierLevel;
 import static com.android.tools.build.bundletool.model.SizeConfiguration.getLocaleName;
 import static com.android.tools.build.bundletool.model.SizeConfiguration.getScreenDensityName;
@@ -32,6 +33,8 @@ import static com.android.tools.build.bundletool.model.SizeConfiguration.getSdkN
 import static com.android.tools.build.bundletool.model.SizeConfiguration.getSdkRuntimeRequired;
 import static com.android.tools.build.bundletool.model.SizeConfiguration.getTextureCompressionFormatName;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.abiTargeting;
+import static com.android.tools.build.bundletool.testing.TargetingUtils.alternativeCountrySetTargeting;
+import static com.android.tools.build.bundletool.testing.TargetingUtils.countrySetTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.deviceTierTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.languageTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.screenDensityTargeting;
@@ -43,6 +46,7 @@ import static com.google.common.truth.Truth8.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.android.bundle.Targeting.AbiTargeting;
+import com.android.bundle.Targeting.CountrySetTargeting;
 import com.android.bundle.Targeting.LanguageTargeting;
 import com.android.bundle.Targeting.ScreenDensityTargeting;
 import com.android.bundle.Targeting.SdkRuntimeTargeting;
@@ -159,6 +163,23 @@ public class SizeConfigurationTest {
             getDeviceTierLevel(
                 deviceTierTargeting(/* value= */ 1, /* alternatives= */ ImmutableList.of(0))))
         .hasValue(1);
+  }
+
+  @Test
+  public void getCountrySetName_onlyAlternativesIn_countrySetTargeting() {
+    assertThat(getCountrySetName(alternativeCountrySetTargeting(ImmutableList.of("latam", "sea"))))
+        .hasValue("");
+  }
+
+  @Test
+  public void getCountrySet_emptyCountrySetTargeting() {
+    assertThat(getCountrySetName(CountrySetTargeting.getDefaultInstance())).isEmpty();
+  }
+
+  @Test
+  public void getCountrySet_withValuesAndAlternativesIn_countrySetTargeting() {
+    assertThat(getCountrySetName(countrySetTargeting("sea", ImmutableList.of("latam", "europe"))))
+        .hasValue("sea");
   }
 
   @Test

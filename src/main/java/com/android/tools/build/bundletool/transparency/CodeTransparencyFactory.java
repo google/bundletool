@@ -67,7 +67,7 @@ public final class CodeTransparencyFactory {
     try {
       ResourceReader resourceReader = new ResourceReader();
       ArchivedResourcesHelper archivedResourcesHelper =
-          new ArchivedResourcesHelper(new ResourceReader());
+          new ArchivedResourcesHelper(resourceReader);
       String resourcePath =
           archivedResourcesHelper.findArchivedClassesDexPath(
               bundle.getVersion(), /* transparencyEnabled= */ true);

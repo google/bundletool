@@ -1,0 +1,59 @@
+Group 'high':
+  (
+    RAM >= 7.00 GB
+      AND
+    device IN ('google flame')
+  )
+
+Group 'medium':
+  (
+    4.00 GB <= RAM < 7.00 GB
+  )
+
+Tier 2:
+  (
+    (
+      RAM >= 7.00 GB
+        AND
+      device IN ('google flame')
+    )
+  )
+
+Tier 1:
+  (
+    (
+      4.00 GB <= RAM < 7.00 GB
+    )
+  ) AND NOT (
+    (
+      RAM >= 7.00 GB
+        AND
+      device IN ('google flame')
+    )
+  )
+
+Tier 0 (default):
+  NOT (
+    (
+      4.00 GB <= RAM < 7.00 GB
+    ) OR (
+      RAM >= 7.00 GB
+        AND
+      device IN ('google flame')
+    )
+  )
+
+Country set 'latam':
+  (
+    Country Codes: [
+      AR, BR
+    ]
+  )
+
+Country set 'sea':
+  (
+    Country Codes: [
+      VN, TW
+    ]
+  )
+

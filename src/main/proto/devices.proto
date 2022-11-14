@@ -38,6 +38,9 @@ message DeviceSpec {
 
   // Information about the runtime-enabled SDK capabilities of the device.
   SdkRuntime sdk_runtime = 10;
+
+  // Country set.
+  google.protobuf.StringValue country_set = 11;
 }
 
 message SdkRuntime {

@@ -17,12 +17,14 @@
 package com.android.tools.build.bundletool.model.utils;
 
 import static com.google.common.collect.Comparators.lexicographical;
+import static com.google.common.collect.ImmutableList.sortedCopyOf;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static java.util.Comparator.comparing;
 
 import com.android.bundle.Targeting.Abi;
 import com.android.bundle.Targeting.AbiTargeting;
 import com.android.bundle.Targeting.ApkTargeting;
+import com.android.bundle.Targeting.CountrySetTargeting;
 import com.android.bundle.Targeting.DeviceTierTargeting;
 import com.android.bundle.Targeting.LanguageTargeting;
 import com.android.bundle.Targeting.MultiAbi;
@@ -91,6 +93,10 @@ public final class TargetingNormalizer {
     if (targeting.hasDeviceTierTargeting()) {
       normalized.setDeviceTierTargeting(
           normalizeDeviceTierTargeting(targeting.getDeviceTierTargeting()));
+    }
+    if (targeting.hasCountrySetTargeting()) {
+      normalized.setCountrySetTargeting(
+          normalizeCountrySetTargeting(targeting.getCountrySetTargeting()));
     }
     return normalized.build();
   }
@@ -195,6 +201,13 @@ public final class TargetingNormalizer {
     return DeviceTierTargeting.newBuilder()
         .addAllValue(sortInt32Values(targeting.getValueList()))
         .addAllAlternatives(sortInt32Values(targeting.getAlternativesList()))
+        .build();
+  }
+
+  private static CountrySetTargeting normalizeCountrySetTargeting(CountrySetTargeting targeting) {
+    return CountrySetTargeting.newBuilder()
+        .addAllValue(sortedCopyOf(targeting.getValueList()))
+        .addAllAlternatives(sortedCopyOf(targeting.getAlternativesList()))
         .build();
   }
 

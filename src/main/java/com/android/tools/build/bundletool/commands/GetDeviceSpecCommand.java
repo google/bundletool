@@ -36,6 +36,7 @@ import com.google.auto.value.AutoValue;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.io.MoreFiles;
 import com.google.protobuf.Int32Value;
+import com.google.protobuf.StringValue;
 import com.google.protobuf.util.JsonFormat;
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -59,6 +60,7 @@ public abstract class GetDeviceSpecCommand {
   private static final Flag<Integer> DEVICE_TIER_FLAG = Flag.nonNegativeInteger("device-tier");
   private static final Flag<ImmutableSet<String>> DEVICE_GROUPS_FLAG =
       Flag.stringSet("device-groups");
+  private static final Flag<String> COUNTRY_SET_FLAG = Flag.string("country-set");
 
   private static final SystemEnvironmentProvider DEFAULT_PROVIDER =
       new DefaultSystemEnvironmentProvider();
@@ -78,6 +80,8 @@ public abstract class GetDeviceSpecCommand {
   public abstract Optional<Integer> getDeviceTier();
 
   public abstract Optional<ImmutableSet<String>> getDeviceGroups();
+
+  public abstract Optional<String> getCountrySet();
 
   public static Builder builder() {
     return new AutoValue_GetDeviceSpecCommand.Builder().setOverwriteOutput(false);
@@ -106,6 +110,8 @@ public abstract class GetDeviceSpecCommand {
     public abstract Builder setDeviceTier(Integer deviceTier);
 
     public abstract Builder setDeviceGroups(ImmutableSet<String> deviceGroups);
+
+    public abstract Builder setCountrySet(String countrySet);
 
     abstract GetDeviceSpecCommand autoBuild();
 
@@ -144,6 +150,7 @@ public abstract class GetDeviceSpecCommand {
 
     DEVICE_TIER_FLAG.getValue(flags).ifPresent(builder::setDeviceTier);
     DEVICE_GROUPS_FLAG.getValue(flags).ifPresent(builder::setDeviceGroups);
+    COUNTRY_SET_FLAG.getValue(flags).ifPresent(builder::setCountrySet);
     flags.checkNoUnknownFlags();
 
     return builder.build();
@@ -166,6 +173,10 @@ public abstract class GetDeviceSpecCommand {
     }
     if (getDeviceGroups().isPresent()) {
       deviceSpec = deviceSpec.toBuilder().addAllDeviceGroups(getDeviceGroups().get()).build();
+    }
+    if (getCountrySet().isPresent()) {
+      deviceSpec =
+          deviceSpec.toBuilder().setCountrySet(StringValue.of(getCountrySet().get())).build();
     }
     writeDeviceSpecToFile(deviceSpec, getOutputPath());
     return deviceSpec;
@@ -254,6 +265,17 @@ public abstract class GetDeviceSpecCommand {
                         + " the correct device group conditional modules to this device."
                         + " This flag is only relevant if the bundle uses device group targeting"
                         + " in conditional modules and should be set in that case.")
+                .build())
+        .addFlag(
+            FlagDescription.builder()
+                .setFlagName(COUNTRY_SET_FLAG.getName())
+                .setExampleValue("country_set_name")
+                .setOptional(true)
+                .setDescription(
+                    "Country set for the user account on the device. This value will be"
+                        + " used to match the correct country set targeted APKs to this device."
+                        + " This flag is only relevant if the bundle uses country set targeting,"
+                        + " and should be set in that case.")
                 .build())
         .build();
   }

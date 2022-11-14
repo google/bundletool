@@ -25,6 +25,7 @@ import com.android.bundle.Devices.SdkRuntime;
 import com.android.bundle.Targeting.ScreenDensity.DensityAlias;
 import com.android.tools.build.bundletool.model.utils.Versions;
 import com.google.protobuf.Int32Value;
+import com.google.protobuf.StringValue;
 import com.google.protobuf.util.JsonFormat;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -141,6 +142,10 @@ public final class DeviceFactory {
 
   public static DeviceSpec deviceTier(int deviceTier) {
     return DeviceSpec.newBuilder().setDeviceTier(Int32Value.of(deviceTier)).build();
+  }
+
+  public static DeviceSpec countrySet(String countrySet) {
+    return DeviceSpec.newBuilder().setCountrySet(StringValue.of(countrySet)).build();
   }
 
   public static DeviceSpec deviceGroups(String... deviceGroups) {

@@ -26,6 +26,7 @@ import com.android.bundle.DeviceSelector;
 import com.android.bundle.DeviceTier;
 import com.android.bundle.DeviceTierConfig;
 import com.android.bundle.SystemFeature;
+import com.android.bundle.UserCountrySet;
 import com.android.tools.build.bundletool.commands.CommandHelp.CommandDescription;
 import com.android.tools.build.bundletool.commands.CommandHelp.FlagDescription;
 import com.android.tools.build.bundletool.flags.Flag;
@@ -37,6 +38,7 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
+import com.google.common.collect.Lists;
 import com.google.protobuf.util.JsonFormat;
 import java.io.IOException;
 import java.io.PrintStream;
@@ -55,6 +57,8 @@ public abstract class PrintDeviceTargetingConfigCommand {
 
   private static final Flag<Path> DEVICE_TARGETING_CONFIGURATION_LOCATION_FLAG =
       Flag.path("config");
+
+  private static final int MAX_COUNTRY_CODES_ON_A_LINE = 10;
 
   abstract Path getDeviceTargetingConfigurationPath();
 
@@ -98,6 +102,7 @@ public abstract class PrintDeviceTargetingConfigCommand {
       }
 
       printDeviceTierSet(config);
+      config.getUserCountrySetsList().forEach(countrySet -> printCountrySet(countrySet, ""));
     }
   }
 
@@ -131,6 +136,24 @@ public abstract class PrintDeviceTargetingConfigCommand {
           excludedSelectorsFromHigherTiers,
           INDENT);
     }
+  }
+
+  private void printCountrySet(UserCountrySet countrySet, String indent) {
+    getOutputStream().println(indent + "Country set '" + countrySet.getName() + "':");
+    getOutputStream().println(indent + INDENT + "(");
+    getOutputStream().println(indent + INDENT + INDENT + "Country Codes: [");
+    printCountryCodes(countrySet.getCountryCodesList(), indent + INDENT + INDENT + INDENT);
+    getOutputStream().println(indent + INDENT + INDENT + "]");
+    getOutputStream().println(indent + INDENT + ")");
+    getOutputStream().println();
+  }
+
+  private void printCountryCodes(List<String> countryCodes, String indent) {
+    List<List<String>> partitionedCountryCodes =
+        Lists.partition(countryCodes, MAX_COUNTRY_CODES_ON_A_LINE);
+    partitionedCountryCodes.forEach(
+        countryCodesOnThisLine ->
+            getOutputStream().println(indent + String.join(", ", countryCodesOnThisLine)));
   }
 
   private void printDeviceTier(

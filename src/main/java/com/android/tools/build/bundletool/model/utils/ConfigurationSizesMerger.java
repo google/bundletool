@@ -65,6 +65,7 @@ public class ConfigurationSizesMerger {
         && areCompatible(
             sizeConfig1.getTextureCompressionFormat(), sizeConfig2.getTextureCompressionFormat())
         && areCompatible(sizeConfig1.getDeviceTier(), sizeConfig2.getDeviceTier())
+        && areCompatible(sizeConfig1.getCountrySet(), sizeConfig2.getCountrySet())
         && areCompatible(sizeConfig1.getSdkRuntime(), sizeConfig2.getSdkRuntime());
   }
 
@@ -96,6 +97,7 @@ public class ConfigurationSizesMerger {
         .getTextureCompressionFormat()
         .ifPresent(configBuilder::setTextureCompressionFormat);
     entry2.getKey().getDeviceTier().ifPresent(configBuilder::setDeviceTier);
+    entry2.getKey().getCountrySet().ifPresent(configBuilder::setCountrySet);
     entry2.getKey().getSdkRuntime().ifPresent(configBuilder::setSdkRuntime);
     return Maps.immutableEntry(configBuilder.build(), entry1.getValue() + entry2.getValue());
   }

@@ -41,28 +41,38 @@ public final class DexAndResourceRepackager {
   private static final String COMPAT_CONFIG_ELEMENT_NAME = "compat-config";
   private static final String COMPAT_ENTRYPOINT_ELEMENT_NAME = "compat-entrypoint";
   private static final String DEX_PATH_ELEMENT_NAME = "dex-path";
-  private static final String JAVA_RESOURCE_PATH_ELEMENT_NAME = "java-resource-path";
+  private static final String JAVA_RESOURCES_ROOT_PATH_ELEMENT_NAME = "java-resources-root-path";
   // Element which contains the package ID that SDK resource IDs should be remapped to.
   private static final String RESOURCES_PACKAGE_ID_ELEMENT_NAME = "resources-package-id";
   // Element which contains the fully qualified name of the RPackage class of the SDK, where the new
   // resources package ID should be set at app runtime.
   private static final String R_PACKAGE_CLASS_NAME_ELEMENT_NAME = "r-package-class";
+  // Parent element to RESOURCES_PACKAGE_ID_ELEMENT_NAME and R_PACKAGE_CLASS_NAME_ELEMENT_NAME.
+  private static final String RESOURCE_ID_REMAPPING_ELEMENT_NAME = "resource-id-remapping";
 
   private static final String R_PACKAGE_CLASS_NAME = "RPackage";
 
   /**
-   * Name of the config file that contains paths to moved dex files and java resources inside assets
-   * folder, as well as the path to the SDK entrypoint class. Example of what CompatSdkConfig.xml
-   * contents look like:
+   * Name of the config file that contains:
+   *
+   * <ul>
+   *   <li>paths to moved dex files and java resources inside assets.
+   *   <li>path to the SDK entrypoint class.
+   *   <li>metadata necessary for SDK resource ID remapping.
+   * </ul>
+   *
+   * Example of what CompatSdkConfig.xml contents look like:
    *
    * <pre>{@code
    * <compat-config>
    *   <dex-path>RuntimeEnabledSdk-sdk.package.name/classes.dex</dex-path>
    *   <dex-path>RuntimeEnabledSdk-sdk.package.name/classes2.dex</dex-path>
-   *   <java-resource-path>RuntimeEnabledSdk-sdk.package.name/image.png</java-resource-path>
+   *   <java-resources-root-path>RuntimeEnabledSdk-sdk.package.name</java-resources-root-path>
    *   <compat-entrypoint>com.sdk.EntryPointClass</compat-entrypoint>
-   *   <resources-package-id>123</resources-package-id>
-   *   <r-package-class>sdk.package.name.RPackage</r-package-class>
+   *   <resource-id-remapping>
+   *     <resources-package-id>123</resources-package-id>
+   *     <r-package-class>sdk.package.name.RPackage</r-package-class>
+   *   </resource-id-remapping>
    * </compat-config>
    * }</pre>
    */
@@ -133,10 +143,9 @@ public final class DexAndResourceRepackager {
   private Node createCompatConfigXmlNode(Document xmlFactory, BundleModule repackagedModule) {
     Element compatConfigElement = xmlFactory.createElement(COMPAT_CONFIG_ELEMENT_NAME);
     appendCompatEntrypointElement(compatConfigElement, xmlFactory);
-    appendResourcesPackageIdElement(compatConfigElement, xmlFactory);
-    appendRPackageClassNameElement(compatConfigElement, xmlFactory);
+    appendResourceIdRemappingElement(compatConfigElement, xmlFactory);
     appendDexPathsToElement(compatConfigElement, xmlFactory, repackagedModule);
-    appendJavaResourcePathsToElement(compatConfigElement, xmlFactory, repackagedModule);
+    appendJavaResourcesRootPathToElement(compatConfigElement, xmlFactory, repackagedModule);
     return compatConfigElement;
   }
 
@@ -148,18 +157,28 @@ public final class DexAndResourceRepackager {
     }
   }
 
-  private void appendResourcesPackageIdElement(Element compatConfigElement, Document xmlFactory) {
+  private void appendResourceIdRemappingElement(Element compatConfigElement, Document xmlFactory) {
+    Element resourceIdRemappingElement =
+        xmlFactory.createElement(RESOURCE_ID_REMAPPING_ELEMENT_NAME);
+    appendResourcesPackageIdElement(resourceIdRemappingElement, xmlFactory);
+    appendRPackageClassNameElement(resourceIdRemappingElement, xmlFactory);
+    compatConfigElement.appendChild(resourceIdRemappingElement);
+  }
+
+  private void appendResourcesPackageIdElement(
+      Element resourceIdRemappingElement, Document xmlFactory) {
     Element resourcesPackageIdElement = xmlFactory.createElement(RESOURCES_PACKAGE_ID_ELEMENT_NAME);
     resourcesPackageIdElement.setTextContent(
         Integer.toString(sdkDependencyConfig.getResourcesPackageId()));
-    compatConfigElement.appendChild(resourcesPackageIdElement);
+    resourceIdRemappingElement.appendChild(resourcesPackageIdElement);
   }
 
-  private void appendRPackageClassNameElement(Element compatConfigElement, Document xmlFactory) {
+  private void appendRPackageClassNameElement(
+      Element resourceIdRemappingElement, Document xmlFactory) {
     Element rPackageClassNameElement = xmlFactory.createElement(R_PACKAGE_CLASS_NAME_ELEMENT_NAME);
     rPackageClassNameElement.setTextContent(
         sdkModulesConfig.getSdkPackageName() + "." + R_PACKAGE_CLASS_NAME);
-    compatConfigElement.appendChild(rPackageClassNameElement);
+    resourceIdRemappingElement.appendChild(rPackageClassNameElement);
   }
 
   private void appendDexPathsToElement(
@@ -178,24 +197,26 @@ public final class DexAndResourceRepackager {
         .forEach(compatConfigElement::appendChild);
   }
 
-  private void appendJavaResourcePathsToElement(
+  private void appendJavaResourcesRootPathToElement(
       Element compatConfigElement, Document xmlFactory, BundleModule repackagedModule) {
-    repackagedModule.getEntries().stream()
+    // Only add java resources root directory to compat config if the module contains java
+    // resources.
+    if (getRepackagedJavaResourcesCount(repackagedModule) > 0) {
+      Element javaResourcesRootPathElement =
+          xmlFactory.createElement(JAVA_RESOURCES_ROOT_PATH_ELEMENT_NAME);
+      javaResourcesRootPathElement.setTextContent(
+          javaResourceRepackager.getNewJavaResourceDirectoryPathInsideAssets());
+      compatConfigElement.appendChild(javaResourcesRootPathElement);
+    }
+  }
+
+  private long getRepackagedJavaResourcesCount(BundleModule repackagedModule) {
+    return repackagedModule.getEntries().stream()
         .filter(
             entry ->
                 entry
                     .getPath()
                     .startsWith(javaResourceRepackager.getNewJavaResourceDirectoryPath()))
-        .map(
-            entry -> {
-              Element javaResourcePathElement =
-                  xmlFactory.createElement(JAVA_RESOURCE_PATH_ELEMENT_NAME);
-              javaResourcePathElement.setTextContent(
-                  javaResourceRepackager.getNewJavaResourceDirectoryPathInsideAssets()
-                      + "/"
-                      + entry.getPath().getFileName().toString());
-              return javaResourcePathElement;
-            })
-        .forEach(compatConfigElement::appendChild);
+        .count();
   }
 }

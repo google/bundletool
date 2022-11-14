@@ -61,8 +61,8 @@ public class MergingUtilsTest {
     assertThat(exception)
         .hasMessageThat()
         .contains(
-            "Expecting only ABI, screen density, language and texture compression format"
-                + " targeting");
+            "Expecting only ABI, screen density, language, texture compression format, device tier"
+                + " and country set targeting");
   }
 
   @Test
@@ -77,8 +77,8 @@ public class MergingUtilsTest {
     assertThat(exception)
         .hasMessageThat()
         .contains(
-            "Expecting only ABI, screen density, language and texture compression format"
-                + " targeting");
+            "Expecting only ABI, screen density, language, texture compression format, device tier"
+                + " and country set targeting");
   }
 
   @Test

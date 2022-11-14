@@ -22,5 +22,6 @@ public enum OptimizationDimension {
   SCREEN_DENSITY,
   LANGUAGE,
   TEXTURE_COMPRESSION_FORMAT,
-  DEVICE_TIER
+  DEVICE_TIER,
+  COUNTRY_SET
 }

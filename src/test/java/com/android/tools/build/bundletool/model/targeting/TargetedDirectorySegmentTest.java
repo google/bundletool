@@ -17,6 +17,7 @@
 package com.android.tools.build.bundletool.model.targeting;
 
 import static com.android.tools.build.bundletool.testing.TargetingUtils.assetsDirectoryTargeting;
+import static com.android.tools.build.bundletool.testing.TargetingUtils.countrySetTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.deviceTierTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.languageTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.textureCompressionTargeting;
@@ -202,6 +203,41 @@ public class TargetedDirectorySegmentTest {
   }
 
   @Test
+  public void testTargeting_countrySet() {
+    TargetedDirectorySegment segment = TargetedDirectorySegment.parse("test#countries_latam");
+    assertThat(segment.getName()).isEqualTo("test");
+    assertThat(segment.getTargetingDimension()).hasValue(TargetingDimension.COUNTRY_SET);
+    assertThat(segment.getTargeting())
+        .isEqualTo(assetsDirectoryTargeting(countrySetTargeting("latam")));
+  }
+
+  @Test
+  public void testTargeting_countrySet_invalidCountrySetName_withSpecialChars() {
+    InvalidBundleException exception =
+        assertThrows(
+            InvalidBundleException.class,
+            () -> TargetedDirectorySegment.parse("assets/test#countries_latam$%@#"));
+    assertThat(exception)
+        .hasMessageThat()
+        .contains(
+            "Country set name should match the regex '^[a-zA-Z][a-zA-Z0-9_]*$' but got"
+                + " 'latam$%@#' for directory 'assets/test'.");
+  }
+
+  @Test
+  public void testTargeting_countrySet_invalidCountrySetName_onlyNumerics() {
+    InvalidBundleException exception =
+        assertThrows(
+            InvalidBundleException.class,
+            () -> TargetedDirectorySegment.parse("assets/test#countries_1234"));
+    assertThat(exception)
+        .hasMessageThat()
+        .contains(
+            "Country set name should match the regex '^[a-zA-Z][a-zA-Z0-9_]*$' but got"
+                + " '1234' for directory 'assets/test'.");
+  }
+
+  @Test
   public void testFailsParsing_missingKey() {
     assertThrows(InvalidBundleException.class, () -> TargetedDirectorySegment.parse("bad#"));
     assertThrows(InvalidBundleException.class, () -> TargetedDirectorySegment.parse("bad#_2.0"));
@@ -292,5 +328,14 @@ public class TargetedDirectorySegmentTest {
 
     segment = TargetedDirectorySegment.parse("test#tier_0");
     assertThat(segment.toPathSegment()).isEqualTo("test#tier_0");
+  }
+
+  @Test
+  public void testTargeting_countrySet_toPathIdempotent() {
+    TargetedDirectorySegment segment = TargetedDirectorySegment.parse("test#countries_latam");
+    assertThat(segment.toPathSegment()).isEqualTo("test#countries_latam");
+
+    segment = TargetedDirectorySegment.parse("test#countries_sea");
+    assertThat(segment.toPathSegment()).isEqualTo("test#countries_sea");
   }
 }

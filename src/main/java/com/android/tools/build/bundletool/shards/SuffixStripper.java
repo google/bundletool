@@ -25,6 +25,7 @@ import com.android.bundle.Files.Assets;
 import com.android.bundle.Files.TargetedAssetsDirectory;
 import com.android.bundle.Targeting.ApkTargeting;
 import com.android.bundle.Targeting.AssetsDirectoryTargeting;
+import com.android.bundle.Targeting.CountrySetTargeting;
 import com.android.bundle.Targeting.DeviceTierTargeting;
 import com.android.bundle.Targeting.VariantTargeting;
 import com.android.tools.build.bundletool.model.ModuleEntry;
@@ -59,6 +60,8 @@ public final class SuffixStripper {
         return createForDimension(TargetingDimension.TEXTURE_COMPRESSION_FORMAT);
       case DEVICE_TIER:
         return createForDimension(TargetingDimension.DEVICE_TIER);
+      case COUNTRY_SET:
+        return createForDimension(TargetingDimension.COUNTRY_SET);
       default:
         throw new IllegalArgumentException("Cannot strip suffixes for dimension " + dimension);
     }
@@ -70,6 +73,8 @@ public final class SuffixStripper {
         return new SuffixStripper(dimension, new TextureCompressionFormatDimensionHandler());
       case DEVICE_TIER:
         return new SuffixStripper(dimension, new DeviceTierDimensionHandler());
+      case COUNTRY_SET:
+        return new SuffixStripper(dimension, new CountrySetDimensionHandler());
       default:
         throw new IllegalArgumentException("Cannot strip suffixes for dimension " + dimension);
     }
@@ -97,7 +102,7 @@ public final class SuffixStripper {
     }
 
     // Apply the updated targeting to the module split (as it now only contains assets for
-    // the selected TCF)
+    // the selected targeting value)
     split = setTargetingByDefaultSuffix(split, suffixStripping.getDefaultSuffix());
 
     return split;
@@ -381,6 +386,51 @@ public final class SuffixStripper {
           Integer.toString(
               Iterables.getOnlyElement(targeting.getDeviceTier().getValueList()).getValue());
       return !searchedValueWithDefault.equals(targetingValue);
+    }
+  }
+
+  /** {@link TargetingDimensionHandler} for country set targeting. */
+  private static final class CountrySetDimensionHandler implements TargetingDimensionHandler {
+    @Override
+    public boolean hasTargetingDimension(AssetsDirectoryTargeting directoryTargeting) {
+      return directoryTargeting.hasCountrySet();
+    }
+
+    @Override
+    public AssetsDirectoryTargeting clearTargetingDimension(
+        AssetsDirectoryTargeting directoryTargeting) {
+      return directoryTargeting.toBuilder().clearCountrySet().build();
+    }
+
+    @Override
+    public ApkTargeting setTargetingDimension(ApkTargeting apkTargeting, String value) {
+      return apkTargeting.toBuilder()
+          .setCountrySetTargeting(CountrySetTargeting.newBuilder().addValue(value))
+          .build();
+    }
+
+    @Override
+    public VariantTargeting setTargetingDimension(VariantTargeting variantTargeting, String value) {
+      // No country set variant targeting.
+      return variantTargeting;
+    }
+
+    @Override
+    public boolean isDirectoryTargetingOtherValue(
+        TargetedAssetsDirectory directory, String searchedValue) {
+      AssetsDirectoryTargeting targeting = directory.getTargeting();
+
+      if (!targeting.hasCountrySet()) {
+        // The directory is not even targeting the specified dimension,
+        // so it's not targeting another value for this dimension.
+        return false;
+      }
+
+      // The value list can be empty for default directory for country sets.
+      // In which case, the country set name is "", targeting all other countries.
+      String targetingValue =
+          Iterables.getOnlyElement(targeting.getCountrySet().getValueList(), "");
+      return !searchedValue.equals(targetingValue);
     }
   }
 }

@@ -61,6 +61,11 @@ public final class TargetingProtoUtils {
           .getDeviceTierBuilder()
           .addAllAlternatives(targeting.getDeviceTier().getValueList());
     }
+    if (targeting.hasCountrySet()) {
+      alternativeTargeting
+          .getCountrySetBuilder()
+          .addAllAlternatives(targeting.getCountrySet().getValueList());
+    }
     return alternativeTargeting.build();
   }
 
@@ -175,6 +180,17 @@ public final class TargetingProtoUtils {
             targeting.getDeviceTierTargeting().getAlternativesList().stream())
         .map(Int32Value::getValue)
         .collect(toImmutableSet());
+  }
+
+  public static ImmutableSet<String> countrySetUniverse(ApkTargeting targeting) {
+    return Streams.concat(
+            targeting.getCountrySetTargeting().getValueList().stream(),
+            targeting.getCountrySetTargeting().getAlternativesList().stream())
+        .collect(toImmutableSet());
+  }
+
+  public static ImmutableSet<String> countrySetValues(ApkTargeting targeting) {
+    return ImmutableSet.copyOf(targeting.getCountrySetTargeting().getValueList());
   }
 
   public static SdkVersion sdkVersionFrom(int from) {
