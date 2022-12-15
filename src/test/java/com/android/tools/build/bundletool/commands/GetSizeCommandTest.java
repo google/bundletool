@@ -1253,27 +1253,27 @@ public final class GetSizeCommandTest {
         .setApksArchivePath(apksArchiveFile)
         .setDimensions(
             ImmutableSet.of(Dimension.ABI, Dimension.TEXTURE_COMPRESSION_FORMAT, Dimension.SDK))
-        .setModules(ImmutableSet.of("asset2"))
+        .setModules(ImmutableSet.of("base", "asset2"))
         .build()
         .getSizeTotal(new PrintStream(outputStream));
 
-    // Selects all install-time modules (base and asset1) and the ones explicitly selected (asset2).
+    // Selects base module and the ones explicitly selected (asset2).
     assertThat(new String(outputStream.toByteArray(), UTF_8).split(CRLF))
         .asList()
         .containsExactly(
             "SDK,ABI,TEXTURE_COMPRESSION_FORMAT,MIN,MAX",
             String.format(
                 "%s,%s,%s,%d,%d",
-                "21-", "x86_64", "astc", 5 * compressedApkSize, 5 * compressedApkSize),
+                "21-", "x86_64", "astc", 3 * compressedApkSize, 3 * compressedApkSize),
             String.format(
                 "%s,%s,%s,%d,%d",
-                "21-", "x86_64", "etc2", 5 * compressedApkSize, 5 * compressedApkSize),
+                "21-", "x86_64", "etc2", 3 * compressedApkSize, 3 * compressedApkSize),
             String.format(
                 "%s,%s,%s,%d,%d",
-                "21-", "x86", "astc", 5 * compressedApkSize, 5 * compressedApkSize),
+                "21-", "x86", "astc", 3 * compressedApkSize, 3 * compressedApkSize),
             String.format(
                 "%s,%s,%s,%d,%d",
-                "21-", "x86", "etc2", 5 * compressedApkSize, 5 * compressedApkSize));
+                "21-", "x86", "etc2", 3 * compressedApkSize, 3 * compressedApkSize));
   }
 
   @Test

@@ -13,20 +13,20 @@
  * See the License for the specific language governing permissions and
  * limitations under the License
  */
-package com.android.tools.build.bundletool.preprocessors;
+package com.android.tools.build.bundletool.splitters;
 
 import static com.android.tools.build.bundletool.sdkmodule.DexAndResourceRepackager.getCompatSdkConfigPathInAssets;
-import static com.google.common.collect.ImmutableList.toImmutableList;
 import static java.nio.charset.StandardCharsets.UTF_8;
 
 import com.android.tools.build.bundletool.model.AppBundle;
-import com.android.tools.build.bundletool.model.BundleModule;
 import com.android.tools.build.bundletool.model.ModuleEntry;
+import com.android.tools.build.bundletool.model.ModuleSplit;
+import com.android.tools.build.bundletool.model.ModuleSplit.SplitType;
 import com.android.tools.build.bundletool.model.ZipPath;
 import com.android.tools.build.bundletool.xml.XmlUtils;
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.io.ByteSource;
-import javax.inject.Inject;
 import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
 import org.w3c.dom.Document;
@@ -34,8 +34,9 @@ import org.w3c.dom.Element;
 import org.w3c.dom.Node;
 
 /**
- * Preprocessor that generates RuntimeEnabledSdkTable.xml config for app bundles that have
- * runtime-enabled SDK dependencies.
+ * Injects RuntimeEnabledSdkTable.xml config into the main split of the base module, as well as
+ * standalone splits, in the backwards-compatible variant of apps that have runtime-enabled SDK
+ * dependencies.
  *
  * <p>RuntimeEnabledSdkTable.xml contains paths to compat SDK config files inside the assets
  * directory. There is 1 compat SDK config file per runtime-enabled SDK dependency of the app. Here
@@ -54,43 +55,46 @@ import org.w3c.dom.Node;
  * </runtime-enabled-sdk-table>
  * }</pre>
  */
-public class RuntimeEnabledSdkTablePreprocessor implements AppBundlePreprocessor {
+public final class RuntimeEnabledSdkTableInjector {
 
-  private static final String RUNTIME_ENABLED_SDK_TABLE_FILE_PATH =
+  @VisibleForTesting
+  public static final String RUNTIME_ENABLED_SDK_TABLE_FILE_PATH =
       "assets/RuntimeEnabledSdkTable.xml";
+
   private static final String RUNTIME_ENABLED_SDK_TABLE_ELEMENT_NAME = "runtime-enabled-sdk-table";
   private static final String RUNTIME_ENABELD_SDK_ELEMENT_NAME = "runtime-enabled-sdk";
   private static final String SDK_PACKAGE_NAME_ELEMENT_NAME = "package-name";
   private static final String COMPAT_CONFIG_PATH_ELEMENT_NAME = "compat-config-path";
 
-  @Inject
-  RuntimeEnabledSdkTablePreprocessor() {}
+  private final AppBundle appBundle;
 
-  @Override
-  public AppBundle preprocess(AppBundle bundle) {
-    if (bundle.getRuntimeEnabledSdkDependencies().isEmpty()) {
-      return bundle;
+  public RuntimeEnabledSdkTableInjector(AppBundle appBundle) {
+    this.appBundle = appBundle;
+  }
+
+  public ModuleSplit inject(ModuleSplit split) {
+    if (appBundle.getRuntimeEnabledSdkDependencies().isEmpty()
+        || !shouldAddRuntimeEnabledSdkTable(split)) {
+      return split;
     }
-    BundleModule modifiedBaseModule =
-        bundle.getBaseModule().toBuilder()
-            .addEntry(
-                ModuleEntry.builder()
-                    .setPath(ZipPath.create(RUNTIME_ENABLED_SDK_TABLE_FILE_PATH))
-                    .setContent(
-                        ByteSource.wrap(
-                            XmlUtils.documentToString(
-                                    getRuntimeEnabledSdkTable(
-                                        bundle.getRuntimeEnabledSdkDependencies().keySet()))
-                                .getBytes(UTF_8)))
-                    .build())
-            .build();
-    return bundle.toBuilder()
-        .setRawModules(
-            bundle.getFeatureModules().values().stream()
-                .filter(module -> !module.isBaseModule())
-                .collect(toImmutableList()))
-        .addRawModule(modifiedBaseModule)
+    return split.toBuilder()
+        .addEntry(
+            ModuleEntry.builder()
+                .setPath(ZipPath.create(RUNTIME_ENABLED_SDK_TABLE_FILE_PATH))
+                .setContent(
+                    ByteSource.wrap(
+                        XmlUtils.documentToString(
+                                getRuntimeEnabledSdkTable(
+                                    appBundle.getRuntimeEnabledSdkDependencies().keySet()))
+                            .getBytes(UTF_8)))
+                .build())
         .build();
+  }
+
+  private boolean shouldAddRuntimeEnabledSdkTable(ModuleSplit split) {
+    return !split.getVariantTargeting().getSdkRuntimeTargeting().getRequiresSdkRuntime()
+        && (split.getSplitType() == SplitType.STANDALONE
+            || (split.isMasterSplit() && split.isBaseModuleSplit()));
   }
 
   private Document getRuntimeEnabledSdkTable(ImmutableSet<String> sdkPackageNames) {

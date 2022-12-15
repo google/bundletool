@@ -80,6 +80,7 @@ import static com.google.common.collect.MoreCollectors.toOptional;
 import static java.util.stream.Collectors.joining;
 
 import com.android.tools.build.bundletool.model.manifestelements.Activity;
+import com.android.tools.build.bundletool.model.manifestelements.Provider;
 import com.android.tools.build.bundletool.model.manifestelements.Receiver;
 import com.android.tools.build.bundletool.model.utils.xmlproto.XmlProtoAttribute;
 import com.android.tools.build.bundletool.model.utils.xmlproto.XmlProtoAttributeBuilder;
@@ -393,6 +394,14 @@ public class ManifestEditor {
     return this;
   }
 
+  @CanIgnoreReturnValue
+  public ManifestEditor addProvider(Provider provider) {
+    manifestElement
+        .getOrCreateChildElement(APPLICATION_ELEMENT_NAME)
+        .addChildElement(provider.asXmlProtoElement().toBuilder());
+    return this;
+  }
+
   /** Adds uses-sdk-library tag to the manifest. */
   @CanIgnoreReturnValue
   public ManifestEditor addUsesSdkLibraryElement(
@@ -508,6 +517,24 @@ public class ManifestEditor {
                     XmlProtoAttributeBuilder.create(
                             DISTRIBUTION_NAMESPACE_URI, INCLUDE_ATTRIBUTE_NAME)
                         .setValueAsBoolean(true)));
+    return this;
+  }
+
+  /** Sets distribution module that is required for a recovery module. */
+  @CanIgnoreReturnValue
+  public ManifestEditor setDistributionModuleForRecoveryModule() {
+    manifestElement
+        .getOrCreateChildElement(DISTRIBUTION_NAMESPACE_URI, MODULE_ELEMENT_NAME)
+        .addChildElement(
+            XmlProtoElementBuilder.create(DISTRIBUTION_NAMESPACE_URI, DELIVERY_ELEMENT_NAME)
+                .addChildElement(
+                    XmlProtoElementBuilder.create(DISTRIBUTION_NAMESPACE_URI, "on-demand")))
+        .addChildElement(
+            XmlProtoElementBuilder.create(DISTRIBUTION_NAMESPACE_URI, FUSING_ELEMENT_NAME)
+                .addAttribute(
+                    XmlProtoAttributeBuilder.create(
+                            DISTRIBUTION_NAMESPACE_URI, INCLUDE_ATTRIBUTE_NAME)
+                        .setValueAsBoolean(false)));
     return this;
   }
 

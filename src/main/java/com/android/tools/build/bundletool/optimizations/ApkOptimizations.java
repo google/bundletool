@@ -83,7 +83,22 @@ public abstract class ApkOptimizations {
                       .setUncompressDexFiles(true)
                       .setUncompressedDexTargetSdk(UncompressedDexTargetSdk.SDK_31)
                       .build())
-              .build();
+              .put(
+                  Version.of("1.13.2"),
+                  ApkOptimizations.builder()
+                      .setSplitDimensions(
+                          ImmutableSet.of(
+                              ABI,
+                              SCREEN_DENSITY,
+                              TEXTURE_COMPRESSION_FORMAT,
+                              LANGUAGE,
+                              DEVICE_TIER))
+                      .setUncompressNativeLibraries(true)
+                      .setStandaloneDimensions(ImmutableSet.of(ABI, SCREEN_DENSITY))
+                      .setUncompressDexFiles(true)
+                      .setUncompressedDexTargetSdk(UncompressedDexTargetSdk.SDK_31)
+                      .build())
+              .buildOrThrow();
 
   /** List of dimensions supported by asset modules. */
   private static final ImmutableSet<OptimizationDimension> DIMENSIONS_SUPPORTED_BY_ASSET_MODULES =

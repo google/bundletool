@@ -56,6 +56,7 @@ public final class BinaryArtProfilesInjector {
         content ->
             builder.addEntry(
                 ModuleEntry.builder()
+                    .setForceUncompressed(true)
                     .setContent(content)
                     .setPath(ZipPath.create(APK_LOCATION).resolve(BINARY_ART_PROFILE_NAME))
                     .build()));
@@ -63,6 +64,7 @@ public final class BinaryArtProfilesInjector {
         content ->
             builder.addEntry(
                 ModuleEntry.builder()
+                    .setForceUncompressed(true)
                     .setContent(content)
                     .setPath(ZipPath.create(APK_LOCATION).resolve(BINARY_ART_PROFILE_METADATA_NAME))
                     .build()));

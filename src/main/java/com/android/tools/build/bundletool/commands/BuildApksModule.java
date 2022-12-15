@@ -20,6 +20,7 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
 import com.android.bundle.Config.BundleConfig;
 import com.android.bundle.Devices.DeviceSpec;
+import com.android.bundle.RuntimeEnabledSdkConfigProto.LocalDeploymentRuntimeEnabledSdkConfig;
 import com.android.tools.build.bundletool.androidtools.P7ZipCommand;
 import com.android.tools.build.bundletool.commands.BuildApksCommand.ApkBuildMode;
 import com.android.tools.build.bundletool.device.AdbServer;
@@ -171,6 +172,13 @@ public final class BuildApksModule {
   @VerboseLogs
   static boolean provideVerbose(BuildApksCommand command) {
     return command.getVerbose();
+  }
+
+  @CommandScoped
+  @Provides
+  static Optional<LocalDeploymentRuntimeEnabledSdkConfig> provideLocalRuntimeEnabledSdkConfig(
+      BuildApksCommand command) {
+    return command.getLocalDeploymentRuntimeEnabledSdkConfig();
   }
 
   /**

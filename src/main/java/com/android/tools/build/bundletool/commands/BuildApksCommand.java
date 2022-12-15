@@ -33,12 +33,15 @@ import static com.android.tools.build.bundletool.model.utils.files.FilePrecondit
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.collect.ImmutableMap.toImmutableMap;
+import static java.util.Arrays.stream;
+import static java.util.stream.Collectors.joining;
 
 import com.android.apksig.SigningCertificateLineage;
 import com.android.apksig.apk.ApkFormatException;
 import com.android.apksig.util.DataSource;
 import com.android.apksig.util.DataSources;
 import com.android.bundle.Devices.DeviceSpec;
+import com.android.bundle.RuntimeEnabledSdkConfigProto.LocalDeploymentRuntimeEnabledSdkConfig;
 import com.android.bundle.RuntimeEnabledSdkConfigProto.RuntimeEnabledSdk;
 import com.android.tools.build.bundletool.androidtools.Aapt2Command;
 import com.android.tools.build.bundletool.androidtools.P7ZipCommand;
@@ -67,6 +70,7 @@ import com.android.tools.build.bundletool.model.exceptions.InvalidBundleExceptio
 import com.android.tools.build.bundletool.model.exceptions.InvalidCommandException;
 import com.android.tools.build.bundletool.model.utils.DefaultSystemEnvironmentProvider;
 import com.android.tools.build.bundletool.model.utils.SystemEnvironmentProvider;
+import com.android.tools.build.bundletool.model.utils.files.BufferedIo;
 import com.android.tools.build.bundletool.model.utils.files.FileUtils;
 import com.android.tools.build.bundletool.preprocessors.AppBundlePreprocessorManager;
 import com.android.tools.build.bundletool.preprocessors.DaggerAppBundlePreprocessorComponent;
@@ -88,21 +92,21 @@ import com.google.common.io.MoreFiles;
 import com.google.common.util.concurrent.ListeningExecutorService;
 import com.google.common.util.concurrent.MoreExecutors;
 import com.google.errorprone.annotations.CanIgnoreReturnValue;
+import com.google.protobuf.util.JsonFormat;
 import java.io.File;
 import java.io.IOException;
 import java.io.PrintStream;
 import java.io.RandomAccessFile;
+import java.io.Reader;
 import java.io.UncheckedIOException;
 import java.nio.ByteOrder;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.Arrays;
 import java.util.Collection;
 import java.util.Map.Entry;
 import java.util.Optional;
 import java.util.concurrent.Executors;
 import java.util.logging.Logger;
-import java.util.stream.Collectors;
 import java.util.zip.ZipException;
 import java.util.zip.ZipFile;
 
@@ -211,6 +215,8 @@ public abstract class BuildApksCommand {
       Flag.pathSet("sdk-bundles");
   private static final Flag<ImmutableSet<Path>> RUNTIME_ENABLED_SDK_ARCHIVE_LOCATIONS_FLAG =
       Flag.pathSet("sdk-archives");
+  private static final Flag<Path> LOCAL_DEPLOYMENT_RUNTIME_ENABLED_SDK_CONFIG_FLAG =
+      Flag.path("local-runtime-enabled-sdk-config");
 
   // Archive APK related flags.
   private static final Flag<String> APP_STORE_PACKAGE_NAME_FLAG = Flag.string("store-package");
@@ -299,6 +305,9 @@ public abstract class BuildApksCommand {
   public abstract ImmutableSet<Path> getRuntimeEnabledSdkBundlePaths();
 
   public abstract ImmutableSet<Path> getRuntimeEnabledSdkArchivePaths();
+
+  public abstract Optional<LocalDeploymentRuntimeEnabledSdkConfig>
+      getLocalDeploymentRuntimeEnabledSdkConfig();
 
   public abstract Optional<String> getAppStorePackageName();
 
@@ -548,6 +557,13 @@ public abstract class BuildApksCommand {
     public abstract Builder setRuntimeEnabledSdkArchivePaths(ImmutableSet<Path> sdkArchivePaths);
 
     /**
+     * Options for overriding parts of runtime-enabled SDK dependency configuration of the app for
+     * local deployment and testing.
+     */
+    public abstract Builder setLocalDeploymentRuntimeEnabledSdkConfig(
+        LocalDeploymentRuntimeEnabledSdkConfig localDeploymentRuntimeEnabledSdkConfig);
+
+    /**
      * Sets package name of an app store that will be called by archived app to redownload the
      * application.
      *
@@ -709,6 +725,16 @@ public abstract class BuildApksCommand {
                     + " archives, but both were set.")
             .build();
       }
+
+      if (command.getLocalDeploymentRuntimeEnabledSdkConfig().isPresent()
+          && command.getRuntimeEnabledSdkBundlePaths().isEmpty()
+          && command.getRuntimeEnabledSdkArchivePaths().isEmpty()) {
+        throw InvalidCommandException.builder()
+            .withInternalMessage(
+                "Using --local-deployment-runtime-enabled-sdk-config flag requires either"
+                    + " --sdk-bundles or --sdk-archives flag to be also present.")
+            .build();
+      }
       return command;
     }
   }
@@ -823,6 +849,25 @@ public abstract class BuildApksCommand {
         .getValue(flags)
         .ifPresent(buildApksCommand::setRuntimeEnabledSdkArchivePaths);
 
+    if (LOCAL_DEPLOYMENT_RUNTIME_ENABLED_SDK_CONFIG_FLAG.getValue(flags).isPresent()
+        && !RUNTIME_ENABLED_SDK_BUNDLE_LOCATIONS_FLAG.getValue(flags).isPresent()
+        && !RUNTIME_ENABLED_SDK_ARCHIVE_LOCATIONS_FLAG.getValue(flags).isPresent()) {
+      throw InvalidCommandException.builder()
+          .withInternalMessage(
+              "'%s' flag can only be set together with '%s' or '%s' flags.",
+              LOCAL_DEPLOYMENT_RUNTIME_ENABLED_SDK_CONFIG_FLAG.getName(),
+              RUNTIME_ENABLED_SDK_BUNDLE_LOCATIONS_FLAG.getName(),
+              RUNTIME_ENABLED_SDK_ARCHIVE_LOCATIONS_FLAG.getName())
+          .build();
+    }
+
+    LOCAL_DEPLOYMENT_RUNTIME_ENABLED_SDK_CONFIG_FLAG
+        .getValue(flags)
+        .ifPresent(
+            configPath ->
+                buildApksCommand.setLocalDeploymentRuntimeEnabledSdkConfig(
+                    parseLocalRuntimeEnabledSdkConfig(configPath)));
+
     APP_STORE_PACKAGE_NAME_FLAG.getValue(flags).ifPresent(buildApksCommand::setAppStorePackageName);
 
     flags.checkNoUnknownFlags();
@@ -914,6 +959,17 @@ public abstract class BuildApksCommand {
       checkFileExistsAndExecutable(getAdbPath().get());
     }
 
+    if (!shouldGenerateSdkRuntimeVariant(getApkBuildMode())) {
+      checkArgument(
+          getRuntimeEnabledSdkBundlePaths().isEmpty(),
+          "runtimeEnabledSdkBundlePaths can not be present in '%s' mode.",
+          getApkBuildMode().name());
+      checkArgument(
+          getRuntimeEnabledSdkArchivePaths().isEmpty(),
+          "runtimeEnabledSdkArchivePaths can not be present in '%s' mode.",
+          getApkBuildMode().name());
+    }
+
     getRuntimeEnabledSdkBundlePaths()
         .forEach(
             path -> {
@@ -930,6 +986,9 @@ public abstract class BuildApksCommand {
 
   private ImmutableMap<String, BundleModule> getValidatedSdkModules(
       Closer closer, TempDirectory tempDir, AppBundle appBundle) throws IOException {
+    if (!shouldGenerateSdkRuntimeVariant(getApkBuildMode())) {
+      return ImmutableMap.of();
+    }
     if (!getRuntimeEnabledSdkArchivePaths().isEmpty()) {
       ImmutableMap<String, SdkAsar> sdkAsars = getValidatedSdkAsarsByPackageName(closer, tempDir);
       validateSdkAsarsMatchAppBundleDependencies(appBundle, sdkAsars);
@@ -1581,6 +1640,18 @@ public abstract class BuildApksCommand {
                 .build())
         .addFlag(
             FlagDescription.builder()
+                .setFlagName(LOCAL_DEPLOYMENT_RUNTIME_ENABLED_SDK_CONFIG_FLAG.getName())
+                .setExampleValue("path/to/config.json")
+                .setOptional(true)
+                .setDescription(
+                    "Path to config file that contains options for overriding parts of"
+                        + " runtime-enabled SDK dependency configuration of the app bundle. Can"
+                        + " only be used if either '%s' or '%s' is set.",
+                    RUNTIME_ENABLED_SDK_BUNDLE_LOCATIONS_FLAG.getName(),
+                    RUNTIME_ENABLED_SDK_ARCHIVE_LOCATIONS_FLAG.getName())
+                .build())
+        .addFlag(
+            FlagDescription.builder()
                 .setFlagName(APP_STORE_PACKAGE_NAME_FLAG.getName())
                 .setExampleValue("com.android.vending")
                 .setOptional(true)
@@ -1593,10 +1664,7 @@ public abstract class BuildApksCommand {
   }
 
   private static String joinFlagOptions(Enum<?>... flagOptions) {
-    return Arrays.stream(flagOptions)
-        .map(Enum::name)
-        .map(String::toLowerCase)
-        .collect(Collectors.joining("|"));
+    return stream(flagOptions).map(Enum::name).map(String::toLowerCase).collect(joining("|"));
   }
 
   private static void populateSigningConfigurationFromFlags(
@@ -1786,5 +1854,31 @@ public abstract class BuildApksCommand {
 
     return SigningConfiguration.extractFromKeystore(
         keystorePath, keyAlias, keystorePassword, keyPassword);
+  }
+
+  private static LocalDeploymentRuntimeEnabledSdkConfig parseLocalRuntimeEnabledSdkConfig(
+      Path configPath) {
+    try (Reader configReader = BufferedIo.reader(configPath)) {
+      LocalDeploymentRuntimeEnabledSdkConfig.Builder configBuilder =
+          LocalDeploymentRuntimeEnabledSdkConfig.newBuilder();
+      JsonFormat.parser().merge(configReader, configBuilder);
+      return configBuilder.build();
+    } catch (IOException e) {
+      throw new UncheckedIOException(e);
+    }
+  }
+
+  private static boolean shouldGenerateSdkRuntimeVariant(ApkBuildMode mode) {
+    switch (mode) {
+      case DEFAULT:
+      case UNIVERSAL:
+      case SYSTEM:
+      case PERSISTENT:
+        return true;
+      case INSTANT:
+      case ARCHIVE:
+        return false;
+    }
+    throw new IllegalStateException();
   }
 }

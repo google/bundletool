@@ -68,6 +68,9 @@ import com.android.bundle.Commands.ApkSet;
 import com.android.bundle.Commands.BuildApksResult;
 import com.android.bundle.Commands.ModuleMetadata;
 import com.android.bundle.Commands.Variant;
+import com.android.bundle.RuntimeEnabledSdkConfigProto.CertificateOverride;
+import com.android.bundle.RuntimeEnabledSdkConfigProto.CertificateOverrides;
+import com.android.bundle.RuntimeEnabledSdkConfigProto.LocalDeploymentRuntimeEnabledSdkConfig;
 import com.android.bundle.RuntimeEnabledSdkConfigProto.RuntimeEnabledSdk;
 import com.android.bundle.RuntimeEnabledSdkConfigProto.RuntimeEnabledSdkConfig;
 import com.android.bundle.SdkMetadataOuterClass.SdkMetadata;
@@ -187,6 +190,7 @@ public class BuildApksCommandTest {
   private Path sdkArchivePath1;
   private Path sdkArchivePath2;
   private Path extractedSdkBundleModulesPath;
+  private Path localDeploymentRuntimeEnabledSdkConfigPath;
 
   private final AdbServer fakeAdbServer = mock(AdbServer.class);
   private final SystemEnvironmentProvider systemEnvironmentProvider =
@@ -281,6 +285,8 @@ public class BuildApksCommandTest {
     sdkArchivePath1 = tmpDir.resolve("archive1.asar");
     sdkArchivePath2 = tmpDir.resolve("archive2.asar");
     extractedSdkBundleModulesPath = tmpDir.resolve(EXTRACTED_SDK_MODULES_FILE_NAME);
+    localDeploymentRuntimeEnabledSdkConfigPath =
+        tmpDir.resolve("local-runtime-enabled-sdk-config.json");
   }
 
   @Test
@@ -1453,6 +1459,54 @@ public class BuildApksCommandTest {
   }
 
   @Test
+  public void buildingViaFlagsAndBuilderHasSameResult_localRuntimeEnabledSdkConfigSet()
+      throws Exception {
+    LocalDeploymentRuntimeEnabledSdkConfig config =
+        LocalDeploymentRuntimeEnabledSdkConfig.newBuilder()
+            .setCertificateOverrides(
+                CertificateOverrides.newBuilder()
+                    .addPerSdkCertificateOverride(
+                        CertificateOverride.newBuilder()
+                            .setSdkPackageName("com.test.sdk1")
+                            .setCertificateDigest(VALID_CERT_FINGERPRINT))
+                    .addPerSdkCertificateOverride(
+                        CertificateOverride.newBuilder()
+                            .setSdkPackageName("com.test.sdk2")
+                            .setCertificateDigest(VALID_CERT_FINGERPRINT2)))
+            .build();
+    Files.writeString(
+        localDeploymentRuntimeEnabledSdkConfigPath, JsonFormat.printer().print(config));
+    ByteArrayOutputStream output = new ByteArrayOutputStream();
+    BuildApksCommand commandViaFlags =
+        BuildApksCommand.fromFlags(
+            new FlagParser()
+                .parse(
+                    "--bundle=" + bundlePath,
+                    "--output=" + outputFilePath,
+                    "--sdk-bundles=" + sdkBundlePath1,
+                    "--local-runtime-enabled-sdk-config="
+                        + localDeploymentRuntimeEnabledSdkConfigPath),
+            new PrintStream(output),
+            systemEnvironmentProvider,
+            fakeAdbServer);
+
+    BuildApksCommand.Builder commandViaBuilder =
+        BuildApksCommand.builder()
+            .setBundlePath(bundlePath)
+            .setOutputFile(outputFilePath)
+            .setExecutorServiceInternal(commandViaFlags.getExecutorService())
+            .setExecutorServiceCreatedByBundleTool(true)
+            .setRuntimeEnabledSdkBundlePaths(ImmutableSet.of(sdkBundlePath1))
+            .setLocalDeploymentRuntimeEnabledSdkConfig(config)
+            .setOutputPrintStream(commandViaFlags.getOutputPrintStream().get());
+
+    DebugKeystoreUtils.getDebugSigningConfiguration(systemEnvironmentProvider)
+        .ifPresent(commandViaBuilder::setSigningConfiguration);
+
+    assertThat(commandViaBuilder.build()).isEqualTo(commandViaFlags);
+  }
+
+  @Test
   public void buildingViaFlagsAndBuilderHasSameResult_customStorePackage() throws Exception {
     ByteArrayOutputStream output = new ByteArrayOutputStream();
     BuildApksCommand commandViaFlags =
@@ -1722,8 +1776,8 @@ public class BuildApksCommandTest {
     SigningCertificateLineage lineage =
         new SigningCertificateLineage.Builder(oldestSignerConfig, signerConfig).build();
 
-    com.android.tools.build.bundletool.model.SignerConfig oldestSigner =
-        com.android.tools.build.bundletool.model.SignerConfig.builder()
+    SignerConfig oldestSigner =
+        SignerConfig.builder()
             .setPrivateKey(oldestSignerPrivateKey)
             .setCertificates(ImmutableList.of(oldestSignerCertificate))
             .build();
@@ -1909,6 +1963,46 @@ public class BuildApksCommandTest {
   }
 
   @Test
+  public void localDeploymentRuntimeEnabledSdkConfig_withoutSdkDependencies_fromFlags_throws() {
+    Throwable e =
+        assertThrows(
+            InvalidCommandException.class,
+            () ->
+                BuildApksCommand.fromFlags(
+                    new FlagParser()
+                        .parse(
+                            "--bundle=" + bundlePath,
+                            "--output=" + outputFilePath,
+                            "--local-runtime-enabled-sdk-config="
+                                + localDeploymentRuntimeEnabledSdkConfigPath),
+                    fakeAdbServer));
+    assertThat(e)
+        .hasMessageThat()
+        .isEqualTo(
+            "'local-runtime-enabled-sdk-config' flag can only be set together with 'sdk-bundles' or"
+                + " 'sdk-archives' flags.");
+  }
+
+  @Test
+  public void localDeploymentRuntimeEnabledSdkConfig_withoutSdkDependencies_fromBuilder_throws() {
+    Throwable e =
+        assertThrows(
+            InvalidCommandException.class,
+            () ->
+                BuildApksCommand.builder()
+                    .setBundlePath(bundlePath)
+                    .setOutputFile(outputFilePath)
+                    .setLocalDeploymentRuntimeEnabledSdkConfig(
+                        LocalDeploymentRuntimeEnabledSdkConfig.getDefaultInstance())
+                    .build());
+    assertThat(e)
+        .hasMessageThat()
+        .isEqualTo(
+            "Using --local-deployment-runtime-enabled-sdk-config flag requires either"
+                + " --sdk-bundles or --sdk-archives flag to be also present.");
+  }
+
+  @Test
   public void sdkBundleFileDoesNotExist_throws() throws Exception {
     // Creating SDK bundle for sdkBundlePath1, but not for SdkBundlePath2.
     createSdkBundle(sdkBundlePath1, "com.test.sdk", /* majorVersion= */ 1, /* minorVersion= */ 2);
@@ -2035,6 +2129,65 @@ public class BuildApksCommandTest {
     assertThat(e)
         .hasMessageThat()
         .contains("ASAR file 'sdk_archive.aab' is expected to have '.asar' extension.");
+  }
+
+  @Test
+  public void sdkBundlesSetInUnsupportedMode_throws() throws Exception {
+    createSdkBundle(sdkBundlePath1, "com.test.sdk2", /* majorVersion= */ 2, /* minorVersion= */ 3);
+    createAppBundleWithRuntimeEnabledSdkConfig(
+        bundlePath,
+        RuntimeEnabledSdkConfig.newBuilder()
+            .addRuntimeEnabledSdk(
+                RuntimeEnabledSdk.newBuilder()
+                    .setPackageName("com.test.sdk1")
+                    .setVersionMajor(1)
+                    .setVersionMinor(2)
+                    .setCertificateDigest(VALID_CERT_FINGERPRINT))
+            .build());
+    BuildApksCommand command =
+        BuildApksCommand.fromFlags(
+            new FlagParser()
+                .parse(
+                    "--bundle=" + bundlePath,
+                    "--output=" + outputFilePath,
+                    "--sdk-bundles=" + sdkBundlePath1,
+                    "--mode=ARCHIVE"),
+            fakeAdbServer);
+
+    Exception e = assertThrows(IllegalArgumentException.class, command::execute);
+    assertThat(e)
+        .hasMessageThat()
+        .contains("runtimeEnabledSdkBundlePaths can not be present in 'ARCHIVE' mode.");
+  }
+
+  @Test
+  public void sdkArchivessSetInUnsupportedMode_throws() throws Exception {
+    createSdkArchive(
+        sdkArchivePath1, "com.test.sdk1", /* majorVersion= */ 1, /* minorVersion= */ 2);
+    createAppBundleWithRuntimeEnabledSdkConfig(
+        bundlePath,
+        RuntimeEnabledSdkConfig.newBuilder()
+            .addRuntimeEnabledSdk(
+                RuntimeEnabledSdk.newBuilder()
+                    .setPackageName("com.test.sdk1")
+                    .setVersionMajor(1)
+                    .setVersionMinor(2)
+                    .setCertificateDigest(VALID_CERT_FINGERPRINT))
+            .build());
+    BuildApksCommand command =
+        BuildApksCommand.fromFlags(
+            new FlagParser()
+                .parse(
+                    "--bundle=" + bundlePath,
+                    "--output=" + outputFilePath,
+                    "--sdk-archives=" + sdkArchivePath1,
+                    "--mode=ARCHIVE"),
+            fakeAdbServer);
+
+    Exception e = assertThrows(IllegalArgumentException.class, command::execute);
+    assertThat(e)
+        .hasMessageThat()
+        .contains("runtimeEnabledSdkArchivePaths can not be present in 'ARCHIVE' mode.");
   }
 
   @Test
@@ -2265,6 +2418,28 @@ public class BuildApksCommandTest {
     assertThat(e)
         .hasMessageThat()
         .contains("App bundle depends on SDK 'com.test.sdk2', but no SDK bundle was provided.");
+  }
+
+  @Test
+  public void appBundleHasSdkDeps_noSdkBundleInInput_modeWithoutSdkRuntimeVariant_succeeds()
+      throws Exception {
+    createAppBundleWithRuntimeEnabledSdkConfig(
+        bundlePath,
+        RuntimeEnabledSdkConfig.newBuilder()
+            .addRuntimeEnabledSdk(
+                RuntimeEnabledSdk.newBuilder()
+                    .setPackageName("com.test.sdk1")
+                    .setVersionMajor(1)
+                    .setVersionMinor(2)
+                    .setCertificateDigest(VALID_CERT_FINGERPRINT)
+                    .setResourcesPackageId(2))
+            .build());
+
+    BuildApksCommand.fromFlags(
+            new FlagParser()
+                .parse("--bundle=" + bundlePath, "--output=" + outputFilePath, "--mode=INSTANT"),
+            fakeAdbServer)
+        .execute();
   }
 
   @Test

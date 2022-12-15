@@ -40,6 +40,7 @@ public interface ApkSetWriter {
 
   void writeApkSet(BuildSdkApksResult toc) throws IOException;
 
+
   /** Creates ApkSet writer which stores all splits uncompressed inside output directory. */
   static ApkSetWriter directory(Path outputDirectory) {
     return new ApkSetWriter() {
@@ -57,6 +58,7 @@ public interface ApkSetWriter {
       public void writeApkSet(BuildSdkApksResult toc) throws IOException {
         Files.write(getSplitsDirectory().resolve(TABLE_OF_CONTENTS_FILE), toc.toByteArray());
       }
+
     };
   }
 
@@ -99,6 +101,7 @@ public interface ApkSetWriter {
 
         zipApkSet(apkRelativePaths, toc.toByteArray());
       }
+
 
       private void zipApkSet(ImmutableSet<String> apkRelativePaths, byte[] tocBytes)
           throws IOException {

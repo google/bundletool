@@ -36,8 +36,8 @@ public final class AppBundlePreprocessorModule {
       EmbeddedApkSigningPreprocessor embeddedApkSigningPreprocessor,
       EntryCompressionPreprocessor entryCompressionPreprocessor,
       LocalTestingPreprocessor localTestingPreprocessor,
-      RuntimeEnabledSdkTablePreprocessor runtimeEnabledSdkTablePreprocessor,
       RuntimeEnabledSdkDependencyPreprocessor runtimeEnabledSdkDependencyPreprocessor,
+      LocalRuntimeEnabledSdkConfigPreprocessor localRuntimeEnabledSdkConfigPreprocessor,
       BuildApksCommand command) {
     ImmutableList.Builder<AppBundlePreprocessor> preprocessors =
         ImmutableList.<AppBundlePreprocessor>builder()
@@ -45,8 +45,8 @@ public final class AppBundlePreprocessorModule {
                 appBundle64BitNativeLibrariesPreprocessor,
                 embeddedApkSigningPreprocessor,
                 entryCompressionPreprocessor,
-                runtimeEnabledSdkTablePreprocessor,
-                runtimeEnabledSdkDependencyPreprocessor);
+                runtimeEnabledSdkDependencyPreprocessor,
+                localRuntimeEnabledSdkConfigPreprocessor);
     if (command.getLocalTestingMode()) {
       preprocessors.add(localTestingPreprocessor);
     }

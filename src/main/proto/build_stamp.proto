@@ -1,0 +1,43 @@
+syntax = "proto3";
+
+package android.bundle;
+
+import "google/protobuf/timestamp.proto";
+
+option java_package = "com.android.bundle";
+
+// Build stamp metadata.
+message BuildStampFile {
+  // The build stamp for this bundle.
+  BuildStamp build_stamp = 1;
+}
+
+// A build stamp.
+// Next tag: 8.
+message BuildStamp {
+  // Source revision for the build, e.g. HEAD commit hash.
+  string source_revision = 1;
+  // ID of the build job which created this bundle.
+  string job_id = 2;
+  // URL to the build job which created this bundle. Does not need to be public,
+  // and probably will not be.
+  string job_url = 3;
+  // ID for the specific build, e.g. a UUID.
+  string build_id = 4;
+  // Build label: an arbitrary string set by the build system. May be used to
+  // embed a release label.
+  string label = 5;
+  // Time at which the build was started.
+  google.protobuf.Timestamp build_start_timestamp = 6;
+
+  // Status of the working tree this bundle was built from.
+  enum WorktreeStatus {
+    WORKTREE_STATUS_UNSPECIFIED = 0;
+    // Clean. No uncommitted modifications or files.
+    WORKTREE_STATUS_CLEAN = 1;
+    // Dirty. One or more uncommitted modifications or files.
+    WORKTREE_STATUS_DIRTY = 2;
+  }
+  // Status of the working tree this bundle was built from.
+  WorktreeStatus worktree_status = 7;
+}

@@ -92,7 +92,7 @@ public class VariantTotalSizeAggregator extends AbstractSizeAggregator {
                 countrySetTargeting,
                 sdkRuntimeTargeting),
             getSizeRequest.getModules(),
-            /* includeInstallTimeAssetModules= */ true,
+            /* includeInstallTimeAssetModules= */ false,
             getSizeRequest.getInstant(),
             /* ensureDensityAndAbiApksMatched= */ false)
         .getMatchingApksFromVariant(variant, bundleVersion);

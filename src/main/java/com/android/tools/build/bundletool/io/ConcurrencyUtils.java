@@ -40,8 +40,16 @@ final class ConcurrencyUtils {
     // reason that we don't use Futures#allAsList() directly is it will fail-fast and will cause the
     // other existing futures to continue running until they fail (e.g. if they depend on the
     // temporary file which gets deleted then it will produce NoFileFound exception).
-    waitFor(Futures.whenAllComplete(futures).call(() -> null, directExecutor()));
-    return ImmutableList.copyOf(waitFor(Futures.allAsList(futures)));
+    try {
+      return ImmutableList.copyOf(waitFor(Futures.allAsList(futures)));
+    } catch (RuntimeException e) {
+      try {
+        waitFor(Futures.whenAllComplete(futures).call(() -> null, directExecutor()));
+      } catch (RuntimeException ignoredException) {
+        // Silently ignored - only report the very first Exception encountered.
+      }
+      throw e;
+    }
   }
 
   public static <K, V> ImmutableMap<K, V> waitForAll(Map<K, ListenableFuture<V>> futures) {

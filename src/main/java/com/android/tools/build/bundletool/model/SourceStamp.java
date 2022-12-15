@@ -32,9 +32,6 @@ public abstract class SourceStamp {
 
   public static final String LOCAL_SOURCE = "http://localhost";
 
-  public static final String STAMP_SOURCE_METADATA_KEY = "com.android.stamp.source";
-  public static final String STAMP_TYPE_METADATA_KEY = "com.android.stamp.type";
-
   /** Returns the signing configuration used for signing the stamp. */
   public abstract SigningConfiguration getSigningConfiguration();
 
@@ -63,13 +60,5 @@ public abstract class SourceStamp {
     public abstract Builder setIncludeTimestamp(boolean includeTimestamp);
 
     public abstract SourceStamp build();
-  }
-
-  /** Type of stamp generated. */
-  public enum StampType {
-    // Stamp generated for APKs intended for distribution.
-    STAMP_TYPE_DISTRIBUTION_APK,
-    // Stamp generated for standalone APKs.
-    STAMP_TYPE_STANDALONE_APK,
   }
 }

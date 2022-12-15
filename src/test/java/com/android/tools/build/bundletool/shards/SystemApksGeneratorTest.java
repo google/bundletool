@@ -70,10 +70,13 @@ import static com.google.common.truth.Truth8.assertThat;
 import static com.google.common.truth.extensions.proto.ProtoTruth.assertThat;
 
 import com.android.bundle.Devices.DeviceSpec;
+import com.android.bundle.RuntimeEnabledSdkConfigProto.RuntimeEnabledSdk;
+import com.android.bundle.RuntimeEnabledSdkConfigProto.RuntimeEnabledSdkConfig;
 import com.android.bundle.Targeting.LanguageTargeting;
 import com.android.bundle.Targeting.ScreenDensity.DensityAlias;
 import com.android.tools.build.bundletool.commands.BuildApksModule;
 import com.android.tools.build.bundletool.commands.CommandScoped;
+import com.android.tools.build.bundletool.model.AppBundle;
 import com.android.tools.build.bundletool.model.BundleMetadata;
 import com.android.tools.build.bundletool.model.BundleModule;
 import com.android.tools.build.bundletool.model.BundleModuleName;
@@ -83,6 +86,8 @@ import com.android.tools.build.bundletool.model.ModuleSplit.SplitType;
 import com.android.tools.build.bundletool.model.OptimizationDimension;
 import com.android.tools.build.bundletool.model.ZipPath;
 import com.android.tools.build.bundletool.optimizations.ApkOptimizations;
+import com.android.tools.build.bundletool.splitters.RuntimeEnabledSdkTableInjector;
+import com.android.tools.build.bundletool.testing.AppBundleBuilder;
 import com.android.tools.build.bundletool.testing.BundleModuleBuilder;
 import com.android.tools.build.bundletool.testing.ResourceTableBuilder;
 import com.android.tools.build.bundletool.testing.TestModule;
@@ -1115,6 +1120,43 @@ public class SystemApksGeneratorTest {
             .getContent()
             .read();
     assertThat(actualContent).isEqualTo(content);
+  }
+
+  @Test
+  public void appBundleHasRuntimeEnabledSdkDependencies_injectsRuntimeEnabledSdkTable()
+      throws Exception {
+    RuntimeEnabledSdkConfig runtimeEnabledSdkConfig =
+        RuntimeEnabledSdkConfig.newBuilder()
+            .addRuntimeEnabledSdk(
+                RuntimeEnabledSdk.newBuilder()
+                    .setPackageName("com.test.sdk")
+                    .setVersionMajor(1)
+                    .setVersionMinor(2)
+                    .setCertificateDigest("certdigest"))
+            .build();
+    BundleModule baseModule =
+        new BundleModuleBuilder("base")
+            .setManifest(androidManifest("com.test.app"))
+            .setRuntimeEnabledSdkConfig(runtimeEnabledSdkConfig)
+            .build();
+    AppBundle appBundle = new AppBundleBuilder().addModule(baseModule).build();
+    TestComponent.useTestModule(
+        this, TestModule.builder().withDeviceSpec(DEVICE_SPEC).withAppBundle(appBundle).build());
+
+    ImmutableList<ModuleSplit> shards =
+        systemApksGenerator.generateSystemApks(
+            /* modules= */ ImmutableList.of(baseModule),
+            /* modulesToFuse= */ ImmutableSet.of(BASE_MODULE_NAME),
+            splitOptimizations());
+
+    assertThat(shards).hasSize(1);
+    assertThat(
+            shards
+                .get(0)
+                .findEntry(
+                    ZipPath.create(
+                        RuntimeEnabledSdkTableInjector.RUNTIME_ENABLED_SDK_TABLE_FILE_PATH)))
+        .isPresent();
   }
 
   private static ApkOptimizations splitOptimizations(OptimizationDimension... dimensions) {

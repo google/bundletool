@@ -76,9 +76,15 @@ public class BinaryArtProfilesInjectorTest {
             .build();
     ModuleSplit result = injector.inject(moduleSplit);
 
-    assertThat(getEntryContent(result, ZipPath.create("assets/dexopt/baseline.prof")))
-        .hasValue(BINARY_ART_PROFILE_CONTENT);
-    assertThat(getEntryContent(result, ZipPath.create("assets/dexopt/baseline.profm")))
+    ZipPath apkProfilePath = ZipPath.create("assets/dexopt/baseline.prof");
+    ZipPath apkProfileMetadataPath = ZipPath.create("assets/dexopt/baseline.profm");
+    assertThat(result.findEntry(apkProfilePath).map(ModuleEntry::getForceUncompressed))
+        .hasValue(true);
+    assertThat(result.findEntry(apkProfileMetadataPath).map(ModuleEntry::getForceUncompressed))
+        .hasValue(true);
+
+    assertThat(getEntryContent(result, apkProfilePath)).hasValue(BINARY_ART_PROFILE_CONTENT);
+    assertThat(getEntryContent(result, apkProfileMetadataPath))
         .hasValue(BINARY_ART_PROFILE_METADATA_CONTENT);
     assertThat(getEntryContent(result, ZipPath.create("some.bin"))).hasValue(new byte[] {10, 9, 8});
   }

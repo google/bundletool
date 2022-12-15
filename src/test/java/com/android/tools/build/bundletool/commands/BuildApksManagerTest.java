@@ -35,7 +35,7 @@ import static com.android.tools.build.bundletool.model.BundleModule.ASSETS_DIREC
 import static com.android.tools.build.bundletool.model.OptimizationDimension.ABI;
 import static com.android.tools.build.bundletool.model.OptimizationDimension.LANGUAGE;
 import static com.android.tools.build.bundletool.model.OptimizationDimension.TEXTURE_COMPRESSION_FORMAT;
-import static com.android.tools.build.bundletool.model.SourceStamp.STAMP_SOURCE_METADATA_KEY;
+import static com.android.tools.build.bundletool.model.SourceStampConstants.STAMP_SOURCE_METADATA_KEY;
 import static com.android.tools.build.bundletool.model.utils.ResourcesUtils.MDPI_VALUE;
 import static com.android.tools.build.bundletool.model.utils.ResultUtils.apexApkVariants;
 import static com.android.tools.build.bundletool.model.utils.ResultUtils.archivedApkVariants;

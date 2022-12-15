@@ -25,7 +25,7 @@ import com.android.tools.build.bundletool.model.BundleModule;
 import com.android.tools.build.bundletool.model.BundleModule.ModuleType;
 import com.android.tools.build.bundletool.model.ModuleSplit;
 import com.android.tools.build.bundletool.model.SourceStamp;
-import com.android.tools.build.bundletool.model.SourceStamp.StampType;
+import com.android.tools.build.bundletool.model.SourceStampConstants.StampType;
 import com.android.tools.build.bundletool.model.version.Version;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;

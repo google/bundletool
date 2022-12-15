@@ -92,6 +92,24 @@ public class ApkOptimizationsTest {
   }
 
   @Test
+  public void
+      getDefaultOptimizations_1_13_2_onlySplitsByAbiDensityTextureLanguageUncompressNativeLibsUncompressedDexDeviceTiers() {
+    ApkOptimizations defaultOptimizations =
+        ApkOptimizations.getDefaultOptimizationsForVersion(Version.of("1.13.2"));
+    assertThat(defaultOptimizations)
+        .isEqualTo(
+            ApkOptimizations.builder()
+                .setSplitDimensions(
+                    ImmutableSet.of(
+                        ABI, SCREEN_DENSITY, TEXTURE_COMPRESSION_FORMAT, LANGUAGE, DEVICE_TIER))
+                .setUncompressNativeLibraries(true)
+                .setStandaloneDimensions(ImmutableSet.of(ABI, SCREEN_DENSITY))
+                .setUncompressDexFiles(true)
+                .setUncompressedDexTargetSdk(UncompressedDexTargetSdk.SDK_31)
+                .build());
+  }
+
+  @Test
   public void getSplitDimensionsForAssetModules_returnsDimensionsSupportedByAssetModules() {
     ApkOptimizations optimizations =
         ApkOptimizations.builder()

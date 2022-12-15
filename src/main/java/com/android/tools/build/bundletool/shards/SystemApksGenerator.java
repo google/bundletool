@@ -39,6 +39,7 @@ import com.android.tools.build.bundletool.model.ZipPath;
 import com.android.tools.build.bundletool.optimizations.ApkOptimizations;
 import com.android.tools.build.bundletool.splitters.BinaryArtProfilesInjector;
 import com.android.tools.build.bundletool.splitters.CodeTransparencyInjector;
+import com.android.tools.build.bundletool.splitters.RuntimeEnabledSdkTableInjector;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
@@ -58,6 +59,7 @@ public class SystemApksGenerator {
   private final Optional<DeviceSpec> deviceSpec;
   private final CodeTransparencyInjector codeTransparencyInjector;
   private final BinaryArtProfilesInjector binaryArtProfilesInjector;
+  private final RuntimeEnabledSdkTableInjector runtimeEnabledSdkTableInjector;
 
   @Inject
   public SystemApksGenerator(
@@ -71,7 +73,8 @@ public class SystemApksGenerator {
     this.shardsMerger = shardsMerger;
     this.deviceSpec = deviceSpec;
     this.codeTransparencyInjector = new CodeTransparencyInjector(appBundle);
-    binaryArtProfilesInjector = new BinaryArtProfilesInjector(appBundle);
+    this.binaryArtProfilesInjector = new BinaryArtProfilesInjector(appBundle);
+    this.runtimeEnabledSdkTableInjector = new RuntimeEnabledSdkTableInjector(appBundle);
   }
 
   /**
@@ -102,6 +105,7 @@ public class SystemApksGenerator {
         .map(module -> applyUncompressedOptimizations(module, apkOptimizations))
         .map(codeTransparencyInjector::inject)
         .map(binaryArtProfilesInjector::inject)
+        .map(runtimeEnabledSdkTableInjector::inject)
         .collect(toImmutableList());
   }
 

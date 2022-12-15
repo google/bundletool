@@ -33,6 +33,7 @@ public final class SdkModuleToAppBundleModuleConverter {
   private final ResourceTablePackageIdRemapper resourceTablePackageIdRemapper;
   private final XmlPackageIdRemapper xmlPackageIdRemapper;
   private final DexAndResourceRepackager dexAndResourceRepackager;
+  private final AndroidResourceRenamer androidResourceRenamer;
   private final AndroidManifest appBaseModuleManifest;
 
   public SdkModuleToAppBundleModuleConverter(
@@ -46,6 +47,7 @@ public final class SdkModuleToAppBundleModuleConverter {
         new XmlPackageIdRemapper(sdkDependencyConfig.getResourcesPackageId());
     this.dexAndResourceRepackager =
         new DexAndResourceRepackager(sdkModule.getSdkModulesConfig().get(), sdkDependencyConfig);
+    this.androidResourceRenamer = new AndroidResourceRenamer(sdkModule.getSdkModulesConfig().get());
     this.appBaseModuleManifest = appBaseModuleManifest;
   }
 
@@ -54,9 +56,10 @@ public final class SdkModuleToAppBundleModuleConverter {
    * Bundle as a removable install-time module.
    */
   public BundleModule convert() {
-    return repackageDexAndJavaResources(
-        remapResourceIdsInResourceTable(
-            remapResourceIdsInXmlResources(convertNameTypeAndManifest(sdkModule))));
+    return renameAndroidResources(
+        repackageDexAndJavaResources(
+            remapResourceIdsInResourceTable(
+                remapResourceIdsInXmlResources(convertNameTypeAndManifest(sdkModule)))));
   }
 
   private BundleModule remapResourceIdsInResourceTable(BundleModule module) {
@@ -69,6 +72,10 @@ public final class SdkModuleToAppBundleModuleConverter {
 
   private BundleModule repackageDexAndJavaResources(BundleModule module) {
     return dexAndResourceRepackager.repackage(module);
+  }
+
+  private BundleModule renameAndroidResources(BundleModule module) {
+    return androidResourceRenamer.renameAndroidResources(module);
   }
 
   private BundleModule convertNameTypeAndManifest(BundleModule module) {

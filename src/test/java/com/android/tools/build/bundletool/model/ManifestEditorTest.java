@@ -76,6 +76,7 @@ import com.android.aapt.Resources.XmlElement;
 import com.android.aapt.Resources.XmlNode;
 import com.android.tools.build.bundletool.TestData;
 import com.android.tools.build.bundletool.model.manifestelements.Activity;
+import com.android.tools.build.bundletool.model.manifestelements.Provider;
 import com.android.tools.build.bundletool.model.manifestelements.Receiver;
 import com.android.tools.build.bundletool.model.utils.xmlproto.XmlProtoAttribute;
 import com.android.tools.build.bundletool.model.utils.xmlproto.XmlProtoElement;
@@ -116,7 +117,6 @@ public class ManifestEditorTest {
                         MIN_SDK_VERSION_RESOURCE_ID,
                         123))));
   }
-
 
   @Test
   public void setMinSdkVersion_existingAttribute_adjusted() throws Exception {
@@ -749,6 +749,18 @@ public class ManifestEditorTest {
   }
 
   @Test
+  public void addProvider() throws Exception {
+    Provider provider = Provider.builder().setName("providerName").build();
+    XmlNode providerXmlNode =
+        XmlNode.newBuilder().setElement(provider.asXmlProtoElement().getProto()).build();
+    AndroidManifest androidManifest = AndroidManifest.create(androidManifest("com.test.app"));
+    AndroidManifest editedManifest = androidManifest.toEditor().addProvider(provider).save();
+
+    assertThat(getApplicationElement(editedManifest).getChildList())
+        .containsExactly(providerXmlNode);
+  }
+
+  @Test
   public void addUsesSdkLibraryElement() {
     AndroidManifest androidManifest = AndroidManifest.create(androidManifest("com.test.app"));
 
@@ -1093,6 +1105,35 @@ public class ManifestEditorTest {
                             FUSING_ELEMENT_NAME,
                             xmlBooleanAttribute(
                                 DISTRIBUTION_NAMESPACE_URI, INCLUDE_ATTRIBUTE_NAME, true))))));
+  }
+
+  @Test
+  public void setDistributionModuleForRecoveryModule() {
+    AndroidManifest androidManifest = AndroidManifest.create(xmlNode(xmlElement("manifest")));
+    AndroidManifest editedManifest =
+        androidManifest.toEditor().setDistributionModuleForRecoveryModule().save();
+
+    XmlNode editedManifestRoot = editedManifest.getManifestRoot().getProto();
+    assertThat(editedManifestRoot.hasElement()).isTrue();
+    XmlElement manifestElement = editedManifestRoot.getElement();
+    assertThat(manifestElement.getName()).isEqualTo("manifest");
+    assertThat(manifestElement.getChildList())
+        .containsExactly(
+            xmlNode(
+                xmlElement(
+                    DISTRIBUTION_NAMESPACE_URI,
+                    MODULE_ELEMENT_NAME,
+                    xmlNode(
+                        xmlElement(
+                            DISTRIBUTION_NAMESPACE_URI,
+                            DELIVERY_ELEMENT_NAME,
+                            xmlNode(xmlElement(DISTRIBUTION_NAMESPACE_URI, "on-demand")))),
+                    xmlNode(
+                        xmlElement(
+                            DISTRIBUTION_NAMESPACE_URI,
+                            FUSING_ELEMENT_NAME,
+                            xmlBooleanAttribute(
+                                DISTRIBUTION_NAMESPACE_URI, INCLUDE_ATTRIBUTE_NAME, false))))));
   }
 
   @Test

@@ -158,6 +158,7 @@ public abstract class AndroidManifest {
   public static final String FITS_SYSTEM_WINDOWS_ATTRIBUTE_NAME = "fitsSystemWindows";
   public static final String SRC_ATTRIBUTE_NAME = "src";
   public static final String APP_COMPONENT_FACTORY_ATTRIBUTE_NAME = "appComponentFactory";
+  public static final String AUTHORITIES_ATTRIBUTE_NAME = "authorities";
 
   public static final String LEANBACK_FEATURE_NAME = "android.software.leanback";
   public static final String TOUCHSCREEN_FEATURE_NAME = "android.hardware.touchscreen";
@@ -219,6 +220,7 @@ public abstract class AndroidManifest {
   public static final int FITS_SYSTEM_WINDOWS_RESOURCE_ID = 0x010100dd;
   public static final int SRC_RESOURCE_ID = 0x01010119;
   public static final int APP_COMPONENT_FACTORY_RESOURCE_ID = 0x0101057a;
+  public static final int AUTHORITIES_RESOURCE_ID = 0x01010018;
 
   // Matches the value of android.os.Build.VERSION_CODES.CUR_DEVELOPMENT, used when turning
   // a manifest attribute which references a prerelease API version (e.g., "Q") into an integer.
@@ -926,6 +928,12 @@ public abstract class AndroidManifest {
   /** Gets the AppComponentFactory class name if it is set in the AndroidManifest. */
   public Optional<String> getAppComponentFactoryAttribute() {
     return getApplicationAttribute(APP_COMPONENT_FACTORY_RESOURCE_ID)
+        .map(XmlProtoAttribute::getValueAsString);
+  }
+
+  /** Gets the Authorities class name if it is set in the AndroidManifest. */
+  public Optional<String> getAuthoritiesAttribute() {
+    return getApplicationAttribute(AUTHORITIES_RESOURCE_ID)
         .map(XmlProtoAttribute::getValueAsString);
   }
 

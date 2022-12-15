@@ -34,3 +34,31 @@ message RuntimeEnabledSdk {
   // remapped to.
   int32 resources_package_id = 5;
 }
+
+// Options for overriding parts of runtime-enabled SDK dependency configuration
+// for local deployment and testing.
+message LocalDeploymentRuntimeEnabledSdkConfig {
+  // Options for overriding SDK certificate digests in RuntimeEnabledSdkConfig
+  // of the app bundle.
+  CertificateOverrides certificate_overrides = 1;
+}
+
+// Contains information on certificate digests that should be overridden in
+// runtime-enabled SDK dependency config for local deployment.
+message CertificateOverrides {
+  // Certificate digest override for specific SDKs.
+  repeated CertificateOverride per_sdk_certificate_override = 1;
+  // Default certificate override. If set, certificate digests of SDKs that are
+  // not present in per_sdk_certificate_override field will be overriden to this
+  // value.
+  optional string default_certificate_override = 2;
+}
+
+// Contains information on certificate digest overrides for a specific SDK.
+message CertificateOverride {
+  // Package name of the SDK that we want to override the certificate digest
+  // for.
+  string sdk_package_name = 1;
+  // Certificate digest that we should override to.
+  string certificate_digest = 2;
+}

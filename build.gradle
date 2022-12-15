@@ -201,6 +201,7 @@ shadowJar {
         exclude 'com.android.vending.splits'
         exclude 'com.android.vending.splits.required'
         exclude 'com.android.dynamic.apk.fused.modules'
+        exclude 'com.android.tools.build.profiles'
     }
 
     // Exclude ddmlib protos from maven jar

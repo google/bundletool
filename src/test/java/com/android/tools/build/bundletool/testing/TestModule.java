@@ -325,6 +325,7 @@ public class TestModule {
                 .setAapt2Command(Aapt2Helper.getAapt2Command())
                 .setSdkBundlePath(bundlePath)
                 .setOutputFile(outputPath);
+
         if (signingConfig != null) {
           command.setSigningConfiguration(signingConfig);
           sdkCommand.setSigningConfiguration(signingConfig);

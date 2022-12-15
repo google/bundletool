@@ -18,6 +18,8 @@ package com.android.tools.build.bundletool.model;
 
 import static com.android.tools.build.bundletool.model.AndroidManifest.APP_COMPONENT_FACTORY_ATTRIBUTE_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.APP_COMPONENT_FACTORY_RESOURCE_ID;
+import static com.android.tools.build.bundletool.model.AndroidManifest.AUTHORITIES_ATTRIBUTE_NAME;
+import static com.android.tools.build.bundletool.model.AndroidManifest.AUTHORITIES_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.DEBUGGABLE_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.DESCRIPTION_ATTRIBUTE_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.DESCRIPTION_RESOURCE_ID;
@@ -1447,5 +1449,24 @@ public class AndroidManifestTest {
 
     assertThat(androidManifest.getAppComponentFactoryAttribute())
         .hasValue("my.package.customFactory");
+  }
+
+  @Test
+  public void getAuthoritiesAttribute_present() {
+    AndroidManifest androidManifest =
+        AndroidManifest.create(
+            xmlNode(
+                xmlElement(
+                    "manifest",
+                    xmlNode(
+                        xmlElement(
+                            "application",
+                            xmlAttribute(
+                                ANDROID_NAMESPACE_URI,
+                                AUTHORITIES_ATTRIBUTE_NAME,
+                                AUTHORITIES_RESOURCE_ID,
+                                "my.package.customAuthority"))))));
+
+    assertThat(androidManifest.getAuthoritiesAttribute()).hasValue("my.package.customAuthority");
   }
 }

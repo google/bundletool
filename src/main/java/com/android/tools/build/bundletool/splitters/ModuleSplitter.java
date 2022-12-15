@@ -45,7 +45,7 @@ import com.android.tools.build.bundletool.model.ModuleSplit.SplitType;
 import com.android.tools.build.bundletool.model.OptimizationDimension;
 import com.android.tools.build.bundletool.model.ResourceId;
 import com.android.tools.build.bundletool.model.ResourceTableEntry;
-import com.android.tools.build.bundletool.model.SourceStamp.StampType;
+import com.android.tools.build.bundletool.model.SourceStampConstants.StampType;
 import com.android.tools.build.bundletool.model.SuffixManager;
 import com.android.tools.build.bundletool.model.exceptions.CommandExecutionException;
 import com.android.tools.build.bundletool.model.version.Version;
@@ -83,6 +83,7 @@ public class ModuleSplitter {
   private final PinSpecInjector pinSpecInjector;
   private final CodeTransparencyInjector codeTransparencyInjector;
   private final BinaryArtProfilesInjector binaryArtProfilesInjector;
+  private final RuntimeEnabledSdkTableInjector runtimeEnabledSdkTableInjector;
 
   @VisibleForTesting
   public static ModuleSplitter createForTest(BundleModule module, Version bundleVersion) {
@@ -157,6 +158,7 @@ public class ModuleSplitter {
     this.pinSpecInjector = new PinSpecInjector(module);
     this.codeTransparencyInjector = new CodeTransparencyInjector(appBundle);
     this.binaryArtProfilesInjector = new BinaryArtProfilesInjector(appBundle);
+    this.runtimeEnabledSdkTableInjector = new RuntimeEnabledSdkTableInjector(appBundle);
     this.allModuleNames = allModuleNames;
     this.stampSource = stampSource;
     this.stampType = stampType;
@@ -261,6 +263,7 @@ public class ModuleSplitter {
             .map(pinSpecInjector::inject)
             .map(codeTransparencyInjector::inject)
             .map(binaryArtProfilesInjector::inject)
+            .map(runtimeEnabledSdkTableInjector::inject)
             .map(this::addApkTargetingForSigningConfiguration)
             .map(moduleSplit -> addDefaultSdkApkTargeting(moduleSplit, masterSplitMinSdk))
             .map(this::writeSplitIdInManifest)

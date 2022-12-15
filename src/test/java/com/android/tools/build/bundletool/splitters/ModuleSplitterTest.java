@@ -35,8 +35,8 @@ import static com.android.tools.build.bundletool.model.OptimizationDimension.LAN
 import static com.android.tools.build.bundletool.model.OptimizationDimension.SCREEN_DENSITY;
 import static com.android.tools.build.bundletool.model.OptimizationDimension.TEXTURE_COMPRESSION_FORMAT;
 import static com.android.tools.build.bundletool.model.RuntimeEnabledSdkVersionEncoder.encodeSdkMajorAndMinorVersion;
-import static com.android.tools.build.bundletool.model.SourceStamp.STAMP_SOURCE_METADATA_KEY;
-import static com.android.tools.build.bundletool.model.SourceStamp.STAMP_TYPE_METADATA_KEY;
+import static com.android.tools.build.bundletool.model.SourceStampConstants.STAMP_SOURCE_METADATA_KEY;
+import static com.android.tools.build.bundletool.model.SourceStampConstants.STAMP_TYPE_METADATA_KEY;
 import static com.android.tools.build.bundletool.model.utils.Versions.ANDROID_L_API_VERSION;
 import static com.android.tools.build.bundletool.model.utils.Versions.ANDROID_M_API_VERSION;
 import static com.android.tools.build.bundletool.model.utils.Versions.ANDROID_Q_API_VERSION;
@@ -128,7 +128,7 @@ import com.android.tools.build.bundletool.model.ModuleSplit;
 import com.android.tools.build.bundletool.model.ModuleSplit.SplitType;
 import com.android.tools.build.bundletool.model.OptimizationDimension;
 import com.android.tools.build.bundletool.model.ResourceId;
-import com.android.tools.build.bundletool.model.SourceStamp.StampType;
+import com.android.tools.build.bundletool.model.SourceStampConstants.StampType;
 import com.android.tools.build.bundletool.model.ZipPath;
 import com.android.tools.build.bundletool.model.exceptions.CommandExecutionException;
 import com.android.tools.build.bundletool.model.utils.Versions;
@@ -2445,6 +2445,48 @@ public class ModuleSplitterTest {
     assertThat(splits).hasSize(1);
     assertThat(splits.get(0).getAndroidManifest().getManifestRoot().getProto())
         .isEqualTo(androidManifest("com.test.app", withMinSdkVersion(SDK_SANDBOX_MIN_VERSION)));
+  }
+
+  @Test
+  public void bundleHasdSdkDeps_nonSdkRuntimeVariant_baseModule_mainSplit_sdkTableConfigInjected() {
+    RuntimeEnabledSdkConfig runtimeEnabledSdkConfig =
+        RuntimeEnabledSdkConfig.newBuilder()
+            .addRuntimeEnabledSdk(
+                RuntimeEnabledSdk.newBuilder()
+                    .setPackageName("com.test.sdk")
+                    .setVersionMajor(1)
+                    .setVersionMinor(2)
+                    .setCertificateDigest(VALID_CERT_DIGEST))
+            .build();
+    BundleModule testModule =
+        new BundleModuleBuilder("base")
+            .setManifest(androidManifest("com.test.app"))
+            .setRuntimeEnabledSdkConfig(runtimeEnabledSdkConfig)
+            .build();
+    AppBundle appBundle = new AppBundleBuilder().addModule(testModule).build();
+    ModuleSplitter moduleSplitter =
+        ModuleSplitter.createNoStamp(
+            testModule,
+            BUNDLETOOL_VERSION,
+            appBundle,
+            ApkGenerationConfiguration.getDefaultInstance(),
+            VariantTargeting.getDefaultInstance(),
+            ImmutableSet.of("base"));
+
+    ImmutableList<ModuleSplit> splits = moduleSplitter.splitModule();
+
+    ModuleSplit mainSplit = splits.stream().filter(ModuleSplit::isMasterSplit).findAny().get();
+    assertThat(
+            mainSplit.getEntries().stream()
+                .filter(
+                    entry ->
+                        entry
+                            .getPath()
+                            .equals(
+                                ZipPath.create(
+                                    RuntimeEnabledSdkTableInjector
+                                        .RUNTIME_ENABLED_SDK_TABLE_FILE_PATH))))
+        .hasSize(1);
   }
 
   private ModuleSplit checkAndReturnTheOnlyMasterSplit(List<ModuleSplit> splits) {
