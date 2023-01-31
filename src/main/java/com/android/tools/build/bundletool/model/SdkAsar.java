@@ -50,17 +50,21 @@ public abstract class SdkAsar {
 
   public static SdkAsar buildFromZip(ZipFile asar, ZipFile modulesFile, Path modulesFilePath) {
     SdkModulesConfig sdkModulesConfig = readSdkModulesConfig(modulesFile);
+    BundleModule sdkModule =
+        Iterables.getOnlyElement(
+                sanitize(
+                    extractModules(
+                        modulesFile,
+                        BundleType.REGULAR,
+                        Version.of(sdkModulesConfig.getBundletool().getVersion()),
+                        /* apexConfig= */ Optional.empty(),
+                        /* nonModuleDirectories= */ ImmutableSet.of())))
+            .toBuilder()
+            .setSdkModulesConfig(sdkModulesConfig)
+            .build();
     SdkAsar.Builder sdkAsarBuilder =
         builder()
-            .setModule(
-                Iterables.getOnlyElement(
-                    sanitize(
-                        extractModules(
-                            modulesFile,
-                            BundleType.REGULAR,
-                            Version.of(sdkModulesConfig.getBundletool().getVersion()),
-                            /* apexConfig= */ Optional.empty(),
-                            /* nonModuleDirectories= */ ImmutableSet.of()))))
+            .setModule(sdkModule)
             .setSdkModulesConfig(sdkModulesConfig)
             .setModulesFile(modulesFilePath.toFile())
             .setSdkMetadata(readSdkMetadata(asar));

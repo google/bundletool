@@ -17,6 +17,7 @@
 package com.android.tools.build.bundletool.model;
 
 import com.android.aapt.Resources;
+import com.android.aapt.Resources.CompoundValue;
 import com.android.aapt.Resources.ConfigValue;
 import com.android.aapt.Resources.Entry;
 import com.android.aapt.Resources.EntryId;
@@ -25,6 +26,7 @@ import com.android.aapt.Resources.Item;
 import com.android.aapt.Resources.Package;
 import com.android.aapt.Resources.PackageId;
 import com.android.aapt.Resources.ResourceTable;
+import com.android.aapt.Resources.Style;
 import com.android.aapt.Resources.Type;
 import com.android.aapt.Resources.TypeId;
 import com.android.aapt.Resources.Value;
@@ -48,6 +50,7 @@ public class ResourceInjector {
   private static final String STRING_ENTRY_TYPE = "string";
   private static final String DRAWABLE_ENTRY_TYPE = "drawable";
   private static final String LAYOUT_ENTRY_TYPE = "layout";
+  private static final String STYLE_ENTRY_TYPE = "style";
 
   private final ResourceTable.Builder resourceTable;
   private final String packageName;
@@ -115,6 +118,19 @@ public class ResourceInjector {
                                             .setType(FileReference.Type.PROTO_XML)))))
             .build();
     return addResource(LAYOUT_ENTRY_TYPE, layoutEntry);
+  }
+
+  public ResourceId addStyleResource(String styleName, Style style) {
+    Entry layoutEntry =
+        Entry.newBuilder()
+            .setName(styleName)
+            .addConfigValue(
+                ConfigValue.newBuilder()
+                    .setValue(
+                        Value.newBuilder()
+                            .setCompoundValue(CompoundValue.newBuilder().setStyle(style))))
+            .build();
+    return addResource(STYLE_ENTRY_TYPE, layoutEntry);
   }
 
   public ResourceId addResource(String entryType, Entry entry) {

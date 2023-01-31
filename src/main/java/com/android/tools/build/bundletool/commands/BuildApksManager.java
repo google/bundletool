@@ -351,6 +351,9 @@ public final class BuildApksManager {
 
     apkGenerationConfiguration.setSuffixStrippings(apkOptimizations.getSuffixStrippings());
 
+    apkGenerationConfiguration.setEnableBaseModuleMinSdkAsDefaultTargeting(
+        command.getEnableBaseModuleMinSdkAsDefaultTargeting());
+
     command
         .getMinSdkForAdditionalVariantWithV3Rotation()
         .ifPresent(apkGenerationConfiguration::setMinSdkForAdditionalVariantWithV3Rotation);
@@ -360,6 +363,8 @@ public final class BuildApksManager {
 
   private ApkGenerationConfiguration getAssetSliceGenerationConfiguration() {
     return ApkGenerationConfiguration.builder()
+        .setEnableBaseModuleMinSdkAsDefaultTargeting(
+            command.getEnableBaseModuleMinSdkAsDefaultTargeting())
         .setOptimizationDimensions(apkOptimizations.getSplitDimensionsForAssetModules())
         .setSuffixStrippings(apkOptimizations.getSuffixStrippings())
         .build();

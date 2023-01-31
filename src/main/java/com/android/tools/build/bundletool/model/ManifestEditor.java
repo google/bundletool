@@ -65,6 +65,8 @@ import static com.android.tools.build.bundletool.model.AndroidManifest.SERVICE_E
 import static com.android.tools.build.bundletool.model.AndroidManifest.SPLIT_NAME_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.TARGET_SANDBOX_VERSION_ATTRIBUTE_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.TARGET_SANDBOX_VERSION_RESOURCE_ID;
+import static com.android.tools.build.bundletool.model.AndroidManifest.THEME_ATTRIBUTE_NAME;
+import static com.android.tools.build.bundletool.model.AndroidManifest.THEME_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.TOOLS_NAMESPACE_URI;
 import static com.android.tools.build.bundletool.model.AndroidManifest.USES_FEATURE_ELEMENT_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.USES_SDK_ELEMENT_NAME;
@@ -387,6 +389,16 @@ public class ManifestEditor {
   }
 
   @CanIgnoreReturnValue
+  public ManifestEditor setActivityTheme(String activityName, int themeResId) {
+    manifestElement
+        .getOrCreateChildElement(APPLICATION_ELEMENT_NAME)
+        .getOrCreateChildElement(ACTIVITY_ELEMENT_NAME)
+        .getOrCreateAndroidAttribute(THEME_ATTRIBUTE_NAME, THEME_RESOURCE_ID)
+        .setValueAsRefId(themeResId);
+    return this;
+  }
+
+  @CanIgnoreReturnValue
   public ManifestEditor addReceiver(Receiver receiver) {
     manifestElement
         .getOrCreateChildElement(APPLICATION_ELEMENT_NAME)
@@ -557,6 +569,12 @@ public class ManifestEditor {
             .addAttribute(
                 createAndroidAttribute(REQUIRED_ATTRIBUTE_NAME, REQUIRED_RESOURCE_ID)
                     .setValueAsBoolean(isRequired)));
+    return this;
+  }
+
+  @CanIgnoreReturnValue
+  public ManifestEditor addManifestChildElement(XmlProtoElement element) {
+    manifestElement.addChildElement(element.toBuilder());
     return this;
   }
 

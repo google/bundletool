@@ -19,7 +19,6 @@ package com.android.tools.build.bundletool.archive;
 import static com.google.common.base.Preconditions.checkNotNull;
 
 import com.android.aapt.Resources.ResourceTable;
-import com.android.tools.build.bundletool.commands.BuildApksModule.UpdateIconInArchiveMode;
 import com.android.tools.build.bundletool.io.ResourceReader;
 import com.android.tools.build.bundletool.model.AndroidManifest;
 import com.android.tools.build.bundletool.model.AppBundle;
@@ -47,13 +46,11 @@ import javax.inject.Inject;
  * resources and two custom actions to clear app cache and to wake up an app.
  */
 public final class ArchivedApksGenerator {
-  private final boolean updateIconInArchiveMode;
   private final ResourceReader resourceReader;
   private final ArchivedResourcesHelper archivedResourcesHelper;
 
   @Inject
-  ArchivedApksGenerator(@UpdateIconInArchiveMode boolean updateIconInArchiveMode) {
-    this.updateIconInArchiveMode = updateIconInArchiveMode;
+  ArchivedApksGenerator() {
     resourceReader = new ResourceReader();
     archivedResourcesHelper = new ArchivedResourcesHelper(resourceReader);
   }
@@ -74,37 +71,23 @@ public final class ArchivedApksGenerator {
     ResourceInjector resourceInjector =
         new ResourceInjector(archivedResourceTable.toBuilder(), appBundle.getPackageName());
 
-    ImmutableMap<ZipPath, ByteSource> additionalResourcesByByteSource = ImmutableMap.of();
-    if (updateIconInArchiveMode) {
-      ImmutableMap<String, Integer> extraResourceNameToIdMap =
-          ArchivedResourcesHelper.injectExtraResources(
-              resourceInjector, customAppStorePackageName, iconAttribute, roundIconAttribute);
+    ImmutableMap<String, Integer> extraResourceNameToIdMap =
+        ArchivedResourcesHelper.injectExtraResources(
+            resourceInjector, customAppStorePackageName, iconAttribute, roundIconAttribute);
 
-      additionalResourcesByByteSource =
-          archivedResourcesHelper.buildAdditionalResourcesByByteSourceMap(
-              extraResourceNameToIdMap.get(ArchivedResourcesHelper.CLOUD_SYMBOL_DRAWABLE_NAME),
-              extraResourceNameToIdMap.get(ArchivedResourcesHelper.OPACITY_LAYER_DRAWABLE_NAME),
-              iconAttribute,
-              roundIconAttribute,
-              archivedResourcesHelper.findArchivedClassesDexPath(
-                  appBundle.getVersion(),
-                  BundleTransparencyCheckUtils.isTransparencyEnabled(appBundle)));
+    ImmutableMap<ZipPath, ByteSource> additionalResourcesByByteSource =
+        archivedResourcesHelper.buildAdditionalResourcesByByteSourceMap(
+            extraResourceNameToIdMap.get(ArchivedResourcesHelper.CLOUD_SYMBOL_DRAWABLE_NAME),
+            extraResourceNameToIdMap.get(ArchivedResourcesHelper.OPACITY_LAYER_DRAWABLE_NAME),
+            iconAttribute,
+            roundIconAttribute,
+            archivedResourcesHelper.findArchivedClassesDexPath(
+                appBundle.getVersion(),
+                BundleTransparencyCheckUtils.isTransparencyEnabled(appBundle)));
 
-      archivedManifest =
-          ArchivedAndroidManifestUtils.updateArchivedIcons(
-              archivedManifest, extraResourceNameToIdMap);
-    } else {
-      resourceInjector.addStringResource(
-          ArchivedResourcesHelper.APP_STORE_PACKAGE_NAME_RESOURCE_NAME,
-          ArchivedResourcesHelper.getAppStorePackageName(customAppStorePackageName));
-      additionalResourcesByByteSource =
-          ImmutableMap.of(
-              BundleModule.DEX_DIRECTORY.resolve("classes.dex"),
-              resourceReader.getResourceByteSource(
-                  archivedResourcesHelper.findArchivedClassesDexPath(
-                      appBundle.getVersion(),
-                      BundleTransparencyCheckUtils.isTransparencyEnabled(appBundle))));
-    }
+    archivedManifest =
+        ArchivedAndroidManifestUtils.updateArchivedIconsAndTheme(
+            archivedManifest, extraResourceNameToIdMap);
 
     ModuleSplit moduleSplit =
         ModuleSplit.forArchive(

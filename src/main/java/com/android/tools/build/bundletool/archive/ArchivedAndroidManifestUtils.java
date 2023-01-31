@@ -27,6 +27,7 @@ import static com.android.tools.build.bundletool.model.AndroidManifest.LEANBACK_
 import static com.android.tools.build.bundletool.model.AndroidManifest.MAIN_ACTION_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.META_DATA_GMS_VERSION;
 import static com.android.tools.build.bundletool.model.AndroidManifest.TOUCHSCREEN_FEATURE_NAME;
+import static com.android.tools.build.bundletool.model.AndroidManifest.USES_FEATURE_HARDWARE_WATCH_NAME;
 import static com.google.common.base.Preconditions.checkNotNull;
 
 import com.android.tools.build.bundletool.model.AndroidManifest;
@@ -43,11 +44,13 @@ import com.google.common.collect.ImmutableMap;
 /** Utility methods for creation of archived manifest. */
 public final class ArchivedAndroidManifestUtils {
   public static final String META_DATA_KEY_ARCHIVED = "com.android.vending.archive";
-
+  public static final int WINDOW_IS_TRANSLUCENT_RESOURCE_ID = 0x01010058;
+  public static final int WINDOW_BACKGROUND_RESOURCE_ID = 0x01010054;
+  public static final int SCREEN_BACKGROUND_DARK_TRANSPARENT_THEME_RESOURCE_ID = 0x010800a9;
+  public static final int HOLO_LIGHT_NO_ACTION_BAR_FULSCREEN_THEME_RESOURCE_ID = 0x010300f1;
+  public static final int BACKGROUND_DIM_ENABLED = 0x0101021f;
   public static final String REACTIVATE_ACTIVITY_NAME =
       "com.google.android.archive.ReactivateActivity";
-  public static final int HOLO_LIGHT_NO_ACTION_BAR_FULSCREEN_THEME_RES_ID = 0x010300f1;
-
   public static final String UPDATE_BROADCAST_RECEIVER_NAME =
       "com.google.android.archive.UpdateBroadcastReceiver";
   public static final String MY_PACKAGE_REPLACED_ACTION_NAME =
@@ -119,6 +122,11 @@ public final class ArchivedAndroidManifestUtils {
         .getMetadataElement(META_DATA_GMS_VERSION)
         .ifPresent(editor::addApplicationChildElement);
 
+    // Make archived APK generated for wear AAB as a wear app
+    manifest
+        .getUsesFeatureElement(USES_FEATURE_HARDWARE_WATCH_NAME)
+        .forEach(editor::addManifestChildElement);
+
     CHILDREN_ELEMENTS_TO_KEEP.forEach(
         elementName -> editor.copyChildrenElements(manifest, elementName));
 
@@ -136,7 +144,7 @@ public final class ArchivedAndroidManifestUtils {
             .build());
   }
 
-  public static AndroidManifest updateArchivedIcons(
+  public static AndroidManifest updateArchivedIconsAndTheme(
       AndroidManifest manifest, ImmutableMap<String, Integer> resourceNameToIdMap) {
     ManifestEditor archivedManifestEditor = manifest.toEditor();
 
@@ -150,6 +158,10 @@ public final class ArchivedAndroidManifestUtils {
       archivedManifestEditor.setRoundIcon(
           resourceNameToIdMap.get(ARCHIVED_ROUND_ICON_DRAWABLE_NAME));
     }
+
+    archivedManifestEditor.setActivityTheme(
+        REACTIVATE_ACTIVITY_NAME,
+        resourceNameToIdMap.getOrDefault(ArchivedResourcesHelper.ARCHIVED_TV_THEME_NAME, 0));
 
     return archivedManifestEditor.save();
   }
@@ -168,10 +180,11 @@ public final class ArchivedAndroidManifestUtils {
 
     return Activity.builder()
         .setName(REACTIVATE_ACTIVITY_NAME)
-        .setTheme(HOLO_LIGHT_NO_ACTION_BAR_FULSCREEN_THEME_RES_ID)
+        .setTheme(HOLO_LIGHT_NO_ACTION_BAR_FULSCREEN_THEME_RESOURCE_ID)
         .setExported(true)
         .setExcludeFromRecents(true)
         .setStateNotNeeded(true)
+        .setNoHistory(true)
         .setIntentFilter(intentFilterBuilder.build())
         .build();
   }

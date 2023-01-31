@@ -59,12 +59,14 @@ public class CountrySetParityValidatorTest {
         new BundleModuleBuilder("a")
             .addFile("assets/img#countries_latam/image.jpg")
             .addFile("assets/img#countries_sea/image.jpg")
+            .addFile("assets/img/image.jpg")
             .setManifest(androidManifest("com.test.app"))
             .build();
     BundleModule moduleB =
         new BundleModuleBuilder("b")
             .addFile("assets/img#countries_latam/image.jpg")
             .addFile("assets/img#countries_sea/image.jpg")
+            .addFile("assets/img/image.jpg")
             .setManifest(androidManifest("com.test.app"))
             .build();
 
@@ -79,6 +81,7 @@ public class CountrySetParityValidatorTest {
             .addFile("assets/img#countries_latam/imageB.jpg")
             .addFile("assets/img#countries_sea/image1.jpg")
             .addFile("assets/img#countries_sea/image2.jpg")
+            .addFile("assets/img/image.jpg")
             .setManifest(androidManifest("com.test.app"))
             .build();
 
@@ -91,12 +94,14 @@ public class CountrySetParityValidatorTest {
         new BundleModuleBuilder("a")
             .addFile("assets/img#countries_latam/image.jpg")
             .addFile("assets/img#countries_sea/image.jpg")
+            .addFile("assets/img/image.jpg")
             .setManifest(androidManifest("com.test.app"))
             .build();
     BundleModule moduleB =
         new BundleModuleBuilder("b")
             .addFile("assets/img#countries_latam/image.jpg")
             .addFile("assets/img#countries_sea/image.jpg")
+            .addFile("assets/img/image.jpg")
             .setManifest(androidManifest("com.test.app"))
             .build();
     BundleModule moduleC =
@@ -110,36 +115,6 @@ public class CountrySetParityValidatorTest {
     BundleModule moduleA =
         new BundleModuleBuilder("a")
             .addFile("assets/img#countries_latam/image.jpg")
-            .setManifest(androidManifest("com.test.app"))
-            .build();
-    BundleModule moduleB =
-        new BundleModuleBuilder("b")
-            .addFile("assets/img#countries_latam/image.jpg")
-            .addFile("assets/img#countries_sea/image.jpg")
-            .setManifest(androidManifest("com.test.app"))
-            .build();
-
-    InvalidBundleException exception =
-        assertThrows(
-            InvalidBundleException.class,
-            () ->
-                new CountrySetParityValidator()
-                    .validateAllModules(ImmutableList.of(moduleA, moduleB)));
-
-    assertThat(exception)
-        .hasMessageThat()
-        .contains(
-            "All modules with country set targeting must support the same country sets, but module"
-                + " 'a' supports [latam] (without fallback directories) and module 'b' supports"
-                + " [latam, sea] (without fallback directories).");
-  }
-
-  @Test
-  public void sameCountrySetsInDifferentModules_differentFallback_throws() {
-    BundleModule moduleA =
-        new BundleModuleBuilder("a")
-            .addFile("assets/img#countries_latam/image.jpg")
-            .addFile("assets/img#countries_sea/image.jpg")
             .addFile("assets/img/image.jpg")
             .setManifest(androidManifest("com.test.app"))
             .build();
@@ -147,6 +122,7 @@ public class CountrySetParityValidatorTest {
         new BundleModuleBuilder("b")
             .addFile("assets/img#countries_latam/image.jpg")
             .addFile("assets/img#countries_sea/image.jpg")
+            .addFile("assets/img/image.jpg")
             .setManifest(androidManifest("com.test.app"))
             .build();
 
@@ -161,8 +137,31 @@ public class CountrySetParityValidatorTest {
         .hasMessageThat()
         .contains(
             "All modules with country set targeting must support the same country sets, but module"
-                + " 'a' supports [latam, sea] (with fallback directories) and module 'b' supports"
-                + " [latam, sea] (without fallback directories).");
+                + " 'a' supports [latam] (with fallback directories) and module 'b' supports"
+                + " [latam, sea] (with fallback directories).");
+  }
+
+  @Test
+  public void validateAllModules_noFallback_throws() {
+    BundleModule moduleA =
+        new BundleModuleBuilder("a")
+            .addFile("assets/img#countries_latam/image.jpg")
+            .addFile("assets/img#countries_sea/image.jpg")
+            .setManifest(androidManifest("com.test.app"))
+            .build();
+
+    InvalidBundleException exception =
+        assertThrows(
+            InvalidBundleException.class,
+            () -> new CountrySetParityValidator().validateAllModules(ImmutableList.of(moduleA)));
+
+    assertThat(exception)
+        .hasMessageThat()
+        .contains(
+            "Module 'a' targets content based on country set but doesn't have fallback folders"
+                + " (folders without #countries suffixes). Fallback folders will be used to"
+                + " generate split for rest of the countries which are not targeted by existing"
+                + " country sets. Please add missing folders and try again.");
   }
 
   @Test
@@ -225,21 +224,22 @@ public class CountrySetParityValidatorTest {
     assertThat(exception)
         .hasMessageThat()
         .contains(
-            "When a standalone or universal APK is built, the fallback country set folders (folders"
-                + " without #countries suffixes) will be used, but module: 'a' has no such folders."
-                + " Either add missing folders or change the configuration for the COUNTRY_SET"
-                + " optimization to specify a default suffix corresponding to country set to use in"
-                + " the standalone and universal APKs.");
+            "Module 'a' targets content based on country set but doesn't have fallback folders"
+                + " (folders without #countries suffixes). Fallback folders will be used to"
+                + " generate split for rest of the countries which are not targeted by existing"
+                + " country sets. Please add missing folders and try again.");
   }
 
   @Test
-  public void validateBundle_moduleWithDefaultCountrySet_succeeds() {
+  public void validateBundle_moduleWithDefaultCountrySetFolders_succeeds() {
     BundleModule moduleA =
         new BundleModuleBuilder("a")
             .addFile("assets/img1#countries_latam/image.jpg")
             .addFile("assets/img1#countries_sea/image.jpg")
+            .addFile("assets/img1/image.jpg")
             .addFile("assets/img2#countries_latam/image.jpg")
             .addFile("assets/img2#countries_sea/image.jpg")
+            .addFile("assets/img2/image.jpg")
             .setManifest(androidManifest("com.test.app"))
             .build();
     AppBundle appBundle =
@@ -262,7 +262,7 @@ public class CountrySetParityValidatorTest {
   }
 
   @Test
-  public void validateBundle_moduleWithoutDefaultCountrySet_throws() {
+  public void validateBundle_moduleWithoutDefaultCountrySetFolders_throws() {
     BundleModule moduleA =
         new BundleModuleBuilder("a")
             .addFile("assets/img1#countries_latam/image.jpg")

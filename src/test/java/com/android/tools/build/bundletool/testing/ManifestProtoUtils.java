@@ -71,6 +71,7 @@ import static com.android.tools.build.bundletool.model.AndroidManifest.TARGET_SD
 import static com.android.tools.build.bundletool.model.AndroidManifest.THEME_ATTRIBUTE_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.THEME_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.TOOLS_NAMESPACE_URI;
+import static com.android.tools.build.bundletool.model.AndroidManifest.USES_FEATURE_ELEMENT_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.USES_SDK_ELEMENT_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.USES_SDK_LIBRARY_ELEMENT_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.VALUE_ATTRIBUTE_NAME;
@@ -1104,6 +1105,21 @@ public final class ManifestProtoUtils {
     return defaultManifest
         .applyMutators(manifestMutators)
         .equals(defaultManifest.applyMutators(ImmutableList.of(otherManifestMutator)));
+  }
+
+  /** Adds an <uses-feature> element. */
+  public static ManifestMutator withUsesFeatureElement(String usesFeatureNameValue) {
+    return manifestElement ->
+        manifestElement.addChildElement(
+            new XmlProtoElementBuilder(
+                xmlElement(
+                    USES_FEATURE_ELEMENT_NAME,
+                    xmlAttribute(
+                        ANDROID_NAMESPACE_URI,
+                        NAME_ATTRIBUTE_NAME,
+                        NAME_RESOURCE_ID,
+                        usesFeatureNameValue))
+                    .toBuilder()));
   }
 
   // Do not instantiate.

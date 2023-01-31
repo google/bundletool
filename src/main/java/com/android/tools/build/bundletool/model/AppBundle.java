@@ -147,6 +147,8 @@ public abstract class AppBundle implements Bundle {
   @Override
   public abstract BundleMetadata getBundleMetadata();
 
+  abstract Optional<String> getPackageNameOptional();
+
   /**
    * Returns runtime-enabled SDK dependencies of this bundle, keyed by SDK package name.
    *
@@ -183,6 +185,9 @@ public abstract class AppBundle implements Bundle {
 
   @Override
   public String getPackageName() {
+    if (getPackageNameOptional().isPresent()) {
+      return getPackageNameOptional().get();
+    }
     if (isAssetOnly()) {
       return getModules().values().stream()
           .map(module -> module.getAndroidManifest().getPackageName())
@@ -315,6 +320,12 @@ public abstract class AppBundle implements Bundle {
 
     public abstract Builder setRuntimeEnabledSdkDependencies(
         ImmutableMap<String, RuntimeEnabledSdk> runtimeEnabledSdkDependencies);
+
+    /**
+     * Package name is explicitly set in BuidSdkApksForAppCommand, since it does not take app bundle
+     * as input.
+     */
+    public abstract Builder setPackageNameOptional(String packageName);
 
     public abstract AppBundle build();
 

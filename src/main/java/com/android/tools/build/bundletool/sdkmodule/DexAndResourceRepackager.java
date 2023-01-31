@@ -18,7 +18,7 @@ package com.android.tools.build.bundletool.sdkmodule;
 import static com.google.common.base.Preconditions.checkArgument;
 import static java.nio.charset.StandardCharsets.UTF_8;
 
-import com.android.bundle.RuntimeEnabledSdkConfigProto.RuntimeEnabledSdk;
+import com.android.bundle.RuntimeEnabledSdkConfigProto.SdkSplitPropertiesInheritedFromApp;
 import com.android.bundle.SdkModulesConfigOuterClass.SdkModulesConfig;
 import com.android.tools.build.bundletool.model.BundleModule;
 import com.android.tools.build.bundletool.model.ModuleEntry;
@@ -82,14 +82,15 @@ public final class DexAndResourceRepackager {
   private static final String ASSETS_SUBDIRECTORY_PREFIX = "RuntimeEnabledSdk-";
 
   private final SdkModulesConfig sdkModulesConfig;
-  private final RuntimeEnabledSdk sdkDependencyConfig;
+  private final SdkSplitPropertiesInheritedFromApp inheritedAppProperties;
   private final DexRepackager dexRepackager;
   private final JavaResourceRepackager javaResourceRepackager;
 
   DexAndResourceRepackager(
-      SdkModulesConfig sdkModulesConfig, RuntimeEnabledSdk sdkDependencyConfig) {
+      SdkModulesConfig sdkModulesConfig,
+      SdkSplitPropertiesInheritedFromApp inheritedAppProperties) {
     this.sdkModulesConfig = sdkModulesConfig;
-    this.sdkDependencyConfig = sdkDependencyConfig;
+    this.inheritedAppProperties = inheritedAppProperties;
     this.dexRepackager = new DexRepackager(sdkModulesConfig);
     this.javaResourceRepackager = new JavaResourceRepackager(sdkModulesConfig);
   }
@@ -169,7 +170,7 @@ public final class DexAndResourceRepackager {
       Element resourceIdRemappingElement, Document xmlFactory) {
     Element resourcesPackageIdElement = xmlFactory.createElement(RESOURCES_PACKAGE_ID_ELEMENT_NAME);
     resourcesPackageIdElement.setTextContent(
-        Integer.toString(sdkDependencyConfig.getResourcesPackageId()));
+        Integer.toString(inheritedAppProperties.getResourcesPackageId()));
     resourceIdRemappingElement.appendChild(resourcesPackageIdElement);
   }
 

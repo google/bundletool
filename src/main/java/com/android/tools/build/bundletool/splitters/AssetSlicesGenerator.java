@@ -55,7 +55,7 @@ public class AssetSlicesGenerator {
 
     for (BundleModule module : appBundle.getAssetModules().values()) {
       AssetModuleSplitter moduleSplitter =
-          new AssetModuleSplitter(module, apkGenerationConfiguration);
+          new AssetModuleSplitter(module, apkGenerationConfiguration, appBundle);
       splits.addAll(
           moduleSplitter.splitModule().stream()
               .map(

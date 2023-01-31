@@ -19,6 +19,7 @@ import com.android.tools.build.bundletool.commands.AddTransparencyCommand;
 import com.android.tools.build.bundletool.commands.BuildApksCommand;
 import com.android.tools.build.bundletool.commands.BuildBundleCommand;
 import com.android.tools.build.bundletool.commands.BuildSdkApksCommand;
+import com.android.tools.build.bundletool.commands.BuildSdkApksForAppCommand;
 import com.android.tools.build.bundletool.commands.BuildSdkAsarCommand;
 import com.android.tools.build.bundletool.commands.BuildSdkBundleCommand;
 import com.android.tools.build.bundletool.commands.CheckTransparencyCommand;
@@ -87,6 +88,9 @@ public class BundleToolMain {
           break;
         case BuildSdkApksCommand.COMMAND_NAME:
           BuildSdkApksCommand.fromFlags(flags).execute();
+          break;
+        case BuildSdkApksForAppCommand.COMMAND_NAME:
+          BuildSdkApksForAppCommand.fromFlags(flags).execute();
           break;
         case BuildSdkAsarCommand.COMMAND_NAME:
           BuildSdkAsarCommand.fromFlags(flags).execute();
@@ -171,6 +175,7 @@ public class BundleToolMain {
             BuildApksCommand.help(),
             BuildSdkBundleCommand.help(),
             BuildSdkApksCommand.help(),
+            BuildSdkApksForAppCommand.help(),
             BuildSdkAsarCommand.help(),
             PrintDeviceTargetingConfigCommand.help(),
             EvaluateDeviceTargetingConfigCommand.help(),
@@ -205,6 +210,9 @@ public class BundleToolMain {
         break;
       case BuildSdkApksCommand.COMMAND_NAME:
         commandHelp = BuildSdkApksCommand.help();
+        break;
+      case BuildSdkApksForAppCommand.COMMAND_NAME:
+        commandHelp = BuildSdkApksForAppCommand.help();
         break;
       case BuildSdkAsarCommand.COMMAND_NAME:
         commandHelp = BuildSdkAsarCommand.help();

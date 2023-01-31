@@ -210,11 +210,14 @@ public final class TestUtils {
   }
 
   public static ZipBuilder createZipBuilderForSdkBundle() {
+    return createZipBuilderForSdkBundle(SdkBundleConfig.getDefaultInstance());
+  }
+
+  public static ZipBuilder createZipBuilderForSdkBundle(SdkBundleConfig sdkBundleConfig) {
     return new ZipBuilder()
         .addFileWithContent(
             ZipPath.create("BUNDLE-METADATA/some.namespace/metadata1"), new byte[] {0x01})
-        .addFileWithProtoContent(
-            ZipPath.create(SDK_BUNDLE_CONFIG_FILE_NAME), SdkBundleConfig.getDefaultInstance())
+        .addFileWithProtoContent(ZipPath.create(SDK_BUNDLE_CONFIG_FILE_NAME), sdkBundleConfig)
         .addFileWithContent(ZipPath.create(SDK_INTERFACE_DESCRIPTORS_FILE_NAME), TEST_CONTENT);
   }
 

@@ -94,6 +94,7 @@ public abstract class AndroidManifest {
   public static final String INSTALL_TIME_ELEMENT_NAME = "install-time";
   public static final String REMOVABLE_ELEMENT_NAME = "removable";
   public static final String FUSING_ELEMENT_NAME = "fusing";
+  public static final String STYLE_ELEMENT_NAME = "style";
 
   public static final String DEBUGGABLE_ATTRIBUTE_NAME = "debuggable";
   public static final String EXTRACT_NATIVE_LIBS_ATTRIBUTE_NAME = "extractNativeLibs";
@@ -238,6 +239,7 @@ public abstract class AndroidManifest {
   public static final String META_DATA_KEY_SPLITS_REQUIRED = "com.android.vending.splits.required";
 
   public static final String META_DATA_GMS_VERSION = "com.google.android.gms.version";
+  public static final String USES_FEATURE_HARDWARE_WATCH_NAME = "android.hardware.type.watch";
 
   public static final String MAIN_ACTION_NAME = "android.intent.action.MAIN";
   public static final String LAUNCHER_CATEGORY_NAME = "android.intent.category.LAUNCHER";
@@ -747,6 +749,20 @@ public abstract class AndroidManifest {
                 "Found multiple <meta-data> elements for key '%s', expected at most one.", name)
             .build();
     }
+  }
+
+  /** Returns the <uses-feature> XML elements with the given "android:name" value. */
+  public ImmutableList<XmlProtoElement> getUsesFeatureElement(String name) {
+    return getManifestElement()
+        .getChildrenElements(USES_FEATURE_ELEMENT_NAME)
+        .filter(
+            metadataElement ->
+                metadataElement
+                    .getAndroidAttribute(NAME_RESOURCE_ID)
+                    .map(XmlProtoAttribute::getValueAsString)
+                    .orElse("")
+                    .equals(name))
+        .collect(toImmutableList());
   }
 
   public ModuleDeliveryType getModuleDeliveryType() {

@@ -38,6 +38,8 @@ public interface ApkSetWriter {
 
   void writeApkSet(BuildApksResult toc) throws IOException;
 
+  void writeApkSetWithoutToc(BuildApksResult toc) throws IOException;
+
   void writeApkSet(BuildSdkApksResult toc) throws IOException;
 
 
@@ -52,6 +54,11 @@ public interface ApkSetWriter {
       @Override
       public void writeApkSet(BuildApksResult toc) throws IOException {
         Files.write(getSplitsDirectory().resolve(TABLE_OF_CONTENTS_FILE), toc.toByteArray());
+      }
+
+      @Override
+      public void writeApkSetWithoutToc(BuildApksResult toc) {
+        // No-op for directory APK set writer.
       }
 
       @Override
@@ -72,21 +79,12 @@ public interface ApkSetWriter {
 
       @Override
       public void writeApkSet(BuildApksResult toc) throws IOException {
-        Stream<ApkDescription> apks =
-            toc.getVariantList().stream()
-                .flatMap(variant -> variant.getApkSetList().stream())
-                .flatMap(apkSet -> apkSet.getApkDescriptionList().stream());
-        Stream<ApkDescription> assets =
-            toc.getAssetSliceSetList().stream()
-                .flatMap(assetSliceSet -> assetSliceSet.getApkDescriptionList().stream());
+        zipApkSet(getApkRelativePaths(toc), toc.toByteArray());
+      }
 
-        ImmutableSet<String> apkRelativePaths =
-            Stream.concat(apks, assets)
-                .map(ApkDescription::getPath)
-                .sorted()
-                .collect(toImmutableSet());
-
-        zipApkSet(apkRelativePaths, toc.toByteArray());
+      @Override
+      public void writeApkSetWithoutToc(BuildApksResult toc) throws IOException {
+        zipApkSet(getApkRelativePaths(toc), toc.toByteArray(), /* serializeToc= */ false);
       }
 
       @Override
@@ -105,9 +103,17 @@ public interface ApkSetWriter {
 
       private void zipApkSet(ImmutableSet<String> apkRelativePaths, byte[] tocBytes)
           throws IOException {
+        zipApkSet(apkRelativePaths, tocBytes, /* serializeToc= */ true);
+      }
+
+      private void zipApkSet(
+          ImmutableSet<String> apkRelativePaths, byte[] tocBytes, boolean serializeToc)
+          throws IOException {
         try (ZipArchive zipArchive = new ZipArchive(outputFile)) {
-          zipArchive.add(
-              new BytesSource(tocBytes, TABLE_OF_CONTENTS_FILE, Deflater.NO_COMPRESSION));
+          if (serializeToc) {
+            zipArchive.add(
+                new BytesSource(tocBytes, TABLE_OF_CONTENTS_FILE, Deflater.NO_COMPRESSION));
+          }
 
           for (String relativePath : apkRelativePaths) {
             zipArchive.add(
@@ -118,6 +124,21 @@ public interface ApkSetWriter {
                     Deflater.NO_COMPRESSION));
           }
         }
+      }
+
+      private ImmutableSet<String> getApkRelativePaths(BuildApksResult toc) {
+        Stream<ApkDescription> apks =
+            toc.getVariantList().stream()
+                .flatMap(variant -> variant.getApkSetList().stream())
+                .flatMap(apkSet -> apkSet.getApkDescriptionList().stream());
+        Stream<ApkDescription> assets =
+            toc.getAssetSliceSetList().stream()
+                .flatMap(assetSliceSet -> assetSliceSet.getApkDescriptionList().stream());
+
+        return Stream.concat(apks, assets)
+            .map(ApkDescription::getPath)
+            .sorted()
+            .collect(toImmutableSet());
       }
     };
   }

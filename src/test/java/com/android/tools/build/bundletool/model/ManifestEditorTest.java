@@ -1389,6 +1389,38 @@ public class ManifestEditorTest {
                                         xmlNode(xmlElement(REMOVABLE_ELEMENT_NAME))))))))));
   }
 
+  @Test
+  public void addManifestChildElement() {
+    AndroidManifest androidManifest = AndroidManifest.create(xmlNode(xmlElement("manifest")));
+
+    AndroidManifest editedManifest =
+        androidManifest
+            .toEditor()
+            .addManifestChildElement(
+                new XmlProtoElement(
+                    xmlElement(
+                        USES_FEATURE_ELEMENT_NAME,
+                        ImmutableList.of(
+                            xmlAttribute(
+                                ANDROID_NAMESPACE_URI,
+                                NAME_ATTRIBUTE_NAME,
+                                NAME_RESOURCE_ID,
+                                "featureName")))))
+            .save();
+
+    assertThat(editedManifest.getManifestElement().getProto().getChildList())
+        .containsExactly(
+            xmlNode(
+                xmlElement(
+                    USES_FEATURE_ELEMENT_NAME,
+                    ImmutableList.of(
+                        xmlAttribute(
+                            ANDROID_NAMESPACE_URI,
+                            NAME_ATTRIBUTE_NAME,
+                            NAME_RESOURCE_ID,
+                            "featureName")))));
+  }
+
   private static void assertUsesSdkLibraryAttributes(
       XmlElement usesSdkLibraryElement, String name, long versionMajor, String certDigest) {
     assertThat(usesSdkLibraryElement.getAttributeList()).hasSize(3);

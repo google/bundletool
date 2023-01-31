@@ -34,6 +34,7 @@ import static com.android.tools.build.bundletool.model.AndroidManifest.LOCALE_CO
 import static com.android.tools.build.bundletool.model.AndroidManifest.LOCALE_CONFIG_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.MODULE_TYPE_ASSET_VALUE;
 import static com.android.tools.build.bundletool.model.AndroidManifest.MODULE_TYPE_FEATURE_VALUE;
+import static com.android.tools.build.bundletool.model.AndroidManifest.NAME_ATTRIBUTE_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.NAME_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.PERMISSION_ELEMENT_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.PERMISSION_GROUP_ELEMENT_NAME;
@@ -82,6 +83,7 @@ import static com.google.common.truth.Truth8.assertThat;
 import static com.google.common.truth.extensions.proto.ProtoTruth.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
+import com.android.aapt.Resources.XmlElement;
 import com.android.aapt.Resources.XmlNode;
 import com.android.tools.build.bundletool.TestData;
 import com.android.tools.build.bundletool.model.exceptions.InvalidBundleException;
@@ -1468,5 +1470,26 @@ public class AndroidManifestTest {
                                 "my.package.customAuthority"))))));
 
     assertThat(androidManifest.getAuthoritiesAttribute()).hasValue("my.package.customAuthority");
+  }
+
+  @Test
+  public void getUsesFeatureElement_present() {
+    XmlElement usesFeatureElement =
+        xmlElement(
+            "uses-feature",
+            xmlAttribute(
+                ANDROID_NAMESPACE_URI, NAME_ATTRIBUTE_NAME, NAME_RESOURCE_ID, "featureName"));
+    AndroidManifest androidManifest =
+        AndroidManifest.create(xmlNode(xmlElement("manifest", xmlNode(usesFeatureElement))));
+
+    assertThat(androidManifest.getUsesFeatureElement("featureName"))
+        .containsExactlyElementsIn(ImmutableList.of(new XmlProtoElement(usesFeatureElement)));
+  }
+
+  @Test
+  public void getUsesFeatureElement_absent() {
+    AndroidManifest androidManifest = AndroidManifest.create(xmlNode(xmlElement("manifest")));
+
+    assertThat(androidManifest.getUsesFeatureElement("featureName")).isEmpty();
   }
 }

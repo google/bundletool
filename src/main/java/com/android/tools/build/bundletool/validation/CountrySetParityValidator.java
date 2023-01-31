@@ -45,6 +45,7 @@ public class CountrySetParityValidator extends SubValidator {
    */
   @AutoValue
   public abstract static class SupportedCountrySets {
+
     public static CountrySetParityValidator.SupportedCountrySets create(
         ImmutableSet<String> countrySets, boolean hasFallback) {
       return new AutoValue_CountrySetParityValidator_SupportedCountrySets(countrySets, hasFallback);
@@ -88,6 +89,7 @@ public class CountrySetParityValidator extends SubValidator {
         continue;
       }
 
+      validateModuleHasFallbackCountrySet(module, moduleCountrySets);
       if (referenceCountrySets == null) {
         referenceModule = module;
         referenceCountrySets = moduleCountrySets;
@@ -132,20 +134,9 @@ public class CountrySetParityValidator extends SubValidator {
                           defaultCountrySet, module.getName())
                       .build();
                 }
-              } else {
-                if (!supportedCountrySets.getHasFallback()) {
-                  throw InvalidBundleException.builder()
-                      .withUserMessage(
-                          "When a standalone or universal APK is built, the fallback country set"
-                              + " folders (folders without #countries suffixes) will be used, but"
-                              + " module: '%s' has no such folders. Either add"
-                              + " missing folders or change the configuration for the COUNTRY_SET"
-                              + " optimization to specify a default suffix corresponding to country"
-                              + " set to use in the standalone and universal APKs.",
-                          module.getName())
-                      .build();
-                }
               }
+
+              validateModuleHasFallbackCountrySet(module, supportedCountrySets);
             });
   }
 
@@ -178,5 +169,20 @@ public class CountrySetParityValidator extends SubValidator {
                 });
 
     return SupportedCountrySets.create(countrySets, hasFallback);
+  }
+
+  private static void validateModuleHasFallbackCountrySet(
+      BundleModule module, SupportedCountrySets supportedCountrySets) {
+    if (!supportedCountrySets.getHasFallback()) {
+      throw InvalidBundleException.builder()
+          .withUserMessage(
+              "Module '%s' targets content based on country set but doesn't have fallback"
+                  + " folders (folders without #countries suffixes). Fallback folders"
+                  + " will be used to generate split for rest of the countries which are"
+                  + " not targeted by existing country sets. Please add missing folders"
+                  + " and try again.",
+              module.getName())
+          .build();
+    }
   }
 }

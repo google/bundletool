@@ -25,10 +25,9 @@ import static com.android.tools.build.bundletool.model.version.VersionGuardedFea
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.collect.ImmutableList.toImmutableList;
-import static java.lang.Math.max;
+import static com.google.common.primitives.Ints.max;
 
 import com.android.aapt.ConfigurationOuterClass.Configuration;
-import com.android.bundle.Config.BundleConfig;
 import com.android.bundle.Targeting.ApkTargeting;
 import com.android.bundle.Targeting.SdkVersion;
 import com.android.bundle.Targeting.SdkVersionTargeting;
@@ -36,7 +35,6 @@ import com.android.bundle.Targeting.VariantTargeting;
 import com.android.tools.build.bundletool.mergers.SameTargetingMerger;
 import com.android.tools.build.bundletool.model.AndroidManifest;
 import com.android.tools.build.bundletool.model.AppBundle;
-import com.android.tools.build.bundletool.model.BundleMetadata;
 import com.android.tools.build.bundletool.model.BundleModule;
 import com.android.tools.build.bundletool.model.ManifestEditor;
 import com.android.tools.build.bundletool.model.ManifestMutator;
@@ -86,14 +84,12 @@ public class ModuleSplitter {
   private final RuntimeEnabledSdkTableInjector runtimeEnabledSdkTableInjector;
 
   @VisibleForTesting
-  public static ModuleSplitter createForTest(BundleModule module, Version bundleVersion) {
+  public static ModuleSplitter createForTest(
+      BundleModule module, AppBundle appBundle, Version bundleVersion) {
     return new ModuleSplitter(
         module,
         bundleVersion,
-        AppBundle.buildFromModules(
-            ImmutableList.of(module),
-            BundleConfig.getDefaultInstance(),
-            BundleMetadata.builder().build()),
+        appBundle,
         ApkGenerationConfiguration.getDefaultInstance(),
         lPlusVariantTargeting(),
         /* allModuleNames= */ ImmutableSet.of(),
@@ -252,6 +248,11 @@ public class ModuleSplitter {
   /** Common modifications to both the instant and installed splits. */
   private ImmutableList<ModuleSplit> splitModuleInternal() {
     ImmutableList<ModuleSplit> moduleSplits = runSplitters();
+    int baseModuleMinSdk =
+        apkGenerationConfiguration.getEnableBaseModuleMinSdkAsDefaultTargeting()
+                && appBundle.hasBaseModule()
+            ? appBundle.getBaseModule().getAndroidManifest().getEffectiveMinSdkVersion()
+            : 1;
     int masterSplitMinSdk =
         moduleSplits.stream()
             .filter(ModuleSplit::isMasterSplit)
@@ -265,7 +266,9 @@ public class ModuleSplitter {
             .map(binaryArtProfilesInjector::inject)
             .map(runtimeEnabledSdkTableInjector::inject)
             .map(this::addApkTargetingForSigningConfiguration)
-            .map(moduleSplit -> addDefaultSdkApkTargeting(moduleSplit, masterSplitMinSdk))
+            .map(
+                moduleSplit ->
+                    addDefaultSdkApkTargeting(moduleSplit, masterSplitMinSdk, baseModuleMinSdk))
             .map(this::writeSplitIdInManifest)
             .map(ModuleSplit::addApplicationElementIfMissingInManifest)
             .collect(toImmutableList());
@@ -505,7 +508,8 @@ public class ModuleSplitter {
    * Adds default SDK targeting to the Apk targeting of module split. If SDK targeting already
    * exists, it's not overridden but checked that it targets no L- devices.
    */
-  private ModuleSplit addDefaultSdkApkTargeting(ModuleSplit split, int masterSplitMinSdk) {
+  private ModuleSplit addDefaultSdkApkTargeting(
+      ModuleSplit split, int masterSplitMinSdk, int baseModuleMinSdk) {
     if (split.getApkTargeting().hasSdkVersionTargeting()) {
       checkState(
           split.getApkTargeting().getSdkVersionTargeting().getValue(0).getMin().getValue()
@@ -514,7 +518,7 @@ public class ModuleSplitter {
       return split;
     }
 
-    int defaultSdkVersion = max(masterSplitMinSdk, ANDROID_L_API_VERSION);
+    int defaultSdkVersion = max(masterSplitMinSdk, baseModuleMinSdk, ANDROID_L_API_VERSION);
     return split.toBuilder()
         .setApkTargeting(
             split.getApkTargeting().toBuilder()

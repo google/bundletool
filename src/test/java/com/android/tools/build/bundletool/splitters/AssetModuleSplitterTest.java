@@ -19,10 +19,14 @@ package com.android.tools.build.bundletool.splitters;
 import static com.android.tools.build.bundletool.model.OptimizationDimension.COUNTRY_SET;
 import static com.android.tools.build.bundletool.model.OptimizationDimension.LANGUAGE;
 import static com.android.tools.build.bundletool.model.OptimizationDimension.TEXTURE_COMPRESSION_FORMAT;
+import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifest;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifestForAssetModule;
+import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withInstallTimeDelivery;
+import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withMinSdkVersion;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.alternativeCountrySetTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.apkCountrySetTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.apkLanguageTargeting;
+import static com.android.tools.build.bundletool.testing.TargetingUtils.apkMinSdkTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.apkTextureTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.assets;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.assetsDirectoryTargeting;
@@ -41,10 +45,12 @@ import com.android.bundle.Config.SuffixStripping;
 import com.android.bundle.Targeting.ApkTargeting;
 import com.android.bundle.Targeting.AssetsDirectoryTargeting;
 import com.android.bundle.Targeting.TextureCompressionFormat.TextureCompressionFormatAlias;
+import com.android.tools.build.bundletool.model.AppBundle;
 import com.android.tools.build.bundletool.model.BundleModule;
 import com.android.tools.build.bundletool.model.BundleModule.ModuleType;
 import com.android.tools.build.bundletool.model.ModuleSplit;
 import com.android.tools.build.bundletool.model.ModuleSplit.SplitType;
+import com.android.tools.build.bundletool.testing.AppBundleBuilder;
 import com.android.tools.build.bundletool.testing.BundleModuleBuilder;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
@@ -60,6 +66,14 @@ public class AssetModuleSplitterTest {
 
   private static final String MODULE_NAME = "test_module";
 
+  private static final BundleModule BASE_MODULE =
+      new BundleModuleBuilder("base")
+          .addFile("dex/classes.dex")
+          .setManifest(androidManifest("com.test.app"))
+          .build();
+
+  private static final AppBundle APP_BUNDLE = new AppBundleBuilder().addModule(BASE_MODULE).build();
+
   @Test
   public void singleSlice() throws Exception {
     BundleModule testModule =
@@ -71,7 +85,8 @@ public class AssetModuleSplitterTest {
 
     assertThat(testModule.getModuleType()).isEqualTo(ModuleType.ASSET_MODULE);
     ImmutableList<ModuleSplit> slices =
-        new AssetModuleSplitter(testModule, ApkGenerationConfiguration.getDefaultInstance())
+        new AssetModuleSplitter(
+                testModule, ApkGenerationConfiguration.getDefaultInstance(), APP_BUNDLE)
             .splitModule();
 
     assertThat(slices).hasSize(1);
@@ -118,7 +133,8 @@ public class AssetModuleSplitterTest {
                 testModule,
                 ApkGenerationConfiguration.builder()
                     .setOptimizationDimensions(ImmutableSet.of(COUNTRY_SET))
-                    .build())
+                    .build(),
+                APP_BUNDLE)
             .splitModule();
 
     assertThat(slices).hasSize(4);
@@ -178,5 +194,71 @@ public class AssetModuleSplitterTest {
     assertThat(restOfWorldSplit.getAndroidManifest().getHasCode()).hasValue(false);
     assertThat(extractPaths(restOfWorldSplit.getEntries()))
         .containsExactly("assets/images/image.jpg");
+  }
+
+  @Test
+  public void singleSlice_updatesMinSdkVersionFromBaseModule_flagEnabled() throws Exception {
+    BundleModule baseModule =
+        new BundleModuleBuilder("base")
+            .setManifest(androidManifest("com.test.app", withMinSdkVersion(23)))
+            .build();
+    BundleModule testModule =
+        new BundleModuleBuilder(MODULE_NAME)
+            .addFile("assets/image.jpg")
+            .addFile("assets/image2.jpg")
+            .setManifest(androidManifestForAssetModule("com.test.app", withInstallTimeDelivery()))
+            .build();
+    AppBundle appBundle =
+        new AppBundleBuilder().addModule(baseModule).addModule(testModule).build();
+
+    ImmutableList<ModuleSplit> slices =
+        new AssetModuleSplitter(
+                testModule,
+                ApkGenerationConfiguration.builder()
+                    .setEnableBaseModuleMinSdkAsDefaultTargeting(true)
+                    .build(),
+                appBundle)
+            .splitModule();
+
+    assertThat(slices).hasSize(1);
+    ModuleSplit masterSlice = slices.get(0);
+    assertThat(masterSlice.getSplitType()).isEqualTo(SplitType.ASSET_SLICE);
+    assertThat(masterSlice.isMasterSplit()).isTrue();
+    assertThat(masterSlice.getAndroidManifest().getSplitId()).hasValue(MODULE_NAME);
+    assertThat(masterSlice.getAndroidManifest().getHasCode()).hasValue(false);
+    assertThat(masterSlice.getApkTargeting()).isEqualTo(apkMinSdkTargeting(23));
+    assertThat(extractPaths(masterSlice.getEntries()))
+        .containsExactly("assets/image.jpg", "assets/image2.jpg");
+  }
+
+  @Test
+  public void singleSlice_updatesMinSdkVersionFromBaseModule_flagDisabled() throws Exception {
+    BundleModule baseModule =
+        new BundleModuleBuilder("base")
+            .setManifest(androidManifest("com.test.app", withMinSdkVersion(23)))
+            .build();
+    BundleModule testModule =
+        new BundleModuleBuilder(MODULE_NAME)
+            .addFile("assets/image.jpg")
+            .addFile("assets/image2.jpg")
+            .setManifest(androidManifestForAssetModule("com.test.app", withInstallTimeDelivery()))
+            .build();
+    AppBundle appBundle =
+        new AppBundleBuilder().addModule(baseModule).addModule(testModule).build();
+
+    ImmutableList<ModuleSplit> slices =
+        new AssetModuleSplitter(
+                testModule, ApkGenerationConfiguration.getDefaultInstance(), appBundle)
+            .splitModule();
+
+    assertThat(slices).hasSize(1);
+    ModuleSplit masterSlice = slices.get(0);
+    assertThat(masterSlice.getSplitType()).isEqualTo(SplitType.ASSET_SLICE);
+    assertThat(masterSlice.isMasterSplit()).isTrue();
+    assertThat(masterSlice.getAndroidManifest().getSplitId()).hasValue(MODULE_NAME);
+    assertThat(masterSlice.getAndroidManifest().getHasCode()).hasValue(false);
+    assertThat(masterSlice.getApkTargeting()).isEqualTo(apkMinSdkTargeting(21));
+    assertThat(extractPaths(masterSlice.getEntries()))
+        .containsExactly("assets/image.jpg", "assets/image2.jpg");
   }
 }

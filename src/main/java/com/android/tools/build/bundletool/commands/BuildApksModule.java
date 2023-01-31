@@ -127,15 +127,6 @@ public final class BuildApksModule {
 
   @CommandScoped
   @Provides
-  @UpdateIconInArchiveMode
-  static boolean provideUpdateIconInArchiveMode(BuildApksCommand command) {
-    @SuppressWarnings("unused")
-    boolean updateIconInArchiveMode = false;
-    return updateIconInArchiveMode;
-  }
-
-  @CommandScoped
-  @Provides
   static Optional<DeviceSpec> provideDeviceSpec(BuildApksCommand command) {
     Optional<DeviceSpec> deviceSpec = command.getDeviceSpec();
     if (command.getGenerateOnlyForConnectedDevice()) {
@@ -206,11 +197,6 @@ public final class BuildApksModule {
   @Qualifier
   @Retention(RUNTIME)
   public @interface ApkSigningConfigProvider {}
-
-  /** Qualifying annotation a {@code boolean} on whether to update archived apps icon. */
-  @Qualifier
-  @Retention(RUNTIME)
-  public @interface UpdateIconInArchiveMode {}
 
   private BuildApksModule() {}
 }

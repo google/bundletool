@@ -47,6 +47,8 @@ public abstract class ApkGenerationConfiguration {
 
   public abstract boolean isInstallableOnExternalStorage();
 
+  public abstract boolean getEnableBaseModuleMinSdkAsDefaultTargeting();
+
   /**
    * Returns a list of ABIs for placeholder libraries that should be populated for base modules
    * without native code. See {@link AbiPlaceholderInjector} for details.
@@ -88,6 +90,7 @@ public abstract class ApkGenerationConfiguration {
         .setDexCompressionSplitterForTargetSdk(UncompressedDexTargetSdk.UNSPECIFIED)
         .setEnableSparseEncodingVariant(false)
         .setInstallableOnExternalStorage(false)
+        .setEnableBaseModuleMinSdkAsDefaultTargeting(false)
         .setAbisForPlaceholderLibs(ImmutableSet.of())
         .setOptimizationDimensions(ImmutableSet.of())
         .setMasterPinnedResourceIds(ImmutableSet.of())
@@ -134,6 +137,9 @@ public abstract class ApkGenerationConfiguration {
 
     public abstract Builder setMinSdkForAdditionalVariantWithV3Rotation(
         int minSdkForAdditionalVariantWithV3Rotation);
+
+    public abstract Builder setEnableBaseModuleMinSdkAsDefaultTargeting(
+        boolean enableBaseModuleMinSdkAsDefaultTargeting);
 
     public abstract ApkGenerationConfiguration build();
   }

@@ -62,3 +62,16 @@ message CertificateOverride {
   // Certificate digest that we should override to.
   string certificate_digest = 2;
 }
+
+// Properties that backwards-compatible SDK split inherits from the app.
+message SdkSplitPropertiesInheritedFromApp {
+  // Package name of the app.
+  string package_name = 1;
+  // Version code of the app.
+  int32 version_code = 2;
+  // minSdkVersion of the app.
+  int32 min_sdk_version = 3;
+  // Package ID that the SDK resources should be remapped to so that they do not
+  // conflict with the app's resources.
+  int32 resources_package_id = 4;
+}

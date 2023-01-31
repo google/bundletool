@@ -16,12 +16,22 @@
 
 package com.android.tools.build.bundletool.archive;
 
+import static com.android.tools.build.bundletool.archive.ArchivedAndroidManifestUtils.BACKGROUND_DIM_ENABLED;
+import static com.android.tools.build.bundletool.archive.ArchivedAndroidManifestUtils.HOLO_LIGHT_NO_ACTION_BAR_FULSCREEN_THEME_RESOURCE_ID;
+import static com.android.tools.build.bundletool.archive.ArchivedAndroidManifestUtils.SCREEN_BACKGROUND_DARK_TRANSPARENT_THEME_RESOURCE_ID;
+import static com.android.tools.build.bundletool.archive.ArchivedAndroidManifestUtils.WINDOW_BACKGROUND_RESOURCE_ID;
+import static com.android.tools.build.bundletool.archive.ArchivedAndroidManifestUtils.WINDOW_IS_TRANSLUCENT_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.ANDROID_NAMESPACE_URI;
 import static com.android.tools.build.bundletool.model.AndroidManifest.DRAWABLE_RESOURCE_ID;
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static java.util.Comparator.reverseOrder;
 
+import com.android.aapt.Resources.Item;
+import com.android.aapt.Resources.Primitive;
+import com.android.aapt.Resources.Reference;
+import com.android.aapt.Resources.Style;
+import com.android.aapt.Resources.Style.Entry;
 import com.android.tools.build.bundletool.io.ResourceReader;
 import com.android.tools.build.bundletool.model.BundleModule;
 import com.android.tools.build.bundletool.model.ResourceInjector;
@@ -39,6 +49,7 @@ import java.io.IOException;
 import java.net.URISyntaxException;
 import java.nio.file.Path;
 import java.util.Optional;
+import java.util.function.Consumer;
 import java.util.logging.Logger;
 
 /** Helper methods for managing extra resources for archived apps. */
@@ -56,6 +67,7 @@ public final class ArchivedResourcesHelper {
       "com_android_vending_archive_application_round_icon";
   public static final String ARCHIVED_SPLASH_SCREEN_LAYOUT_NAME =
       "com_android_vending_archive_splash_screen_layout";
+  public static final String ARCHIVED_TV_THEME_NAME = "com_android_vending_archive_tv_theme";
 
   public static final String ARCHIVED_CLASSES_DEX_PATH_PREFIX =
       "/com/android/tools/build/bundletool/archive/dex";
@@ -156,6 +168,11 @@ public final class ArchivedResourcesHelper {
                         BundleModule.DRAWABLE_RESOURCE_DIRECTORY
                             .resolve(String.format("%s.xml", CLOUD_SYMBOL_DRAWABLE_NAME))
                             .toString())
+                    .getFullResourceId())
+            .put(
+                ARCHIVED_TV_THEME_NAME,
+                resourceInjector
+                    .addStyleResource(ARCHIVED_TV_THEME_NAME, buildArchivedTvActivityTheme())
                     .getFullResourceId());
     iconAttribute.ifPresent(
         attribute -> {
@@ -281,6 +298,38 @@ public final class ArchivedResourcesHelper {
             .setImageResourceId(imageResId)
             .build()
             .asXmlProtoElement());
+  }
+
+  private static Style buildArchivedTvActivityTheme() {
+    return Style.newBuilder()
+        .setParent(
+            Reference.newBuilder().setId(HOLO_LIGHT_NO_ACTION_BAR_FULSCREEN_THEME_RESOURCE_ID))
+        // To make the background of the activity transparent.
+        .addEntry(
+            createStyleEntryBuilder(
+                WINDOW_IS_TRANSLUCENT_RESOURCE_ID,
+                item -> item.setPrim(Primitive.newBuilder().setBooleanValue(true))))
+        // A black background.
+        .addEntry(
+            createStyleEntryBuilder(
+                WINDOW_BACKGROUND_RESOURCE_ID,
+                item ->
+                    item.setRef(
+                        Reference.newBuilder()
+                            .setId(SCREEN_BACKGROUND_DARK_TRANSPARENT_THEME_RESOURCE_ID))))
+        // Add a dimmed effect to background.
+        .addEntry(
+            createStyleEntryBuilder(
+                BACKGROUND_DIM_ENABLED,
+                item -> item.setPrim(Primitive.newBuilder().setBooleanValue(true))))
+        .build();
+  }
+
+  private static Entry.Builder createStyleEntryBuilder(
+      int resourceId, Consumer<Item.Builder> itemConsumer) {
+    Item.Builder itemBuilder = Item.newBuilder();
+    itemConsumer.accept(itemBuilder);
+    return Entry.newBuilder().setKey(Reference.newBuilder().setId(resourceId)).setItem(itemBuilder);
   }
 
   private static XmlProtoAttributeBuilder createDrawableAttribute(int referenceId) {

@@ -16,6 +16,7 @@
 package com.android.tools.build.bundletool.sdkmodule;
 
 import com.android.bundle.RuntimeEnabledSdkConfigProto.RuntimeEnabledSdk;
+import com.android.bundle.RuntimeEnabledSdkConfigProto.SdkSplitPropertiesInheritedFromApp;
 import com.android.tools.build.bundletool.model.AndroidManifest;
 import com.android.tools.build.bundletool.model.BundleModule;
 import com.android.tools.build.bundletool.model.BundleModule.ModuleType;
@@ -34,21 +35,33 @@ public final class SdkModuleToAppBundleModuleConverter {
   private final XmlPackageIdRemapper xmlPackageIdRemapper;
   private final DexAndResourceRepackager dexAndResourceRepackager;
   private final AndroidResourceRenamer androidResourceRenamer;
-  private final AndroidManifest appBaseModuleManifest;
+  private final SdkSplitPropertiesInheritedFromApp inheritedAppProperties;
 
   public SdkModuleToAppBundleModuleConverter(
       BundleModule sdkModule,
       RuntimeEnabledSdk sdkDependencyConfig,
       AndroidManifest appBaseModuleManifest) {
+    this(
+        sdkModule,
+        SdkSplitPropertiesInheritedFromApp.newBuilder()
+            .setPackageName(appBaseModuleManifest.getPackageName())
+            .setVersionCode(appBaseModuleManifest.getVersionCode().get())
+            .setMinSdkVersion(appBaseModuleManifest.getMinSdkVersion().get())
+            .setResourcesPackageId(sdkDependencyConfig.getResourcesPackageId())
+            .build());
+  }
+
+  public SdkModuleToAppBundleModuleConverter(
+      BundleModule sdkModule, SdkSplitPropertiesInheritedFromApp inheritedAppProperties) {
     this.sdkModule = sdkModule;
     this.resourceTablePackageIdRemapper =
-        new ResourceTablePackageIdRemapper(sdkDependencyConfig.getResourcesPackageId());
+        new ResourceTablePackageIdRemapper(inheritedAppProperties.getResourcesPackageId());
     this.xmlPackageIdRemapper =
-        new XmlPackageIdRemapper(sdkDependencyConfig.getResourcesPackageId());
+        new XmlPackageIdRemapper(inheritedAppProperties.getResourcesPackageId());
     this.dexAndResourceRepackager =
-        new DexAndResourceRepackager(sdkModule.getSdkModulesConfig().get(), sdkDependencyConfig);
+        new DexAndResourceRepackager(sdkModule.getSdkModulesConfig().get(), inheritedAppProperties);
     this.androidResourceRenamer = new AndroidResourceRenamer(sdkModule.getSdkModulesConfig().get());
-    this.appBaseModuleManifest = appBaseModuleManifest;
+    this.inheritedAppProperties = inheritedAppProperties;
   }
 
   /**
@@ -90,10 +103,10 @@ public final class SdkModuleToAppBundleModuleConverter {
             module
                 .getAndroidManifest()
                 .toEditor()
-                .setPackage(appBaseModuleManifest.getPackageName())
-                .setVersionCode(appBaseModuleManifest.getVersionCode().get())
+                .setPackage(inheritedAppProperties.getPackageName())
+                .setVersionCode(inheritedAppProperties.getVersionCode())
                 .removeUsesSdkElement()
-                .setMinSdkVersion(appBaseModuleManifest.getMinSdkVersion().get())
+                .setMinSdkVersion(inheritedAppProperties.getMinSdkVersion())
                 .setHasCode(false)
                 .setSplitIdForFeatureSplit(sdkModuleName)
                 .setDeliveryOptionsForRuntimeEnabledSdkModule()

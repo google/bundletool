@@ -311,6 +311,8 @@ public abstract class BuildApksCommand {
 
   public abstract Optional<String> getAppStorePackageName();
 
+  public abstract boolean getEnableBaseModuleMinSdkAsDefaultTargeting();
+
   public static Builder builder() {
     return new AutoValue_BuildApksCommand.Builder()
         .setOverwriteOutput(false)
@@ -326,7 +328,8 @@ public abstract class BuildApksCommand {
         .setSystemApkOptions(ImmutableSet.of())
         .setEnableApkSerializerWithoutBundleRecompression(true)
         .setRuntimeEnabledSdkBundlePaths(ImmutableSet.of())
-        .setRuntimeEnabledSdkArchivePaths(ImmutableSet.of());
+        .setRuntimeEnabledSdkArchivePaths(ImmutableSet.of())
+        .setEnableBaseModuleMinSdkAsDefaultTargeting(false);
   }
 
   /** Builder for the {@link BuildApksCommand}. */
@@ -572,6 +575,12 @@ public abstract class BuildApksCommand {
      * <p>PlayStore package (com.android.vending) is used by default.
      */
     public abstract Builder setAppStorePackageName(String appStorePackageName);
+
+    /**
+     * If true, will set default min sdk version targeting for generated splits as min sdk of base
+     * module.
+     */
+    public abstract Builder setEnableBaseModuleMinSdkAsDefaultTargeting(boolean value);
 
     abstract BuildApksCommand autoBuild();
 
@@ -993,13 +1002,7 @@ public abstract class BuildApksCommand {
       ImmutableMap<String, SdkAsar> sdkAsars = getValidatedSdkAsarsByPackageName(closer, tempDir);
       validateSdkAsarsMatchAppBundleDependencies(appBundle, sdkAsars);
       return sdkAsars.entrySet().stream()
-          .collect(
-              toImmutableMap(
-                  Entry::getKey,
-                  entry ->
-                      entry.getValue().getModule().toBuilder()
-                          .setSdkModulesConfig(entry.getValue().getSdkModulesConfig())
-                          .build()));
+          .collect(toImmutableMap(Entry::getKey, entry -> entry.getValue().getModule()));
     }
     ImmutableMap<String, SdkBundle> sdkBundles =
         getValidatedSdkBundlesByPackageName(closer, tempDir);

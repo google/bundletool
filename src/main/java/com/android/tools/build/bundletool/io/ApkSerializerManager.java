@@ -52,7 +52,6 @@ import com.android.bundle.Devices.DeviceSpec;
 import com.android.bundle.Targeting.VariantTargeting;
 import com.android.tools.build.bundletool.commands.BuildApksCommand.ApkBuildMode;
 import com.android.tools.build.bundletool.commands.BuildApksModule.FirstVariantNumber;
-import com.android.tools.build.bundletool.commands.BuildApksModule.VerboseLogs;
 import com.android.tools.build.bundletool.device.ApkMatcher;
 import com.android.tools.build.bundletool.model.AndroidManifest;
 import com.android.tools.build.bundletool.model.ApkModifier;
@@ -108,7 +107,6 @@ public class ApkSerializerManager {
       Bundle bundle,
       Optional<ApkModifier> apkModifier,
       @FirstVariantNumber Optional<Integer> firstVariantNumber,
-      @VerboseLogs boolean verbose,
       ApkBuildMode apkBuildMode,
       ApkPathManager apkPathManager,
       ApkOptimizations apkOptimizations,
@@ -141,6 +139,29 @@ public class ApkSerializerManager {
               permanentlyFusedModules);
       apkSetWriter.writeApkSet(toc);
       return toc;
+    } catch (IOException e) {
+      throw new UncheckedIOException(e);
+    }
+  }
+
+  /** Serialize App Bundle APKs without including TOC in the output archive. */
+  public void serializeApkSetWithoutToc(
+      ApkSetWriter apkSetWriter,
+      GeneratedApks generatedApks,
+      GeneratedAssetSlices generatedAssetSlices,
+      Optional<DeviceSpec> deviceSpec,
+      LocalTestingInfo localTestingInfo,
+      ImmutableSet<BundleModuleName> permanentlyFusedModules) {
+    try {
+      BuildApksResult toc =
+          serializeApkSetContent(
+              apkSetWriter.getSplitsDirectory(),
+              generatedApks,
+              generatedAssetSlices,
+              deviceSpec,
+              localTestingInfo,
+              permanentlyFusedModules);
+      apkSetWriter.writeApkSetWithoutToc(toc);
     } catch (IOException e) {
       throw new UncheckedIOException(e);
     }
