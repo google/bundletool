@@ -41,6 +41,8 @@ public abstract class GeneratedApks {
 
   public abstract ImmutableList<ModuleSplit> getStandaloneApks();
 
+  public abstract ImmutableList<ModuleSplit> getStandaloneFeatureModuleApks();
+
   public abstract ImmutableList<ModuleSplit> getSystemApks();
 
   // There is alsways a single archived APK. List type is used for consistency.
@@ -50,6 +52,7 @@ public abstract class GeneratedApks {
     return getInstantApks().size()
         + getSplitApks().size()
         + getStandaloneApks().size()
+        + getStandaloneFeatureModuleApks().size()
         + getSystemApks().size()
         + getArchivedApks().size();
   }
@@ -57,6 +60,7 @@ public abstract class GeneratedApks {
   public Stream<ModuleSplit> getAllApksStream() {
     return Stream.of(
             getStandaloneApks(),
+            getStandaloneFeatureModuleApks(),
             getInstantApks(),
             getSplitApks(),
             getSystemApks(),
@@ -75,6 +79,7 @@ public abstract class GeneratedApks {
         .setInstantApks(ImmutableList.of())
         .setSplitApks(ImmutableList.of())
         .setStandaloneApks(ImmutableList.of())
+        .setStandaloneFeatureModuleApks(ImmutableList.of())
         .setSystemApks(ImmutableList.of())
         .setArchivedApks(ImmutableList.of());
   }
@@ -87,6 +92,8 @@ public abstract class GeneratedApks {
         .setInstantApks(groups.getOrDefault(SplitType.INSTANT, ImmutableList.of()))
         .setSplitApks(groups.getOrDefault(SplitType.SPLIT, ImmutableList.of()))
         .setStandaloneApks(groups.getOrDefault(SplitType.STANDALONE, ImmutableList.of()))
+        .setStandaloneFeatureModuleApks(
+            groups.getOrDefault(SplitType.STANDALONE_FEATURE_MODULE, ImmutableList.of()))
         .setSystemApks(groups.getOrDefault(SplitType.SYSTEM, ImmutableList.of()))
         .setArchivedApks(groups.getOrDefault(SplitType.ARCHIVE, ImmutableList.of()))
         .build();
@@ -101,6 +108,9 @@ public abstract class GeneratedApks {
     public abstract Builder setSplitApks(ImmutableList<ModuleSplit> splitApks);
 
     public abstract Builder setStandaloneApks(ImmutableList<ModuleSplit> standaloneApks);
+
+    public abstract Builder setStandaloneFeatureModuleApks(
+        ImmutableList<ModuleSplit> standaloneApks);
 
     public abstract Builder setSystemApks(ImmutableList<ModuleSplit> systemApks);
 

@@ -28,6 +28,7 @@ import static com.android.tools.build.bundletool.model.AndroidManifest.FUSING_EL
 import static com.android.tools.build.bundletool.model.AndroidManifest.HAS_CODE_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.INCLUDE_ATTRIBUTE_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.INSTALL_TIME_ELEMENT_NAME;
+import static com.android.tools.build.bundletool.model.AndroidManifest.INTENT_FILTER_ELEMENT_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.IS_FEATURE_SPLIT_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.IS_SPLIT_REQUIRED_ATTRIBUTE_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.IS_SPLIT_REQUIRED_RESOURCE_ID;
@@ -48,6 +49,8 @@ import static com.android.tools.build.bundletool.model.AndroidManifest.SERVICE_E
 import static com.android.tools.build.bundletool.model.AndroidManifest.SPLIT_NAME_ATTRIBUTE_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.SPLIT_NAME_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.TARGET_SANDBOX_VERSION_RESOURCE_ID;
+import static com.android.tools.build.bundletool.model.AndroidManifest.THEME_ATTRIBUTE_NAME;
+import static com.android.tools.build.bundletool.model.AndroidManifest.THEME_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.TOOLS_NAMESPACE_URI;
 import static com.android.tools.build.bundletool.model.AndroidManifest.USES_FEATURE_ELEMENT_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.USES_SDK_LIBRARY_ELEMENT_NAME;
@@ -1419,6 +1422,55 @@ public class ManifestEditorTest {
                             NAME_ATTRIBUTE_NAME,
                             NAME_RESOURCE_ID,
                             "featureName")))));
+  }
+
+  @Test
+  public void setActivityTheme_succeeds() {
+    XmlNode category =
+        xmlNode(
+            xmlElement(
+                CATEGORY_ELEMENT_NAME,
+                ImmutableList.of(
+                    xmlAttribute(
+                        ANDROID_NAMESPACE_URI,
+                        NAME_ATTRIBUTE_NAME,
+                        NAME_RESOURCE_ID,
+                        "myCategory"))));
+    XmlNode intentFilter = xmlNode(xmlElement(INTENT_FILTER_ELEMENT_NAME, category));
+    XmlNode activity =
+        xmlNode(
+            xmlElement(
+                ACTIVITY_ELEMENT_NAME,
+                ImmutableList.of(
+                    xmlAttribute(
+                        ANDROID_NAMESPACE_URI,
+                        NAME_ATTRIBUTE_NAME,
+                        NAME_RESOURCE_ID,
+                        "myActivity")),
+                intentFilter));
+    XmlNode application = xmlNode(xmlElement(APPLICATION_ELEMENT_NAME, activity));
+    AndroidManifest androidManifest =
+        AndroidManifest.create(xmlNode(xmlElement("manifest", application)));
+
+    AndroidManifest edited =
+        androidManifest.toEditor().setActivityTheme("myActivity", "myCategory", 1).save();
+
+    XmlNode expectedActivity =
+        xmlNode(
+            xmlElement(
+                ACTIVITY_ELEMENT_NAME,
+                ImmutableList.of(
+                    xmlAttribute(
+                        ANDROID_NAMESPACE_URI, NAME_ATTRIBUTE_NAME, NAME_RESOURCE_ID, "myActivity"),
+                    xmlResourceReferenceAttribute(
+                        ANDROID_NAMESPACE_URI, THEME_ATTRIBUTE_NAME, THEME_RESOURCE_ID, 1)),
+                intentFilter));
+    AndroidManifest expected =
+        AndroidManifest.create(
+            xmlNode(
+                xmlElement(
+                    "manifest", xmlNode(xmlElement(APPLICATION_ELEMENT_NAME, expectedActivity)))));
+    assertThat(edited).isEqualTo(expected);
   }
 
   private static void assertUsesSdkLibraryAttributes(

@@ -216,8 +216,9 @@ public class BuildSdkApksManagerTest {
                 .getValueAsDecimalInteger())
         .isEqualTo(RuntimeEnabledSdkVersionEncoder.encodeSdkMajorAndMinorVersion(major, minor));
 
+    // <meta-data> mutations.
+    assertThat(manifest.getSdkPatchVersionMetadata()).hasValue(patch);
     // <property> mutations.
-    assertThat(manifest.getSdkPatchVersionProperty()).hasValue(patch);
     assertThat(manifest.getSdkProviderClassNameProperty()).hasValue(sdkProviderClassName);
     assertThat(manifest.getCompatSdkProviderClassNameProperty()).isEmpty();
   }

@@ -25,9 +25,12 @@ import com.android.bundle.SdkModulesConfigOuterClass.SdkModulesConfig;
 import com.android.tools.build.bundletool.model.BundleMetadata;
 import com.android.tools.build.bundletool.model.BundleModule;
 import com.android.tools.build.bundletool.model.SdkBundle;
+import com.android.tools.build.bundletool.model.ZipPath;
 import com.android.tools.build.bundletool.model.version.BundleToolVersion;
+import com.google.common.collect.ImmutableList;
 import com.google.common.io.ByteSource;
 import com.google.errorprone.annotations.CanIgnoreReturnValue;
+import java.nio.file.Path;
 import java.util.Optional;
 import java.util.zip.ZipFile;
 
@@ -49,6 +52,8 @@ public class SdkBundleBuilder {
   private static final String SDK_PROVIDER_CLASS_NAME =
       "com.example.sandboxservice.MyAdsSdkEntryPoint";
 
+  private static final String DEFAULT_MODULE_NAME = "base";
+
   private static final BundleMetadata METADATA = BundleMetadata.builder().build();
 
   private BundleModule module = defaultModule();
@@ -62,7 +67,22 @@ public class SdkBundleBuilder {
   private Optional<ByteSource> sdkInterfaceDescriptors = Optional.empty();
 
   private static BundleModule defaultModule() {
-    return new BundleModuleBuilder("base").setManifest(createSdkAndroidManifest()).build();
+    return new BundleModuleBuilder(DEFAULT_MODULE_NAME)
+        .setManifest(createSdkAndroidManifest())
+        .build();
+  }
+
+  private static BundleModule defaultModuleWithAssets(
+      Path sdkBundlePath, ImmutableList<FakeAsset> assets) {
+    BundleModuleBuilder builder = new BundleModuleBuilder(DEFAULT_MODULE_NAME);
+    assets.forEach(
+        asset ->
+            builder.addFile(
+                asset.getAssetName(),
+                sdkBundlePath,
+                ZipPath.create(Path.of(DEFAULT_MODULE_NAME, asset.getAssetName()).toString()),
+                asset.getAssetContent()));
+    return builder.setManifest(createSdkAndroidManifest()).build();
   }
 
   @CanIgnoreReturnValue
@@ -107,6 +127,18 @@ public class SdkBundleBuilder {
 
   public static RuntimeEnabledSdkVersion.Builder sdkVersionBuilder() {
     return RuntimeEnabledSdkVersion.newBuilder().setMajor(1).setMinor(1).setPatch(1);
+  }
+
+  public SdkBundle buildWithAssets(Path sdkBundlePath, ImmutableList<FakeAsset> assets) {
+    SdkBundle.Builder sdkBundle =
+        SdkBundle.builder()
+            .setModule(defaultModuleWithAssets(sdkBundlePath, assets))
+            .setSdkModulesConfig(sdkModulesConfig)
+            .setSdkBundleConfig(sdkBundleConfig)
+            .setBundleMetadata(METADATA)
+            .setVersionCode(versionCode);
+    sdkInterfaceDescriptors.ifPresent(sdkBundle::setSdkInterfaceDescriptors);
+    return sdkBundle.build();
   }
 
   public SdkBundle build() {

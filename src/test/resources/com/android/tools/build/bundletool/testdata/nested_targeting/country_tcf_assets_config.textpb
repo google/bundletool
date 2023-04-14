@@ -1,0 +1,153 @@
+directory {
+  path: "assets/textures#countries_latam#tcf_astc"
+  targeting {
+    texture_compression_format {
+      value {
+        alias: ASTC
+      }
+      alternatives {
+        alias: PVRTC
+      }
+    }
+    country_set {
+      value: "latam"
+      alternatives: "sea"
+    }
+  }
+}
+directory {
+  path: "assets/textures#countries_latam#tcf_pvrtc"
+  targeting {
+    texture_compression_format {
+      value {
+        alias: PVRTC
+      }
+      alternatives {
+        alias: ASTC
+      }
+    }
+    country_set {
+      value: "latam"
+      alternatives: "sea"
+    }
+  }
+}
+directory {
+  path: "assets/textures#countries_latam"
+  targeting {
+    texture_compression_format {
+      alternatives {
+        alias: ASTC
+      }
+      alternatives {
+        alias: PVRTC
+      }
+    }
+    country_set {
+      value: "latam"
+      alternatives: "sea"
+    }
+  }
+}
+directory {
+  path: "assets/textures#countries_sea#tcf_astc"
+  targeting {
+    texture_compression_format {
+      value {
+        alias: ASTC
+      }
+      alternatives {
+        alias: PVRTC
+      }
+    }
+    country_set {
+      value: "sea"
+      alternatives: "latam"
+    }
+  }
+}
+directory {
+  path: "assets/textures#countries_sea#tcf_pvrtc"
+  targeting {
+    texture_compression_format {
+      value {
+        alias: PVRTC
+      }
+      alternatives {
+        alias: ASTC
+      }
+    }
+    country_set {
+      value: "sea"
+      alternatives: "latam"
+    }
+  }
+}
+directory {
+  path: "assets/textures#countries_sea"
+  targeting {
+    texture_compression_format {
+      alternatives {
+        alias: ASTC
+      }
+      alternatives {
+        alias: PVRTC
+      }
+    }
+    country_set {
+      value: "sea"
+      alternatives: "latam"
+    }
+  }
+}
+directory {
+  path: "assets/textures#tcf_astc"
+  targeting {
+    texture_compression_format {
+      value {
+        alias: ASTC
+      }
+      alternatives {
+        alias: PVRTC
+      }
+    }
+    country_set {
+      alternatives: "latam"
+      alternatives: "sea"
+    }
+  }
+}
+directory {
+  path: "assets/textures#tcf_pvrtc"
+  targeting {
+    texture_compression_format {
+      value {
+        alias: PVRTC
+      }
+      alternatives {
+        alias: ASTC
+      }
+    }
+    country_set {
+      alternatives: "latam"
+      alternatives: "sea"
+    }
+  }
+}
+directory {
+  path: "assets/textures"
+  targeting {
+    texture_compression_format {
+      alternatives {
+        alias: ASTC
+      }
+      alternatives {
+        alias: PVRTC
+      }
+    }
+    country_set {
+      alternatives: "latam"
+      alternatives: "sea"
+    }
+  }
+}

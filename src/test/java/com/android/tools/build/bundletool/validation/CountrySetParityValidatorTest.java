@@ -336,4 +336,34 @@ public class CountrySetParityValidatorTest {
 
     new CountrySetParityValidator().validateBundle(appBundle);
   }
+
+  @Test
+  public void validateBundle_modulesWithNestedTargeting_succeeds() {
+    BundleModule moduleA =
+        new BundleModuleBuilder("a")
+            .addFile("assets/img1#countries_latam#tcf_astc/image.jpg")
+            .addFile("assets/img1#countries_latam#tcf_pvrtc/image.jpg")
+            .addFile("assets/img1#countries_latam/image.jpg")
+            .addFile("assets/img1#tcf_astc/image.jpg")
+            .addFile("assets/img1#tcf_pvrtc/image.jpg")
+            .addFile("assets/img1/image.jpg")
+            .setManifest(androidManifest("com.test.app"))
+            .build();
+    AppBundle appBundle =
+        AppBundle.buildFromModules(
+            /* modules= */ ImmutableList.of(moduleA),
+            /* bundleConfig= */ BundleConfig.newBuilder()
+                .setOptimizations(
+                    Optimizations.newBuilder()
+                        .setSplitsConfig(
+                            SplitsConfig.newBuilder()
+                                .addSplitDimension(
+                                    SplitDimension.newBuilder().setValue(Value.COUNTRY_SET))
+                                .addSplitDimension(
+                                    SplitDimension.newBuilder()
+                                        .setValue(Value.TEXTURE_COMPRESSION_FORMAT))))
+                .build(),
+            /* bundleMetadata= */ BundleMetadata.builder().build());
+    new CountrySetParityValidator().validateBundle(appBundle);
+  }
 }

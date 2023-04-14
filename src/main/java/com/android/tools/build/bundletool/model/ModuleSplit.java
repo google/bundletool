@@ -97,6 +97,7 @@ public abstract class ModuleSplit {
     INSTANT,
     ASSET_SLICE,
     ARCHIVE,
+    STANDALONE_FEATURE_MODULE
   }
 
   /**
@@ -377,10 +378,10 @@ public abstract class ModuleSplit {
     return this;
   }
 
-  /** Writes the SDK Patch version to a new <property> element. */
+  /** Writes the SDK Patch version to a new <meta-data> element. */
   public ModuleSplit writePatchVersion(int patchVersion) {
     AndroidManifest apkManifest =
-        getAndroidManifest().toEditor().setSdkPatchVersionProperty(patchVersion).save();
+        getAndroidManifest().toEditor().setSdkPatchVersionMetadata(patchVersion).save();
     return toBuilder().setAndroidManifest(apkManifest).build();
   }
 

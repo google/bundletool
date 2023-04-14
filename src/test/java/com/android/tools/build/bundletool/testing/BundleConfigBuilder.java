@@ -23,6 +23,7 @@ import com.android.bundle.Config.ResourceOptimizations;
 import com.android.bundle.Config.ResourceOptimizations.SparseEncoding;
 import com.android.bundle.Config.SplitDimension;
 import com.android.bundle.Config.StandaloneConfig.DexMergingStrategy;
+import com.android.bundle.Config.StandaloneConfig.FeatureModulesMode;
 import com.android.bundle.Config.SuffixStripping;
 import com.android.bundle.Config.UncompressDexFiles.UncompressedDexTargetSdk;
 import com.android.bundle.Config.UnsignedEmbeddedApkConfig;
@@ -176,6 +177,15 @@ public class BundleConfigBuilder {
 
   public BundleConfigBuilder setVersion(String versionString) {
     builder.setBundletool(Bundletool.newBuilder().setVersion(versionString));
+    return this;
+  }
+
+  public BundleConfigBuilder setFeatureModulesModeForStandalone(
+      FeatureModulesMode featureModulesMode) {
+    builder
+        .getOptimizationsBuilder()
+        .getStandaloneConfigBuilder()
+        .setFeatureModulesMode(featureModulesMode);
     return this;
   }
 

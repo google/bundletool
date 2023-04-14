@@ -23,6 +23,7 @@ import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.andr
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withInstallLocation;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withMinSdkVersion;
 import static com.android.tools.build.bundletool.testing.SdkBundleBuilder.DEFAULT_SDK_MODULES_CONFIG;
+import static com.android.tools.build.bundletool.testing.SdkBundleBuilder.PACKAGE_NAME;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.truth.Truth.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -64,7 +65,6 @@ import org.junit.jupiter.api.function.Executable;
 public final class TestUtils {
 
   private static final byte[] TEST_CONTENT = new byte[1];
-  private static final String PACKAGE_NAME = "com.test.sdk.detail";
   private static final XmlNode MANIFEST = createSdkAndroidManifest();
   public static final SdkMetadata DEFAULT_SDK_METADATA = getSdkMetadata();
 
@@ -236,6 +236,12 @@ public final class TestUtils {
         .addFileWithContent(ZipPath.create("base/dex/classes.dex"), TEST_CONTENT)
         .addFileWithContent(
             ZipPath.create("SdkModulesConfig.pb"), DEFAULT_SDK_MODULES_CONFIG.toByteArray());
+  }
+
+  public static ZipBuilder createZipBuilderForModulesWithoutConfig() {
+    return new ZipBuilder()
+        .addFileWithProtoContent(ZipPath.create("base/manifest/AndroidManifest.xml"), MANIFEST)
+        .addFileWithContent(ZipPath.create("base/dex/classes.dex"), TEST_CONTENT);
   }
 
   public static ZipBuilder createZipBuilderForModulesWithoutManifest() {

@@ -71,6 +71,7 @@ public class LocaleConfigXmlInjector {
         // No need to inject a locales_config.xml if resources with all languages are
         // available inside the one APK.
       case STANDALONE:
+      case STANDALONE_FEATURE_MODULE:
       case INSTANT:
       case ARCHIVE:
         return splits;

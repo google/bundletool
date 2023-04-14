@@ -95,6 +95,7 @@ public abstract class AndroidManifest {
   public static final String REMOVABLE_ELEMENT_NAME = "removable";
   public static final String FUSING_ELEMENT_NAME = "fusing";
   public static final String STYLE_ELEMENT_NAME = "style";
+  public static final String MAIN_ACTION_ELEMENT_NAME = "action";
 
   public static final String DEBUGGABLE_ATTRIBUTE_NAME = "debuggable";
   public static final String EXTRACT_NATIVE_LIBS_ATTRIBUTE_NAME = "extractNativeLibs";
@@ -135,12 +136,14 @@ public abstract class AndroidManifest {
   public static final String LOCALE_CONFIG_ATTRIBUTE_NAME = "localeConfig";
   public static final String SDK_LIBRARY_ELEMENT_NAME = "sdk-library";
   public static final String SDK_VERSION_MAJOR_ATTRIBUTE_NAME = "versionMajor";
+  public static final String ISOLATED_SPLITS_ATTRIBUTE_NAME = "isolatedSplits";
   public static final String SDK_PATCH_VERSION_ATTRIBUTE_NAME =
       "com.android.vending.sdk.version.patch";
   public static final String SDK_PROVIDER_CLASS_NAME_ATTRIBUTE_NAME =
       "android.sdksandbox.PROPERTY_SDK_PROVIDER_CLASS_NAME";
   public static final String COMPAT_SDK_PROVIDER_CLASS_NAME_ATTRIBUTE_NAME =
       "android.sdksandbox.PROPERTY_COMPAT_SDK_PROVIDER_CLASS_NAME";
+
   public static final String REQUIRED_ATTRIBUTE_NAME = "required";
   public static final int SDK_SANDBOX_MIN_VERSION = ANDROID_T_API_VERSION;
   public static final String USES_SDK_LIBRARY_ELEMENT_NAME = "uses-sdk-library";
@@ -913,12 +916,11 @@ public abstract class AndroidManifest {
 
   /**
    * Gets the SDK patch version if it is set in the AndroidManifest. If there are multiple
-   * <property> elements with android:name={@value SDK_PATCH_VERSION_ATTRIBUTE_NAME}, return the
+   * <meta-data> elements with android:name={@value SDK_PATCH_VERSION_ATTRIBUTE_NAME}, return the
    * first one.
    */
-  public Optional<Integer> getSdkPatchVersionProperty() {
-    return getPropertyValue(SDK_PATCH_VERSION_ATTRIBUTE_NAME)
-        .map(XmlProtoAttribute::getValueAsInteger);
+  public Optional<Integer> getSdkPatchVersionMetadata() {
+    return getMetadataValueAsInteger(SDK_PATCH_VERSION_ATTRIBUTE_NAME);
   }
 
   /**

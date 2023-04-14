@@ -60,6 +60,10 @@ public class SplitsXmlInjector {
         return splits.stream()
             .map(SplitsXmlInjector::processStandaloneVariant)
             .collect(toImmutableList());
+      case STANDALONE_FEATURE_MODULE:
+        return splits.stream()
+            .map(split -> split.isBaseModuleSplit() ? processStandaloneVariant(split) : split)
+            .collect(toImmutableList());
       case INSTANT:
       case ARCHIVE:
         return ImmutableList.copyOf(splits);

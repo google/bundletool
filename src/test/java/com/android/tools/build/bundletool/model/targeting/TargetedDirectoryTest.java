@@ -17,6 +17,7 @@
 package com.android.tools.build.bundletool.model.targeting;
 
 import static com.android.tools.build.bundletool.testing.TargetingUtils.assetsDirectoryTargeting;
+import static com.android.tools.build.bundletool.testing.TargetingUtils.countrySetTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.languageTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.textureCompressionTargeting;
 import static com.google.common.truth.Truth.assertThat;
@@ -162,5 +163,25 @@ public class TargetedDirectoryTest {
         () ->
             TargetedDirectory.parse(
                 ZipPath.create("assets/world/gfx#tcf_etc1/other/gl#opengl_2.0/texture#tcf_atc")));
+  }
+
+  @Test
+  public void nestedTargeting_succeeds() {
+    ZipPath path = ZipPath.create("assets/world/texture#countries_latam#tcf_etc1");
+    TargetedDirectory actual = TargetedDirectory.parse(path);
+
+    assertThat(actual.getPathSegments()).hasSize(3);
+    assertThat(actual.getPathSegments().get(0).getName()).isEqualTo("assets");
+    assertThat(actual.getPathSegments().get(0).getTargeting()).isEqualToDefaultInstance();
+    assertThat(actual.getPathSegments().get(1).getName()).isEqualTo("world");
+    assertThat(actual.getPathSegments().get(1).getTargeting()).isEqualToDefaultInstance();
+    assertThat(actual.getPathSegments().get(2).getName()).isEqualTo("texture");
+    assertThat(actual.getPathSegments().get(2).getTargeting())
+        .isEqualTo(
+            AssetsDirectoryTargeting.newBuilder()
+                .setCountrySet(countrySetTargeting("latam"))
+                .setTextureCompressionFormat(
+                    textureCompressionTargeting(TextureCompressionFormatAlias.ETC1_RGB8))
+                .build());
   }
 }

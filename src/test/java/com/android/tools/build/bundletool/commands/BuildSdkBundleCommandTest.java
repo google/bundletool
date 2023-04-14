@@ -38,6 +38,7 @@ import com.android.bundle.Files.TargetedAssetsDirectory;
 import com.android.bundle.Files.TargetedNativeDirectory;
 import com.android.bundle.SdkBundleConfigProto.SdkBundle;
 import com.android.bundle.SdkBundleConfigProto.SdkBundleConfig;
+import com.android.bundle.SdkBundleConfigProto.SdkDependencyType;
 import com.android.bundle.SdkModulesConfigOuterClass.RuntimeEnabledSdkVersion;
 import com.android.bundle.SdkModulesConfigOuterClass.SdkModulesConfig;
 import com.android.bundle.Targeting.Abi;
@@ -99,7 +100,8 @@ public class BuildSdkBundleCommandTest {
                   .setVersionMajor(123)
                   .setVersionMinor(234)
                   .setBuildTimeVersionPatch(345)
-                  .setCertificateDigest(VALID_CERT_FINGERPRINT))
+                  .setCertificateDigest(VALID_CERT_FINGERPRINT)
+                  .setDependencyType(SdkDependencyType.SDK_DEPENDENCY_TYPE_REQUIRED))
           .build();
   private static final byte[] SDK_BUNDLE_CONFIG_CONTENTS =
       ("{ sdk_dependencies: [{ "
@@ -109,7 +111,9 @@ public class BuildSdkBundleCommandTest {
               + "build_time_version_patch: 345, "
               + "certificate_digest: \""
               + VALID_CERT_FINGERPRINT
-              + "\" }]}")
+              + "\", "
+              + "dependency_type: \"SDK_DEPENDENCY_TYPE_REQUIRED\""
+              + "}]}")
           .getBytes(UTF_8);
 
   @Rule public final TemporaryFolder tmp = new TemporaryFolder();

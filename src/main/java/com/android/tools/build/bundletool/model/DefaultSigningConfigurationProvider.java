@@ -52,6 +52,12 @@ public class DefaultSigningConfigurationProvider implements SigningConfiguration
     return apksigSigningConfig.build();
   }
 
+  @Override
+  public boolean hasRestrictedV3SigningConfig() {
+    return signingConfiguration.getSigningCertificateLineage().isPresent()
+        && signingConfiguration.getEffectiveMinimumV3RotationApiVersion() > 1;
+  }
+
   private ImmutableList<SignerConfig> getSignerConfigs(ApkDescription apkDescription) {
     ImmutableList.Builder<SignerConfig> signerConfigs = ImmutableList.builder();
     Optional<SignerConfig> oldestSigner = signingConfiguration.getOldestSigner();

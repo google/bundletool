@@ -54,6 +54,7 @@ class ApkDescriptionHelper {
         }
         break;
       case STANDALONE:
+      case STANDALONE_FEATURE_MODULE:
         if (split.isApex()) {
           resultBuilder.setApexApkMetadata(createApexApkMetadata(split));
         } else {

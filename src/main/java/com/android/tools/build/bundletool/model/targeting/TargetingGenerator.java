@@ -17,6 +17,7 @@
 package com.android.tools.build.bundletool.model.targeting;
 
 import static com.android.tools.build.bundletool.model.BundleModule.ABI_SPLITTER;
+import static com.android.tools.build.bundletool.model.targeting.TargetingUtils.getAlternativeTargeting;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.collect.ImmutableList.toImmutableList;
@@ -39,7 +40,6 @@ import com.android.tools.build.bundletool.model.AbiName;
 import com.android.tools.build.bundletool.model.BundleModule;
 import com.android.tools.build.bundletool.model.ZipPath;
 import com.android.tools.build.bundletool.model.exceptions.InvalidBundleException;
-import com.android.tools.build.bundletool.model.utils.TargetingProtoUtils;
 import com.android.tools.build.bundletool.model.utils.files.FileUtils;
 import com.google.common.base.Ascii;
 import com.google.common.collect.HashMultimap;
@@ -47,12 +47,10 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Maps;
-import com.google.common.collect.Multimap;
 import com.google.common.collect.Sets;
 import java.util.Collection;
 import java.util.Optional;
 import java.util.Set;
-import java.util.stream.Collectors;
 
 /**
  * From a list of raw directory names produces targeting.
@@ -88,7 +86,6 @@ public class TargetingGenerator {
       targetingByBaseName.put(
           targetedDirectory.getPathBaseName(), targetedDirectory.getLastSegment().getTargeting());
     }
-    validateDimensions(targetingByBaseName);
 
     // Pass 2: Building the directory targeting proto using the targetingByBaseName map.
 
@@ -117,17 +114,10 @@ public class TargetingGenerator {
           continue;
         }
         targeting.mergeFrom(
-            // Remove oneself from the alternatives and merge them together.
-            Sets.difference(
-                    targetingByBaseName.get(targetedDirectory.getSubPathBaseName(i)),
-                    ImmutableSet.of(segment.getTargeting()))
-                .stream()
-                .map(TargetingProtoUtils::toAlternativeTargeting)
-                .reduce(
-                    AssetsDirectoryTargeting.newBuilder(),
-                    (builder, targetingValue) -> builder.mergeFrom(targetingValue),
-                    (builderA, builderB) -> builderA.mergeFrom(builderB.build()))
-                .build());
+            getAlternativeTargeting(
+                segment.getTargeting(),
+                ImmutableList.copyOf(
+                    targetingByBaseName.get(targetedDirectory.getSubPathBaseName(i)))));
       }
       assetsBuilder.addDirectory(
           TargetedAssetsDirectory.newBuilder()
@@ -136,36 +126,6 @@ public class TargetingGenerator {
     }
 
     return assetsBuilder.build();
-  }
-
-  /** Finds targeting dimension mismatches amongst multi-map entries. */
-  private void validateDimensions(Multimap<String, AssetsDirectoryTargeting> targetingMultimap) {
-    for (String baseName : targetingMultimap.keySet()) {
-      ImmutableList<TargetingDimension> distinctDimensions =
-          targetingMultimap
-              .get(baseName)
-              .stream()
-              .map(TargetingUtils::getTargetingDimensions)
-              .flatMap(Collection::stream)
-              .distinct()
-              .collect(toImmutableList());
-      if (distinctDimensions.size() > 1) {
-        throw InvalidBundleException.builder()
-            .withUserMessage(
-                "Expected at most one dimension type used for targeting of '%s'. "
-                    + "However, the following dimensions were used: %s.",
-                baseName, joinDimensions(distinctDimensions))
-            .build();
-      }
-    }
-  }
-
-  private static String joinDimensions(ImmutableList<TargetingDimension> dimensions) {
-    return dimensions
-        .stream()
-        .map(dimension -> String.format("'%s'", dimension))
-        .sorted()
-        .collect(Collectors.joining(", "));
   }
 
   /**

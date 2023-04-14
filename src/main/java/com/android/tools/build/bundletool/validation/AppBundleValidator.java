@@ -44,6 +44,7 @@ public class AppBundleValidator {
           new BundleConfigValidator(),
           // More specific file validations.
           new EntryClashValidator(),
+          new NestedTargetingValidator(),
           new AbiParityValidator(),
           new TextureCompressionFormatParityValidator(),
           new DeviceTierParityValidator(),
@@ -61,7 +62,8 @@ public class AppBundleValidator {
           new ResourceTableValidator(),
           new AssetModuleFilesValidator(),
           new CodeTransparencyValidator(),
-          new RuntimeEnabledSdkConfigValidator());
+          new RuntimeEnabledSdkConfigValidator(),
+          new StandaloneFeatureModulesValidator());
 
   private final ImmutableList<SubValidator> allBundleSubValidators;
   private final ImmutableList<SubValidator> allBundleFileSubValidators;

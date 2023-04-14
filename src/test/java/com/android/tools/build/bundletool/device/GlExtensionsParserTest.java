@@ -17,9 +17,7 @@
 package com.android.tools.build.bundletool.device;
 
 import static com.google.common.truth.Truth.assertThat;
-import static org.junit.jupiter.api.Assertions.assertThrows;
 
-import com.android.tools.build.bundletool.model.exceptions.AdbOutputParseException;
 import com.google.common.collect.ImmutableList;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -75,14 +73,12 @@ public class GlExtensionsParserTest {
   }
 
   @Test
-  public void invalidOutput_throws() {
-    ImmutableList<String> dumpsysOutput =
-        ImmutableList.of("", "SurfaceFlinger global state:", "unrelated information", "that's all");
-    Throwable exception =
-        assertThrows(
-            AdbOutputParseException.class, () -> new GlExtensionsParser().parse(dumpsysOutput));
-    assertThat(exception)
-        .hasMessageThat()
-        .contains("Unexpected output of 'dumpsys SurfaceFlinger' command: no GL extensions found.");
+  public void invalidOutput_returnsEmpty() {
+    ImmutableList<String> glExtensions =
+        new GlExtensionsParser()
+            .parse(
+                ImmutableList.of(
+                    "", "SurfaceFlinger global state:", "unrelated information", "that's all"));
+    assertThat(glExtensions).isEmpty();
   }
 }

@@ -313,4 +313,20 @@ public class TextureCompressionFormatParityValidatorTest {
                 + " module 'a' has formats [ASTC] (with fallback directories) and module 'b' has"
                 + " formats [ASTC] (without fallback directories).");
   }
+
+  @Test
+  public void validateAllModules_withNestedTargeting_succeeds() throws Exception {
+    BundleModule moduleA =
+        new BundleModuleBuilder("a")
+            .addFile("assets/img1#countries_latam#tcf_astc/image.jpg")
+            .addFile("assets/img1#countries_latam#tcf_pvrtc/image.jpg")
+            .addFile("assets/img1#countries_latam/image.jpg")
+            .addFile("assets/img1#tcf_astc/image.jpg")
+            .addFile("assets/img1#tcf_pvrtc/image.jpg")
+            .addFile("assets/img1/image.jpg")
+            .setManifest(androidManifest("com.test.app"))
+            .build();
+
+    new TextureCompressionFormatParityValidator().validateAllModules(ImmutableList.of(moduleA));
+  }
 }

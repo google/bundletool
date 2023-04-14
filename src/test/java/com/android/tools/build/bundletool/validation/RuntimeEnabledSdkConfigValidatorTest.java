@@ -15,6 +15,7 @@
  */
 package com.android.tools.build.bundletool.validation;
 
+import static com.android.tools.build.bundletool.model.RuntimeEnabledSdkVersionEncoder.SDK_PATCH_VERSION_MAX_VALUE;
 import static com.android.tools.build.bundletool.model.RuntimeEnabledSdkVersionEncoder.VERSION_MAJOR_MAX_VALUE;
 import static com.android.tools.build.bundletool.model.RuntimeEnabledSdkVersionEncoder.VERSION_MINOR_MAX_VALUE;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifest;
@@ -331,6 +332,44 @@ public final class RuntimeEnabledSdkConfigValidatorTest {
         .contains(
             "Found dependency on runtime-enabled SDK 'package.name.1' with a negative patch"
                 + " version.");
+  }
+
+  @Test
+  public void validateAllModules_patchVersionTooBigInRuntimeEnabledSdkConfig_throws() {
+    BundleModule module =
+        new BundleModuleBuilder("module")
+            .setManifest(androidManifest("com.test.app"))
+            .setRuntimeEnabledSdkConfig(
+                RuntimeEnabledSdkConfig.newBuilder()
+                    .addRuntimeEnabledSdk(
+                        RuntimeEnabledSdk.newBuilder()
+                            .setPackageName("package.name.1")
+                            .setVersionMajor(0)
+                            .setVersionMinor(1)
+                            .setBuildTimeVersionPatch(SDK_PATCH_VERSION_MAX_VALUE + 1)
+                            .setCertificateDigest(VALID_CERT_FINGERPRINT)
+                            .setResourcesPackageId(2))
+                    .addRuntimeEnabledSdk(
+                        RuntimeEnabledSdk.newBuilder()
+                            .setPackageName("package.name.2")
+                            .setVersionMajor(1234)
+                            .setCertificateDigest(VALID_CERT_FINGERPRINT)
+                            .setResourcesPackageId(3))
+                    .build())
+            .build();
+
+    InvalidBundleException exception =
+        assertThrows(
+            InvalidBundleException.class,
+            () ->
+                new RuntimeEnabledSdkConfigValidator()
+                    .validateAllModules(ImmutableList.of(module)));
+    assertThat(exception)
+        .hasMessageThat()
+        .contains(
+            "Found dependency on runtime-enabled SDK 'package.name.1' with illegal patch"
+                + " version. Patch version must be <= "
+                + SDK_PATCH_VERSION_MAX_VALUE);
   }
 
   @Test

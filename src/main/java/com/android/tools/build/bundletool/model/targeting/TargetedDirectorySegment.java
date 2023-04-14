@@ -16,8 +16,9 @@
 
 package com.android.tools.build.bundletool.model.targeting;
 
-import static com.google.common.base.Preconditions.checkArgument;
-import static com.google.common.base.Preconditions.checkState;
+import static com.google.common.collect.ImmutableList.toImmutableList;
+import static com.google.common.collect.ImmutableMap.toImmutableMap;
+import static java.util.stream.Collectors.joining;
 
 import com.android.bundle.Targeting.AssetsDirectoryTargeting;
 import com.android.bundle.Targeting.CountrySetTargeting;
@@ -29,12 +30,13 @@ import com.android.tools.build.bundletool.model.utils.TextureCompressionUtils;
 import com.google.auto.value.AutoValue;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.ImmutableSetMultimap;
-import com.google.common.collect.Iterables;
 import com.google.errorprone.annotations.CheckReturnValue;
 import com.google.errorprone.annotations.Immutable;
 import com.google.protobuf.Int32Value;
 import java.util.Collection;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -47,8 +49,8 @@ public abstract class TargetedDirectorySegment {
 
   public static final String COUNTRY_SET_KEY = "countries";
   private static final String COUNTRY_SET_NAME_REGEX_STRING = "^[a-zA-Z][a-zA-Z0-9_]*$";
-  private static final Pattern DIRECTORY_SEGMENT_PATTERN =
-      Pattern.compile("(?<base>.+?)#(?<key>.+?)_(?<value>.+)");
+
+  private static final String SEGMENT_SPLIT_CHARACTER = "#";
   private static final Pattern LANGUAGE_CODE_PATTERN = Pattern.compile("^[a-zA-Z]{2,3}$");
   private static final Pattern COUNTRY_SET_PATTERN = Pattern.compile(COUNTRY_SET_NAME_REGEX_STRING);
 
@@ -56,12 +58,19 @@ public abstract class TargetedDirectorySegment {
   private static final String TCF_KEY = "tcf";
   private static final String DEVICE_TIER_KEY = "tier";
 
+  private static final ImmutableSet<TargetingDimension> ALLOWED_NESTING_DIMENSIONS =
+      ImmutableSet.of(
+          TargetingDimension.COUNTRY_SET,
+          TargetingDimension.DEVICE_TIER,
+          TargetingDimension.TEXTURE_COMPRESSION_FORMAT);
+  private static final int MAXIMUM_NESTING_DEPTH_ALLOWED = 2;
+
   private static final ImmutableMap<String, TargetingDimension> KEY_TO_DIMENSION =
       ImmutableMap.<String, TargetingDimension>builder()
+          .put(COUNTRY_SET_KEY, TargetingDimension.COUNTRY_SET)
+          .put(DEVICE_TIER_KEY, TargetingDimension.DEVICE_TIER)
           .put(LANG_KEY, TargetingDimension.LANGUAGE)
           .put(TCF_KEY, TargetingDimension.TEXTURE_COMPRESSION_FORMAT)
-          .put(DEVICE_TIER_KEY, TargetingDimension.DEVICE_TIER)
-          .put(COUNTRY_SET_KEY, TargetingDimension.COUNTRY_SET)
           .build();
   private static final ImmutableSetMultimap<TargetingDimension, String> DIMENSION_TO_KEY =
       KEY_TO_DIMENSION.asMultimap().inverse();
@@ -71,17 +80,11 @@ public abstract class TargetedDirectorySegment {
   /** Positive targeting resolved from this directory name. */
   public abstract AssetsDirectoryTargeting getTargeting();
 
-  /** Get the targeting applied on this segment (if any). */
-  public Optional<TargetingDimension> getTargetingDimension() {
-    ImmutableList<TargetingDimension> dimensions =
-        TargetingUtils.getTargetingDimensions(getTargeting());
-    checkState(dimensions.size() <= 1);
+  public abstract ImmutableList<TargetingDimension> getTargetingDimensionOrder();
 
-    if (dimensions.isEmpty()) {
-      return Optional.empty();
-    } else {
-      return Optional.of(dimensions.get(0));
-    }
+  /** Get the targeting applied on this segment. */
+  ImmutableList<TargetingDimension> getTargetingDimensions() {
+    return TargetingUtils.getTargetingDimensions(getTargeting());
   }
 
   /** Remove the targeting done for a specific dimension. */
@@ -104,40 +107,62 @@ public abstract class TargetedDirectorySegment {
       return this;
     }
 
-    return new AutoValue_TargetedDirectorySegment(getName(), newTargeting.build());
+    ImmutableList<TargetingDimension> updatedTargetingDimensionOrder =
+        getTargetingDimensionOrder().stream()
+            .filter(targetingDimension -> !targetingDimension.equals(dimension))
+            .collect(toImmutableList());
+    return new AutoValue_TargetedDirectorySegment(
+        getName(), newTargeting.build(), updatedTargetingDimensionOrder);
   }
 
   public static TargetedDirectorySegment parse(String directorySegment) {
-    if (!directorySegment.contains("#")) {
+    if (!directorySegment.contains(SEGMENT_SPLIT_CHARACTER)) {
       return TargetedDirectorySegment.create(directorySegment);
     }
-    Matcher matcher = DIRECTORY_SEGMENT_PATTERN.matcher(directorySegment);
-    if (matcher.matches()) {
-      return TargetedDirectorySegment.create(
-          matcher.group("base"), matcher.group("key"), matcher.group("value"));
+    if (directorySegment.startsWith(SEGMENT_SPLIT_CHARACTER)
+        || directorySegment.endsWith(SEGMENT_SPLIT_CHARACTER)) {
+      throw InvalidBundleException.builder()
+          .withUserMessage(
+              "Cannot tokenize targeted directory '%s'. "
+                  + "Expecting either '<name>' or '<name>#<key>_<value>' format.",
+              directorySegment)
+          .build();
     }
-    throw InvalidBundleException.builder()
-        .withUserMessage(
-            "Cannot tokenize targeted directory '%s'. "
-                + "Expecting either '<name>' or '<name>#<key>_<value>' format.",
-            directorySegment)
-        .build();
+    ImmutableList<String> pathFragments =
+        ImmutableList.copyOf(directorySegment.split(SEGMENT_SPLIT_CHARACTER));
+    String baseName = pathFragments.get(0);
+    ImmutableMap<String, String> targetingKeyValues =
+        pathFragments.stream()
+            .skip(1) // first is base name.
+            .map(DimensionKeyValue::parse)
+            .collect(
+                toImmutableMap(
+                    DimensionKeyValue::getDimensionKey,
+                    DimensionKeyValue::getDimensionValue,
+                    (v1, v2) -> {
+                      throw InvalidBundleException.builder()
+                          .withUserMessage(
+                              "No directory should be targeted more than once on the same"
+                                  + " dimension. Found directory '%s' targeted multiple times on"
+                                  + " same dimension.",
+                              directorySegment)
+                          .build();
+                    }));
+    validateNestedTargetingDimensions(targetingKeyValues, directorySegment);
+    return TargetedDirectorySegment.create(baseName, targetingKeyValues);
   }
 
   /** Do the reverse of parse, returns the path represented by the segment. */
   public String toPathSegment() {
-    ImmutableList<TargetingDimension> dimensions =
-        TargetingUtils.getTargetingDimensions(getTargeting());
-    checkState(dimensions.size() <= 1);
-
-    Optional<String> key = getTargetingKey(getTargeting());
-    Optional<String> value = getTargetingValue(getTargeting());
-
-    if (!key.isPresent() || !value.isPresent()) {
-      return getName();
-    }
-
-    return String.format("%s#%s_%s", getName(), key.get(), value.get());
+    ImmutableList.Builder<String> pathFragmentsBuilder = ImmutableList.builder();
+    pathFragmentsBuilder.add(getName());
+    pathFragmentsBuilder.addAll(
+        getTargetingDimensionOrder().stream()
+            .map(this::convertTargetingToPathSegment)
+            .filter(Optional::isPresent)
+            .map(Optional::get)
+            .collect(toImmutableList()));
+    return String.join("", pathFragmentsBuilder.build());
   }
 
   /**
@@ -150,58 +175,113 @@ public abstract class TargetedDirectorySegment {
     return keys.stream().anyMatch(key -> path.contains("#" + key + "_"));
   }
 
+  /** Constructs targeting of directory in the given order of targeting dimension. */
+  public static String constructTargetingSegmentPath(
+      AssetsDirectoryTargeting targeting, ImmutableList<TargetingDimension> targetingOrder) {
+    return targetingOrder.stream()
+        .filter(dimension -> getTargetingValue(targeting, dimension).isPresent())
+        .map(
+            dimension ->
+                String.format(
+                    "#%s_%s",
+                    getTargetingKey(dimension).get(),
+                    getTargetingValue(targeting, dimension).get()))
+        .collect(joining(""));
+  }
+
+  private Optional<String> convertTargetingToPathSegment(TargetingDimension dimension) {
+    Optional<String> key = getTargetingKey(dimension);
+    Optional<String> value = getTargetingValue(getTargeting(), dimension);
+    if (key.isPresent() && value.isPresent()) {
+      return Optional.of(String.format("#%s_%s", key.get(), value.get()));
+    }
+    return Optional.empty();
+  }
+
+  private static Optional<String> getTargetingValue(
+      AssetsDirectoryTargeting targeting, TargetingDimension dimension) {
+    switch (dimension) {
+      case COUNTRY_SET:
+        return targeting.getCountrySet().getValueList().stream().findFirst();
+      case DEVICE_TIER:
+        return targeting.getDeviceTier().getValueList().stream()
+            .map(tier -> Integer.toString(tier.getValue()))
+            .findFirst();
+      case LANGUAGE:
+        return targeting.getLanguage().getValueList().stream().findFirst();
+      case TEXTURE_COMPRESSION_FORMAT:
+        return targeting.getTextureCompressionFormat().getValueList().stream()
+            .map(
+                tcfAlias ->
+                    TextureCompressionUtils.TARGETING_TO_TEXTURE.getOrDefault(
+                        tcfAlias.getAlias(), null))
+            .filter(Objects::nonNull)
+            .findFirst();
+      default:
+        return Optional.empty();
+    }
+  }
+
+  private static void validateNestedTargetingDimensions(
+      ImmutableMap<String, String> keyValues, String directorySegment) {
+    if (keyValues.size() == 1) {
+      return;
+    }
+    if (keyValues.size() > MAXIMUM_NESTING_DEPTH_ALLOWED) {
+      throw InvalidBundleException.builder()
+          .withUserMessage(
+              "No directory should target more than two dimension. Found"
+                  + " directory '%s' targeting more than two dimension.",
+              directorySegment)
+          .build();
+    }
+    keyValues
+        .keySet()
+        .forEach(
+            key -> {
+              if (!KEY_TO_DIMENSION.containsKey(key)) {
+                throw InvalidBundleException.builder()
+                    .withUserMessage(
+                        "Unrecognized key: '%s' used in targeting of directory '%s'.",
+                        key, directorySegment)
+                    .build();
+              }
+              if (!ALLOWED_NESTING_DIMENSIONS.contains(KEY_TO_DIMENSION.get(key))) {
+                throw InvalidBundleException.builder()
+                    .withUserMessage(
+                        "Targeting dimension '%s' should not be nested with other dimensions. Found"
+                            + " directory '%s' which nests the dimension with other dimensions.",
+                        KEY_TO_DIMENSION.get(key), directorySegment)
+                    .build();
+              }
+            });
+  }
+
   private static TargetedDirectorySegment create(String name) {
     return new AutoValue_TargetedDirectorySegment(
-        name, AssetsDirectoryTargeting.getDefaultInstance());
+        name, AssetsDirectoryTargeting.getDefaultInstance(), ImmutableList.of());
   }
 
-  private static TargetedDirectorySegment create(String name, String key, String value) {
+  private static TargetedDirectorySegment create(
+      String name, ImmutableMap<String, String> dimensionKeyValues) {
+    AssetsDirectoryTargeting directoryTargeting =
+        dimensionKeyValues.entrySet().stream()
+            .map(
+                keyValue ->
+                    toAssetsDirectoryTargeting(name, keyValue.getKey(), keyValue.getValue()))
+            .reduce(
+                AssetsDirectoryTargeting.newBuilder(),
+                AssetsDirectoryTargeting.Builder::mergeFrom,
+                (builderA, builderB) -> builderA.mergeFrom(builderB.build()))
+            .build();
+    ImmutableList<TargetingDimension> targetingDimensionOrder =
+        dimensionKeyValues.keySet().stream().map(KEY_TO_DIMENSION::get).collect(toImmutableList());
     return new AutoValue_TargetedDirectorySegment(
-        name, toAssetsDirectoryTargeting(name, key, value));
+        name, directoryTargeting, targetingDimensionOrder);
   }
 
-  /** Do the reverse of toAssetsDirectoryTargeting, return the key of the targeting. */
-  private static Optional<String> getTargetingKey(AssetsDirectoryTargeting targeting) {
-    ImmutableList<TargetingDimension> dimensions = TargetingUtils.getTargetingDimensions(targeting);
-    checkArgument(
-        dimensions.size() <= 1, "Multiple targeting for a same directory is not supported");
-
-    if (targeting.hasLanguage()) {
-      return Optional.of(LANG_KEY);
-    } else if (targeting.hasTextureCompressionFormat()) {
-      return Optional.of(TCF_KEY);
-    } else if (targeting.hasDeviceTier()) {
-      return Optional.of(DEVICE_TIER_KEY);
-    } else if (targeting.hasCountrySet()) {
-      return Optional.of(COUNTRY_SET_KEY);
-    }
-
-    return Optional.empty();
-  }
-
-  /** Do the reverse of toAssetsDirectoryTargeting, return the value of the targeting. */
-  private static Optional<String> getTargetingValue(AssetsDirectoryTargeting targeting) {
-    ImmutableList<TargetingDimension> dimensions = TargetingUtils.getTargetingDimensions(targeting);
-    checkArgument(
-        dimensions.size() <= 1, "Multiple targeting for a same directory is not supported");
-
-    if (targeting.hasLanguage()) {
-      return Optional.of(Iterables.getOnlyElement(targeting.getLanguage().getValueList()));
-    } else if (targeting.hasTextureCompressionFormat()) {
-      return Optional.ofNullable(
-          TextureCompressionUtils.TARGETING_TO_TEXTURE.getOrDefault(
-              Iterables.getOnlyElement(targeting.getTextureCompressionFormat().getValueList())
-                  .getAlias(),
-              null));
-    } else if (targeting.hasDeviceTier()) {
-      return Optional.of(
-          Integer.toString(
-              Iterables.getOnlyElement(targeting.getDeviceTier().getValueList()).getValue()));
-    } else if (targeting.hasCountrySet()) {
-      return Optional.of(Iterables.getOnlyElement(targeting.getCountrySet().getValueList()));
-    }
-
-    return Optional.empty();
+  private static Optional<String> getTargetingKey(TargetingDimension dimension) {
+    return DIMENSION_TO_KEY.get(dimension).stream().findFirst();
   }
 
   /** Returns the targeting specified by the directory name, alternatives are not generated. */
@@ -214,14 +294,14 @@ public abstract class TargetedDirectorySegment {
     }
 
     switch (KEY_TO_DIMENSION.get(key)) {
+      case COUNTRY_SET:
+        return parseCountrySet(name, value);
+      case DEVICE_TIER:
+        return parseDeviceTier(name, value);
       case LANGUAGE:
         return parseLanguage(name, value);
       case TEXTURE_COMPRESSION_FORMAT:
         return parseTextureCompressionFormat(name, value);
-      case DEVICE_TIER:
-        return parseDeviceTier(name, value);
-      case COUNTRY_SET:
-        return parseCountrySet(name, value);
       default:
         throw InvalidBundleException.builder()
             .withUserMessage("Unrecognized key: '%s'.", key)

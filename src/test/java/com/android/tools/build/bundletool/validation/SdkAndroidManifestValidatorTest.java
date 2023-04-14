@@ -17,10 +17,10 @@
 package com.android.tools.build.bundletool.validation;
 
 import static com.android.tools.build.bundletool.model.AndroidManifest.INSTALL_LOCATION_ATTRIBUTE_NAME;
+import static com.android.tools.build.bundletool.model.AndroidManifest.META_DATA_ELEMENT_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.PERMISSION_ELEMENT_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.PERMISSION_GROUP_ELEMENT_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.PERMISSION_TREE_ELEMENT_NAME;
-import static com.android.tools.build.bundletool.model.AndroidManifest.PROPERTY_ELEMENT_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.SDK_LIBRARY_ELEMENT_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.SDK_PATCH_VERSION_ATTRIBUTE_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.SHARED_USER_ID_ATTRIBUTE_NAME;
@@ -31,7 +31,7 @@ import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.with
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withPermissionGroup;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withPermissionTree;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withSdkLibraryElement;
-import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withSdkPatchVersionProperty;
+import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withSdkPatchVersionMetadata;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withSharedUserId;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withSplitId;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withSplitNameService;
@@ -77,7 +77,7 @@ public class SdkAndroidManifestValidatorTest {
     BundleModule module =
         new BundleModuleBuilder(BASE_MODULE_NAME)
             .setManifest(
-                androidManifest(PKG_NAME, withSdkPatchVersionProperty(/* patchVersion= */ 14)))
+                androidManifest(PKG_NAME, withSdkPatchVersionMetadata(/* patchVersion= */ 14)))
             .build();
 
     Throwable exception =
@@ -88,7 +88,7 @@ public class SdkAndroidManifestValidatorTest {
         .hasMessageThat()
         .isEqualTo(
             "<"
-                + PROPERTY_ELEMENT_NAME
+                + META_DATA_ELEMENT_NAME
                 + "> cannot be declared with name='"
                 + SDK_PATCH_VERSION_ATTRIBUTE_NAME
                 + "' in the manifest of an SDK bundle.");

@@ -16,8 +16,12 @@
 
 package com.android.tools.build.bundletool.model.targeting;
 
+import static com.android.tools.build.bundletool.model.utils.TargetingNormalizer.normalizeAssetsDirectoryTargeting;
+import static com.android.tools.build.bundletool.testing.TargetingUtils.alternativeCountrySetTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.alternativeLanguageTargeting;
+import static com.android.tools.build.bundletool.testing.TargetingUtils.alternativeTextureCompressionTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.assetsDirectoryTargeting;
+import static com.android.tools.build.bundletool.testing.TargetingUtils.countrySetTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.deviceTierTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.languageTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.mergeAssetsTargeting;
@@ -163,7 +167,7 @@ public class TargetingGeneratorTest {
     checkState(allAbiFiles.size() > 1); // Otherwise this test is useless.
 
     ApexImages apexImages =
-        generator.generateTargetingForApexImages(allAbiFiles, /*hasBuildInfo=*/ true);
+        generator.generateTargetingForApexImages(allAbiFiles, /* hasBuildInfo= */ true);
 
     List<TargetedApexImage> images = apexImages.getImageList();
     assertThat(images).hasSize(allAbiFiles.size());
@@ -177,7 +181,7 @@ public class TargetingGeneratorTest {
             () ->
                 generator.generateTargetingForApexImages(
                     ImmutableList.of(ZipPath.create("x86.ARM64-v8a.img")),
-                    /*hasBuildInfo=*/ false));
+                    /* hasBuildInfo= */ false));
 
     assertThat(exception)
         .hasMessageThat()
@@ -193,7 +197,8 @@ public class TargetingGeneratorTest {
             InvalidBundleException.class,
             () ->
                 generator.generateTargetingForApexImages(
-                    ImmutableList.of(ZipPath.create("non_abi_name.img")), /*hasBuildInfo=*/ false));
+                    ImmutableList.of(ZipPath.create("non_abi_name.img")),
+                    /* hasBuildInfo= */ false));
 
     assertThat(exception)
         .hasMessageThat()
@@ -234,44 +239,6 @@ public class TargetingGeneratorTest {
                         .setPath("assets/world/static-alt")
                         .setTargeting(AssetsDirectoryTargeting.getDefaultInstance()))
                 .build());
-  }
-
-  @Test
-  public void generateTargetingForAssets_typeMismatch_leaf() throws Exception {
-    Throwable t =
-        assertThrows(
-            InvalidBundleException.class,
-            () ->
-                new TargetingGenerator()
-                    .generateTargetingForAssets(
-                        ImmutableList.of(
-                            ZipPath.create("assets/world/gfx#lang_ru"),
-                            ZipPath.create("assets/world/gfx#tcf_etc1"))));
-    assertThat(t)
-        .hasMessageThat()
-        .contains(
-            "Expected at most one dimension type used for targeting of 'assets/world/gfx'. "
-                + "However, the following dimensions were used: "
-                + "'LANGUAGE', 'TEXTURE_COMPRESSION_FORMAT'.");
-  }
-
-  @Test
-  public void generateTargetingForAssets_typeMismatch_midPath() throws Exception {
-    Throwable t =
-        assertThrows(
-            InvalidBundleException.class,
-            () ->
-                new TargetingGenerator()
-                    .generateTargetingForAssets(
-                        ImmutableList.of(
-                            ZipPath.create("assets/world/texture#tcf_etc1/gfx#lang_en"),
-                            ZipPath.create("assets/world/texture#lang_ru/gfx#tcf_etc1"))));
-    assertThat(t)
-        .hasMessageThat()
-        .contains(
-            "Expected at most one dimension type used for targeting of 'assets/world/texture'. "
-                + "However, the following dimensions were used: "
-                + "'LANGUAGE', 'TEXTURE_COMPRESSION_FORMAT'.");
   }
 
   @Test
@@ -650,6 +617,108 @@ public class TargetingGeneratorTest {
                     TargetedAssetsDirectory.newBuilder()
                         .setPath("assets")
                         .setTargeting(AssetsDirectoryTargeting.getDefaultInstance()))
+                .build());
+  }
+
+  @Test
+  public void generateTargetingForAssets_nestedTargeting() {
+    ImmutableList<ZipPath> assetDirectories =
+        ImmutableList.of(
+            ZipPath.create("assets/img#countries_latam#tcf_astc"),
+            ZipPath.create("assets/img#countries_latam#tcf_pvrtc"),
+            ZipPath.create("assets/img#countries_latam"),
+            ZipPath.create("assets/img#tcf_astc"),
+            ZipPath.create("assets/img#tcf_pvrtc"),
+            ZipPath.create("assets/img"));
+
+    Assets assetsConfig = new TargetingGenerator().generateTargetingForAssets(assetDirectories);
+
+    assertThat(assetsConfig)
+        .ignoringRepeatedFieldOrder()
+        .isEqualTo(
+            Assets.newBuilder()
+                .addDirectory(
+                    TargetedAssetsDirectory.newBuilder()
+                        .setPath("assets/img#countries_latam#tcf_astc")
+                        .setTargeting(
+                            normalizeAssetsDirectoryTargeting(
+                                AssetsDirectoryTargeting.newBuilder()
+                                    .setCountrySet(countrySetTargeting("latam"))
+                                    .setTextureCompressionFormat(
+                                        textureCompressionTargeting(
+                                            /* value= */ TextureCompressionFormatAlias.ASTC,
+                                            /* alternatives= */ ImmutableSet.of(
+                                                TextureCompressionFormatAlias.PVRTC)))
+                                    .build())))
+                .addDirectory(
+                    TargetedAssetsDirectory.newBuilder()
+                        .setPath("assets/img#countries_latam#tcf_pvrtc")
+                        .setTargeting(
+                            normalizeAssetsDirectoryTargeting(
+                                AssetsDirectoryTargeting.newBuilder()
+                                    .setCountrySet(countrySetTargeting("latam"))
+                                    .setTextureCompressionFormat(
+                                        textureCompressionTargeting(
+                                            /* value= */ TextureCompressionFormatAlias.PVRTC,
+                                            /* alternatives= */ ImmutableSet.of(
+                                                TextureCompressionFormatAlias.ASTC)))
+                                    .build())))
+                .addDirectory(
+                    TargetedAssetsDirectory.newBuilder()
+                        .setPath("assets/img#countries_latam")
+                        .setTargeting(
+                            normalizeAssetsDirectoryTargeting(
+                                AssetsDirectoryTargeting.newBuilder()
+                                    .setCountrySet(countrySetTargeting("latam"))
+                                    .setTextureCompressionFormat(
+                                        alternativeTextureCompressionTargeting(
+                                            TextureCompressionFormatAlias.PVRTC,
+                                            TextureCompressionFormatAlias.ASTC))
+                                    .build())))
+                .addDirectory(
+                    TargetedAssetsDirectory.newBuilder()
+                        .setPath("assets/img#tcf_astc")
+                        .setTargeting(
+                            normalizeAssetsDirectoryTargeting(
+                                AssetsDirectoryTargeting.newBuilder()
+                                    .setCountrySet(
+                                        alternativeCountrySetTargeting(
+                                            /* alternatives= */ ImmutableList.of("latam")))
+                                    .setTextureCompressionFormat(
+                                        textureCompressionTargeting(
+                                            /* value= */ TextureCompressionFormatAlias.ASTC,
+                                            /* alternatives= */ ImmutableSet.of(
+                                                TextureCompressionFormatAlias.PVRTC)))
+                                    .build())))
+                .addDirectory(
+                    TargetedAssetsDirectory.newBuilder()
+                        .setPath("assets/img#tcf_pvrtc")
+                        .setTargeting(
+                            normalizeAssetsDirectoryTargeting(
+                                AssetsDirectoryTargeting.newBuilder()
+                                    .setCountrySet(
+                                        alternativeCountrySetTargeting(
+                                            /* alternatives= */ ImmutableList.of("latam")))
+                                    .setTextureCompressionFormat(
+                                        textureCompressionTargeting(
+                                            /* value= */ TextureCompressionFormatAlias.PVRTC,
+                                            /* alternatives= */ ImmutableSet.of(
+                                                TextureCompressionFormatAlias.ASTC)))
+                                    .build())))
+                .addDirectory(
+                    TargetedAssetsDirectory.newBuilder()
+                        .setPath("assets/img")
+                        .setTargeting(
+                            normalizeAssetsDirectoryTargeting(
+                                AssetsDirectoryTargeting.newBuilder()
+                                    .setCountrySet(
+                                        alternativeCountrySetTargeting(
+                                            /* alternatives= */ ImmutableList.of("latam")))
+                                    .setTextureCompressionFormat(
+                                        alternativeTextureCompressionTargeting(
+                                            TextureCompressionFormatAlias.PVRTC,
+                                            TextureCompressionFormatAlias.ASTC))
+                                    .build())))
                 .build());
   }
 }

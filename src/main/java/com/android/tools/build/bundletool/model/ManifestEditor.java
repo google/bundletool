@@ -21,6 +21,7 @@ import static com.android.tools.build.bundletool.model.AndroidManifest.ALLOW_BAC
 import static com.android.tools.build.bundletool.model.AndroidManifest.ALLOW_BACKUP_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.ANDROID_NAMESPACE_URI;
 import static com.android.tools.build.bundletool.model.AndroidManifest.APPLICATION_ELEMENT_NAME;
+import static com.android.tools.build.bundletool.model.AndroidManifest.CATEGORY_ELEMENT_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.CERTIFICATE_DIGEST_ATTRIBUTE_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.CERTIFICATE_DIGEST_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.COMPAT_SDK_PROVIDER_CLASS_NAME_ATTRIBUTE_NAME;
@@ -34,6 +35,7 @@ import static com.android.tools.build.bundletool.model.AndroidManifest.ICON_ATTR
 import static com.android.tools.build.bundletool.model.AndroidManifest.ICON_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.INCLUDE_ATTRIBUTE_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.INSTALL_TIME_ELEMENT_NAME;
+import static com.android.tools.build.bundletool.model.AndroidManifest.INTENT_FILTER_ELEMENT_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.IS_FEATURE_SPLIT_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.IS_SPLIT_REQUIRED_ATTRIBUTE_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.IS_SPLIT_REQUIRED_RESOURCE_ID;
@@ -78,6 +80,7 @@ import static com.android.tools.build.bundletool.model.AndroidManifest.VERSION_M
 import static com.android.tools.build.bundletool.model.AndroidManifest.VERSION_NAME_ATTRIBUTE_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.VERSION_NAME_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.utils.xmlproto.XmlProtoAttributeBuilder.createAndroidAttribute;
+import static com.google.common.collect.MoreCollectors.onlyElement;
 import static com.google.common.collect.MoreCollectors.toOptional;
 import static java.util.stream.Collectors.joining;
 
@@ -217,7 +220,7 @@ public class ManifestEditor {
   @CanIgnoreReturnValue
   public ManifestEditor addMetaDataResourceId(String key, int resourceId) {
     return addMetaDataValue(
-        key, createAndroidAttribute("value", RESOURCE_RESOURCE_ID).setValueAsRefId(resourceId));
+        key, createAndroidAttribute("resource", RESOURCE_RESOURCE_ID).setValueAsRefId(resourceId));
   }
 
   @CanIgnoreReturnValue
@@ -398,6 +401,53 @@ public class ManifestEditor {
     return this;
   }
 
+  /**
+   * Sets the theme of an activity that has an action with the name mainActionCategoryName to the
+   * given themeResId. This method assumes such activity exists.
+   */
+  @CanIgnoreReturnValue
+  public ManifestEditor setActivityTheme(String activityName, String categoryName, int themeResId) {
+    // Find the activity that has intentFilter -> action (with name mainActionCategoryName).
+    XmlProtoElementBuilder activityElement =
+        manifestElement
+            .getOrCreateChildElement(APPLICATION_ELEMENT_NAME)
+            .getChildrenElements(ACTIVITY_ELEMENT_NAME)
+            .filter(
+                activity ->
+                    activity
+                            .getOrCreateAndroidAttribute(NAME_ATTRIBUTE_NAME, NAME_RESOURCE_ID)
+                            .getValueAsString()
+                            .equals(activityName)
+                        && hasIntentFilterWithCategoryName(activity, categoryName))
+            .collect(onlyElement());
+
+    // set the theme of the activity.
+    activityElement
+        .getOrCreateAndroidAttribute(THEME_ATTRIBUTE_NAME, THEME_RESOURCE_ID)
+        .setValueAsRefId(themeResId);
+    return this;
+  }
+
+  private boolean hasIntentFilterWithCategoryName(
+      XmlProtoElementBuilder element, String categoryName) {
+    return element
+        .getChildrenElements(INTENT_FILTER_ELEMENT_NAME)
+        .filter(
+            intentFilter ->
+                intentFilter
+                    .getChildrenElements(CATEGORY_ELEMENT_NAME)
+                    .filter(categoryElement -> hasName(categoryElement, categoryName))
+                    .findAny()
+                    .isPresent())
+        .findAny()
+        .isPresent();
+  }
+
+  private boolean hasName(XmlProtoElementBuilder element, String name) {
+    Optional<XmlProtoAttributeBuilder> action = element.getAndroidAttribute(NAME_RESOURCE_ID);
+    return action.isPresent() && action.get().getValueAsString().equals(name);
+  }
+
   @CanIgnoreReturnValue
   public ManifestEditor addReceiver(Receiver receiver) {
     manifestElement
@@ -454,13 +504,13 @@ public class ManifestEditor {
     return this;
   }
 
-  /** Creates a <property> element and populates it with SDK patch version. */
+  /** Creates a <meta-data> element and populates it with SDK patch version. */
   @CanIgnoreReturnValue
-  public ManifestEditor setSdkPatchVersionProperty(int patchVersion) {
+  public ManifestEditor setSdkPatchVersionMetadata(int patchVersion) {
     manifestElement
         .getOrCreateChildElement(APPLICATION_ELEMENT_NAME)
         .addChildElement(
-            XmlProtoElementBuilder.create(PROPERTY_ELEMENT_NAME)
+            XmlProtoElementBuilder.create(META_DATA_ELEMENT_NAME)
                 .addAttribute(
                     createAndroidAttribute(NAME_ATTRIBUTE_NAME, NAME_RESOURCE_ID)
                         .setValueAsString(SDK_PATCH_VERSION_ATTRIBUTE_NAME))

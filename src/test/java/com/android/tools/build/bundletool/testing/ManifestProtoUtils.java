@@ -1051,12 +1051,12 @@ public final class ManifestProtoUtils {
                     .setValueAsString(certDigest));
   }
 
-  /** Adds a <property> element to an SDK Bundle manifest. */
-  public static ManifestMutator withSdkPatchVersionProperty(int patchVersion) {
+  /** Adds a <meta-data> element to an SDK Bundle manifest. */
+  public static ManifestMutator withSdkPatchVersionMetadata(int patchVersion) {
     return manifestElement ->
         manifestElement
             .getOrCreateChildElement(APPLICATION_ELEMENT_NAME)
-            .getOrCreateChildElement(PROPERTY_ELEMENT_NAME)
+            .getOrCreateChildElement(META_DATA_ELEMENT_NAME)
             .addAttribute(
                 createAndroidAttribute(NAME_ATTRIBUTE_NAME, NAME_RESOURCE_ID)
                     .setValueAsString(SDK_PATCH_VERSION_ATTRIBUTE_NAME))
@@ -1064,6 +1064,7 @@ public final class ManifestProtoUtils {
                 createAndroidAttribute(VALUE_ATTRIBUTE_NAME, VALUE_RESOURCE_ID)
                     .setValueAsDecimalInteger(patchVersion));
   }
+
 
   /** Adds a {@value #PERMISSION_ELEMENT_NAME} element to the manifest. */
   public static ManifestMutator withPermission() {

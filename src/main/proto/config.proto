@@ -239,6 +239,19 @@ message StandaloneConfig {
     // application developers.
     NEVER_MERGE = 1;
   }
+
+  // Defines how to deal with feature modules in standalone variants (minSdk <
+  // 21).
+  FeatureModulesMode feature_modules_mode = 4;
+
+  enum FeatureModulesMode {
+    // Default mode which fuses feature modules with respect to its
+    // fusing attribute into base.apk.
+    FUSED_FEATURE_MODULES = 0;
+    // Advanced mode, which allows to generate a single separate apk per each
+    // feature module in variants with minSdk < 21.
+    SEPARATE_FEATURE_MODULES = 1;
+  }
 }
 
 message SplitDimension {

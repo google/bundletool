@@ -51,6 +51,7 @@ import com.android.bundle.Config.SuffixStripping;
 import com.android.bundle.Devices.DeviceSpec;
 import com.android.bundle.Targeting.VariantTargeting;
 import com.android.tools.build.bundletool.commands.BuildApksCommand.ApkBuildMode;
+import com.android.tools.build.bundletool.commands.BuildApksModule.ApkSigningConfigProvider;
 import com.android.tools.build.bundletool.commands.BuildApksModule.FirstVariantNumber;
 import com.android.tools.build.bundletool.device.ApkMatcher;
 import com.android.tools.build.bundletool.model.AndroidManifest;
@@ -68,6 +69,7 @@ import com.android.tools.build.bundletool.model.ModuleSplit;
 import com.android.tools.build.bundletool.model.ModuleSplit.SplitType;
 import com.android.tools.build.bundletool.model.OptimizationDimension;
 import com.android.tools.build.bundletool.model.SdkBundle;
+import com.android.tools.build.bundletool.model.SigningConfigurationProvider;
 import com.android.tools.build.bundletool.model.VariantKey;
 import com.android.tools.build.bundletool.model.ZipPath;
 import com.android.tools.build.bundletool.model.version.BundleToolVersion;
@@ -101,6 +103,7 @@ public class ApkSerializerManager {
   private final ApkPathManager apkPathManager;
   private final ApkOptimizations apkOptimizations;
   private final ApkSerializer apkSerializer;
+  private final Optional<SigningConfigurationProvider> signingConfigProvider;
 
   @Inject
   public ApkSerializerManager(
@@ -110,7 +113,8 @@ public class ApkSerializerManager {
       ApkBuildMode apkBuildMode,
       ApkPathManager apkPathManager,
       ApkOptimizations apkOptimizations,
-      ApkSerializer apkSerializer) {
+      ApkSerializer apkSerializer,
+      @ApkSigningConfigProvider Optional<SigningConfigurationProvider> signingConfigProvider) {
     this.bundle = bundle;
     this.apkModifier = apkModifier.orElse(ApkModifier.NO_OP);
     this.firstVariantNumber = firstVariantNumber.orElse(0);
@@ -118,6 +122,7 @@ public class ApkSerializerManager {
     this.apkPathManager = apkPathManager;
     this.apkOptimizations = apkOptimizations;
     this.apkSerializer = apkSerializer;
+    this.signingConfigProvider = signingConfigProvider;
   }
 
   /** Serialize App Bundle APKs. */
@@ -483,10 +488,21 @@ public class ApkSerializerManager {
         .build();
   }
 
-  private static ModuleSplit clearVariantTargeting(ModuleSplit moduleSplit) {
-    return moduleSplit.toBuilder()
-        .setVariantTargeting(VariantTargeting.getDefaultInstance())
-        .build();
+  private ModuleSplit clearVariantTargeting(ModuleSplit moduleSplit) {
+    VariantTargeting.Builder variantTargeting = VariantTargeting.newBuilder();
+    boolean hasRestrictedV3SigningConfig =
+        signingConfigProvider
+            .map(SigningConfigurationProvider::hasRestrictedV3SigningConfig)
+            .orElse(false);
+    // If the signing config includes signing with rotated keys using V3 signature scheme, and it is
+    // restricted to specific Android SDK versions, then the de-duplication of generated splits must
+    // account for variant SDK version targeting when comparing splits.
+    if (hasRestrictedV3SigningConfig
+        && moduleSplit.getVariantTargeting().hasSdkVersionTargeting()) {
+      variantTargeting.setSdkVersionTargeting(
+          moduleSplit.getVariantTargeting().getSdkVersionTargeting());
+    }
+    return moduleSplit.toBuilder().setVariantTargeting(variantTargeting.build()).build();
   }
 
   private static AssetModulesInfo getAssetModulesInfo(AssetModulesConfig assetModulesConfig) {

@@ -18,10 +18,12 @@ package com.android.tools.build.bundletool.splitters;
 import static com.android.tools.build.bundletool.sdkmodule.DexAndResourceRepackager.getCompatSdkConfigPathInAssets;
 import static java.nio.charset.StandardCharsets.UTF_8;
 
+import com.android.bundle.RuntimeEnabledSdkConfigProto.RuntimeEnabledSdk;
 import com.android.tools.build.bundletool.model.AppBundle;
 import com.android.tools.build.bundletool.model.ModuleEntry;
 import com.android.tools.build.bundletool.model.ModuleSplit;
 import com.android.tools.build.bundletool.model.ModuleSplit.SplitType;
+import com.android.tools.build.bundletool.model.RuntimeEnabledSdkVersionEncoder;
 import com.android.tools.build.bundletool.model.ZipPath;
 import com.android.tools.build.bundletool.xml.XmlUtils;
 import com.google.common.annotations.VisibleForTesting;
@@ -50,6 +52,7 @@ import org.w3c.dom.Node;
  *   </runtime-enabled-sdk>
  *   <runtime-enabled-sdk>
  *     <package-name>com.sdk2</package-name>
+ *     <version-major>11000<version-major/>
  *     <compat-config-path>RuntimeEnabledSdk-com.sdk2/CompatSdkConfig.xml</compat-config-path>
  *   </runtime-enabled-sdk>
  * </runtime-enabled-sdk-table>
@@ -64,6 +67,8 @@ public final class RuntimeEnabledSdkTableInjector {
   private static final String RUNTIME_ENABLED_SDK_TABLE_ELEMENT_NAME = "runtime-enabled-sdk-table";
   private static final String RUNTIME_ENABELD_SDK_ELEMENT_NAME = "runtime-enabled-sdk";
   private static final String SDK_PACKAGE_NAME_ELEMENT_NAME = "package-name";
+
+  private static final String SDK_VERSION_MAJOR_ELEMENT_NAME = "version-major";
   private static final String COMPAT_CONFIG_PATH_ELEMENT_NAME = "compat-config-path";
 
   private final AppBundle appBundle;
@@ -85,7 +90,8 @@ public final class RuntimeEnabledSdkTableInjector {
                     ByteSource.wrap(
                         XmlUtils.documentToString(
                                 getRuntimeEnabledSdkTable(
-                                    appBundle.getRuntimeEnabledSdkDependencies().keySet()))
+                                    ImmutableSet.copyOf(
+                                        appBundle.getRuntimeEnabledSdkDependencies().values())))
                             .getBytes(UTF_8)))
                 .build())
         .build();
@@ -97,7 +103,7 @@ public final class RuntimeEnabledSdkTableInjector {
             || (split.isMasterSplit() && split.isBaseModuleSplit()));
   }
 
-  private Document getRuntimeEnabledSdkTable(ImmutableSet<String> sdkPackageNames) {
+  private Document getRuntimeEnabledSdkTable(ImmutableSet<RuntimeEnabledSdk> runtimeEnabledSdks) {
     Document runtimeEnabledSdkTable;
     try {
       runtimeEnabledSdkTable =
@@ -106,28 +112,36 @@ public final class RuntimeEnabledSdkTableInjector {
       throw new IllegalStateException(e);
     }
     runtimeEnabledSdkTable.appendChild(
-        createRuntimeEnabledSdkTableNode(runtimeEnabledSdkTable, sdkPackageNames));
+        createRuntimeEnabledSdkTableNode(runtimeEnabledSdkTable, runtimeEnabledSdks));
     return runtimeEnabledSdkTable;
   }
 
   private Node createRuntimeEnabledSdkTableNode(
-      Document xmlFactory, ImmutableSet<String> sdkPackageNames) {
+      Document xmlFactory, ImmutableSet<RuntimeEnabledSdk> runtimeEnabledSdks) {
     Element runtimeEnabledSdkTableNode =
         xmlFactory.createElement(RUNTIME_ENABLED_SDK_TABLE_ELEMENT_NAME);
-    sdkPackageNames.forEach(
-        sdkPackageName ->
+    runtimeEnabledSdks.forEach(
+        runtimeEnabledSdk ->
             runtimeEnabledSdkTableNode.appendChild(
-                createRuntimeEnabledSdkNode(xmlFactory, sdkPackageName)));
+                createRuntimeEnabledSdkNode(xmlFactory, runtimeEnabledSdk)));
     return runtimeEnabledSdkTableNode;
   }
 
-  private Node createRuntimeEnabledSdkNode(Document xmlFactory, String sdkPackageName) {
+  private Node createRuntimeEnabledSdkNode(
+      Document xmlFactory, RuntimeEnabledSdk runtimeEnabledSdk) {
     Element runtimeEnabledSdkNode = xmlFactory.createElement(RUNTIME_ENABELD_SDK_ELEMENT_NAME);
     Element sdkPackageNameNode = xmlFactory.createElement(SDK_PACKAGE_NAME_ELEMENT_NAME);
-    sdkPackageNameNode.setTextContent(sdkPackageName);
+    sdkPackageNameNode.setTextContent(runtimeEnabledSdk.getPackageName());
+    Element sdkVersionMajorNode = xmlFactory.createElement(SDK_VERSION_MAJOR_ELEMENT_NAME);
+    sdkVersionMajorNode.setTextContent(
+        String.valueOf(
+            RuntimeEnabledSdkVersionEncoder.encodeSdkMajorAndMinorVersion(
+                runtimeEnabledSdk.getVersionMajor(), runtimeEnabledSdk.getVersionMinor())));
     Element compatConfigPathNode = xmlFactory.createElement(COMPAT_CONFIG_PATH_ELEMENT_NAME);
-    compatConfigPathNode.setTextContent(getCompatSdkConfigPathInAssets(sdkPackageName));
+    compatConfigPathNode.setTextContent(
+        getCompatSdkConfigPathInAssets(runtimeEnabledSdk.getPackageName()));
     runtimeEnabledSdkNode.appendChild(sdkPackageNameNode);
+    runtimeEnabledSdkNode.appendChild(sdkVersionMajorNode);
     runtimeEnabledSdkNode.appendChild(compatConfigPathNode);
     return runtimeEnabledSdkNode;
   }

@@ -16,6 +16,7 @@
 
 package com.android.tools.build.bundletool.validation;
 
+import static com.android.tools.build.bundletool.model.RuntimeEnabledSdkVersionEncoder.SDK_PATCH_VERSION_MAX_VALUE;
 import static com.android.tools.build.bundletool.model.RuntimeEnabledSdkVersionEncoder.VERSION_MAJOR_MAX_VALUE;
 import static com.android.tools.build.bundletool.model.RuntimeEnabledSdkVersionEncoder.VERSION_MINOR_MAX_VALUE;
 import static com.android.tools.build.bundletool.model.utils.BundleParser.EXTRACTED_SDK_MODULES_FILE_NAME;
@@ -88,7 +89,16 @@ public class SdkModulesConfigValidatorTest {
   public void patchVersionNegative_throws() throws IOException {
     assertExceptionThrown(
         createSdkModulesConfig().setSdkVersion(RuntimeEnabledSdkVersion.newBuilder().setPatch(-3)),
-        "SDK patch version must be a non-negative integer");
+        "SDK patch version must be an integer between 0 and " + SDK_PATCH_VERSION_MAX_VALUE);
+  }
+
+  @Test
+  public void patchVersionTooBig_throws() throws IOException {
+    assertExceptionThrown(
+        createSdkModulesConfig()
+            .setSdkVersion(
+                RuntimeEnabledSdkVersion.newBuilder().setPatch(SDK_PATCH_VERSION_MAX_VALUE + 1)),
+        "SDK patch version must be an integer between 0 and " + SDK_PATCH_VERSION_MAX_VALUE);
   }
 
   @Test

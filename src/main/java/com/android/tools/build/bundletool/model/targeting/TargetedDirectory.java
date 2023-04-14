@@ -16,6 +16,7 @@
 
 package com.android.tools.build.bundletool.model.targeting;
 
+import static com.android.tools.build.bundletool.model.targeting.TargetingUtils.extractDimensionTargeting;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.MoreCollectors.toOptional;
@@ -98,10 +99,16 @@ public abstract class TargetedDirectory {
    */
   public Optional<AssetsDirectoryTargeting> getTargeting(TargetingDimension dimension) {
     // We're assuming that dimensions are not duplicated (see checkNoDuplicateDimensions).
+    return getTargeting()
+        .flatMap(directoryTargeting -> extractDimensionTargeting(directoryTargeting, dimension));
+  }
+
+  /** Returns the value of the targeting for this directory. */
+  private Optional<AssetsDirectoryTargeting> getTargeting() {
     return getPathSegments().stream()
-        .filter(segment -> segment.getTargetingDimension().equals(Optional.of(dimension)))
-        .map(segment -> segment.getTargeting())
-        .collect(toOptional());
+        .filter(segment -> !segment.getTargetingDimensions().isEmpty())
+        .findFirst()
+        .map(TargetedDirectorySegment::getTargeting);
   }
 
   /**
@@ -152,9 +159,7 @@ public abstract class TargetedDirectory {
   private Optional<Integer> getTargetedPathSegmentIndex(TargetingDimension dimension) {
     // We're assuming that dimensions are not duplicated (see checkNoDuplicateDimensions).
     return IntStream.range(0, getPathSegments().size())
-        .filter(
-            idx ->
-                getPathSegments().get(idx).getTargetingDimension().equals(Optional.of(dimension)))
+        .filter(idx -> getPathSegments().get(idx).getTargetingDimensions().contains(dimension))
         .boxed()
         .collect(toOptional());
   }
@@ -163,18 +168,18 @@ public abstract class TargetedDirectory {
       ImmutableList<TargetedDirectorySegment> directorySegments, ZipPath directoryPath) {
     Set<TargetingDimension> coveredDimensions = new HashSet<>();
     for (TargetedDirectorySegment targetedDirectorySegment : directorySegments) {
-      if (targetedDirectorySegment.getTargetingDimension().isPresent()) {
-        TargetingDimension lastSegmentDimension =
-            targetedDirectorySegment.getTargetingDimension().get();
-        if (coveredDimensions.contains(lastSegmentDimension)) {
-          throw InvalidBundleException.builder()
-              .withUserMessage(
-                  "Duplicate targeting dimension '%s' on path '%s'.",
-                  lastSegmentDimension, directoryPath)
-              .build();
-        }
-        coveredDimensions.add(lastSegmentDimension);
-      }
+      ImmutableList<TargetingDimension> segmentTargetingDimensions =
+          targetedDirectorySegment.getTargetingDimensions();
+      segmentTargetingDimensions.forEach(
+          dimension -> {
+            if (coveredDimensions.contains(dimension)) {
+              throw InvalidBundleException.builder()
+                  .withUserMessage(
+                      "Duplicate targeting dimension '%s' on path '%s'.", dimension, directoryPath)
+                  .build();
+            }
+          });
+      coveredDimensions.addAll(segmentTargetingDimensions);
     }
   }
 

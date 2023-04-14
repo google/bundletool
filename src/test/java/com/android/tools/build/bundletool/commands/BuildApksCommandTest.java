@@ -107,6 +107,7 @@ import com.android.tools.build.bundletool.testing.Aapt2Helper;
 import com.android.tools.build.bundletool.testing.AppBundleBuilder;
 import com.android.tools.build.bundletool.testing.BundleModuleBuilder;
 import com.android.tools.build.bundletool.testing.CertificateFactory;
+import com.android.tools.build.bundletool.testing.FakeSigningConfigurationProvider;
 import com.android.tools.build.bundletool.testing.FakeSystemEnvironmentProvider;
 import com.android.tools.build.bundletool.testing.SdkBundleBuilder;
 import com.android.tools.build.bundletool.testing.TargetingUtils;
@@ -1913,7 +1914,8 @@ public class BuildApksCommandTest {
             () ->
                 BuildApksCommand.builder()
                     .setSigningConfiguration(signingConfig)
-                    .setSigningConfigurationProvider(apkDescription -> apksigSigningConfig)
+                    .setSigningConfigurationProvider(
+                        new FakeSigningConfigurationProvider(apkDescription -> apksigSigningConfig))
                     .build());
 
     assertThat(e)

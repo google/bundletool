@@ -25,6 +25,7 @@ import static com.google.common.collect.ImmutableSet.toImmutableSet;
 import com.android.bundle.Commands.LocalTestingInfo;
 import com.android.bundle.Config.BundleConfig;
 import com.android.bundle.Config.ResourceOptimizations.SparseEncoding;
+import com.android.bundle.Config.StandaloneConfig.FeatureModulesMode;
 import com.android.bundle.Devices.DeviceSpec;
 import com.android.tools.build.bundletool.archive.ArchivedApksGenerator;
 import com.android.tools.build.bundletool.commands.BuildApksCommand.ApkBuildMode;
@@ -371,6 +372,14 @@ public final class BuildApksManager {
   }
 
   private ImmutableList<BundleModule> modulesToFuse(ImmutableList<BundleModule> modules) {
+    if (appBundle
+        .getBundleConfig()
+        .getOptimizations()
+        .getStandaloneConfig()
+        .getFeatureModulesMode()
+        .equals(FeatureModulesMode.SEPARATE_FEATURE_MODULES)) {
+      return modules;
+    }
     return modules.stream()
         .filter(BundleModule::isIncludedInFusing)
         .filter(

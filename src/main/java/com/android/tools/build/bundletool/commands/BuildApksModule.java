@@ -172,6 +172,15 @@ public final class BuildApksModule {
     return command.getLocalDeploymentRuntimeEnabledSdkConfig();
   }
 
+  @CommandScoped
+  @Provides
+  @DifferentThemesForTvAndPhone
+  static boolean provideDifferentThemesForTvAndPhone(BuildApksCommand command) {
+    @SuppressWarnings("unused")
+    boolean differentThemesForTvAndPhone = false;
+    return differentThemesForTvAndPhone;
+  }
+
   /**
    * Qualifying annotation of an {@code Optional<Integer>} for the first variant number to use when
    * numbering the generated variants.
@@ -197,6 +206,14 @@ public final class BuildApksModule {
   @Qualifier
   @Retention(RUNTIME)
   public @interface ApkSigningConfigProvider {}
+
+  /**
+   * Qualifying annotation of a {@code boolean} to enable usage of different themes for tv and
+   * phone.
+   */
+  @Qualifier
+  @Retention(RUNTIME)
+  public @interface DifferentThemesForTvAndPhone {}
 
   private BuildApksModule() {}
 }

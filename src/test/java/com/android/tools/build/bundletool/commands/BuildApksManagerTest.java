@@ -166,8 +166,10 @@ import com.android.bundle.Config.ResourceOptimizations.CollapsedResourceNames;
 import com.android.bundle.Config.ResourceOptimizations.ResourceTypeAndName;
 import com.android.bundle.Config.SplitDimension.Value;
 import com.android.bundle.Config.StandaloneConfig;
+import com.android.bundle.Config.StandaloneConfig.FeatureModulesMode;
 import com.android.bundle.Config.UncompressDexFiles.UncompressedDexTargetSdk;
 import com.android.bundle.Files.ApexImages;
+import com.android.bundle.Files.Assets;
 import com.android.bundle.RuntimeEnabledSdkConfigProto.RuntimeEnabledSdk;
 import com.android.bundle.RuntimeEnabledSdkConfigProto.RuntimeEnabledSdkConfig;
 import com.android.bundle.Targeting.Abi;
@@ -215,12 +217,14 @@ import com.android.tools.build.bundletool.testing.TestModule;
 import com.android.tools.build.bundletool.testing.truth.zip.TruthZip;
 import com.android.zipflinger.ZipMap;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableListMultimap;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableMultiset;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.ListMultimap;
 import com.google.common.collect.Maps;
+import com.google.common.collect.Multimaps;
 import com.google.common.hash.Hashing;
 import com.google.common.io.ByteSource;
 import com.google.common.io.ByteStreams;
@@ -230,6 +234,7 @@ import com.google.common.truth.Correspondence;
 import com.google.common.util.concurrent.ListeningExecutorService;
 import com.google.common.util.concurrent.MoreExecutors;
 import com.google.protobuf.Int32Value;
+import com.google.protobuf.TextFormat;
 import dagger.Component;
 import java.io.File;
 import java.io.FileOutputStream;
@@ -2399,6 +2404,201 @@ public class BuildApksManagerTest {
   }
 
   @Test
+  public void buildApksCommand_splitApks_nestedTargeting_countryAndTexture() throws Exception {
+    Assets.Builder assetsConfigBuilder = Assets.newBuilder();
+    TextFormat.merge(
+        TestData.openReader("testdata/nested_targeting/country_tcf_assets_config.textpb"),
+        assetsConfigBuilder);
+    AppBundle appBundle =
+        new AppBundleBuilder()
+            .addModule("base", builder -> builder.setManifest(androidManifest("com.test.app")))
+            .addModule(
+                "assetpack1",
+                builder ->
+                    builder
+                        .addFile("assets/textures#countries_latam#tcf_astc/texture.dat")
+                        .addFile("assets/textures#countries_latam#tcf_pvrtc/texture.dat")
+                        .addFile("assets/textures#countries_latam/texture.dat")
+                        .addFile("assets/textures#countries_sea#tcf_astc/texture.dat")
+                        .addFile("assets/textures#countries_sea#tcf_pvrtc/texture.dat")
+                        .addFile("assets/textures#countries_sea/texture.dat")
+                        .addFile("assets/textures#tcf_astc/texture.dat")
+                        .addFile("assets/textures#tcf_pvrtc/texture.dat")
+                        .addFile("assets/textures/texture.dat")
+                        .setAssetsConfig(assetsConfigBuilder.build())
+                        .setManifest(
+                            androidManifestForAssetModule(
+                                "com.test.app", withInstallTimeDelivery())))
+            .setBundleConfig(
+                BundleConfigBuilder.create()
+                    .addSplitDimension(
+                        Value.COUNTRY_SET,
+                        /* negate= */ false,
+                        /* stripSuffix= */ true,
+                        /* defaultSuffix= */ "latam")
+                    .addSplitDimension(
+                        Value.TEXTURE_COMPRESSION_FORMAT,
+                        /* negate= */ false,
+                        /* stripSuffix= */ true,
+                        /* defaultSuffix= */ "astc")
+                    .build())
+            .build();
+
+    TestComponent.useTestModule(
+        this,
+        createTestModuleBuilder().withAppBundle(appBundle).withOutputPath(outputFilePath).build());
+    buildApksManager.execute();
+
+    BuildApksResult.Builder expectedBuildApksResultBuilder = BuildApksResult.newBuilder();
+    TextFormat.merge(
+        TestData.openReader("testdata/nested_targeting/country_tcf_toc.textpb"),
+        expectedBuildApksResultBuilder);
+    BuildApksResult expectedBuildApksResult = expectedBuildApksResultBuilder.build();
+    ZipFile apkSetFile = openZipFile(outputFilePath.toFile());
+    BuildApksResult generatedBuildApksResult = extractTocFromApkSetFile(apkSetFile, outputDir);
+    assertThat(generatedBuildApksResult)
+        .comparingExpectedFieldsOnly()
+        .isEqualTo(expectedBuildApksResult);
+    expectedBuildApksResult.getAssetSliceSetList().stream()
+        .flatMap(assetSliceSet -> assetSliceSet.getApkDescriptionList().stream())
+        .forEach(assetSlice -> assertThat(apkSetFile).hasFile(assetSlice.getPath()));
+    expectedBuildApksResult.getVariantList().stream()
+        .flatMap(variant -> variant.getApkSetList().stream())
+        .flatMap(apkSet -> apkSet.getApkDescriptionList().stream())
+        .forEach(splitApk -> assertThat(apkSetFile).hasFile(splitApk.getPath()));
+  }
+
+  @Test
+  public void buildApksCommand_splitApks_nestedTargeting_tierAndTexture() throws Exception {
+    Assets.Builder assetsConfigBuilder = Assets.newBuilder();
+    TextFormat.merge(
+        TestData.openReader("testdata/nested_targeting/tier_tcf_assets_config.textpb"),
+        assetsConfigBuilder);
+    AppBundle appBundle =
+        new AppBundleBuilder()
+            .addModule("base", builder -> builder.setManifest(androidManifest("com.test.app")))
+            .addModule(
+                "assetpack1",
+                builder ->
+                    builder
+                        .addFile("assets/textures#tier_2#tcf_astc/texture.dat")
+                        .addFile("assets/textures#tier_2#tcf_pvrtc/texture.dat")
+                        .addFile("assets/textures#tier_2/texture.dat")
+                        .addFile("assets/textures#tier_1#tcf_astc/texture.dat")
+                        .addFile("assets/textures#tier_1#tcf_pvrtc/texture.dat")
+                        .addFile("assets/textures#tier_1/texture.dat")
+                        .addFile("assets/textures#tier_0#tcf_astc/texture.dat")
+                        .addFile("assets/textures#tier_0#tcf_pvrtc/texture.dat")
+                        .addFile("assets/textures#tier_0/texture.dat")
+                        .setAssetsConfig(assetsConfigBuilder.build())
+                        .setManifest(
+                            androidManifestForAssetModule(
+                                "com.test.app", withInstallTimeDelivery())))
+            .setBundleConfig(
+                BundleConfigBuilder.create()
+                    .addSplitDimension(
+                        Value.DEVICE_TIER,
+                        /* negate= */ false,
+                        /* stripSuffix= */ true,
+                        /* defaultSuffix= */ "0")
+                    .addSplitDimension(
+                        Value.TEXTURE_COMPRESSION_FORMAT,
+                        /* negate= */ false,
+                        /* stripSuffix= */ true,
+                        /* defaultSuffix= */ "astc")
+                    .build())
+            .build();
+
+    TestComponent.useTestModule(
+        this,
+        createTestModuleBuilder().withAppBundle(appBundle).withOutputPath(outputFilePath).build());
+    buildApksManager.execute();
+
+    BuildApksResult.Builder expectedBuildApksResultBuilder = BuildApksResult.newBuilder();
+    TextFormat.merge(
+        TestData.openReader("testdata/nested_targeting/tier_tcf_toc.textpb"),
+        expectedBuildApksResultBuilder);
+    BuildApksResult expectedBuildApksResult = expectedBuildApksResultBuilder.build();
+    ZipFile apkSetFile = openZipFile(outputFilePath.toFile());
+    BuildApksResult generatedBuildApksResult = extractTocFromApkSetFile(apkSetFile, outputDir);
+    assertThat(generatedBuildApksResult)
+        .comparingExpectedFieldsOnly()
+        .isEqualTo(expectedBuildApksResult);
+    expectedBuildApksResult.getAssetSliceSetList().stream()
+        .flatMap(assetSliceSet -> assetSliceSet.getApkDescriptionList().stream())
+        .forEach(assetSlice -> assertThat(apkSetFile).hasFile(assetSlice.getPath()));
+    expectedBuildApksResult.getVariantList().stream()
+        .flatMap(variant -> variant.getApkSetList().stream())
+        .flatMap(apkSet -> apkSet.getApkDescriptionList().stream())
+        .forEach(splitApk -> assertThat(apkSetFile).hasFile(splitApk.getPath()));
+  }
+
+  @Test
+  public void buildApksCommand_splitApks_nestedTargeting_countryAndTier() throws Exception {
+    Assets.Builder assetsConfigBuilder = Assets.newBuilder();
+    TextFormat.merge(
+        TestData.openReader("testdata/nested_targeting/country_tier_assets_config.textpb"),
+        assetsConfigBuilder);
+    AppBundle appBundle =
+        new AppBundleBuilder()
+            .addModule("base", builder -> builder.setManifest(androidManifest("com.test.app")))
+            .addModule(
+                "assetpack1",
+                builder ->
+                    builder
+                        .addFile("assets/textures#countries_latam#tier_2/texture.dat")
+                        .addFile("assets/textures#countries_latam#tier_1/texture.dat")
+                        .addFile("assets/textures#countries_latam#tier_0/texture.dat")
+                        .addFile("assets/textures#countries_sea#tier_2/texture.dat")
+                        .addFile("assets/textures#countries_sea#tier_1/texture.dat")
+                        .addFile("assets/textures#countries_sea#tier_0/texture.dat")
+                        .addFile("assets/textures#tier_2/texture.dat")
+                        .addFile("assets/textures#tier_1/texture.dat")
+                        .addFile("assets/textures#tier_0/texture.dat")
+                        .setAssetsConfig(assetsConfigBuilder.build())
+                        .setManifest(
+                            androidManifestForAssetModule(
+                                "com.test.app", withInstallTimeDelivery())))
+            .setBundleConfig(
+                BundleConfigBuilder.create()
+                    .addSplitDimension(
+                        Value.COUNTRY_SET,
+                        /* negate= */ false,
+                        /* stripSuffix= */ true,
+                        /* defaultSuffix= */ "latam")
+                    .addSplitDimension(
+                        Value.DEVICE_TIER,
+                        /* negate= */ false,
+                        /* stripSuffix= */ true,
+                        /* defaultSuffix= */ "0")
+                    .build())
+            .build();
+
+    TestComponent.useTestModule(
+        this,
+        createTestModuleBuilder().withAppBundle(appBundle).withOutputPath(outputFilePath).build());
+    buildApksManager.execute();
+
+    BuildApksResult.Builder expectedBuildApksResultBuilder = BuildApksResult.newBuilder();
+    TextFormat.merge(
+        TestData.openReader("testdata/nested_targeting/country_tier_toc.textpb"),
+        expectedBuildApksResultBuilder);
+    BuildApksResult expectedBuildApksResult = expectedBuildApksResultBuilder.build();
+    ZipFile apkSetFile = openZipFile(outputFilePath.toFile());
+    BuildApksResult generatedBuildApksResult = extractTocFromApkSetFile(apkSetFile, outputDir);
+    assertThat(generatedBuildApksResult)
+        .comparingExpectedFieldsOnly()
+        .isEqualTo(expectedBuildApksResult);
+    expectedBuildApksResult.getAssetSliceSetList().stream()
+        .flatMap(assetSliceSet -> assetSliceSet.getApkDescriptionList().stream())
+        .forEach(assetSlice -> assertThat(apkSetFile).hasFile(assetSlice.getPath()));
+    expectedBuildApksResult.getVariantList().stream()
+        .flatMap(variant -> variant.getApkSetList().stream())
+        .flatMap(apkSet -> apkSet.getApkDescriptionList().stream())
+        .forEach(splitApk -> assertThat(apkSetFile).hasFile(splitApk.getPath()));
+  }
+
+  @Test
   public void buildApksCommand_standalone_oneModuleOneVariant() throws Exception {
     AppBundle appBundle =
         new AppBundleBuilder()
@@ -3431,6 +3631,96 @@ public class BuildApksManagerTest {
       assertThat(x64Zip).hasFile("assets/strings#lang_fr/trans.txt");
       assertThat(x64Zip).hasFile("assets/textures#tcf_atc/texture.dat");
       assertThat(x64Zip).hasFile("assets/textures#tcf_etc1/texture.dat");
+    }
+  }
+
+  @Test
+  public void buildApksCommand_standalone_standaloneFeatureModules_mixedTargeting()
+      throws Exception {
+    AppBundle appBundle =
+        new AppBundleBuilder()
+            .setBundleConfig(
+                BundleConfigBuilder.create()
+                    .setFeatureModulesModeForStandalone(FeatureModulesMode.SEPARATE_FEATURE_MODULES)
+                    .build())
+            .addModule(
+                "base",
+                builder ->
+                    builder
+                        .setManifest(androidManifest("com.test.app"))
+                        .setResourceTable(resourceTableWithTestLabel("Test feature")))
+            .addModule(
+                "feature_abi_lib",
+                builder ->
+                    builder
+                        .addFile("assets/a.txt")
+                        .addFile("lib/x86/libfeature.so")
+                        .addFile("lib/x86_64/libfeature.so")
+                        .setNativeConfig(
+                            nativeLibraries(
+                                targetedNativeDirectory("lib/x86", nativeDirectoryTargeting(X86)),
+                                targetedNativeDirectory(
+                                    "lib/x86_64", nativeDirectoryTargeting(X86_64))))
+                        .setManifest(
+                            androidManifestForFeature(
+                                "com.test.app",
+                                withTitle("@string/test_label", TEST_LABEL_RESOURCE_ID),
+                                // Disable fusing as this should not affect DFMs in
+                                // SEPARATE_FEATURE_MODULES mode.
+                                withFusingAttribute(false))))
+            .build();
+    TestComponent.useTestModule(
+        this,
+        createTestModuleBuilder()
+            .withAppBundle(appBundle)
+            .withOutputPath(outputFilePath)
+            .withOptimizationDimensions(ABI)
+            .build());
+
+    buildApksManager.execute();
+
+    ZipFile apkSetFile = openZipFile(outputFilePath.toFile());
+    BuildApksResult result = extractTocFromApkSetFile(apkSetFile, outputDir);
+
+    ImmutableListMultimap<Abi, ApkDescription> standaloneApksByAbi =
+        Multimaps.index(
+            apkDescriptions(standaloneApkVariants(result)),
+            apkDesc -> getOnlyElement(apkDesc.getTargeting().getAbiTargeting().getValueList()));
+
+    assertThat(standaloneApksByAbi.keySet()).containsExactly(toAbi(X86), toAbi(X86_64));
+    assertThat(standaloneApksByAbi.get(toAbi(X86)).stream().map(ApkDescription::getPath))
+        .containsExactly("standalones/standalone-x86.apk", "standalones/feature_abi_lib-x86.apk");
+    assertThat(standaloneApksByAbi.get(toAbi(X86_64)).stream().map(ApkDescription::getPath))
+        .containsExactly(
+            "standalones/standalone-x86_64.apk", "standalones/feature_abi_lib-x86_64.apk");
+
+    File baseX86ApkFile =
+        extractFromApkSetFile(apkSetFile, "standalones/standalone-x86.apk", outputDir);
+    File baseX64ApkFile =
+        extractFromApkSetFile(apkSetFile, "standalones/standalone-x86_64.apk", outputDir);
+    File featureX86ApkFile =
+        extractFromApkSetFile(apkSetFile, "standalones/feature_abi_lib-x86.apk", outputDir);
+    File featureX64ApkFile =
+        extractFromApkSetFile(apkSetFile, "standalones/feature_abi_lib-x86_64.apk", outputDir);
+    try (ZipFile baseX86ApkZip = new ZipFile(baseX86ApkFile)) {
+      assertThat(baseX86ApkZip).doesNotHaveFile("lib/x86/libfeature.so");
+      assertThat(baseX86ApkZip).doesNotHaveFile("lib/x86_64/libfeature.so");
+      assertThat(baseX86ApkZip).doesNotHaveFile("assets/a.txt");
+    }
+    try (ZipFile baseX64ApkZip = new ZipFile(baseX64ApkFile)) {
+      assertThat(baseX64ApkZip).doesNotHaveFile("lib/x86/libfeature.so");
+      assertThat(baseX64ApkZip).doesNotHaveFile("lib/x86_64/libfeature.so");
+      assertThat(baseX64ApkZip).doesNotHaveFile("assets/a.txt");
+    }
+    try (ZipFile featureX86ApkZip = new ZipFile(featureX86ApkFile)) {
+      assertThat(featureX86ApkZip).hasFile("lib/x86/libfeature.so");
+      assertThat(featureX86ApkZip).doesNotHaveFile("lib/x86_64/libfeature.so");
+      assertThat(featureX86ApkZip).hasFile("assets/a.txt");
+    }
+    try (ZipFile featureX64ApkZip = new ZipFile(featureX64ApkFile)) {
+      assertThat(featureX64ApkZip).doesNotHaveFile("lib/x86/libfeature.so");
+      assertThat(featureX64ApkZip).hasFile("lib/x86_64/libfeature.so");
+      assertThat(featureX64ApkZip).hasFile("assets/a.txt");
     }
   }
 

@@ -16,6 +16,7 @@
 
 package com.android.tools.build.bundletool.validation;
 
+import static com.android.tools.build.bundletool.model.RuntimeEnabledSdkVersionEncoder.SDK_PATCH_VERSION_MAX_VALUE;
 import static com.android.tools.build.bundletool.model.RuntimeEnabledSdkVersionEncoder.VERSION_MAJOR_MAX_VALUE;
 import static com.android.tools.build.bundletool.model.RuntimeEnabledSdkVersionEncoder.VERSION_MINOR_MAX_VALUE;
 import static com.google.common.collect.ImmutableList.toImmutableList;
@@ -124,6 +125,12 @@ public final class RuntimeEnabledSdkConfigValidator extends SubValidator {
         runtimeEnabledSdk.getBuildTimeVersionPatch() >= 0,
         "Found dependency on runtime-enabled SDK '%s' with a negative patch version.",
         runtimeEnabledSdk.getPackageName());
+    validate(
+        runtimeEnabledSdk.getBuildTimeVersionPatch() <= SDK_PATCH_VERSION_MAX_VALUE,
+        "Found dependency on runtime-enabled SDK '%s' with illegal patch version. Patch"
+            + " version must be <= %d.",
+        runtimeEnabledSdk.getPackageName(),
+        SDK_PATCH_VERSION_MAX_VALUE);
     validate(
         FingerprintDigestValidator.isValidFingerprintDigest(
             runtimeEnabledSdk.getCertificateDigest()),

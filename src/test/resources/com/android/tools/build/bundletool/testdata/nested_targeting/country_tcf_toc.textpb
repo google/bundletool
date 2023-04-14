@@ -1,0 +1,370 @@
+variant {
+  targeting {
+    sdk_version_targeting {
+      value {
+        min {
+          value: 1
+        }
+      }
+      alternatives {
+        min {
+          value: 21
+        }
+      }
+    }
+    texture_compression_format_targeting {
+      value {
+        alias: ASTC
+      }
+    }
+  }
+  apk_set {
+    module_metadata {
+      name: "base"
+      targeting {
+      }
+      delivery_type: INSTALL_TIME
+      module_type: FEATURE_MODULE
+    }
+    apk_description {
+      targeting {
+        texture_compression_format_targeting {
+          value {
+            alias: ASTC
+          }
+        }
+        country_set_targeting {
+          value: "latam"
+        }
+      }
+      path: "standalones/standalone-astc_countries_latam.apk"
+      standalone_apk_metadata {
+        fused_module_name: "assetpack1"
+        fused_module_name: "base"
+      }
+    }
+  }
+  variant_properties {
+  }
+}
+variant {
+  targeting {
+    sdk_version_targeting {
+      value {
+        min {
+          value: 21
+        }
+      }
+      alternatives {
+        min {
+          value: 1
+        }
+      }
+    }
+  }
+  apk_set {
+    module_metadata {
+      name: "base"
+      targeting {
+      }
+      delivery_type: INSTALL_TIME
+      module_type: FEATURE_MODULE
+    }
+    apk_description {
+      targeting {
+        sdk_version_targeting {
+          value {
+            min {
+              value: 21
+            }
+          }
+        }
+      }
+      path: "splits/base-master.apk"
+      split_apk_metadata {
+        is_master_split: true
+      }
+    }
+  }
+  variant_number: 1
+  variant_properties {
+  }
+}
+asset_slice_set {
+  asset_module_metadata {
+    name: "assetpack1"
+    instant_metadata {
+    }
+    delivery_type: INSTALL_TIME
+  }
+  apk_description {
+    targeting {
+      sdk_version_targeting {
+        value {
+          min {
+            value: 21
+          }
+        }
+      }
+      texture_compression_format_targeting {
+        value {
+          alias: ASTC
+        }
+        alternatives {
+          alias: PVRTC
+        }
+      }
+      country_set_targeting {
+        value: "latam"
+        alternatives: "sea"
+      }
+    }
+    path: "asset-slices/assetpack1-astc_countries_latam.apk"
+    asset_slice_metadata {
+      split_id: "assetpack1.config.astc_countries_latam"
+    }
+  }
+  apk_description {
+    targeting {
+      sdk_version_targeting {
+        value {
+          min {
+            value: 21
+          }
+        }
+      }
+      texture_compression_format_targeting {
+        value {
+          alias: ASTC
+        }
+        alternatives {
+          alias: PVRTC
+        }
+      }
+      country_set_targeting {
+        value: "sea"
+        alternatives: "latam"
+      }
+    }
+    path: "asset-slices/assetpack1-astc_countries_sea.apk"
+    asset_slice_metadata {
+      split_id: "assetpack1.config.astc_countries_sea"
+    }
+  }
+  apk_description {
+    targeting {
+      sdk_version_targeting {
+        value {
+          min {
+            value: 21
+          }
+        }
+      }
+      texture_compression_format_targeting {
+        value {
+          alias: ASTC
+        }
+        alternatives {
+          alias: PVRTC
+        }
+      }
+      country_set_targeting {
+        alternatives: "latam"
+        alternatives: "sea"
+      }
+    }
+    path: "asset-slices/assetpack1-astc_other_countries.apk"
+    asset_slice_metadata {
+      split_id: "assetpack1.config.astc_other_countries"
+    }
+  }
+  apk_description {
+    targeting {
+      sdk_version_targeting {
+        value {
+          min {
+            value: 21
+          }
+        }
+      }
+      texture_compression_format_targeting {
+        value {
+          alias: PVRTC
+        }
+        alternatives {
+          alias: ASTC
+        }
+      }
+      country_set_targeting {
+        value: "latam"
+        alternatives: "sea"
+      }
+    }
+    path: "asset-slices/assetpack1-pvrtc_countries_latam.apk"
+    asset_slice_metadata {
+      split_id: "assetpack1.config.pvrtc_countries_latam"
+    }
+  }
+  apk_description {
+    targeting {
+      sdk_version_targeting {
+        value {
+          min {
+            value: 21
+          }
+        }
+      }
+      texture_compression_format_targeting {
+        value {
+          alias: PVRTC
+        }
+        alternatives {
+          alias: ASTC
+        }
+      }
+      country_set_targeting {
+        value: "sea"
+        alternatives: "latam"
+      }
+    }
+    path: "asset-slices/assetpack1-pvrtc_countries_sea.apk"
+    asset_slice_metadata {
+      split_id: "assetpack1.config.pvrtc_countries_sea"
+    }
+  }
+  apk_description {
+    targeting {
+      sdk_version_targeting {
+        value {
+          min {
+            value: 21
+          }
+        }
+      }
+      texture_compression_format_targeting {
+        value {
+          alias: PVRTC
+        }
+        alternatives {
+          alias: ASTC
+        }
+      }
+      country_set_targeting {
+        alternatives: "latam"
+        alternatives: "sea"
+      }
+    }
+    path: "asset-slices/assetpack1-pvrtc_other_countries.apk"
+    asset_slice_metadata {
+      split_id: "assetpack1.config.pvrtc_other_countries"
+    }
+  }
+  apk_description {
+    targeting {
+      sdk_version_targeting {
+        value {
+          min {
+            value: 21
+          }
+        }
+      }
+      texture_compression_format_targeting {
+        alternatives {
+          alias: PVRTC
+        }
+        alternatives {
+          alias: ASTC
+        }
+      }
+      country_set_targeting {
+        value: "latam"
+        alternatives: "sea"
+      }
+    }
+    path: "asset-slices/assetpack1-other_tcf_countries_latam.apk"
+    asset_slice_metadata {
+      split_id: "assetpack1.config.other_tcf_countries_latam"
+    }
+  }
+  apk_description {
+    targeting {
+      sdk_version_targeting {
+        value {
+          min {
+            value: 21
+          }
+        }
+      }
+      texture_compression_format_targeting {
+        alternatives {
+          alias: PVRTC
+        }
+        alternatives {
+          alias: ASTC
+        }
+      }
+      country_set_targeting {
+        value: "sea"
+        alternatives: "latam"
+      }
+    }
+    path: "asset-slices/assetpack1-other_tcf_countries_sea.apk"
+    asset_slice_metadata {
+      split_id: "assetpack1.config.other_tcf_countries_sea"
+    }
+  }
+  apk_description {
+    targeting {
+      sdk_version_targeting {
+        value {
+          min {
+            value: 21
+          }
+        }
+      }
+      texture_compression_format_targeting {
+        alternatives {
+          alias: PVRTC
+        }
+        alternatives {
+          alias: ASTC
+        }
+      }
+      country_set_targeting {
+        alternatives: "latam"
+        alternatives: "sea"
+      }
+    }
+    path: "asset-slices/assetpack1-other_tcf_other_countries.apk"
+    asset_slice_metadata {
+      split_id: "assetpack1.config.other_tcf_other_countries"
+    }
+  }
+  apk_description {
+    targeting {
+      sdk_version_targeting {
+        value {
+          min {
+            value: 21
+          }
+        }
+      }
+    }
+    path: "asset-slices/assetpack1-master.apk"
+    asset_slice_metadata {
+      split_id: "assetpack1"
+      is_master_split: true
+    }
+  }
+}
+package_name: "com.test.app"
+local_testing_info {
+}
+default_targeting_value {
+  dimension: COUNTRY_SET
+  default_value: "latam"
+}
+default_targeting_value {
+  dimension: TEXTURE_COMPRESSION_FORMAT
+  default_value: "astc"
+}

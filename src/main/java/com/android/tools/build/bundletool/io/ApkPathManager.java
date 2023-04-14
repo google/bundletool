@@ -91,6 +91,11 @@ public class ApkPathManager {
         directory = ZipPath.create("standalones");
         apkFileName = buildName("standalone", targetingSuffix);
         break;
+      case STANDALONE_FEATURE_MODULE:
+        directory = ZipPath.create("standalones");
+        apkFileName =
+            buildName(moduleSplit.isBaseModuleSplit() ? "standalone" : moduleName, targetingSuffix);
+        break;
       case SYSTEM:
         if (moduleSplit.isBaseModuleSplit() && moduleSplit.isMasterSplit()) {
           directory = ZipPath.create("system");

@@ -35,6 +35,7 @@ import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.with
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.xmlAttribute;
 import static com.android.tools.build.bundletool.testing.ResourcesTableFactory.HDPI;
 import static com.android.tools.build.bundletool.testing.ResourcesTableFactory.LDPI;
+import static com.android.tools.build.bundletool.testing.ResourcesTableFactory.MDPI;
 import static com.android.tools.build.bundletool.testing.ResourcesTableFactory.USER_PACKAGE_OFFSET;
 import static com.android.tools.build.bundletool.testing.ResourcesTableFactory.entry;
 import static com.android.tools.build.bundletool.testing.ResourcesTableFactory.fileReference;
@@ -60,6 +61,7 @@ import static com.android.tools.build.bundletool.testing.TestUtils.extractPaths;
 import static com.android.tools.build.bundletool.testing.truth.resources.TruthResourceTable.assertThat;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.ImmutableSet.toImmutableSet;
+import static com.google.common.collect.MoreCollectors.onlyElement;
 import static com.google.common.truth.Truth.assertThat;
 import static com.google.common.truth.Truth8.assertThat;
 import static com.google.common.truth.extensions.proto.ProtoTruth.assertThat;
@@ -76,6 +78,7 @@ import com.android.bundle.Config.SplitDimension.Value;
 import com.android.bundle.Config.SplitsConfig;
 import com.android.bundle.Config.StandaloneConfig;
 import com.android.bundle.Config.StandaloneConfig.DexMergingStrategy;
+import com.android.bundle.Config.StandaloneConfig.FeatureModulesMode;
 import com.android.bundle.Config.SuffixStripping;
 import com.android.bundle.RuntimeEnabledSdkConfigProto.RuntimeEnabledSdk;
 import com.android.bundle.RuntimeEnabledSdkConfigProto.RuntimeEnabledSdkConfig;
@@ -89,6 +92,7 @@ import com.android.tools.build.bundletool.commands.CommandScoped;
 import com.android.tools.build.bundletool.model.AppBundle;
 import com.android.tools.build.bundletool.model.BundleMetadata;
 import com.android.tools.build.bundletool.model.BundleModule;
+import com.android.tools.build.bundletool.model.BundleModuleName;
 import com.android.tools.build.bundletool.model.ModuleSplit;
 import com.android.tools.build.bundletool.model.ModuleSplit.SplitType;
 import com.android.tools.build.bundletool.model.OptimizationDimension;
@@ -97,6 +101,7 @@ import com.android.tools.build.bundletool.model.utils.xmlproto.XmlProtoElement;
 import com.android.tools.build.bundletool.optimizations.ApkOptimizations;
 import com.android.tools.build.bundletool.splitters.RuntimeEnabledSdkTableInjector;
 import com.android.tools.build.bundletool.testing.AppBundleBuilder;
+import com.android.tools.build.bundletool.testing.BundleConfigBuilder;
 import com.android.tools.build.bundletool.testing.BundleModuleBuilder;
 import com.android.tools.build.bundletool.testing.ResourceTableBuilder;
 import com.android.tools.build.bundletool.testing.TestModule;
@@ -1091,6 +1096,211 @@ public class StandaloneApksGeneratorTest {
         .containsResource("com.test.app:drawable/image1")
         .onlyWithConfigs(LDPI);
     assertThat(fatApk.getResourceTable().get())
+        .containsResource("com.test.app.split:drawable/image2")
+        .onlyWithConfigs(LDPI);
+  }
+
+  @Test
+  public void manyModulesShardByNoDimension_standaloneFeatureModules_producesTwoApk()
+      throws Exception {
+    BundleModule baseModule =
+        new BundleModuleBuilder("base")
+            .addFile("lib/x86_64/libtest1.so")
+            .addFile("lib/x86/libtest1.so")
+            .setNativeConfig(
+                nativeLibraries(
+                    targetedNativeDirectory("lib/x86_64", nativeDirectoryTargeting(X86_64)),
+                    targetedNativeDirectory("lib/x86", nativeDirectoryTargeting(X86))))
+            .addFile("res/drawable-ldpi/image1.jpg")
+            .setResourceTable(
+                resourceTable(
+                    pkg(
+                        USER_PACKAGE_OFFSET,
+                        "com.test.app",
+                        type(
+                            0x01,
+                            "drawable",
+                            entry(
+                                0x01,
+                                "image1",
+                                fileReference("res/drawable-ldpi/image1.jpg", LDPI))))))
+            .setManifest(androidManifest("com.test.app"))
+            .build();
+    BundleModule featureModule =
+        new BundleModuleBuilder("feature")
+            .addFile("lib/x86_64/libtest2.so")
+            .setNativeConfig(
+                nativeLibraries(
+                    targetedNativeDirectory("lib/x86_64", nativeDirectoryTargeting(X86_64))))
+            .addFile("res/drawable-ldpi/image2.jpg")
+            .setResourceTable(
+                resourceTable(
+                    pkg(
+                        USER_PACKAGE_OFFSET + 1,
+                        "com.test.app.split",
+                        type(
+                            0x01,
+                            "drawable",
+                            entry(
+                                0x01,
+                                "image2",
+                                fileReference("res/drawable-ldpi/image2.jpg", LDPI))))))
+            .setManifest(androidManifestForFeature("com.test.app"))
+            .build();
+    AppBundle appBundle =
+        new AppBundleBuilder()
+            .setBundleConfig(
+                BundleConfigBuilder.create()
+                    .setFeatureModulesModeForStandalone(FeatureModulesMode.SEPARATE_FEATURE_MODULES)
+                    .build())
+            .addModule(baseModule)
+            .addModule(featureModule)
+            .build();
+    TestComponent.useTestModule(this, TestModule.builder().withAppBundle(appBundle).build());
+
+    ImmutableList<ModuleSplit> shards =
+        standaloneApksGenerator.generateStandaloneApks(
+            ImmutableList.of(baseModule, featureModule), NO_DIMENSIONS);
+
+    assertThat(shards).hasSize(2);
+    ModuleSplit baseApk = shards.get(0);
+    assertThat(extractPaths(baseApk.getEntries()))
+        .containsExactly(
+            "lib/x86_64/libtest1.so", "lib/x86/libtest1.so", "res/drawable-ldpi/image1.jpg");
+    assertThat(baseApk.getResourceTable().get())
+        .containsResource("com.test.app:drawable/image1")
+        .onlyWithConfigs(LDPI);
+    ModuleSplit featureApk = shards.get(1);
+    assertThat(extractPaths(featureApk.getEntries()))
+        .containsExactly("lib/x86_64/libtest2.so", "res/drawable-ldpi/image2.jpg");
+    assertThat(featureApk.getResourceTable().get())
+        .containsResource("com.test.app.split:drawable/image2")
+        .onlyWithConfigs(LDPI);
+  }
+
+  @Test
+  public void
+      manyModulesShardByAbiDensity_standaloneFeatureModules_producesTwoApksPerEachAbiAndDensity()
+          throws Exception {
+    BundleModule baseModule =
+        new BundleModuleBuilder("base")
+            .addFile("lib/x86_64/libtest1.so")
+            .addFile("lib/x86/libtest1.so")
+            .setNativeConfig(
+                nativeLibraries(
+                    targetedNativeDirectory("lib/x86_64", nativeDirectoryTargeting(X86_64)),
+                    targetedNativeDirectory("lib/x86", nativeDirectoryTargeting(X86))))
+            .addFile("res/drawable-ldpi/image1.jpg")
+            .addFile("res/drawable-mdpi/image1.jpg")
+            .setResourceTable(
+                resourceTable(
+                    pkg(
+                        USER_PACKAGE_OFFSET,
+                        "com.test.app",
+                        type(
+                            0x01,
+                            "drawable",
+                            entry(
+                                0x01,
+                                "image1",
+                                fileReference("res/drawable-ldpi/image1.jpg", LDPI),
+                                fileReference("res/drawable-mdpi/image1.jpg", MDPI))))))
+            .setManifest(androidManifest("com.test.app"))
+            .build();
+    BundleModule featureModule =
+        new BundleModuleBuilder("feature")
+            .addFile("lib/x86_64/libtest2.so")
+            .addFile("lib/x86/libtest2.so")
+            .setNativeConfig(
+                nativeLibraries(
+                    targetedNativeDirectory("lib/x86_64", nativeDirectoryTargeting(X86_64)),
+                    targetedNativeDirectory("lib/x86", nativeDirectoryTargeting(X86))))
+            .addFile("res/drawable-ldpi/image2.jpg")
+            .setResourceTable(
+                resourceTable(
+                    pkg(
+                        USER_PACKAGE_OFFSET + 1,
+                        "com.test.app.split",
+                        type(
+                            0x01,
+                            "drawable",
+                            entry(
+                                0x01,
+                                "image2",
+                                fileReference("res/drawable-ldpi/image2.jpg", LDPI))))))
+            .setManifest(androidManifestForFeature("com.test.app"))
+            .build();
+    AppBundle appBundle =
+        new AppBundleBuilder()
+            .setBundleConfig(
+                BundleConfigBuilder.create()
+                    .setFeatureModulesModeForStandalone(FeatureModulesMode.SEPARATE_FEATURE_MODULES)
+                    .build())
+            .addModule(baseModule)
+            .addModule(featureModule)
+            .build();
+    TestComponent.useTestModule(this, TestModule.builder().withAppBundle(appBundle).build());
+
+    ImmutableList<ModuleSplit> shards =
+        standaloneApksGenerator.generateStandaloneApks(
+            ImmutableList.of(baseModule, featureModule),
+            standaloneApkOptimizations(
+                OptimizationDimension.ABI, OptimizationDimension.SCREEN_DENSITY));
+
+    assertThat(shards).hasSize(28); // 2 modules each in 2 ABIs and 7 DPIs.
+
+    ApkTargeting x86Targeting = apkAbiTargeting(X86, ImmutableSet.of(X86_64));
+    ApkTargeting x64Targeting = apkAbiTargeting(X86_64, ImmutableSet.of(X86));
+    for (BundleModuleName moduleName :
+        ImmutableList.of(baseModule.getName(), featureModule.getName())) {
+      assertThat(
+              shards.stream()
+                  .filter(split -> split.getModuleName().equals(moduleName))
+                  .map(ModuleSplit::getApkTargeting))
+          .containsExactly(
+              mergeApkTargeting(x86Targeting, LDPI_TARGETING),
+              mergeApkTargeting(x86Targeting, MDPI_TARGETING),
+              mergeApkTargeting(x86Targeting, HDPI_TARGETING),
+              mergeApkTargeting(x86Targeting, XHDPI_TARGETING),
+              mergeApkTargeting(x86Targeting, XXHDPI_TARGETING),
+              mergeApkTargeting(x86Targeting, XXXHDPI_TARGETING),
+              mergeApkTargeting(x86Targeting, TVDPI_TARGETING),
+              mergeApkTargeting(x64Targeting, LDPI_TARGETING),
+              mergeApkTargeting(x64Targeting, MDPI_TARGETING),
+              mergeApkTargeting(x64Targeting, HDPI_TARGETING),
+              mergeApkTargeting(x64Targeting, XHDPI_TARGETING),
+              mergeApkTargeting(x64Targeting, XXHDPI_TARGETING),
+              mergeApkTargeting(x64Targeting, XXXHDPI_TARGETING),
+              mergeApkTargeting(x64Targeting, TVDPI_TARGETING));
+    }
+    ModuleSplit baseX86Mdpi =
+        shards.stream()
+            .filter(
+                moduleSplit ->
+                    moduleSplit.isBaseModuleSplit()
+                        && moduleSplit
+                            .getApkTargeting()
+                            .equals(mergeApkTargeting(x86Targeting, MDPI_TARGETING)))
+            .collect(onlyElement());
+    assertThat(extractPaths(baseX86Mdpi.getEntries()))
+        .containsExactly("lib/x86/libtest1.so", "res/drawable-mdpi/image1.jpg");
+    assertThat(baseX86Mdpi.getResourceTable().get())
+        .containsResource("com.test.app:drawable/image1")
+        .onlyWithConfigs(MDPI);
+
+    ModuleSplit featureX86Mdpi =
+        shards.stream()
+            .filter(
+                moduleSplit ->
+                    !moduleSplit.isBaseModuleSplit()
+                        && moduleSplit
+                            .getApkTargeting()
+                            .equals(mergeApkTargeting(x86Targeting, MDPI_TARGETING)))
+            .collect(onlyElement());
+    assertThat(extractPaths(featureX86Mdpi.getEntries()))
+        .containsExactly("lib/x86/libtest2.so", "res/drawable-ldpi/image2.jpg");
+    // Here we check LDPI resource in MDPI shard because this resource does not have MDPI version.
+    assertThat(featureX86Mdpi.getResourceTable().get())
         .containsResource("com.test.app.split:drawable/image2")
         .onlyWithConfigs(LDPI);
   }

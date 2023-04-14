@@ -24,6 +24,7 @@ import static java.util.Comparator.comparing;
 import com.android.bundle.Targeting.Abi;
 import com.android.bundle.Targeting.AbiTargeting;
 import com.android.bundle.Targeting.ApkTargeting;
+import com.android.bundle.Targeting.AssetsDirectoryTargeting;
 import com.android.bundle.Targeting.CountrySetTargeting;
 import com.android.bundle.Targeting.DeviceTierTargeting;
 import com.android.bundle.Targeting.LanguageTargeting;
@@ -121,6 +122,28 @@ public final class TargetingNormalizer {
       normalized.setTextureCompressionFormatTargeting(
           normalizeTextureCompressionFormatTargeting(
               targeting.getTextureCompressionFormatTargeting()));
+    }
+    return normalized.build();
+  }
+
+  public static AssetsDirectoryTargeting normalizeAssetsDirectoryTargeting(
+      AssetsDirectoryTargeting targeting) {
+    AssetsDirectoryTargeting.Builder normalized = targeting.toBuilder();
+    if (targeting.hasAbi()) {
+      normalized.setAbi(normalizeAbiTargeting(targeting.getAbi()));
+    }
+    if (targeting.hasCountrySet()) {
+      normalized.setCountrySet(normalizeCountrySetTargeting(targeting.getCountrySet()));
+    }
+    if (targeting.hasDeviceTier()) {
+      normalized.setDeviceTier(normalizeDeviceTierTargeting(targeting.getDeviceTier()));
+    }
+    if (targeting.hasLanguage()) {
+      normalized.setLanguage(normalizeLanguageTargeting(targeting.getLanguage()));
+    }
+    if (targeting.hasTextureCompressionFormat()) {
+      normalized.setTextureCompressionFormat(
+          normalizeTextureCompressionFormatTargeting(targeting.getTextureCompressionFormat()));
     }
     return normalized.build();
   }

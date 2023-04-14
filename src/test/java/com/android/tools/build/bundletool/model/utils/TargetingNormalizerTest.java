@@ -27,6 +27,7 @@ import static com.android.tools.build.bundletool.testing.TargetingUtils.toScreen
 import static com.google.common.truth.extensions.proto.ProtoTruth.assertThat;
 
 import com.android.bundle.Targeting.ApkTargeting;
+import com.android.bundle.Targeting.AssetsDirectoryTargeting;
 import com.android.bundle.Targeting.ScreenDensityTargeting;
 import com.android.bundle.Targeting.VariantTargeting;
 import com.android.tools.build.bundletool.testing.ProtoFuzzer;
@@ -105,5 +106,22 @@ public class TargetingNormalizerTest {
     // This would typically happen when the targeting proto is extended by a new dimension.
     assertThat(TargetingNormalizer.normalizeVariantTargeting(variantTargeting))
         .isEqualTo(TargetingNormalizer.normalizeVariantTargeting(shuffledVariantTargeting));
+  }
+
+  @Test
+  public void normalizeAssetsDirectoryTargeting_allTargetingDimensionsAreHandled() {
+    AssetsDirectoryTargeting assetsDirectoryTargeting =
+        ProtoFuzzer.randomProtoMessage(AssetsDirectoryTargeting.class);
+    AssetsDirectoryTargeting shuffledAssetsDirectoryTargeting =
+        ProtoFuzzer.shuffleRepeatedFields(assetsDirectoryTargeting);
+    // Sanity-check that the testing data was generated alright.
+    assertThat(assetsDirectoryTargeting).isNotEqualTo(shuffledAssetsDirectoryTargeting);
+
+    // The following check fails, if the normalizing logic forgets to handle some dimension.
+    // This would typically happen when the targeting proto is extended by a new dimension.
+    assertThat(TargetingNormalizer.normalizeAssetsDirectoryTargeting(assetsDirectoryTargeting))
+        .isEqualTo(
+            TargetingNormalizer.normalizeAssetsDirectoryTargeting(
+                shuffledAssetsDirectoryTargeting));
   }
 }

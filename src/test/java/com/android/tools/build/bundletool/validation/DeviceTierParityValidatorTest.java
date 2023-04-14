@@ -188,4 +188,20 @@ public class DeviceTierParityValidatorTest {
             "All modules with device tier targeting must support the same contiguous"
                 + " range of tier values starting from 0, but module 'a' supports [0, 2].");
   }
+
+  @Test
+  public void validateAllModules_withNestedTargeting_succeeds() {
+    BundleModule moduleA =
+        new BundleModuleBuilder("a")
+            .addFile("assets/img1#countries_latam#tier_1/image.jpg")
+            .addFile("assets/img1#countries_latam#tier_0/image.jpg")
+            .addFile("assets/img1#countries_latam/image.jpg")
+            .addFile("assets/img1#tier_1/image.jpg")
+            .addFile("assets/img1#tier_0/image.jpg")
+            .addFile("assets/img1/image.jpg")
+            .setManifest(androidManifest("com.test.app"))
+            .build();
+
+    new DeviceTierParityValidator().validateAllModules(ImmutableList.of(moduleA));
+  }
 }

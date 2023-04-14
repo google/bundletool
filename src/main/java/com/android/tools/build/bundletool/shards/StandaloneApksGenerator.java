@@ -18,10 +18,18 @@ package com.android.tools.build.bundletool.shards;
 
 import static com.android.tools.build.bundletool.model.targeting.TargetingUtils.standaloneApkVariantTargeting;
 import static com.google.common.collect.ImmutableList.toImmutableList;
+import static com.google.common.collect.ImmutableListMultimap.toImmutableListMultimap;
+import static com.google.common.collect.ImmutableMap.toImmutableMap;
+import static com.google.common.collect.ImmutableSet.toImmutableSet;
 
+import com.android.bundle.Targeting;
+import com.android.bundle.Targeting.ApkTargeting;
+import com.android.tools.build.bundletool.mergers.AndroidManifestMerger;
 import com.android.tools.build.bundletool.mergers.ModuleSplitsToShardMerger;
+import com.android.tools.build.bundletool.model.AndroidManifest;
 import com.android.tools.build.bundletool.model.AppBundle;
 import com.android.tools.build.bundletool.model.BundleModule;
+import com.android.tools.build.bundletool.model.BundleModuleName;
 import com.android.tools.build.bundletool.model.ModuleEntry;
 import com.android.tools.build.bundletool.model.ModuleSplit;
 import com.android.tools.build.bundletool.model.ModuleSplit.SplitType;
@@ -32,11 +40,14 @@ import com.android.tools.build.bundletool.splitters.BinaryArtProfilesInjector;
 import com.android.tools.build.bundletool.splitters.CodeTransparencyInjector;
 import com.android.tools.build.bundletool.splitters.RuntimeEnabledSdkTableInjector;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableListMultimap;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Maps;
 import java.nio.file.Path;
 import java.util.Map;
 import java.util.Optional;
+import java.util.function.Function;
 import javax.inject.Inject;
 
 /** Generates standalone APKs sharded by required dimensions. */
@@ -46,6 +57,7 @@ public class StandaloneApksGenerator {
   private final ModuleSplitterForShards moduleSplitter;
   private final Sharder sharder;
   private final ModuleSplitsToShardMerger shardsMerger;
+  private final AppBundle appBundle;
   private final CodeTransparencyInjector codeTransparencyInjector;
   private final BinaryArtProfilesInjector binaryArtProfilesInjector;
   private final RuntimeEnabledSdkTableInjector runtimeEnabledSdkTableInjector;
@@ -61,6 +73,7 @@ public class StandaloneApksGenerator {
     this.moduleSplitter = moduleSplitter;
     this.sharder = sharder;
     this.shardsMerger = shardsMerger;
+    this.appBundle = appBundle;
     this.codeTransparencyInjector = new CodeTransparencyInjector(appBundle);
     this.binaryArtProfilesInjector = new BinaryArtProfilesInjector(appBundle);
     this.runtimeEnabledSdkTableInjector = new RuntimeEnabledSdkTableInjector(appBundle);
@@ -100,15 +113,123 @@ public class StandaloneApksGenerator {
                         .stream())
             .collect(toImmutableList());
 
+    switch (appBundle
+        .getBundleConfig()
+        .getOptimizations()
+        .getStandaloneConfig()
+        .getFeatureModulesMode()) {
+      case SEPARATE_FEATURE_MODULES:
+        return generateStandaloneApkWithStandaloneFeatureModules(splits);
+      default:
+        return generateStandaloneApkWithFusedModule(splits);
+    }
+  }
+
+  private ImmutableList<ModuleSplit> generateStandaloneApkWithFusedModule(
+      ImmutableList<ModuleSplit> splits) {
     Map<ImmutableSet<ModuleEntry>, ImmutableList<Path>> dexCache = Maps.newHashMap();
     return sharder.groupSplitsToShards(splits).stream()
         .map(unfusedShard -> shardsMerger.mergeSingleShard(unfusedShard, dexCache))
         .map(StandaloneApksGenerator::setVariantTargetingAndSplitType)
-        .map(this::writeSourceStampInManifest)
-        .map(codeTransparencyInjector::inject)
-        .map(binaryArtProfilesInjector::inject)
-        .map(runtimeEnabledSdkTableInjector::inject)
+        .map(this::injectAdditionalEntriesIntoStandaloneApk)
         .collect(toImmutableList());
+  }
+
+  private ImmutableList<ModuleSplit> generateStandaloneApkWithStandaloneFeatureModules(
+      ImmutableList<ModuleSplit> splits) {
+    ImmutableListMultimap<BundleModuleName, ModuleSplit> splitsByModuleName =
+        splits.stream()
+            .collect(toImmutableListMultimap(ModuleSplit::getModuleName, Function.identity()));
+
+    ImmutableSet<ApkTargeting> uniqueApkTargetingFromAllModules =
+        splits.stream().map(ModuleSplit::getApkTargeting).collect(toImmutableSet());
+
+    return splitsByModuleName.keySet().stream()
+        .flatMap(
+            featureModuleName ->
+                generateStandaloneApkForFeatureModule(
+                    appBundle.getModule(featureModuleName),
+                    splitsByModuleName.get(featureModuleName),
+                    uniqueApkTargetingFromAllModules)
+                    .stream())
+        .collect(toImmutableList());
+  }
+
+  private ImmutableList<ModuleSplit> generateStandaloneApkForFeatureModule(
+      BundleModule featureModule,
+      ImmutableList<ModuleSplit> featureModuleSplit,
+      ImmutableSet<ApkTargeting> uniqueApkTargeting) {
+    // First we take all splits which are available in this module by their targeting.
+    ImmutableMap<ApkTargeting, ModuleSplit> featureSplitByTargeting =
+        featureModuleSplit.stream()
+            .collect(toImmutableMap(ModuleSplit::getApkTargeting, Function.identity()));
+    // Next we enrich empty module splits (without content) with targeting that is not used by this
+    // feature.
+    //
+    // If feature module doesn't contain native libraries but base module does (or vice-versa) we
+    // need to emulate
+    // ABI splits for feature module in order for {@link Sharder#groupSplitsToShards} to produce
+    // feature module
+    // APKs targeted by ABI dimension.
+    //
+    // For example: AAB with the following structure
+    //    base
+    //    |-- lib
+    //    |   |-- armeabi-v7a
+    //    |   |-- arm64-v8a
+    //    feature
+    // should produce: base-armeabi_v7a.apk, base-arm64_v8a.apk, feature_armeabi_v7a.apk,
+    // feature-arm64_v8a.apk.
+    // As they later will be grouped into two variants:
+    //   variant=1 (targeting ABI=armeabi-v7a): base-armeabi_v7a.apk, feature_armeabi_v7a.apk
+    //   variant=2 (targeting ABI=arm64-v8a): base-arm64_v8a.apk, feature-arm64_v8a.apk
+    ImmutableList<ModuleSplit> enrichedFeatureSplits =
+        uniqueApkTargeting.stream()
+            .map(
+                apkTargeting ->
+                    featureSplitByTargeting.getOrDefault(
+                        apkTargeting, createEmptyConfigSplit(featureModule, apkTargeting)))
+            .collect(toImmutableList());
+
+    return sharder.groupSplitsToShards(enrichedFeatureSplits).stream()
+        .map(
+            unfusedShard ->
+                shardsMerger.mergeSingleShard(
+                    unfusedShard,
+                    /* mergedDexCache= */ Maps.newHashMap(),
+                    SplitType.STANDALONE_FEATURE_MODULE,
+                    AndroidManifestMerger.manifestOverride(featureModule.getAndroidManifest())))
+        .map(
+            shard ->
+                setVariantTargetingAndSplitTypeForStandaloneFeatureModule(
+                    featureModule.getName(), shard))
+        .map(
+            shard ->
+                featureModule.isBaseModule()
+                    ? injectAdditionalEntriesIntoStandaloneApk(shard)
+                    : shard)
+        .collect(toImmutableList());
+  }
+
+  private ModuleSplit createEmptyConfigSplit(
+      BundleModule featureModule, ApkTargeting apkTargeting) {
+    return ModuleSplit.builder()
+        .setAndroidManifest(
+            AndroidManifest.create(
+                AndroidManifest.createMinimalManifestTag(), appBundle.getVersion()))
+        .setModuleName(featureModule.getName())
+        .setApkTargeting(apkTargeting)
+        .setVariantTargeting(Targeting.VariantTargeting.getDefaultInstance())
+        .setMasterSplit(false)
+        .build();
+  }
+
+  private ModuleSplit injectAdditionalEntriesIntoStandaloneApk(ModuleSplit moduleSplit) {
+    ModuleSplit result = writeSourceStampInManifest(moduleSplit);
+    result = codeTransparencyInjector.inject(result);
+    result = binaryArtProfilesInjector.inject(result);
+    result = runtimeEnabledSdkTableInjector.inject(result);
+    return result;
   }
 
   /** Sets the variant targeting and split type to standalone. */
@@ -116,6 +237,15 @@ public class StandaloneApksGenerator {
     return shard.toBuilder()
         .setVariantTargeting(standaloneApkVariantTargeting(shard))
         .setSplitType(SplitType.STANDALONE)
+        .build();
+  }
+
+  public static ModuleSplit setVariantTargetingAndSplitTypeForStandaloneFeatureModule(
+      BundleModuleName moduleName, ModuleSplit shard) {
+    return shard.toBuilder()
+        .setModuleName(moduleName)
+        .setVariantTargeting(standaloneApkVariantTargeting(shard))
+        .setSplitType(SplitType.STANDALONE_FEATURE_MODULE)
         .build();
   }
 

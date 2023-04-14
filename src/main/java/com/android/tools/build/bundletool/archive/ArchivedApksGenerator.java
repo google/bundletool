@@ -19,6 +19,7 @@ package com.android.tools.build.bundletool.archive;
 import static com.google.common.base.Preconditions.checkNotNull;
 
 import com.android.aapt.Resources.ResourceTable;
+import com.android.tools.build.bundletool.commands.BuildApksModule.DifferentThemesForTvAndPhone;
 import com.android.tools.build.bundletool.io.ResourceReader;
 import com.android.tools.build.bundletool.model.AndroidManifest;
 import com.android.tools.build.bundletool.model.AppBundle;
@@ -48,11 +49,13 @@ import javax.inject.Inject;
 public final class ArchivedApksGenerator {
   private final ResourceReader resourceReader;
   private final ArchivedResourcesHelper archivedResourcesHelper;
+  private final boolean createDifferentThemesForTvAndPhone;
 
   @Inject
-  ArchivedApksGenerator() {
+  ArchivedApksGenerator(@DifferentThemesForTvAndPhone boolean createDifferentThemesForTvAndPhone) {
     resourceReader = new ResourceReader();
     archivedResourcesHelper = new ArchivedResourcesHelper(resourceReader);
+    this.createDifferentThemesForTvAndPhone = createDifferentThemesForTvAndPhone;
   }
 
   public ModuleSplit generateArchivedApk(
@@ -62,7 +65,8 @@ public final class ArchivedApksGenerator {
     BundleModule baseModule = appBundle.getBaseModule();
 
     AndroidManifest archivedManifest =
-        ArchivedAndroidManifestUtils.createArchivedManifest(baseModule.getAndroidManifest());
+        ArchivedAndroidManifestUtils.createArchivedManifest(
+            baseModule.getAndroidManifest(), createDifferentThemesForTvAndPhone);
     ResourceTable archivedResourceTable =
         getArchivedResourceTable(appBundle, baseModule, archivedManifest);
 
@@ -87,7 +91,7 @@ public final class ArchivedApksGenerator {
 
     archivedManifest =
         ArchivedAndroidManifestUtils.updateArchivedIconsAndTheme(
-            archivedManifest, extraResourceNameToIdMap);
+            archivedManifest, extraResourceNameToIdMap, createDifferentThemesForTvAndPhone);
 
     ModuleSplit moduleSplit =
         ModuleSplit.forArchive(

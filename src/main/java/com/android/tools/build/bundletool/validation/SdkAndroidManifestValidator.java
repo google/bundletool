@@ -18,10 +18,10 @@ package com.android.tools.build.bundletool.validation;
 
 import static com.android.tools.build.bundletool.model.AndroidManifest.ACTIVITY_ELEMENT_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.INSTALL_LOCATION_ATTRIBUTE_NAME;
+import static com.android.tools.build.bundletool.model.AndroidManifest.META_DATA_ELEMENT_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.PERMISSION_ELEMENT_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.PERMISSION_GROUP_ELEMENT_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.PERMISSION_TREE_ELEMENT_NAME;
-import static com.android.tools.build.bundletool.model.AndroidManifest.PROPERTY_ELEMENT_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.PROVIDER_ELEMENT_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.RECEIVER_ELEMENT_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.SDK_LIBRARY_ELEMENT_NAME;
@@ -40,7 +40,7 @@ public class SdkAndroidManifestValidator extends SubValidator {
   public void validateModule(BundleModule module) {
     AndroidManifest manifest = module.getAndroidManifest();
     validateNoSdkLibraryElement(manifest);
-    validateNoSdkPatchVersionProperty(manifest);
+    validateNoSdkPatchVersionMetadata(manifest);
     validateInternalOnlyIfInstallLocationSet(manifest);
     validateNoPermissions(manifest);
     validateNoSharedUserId(manifest);
@@ -57,12 +57,12 @@ public class SdkAndroidManifestValidator extends SubValidator {
     }
   }
 
-  private void validateNoSdkPatchVersionProperty(AndroidManifest manifest) {
-    if (manifest.getSdkPatchVersionProperty().isPresent()) {
+  private void validateNoSdkPatchVersionMetadata(AndroidManifest manifest) {
+    if (manifest.getSdkPatchVersionMetadata().isPresent()) {
       throw InvalidBundleException.builder()
           .withUserMessage(
               "<%s> cannot be declared with name='%s' in the manifest of an SDK bundle.",
-              PROPERTY_ELEMENT_NAME, SDK_PATCH_VERSION_ATTRIBUTE_NAME)
+              META_DATA_ELEMENT_NAME, SDK_PATCH_VERSION_ATTRIBUTE_NAME)
           .build();
     }
   }

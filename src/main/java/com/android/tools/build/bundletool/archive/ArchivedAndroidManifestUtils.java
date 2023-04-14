@@ -90,7 +90,8 @@ public final class ArchivedAndroidManifestUtils {
           AndroidManifest.PERMISSION_GROUP_ELEMENT_NAME,
           AndroidManifest.PERMISSION_TREE_ELEMENT_NAME);
 
-  public static AndroidManifest createArchivedManifest(AndroidManifest manifest) {
+  public static AndroidManifest createArchivedManifest(
+      AndroidManifest manifest, boolean createDifferentThemesForTvAndPhone) {
     checkNotNull(manifest);
 
     ManifestEditor editor =
@@ -130,7 +131,27 @@ public final class ArchivedAndroidManifestUtils {
     CHILDREN_ELEMENTS_TO_KEEP.forEach(
         elementName -> editor.copyChildrenElements(manifest, elementName));
 
-    editor.addActivity(createReactivateActivity(manifest));
+    if (createDifferentThemesForTvAndPhone) {
+      if (manifest.hasMainActivity()) {
+        editor.addActivity(
+            createReactivateActivity(
+                IntentFilter.builder()
+                    .addActionName(MAIN_ACTION_NAME)
+                    .addCategoryName(LAUNCHER_CATEGORY_NAME)
+                    .build()));
+      }
+      if (manifest.hasMainTvActivity()) {
+        editor.addActivity(
+            createReactivateActivity(
+                IntentFilter.builder()
+                    .addActionName(MAIN_ACTION_NAME)
+                    .addCategoryName(LEANBACK_LAUNCHER_CATEGORY_NAME)
+                    .build()));
+      }
+    } else {
+      editor.addActivity(createReactivateActivity(manifest));
+    }
+
     editor.addReceiver(createUpdateBroadcastReceiver());
     addTvSupportIfRequired(editor, manifest);
 
@@ -145,7 +166,9 @@ public final class ArchivedAndroidManifestUtils {
   }
 
   public static AndroidManifest updateArchivedIconsAndTheme(
-      AndroidManifest manifest, ImmutableMap<String, Integer> resourceNameToIdMap) {
+      AndroidManifest manifest,
+      ImmutableMap<String, Integer> resourceNameToIdMap,
+      boolean createDifferentThemesForTvAndPhone) {
     ManifestEditor archivedManifestEditor = manifest.toEditor();
 
     if (manifest.getIconAttribute().isPresent()
@@ -159,11 +182,38 @@ public final class ArchivedAndroidManifestUtils {
           resourceNameToIdMap.get(ARCHIVED_ROUND_ICON_DRAWABLE_NAME));
     }
 
-    archivedManifestEditor.setActivityTheme(
-        REACTIVATE_ACTIVITY_NAME,
-        resourceNameToIdMap.getOrDefault(ArchivedResourcesHelper.ARCHIVED_TV_THEME_NAME, 0));
+    if (createDifferentThemesForTvAndPhone) {
+      if (manifest.hasMainActivity()) {
+        archivedManifestEditor.setActivityTheme(
+            REACTIVATE_ACTIVITY_NAME,
+            LAUNCHER_CATEGORY_NAME,
+            HOLO_LIGHT_NO_ACTION_BAR_FULSCREEN_THEME_RESOURCE_ID);
+      }
+      if (manifest.hasMainTvActivity()) {
+        archivedManifestEditor.setActivityTheme(
+            REACTIVATE_ACTIVITY_NAME,
+            LEANBACK_LAUNCHER_CATEGORY_NAME,
+            checkNotNull(resourceNameToIdMap.get(ArchivedResourcesHelper.ARCHIVED_TV_THEME_NAME))
+                .intValue());
+      }
+    } else {
+      archivedManifestEditor.setActivityTheme(
+          REACTIVATE_ACTIVITY_NAME,
+          resourceNameToIdMap.getOrDefault(ArchivedResourcesHelper.ARCHIVED_TV_THEME_NAME, 0));
+    }
 
     return archivedManifestEditor.save();
+  }
+
+  private static Activity createReactivateActivity(IntentFilter intentFilter) {
+    return Activity.builder()
+        .setName(REACTIVATE_ACTIVITY_NAME)
+        .setExported(true)
+        .setExcludeFromRecents(true)
+        .setStateNotNeeded(true)
+        .setNoHistory(true)
+        .setIntentFilter(intentFilter)
+        .build();
   }
 
   private static Activity createReactivateActivity(AndroidManifest manifest) {

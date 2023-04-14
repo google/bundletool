@@ -1,0 +1,207 @@
+directory: {
+  path: "assets/textures#tier_0#tcf_astc"
+  targeting: {
+    texture_compression_format: {
+      value: {
+        alias: ASTC
+      }
+      alternatives: {
+        alias: PVRTC
+      }
+    }
+    device_tier: {
+      value: {
+      }
+      alternatives: {
+        value: 1
+      }
+      alternatives: {
+        value: 2
+      }
+    }
+  }
+}
+directory: {
+  path: "assets/textures#tier_0#tcf_pvrtc"
+  targeting: {
+    texture_compression_format: {
+      value: {
+        alias: PVRTC
+      }
+      alternatives: {
+        alias: ASTC
+      }
+    }
+    device_tier: {
+      value: {
+      }
+      alternatives: {
+        value: 1
+      }
+      alternatives: {
+        value: 2
+      }
+    }
+  }
+}
+directory: {
+  path: "assets/textures#tier_0"
+  targeting: {
+    texture_compression_format: {
+      alternatives: {
+        alias: ASTC
+      }
+      alternatives: {
+        alias: PVRTC
+      }
+    }
+    device_tier: {
+      value: {
+      }
+      alternatives: {
+        value: 1
+      }
+      alternatives: {
+        value: 2
+      }
+    }
+  }
+}
+directory: {
+  path: "assets/textures#tier_1#tcf_astc"
+  targeting: {
+    texture_compression_format: {
+      value: {
+        alias: ASTC
+      }
+      alternatives: {
+        alias: PVRTC
+      }
+    }
+    device_tier: {
+      value: {
+        value: 1
+      }
+      alternatives: {
+        value: 2
+      }
+      alternatives: {
+      }
+    }
+  }
+}
+directory: {
+  path: "assets/textures#tier_1#tcf_pvrtc"
+  targeting: {
+    texture_compression_format: {
+      value: {
+        alias: PVRTC
+      }
+      alternatives: {
+        alias: ASTC
+      }
+    }
+    device_tier: {
+      value: {
+        value: 1
+      }
+      alternatives: {
+        value: 2
+      }
+      alternatives: {
+      }
+    }
+  }
+}
+directory: {
+  path: "assets/textures#tier_1"
+  targeting: {
+    texture_compression_format: {
+      alternatives: {
+        alias: ASTC
+      }
+      alternatives: {
+        alias: PVRTC
+      }
+    }
+    device_tier: {
+      value: {
+        value: 1
+      }
+      alternatives: {
+        value: 2
+      }
+      alternatives: {
+      }
+    }
+  }
+}
+directory: {
+  path: "assets/textures#tier_2#tcf_astc"
+  targeting: {
+    texture_compression_format: {
+      value: {
+        alias: ASTC
+      }
+      alternatives: {
+        alias: PVRTC
+      }
+    }
+    device_tier: {
+      value: {
+        value: 2
+      }
+      alternatives: {
+        value: 1
+      }
+      alternatives: {
+      }
+    }
+  }
+}
+directory: {
+  path: "assets/textures#tier_2#tcf_pvrtc"
+  targeting: {
+    texture_compression_format: {
+      value: {
+        alias: PVRTC
+      }
+      alternatives: {
+        alias: ASTC
+      }
+    }
+    device_tier: {
+      value: {
+        value: 2
+      }
+      alternatives: {
+        value: 1
+      }
+      alternatives: {
+      }
+    }
+  }
+}
+directory: {
+  path: "assets/textures#tier_2"
+  targeting: {
+    texture_compression_format: {
+      alternatives: {
+        alias: ASTC
+      }
+      alternatives: {
+        alias: PVRTC
+      }
+    }
+    device_tier: {
+      value: {
+        value: 2
+      }
+      alternatives: {
+        value: 1
+      }
+      alternatives: {
+      }
+    }
+  }
+}

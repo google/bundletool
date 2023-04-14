@@ -1,0 +1,168 @@
+directory: {
+  path: "assets/textures#countries_latam#tier_0"
+  targeting: {
+    device_tier: {
+      value: {
+      }
+      alternatives: {
+        value: 1
+      }
+      alternatives: {
+        value: 2
+      }
+    }
+    country_set: {
+      value: ["latam"]
+      alternatives: ["sea"]
+    }
+  }
+}
+directory: {
+  path: "assets/textures#countries_latam#tier_1"
+  targeting: {
+    device_tier: {
+      value: {
+        value: 1
+      }
+      alternatives: {
+        value: 2
+      }
+      alternatives: {
+      }
+    }
+    country_set: {
+      value: ["latam"]
+      alternatives: ["sea"]
+    }
+  }
+}
+directory: {
+  path: "assets/textures#countries_latam#tier_2"
+  targeting: {
+    device_tier: {
+      value: {
+        value: 2
+      }
+      alternatives: {
+        value: 1
+      }
+      alternatives: {
+      }
+    }
+    country_set: {
+      value: ["latam"]
+      alternatives: ["sea"]
+    }
+  }
+}
+directory: {
+  path: "assets/textures#countries_sea#tier_0"
+  targeting: {
+    device_tier: {
+      value: {
+      }
+      alternatives: {
+        value: 1
+      }
+      alternatives: {
+        value: 2
+      }
+    }
+    country_set: {
+      value: ["sea"]
+      alternatives: ["latam"]
+    }
+  }
+}
+directory: {
+  path: "assets/textures#countries_sea#tier_1"
+  targeting: {
+    device_tier: {
+      value: {
+        value: 1
+      }
+      alternatives: {
+        value: 2
+      }
+      alternatives: {
+      }
+    }
+    country_set: {
+      value: ["sea"]
+      alternatives: ["latam"]
+    }
+  }
+}
+directory: {
+  path: "assets/textures#countries_sea#tier_2"
+  targeting: {
+    device_tier: {
+      value: {
+        value: 2
+      }
+      alternatives: {
+        value: 1
+      }
+      alternatives: {
+      }
+    }
+    country_set: {
+      value: ["sea"]
+      alternatives: ["latam"]
+    }
+  }
+}
+directory: {
+  path: "assets/textures#tier_0"
+  targeting: {
+    device_tier: {
+      value: {
+      }
+      alternatives: {
+        value: 1
+      }
+      alternatives: {
+        value: 2
+      }
+    }
+    country_set: {
+      alternatives: ["latam", "sea"]
+    }
+  }
+}
+directory: {
+  path: "assets/textures#tier_1"
+  targeting: {
+    device_tier: {
+      value: {
+        value: 1
+      }
+      alternatives: {
+        value: 2
+      }
+      alternatives: {
+      }
+    }
+    country_set: {
+      alternatives: ["latam", "sea"]
+    }
+  }
+}
+directory: {
+  path: "assets/textures#tier_2"
+  targeting: {
+    device_tier: {
+      value: {
+        value: 2
+      }
+      alternatives: {
+        value: 1
+      }
+      alternatives: {
+      }
+    }
+    country_set: {
+      alternatives: ["latam", "sea"]
+    }
+  }
+}

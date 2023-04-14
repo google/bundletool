@@ -39,6 +39,9 @@ public final class RuntimeEnabledSdkVersionEncoder {
   /** Each major version can have 10,000 minor versions with values between [0, 10,000). */
   public static final int VERSION_MINOR_MAX_VALUE = VERSION_MAJOR_OFFSET - 1;
 
+  /** Maximum allowed value for SDK patch version. */
+  public static final int SDK_PATCH_VERSION_MAX_VALUE = 9999;
+
   /**
    * Encodes SDK major and minor version into a single {@code long}, to be used as the value of
    * android:versionMajor attribute of <sdk-library> and <uses-sdk-library> tags of the APK

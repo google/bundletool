@@ -195,6 +195,37 @@ public class DefaultSigningConfigurationProviderTest {
     assertThat(apksigSigningConfig.getSigningCertificateLineage()).isEmpty();
   }
 
+  @Test
+  public void v3SigningRestrictedToRPlus_variantTargetingRPlus_shouldSignWithV3Rotation() {
+    SigningConfiguration signingConfig =
+        signingConfigForV3Rotation.toBuilder()
+            .setMinimumV3RotationApiVersion(Optional.of(ANDROID_R_API_VERSION))
+            .build();
+    SigningConfigurationProvider signingConfigProvider =
+        new DefaultSigningConfigurationProvider(
+            signingConfig, BundleToolVersion.getCurrentVersion());
+    ModuleSplit split =
+        createModuleSplitWithMinSdk(ANDROID_Q_API_VERSION).toBuilder()
+            .setVariantTargeting(
+                VariantTargeting.newBuilder()
+                    .setSdkVersionTargeting(
+                        SdkVersionTargeting.newBuilder()
+                            .addValue(
+                                SdkVersion.newBuilder()
+                                    .setMin(
+                                        Int32Value.newBuilder().setValue(ANDROID_R_API_VERSION))))
+                    .build())
+            .build();
+
+    ApksigSigningConfiguration apksigSigningConfig =
+        signingConfigProvider.getSigningConfiguration(ApkDescription.fromModuleSplit(split));
+
+    assertThat(apksigSigningConfig.getSignerConfigs())
+        .containsExactly(oldSignerConfig, signerConfig)
+        .inOrder();
+    assertThat(apksigSigningConfig.getSigningCertificateLineage()).hasValue(lineage);
+  }
+
   private static ModuleSplit createModuleSplitWithMinSdk(int minSdkVersion) {
     return createModuleSplit().toBuilder()
         .setAndroidManifest(

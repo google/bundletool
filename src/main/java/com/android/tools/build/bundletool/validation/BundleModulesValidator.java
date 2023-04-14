@@ -52,6 +52,7 @@ public class BundleModulesValidator {
           new AndroidManifestValidator(),
           // More specific file validations.
           new EntryClashValidator(),
+          new NestedTargetingValidator(),
           new AbiParityValidator(),
           new TextureCompressionFormatParityValidator(),
           new DeviceTierParityValidator(),
