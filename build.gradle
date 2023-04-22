@@ -102,6 +102,15 @@ if (JavaVersion.current() != JavaVersion.VERSION_1_8) {
     compileJava.options.release = 8;
 }
 
+// add protobuf generated sources for correct importing project in the JntelliJ
+sourceSets {
+    main {
+        java {
+            srcDirs 'build/generated/source/proto/main/java'
+        }
+    }
+}
+
 test {
     if (osName.contains("linux")) {
         environment "AAPT2_PATH", "build/resources/main/linux/aapt2"
