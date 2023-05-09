@@ -164,6 +164,10 @@ message ModuleMetadata {
 
   // Runtime-enabled SDK dependencies of this module.
   repeated RuntimeEnabledSdkDependency runtime_enabled_sdk_dependencies = 8;
+
+  // Information about the SDK that this module was generated from.
+  // Only set for modules with module_type FeatureModuleType.SDK_MODULE.
+  optional SdkModuleMetadata sdk_module_metadata = 9;
 }
 
 // Set of asset slices belonging to a single asset module.
@@ -211,6 +215,7 @@ enum FeatureModuleType {
   UNKNOWN_MODULE_TYPE = 0;
   FEATURE_MODULE = 1;
   ML_MODULE = 2;
+  SDK_MODULE = 3;
 }
 
 message ApkDescription {
@@ -324,5 +329,29 @@ message RuntimeEnabledSdkDependency {
   // Minor version of the runtime-enabled SDK.
   // Required.
   int32 minor_version = 3;
+}
+
+// Metadata of the app module generated from a runtime-enabled SDK that the app
+// depends on.
+message SdkModuleMetadata {
+  // Version of the Runtime-enabled SDK that this module was generated from.
+  optional SdkModuleVersion sdk_module_version = 1;
+
+  // Package name of the runtime-enabled SDK that this module was generated
+  // from.
+  optional string sdk_package_name = 2;
+}
+
+// Versioning information about the SDK that the app module was generated from.
+message SdkModuleVersion {
+  // Major version of the SDK.
+  // Required.
+  optional int32 major = 1;
+  // Minor version of the SDK.
+  // Required.
+  optional int32 minor = 2;
+  // Patch version of the SDK.
+  // Required.
+  optional int32 patch = 3;
 }
 

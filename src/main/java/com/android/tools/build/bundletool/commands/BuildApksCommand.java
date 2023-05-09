@@ -1505,7 +1505,7 @@ public abstract class BuildApksCommand {
                 .setOptional(true)
                 .setDescription(
                     "When set, conditional modules with fused attribute will be fused into the"
-                        + " base module if they match the the device given by %s",
+                        + " base module if they match the device given by %s",
                     DEVICE_SPEC_FLAG.getName())
                 .build())
         .addFlag(

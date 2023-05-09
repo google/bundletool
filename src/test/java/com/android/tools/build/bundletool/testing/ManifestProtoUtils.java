@@ -25,6 +25,7 @@ import static com.android.tools.build.bundletool.model.AndroidManifest.CERTIFICA
 import static com.android.tools.build.bundletool.model.AndroidManifest.CONDITION_DEVICE_GROUPS_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.DEBUGGABLE_ATTRIBUTE_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.DEBUGGABLE_RESOURCE_ID;
+import static com.android.tools.build.bundletool.model.AndroidManifest.DECLARATIVE_WATCH_FACE_PROPERTY;
 import static com.android.tools.build.bundletool.model.AndroidManifest.DESCRIPTION_ATTRIBUTE_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.DESCRIPTION_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.DEVICE_GROUP_ELEMENT_NAME;
@@ -326,6 +327,18 @@ public final class ManifestProtoUtils {
             ManifestMutator.class));
   }
 
+  public static XmlNode androidManifestForSdkModule(
+      String packageName, ManifestMutator... manifestMutators) {
+    return androidManifest(
+        packageName,
+        ObjectArrays.concat(
+            new ManifestMutator[] {
+              withOnDemandAttribute(true), withFusingAttribute(true), withTypeAttribute("sdk")
+            },
+            manifestMutators,
+            ManifestMutator.class));
+  }
+
   public static XmlNode androidManifestForAssetModule(
       String packageName, ManifestMutator... manifestMutators) {
     XmlNode manifestNode =
@@ -575,6 +588,11 @@ public final class ManifestProtoUtils {
             .getOrCreateChildElement(DISTRIBUTION_NAMESPACE_URI, "fusing")
             .getOrCreateAttribute(DISTRIBUTION_NAMESPACE_URI, "include")
             .setValueAsBoolean(value);
+  }
+
+  public static ManifestMutator withTargetSdkVersion(int version) {
+    return withUsesSdkAttribute(
+        TARGET_SDK_VERSION_ATTRIBUTE_NAME, TARGET_SDK_VERSION_RESOURCE_ID, version);
   }
 
   public static ManifestMutator withTargetSdkVersion(String version) {
@@ -1065,6 +1083,19 @@ public final class ManifestProtoUtils {
                     .setValueAsDecimalInteger(patchVersion));
   }
 
+  /** Adds a <property> element to a Declarative Watch Face manifest. */
+  public static ManifestMutator withDwfProperty(String dwfVersion) {
+    return manifestElement ->
+        manifestElement
+            .getOrCreateChildElement(APPLICATION_ELEMENT_NAME)
+            .getOrCreateChildElement(PROPERTY_ELEMENT_NAME)
+            .addAttribute(
+                createAndroidAttribute(NAME_ATTRIBUTE_NAME, NAME_RESOURCE_ID)
+                    .setValueAsString(DECLARATIVE_WATCH_FACE_PROPERTY))
+            .addAttribute(
+                createAndroidAttribute(VALUE_ATTRIBUTE_NAME, VALUE_RESOURCE_ID)
+                    .setValueAsString(dwfVersion));
+  }
 
   /** Adds a {@value #PERMISSION_ELEMENT_NAME} element to the manifest. */
   public static ManifestMutator withPermission() {

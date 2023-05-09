@@ -169,6 +169,10 @@ public class DdmlibDevice extends Device {
     if (installOptions.getAllowTestOnly()) {
       extraArgs.add("-t");
     }
+    if (installOptions.getGrantRuntimePermissions()
+        && device.getVersion().isGreaterOrEqualThan(AndroidVersion.VersionCodes.M)) {
+      extraArgs.add("-g");
+    }
 
     try {
       if (getVersion()

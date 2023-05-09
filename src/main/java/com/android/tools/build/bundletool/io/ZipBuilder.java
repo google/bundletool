@@ -34,6 +34,7 @@ import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Enumeration;
+import java.util.GregorianCalendar;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
@@ -50,7 +51,10 @@ import javax.annotation.concurrent.GuardedBy;
  */
 public final class ZipBuilder {
   private static final long PRELOAD_INTO_MEMORY_THRESHOLD = 150 * 1024 * 1024L;
-  private static final long EPOCH = 0L;
+
+  /** Normalize timestamps. */
+  private static final long DEFAULT_TIMESTAMP =
+      new GregorianCalendar(2010, 0, 1, 0, 0, 0).getTimeInMillis();
 
   /** Entries to be output. */
   @GuardedBy("this")
@@ -78,13 +82,13 @@ public final class ZipBuilder {
             // For directories, we append "/" at the end of the file path since that's what the
             // ZipEntry class relies on.
             ZipEntry zipEntry = new ZipEntry(path + "/");
-            zipEntry.setTime(EPOCH);
+            zipEntry.setTime(DEFAULT_TIMESTAMP);
             outZip.putNextEntry(zipEntry);
             // Directories are represented as having empty content in a zip file, so we don't write
             // any bytes to the outZip for this entry.
           } else {
             ZipEntry zipEntry = new ZipEntry(path.toString());
-            zipEntry.setTime(EPOCH);
+            zipEntry.setTime(DEFAULT_TIMESTAMP);
             if (entry.hasOption(EntryOption.UNCOMPRESSED)) {
               zipEntry.setMethod(ZipEntry.STORED);
               // ZipFile API requires us to set the following properties manually for uncompressed

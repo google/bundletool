@@ -205,6 +205,26 @@ public class InstallApksCommandTest {
   }
 
   @Test
+  public void fromFlagsEquivalentToBuilder_grantRuntimePermissions() throws Exception {
+    InstallApksCommand fromFlags =
+        InstallApksCommand.fromFlags(
+            new FlagParser().parse("--apks=" + simpleApksPath, "--grant-runtime-permissions"),
+            systemEnvironmentProvider,
+            fakeServerOneDevice(lDeviceWithLocales("en-US")));
+
+    InstallApksCommand fromBuilder =
+        InstallApksCommand.builder()
+            .setApksArchivePath(simpleApksPath)
+            .setAdbPath(adbPath)
+            .setAdbServer(fromFlags.getAdbServer())
+            .setDeviceId(DEVICE_ID)
+            .setGrantRuntimePermissions(true)
+            .build();
+
+    assertThat(fromBuilder).isEqualTo(fromFlags);
+  }
+
+  @Test
   public void fromFlagsEquivalentToBuilder_androidSerialVariable() throws Exception {
     InstallApksCommand fromFlags =
         InstallApksCommand.fromFlags(

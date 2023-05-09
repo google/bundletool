@@ -63,6 +63,7 @@ public class AppBundleValidator {
           new AssetModuleFilesValidator(),
           new CodeTransparencyValidator(),
           new RuntimeEnabledSdkConfigValidator(),
+          new DeclarativeWatchFaceBundleValidator(),
           new StandaloneFeatureModulesValidator());
 
   private final ImmutableList<SubValidator> allBundleSubValidators;

@@ -2936,6 +2936,7 @@ public class BuildApksManagerTest {
         .containsExactly(sdkVersionTargeting(L_SDK_VERSION, ImmutableSet.of(LOWEST_SDK_VERSION)));
   }
 
+
   @Test
   public void dexCompressionIsNotSet_enabledByDefault() throws Exception {
     AppBundle appBundle =

@@ -143,6 +143,8 @@ public abstract class AndroidManifest {
       "android.sdksandbox.PROPERTY_SDK_PROVIDER_CLASS_NAME";
   public static final String COMPAT_SDK_PROVIDER_CLASS_NAME_ATTRIBUTE_NAME =
       "android.sdksandbox.PROPERTY_COMPAT_SDK_PROVIDER_CLASS_NAME";
+  public static final String DECLARATIVE_WATCH_FACE_PROPERTY =
+      "com.google.wear.watchface.format.version";
 
   public static final String REQUIRED_ATTRIBUTE_NAME = "required";
   public static final int SDK_SANDBOX_MIN_VERSION = ANDROID_T_API_VERSION;
@@ -170,6 +172,7 @@ public abstract class AndroidManifest {
   public static final String MODULE_TYPE_FEATURE_VALUE = "feature";
   public static final String MODULE_TYPE_ASSET_VALUE = "asset-pack";
   public static final String MODULE_TYPE_ML_VALUE = "ml-pack";
+  public static final String MODULE_TYPE_SDK_VALUE = "sdk";
 
   /** <meta-data> name that specifies native library for native activity */
   public static final String NATIVE_ACTIVITY_LIB_NAME = "android.app.lib_name";
@@ -465,6 +468,8 @@ public abstract class AndroidManifest {
         return ModuleType.ASSET_MODULE;
       case MODULE_TYPE_ML_VALUE:
         return ModuleType.ML_MODULE;
+      case MODULE_TYPE_SDK_VALUE:
+        return ModuleType.SDK_DEPENDENCY_MODULE;
       default:
         throw InvalidBundleException.builder()
             .withUserMessage("Found invalid type attribute %s for <module> element.", value)
@@ -940,6 +945,11 @@ public abstract class AndroidManifest {
    */
   public Optional<String> getCompatSdkProviderClassNameProperty() {
     return getPropertyValue(COMPAT_SDK_PROVIDER_CLASS_NAME_ATTRIBUTE_NAME)
+        .map(XmlProtoAttribute::getValueAsString);
+  }
+
+  public Optional<String> getDeclarativeWatchFaceProperty() {
+    return getPropertyValue(DECLARATIVE_WATCH_FACE_PROPERTY)
         .map(XmlProtoAttribute::getValueAsString);
   }
 

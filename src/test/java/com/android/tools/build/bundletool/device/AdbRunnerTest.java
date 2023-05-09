@@ -44,6 +44,7 @@ public class AdbRunnerTest {
       InstallOptions.builder()
           .setAllowDowngrade(false)
           .setAllowReinstall(true)
+          .setGrantRuntimePermissions(false)
           .setTimeout(Duration.ofMillis(100))
           .build();
 

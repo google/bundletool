@@ -163,6 +163,16 @@ public final class BundleValidationUtils {
         .equals(BundleConfig.BundleType.ASSET_ONLY);
   }
 
+  public static boolean isDeclarativeWatchFaceBundle(AppBundle bundle) {
+    if (bundle.hasBaseModule()) {
+      Optional<String> dwfProperty =
+          bundle.getBaseModule().getAndroidManifest().getDeclarativeWatchFaceProperty();
+
+      return dwfProperty.isPresent();
+    }
+    return false;
+  }
+
   public static BundleModule expectBaseModule(ImmutableList<BundleModule> modules) {
     return modules.stream()
         .filter(BundleModule::isBaseModule)

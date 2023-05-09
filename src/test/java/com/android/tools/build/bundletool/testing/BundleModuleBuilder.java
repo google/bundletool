@@ -156,6 +156,7 @@ public class BundleModuleBuilder {
     return this;
   }
 
+  @CanIgnoreReturnValue
   public BundleModuleBuilder setModuleType(ModuleType moduleType) {
     this.moduleTypeOptional = Optional.of(moduleType);
     return this;

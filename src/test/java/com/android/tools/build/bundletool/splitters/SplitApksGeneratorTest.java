@@ -49,6 +49,7 @@ import com.android.aapt.ConfigurationOuterClass.Configuration;
 import com.android.aapt.Resources.ResourceTable;
 import com.android.bundle.RuntimeEnabledSdkConfigProto.RuntimeEnabledSdk;
 import com.android.bundle.RuntimeEnabledSdkConfigProto.RuntimeEnabledSdkConfig;
+import com.android.bundle.SdkModulesConfigOuterClass.SdkModulesConfig;
 import com.android.bundle.Targeting.Abi.AbiAlias;
 import com.android.bundle.Targeting.ApkTargeting;
 import com.android.bundle.Targeting.VariantTargeting;
@@ -533,6 +534,7 @@ public class SplitApksGeneratorTest {
             .addModule(
                 new BundleModuleBuilder("comTestSdk")
                     .setModuleType(ModuleType.SDK_DEPENDENCY_MODULE)
+                    .setSdkModulesConfig(SdkModulesConfig.getDefaultInstance())
                     .setManifest(androidManifest("com.test.sdk"))
                     .build())
             .build();
@@ -616,6 +618,7 @@ public class SplitApksGeneratorTest {
             .addModule(
                 new BundleModuleBuilder("comTestSdk")
                     .setModuleType(ModuleType.SDK_DEPENDENCY_MODULE)
+                    .setSdkModulesConfig(SdkModulesConfig.getDefaultInstance())
                     .setManifest(androidManifest("com.test.sdk"))
                     .setResourceTable(sdkResourceTable)
                     .build())

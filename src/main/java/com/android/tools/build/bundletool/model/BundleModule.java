@@ -19,6 +19,7 @@ package com.android.tools.build.bundletool.model;
 import static com.android.tools.build.bundletool.model.utils.TargetingProtoUtils.sdkVersionFrom;
 import static com.android.tools.build.bundletool.model.utils.TargetingProtoUtils.sdkVersionTargeting;
 import static com.google.common.base.Preconditions.checkArgument;
+import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.collect.ImmutableMap.toImmutableMap;
 import static com.google.common.collect.ImmutableSet.toImmutableSet;
 import static java.util.function.Function.identity;
@@ -29,12 +30,15 @@ import com.android.bundle.Commands.DeliveryType;
 import com.android.bundle.Commands.FeatureModuleType;
 import com.android.bundle.Commands.ModuleMetadata;
 import com.android.bundle.Commands.RuntimeEnabledSdkDependency;
+import com.android.bundle.Commands.SdkModuleMetadata;
+import com.android.bundle.Commands.SdkModuleVersion;
 import com.android.bundle.Config.ApexConfig;
 import com.android.bundle.Config.BundleConfig.BundleType;
 import com.android.bundle.Files.ApexImages;
 import com.android.bundle.Files.Assets;
 import com.android.bundle.Files.NativeLibraries;
 import com.android.bundle.RuntimeEnabledSdkConfigProto.RuntimeEnabledSdkConfig;
+import com.android.bundle.SdkModulesConfigOuterClass.RuntimeEnabledSdkVersion;
 import com.android.bundle.SdkModulesConfigOuterClass.SdkModulesConfig;
 import com.android.bundle.Targeting.ModuleTargeting;
 import com.android.tools.build.bundletool.model.exceptions.InvalidBundleException;
@@ -277,8 +281,12 @@ public abstract class BundleModule {
             .setTargeting(getModuleTargeting())
             .setDeliveryType(moduleDeliveryTypeToDeliveryType(getDeliveryType()));
 
-    moduleTypeToFeatureModuleType(getModuleType())
-        .ifPresent(moduleType -> moduleMetadata.setModuleType(moduleType));
+    moduleTypeToFeatureModuleType(getModuleType()).ifPresent(moduleMetadata::setModuleType);
+    getSdkModulesConfig()
+        .ifPresent(
+            sdkModulesConfig ->
+                moduleMetadata.setSdkModuleMetadata(
+                    sdkModulesConfigToSdkModuleMetadata(sdkModulesConfig)));
     if (isSdkRuntimeVariant) {
       getRuntimeEnabledSdkConfig()
           .ifPresent(
@@ -318,8 +326,9 @@ public abstract class BundleModule {
   private static Optional<FeatureModuleType> moduleTypeToFeatureModuleType(ModuleType moduleType) {
     switch (moduleType) {
       case FEATURE_MODULE:
-      case SDK_DEPENDENCY_MODULE:
         return Optional.of(FeatureModuleType.FEATURE_MODULE);
+      case SDK_DEPENDENCY_MODULE:
+        return Optional.of(FeatureModuleType.SDK_MODULE);
       case ML_MODULE:
         return Optional.of(FeatureModuleType.ML_MODULE);
       case ASSET_MODULE:
@@ -327,6 +336,24 @@ public abstract class BundleModule {
         return Optional.empty();
     }
     throw new IllegalArgumentException("Unknown module type: " + moduleType);
+  }
+
+  private static SdkModuleMetadata sdkModulesConfigToSdkModuleMetadata(
+      SdkModulesConfig sdkModulesConfig) {
+    return SdkModuleMetadata.newBuilder()
+        .setSdkPackageName(sdkModulesConfig.getSdkPackageName())
+        .setSdkModuleVersion(
+            runtimeEnabledSdkVersionToModuleMetadataConverter(sdkModulesConfig.getSdkVersion()))
+        .build();
+  }
+
+  private static SdkModuleVersion runtimeEnabledSdkVersionToModuleMetadataConverter(
+      RuntimeEnabledSdkVersion runtimeEnabledSdkVersion) {
+    return SdkModuleVersion.newBuilder()
+        .setMajor(runtimeEnabledSdkVersion.getMajor())
+        .setMinor(runtimeEnabledSdkVersion.getMinor())
+        .setPatch(runtimeEnabledSdkVersion.getPatch())
+        .build();
   }
 
   public static Builder builder() {
@@ -443,6 +470,10 @@ public abstract class BundleModule {
                 .setModuleType(bundleModule.getAndroidManifest().getModuleType())
                 .build();
       }
+      checkState(
+          !bundleModule.getModuleType().equals(ModuleType.SDK_DEPENDENCY_MODULE)
+              || bundleModule.getSdkModulesConfig().isPresent(),
+          "BundleModule of type SDK_DEPENDENCY_MODULE can not have empty SdkModulesConfig.");
       return bundleModule;
     }
   }

@@ -22,6 +22,7 @@ import static com.android.tools.build.bundletool.model.ModuleDeliveryType.NO_INI
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifest;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifestForAssetModule;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifestForMlModule;
+import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifestForSdkModule;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withFeatureCondition;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withFusingAttribute;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withInstant;
@@ -46,6 +47,8 @@ import com.android.aapt.Resources.Package;
 import com.android.aapt.Resources.ResourceTable;
 import com.android.aapt.Resources.XmlNode;
 import com.android.bundle.Commands.RuntimeEnabledSdkDependency;
+import com.android.bundle.Commands.SdkModuleMetadata;
+import com.android.bundle.Commands.SdkModuleVersion;
 import com.android.bundle.Config.BundleConfig;
 import com.android.bundle.Files.ApexImages;
 import com.android.bundle.Files.Assets;
@@ -55,6 +58,8 @@ import com.android.bundle.Files.TargetedAssetsDirectory;
 import com.android.bundle.Files.TargetedNativeDirectory;
 import com.android.bundle.RuntimeEnabledSdkConfigProto.RuntimeEnabledSdk;
 import com.android.bundle.RuntimeEnabledSdkConfigProto.RuntimeEnabledSdkConfig;
+import com.android.bundle.SdkModulesConfigOuterClass.RuntimeEnabledSdkVersion;
+import com.android.bundle.SdkModulesConfigOuterClass.SdkModulesConfig;
 import com.android.bundle.Targeting.ModuleTargeting;
 import com.android.tools.build.bundletool.model.BundleModule.ModuleType;
 import com.android.tools.build.bundletool.model.version.Version;
@@ -433,6 +438,38 @@ public class BundleModuleTest {
   }
 
   @Test
+  public void getModuleMetadataForSdkDependencyModule_sdkModuleMetadataSet() {
+    String sdkPackageName = "com.test.sdk";
+    int sdkMajorVersion = 1;
+    int sdkMinorVersion = 2;
+    int sdkPatchVersion = 3;
+    BundleModule bundleModule =
+        createMinimalModuleBuilder()
+            .setAndroidManifestProto(androidManifestForSdkModule("com.test.app"))
+            .setSdkModulesConfig(
+                SdkModulesConfig.newBuilder()
+                    .setSdkPackageName(sdkPackageName)
+                    .setSdkVersion(
+                        RuntimeEnabledSdkVersion.newBuilder()
+                            .setMajor(sdkMajorVersion)
+                            .setMinor(sdkMinorVersion)
+                            .setPatch(sdkPatchVersion))
+                    .build())
+            .build();
+
+    assertThat(bundleModule.getModuleMetadata().getSdkModuleMetadata())
+        .isEqualTo(
+            SdkModuleMetadata.newBuilder()
+                .setSdkPackageName(sdkPackageName)
+                .setSdkModuleVersion(
+                    SdkModuleVersion.newBuilder()
+                        .setMajor(sdkMajorVersion)
+                        .setMinor(sdkMinorVersion)
+                        .setPatch(sdkPatchVersion))
+                .build());
+  }
+
+  @Test
   public void getInstantDeliveryType_noConfig() {
     BundleModule bundleModule =
         createMinimalModuleBuilder()
@@ -525,6 +562,28 @@ public class BundleModuleTest {
             .build();
 
     assertThat(bundleModule.getModuleType()).isEqualTo(ModuleType.ML_MODULE);
+  }
+
+  @Test
+  public void getModuleType_sdkModule() {
+    BundleModule bundleModule =
+        createMinimalModuleBuilder()
+            .setAndroidManifestProto(androidManifestForSdkModule("com.test.app"))
+            .setSdkModulesConfig(
+                SdkModulesConfig.newBuilder().setSdkPackageName("com.test.sdk").build())
+            .build();
+
+    assertThat(bundleModule.getModuleType()).isEqualTo(ModuleType.SDK_DEPENDENCY_MODULE);
+  }
+
+  @Test
+  public void missingSdkModulesConfigForSdkDependencyModule_throws() {
+    assertThrows(
+        IllegalStateException.class,
+        () ->
+            createMinimalModuleBuilder()
+                .setAndroidManifestProto(androidManifestForSdkModule("com.test.app"))
+                .build());
   }
 
   @Test
