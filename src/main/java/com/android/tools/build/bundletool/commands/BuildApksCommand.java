@@ -1008,13 +1008,7 @@ public abstract class BuildApksCommand {
         getValidatedSdkBundlesByPackageName(closer, tempDir);
     validateSdkBundlesMatchAppBundleDependencies(appBundle, sdkBundles);
     return sdkBundles.entrySet().stream()
-        .collect(
-            toImmutableMap(
-                Entry::getKey,
-                entry ->
-                    entry.getValue().getModule().toBuilder()
-                        .setSdkModulesConfig(entry.getValue().getSdkModulesConfig())
-                        .build()));
+        .collect(toImmutableMap(Entry::getKey, entry -> entry.getValue().getModule()));
   }
 
   private ImmutableMap<String, SdkAsar> getValidatedSdkAsarsByPackageName(

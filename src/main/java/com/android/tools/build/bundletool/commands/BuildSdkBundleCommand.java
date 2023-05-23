@@ -34,8 +34,10 @@ import com.android.tools.build.bundletool.commands.CommandHelp.FlagDescription;
 import com.android.tools.build.bundletool.flags.Flag;
 import com.android.tools.build.bundletool.flags.ParsedFlags;
 import com.android.tools.build.bundletool.io.ZipFlingerBundleSerializer;
+import com.android.tools.build.bundletool.model.AndroidManifest;
 import com.android.tools.build.bundletool.model.BundleMetadata;
 import com.android.tools.build.bundletool.model.BundleModule;
+import com.android.tools.build.bundletool.model.ManifestEditor;
 import com.android.tools.build.bundletool.model.SdkBundle;
 import com.android.tools.build.bundletool.model.ZipPath;
 import com.android.tools.build.bundletool.model.exceptions.CommandExecutionException;
@@ -224,6 +226,7 @@ public abstract class BuildSdkBundleCommand {
               .map(
                   moduleZipPath ->
                       BundleModuleParser.parseSdkBundleModule(moduleZipPath, sdkModulesConfig))
+              .map(BuildSdkBundleCommand::sanitizeManifest)
               .collect(toImmutableList());
 
       new SdkBundleModulesValidator().validateSdkBundleModules(modules);
@@ -322,6 +325,17 @@ public abstract class BuildSdkBundleCommand {
               "An error occurred while trying to read the file '%s'.", configJsonPath)
           .build();
     }
+  }
+
+  private static BundleModule sanitizeManifest(BundleModule bundleModule) {
+    return bundleModule.toBuilder()
+        .setAndroidManifest(sanitizeManifest(bundleModule.getAndroidManifest()))
+        .build();
+  }
+
+  private static AndroidManifest sanitizeManifest(AndroidManifest androidManifest) {
+    return androidManifest.applyMutators(
+        ImmutableList.of(ManifestEditor::removePermissions, ManifestEditor::removeComponents));
   }
 
   public static CommandHelp help() {

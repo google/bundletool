@@ -18,9 +18,17 @@ package com.android.tools.build.bundletool.commands;
 
 import static com.android.bundle.Targeting.Abi.AbiAlias.X86;
 import static com.android.bundle.Targeting.Abi.AbiAlias.X86_64;
+import static com.android.tools.build.bundletool.model.AndroidManifest.ACTIVITY_ELEMENT_NAME;
+import static com.android.tools.build.bundletool.model.AndroidManifest.APPLICATION_ELEMENT_NAME;
+import static com.android.tools.build.bundletool.model.AndroidManifest.PERMISSION_ELEMENT_NAME;
+import static com.android.tools.build.bundletool.model.AndroidManifest.PROVIDER_ELEMENT_NAME;
+import static com.android.tools.build.bundletool.model.AndroidManifest.RECEIVER_ELEMENT_NAME;
+import static com.android.tools.build.bundletool.model.AndroidManifest.SERVICE_ELEMENT_NAME;
 import static com.android.tools.build.bundletool.model.RuntimeEnabledSdkVersionEncoder.VERSION_MAJOR_MAX_VALUE;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifest;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withSplitId;
+import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.xmlElement;
+import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.xmlNode;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.assetsDirectoryTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.languageTargeting;
 import static com.android.tools.build.bundletool.testing.TestUtils.expectMissingRequiredBuilderPropertyException;
@@ -867,6 +875,49 @@ public class BuildSdkBundleCommandTest {
       TruthZip.assertThat(bundle)
           .hasFile("SdkBundleConfig.pb")
           .withContent(SDK_BUNDLE_CONFIG.toByteArray());
+    }
+  }
+
+  @Test
+  public void androidManifestSanitized() throws Exception {
+    XmlNode manifest =
+        xmlNode(
+            xmlElement(
+                "manifest",
+                xmlNode(xmlElement(PERMISSION_ELEMENT_NAME)),
+                xmlNode(
+                    xmlElement(
+                        APPLICATION_ELEMENT_NAME,
+                        xmlNode(xmlElement(ACTIVITY_ELEMENT_NAME)),
+                        xmlNode(xmlElement(SERVICE_ELEMENT_NAME)),
+                        xmlNode(xmlElement(PROVIDER_ELEMENT_NAME)),
+                        xmlNode(xmlElement(RECEIVER_ELEMENT_NAME))))));
+    Path module =
+        new ZipBuilder()
+            .addFileWithProtoContent(ZipPath.create("manifest/AndroidManifest.xml"), manifest)
+            .addFileWithContent(ZipPath.create("dex/classes.dex"), "dex".getBytes(UTF_8))
+            .writeTo(tmpDir.resolve("base.zip"));
+    Path sdkInterfaceDescriptorsPath = buildSdkInterfaceDescriptors("sdk-api.jar");
+
+    BuildSdkBundleCommand.builder()
+        .setOutputPath(bundlePath)
+        .setModulesPaths(ImmutableList.of(module))
+        .setSdkModulesConfig(sdkModulesConfigPath)
+        .setSdkInterfaceDescriptors(sdkInterfaceDescriptorsPath)
+        .build()
+        .execute();
+
+    XmlNode sanitizedManifest =
+        xmlNode(xmlElement("manifest", xmlNode(xmlElement(APPLICATION_ELEMENT_NAME))));
+    try (ZipFile bundle = new ZipFile(bundlePath.toFile())) {
+      ZipEntry modulesEntry = bundle.getEntry("modules.resm");
+      Path modulesPath = tmpDir.resolve("modules.resm");
+      Files.write(modulesPath, ZipUtils.asByteSource(bundle, modulesEntry).read());
+      try (ZipFile modules = new ZipFile(modulesPath.toFile())) {
+        TruthZip.assertThat(modules)
+            .hasFile("base/manifest/AndroidManifest.xml")
+            .withContent(sanitizedManifest.toByteArray());
+      }
     }
   }
 

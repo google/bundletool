@@ -27,6 +27,7 @@ import static com.android.tools.build.bundletool.testing.TestUtils.createKeystor
 import static com.android.tools.build.bundletool.testing.TestUtils.createZipBuilderForModules;
 import static com.android.tools.build.bundletool.testing.TestUtils.createZipBuilderForModulesWithoutManifest;
 import static com.android.tools.build.bundletool.testing.TestUtils.createZipBuilderForSdkAsarWithModules;
+import static com.android.tools.build.bundletool.testing.TestUtils.createZipBuilderForSdkBundleWithModules;
 import static com.android.tools.build.bundletool.testing.TestUtils.expectMissingRequiredBuilderPropertyException;
 import static com.android.tools.build.bundletool.testing.TestUtils.expectMissingRequiredFlagException;
 import static com.android.tools.build.bundletool.testing.TestUtils.extractAndroidManifest;
@@ -100,6 +101,7 @@ public class BuildSdkApksForAppCommandTest {
 
   private Path tmpDir;
   private Path sdkAsarPath;
+  private Path sdkBundlePath;
   private Path appBundlePath;
   private Path extractedModulesFilePath;
   private Path inheritedAppPropertiesConfigPath;
@@ -125,6 +127,7 @@ public class BuildSdkApksForAppCommandTest {
   public void setUp() throws Exception {
     tmpDir = tmp.getRoot().toPath();
     sdkAsarPath = tmpDir.resolve("sdk.asar");
+    sdkBundlePath = tmpDir.resolve("sdk.asb");
     appBundlePath = tmpDir.resolve("app.aab");
     inheritedAppPropertiesConfigPath = tmpDir.resolve("config.json");
     Files.writeString(
@@ -141,7 +144,7 @@ public class BuildSdkApksForAppCommandTest {
   }
 
   @Test
-  public void buildingViaFlagsAndBuilderHasSameResult_defaults() {
+  public void buildingViaFlagsAndBuilderHasSameResult_defaults_withSdkArchive() {
     ByteArrayOutputStream output = new ByteArrayOutputStream();
     BuildSdkApksForAppCommand commandViaFlags =
         BuildSdkApksForAppCommand.fromFlags(
@@ -157,6 +160,34 @@ public class BuildSdkApksForAppCommandTest {
     BuildSdkApksForAppCommand.Builder commandViaBuilder =
         BuildSdkApksForAppCommand.builder()
             .setSdkArchivePath(sdkAsarPath)
+            .setInheritedAppProperties(INHERITED_APP_PROPERTIES)
+            .setOutputFile(outputFilePath)
+            .setAapt2Command(commandViaFlags.getAapt2Command().get())
+            .setExecutorService(commandViaFlags.getExecutorService())
+            .setExecutorServiceCreatedByBundleTool(true);
+    DebugKeystoreUtils.getDebugSigningConfiguration(systemEnvironmentProvider)
+        .ifPresent(commandViaBuilder::setSigningConfiguration);
+
+    assertThat(commandViaBuilder.build()).isEqualTo(commandViaFlags);
+  }
+
+  @Test
+  public void buildingViaFlagsAndBuilderHasSameResult_defaults_withSdkBundle() {
+    ByteArrayOutputStream output = new ByteArrayOutputStream();
+    BuildSdkApksForAppCommand commandViaFlags =
+        BuildSdkApksForAppCommand.fromFlags(
+            new FlagParser()
+                .parse(
+                    "--sdk-bundle=" + sdkBundlePath,
+                    "--app-properties=" + inheritedAppPropertiesConfigPath,
+                    "--output=" + outputFilePath,
+                    "--aapt2=" + AAPT2_PATH),
+            new PrintStream(output),
+            systemEnvironmentProvider);
+
+    BuildSdkApksForAppCommand.Builder commandViaBuilder =
+        BuildSdkApksForAppCommand.builder()
+            .setSdkBundlePath(sdkBundlePath)
             .setInheritedAppProperties(INHERITED_APP_PROPERTIES)
             .setOutputFile(outputFilePath)
             .setAapt2Command(commandViaFlags.getAapt2Command().get())
@@ -203,23 +234,63 @@ public class BuildSdkApksForAppCommandTest {
   }
 
   @Test
-  public void sdkAsarNotSet_throws() {
-    expectMissingRequiredBuilderPropertyException(
-        "sdkArchivePath",
-        () ->
-            BuildSdkApksForAppCommand.builder()
-                .setInheritedAppProperties(INHERITED_APP_PROPERTIES)
-                .setOutputFile(outputFilePath)
-                .build());
+  public void sdkAsarNotSet_sdkBundleNotSet_throws() {
+    Throwable exceptionFromBuilder =
+        assertThrows(
+            IllegalStateException.class,
+            () ->
+                BuildSdkApksForAppCommand.builder()
+                    .setInheritedAppProperties(INHERITED_APP_PROPERTIES)
+                    .setOutputFile(outputFilePath)
+                    .build());
+    assertThat(exceptionFromBuilder)
+        .hasMessageThat()
+        .contains("One and only one of SdkBundlePath and SdkArchivePath should be set.");
 
-    expectMissingRequiredFlagException(
-        "sdk-archive",
-        () ->
-            BuildSdkApksForAppCommand.fromFlags(
-                new FlagParser()
-                    .parse(
-                        "--app-properties=" + inheritedAppPropertiesConfigPath,
-                        "--output=" + outputFilePath)));
+    Throwable exceptionFromFlags =
+        assertThrows(
+            IllegalStateException.class,
+            () ->
+                BuildSdkApksForAppCommand.fromFlags(
+                    new FlagParser()
+                        .parse(
+                            "--app-properties=" + inheritedAppPropertiesConfigPath,
+                            "--output=" + outputFilePath)));
+    assertThat(exceptionFromFlags)
+        .hasMessageThat()
+        .contains("One and only one of SdkBundlePath and SdkArchivePath should be set.");
+  }
+
+  @Test
+  public void sdkAsarSet_sdkBundleSet_throws() {
+    Throwable exceptionFromBuilder =
+        assertThrows(
+            IllegalStateException.class,
+            () ->
+                BuildSdkApksForAppCommand.builder()
+                    .setSdkBundlePath(sdkBundlePath)
+                    .setSdkArchivePath(sdkAsarPath)
+                    .setInheritedAppProperties(INHERITED_APP_PROPERTIES)
+                    .setOutputFile(outputFilePath)
+                    .build());
+    assertThat(exceptionFromBuilder)
+        .hasMessageThat()
+        .contains("One and only one of SdkBundlePath and SdkArchivePath should be set.");
+
+    Throwable exceptionFromFlags =
+        assertThrows(
+            IllegalStateException.class,
+            () ->
+                BuildSdkApksForAppCommand.fromFlags(
+                    new FlagParser()
+                        .parse(
+                            "--sdk-bundle=" + sdkBundlePath,
+                            "--sdk-archive=" + sdkAsarPath,
+                            "--app-properties=" + inheritedAppPropertiesConfigPath,
+                            "--output=" + outputFilePath)));
+    assertThat(exceptionFromFlags)
+        .hasMessageThat()
+        .contains("One and only one of SdkBundlePath and SdkArchivePath should be set.");
   }
 
   @Test
@@ -261,6 +332,84 @@ public class BuildSdkApksForAppCommandTest {
   }
 
   @Test
+  public void sdkArchiveSet_fileDoesNotExist_throws() {
+    Throwable exceptionFromFlags =
+        assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                BuildSdkApksForAppCommand.fromFlags(
+                        new FlagParser()
+                            .parse(
+                                "--sdk-archive=non-existent-file.asar",
+                                "--app-properties=" + inheritedAppPropertiesConfigPath,
+                                "--output=" + outputFilePath))
+                    .execute());
+    assertThat(exceptionFromFlags)
+        .hasMessageThat()
+        .contains("File 'non-existent-file.asar' was not found.");
+  }
+
+  @Test
+  public void sdkArchiveSet_badExtension_throws() throws Exception {
+    Path filePathWithBadExtension = tmpDir.resolve("sdk.sdk");
+    ZipBuilder sdkBundleZipBuilder =
+        createZipBuilderForSdkBundleWithModules(
+            createZipBuilderForModules(), extractedModulesFilePath);
+    sdkBundleZipBuilder.writeTo(filePathWithBadExtension);
+    Throwable exceptionFromFlags =
+        assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                BuildSdkApksForAppCommand.fromFlags(
+                        new FlagParser()
+                            .parse(
+                                "--sdk-archive=" + filePathWithBadExtension,
+                                "--app-properties=" + inheritedAppPropertiesConfigPath,
+                                "--output=" + outputFilePath))
+                    .execute());
+    assertThat(exceptionFromFlags).hasMessageThat().contains("expected to have '.asar' extension.");
+  }
+
+  @Test
+  public void sdkBundleSet_fileDoesNotExist_throws() {
+    Throwable exceptionFromFlags =
+        assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                BuildSdkApksForAppCommand.fromFlags(
+                        new FlagParser()
+                            .parse(
+                                "--sdk-bundle=non-existent-file.asb",
+                                "--app-properties=" + inheritedAppPropertiesConfigPath,
+                                "--output=" + outputFilePath))
+                    .execute());
+    assertThat(exceptionFromFlags)
+        .hasMessageThat()
+        .contains("File 'non-existent-file.asb' was not found.");
+  }
+
+  @Test
+  public void sdkBundleSet_badExtension_throws() throws Exception {
+    Path filePathWithBadExtension = tmpDir.resolve("sdk.sdk");
+    ZipBuilder sdkBundleZipBuilder =
+        createZipBuilderForSdkBundleWithModules(
+            createZipBuilderForModules(), extractedModulesFilePath);
+    sdkBundleZipBuilder.writeTo(filePathWithBadExtension);
+    Throwable exceptionFromFlags =
+        assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                BuildSdkApksForAppCommand.fromFlags(
+                        new FlagParser()
+                            .parse(
+                                "--sdk-bundle=" + filePathWithBadExtension,
+                                "--app-properties=" + inheritedAppPropertiesConfigPath,
+                                "--output=" + outputFilePath))
+                    .execute());
+    assertThat(exceptionFromFlags).hasMessageThat().contains("expected to have '.asb' extension.");
+  }
+
+  @Test
   public void modulesZipMissingManifestInAsar_validationFails() throws Exception {
     createZipBuilderForSdkAsarWithModules(
             createZipBuilderForModulesWithoutManifest(), extractedModulesFilePath)
@@ -279,7 +428,25 @@ public class BuildSdkApksForAppCommandTest {
   }
 
   @Test
-  public void generatesModuleSplit() throws Exception {
+  public void modulesZipMissingManifestInSdkBundle_validationFails() throws Exception {
+    createZipBuilderForSdkBundleWithModules(
+            createZipBuilderForModulesWithoutManifest(), extractedModulesFilePath)
+        .writeTo(sdkBundlePath);
+    BuildSdkApksForAppCommand command =
+        BuildSdkApksForAppCommand.builder()
+            .setSdkBundlePath(sdkBundlePath)
+            .setInheritedAppProperties(INHERITED_APP_PROPERTIES)
+            .setOutputFile(outputFilePath)
+            .build();
+
+    Exception e = assertThrows(InvalidBundleException.class, command::execute);
+    assertThat(e)
+        .hasMessageThat()
+        .contains("Module 'base' is missing mandatory file 'manifest/AndroidManifest.xml'.");
+  }
+
+  @Test
+  public void generatesModuleSplit_withSdkArchive() throws Exception {
     ZipBuilder asarZipBuilder =
         createZipBuilderForSdkAsarWithModules(
             createZipBuilderForModules(), extractedModulesFilePath);
@@ -308,7 +475,36 @@ public class BuildSdkApksForAppCommandTest {
   }
 
   @Test
-  public void generateModuleSplit_sameAsBuildApks() throws Exception {
+  public void generatesModuleSplit_withSdkBundle() throws Exception {
+    ZipBuilder sdkBundleZipBuilder =
+        createZipBuilderForSdkBundleWithModules(
+            createZipBuilderForModules(), extractedModulesFilePath);
+    sdkBundleZipBuilder.writeTo(sdkBundlePath);
+    BuildSdkApksForAppCommand command =
+        BuildSdkApksForAppCommand.builder()
+            .setSdkBundlePath(sdkBundlePath)
+            .setInheritedAppProperties(INHERITED_APP_PROPERTIES)
+            .setOutputFile(outputFilePath)
+            .build();
+
+    command.execute();
+
+    ZipFile apkSetFile = new ZipFile(outputFilePath.toFile());
+    assertThat(apkSetFile.size()).isEqualTo(1);
+    String apkPathInsideArchive =
+        "splits/" + SdkBundleBuilder.PACKAGE_NAME.replace(".", "") + "-master.apk";
+    assertThat(ZipUtils.allFileEntriesPaths(apkSetFile))
+        .containsExactly(ZipPath.create(apkPathInsideArchive));
+    File apkFile = ApkSetUtils.extractFromApkSetFile(apkSetFile, apkPathInsideArchive, tmpDir);
+    AndroidManifest apkManifest = extractAndroidManifest(apkFile, tmpDir);
+    assertThat(apkManifest.getPackageName()).isEqualTo(INHERITED_APP_PROPERTIES.getPackageName());
+    assertThat(apkManifest.getVersionCode()).hasValue(INHERITED_APP_PROPERTIES.getVersionCode());
+    assertThat(apkManifest.getMinSdkVersion())
+        .hasValue(INHERITED_APP_PROPERTIES.getMinSdkVersion());
+  }
+
+  @Test
+  public void generateModuleSplit_withAsar_sameAsBuildApks() throws Exception {
     String validCertDigest =
         "96:C7:EC:89:3E:69:2A:25:BA:4D:EE:C1:84:E8:33:3F:34:7D:6D:12:26:A1:C1:AA:70:A2:8A:DB:75:3E:02:0A";
     ZipBuilder asarZipBuilder =
@@ -351,6 +547,60 @@ public class BuildSdkApksForAppCommandTest {
             .setBundlePath(appBundlePath)
             .setOutputFile(buildApksOutputFilePath)
             .setRuntimeEnabledSdkArchivePaths(ImmutableSet.of(sdkAsarPath))
+            .build();
+
+    buildSdkApksForAppCommand.execute();
+    buildApksCommand.execute();
+
+    String sdkSplitPath =
+        "splits/" + SdkBundleBuilder.PACKAGE_NAME.replace(".", "") + "-master.apk";
+    ZipFile buildApksOutputSet = new ZipFile(buildApksOutputFilePath.toFile());
+    File buildApksOutputApk =
+        ApkSetUtils.extractFromApkSetFile(buildApksOutputSet, sdkSplitPath, tmpDir);
+    ZipFile buildSdkApksForApOutputSet = new ZipFile(outputFilePath.toFile());
+    File buildSdkApksForAppOutputApk =
+        ApkSetUtils.extractFromApkSetFile(buildSdkApksForApOutputSet, sdkSplitPath, tmpDir);
+    assertThat(getFileHash(buildSdkApksForAppOutputApk)).isEqualTo(getFileHash(buildApksOutputApk));
+  }
+
+  @Test
+  public void generateModuleSplit_withSdkBundle_sameAsBuildApks() throws Exception {
+    String validCertDigest =
+        "96:C7:EC:89:3E:69:2A:25:BA:4D:EE:C1:84:E8:33:3F:34:7D:6D:12:26:A1:C1:AA:70:A2:8A:DB:75:3E:02:0A";
+    ZipBuilder sdkBundleZipBuilder =
+        createZipBuilderForSdkBundleWithModules(
+            createZipBuilderForModules(), extractedModulesFilePath);
+    sdkBundleZipBuilder.writeTo(sdkBundlePath);
+    BuildSdkApksForAppCommand buildSdkApksForAppCommand =
+        BuildSdkApksForAppCommand.builder()
+            .setSdkBundlePath(sdkBundlePath)
+            .setInheritedAppProperties(INHERITED_APP_PROPERTIES)
+            .setOutputFile(outputFilePath)
+            .build();
+    AppBundle appBundle =
+        new AppBundleBuilder()
+            .addModule(
+                new BundleModuleBuilder("base")
+                    .setManifest(
+                        androidManifest("com.test.app", withMinSdkVersion(ANDROID_L_API_VERSION)))
+                    .setRuntimeEnabledSdkConfig(
+                        RuntimeEnabledSdkConfig.newBuilder()
+                            .addRuntimeEnabledSdk(
+                                RuntimeEnabledSdk.newBuilder()
+                                    .setPackageName(SdkBundleBuilder.PACKAGE_NAME)
+                                    .setVersionMajor(1)
+                                    .setVersionMinor(1)
+                                    .setCertificateDigest(validCertDigest)
+                                    .setResourcesPackageId(2))
+                            .build())
+                    .build())
+            .build();
+    new AppBundleSerializer().writeToDisk(appBundle, appBundlePath);
+    BuildApksCommand buildApksCommand =
+        BuildApksCommand.builder()
+            .setBundlePath(appBundlePath)
+            .setOutputFile(buildApksOutputFilePath)
+            .setRuntimeEnabledSdkBundlePaths(ImmutableSet.of(sdkBundlePath))
             .build();
 
     buildSdkApksForAppCommand.execute();

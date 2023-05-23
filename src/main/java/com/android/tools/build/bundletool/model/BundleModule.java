@@ -153,7 +153,10 @@ public abstract class BundleModule {
 
   public abstract Optional<RuntimeEnabledSdkConfig> getRuntimeEnabledSdkConfig();
 
-  /** Only present for modules of type SDK_DEPENDENCY_MODULE. */
+  /**
+   * Only present for modules of type SDK_DEPENDENCY_MODULE in app bundles, as well as in SDK
+   * bundles and ASARs.
+   */
   public abstract Optional<SdkModulesConfig> getSdkModulesConfig();
 
   /**

@@ -40,6 +40,7 @@ import static com.android.tools.build.bundletool.model.AndroidManifest.NAME_ATTR
 import static com.android.tools.build.bundletool.model.AndroidManifest.NAME_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.PERMISSION_ELEMENT_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.PROVIDER_ELEMENT_NAME;
+import static com.android.tools.build.bundletool.model.AndroidManifest.RECEIVER_ELEMENT_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.REMOVABLE_ELEMENT_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.REQUIRED_ATTRIBUTE_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.REQUIRED_BY_PRIVACY_SANDBOX_SDK_ATTRIBUTE_NAME;
@@ -1390,6 +1391,40 @@ public class ManifestEditorTest {
                                     xmlElement(
                                         CATEGORY_ELEMENT_NAME,
                                         xmlNode(xmlElement(REMOVABLE_ELEMENT_NAME))))))))));
+  }
+
+  @Test
+  public void removePermissions() {
+    AndroidManifest originalManifest =
+        AndroidManifest.create(
+            xmlNode(xmlElement("manifest", xmlNode(xmlElement(PERMISSION_ELEMENT_NAME)))));
+
+    AndroidManifest editedManifest = originalManifest.toEditor().removePermissions().save();
+
+    assertThat(editedManifest).isEqualTo(AndroidManifest.create(xmlNode(xmlElement("manifest"))));
+  }
+
+  @Test
+  public void removeComponents() {
+    AndroidManifest originalManifest =
+        AndroidManifest.create(
+            xmlNode(
+                xmlElement(
+                    "manifest",
+                    xmlNode(
+                        xmlElement(
+                            APPLICATION_ELEMENT_NAME,
+                            xmlNode(xmlElement(ACTIVITY_ELEMENT_NAME)),
+                            xmlNode(xmlElement(SERVICE_ELEMENT_NAME)),
+                            xmlNode(xmlElement(PROVIDER_ELEMENT_NAME)),
+                            xmlNode(xmlElement(RECEIVER_ELEMENT_NAME)))))));
+
+    AndroidManifest editedManifest = originalManifest.toEditor().removeComponents().save();
+
+    assertThat(editedManifest)
+        .isEqualTo(
+            AndroidManifest.create(
+                xmlNode(xmlElement("manifest", xmlNode(xmlElement(APPLICATION_ELEMENT_NAME))))));
   }
 
   @Test

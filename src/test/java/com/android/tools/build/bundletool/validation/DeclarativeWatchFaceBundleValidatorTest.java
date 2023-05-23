@@ -272,6 +272,44 @@ public class DeclarativeWatchFaceBundleValidatorTest {
   }
 
   @Test
+  public void invalidSimpleDwf_hasLibsInBase() {
+    AppBundle appBundle =
+        new AppBundleBuilder()
+            .addModule(
+                new BundleModuleBuilder("base")
+                    .setManifest(
+                        createDwfManifest(
+                            withUsesFeatureElement(
+                                AndroidManifest.USES_FEATURE_HARDWARE_WATCH_NAME)))
+                    .addFile("/res/raw/watchface.xml")
+                    .addFile("/lib/sample.so")
+                    .build())
+            .build();
+
+    InvalidBundleException e = assertThrowsForBundle(appBundle);
+    assertThat(e).hasMessageThat().contains("cannot have any external libraries");
+  }
+
+  @Test
+  public void invalidSimpleDwf_hasRootFilesInBase() {
+    AppBundle appBundle =
+        new AppBundleBuilder()
+            .addModule(
+                new BundleModuleBuilder("base")
+                    .setManifest(
+                        createDwfManifest(
+                            withUsesFeatureElement(
+                                AndroidManifest.USES_FEATURE_HARDWARE_WATCH_NAME)))
+                    .addFile("/res/raw/watchface.xml")
+                    .addFile("/root/some-file.txt")
+                    .build())
+            .build();
+
+    InvalidBundleException e = assertThrowsForBundle(appBundle);
+    assertThat(e).hasMessageThat().contains("cannot have any files in the root of the package");
+  }
+
+  @Test
   public void invalidDwfWithEmbeddedRuntime_unexpectedDexFile() {
     AppBundle appBundle =
         createAppBundleWithRuntime(new SimpleEntry<>("/dex/classes.dex", new byte[1]));

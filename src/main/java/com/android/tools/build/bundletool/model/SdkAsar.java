@@ -52,16 +52,14 @@ public abstract class SdkAsar {
     SdkModulesConfig sdkModulesConfig = readSdkModulesConfig(modulesFile);
     BundleModule sdkModule =
         Iterables.getOnlyElement(
-                sanitize(
-                    extractModules(
-                        modulesFile,
-                        BundleType.REGULAR,
-                        Version.of(sdkModulesConfig.getBundletool().getVersion()),
-                        /* apexConfig= */ Optional.empty(),
-                        /* nonModuleDirectories= */ ImmutableSet.of())))
-            .toBuilder()
-            .setSdkModulesConfig(sdkModulesConfig)
-            .build();
+            sanitize(
+                extractModules(
+                    modulesFile,
+                    BundleType.REGULAR,
+                    Version.of(sdkModulesConfig.getBundletool().getVersion()),
+                    /* apexConfig= */ Optional.empty(),
+                    Optional.of(sdkModulesConfig),
+                    /* nonModuleDirectories= */ ImmutableSet.of())));
     SdkAsar.Builder sdkAsarBuilder =
         builder()
             .setModule(sdkModule)

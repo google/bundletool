@@ -50,8 +50,10 @@ import static com.android.tools.build.bundletool.model.AndroidManifest.MODULE_EL
 import static com.android.tools.build.bundletool.model.AndroidManifest.NAME_ATTRIBUTE_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.NAME_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.NO_NAMESPACE_URI;
+import static com.android.tools.build.bundletool.model.AndroidManifest.PERMISSION_ELEMENT_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.PROPERTY_ELEMENT_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.PROVIDER_ELEMENT_NAME;
+import static com.android.tools.build.bundletool.model.AndroidManifest.RECEIVER_ELEMENT_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.REMOVABLE_ELEMENT_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.REQUIRED_ATTRIBUTE_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.REQUIRED_BY_PRIVACY_SANDBOX_SDK_ATTRIBUTE_NAME;
@@ -739,6 +741,38 @@ public class ManifestEditor {
     return element
         .getAttribute(TOOLS_NAMESPACE_URI, REQUIRED_BY_PRIVACY_SANDBOX_SDK_ATTRIBUTE_NAME)
         .isPresent();
+  }
+
+  /** Removes custom permissions from the manifest. */
+  @CanIgnoreReturnValue
+  public ManifestEditor removePermissions() {
+    manifestElement.removeChildrenElementsIf(
+        childElement ->
+            childElement.isElement()
+                && childElement.getElement().getName().equals(PERMISSION_ELEMENT_NAME));
+    return this;
+  }
+
+  /** Removes any components from the application element. */
+  @CanIgnoreReturnValue
+  public ManifestEditor removeComponents() {
+    manifestElement
+        .getOptionalChildElement(APPLICATION_ELEMENT_NAME)
+        .ifPresent(this::removeComponents);
+    return this;
+  }
+
+  private void removeComponents(XmlProtoElementBuilder element) {
+    ImmutableSet<String> componentNames =
+        ImmutableSet.of(
+            ACTIVITY_ELEMENT_NAME,
+            SERVICE_ELEMENT_NAME,
+            PROVIDER_ELEMENT_NAME,
+            RECEIVER_ELEMENT_NAME);
+    element.removeChildrenElementsIf(
+        childElement ->
+            childElement.isElement()
+                && componentNames.contains(childElement.getElement().getName()));
   }
 
   /** Generates the modified manifest. */

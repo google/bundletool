@@ -89,6 +89,7 @@ public abstract class AppBundle implements Bundle {
                 bundleConfig.getType(),
                 Version.of(bundleConfig.getBundletool().getVersion()),
                 apexConfig,
+                /* sdkModulesConfig= */ Optional.empty(),
                 NON_MODULE_DIRECTORIES)),
         bundleConfig,
         readBundleMetadata(bundleFile));

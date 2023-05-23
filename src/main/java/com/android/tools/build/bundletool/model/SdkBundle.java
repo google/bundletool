@@ -59,6 +59,7 @@ public abstract class SdkBundle implements Bundle {
                             BundleType.REGULAR,
                             Version.of(sdkModulesConfig.getBundletool().getVersion()),
                             /* apexConfig= */ Optional.empty(),
+                            Optional.of(sdkModulesConfig),
                             /* nonModuleDirectories= */ ImmutableSet.of()))
                     .get(0))
             .setSdkModulesConfig(sdkModulesConfig)

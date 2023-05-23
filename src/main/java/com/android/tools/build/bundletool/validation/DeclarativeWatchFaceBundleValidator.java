@@ -64,6 +64,9 @@ public final class DeclarativeWatchFaceBundleValidator extends SubValidator {
     validateBaseContainsLayoutDefinitions(baseModule);
     validateBaseHasNoExecutableComponents(baseModule);
 
+    validateBaseHasNoLibs(baseModule);
+    validateBaseHasNoRoot(baseModule);
+
     Optional<Entry<BundleModuleName, BundleModule>> optionalRuntime = getOptionalRuntime(bundle);
 
     optionalRuntime.ifPresent(this::validateRuntimeIsConditionallyInstalled);
@@ -161,7 +164,7 @@ public final class DeclarativeWatchFaceBundleValidator extends SubValidator {
 
   private void validateNoUnexpectedDexFiles(BundleModule baseModule, boolean hasRuntime) {
     ImmutableList<ModuleEntry> dexFiles =
-        baseModule.findEntriesUnderPath(ZipPath.create("/dex/")).collect(toImmutableList());
+        baseModule.findEntriesUnderPath(BundleModule.DEX_DIRECTORY).collect(toImmutableList());
     if (!hasRuntime) {
       assertWithUserMessage(
           dexFiles.isEmpty(), "Watch face with minSdk >= 33 cannot have dex files.");
@@ -172,6 +175,18 @@ public final class DeclarativeWatchFaceBundleValidator extends SubValidator {
           "Watch face with embedded runtime must have a single, expected dex file in"
               + " its base module.");
     }
+  }
+
+  private void validateBaseHasNoLibs(BundleModule baseModule) {
+    boolean hasLibs =
+        baseModule.findEntriesUnderPath(BundleModule.LIB_DIRECTORY).findFirst().isPresent();
+    assertWithUserMessage(!hasLibs, "Watch face cannot have any external libraries.");
+  }
+
+  private void validateBaseHasNoRoot(BundleModule baseModule) {
+    boolean hasRoot =
+        baseModule.findEntriesUnderPath(BundleModule.ROOT_DIRECTORY).findFirst().isPresent();
+    assertWithUserMessage(!hasRoot, "Watch face cannot have any files in the root of the package.");
   }
 
   private void assertWithUserMessage(boolean condition, String message) {

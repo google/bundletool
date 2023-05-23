@@ -112,6 +112,7 @@ public class BundleParser {
       BundleType bundleType,
       Version bundletoolVersion,
       Optional<ApexConfig> apexConfig,
+      Optional<SdkModulesConfig> sdkModulesConfig,
       ImmutableSet<ZipPath> nonModuleDirectories) {
     Map<BundleModuleName, BundleModule.Builder> moduleBuilders = new HashMap<>();
     Enumeration<? extends ZipEntry> entries = bundleFile.entries();
@@ -136,6 +137,7 @@ public class BundleParser {
                         .setBundleType(bundleType)
                         .setBundletoolVersion(bundletoolVersion);
                 apexConfig.ifPresent(bundleModuleBuilder::setBundleApexConfig);
+                sdkModulesConfig.ifPresent(bundleModuleBuilder::setSdkModulesConfig);
                 return bundleModuleBuilder;
               });
 
