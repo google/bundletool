@@ -51,7 +51,7 @@ public class ResourceReader {
 
   private ImmutableList<Path> readFromDirectory(Path sourceDirectory) throws IOException {
     try (Stream<Path> stream = Files.list(sourceDirectory)) {
-      return stream.collect(toImmutableList());
+      return stream.map(Path::normalize).collect(toImmutableList());
     }
   }
 
