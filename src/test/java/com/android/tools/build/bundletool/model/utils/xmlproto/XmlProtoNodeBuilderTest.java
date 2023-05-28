@@ -19,7 +19,6 @@ import static com.google.common.collect.MoreCollectors.onlyElement;
 import static com.google.common.truth.Truth.assertThat;
 import static com.google.common.truth.Truth8.assertThat;
 import static com.google.common.truth.extensions.proto.ProtoTruth.assertThat;
-
 import com.android.aapt.Resources.XmlElement;
 import com.android.aapt.Resources.XmlNode;
 import com.android.tools.build.bundletool.TestData;
@@ -31,81 +30,48 @@ import org.junit.runners.JUnit4;
 @RunWith(JUnit4.class)
 public class XmlProtoNodeBuilderTest {
 
-  @Test
-  public void setElement_overridesElement() {
-    XmlProtoNodeBuilder node =
-        XmlProtoNode.createElementNode(XmlProtoElement.create("hello")).toBuilder();
-    node.setElement(XmlProtoElementBuilder.create("bye"));
+    @Test
+    public void setElement_overridesElement() {
+        XmlProtoNodeBuilder node = XmlProtoNode.createElementNode(XmlProtoElement.create("hello")).toBuilder();
+        node.setElement(XmlProtoElementBuilder.create("bye"));
+        assertThat(node.getProto().build()).isEqualTo(XmlNode.newBuilder().setElement(XmlElement.newBuilder().setName("bye")).build());
+    }
 
-    assertThat(node.getProto().build())
-        .isEqualTo(XmlNode.newBuilder().setElement(XmlElement.newBuilder().setName("bye")).build());
-  }
+    @Test
+    public void setElement_overridesText() {
+        XmlProtoNodeBuilder node = XmlProtoNode.createTextNode("hello").toBuilder();
+        node.setElement(XmlProtoElementBuilder.create("bye"));
+        assertThat(node.getProto().build()).isEqualTo(XmlNode.newBuilder().setElement(XmlElement.newBuilder().setName("bye")).build());
+    }
 
-  @Test
-  public void setElement_overridesText() {
-    XmlProtoNodeBuilder node = XmlProtoNode.createTextNode("hello").toBuilder();
-    node.setElement(XmlProtoElementBuilder.create("bye"));
+    @Test
+    public void setText_overridesElement() {
+        XmlProtoNodeBuilder node = XmlProtoNode.createElementNode(XmlProtoElement.create("hello")).toBuilder();
+        node.setText("bye");
+        assertThat(node.getProto().build()).isEqualTo(XmlNode.newBuilder().setText("bye").build());
+    }
 
-    assertThat(node.getProto().build())
-        .isEqualTo(XmlNode.newBuilder().setElement(XmlElement.newBuilder().setName("bye")).build());
-  }
+    @Test
+    public void setText_overridesText() {
+        XmlProtoNodeBuilder node = XmlProtoNode.createTextNode("hello").toBuilder();
+        node.setText("bye");
+        assertThat(node.getProto().build()).isEqualTo(XmlNode.newBuilder().setText("bye").build());
+    }
 
-  @Test
-  public void setText_overridesElement() {
-    XmlProtoNodeBuilder node =
-        XmlProtoNode.createElementNode(XmlProtoElement.create("hello")).toBuilder();
-    node.setText("bye");
+    @Test
+    public void modifyingProtoModifiesAlsoWrapper() {
+        XmlNode.Builder protoNode = XmlNode.newBuilder().setElement(XmlElement.newBuilder().setName("hello"));
+        XmlProtoNodeBuilder wrapperNode = new XmlProtoNodeBuilder(protoNode);
+        protoNode.getElementBuilder().addChild(XmlNode.newBuilder().setText("text"));
+        assertThat(wrapperNode.getElement().getChildText().map(XmlProtoNodeBuilder::build)).hasValue(XmlProtoNode.createTextNode("text"));
+    }
 
-    assertThat(node.getProto().build()).isEqualTo(XmlNode.newBuilder().setText("bye").build());
-  }
-
-  @Test
-  public void setText_overridesText() {
-    XmlProtoNodeBuilder node = XmlProtoNode.createTextNode("hello").toBuilder();
-    node.setText("bye");
-
-    assertThat(node.getProto().build()).isEqualTo(XmlNode.newBuilder().setText("bye").build());
-  }
-
-  @Test
-  public void modifyingProtoModifiesAlsoWrapper() {
-    XmlNode.Builder protoNode =
-        XmlNode.newBuilder().setElement(XmlElement.newBuilder().setName("hello"));
-    XmlProtoNodeBuilder wrapperNode = new XmlProtoNodeBuilder(protoNode);
-
-    protoNode.getElementBuilder().addChild(XmlNode.newBuilder().setText("text"));
-
-    assertThat(wrapperNode.getElement().getChildText().map(XmlProtoNodeBuilder::build))
-        .hasValue(XmlProtoNode.createTextNode("text"));
-  }
-
-  @Test
-  public void modifyingDeepElementReflectsChangeInParentsToo() throws Exception {
-    XmlNode.Builder xmlNode = XmlNode.newBuilder();
-    TextFormat.merge(TestData.openReader("testdata/manifest/manifest1.textpb"), xmlNode);
-
-    XmlProtoNodeBuilder node = new XmlProtoNode(xmlNode.build()).toBuilder();
-    node.getElement()
-        .getChildElement("uses-sdk")
-        .getOrCreateAndroidAttribute("minSdkVersion", 0x0101020c)
-        .setValueAsDecimalInteger(999);
-
-    assertThat(
-            node.build()
-                .getProto()
-                .getElement()
-                .getChildList()
-                .stream()
-                .filter(childNode -> childNode.getElement().getName().equals("uses-sdk"))
-                .collect(onlyElement())
-                .getElement()
-                .getAttributeList()
-                .stream()
-                .filter(attribute -> attribute.getName().equals("minSdkVersion"))
-                .collect(onlyElement())
-                .getCompiledItem()
-                .getPrim()
-                .getIntDecimalValue())
-        .isEqualTo(999);
-  }
+    @Test
+    public void modifyingDeepElementReflectsChangeInParentsToo() throws Exception {
+        XmlNode.Builder xmlNode = XmlNode.newBuilder();
+        TextFormat.merge(TestData.openReader("testdata/manifest/manifest1.textpb"), xmlNode);
+        XmlProtoNodeBuilder node = new XmlProtoNode(xmlNode.build()).toBuilder();
+        node.getElement().getChildElement("uses-sdk").getOrCreateAndroidAttribute("minSdkVersion", 0x0101020c).setValueAsDecimalInteger(999);
+        assertThat(node.build().getProto().getElement().getChildList().stream().filter(childNode -> childNode.getElement().getName().equals("uses-sdk")).collect(onlyElement()).getElement().getAttributeList().stream().filter(attribute -> attribute.getName().equals("minSdkVersion")).collect(onlyElement()).getCompiledItem().getPrim().getIntDecimalValue()).isEqualTo(999);
+    }
 }

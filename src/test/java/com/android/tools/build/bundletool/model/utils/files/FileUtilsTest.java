@@ -13,13 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License
  */
-
 package com.android.tools.build.bundletool.model.utils.files;
 
 import static com.google.common.base.StandardSystemProperty.OS_NAME;
 import static com.google.common.base.StandardSystemProperty.USER_HOME;
 import static com.google.common.truth.Truth.assertThat;
-
 import com.android.tools.build.bundletool.model.ZipPath;
 import com.android.tools.build.bundletool.model.utils.OsPlatform;
 import java.nio.file.Path;
@@ -30,125 +28,119 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 
-/** Tests for {@link FileUtils}. */
+/**
+ * Tests for {@link FileUtils}.
+ */
 @RunWith(JUnit4.class)
 public class FileUtilsTest {
 
-  @Test
-  public void getDistinctParentPaths_emptyInput_emptyOutput() throws Exception {
-    List<Path> parents = FileUtils.getDistinctParentPaths(Arrays.asList());
+    @Test
+    public void getDistinctParentPaths_emptyInput_emptyOutput() throws Exception {
+        List<Path> parents = FileUtils.getDistinctParentPaths(Arrays.asList());
+        assertThat(parents).isEmpty();
+    }
 
-    assertThat(parents).isEmpty();
-  }
+    @Test
+    public void getDistinctParentPaths_identifiesParent() throws Exception {
+        Path file = Paths.get("dir1", "dir2", "dir3", "file");
+        Path dir = Paths.get("dir1", "dir2", "dir3");
+        List<Path> parents = FileUtils.getDistinctParentPaths(Arrays.asList(file));
+        assertThat(parents).containsExactly(dir);
+    }
 
-  @Test
-  public void getDistinctParentPaths_identifiesParent() throws Exception {
-    Path file = Paths.get("dir1", "dir2", "dir3", "file");
-    Path dir = Paths.get("dir1", "dir2", "dir3");
+    @Test
+    public void getDistinctParentPaths_removesDuplicates() throws Exception {
+        Path dir = Paths.get("same-dir");
+        Path file1 = Paths.get("same-dir", "file1");
+        Path file2 = Paths.get("same-dir", "file2");
+        Path file3 = Paths.get("same-dir", "file3");
+        List<Path> parents = FileUtils.getDistinctParentPaths(Arrays.asList(file1, file2, file3));
+        assertThat(parents).containsExactly(dir);
+    }
 
-    List<Path> parents = FileUtils.getDistinctParentPaths(Arrays.asList(file));
+    @Test
+    public void getExtension_emptyFile() {
+        assertThat(FileUtils.getFileExtension(ZipPath.create(""))).isEmpty();
+    }
 
-    assertThat(parents).containsExactly(dir);
-  }
+    @Test
+    public void getExtension_fileNoExtension() {
+        assertThat(FileUtils.getFileExtension(ZipPath.create("file"))).isEmpty();
+    }
 
-  @Test
-  public void getDistinctParentPaths_removesDuplicates() throws Exception {
-    Path dir = Paths.get("same-dir");
-    Path file1 = Paths.get("same-dir", "file1");
-    Path file2 = Paths.get("same-dir", "file2");
-    Path file3 = Paths.get("same-dir", "file3");
+    @Test
+    public void getExtension_fileInDirectoryNoExtension() {
+        assertThat(FileUtils.getFileExtension(ZipPath.create("directory/file"))).isEmpty();
+    }
 
-    List<Path> parents = FileUtils.getDistinctParentPaths(Arrays.asList(file1, file2, file3));
+    @Test
+    public void getExtension_fileInDirectoryNoExtension_EndWithDot() {
+        assertThat(FileUtils.getFileExtension(ZipPath.create("directory/file."))).isEmpty();
+    }
 
-    assertThat(parents).containsExactly(dir);
-  }
+    @Test
+    public void getExtension_fileInDirectoryOneLetterExtension() {
+        assertThat(FileUtils.getFileExtension(ZipPath.create("directory/file.a"))).isEqualTo("a");
+    }
 
-  @Test
-  public void getExtension_emptyFile() {
-    assertThat(FileUtils.getFileExtension(ZipPath.create(""))).isEmpty();
-  }
+    @Test
+    public void getExtension_fileInDirectorySimpleExtension() {
+        assertThat(FileUtils.getFileExtension(ZipPath.create("directory/file.txt"))).isEqualTo("txt");
+    }
 
-  @Test
-  public void getExtension_fileNoExtension() {
-    assertThat(FileUtils.getFileExtension(ZipPath.create("file"))).isEmpty();
-  }
+    @Test
+    public void getExtension_fileInDirectorySimpleExtension_EndsWithDot() {
+        assertThat(FileUtils.getFileExtension(ZipPath.create("directory/file.txt."))).isEmpty();
+    }
 
-  @Test
-  public void getExtension_fileInDirectoryNoExtension() {
-    assertThat(FileUtils.getFileExtension(ZipPath.create("directory/file"))).isEmpty();
-  }
+    @Test
+    public void getExtension_fileInDirectoryDoubleExtension() {
+        assertThat(FileUtils.getFileExtension(ZipPath.create("directory/file.pb.json"))).isEqualTo("json");
+    }
 
-  @Test
-  public void getExtension_fileInDirectoryNoExtension_EndWithDot() {
-    assertThat(FileUtils.getFileExtension(ZipPath.create("directory/file."))).isEmpty();
-  }
+    @Test
+    public void getPath() {
+        assertThat((Object) FileUtils.getPath("/my/path")).isEqualTo(Paths.get("/my/path"));
+    }
 
-  @Test
-  public void getExtension_fileInDirectoryOneLetterExtension() {
-    assertThat(FileUtils.getFileExtension(ZipPath.create("directory/file.a"))).isEqualTo("a");
-  }
-
-  @Test
-  public void getExtension_fileInDirectorySimpleExtension() {
-    assertThat(FileUtils.getFileExtension(ZipPath.create("directory/file.txt"))).isEqualTo("txt");
-  }
-
-  @Test
-  public void getExtension_fileInDirectorySimpleExtension_EndsWithDot() {
-    assertThat(FileUtils.getFileExtension(ZipPath.create("directory/file.txt."))).isEmpty();
-  }
-
-  @Test
-  public void getExtension_fileInDirectoryDoubleExtension() {
-    assertThat(FileUtils.getFileExtension(ZipPath.create("directory/file.pb.json")))
-        .isEqualTo("json");
-  }
-
-  @Test
-  public void getPath() {
-    assertThat((Object) FileUtils.getPath("/my/path")).isEqualTo(Paths.get("/my/path"));
-  }
-
-  @Test
+    @Test
     public void getPath_tildeInPathStart_linux() {
-    String currentSystem = OS_NAME.value();
-    try {
-      System.setProperty("os.name", "Linux");
-      assertThat(OsPlatform.getCurrentPlatform()).isEqualTo(OsPlatform.LINUX);
-      assertThat((Object) FileUtils.getPath("~/my/path"))
-          .isEqualTo(Paths.get(USER_HOME.value(), "/my/path"));
-    } finally {
-      System.setProperty("os.name", currentSystem);
+        String currentSystem = OS_NAME.value();
+        try {
+            System.setProperty("os.name", "Linux");
+            assertThat(OsPlatform.getCurrentPlatform()).isEqualTo(OsPlatform.LINUX);
+            assertThat((Object) FileUtils.getPath("~/my/path")).isEqualTo(Paths.get(USER_HOME.value(), "/my/path"));
+        } finally {
+            System.setProperty("os.name", currentSystem);
+        }
     }
-  }
 
-  @Test
+    @Test
     public void getPath_tildeInPathStart_macos() {
-    String currentSystem = OS_NAME.value();
-    try {
-      System.setProperty("os.name", "Mac OS X");
-      assertThat(OsPlatform.getCurrentPlatform()).isEqualTo(OsPlatform.MACOS);
-      assertThat((Object) FileUtils.getPath("~/my/path"))
-          .isEqualTo(Paths.get(USER_HOME.value(), "/my/path"));
-    } finally {
-      System.setProperty("os.name", currentSystem);
+        String currentSystem = OS_NAME.value();
+        try {
+            System.setProperty("os.name", "Mac OS X");
+            assertThat(OsPlatform.getCurrentPlatform()).isEqualTo(OsPlatform.MACOS);
+            assertThat((Object) FileUtils.getPath("~/my/path")).isEqualTo(Paths.get(USER_HOME.value(), "/my/path"));
+        } finally {
+            System.setProperty("os.name", currentSystem);
+        }
     }
-  }
 
-  @Test
-  public void getPath_tildeInPathMiddle_nonWindows() {
-    assertThat((Object) FileUtils.getPath("/my/~/path")).isEqualTo(Paths.get("/my/~/path"));
-  }
+    @Test
+    public void getPath_tildeInPathMiddle_nonWindows() {
+        assertThat((Object) FileUtils.getPath("/my/~/path")).isEqualTo(Paths.get("/my/~/path"));
+    }
 
-  @Test
+    @Test
     public void getPath_tildeInPath_windows() {
-    String currentSystem = OS_NAME.value();
-    try {
-      System.setProperty("os.name", "Windows");
-      assertThat(OsPlatform.getCurrentPlatform()).isEqualTo(OsPlatform.WINDOWS);
-      assertThat((Object) FileUtils.getPath("~\\my\\path")).isEqualTo(Paths.get("~\\my\\path"));
-    } finally {
-      System.setProperty("os.name", currentSystem);
+        String currentSystem = OS_NAME.value();
+        try {
+            System.setProperty("os.name", "Windows");
+            assertThat(OsPlatform.getCurrentPlatform()).isEqualTo(OsPlatform.WINDOWS);
+            assertThat((Object) FileUtils.getPath("~\\my\\path")).isEqualTo(Paths.get("~\\my\\path"));
+        } finally {
+            System.setProperty("os.name", currentSystem);
+        }
     }
-  }
 }

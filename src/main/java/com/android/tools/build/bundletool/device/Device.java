@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License
  */
-
 package com.android.tools.build.bundletool.device;
 
 import com.android.ddmlib.AdbCommandRejectedException;
@@ -32,148 +31,157 @@ import java.time.Duration;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 
-/** Interface for BundleTool - Ddmlib interactions. Represents a connected device. */
+/**
+ * Interface for BundleTool - Ddmlib interactions. Represents a connected device.
+ */
 public abstract class Device {
 
-  public static final Duration DEFAULT_ADB_TIMEOUT = Duration.ofMinutes(10);
+    public static final Duration DEFAULT_ADB_TIMEOUT = Duration.ofMinutes(10);
 
-  public abstract DeviceState getState();
+    public abstract DeviceState getState();
 
-  public abstract AndroidVersion getVersion();
+    public abstract AndroidVersion getVersion();
 
-  public abstract ImmutableList<String> getAbis();
+    public abstract ImmutableList<String> getAbis();
 
-  /** Returns device density or -1 if error occurred. */
-  public abstract int getDensity();
+    /**
+     * Returns device density or -1 if error occurred.
+     */
+    public abstract int getDensity();
 
-  public abstract String getSerialNumber();
+    public abstract String getSerialNumber();
 
-  public abstract Optional<String> getProperty(String propertyName);
+    public abstract Optional<String> getProperty(String propertyName);
 
-  public abstract ImmutableList<String> getDeviceFeatures();
+    public abstract ImmutableList<String> getDeviceFeatures();
 
-  public abstract ImmutableList<String> getGlExtensions();
+    public abstract ImmutableList<String> getGlExtensions();
 
-  public abstract void executeShellCommand(
-      String command,
-      IShellOutputReceiver receiver,
-      long maxTimeToOutputResponse,
-      TimeUnit maxTimeUnits)
-      throws TimeoutException, AdbCommandRejectedException, ShellCommandUnresponsiveException,
-          IOException;
+    public abstract void executeShellCommand(String command, IShellOutputReceiver receiver, long maxTimeToOutputResponse, TimeUnit maxTimeUnits) throws TimeoutException, AdbCommandRejectedException, ShellCommandUnresponsiveException, IOException;
 
-  public abstract void installApks(ImmutableList<Path> apks, InstallOptions installOptions);
+    public abstract void installApks(ImmutableList<Path> apks, InstallOptions installOptions);
 
-  public abstract void push(ImmutableList<Path> files, PushOptions installOptions);
+    public abstract void push(ImmutableList<Path> files, PushOptions installOptions);
 
-  public abstract Path syncPackageToDevice(Path localFilePath)
-      throws TimeoutException, AdbCommandRejectedException, SyncException, IOException;
+    public abstract Path syncPackageToDevice(Path localFilePath) throws TimeoutException, AdbCommandRejectedException, SyncException, IOException;
 
-  public abstract void removeRemotePath(
-      String remoteFilePath, Optional<String> runAsPackageName, Duration timeout)
-      throws IOException;
+    public abstract void removeRemotePath(String remoteFilePath, Optional<String> runAsPackageName, Duration timeout) throws IOException;
 
-  public abstract void pull(ImmutableList<FilePullParams> files);
+    public abstract void pull(ImmutableList<FilePullParams> files);
 
-  /** Options related to APK installation. */
-  @Immutable
-  @AutoValue
-  @AutoValue.CopyAnnotations
-  public abstract static class InstallOptions {
+    /**
+     * Options related to APK installation.
+     */
+    @Immutable
+    @AutoValue
+    @AutoValue.CopyAnnotations
+    public abstract static class InstallOptions {
 
-    public abstract boolean getAllowDowngrade();
+        public abstract boolean getAllowDowngrade();
 
-    public abstract boolean getAllowReinstall();
+        public abstract boolean getAllowReinstall();
 
-    public abstract boolean getAllowTestOnly();
+        public abstract boolean getAllowTestOnly();
 
-    public abstract boolean getGrantRuntimePermissions();
+        public abstract boolean getGrantRuntimePermissions();
 
-    public abstract Duration getTimeout();
+        public abstract Duration getTimeout();
 
-    public static Builder builder() {
-      return new AutoValue_Device_InstallOptions.Builder()
-          .setTimeout(DEFAULT_ADB_TIMEOUT)
-          .setAllowReinstall(true)
-          .setAllowDowngrade(false)
-          .setGrantRuntimePermissions(false)
-          .setAllowTestOnly(false);
+        public static Builder builder() {
+            return new AutoValue_Device_InstallOptions.Builder().setTimeout(DEFAULT_ADB_TIMEOUT).setAllowReinstall(true).setAllowDowngrade(false).setGrantRuntimePermissions(false).setAllowTestOnly(false);
+        }
+
+        /**
+         * Builder for {@link InstallOptions}.
+         */
+        @AutoValue.Builder
+        public abstract static class Builder {
+
+            public abstract Builder setAllowDowngrade(boolean allowDowngrade);
+
+            public abstract Builder setAllowReinstall(boolean allowReinstall);
+
+            public abstract Builder setTimeout(Duration timeout);
+
+            public abstract Builder setAllowTestOnly(boolean allowTestOnly);
+
+            public abstract Builder setGrantRuntimePermissions(boolean value);
+
+            public abstract InstallOptions build();
+        }
     }
 
-    /** Builder for {@link InstallOptions}. */
-    @AutoValue.Builder
-    public abstract static class Builder {
-      public abstract Builder setAllowDowngrade(boolean allowDowngrade);
+    /**
+     * Options related to pushing files to the device.
+     */
+    @Immutable
+    @AutoValue
+    @AutoValue.CopyAnnotations
+    public abstract static class PushOptions {
 
-      public abstract Builder setAllowReinstall(boolean allowReinstall);
+        public abstract String getDestinationPath();
 
-      public abstract Builder setTimeout(Duration timeout);
+        public abstract Duration getTimeout();
 
-      public abstract Builder setAllowTestOnly(boolean allowTestOnly);
+        public abstract Optional<String> getPackageName();
 
-      public abstract Builder setGrantRuntimePermissions(boolean value);
+        public abstract boolean getClearDestinationPath();
 
-      public abstract InstallOptions build();
-    }
-  }
+        public static Builder builder() {
+            return new AutoValue_Device_PushOptions.Builder().setTimeout(DEFAULT_ADB_TIMEOUT).setClearDestinationPath(true);
+        }
 
-  /** Options related to pushing files to the device. */
-  @Immutable
-  @AutoValue
-  @AutoValue.CopyAnnotations
-  public abstract static class PushOptions {
-    public abstract String getDestinationPath();
+        /**
+         * Builder for {@link PushOptions}.
+         */
+        @AutoValue.Builder
+        public abstract static class Builder {
 
-    public abstract Duration getTimeout();
+            public abstract Builder setDestinationPath(String destinationPath);
 
-    public abstract Optional<String> getPackageName();
+            public abstract Builder setTimeout(Duration timeout);
 
-    public abstract boolean getClearDestinationPath();
+            public abstract Builder setPackageName(String packageName);
 
-    public static Builder builder() {
-      return new AutoValue_Device_PushOptions.Builder()
-          .setTimeout(DEFAULT_ADB_TIMEOUT)
-          .setClearDestinationPath(true);
-    }
+            public abstract Builder setClearDestinationPath(boolean shouldClear);
 
-    /** Builder for {@link PushOptions}. */
-    @AutoValue.Builder
-    public abstract static class Builder {
-      public abstract Builder setDestinationPath(String destinationPath);
-
-      public abstract Builder setTimeout(Duration timeout);
-
-      public abstract Builder setPackageName(String packageName);
-
-      public abstract Builder setClearDestinationPath(boolean shouldClear);
-
-      public abstract PushOptions build();
-    }
-  }
-
-  /** Parameters related to pulling a single file from the device. */
-  @Immutable
-  @AutoValue
-  @AutoValue.CopyAnnotations
-  public abstract static class FilePullParams {
-    /** Path to the remote file that should be pulled from the device. */
-    public abstract String getPathOnDevice();
-
-    /** Path to the local file where the pulled file should be written to. */
-    public abstract Path getDestinationPath();
-
-    public static Builder builder() {
-      return new AutoValue_Device_FilePullParams.Builder();
+            public abstract PushOptions build();
+        }
     }
 
-    /** Builder for {@link FilePullParams}. */
-    @AutoValue.Builder
-    public abstract static class Builder {
-      public abstract Builder setPathOnDevice(String pathOnDevice);
+    /**
+     * Parameters related to pulling a single file from the device.
+     */
+    @Immutable
+    @AutoValue
+    @AutoValue.CopyAnnotations
+    public abstract static class FilePullParams {
 
-      public abstract Builder setDestinationPath(Path destinationPath);
+        /**
+         * Path to the remote file that should be pulled from the device.
+         */
+        public abstract String getPathOnDevice();
 
-      public abstract FilePullParams build();
+        /**
+         * Path to the local file where the pulled file should be written to.
+         */
+        public abstract Path getDestinationPath();
+
+        public static Builder builder() {
+            return new AutoValue_Device_FilePullParams.Builder();
+        }
+
+        /**
+         * Builder for {@link FilePullParams}.
+         */
+        @AutoValue.Builder
+        public abstract static class Builder {
+
+            public abstract Builder setPathOnDevice(String pathOnDevice);
+
+            public abstract Builder setDestinationPath(Path destinationPath);
+
+            public abstract FilePullParams build();
+        }
     }
-  }
 }

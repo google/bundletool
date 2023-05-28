@@ -15,7 +15,6 @@
  */
 package com.android.tools.build.bundletool.commands;
 
-
 import com.android.bundle.Config.BundleConfig;
 import com.android.tools.build.bundletool.model.AppBundle;
 import com.android.tools.build.bundletool.model.Bundle;
@@ -24,24 +23,27 @@ import dagger.Binds;
 import dagger.Module;
 import dagger.Provides;
 
-/** Dagger module for components that manipulate an App Bundle. */
+/**
+ * Dagger module for components that manipulate an App Bundle.
+ */
 @Module
 public abstract class AppBundleModule {
 
-  @CommandScoped
-  @Provides
-  static BundleConfig provideBundleConfig(AppBundle appBundle) {
-    return appBundle.getBundleConfig();
-  }
+    @CommandScoped
+    @Provides
+    static BundleConfig provideBundleConfig(AppBundle appBundle) {
+        return appBundle.getBundleConfig();
+    }
 
-  @CommandScoped
-  @Provides
-  static BundleMetadata provideBundleMetadata(AppBundle appBundle) {
-    return appBundle.getBundleMetadata();
-  }
+    @CommandScoped
+    @Provides
+    static BundleMetadata provideBundleMetadata(AppBundle appBundle) {
+        return appBundle.getBundleMetadata();
+    }
 
-  private AppBundleModule() {}
+    private AppBundleModule() {
+    }
 
-  @Binds
-  abstract Bundle bundle(AppBundle bundle);
+    @Binds
+    abstract Bundle bundle(AppBundle bundle);
 }

@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License
  */
-
 package com.android.tools.build.bundletool.model;
 
 import static com.android.bundle.Targeting.Abi.AbiAlias.MIPS;
@@ -26,7 +25,6 @@ import static com.android.tools.build.bundletool.testing.TargetingUtils.targeted
 import static com.google.common.truth.Truth.assertThat;
 import static com.google.common.truth.Truth8.assertThat;
 import static com.google.common.truth.extensions.proto.ProtoTruth.assertThat;
-
 import com.android.bundle.Files.NativeLibraries;
 import com.android.tools.build.bundletool.testing.BundleModuleBuilder;
 import org.junit.Test;
@@ -36,82 +34,30 @@ import org.junit.runners.JUnit4;
 @RunWith(JUnit4.class)
 public class ModuleAbiSanitizerTest {
 
-  @Test
-  public void noNativeLibraries_moduleUnchanged() throws Exception {
-    BundleModule testModule =
-        new BundleModuleBuilder("testModule")
-            .addFile("assets/file.txt")
-            .setManifest(androidManifest("com.test.app"))
-            .build();
+    @Test
+    public void noNativeLibraries_moduleUnchanged() throws Exception {
+        BundleModule testModule = new BundleModuleBuilder("testModule").addFile("assets/file.txt").setManifest(androidManifest("com.test.app")).build();
+        BundleModule sanitizedModule = new ModuleAbiSanitizer().sanitize(testModule);
+        assertThat(sanitizedModule).isEqualTo(testModule);
+    }
 
-    BundleModule sanitizedModule = new ModuleAbiSanitizer().sanitize(testModule);
+    @Test
+    public void consistentNativeLibraries_moduleUnchanged() throws Exception {
+        NativeLibraries nativeConfig = nativeLibraries(targetedNativeDirectory("lib/x86", nativeDirectoryTargeting(X86)), targetedNativeDirectory("lib/x86_64", nativeDirectoryTargeting(X86_64)), targetedNativeDirectory("lib/mips", nativeDirectoryTargeting(MIPS)));
+        BundleModule testModule = new BundleModuleBuilder("testModule").addFile("lib/x86/lib1.so").addFile("lib/x86/lib2.so").addFile("lib/x86/lib3.so").addFile("lib/x86_64/lib1.so").addFile("lib/x86_64/lib2.so").addFile("lib/x86_64/lib3.so").addFile("lib/mips/lib1.so").addFile("lib/mips/lib2.so").addFile("lib/mips/lib3.so").setNativeConfig(nativeConfig).setManifest(androidManifest("com.test.app")).build();
+        BundleModule sanitizedModule = new ModuleAbiSanitizer().sanitize(testModule);
+        assertThat(sanitizedModule.getNativeConfig().get()).isEqualTo(testModule.getNativeConfig().get());
+        assertThat(sanitizedModule.getEntries()).containsExactlyElementsIn(testModule.getEntries());
+        // Sanity check that nothing else changed as well.
+        assertThat(sanitizedModule).isEqualTo(testModule);
+    }
 
-    assertThat(sanitizedModule).isEqualTo(testModule);
-  }
-
-  @Test
-  public void consistentNativeLibraries_moduleUnchanged() throws Exception {
-    NativeLibraries nativeConfig =
-        nativeLibraries(
-            targetedNativeDirectory("lib/x86", nativeDirectoryTargeting(X86)),
-            targetedNativeDirectory("lib/x86_64", nativeDirectoryTargeting(X86_64)),
-            targetedNativeDirectory("lib/mips", nativeDirectoryTargeting(MIPS)));
-    BundleModule testModule =
-        new BundleModuleBuilder("testModule")
-            .addFile("lib/x86/lib1.so")
-            .addFile("lib/x86/lib2.so")
-            .addFile("lib/x86/lib3.so")
-            .addFile("lib/x86_64/lib1.so")
-            .addFile("lib/x86_64/lib2.so")
-            .addFile("lib/x86_64/lib3.so")
-            .addFile("lib/mips/lib1.so")
-            .addFile("lib/mips/lib2.so")
-            .addFile("lib/mips/lib3.so")
-            .setNativeConfig(nativeConfig)
-            .setManifest(androidManifest("com.test.app"))
-            .build();
-
-    BundleModule sanitizedModule = new ModuleAbiSanitizer().sanitize(testModule);
-
-    assertThat(sanitizedModule.getNativeConfig().get())
-        .isEqualTo(testModule.getNativeConfig().get());
-    assertThat(sanitizedModule.getEntries()).containsExactlyElementsIn(testModule.getEntries());
-    // Sanity check that nothing else changed as well.
-    assertThat(sanitizedModule).isEqualTo(testModule);
-  }
-
-  @Test
-  public void inconsistentNativeLibraries_libFilesFilteredAwayAndNativeTargetingAdjusted()
-      throws Exception {
-    NativeLibraries nativeConfig =
-        nativeLibraries(
-            targetedNativeDirectory("lib/x86", nativeDirectoryTargeting(X86)),
-            targetedNativeDirectory("lib/x86_64", nativeDirectoryTargeting(X86_64)),
-            targetedNativeDirectory("lib/mips", nativeDirectoryTargeting(MIPS)));
-    BundleModule testModule =
-        new BundleModuleBuilder("testModule")
-            .addFile("lib/x86/lib1.so")
-            .addFile("lib/x86/lib2.so")
-            .addFile("lib/x86/lib3.so")
-            .addFile("lib/x86_64/lib1.so")
-            .addFile("lib/x86_64/lib2.so")
-            .addFile("lib/mips/lib1.so")
-            .setNativeConfig(nativeConfig)
-            .setManifest(androidManifest("com.test.app"))
-            .build();
-
-    BundleModule sanitizedModule = new ModuleAbiSanitizer().sanitize(testModule);
-
-    assertThat(
-            sanitizedModule
-                .getEntries()
-                .stream()
-                .map(ModuleEntry::getPath)
-                .filter(entryPath -> entryPath.startsWith(ZipPath.create("lib")))
-                .map(ZipPath::toString))
-        .containsExactly("lib/x86/lib1.so", "lib/x86/lib2.so", "lib/x86/lib3.so");
-    assertThat(sanitizedModule.getNativeConfig().get())
-        .isEqualTo(
-            nativeLibraries(targetedNativeDirectory("lib/x86", nativeDirectoryTargeting(X86))));
-  }
+    @Test
+    public void inconsistentNativeLibraries_libFilesFilteredAwayAndNativeTargetingAdjusted() throws Exception {
+        NativeLibraries nativeConfig = nativeLibraries(targetedNativeDirectory("lib/x86", nativeDirectoryTargeting(X86)), targetedNativeDirectory("lib/x86_64", nativeDirectoryTargeting(X86_64)), targetedNativeDirectory("lib/mips", nativeDirectoryTargeting(MIPS)));
+        BundleModule testModule = new BundleModuleBuilder("testModule").addFile("lib/x86/lib1.so").addFile("lib/x86/lib2.so").addFile("lib/x86/lib3.so").addFile("lib/x86_64/lib1.so").addFile("lib/x86_64/lib2.so").addFile("lib/mips/lib1.so").setNativeConfig(nativeConfig).setManifest(androidManifest("com.test.app")).build();
+        BundleModule sanitizedModule = new ModuleAbiSanitizer().sanitize(testModule);
+        assertThat(sanitizedModule.getEntries().stream().map(ModuleEntry::getPath).filter(entryPath -> entryPath.startsWith(ZipPath.create("lib"))).map(ZipPath::toString)).containsExactly("lib/x86/lib1.so", "lib/x86/lib2.so", "lib/x86/lib3.so");
+        assertThat(sanitizedModule.getNativeConfig().get()).isEqualTo(nativeLibraries(targetedNativeDirectory("lib/x86", nativeDirectoryTargeting(X86))));
+    }
 }

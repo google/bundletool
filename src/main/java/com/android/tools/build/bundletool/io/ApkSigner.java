@@ -17,7 +17,6 @@ package com.android.tools.build.bundletool.io;
 
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static java.nio.file.StandardCopyOption.REPLACE_EXISTING;
-
 import com.android.apksig.ApkSigner.SignerConfig;
 import com.android.apksig.apk.ApkFormatException;
 import com.android.bundle.Commands.SigningDescription;
@@ -45,125 +44,93 @@ import java.security.SignatureException;
 import java.util.Optional;
 import javax.inject.Inject;
 
-/** Signs APKs. */
+/**
+ * Signs APKs.
+ */
 class ApkSigner {
-  /** Name identifying uniquely the {@link SignerConfig}. */
-  private static final String SIGNER_CONFIG_NAME = "BNDLTOOL";
 
-  private final Optional<SigningConfigurationProvider> signingConfigProvider;
-  private final Optional<SourceStamp> sourceStampSigningConfig;
-  private final TempDirectory tempDirectory;
+    /**
+     * Name identifying uniquely the {@link SignerConfig}.
+     */
+    private static final String SIGNER_CONFIG_NAME = "BNDLTOOL";
 
-  @Inject
-  ApkSigner(
-      @ApkSigningConfigProvider Optional<SigningConfigurationProvider> signingConfigProvider,
-      Optional<SourceStamp> sourceStampSigningConfig,
-      TempDirectory tempDirectory) {
-    this.signingConfigProvider = signingConfigProvider;
-    this.sourceStampSigningConfig = sourceStampSigningConfig;
-    this.tempDirectory = tempDirectory;
-  }
+    private final Optional<SigningConfigurationProvider> signingConfigProvider;
 
-  public Optional<SigningDescription> signApk(Path apkPath, ModuleSplit split) {
-    if (!signingConfigProvider.isPresent()) {
-      return Optional.empty();
+    private final Optional<SourceStamp> sourceStampSigningConfig;
+
+    private final TempDirectory tempDirectory;
+
+    @Inject
+    ApkSigner(@ApkSigningConfigProvider Optional<SigningConfigurationProvider> signingConfigProvider, Optional<SourceStamp> sourceStampSigningConfig, TempDirectory tempDirectory) {
+        this.signingConfigProvider = signingConfigProvider;
+        this.sourceStampSigningConfig = sourceStampSigningConfig;
+        this.tempDirectory = tempDirectory;
     }
 
-    ApksigSigningConfiguration signingConfig =
-        signingConfigProvider.get().getSigningConfiguration(ApkDescription.fromModuleSplit(split));
-
-    try (TempDirectory tempDirectory = new TempDirectory(getClass().getSimpleName())) {
-      Path signedApkPath = tempDirectory.getPath().resolve("signed.apk");
-      com.android.apksig.ApkSigner.Builder apkSigner =
-          new com.android.apksig.ApkSigner.Builder(
-                  signingConfig.getSignerConfigs().stream()
-                      .map(ApkSigner::convertToApksigSignerConfig)
-                      .collect(toImmutableList()))
-              .setInputApk(apkPath.toFile())
-              .setOutputApk(signedApkPath.toFile())
-              .setV1SigningEnabled(signingConfig.getV1SigningEnabled())
-              .setV2SigningEnabled(signingConfig.getV2SigningEnabled())
-              .setV3SigningEnabled(signingConfig.getV3SigningEnabled())
-              .setOtherSignersSignaturesPreserved(false)
-              .setMinSdkVersion(split.getAndroidManifest().getEffectiveMinSdkVersion());
-      signingConfig
-          .getSigningCertificateLineage()
-          .ifPresent(apkSigner::setSigningCertificateLineage);
-
-
-      sourceStampSigningConfig.ifPresent(
-          stampConfig -> {
-            apkSigner.setSourceStampSignerConfig(
-                convertToApksigSignerConfig(
-                    stampConfig.getSigningConfiguration().getSignerConfig()));
-          });
-      apkSigner.build().sign();
-      Files.move(signedApkPath, apkPath, REPLACE_EXISTING);
-      return Optional.of(signingDescription(signingConfig));
-    } catch (IOException
-        | ApkFormatException
-        | NoSuchAlgorithmException
-        | InvalidKeyException
-        | SignatureException e) {
-      throw CommandExecutionException.builder()
-          .withCause(e)
-          .withInternalMessage("Unable to sign APK.")
-          .build();
+    public Optional<SigningDescription> signApk(Path apkPath, ModuleSplit split) {
+        if (!signingConfigProvider.isPresent()) {
+            return Optional.empty();
+        }
+        ApksigSigningConfiguration signingConfig = signingConfigProvider.get().getSigningConfiguration(ApkDescription.fromModuleSplit(split));
+        try (TempDirectory tempDirectory = new TempDirectory(getClass().getSimpleName())) {
+            Path signedApkPath = tempDirectory.getPath().resolve("signed.apk");
+            com.android.apksig.ApkSigner.Builder apkSigner = new com.android.apksig.ApkSigner.Builder(signingConfig.getSignerConfigs().stream().map(ApkSigner::convertToApksigSignerConfig).collect(toImmutableList())).setInputApk(apkPath.toFile()).setOutputApk(signedApkPath.toFile()).setV1SigningEnabled(signingConfig.getV1SigningEnabled()).setV2SigningEnabled(signingConfig.getV2SigningEnabled()).setV3SigningEnabled(signingConfig.getV3SigningEnabled()).setOtherSignersSignaturesPreserved(false).setMinSdkVersion(split.getAndroidManifest().getEffectiveMinSdkVersion());
+            signingConfig.getSigningCertificateLineage().ifPresent(apkSigner::setSigningCertificateLineage);
+            sourceStampSigningConfig.ifPresent(stampConfig -> {
+                apkSigner.setSourceStampSignerConfig(convertToApksigSignerConfig(stampConfig.getSigningConfiguration().getSignerConfig()));
+            });
+            apkSigner.build().sign();
+            Files.move(signedApkPath, apkPath, REPLACE_EXISTING);
+            return Optional.of(signingDescription(signingConfig));
+        } catch (IOException | ApkFormatException | NoSuchAlgorithmException | InvalidKeyException | SignatureException e) {
+            throw CommandExecutionException.builder().withCause(e).withInternalMessage("Unable to sign APK.").build();
+        }
     }
-  }
 
-  private SigningDescription signingDescription(ApksigSigningConfiguration signingConfig) {
-    boolean usesKeyRotation =
-        signingConfig
-            .getSigningCertificateLineage()
-            .map(lineage -> lineage.size() > 1)
-            .orElse(false);
-    return SigningDescription.newBuilder().setSignedWithRotatedKey(usesKeyRotation).build();
-  }
-
-  /**
-   * Returns a new {@link ModuleSplit} with the same entries as the one given as parameter but with
-   * embedded APKs signed.
-   */
-  @CheckReturnValue
-  public ModuleSplit signEmbeddedApks(ModuleSplit split) {
-    ImmutableSet<ZipPath> wear1ApkPaths =
-        ImmutableSet.copyOf(WearApkLocator.findEmbeddedWearApkPaths(split));
-    ImmutableList.Builder<ModuleEntry> newEntries = ImmutableList.builder();
-    for (ModuleEntry entry : split.getEntries()) {
-      ZipPath pathInApk = ApkSerializerHelper.toApkEntryPath(entry.getPath());
-      if (entry.getShouldSign() || wear1ApkPaths.contains(pathInApk)) {
-        newEntries.add(signModuleEntry(split, entry));
-      } else {
-        newEntries.add(entry);
-      }
+    private SigningDescription signingDescription(ApksigSigningConfiguration signingConfig) {
+        boolean usesKeyRotation = signingConfig.getSigningCertificateLineage().map(lineage -> lineage.size() > 1).orElse(false);
+        return SigningDescription.newBuilder().setSignedWithRotatedKey(usesKeyRotation).build();
     }
-    return split.toBuilder().setEntries(newEntries.build()).build();
-  }
 
-  /**
-   * Extracts the given {@link ModuleEntry} to the filesystem then signs the file as an APK and
-   * returns a new ModuleEntry with the signed APK as content.
-   */
-  private ModuleEntry signModuleEntry(ModuleSplit split, ModuleEntry entry) {
-    try {
-      // Creating a new temp directory to ensure unicity of APK name in the temp directory..
-      Path tempDir = Files.createTempDirectory(tempDirectory.getPath(), getClass().getSimpleName());
-      Path embeddedApk = tempDir.resolve("embedded.apk");
-      try (InputStream entryContent = entry.getContent().openStream()) {
-        Files.copy(entryContent, embeddedApk);
-      }
-      signApk(embeddedApk, split);
-      return entry.toBuilder().setContent(embeddedApk).setShouldSign(false).build();
-    } catch (IOException e) {
-      throw new UncheckedIOException(e);
+    /**
+     * Returns a new {@link ModuleSplit} with the same entries as the one given as parameter but with
+     * embedded APKs signed.
+     */
+    @CheckReturnValue
+    public ModuleSplit signEmbeddedApks(ModuleSplit split) {
+        ImmutableSet<ZipPath> wear1ApkPaths = ImmutableSet.copyOf(WearApkLocator.findEmbeddedWearApkPaths(split));
+        ImmutableList.Builder<ModuleEntry> newEntries = ImmutableList.builder();
+        for (ModuleEntry entry : split.getEntries()) {
+            ZipPath pathInApk = ApkSerializerHelper.toApkEntryPath(entry.getPath());
+            if (entry.getShouldSign() || wear1ApkPaths.contains(pathInApk)) {
+                newEntries.add(signModuleEntry(split, entry));
+            } else {
+                newEntries.add(entry);
+            }
+        }
+        return split.toBuilder().setEntries(newEntries.build()).build();
     }
-  }
 
-  private static SignerConfig convertToApksigSignerConfig(
-      com.android.tools.build.bundletool.model.SignerConfig signerConfig) {
-    return new SignerConfig.Builder(
-            SIGNER_CONFIG_NAME, signerConfig.getPrivateKey(), signerConfig.getCertificates())
-        .build();
-  }
+    /**
+     * Extracts the given {@link ModuleEntry} to the filesystem then signs the file as an APK and
+     * returns a new ModuleEntry with the signed APK as content.
+     */
+    private ModuleEntry signModuleEntry(ModuleSplit split, ModuleEntry entry) {
+        try {
+            // Creating a new temp directory to ensure unicity of APK name in the temp directory..
+            Path tempDir = Files.createTempDirectory(tempDirectory.getPath(), getClass().getSimpleName());
+            Path embeddedApk = tempDir.resolve("embedded.apk");
+            try (InputStream entryContent = entry.getContent().openStream()) {
+                Files.copy(entryContent, embeddedApk);
+            }
+            signApk(embeddedApk, split);
+            return entry.toBuilder().setContent(embeddedApk).setShouldSign(false).build();
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+    }
+
+    private static SignerConfig convertToApksigSignerConfig(com.android.tools.build.bundletool.model.SignerConfig signerConfig) {
+        return new SignerConfig.Builder(SIGNER_CONFIG_NAME, signerConfig.getPrivateKey(), signerConfig.getCertificates()).build();
+    }
 }

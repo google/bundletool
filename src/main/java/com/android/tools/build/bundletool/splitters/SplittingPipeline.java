@@ -13,39 +13,34 @@
  * See the License for the specific language governing permissions and
  * limitations under the License
  */
-
 package com.android.tools.build.bundletool.splitters;
 
 import static com.google.common.collect.ImmutableList.toImmutableList;
-
 import com.android.tools.build.bundletool.model.ModuleSplit;
 import com.google.common.collect.ImmutableCollection;
 import com.google.common.collect.ImmutableList;
 import java.util.Collection;
 
-/** Pipeline chaining the execution of module splitters. */
+/**
+ * Pipeline chaining the execution of module splitters.
+ */
 public final class SplittingPipeline {
 
-  private final ImmutableList<ModuleSplitSplitter> splitters;
+    private final ImmutableList<ModuleSplitSplitter> splitters;
 
-  public SplittingPipeline(ImmutableList<ModuleSplitSplitter> splitters) {
-    this.splitters = splitters;
-  }
-
-  public ImmutableList<ModuleSplitSplitter> getSplitters() {
-    return splitters;
-  }
-
-  public ImmutableCollection<ModuleSplit> split(ModuleSplit split) {
-    ImmutableList<ModuleSplit> splits = ImmutableList.of(split);
-    for (ModuleSplitSplitter splitter : splitters) {
-      splits =
-          splits
-              .stream()
-              .map(splitter::split)
-              .flatMap(Collection::stream)
-              .collect(toImmutableList());
+    public SplittingPipeline(ImmutableList<ModuleSplitSplitter> splitters) {
+        this.splitters = splitters;
     }
-    return splits;
-  }
+
+    public ImmutableList<ModuleSplitSplitter> getSplitters() {
+        return splitters;
+    }
+
+    public ImmutableCollection<ModuleSplit> split(ModuleSplit split) {
+        ImmutableList<ModuleSplit> splits = ImmutableList.of(split);
+        for (ModuleSplitSplitter splitter : splitters) {
+            splits = splits.stream().map(splitter::split).flatMap(Collection::stream).collect(toImmutableList());
+        }
+        return splits;
+    }
 }

@@ -29,7 +29,6 @@ import static com.android.tools.build.bundletool.testing.TargetingUtils.nativeLi
 import static com.android.tools.build.bundletool.testing.TargetingUtils.targetedNativeDirectory;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.truth.Truth.assertThat;
-
 import com.android.aapt.Resources.ResourceTable;
 import com.android.bundle.Devices.DeviceSpec;
 import com.android.bundle.Targeting.Abi.AbiAlias;
@@ -54,189 +53,89 @@ import org.junit.runners.JUnit4;
 @RunWith(JUnit4.class)
 public class BuildExtractApksTest {
 
-  private final AppBundleSerializer bundleSerializer = new AppBundleSerializer();
+    private final AppBundleSerializer bundleSerializer = new AppBundleSerializer();
 
-  @Rule public final TemporaryFolder tmp = new TemporaryFolder();
-  private Path tmpDir;
-  private Path bundlePath;
-  private Path outputDir;
-  private Path outputFilePath;
+    @Rule
+    public final TemporaryFolder tmp = new TemporaryFolder();
 
-  private final Aapt2Command aapt2Command = Aapt2Helper.getAapt2Command();
+    private Path tmpDir;
 
-  private static final DeviceSpec PRE_L_X86_ES_DEVICE =
-      mergeSpecs(sdkVersion(19), abis("x86", "armeabi"), locales("es-US"), density(HDPI));
-  private static final DeviceSpec L_X86_64_ES_DEVICE =
-      mergeSpecs(
-          sdkVersion(21), abis("x86_64", "x86", "armeabi"), locales("es-US"), density(XHDPI));
+    private Path bundlePath;
 
-  @Before
-  public void setUp() throws Exception {
-    tmpDir = tmp.getRoot().toPath();
-    bundlePath = tmpDir.resolve("bundle");
-    outputDir = tmp.newFolder("output").toPath();
-    outputFilePath = outputDir.resolve("app.apks");
-  }
+    private Path outputDir;
 
-  @Test
-  public void forPreLDevice() throws Exception {
-    AppBundle appBundle = createAppBundle();
-    bundleSerializer.writeToDisk(appBundle, bundlePath);
+    private Path outputFilePath;
 
-    BuildApksCommand command =
-        BuildApksCommand.builder()
-            .setBundlePath(bundlePath)
-            .setOutputFile(outputFilePath)
-            .setAapt2Command(aapt2Command)
-            .build();
+    private final Aapt2Command aapt2Command = Aapt2Helper.getAapt2Command();
 
-    Path apkSetFilePath = command.execute();
+    private static final DeviceSpec PRE_L_X86_ES_DEVICE = mergeSpecs(sdkVersion(19), abis("x86", "armeabi"), locales("es-US"), density(HDPI));
 
-    ExtractApksCommand extractApksCommand =
-        ExtractApksCommand.builder()
-            .setOutputDirectory(outputDir)
-            .setApksArchivePath(apkSetFilePath)
-            .setDeviceSpec(PRE_L_X86_ES_DEVICE)
-            .build();
+    private static final DeviceSpec L_X86_64_ES_DEVICE = mergeSpecs(sdkVersion(21), abis("x86_64", "x86", "armeabi"), locales("es-US"), density(XHDPI));
 
-    ImmutableList<Path> extractedApks = extractApksCommand.execute();
-    assertThat(
-            extractedApks
-                .stream()
-                .map(Path::getFileName)
-                .map(Path::toString)
-                .collect(toImmutableList()))
-        .containsExactly("standalone-x86_hdpi.apk");
-  }
+    @Before
+    public void setUp() throws Exception {
+        tmpDir = tmp.getRoot().toPath();
+        bundlePath = tmpDir.resolve("bundle");
+        outputDir = tmp.newFolder("output").toPath();
+        outputFilePath = outputDir.resolve("app.apks");
+    }
 
-  @Test
-  public void forLDevice() throws Exception {
-    AppBundle appBundle = createAppBundle();
-    bundleSerializer.writeToDisk(appBundle, bundlePath);
+    @Test
+    public void forPreLDevice() throws Exception {
+        AppBundle appBundle = createAppBundle();
+        bundleSerializer.writeToDisk(appBundle, bundlePath);
+        BuildApksCommand command = BuildApksCommand.builder().setBundlePath(bundlePath).setOutputFile(outputFilePath).setAapt2Command(aapt2Command).build();
+        Path apkSetFilePath = command.execute();
+        ExtractApksCommand extractApksCommand = ExtractApksCommand.builder().setOutputDirectory(outputDir).setApksArchivePath(apkSetFilePath).setDeviceSpec(PRE_L_X86_ES_DEVICE).build();
+        ImmutableList<Path> extractedApks = extractApksCommand.execute();
+        assertThat(extractedApks.stream().map(Path::getFileName).map(Path::toString).collect(toImmutableList())).containsExactly("standalone-x86_hdpi.apk");
+    }
 
-    BuildApksCommand command =
-        BuildApksCommand.builder()
-            .setBundlePath(bundlePath)
-            .setOutputFile(outputFilePath)
-            .setAapt2Command(aapt2Command)
-            .build();
+    @Test
+    public void forLDevice() throws Exception {
+        AppBundle appBundle = createAppBundle();
+        bundleSerializer.writeToDisk(appBundle, bundlePath);
+        BuildApksCommand command = BuildApksCommand.builder().setBundlePath(bundlePath).setOutputFile(outputFilePath).setAapt2Command(aapt2Command).build();
+        Path apkSetFilePath = command.execute();
+        ExtractApksCommand extractApksCommand = ExtractApksCommand.builder().setOutputDirectory(outputDir).setApksArchivePath(apkSetFilePath).setDeviceSpec(L_X86_64_ES_DEVICE).build();
+        ImmutableList<String> extractedApks = extractApksCommand.execute().stream().map(Path::getFileName).map(Path::toString).collect(toImmutableList());
+        assertThat(extractedApks).hasSize(4);
+        assertThat(extractedApks).containsAtLeast("base-xhdpi.apk", "base-es.apk");
+        assertThat(extractedApks).containsAnyOf("base-master.apk", "base-master_2.apk");
+        assertThat(extractedApks).containsAnyOf("base-x86_64.apk", "base-x86_64_2.apk");
+    }
 
-    Path apkSetFilePath = command.execute();
+    @Test
+    public void forPreLDeviceUniversalApk() throws Exception {
+        AppBundle appBundle = createAppBundle();
+        bundleSerializer.writeToDisk(appBundle, bundlePath);
+        BuildApksCommand command = BuildApksCommand.builder().setBundlePath(bundlePath).setOutputFile(outputFilePath).setAapt2Command(aapt2Command).setApkBuildMode(UNIVERSAL).build();
+        Path apkSetFilePath = command.execute();
+        ExtractApksCommand extractApksCommand = ExtractApksCommand.builder().setOutputDirectory(outputDir).setApksArchivePath(apkSetFilePath).setDeviceSpec(PRE_L_X86_ES_DEVICE).build();
+        ImmutableList<Path> extractedApks = extractApksCommand.execute();
+        assertThat(extractedApks.stream().map(Path::getFileName).map(Path::toString).collect(toImmutableList())).containsExactly("universal.apk");
+    }
 
-    ExtractApksCommand extractApksCommand =
-        ExtractApksCommand.builder()
-            .setOutputDirectory(outputDir)
-            .setApksArchivePath(apkSetFilePath)
-            .setDeviceSpec(L_X86_64_ES_DEVICE)
-            .build();
+    @Test
+    public void forLDeviceUniversalApk() throws Exception {
+        AppBundle appBundle = createAppBundle();
+        bundleSerializer.writeToDisk(appBundle, bundlePath);
+        BuildApksCommand command = BuildApksCommand.builder().setBundlePath(bundlePath).setOutputFile(outputFilePath).setAapt2Command(aapt2Command).setApkBuildMode(UNIVERSAL).build();
+        Path apkSetFilePath = command.execute();
+        ExtractApksCommand extractApksCommand = ExtractApksCommand.builder().setOutputDirectory(outputDir).setApksArchivePath(apkSetFilePath).setDeviceSpec(L_X86_64_ES_DEVICE).build();
+        ImmutableList<Path> extractedApks = extractApksCommand.execute();
+        assertThat(extractedApks.stream().map(Path::getFileName).map(Path::toString).collect(toImmutableList())).containsExactly("universal.apk");
+    }
 
-    ImmutableList<String> extractedApks =
-        extractApksCommand.execute().stream()
-            .map(Path::getFileName)
-            .map(Path::toString)
-            .collect(toImmutableList());
-    assertThat(extractedApks).hasSize(4);
+    /**
+     * Creates an {@link AppBundle} with all common components.
+     */
+    private static AppBundle createAppBundle() throws Exception {
+        return new AppBundleBuilder().addModule("base", builder -> builder.addFile("lib/x86/libsome.so").addFile("lib/x86_64/libsome.so").addFile("res/drawable-hdpi/image.jpg").addFile("res/drawable-xhdpi/image.jpg").setNativeConfig(nativeLibraries(targetedNativeDirectory("lib/x86", nativeDirectoryTargeting(AbiAlias.X86)), targetedNativeDirectory("lib/x86_64", nativeDirectoryTargeting(AbiAlias.X86_64)))).setResourceTable(createResourceTable()).setManifest(androidManifest("com.test.app"))).build();
+    }
 
-    assertThat(extractedApks).containsAtLeast("base-xhdpi.apk", "base-es.apk");
-    assertThat(extractedApks).containsAnyOf("base-master.apk", "base-master_2.apk");
-    assertThat(extractedApks).containsAnyOf("base-x86_64.apk", "base-x86_64_2.apk");
-  }
-
-  @Test
-  public void forPreLDeviceUniversalApk() throws Exception {
-    AppBundle appBundle = createAppBundle();
-    bundleSerializer.writeToDisk(appBundle, bundlePath);
-
-    BuildApksCommand command =
-        BuildApksCommand.builder()
-            .setBundlePath(bundlePath)
-            .setOutputFile(outputFilePath)
-            .setAapt2Command(aapt2Command)
-            .setApkBuildMode(UNIVERSAL)
-            .build();
-
-    Path apkSetFilePath = command.execute();
-
-    ExtractApksCommand extractApksCommand =
-        ExtractApksCommand.builder()
-            .setOutputDirectory(outputDir)
-            .setApksArchivePath(apkSetFilePath)
-            .setDeviceSpec(PRE_L_X86_ES_DEVICE)
-            .build();
-
-    ImmutableList<Path> extractedApks = extractApksCommand.execute();
-    assertThat(
-            extractedApks
-                .stream()
-                .map(Path::getFileName)
-                .map(Path::toString)
-                .collect(toImmutableList()))
-        .containsExactly("universal.apk");
-  }
-
-  @Test
-  public void forLDeviceUniversalApk() throws Exception {
-    AppBundle appBundle = createAppBundle();
-    bundleSerializer.writeToDisk(appBundle, bundlePath);
-
-    BuildApksCommand command =
-        BuildApksCommand.builder()
-            .setBundlePath(bundlePath)
-            .setOutputFile(outputFilePath)
-            .setAapt2Command(aapt2Command)
-            .setApkBuildMode(UNIVERSAL)
-            .build();
-
-    Path apkSetFilePath = command.execute();
-
-    ExtractApksCommand extractApksCommand =
-        ExtractApksCommand.builder()
-            .setOutputDirectory(outputDir)
-            .setApksArchivePath(apkSetFilePath)
-            .setDeviceSpec(L_X86_64_ES_DEVICE)
-            .build();
-
-    ImmutableList<Path> extractedApks = extractApksCommand.execute();
-    assertThat(
-            extractedApks
-                .stream()
-                .map(Path::getFileName)
-                .map(Path::toString)
-                .collect(toImmutableList()))
-        .containsExactly("universal.apk");
-  }
-
-  /** Creates an {@link AppBundle} with all common components. */
-  private static AppBundle createAppBundle() throws Exception {
-    return new AppBundleBuilder()
-        .addModule(
-            "base",
-            builder ->
-                builder
-                    .addFile("lib/x86/libsome.so")
-                    .addFile("lib/x86_64/libsome.so")
-                    .addFile("res/drawable-hdpi/image.jpg")
-                    .addFile("res/drawable-xhdpi/image.jpg")
-                    .setNativeConfig(
-                        nativeLibraries(
-                            targetedNativeDirectory(
-                                "lib/x86", nativeDirectoryTargeting(AbiAlias.X86)),
-                            targetedNativeDirectory(
-                                "lib/x86_64", nativeDirectoryTargeting(AbiAlias.X86_64))))
-                    .setResourceTable(createResourceTable())
-                    .setManifest(androidManifest("com.test.app")))
-        .build();
-  }
-
-  public static ResourceTable createResourceTable() {
-    return new ResourceTableBuilder()
-        .addPackage("com.test.app")
-        .addDrawableResourceForMultipleDensities(
-            "image",
-            ImmutableMap.of(
-                240, "res/drawable-hdpi/image.jpg", 320, "res/drawable-xhdpi/image.jpg"))
-        .addStringResourceForMultipleLocales(
-            "text", ImmutableMap.of(/* default locale */ "", "hello", "es", "hola"))
-        .build();
-  }
+    public static ResourceTable createResourceTable() {
+        return new ResourceTableBuilder().addPackage("com.test.app").addDrawableResourceForMultipleDensities("image", ImmutableMap.of(240, "res/drawable-hdpi/image.jpg", 320, "res/drawable-xhdpi/image.jpg")).addStringResourceForMultipleLocales("text", ImmutableMap.of(/* default locale */
+        "", "hello", "es", "hola")).build();
+    }
 }

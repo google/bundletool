@@ -13,37 +13,36 @@
  * See the License for the specific language governing permissions and
  * limitations under the License
  */
-
 package com.android.tools.build.bundletool.model.exceptions;
 
 import static com.google.common.base.Preconditions.checkNotNull;
-
 import com.google.errorprone.annotations.FormatMethod;
 import com.google.errorprone.annotations.FormatString;
 
-/** Error manifesting that a given device cannot be found. */
+/**
+ * Error manifesting that a given device cannot be found.
+ */
 public class DeviceNotFoundException extends RuntimeException {
 
-  @FormatMethod
-  public DeviceNotFoundException(@FormatString String message, Object... args) {
-    super(String.format(checkNotNull(message), args));
-  }
-
-  /** Thrown when we expected one device match but failed to achieve it. */
-  public static class TooManyDevicesMatchedException extends DeviceNotFoundException {
-
-    private final int matchedNumber;
-
-    public int getMatchedNumber() {
-      return matchedNumber;
+    @FormatMethod
+    public DeviceNotFoundException(@FormatString String message, Object... args) {
+        super(String.format(checkNotNull(message), args));
     }
 
-    public TooManyDevicesMatchedException(int matchedNumber) {
-      super(
-          "Unable to find one device matching the given criteria. Matched %d devices.",
-          matchedNumber);
-      this.matchedNumber = matchedNumber;
-    }
-  }
+    /**
+     * Thrown when we expected one device match but failed to achieve it.
+     */
+    public static class TooManyDevicesMatchedException extends DeviceNotFoundException {
 
+        private final int matchedNumber;
+
+        public int getMatchedNumber() {
+            return matchedNumber;
+        }
+
+        public TooManyDevicesMatchedException(int matchedNumber) {
+            super("Unable to find one device matching the given criteria. Matched %d devices.", matchedNumber);
+            this.matchedNumber = matchedNumber;
+        }
+    }
 }
