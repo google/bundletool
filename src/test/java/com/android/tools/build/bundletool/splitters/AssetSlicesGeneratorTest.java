@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License
  */
-
 package com.android.tools.build.bundletool.splitters;
 
 import static com.android.tools.build.bundletool.model.OptimizationDimension.LANGUAGE;
@@ -31,7 +30,6 @@ import static com.android.tools.build.bundletool.testing.TestUtils.extractPaths;
 import static com.google.common.truth.Truth.assertThat;
 import static com.google.common.truth.Truth8.assertThat;
 import static com.google.common.truth.extensions.proto.ProtoTruth.assertThat;
-
 import com.android.bundle.Targeting.ApkTargeting;
 import com.android.tools.build.bundletool.model.AppBundle;
 import com.android.tools.build.bundletool.model.BundleModule;
@@ -51,124 +49,71 @@ import org.junit.runners.JUnit4;
 @RunWith(JUnit4.class)
 public class AssetSlicesGeneratorTest {
 
-  private static final String PACKAGE_NAME = "com.test.app";
-  private static final int VERSION_CODE = 12341;
-  private static final String VERSION_NAME = "12341";
-  // Larger than 32 bit, to test the conversion.
-  private static final long OVERRIDDEN_VERSION_CODE = 101010101010L;
-  private static final String OVERRIDDEN_VERSION_NAME = "101010101010";
+    private static final String PACKAGE_NAME = "com.test.app";
 
-  @Test
-  public void singleAssetModule() throws Exception {
-    AppBundle appBundle =
-        createAppBundle(
-            new BundleModuleBuilder("asset_module")
-                .addFile("assets/some_asset.txt")
-                .setManifest(androidManifestForAssetModule(PACKAGE_NAME))
-                .build());
+    private static final int VERSION_CODE = 12341;
 
-    ImmutableList<ModuleSplit> assetSlices =
-        new AssetSlicesGenerator(
-                appBundle, ApkGenerationConfiguration.getDefaultInstance(), Optional.empty())
-            .generateAssetSlices();
+    private static final String VERSION_NAME = "12341";
 
-    assertThat(assetSlices).hasSize(1);
-    ModuleSplit assetSlice = assetSlices.get(0);
+    // Larger than 32 bit, to test the conversion.
+    private static final long OVERRIDDEN_VERSION_CODE = 101010101010L;
 
-    assertThat(assetSlice.getModuleName().getName()).isEqualTo("asset_module");
-    assertThat(assetSlice.getSplitType()).isEqualTo(SplitType.ASSET_SLICE);
-    assertThat(assetSlice.isMasterSplit()).isTrue();
-    assertThat(assetSlice.getApkTargeting()).isEqualToDefaultInstance();
-    assertThat(extractPaths(assetSlice.getEntries())).containsExactly("assets/some_asset.txt");
-  }
+    private static final String OVERRIDDEN_VERSION_NAME = "101010101010";
 
-  @Test
-  public void upfrontAssetModule_addsVersionCode() throws Exception {
-    AppBundle appBundle =
-        createAppBundle(
-            new BundleModuleBuilder("asset_module")
-                .setManifest(androidManifestForAssetModule(PACKAGE_NAME, withInstallTimeDelivery()))
-                .build());
-
-    ImmutableList<ModuleSplit> assetSlices =
-        new AssetSlicesGenerator(
-                appBundle, ApkGenerationConfiguration.getDefaultInstance(), Optional.empty())
-            .generateAssetSlices();
-
-    assertThat(assetSlices).hasSize(1);
-    ModuleSplit assetSlice = assetSlices.get(0);
-    assertThat(assetSlice.getAndroidManifest().getVersionCode()).hasValue(VERSION_CODE);
-  }
-
-  @Test
-  public void upfrontAssetModule_doesNotOverrideVersionCode() throws Exception {
-    AppBundle appBundle =
-        createAppBundle(
-            new BundleModuleBuilder("asset_module")
-                .setManifest(androidManifestForAssetModule(PACKAGE_NAME, withInstallTimeDelivery()))
-                .build());
-
-    ImmutableList<ModuleSplit> assetSlices =
-        new AssetSlicesGenerator(
-                appBundle,
-                ApkGenerationConfiguration.getDefaultInstance(),
-                Optional.of(OVERRIDDEN_VERSION_CODE))
-            .generateAssetSlices();
-
-    assertThat(assetSlices).hasSize(1);
-    ModuleSplit assetSlice = assetSlices.get(0);
-    assertThat(assetSlice.getAndroidManifest().getVersionCode()).hasValue(VERSION_CODE);
-  }
-
-  @Test
-  public void onDemandAssetModule_overridesVersionCodeWhenFillingVersionName() throws Exception {
-    AppBundle appBundle =
-        createAppBundle(
-            new BundleModuleBuilder("asset_module")
-                .setManifest(androidManifestForAssetModule(PACKAGE_NAME, withOnDemandDelivery()))
-                .build());
-
-    ImmutableList<ModuleSplit> assetSlices =
-        new AssetSlicesGenerator(
-                appBundle,
-                ApkGenerationConfiguration.getDefaultInstance(),
-                Optional.of(OVERRIDDEN_VERSION_CODE))
-            .generateAssetSlices();
-
-    assertThat(assetSlices).hasSize(1);
-    ModuleSplit assetSlice = assetSlices.get(0);
-    assertThat(assetSlice.getAndroidManifest().getVersionName()).hasValue(OVERRIDDEN_VERSION_NAME);
-  }
-
-  @Test
-  public void onDemandAssetModule_addsVersionName() throws Exception {
-    AppBundle appBundle =
-        createAppBundle(
-            new BundleModuleBuilder("asset_module")
-                .setManifest(androidManifestForAssetModule(PACKAGE_NAME, withOnDemandDelivery()))
-                .build());
-
-    ImmutableList<ModuleSplit> assetSlices =
-        new AssetSlicesGenerator(
-                appBundle, ApkGenerationConfiguration.getDefaultInstance(), Optional.empty())
-            .generateAssetSlices();
-
-    assertThat(assetSlices).hasSize(1);
-    ModuleSplit assetSlice = assetSlices.get(0);
-    assertThat(assetSlice.getAndroidManifest().getVersionName()).hasValue(VERSION_NAME);
-  }
-
-
-  private static AppBundle createAppBundle(BundleModule... assetModules) throws Exception {
-    AppBundleBuilder appBundleBuilder =
-        new AppBundleBuilder()
-            .addModule(
-                new BundleModuleBuilder("base")
-                    .setManifest(androidManifest(PACKAGE_NAME, withVersionCode(VERSION_CODE)))
-                    .build());
-    for (BundleModule assetModule : assetModules) {
-      appBundleBuilder.addModule(assetModule);
+    @Test
+    public void singleAssetModule() throws Exception {
+        AppBundle appBundle = createAppBundle(new BundleModuleBuilder("asset_module").addFile("assets/some_asset.txt").setManifest(androidManifestForAssetModule(PACKAGE_NAME)).build());
+        ImmutableList<ModuleSplit> assetSlices = new AssetSlicesGenerator(appBundle, ApkGenerationConfiguration.getDefaultInstance(), Optional.empty()).generateAssetSlices();
+        assertThat(assetSlices).hasSize(1);
+        ModuleSplit assetSlice = assetSlices.get(0);
+        assertThat(assetSlice.getModuleName().getName()).isEqualTo("asset_module");
+        assertThat(assetSlice.getSplitType()).isEqualTo(SplitType.ASSET_SLICE);
+        assertThat(assetSlice.isMasterSplit()).isTrue();
+        assertThat(assetSlice.getApkTargeting()).isEqualToDefaultInstance();
+        assertThat(extractPaths(assetSlice.getEntries())).containsExactly("assets/some_asset.txt");
     }
-    return appBundleBuilder.build();
-  }
+
+    @Test
+    public void upfrontAssetModule_addsVersionCode() throws Exception {
+        AppBundle appBundle = createAppBundle(new BundleModuleBuilder("asset_module").setManifest(androidManifestForAssetModule(PACKAGE_NAME, withInstallTimeDelivery())).build());
+        ImmutableList<ModuleSplit> assetSlices = new AssetSlicesGenerator(appBundle, ApkGenerationConfiguration.getDefaultInstance(), Optional.empty()).generateAssetSlices();
+        assertThat(assetSlices).hasSize(1);
+        ModuleSplit assetSlice = assetSlices.get(0);
+        assertThat(assetSlice.getAndroidManifest().getVersionCode()).hasValue(VERSION_CODE);
+    }
+
+    @Test
+    public void upfrontAssetModule_doesNotOverrideVersionCode() throws Exception {
+        AppBundle appBundle = createAppBundle(new BundleModuleBuilder("asset_module").setManifest(androidManifestForAssetModule(PACKAGE_NAME, withInstallTimeDelivery())).build());
+        ImmutableList<ModuleSplit> assetSlices = new AssetSlicesGenerator(appBundle, ApkGenerationConfiguration.getDefaultInstance(), Optional.of(OVERRIDDEN_VERSION_CODE)).generateAssetSlices();
+        assertThat(assetSlices).hasSize(1);
+        ModuleSplit assetSlice = assetSlices.get(0);
+        assertThat(assetSlice.getAndroidManifest().getVersionCode()).hasValue(VERSION_CODE);
+    }
+
+    @Test
+    public void onDemandAssetModule_overridesVersionCodeWhenFillingVersionName() throws Exception {
+        AppBundle appBundle = createAppBundle(new BundleModuleBuilder("asset_module").setManifest(androidManifestForAssetModule(PACKAGE_NAME, withOnDemandDelivery())).build());
+        ImmutableList<ModuleSplit> assetSlices = new AssetSlicesGenerator(appBundle, ApkGenerationConfiguration.getDefaultInstance(), Optional.of(OVERRIDDEN_VERSION_CODE)).generateAssetSlices();
+        assertThat(assetSlices).hasSize(1);
+        ModuleSplit assetSlice = assetSlices.get(0);
+        assertThat(assetSlice.getAndroidManifest().getVersionName()).hasValue(OVERRIDDEN_VERSION_NAME);
+    }
+
+    @Test
+    public void onDemandAssetModule_addsVersionName() throws Exception {
+        AppBundle appBundle = createAppBundle(new BundleModuleBuilder("asset_module").setManifest(androidManifestForAssetModule(PACKAGE_NAME, withOnDemandDelivery())).build());
+        ImmutableList<ModuleSplit> assetSlices = new AssetSlicesGenerator(appBundle, ApkGenerationConfiguration.getDefaultInstance(), Optional.empty()).generateAssetSlices();
+        assertThat(assetSlices).hasSize(1);
+        ModuleSplit assetSlice = assetSlices.get(0);
+        assertThat(assetSlice.getAndroidManifest().getVersionName()).hasValue(VERSION_NAME);
+    }
+
+    private static AppBundle createAppBundle(BundleModule... assetModules) throws Exception {
+        AppBundleBuilder appBundleBuilder = new AppBundleBuilder().addModule(new BundleModuleBuilder("base").setManifest(androidManifest(PACKAGE_NAME, withVersionCode(VERSION_CODE))).build());
+        for (BundleModule assetModule : assetModules) {
+            appBundleBuilder.addModule(assetModule);
+        }
+        return appBundleBuilder.build();
+    }
 }

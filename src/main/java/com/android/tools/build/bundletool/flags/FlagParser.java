@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License
  */
-
 package com.android.tools.build.bundletool.flags;
 
 import com.google.common.base.Splitter;
@@ -40,61 +39,63 @@ import java.util.List;
  */
 public class FlagParser {
 
-  private static final String KEY_VALUE_SEPARATOR = "=";
-  private static final Splitter KEY_VALUE_SPLITTER = Splitter.on(KEY_VALUE_SEPARATOR).limit(2);
+    private static final String KEY_VALUE_SEPARATOR = "=";
 
-  /**
-   * Parses the given arguments populating the structures.
-   *
-   * @throws FlagParseException if the input does not represent parsable command line arguments
-   */
-  public ParsedFlags parse(String... args) {
-    List<String> commands = new ArrayList<>();
-    // Need to wrap it into a proper list implementation to be able to remove elements.
-    List<String> argsToProcess = new ArrayList<>(Arrays.asList(args));
-    while (argsToProcess.size() > 0 && !argsToProcess.get(0).startsWith("-")) {
-      commands.add(argsToProcess.get(0));
-      argsToProcess.remove(0);
+    private static final Splitter KEY_VALUE_SPLITTER = Splitter.on(KEY_VALUE_SEPARATOR).limit(2);
+
+    /**
+     * Parses the given arguments populating the structures.
+     *
+     * @throws FlagParseException if the input does not represent parsable command line arguments
+     */
+    public ParsedFlags parse(String... args) {
+        List<String> commands = new ArrayList<>();
+        // Need to wrap it into a proper list implementation to be able to remove elements.
+        List<String> argsToProcess = new ArrayList<>(Arrays.asList(args));
+        while (argsToProcess.size() > 0 && !argsToProcess.get(0).startsWith("-")) {
+            commands.add(argsToProcess.get(0));
+            argsToProcess.remove(0);
+        }
+        return new ParsedFlags(ImmutableList.copyOf(commands), parseFlags(argsToProcess));
     }
-    return new ParsedFlags(ImmutableList.copyOf(commands), parseFlags(argsToProcess));
-  }
 
-  private ImmutableListMultimap<String, String> parseFlags(List<String> args) {
-    ImmutableListMultimap.Builder<String, String> flagMap = ImmutableListMultimap.builder();
-    String lastFlag = null;
-    for (String arg : args) {
-      if (arg.startsWith("--")) {
+    private ImmutableListMultimap<String, String> parseFlags(List<String> args) {
+        ImmutableListMultimap.Builder<String, String> flagMap = ImmutableListMultimap.builder();
+        String lastFlag = null;
+        for (String arg : args) {
+            if (arg.startsWith("--")) {
+                if (lastFlag != null) {
+                    flagMap.put(lastFlag, "");
+                    lastFlag = null;
+                }
+                if (arg.contains(KEY_VALUE_SEPARATOR)) {
+                    List<String> segments = KEY_VALUE_SPLITTER.splitToList(arg);
+                    flagMap.put(segments.get(0).substring(2), segments.get(1));
+                } else {
+                    lastFlag = arg.substring(2);
+                }
+            } else {
+                if (lastFlag == null) {
+                    throw new FlagParseException(String.format("Syntax error: flags should start with -- (%s)", arg));
+                } else {
+                    flagMap.put(lastFlag, arg);
+                    lastFlag = null;
+                }
+            }
+        }
         if (lastFlag != null) {
-          flagMap.put(lastFlag, "");
-          lastFlag = null;
+            flagMap.put(lastFlag, "");
         }
-        if (arg.contains(KEY_VALUE_SEPARATOR)) {
-          List<String> segments = KEY_VALUE_SPLITTER.splitToList(arg);
-          flagMap.put(segments.get(0).substring(2), segments.get(1));
-        } else {
-          lastFlag = arg.substring(2);
-        }
-      } else {
-        if (lastFlag == null) {
-          throw new FlagParseException(
-              String.format("Syntax error: flags should start with -- (%s)", arg));
-        } else {
-          flagMap.put(lastFlag, arg);
-          lastFlag = null;
-        }
-      }
+        return flagMap.build();
     }
-    if (lastFlag != null) {
-      flagMap.put(lastFlag, "");
-    }
-    return flagMap.build();
-  }
 
-  /** Exception encapsulating any flag parsing errors. */
-  public static class FlagParseException extends IllegalStateException {
+    /**
+     * Exception encapsulating any flag parsing errors.
+     */
+    public static class FlagParseException extends IllegalStateException {
 
-    public FlagParseException(String message) {
-      super(message);
+        public FlagParseException(String message) {
+            super(message);
+        }
     }
-  }
 }

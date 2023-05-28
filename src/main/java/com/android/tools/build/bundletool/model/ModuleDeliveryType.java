@@ -15,11 +15,13 @@
  */
 package com.android.tools.build.bundletool.model;
 
-
-/** Describes how the module is delivered at install-time. */
+/**
+ * Describes how the module is delivered at install-time.
+ */
 public enum ModuleDeliveryType {
-  ALWAYS_INITIAL_INSTALL,
-  CONDITIONAL_INITIAL_INSTALL,
-  // Covers both on-demand and fast-follow modes.
-  NO_INITIAL_INSTALL;
+
+    ALWAYS_INITIAL_INSTALL,
+    CONDITIONAL_INITIAL_INSTALL,
+    // Covers both on-demand and fast-follow modes.
+    NO_INITIAL_INSTALL
 }

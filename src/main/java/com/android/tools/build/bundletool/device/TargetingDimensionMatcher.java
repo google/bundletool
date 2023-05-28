@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License
  */
-
 package com.android.tools.build.bundletool.device;
 
 import com.android.bundle.Devices.DeviceSpec;
@@ -33,94 +32,95 @@ import java.util.function.Predicate;
  */
 public abstract class TargetingDimensionMatcher<T> {
 
-  private final DeviceSpec deviceSpec;
+    private final DeviceSpec deviceSpec;
 
-  public TargetingDimensionMatcher(DeviceSpec deviceSpec) {
-    this.deviceSpec = deviceSpec;
-  }
-
-  protected DeviceSpec getDeviceSpec() {
-    return deviceSpec;
-  }
-
-  /**
-   * Returns a convenient predicate on {@link ApkTargeting} message.
-   */
-  public Predicate<ApkTargeting> getApkTargetingPredicate() {
-    return Predicates.compose(this::matchesTargeting, this::getTargetingValue);
-  }
-
-  /**
-   * Returns a convenient predicate on {@link VariantTargeting} message.
-   *
-   * @return a predicate that extracts the targeting value from the {@link VariantTargeting} message
-   *     and calls the {@link TargetingDimensionMatcher#matchesTargeting}. If the device spec
-   *     doesn't target this dimension, we match the spec with any targeting of the dimension.
-   */
-  public Predicate<VariantTargeting> getVariantTargetingPredicate() {
-    return variantTargeting ->
-        !isDeviceDimensionPresent() || matchesTargeting(getTargetingValue(variantTargeting));
-  }
-
-  /**
-   * Returns a convenient predicate on {@link ModuleTargeting}.
-   *
-   * <p>As this is used to determine if a conditional module should be installed, the device
-   * incompatibility safety checks are not performed. Should this happen, the module will simply
-   * fail the matching.
-   */
-  public Predicate<ModuleTargeting> getModuleTargetingPredicate() {
-    return Predicates.compose(
-        targetingValue -> !isDeviceDimensionPresent() || matchesTargeting(targetingValue),
-        this::getTargetingValue);
-  }
-
-  /**
-   * Extracts dimension specific message from the targeting proto
-   *
-   * <p>Some of the Targeting protos may not support all dimensions, in that case if this method is
-   * not overridden it will throw {@link UnsupportedOperationException}.
-   */
-  protected T getTargetingValue(ApkTargeting apkTargeting) {
-    throw new UnsupportedOperationException();
-  }
-
-  /**
-   * Extracts dimension specific message from the targeting proto
-   *
-   * <p>Some of the Targeting protos may not support all dimensions, in that case if this method is
-   * not overridden it will throw {@link UnsupportedOperationException}.
-   */
-  protected T getTargetingValue(VariantTargeting variantTargeting) {
-    throw new UnsupportedOperationException();
-  }
-
-  /**
-   * Extracts dimension specific message from the targeting proto
-   *
-   * <p>Some of the Targeting protos may not support all dimensions, in that case if this method is
-   * not overridden it will throw {@link UnsupportedOperationException}.
-   */
-  protected T getTargetingValue(ModuleTargeting moduleTargeting) {
-    throw new UnsupportedOperationException();
-  }
-
-  /** Returns if the {@link DeviceSpec} has the dimension that this instance uses for matching. */
-  protected abstract boolean isDeviceDimensionPresent();
-
-  /** Returns if the given targeting value matches the device spec. */
-  public abstract boolean matchesTargeting(T targetingValue);
-
-  /**
-   * Checks if a device is compatible with a given targeting considering alternatives.
-   *
-   * @throws CommandExecutionException if a device can't support given targeting value
-   */
-  public void checkDeviceCompatible(T targetingValue) {
-    if (isDeviceDimensionPresent()) {
-      checkDeviceCompatibleInternal(targetingValue);
+    public TargetingDimensionMatcher(DeviceSpec deviceSpec) {
+        this.deviceSpec = deviceSpec;
     }
-  }
 
-  protected abstract void checkDeviceCompatibleInternal(T targetingValue);
+    protected DeviceSpec getDeviceSpec() {
+        return deviceSpec;
+    }
+
+    /**
+     * Returns a convenient predicate on {@link ApkTargeting} message.
+     */
+    public Predicate<ApkTargeting> getApkTargetingPredicate() {
+        return Predicates.compose(this::matchesTargeting, this::getTargetingValue);
+    }
+
+    /**
+     * Returns a convenient predicate on {@link VariantTargeting} message.
+     *
+     * @return a predicate that extracts the targeting value from the {@link VariantTargeting} message
+     *     and calls the {@link TargetingDimensionMatcher#matchesTargeting}. If the device spec
+     *     doesn't target this dimension, we match the spec with any targeting of the dimension.
+     */
+    public Predicate<VariantTargeting> getVariantTargetingPredicate() {
+        return variantTargeting -> !isDeviceDimensionPresent() || matchesTargeting(getTargetingValue(variantTargeting));
+    }
+
+    /**
+     * Returns a convenient predicate on {@link ModuleTargeting}.
+     *
+     * <p>As this is used to determine if a conditional module should be installed, the device
+     * incompatibility safety checks are not performed. Should this happen, the module will simply
+     * fail the matching.
+     */
+    public Predicate<ModuleTargeting> getModuleTargetingPredicate() {
+        return Predicates.compose(targetingValue -> !isDeviceDimensionPresent() || matchesTargeting(targetingValue), this::getTargetingValue);
+    }
+
+    /**
+     * Extracts dimension specific message from the targeting proto
+     *
+     * <p>Some of the Targeting protos may not support all dimensions, in that case if this method is
+     * not overridden it will throw {@link UnsupportedOperationException}.
+     */
+    protected T getTargetingValue(ApkTargeting apkTargeting) {
+        throw new UnsupportedOperationException();
+    }
+
+    /**
+     * Extracts dimension specific message from the targeting proto
+     *
+     * <p>Some of the Targeting protos may not support all dimensions, in that case if this method is
+     * not overridden it will throw {@link UnsupportedOperationException}.
+     */
+    protected T getTargetingValue(VariantTargeting variantTargeting) {
+        throw new UnsupportedOperationException();
+    }
+
+    /**
+     * Extracts dimension specific message from the targeting proto
+     *
+     * <p>Some of the Targeting protos may not support all dimensions, in that case if this method is
+     * not overridden it will throw {@link UnsupportedOperationException}.
+     */
+    protected T getTargetingValue(ModuleTargeting moduleTargeting) {
+        throw new UnsupportedOperationException();
+    }
+
+    /**
+     * Returns if the {@link DeviceSpec} has the dimension that this instance uses for matching.
+     */
+    protected abstract boolean isDeviceDimensionPresent();
+
+    /**
+     * Returns if the given targeting value matches the device spec.
+     */
+    public abstract boolean matchesTargeting(T targetingValue);
+
+    /**
+     * Checks if a device is compatible with a given targeting considering alternatives.
+     *
+     * @throws CommandExecutionException if a device can't support given targeting value
+     */
+    public void checkDeviceCompatible(T targetingValue) {
+        if (isDeviceDimensionPresent()) {
+            checkDeviceCompatibleInternal(targetingValue);
+        }
+    }
+
+    protected abstract void checkDeviceCompatibleInternal(T targetingValue);
 }

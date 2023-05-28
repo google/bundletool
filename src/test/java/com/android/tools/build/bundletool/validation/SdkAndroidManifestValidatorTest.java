@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License
  */
-
 package com.android.tools.build.bundletool.validation;
 
 import static com.android.tools.build.bundletool.model.AndroidManifest.INSTALL_LOCATION_ATTRIBUTE_NAME;
@@ -37,7 +36,6 @@ import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.with
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withSplitNameService;
 import static com.google.common.truth.Truth.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-
 import com.android.tools.build.bundletool.model.BundleModule;
 import com.android.tools.build.bundletool.model.exceptions.InvalidBundleException;
 import com.android.tools.build.bundletool.testing.BundleModuleBuilder;
@@ -48,207 +46,85 @@ import org.junit.runner.RunWith;
 @RunWith(Theories.class)
 public class SdkAndroidManifestValidatorTest {
 
-  private static final String BASE_MODULE_NAME = "base";
-  private static final String PKG_NAME = "com.test.app";
+    private static final String BASE_MODULE_NAME = "base";
 
-  @Test
-  public void manifest_withSdkLibraryElement_throws() {
-    BundleModule module =
-        new BundleModuleBuilder(BASE_MODULE_NAME)
-            .setManifest(
-                androidManifest(
-                    PKG_NAME, withSdkLibraryElement(PKG_NAME, /* versionMajor= */ 13499)))
-            .build();
+    private static final String PKG_NAME = "com.test.app";
 
-    Throwable exception =
-        assertThrows(
-            InvalidBundleException.class,
-            () -> new SdkAndroidManifestValidator().validateModule(module));
-    assertThat(exception)
-        .hasMessageThat()
-        .isEqualTo(
-            "<"
-                + SDK_LIBRARY_ELEMENT_NAME
-                + "> cannot be declared in the manifest of an SDK bundle.");
-  }
+    @Test
+    public void manifest_withSdkLibraryElement_throws() {
+        BundleModule module = new BundleModuleBuilder(BASE_MODULE_NAME).setManifest(androidManifest(PKG_NAME, withSdkLibraryElement(PKG_NAME, /* versionMajor= */
+        13499))).build();
+        Throwable exception = assertThrows(InvalidBundleException.class, () -> new SdkAndroidManifestValidator().validateModule(module));
+        assertThat(exception).hasMessageThat().isEqualTo("<" + SDK_LIBRARY_ELEMENT_NAME + "> cannot be declared in the manifest of an SDK bundle.");
+    }
 
-  @Test
-  public void manifest_withSdkPatchVersionProperty_throws() {
-    BundleModule module =
-        new BundleModuleBuilder(BASE_MODULE_NAME)
-            .setManifest(
-                androidManifest(PKG_NAME, withSdkPatchVersionMetadata(/* patchVersion= */ 14)))
-            .build();
+    @Test
+    public void manifest_withSdkPatchVersionProperty_throws() {
+        BundleModule module = new BundleModuleBuilder(BASE_MODULE_NAME).setManifest(androidManifest(PKG_NAME, withSdkPatchVersionMetadata(/* patchVersion= */
+        14))).build();
+        Throwable exception = assertThrows(InvalidBundleException.class, () -> new SdkAndroidManifestValidator().validateModule(module));
+        assertThat(exception).hasMessageThat().isEqualTo("<" + META_DATA_ELEMENT_NAME + "> cannot be declared with name='" + SDK_PATCH_VERSION_ATTRIBUTE_NAME + "' in the manifest of an SDK bundle.");
+    }
 
-    Throwable exception =
-        assertThrows(
-            InvalidBundleException.class,
-            () -> new SdkAndroidManifestValidator().validateModule(module));
-    assertThat(exception)
-        .hasMessageThat()
-        .isEqualTo(
-            "<"
-                + META_DATA_ELEMENT_NAME
-                + "> cannot be declared with name='"
-                + SDK_PATCH_VERSION_ATTRIBUTE_NAME
-                + "' in the manifest of an SDK bundle.");
-  }
+    @Test
+    public void manifest_withPreferExternal_throws() {
+        BundleModule module = new BundleModuleBuilder(BASE_MODULE_NAME).setManifest(androidManifest(PKG_NAME, withInstallLocation("preferExternal"))).build();
+        Throwable exception = assertThrows(InvalidBundleException.class, () -> new SdkAndroidManifestValidator().validateModule(module));
+        assertThat(exception).hasMessageThat().contains("'" + INSTALL_LOCATION_ATTRIBUTE_NAME + "' in <manifest> must be 'internalOnly' for SDK bundles if it is set.");
+    }
 
-  @Test
-  public void manifest_withPreferExternal_throws() {
-    BundleModule module =
-        new BundleModuleBuilder(BASE_MODULE_NAME)
-            .setManifest(androidManifest(PKG_NAME, withInstallLocation("preferExternal")))
-            .build();
+    @Test
+    public void manifest_withPermission_throws() {
+        BundleModule module = new BundleModuleBuilder(BASE_MODULE_NAME).setManifest(androidManifest(PKG_NAME, withPermission())).build();
+        Throwable exception = assertThrows(InvalidBundleException.class, () -> new SdkAndroidManifestValidator().validateModule(module));
+        assertThat(exception).hasMessageThat().contains("<" + PERMISSION_ELEMENT_NAME + "> cannot be declared in the manifest of an SDK bundle.");
+    }
 
-    Throwable exception =
-        assertThrows(
-            InvalidBundleException.class,
-            () -> new SdkAndroidManifestValidator().validateModule(module));
-    assertThat(exception)
-        .hasMessageThat()
-        .contains(
-            "'"
-                + INSTALL_LOCATION_ATTRIBUTE_NAME
-                + "' in <manifest> must be 'internalOnly' for SDK bundles if it is set.");
-  }
+    @Test
+    public void manifest_withPermissionGroup_throws() {
+        BundleModule module = new BundleModuleBuilder(BASE_MODULE_NAME).setManifest(androidManifest(PKG_NAME, withPermissionGroup())).build();
+        Throwable exception = assertThrows(InvalidBundleException.class, () -> new SdkAndroidManifestValidator().validateModule(module));
+        assertThat(exception).hasMessageThat().contains("<" + PERMISSION_GROUP_ELEMENT_NAME + "> cannot be declared in the manifest of an SDK bundle.");
+    }
 
-  @Test
-  public void manifest_withPermission_throws() {
-    BundleModule module =
-        new BundleModuleBuilder(BASE_MODULE_NAME)
-            .setManifest(androidManifest(PKG_NAME, withPermission()))
-            .build();
+    @Test
+    public void manifest_withPermissionTree_throws() {
+        BundleModule module = new BundleModuleBuilder(BASE_MODULE_NAME).setManifest(androidManifest(PKG_NAME, withPermissionTree())).build();
+        Throwable exception = assertThrows(InvalidBundleException.class, () -> new SdkAndroidManifestValidator().validateModule(module));
+        assertThat(exception).hasMessageThat().contains("<" + PERMISSION_TREE_ELEMENT_NAME + "> cannot be declared in the manifest of an SDK bundle.");
+    }
 
-    Throwable exception =
-        assertThrows(
-            InvalidBundleException.class,
-            () -> new SdkAndroidManifestValidator().validateModule(module));
-    assertThat(exception)
-        .hasMessageThat()
-        .contains(
-            "<"
-                + PERMISSION_ELEMENT_NAME
-                + "> cannot be declared in the manifest of an SDK bundle.");
-  }
+    @Test
+    public void manifest_withSharedUserId_throws() {
+        BundleModule module = new BundleModuleBuilder(BASE_MODULE_NAME).setManifest(androidManifest(PKG_NAME, withSharedUserId("sharedUserId"))).build();
+        Throwable exception = assertThrows(InvalidBundleException.class, () -> new SdkAndroidManifestValidator().validateModule(module));
+        assertThat(exception).hasMessageThat().contains("'" + SHARED_USER_ID_ATTRIBUTE_NAME + "' attribute cannot be used in the manifest of an SDK bundle.");
+    }
 
-  @Test
-  public void manifest_withPermissionGroup_throws() {
-    BundleModule module =
-        new BundleModuleBuilder(BASE_MODULE_NAME)
-            .setManifest(androidManifest(PKG_NAME, withPermissionGroup()))
-            .build();
+    @Test
+    public void manifest_withActivityComponent_throws() {
+        BundleModule module = new BundleModuleBuilder(BASE_MODULE_NAME).setManifest(androidManifest(PKG_NAME, withMainActivity("myFunActivity"))).build();
+        Throwable exception = assertThrows(InvalidBundleException.class, () -> new SdkAndroidManifestValidator().validateModule(module));
+        assertThat(exception).hasMessageThat().contains("None of <activity>, <service>, <provider>, or <receiver> can be declared in the" + " manifest of an SDK bundle.");
+    }
 
-    Throwable exception =
-        assertThrows(
-            InvalidBundleException.class,
-            () -> new SdkAndroidManifestValidator().validateModule(module));
-    assertThat(exception)
-        .hasMessageThat()
-        .contains(
-            "<"
-                + PERMISSION_GROUP_ELEMENT_NAME
-                + "> cannot be declared in the manifest of an SDK bundle.");
-  }
+    @Test
+    public void manifest_withServiceComponent_throws() {
+        BundleModule module = new BundleModuleBuilder(BASE_MODULE_NAME).setManifest(androidManifest(PKG_NAME, withSplitNameService("serviceName", "splitName"))).build();
+        Throwable exception = assertThrows(InvalidBundleException.class, () -> new SdkAndroidManifestValidator().validateModule(module));
+        assertThat(exception).hasMessageThat().contains("None of <activity>, <service>, <provider>, or <receiver> can be declared in the" + " manifest of an SDK bundle.");
+    }
 
-  @Test
-  public void manifest_withPermissionTree_throws() {
-    BundleModule module =
-        new BundleModuleBuilder(BASE_MODULE_NAME)
-            .setManifest(androidManifest(PKG_NAME, withPermissionTree()))
-            .build();
+    @Test
+    public void manifest_withSplitId_throws() {
+        BundleModule module = new BundleModuleBuilder(BASE_MODULE_NAME).setManifest(androidManifest(PKG_NAME, withSplitId(BASE_MODULE_NAME))).build();
+        Throwable exception = assertThrows(InvalidBundleException.class, () -> new SdkAndroidManifestValidator().validateModule(module));
+        assertThat(exception).hasMessageThat().contains("'split' attribute cannot be used in the manifest of an SDK bundle.");
+    }
 
-    Throwable exception =
-        assertThrows(
-            InvalidBundleException.class,
-            () -> new SdkAndroidManifestValidator().validateModule(module));
-    assertThat(exception)
-        .hasMessageThat()
-        .contains(
-            "<"
-                + PERMISSION_TREE_ELEMENT_NAME
-                + "> cannot be declared in the manifest of an SDK bundle.");
-  }
-
-  @Test
-  public void manifest_withSharedUserId_throws() {
-    BundleModule module =
-        new BundleModuleBuilder(BASE_MODULE_NAME)
-            .setManifest(androidManifest(PKG_NAME, withSharedUserId("sharedUserId")))
-            .build();
-
-    Throwable exception =
-        assertThrows(
-            InvalidBundleException.class,
-            () -> new SdkAndroidManifestValidator().validateModule(module));
-    assertThat(exception)
-        .hasMessageThat()
-        .contains(
-            "'"
-                + SHARED_USER_ID_ATTRIBUTE_NAME
-                + "' attribute cannot be used in the manifest of an SDK bundle.");
-  }
-
-  @Test
-  public void manifest_withActivityComponent_throws() {
-    BundleModule module =
-        new BundleModuleBuilder(BASE_MODULE_NAME)
-            .setManifest(androidManifest(PKG_NAME, withMainActivity("myFunActivity")))
-            .build();
-
-    Throwable exception =
-        assertThrows(
-            InvalidBundleException.class,
-            () -> new SdkAndroidManifestValidator().validateModule(module));
-    assertThat(exception)
-        .hasMessageThat()
-        .contains(
-            "None of <activity>, <service>, <provider>, or <receiver> can be declared in the"
-                + " manifest of an SDK bundle.");
-  }
-
-  @Test
-  public void manifest_withServiceComponent_throws() {
-    BundleModule module =
-        new BundleModuleBuilder(BASE_MODULE_NAME)
-            .setManifest(
-                androidManifest(
-                    PKG_NAME,
-                    withSplitNameService("serviceName", "splitName")))
-            .build();
-
-    Throwable exception =
-        assertThrows(
-            InvalidBundleException.class,
-            () -> new SdkAndroidManifestValidator().validateModule(module));
-    assertThat(exception)
-        .hasMessageThat()
-        .contains(
-            "None of <activity>, <service>, <provider>, or <receiver> can be declared in the"
-                + " manifest of an SDK bundle.");
-  }
-
-  @Test
-  public void manifest_withSplitId_throws() {
-    BundleModule module =
-        new BundleModuleBuilder(BASE_MODULE_NAME)
-            .setManifest(androidManifest(PKG_NAME, withSplitId(BASE_MODULE_NAME)))
-            .build();
-
-    Throwable exception =
-        assertThrows(
-            InvalidBundleException.class,
-            () -> new SdkAndroidManifestValidator().validateModule(module));
-    assertThat(exception)
-        .hasMessageThat()
-        .contains("'split' attribute cannot be used in the manifest of an SDK bundle.");
-  }
-
-  @Test
-  public void manifest_valid_ok() {
-    BundleModule module =
-        new BundleModuleBuilder(BASE_MODULE_NAME).setManifest(androidManifest(PKG_NAME)).build();
-
-    new SdkAndroidManifestValidator().validateModule(module);
-  }
+    @Test
+    public void manifest_valid_ok() {
+        BundleModule module = new BundleModuleBuilder(BASE_MODULE_NAME).setManifest(androidManifest(PKG_NAME)).build();
+        new SdkAndroidManifestValidator().validateModule(module);
+    }
 }

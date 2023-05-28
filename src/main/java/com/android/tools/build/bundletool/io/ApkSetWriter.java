@@ -17,7 +17,6 @@ package com.android.tools.build.bundletool.io;
 
 import static com.android.tools.build.bundletool.model.utils.FileNames.TABLE_OF_CONTENTS_FILE;
 import static com.google.common.collect.ImmutableSet.toImmutableSet;
-
 import com.android.bundle.Commands.ApkDescription;
 import com.android.bundle.Commands.BuildApksResult;
 import com.android.bundle.Commands.BuildSdkApksResult;
@@ -31,115 +30,98 @@ import java.nio.file.Path;
 import java.util.stream.Stream;
 import java.util.zip.Deflater;
 
-/** Interface for ApkSet writer. */
+/**
+ * Interface for ApkSet writer.
+ */
 public interface ApkSetWriter {
 
-  Path getSplitsDirectory();
+    Path getSplitsDirectory();
 
-  void writeApkSet(BuildApksResult toc) throws IOException;
+    void writeApkSet(BuildApksResult toc) throws IOException;
 
-  void writeApkSetWithoutToc(BuildApksResult toc) throws IOException;
+    void writeApkSetWithoutToc(BuildApksResult toc) throws IOException;
 
-  void writeApkSet(BuildSdkApksResult toc) throws IOException;
+    void writeApkSet(BuildSdkApksResult toc) throws IOException;
 
+    /**
+     * Creates ApkSet writer which stores all splits uncompressed inside output directory.
+     */
+    static ApkSetWriter directory(Path outputDirectory) {
+        return new ApkSetWriter() {
 
-  /** Creates ApkSet writer which stores all splits uncompressed inside output directory. */
-  static ApkSetWriter directory(Path outputDirectory) {
-    return new ApkSetWriter() {
-      @Override
-      public Path getSplitsDirectory() {
-        return outputDirectory;
-      }
+            @Override
+            public Path getSplitsDirectory() {
+                return outputDirectory;
+            }
 
-      @Override
-      public void writeApkSet(BuildApksResult toc) throws IOException {
-        Files.write(getSplitsDirectory().resolve(TABLE_OF_CONTENTS_FILE), toc.toByteArray());
-      }
+            @Override
+            public void writeApkSet(BuildApksResult toc) throws IOException {
+                Files.write(getSplitsDirectory().resolve(TABLE_OF_CONTENTS_FILE), toc.toByteArray());
+            }
 
-      @Override
-      public void writeApkSetWithoutToc(BuildApksResult toc) {
-        // No-op for directory APK set writer.
-      }
+            @Override
+            public void writeApkSetWithoutToc(BuildApksResult toc) {
+                // No-op for directory APK set writer.
+            }
 
-      @Override
-      public void writeApkSet(BuildSdkApksResult toc) throws IOException {
-        Files.write(getSplitsDirectory().resolve(TABLE_OF_CONTENTS_FILE), toc.toByteArray());
-      }
+            @Override
+            public void writeApkSet(BuildSdkApksResult toc) throws IOException {
+                Files.write(getSplitsDirectory().resolve(TABLE_OF_CONTENTS_FILE), toc.toByteArray());
+            }
+        };
+    }
 
-    };
-  }
+    /**
+     * Creates ApkSet writer which stores all splits as ZIP archive.
+     */
+    static ApkSetWriter zip(Path tempDirectory, Path outputFile) {
+        return new ApkSetWriter() {
 
-  /** Creates ApkSet writer which stores all splits as ZIP archive. */
-  static ApkSetWriter zip(Path tempDirectory, Path outputFile) {
-    return new ApkSetWriter() {
-      @Override
-      public Path getSplitsDirectory() {
-        return tempDirectory;
-      }
+            @Override
+            public Path getSplitsDirectory() {
+                return tempDirectory;
+            }
 
-      @Override
-      public void writeApkSet(BuildApksResult toc) throws IOException {
-        zipApkSet(getApkRelativePaths(toc), toc.toByteArray());
-      }
+            @Override
+            public void writeApkSet(BuildApksResult toc) throws IOException {
+                zipApkSet(getApkRelativePaths(toc), toc.toByteArray());
+            }
 
-      @Override
-      public void writeApkSetWithoutToc(BuildApksResult toc) throws IOException {
-        zipApkSet(getApkRelativePaths(toc), toc.toByteArray(), /* serializeToc= */ false);
-      }
+            @Override
+            public void writeApkSetWithoutToc(BuildApksResult toc) throws IOException {
+                zipApkSet(getApkRelativePaths(toc), toc.toByteArray(), /* serializeToc= */
+                false);
+            }
 
-      @Override
-      public void writeApkSet(BuildSdkApksResult toc) throws IOException {
-        Stream<ApkDescription> apks =
-            toc.getVariantList().stream()
-                .flatMap(variant -> variant.getApkSetList().stream())
-                .flatMap(apkSet -> apkSet.getApkDescriptionList().stream());
+            @Override
+            public void writeApkSet(BuildSdkApksResult toc) throws IOException {
+                Stream<ApkDescription> apks = toc.getVariantList().stream().flatMap(variant -> variant.getApkSetList().stream()).flatMap(apkSet -> apkSet.getApkDescriptionList().stream());
+                ImmutableSet<String> apkRelativePaths = apks.map(ApkDescription::getPath).sorted().collect(toImmutableSet());
+                zipApkSet(apkRelativePaths, toc.toByteArray());
+            }
 
-        ImmutableSet<String> apkRelativePaths =
-            apks.map(ApkDescription::getPath).sorted().collect(toImmutableSet());
+            private void zipApkSet(ImmutableSet<String> apkRelativePaths, byte[] tocBytes) throws IOException {
+                zipApkSet(apkRelativePaths, tocBytes, /* serializeToc= */
+                true);
+            }
 
-        zipApkSet(apkRelativePaths, toc.toByteArray());
-      }
+            private void zipApkSet(ImmutableSet<String> apkRelativePaths, byte[] tocBytes, boolean serializeToc) throws IOException {
+                try (ZipArchive zipArchive = new ZipArchive(outputFile)) {
+                    if (serializeToc) {
+                        zipArchive.add(new BytesSource(tocBytes, TABLE_OF_CONTENTS_FILE, Deflater.NO_COMPRESSION));
+                    }
+                    for (String relativePath : apkRelativePaths) {
+                        zipArchive.add(new LargeFileSource(getSplitsDirectory().resolve(relativePath), /* tmpStorage= */
+                        null, relativePath, Deflater.NO_COMPRESSION));
+                    }
+                }
+            }
 
-
-      private void zipApkSet(ImmutableSet<String> apkRelativePaths, byte[] tocBytes)
-          throws IOException {
-        zipApkSet(apkRelativePaths, tocBytes, /* serializeToc= */ true);
-      }
-
-      private void zipApkSet(
-          ImmutableSet<String> apkRelativePaths, byte[] tocBytes, boolean serializeToc)
-          throws IOException {
-        try (ZipArchive zipArchive = new ZipArchive(outputFile)) {
-          if (serializeToc) {
-            zipArchive.add(
-                new BytesSource(tocBytes, TABLE_OF_CONTENTS_FILE, Deflater.NO_COMPRESSION));
-          }
-
-          for (String relativePath : apkRelativePaths) {
-            zipArchive.add(
-                new LargeFileSource(
-                    getSplitsDirectory().resolve(relativePath),
-                    /* tmpStorage= */ null,
-                    relativePath,
-                    Deflater.NO_COMPRESSION));
-          }
-        }
-      }
-
-      private ImmutableSet<String> getApkRelativePaths(BuildApksResult toc) {
-        Stream<ApkDescription> apks =
-            toc.getVariantList().stream()
-                .flatMap(variant -> variant.getApkSetList().stream())
-                .flatMap(apkSet -> apkSet.getApkDescriptionList().stream());
-        Stream<ApkDescription> assets =
-            toc.getAssetSliceSetList().stream()
-                .flatMap(assetSliceSet -> assetSliceSet.getApkDescriptionList().stream());
-
-        return Stream.concat(apks, assets)
-            .map(ApkDescription::getPath)
-            .sorted()
-            .collect(toImmutableSet());
-      }
-    };
-  }
+            private ImmutableSet<String> getApkRelativePaths(BuildApksResult toc) {
+                Stream<ApkDescription> apks = toc.getVariantList().stream().flatMap(variant -> variant.getApkSetList().stream()).flatMap(apkSet -> apkSet.getApkDescriptionList().stream());
+                Stream<ApkDescription> assets = toc.getAssetSliceSetList().stream().flatMap(assetSliceSet -> assetSliceSet.getApkDescriptionList().stream());
+                return Stream.concat(apks, assets).map(ApkDescription::getPath).sorted().collect(toImmutableSet());
+            }
+        };
+    }
 }
