@@ -459,9 +459,7 @@ public class ApkMatcherTest {
     // Texture splits
     @Test
     public void apkMatch_textureSplit() {
-        ZipPath apk = ZipPath.create("master-etc1_rgb8.apk");
-        BuildApksResult buildApksResult = buildApksResult(oneApkSplitApkVariant(variantSdkTargeting(sdkVersionFrom(Versions.ANDROID_L_API_VERSION)), apkTextureTargeting(ETC1_RGB8, ImmutableSet.of(ATC, PVRTC)), apk));
-        assertThat(new ApkMatcher(lDeviceWithGlExtensions("GL_OES_compressed_ETC1_RGB8_texture")).getMatchingApks(buildApksResult)).containsExactly(baseMatchedApk(apk));
+        createApkResultMatcher();
     }
 
     @Test
@@ -473,9 +471,7 @@ public class ApkMatcherTest {
 
     @Test
     public void apkMatch_textureSplit_noBetterAlternative() {
-        ZipPath apk = ZipPath.create("master-etc1_rgb8.apk");
-        BuildApksResult buildApksResult = buildApksResult(oneApkSplitApkVariant(variantSdkTargeting(sdkVersionFrom(Versions.ANDROID_L_API_VERSION)), apkTextureTargeting(ETC1_RGB8, ImmutableSet.of(ATC, PVRTC)), apk));
-        assertThat(new ApkMatcher(lDeviceWithGlExtensions("GL_OES_compressed_ETC1_RGB8_texture")).getMatchingApks(buildApksResult)).containsExactly(baseMatchedApk(apk));
+        createApkResultMatcher();
     }
 
     @Test
@@ -842,5 +838,11 @@ public class ApkMatcherTest {
         true, /* matchInstant= */
         false, /* ensureDensityAndAbiApksMatched= */
         true);
+    }
+
+    private void createApkResultMatcher() {
+        ZipPath apk = ZipPath.create("master-etc1_rgb8.apk");
+        BuildApksResult buildApksResult = buildApksResult(oneApkSplitApkVariant(variantSdkTargeting(sdkVersionFrom(Versions.ANDROID_L_API_VERSION)), apkTextureTargeting(ETC1_RGB8, ImmutableSet.of(ATC, PVRTC)), apk));
+        assertThat(new ApkMatcher(lDeviceWithGlExtensions("GL_OES_compressed_ETC1_RGB8_texture")).getMatchingApks(buildApksResult)).containsExactly(baseMatchedApk(apk));
     }
 }
