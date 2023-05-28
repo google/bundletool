@@ -47,11 +47,9 @@ public final class ZipAlignCheck {
         ZipMap zipMap = ZipMap.from(zip.toPath());
         for (Entry entry : zipMap.getEntries().values()) {
             int expectedAligment = NATIVE_LIB_PATTERN.matcher(entry.getName()).matches() ? PAGE_ALIGNMENT : FOUR_BYTE_ALIGNMENT;
-            if (!entry.isCompressed()) {
-                if (entry.getPayloadLocation().first % expectedAligment != 0) {
-                    System.out.printf("File '%s' is not aligned. dataOffset=%d, expectedAlignment=%d%n", entry.getName(), entry.getPayloadLocation().first, expectedAligment);
-                    return false;
-                }
+            if (!entry.isCompressed() && entry.getPayloadLocation().first % expectedAligment != 0) {
+                System.out.printf("File '%s' is not aligned. dataOffset=%d, expectedAlignment=%d%n", entry.getName(), entry.getPayloadLocation().first, expectedAligment);
+                return false;
             }
         }
         return true;

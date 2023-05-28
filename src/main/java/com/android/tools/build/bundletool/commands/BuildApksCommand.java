@@ -688,10 +688,8 @@ public abstract class BuildApksCommand {
             if (command.getCountrySet().isPresent() && !command.getGenerateOnlyForConnectedDevice() && !command.getDeviceSpec().isPresent()) {
                 throw InvalidCommandException.builder().withInternalMessage("Setting --country-set requires using either the --connected-device or the" + " --device-spec flag.").build();
             }
-            if (command.getOutputFormat().equals(APK_SET)) {
-                if (!APK_SET_ARCHIVE_EXTENSION.equals(MoreFiles.getFileExtension(command.getOutputFile()))) {
-                    throw InvalidCommandException.builder().withInternalMessage("Flag --output should be the path where to generate the APK Set. " + "Its extension must be '.apks'.").build();
-                }
+            if (command.getOutputFormat().equals(APK_SET) && !APK_SET_ARCHIVE_EXTENSION.equals(MoreFiles.getFileExtension(command.getOutputFile()))) {
+                throw InvalidCommandException.builder().withInternalMessage("Flag --output should be the path where to generate the APK Set. " + "Its extension must be '.apks'.").build();
             }
             if (!command.getModules().isEmpty() && !command.getApkBuildMode().equals(SYSTEM) && !command.getApkBuildMode().equals(UNIVERSAL)) {
                 throw InvalidCommandException.builder().withInternalMessage("Modules can be only set when running with '%s' or '%s' mode flag.", UNIVERSAL.getLowerCaseName(), SYSTEM.getLowerCaseName()).build();
