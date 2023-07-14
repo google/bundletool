@@ -335,11 +335,17 @@ message RuntimeEnabledSdkDependency {
 // depends on.
 message SdkModuleMetadata {
   // Version of the Runtime-enabled SDK that this module was generated from.
+  // Required.
   optional SdkModuleVersion sdk_module_version = 1;
 
   // Package name of the runtime-enabled SDK that this module was generated
   // from.
+  // Required.
   optional string sdk_package_name = 2;
+
+  // Package ID of the resources of this module. Can have values between 2-255.
+  // Required.
+  optional int32 resources_package_id = 3;
 }
 
 // Versioning information about the SDK that the app module was generated from.

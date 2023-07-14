@@ -23,8 +23,8 @@ import com.google.errorprone.annotations.Immutable;
 
 /** Wrapper around the {@link XmlNode} proto, providing a fluent API. */
 @Immutable
-public final class XmlProtoNode
-    extends XmlProtoNodeOrBuilder<XmlElement, XmlProtoElement, XmlNode> {
+public final class XmlProtoNode extends XmlProtoNodeOrBuilder<XmlElement, XmlProtoElement, XmlNode>
+    implements ToXmlNode {
 
   private final XmlNode node;
 
@@ -42,6 +42,11 @@ public final class XmlProtoNode
 
   public XmlProtoNodeBuilder toBuilder() {
     return new XmlProtoNodeBuilder(node.toBuilder());
+  }
+
+  @Override
+  public XmlNode toXmlNode() {
+    return node;
   }
 
   @Override

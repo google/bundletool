@@ -22,6 +22,7 @@ import static com.android.tools.build.bundletool.testing.TargetingUtils.sdkVersi
 import static com.android.tools.build.bundletool.testing.TargetingUtils.variantMultiAbiTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.variantSdkTargeting;
 import static com.google.common.collect.ImmutableList.toImmutableList;
+import static java.nio.charset.StandardCharsets.UTF_8;
 
 import com.android.bundle.Commands.ApexApkMetadata;
 import com.android.bundle.Commands.ApkDescription;
@@ -46,6 +47,7 @@ import com.android.tools.build.bundletool.model.ZipPath;
 import com.android.tools.build.bundletool.model.version.BundleToolVersion;
 import com.android.tools.build.bundletool.model.version.Version;
 import com.google.common.collect.ImmutableList;
+import com.google.protobuf.util.JsonFormat;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Arrays;
@@ -56,15 +58,38 @@ public final class ApksArchiveHelpers {
 
   private static final byte[] TEST_BYTES = new byte[100];
 
+  /** The format of the table of content when serialized to disk. */
+  public enum TocFormat {
+    PROTO,
+    JSON
+  }
+
   /** Create an app APK set and serialize it to the provided path. */
   public static Path createApksArchiveFile(BuildApksResult result, Path location) throws Exception {
+    return createApksArchiveFile(result, location, TocFormat.PROTO);
+  }
+
+  /**
+   * Create an app APK set and serialize it to the provided path. The toc file will be serialized in
+   * the given tocFormat
+   */
+  public static Path createApksArchiveFile(
+      BuildApksResult result, Path location, TocFormat tocFormat) throws Exception {
     ZipBuilder archiveBuilder = new ZipBuilder();
 
     apkDescriptionStream(result)
         .forEach(
             apkDesc ->
                 archiveBuilder.addFileWithContent(ZipPath.create(apkDesc.getPath()), TEST_BYTES));
-    archiveBuilder.addFileWithProtoContent(ZipPath.create("toc.pb"), result);
+    switch (tocFormat) {
+      case PROTO:
+        archiveBuilder.addFileWithProtoContent(ZipPath.create("toc.pb"), result);
+        break;
+      case JSON:
+        archiveBuilder.addFileWithContent(
+            ZipPath.create("toc.json"), JsonFormat.printer().print(result).getBytes(UTF_8));
+        break;
+    }
 
     return archiveBuilder.writeTo(location);
   }
@@ -86,6 +111,11 @@ public final class ApksArchiveHelpers {
   }
 
   public static Path createApksDirectory(BuildApksResult result, Path location) throws Exception {
+    return createApksDirectory(result, location, TocFormat.PROTO);
+  }
+
+  public static Path createApksDirectory(BuildApksResult result, Path location, TocFormat tocFormat)
+      throws Exception {
     ImmutableList<ApkDescription> apkDescriptions =
         apkDescriptionStream(result).collect(toImmutableList());
 
@@ -94,7 +124,14 @@ public final class ApksArchiveHelpers {
       Files.createDirectories(apkPath.getParent());
       Files.write(apkPath, TEST_BYTES);
     }
-    Files.write(location.resolve("toc.pb"), result.toByteArray());
+    switch (tocFormat) {
+      case PROTO:
+        Files.write(location.resolve("toc.pb"), result.toByteArray());
+        break;
+      case JSON:
+        Files.writeString(location.resolve("toc.json"), JsonFormat.printer().print(result));
+        break;
+    }
 
     return location;
   }

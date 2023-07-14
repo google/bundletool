@@ -35,16 +35,23 @@ import com.android.tools.build.bundletool.model.exceptions.InvalidBundleExceptio
 import com.android.tools.build.bundletool.testing.AppBundleBuilder;
 import com.android.tools.build.bundletool.testing.BundleModuleBuilder;
 import com.android.tools.build.bundletool.testing.ManifestProtoUtils.ManifestMutator;
+import java.nio.file.Path;
 import java.util.AbstractMap.SimpleEntry;
 import java.util.Arrays;
+import java.util.List;
 import java.util.Map;
 import java.util.stream.Stream;
+import java.util.zip.ZipFile;
+import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.TemporaryFolder;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 
 @RunWith(JUnit4.class)
 public class DeclarativeWatchFaceBundleValidatorTest {
+
+  @Rule public final TemporaryFolder tmp = new TemporaryFolder();
 
   private static final String DWF_BUNDLE_PACKAGE = "com.sample.dwf";
   private static final int MIN_DWF_SDK_VERSION = 33;
@@ -80,6 +87,13 @@ public class DeclarativeWatchFaceBundleValidatorTest {
   @Test
   public void validDwfWithEmbeddedRuntime() {
     AppBundle appBundle = createAppBundleWithRuntime();
+    new DeclarativeWatchFaceBundleValidator().validateBundle(appBundle);
+  }
+
+  @Test
+  public void validDwfAabWithEmbeddedRuntime() throws Exception {
+    Path wfAabPath = TestData.copyToTempDir(tmp, "testdata/bundle/watch-face-from-tool.aab");
+    AppBundle appBundle = AppBundle.buildFromZip(new ZipFile(wfAabPath.toFile()));
     new DeclarativeWatchFaceBundleValidator().validateBundle(appBundle);
   }
 
@@ -291,22 +305,29 @@ public class DeclarativeWatchFaceBundleValidatorTest {
   }
 
   @Test
-  public void invalidSimpleDwf_hasRootFilesInBase() {
-    AppBundle appBundle =
-        new AppBundleBuilder()
-            .addModule(
-                new BundleModuleBuilder("base")
-                    .setManifest(
-                        createDwfManifest(
-                            withUsesFeatureElement(
-                                AndroidManifest.USES_FEATURE_HARDWARE_WATCH_NAME)))
-                    .addFile("/res/raw/watchface.xml")
-                    .addFile("/root/some-file.txt")
-                    .build())
-            .build();
+  public void invalidSimpleDwf_hasCodeFilesInBase() {
+    List<String> codeFileNames = Arrays.asList("classes.dex", "libs.so");
 
-    InvalidBundleException e = assertThrowsForBundle(appBundle);
-    assertThat(e).hasMessageThat().contains("cannot have any files in the root of the package");
+    codeFileNames.forEach(
+        fileName -> {
+          AppBundle appBundle =
+              new AppBundleBuilder()
+                  .addModule(
+                      new BundleModuleBuilder("base")
+                          .setManifest(
+                              createDwfManifest(
+                                  withUsesFeatureElement(
+                                      AndroidManifest.USES_FEATURE_HARDWARE_WATCH_NAME)))
+                          .addFile("/res/raw/watchface.xml")
+                          .addFile("/root/" + fileName)
+                          .build())
+                  .build();
+
+          InvalidBundleException e = assertThrowsForBundle(appBundle);
+          assertThat(e)
+              .hasMessageThat()
+              .contains("cannot have any compiled code in its root folder");
+        });
   }
 
   @Test

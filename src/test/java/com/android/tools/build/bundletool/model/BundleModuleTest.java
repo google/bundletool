@@ -455,6 +455,7 @@ public class BundleModuleTest {
                             .setMinor(sdkMinorVersion)
                             .setPatch(sdkPatchVersion))
                     .build())
+            .setResourcesPackageId(2)
             .build();
 
     assertThat(bundleModule.getModuleMetadata().getSdkModuleMetadata())
@@ -466,6 +467,7 @@ public class BundleModuleTest {
                         .setMajor(sdkMajorVersion)
                         .setMinor(sdkMinorVersion)
                         .setPatch(sdkPatchVersion))
+                .setResourcesPackageId(2)
                 .build());
   }
 
@@ -571,6 +573,7 @@ public class BundleModuleTest {
             .setAndroidManifestProto(androidManifestForSdkModule("com.test.app"))
             .setSdkModulesConfig(
                 SdkModulesConfig.newBuilder().setSdkPackageName("com.test.sdk").build())
+            .setResourcesPackageId(2)
             .build();
 
     assertThat(bundleModule.getModuleType()).isEqualTo(ModuleType.SDK_DEPENDENCY_MODULE);
@@ -578,12 +581,34 @@ public class BundleModuleTest {
 
   @Test
   public void missingSdkModulesConfigForSdkDependencyModule_throws() {
-    assertThrows(
-        IllegalStateException.class,
-        () ->
-            createMinimalModuleBuilder()
-                .setAndroidManifestProto(androidManifestForSdkModule("com.test.app"))
-                .build());
+    Throwable e =
+        assertThrows(
+            IllegalStateException.class,
+            () ->
+                createMinimalModuleBuilder()
+                    .setAndroidManifestProto(androidManifestForSdkModule("com.test.app"))
+                    .setResourcesPackageId(2)
+                    .build());
+    assertThat(e)
+        .hasMessageThat()
+        .contains(
+            "BundleModule of type SDK_DEPENDENCY_MODULE can not have empty SdkModulesConfig.");
+  }
+
+  @Test
+  public void missingResourcesPackageIdForSdkDependencyModule_throws() {
+    Throwable e =
+        assertThrows(
+            IllegalStateException.class,
+            () ->
+                createMinimalModuleBuilder()
+                    .setAndroidManifestProto(androidManifestForSdkModule("com.test.app"))
+                    .setSdkModulesConfig(SdkModulesConfig.getDefaultInstance())
+                    .build());
+    assertThat(e)
+        .hasMessageThat()
+        .contains(
+            "BundleModule of type SDK_DEPENDENCY_MODULE can not have empty ResourcesPackageId.");
   }
 
   @Test

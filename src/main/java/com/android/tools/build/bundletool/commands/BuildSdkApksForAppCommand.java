@@ -16,15 +16,21 @@
 
 package com.android.tools.build.bundletool.commands;
 
+import static com.android.tools.build.bundletool.commands.BuildApksCommand.OutputFormat.APK_SET;
+import static com.android.tools.build.bundletool.commands.BuildApksCommand.OutputFormat.DIRECTORY;
 import static com.android.tools.build.bundletool.model.utils.BundleParser.EXTRACTED_SDK_MODULES_FILE_NAME;
 import static com.android.tools.build.bundletool.model.utils.BundleParser.getModulesZip;
+import static com.android.tools.build.bundletool.model.utils.files.FilePreconditions.checkFileDoesNotExist;
 import static com.android.tools.build.bundletool.model.utils.files.FilePreconditions.checkFileExistsAndReadable;
 import static com.android.tools.build.bundletool.model.utils.files.FilePreconditions.checkFileHasExtension;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
+import static java.util.Arrays.stream;
+import static java.util.stream.Collectors.joining;
 
 import com.android.bundle.RuntimeEnabledSdkConfigProto.SdkSplitPropertiesInheritedFromApp;
 import com.android.tools.build.bundletool.androidtools.Aapt2Command;
+import com.android.tools.build.bundletool.commands.BuildApksCommand.OutputFormat;
 import com.android.tools.build.bundletool.commands.CommandHelp.CommandDescription;
 import com.android.tools.build.bundletool.commands.CommandHelp.FlagDescription;
 import com.android.tools.build.bundletool.flags.Flag;
@@ -41,10 +47,12 @@ import com.android.tools.build.bundletool.model.exceptions.InvalidCommandExcepti
 import com.android.tools.build.bundletool.model.utils.DefaultSystemEnvironmentProvider;
 import com.android.tools.build.bundletool.model.utils.SystemEnvironmentProvider;
 import com.android.tools.build.bundletool.model.utils.files.BufferedIo;
+import com.android.tools.build.bundletool.model.utils.files.FileUtils;
 import com.android.tools.build.bundletool.sdkmodule.SdkModuleToAppBundleModuleConverter;
 import com.android.tools.build.bundletool.validation.SdkAsarValidator;
 import com.android.tools.build.bundletool.validation.SdkBundleValidator;
 import com.google.auto.value.AutoValue;
+import com.google.common.io.MoreFiles;
 import com.google.common.util.concurrent.ListeningExecutorService;
 import com.google.common.util.concurrent.MoreExecutors;
 import com.google.errorprone.annotations.CanIgnoreReturnValue;
@@ -53,9 +61,12 @@ import java.io.IOException;
 import java.io.PrintStream;
 import java.io.Reader;
 import java.io.UncheckedIOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.Executors;
+import java.util.logging.Logger;
 import java.util.zip.ZipException;
 import java.util.zip.ZipFile;
 
@@ -65,7 +76,11 @@ public abstract class BuildSdkApksForAppCommand {
 
   private static final int DEFAULT_THREAD_POOL_SIZE = 4;
 
+  private static final String APK_SET_ARCHIVE_EXTENSION = "apks";
+
   public static final String COMMAND_NAME = "build-sdk-apks-for-app";
+
+  private static final Logger logger = Logger.getLogger(BuildSdkApksForAppCommand.class.getName());
 
   private static final Flag<Path> SDK_BUNDLE_LOCATION_FLAG = Flag.path("sdk-bundle");
 
@@ -75,6 +90,9 @@ public abstract class BuildSdkApksForAppCommand {
       Flag.path("app-properties");
 
   private static final Flag<Path> OUTPUT_FILE_FLAG = Flag.path("output");
+
+  private static final Flag<OutputFormat> OUTPUT_FORMAT_FLAG =
+      Flag.enumFlag("output-format", OutputFormat.class);
 
   private static final Flag<Path> AAPT2_PATH_FLAG = Flag.path("aapt2");
 
@@ -95,6 +113,8 @@ public abstract class BuildSdkApksForAppCommand {
 
   public abstract Path getOutputFile();
 
+  public abstract OutputFormat getOutputFormat();
+
   public abstract Optional<Aapt2Command> getAapt2Command();
 
   public abstract Optional<SigningConfiguration> getSigningConfiguration();
@@ -108,7 +128,7 @@ public abstract class BuildSdkApksForAppCommand {
   abstract boolean isExecutorServiceCreatedByBundleTool();
 
   public static BuildSdkApksForAppCommand.Builder builder() {
-    return new AutoValue_BuildSdkApksForAppCommand.Builder();
+    return new AutoValue_BuildSdkApksForAppCommand.Builder().setOutputFormat(APK_SET);
   }
 
   /** Builder for {@link BuildSdkApksForAppCommand}. */
@@ -122,7 +142,7 @@ public abstract class BuildSdkApksForAppCommand {
     public abstract Builder setSdkArchivePath(Path sdkArchivePath);
 
     /** Sets the config containing app properties that the SDK split should inherit. */
-    abstract Builder setInheritedAppProperties(
+    public abstract Builder setInheritedAppProperties(
         SdkSplitPropertiesInheritedFromApp sdkSplitPropertiesInheritedFromApp);
 
     /** Sets path to a config file containing app properties that the SDK split should inherit. */
@@ -132,6 +152,9 @@ public abstract class BuildSdkApksForAppCommand {
 
     /** Path to the output produced by this command. Must have extension ".apks". */
     public abstract Builder setOutputFile(Path outputFile);
+
+    /** Sets the output format. */
+    public abstract Builder setOutputFormat(OutputFormat outputFormat);
 
     /** Provides a wrapper around the execution of the aapt2 command. */
     public abstract Builder setAapt2Command(Aapt2Command aapt2Command);
@@ -211,7 +234,22 @@ public abstract class BuildSdkApksForAppCommand {
             FlagDescription.builder()
                 .setFlagName(OUTPUT_FILE_FLAG.getName())
                 .setExampleValue("output.apks")
-                .setDescription("Path to where the APK Set archive should be created.")
+                .setDescription(
+                    "Path to where the APK Set archive should be created (default) or path to the"
+                        + " directory where generated APKs should be stored when flag --%s is set"
+                        + " to '%s'.",
+                    OUTPUT_FORMAT_FLAG.getName(), DIRECTORY)
+                .build())
+        .addFlag(
+            FlagDescription.builder()
+                .setFlagName(OUTPUT_FORMAT_FLAG.getName())
+                .setExampleValue(joinFlagOptions(OutputFormat.values()))
+                .setOptional(true)
+                .setDescription(
+                    "Specifies output format for generated APKs. If set to '%s' outputs APKs into"
+                        + " the created APK Set archive (default). If set to '%s' outputs APKs"
+                        + " into the specified directory.",
+                    APK_SET, DIRECTORY)
                 .build())
         .addFlag(
             FlagDescription.builder()
@@ -267,6 +305,10 @@ public abstract class BuildSdkApksForAppCommand {
         .build();
   }
 
+  private static String joinFlagOptions(Enum<?>... flagOptions) {
+    return stream(flagOptions).map(Enum::name).map(String::toLowerCase).collect(joining("|"));
+  }
+
   public static BuildSdkApksForAppCommand fromFlags(ParsedFlags flags) {
     return fromFlags(flags, System.out, DEFAULT_PROVIDER);
   }
@@ -278,6 +320,7 @@ public abstract class BuildSdkApksForAppCommand {
             .setInheritedAppProperties(
                 INHERITED_APP_PROPERTIES_LOCATION_FLAG.getRequiredValue(flags))
             .setOutputFile(OUTPUT_FILE_FLAG.getRequiredValue(flags));
+    OUTPUT_FORMAT_FLAG.getValue(flags).ifPresent(command::setOutputFormat);
     SDK_BUNDLE_LOCATION_FLAG.getValue(flags).ifPresent(command::setSdkBundlePath);
     SDK_ARCHIVE_LOCATION_FLAG.getValue(flags).ifPresent(command::setSdkArchivePath);
     AAPT2_PATH_FLAG
@@ -290,15 +333,26 @@ public abstract class BuildSdkApksForAppCommand {
     return command.build();
   }
 
-  public void execute() {
+  @CanIgnoreReturnValue
+  public Path execute() {
     validateInput();
+
+    Path outputDirectory =
+        getOutputFormat().equals(APK_SET) ? getOutputFile().getParent() : getOutputFile();
+    if (outputDirectory != null && Files.notExists(outputDirectory)) {
+      logger.info("Output directory '" + outputDirectory + "' does not exist, creating it.");
+      FileUtils.createDirectories(outputDirectory);
+    }
+
     if (getSdkBundlePath().isPresent()) {
       executeForSdkBundle();
     } else if (getSdkArchivePath().isPresent()) {
       executeForSdkArchive();
     } else {
-      throw new IllegalStateException("whaaat");
+      throw new IllegalStateException(
+          "One and only one of SdkBundlePath and SdkArchivePath should be set.");
     }
+    return getOutputFile();
   }
 
   private void validateInput() {
@@ -309,6 +363,16 @@ public abstract class BuildSdkApksForAppCommand {
     if (getSdkArchivePath().isPresent()) {
       checkFileExistsAndReadable(getSdkArchivePath().get());
       checkFileHasExtension("ASAR file", getSdkArchivePath().get(), ".asar");
+    }
+    if (getOutputFormat().equals(APK_SET)) {
+      if (!Objects.equals(MoreFiles.getFileExtension(getOutputFile()), APK_SET_ARCHIVE_EXTENSION)) {
+        throw InvalidCommandException.builder()
+            .withInternalMessage(
+                "Flag --output should be the path where to generate the APK Set. "
+                    + "Its extension must be '.apks'.")
+            .build();
+      }
+      checkFileDoesNotExist(getOutputFile());
     }
   }
 

@@ -19,6 +19,7 @@ import static com.android.tools.build.bundletool.commands.BuildApksCommand.ApkBu
 import static com.android.tools.build.bundletool.commands.BuildApksCommand.ApkBuildMode.SYSTEM;
 import static com.android.tools.build.bundletool.commands.ExtractApksCommand.ALL_MODULES_SHORTCUT;
 import static com.android.tools.build.bundletool.model.version.VersionGuardedFeature.RESOURCES_REFERENCED_IN_MANIFEST_TO_MASTER_SPLIT;
+import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.ImmutableSet.toImmutableSet;
 
@@ -43,6 +44,7 @@ import com.android.tools.build.bundletool.model.GeneratedApks;
 import com.android.tools.build.bundletool.model.GeneratedAssetSlices;
 import com.android.tools.build.bundletool.model.ModuleDeliveryType;
 import com.android.tools.build.bundletool.model.ModuleSplit;
+import com.android.tools.build.bundletool.model.OptimizationDimension;
 import com.android.tools.build.bundletool.model.exceptions.IncompatibleDeviceException;
 import com.android.tools.build.bundletool.model.exceptions.InvalidCommandException;
 import com.android.tools.build.bundletool.model.targeting.AlternativeVariantTargetingPopulator;
@@ -325,7 +327,7 @@ public final class BuildApksManager {
     apkGenerationConfiguration.setEnableUncompressedNativeLibraries(
         apkOptimizations.getUncompressNativeLibraries());
     apkGenerationConfiguration.setEnableDexCompressionSplitter(
-        apkOptimizations.getUncompressDexFiles());
+        getEnableUncompressedDexOptimization(appBundle));
     apkGenerationConfiguration.setDexCompressionSplitterForTargetSdk(
         apkOptimizations.getUncompressedDexTargetSdk());
     apkGenerationConfiguration.setEnableSparseEncodingVariant(
@@ -360,6 +362,20 @@ public final class BuildApksManager {
         .ifPresent(apkGenerationConfiguration::setMinSdkForAdditionalVariantWithV3Rotation);
 
     return apkGenerationConfiguration;
+  }
+
+  private boolean getEnableUncompressedDexOptimization(AppBundle appBundle) {
+    if (appBundle.getUncompressedDexOptOut()) {
+      return false;
+    }
+    if (appBundle.getBundleConfig().getOptimizations().hasUncompressDexFiles()) {
+      // If uncompressed dex is specified in the BundleConfig it will be honoured.
+      return appBundle.getBundleConfig().getOptimizations().getUncompressDexFiles().getEnabled();
+    }
+    // This is the default value of the optimisation. Depends on the bundletool version.
+    boolean enableUncompressedDexOptimization = apkOptimizations.getUncompressDexFiles();
+
+    return enableUncompressedDexOptimization;
   }
 
   private ApkGenerationConfiguration getAssetSliceGenerationConfiguration() {
@@ -397,7 +413,18 @@ public final class BuildApksManager {
 
   private ApkOptimizations getSystemApkOptimizations() {
     ImmutableSet<SystemApkOption> systemApkOptions = command.getSystemApkOptions();
-    return apkOptimizations.toBuilder()
+    ApkOptimizations.Builder apkOptimizationsBuilder = apkOptimizations.toBuilder();
+
+    checkArgument(deviceSpec.isPresent(), "Must specify a device spec in system mode");
+    if (deviceSpec.get().getScreenDensity() == 0) {
+      // If no screen density is specified, then don't split by screen density.
+      apkOptimizationsBuilder.setSplitDimensions(
+          Sets.difference(
+                  apkOptimizations.getSplitDimensions(),
+                  ImmutableSet.of(OptimizationDimension.SCREEN_DENSITY))
+              .immutableCopy());
+    }
+    return apkOptimizationsBuilder
         .setUncompressNativeLibraries(
             systemApkOptions.contains(SystemApkOption.UNCOMPRESSED_NATIVE_LIBRARIES))
         .setUncompressDexFiles(systemApkOptions.contains(SystemApkOption.UNCOMPRESSED_DEX_FILES))

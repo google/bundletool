@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2017 The Android Open Source Project
+ * Copyright (C) 2023 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,20 +13,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License
  */
+package com.android.tools.build.bundletool.model.utils.xmlproto;
 
-package com.android.tools.build.bundletool.model.utils;
+import com.android.aapt.Resources.XmlNode;
 
-/** Common constants used for file names by the bundletool. */
-public final class FileNames {
+/** Represents an entity that can be converted to {@link XmlNode}. */
+public interface ToXmlNode {
 
-  /**
-   * File living inside of and describing contents of the archive produced by the build-apks
-   * command.
-   */
-  public static final String TABLE_OF_CONTENTS_FILE = "toc.pb";
-
-  /** Same as {@link TABLE_OF_CONTENTS_FILE}, but represented as JSON */
-  public static final String TABLE_OF_CONTENTS_JSON_FILE = "toc.json";
-
-  private FileNames() {}
+  /** Converts the entity to {@link XmlNode}. */
+  XmlNode toXmlNode();
 }

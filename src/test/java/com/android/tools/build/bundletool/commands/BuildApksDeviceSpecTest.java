@@ -250,35 +250,7 @@ public class BuildApksDeviceSpecTest {
     Throwable exception = assertThrows(InvalidCommandException.class, command::build);
     assertThat(exception)
         .hasMessageThat()
-        .contains(
-            "Device spec must have screen density and ABIs set when running with 'system' mode"
-                + " flag.");
-  }
-
-  @Test
-  @Theory
-  public void deviceSpec_systemApkMode_partialDeviceSpecMissingDensity_throws() throws Exception {
-    DeviceSpec deviceSpec = mergeSpecs(abis("arm64-v8a"));
-
-    AppBundle appBundle =
-        new AppBundleBuilder()
-            .addModule("base", module -> module.setManifest(androidManifest("com.app")))
-            .build();
-    bundleSerializer.writeToDisk(appBundle, bundlePath);
-
-    BuildApksCommand.Builder command =
-        BuildApksCommand.builder()
-            .setBundlePath(bundlePath)
-            .setOutputFile(outputFilePath)
-            .setDeviceSpec(deviceSpec)
-            .setApkBuildMode(SYSTEM);
-
-    Throwable exception = assertThrows(InvalidCommandException.class, command::build);
-    assertThat(exception)
-        .hasMessageThat()
-        .contains(
-            "Device spec must have screen density and ABIs set when running with 'system' mode"
-                + " flag.");
+        .contains("Device spec must have ABIs set when running with 'system' mode flag.");
   }
 
   @Test

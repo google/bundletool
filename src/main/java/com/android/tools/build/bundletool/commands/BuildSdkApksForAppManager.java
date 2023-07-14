@@ -23,9 +23,11 @@ import com.android.tools.build.bundletool.model.BundleModule;
 import com.android.tools.build.bundletool.model.GeneratedApks;
 import com.android.tools.build.bundletool.model.GeneratedAssetSlices;
 import com.android.tools.build.bundletool.model.ModuleSplit;
+import com.android.tools.build.bundletool.model.exceptions.InvalidCommandException;
 import com.android.tools.build.bundletool.shards.ModuleSplitterForShards;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
+import java.nio.file.Path;
 import java.util.Optional;
 import javax.inject.Inject;
 
@@ -59,14 +61,25 @@ public class BuildSdkApksForAppManager {
         moduleSplitterForShards.generateSplits(module, /* shardingDimensions= */ ImmutableSet.of());
 
     GeneratedApks generatedApks = GeneratedApks.fromModuleSplits(splits);
-    ApkSetWriter apkSetWriter = ApkSetWriter.zip(tempDirectory.getPath(), command.getOutputFile());
 
     apkSerializerManager.serializeApkSetWithoutToc(
-        apkSetWriter,
+        createApkSetWriter(tempDirectory.getPath()),
         generatedApks,
         GeneratedAssetSlices.builder().build(),
         /* deviceSpec= */ Optional.empty(),
         LocalTestingInfo.getDefaultInstance(),
         /* permanentlyFusedModules= */ ImmutableSet.of());
+  }
+
+  private ApkSetWriter createApkSetWriter(Path tempDir) {
+    switch (command.getOutputFormat()) {
+      case APK_SET:
+        return ApkSetWriter.zip(tempDir, command.getOutputFile());
+      case DIRECTORY:
+        return ApkSetWriter.directory(command.getOutputFile());
+    }
+    throw InvalidCommandException.builder()
+        .withInternalMessage("Unsupported output format '%s'.", command.getOutputFormat())
+        .build();
   }
 }

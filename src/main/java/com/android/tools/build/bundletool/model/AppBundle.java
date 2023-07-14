@@ -77,6 +77,13 @@ public abstract class AppBundle implements Bundle {
   public static final String ARCHIVE_OPT_OUT_XML_PATH =
       "res/xml/com_android_vending_archive_opt_out.xml";
 
+  /**
+   * If this file path exists in the base module of the app bundle, uncompressed dex optimisation
+   * will be disabled.
+   */
+  public static final String UNCOMPRESSED_DEX_OPT_OUT_XML_PATH =
+      "res/xml/uncompressed_dex_opt_out.xml";
+
   /** Builds an {@link AppBundle} from an App Bundle on disk. */
   public static AppBundle buildFromZip(ZipFile bundleFile) {
     BundleConfig bundleConfig = readBundleConfig(bundleFile);
@@ -274,6 +281,14 @@ public abstract class AppBundle implements Bundle {
       return Optional.of(false);
     }
     return Optional.empty();
+  }
+
+  public boolean getUncompressedDexOptOut() {
+    return hasBaseModule()
+        && getBaseModule()
+            .findEntriesUnderPath(BundleModule.RESOURCES_DIRECTORY)
+            .anyMatch(
+                entry -> entry.getPath().equals(ZipPath.create(UNCOMPRESSED_DEX_OPT_OUT_XML_PATH)));
   }
 
   /** Returns {@code true} if bundletool has to generate a LocaleConfig file. */

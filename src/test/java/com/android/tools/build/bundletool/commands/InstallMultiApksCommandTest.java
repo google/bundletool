@@ -85,6 +85,11 @@ public class InstallMultiApksCommandTest {
   private static final String DEVICE_ID = "id1";
   private static final String PKG_NAME_1 = "com.example.a";
   private static final String PKG_NAME_2 = "com.example.b";
+  private static final String NONUPDATABLE_PKG_NAME_1 = "com.google.android.permissionconfig";
+  private static final String NONUPDATABLE_PKG_NAME_2 = "com.google.android.ext.service";
+  private static final String NONUPDATABLE_PKG_NAME_3 = "com.google.android.permissioncontroller";
+  private static final String NONUPDATABLE_PKG_NAME_4 = "com.google.android.extservice";
+  private static final String NONUPDATABLE_PKG_NAME_5 = "com.google.android.permission";
 
   @Rule public TemporaryFolder tmp = new TemporaryFolder();
 
@@ -556,6 +561,73 @@ public class InstallMultiApksCommandTest {
             .build();
 
     // EXPECT only one of the packages
+    command.execute();
+    assertAdbCommandExecuted();
+  }
+
+  @Test
+  public void execute_installUpdatablePackageOnly() throws Exception {
+
+    BuildApksResult tableOfContents1 = fakeTableOfContents(NONUPDATABLE_PKG_NAME_1);
+    Path apksPath1 = createApksArchiveFile(tableOfContents1, tmpDir.resolve("package1.apks"));
+    BuildApksResult tableOfContents2 = fakeTableOfContents(NONUPDATABLE_PKG_NAME_2);
+    Path apksPath2 = createApksArchiveFile(tableOfContents2, tmpDir.resolve("package2.apks"));
+    BuildApksResult tableOfContents3 = fakeTableOfContents(NONUPDATABLE_PKG_NAME_3);
+    Path apksPath3 = createApksArchiveFile(tableOfContents3, tmpDir.resolve("package3.apks"));
+    BuildApksResult tableOfContents4 = fakeTableOfContents(NONUPDATABLE_PKG_NAME_4);
+    Path apksPath4 = createApksArchiveFile(tableOfContents4, tmpDir.resolve("package4.apks"));
+    BuildApksResult tableOfContents5 = fakeTableOfContents(NONUPDATABLE_PKG_NAME_5);
+    Path apksPath5 = createApksArchiveFile(tableOfContents5, tmpDir.resolve("package5.apks"));
+
+    InstallMultiApksCommand command =
+        InstallMultiApksCommand.builder()
+            .setAdbServer(fakeServerOneDevice(device))
+            .setDeviceId(DEVICE_ID)
+            .setAdbPath(adbPath)
+            .setApksArchivePaths(
+                ImmutableList.of(apksPath1, apksPath2, apksPath3, apksPath4, apksPath5))
+            .setAapt2Command(
+                createFakeAapt2Command(
+                    ImmutableMap.of(
+                        NONUPDATABLE_PKG_NAME_1,
+                        1L,
+                        NONUPDATABLE_PKG_NAME_2,
+                        1L,
+                        NONUPDATABLE_PKG_NAME_3,
+                        1L,
+                        NONUPDATABLE_PKG_NAME_4,
+                        1L,
+                        NONUPDATABLE_PKG_NAME_5,
+                        1L)))
+            .setAdbCommand(
+                // EXPECT three packages to be installed.
+                createFakeAdbCommand(
+                    ImmutableListMultimap.<String, String>builder()
+                        .putAll(expectedInstallApks(NONUPDATABLE_PKG_NAME_1, tableOfContents1))
+                        .putAll(expectedInstallApks(NONUPDATABLE_PKG_NAME_4, tableOfContents4))
+                        .putAll(expectedInstallApks(NONUPDATABLE_PKG_NAME_5, tableOfContents5))
+                        .build(),
+                    /* expectedStaged= */ false,
+                    /* expectedEnableRollback= */ false,
+                    Optional.of(DEVICE_ID)))
+            .build();
+
+    // EXPECT to filter out the non-updatable packages which have updatable versions available.
+    device.injectShellCommandOutput(
+        "pm list packages --show-versioncode",
+        () ->
+            String.format(
+                "package:%s versionCode:1\n"
+                    + "package:%s versionCode:1\n"
+                    + "package:%s versionCode:1\n"
+                    + "package:%s versionCode:1\n"
+                    + "package:%s versionCode:1",
+                NONUPDATABLE_PKG_NAME_1,
+                NONUPDATABLE_PKG_NAME_2,
+                NONUPDATABLE_PKG_NAME_3,
+                NONUPDATABLE_PKG_NAME_4,
+                NONUPDATABLE_PKG_NAME_5));
+    device.injectShellCommandOutput("pm list packages --apex-only --show-versioncode", () -> "");
     command.execute();
     assertAdbCommandExecuted();
   }

@@ -975,24 +975,47 @@ public final class ManifestProtoUtils {
                                 .setValueAsString(name))));
   }
 
+  public static ManifestMutator withActivityAlias(
+      String name, Function<XmlProtoElementBuilder, XmlProtoElementBuilder> modifier) {
+    return manifestElement ->
+        manifestElement
+            .getOrCreateChildElement(APPLICATION_ELEMENT_NAME)
+            .addChildElement(
+                modifier.apply(
+                    XmlProtoElementBuilder.create(ACTIVITY_ALIAS_ELEMENT_NAME)
+                        .addAttribute(
+                            XmlProtoAttributeBuilder.createAndroidAttribute(
+                                    NAME_ATTRIBUTE_NAME, NAME_RESOURCE_ID)
+                                .setValueAsString(name))));
+  }
+
   private static ManifestMutator withActivity(String activityName, String categoryName) {
     return withActivity(
         activityName,
-        activity ->
-            activity.addChildElement(
-                XmlProtoElementBuilder.create("intent-filter")
-                    .addChildElement(
-                        XmlProtoElementBuilder.create("action")
-                            .addAttribute(
-                                XmlProtoAttributeBuilder.createAndroidAttribute(
-                                        NAME_ATTRIBUTE_NAME, NAME_RESOURCE_ID)
-                                    .setValueAsString("android.intent.action.MAIN")))
-                    .addChildElement(
-                        XmlProtoElementBuilder.create("category")
-                            .addAttribute(
-                                XmlProtoAttributeBuilder.createAndroidAttribute(
-                                        NAME_ATTRIBUTE_NAME, NAME_RESOURCE_ID)
-                                    .setValueAsString(categoryName)))));
+        activity -> activity.addChildElement(createIntentFilterForMainActivity(categoryName)));
+  }
+
+  public static XmlProtoElementBuilder createIntentFilter(
+      Function<XmlProtoElementBuilder, XmlProtoElementBuilder> modifier) {
+    return modifier.apply(XmlProtoElementBuilder.create("intent-filter"));
+  }
+
+  public static XmlProtoElementBuilder createIntentFilterForMainActivity(String categoryName) {
+    return createIntentFilter(
+        intentFilter ->
+            intentFilter
+                .addChildElement(
+                    XmlProtoElementBuilder.create("action")
+                        .addAttribute(
+                            XmlProtoAttributeBuilder.createAndroidAttribute(
+                                    NAME_ATTRIBUTE_NAME, NAME_RESOURCE_ID)
+                                .setValueAsString("android.intent.action.MAIN")))
+                .addChildElement(
+                    XmlProtoElementBuilder.create("category")
+                        .addAttribute(
+                            XmlProtoAttributeBuilder.createAndroidAttribute(
+                                    NAME_ATTRIBUTE_NAME, NAME_RESOURCE_ID)
+                                .setValueAsString(categoryName))));
   }
 
   public static ManifestMutator withCustomThemeActivity(String name, int themeRefId) {

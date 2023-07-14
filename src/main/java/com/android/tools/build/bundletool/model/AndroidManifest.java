@@ -137,6 +137,11 @@ public abstract class AndroidManifest {
   public static final String SDK_LIBRARY_ELEMENT_NAME = "sdk-library";
   public static final String SDK_VERSION_MAJOR_ATTRIBUTE_NAME = "versionMajor";
   public static final String ISOLATED_SPLITS_ATTRIBUTE_NAME = "isolatedSplits";
+  public static final String PATH_ATTRIBUTE_NAME = "path";
+  public static final String PATH_PATTERN_NAME = "pathPattern";
+  public static final String SCHEME_NAME = "scheme";
+  public static final String HOST_NAME = "host";
+
   public static final String SDK_PATCH_VERSION_ATTRIBUTE_NAME =
       "com.android.vending.sdk.version.patch";
   public static final String SDK_PROVIDER_CLASS_NAME_ATTRIBUTE_NAME =
@@ -228,6 +233,11 @@ public abstract class AndroidManifest {
   public static final int SRC_RESOURCE_ID = 0x01010119;
   public static final int APP_COMPONENT_FACTORY_RESOURCE_ID = 0x0101057a;
   public static final int AUTHORITIES_RESOURCE_ID = 0x01010018;
+  public static final int PATH_RESOURCE_ID = 0x0101002a;
+  public static final int PATH_PATTERN_RESOURCE_ID = 0x0101002c;
+  public static final int PATH_PREFIX_RESOURCE_ID = 0x0101002b;
+  public static final int SCHEME_RESOURCE_ID = 0x01010027;
+  public static final int HOST_RESOURCE_ID = 0x01010028;
 
   // Matches the value of android.os.Build.VERSION_CODES.CUR_DEVELOPMENT, used when turning
   // a manifest attribute which references a prerelease API version (e.g., "Q") into an integer.
@@ -837,7 +847,7 @@ public abstract class AndroidManifest {
   }
 
   public boolean hasMainActivity() {
-    return getActivities().stream()
+    return Stream.concat(getActivities().stream(), getActivityAliases().stream())
         .flatMap(activity -> activity.getChildrenElements(INTENT_FILTER_ELEMENT_NAME))
         .anyMatch(
             intent ->
@@ -847,7 +857,7 @@ public abstract class AndroidManifest {
   }
 
   public boolean hasMainTvActivity() {
-    return getActivities().stream()
+    return Stream.concat(getActivities().stream(), getActivityAliases().stream())
         .flatMap(activity -> activity.getChildrenElements(INTENT_FILTER_ELEMENT_NAME))
         .anyMatch(
             intent ->
@@ -859,6 +869,12 @@ public abstract class AndroidManifest {
   private ImmutableList<XmlProtoElement> getActivities() {
     return stream(getManifestElement().getOptionalChildElement(APPLICATION_ELEMENT_NAME))
         .flatMap(app -> app.getChildrenElements(ACTIVITY_ELEMENT_NAME))
+        .collect(toImmutableList());
+  }
+
+  private ImmutableList<XmlProtoElement> getActivityAliases() {
+    return stream(getManifestElement().getOptionalChildElement(APPLICATION_ELEMENT_NAME))
+        .flatMap(app -> app.getChildrenElements(ACTIVITY_ALIAS_ELEMENT_NAME))
         .collect(toImmutableList());
   }
 

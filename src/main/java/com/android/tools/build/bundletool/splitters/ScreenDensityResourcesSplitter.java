@@ -21,6 +21,7 @@ import static com.android.tools.build.bundletool.model.utils.CollectorUtils.grou
 import static com.android.tools.build.bundletool.model.utils.ResourcesUtils.DEFAULT_DENSITY_VALUE;
 import static com.android.tools.build.bundletool.model.utils.ResourcesUtils.MIPMAP_TYPE;
 import static com.android.tools.build.bundletool.model.utils.ResourcesUtils.getLowestDensity;
+import static com.android.tools.build.bundletool.model.version.VersionGuardedFeature.FIX_SKIP_GENERATING_EMPTY_DENSITY_SPLITS;
 import static com.android.tools.build.bundletool.model.version.VersionGuardedFeature.RESOURCES_WITH_NO_ALTERNATIVES_IN_MASTER_SPLIT;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
@@ -116,10 +117,15 @@ public class ScreenDensityResourcesSplitter extends SplitterForOneTargetingDimen
     ImmutableList.Builder<ModuleSplit> splitsBuilder = new ImmutableList.Builder<>();
     for (DensityAlias density : densityBuckets) {
       ResourceTable optimizedTable = filterResourceTableForDensity(resourceTable.get(), density);
+
       // Don't generate empty splits.
-      if (optimizedTable.equals(ResourceTable.getDefaultInstance())) {
+      if (FIX_SKIP_GENERATING_EMPTY_DENSITY_SPLITS.enabledForVersion(bundleVersion)
+          && optimizedTable.getPackageList().isEmpty()) {
+        continue;
+      } else if (optimizedTable.equals(ResourceTable.getDefaultInstance())) {
         continue;
       }
+
       ModuleSplit.Builder moduleSplitBuilder =
           split.toBuilder()
               .setApkTargeting(

@@ -160,6 +160,12 @@ public abstract class BundleModule {
   public abstract Optional<SdkModulesConfig> getSdkModulesConfig();
 
   /**
+   * Package ID of resources of this module. Only set for modules of type SDK_DEPENDENCY_MODULE in
+   * app bundles.
+   */
+  public abstract Optional<Integer> getResourcesPackageId();
+
+  /**
    * Returns entries of the module, indexed by their module path.
    *
    * <p>Note that special module files (eg. {@code AndroidManifest.xml} are NOT represented as
@@ -285,11 +291,8 @@ public abstract class BundleModule {
             .setDeliveryType(moduleDeliveryTypeToDeliveryType(getDeliveryType()));
 
     moduleTypeToFeatureModuleType(getModuleType()).ifPresent(moduleMetadata::setModuleType);
-    getSdkModulesConfig()
-        .ifPresent(
-            sdkModulesConfig ->
-                moduleMetadata.setSdkModuleMetadata(
-                    sdkModulesConfigToSdkModuleMetadata(sdkModulesConfig)));
+
+    getSdkModuleMetadata().ifPresent(moduleMetadata::setSdkModuleMetadata);
     if (isSdkRuntimeVariant) {
       getRuntimeEnabledSdkConfig()
           .ifPresent(
@@ -299,6 +302,32 @@ public abstract class BundleModule {
     }
 
     return moduleMetadata.build();
+  }
+
+  private Optional<SdkModuleMetadata> getSdkModuleMetadata() {
+    if (getModuleType().equals(ModuleType.SDK_DEPENDENCY_MODULE)) {
+      SdkModulesConfig sdkModulesConfig =
+          getSdkModulesConfig()
+              .orElseThrow(
+                  () ->
+                      new IllegalStateException(
+                          "SDK_DEPENDENCY_MODULE does not have SdkModulesConfig set."));
+      int resourcesPackageId =
+          getResourcesPackageId()
+              .orElseThrow(
+                  () ->
+                      new IllegalStateException(
+                          "SDK_DEPENDENCY_MODULE does not have ResourcesPackageId set."));
+      return Optional.of(
+          SdkModuleMetadata.newBuilder()
+              .setSdkPackageName(sdkModulesConfig.getSdkPackageName())
+              .setSdkModuleVersion(
+                  runtimeEnabledSdkVersionToModuleMetadataConverter(
+                      sdkModulesConfig.getSdkVersion()))
+              .setResourcesPackageId(resourcesPackageId)
+              .build());
+    }
+    return Optional.empty();
   }
 
   private static ImmutableSet<RuntimeEnabledSdkDependency> runtimeEnabledDependenciesFromConfig(
@@ -339,15 +368,6 @@ public abstract class BundleModule {
         return Optional.empty();
     }
     throw new IllegalArgumentException("Unknown module type: " + moduleType);
-  }
-
-  private static SdkModuleMetadata sdkModulesConfigToSdkModuleMetadata(
-      SdkModulesConfig sdkModulesConfig) {
-    return SdkModuleMetadata.newBuilder()
-        .setSdkPackageName(sdkModulesConfig.getSdkPackageName())
-        .setSdkModuleVersion(
-            runtimeEnabledSdkVersionToModuleMetadataConverter(sdkModulesConfig.getSdkVersion()))
-        .build();
   }
 
   private static SdkModuleVersion runtimeEnabledSdkVersionToModuleMetadataConverter(
@@ -395,6 +415,8 @@ public abstract class BundleModule {
 
     public abstract Builder setSdkModulesConfig(SdkModulesConfig sdkModulesConfig);
 
+    public abstract Builder setResourcesPackageId(int resourcesPackageId);
+
     public abstract Builder setModuleType(ModuleType moduleType);
 
     abstract ImmutableMap.Builder<ZipPath, ModuleEntry> entryMapBuilder();
@@ -420,9 +442,7 @@ public abstract class BundleModule {
       return this;
     }
 
-    /**
-     * @see #addEntry(ModuleEntry)
-     */
+    /** See {@link #addEntry(ModuleEntry)}. */
     @CanIgnoreReturnValue
     public Builder addEntries(Collection<ModuleEntry> entries) {
       for (ModuleEntry entry : entries) {
@@ -477,6 +497,10 @@ public abstract class BundleModule {
           !bundleModule.getModuleType().equals(ModuleType.SDK_DEPENDENCY_MODULE)
               || bundleModule.getSdkModulesConfig().isPresent(),
           "BundleModule of type SDK_DEPENDENCY_MODULE can not have empty SdkModulesConfig.");
+      checkState(
+          !bundleModule.getModuleType().equals(ModuleType.SDK_DEPENDENCY_MODULE)
+              || bundleModule.getResourcesPackageId().isPresent(),
+          "BundleModule of type SDK_DEPENDENCY_MODULE can not have empty ResourcesPackageId.");
       return bundleModule;
     }
   }

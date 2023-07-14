@@ -50,6 +50,8 @@ import static com.android.tools.build.bundletool.model.ModuleDeliveryType.NO_INI
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifest;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifestForAssetModule;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifestForMlModule;
+import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.createIntentFilterForMainActivity;
+import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withActivityAlias;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withCustomThemeActivity;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withFastFollowDelivery;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withFusingAttribute;
@@ -121,6 +123,27 @@ public class AndroidManifestTest {
         AndroidManifest.create(xmlNode(xmlElement("manifest", xmlNode(xmlElement("application")))));
     assertThat(androidManifest.getApplicationDebuggable()).isEmpty();
     assertThat(androidManifest.getEffectiveApplicationDebuggable()).isFalse();
+  }
+
+  @Test
+  public void hasMainActivity_definedAsActivityAlias_returnTrue() {
+    AndroidManifest androidManifest =
+        AndroidManifest.create(
+            androidManifest(
+                "com.test.app",
+                withActivityAlias(
+                    "com.test.app.MainActivity",
+                    activity ->
+                        activity
+                            .addChildElement(
+                                createIntentFilterForMainActivity(
+                                    "android.intent.category.LAUNCHER"))
+                            .addChildElement(
+                                createIntentFilterForMainActivity(
+                                    "android.intent.category.LEANBACK_LAUNCHER")))));
+
+    assertThat(androidManifest.hasMainTvActivity()).isTrue();
+    assertThat(androidManifest.hasMainActivity()).isTrue();
   }
 
   @Test

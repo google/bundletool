@@ -258,7 +258,11 @@ public abstract class ExtractApksCommand {
           !getOutputDirectory().isPresent(),
           "Output directory should not be set when APKs are inside directory.");
       checkDirectoryExists(getApksArchivePath());
-      checkFileExistsAndReadable(getApksArchivePath().resolve(FileNames.TABLE_OF_CONTENTS_FILE));
+      Path tocFile =
+          Files.exists(getApksArchivePath().resolve(FileNames.TABLE_OF_CONTENTS_JSON_FILE))
+              ? getApksArchivePath().resolve(FileNames.TABLE_OF_CONTENTS_JSON_FILE)
+              : getApksArchivePath().resolve(FileNames.TABLE_OF_CONTENTS_FILE);
+      checkFileExistsAndReadable(tocFile);
     } else {
       checkFileExistsAndReadable(getApksArchivePath());
     }

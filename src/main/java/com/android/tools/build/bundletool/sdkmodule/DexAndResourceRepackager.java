@@ -103,7 +103,10 @@ public final class DexAndResourceRepackager {
         sdkModulesConfig.getSdkPackageName());
     module = dexRepackager.applyMutation(module);
     module = javaResourceRepackager.applyMutation(module);
-    return module.toBuilder().addEntry(getCompatSdkConfigModuleEntry(module)).build();
+    return module.toBuilder()
+        .addEntry(getCompatSdkConfigModuleEntry(module))
+        .setResourcesPackageId(inheritedAppProperties.getResourcesPackageId())
+        .build();
   }
 
   /**

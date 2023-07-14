@@ -535,6 +535,7 @@ public class SplitApksGeneratorTest {
                 new BundleModuleBuilder("comTestSdk")
                     .setModuleType(ModuleType.SDK_DEPENDENCY_MODULE)
                     .setSdkModulesConfig(SdkModulesConfig.getDefaultInstance())
+                    .setResourcesPackageId(2)
                     .setManifest(androidManifest("com.test.sdk"))
                     .build())
             .build();
@@ -614,11 +615,13 @@ public class SplitApksGeneratorTest {
                                     .setCertificateDigest("AA:BB:CC")
                                     .setResourcesPackageId(2))
                             .build())
+                    .setResourcesPackageId(2)
                     .build())
             .addModule(
-                new BundleModuleBuilder("comTestSdk")
+                new BundleModuleBuilder("comtestsdk")
                     .setModuleType(ModuleType.SDK_DEPENDENCY_MODULE)
                     .setSdkModulesConfig(SdkModulesConfig.getDefaultInstance())
+                    .setResourcesPackageId(2)
                     .setManifest(androidManifest("com.test.sdk"))
                     .setResourceTable(sdkResourceTable)
                     .build())
@@ -646,10 +649,10 @@ public class SplitApksGeneratorTest {
                 .map(ModuleSplit::getModuleName)
                 .map(BundleModuleName::getName)
                 .distinct())
-        .containsExactly("base", "comTestSdk");
+        .containsExactly("base", "comtestsdk");
     ImmutableSet<ModuleSplit> sdkModuleSplits =
         moduleSplitMap.get(lPlusVariantTargeting()).stream()
-            .filter(moduleSplit -> moduleSplit.getModuleName().getName().equals("comTestSdk"))
+            .filter(moduleSplit -> moduleSplit.getModuleName().getName().equals("comtestsdk"))
             .collect(toImmutableSet());
     // Only main split for SDK dependency module - no config splits.
     assertThat(sdkModuleSplits).hasSize(1);

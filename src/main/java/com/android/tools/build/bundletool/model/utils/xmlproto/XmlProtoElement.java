@@ -28,7 +28,8 @@ import java.util.List;
 @Immutable
 public final class XmlProtoElement
     extends XmlProtoElementOrBuilder<
-        XmlNode, XmlProtoNode, XmlElement, XmlProtoElement, XmlAttribute, XmlProtoAttribute> {
+        XmlNode, XmlProtoNode, XmlElement, XmlProtoElement, XmlAttribute, XmlProtoAttribute>
+    implements ToXmlNode {
 
   private final XmlElement element;
 
@@ -47,6 +48,11 @@ public final class XmlProtoElement
 
   public XmlProtoElementBuilder toBuilder() {
     return new XmlProtoElementBuilder(element.toBuilder());
+  }
+
+  @Override
+  public XmlNode toXmlNode() {
+    return XmlNode.newBuilder().setElement(element).build();
   }
 
   @Override

@@ -84,6 +84,7 @@ import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.with
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withTargetSdkVersion;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withTitle;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withUsesSplit;
+import static com.android.tools.build.bundletool.testing.ResourcesTableFactory.HDPI;
 import static com.android.tools.build.bundletool.testing.ResourcesTableFactory.LDPI;
 import static com.android.tools.build.bundletool.testing.ResourcesTableFactory.MDPI;
 import static com.android.tools.build.bundletool.testing.ResourcesTableFactory.TEST_LABEL_RESOURCE_ID;
@@ -1071,6 +1072,72 @@ public class BuildApksManagerTest {
     nonFusedApkSet
         .getApkDescriptionList()
         .forEach(apkDescription -> assertThat(apkSetFile).hasFile(apkDescription.getPath()));
+  }
+
+  @Test
+  public void buildApksCommand_system_noDensityInSpec_includesAllDensities() throws Exception {
+    AppBundle appBundle =
+        new AppBundleBuilder()
+            .addModule(
+                "base",
+                builder ->
+                    builder
+                        .addFile("res/drawable-ldpi/image.jpg")
+                        .addFile("res/drawable-mdpi/image.jpg")
+                        .addFile("res/drawable-hdpi/image.jpg")
+                        .setResourceTable(
+                            new ResourceTableBuilder()
+                                .addPackage("com.test.app")
+                                .addFileResourceForMultipleConfigs(
+                                    "drawable",
+                                    "image",
+                                    ImmutableMap.of(
+                                        LDPI,
+                                        "res/drawable-ldpi/image.jpg",
+                                        MDPI,
+                                        "res/drawable-mdpi/image.jpg",
+                                        HDPI,
+                                        "res/drawable-hdpi/image.jpg"))
+                                .build())
+                        .setManifest(androidManifest("com.test.app")))
+            .build();
+    TestComponent.useTestModule(
+        this,
+        createTestModuleBuilder()
+            .withAppBundle(appBundle)
+            .withOutputPath(outputFilePath)
+            .withApkBuildMode(SYSTEM)
+            .withDeviceSpec(mergeSpecs(sdkVersion(28), abis("x86"), locales("en-US")))
+            .build());
+
+    buildApksManager.execute();
+
+    ZipFile apkSetFile = openZipFile(outputFilePath.toFile());
+    BuildApksResult result = extractTocFromApkSetFile(apkSetFile, outputDir);
+
+    // Should not shard by screen density.
+    assertThat(systemApkVariants(result)).hasSize(1);
+
+    Variant systemVariant = systemApkVariants(result).get(0);
+    // No screen density targeting.
+    assertThat(systemVariant.getTargeting().hasScreenDensityTargeting()).isFalse();
+
+    assertThat(apkDescriptions(systemVariant)).hasSize(1);
+    ApkDescription systemApk = apkDescriptions(systemVariant).get(0);
+    assertThat(systemApk.getTargeting().hasScreenDensityTargeting()).isFalse();
+
+    File systemApkFile = extractFromApkSetFile(apkSetFile, systemApk.getPath(), outputDir);
+    try (ZipFile systemApkZipFile = new ZipFile(systemApkFile)) {
+      // "res/xml/splits0.xml" is created by bundletool with list of generated splits.
+      TruthZip.assertThat(systemApkZipFile)
+          .containsExactlyEntries(
+              "AndroidManifest.xml",
+              "res/drawable-hdpi/image.jpg",
+              "res/drawable-ldpi/image.jpg",
+              "res/drawable-mdpi/image.jpg",
+              "res/xml/splits0.xml",
+              "resources.arsc");
+    }
   }
 
   @Test
@@ -2936,6 +3003,43 @@ public class BuildApksManagerTest {
         .containsExactly(sdkVersionTargeting(L_SDK_VERSION, ImmutableSet.of(LOWEST_SDK_VERSION)));
   }
 
+
+  @Test
+  public void
+      uncompressedDexOptOut_withEnabledUncompressDexInBundleConfig_noUncompressedDexVariant()
+          throws Exception {
+    AppBundle appBundle =
+        new AppBundleBuilder()
+            .addModule(
+                "base",
+                builder ->
+                    builder
+                        .addFile("dex/classes.dex")
+                        .addFile(
+                            AppBundle.UNCOMPRESSED_DEX_OPT_OUT_XML_PATH,
+                            TestData.readBytes("testdata/xml/opt-out.xml"))
+                        .setManifest(androidManifest("com.test.app"))
+                        .setResourceTable(
+                            new ResourceTableBuilder()
+                                .addPackage("com.test.app")
+                                .addXmlResource(
+                                    "optout", AppBundle.UNCOMPRESSED_DEX_OPT_OUT_XML_PATH)
+                                .build()))
+            .setBundleConfig(BundleConfigBuilder.create().setUncompressDexFiles(true).build())
+            .build();
+    TestComponent.useTestModule(
+        this, TestModule.builder().withAppBundle(appBundle).withOutputPath(outputFilePath).build());
+
+    buildApksManager.execute();
+
+    ZipFile apkSetFile = openZipFile(outputFilePath.toFile());
+    BuildApksResult result = extractTocFromApkSetFile(apkSetFile, outputDir);
+    ImmutableList<Variant> splitApkVariants = splitApkVariants(result);
+    assertThat(
+            splitApkVariants.stream()
+                .map(variant -> variant.getTargeting().getSdkVersionTargeting()))
+        .containsExactly(sdkVersionTargeting(L_SDK_VERSION, ImmutableSet.of(LOWEST_SDK_VERSION)));
+  }
 
   @Test
   public void dexCompressionIsNotSet_enabledByDefault() throws Exception {

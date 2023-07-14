@@ -631,11 +631,10 @@ public abstract class BuildApksCommand {
                 .build();
           case SYSTEM:
             DeviceSpec deviceSpec = command.getDeviceSpec().get();
-            if (deviceSpec.getScreenDensity() == 0 || deviceSpec.getSupportedAbisList().isEmpty()) {
+            if (deviceSpec.getSupportedAbisList().isEmpty()) {
               throw InvalidCommandException.builder()
                   .withInternalMessage(
-                      "Device spec must have screen density and ABIs set when running with "
-                          + "'%s' mode flag. ",
+                      "Device spec must have ABIs set when running with '%s' mode flag.",
                       SYSTEM.getLowerCaseName())
                   .build();
             }

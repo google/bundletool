@@ -57,6 +57,8 @@ public class BundleModuleBuilder {
 
   private Optional<SdkModulesConfig> sdkModulesConfigOptional = Optional.empty();
 
+  private Optional<Integer> resourcesPackageIdOptional = Optional.empty();
+
   public BundleModuleBuilder(String moduleName) {
     checkNotNull(moduleName);
     this.moduleName = BundleModuleName.create(moduleName);
@@ -162,6 +164,12 @@ public class BundleModuleBuilder {
     return this;
   }
 
+  @CanIgnoreReturnValue
+  public BundleModuleBuilder setResourcesPackageId(int resourcesPackageId) {
+    this.resourcesPackageIdOptional = Optional.of(resourcesPackageId);
+    return this;
+  }
+
   public BundleModule build() {
     if (androidManifest != null) {
       XmlProtoNodeBuilder manifestBuilder = new XmlProtoNode(androidManifest).toBuilder();
@@ -188,6 +196,7 @@ public class BundleModuleBuilder {
             .setBundletoolVersion(BundleToolVersion.getCurrentVersion());
     moduleTypeOptional.ifPresent(bundleModuleBuilder::setModuleType);
     sdkModulesConfigOptional.ifPresent(bundleModuleBuilder::setSdkModulesConfig);
+    resourcesPackageIdOptional.ifPresent(bundleModuleBuilder::setResourcesPackageId);
 
     if (!bundleConfig.getBundletool().getVersion().isEmpty()) {
       bundleModuleBuilder.setBundletoolVersion(

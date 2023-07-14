@@ -131,6 +131,7 @@ public class ScreenDensityResourcesSplitterTest {
             .addFile("res/drawable/test.jpg")
             .setResourceTable(
                 resourceTable(
+                    StringPool.newBuilder().setData(ByteString.copyFrom(new byte[] {'x'})).build(),
                     pkg(
                         USER_PACKAGE_OFFSET,
                         "com.test.app",
@@ -151,6 +152,44 @@ public class ScreenDensityResourcesSplitterTest {
     ImmutableCollection<ModuleSplit> splits = splitter.split(resourcesModule);
     assertThat(splits).hasSize(1);
 
+    ModuleSplit baseSplit = splits.iterator().next();
+    assertThat(baseSplit.getResourceTable().get()).containsResource("com.test.app:drawable/test");
+    assertThat(baseSplit.findEntry("res/drawable/test.jpg")).isPresent();
+  }
+
+  @Test
+  public void noDensityResources_noDensitySplits_preFixSkipGeneratingEmptyDensitySplits() {
+    BundleModule testModule =
+        new BundleModuleBuilder("testModule")
+            .addFile("res/drawable/test.jpg")
+            .setResourceTable(
+                resourceTable(
+                    pkg(
+                        USER_PACKAGE_OFFSET,
+                        "com.test.app",
+                        type(
+                            0x01,
+                            "drawable",
+                            entry(
+                                0x01,
+                                "test",
+                                fileReference(
+                                    "res/drawable/test.jpg",
+                                    Configuration.getDefaultInstance()))))))
+            .setManifest(androidManifest("com.test.app"))
+            .build();
+    ModuleSplit resourcesModule = ModuleSplit.forResources(testModule);
+    ScreenDensityResourcesSplitter splitter =
+        new ScreenDensityResourcesSplitter(
+            // Fix was introduced in 1.15.1
+            Version.of("1.15.0"),
+            NO_RESOURCES_PINNED_TO_MASTER,
+            NO_LOW_DENSITY_CONFIG_PINNED_TO_MASTER,
+            /* pinLowestBucketOfStylesToMaster= */ false);
+
+    ImmutableCollection<ModuleSplit> splits = splitter.split(resourcesModule);
+
+    assertThat(splits).hasSize(1);
     ModuleSplit baseSplit = splits.iterator().next();
     assertThat(baseSplit.getResourceTable().get()).containsResource("com.test.app:drawable/test");
     assertThat(baseSplit.findEntry("res/drawable/test.jpg")).isPresent();
@@ -286,6 +325,41 @@ public class ScreenDensityResourcesSplitterTest {
         new ResourceTableBuilder()
                 .addPackage("com.test.app")
                 .addDrawableResourceForMultipleDensities(
+                    "image",
+                    ImmutableMap.of(
+                        MDPI_VALUE,
+                        "res/drawable-mdpi/image.jpg",
+                        XHDPI_VALUE,
+                        "res/drawable-xhdpi/image.jpg"))
+                .build()
+                .toBuilder()
+                .setSourcePool(sourcePool)
+                .build();
+    BundleModule testModule =
+        new BundleModuleBuilder("testModule")
+            .addFile("res/drawable-mdpi/test.jpg")
+            .setResourceTable(table)
+            .setManifest(androidManifest("com.test.app"))
+            .build();
+
+    ImmutableCollection<ModuleSplit> densitySplits =
+        splitter.split(ModuleSplit.forResources(testModule));
+    assertThat(densitySplits).hasSize(DEFAULT_DENSITY_BUCKETS.size() + 1);
+
+    for (ModuleSplit densitySplit : densitySplits) {
+      assertThat(densitySplit.getResourceTable()).isPresent();
+      assertThat(densitySplit.getResourceTable().get().getSourcePool()).isEqualTo(sourcePool);
+    }
+  }
+
+  @Test
+  public void generateAllDensitySplitsBeforeDensitySplitGenerationFix() {
+    StringPool sourcePool =
+        StringPool.newBuilder().setData(ByteString.copyFrom(new byte[] {'x'})).build();
+    ResourceTable table =
+        new ResourceTableBuilder()
+                .addPackage("com.test.app")
+                .addDrawableResourceForMultipleDensities(
                     "image", ImmutableMap.of(MDPI_VALUE, "res/drawable-mdpi/image.jpg"))
                 .build()
                 .toBuilder()
@@ -297,6 +371,13 @@ public class ScreenDensityResourcesSplitterTest {
             .setResourceTable(table)
             .setManifest(androidManifest("com.test.app"))
             .build();
+    ScreenDensityResourcesSplitter splitter =
+        new ScreenDensityResourcesSplitter(
+            // Fix was introduced in 1.15.1
+            Version.of("1.15.0"),
+            NO_RESOURCES_PINNED_TO_MASTER,
+            NO_LOW_DENSITY_CONFIG_PINNED_TO_MASTER,
+            /* pinLowestBucketOfStylesToMaster= */ false);
 
     ImmutableCollection<ModuleSplit> densitySplits =
         splitter.split(ModuleSplit.forResources(testModule));

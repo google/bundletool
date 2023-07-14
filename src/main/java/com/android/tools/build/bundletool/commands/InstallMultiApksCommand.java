@@ -25,6 +25,7 @@ import static com.android.tools.build.bundletool.model.utils.files.FilePrecondit
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.ImmutableListMultimap.toImmutableListMultimap;
 import static com.google.common.collect.ImmutableMap.toImmutableMap;
+import static com.google.common.collect.ImmutableSet.toImmutableSet;
 import static com.google.common.collect.Streams.stream;
 import static java.util.Comparator.comparing;
 import static java.util.Objects.requireNonNull;
@@ -87,6 +88,11 @@ public abstract class InstallMultiApksCommand {
   private static final Logger logger = Logger.getLogger(InstallMultiApksCommand.class.getName());
 
   public static final String COMMAND_NAME = "install-multi-apks";
+
+  public static final ImmutableMap<String, String> NONUPDATABLE_PACKAGES_PAIRS =
+      ImmutableMap.of(
+          "com.google.android.ext.service", "com.google.android.extservice",
+          "com.google.android.permissioncontroller", "com.google.android.permission");
 
   private static final Flag<Path> ADB_PATH_FLAG = Flag.path("adb");
   private static final Flag<ImmutableList<Path>> APKS_ARCHIVES_FLAG = Flag.pathList("apks");
@@ -494,15 +500,43 @@ public abstract class InstallMultiApksCommand {
    */
   private static ImmutableList<PackagePathVersion> uniqueApksByPackageName(
       ImmutableList<PackagePathVersion> installableApksFiles) {
-    return installableApksFiles.stream()
-        .collect(
-            groupingBy(
-                PackagePathVersion::getPackageName,
-                maxBy(comparing(PackagePathVersion::getVersionCode))))
-        .values()
-        .stream()
-        .flatMap(Streams::stream)
+    ImmutableList<PackagePathVersion> unfilteredResults =
+        installableApksFiles.stream()
+            .collect(
+                groupingBy(
+                    PackagePathVersion::getPackageName,
+                    maxBy(comparing(PackagePathVersion::getVersionCode))))
+            .values()
+            .stream()
+            .flatMap(Streams::stream)
+            .collect(toImmutableList());
+
+    /* names of all the unique packages */
+    ImmutableSet<String> packageNames =
+        unfilteredResults.stream()
+            .map(PackagePathVersion::getPackageName)
+            .collect(toImmutableSet());
+
+    return unfilteredResults.stream()
+        .filter(result -> !isRedundantNonUpdatablePackage(result.getPackageName(), packageNames))
         .collect(toImmutableList());
+  }
+
+  /**
+   * Check for the non-updatable package. If an updatable and non-updatable versions are present in
+   * the package list, only use the updatable version for the installation.
+   */
+  static boolean isRedundantNonUpdatablePackage(
+      String packageName, ImmutableSet<String> packageNames) {
+
+    /* If non-updatable package and it's updatable pair is not present, return false. */
+    if (!NONUPDATABLE_PACKAGES_PAIRS.containsKey(packageName)) {
+      return false;
+    }
+
+    /* If updatable pair is present in the Apks list, return it for installation. */
+    String name = NONUPDATABLE_PACKAGES_PAIRS.get(packageName);
+    return packageNames.contains(name);
   }
 
   public static CommandHelp help() {

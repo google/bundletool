@@ -24,6 +24,7 @@ import com.android.aapt.Resources.XmlAttribute;
 import com.android.aapt.Resources.XmlElement;
 import com.android.aapt.Resources.XmlNamespace;
 import com.android.aapt.Resources.XmlNode;
+import com.google.common.base.Predicates;
 import com.google.common.collect.ImmutableList;
 import java.util.List;
 import java.util.function.Function;
@@ -38,7 +39,8 @@ public final class XmlProtoElementBuilder
         XmlElement.Builder,
         XmlProtoElementBuilder,
         XmlAttribute.Builder,
-        XmlProtoAttributeBuilder> {
+        XmlProtoAttributeBuilder>
+    implements ToXmlNode {
 
   private final XmlElement.Builder element;
 
@@ -62,6 +64,11 @@ public final class XmlProtoElementBuilder
   @Override
   public XmlElement.Builder getProto() {
     return element;
+  }
+
+  @Override
+  public XmlNode toXmlNode() {
+    return XmlNode.newBuilder().setElement(element.build()).build();
   }
 
   @Override
@@ -236,6 +243,26 @@ public final class XmlProtoElementBuilder
     if (getProtoChildrenList().size() != keptChildren.size()) {
       element.clearChild().addAllChild(keptChildren);
     }
+    return this;
+  }
+
+  public XmlProtoElementBuilder removeChildren() {
+    removeChildrenElementsIf(Predicates.alwaysTrue());
+    return this;
+  }
+
+  public XmlProtoElementBuilder addChildren(ImmutableList<? extends ToXmlNode> children) {
+    children.forEach(child -> element.addChild(child.toXmlNode()));
+    return this;
+  }
+
+  public XmlProtoElementBuilder clearAttribute() {
+    element.clearAttribute();
+    return this;
+  }
+
+  public XmlProtoElementBuilder addAllAttribute(ImmutableList<XmlProtoAttribute> attributes) {
+    attributes.forEach(attribute -> element.addAttribute(attribute.getProto()));
     return this;
   }
 

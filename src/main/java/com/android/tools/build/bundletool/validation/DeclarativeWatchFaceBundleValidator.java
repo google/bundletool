@@ -65,7 +65,7 @@ public final class DeclarativeWatchFaceBundleValidator extends SubValidator {
     validateBaseHasNoExecutableComponents(baseModule);
 
     validateBaseHasNoLibs(baseModule);
-    validateBaseHasNoRoot(baseModule);
+    validateBaseHasNoCodeInRoot(baseModule);
 
     Optional<Entry<BundleModuleName, BundleModule>> optionalRuntime = getOptionalRuntime(bundle);
 
@@ -183,10 +183,17 @@ public final class DeclarativeWatchFaceBundleValidator extends SubValidator {
     assertWithUserMessage(!hasLibs, "Watch face cannot have any external libraries.");
   }
 
-  private void validateBaseHasNoRoot(BundleModule baseModule) {
-    boolean hasRoot =
-        baseModule.findEntriesUnderPath(BundleModule.ROOT_DIRECTORY).findFirst().isPresent();
-    assertWithUserMessage(!hasRoot, "Watch face cannot have any files in the root of the package.");
+  private void validateBaseHasNoCodeInRoot(BundleModule baseModule) {
+    boolean hasCodeInRoot =
+        baseModule
+            .findEntriesUnderPath(BundleModule.ROOT_DIRECTORY)
+            .anyMatch(
+                entry -> {
+                  String fileName = entry.getPath().toString();
+                  return fileName.endsWith(".so") || fileName.endsWith(".dex");
+                });
+    assertWithUserMessage(
+        !hasCodeInRoot, "Watch face cannot have any compiled code in its root folder.");
   }
 
   private void assertWithUserMessage(boolean condition, String message) {

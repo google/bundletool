@@ -70,9 +70,9 @@ public final class SdkModuleToAppBundleModuleConverter {
    */
   public BundleModule convert() {
     return renameAndroidResources(
-        repackageDexAndJavaResources(
-            remapResourceIdsInResourceTable(
-                remapResourceIdsInXmlResources(convertNameTypeAndManifest(sdkModule)))));
+        convertNameTypeAndManifest(
+            repackageDexAndJavaResources(
+                remapResourceIdsInResourceTable(remapResourceIdsInXmlResources(sdkModule)))));
   }
 
   private BundleModule remapResourceIdsInResourceTable(BundleModule module) {

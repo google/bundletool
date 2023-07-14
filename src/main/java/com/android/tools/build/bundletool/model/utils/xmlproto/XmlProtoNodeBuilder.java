@@ -22,7 +22,8 @@ import com.android.aapt.Resources.XmlNode;
 
 /** Wrapper around the {@link XmlNode.Builder} proto, providing a fluent API. */
 public final class XmlProtoNodeBuilder
-    extends XmlProtoNodeOrBuilder<XmlElement.Builder, XmlProtoElementBuilder, XmlNode.Builder> {
+    extends XmlProtoNodeOrBuilder<XmlElement.Builder, XmlProtoElementBuilder, XmlNode.Builder>
+    implements ToXmlNode {
 
   private final XmlNode.Builder node;
 
@@ -45,6 +46,11 @@ public final class XmlProtoNodeBuilder
 
   public XmlProtoNode build() {
     return new XmlProtoNode(node.build());
+  }
+
+  @Override
+  public XmlNode toXmlNode() {
+    return node.build();
   }
 
   @Override

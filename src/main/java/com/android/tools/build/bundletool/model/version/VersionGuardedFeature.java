@@ -93,7 +93,19 @@ public enum VersionGuardedFeature {
    * Install time modules will be merged into base unless explicitly turned off via <dist:permanent
    * dist:value="false" /> in "install-time" attribute.
    */
-  MERGE_INSTALL_TIME_MODULES_INTO_BASE("1.0.0");
+  MERGE_INSTALL_TIME_MODULES_INTO_BASE("1.0.0"),
+
+  /**
+   * Fix empty density splits from being generated.
+   *
+   * <p>Density splits used to be generated even if there are no density specific resources in the
+   * feature. This caused density splits with empty res/ directories and empty resource.arsc tables
+   * to be generated.
+   *
+   * <p>Now, features with no density specific resources (or with a single density specific
+   * resource) will not have density splits generated for them.
+   */
+  FIX_SKIP_GENERATING_EMPTY_DENSITY_SPLITS("1.15.1");
 
   /** Version from which the given feature should be enabled by default. */
   private final Version enabledSinceVersion;

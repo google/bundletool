@@ -34,6 +34,8 @@ import static com.android.tools.build.bundletool.testing.TargetingUtils.sdkVersi
 import static com.android.tools.build.bundletool.testing.TargetingUtils.variantSdkTargeting;
 import static com.google.common.truth.Truth.assertThat;
 import static com.google.common.truth.extensions.proto.ProtoTruth.assertThat;
+import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.android.bundle.Commands.ApkDescription;
 import com.android.bundle.Commands.ApkSet;
@@ -48,19 +50,27 @@ import com.android.bundle.Targeting.Abi.AbiAlias;
 import com.android.bundle.Targeting.ApkTargeting;
 import com.android.bundle.Targeting.SdkVersion;
 import com.android.bundle.Targeting.VariantTargeting;
+import com.android.tools.build.bundletool.io.ZipBuilder;
 import com.android.tools.build.bundletool.model.ZipPath;
+import com.android.tools.build.bundletool.model.version.BundleToolVersion;
 import com.android.tools.build.bundletool.testing.ApksArchiveHelpers;
+import com.android.tools.build.bundletool.testing.ApksArchiveHelpers.TocFormat;
 import com.google.common.collect.ImmutableSet;
+import com.google.protobuf.util.JsonFormat;
 import java.nio.file.Path;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
+import org.junit.experimental.theories.Theories;
+import org.junit.experimental.theories.Theory;
 import org.junit.rules.TemporaryFolder;
 import org.junit.runner.RunWith;
-import org.junit.runners.JUnit4;
 
-@RunWith(JUnit4.class)
+@RunWith(Theories.class)
 public class ResultUtilsTest {
+
+  private static final BuildApksResult DEFAULT_BUILD_APKS_RESULT =
+      ResultUtils.applyDefaultValues(BuildApksResult.getDefaultInstance());
 
   @Rule public final TemporaryFolder tmp = new TemporaryFolder();
   private Path tmpDir;
@@ -77,7 +87,7 @@ public class ResultUtilsTest {
 
     BuildApksResult buildApksResult = readTableOfContents(apksArchiveFile);
 
-    assertThat(buildApksResult).isEqualToDefaultInstance();
+    assertThat(buildApksResult).isEqualTo(DEFAULT_BUILD_APKS_RESULT);
   }
 
   @Test
@@ -88,16 +98,19 @@ public class ResultUtilsTest {
 
     BuildApksResult buildApksResult = readTableOfContents(sdkApksArchiveFile);
 
-    assertThat(buildApksResult).isEqualToDefaultInstance();
+    assertThat(buildApksResult).isEqualTo(DEFAULT_BUILD_APKS_RESULT);
   }
 
+  @Theory
   @Test
-  public void emptyBuildApksResult_inDirectory_readTableOfContents() throws Exception {
-    Path apksDirectory = createApksDirectory(BuildApksResult.getDefaultInstance(), tmpDir);
+  public void emptyBuildApksResult_inDirectory_readTableOfContents(TocFormat tocFormat)
+      throws Exception {
+    Path apksDirectory =
+        createApksDirectory(BuildApksResult.getDefaultInstance(), tmpDir, tocFormat);
 
     BuildApksResult buildApksResult = readTableOfContents(apksDirectory);
 
-    assertThat(buildApksResult).isEqualToDefaultInstance();
+    assertThat(buildApksResult).isEqualTo(DEFAULT_BUILD_APKS_RESULT);
   }
 
   @Test
@@ -117,7 +130,8 @@ public class ResultUtilsTest {
 
     BuildApksResult buildApksResult = readTableOfContents(apksArchiveFile);
 
-    assertThat(buildApksResult).isEqualTo(tableOfContentsProto);
+    assertThat(buildApksResult)
+        .isEqualTo(tableOfContentsProto.toBuilder().mergeFrom(DEFAULT_BUILD_APKS_RESULT).build());
   }
 
   @Test
@@ -155,8 +169,10 @@ public class ResultUtilsTest {
                 .build());
   }
 
+  @Theory
   @Test
-  public void buildApksResult_inDirectory_readTableOfContents() throws Exception {
+  public void buildApksResult_inDirectory_readTableOfContents(TocFormat tocFormat)
+      throws Exception {
     ZipPath apkLBase = ZipPath.create("apkL-base.apk");
     BuildApksResult tableOfContentsProto =
         BuildApksResult.newBuilder()
@@ -167,11 +183,12 @@ public class ResultUtilsTest {
                         "base",
                         createMasterApkDescription(ApkTargeting.getDefaultInstance(), apkLBase))))
             .build();
-
-    Path apksDirectory = createApksDirectory(tableOfContentsProto, tmpDir);
+    Path apksDirectory = createApksDirectory(tableOfContentsProto, tmpDir, tocFormat);
 
     BuildApksResult buildApksResult = readTableOfContents(apksDirectory);
-    assertThat(buildApksResult).isEqualTo(tableOfContentsProto);
+
+    assertThat(buildApksResult)
+        .isEqualTo(tableOfContentsProto.toBuilder().mergeFrom(DEFAULT_BUILD_APKS_RESULT).build());
   }
 
   @Test
@@ -327,6 +344,33 @@ public class ResultUtilsTest {
             .build();
     ImmutableSet<String> langs = ResultUtils.getAllTargetedLanguages(tableOfContentsProto);
     assertThat(langs).containsExactly("pl", "en", "ru", "fr");
+  }
+
+  @Test
+  public void jsonToc_withNobundletoolVersion_defaultApplied() throws Exception {
+    Path apksDirectory =
+        createApksDirectory(BuildApksResult.getDefaultInstance(), tmpDir, TocFormat.JSON);
+
+    BuildApksResult buildApksResult = readTableOfContents(apksDirectory);
+
+    assertThat(buildApksResult.getBundletool().getVersion())
+        .isEqualTo(BundleToolVersion.getCurrentVersion().toString());
+  }
+
+  @Test
+  public void jsonTocAndProtoToc_throws() throws Exception {
+    Path apksPath = tmpDir.resolve("file.apks");
+    ZipBuilder archiveBuilder = new ZipBuilder();
+    archiveBuilder.addFileWithProtoContent(
+        ZipPath.create("toc.pb"), BuildApksResult.getDefaultInstance());
+    archiveBuilder.addFileWithContent(
+        ZipPath.create("toc.json"),
+        JsonFormat.printer().print(BuildApksResult.getDefaultInstance()).getBytes(UTF_8));
+    archiveBuilder.writeTo(apksPath);
+
+    assertThat(assertThrows(IllegalStateException.class, () -> readTableOfContents(apksPath)))
+        .hasMessageThat()
+        .contains("Apks archive cannot have both toc.pb and toc.json");
   }
 
   private Variant createInstantVariant() {
