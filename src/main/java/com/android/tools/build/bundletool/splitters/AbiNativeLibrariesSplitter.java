@@ -69,23 +69,20 @@ public class AbiNativeLibrariesSplitter implements ModuleSplitSplitter {
               .stream()
               .flatMap(directory -> moduleSplit.findEntriesUnderPath(directory.getPath()))
               .collect(toImmutableList());
-        ModuleSplit.Builder splitBuilder =
-            moduleSplit
-                .toBuilder()
-                .setApkTargeting(
-                    moduleSplit
-                        .getApkTargeting()
-                        .toBuilder()
-                        .setAbiTargeting(
-                            AbiTargeting.newBuilder()
-                                .addValue(targeting.getAbi())
-                                .addAllAlternatives(
-                                    Sets.difference(
-                                        abisToGenerate, ImmutableSet.of(targeting.getAbi()))))
-                        .build())
-                .setMasterSplit(false)
-                .addMasterManifestMutator(withSplitsRequired(true))
-                .setEntries(entriesList);
+      ModuleSplit.Builder splitBuilder =
+          moduleSplit.toBuilder()
+              .setApkTargeting(
+                  moduleSplit.getApkTargeting().toBuilder()
+                      .setAbiTargeting(
+                          AbiTargeting.newBuilder()
+                              .addValue(targeting.getAbi())
+                              .addAllAlternatives(
+                                  Sets.difference(
+                                      abisToGenerate, ImmutableSet.of(targeting.getAbi()))))
+                      .build())
+              .setMasterSplit(false)
+              .addMasterManifestMutator(withSplitsRequired(true))
+              .setEntries(entriesList);
         splits.add(splitBuilder.build());
       leftOverEntries.removeAll(entriesList);
     }

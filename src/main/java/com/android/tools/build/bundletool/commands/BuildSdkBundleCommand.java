@@ -33,6 +33,7 @@ import com.android.tools.build.bundletool.commands.CommandHelp.CommandDescriptio
 import com.android.tools.build.bundletool.commands.CommandHelp.FlagDescription;
 import com.android.tools.build.bundletool.flags.Flag;
 import com.android.tools.build.bundletool.flags.ParsedFlags;
+import com.android.tools.build.bundletool.io.TempDirectory;
 import com.android.tools.build.bundletool.io.ZipFlingerBundleSerializer;
 import com.android.tools.build.bundletool.model.AndroidManifest;
 import com.android.tools.build.bundletool.model.BundleMetadata;
@@ -257,8 +258,11 @@ public abstract class BuildSdkBundleCommand {
       if (getOverwriteOutput()) {
         Files.deleteIfExists(getOutputPath());
       }
+      try (TempDirectory tempDir = new TempDirectory(getClass().getSimpleName())) {
+        new ZipFlingerBundleSerializer()
+            .serializeSdkBundle(sdkBundle, getOutputPath(), tempDir.getPath());
+      }
 
-      new ZipFlingerBundleSerializer().serializeSdkBundle(sdkBundle, getOutputPath());
     } catch (IOException e) {
       throw new UncheckedIOException(e);
     }

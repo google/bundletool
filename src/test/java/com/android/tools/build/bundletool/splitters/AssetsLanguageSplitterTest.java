@@ -220,7 +220,7 @@ public class AssetsLanguageSplitterTest {
     for (ModuleSplit configSplit : configSplits) {
       assertThat(
               compareManifestMutators(
-                  configSplit.getMasterManifestMutators(), withSplitsRequired(true)))
+                  configSplit.getMasterManifestMutators(), withSplitsRequired(/* value= */ true)))
           .isTrue();
     }
   }

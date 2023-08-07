@@ -31,6 +31,7 @@ import com.android.tools.build.bundletool.model.ModuleEntry;
 import com.android.tools.build.bundletool.model.ModuleSplit;
 import com.android.tools.build.bundletool.model.ZipPath;
 import com.android.tools.build.bundletool.model.targeting.TargetingDimension;
+import com.android.tools.build.bundletool.model.version.Version;
 import com.android.tools.build.bundletool.shards.SuffixStripper;
 import com.google.common.base.Function;
 import com.google.common.collect.ImmutableCollection;
@@ -64,7 +65,7 @@ public class AssetsDimensionSplitterFactory {
    * Creates a {@link ModuleSplitSplitter} capable of splitting on a given Asset targeting
    * dimension.
    *
-   * See {@link #createSplitter(Function, Function, Predicate, Optional)} for parameters
+   * <p>See {@link #createSplitter(Version, Function, Function, Predicate, Optional)} for parameters
    * descriptions.
    */
   public static <T extends Message> ModuleSplitSplitter createSplitter(
@@ -90,7 +91,7 @@ public class AssetsDimensionSplitterFactory {
    * @param hasTargeting predicate to test if the input {@link ModuleSplit} is already targeting on
    *     the dimension of this splitter.
    * @param targetingDimensionToRemove If not empty, the targeting for this dimension will be
-   * removed from asset paths (i.e: suffixes like #tcf_xxx will be removed from paths).
+   *     removed from asset paths (i.e: suffixes like #tcf_xxx will be removed from paths).
    * @return {@link ModuleSplitSplitter} for a given dimension functions.
    */
   public static <T extends Message> ModuleSplitSplitter createSplitter(

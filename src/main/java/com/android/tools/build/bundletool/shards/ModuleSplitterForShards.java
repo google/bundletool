@@ -133,7 +133,7 @@ public class ModuleSplitterForShards {
     return split;
   }
 
-  private static SplittingPipeline createNativeLibrariesSplittingPipeline(
+  private SplittingPipeline createNativeLibrariesSplittingPipeline(
       ImmutableSet<OptimizationDimension> shardingDimensions) {
     ImmutableList.Builder<ModuleSplitSplitter> nativeSplitters = ImmutableList.builder();
     if (shardingDimensions.contains(OptimizationDimension.ABI)) {

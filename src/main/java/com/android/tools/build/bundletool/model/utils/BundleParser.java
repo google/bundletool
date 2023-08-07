@@ -50,6 +50,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
 import java.util.zip.ZipEntry;
+import java.util.zip.ZipException;
 import java.util.zip.ZipFile;
 
 /** Utility class to help parse bundles */
@@ -191,6 +192,11 @@ public class BundleParser {
       throw InvalidBundleException.builder()
           .withCause(e)
           .withUserMessage("Bundle config '%s' could not be parsed.", BUNDLE_CONFIG_FILE_NAME)
+          .build();
+    } catch (ZipException e) {
+      throw InvalidBundleException.builder()
+          .withUserMessage("Bundle file is not a valid zip file.")
+          .withCause(e)
           .build();
     } catch (IOException e) {
       throw new UncheckedIOException(

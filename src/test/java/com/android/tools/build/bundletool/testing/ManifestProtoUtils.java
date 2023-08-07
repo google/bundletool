@@ -16,13 +16,16 @@
 
 package com.android.tools.build.bundletool.testing;
 
+import static com.android.tools.build.bundletool.model.AndroidManifest.ACTION_ELEMENT_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.ACTIVITY_ALIAS_ELEMENT_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.ACTIVITY_ELEMENT_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.ANDROID_NAMESPACE_URI;
 import static com.android.tools.build.bundletool.model.AndroidManifest.APPLICATION_ELEMENT_NAME;
+import static com.android.tools.build.bundletool.model.AndroidManifest.CATEGORY_ELEMENT_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.CERTIFICATE_DIGEST_ATTRIBUTE_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.CERTIFICATE_DIGEST_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.CONDITION_DEVICE_GROUPS_NAME;
+import static com.android.tools.build.bundletool.model.AndroidManifest.DATA_ELEMENT_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.DEBUGGABLE_ATTRIBUTE_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.DEBUGGABLE_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.DECLARATIVE_WATCH_FACE_PROPERTY;
@@ -33,10 +36,13 @@ import static com.android.tools.build.bundletool.model.AndroidManifest.DISTRIBUT
 import static com.android.tools.build.bundletool.model.AndroidManifest.EXTRACT_NATIVE_LIBS_ATTRIBUTE_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.EXTRACT_NATIVE_LIBS_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.HAS_CODE_RESOURCE_ID;
+import static com.android.tools.build.bundletool.model.AndroidManifest.HOST_NAME;
+import static com.android.tools.build.bundletool.model.AndroidManifest.HOST_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.ICON_ATTRIBUTE_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.ICON_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.INSTALL_LOCATION_ATTRIBUTE_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.INSTALL_LOCATION_RESOURCE_ID;
+import static com.android.tools.build.bundletool.model.AndroidManifest.INTENT_FILTER_ELEMENT_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.ISOLATED_SPLITS_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.MAX_SDK_VERSION_ATTRIBUTE_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.MAX_SDK_VERSION_RESOURCE_ID;
@@ -49,6 +55,8 @@ import static com.android.tools.build.bundletool.model.AndroidManifest.NAME_ATTR
 import static com.android.tools.build.bundletool.model.AndroidManifest.NAME_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.NATIVE_ACTIVITY_LIB_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.NO_NAMESPACE_URI;
+import static com.android.tools.build.bundletool.model.AndroidManifest.PATH_PATTERN_NAME;
+import static com.android.tools.build.bundletool.model.AndroidManifest.PATH_PATTERN_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.PERMISSION_ELEMENT_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.PERMISSION_GROUP_ELEMENT_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.PERMISSION_TREE_ELEMENT_NAME;
@@ -59,6 +67,8 @@ import static com.android.tools.build.bundletool.model.AndroidManifest.REQUIRED_
 import static com.android.tools.build.bundletool.model.AndroidManifest.RESOURCE_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.ROUND_ICON_ATTRIBUTE_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.ROUND_ICON_RESOURCE_ID;
+import static com.android.tools.build.bundletool.model.AndroidManifest.SCHEME_NAME;
+import static com.android.tools.build.bundletool.model.AndroidManifest.SCHEME_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.SDK_LIBRARY_ELEMENT_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.SDK_PATCH_VERSION_ATTRIBUTE_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.SDK_VERSION_MAJOR_ATTRIBUTE_NAME;
@@ -565,6 +575,82 @@ public final class ManifestProtoUtils {
             .getOrCreateChildElement(DISTRIBUTION_NAMESPACE_URI, "module")
             .getOrCreateChildElement(DISTRIBUTION_NAMESPACE_URI, "instant-delivery")
             .getOrCreateChildElement(DISTRIBUTION_NAMESPACE_URI, "install-time");
+  }
+
+  public static ManifestMutator withDeepLink(
+      String activityName, String path, String host, String scheme, boolean addToActivityAlias) {
+    return withDeepLink(
+        activityName,
+        host,
+        scheme,
+        XmlProtoAttributeBuilder.createAndroidAttribute(PATH_PATTERN_NAME, PATH_PATTERN_RESOURCE_ID)
+            .setValueAsString(path),
+        addToActivityAlias);
+  }
+
+  public static ManifestMutator withDeepLink(
+      String activityName,
+      int pathResourceId,
+      String host,
+      String scheme,
+      boolean addToActivityAlias) {
+    return withDeepLink(
+        activityName,
+        host,
+        scheme,
+        XmlProtoAttributeBuilder.createAndroidAttribute(PATH_PATTERN_NAME, PATH_PATTERN_RESOURCE_ID)
+            .setValueAsRefId(pathResourceId),
+        addToActivityAlias);
+  }
+
+  private static ManifestMutator withDeepLink(
+      String activityName,
+      String host,
+      String scheme,
+      XmlProtoAttributeBuilder pathAttributeBuilder,
+      boolean addToActivityAlias) {
+    return manifestElement -> {
+      XmlProtoElementBuilder activityElement =
+          manifestElement
+              .getOrCreateChildElement(APPLICATION_ELEMENT_NAME)
+              .getOrCreateChildElement(
+                  addToActivityAlias ? ACTIVITY_ELEMENT_NAME : ACTIVITY_ALIAS_ELEMENT_NAME)
+              .addAttribute(
+                  XmlProtoAttributeBuilder.createAndroidAttribute(
+                          NAME_ATTRIBUTE_NAME, NAME_RESOURCE_ID)
+                      .setValueAsString(activityName));
+      XmlProtoElementBuilder intentFilter =
+          activityElement.getOrCreateChildElement(INTENT_FILTER_ELEMENT_NAME);
+
+      intentFilter
+          .getOrCreateChildElement(ACTION_ELEMENT_NAME)
+          .addAttribute(
+              XmlProtoAttributeBuilder.createAndroidAttribute(NAME_ATTRIBUTE_NAME, NAME_RESOURCE_ID)
+                  .setValueAsString("android.intent.action.VIEW"));
+
+      intentFilter
+          .getOrCreateChildElement(CATEGORY_ELEMENT_NAME)
+          .addAttribute(
+              XmlProtoAttributeBuilder.createAndroidAttribute(NAME_ATTRIBUTE_NAME, NAME_RESOURCE_ID)
+                  .setValueAsString("android.intent.category.BROWSABLE"));
+
+      intentFilter
+          .getOrCreateChildElement(DATA_ELEMENT_NAME)
+          .addAttribute(
+              XmlProtoAttributeBuilder.createAndroidAttribute(SCHEME_NAME, SCHEME_RESOURCE_ID)
+                  .setValueAsString(scheme))
+          .addAttribute(
+              XmlProtoAttributeBuilder.createAndroidAttribute(HOST_NAME, HOST_RESOURCE_ID)
+                  .setValueAsString(host))
+          .addAttribute(pathAttributeBuilder)
+          .addAttribute(
+              XmlProtoAttributeBuilder.createAndroidAttribute(SCHEME_NAME, SCHEME_RESOURCE_ID)
+                  .setValueAsString(scheme));
+    };
+  }
+
+  public static ManifestMutator withElement(String name) {
+    return manifestElement -> manifestElement.getOrCreateChildElement(name);
   }
 
   public static ManifestMutator withFusedModuleNames(String modulesString) {

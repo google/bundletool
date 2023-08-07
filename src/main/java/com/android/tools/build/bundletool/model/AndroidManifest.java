@@ -96,6 +96,7 @@ public abstract class AndroidManifest {
   public static final String FUSING_ELEMENT_NAME = "fusing";
   public static final String STYLE_ELEMENT_NAME = "style";
   public static final String MAIN_ACTION_ELEMENT_NAME = "action";
+  public static final String DATA_ELEMENT_NAME = "data";
 
   public static final String DEBUGGABLE_ATTRIBUTE_NAME = "debuggable";
   public static final String EXTRACT_NATIVE_LIBS_ATTRIBUTE_NAME = "extractNativeLibs";
@@ -144,6 +145,9 @@ public abstract class AndroidManifest {
 
   public static final String SDK_PATCH_VERSION_ATTRIBUTE_NAME =
       "com.android.vending.sdk.version.patch";
+
+  public static final String METADATA_KEY_SDK_PATCH_VERSION_PREFIX =
+      "com.android.vending.sdk.patch.version.";
   public static final String SDK_PROVIDER_CLASS_NAME_ATTRIBUTE_NAME =
       "android.sdksandbox.PROPERTY_SDK_PROVIDER_CLASS_NAME";
   public static final String COMPAT_SDK_PROVIDER_CLASS_NAME_ATTRIBUTE_NAME =
@@ -369,9 +373,26 @@ public abstract class AndroidManifest {
     return getApplicationAttributeAsBoolean(DEBUGGABLE_RESOURCE_ID);
   }
 
+  /**
+   * Gets all the xml proto activities defined in the manifest.
+   *
+   * @return An {@link ImmutableListMultimap} where the key is the activity name and the value is a
+   *     list of activity xml proto elements.
+   */
   public ImmutableListMultimap<String, XmlProtoElement> getActivitiesByName() {
+    return getActivitiesByName(/* includeActivityAlias= */ false);
+  }
+
+  public ImmutableListMultimap<String, XmlProtoElement> getActivitiesByName(
+      boolean includeActivityAlias) {
     return stream(getManifestElement().getOptionalChildElement(APPLICATION_ELEMENT_NAME))
-        .flatMap(app -> app.getChildrenElements(ACTIVITY_ELEMENT_NAME))
+        .flatMap(
+            app ->
+                Stream.concat(
+                    app.getChildrenElements(ACTIVITY_ELEMENT_NAME),
+                    includeActivityAlias
+                        ? app.getChildrenElements(ACTIVITY_ALIAS_ELEMENT_NAME)
+                        : Stream.empty()))
         .filter(activity -> activity.getAndroidAttribute(NAME_RESOURCE_ID).isPresent())
         .collect(
             toImmutableListMultimap(

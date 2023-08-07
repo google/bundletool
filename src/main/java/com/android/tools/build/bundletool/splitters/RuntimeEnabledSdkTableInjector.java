@@ -27,6 +27,7 @@ import com.android.tools.build.bundletool.model.RuntimeEnabledSdkVersionEncoder;
 import com.android.tools.build.bundletool.model.ZipPath;
 import com.android.tools.build.bundletool.xml.XmlUtils;
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.collect.ImmutableCollection;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.io.ByteSource;
 import javax.xml.parsers.DocumentBuilderFactory;
@@ -88,13 +89,17 @@ public final class RuntimeEnabledSdkTableInjector {
                 .setPath(ZipPath.create(RUNTIME_ENABLED_SDK_TABLE_FILE_PATH))
                 .setContent(
                     ByteSource.wrap(
-                        XmlUtils.documentToString(
-                                getRuntimeEnabledSdkTable(
-                                    ImmutableSet.copyOf(
-                                        appBundle.getRuntimeEnabledSdkDependencies().values())))
-                            .getBytes(UTF_8)))
+                        generateRuntimeEnabledSdkTableBytes(
+                            appBundle.getRuntimeEnabledSdkDependencies().values())))
                 .build())
         .build();
+  }
+
+  public static byte[] generateRuntimeEnabledSdkTableBytes(
+      ImmutableCollection<RuntimeEnabledSdk> runtimeEnabledSdks) {
+    return XmlUtils.documentToString(
+            getRuntimeEnabledSdkTable(ImmutableSet.copyOf(runtimeEnabledSdks)))
+        .getBytes(UTF_8);
   }
 
   private boolean shouldAddRuntimeEnabledSdkTable(ModuleSplit split) {
@@ -103,7 +108,8 @@ public final class RuntimeEnabledSdkTableInjector {
             || (split.isMasterSplit() && split.isBaseModuleSplit()));
   }
 
-  private Document getRuntimeEnabledSdkTable(ImmutableSet<RuntimeEnabledSdk> runtimeEnabledSdks) {
+  private static Document getRuntimeEnabledSdkTable(
+      ImmutableSet<RuntimeEnabledSdk> runtimeEnabledSdks) {
     Document runtimeEnabledSdkTable;
     try {
       runtimeEnabledSdkTable =
@@ -116,7 +122,7 @@ public final class RuntimeEnabledSdkTableInjector {
     return runtimeEnabledSdkTable;
   }
 
-  private Node createRuntimeEnabledSdkTableNode(
+  private static  Node createRuntimeEnabledSdkTableNode(
       Document xmlFactory, ImmutableSet<RuntimeEnabledSdk> runtimeEnabledSdks) {
     Element runtimeEnabledSdkTableNode =
         xmlFactory.createElement(RUNTIME_ENABLED_SDK_TABLE_ELEMENT_NAME);
@@ -127,7 +133,7 @@ public final class RuntimeEnabledSdkTableInjector {
     return runtimeEnabledSdkTableNode;
   }
 
-  private Node createRuntimeEnabledSdkNode(
+  private static Node createRuntimeEnabledSdkNode(
       Document xmlFactory, RuntimeEnabledSdk runtimeEnabledSdk) {
     Element runtimeEnabledSdkNode = xmlFactory.createElement(RUNTIME_ENABELD_SDK_ELEMENT_NAME);
     Element sdkPackageNameNode = xmlFactory.createElement(SDK_PACKAGE_NAME_ELEMENT_NAME);

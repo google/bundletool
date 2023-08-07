@@ -28,6 +28,7 @@ import static com.google.common.base.Preconditions.checkState;
 import static java.util.Arrays.stream;
 import static java.util.stream.Collectors.joining;
 
+import com.android.bundle.Commands.BuildApksResult;
 import com.android.bundle.RuntimeEnabledSdkConfigProto.SdkSplitPropertiesInheritedFromApp;
 import com.android.tools.build.bundletool.androidtools.Aapt2Command;
 import com.android.tools.build.bundletool.commands.BuildApksCommand.OutputFormat;
@@ -36,6 +37,8 @@ import com.android.tools.build.bundletool.commands.CommandHelp.FlagDescription;
 import com.android.tools.build.bundletool.flags.Flag;
 import com.android.tools.build.bundletool.flags.ParsedFlags;
 import com.android.tools.build.bundletool.io.TempDirectory;
+import com.android.tools.build.bundletool.model.ApkListener;
+import com.android.tools.build.bundletool.model.ApkModifier;
 import com.android.tools.build.bundletool.model.BundleModule;
 import com.android.tools.build.bundletool.model.Password;
 import com.android.tools.build.bundletool.model.SdkAsar;
@@ -119,6 +122,12 @@ public abstract class BuildSdkApksForAppCommand {
 
   public abstract Optional<SigningConfiguration> getSigningConfiguration();
 
+  public abstract Optional<ApkListener> getApkListener();
+
+  public abstract Optional<ApkModifier> getApkModifier();
+
+  public abstract boolean getSerializeTableOfContents();
+
   ListeningExecutorService getExecutorService() {
     return getExecutorServiceInternal();
   }
@@ -128,7 +137,9 @@ public abstract class BuildSdkApksForAppCommand {
   abstract boolean isExecutorServiceCreatedByBundleTool();
 
   public static BuildSdkApksForAppCommand.Builder builder() {
-    return new AutoValue_BuildSdkApksForAppCommand.Builder().setOutputFormat(APK_SET);
+    return new AutoValue_BuildSdkApksForAppCommand.Builder()
+        .setOutputFormat(APK_SET)
+        .setSerializeTableOfContents(false);
   }
 
   /** Builder for {@link BuildSdkApksForAppCommand}. */
@@ -163,6 +174,22 @@ public abstract class BuildSdkApksForAppCommand {
     public abstract Builder setSigningConfiguration(SigningConfiguration signingConfiguration);
 
     /**
+     * Provides an {@link ApkListener} that will be notified at defined stages of APK creation.
+     *
+     * <p>The {@link ApkListener} must be thread-safe.
+     */
+    public abstract Builder setApkListener(ApkListener apkListener);
+
+    /**
+     * Provides an {@link ApkModifier} that will be invoked just before the APKs are finalized,
+     * serialized on disk and signed.
+     *
+     * <p>The {@link ApkModifier} must be thread-safe as it may in the future be invoked
+     * concurrently for the different APKs.
+     */
+    public abstract Builder setApkModifier(ApkModifier apkModifier);
+
+    /**
      * Allows to set an executor service for parallelization.
      *
      * <p>Optional. The caller is responsible for providing a service that accepts new tasks, and
@@ -174,6 +201,12 @@ public abstract class BuildSdkApksForAppCommand {
       setExecutorServiceCreatedByBundleTool(false);
       return this;
     }
+
+    /**
+     * Whether the {@link BuildApksResult} should be serialized in the output directory or the .apks
+     * archive.
+     */
+    public abstract Builder setSerializeTableOfContents(boolean serializeTableOfContents);
 
     abstract Builder setExecutorServiceInternal(ListeningExecutorService executorService);
 
@@ -397,6 +430,10 @@ public abstract class BuildSdkApksForAppCommand {
           .build();
     } catch (IOException e) {
       throw new UncheckedIOException("An error occurred when processing the SDK bundle.", e);
+    } finally {
+      if (isExecutorServiceCreatedByBundleTool()) {
+        getExecutorService().shutdown();
+      }
     }
   }
 
@@ -416,6 +453,10 @@ public abstract class BuildSdkApksForAppCommand {
           .build();
     } catch (IOException e) {
       throw new UncheckedIOException("An error occurred when processing the SDK archive.", e);
+    } finally {
+      if (isExecutorServiceCreatedByBundleTool()) {
+        getExecutorService().shutdown();
+      }
     }
   }
 

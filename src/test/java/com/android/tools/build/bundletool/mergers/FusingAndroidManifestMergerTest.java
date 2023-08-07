@@ -17,6 +17,7 @@
 package com.android.tools.build.bundletool.mergers;
 
 import static com.android.tools.build.bundletool.model.AndroidManifest.ACTIVITY_ELEMENT_NAME;
+import static com.android.tools.build.bundletool.model.AndroidManifest.META_DATA_ELEMENT_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.NAME_ATTRIBUTE_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.NAME_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.SERVICE_ELEMENT_NAME;
@@ -25,8 +26,10 @@ import static com.android.tools.build.bundletool.model.BundleModuleName.BASE_MOD
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifest;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifestForFeature;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withActivity;
+import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withApplication;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withCustomThemeActivity;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withDebuggableAttribute;
+import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withMetadataValue;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withSplitNameActivity;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withSplitNameService;
 import static com.google.common.collect.Iterables.getOnlyElement;
@@ -403,6 +406,24 @@ public class FusingAndroidManifestMergerTest {
                             XmlProtoElementBuilder.create("meta-data")
                                 .addChildElement(XmlProtoElementBuilder.create("action"))))));
     assertThat(merged).isEqualTo(expected);
+  }
+
+  @Test
+  public void mergeChildrenMode_metadataWithGmsCoreVersionName_notMerged() {
+    ImmutableSetMultimap<BundleModuleName, AndroidManifest> manifests =
+        createManifests(
+            androidManifest("com.testapp", withApplication()),
+            androidManifestForFeature(
+                "com.testapp.feature",
+                withMetadataValue(
+                    /* key= */ "com.google.android.gms.version", /* value= */ "1.0")));
+
+    AndroidManifest merged =
+        new FusingAndroidManifestMerger(
+                ImmutableSet.of(META_DATA_ELEMENT_NAME), Mode.MERGE_CHILDREN)
+            .merge(manifests);
+
+    assertThat(merged).isEqualTo(AndroidManifest.create(androidManifest("com.testapp")));
   }
 
   @Test

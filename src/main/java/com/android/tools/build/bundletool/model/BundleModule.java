@@ -226,6 +226,12 @@ public abstract class BundleModule {
     return getAndroidManifest().getUsesSplits();
   }
 
+  public int getSdkPatchVersionOrThrow() {
+    return getSdkModulesConfig()
+        .map(sdkModulesConfig -> sdkModulesConfig.getSdkVersion().getPatch())
+        .orElseThrow(() -> new IllegalStateException("SdkModulesConfig expected to be present."));
+  }
+
   private ModuleTargeting getModuleTargeting() {
     return getAndroidManifest()
         .getManifestDeliveryElement()

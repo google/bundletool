@@ -83,7 +83,9 @@ import com.android.tools.build.bundletool.model.manifestelements.Activity;
 import com.android.tools.build.bundletool.model.manifestelements.Provider;
 import com.android.tools.build.bundletool.model.manifestelements.Receiver;
 import com.android.tools.build.bundletool.model.utils.xmlproto.XmlProtoAttribute;
+import com.android.tools.build.bundletool.model.utils.xmlproto.XmlProtoAttributeBuilder;
 import com.android.tools.build.bundletool.model.utils.xmlproto.XmlProtoElement;
+import com.android.tools.build.bundletool.model.utils.xmlproto.XmlProtoElementBuilder;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
@@ -458,7 +460,8 @@ public class ManifestEditorTest {
   public void setSplitsRequired() throws Exception {
     AndroidManifest androidManifest = createManifestWithApplicationElement();
 
-    AndroidManifest editedManifest = androidManifest.toEditor().setSplitsRequired(true).save();
+    AndroidManifest editedManifest =
+        androidManifest.toEditor().setSplitsRequired(/* value= */ true).save();
 
     assertOnlyMetadataElement(
         editedManifest,
@@ -471,6 +474,12 @@ public class ManifestEditorTest {
                 IS_SPLIT_REQUIRED_ATTRIBUTE_NAME,
                 IS_SPLIT_REQUIRED_RESOURCE_ID,
                 true));
+    assertThat(editedManifest.getManifestElement().getAttributes())
+        .containsExactly(
+            XmlProtoAttributeBuilder.createAndroidAttribute(
+                    IS_SPLIT_REQUIRED_ATTRIBUTE_NAME, IS_SPLIT_REQUIRED_RESOURCE_ID)
+                .setValueAsBoolean(true)
+                .build());
   }
 
   @Test
@@ -478,7 +487,11 @@ public class ManifestEditorTest {
     AndroidManifest androidManifest = createManifestWithApplicationElement();
 
     AndroidManifest editedManifest =
-        androidManifest.toEditor().setSplitsRequired(true).setSplitsRequired(true).save();
+        androidManifest
+            .toEditor()
+            .setSplitsRequired(/* value= */ true)
+            .setSplitsRequired(/* value= */ true)
+            .save();
 
     assertOnlyMetadataElement(
         editedManifest,
@@ -491,6 +504,12 @@ public class ManifestEditorTest {
                 IS_SPLIT_REQUIRED_ATTRIBUTE_NAME,
                 IS_SPLIT_REQUIRED_RESOURCE_ID,
                 true));
+    assertThat(editedManifest.getManifestElement().getAttributes())
+        .containsExactly(
+            XmlProtoAttributeBuilder.createAndroidAttribute(
+                    IS_SPLIT_REQUIRED_ATTRIBUTE_NAME, IS_SPLIT_REQUIRED_RESOURCE_ID)
+                .setValueAsBoolean(true)
+                .build());
   }
 
   @Test
@@ -498,7 +517,11 @@ public class ManifestEditorTest {
     AndroidManifest androidManifest = createManifestWithApplicationElement();
 
     AndroidManifest editedManifest =
-        androidManifest.toEditor().setSplitsRequired(true).setSplitsRequired(false).save();
+        androidManifest
+            .toEditor()
+            .setSplitsRequired(/* value= */ true)
+            .setSplitsRequired(/* value= */ false)
+            .save();
 
     assertOnlyMetadataElement(
         editedManifest,
@@ -511,6 +534,12 @@ public class ManifestEditorTest {
                 IS_SPLIT_REQUIRED_ATTRIBUTE_NAME,
                 IS_SPLIT_REQUIRED_RESOURCE_ID,
                 false));
+    assertThat(editedManifest.getManifestElement().getAttributes())
+        .containsExactly(
+            XmlProtoAttributeBuilder.createAndroidAttribute(
+                    IS_SPLIT_REQUIRED_ATTRIBUTE_NAME, IS_SPLIT_REQUIRED_RESOURCE_ID)
+                .setValueAsBoolean(false)
+                .build());
   }
 
   @Test
@@ -1506,6 +1535,34 @@ public class ManifestEditorTest {
                 xmlElement(
                     "manifest", xmlNode(xmlElement(APPLICATION_ELEMENT_NAME, expectedActivity)))));
     assertThat(edited).isEqualTo(expected);
+  }
+
+  @Test
+  public void updateApplicationElement_succeeds() {
+    XmlNode oldApplication =
+        xmlNode(xmlElement(APPLICATION_ELEMENT_NAME, xmlNode(xmlElement(ACTIVITY_ELEMENT_NAME))));
+    XmlElement.Builder newApplicationElementBuilder =
+        xmlElement(APPLICATION_ELEMENT_NAME).toBuilder();
+    XmlNode nonApplicationElement = xmlNode(xmlElement("nonApplicationElement"));
+    AndroidManifest androidManifest =
+        AndroidManifest.create(
+            xmlNode(xmlElement("manifest", nonApplicationElement, oldApplication)));
+
+    AndroidManifest edited =
+        androidManifest
+            .toEditor()
+            .updateApplicationElement(
+                new XmlProtoElementBuilder(newApplicationElementBuilder).build())
+            .save();
+
+    assertThat(edited)
+        .isEqualTo(
+            AndroidManifest.create(
+                xmlNode(
+                    xmlElement(
+                        "manifest",
+                        nonApplicationElement,
+                        xmlNode(newApplicationElementBuilder.build())))));
   }
 
   private static void assertUsesSdkLibraryAttributes(

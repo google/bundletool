@@ -61,14 +61,9 @@ public class BuildSdkApksForAppManager {
         moduleSplitterForShards.generateSplits(module, /* shardingDimensions= */ ImmutableSet.of());
 
     GeneratedApks generatedApks = GeneratedApks.fromModuleSplits(splits);
+    ApkSetWriter apkSetWriter = createApkSetWriter(tempDirectory.getPath());
 
-    apkSerializerManager.serializeApkSetWithoutToc(
-        createApkSetWriter(tempDirectory.getPath()),
-        generatedApks,
-        GeneratedAssetSlices.builder().build(),
-        /* deviceSpec= */ Optional.empty(),
-        LocalTestingInfo.getDefaultInstance(),
-        /* permanentlyFusedModules= */ ImmutableSet.of());
+    serializeApkSet(apkSetWriter, generatedApks);
   }
 
   private ApkSetWriter createApkSetWriter(Path tempDir) {
@@ -81,5 +76,25 @@ public class BuildSdkApksForAppManager {
     throw InvalidCommandException.builder()
         .withInternalMessage("Unsupported output format '%s'.", command.getOutputFormat())
         .build();
+  }
+
+  private void serializeApkSet(ApkSetWriter apkSetWriter, GeneratedApks generatedApks) {
+    if (command.getSerializeTableOfContents()) {
+      apkSerializerManager.serializeApkSet(
+          apkSetWriter,
+          generatedApks,
+          GeneratedAssetSlices.builder().build(),
+          /* deviceSpec= */ Optional.empty(),
+          LocalTestingInfo.getDefaultInstance(),
+          /* permanentlyFusedModules= */ ImmutableSet.of());
+    } else {
+      apkSerializerManager.serializeApkSetWithoutToc(
+          apkSetWriter,
+          generatedApks,
+          GeneratedAssetSlices.builder().build(),
+          /* deviceSpec= */ Optional.empty(),
+          LocalTestingInfo.getDefaultInstance(),
+          /* permanentlyFusedModules= */ ImmutableSet.of());
+    }
   }
 }

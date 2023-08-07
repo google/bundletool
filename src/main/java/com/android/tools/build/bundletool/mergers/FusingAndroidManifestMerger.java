@@ -261,7 +261,10 @@ public class FusingAndroidManifestMerger implements AndroidManifestMerger {
     stream(manifestElement)
         .flatMap(application -> application.getChildrenElements())
         .filter(child -> elementsToMerge.contains(child.getName()))
-        .filter(child -> child.getAndroidAttribute(AndroidManifest.NAME_RESOURCE_ID).isPresent())
+        .filter(
+            child ->
+                child.getAndroidAttribute(AndroidManifest.NAME_RESOURCE_ID).isPresent()
+                    && !isMetaDataGmsCoreVersion(child))
         .forEach(
             child ->
                 featureElementsBuilder.put(
@@ -302,6 +305,15 @@ public class FusingAndroidManifestMerger implements AndroidManifestMerger {
       builder.put(moduleName, Iterables.getOnlyElement(moduleManifests));
     }
     return builder.build();
+  }
+
+  private static boolean isMetaDataGmsCoreVersion(XmlProtoElement element) {
+    return element.getAndroidAttribute(AndroidManifest.NAME_RESOURCE_ID).isPresent()
+        && element
+            .getAndroidAttribute(AndroidManifest.NAME_RESOURCE_ID)
+            .get()
+            .getValueAsString()
+            .equals("com.google.android.gms.version");
   }
 
   @AutoValue

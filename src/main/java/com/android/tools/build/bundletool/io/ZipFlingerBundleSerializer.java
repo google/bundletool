@@ -18,7 +18,6 @@ package com.android.tools.build.bundletool.io;
 
 import static com.android.tools.build.bundletool.model.AppBundle.BUNDLE_CONFIG_FILE_NAME;
 import static com.android.tools.build.bundletool.model.AppBundle.METADATA_DIRECTORY;
-import static com.android.tools.build.bundletool.model.utils.BundleParser.EXTRACTED_SDK_MODULES_FILE_NAME;
 import static com.android.tools.build.bundletool.model.utils.BundleParser.SDK_BUNDLE_CONFIG_FILE_NAME;
 import static com.android.tools.build.bundletool.model.utils.BundleParser.SDK_INTERFACE_DESCRIPTORS_FILE_NAME;
 import static com.android.tools.build.bundletool.model.utils.BundleParser.SDK_MODULES_CONFIG_FILE_NAME;
@@ -125,9 +124,9 @@ public final class ZipFlingerBundleSerializer {
   }
 
   /** Writes the SDK Bundle on disk at the given location. */
-  public void serializeSdkBundle(SdkBundle sdkBundle, Path pathOnDisk) throws IOException {
-    try (TempDirectory tempDir = new TempDirectory(getClass().getSimpleName());
-        ZipArchive zipArchive = new ZipArchive(pathOnDisk)) {
+  public void serializeSdkBundle(SdkBundle sdkBundle, Path pathOnDisk, Path tempDir)
+      throws IOException {
+    try (ZipArchive zipArchive = new ZipArchive(pathOnDisk)) {
       // SdkBundleConfig.pb
       zipArchive.add(
           protoToSource(
@@ -155,7 +154,7 @@ public final class ZipFlingerBundleSerializer {
       }
 
       // Modules
-      Path modulesPath = tempDir.getPath().resolve(EXTRACTED_SDK_MODULES_FILE_NAME);
+      Path modulesPath = tempDir.resolve(SDK_MODULES_FILE_NAME);
       writeTempModulesFile(sdkBundle, modulesPath);
       zipArchive.add(Sources.from(modulesPath, SDK_MODULES_FILE_NAME, DEFAULT_COMPRESSION_LEVEL));
     }

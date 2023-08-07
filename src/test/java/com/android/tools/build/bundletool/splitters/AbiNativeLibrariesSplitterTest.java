@@ -49,11 +49,12 @@ public class AbiNativeLibrariesSplitterTest {
 
   @Test
   public void splittingByAbi() throws Exception {
+    BundleModule testModule =
+        createSingleLibraryModule("testModule", "x86", "lib/x86/libnoname.so");
+
     AbiNativeLibrariesSplitter abiNativeLibrariesSplitter = new AbiNativeLibrariesSplitter();
     ImmutableCollection<ModuleSplit> splits =
-        abiNativeLibrariesSplitter.split(
-            ModuleSplit.forNativeLibraries(
-                createSingleLibraryModule("testModule", "x86", "lib/x86/libnoname.so")));
+        abiNativeLibrariesSplitter.split(ModuleSplit.forNativeLibraries(testModule));
 
     assertThat(splits).hasSize(1);
     ModuleSplit x86Split = splits.asList().get(0);
@@ -68,7 +69,7 @@ public class AbiNativeLibrariesSplitterTest {
             targetedNativeDirectory("lib/x86", nativeDirectoryTargeting(X86)),
             targetedNativeDirectory("lib/x86_64", nativeDirectoryTargeting(X86_64)));
 
-    BundleModule bundleModule =
+    BundleModule testModule =
         new BundleModuleBuilder("testModule")
             .addFile("lib/x86/libtest.so")
             .addFile("lib/x86_64/libtest.so")
@@ -78,7 +79,7 @@ public class AbiNativeLibrariesSplitterTest {
 
     AbiNativeLibrariesSplitter abiNativeLibrariesSplitter = new AbiNativeLibrariesSplitter();
     ImmutableCollection<ModuleSplit> splits =
-        abiNativeLibrariesSplitter.split(ModuleSplit.forNativeLibraries(bundleModule));
+        abiNativeLibrariesSplitter.split(ModuleSplit.forNativeLibraries(testModule));
 
     assertThat(splits).hasSize(2);
     assertThat(splits.stream().map(ModuleSplit::getApkTargeting).collect(toList()))
@@ -101,9 +102,9 @@ public class AbiNativeLibrariesSplitterTest {
 
   @Test
   public void neverProducesMasterSplit() throws Exception {
-    ModuleSplit inputSplit =
-        ModuleSplit.forNativeLibraries(
-            createSingleLibraryModule("testModule", "x86", "lib/x86/libnoname.so"));
+    BundleModule testModule =
+        createSingleLibraryModule("testModule", "x86", "lib/x86/libnoname.so");
+    ModuleSplit inputSplit = ModuleSplit.forNativeLibraries(testModule);
     assertThat(inputSplit.isMasterSplit()).isTrue();
 
     ImmutableCollection<ModuleSplit> splits = new AbiNativeLibrariesSplitter().split(inputSplit);
@@ -114,10 +115,11 @@ public class AbiNativeLibrariesSplitterTest {
 
   @Test
   public void nativeSplitIdEqualsToModuleName_base() throws Exception {
+    BundleModule testModule = createSingleLibraryModule("base", "x86");
+    ModuleSplit inputSplit = ModuleSplit.forNativeLibraries(testModule);
+
     AbiNativeLibrariesSplitter abiNativeLibrariesSplitter = new AbiNativeLibrariesSplitter();
-    ImmutableCollection<ModuleSplit> splits =
-        abiNativeLibrariesSplitter.split(
-            ModuleSplit.forNativeLibraries(createSingleLibraryModule("base", "x86")));
+    ImmutableCollection<ModuleSplit> splits = abiNativeLibrariesSplitter.split(inputSplit);
 
     assertThat(splits).hasSize(1);
     ModuleSplit x86Split = splits.asList().get(0);
@@ -132,10 +134,12 @@ public class AbiNativeLibrariesSplitterTest {
 
   @Test
   public void masterSplitIdEqualsToModuleName_nonBase() throws Exception {
+    BundleModule testModule = createSingleLibraryModule("testModule", "armeabi-v7a");
+    ModuleSplit inputSplit = ModuleSplit.forNativeLibraries(testModule);
+
     AbiNativeLibrariesSplitter abiNativeLibrariesSplitter = new AbiNativeLibrariesSplitter();
-    ImmutableCollection<ModuleSplit> splits =
-        abiNativeLibrariesSplitter.split(
-            ModuleSplit.forNativeLibraries(createSingleLibraryModule("testModule", "armeabi-v7a")));
+
+    ImmutableCollection<ModuleSplit> splits = abiNativeLibrariesSplitter.split(inputSplit);
 
     assertThat(splits).hasSize(1);
     ModuleSplit armSplit = splits.asList().get(0);
@@ -150,9 +154,7 @@ public class AbiNativeLibrariesSplitterTest {
 
   @Test
   public void generatesSplitWithUnusedEntries() throws Exception {
-    AbiNativeLibrariesSplitter abiNativeLibrariesSplitter = new AbiNativeLibrariesSplitter();
-
-    BundleModule module =
+    BundleModule testModule =
         new BundleModuleBuilder("testModule")
             .addFile("lib/x86_64/libsome.so")
             .addFile("assets/leftover.txt")
@@ -164,8 +166,10 @@ public class AbiNativeLibrariesSplitterTest {
             .setManifest(androidManifest("com.test.app"))
             .build();
 
+    AbiNativeLibrariesSplitter abiNativeLibrariesSplitter = new AbiNativeLibrariesSplitter();
+
     ImmutableCollection<ModuleSplit> splits =
-        abiNativeLibrariesSplitter.split(ModuleSplit.forModule(module));
+        abiNativeLibrariesSplitter.split(ModuleSplit.forModule(testModule));
 
     // x86_64 split and leftover split.
     assertThat(splits).hasSize(2);
@@ -185,26 +189,25 @@ public class AbiNativeLibrariesSplitterTest {
 
   @Test
   public void manifestMutatorToRequireSplits_registered_whenAbisPresent() throws Exception {
-    ModuleSplit inputSplit =
-        ModuleSplit.forNativeLibraries(
-            createSingleLibraryModule("testModule", "x86", "lib/x86/libnoname.so"));
+    BundleModule testModule =
+        createSingleLibraryModule("testModule", "x86", "lib/x86/libnoname.so");
+    ModuleSplit inputSplit = ModuleSplit.forNativeLibraries(testModule);
 
     ImmutableCollection<ModuleSplit> splits = new AbiNativeLibrariesSplitter().split(inputSplit);
 
     assertThat(splits).hasSize(1);
     assertThat(
             compareManifestMutators(
-                splits.asList().get(0).getMasterManifestMutators(), withSplitsRequired(true)))
+                splits.asList().get(0).getMasterManifestMutators(),
+                withSplitsRequired(/* value= */ true)))
         .isTrue();
   }
 
   @Test
   public void manifestMutatorToRequireSplits_notRegistered_whenNoAbis() throws Exception {
-    ModuleSplit inputSplit =
-        ModuleSplit.forNativeLibraries(
-            new BundleModuleBuilder("testModule")
-                .setManifest(androidManifest("com.test.app"))
-                .build());
+    BundleModule testModule =
+        new BundleModuleBuilder("testModule").setManifest(androidManifest("com.test.app")).build();
+    ModuleSplit inputSplit = ModuleSplit.forNativeLibraries(testModule);
 
     ImmutableCollection<ModuleSplit> splits = new AbiNativeLibrariesSplitter().split(inputSplit);
 

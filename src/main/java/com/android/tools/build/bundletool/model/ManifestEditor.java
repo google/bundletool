@@ -41,6 +41,7 @@ import static com.android.tools.build.bundletool.model.AndroidManifest.IS_SPLIT_
 import static com.android.tools.build.bundletool.model.AndroidManifest.IS_SPLIT_REQUIRED_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.LOCALE_CONFIG_ATTRIBUTE_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.LOCALE_CONFIG_RESOURCE_ID;
+import static com.android.tools.build.bundletool.model.AndroidManifest.METADATA_KEY_SDK_PATCH_VERSION_PREFIX;
 import static com.android.tools.build.bundletool.model.AndroidManifest.META_DATA_ELEMENT_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.META_DATA_KEY_FUSED_MODULE_NAMES;
 import static com.android.tools.build.bundletool.model.AndroidManifest.META_DATA_KEY_SPLITS_REQUIRED;
@@ -82,6 +83,7 @@ import static com.android.tools.build.bundletool.model.AndroidManifest.VERSION_M
 import static com.android.tools.build.bundletool.model.AndroidManifest.VERSION_NAME_ATTRIBUTE_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.VERSION_NAME_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.utils.xmlproto.XmlProtoAttributeBuilder.createAndroidAttribute;
+import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.MoreCollectors.onlyElement;
 import static com.google.common.collect.MoreCollectors.toOptional;
 import static java.util.stream.Collectors.joining;
@@ -245,6 +247,20 @@ public class ManifestEditor {
     return this;
   }
 
+  @CanIgnoreReturnValue
+  public ManifestEditor updateApplicationElement(XmlProtoElement applicationElement) {
+    ImmutableList<XmlProtoElementBuilder> nonApplicationElements =
+        manifestElement
+            .getChildrenElements()
+            .filter(child -> !child.getName().equals(APPLICATION_ELEMENT_NAME))
+            .collect(toImmutableList());
+    manifestElement
+        .removeChildren()
+        .addChildren(nonApplicationElements)
+        .addChildElement(applicationElement.toBuilder());
+    return this;
+  }
+
   /**
    * Sets the 'android:extractNativeLibs' value in the {@code application} tag.
    *
@@ -290,6 +306,11 @@ public class ManifestEditor {
     setMetadataValue(
         META_DATA_KEY_SPLITS_REQUIRED,
         createAndroidAttribute("value", VALUE_RESOURCE_ID).setValueAsBoolean(value));
+
+    manifestElement
+        .getOrCreateAndroidAttribute(
+            IS_SPLIT_REQUIRED_ATTRIBUTE_NAME, IS_SPLIT_REQUIRED_RESOURCE_ID)
+        .setValueAsBoolean(value);
 
     return setApplcationAttributeBoolean(
         IS_SPLIT_REQUIRED_ATTRIBUTE_NAME, IS_SPLIT_REQUIRED_RESOURCE_ID, value);
@@ -506,7 +527,7 @@ public class ManifestEditor {
     return this;
   }
 
-  /** Creates a <meta-data> element and populates it with SDK patch version. */
+  /** Creates a <meta-data> element and populates it with SDK patch version in SDK APK manifest. */
   @CanIgnoreReturnValue
   public ManifestEditor setSdkPatchVersionMetadata(int patchVersion) {
     manifestElement
@@ -516,6 +537,22 @@ public class ManifestEditor {
                 .addAttribute(
                     createAndroidAttribute(NAME_ATTRIBUTE_NAME, NAME_RESOURCE_ID)
                         .setValueAsString(SDK_PATCH_VERSION_ATTRIBUTE_NAME))
+                .addAttribute(
+                    createAndroidAttribute(VALUE_ATTRIBUTE_NAME, VALUE_RESOURCE_ID)
+                        .setValueAsDecimalInteger(patchVersion)));
+    return this;
+  }
+
+  /** Creates a <meta-data> element for app's SDK split and populates it with SDK patch version. */
+  @CanIgnoreReturnValue
+  public ManifestEditor setSdkSplitPatchVersionMetadata(String sdkModuleName, int patchVersion) {
+    manifestElement
+        .getOrCreateChildElement(APPLICATION_ELEMENT_NAME)
+        .addChildElement(
+            XmlProtoElementBuilder.create(META_DATA_ELEMENT_NAME)
+                .addAttribute(
+                    createAndroidAttribute(NAME_ATTRIBUTE_NAME, NAME_RESOURCE_ID)
+                        .setValueAsString(METADATA_KEY_SDK_PATCH_VERSION_PREFIX + sdkModuleName))
                 .addAttribute(
                     createAndroidAttribute(VALUE_ATTRIBUTE_NAME, VALUE_RESOURCE_ID)
                         .setValueAsDecimalInteger(patchVersion)));

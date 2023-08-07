@@ -17,6 +17,7 @@
 package com.android.tools.build.bundletool.commands;
 
 import static com.android.tools.build.bundletool.model.utils.BundleParser.EXTRACTED_SDK_MODULES_FILE_NAME;
+import static com.android.tools.build.bundletool.model.utils.FileNames.TABLE_OF_CONTENTS_FILE;
 import static com.android.tools.build.bundletool.model.utils.Versions.ANDROID_L_API_VERSION;
 import static com.android.tools.build.bundletool.testing.Aapt2Helper.AAPT2_PATH;
 import static com.android.tools.build.bundletool.testing.FakeSystemEnvironmentProvider.ANDROID_HOME;
@@ -35,6 +36,9 @@ import static com.google.common.truth.Truth.assertThat;
 import static com.google.common.truth.Truth8.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
+import com.android.bundle.Commands.ApkSet;
+import com.android.bundle.Commands.BuildApksResult;
+import com.android.bundle.Commands.Variant;
 import com.android.bundle.RuntimeEnabledSdkConfigProto.RuntimeEnabledSdk;
 import com.android.bundle.RuntimeEnabledSdkConfigProto.RuntimeEnabledSdkConfig;
 import com.android.bundle.RuntimeEnabledSdkConfigProto.SdkSplitPropertiesInheritedFromApp;
@@ -50,6 +54,7 @@ import com.android.tools.build.bundletool.model.SigningConfiguration;
 import com.android.tools.build.bundletool.model.ZipPath;
 import com.android.tools.build.bundletool.model.exceptions.InvalidBundleException;
 import com.android.tools.build.bundletool.model.exceptions.InvalidCommandException;
+import com.android.tools.build.bundletool.model.utils.ResultUtils;
 import com.android.tools.build.bundletool.model.utils.SystemEnvironmentProvider;
 import com.android.tools.build.bundletool.model.utils.ZipUtils;
 import com.android.tools.build.bundletool.testing.ApkSetUtils;
@@ -60,6 +65,7 @@ import com.android.tools.build.bundletool.testing.FakeSystemEnvironmentProvider;
 import com.android.tools.build.bundletool.testing.SdkBundleBuilder;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.Iterables;
 import com.google.common.hash.HashCode;
 import com.google.common.hash.Hashing;
 import com.google.common.io.ByteSource;
@@ -705,6 +711,52 @@ public class BuildSdkApksForAppCommandTest {
     String sdkSplitPath =
         "splits/" + SdkBundleBuilder.PACKAGE_NAME.replace(".", "") + "-master.apk";
     assertThat(Files.exists(Path.of(tmpDir.toString(), sdkSplitPath))).isTrue();
+  }
+
+  @Test
+  public void serializeTableOfContents_setToDefaultValue_noTocInOutput() throws Exception {
+    ZipBuilder sdkBundleZipBuilder =
+        createZipBuilderForSdkBundleWithModules(
+            createZipBuilderForModules(), extractedModulesFilePath);
+    sdkBundleZipBuilder.writeTo(sdkBundlePath);
+    BuildSdkApksForAppCommand command =
+        BuildSdkApksForAppCommand.builder()
+            .setSdkBundlePath(sdkBundlePath)
+            .setInheritedAppProperties(INHERITED_APP_PROPERTIES)
+            .setOutputFile(tmpDir)
+            .setOutputFormat(OutputFormat.DIRECTORY)
+            .build();
+
+    command.execute();
+
+    assertThat(Files.exists(tmpDir.resolve(TABLE_OF_CONTENTS_FILE))).isFalse();
+  }
+
+  @Test
+  public void serializeTableOfContents_setToTrue_tocSerialized() throws Exception {
+    ZipBuilder sdkBundleZipBuilder =
+        createZipBuilderForSdkBundleWithModules(
+            createZipBuilderForModules(), extractedModulesFilePath);
+    sdkBundleZipBuilder.writeTo(sdkBundlePath);
+    BuildSdkApksForAppCommand command =
+        BuildSdkApksForAppCommand.builder()
+            .setSdkBundlePath(sdkBundlePath)
+            .setInheritedAppProperties(INHERITED_APP_PROPERTIES)
+            .setOutputFile(tmpDir)
+            .setOutputFormat(OutputFormat.DIRECTORY)
+            .setSerializeTableOfContents(true)
+            .build();
+
+    command.execute();
+
+    BuildApksResult buildApksResult = ResultUtils.readTableOfContents(tmpDir);
+    assertThat(buildApksResult.getPackageName())
+        .isEqualTo(INHERITED_APP_PROPERTIES.getPackageName());
+    Variant generatedVariant = Iterables.getOnlyElement(buildApksResult.getVariantList());
+    ApkSet generatedModule = Iterables.getOnlyElement(generatedVariant.getApkSetList());
+    assertThat(generatedModule.getApkDescriptionCount()).isEqualTo(1);
+    assertThat(generatedModule.getModuleMetadata().getName())
+        .isEqualTo(SdkBundleBuilder.PACKAGE_NAME.replace(".", ""));
   }
 
   @Test

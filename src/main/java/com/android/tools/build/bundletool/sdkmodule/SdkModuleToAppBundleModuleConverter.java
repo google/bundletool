@@ -29,7 +29,6 @@ import com.android.tools.build.bundletool.model.SdkBundle;
  * <p>The SDK module will be delivered as the app module on devices with no SDK Runtime support.
  */
 public final class SdkModuleToAppBundleModuleConverter {
-
   private final BundleModule sdkModule;
   private final ResourceTablePackageIdRemapper resourceTablePackageIdRemapper;
   private final XmlPackageIdRemapper xmlPackageIdRemapper;
@@ -110,6 +109,7 @@ public final class SdkModuleToAppBundleModuleConverter {
                 .setHasCode(false)
                 .setSplitIdForFeatureSplit(sdkModuleName)
                 .setDeliveryOptionsForRuntimeEnabledSdkModule()
+                .setSdkSplitPatchVersionMetadata(sdkModuleName, module.getSdkPatchVersionOrThrow())
                 .save())
         .build();
   }

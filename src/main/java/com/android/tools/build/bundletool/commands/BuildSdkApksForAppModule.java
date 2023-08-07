@@ -98,13 +98,13 @@ public abstract class BuildSdkApksForAppModule {
   }
 
   @Provides
-  static Optional<ApkListener> provideApkListener() {
-    return Optional.empty();
+  static Optional<ApkListener> provideApkListener(BuildSdkApksForAppCommand command) {
+    return command.getApkListener();
   }
 
   @Provides
-  static Optional<ApkModifier> provideApkModifier() {
-    return Optional.empty();
+  static Optional<ApkModifier> provideApkModifier(BuildSdkApksForAppCommand command) {
+    return command.getApkModifier();
   }
 
   @Provides
@@ -119,7 +119,7 @@ public abstract class BuildSdkApksForAppModule {
   }
 
   @Provides
-  static Optional<P7ZipCommand> privideP7ZipCommand() {
+  static Optional<P7ZipCommand> provideP7ZipCommand() {
     return Optional.empty();
   }
 
