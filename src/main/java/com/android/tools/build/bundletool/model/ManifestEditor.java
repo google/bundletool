@@ -306,12 +306,6 @@ public class ManifestEditor {
     setMetadataValue(
         META_DATA_KEY_SPLITS_REQUIRED,
         createAndroidAttribute("value", VALUE_RESOURCE_ID).setValueAsBoolean(value));
-
-    manifestElement
-        .getOrCreateAndroidAttribute(
-            IS_SPLIT_REQUIRED_ATTRIBUTE_NAME, IS_SPLIT_REQUIRED_RESOURCE_ID)
-        .setValueAsBoolean(value);
-
     return setApplcationAttributeBoolean(
         IS_SPLIT_REQUIRED_ATTRIBUTE_NAME, IS_SPLIT_REQUIRED_RESOURCE_ID, value);
   }

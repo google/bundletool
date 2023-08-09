@@ -83,7 +83,6 @@ import com.android.tools.build.bundletool.model.manifestelements.Activity;
 import com.android.tools.build.bundletool.model.manifestelements.Provider;
 import com.android.tools.build.bundletool.model.manifestelements.Receiver;
 import com.android.tools.build.bundletool.model.utils.xmlproto.XmlProtoAttribute;
-import com.android.tools.build.bundletool.model.utils.xmlproto.XmlProtoAttributeBuilder;
 import com.android.tools.build.bundletool.model.utils.xmlproto.XmlProtoElement;
 import com.android.tools.build.bundletool.model.utils.xmlproto.XmlProtoElementBuilder;
 import com.google.common.collect.ImmutableList;
@@ -474,12 +473,6 @@ public class ManifestEditorTest {
                 IS_SPLIT_REQUIRED_ATTRIBUTE_NAME,
                 IS_SPLIT_REQUIRED_RESOURCE_ID,
                 true));
-    assertThat(editedManifest.getManifestElement().getAttributes())
-        .containsExactly(
-            XmlProtoAttributeBuilder.createAndroidAttribute(
-                    IS_SPLIT_REQUIRED_ATTRIBUTE_NAME, IS_SPLIT_REQUIRED_RESOURCE_ID)
-                .setValueAsBoolean(true)
-                .build());
   }
 
   @Test
@@ -504,12 +497,6 @@ public class ManifestEditorTest {
                 IS_SPLIT_REQUIRED_ATTRIBUTE_NAME,
                 IS_SPLIT_REQUIRED_RESOURCE_ID,
                 true));
-    assertThat(editedManifest.getManifestElement().getAttributes())
-        .containsExactly(
-            XmlProtoAttributeBuilder.createAndroidAttribute(
-                    IS_SPLIT_REQUIRED_ATTRIBUTE_NAME, IS_SPLIT_REQUIRED_RESOURCE_ID)
-                .setValueAsBoolean(true)
-                .build());
   }
 
   @Test
@@ -534,12 +521,6 @@ public class ManifestEditorTest {
                 IS_SPLIT_REQUIRED_ATTRIBUTE_NAME,
                 IS_SPLIT_REQUIRED_RESOURCE_ID,
                 false));
-    assertThat(editedManifest.getManifestElement().getAttributes())
-        .containsExactly(
-            XmlProtoAttributeBuilder.createAndroidAttribute(
-                    IS_SPLIT_REQUIRED_ATTRIBUTE_NAME, IS_SPLIT_REQUIRED_RESOURCE_ID)
-                .setValueAsBoolean(false)
-                .build());
   }
 
   @Test
