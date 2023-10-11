@@ -15,10 +15,10 @@
  */
 package com.android.tools.build.bundletool.splitters;
 
-import static com.android.tools.build.bundletool.splitters.BinaryArtProfilesInjector.BINARY_ART_PROFILE_METADATA_NAME;
-import static com.android.tools.build.bundletool.splitters.BinaryArtProfilesInjector.BINARY_ART_PROFILE_NAME;
-import static com.android.tools.build.bundletool.splitters.BinaryArtProfilesInjector.LEGACY_METADATA_NAMESPACE;
-import static com.android.tools.build.bundletool.splitters.BinaryArtProfilesInjector.METADATA_NAMESPACE;
+import static com.android.tools.build.bundletool.model.BinaryArtProfileConstants.LEGACY_PROFILE_METADATA_NAMESPACE;
+import static com.android.tools.build.bundletool.model.BinaryArtProfileConstants.PROFILE_FILENAME;
+import static com.android.tools.build.bundletool.model.BinaryArtProfileConstants.PROFILE_METADATA_FILENAME;
+import static com.android.tools.build.bundletool.model.BinaryArtProfileConstants.PROFILE_METADATA_NAMESPACE;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifest;
 import static com.google.common.collect.MoreCollectors.toOptional;
 import static com.google.common.truth.Truth.assertThat;
@@ -45,21 +45,19 @@ import org.junit.runners.JUnit4;
 
 @RunWith(JUnit4.class)
 public class BinaryArtProfilesInjectorTest {
-  private static final byte[] BINARY_ART_PROFILE_CONTENT = {1, 2, 3, 4};
-  private static final byte[] BINARY_ART_PROFILE_METADATA_CONTENT = {4, 3, 2, 1};
+  private static final byte[] PROFILE_CONTENT = {1, 2, 3, 4};
+  private static final byte[] PROFILE_METADATA_CONTENT = {4, 3, 2, 1};
 
   @Test
   public void mainSplitOfTheBaseModule_artProfileInjected() {
     AppBundle appBundle =
         createAppBundleBuilder()
             .addMetadataFile(
-                METADATA_NAMESPACE,
-                BINARY_ART_PROFILE_NAME,
-                ByteSource.wrap(BINARY_ART_PROFILE_CONTENT))
+                PROFILE_METADATA_NAMESPACE, PROFILE_FILENAME, ByteSource.wrap(PROFILE_CONTENT))
             .addMetadataFile(
-                METADATA_NAMESPACE,
-                BINARY_ART_PROFILE_METADATA_NAME,
-                ByteSource.wrap(BINARY_ART_PROFILE_METADATA_CONTENT))
+                PROFILE_METADATA_NAMESPACE,
+                PROFILE_METADATA_FILENAME,
+                ByteSource.wrap(PROFILE_METADATA_CONTENT))
             .build();
 
     BinaryArtProfilesInjector injector = new BinaryArtProfilesInjector(appBundle);
@@ -83,9 +81,8 @@ public class BinaryArtProfilesInjectorTest {
     assertThat(result.findEntry(apkProfileMetadataPath).map(ModuleEntry::getForceUncompressed))
         .hasValue(true);
 
-    assertThat(getEntryContent(result, apkProfilePath)).hasValue(BINARY_ART_PROFILE_CONTENT);
-    assertThat(getEntryContent(result, apkProfileMetadataPath))
-        .hasValue(BINARY_ART_PROFILE_METADATA_CONTENT);
+    assertThat(getEntryContent(result, apkProfilePath)).hasValue(PROFILE_CONTENT);
+    assertThat(getEntryContent(result, apkProfileMetadataPath)).hasValue(PROFILE_METADATA_CONTENT);
     assertThat(getEntryContent(result, ZipPath.create("some.bin"))).hasValue(new byte[] {10, 9, 8});
   }
 
@@ -94,13 +91,11 @@ public class BinaryArtProfilesInjectorTest {
     AppBundle appBundle =
         createAppBundleBuilder()
             .addMetadataFile(
-                METADATA_NAMESPACE,
-                BINARY_ART_PROFILE_NAME,
-                ByteSource.wrap(BINARY_ART_PROFILE_CONTENT))
+                PROFILE_METADATA_NAMESPACE, PROFILE_FILENAME, ByteSource.wrap(PROFILE_CONTENT))
             .addMetadataFile(
-                METADATA_NAMESPACE,
-                BINARY_ART_PROFILE_METADATA_NAME,
-                ByteSource.wrap(BINARY_ART_PROFILE_METADATA_CONTENT))
+                PROFILE_METADATA_NAMESPACE,
+                PROFILE_METADATA_FILENAME,
+                ByteSource.wrap(PROFILE_METADATA_CONTENT))
             .build();
 
     BinaryArtProfilesInjector injector = new BinaryArtProfilesInjector(appBundle);
@@ -119,9 +114,9 @@ public class BinaryArtProfilesInjectorTest {
     ModuleSplit result = injector.inject(moduleSplit);
 
     assertThat(getEntryContent(result, ZipPath.create("assets/dexopt/baseline.prof")))
-        .hasValue(BINARY_ART_PROFILE_CONTENT);
+        .hasValue(PROFILE_CONTENT);
     assertThat(getEntryContent(result, ZipPath.create("assets/dexopt/baseline.profm")))
-        .hasValue(BINARY_ART_PROFILE_METADATA_CONTENT);
+        .hasValue(PROFILE_METADATA_CONTENT);
     assertThat(getEntryContent(result, ZipPath.create("some.bin"))).hasValue(new byte[] {10, 9, 8});
   }
 
@@ -130,13 +125,13 @@ public class BinaryArtProfilesInjectorTest {
     AppBundle appBundle =
         createAppBundleBuilder()
             .addMetadataFile(
-                LEGACY_METADATA_NAMESPACE,
-                BINARY_ART_PROFILE_NAME,
-                ByteSource.wrap(BINARY_ART_PROFILE_CONTENT))
+                LEGACY_PROFILE_METADATA_NAMESPACE,
+                PROFILE_FILENAME,
+                ByteSource.wrap(PROFILE_CONTENT))
             .addMetadataFile(
-                LEGACY_METADATA_NAMESPACE,
-                BINARY_ART_PROFILE_METADATA_NAME,
-                ByteSource.wrap(BINARY_ART_PROFILE_METADATA_CONTENT))
+                LEGACY_PROFILE_METADATA_NAMESPACE,
+                PROFILE_METADATA_FILENAME,
+                ByteSource.wrap(PROFILE_METADATA_CONTENT))
             .build();
 
     BinaryArtProfilesInjector injector = new BinaryArtProfilesInjector(appBundle);
@@ -149,9 +144,9 @@ public class BinaryArtProfilesInjectorTest {
     ModuleSplit result = injector.inject(moduleSplit);
 
     assertThat(getEntryContent(result, ZipPath.create("assets/dexopt/baseline.prof")))
-        .hasValue(BINARY_ART_PROFILE_CONTENT);
+        .hasValue(PROFILE_CONTENT);
     assertThat(getEntryContent(result, ZipPath.create("assets/dexopt/baseline.profm")))
-        .hasValue(BINARY_ART_PROFILE_METADATA_CONTENT);
+        .hasValue(PROFILE_METADATA_CONTENT);
   }
 
   @Test
@@ -159,9 +154,7 @@ public class BinaryArtProfilesInjectorTest {
     AppBundle appBundle =
         createAppBundleBuilder()
             .addMetadataFile(
-                METADATA_NAMESPACE,
-                BINARY_ART_PROFILE_NAME,
-                ByteSource.wrap(BINARY_ART_PROFILE_CONTENT))
+                PROFILE_METADATA_NAMESPACE, PROFILE_FILENAME, ByteSource.wrap(PROFILE_CONTENT))
             .build();
 
     BinaryArtProfilesInjector injector = new BinaryArtProfilesInjector(appBundle);
@@ -174,7 +167,7 @@ public class BinaryArtProfilesInjectorTest {
     ModuleSplit result = injector.inject(moduleSplit);
 
     assertThat(getEntryContent(result, ZipPath.create("assets/dexopt/baseline.prof")))
-        .hasValue(BINARY_ART_PROFILE_CONTENT);
+        .hasValue(PROFILE_CONTENT);
     assertThat(getEntryContent(result, ZipPath.create("assets/dexopt/baseline.profm"))).isEmpty();
   }
 
@@ -183,9 +176,7 @@ public class BinaryArtProfilesInjectorTest {
     AppBundle appBundle =
         createAppBundleBuilder()
             .addMetadataFile(
-                METADATA_NAMESPACE,
-                BINARY_ART_PROFILE_NAME,
-                ByteSource.wrap(BINARY_ART_PROFILE_CONTENT))
+                PROFILE_METADATA_NAMESPACE, PROFILE_FILENAME, ByteSource.wrap(PROFILE_CONTENT))
             .build();
 
     BinaryArtProfilesInjector injector = new BinaryArtProfilesInjector(appBundle);
@@ -206,9 +197,7 @@ public class BinaryArtProfilesInjectorTest {
     AppBundle appBundle =
         createAppBundleBuilder()
             .addMetadataFile(
-                METADATA_NAMESPACE,
-                BINARY_ART_PROFILE_NAME,
-                ByteSource.wrap(BINARY_ART_PROFILE_CONTENT))
+                PROFILE_METADATA_NAMESPACE, PROFILE_FILENAME, ByteSource.wrap(PROFILE_CONTENT))
             .build();
 
     BinaryArtProfilesInjector injector = new BinaryArtProfilesInjector(appBundle);

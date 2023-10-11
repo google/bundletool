@@ -20,12 +20,14 @@ import static com.android.tools.build.bundletool.model.utils.BundleParser.EXTRAC
 import static com.android.tools.build.bundletool.model.utils.BundleParser.SDK_MODULES_FILE_NAME;
 import static com.android.tools.build.bundletool.testing.FakeSystemEnvironmentProvider.ANDROID_HOME;
 import static com.android.tools.build.bundletool.testing.FakeSystemEnvironmentProvider.ANDROID_SERIAL;
+import static com.android.tools.build.bundletool.testing.SdkBundleBuilder.sdkVersionBuilder;
 import static com.android.tools.build.bundletool.testing.TestUtils.addKeyToKeystore;
 import static com.android.tools.build.bundletool.testing.TestUtils.createDebugKeystore;
 import static com.android.tools.build.bundletool.testing.TestUtils.createKeystore;
 import static com.android.tools.build.bundletool.testing.TestUtils.createSdkAndroidManifest;
 import static com.android.tools.build.bundletool.testing.TestUtils.createZipBuilderForModules;
 import static com.android.tools.build.bundletool.testing.TestUtils.createZipBuilderForModulesWithInvalidManifest;
+import static com.android.tools.build.bundletool.testing.TestUtils.createZipBuilderForSdkAsarWithModules;
 import static com.android.tools.build.bundletool.testing.TestUtils.createZipBuilderForSdkBundleWithModules;
 import static com.android.tools.build.bundletool.testing.TestUtils.expectMissingRequiredBuilderPropertyException;
 import static com.android.tools.build.bundletool.testing.TestUtils.expectMissingRequiredFlagException;
@@ -37,8 +39,8 @@ import static java.util.Arrays.stream;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.android.bundle.Config.BundleConfig;
+import com.android.bundle.SdkMetadataOuterClass.SdkMetadata;
 import com.android.tools.build.bundletool.commands.BuildSdkApksCommand.OutputFormat;
-import com.android.tools.build.bundletool.flags.Flag.RequiredFlagNotSetException;
 import com.android.tools.build.bundletool.flags.FlagParser;
 import com.android.tools.build.bundletool.flags.FlagParser.FlagParseException;
 import com.android.tools.build.bundletool.flags.ParsedFlags;
@@ -54,6 +56,7 @@ import com.android.tools.build.bundletool.model.utils.files.FileUtils;
 import com.android.tools.build.bundletool.testing.BundleConfigBuilder;
 import com.android.tools.build.bundletool.testing.CertificateFactory;
 import com.android.tools.build.bundletool.testing.FakeSystemEnvironmentProvider;
+import com.android.tools.build.bundletool.testing.SdkBundleBuilder;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.util.concurrent.MoreExecutors;
@@ -96,6 +99,7 @@ public class BuildSdkApksCommandTest {
 
   private Path tmpDir;
   private Path sdkBundlePath;
+  private Path sdkAsarPath;
   private Path modulesPath;
   private Path outputFilePath;
   private Path keystorePath;
@@ -116,6 +120,7 @@ public class BuildSdkApksCommandTest {
   public void setUp() throws Exception {
     tmpDir = tmp.getRoot().toPath();
     sdkBundlePath = tmpDir.resolve("SdkBundle.asb");
+    sdkAsarPath = tmpDir.resolve("SdkArchive.asar");
     modulesPath = tmpDir.resolve(EXTRACTED_SDK_MODULES_FILE_NAME);
     outputFilePath = tmpDir.resolve("output.apks");
 
@@ -127,10 +132,11 @@ public class BuildSdkApksCommandTest {
   }
 
   @Test
-  public void buildingViaFlagsAndBuilderHasSameResult() {
+  public void buildingViaFlagsAndBuilderHasSameResult_withSdkBundle() {
     BuildSdkApksCommand commandViaFlags =
         BuildSdkApksCommand.fromFlags(
             getDefaultFlagsWithAdditionalFlags(
+                "--sdk-bundle=" + sdkBundlePath,
                 "--version-code=351",
                 "--output-format=DIRECTORY",
                 "--aapt2=path/to/aapt2",
@@ -157,12 +163,123 @@ public class BuildSdkApksCommandTest {
   }
 
   @Test
-  public void buildingCommandViaFlags_sdkBundlePathNotSet() {
+  public void buildingViaFlagsAndBuilderHasSameResult_withSdkArchive() {
+    BuildSdkApksCommand commandViaFlags =
+        BuildSdkApksCommand.fromFlags(
+            getDefaultFlagsWithAdditionalFlags(
+                "--sdk-archive=" + sdkAsarPath,
+                "--version-code=351",
+                "--output-format=DIRECTORY",
+                "--aapt2=path/to/aapt2",
+                "--ks=" + keystorePath,
+                "--ks-key-alias=" + KEY_ALIAS,
+                "--ks-pass=pass:" + KEYSTORE_PASSWORD,
+                "--key-pass=pass:" + KEY_PASSWORD,
+                "--verbose"));
+
+    BuildSdkApksCommand.Builder commandViaBuilder =
+        BuildSdkApksCommand.builder()
+            .setSdkArchivePath(sdkAsarPath)
+            .setOutputFile(outputFilePath)
+            .setVersionCode(351)
+            .setOutputFormat(OutputFormat.DIRECTORY)
+            .setAapt2Command(commandViaFlags.getAapt2Command().get())
+            .setSigningConfiguration(
+                SigningConfiguration.builder().setSignerConfig(privateKey, certificate).build())
+            .setExecutorServiceInternal(commandViaFlags.getExecutorService())
+            .setExecutorServiceCreatedByBundleTool(true)
+            .setVerbose(true);
+
+    assertThat(commandViaBuilder.build()).isEqualTo(commandViaFlags);
+  }
+
+  @Test
+  public void buildingCommandViaFlags_sdkBundlePathSet_sdkArchivePathSet() {
     Throwable e =
         assertThrows(
-            RequiredFlagNotSetException.class,
-            () -> BuildSdkApksCommand.fromFlags(new FlagParser().parse("")));
-    assertThat(e).hasMessageThat().contains("Missing the required --sdk-bundle flag");
+            IllegalStateException.class,
+            () ->
+                BuildSdkApksCommand.fromFlags(
+                    getDefaultFlagsWithAdditionalFlags(
+                        "--sdk-bundle=" + sdkBundlePath, "--sdk-archive=" + sdkAsarPath)));
+    assertThat(e)
+        .hasMessageThat()
+        .contains("One and only one of SdkBundlePath and SdkArchivePath should be set.");
+  }
+
+  @Test
+  public void buildingCommandViaFlags_sdkBundlePathNotSet_sdkArchivePathNotSet() {
+    Throwable e =
+        assertThrows(
+            IllegalStateException.class,
+            () -> BuildSdkApksCommand.fromFlags(getDefaultFlagsWithAdditionalFlags()));
+    assertThat(e)
+        .hasMessageThat()
+        .contains("One and only one of SdkBundlePath and SdkArchivePath should be set.");
+  }
+
+  @Test
+  public void sdkBundleFileDoesNotExist_throws() {
+    Throwable e =
+        assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                BuildSdkApksCommand.builder()
+                    .setSdkBundlePath(Path.of("non_existent.asb"))
+                    .setOutputFile(outputFilePath)
+                    .build()
+                    .execute());
+    assertThat(e).hasMessageThat().contains("File 'non_existent.asb' was not found.");
+  }
+
+  @Test
+  public void sdkBundleFileHasBadExtension_throws() throws Exception {
+    createZipBuilderForSdkBundleWithModules(createZipBuilderForModules(), modulesPath)
+        .writeTo(sdkAsarPath);
+    Throwable e =
+        assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                BuildSdkApksCommand.builder()
+                    .setSdkBundlePath(sdkAsarPath)
+                    .setOutputFile(outputFilePath)
+                    .build()
+                    .execute());
+    assertThat(e)
+        .hasMessageThat()
+        .contains("ASB file 'SdkArchive.asar' is expected to have '.asb' extension.");
+  }
+
+  @Test
+  public void sdkArchiveFileDoesNotExist_throws() {
+    Throwable e =
+        assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                BuildSdkApksCommand.builder()
+                    .setSdkArchivePath(Path.of("non_existent.asar"))
+                    .setOutputFile(outputFilePath)
+                    .build()
+                    .execute());
+    assertThat(e).hasMessageThat().contains("File 'non_existent.asar' was not found.");
+  }
+
+  @Test
+  public void sdkArchiveFileHasBadExtension_throws() throws Exception {
+    createZipBuilderForSdkAsarWithModules(createZipBuilderForModules(), modulesPath)
+        .writeTo(sdkBundlePath);
+    Throwable e =
+        assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                BuildSdkApksCommand.builder()
+                    .setSdkArchivePath(sdkBundlePath)
+                    .setOutputFile(outputFilePath)
+                    .build()
+                    .execute());
+    assertThat(e)
+        .hasMessageThat()
+        .contains("ASAR file 'SdkBundle.asb' is expected to have '.asar' extension.");
   }
 
   @Test
@@ -180,20 +297,14 @@ public class BuildSdkApksCommandTest {
   }
 
   @Test
-  public void bundleNotSetViaFlags_throws() {
-    expectMissingRequiredFlagException(
-        "sdk-bundle",
-        () -> BuildSdkApksCommand.fromFlags(new FlagParser().parse("--output=" + outputFilePath)));
-  }
-
-  @Test
   public void keystoreSet_keyAliasNotSet_throws() {
     InvalidCommandException e =
         assertThrows(
             InvalidCommandException.class,
             () ->
                 BuildSdkApksCommand.fromFlags(
-                    getDefaultFlagsWithAdditionalFlags("--ks=" + keystorePath)));
+                    getDefaultFlagsWithAdditionalFlags(
+                        "--sdk-bundle=" + sdkBundlePath, "--ks=" + keystorePath)));
     assertThat(e).hasMessageThat().isEqualTo("Flag --ks-key-alias is required when --ks is set.");
   }
 
@@ -204,14 +315,9 @@ public class BuildSdkApksCommandTest {
             InvalidCommandException.class,
             () ->
                 BuildSdkApksCommand.fromFlags(
-                    getDefaultFlagsWithAdditionalFlags("--ks-key-alias=" + KEY_ALIAS)));
+                    getDefaultFlagsWithAdditionalFlags(
+                        "--sdk-bundle=" + sdkBundlePath, "--ks-key-alias=" + KEY_ALIAS)));
     assertThat(e).hasMessageThat().isEqualTo("Flag --ks is required when --ks-key-alias is set.");
-  }
-
-  @Test
-  public void bundleNotSetViaBuilder_throws() {
-    expectMissingRequiredBuilderPropertyException(
-        "sdkBundlePath", () -> BuildSdkApksCommand.builder().setOutputFile(outputFilePath).build());
   }
 
   @Test
@@ -219,7 +325,8 @@ public class BuildSdkApksCommandTest {
     createZipBuilderForSdkBundleWithModules(createZipBuilderForModules(), modulesPath)
         .writeTo(sdkBundlePath);
     ParsedFlags flags =
-        getDefaultFlagsWithAdditionalFlags("--overwrite", "--output-format=directory");
+        getDefaultFlagsWithAdditionalFlags(
+            "--sdk-bundle=" + sdkBundlePath, "--overwrite", "--output-format=directory");
     BuildSdkApksCommand command = BuildSdkApksCommand.fromFlags(flags);
 
     Exception e = assertThrows(InvalidCommandException.class, command::execute);
@@ -234,7 +341,8 @@ public class BuildSdkApksCommandTest {
         .addFileWithContent(ZipPath.create("BundleConfig.pb"), BUNDLE_CONFIG.toByteArray())
         .writeTo(outputFilePath);
     BuildSdkApksCommand command =
-        BuildSdkApksCommand.fromFlags(getDefaultFlagsWithAdditionalFlags());
+        BuildSdkApksCommand.fromFlags(
+            getDefaultFlagsWithAdditionalFlags("--sdk-bundle=" + sdkBundlePath));
 
     Exception e = assertThrows(IllegalArgumentException.class, command::execute);
     assertThat(e).hasMessageThat().contains("already exists");
@@ -247,7 +355,8 @@ public class BuildSdkApksCommandTest {
             FlagParseException.class,
             () ->
                 BuildSdkApksCommand.fromFlags(
-                    getDefaultFlagsWithAdditionalFlags("--max-threads=0")));
+                    getDefaultFlagsWithAdditionalFlags(
+                        "--sdk-bundle=" + sdkBundlePath, "--max-threads=0")));
     assertThat(zeroException).hasMessageThat().contains("flag --max-threads has illegal value");
 
     FlagParseException negativeException =
@@ -255,7 +364,8 @@ public class BuildSdkApksCommandTest {
             FlagParseException.class,
             () ->
                 BuildSdkApksCommand.fromFlags(
-                    getDefaultFlagsWithAdditionalFlags("--max-threads=-3")));
+                    getDefaultFlagsWithAdditionalFlags(
+                        "--sdk-bundle=" + sdkBundlePath, "--max-threads=-3")));
     assertThat(negativeException).hasMessageThat().contains("flag --max-threads has illegal value");
   }
 
@@ -266,20 +376,12 @@ public class BuildSdkApksCommandTest {
             UnknownFlagsException.class,
             () ->
                 BuildSdkApksCommand.fromFlags(
-                    getDefaultFlagsWithAdditionalFlags("--unknownFlag=notSure")));
+                    getDefaultFlagsWithAdditionalFlags(
+                        "--sdk-bundle=" + sdkBundlePath, "--unknownFlag=notSure")));
 
     assertThat(exception)
         .hasMessageThat()
         .contains(String.format("Unrecognized flags: --%s", "unknownFlag"));
-  }
-
-  @Test
-  public void missingBundleFile_throws() {
-    BuildSdkApksCommand command =
-        BuildSdkApksCommand.fromFlags(getDefaultFlagsWithAdditionalFlags());
-
-    Exception e = assertThrows(IllegalArgumentException.class, command::execute);
-    assertThat(e).hasMessageThat().contains("not found");
   }
 
   // Ensures that validations are run on the bundle zip file.
@@ -288,7 +390,8 @@ public class BuildSdkApksCommandTest {
     ZipBuilder zipBuilder = new ZipBuilder();
     zipBuilder.writeTo(sdkBundlePath);
     BuildSdkApksCommand command =
-        BuildSdkApksCommand.fromFlags(getDefaultFlagsWithAdditionalFlags());
+        BuildSdkApksCommand.fromFlags(
+            getDefaultFlagsWithAdditionalFlags("--sdk-bundle=" + sdkBundlePath));
 
     Exception e = assertThrows(InvalidBundleException.class, command::execute);
     assertThat(e)
@@ -310,7 +413,25 @@ public class BuildSdkApksCommandTest {
     createZipBuilderForSdkBundleWithModules(modules, modulesPath).writeTo(sdkBundlePath);
 
     BuildSdkApksCommand command =
-        BuildSdkApksCommand.fromFlags(getDefaultFlagsWithAdditionalFlags());
+        BuildSdkApksCommand.fromFlags(
+            getDefaultFlagsWithAdditionalFlags("--sdk-bundle=" + sdkBundlePath));
+
+    Exception e = assertThrows(InvalidBundleException.class, command::execute);
+    assertThat(e).hasMessageThat().contains("SDK bundles need exactly one module");
+  }
+
+  @Test
+  public void asarMultipleModules_throws() throws Exception {
+    ZipBuilder modules =
+        createZipBuilderForModules()
+            .addFileWithProtoContent(
+                ZipPath.create("feature/manifest/AndroidManifest.xml"), createSdkAndroidManifest())
+            .addFileWithContent(ZipPath.create("feature/dex/classes.dex"), TEST_CONTENT);
+    createZipBuilderForSdkAsarWithModules(modules, modulesPath).writeTo(sdkAsarPath);
+
+    BuildSdkApksCommand command =
+        BuildSdkApksCommand.fromFlags(
+            getDefaultFlagsWithAdditionalFlags("--sdk-archive=" + sdkAsarPath));
 
     Exception e = assertThrows(InvalidBundleException.class, command::execute);
     assertThat(e).hasMessageThat().contains("SDK bundles need exactly one module");
@@ -318,12 +439,13 @@ public class BuildSdkApksCommandTest {
 
   // Ensures that validations are run on the bundle object.
   @Test
-  public void invalidManifest_throws() throws Exception {
+  public void invalidManifest_inSdkBundle_throws() throws Exception {
     createZipBuilderForSdkBundleWithModules(
             createZipBuilderForModulesWithInvalidManifest(), modulesPath)
         .writeTo(sdkBundlePath);
     BuildSdkApksCommand command =
-        BuildSdkApksCommand.fromFlags(getDefaultFlagsWithAdditionalFlags());
+        BuildSdkApksCommand.fromFlags(
+            getDefaultFlagsWithAdditionalFlags("--sdk-bundle=" + sdkBundlePath));
 
     Exception e = assertThrows(InvalidBundleException.class, command::execute);
     assertThat(e)
@@ -333,10 +455,51 @@ public class BuildSdkApksCommandTest {
   }
 
   @Test
-  public void executeCreatesFile() throws Exception {
+  public void invalidManifest_inSdkArchive_throws() throws Exception {
+    createZipBuilderForSdkAsarWithModules(
+            createZipBuilderForModulesWithInvalidManifest(),
+            SdkMetadata.newBuilder()
+                .setPackageName(SdkBundleBuilder.PACKAGE_NAME)
+                .setSdkVersion(sdkVersionBuilder())
+                .build(),
+            modulesPath)
+        .writeTo(sdkAsarPath);
+    BuildSdkApksCommand command =
+        BuildSdkApksCommand.fromFlags(
+            getDefaultFlagsWithAdditionalFlags("--sdk-archive=" + sdkAsarPath));
+
+    Exception e = assertThrows(InvalidBundleException.class, command::execute);
+    assertThat(e)
+        .hasMessageThat()
+        .isEqualTo(
+            "'installLocation' in <manifest> must be 'internalOnly' for SDK bundles if it is set.");
+  }
+
+  @Test
+  public void executeCreatesFile_fromSdkBundle() throws Exception {
     createZipBuilderForSdkBundleWithModules(createZipBuilderForModules(), modulesPath)
         .writeTo(sdkBundlePath);
-    BuildSdkApksCommand.fromFlags(getDefaultFlagsWithAdditionalFlags()).execute();
+    BuildSdkApksCommand.fromFlags(
+            getDefaultFlagsWithAdditionalFlags("--sdk-bundle=" + sdkBundlePath))
+        .execute();
+    assertThat(Files.exists(outputFilePath)).isTrue();
+  }
+
+  @Test
+  public void executeCreatesFile_fromSdkArchive() throws Exception {
+    createZipBuilderForSdkAsarWithModules(
+            createZipBuilderForModules(),
+            SdkMetadata.newBuilder()
+                .setPackageName(SdkBundleBuilder.PACKAGE_NAME)
+                .setSdkVersion(sdkVersionBuilder())
+                .build(),
+            modulesPath)
+        .writeTo(sdkAsarPath);
+
+    BuildSdkApksCommand.fromFlags(
+            getDefaultFlagsWithAdditionalFlags("--sdk-archive=" + sdkAsarPath))
+        .execute();
+
     assertThat(Files.exists(outputFilePath)).isTrue();
   }
 
@@ -345,7 +508,10 @@ public class BuildSdkApksCommandTest {
     createZipBuilderForSdkBundleWithModules(createZipBuilderForModules(), modulesPath)
         .writeTo(sdkBundlePath);
 
-    assertThat(BuildSdkApksCommand.fromFlags(getDefaultFlagsWithAdditionalFlags()).execute())
+    assertThat(
+            BuildSdkApksCommand.fromFlags(
+                    getDefaultFlagsWithAdditionalFlags("--sdk-bundle=" + sdkBundlePath))
+                .execute())
         .isEqualTo(outputFilePath);
   }
 
@@ -354,7 +520,9 @@ public class BuildSdkApksCommandTest {
     createZipBuilderForSdkBundleWithModules(createZipBuilderForModules(), modulesPath)
         .writeTo(sdkBundlePath);
     BuildSdkApksCommand command =
-        BuildSdkApksCommand.fromFlags(getDefaultFlagsWithAdditionalFlags("--max-threads=16"));
+        BuildSdkApksCommand.fromFlags(
+            getDefaultFlagsWithAdditionalFlags(
+                "--sdk-bundle=" + sdkBundlePath, "--max-threads=16"));
     command.execute();
 
     assertThat(command.getExecutorService().isShutdown()).isTrue();
@@ -392,7 +560,9 @@ public class BuildSdkApksCommandTest {
     try (ByteArrayOutputStream outputByteArrayStream = new ByteArrayOutputStream();
         PrintStream outputPrintStream = new PrintStream(outputByteArrayStream)) {
       BuildSdkApksCommand.fromFlags(
-          getDefaultFlagsWithAdditionalFlags(), outputPrintStream, provider);
+          getDefaultFlagsWithAdditionalFlags("--sdk-bundle=" + sdkBundlePath),
+          outputPrintStream,
+          provider);
 
       assertThat(new String(outputByteArrayStream.toByteArray(), UTF_8))
           .contains("WARNING: The APKs won't be signed");
@@ -414,7 +584,9 @@ public class BuildSdkApksCommandTest {
     try (ByteArrayOutputStream outputByteArrayStream = new ByteArrayOutputStream();
         PrintStream outputPrintStream = new PrintStream(outputByteArrayStream)) {
       BuildSdkApksCommand.fromFlags(
-          getDefaultFlagsWithAdditionalFlags(), outputPrintStream, provider);
+          getDefaultFlagsWithAdditionalFlags("--sdk-bundle=" + sdkBundlePath),
+          outputPrintStream,
+          provider);
 
       assertThat(new String(outputByteArrayStream.toByteArray(), UTF_8))
           .contains("INFO: The APKs will be signed with the debug keystore");
@@ -427,6 +599,7 @@ public class BuildSdkApksCommandTest {
         PrintStream outputPrintStream = new PrintStream(outputByteArrayStream)) {
       BuildSdkApksCommand.fromFlags(
           getDefaultFlagsWithAdditionalFlags(
+              "--sdk-bundle=" + sdkBundlePath,
               "--ks=" + keystorePath,
               "--ks-key-alias=" + KEY_ALIAS,
               "--ks-pass=pass:" + KEYSTORE_PASSWORD,
@@ -441,10 +614,12 @@ public class BuildSdkApksCommandTest {
   @Test
   public void verboseIsFalseByDefault() {
     BuildSdkApksCommand command =
-        BuildSdkApksCommand.fromFlags(getDefaultFlagsWithAdditionalFlags());
+        BuildSdkApksCommand.fromFlags(
+            getDefaultFlagsWithAdditionalFlags("--sdk-bundle=" + sdkBundlePath));
 
     assertThat(command.getVerbose()).isFalse();
   }
+
 
   private ParsedFlags getDefaultFlagsWithAdditionalFlags(String... additionalFlags) {
     String[] flags =
@@ -454,6 +629,6 @@ public class BuildSdkApksCommandTest {
   }
 
   private ImmutableList<String> getDefaultFlagList() {
-    return ImmutableList.of("--sdk-bundle=" + sdkBundlePath, "--output=" + outputFilePath);
+    return ImmutableList.of("--output=" + outputFilePath);
   }
 }

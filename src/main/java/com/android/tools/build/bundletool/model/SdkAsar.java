@@ -17,6 +17,7 @@
 package com.android.tools.build.bundletool.model;
 
 import static com.android.tools.build.bundletool.model.utils.BundleParser.extractModules;
+import static com.android.tools.build.bundletool.model.utils.BundleParser.readSdkInterfaceDescriptors;
 import static com.android.tools.build.bundletool.model.utils.BundleParser.readSdkModulesConfig;
 import static com.android.tools.build.bundletool.model.utils.BundleParser.sanitize;
 
@@ -66,6 +67,7 @@ public abstract class SdkAsar {
             .setSdkModulesConfig(sdkModulesConfig)
             .setModulesFile(modulesFilePath.toFile())
             .setSdkMetadata(readSdkMetadata(asar));
+    readSdkInterfaceDescriptors(asar).ifPresent(sdkAsarBuilder::setSdkInterfaceDescriptors);
     Document document;
     try {
       document = DocumentBuilderFactory.newInstance().newDocumentBuilder().newDocument();

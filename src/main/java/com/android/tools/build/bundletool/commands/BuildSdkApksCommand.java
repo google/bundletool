@@ -22,6 +22,7 @@ import static com.android.tools.build.bundletool.model.utils.BundleParser.EXTRAC
 import static com.android.tools.build.bundletool.model.utils.BundleParser.getModulesZip;
 import static com.android.tools.build.bundletool.model.utils.files.FilePreconditions.checkFileDoesNotExist;
 import static com.google.common.base.Preconditions.checkArgument;
+import static com.google.common.base.Preconditions.checkState;
 
 import com.android.tools.build.bundletool.androidtools.Aapt2Command;
 import com.android.tools.build.bundletool.commands.CommandHelp.CommandDescription;
@@ -32,6 +33,7 @@ import com.android.tools.build.bundletool.io.TempDirectory;
 import com.android.tools.build.bundletool.model.ApkListener;
 import com.android.tools.build.bundletool.model.ApkModifier;
 import com.android.tools.build.bundletool.model.Password;
+import com.android.tools.build.bundletool.model.SdkAsar;
 import com.android.tools.build.bundletool.model.SdkBundle;
 import com.android.tools.build.bundletool.model.SignerConfig;
 import com.android.tools.build.bundletool.model.SigningConfiguration;
@@ -40,6 +42,7 @@ import com.android.tools.build.bundletool.model.exceptions.InvalidCommandExcepti
 import com.android.tools.build.bundletool.model.utils.DefaultSystemEnvironmentProvider;
 import com.android.tools.build.bundletool.model.utils.SystemEnvironmentProvider;
 import com.android.tools.build.bundletool.model.utils.files.FilePreconditions;
+import com.android.tools.build.bundletool.validation.SdkAsarValidator;
 import com.android.tools.build.bundletool.validation.SdkBundleValidator;
 import com.google.auto.value.AutoValue;
 import com.google.common.util.concurrent.ListeningExecutorService;
@@ -72,6 +75,7 @@ public abstract class BuildSdkApksCommand {
   }
 
   private static final Flag<Path> SDK_BUNDLE_LOCATION_FLAG = Flag.path("sdk-bundle");
+  private static final Flag<Path> SDK_ARCHIVE_LOCATION_FLAG = Flag.path("sdk-archive");
   private static final Flag<Integer> VERSION_CODE_FLAG = Flag.positiveInteger("version-code");
   private static final Flag<Path> OUTPUT_FILE_FLAG = Flag.path("output");
   private static final Flag<OutputFormat> OUTPUT_FORMAT_FLAG =
@@ -90,7 +94,9 @@ public abstract class BuildSdkApksCommand {
   private static final SystemEnvironmentProvider DEFAULT_PROVIDER =
       new DefaultSystemEnvironmentProvider();
 
-  abstract Path getSdkBundlePath();
+  abstract Optional<Path> getSdkBundlePath();
+
+  abstract Optional<Path> getSdkArchivePath();
 
   abstract Integer getVersionCode();
 
@@ -120,6 +126,7 @@ public abstract class BuildSdkApksCommand {
 
   public abstract Optional<Integer> getFirstVariantNumber();
 
+
   /** Creates a builder for the {@link BuildSdkApksCommand} with some default settings. */
   public static BuildSdkApksCommand.Builder builder() {
     return new AutoValue_BuildSdkApksCommand.Builder()
@@ -134,6 +141,9 @@ public abstract class BuildSdkApksCommand {
   public abstract static class Builder {
     /** Sets the path to the input SDK bundle. Must have the extension ".asb". */
     public abstract Builder setSdkBundlePath(Path sdkBundlePath);
+
+    /** Sets the path to the input SDK archive. Must have the extension ".asar". */
+    public abstract Builder setSdkArchivePath(Path sdkArchivePath);
 
     /** Sets the SDK version code */
     public abstract Builder setVersionCode(Integer versionCode);
@@ -220,6 +230,7 @@ public abstract class BuildSdkApksCommand {
      */
     public abstract Builder setFirstVariantNumber(int firstVariantNumber);
 
+
     abstract BuildSdkApksCommand autoBuild();
 
     /**
@@ -232,7 +243,11 @@ public abstract class BuildSdkApksCommand {
         setExecutorServiceInternal(createInternalExecutorService(DEFAULT_THREAD_POOL_SIZE));
         setExecutorServiceCreatedByBundleTool(true);
       }
-      return autoBuild();
+      BuildSdkApksCommand command = autoBuild();
+      checkState(
+          command.getSdkBundlePath().isPresent() ^ command.getSdkArchivePath().isPresent(),
+          "One and only one of SdkBundlePath and SdkArchivePath should be set.");
+      return command;
     }
   }
 
@@ -244,10 +259,11 @@ public abstract class BuildSdkApksCommand {
       ParsedFlags flags, PrintStream out, SystemEnvironmentProvider provider) {
     Builder sdkApksCommandBuilder =
         BuildSdkApksCommand.builder()
-            .setSdkBundlePath(SDK_BUNDLE_LOCATION_FLAG.getRequiredValue(flags))
             .setOutputFile(OUTPUT_FILE_FLAG.getRequiredValue(flags));
 
     // Optional arguments.
+    SDK_BUNDLE_LOCATION_FLAG.getValue(flags).ifPresent(sdkApksCommandBuilder::setSdkBundlePath);
+    SDK_ARCHIVE_LOCATION_FLAG.getValue(flags).ifPresent(sdkApksCommandBuilder::setSdkArchivePath);
     OUTPUT_FORMAT_FLAG.getValue(flags).ifPresent(sdkApksCommandBuilder::setOutputFormat);
     OVERWRITE_OUTPUT_FLAG.getValue(flags).ifPresent(sdkApksCommandBuilder::setOverwriteOutput);
     VERSION_CODE_FLAG.getValue(flags).ifPresent(sdkApksCommandBuilder::setVersionCode);
@@ -275,8 +291,19 @@ public abstract class BuildSdkApksCommand {
 
   public Path execute() {
     validateInput();
+    if (getSdkBundlePath().isPresent()) {
+      executeForSdkBundle();
+    } else if (getSdkArchivePath().isPresent()) {
+      executeForSdkArchive();
+    } else {
+      throw new IllegalStateException(
+          "One and only one of SdkBundlePath and SdkArchivePath should be set.");
+    }
+    return getOutputFile();
+  }
 
-    try (ZipFile bundleZip = new ZipFile(getSdkBundlePath().toFile());
+  private void executeForSdkBundle() {
+    try (ZipFile bundleZip = new ZipFile(getSdkBundlePath().get().toFile());
         TempDirectory tempDir = new TempDirectory(getClass().getSimpleName())) {
 
       SdkBundleValidator bundleValidator = SdkBundleValidator.create();
@@ -287,14 +314,7 @@ public abstract class BuildSdkApksCommand {
         bundleValidator.validateModulesFile(modulesZip);
         SdkBundle sdkBundle = SdkBundle.buildFromZip(bundleZip, modulesZip, getVersionCode());
         bundleValidator.validate(sdkBundle);
-
-        DaggerBuildSdkApksManagerComponent.builder()
-            .setBuildSdkApksCommand(this)
-            .setTempDirectory(tempDir)
-            .setSdkBundle(sdkBundle)
-            .build()
-            .create()
-            .execute();
+        executeBuildSdkApksManager(sdkBundle, tempDir);
       }
     } catch (ZipException e) {
       throw InvalidBundleException.builder()
@@ -302,19 +322,56 @@ public abstract class BuildSdkApksCommand {
           .withUserMessage("The SDK Bundle is not a valid zip file.")
           .build();
     } catch (IOException e) {
-      throw new UncheckedIOException("An error occurred when validating the Sdk Bundle.", e);
+      throw new UncheckedIOException("An error occurred when processing the Sdk Bundle.", e);
     } finally {
       if (isExecutorServiceCreatedByBundleTool()) {
         getExecutorService().shutdown();
       }
     }
+  }
 
-    return getOutputFile();
+  private void executeForSdkArchive() {
+    try (ZipFile sdkAsarZip = new ZipFile(getSdkArchivePath().get().toFile());
+        TempDirectory tempDir = new TempDirectory(getClass().getSimpleName())) {
+
+      SdkAsarValidator.validateFile(sdkAsarZip);
+
+      Path modulesPath = tempDir.getPath().resolve(EXTRACTED_SDK_MODULES_FILE_NAME);
+      try (ZipFile modulesZip = getModulesZip(sdkAsarZip, modulesPath)) {
+        SdkAsarValidator.validateModulesFile(modulesZip);
+        SdkAsar sdkAsar = SdkAsar.buildFromZip(sdkAsarZip, modulesZip, modulesPath);
+        SdkBundle sdkBundle = SdkBundle.buildFromAsar(sdkAsar, getVersionCode());
+        SdkBundleValidator.create().validate(sdkBundle);
+        executeBuildSdkApksManager(sdkBundle, tempDir);
+      }
+    } catch (ZipException e) {
+      throw InvalidBundleException.builder()
+          .withCause(e)
+          .withUserMessage("The SDK archive is not a valid zip file.")
+          .build();
+    } catch (IOException e) {
+      throw new UncheckedIOException("An error occurred when processing the Sdk archive.", e);
+    } finally {
+      if (isExecutorServiceCreatedByBundleTool()) {
+        getExecutorService().shutdown();
+      }
+    }
+  }
+
+  private void executeBuildSdkApksManager(SdkBundle sdkBundle, TempDirectory tempDir)
+      throws IOException {
+    DaggerBuildSdkApksManagerComponent.builder()
+        .setBuildSdkApksCommand(this)
+        .setTempDirectory(tempDir)
+        .setSdkBundle(sdkBundle)
+        .build()
+        .create()
+        .execute();
   }
 
   private void validateInput() {
-    FilePreconditions.checkFileExistsAndReadable(getSdkBundlePath());
-    FilePreconditions.checkFileHasExtension("ASB file", getSdkBundlePath(), ".asb");
+    getSdkBundlePath().ifPresent(BuildSdkApksCommand::validateSdkBundlePath);
+    getSdkArchivePath().ifPresent(BuildSdkApksCommand::validateSdkArchivePath);
 
     switch (getOutputFormat()) {
       case APK_SET:
@@ -344,6 +401,16 @@ public abstract class BuildSdkApksCommand {
     return MoreExecutors.listeningDecorator(Executors.newFixedThreadPool(maxThreads));
   }
 
+  private static void validateSdkBundlePath(Path sdkBundlePath) {
+    FilePreconditions.checkFileExistsAndReadable(sdkBundlePath);
+    FilePreconditions.checkFileHasExtension("ASB file", sdkBundlePath, ".asb");
+  }
+
+  private static void validateSdkArchivePath(Path sdkArchivePath) {
+    FilePreconditions.checkFileExistsAndReadable(sdkArchivePath);
+    FilePreconditions.checkFileHasExtension("ASAR file", sdkArchivePath, ".asar");
+  }
+
   public static CommandHelp help() {
     return CommandHelp.builder()
         .setCommandName(COMMAND_NAME)
@@ -355,7 +422,17 @@ public abstract class BuildSdkApksCommand {
             FlagDescription.builder()
                 .setFlagName(SDK_BUNDLE_LOCATION_FLAG.getName())
                 .setExampleValue("path/to/SDKbundle.asb")
-                .setDescription("Path to SDK bundle. Must have the extension '.asb'.")
+                .setDescription(
+                    "Path to SDK bundle. Must have the extension '.asb'. Cannot be used together"
+                        + " with the `sdk-archive` flag.")
+                .build())
+        .addFlag(
+            FlagDescription.builder()
+                .setFlagName(SDK_ARCHIVE_LOCATION_FLAG.getName())
+                .setExampleValue("path/to/sdk.asar")
+                .setDescription(
+                    "Path to SDK archive. Must have the extension '.asar'. Cannot be used together"
+                        + " with the `sdk-bundle` flag.")
                 .build())
         .addFlag(
             FlagDescription.builder()

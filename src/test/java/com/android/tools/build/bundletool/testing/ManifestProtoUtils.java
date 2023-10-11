@@ -577,9 +577,9 @@ public final class ManifestProtoUtils {
             .getOrCreateChildElement(DISTRIBUTION_NAMESPACE_URI, "install-time");
   }
 
-  public static ManifestMutator withDeepLink(
+  public static ManifestMutator withDeeplink(
       String activityName, String path, String host, String scheme, boolean addToActivityAlias) {
-    return withDeepLink(
+    return withDeeplink(
         activityName,
         host,
         scheme,
@@ -588,13 +588,13 @@ public final class ManifestProtoUtils {
         addToActivityAlias);
   }
 
-  public static ManifestMutator withDeepLink(
+  public static ManifestMutator withDeeplink(
       String activityName,
       int pathResourceId,
       String host,
       String scheme,
       boolean addToActivityAlias) {
-    return withDeepLink(
+    return withDeeplink(
         activityName,
         host,
         scheme,
@@ -603,7 +603,7 @@ public final class ManifestProtoUtils {
         addToActivityAlias);
   }
 
-  private static ManifestMutator withDeepLink(
+  private static ManifestMutator withDeeplink(
       String activityName,
       String host,
       String scheme,

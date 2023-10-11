@@ -150,7 +150,10 @@ public final class BuildApksPreprocessingTest {
     new AppBundleSerializer().writeToDisk(appBundle, bundlePath);
 
     BuildApksCommand command =
-        BuildApksCommand.builder().setBundlePath(bundlePath).setOutputFile(outputFilePath).build();
+        BuildApksCommand.builder()
+            .setBundlePath(bundlePath)
+            .setOutputFile(outputFilePath)
+            .build();
     command.execute();
 
     BuildApksResult result;
@@ -192,7 +195,10 @@ public final class BuildApksPreprocessingTest {
     new AppBundleSerializer().writeToDisk(appBundle, bundlePath);
 
     BuildApksCommand command =
-        BuildApksCommand.builder().setBundlePath(bundlePath).setOutputFile(outputFilePath).build();
+        BuildApksCommand.builder()
+            .setBundlePath(bundlePath)
+            .setOutputFile(outputFilePath)
+            .build();
     InvalidBundleException exception = assertThrows(InvalidBundleException.class, command::execute);
 
     assertThat(exception)

@@ -24,7 +24,6 @@ import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.with
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withFeatureConditionHexVersion;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withFusingAttribute;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withInstallTimeDelivery;
-import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withInstallTimeRemovableElement;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withInstantInstallTimeDelivery;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withInstantOnDemandDelivery;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withMaxSdkCondition;
@@ -43,7 +42,6 @@ import com.android.tools.build.bundletool.model.utils.xmlproto.XmlProtoAttribute
 import com.android.tools.build.bundletool.model.utils.xmlproto.XmlProtoElement;
 import com.android.tools.build.bundletool.model.utils.xmlproto.XmlProtoElementBuilder;
 import com.android.tools.build.bundletool.model.utils.xmlproto.XmlProtoNode;
-import com.android.tools.build.bundletool.model.version.Version;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import java.util.Optional;
@@ -56,7 +54,6 @@ public class ManifestDeliveryElementTest {
 
   private static final String DISTRIBUTION_NAMESPACE_URI =
       "http://schemas.android.com/apk/distribution";
-  private static final Version VERSION = Version.of("1.0.0");
 
   @Test
   public void emptyDeliveryElement_notWellFormed() {
@@ -824,84 +821,6 @@ public class ManifestDeliveryElementTest {
     assertThat(exception)
         .hasMessageThat()
         .contains("Multiple '<dist:user-countries>' conditions are not supported.");
-  }
-
-  @Test
-  public void onDemandModule_removable() {
-    Optional<ManifestDeliveryElement> deliveryElement =
-        ManifestDeliveryElement.fromManifestRootNode(
-            androidManifest("com.test.app", withOnDemandDelivery()),
-            /* isFastFollowAllowed= */ false);
-
-    assertThat(deliveryElement).isPresent();
-    assertThat(deliveryElement.get().isInstallTimeRemovable(VERSION)).isTrue();
-  }
-
-  @Test
-  public void fastFollowDelivery_removable() {
-    Optional<ManifestDeliveryElement> deliveryElement =
-        ManifestDeliveryElement.fromManifestRootNode(
-            androidManifest("com.test.app", withFastFollowDelivery()),
-            /* isFastFollowAllowed= */ true);
-
-    assertThat(deliveryElement).isPresent();
-    assertThat(deliveryElement.get().isInstallTimeRemovable(VERSION)).isTrue();
-  }
-
-  @Test
-  public void conditionalModule_removable() {
-    Optional<ManifestDeliveryElement> deliveryElement =
-        ManifestDeliveryElement.fromManifestRootNode(
-            androidManifest(
-                "com.test.app", withMinSdkVersion(24), withFeatureCondition("android.feature")),
-            /* isFastFollowAllowed= */ true);
-
-    assertThat(deliveryElement).isPresent();
-    assertThat(deliveryElement.get().isInstallTimeRemovable(VERSION)).isTrue();
-  }
-
-  @Test
-  public void installTimeModule_nonRemovableImplicit_newBundleToolVersion() {
-    Optional<ManifestDeliveryElement> deliveryElement =
-        ManifestDeliveryElement.fromManifestRootNode(
-            androidManifest("com.test.app", withInstallTimeDelivery()),
-            /* isFastFollowAllowed= */ false);
-
-    assertThat(deliveryElement).isPresent();
-    assertThat(deliveryElement.get().isInstallTimeRemovable(VERSION)).isFalse();
-  }
-
-  @Test
-  public void installTimeModule_removableImplicit_oldBundleToolVersion() {
-    Optional<ManifestDeliveryElement> deliveryElement =
-        ManifestDeliveryElement.fromManifestRootNode(
-            androidManifest("com.test.app", withInstallTimeDelivery()),
-            /* isFastFollowAllowed= */ false);
-
-    assertThat(deliveryElement).isPresent();
-    assertThat(deliveryElement.get().isInstallTimeRemovable(Version.of("0.14.0"))).isTrue();
-  }
-
-  @Test
-  public void installTimeModule_nonRemovable() {
-    Optional<ManifestDeliveryElement> deliveryElement =
-        ManifestDeliveryElement.fromManifestRootNode(
-            androidManifest("com.test.app", withInstallTimeRemovableElement(false)),
-            /* isFastFollowAllowed= */ false);
-
-    assertThat(deliveryElement).isPresent();
-    assertThat(deliveryElement.get().isInstallTimeRemovable(VERSION)).isFalse();
-  }
-
-  @Test
-  public void installTimeModule_removable() {
-    Optional<ManifestDeliveryElement> deliveryElement =
-        ManifestDeliveryElement.fromManifestRootNode(
-            androidManifest("com.test.app", withInstallTimeRemovableElement(true)),
-            /* isFastFollowAllowed= */ false);
-
-    assertThat(deliveryElement).isPresent();
-    assertThat(deliveryElement.get().isInstallTimeRemovable(VERSION)).isTrue();
   }
 
   private static XmlNode createAndroidManifestWithDeliveryElement(

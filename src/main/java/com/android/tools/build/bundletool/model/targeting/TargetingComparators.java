@@ -47,7 +47,7 @@ public final class TargetingComparators {
    * This should verify the following statements in order:
    *
    * <ul>
-   *   <li>arm < x86 < mips
+   *   <li>arm < x86 < mips < riscv
    *   <li>32 bits < 64 bits
    *   <li>less recent version of CPU < more recent version of CPU
    */
@@ -59,7 +59,8 @@ public final class TargetingComparators {
           AbiAlias.X86,
           AbiAlias.X86_64,
           AbiAlias.MIPS,
-          AbiAlias.MIPS64);
+          AbiAlias.MIPS64,
+          AbiAlias.RISCV64);
 
   /** The order of preference for textures, in case multiple formats are available. */
   public static final Ordering<TextureCompressionFormatAlias> TEXTURE_COMPRESSION_FORMAT_ORDERING =

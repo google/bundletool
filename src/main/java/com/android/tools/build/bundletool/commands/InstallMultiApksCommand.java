@@ -91,7 +91,7 @@ public abstract class InstallMultiApksCommand {
 
   public static final ImmutableMap<String, String> NONUPDATABLE_PACKAGES_PAIRS =
       ImmutableMap.of(
-          "com.google.android.ext.service", "com.google.android.extservice",
+          "com.google.android.ext.services", "com.google.android.extservices",
           "com.google.android.permissioncontroller", "com.google.android.permission");
 
   private static final Flag<Path> ADB_PATH_FLAG = Flag.path("adb");

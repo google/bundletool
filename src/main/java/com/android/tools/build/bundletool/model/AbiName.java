@@ -39,7 +39,8 @@ public enum AbiName {
   X86("x86", 32),
   X86_64("x86_64", 64),
   MIPS("mips", 32),
-  MIPS64("mips64", 64);
+  MIPS64("mips64", 64),
+  RISCV64("riscv64", 64);
 
   private final String platformName;
 

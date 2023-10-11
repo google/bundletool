@@ -23,6 +23,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import com.android.tools.build.bundletool.model.ModuleEntry.ModuleEntryLocationInZipSource;
 import com.google.common.io.ByteSource;
 import com.google.common.io.CharSource;
+import java.io.IOException;
 import java.nio.charset.Charset;
 import java.nio.file.Paths;
 import org.junit.Test;
@@ -118,5 +119,114 @@ public class BundleMetadataTest {
                     ZipPath.create("META-INF")
                         .resolve(BundleMetadata.TRANSPARENCY_SIGNED_FILE_NAME))
                 .build());
+  }
+
+  @Test
+  public void addFile_duplicateEntry_throws() {
+    IllegalArgumentException exception =
+        assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                BundleMetadata.builder()
+                    .addFile(
+                        /* namespacedDir= */ "com.namespace",
+                        /* fileName= */ "filename",
+                        ByteSource.wrap(new byte[] {'0'}))
+                    .addFile(
+                        /* namespacedDir= */ "com.namespace",
+                        /* fileName= */ "filename",
+                        ByteSource.wrap(new byte[] {'1'}))
+                    .build());
+
+    assertThat(exception).hasMessageThat().contains("Multiple entries with same key");
+  }
+
+  @Test
+  public void addFile_duplicateEntry_keepsLast() throws IOException {
+    BundleMetadata metadata =
+        BundleMetadata.builder()
+            .addFile(
+                /* namespacedDir= */ "com.namespace",
+                /* fileName= */ "filename",
+                ByteSource.wrap(new byte[] {'0'}))
+            .addFile(
+                /* namespacedDir= */ "com.namespace",
+                /* fileName= */ "filename",
+                ByteSource.wrap(new byte[] {'1'}))
+            .buildKeepingLast();
+
+    assertThat(metadata.getFileContentMap().keySet())
+        .containsExactly(ZipPath.create("com.namespace/filename"));
+    assertThat(metadata.getFileContentMap().get(ZipPath.create("com.namespace/filename")).read())
+        .isEqualTo(new byte[] {'1'});
+  }
+
+  @Test
+  public void toBuilder() throws IOException {
+    BundleMetadata metadata =
+        BundleMetadata.builder()
+            .addFile(
+                /* namespacedDir= */ "com.namespace",
+                /* fileName= */ "filename",
+                ByteSource.wrap(new byte[] {'0'}))
+            .build()
+            .toBuilder()
+            .addFile(
+                /* namespacedDir= */ "com.namespace",
+                /* fileName= */ "filename1",
+                ByteSource.wrap(new byte[] {'1'}))
+            .build();
+
+    assertThat(metadata.getFileContentMap().keySet())
+        .containsExactly(
+            ZipPath.create("com.namespace/filename"), ZipPath.create("com.namespace/filename1"));
+    assertThat(metadata.getFileContentMap().get(ZipPath.create("com.namespace/filename")).read())
+        .isEqualTo(new byte[] {'0'});
+    assertThat(metadata.getFileContentMap().get(ZipPath.create("com.namespace/filename1")).read())
+        .isEqualTo(new byte[] {'1'});
+  }
+
+  @Test
+  public void toBuilder_duplicateEntry_throw() {
+    IllegalArgumentException exception =
+        assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                BundleMetadata.builder()
+                    .addFile(
+                        /* namespacedDir= */ "com.namespace",
+                        /* fileName= */ "filename",
+                        ByteSource.wrap(new byte[] {'0'}))
+                    .build()
+                    .toBuilder()
+                    .addFile(
+                        /* namespacedDir= */ "com.namespace",
+                        /* fileName= */ "filename",
+                        ByteSource.wrap(new byte[] {'1'}))
+                    .build());
+
+    assertThat(exception).hasMessageThat().contains("Multiple entries with same key");
+  }
+
+  @Test
+  public void toBuilder_duplicateEntry_keepsLast() throws IOException {
+    BundleMetadata metadata =
+        BundleMetadata.builder()
+            .addFile(
+                /* namespacedDir= */ "com.namespace",
+                /* fileName= */ "filename",
+                ByteSource.wrap(new byte[] {'0'}))
+            .build()
+            .toBuilder()
+            .addFile(
+                /* namespacedDir= */ "com.namespace",
+                /* fileName= */ "filename",
+                ByteSource.wrap(new byte[] {'1'}))
+            .buildKeepingLast();
+
+    assertThat(metadata.getFileContentMap().keySet())
+        .containsExactly(ZipPath.create("com.namespace/filename"));
+    assertThat(metadata.getFileContentMap().get(ZipPath.create("com.namespace/filename")).read())
+        .isEqualTo(new byte[] {'1'});
   }
 }

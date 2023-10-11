@@ -29,7 +29,6 @@ import static com.android.tools.build.bundletool.model.AndroidManifest.EXCLUDE_A
 import static com.android.tools.build.bundletool.model.AndroidManifest.NAME_ATTRIBUTE_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.VALUE_ATTRIBUTE_NAME;
 import static com.android.tools.build.bundletool.model.utils.CollectorUtils.groupingByDeterministic;
-import static com.android.tools.build.bundletool.model.version.VersionGuardedFeature.MERGE_INSTALL_TIME_MODULES_INTO_BASE;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static java.util.stream.Collectors.counting;
 
@@ -108,14 +107,6 @@ public abstract class ManifestDeliveryElement {
     return getDeliveryElement()
         .getOptionalChildElement(DISTRIBUTION_NAMESPACE_URI, "install-time")
         .isPresent();
-  }
-
-  public boolean isInstallTimeRemovable(Version bundleToolVersion) {
-    if (hasOnDemandElement() || hasFastFollowElement() || hasModuleConditions()) {
-      return true;
-    }
-    return getInstallTimeRemovableValue()
-        .orElse(!MERGE_INSTALL_TIME_MODULES_INTO_BASE.enabledForVersion(bundleToolVersion));
   }
 
   /**

@@ -70,6 +70,20 @@ public abstract class SdkBundle implements Bundle {
     return bundle.build();
   }
 
+  /** Builds an {@link SdkBundle} from the given {@link SdkAsar}. */
+  public static SdkBundle buildFromAsar(SdkAsar sdkAsar, Integer versionCode) {
+    SdkBundle.Builder sdkBundleBuilder =
+        SdkBundle.builder()
+            .setModule(sdkAsar.getModule())
+            .setSdkModulesConfig(sdkAsar.getSdkModulesConfig())
+            .setVersionCode(versionCode)
+            // ASAR format does not contain SdkBundleConfig or BundleMetadata.
+            .setSdkBundleConfig(SdkBundleConfig.getDefaultInstance())
+            .setBundleMetadata(BundleMetadata.builder().build());
+    sdkAsar.getSdkInterfaceDescriptors().ifPresent(sdkBundleBuilder::setSdkInterfaceDescriptors);
+    return sdkBundleBuilder.build();
+  }
+
   public abstract BundleModule getModule();
 
   @Override

@@ -23,7 +23,9 @@ import com.android.bundle.Targeting.VariantTargeting;
 import com.android.tools.build.bundletool.model.AppBundle;
 import com.android.tools.build.bundletool.model.BundleModule;
 import com.android.tools.build.bundletool.model.BundleModule.ModuleType;
+import com.android.tools.build.bundletool.model.BundleModuleName;
 import com.android.tools.build.bundletool.model.ModuleSplit;
+import com.android.tools.build.bundletool.model.RequiredSplitTypesInjector;
 import com.android.tools.build.bundletool.model.SourceStamp;
 import com.android.tools.build.bundletool.model.SourceStampConstants.StampType;
 import com.android.tools.build.bundletool.model.version.Version;
@@ -87,6 +89,17 @@ public final class SplitApksGenerator {
               StampType.STAMP_TYPE_DISTRIBUTION_APK);
       splits.addAll(moduleSplitter.splitModule());
     }
+
+    if (commonApkGenerationConfiguration.getEnableRequiredSplitTypes()) {
+      ImmutableList<BundleModuleName> nonRemovableModules =
+          modulesForVariant.stream()
+              .filter(module -> module.getAndroidManifest().isAlwaysInstalledModule())
+              .map(BundleModule::getName)
+              .collect(toImmutableList());
+      return RequiredSplitTypesInjector.injectSplitTypeValidation(
+          splits.build(), nonRemovableModules);
+    }
+
     return splits.build();
   }
 

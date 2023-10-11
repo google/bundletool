@@ -23,6 +23,7 @@ import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.andr
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withFeatureCondition;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withInstallTimeDelivery;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withInstallTimeRemovableElement;
+import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withIsolatedSplits;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withMetadataValue;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withMinSdkVersion;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withOnDemandDelivery;
@@ -383,7 +384,7 @@ public class BundleModuleMergerTest {
   @Test
   public void testDoNotMergeIfConditionalModule() throws Exception {
     XmlNode conditionalModuleManifest =
-        androidManifest(
+        androidManifestForFeature(
             "com.test.app.detail", withMinSdkVersion(24), withFeatureCondition("android.feature"));
     createBasicZipBuilder(BUNDLE_CONFIG_1_0_0)
         .addFileWithProtoContent(ZipPath.create("base/manifest/AndroidManifest.xml"), MANIFEST)
@@ -523,6 +524,32 @@ public class BundleModuleMergerTest {
               withMetadataValue("com.android.dynamic.apk.fused.modules", "base,detail"));
       assertThat(appBundle.getBaseModule().getAndroidManifest().getManifestRoot().getProto())
           .isEqualTo(fusedManifest);
+    }
+  }
+
+  @Test
+  public void applicationWithIsolatedSplits_noInstallModuleFusing() throws Exception {
+    XmlNode baseModuleManifest = androidManifest("com.test.app.detail", withIsolatedSplits(true));
+    XmlNode installTimeModuleManifest =
+        androidManifestForFeature(
+            "com.test.app.detail",
+            withInstallTimeDelivery(),
+            withSplitNameActivity("activity1", "detail"),
+            withSplitNameService("service", "detail"));
+    createBasicZipBuilder(BUNDLE_CONFIG_1_8_0)
+        .addFileWithProtoContent(
+            ZipPath.create("base/manifest/AndroidManifest.xml"), baseModuleManifest)
+        .addFileWithProtoContent(
+            ZipPath.create("detail/manifest/AndroidManifest.xml"), installTimeModuleManifest)
+        .writeTo(bundleFile);
+
+    try (ZipFile appBundleZip = new ZipFile(bundleFile.toFile())) {
+      AppBundle appBundle =
+          BundleModuleMerger.mergeNonRemovableInstallTimeModules(
+              AppBundle.buildFromZip(appBundleZip), /* overrideBundleToolVersion= */ false);
+
+      assertThat(appBundle.getModules().keySet())
+          .containsExactly(BundleModuleName.BASE_MODULE_NAME, BundleModuleName.create("detail"));
     }
   }
 

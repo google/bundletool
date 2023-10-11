@@ -18,6 +18,7 @@ package com.android.tools.build.bundletool.model;
 
 import static com.android.tools.build.bundletool.model.utils.BundleParser.EXTRACTED_SDK_MODULES_FILE_NAME;
 import static com.android.tools.build.bundletool.testing.TestUtils.createZipBuilderForModules;
+import static com.android.tools.build.bundletool.testing.TestUtils.createZipBuilderForSdkAsarWithModules;
 import static com.android.tools.build.bundletool.testing.TestUtils.createZipBuilderForSdkBundleWithModules;
 import static com.google.common.truth.Truth8.assertThat;
 
@@ -40,11 +41,13 @@ public class SdkBundleTest {
   @Rule public TemporaryFolder tmp = new TemporaryFolder();
 
   private Path bundleFile;
+  private Path asarFile;
   private Path modulesFile;
 
   @Before
   public void setUp() {
     bundleFile = tmp.getRoot().toPath().resolve("bundle.asb");
+    asarFile = tmp.getRoot().toPath().resolve("archive.asar");
     modulesFile = tmp.getRoot().toPath().resolve(EXTRACTED_SDK_MODULES_FILE_NAME);
   }
 
@@ -65,5 +68,23 @@ public class SdkBundleTest {
           .isPresent();
       assertThat(sdkBundle.getSdkInterfaceDescriptors()).isPresent();
     }
+  }
+
+  @Test
+  public void buildFromAsarCreatesExpectedEntries() throws Exception {
+    ZipBuilder modulesBuilder =
+        createZipBuilderForModules()
+            .addFileWithContent(ZipPath.create("base/dex/classes1.dex"), TEST_CONTENT)
+            .addFileWithContent(ZipPath.create("base/dex/classes2.dex"), TEST_CONTENT);
+    createZipBuilderForSdkAsarWithModules(modulesBuilder, modulesFile).writeTo(asarFile);
+    ZipFile sdkAsarZip = new ZipFile(asarFile.toFile());
+    ZipFile modulesZip = new ZipFile(modulesFile.toFile());
+    SdkAsar sdkAsar = SdkAsar.buildFromZip(sdkAsarZip, modulesZip, modulesFile);
+
+    SdkBundle sdkBundle = SdkBundle.buildFromAsar(sdkAsar, 1);
+
+    assertThat(sdkBundle.getModule().getEntry(ZipPath.create("dex/classes.dex"))).isPresent();
+    assertThat(sdkBundle.getModule().getEntry(ZipPath.create("dex/classes2.dex"))).isPresent();
+    assertThat(sdkBundle.getSdkInterfaceDescriptors()).isPresent();
   }
 }

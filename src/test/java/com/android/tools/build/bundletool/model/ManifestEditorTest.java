@@ -45,10 +45,12 @@ import static com.android.tools.build.bundletool.model.AndroidManifest.REMOVABLE
 import static com.android.tools.build.bundletool.model.AndroidManifest.REQUIRED_ATTRIBUTE_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.REQUIRED_BY_PRIVACY_SANDBOX_SDK_ATTRIBUTE_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.REQUIRED_RESOURCE_ID;
+import static com.android.tools.build.bundletool.model.AndroidManifest.REQUIRED_SPLIT_TYPES_ATTRIBUTE_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.SDK_VERSION_MAJOR_ATTRIBUTE_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.SERVICE_ELEMENT_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.SPLIT_NAME_ATTRIBUTE_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.SPLIT_NAME_RESOURCE_ID;
+import static com.android.tools.build.bundletool.model.AndroidManifest.SPLIT_TYPES_ATTRIBUTE_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.TARGET_SANDBOX_VERSION_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.THEME_ATTRIBUTE_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.THEME_RESOURCE_ID;
@@ -83,6 +85,7 @@ import com.android.tools.build.bundletool.model.manifestelements.Activity;
 import com.android.tools.build.bundletool.model.manifestelements.Provider;
 import com.android.tools.build.bundletool.model.manifestelements.Receiver;
 import com.android.tools.build.bundletool.model.utils.xmlproto.XmlProtoAttribute;
+import com.android.tools.build.bundletool.model.utils.xmlproto.XmlProtoAttributeBuilder;
 import com.android.tools.build.bundletool.model.utils.xmlproto.XmlProtoElement;
 import com.android.tools.build.bundletool.model.utils.xmlproto.XmlProtoElementBuilder;
 import com.google.common.collect.ImmutableList;
@@ -100,6 +103,7 @@ public class ManifestEditorTest {
   private static final String ANDROID_NAMESPACE_URI = "http://schemas.android.com/apk/res/android";
   private static final String VALID_CERT_DIGEST =
       "96:C7:EC:89:3E:69:2A:25:BA:4D:EE:C1:84:E8:33:3F:34:7D:6D:12:26:A1:C1:AA:70:A2:8A:DB:75:3E:02:0A";
+  private static final ImmutableList<String> SPLIT_NAMES = ImmutableList.of("config", "language");
 
   @Test
   public void setMinSdkVersion_nonExistingElement_created() throws Exception {
@@ -521,6 +525,136 @@ public class ManifestEditorTest {
                 IS_SPLIT_REQUIRED_ATTRIBUTE_NAME,
                 IS_SPLIT_REQUIRED_RESOURCE_ID,
                 false));
+  }
+
+  @Test
+  public void setSplitTypes() throws Exception {
+    AndroidManifest androidManifest = createManifestWithApplicationElement();
+
+    AndroidManifest editedManifest = androidManifest.toEditor().setSplitTypes(SPLIT_NAMES).save();
+
+    assertThat(editedManifest.getManifestElement().getAttributes())
+        .containsExactly(
+            XmlProtoAttributeBuilder.create(DISTRIBUTION_NAMESPACE_URI, SPLIT_TYPES_ATTRIBUTE_NAME)
+                .setValueAsString("config,language")
+                .build());
+  }
+
+  @Test
+  public void setSplitTypes_idempotent() throws Exception {
+    AndroidManifest androidManifest = createManifestWithApplicationElement();
+
+    AndroidManifest editedManifest =
+        androidManifest.toEditor().setSplitTypes(SPLIT_NAMES).setSplitTypes(SPLIT_NAMES).save();
+
+    assertThat(editedManifest.getManifestElement().getAttributes())
+        .containsExactly(
+            XmlProtoAttributeBuilder.create(DISTRIBUTION_NAMESPACE_URI, SPLIT_TYPES_ATTRIBUTE_NAME)
+                .setValueAsString("config,language")
+                .build());
+  }
+
+  @Test
+  public void setSplitTypes_sorted() throws Exception {
+    AndroidManifest androidManifest = createManifestWithApplicationElement();
+
+    AndroidManifest editedManifest =
+        androidManifest.toEditor().setSplitTypes(ImmutableList.of("language", "config")).save();
+
+    assertThat(editedManifest.getManifestElement().getAttributes())
+        .containsExactly(
+            XmlProtoAttributeBuilder.create(DISTRIBUTION_NAMESPACE_URI, SPLIT_TYPES_ATTRIBUTE_NAME)
+                .setValueAsString("config,language")
+                .build());
+  }
+
+  @Test
+  public void setSplitTypes_lastInvocationWins() throws Exception {
+    AndroidManifest androidManifest = createManifestWithApplicationElement();
+
+    AndroidManifest editedManifest =
+        androidManifest
+            .toEditor()
+            .setSplitTypes(ImmutableList.of("base,feature"))
+            .setSplitTypes(SPLIT_NAMES)
+            .save();
+
+    assertThat(editedManifest.getManifestElement().getAttributes())
+        .containsExactly(
+            XmlProtoAttributeBuilder.create(DISTRIBUTION_NAMESPACE_URI, SPLIT_TYPES_ATTRIBUTE_NAME)
+                .setValueAsString("config,language")
+                .build());
+  }
+
+  @Test
+  public void setRequiredSplitTypes() throws Exception {
+    AndroidManifest androidManifest = createManifestWithApplicationElement();
+
+    AndroidManifest editedManifest =
+        androidManifest.toEditor().setRequiredSplitTypes(SPLIT_NAMES).save();
+
+    assertThat(editedManifest.getManifestElement().getAttributes())
+        .containsExactly(
+            XmlProtoAttributeBuilder.create(
+                    DISTRIBUTION_NAMESPACE_URI, REQUIRED_SPLIT_TYPES_ATTRIBUTE_NAME)
+                .setValueAsString("config,language")
+                .build());
+  }
+
+  @Test
+  public void setRequiredSplitTypes_idempotent() throws Exception {
+    AndroidManifest androidManifest = createManifestWithApplicationElement();
+
+    AndroidManifest editedManifest =
+        androidManifest
+            .toEditor()
+            .setRequiredSplitTypes(SPLIT_NAMES)
+            .setRequiredSplitTypes(SPLIT_NAMES)
+            .save();
+
+    assertThat(editedManifest.getManifestElement().getAttributes())
+        .containsExactly(
+            XmlProtoAttributeBuilder.create(
+                    DISTRIBUTION_NAMESPACE_URI, REQUIRED_SPLIT_TYPES_ATTRIBUTE_NAME)
+                .setValueAsString("config,language")
+                .build());
+  }
+
+  @Test
+  public void setRequiredSplitTypes_sorted() throws Exception {
+    AndroidManifest androidManifest = createManifestWithApplicationElement();
+
+    AndroidManifest editedManifest =
+        androidManifest
+            .toEditor()
+            .setRequiredSplitTypes(ImmutableList.of("language", "config"))
+            .save();
+
+    assertThat(editedManifest.getManifestElement().getAttributes())
+        .containsExactly(
+            XmlProtoAttributeBuilder.create(
+                    DISTRIBUTION_NAMESPACE_URI, REQUIRED_SPLIT_TYPES_ATTRIBUTE_NAME)
+                .setValueAsString("config,language")
+                .build());
+  }
+
+  @Test
+  public void setRequiredSplitTypes_lastInvocationWins() throws Exception {
+    AndroidManifest androidManifest = createManifestWithApplicationElement();
+
+    AndroidManifest editedManifest =
+        androidManifest
+            .toEditor()
+            .setRequiredSplitTypes(ImmutableList.of("base,feature"))
+            .setRequiredSplitTypes(SPLIT_NAMES)
+            .save();
+
+    assertThat(editedManifest.getManifestElement().getAttributes())
+        .containsExactly(
+            XmlProtoAttributeBuilder.create(
+                    DISTRIBUTION_NAMESPACE_URI, REQUIRED_SPLIT_TYPES_ATTRIBUTE_NAME)
+                .setValueAsString("config,language")
+                .build());
   }
 
   @Test

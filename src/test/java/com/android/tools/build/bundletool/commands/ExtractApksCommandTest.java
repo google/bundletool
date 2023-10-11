@@ -17,6 +17,7 @@
 package com.android.tools.build.bundletool.commands;
 
 import static com.android.bundle.Targeting.Abi.AbiAlias.ARM64_V8A;
+import static com.android.bundle.Targeting.Abi.AbiAlias.RISCV64;
 import static com.android.bundle.Targeting.Abi.AbiAlias.X86;
 import static com.android.bundle.Targeting.Abi.AbiAlias.X86_64;
 import static com.android.bundle.Targeting.ScreenDensity.DensityAlias.XXHDPI;
@@ -2275,6 +2276,50 @@ public class ExtractApksCommandTest {
         .hasMessageThat()
         .isEqualTo(
             "Missing APKs for [ABI] dimensions in the module 'base' for the provided device.");
+  }
+
+  @Theory
+  @Test
+  public void multipleAbiSplits_riscV64(TocFormat tocFormat) throws Exception {
+    BuildApksResult tableOfContent =
+        BuildApksResult.newBuilder()
+            .setBundletool(
+                Bundletool.newBuilder()
+                    .setVersion(BundleToolVersion.getCurrentVersion().toString()))
+            .addVariant(
+                createVariant(
+                    VariantTargeting.getDefaultInstance(),
+                    createSplitApkSet(
+                        /* moduleName= */ "base",
+                        createMasterApkDescription(
+                            ApkTargeting.getDefaultInstance(), ZipPath.create("base-master.apk")),
+                        splitApkDescription(
+                            apkAbiTargeting(RISCV64, ImmutableSet.of(X86_64, X86)),
+                            ZipPath.create("base-riscv64.apk")),
+                        splitApkDescription(
+                            apkAbiTargeting(X86, ImmutableSet.of(X86_64, RISCV64)),
+                            ZipPath.create("base-x86.apk")),
+                        splitApkDescription(
+                            apkAbiTargeting(X86_64, ImmutableSet.of(X86, RISCV64)),
+                            ZipPath.create("base-x86_64.apk")))))
+            .build();
+
+    Path apksArchiveFile =
+        createApksArchiveFile(tableOfContent, tmpDir.resolve("bundle.apks"), tocFormat);
+
+    DeviceSpec deviceSpec = mergeSpecs(deviceWithSdk(21), abis("riscv64"));
+
+    ImmutableList<Path> matchedApks =
+        ExtractApksCommand.builder()
+            .setDeviceSpec(deviceSpec)
+            .setApksArchivePath(apksArchiveFile)
+            .setOutputDirectory(tmpDir)
+            .build()
+            .execute();
+    assertThat(matchedApks)
+        .containsExactly(
+            inOutputDirectory(ZipPath.create("base-master.apk")),
+            inOutputDirectory(ZipPath.create("base-riscv64.apk")));
   }
 
   @DataPoints("localTestingEnabled")

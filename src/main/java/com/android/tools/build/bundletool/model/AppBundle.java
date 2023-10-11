@@ -106,14 +106,6 @@ public abstract class AppBundle implements Bundle {
       ImmutableList<BundleModule> modules,
       BundleConfig bundleConfig,
       BundleMetadata bundleMetadata) {
-    ImmutableSet<ResourceId> pinnedResourceIds =
-        bundleConfig.getMasterResources().getResourceIdsList().stream()
-            .map(ResourceId::create)
-            .collect(toImmutableSet());
-
-    ImmutableSet<String> pinnedResourceNames =
-        ImmutableSet.copyOf(bundleConfig.getMasterResources().getResourceNamesList());
-
     ImmutableListMultimap<String, RuntimeEnabledSdk> runtimeEnabledSdkDependencies =
         modules.stream()
             .filter(module -> module.getRuntimeEnabledSdkConfig().isPresent())
@@ -126,8 +118,6 @@ public abstract class AppBundle implements Bundle {
 
     return builder()
         .setModules(Maps.uniqueIndex(modules, BundleModule::getName))
-        .setMasterPinnedResourceIds(pinnedResourceIds)
-        .setMasterPinnedResourceNames(pinnedResourceNames)
         .setBundleConfig(bundleConfig)
         .setBundleMetadata(bundleMetadata)
         .setRuntimeEnabledSdkDependencies(
@@ -138,17 +128,6 @@ public abstract class AppBundle implements Bundle {
 
   @Override
   public abstract ImmutableMap<BundleModuleName, BundleModule> getModules();
-
-  /**
-   * Resource IDs that must remain in the master split regardless of their targeting configuration.
-   */
-  public abstract ImmutableSet<ResourceId> getMasterPinnedResourceIds();
-
-  /**
-   * Resource names that must remain in the master split regardless of their targeting
-   * configuration.
-   */
-  public abstract ImmutableSet<String> getMasterPinnedResourceNames();
 
   public abstract BundleConfig getBundleConfig();
 
@@ -325,10 +304,6 @@ public abstract class AppBundle implements Bundle {
       modulesBuilder().put(bundleModule.getName(), bundleModule);
       return this;
     }
-
-    public abstract Builder setMasterPinnedResourceIds(ImmutableSet<ResourceId> pinnedResourceIds);
-
-    public abstract Builder setMasterPinnedResourceNames(ImmutableSet<String> pinnedResourceNames);
 
     public abstract Builder setBundleConfig(BundleConfig bundleConfig);
 

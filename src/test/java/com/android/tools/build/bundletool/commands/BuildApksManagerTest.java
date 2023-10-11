@@ -19,6 +19,7 @@ package com.android.tools.build.bundletool.commands;
 import static com.android.bundle.Targeting.Abi.AbiAlias.ARM64_V8A;
 import static com.android.bundle.Targeting.Abi.AbiAlias.ARMEABI_V7A;
 import static com.android.bundle.Targeting.Abi.AbiAlias.MIPS;
+import static com.android.bundle.Targeting.Abi.AbiAlias.RISCV64;
 import static com.android.bundle.Targeting.Abi.AbiAlias.X86;
 import static com.android.bundle.Targeting.Abi.AbiAlias.X86_64;
 import static com.android.bundle.Targeting.TextureCompressionFormat.TextureCompressionFormatAlias.ATC;
@@ -2203,6 +2204,7 @@ public class BuildApksManagerTest {
                 "base",
                 builder ->
                     builder.addFile("dex/classes.dex").setManifest(androidManifest("com.test.app")))
+            .setBundleConfig(BundleConfigBuilder.create().setUncompressDexFiles(false).build())
             .build();
     TestComponent.useTestModule(
         this,
@@ -2213,7 +2215,7 @@ public class BuildApksManagerTest {
     ZipFile apkSetFile = openZipFile(outputFilePath.toFile());
     BuildApksResult result = extractTocFromApkSetFile(apkSetFile, outputDir);
 
-    assertThat(splitApkVariants(result)).hasSize(2);
+    assertThat(splitApkVariants(result)).hasSize(1);
     ImmutableList<Variant> variants = splitApkVariants(result);
     variants.forEach(variant -> assertThat(variant.hasTargeting()).isTrue());
     assertThat(
@@ -2222,7 +2224,7 @@ public class BuildApksManagerTest {
                     variant ->
                         variant.getTargeting().getSdkVersionTargeting().getValueList().stream())
                 .collect(toImmutableList()))
-        .containsExactly(L_SDK_VERSION, S_SDK_VERSION);
+        .containsExactly(L_SDK_VERSION);
   }
 
   @Test
@@ -2238,7 +2240,7 @@ public class BuildApksManagerTest {
                         .setNativeConfig(
                             nativeLibraries(
                                 targetedNativeDirectory("lib/x86", nativeDirectoryTargeting(X86))))
-                        .setManifest(androidManifest("com.test.app", withMinSdkVersion(25))))
+                        .setManifest(androidManifest("com.test.app", withMinSdkVersion(31))))
             .build();
     TestComponent.useTestModule(
         this,
@@ -2249,7 +2251,7 @@ public class BuildApksManagerTest {
     ZipFile apkSetFile = openZipFile(outputFilePath.toFile());
     BuildApksResult result = extractTocFromApkSetFile(apkSetFile, outputDir);
 
-    assertThat(splitApkVariants(result)).hasSize(2);
+    assertThat(splitApkVariants(result)).hasSize(1);
     ImmutableList<Variant> variants = splitApkVariants(result);
     variants.forEach(variant -> assertThat(variant.hasTargeting()).isTrue());
     assertThat(
@@ -2258,7 +2260,7 @@ public class BuildApksManagerTest {
                     variant ->
                         variant.getTargeting().getSdkVersionTargeting().getValueList().stream())
                 .collect(toImmutableList()))
-        .containsExactly(sdkVersionFrom(25), S_SDK_VERSION);
+        .containsExactly(sdkVersionFrom(31));
   }
 
   @Test
@@ -2695,7 +2697,7 @@ public class BuildApksManagerTest {
   }
 
   @Test
-  public void disabledUncompressedNativeLibraries_singleSplitVariant() throws Exception {
+  public void disabledUncompressedNativeLibrariesAndDex_singleSplitVariant() throws Exception {
     AppBundle appBundle =
         new AppBundleBuilder()
             .addModule(
@@ -2709,7 +2711,10 @@ public class BuildApksManagerTest {
                                 targetedNativeDirectory("lib/x86", nativeDirectoryTargeting(X86))))
                         .setManifest(androidManifest("com.test.app")))
             .setBundleConfig(
-                BundleConfigBuilder.create().setUncompressNativeLibraries(false).build())
+                BundleConfigBuilder.create()
+                    .setUncompressNativeLibraries(false)
+                    .setUncompressDexFiles(false)
+                    .build())
             .build();
     TestComponent.useTestModule(
         this,
@@ -2722,14 +2727,12 @@ public class BuildApksManagerTest {
 
     ImmutableList<Variant> splitApkVariants = splitApkVariants(result);
 
-    assertThat(splitApkVariants).hasSize(2);
+    assertThat(splitApkVariants).hasSize(1);
     assertThat(
             splitApkVariants.stream()
                 .map(variant -> variant.getTargeting().getSdkVersionTargeting())
                 .collect(toImmutableList()))
-        .containsExactly(
-            sdkVersionTargeting(L_SDK_VERSION, ImmutableSet.of(LOWEST_SDK_VERSION, S_SDK_VERSION)),
-            sdkVersionTargeting(S_SDK_VERSION, ImmutableSet.of(LOWEST_SDK_VERSION, L_SDK_VERSION)));
+        .containsExactly(sdkVersionTargeting(L_SDK_VERSION, ImmutableSet.of(LOWEST_SDK_VERSION)));
   }
 
   @Test
@@ -2747,7 +2750,7 @@ public class BuildApksManagerTest {
                             nativeLibraries(
                                 targetedNativeDirectory("lib/x86", nativeDirectoryTargeting(X86))))
                         .setManifest(androidManifest("com.test.app")))
-            .setBundleConfig(BundleConfigBuilder.create().build())
+            .setBundleConfig(BundleConfigBuilder.create().setUncompressDexFiles(false).build())
             .build();
     TestComponent.useTestModule(
         this,
@@ -2763,12 +2766,8 @@ public class BuildApksManagerTest {
             splitApkVariants.stream()
                 .map(variant -> variant.getTargeting().getSdkVersionTargeting()))
         .containsExactly(
-            sdkVersionTargeting(
-                L_SDK_VERSION, ImmutableSet.of(LOWEST_SDK_VERSION, M_SDK_VERSION, S_SDK_VERSION)),
-            sdkVersionTargeting(
-                M_SDK_VERSION, ImmutableSet.of(LOWEST_SDK_VERSION, L_SDK_VERSION, S_SDK_VERSION)),
-            sdkVersionTargeting(
-                S_SDK_VERSION, ImmutableSet.of(LOWEST_SDK_VERSION, L_SDK_VERSION, M_SDK_VERSION)));
+            sdkVersionTargeting(L_SDK_VERSION, ImmutableSet.of(LOWEST_SDK_VERSION, M_SDK_VERSION)),
+            sdkVersionTargeting(M_SDK_VERSION, ImmutableSet.of(LOWEST_SDK_VERSION, L_SDK_VERSION)));
   }
 
   @Test
@@ -2819,7 +2818,10 @@ public class BuildApksManagerTest {
                                 targetedNativeDirectory("lib/x86", nativeDirectoryTargeting(X86))))
                         .setManifest(androidManifest("com.test.app", withNativeActivity("some"))))
             .setBundleConfig(
-                BundleConfigBuilder.create().setUncompressNativeLibraries(true).build())
+                BundleConfigBuilder.create()
+                    .setUncompressNativeLibraries(true)
+                    .setUncompressDexFiles(false)
+                    .build())
             .build();
     TestComponent.useTestModule(
         this,
@@ -2835,12 +2837,8 @@ public class BuildApksManagerTest {
             splitApkVariants.stream()
                 .map(variant -> variant.getTargeting().getSdkVersionTargeting()))
         .containsExactly(
-            sdkVersionTargeting(
-                L_SDK_VERSION, ImmutableSet.of(LOWEST_SDK_VERSION, N_SDK_VERSION, S_SDK_VERSION)),
-            sdkVersionTargeting(
-                N_SDK_VERSION, ImmutableSet.of(LOWEST_SDK_VERSION, L_SDK_VERSION, S_SDK_VERSION)),
-            sdkVersionTargeting(
-                S_SDK_VERSION, ImmutableSet.of(LOWEST_SDK_VERSION, L_SDK_VERSION, N_SDK_VERSION)));
+            sdkVersionTargeting(L_SDK_VERSION, ImmutableSet.of(LOWEST_SDK_VERSION, N_SDK_VERSION)),
+            sdkVersionTargeting(N_SDK_VERSION, ImmutableSet.of(LOWEST_SDK_VERSION, L_SDK_VERSION)));
     VariantProperties expectedVariantProperties =
         VariantProperties.newBuilder().setUncompressedNativeLibraries(true).build();
     assertThat(
@@ -2874,7 +2872,10 @@ public class BuildApksManagerTest {
                                 targetedNativeDirectory("lib/x86", nativeDirectoryTargeting(X86))))
                         .setManifest(androidManifest("com.test.app", withInstallLocation("auto"))))
             .setBundleConfig(
-                BundleConfigBuilder.create().setUncompressNativeLibraries(true).build())
+                BundleConfigBuilder.create()
+                    .setUncompressNativeLibraries(true)
+                    .setUncompressDexFiles(false)
+                    .build())
             .build();
     TestComponent.useTestModule(
         this,
@@ -2890,12 +2891,8 @@ public class BuildApksManagerTest {
             splitApkVariants.stream()
                 .map(variant -> variant.getTargeting().getSdkVersionTargeting()))
         .containsExactly(
-            sdkVersionTargeting(
-                L_SDK_VERSION, ImmutableSet.of(LOWEST_SDK_VERSION, P_SDK_VERSION, S_SDK_VERSION)),
-            sdkVersionTargeting(
-                P_SDK_VERSION, ImmutableSet.of(LOWEST_SDK_VERSION, L_SDK_VERSION, S_SDK_VERSION)),
-            sdkVersionTargeting(
-                S_SDK_VERSION, ImmutableSet.of(LOWEST_SDK_VERSION, L_SDK_VERSION, P_SDK_VERSION)));
+            sdkVersionTargeting(L_SDK_VERSION, ImmutableSet.of(LOWEST_SDK_VERSION, P_SDK_VERSION)),
+            sdkVersionTargeting(P_SDK_VERSION, ImmutableSet.of(LOWEST_SDK_VERSION, L_SDK_VERSION)));
   }
 
   @Test
@@ -3043,6 +3040,7 @@ public class BuildApksManagerTest {
 
   @Test
   public void dexCompressionIsNotSet_enabledByDefault() throws Exception {
+    SdkVersion expectedDefaultUncompressedDexSdk = S_SDK_VERSION;
     AppBundle appBundle =
         new AppBundleBuilder()
             .addModule(
@@ -3065,19 +3063,18 @@ public class BuildApksManagerTest {
             splitApkVariants.stream()
                 .map(variant -> variant.getTargeting().getSdkVersionTargeting()))
         .containsExactly(
-            sdkVersionTargeting(L_SDK_VERSION, ImmutableSet.of(LOWEST_SDK_VERSION, S_SDK_VERSION)),
-            sdkVersionTargeting(S_SDK_VERSION, ImmutableSet.of(LOWEST_SDK_VERSION, L_SDK_VERSION)));
+            sdkVersionTargeting(
+                L_SDK_VERSION,
+                ImmutableSet.of(LOWEST_SDK_VERSION, expectedDefaultUncompressedDexSdk)),
+            sdkVersionTargeting(
+                expectedDefaultUncompressedDexSdk,
+                ImmutableSet.of(LOWEST_SDK_VERSION, L_SDK_VERSION)));
     Variant uncompressedDexVariant =
         splitApkVariants.stream()
-            .filter(
-                variant ->
-                    variant
-                        .getTargeting()
-                        .getSdkVersionTargeting()
-                        .getValue(0)
-                        .equals(S_SDK_VERSION))
+            .filter(variant -> variant.getVariantProperties().getUncompressedDex())
             .collect(onlyElement());
-    assertThat(uncompressedDexVariant.getVariantProperties().getUncompressedDex()).isTrue();
+    assertThat(uncompressedDexVariant.getTargeting().getSdkVersionTargeting().getValue(0))
+        .isEqualTo(expectedDefaultUncompressedDexSdk);
   }
 
   @Test
@@ -3320,6 +3317,12 @@ public class BuildApksManagerTest {
                                 targetedNativeDirectory(
                                     "lib/mips", nativeDirectoryTargeting(MIPS))))
                         .setManifest(androidManifest("com.test.app")))
+            .setBundleConfig(
+                BundleConfigBuilder.create()
+                    .setUncompressNativeLibraries(true)
+                    .setUncompressDexFiles(true)
+                    .setUncompressDexFilesForVariant(UncompressedDexTargetSdk.SDK_31)
+                    .build())
             .build();
     TestComponent.useTestModule(
         this,
@@ -3626,6 +3629,60 @@ public class BuildApksManagerTest {
     apkSet
         .getApkDescriptionList()
         .forEach(apkDescription -> assertThat(apkSetFile).hasFile(apkDescription.getPath()));
+  }
+
+  @Test
+  public void buildApksCommand_system_riscv() throws Exception {
+    AppBundle appBundle =
+        new AppBundleBuilder()
+            .addModule(
+                "base",
+                builder ->
+                    builder
+                        .addFile("dex/classes.dex")
+                        .addFile("lib/x86/libsome.so")
+                        .addFile("lib/x86_64/libsome.so")
+                        .addFile("lib/riscv64/libsome.so")
+                        .setNativeConfig(
+                            nativeLibraries(
+                                targetedNativeDirectory("lib/x86", nativeDirectoryTargeting(X86)),
+                                targetedNativeDirectory(
+                                    "lib/x86_64", nativeDirectoryTargeting(X86_64)),
+                                targetedNativeDirectory(
+                                    "lib/riscv64", nativeDirectoryTargeting(RISCV64))))
+                        .setManifest(androidManifest("com.test.app")))
+            .setBundleConfig(BundleConfigBuilder.create().addSplitDimension(Value.ABI).build())
+            .build();
+    TestComponent.useTestModule(
+        this,
+        createTestModuleBuilder()
+            .withAppBundle(appBundle)
+            .withOutputPath(outputFilePath)
+            .withApkBuildMode(SYSTEM)
+            .withDeviceSpec(
+                mergeSpecs(
+                    sdkVersion(28), abis("riscv64"), density(DensityAlias.MDPI), locales("en-US")))
+            .build());
+
+    buildApksManager.execute();
+
+    ZipFile apkSetFile = openZipFile(outputFilePath.toFile());
+    BuildApksResult result = extractTocFromApkSetFile(apkSetFile, outputDir);
+
+    assertThat(result.getVariantList()).hasSize(1);
+    assertThat(systemApkVariants(result)).hasSize(1);
+
+    Variant systemVariant = systemApkVariants(result).get(0);
+    try (ZipFile systemApkFile =
+        new ZipFile(
+            extractFromApkSetFile(
+                apkSetFile,
+                systemVariant.getApkSet(0).getApkDescriptionList().get(0).getPath(),
+                outputDir))) {
+      assertThat(systemApkFile).hasFile("lib/riscv64/libsome.so");
+      assertThat(systemApkFile).doesNotHaveFile("lib/x86/libsome.so");
+      assertThat(systemApkFile).doesNotHaveFile("lib/x86_64/libsome.so");
+    }
   }
 
   @Test
@@ -4572,10 +4629,13 @@ public class BuildApksManagerTest {
                 "base",
                 builder ->
                     builder
+                        .addFile("lib/riscv64/libsome.so")
                         .addFile("lib/x86/libsome.so")
                         .addFile("lib/x86_64/libsome.so")
                         .setNativeConfig(
                             nativeLibraries(
+                                targetedNativeDirectory(
+                                    "lib/riscv64", nativeDirectoryTargeting(RISCV64)),
                                 targetedNativeDirectory("lib/x86", nativeDirectoryTargeting(X86)),
                                 targetedNativeDirectory(
                                     "lib/x86_64", nativeDirectoryTargeting(X86_64))))
@@ -4594,8 +4654,8 @@ public class BuildApksManagerTest {
     ZipFile apkSetFile = openZipFile(outputFilePath.toFile());
     BuildApksResult result = extractTocFromApkSetFile(apkSetFile, outputDir);
 
-    // 2 standalone APK variants, 1 split APK variant
-    assertThat(result.getVariantList()).hasSize(4);
+    // 3 standalone APK variants, 2 split APK variant
+    assertThat(result.getVariantList()).hasSize(5);
 
     VariantTargeting lSplitVariantTargeting =
         variantSdkTargeting(L_SDK_VERSION, ImmutableSet.of(LOWEST_SDK_VERSION, M_SDK_VERSION));
@@ -4603,11 +4663,15 @@ public class BuildApksManagerTest {
         variantSdkTargeting(M_SDK_VERSION, ImmutableSet.of(LOWEST_SDK_VERSION, L_SDK_VERSION));
     VariantTargeting standaloneX86VariantTargeting =
         mergeVariantTargeting(
-            variantAbiTargeting(X86, ImmutableSet.of(X86_64)),
+            variantAbiTargeting(X86, ImmutableSet.of(X86_64, RISCV64)),
             variantSdkTargeting(LOWEST_SDK_VERSION, ImmutableSet.of(L_SDK_VERSION, M_SDK_VERSION)));
     VariantTargeting standaloneX64VariantTargeting =
         mergeVariantTargeting(
-            variantAbiTargeting(X86_64, ImmutableSet.of(X86)),
+            variantAbiTargeting(X86_64, ImmutableSet.of(X86, RISCV64)),
+            variantSdkTargeting(LOWEST_SDK_VERSION, ImmutableSet.of(L_SDK_VERSION, M_SDK_VERSION)));
+    VariantTargeting standaloneRiscV64VariantTargeting =
+        mergeVariantTargeting(
+            variantAbiTargeting(RISCV64, ImmutableSet.of(X86, X86_64)),
             variantSdkTargeting(LOWEST_SDK_VERSION, ImmutableSet.of(L_SDK_VERSION, M_SDK_VERSION)));
 
     ImmutableMap<VariantTargeting, Variant> variantsByTargeting =
@@ -4621,19 +4685,24 @@ public class BuildApksManagerTest {
             "base-master.apk",
             "base-x86.apk",
             "base-x86_64.apk",
+            "base-riscv64.apk",
             "base-master_2.apk",
             "base-x86_2.apk",
-            "base-x86_64_2.apk");
+            "base-x86_64_2.apk",
+            "base-riscv64_2.apk");
     assertThat(variantsByTargeting.keySet())
         .containsExactly(
             lSplitVariantTargeting,
             mSplitVariantTargeting,
             standaloneX86VariantTargeting,
-            standaloneX64VariantTargeting);
+            standaloneX64VariantTargeting,
+            standaloneRiscV64VariantTargeting);
     assertThat(apkNamesInVariant(variantsByTargeting.get(standaloneX86VariantTargeting)))
         .containsExactly("standalone-x86.apk");
     assertThat(apkNamesInVariant(variantsByTargeting.get(standaloneX64VariantTargeting)))
         .containsExactly("standalone-x86_64.apk");
+    assertThat(apkNamesInVariant(variantsByTargeting.get(standaloneRiscV64VariantTargeting)))
+        .containsExactly("standalone-riscv64.apk");
   }
 
   @Test
@@ -5296,6 +5365,12 @@ public class BuildApksManagerTest {
                         .setNativeConfig(
                             nativeLibraries(
                                 targetedNativeDirectory("lib/x86", nativeDirectoryTargeting(X86)))))
+            .setBundleConfig(
+                BundleConfigBuilder.create()
+                    .setUncompressNativeLibraries(true)
+                    .setUncompressDexFiles(true)
+                    .setUncompressDexFilesForVariant(UncompressedDexTargetSdk.SDK_31)
+                    .build())
             .build();
     TestComponent.useTestModule(
         this,
@@ -5361,6 +5436,11 @@ public class BuildApksManagerTest {
                                 targetedAssetsDirectory(
                                     "assets/paks",
                                     assetsDirectoryTargeting(alternativeLanguageTargeting("es"))))))
+            .setBundleConfig(
+                BundleConfigBuilder.create()
+                    .setUncompressDexFiles(true)
+                    .setUncompressDexFilesForVariant(UncompressedDexTargetSdk.SDK_31)
+                    .build())
             .build();
     TestComponent.useTestModule(
         this,
@@ -6353,6 +6433,8 @@ public class BuildApksManagerTest {
                             withUsesSplit("feature1", "feature2"),
                             withOnDemandAttribute(false),
                             withFusingAttribute(true))))
+            // Set old version of Bundletool where this setup wouldn't be merged.
+            .setBundleConfig(BundleConfigBuilder.create().setVersion("0.14.0").build())
             .build();
     TestComponent.useTestModule(
         this,

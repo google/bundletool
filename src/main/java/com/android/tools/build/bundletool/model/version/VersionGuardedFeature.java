@@ -105,7 +105,14 @@ public enum VersionGuardedFeature {
    * <p>Now, features with no density specific resources (or with a single density specific
    * resource) will not have density splits generated for them.
    */
-  FIX_SKIP_GENERATING_EMPTY_DENSITY_SPLITS("1.15.1");
+  FIX_SKIP_GENERATING_EMPTY_DENSITY_SPLITS("1.15.1"),
+
+  /**
+   * Respect legacy onDemand attribute for install time module merging.
+   *
+   * <p>Previously onDemand=false would not be respected and modules may not have been merged.
+   */
+  RESPECT_LEGACY_ON_DEMAND_ATTRIBUTE_FOR_INSTALL_MODULES_MERGING("1.15.4");
 
   /** Version from which the given feature should be enabled by default. */
   private final Version enabledSinceVersion;

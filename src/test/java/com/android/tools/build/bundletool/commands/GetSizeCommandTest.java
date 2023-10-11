@@ -21,6 +21,7 @@ import static com.android.bundle.Targeting.Abi.AbiAlias.ARMEABI;
 import static com.android.bundle.Targeting.Abi.AbiAlias.ARMEABI_V7A;
 import static com.android.bundle.Targeting.Abi.AbiAlias.MIPS;
 import static com.android.bundle.Targeting.Abi.AbiAlias.MIPS64;
+import static com.android.bundle.Targeting.Abi.AbiAlias.RISCV64;
 import static com.android.bundle.Targeting.Abi.AbiAlias.X86;
 import static com.android.bundle.Targeting.Abi.AbiAlias.X86_64;
 import static com.android.bundle.Targeting.ScreenDensity.DensityAlias.HDPI;
@@ -1114,6 +1115,65 @@ public final class GetSizeCommandTest {
             "ABI,SCREEN_DENSITY,MIN,MAX"
                 + CRLF
                 + String.format("x86,124,%d,%d", compressedApkSize, 3 * compressedApkSize)
+                + CRLF);
+  }
+
+  @Test
+  public void getSizeTotal_withDimensionsAndDeviceSpec_riscv64() throws Exception {
+    Variant lVariant =
+        createVariant(
+            lPlusVariantTargeting(),
+            createSplitApkSet(
+                /* moduleName= */ "base",
+                createMasterApkDescription(
+                    ApkTargeting.getDefaultInstance(), ZipPath.create("base-master.apk")),
+                createApkDescription(
+                    apkDensityTargeting(LDPI, ImmutableSet.of(MDPI)),
+                    ZipPath.create("base-ldpi.apk"),
+                    /* isMasterSplit= */ false),
+                createApkDescription(
+                    apkDensityTargeting(MDPI, ImmutableSet.of(LDPI)),
+                    ZipPath.create("base-mdpi.apk"),
+                    /* isMasterSplit= */ false),
+                createApkDescription(
+                    apkAbiTargeting(RISCV64, ImmutableSet.of(X86_64, X86)),
+                    ZipPath.create("base-riscv64.apk"),
+                    /* isMasterSplit= */ false),
+                createApkDescription(
+                    apkAbiTargeting(X86, ImmutableSet.of(X86_64, RISCV64)),
+                    ZipPath.create("base-x86.apk"),
+                    /* isMasterSplit= */ false),
+                createApkDescription(
+                    apkAbiTargeting(X86_64, ImmutableSet.of(X86, RISCV64)),
+                    ZipPath.create("base-x86_64.apk"),
+                    /* isMasterSplit= */ false)));
+
+    BuildApksResult tableOfContentsProto =
+        BuildApksResult.newBuilder()
+            .setBundletool(
+                Bundletool.newBuilder()
+                    .setVersion(BundleToolVersion.getCurrentVersion().toString()))
+            .addVariant(lVariant)
+            .build();
+    Path apksArchiveFile =
+        createApksArchiveFile(tableOfContentsProto, tmpDir.resolve("bundle.apks"));
+
+    ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+
+    GetSizeCommand.builder()
+        .setGetSizeSubCommand(GetSizeSubcommand.TOTAL)
+        .setApksArchivePath(apksArchiveFile)
+        .setDeviceSpec(
+            DeviceSpec.newBuilder().setScreenDensity(124).addSupportedAbis("riscv64").build())
+        .setDimensions(ImmutableSet.of(Dimension.ABI, Dimension.SCREEN_DENSITY))
+        .build()
+        .getSizeTotal(new PrintStream(outputStream));
+
+    assertThat(new String(outputStream.toByteArray(), UTF_8))
+        .isEqualTo(
+            "ABI,SCREEN_DENSITY,MIN,MAX"
+                + CRLF
+                + String.format("riscv64,124,%d,%d", 3 * compressedApkSize, 3 * compressedApkSize)
                 + CRLF);
   }
 

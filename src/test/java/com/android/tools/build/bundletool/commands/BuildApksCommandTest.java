@@ -1538,6 +1538,7 @@ public class BuildApksCommandTest {
     assertThat(commandViaBuilder.build()).isEqualTo(commandViaFlags);
   }
 
+
   @Test
   public void missingBundleFile_throws() throws Exception {
     Path bundlePath = tmpDir.resolve("bundle.aab");

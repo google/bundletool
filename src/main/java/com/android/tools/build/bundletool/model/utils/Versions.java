@@ -30,6 +30,7 @@ public final class Versions {
   public static final int ANDROID_S_API_VERSION = 31;
   public static final int ANDROID_S_V2_API_VERSION = 32;
   public static final int ANDROID_T_API_VERSION = 33;
+  public static final int ANDROID_U_API_VERSION = 34;
 
   // Not meant to be instantiated.
   private Versions() {}

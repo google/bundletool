@@ -102,6 +102,7 @@ message Abi {
     X86_64 = 5;
     MIPS = 6;
     MIPS64 = 7;
+    RISCV64 = 8;
   }
   AbiAlias alias = 1;
 }

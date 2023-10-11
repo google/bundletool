@@ -17,6 +17,9 @@
 package com.android.tools.build.bundletool.model;
 
 import static com.android.tools.build.bundletool.model.ManifestMutator.withExtractNativeLibs;
+import static com.android.tools.build.bundletool.model.ManifestMutator.withProvidedSplitTypes;
+import static com.android.tools.build.bundletool.model.ManifestMutator.withRequiredSplitTypes;
+import static com.android.tools.build.bundletool.model.ManifestMutator.withSplitsRequired;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifest;
 import static com.google.common.truth.Truth8.assertThat;
 
@@ -32,6 +35,7 @@ public class ManifestMutatorTest {
   @Test
   public void setExtractNativeLibsValue() throws Exception {
     AndroidManifest manifest = AndroidManifest.create(androidManifest("com.test.app"));
+    assertThat(manifest.getExtractNativeLibsValue()).isEmpty();
 
     AndroidManifest editedManifest =
         manifest.applyMutators(ImmutableList.of(withExtractNativeLibs(false)));
@@ -39,5 +43,40 @@ public class ManifestMutatorTest {
 
     editedManifest = editedManifest.applyMutators(ImmutableList.of(withExtractNativeLibs(true)));
     assertThat(editedManifest.getExtractNativeLibsValue()).hasValue(true);
+  }
+
+  @Test
+  public void setSplitsRequiredValue() throws Exception {
+    AndroidManifest manifest = AndroidManifest.create(androidManifest("com.test.app"));
+    assertThat(manifest.getSplitsRequiredValue()).isEmpty();
+
+    AndroidManifest editedManifest =
+        manifest.applyMutators(ImmutableList.of(withSplitsRequired(false)));
+    assertThat(editedManifest.getSplitsRequiredValue()).hasValue(false);
+
+    editedManifest = editedManifest.applyMutators(ImmutableList.of(withSplitsRequired(true)));
+    assertThat(editedManifest.getSplitsRequiredValue()).hasValue(true);
+  }
+
+  @Test
+  public void setProvidedSplitTypesValue() throws Exception {
+    AndroidManifest manifest = AndroidManifest.create(androidManifest("com.test.app"));
+    assertThat(manifest.getProvidedSplitTypesValue()).isEmpty();
+
+    AndroidManifest editedManifest =
+        manifest.applyMutators(
+            ImmutableList.of(withProvidedSplitTypes(ImmutableList.of("a", "b"))));
+    assertThat(editedManifest.getProvidedSplitTypesValue()).hasValue(ImmutableList.of("a", "b"));
+  }
+
+  @Test
+  public void setRequiresSplitTypesValue() throws Exception {
+    AndroidManifest manifest = AndroidManifest.create(androidManifest("com.test.app"));
+    assertThat(manifest.getRequiredSplitTypesValue()).isEmpty();
+
+    AndroidManifest editedManifest =
+        manifest.applyMutators(
+            ImmutableList.of(withRequiredSplitTypes(ImmutableList.of("a", "b"))));
+    assertThat(editedManifest.getRequiredSplitTypesValue()).hasValue(ImmutableList.of("a", "b"));
   }
 }

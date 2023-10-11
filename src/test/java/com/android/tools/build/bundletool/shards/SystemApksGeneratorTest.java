@@ -69,6 +69,8 @@ import static com.google.common.truth.Truth.assertThat;
 import static com.google.common.truth.Truth8.assertThat;
 import static com.google.common.truth.extensions.proto.ProtoTruth.assertThat;
 
+import com.android.bundle.Config.BundleConfig;
+import com.android.bundle.Config.MasterResources;
 import com.android.bundle.Devices.DeviceSpec;
 import com.android.bundle.RuntimeEnabledSdkConfigProto.RuntimeEnabledSdk;
 import com.android.bundle.RuntimeEnabledSdkConfigProto.RuntimeEnabledSdkConfig;
@@ -85,6 +87,7 @@ import com.android.tools.build.bundletool.model.ModuleSplit;
 import com.android.tools.build.bundletool.model.ModuleSplit.SplitType;
 import com.android.tools.build.bundletool.model.OptimizationDimension;
 import com.android.tools.build.bundletool.model.ZipPath;
+import com.android.tools.build.bundletool.model.utils.ResourcesUtils;
 import com.android.tools.build.bundletool.optimizations.ApkOptimizations;
 import com.android.tools.build.bundletool.splitters.RuntimeEnabledSdkTableInjector;
 import com.android.tools.build.bundletool.testing.AppBundleBuilder;
@@ -440,7 +443,7 @@ public class SystemApksGeneratorTest {
             splitOptimizations(OptimizationDimension.LANGUAGE));
 
     assertThat(shards).hasSize(2);
-    
+
     ModuleSplit fusedShard = shards.get(0);
     assertThat(fusedShard.isBaseModuleSplit()).isTrue();
     assertThat(extractPaths(fusedShard.getEntries()))
@@ -1157,6 +1160,83 @@ public class SystemApksGeneratorTest {
                     ZipPath.create(
                         RuntimeEnabledSdkTableInjector.RUNTIME_ENABLED_SDK_TABLE_FILE_PATH)))
         .isPresent();
+  }
+
+  @Test
+  public void systemApk_withLanguageSplits_pinnedResources() throws Exception {
+    BundleModule bundleModule =
+        new BundleModuleBuilder("base")
+            .addFile("dex/classes.dex")
+            .setManifest(androidManifest("com.test.app"))
+            .setResourceTable(
+                new ResourceTableBuilder()
+                    .addPackage("com.test.app")
+                    .addStringResourceForMultipleLocales(
+                        "string1",
+                        ImmutableMap.of(
+                            /* default locale */ "", "hello", "es", "hola", "fr", "bonjour"))
+                    .addStringResourceForMultipleLocales(
+                        "string2",
+                        ImmutableMap.of(
+                            /* default locale */ "", "hello2", "es", "hola2", "fr", "bonjour2"))
+                    .addStringResourceForMultipleLocales(
+                        "string3",
+                        ImmutableMap.of(
+                            /* default locale */ "", "hello3", "es", "hola3", "fr", "bonjour3"))
+                    .build())
+            .build();
+    int string3ResourceId =
+        ResourcesUtils.entries(bundleModule.getResourceTable().get())
+            .filter(entry -> entry.getEntry().getName().equals("string3"))
+            .map(entry -> entry.getResourceId().getFullResourceId())
+            .collect(onlyElement());
+
+    TestComponent.useTestModule(
+        this,
+        TestModule.builder()
+            .withDeviceSpec(mergeSpecs(DEVICE_SPEC, locales("fr")))
+            .withBundleConfig(
+                BundleConfig.newBuilder()
+                    .setMasterResources(
+                        MasterResources.newBuilder()
+                            .addResourceIds(string3ResourceId)
+                            .addResourceNames("string2")))
+            .build());
+
+    ImmutableList<ModuleSplit> shards =
+        systemApksGenerator.generateSystemApks(
+            /* modules= */ ImmutableList.of(bundleModule),
+            /* modulesToFuse= */ ImmutableSet.of(BASE_MODULE_NAME),
+            splitOptimizations(OptimizationDimension.LANGUAGE));
+
+    ModuleSplit mainShard = getSystemImageSplit(shards);
+    // es 'string' resource is missing from resource table, 'string2' and 'string3' are there
+    // because they are pinned.
+    assertThat(mainShard.getResourceTable().get())
+        .isEqualTo(
+            new ResourceTableBuilder()
+                .addPackage("com.test.app")
+                .addStringResourceForMultipleLocales(
+                    "string1", ImmutableMap.of(/* default locale */ "", "hello", "fr", "bonjour"))
+                .addStringResourceForMultipleLocales(
+                    "string2",
+                    ImmutableMap.of(
+                        /* default locale */ "", "hello2", "es", "hola2", "fr", "bonjour2"))
+                .addStringResourceForMultipleLocales(
+                    "string3",
+                    ImmutableMap.of(
+                        /* default locale */ "", "hello3", "es", "hola3", "fr", "bonjour3"))
+                .build());
+
+    ModuleSplit esLangShard = Iterables.getOnlyElement(getAdditionalSplits(shards));
+    assertThat(esLangShard.getApkTargeting()).isEqualTo(apkLanguageTargeting("es"));
+    assertThat(esLangShard.getSplitType()).isEqualTo(SplitType.SYSTEM);
+    assertThat(esLangShard.getResourceTable().get())
+        .isEqualTo(
+            new ResourceTableBuilder()
+                .addPackage("com.test.app")
+                .addStringResourceForMultipleLocales("string1", ImmutableMap.of("es", "hola"))
+                .build());
   }
 
   private static ApkOptimizations splitOptimizations(OptimizationDimension... dimensions) {

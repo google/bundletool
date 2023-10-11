@@ -20,11 +20,11 @@ import static com.android.tools.build.bundletool.model.BundleModule.DEX_DIRECTOR
 import static com.android.tools.build.bundletool.model.utils.TargetingProtoUtils.sdkVersionFrom;
 import static com.android.tools.build.bundletool.model.utils.TargetingProtoUtils.sdkVersionTargeting;
 import static com.android.tools.build.bundletool.model.utils.TargetingProtoUtils.variantTargeting;
+import static com.android.tools.build.bundletool.model.utils.Versions.ANDROID_P_API_VERSION;
 import static com.android.tools.build.bundletool.model.utils.Versions.ANDROID_Q_API_VERSION;
 import static com.android.tools.build.bundletool.model.utils.Versions.ANDROID_S_API_VERSION;
 import static com.google.common.collect.ImmutableSet.toImmutableSet;
 
-import com.android.bundle.Config.UncompressDexFiles.UncompressedDexTargetSdk;
 import com.android.bundle.Targeting.VariantTargeting;
 import com.android.tools.build.bundletool.model.BundleModule;
 import com.android.tools.build.bundletool.model.ModuleEntry;
@@ -55,17 +55,17 @@ public final class DexCompressionVariantGenerator implements BundleModuleVariant
       return Stream.of();
     }
     Stream.Builder<VariantTargeting> variantTargetings = Stream.builder();
-    if (apkGenerationConfiguration
-        .getDexCompressionSplitterForTargetSdk()
-        .equals(UncompressedDexTargetSdk.SDK_31)) {
-      variantTargetings.add(
-          variantTargeting(sdkVersionTargeting(sdkVersionFrom(ANDROID_S_API_VERSION))));
-    } else {
-      variantTargetings.add(
-          variantTargeting(sdkVersionTargeting(sdkVersionFrom(ANDROID_Q_API_VERSION))));
+    switch (apkGenerationConfiguration.getDexCompressionSplitterForTargetSdk()) {
+      case SDK_31:
+        variantTargetings.add(
+            variantTargeting(sdkVersionTargeting(sdkVersionFrom(ANDROID_S_API_VERSION))));
+        break;
+      default:
+        // Uncompressed dex are supported starting from Android P, but only starting from Android Q
+        // the performance impact is negligible compared to a compressed dex.
+        variantTargetings.add(
+            variantTargeting(sdkVersionTargeting(sdkVersionFrom(ANDROID_Q_API_VERSION))));
     }
-    // Uncompressed dex are supported starting from Android P, but only starting from Android Q the
-    // performance impact is negligible compared to a compressed dex.
     return variantTargetings.build();
   }
 }

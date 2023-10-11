@@ -45,6 +45,7 @@ import com.android.tools.build.bundletool.model.GeneratedAssetSlices;
 import com.android.tools.build.bundletool.model.ModuleDeliveryType;
 import com.android.tools.build.bundletool.model.ModuleSplit;
 import com.android.tools.build.bundletool.model.OptimizationDimension;
+import com.android.tools.build.bundletool.model.ResourceId;
 import com.android.tools.build.bundletool.model.exceptions.IncompatibleDeviceException;
 import com.android.tools.build.bundletool.model.exceptions.InvalidCommandException;
 import com.android.tools.build.bundletool.model.targeting.AlternativeVariantTargetingPopulator;
@@ -326,10 +327,8 @@ public final class BuildApksManager {
 
     apkGenerationConfiguration.setEnableUncompressedNativeLibraries(
         apkOptimizations.getUncompressNativeLibraries());
-    apkGenerationConfiguration.setEnableDexCompressionSplitter(
-        getEnableUncompressedDexOptimization(appBundle));
-    apkGenerationConfiguration.setDexCompressionSplitterForTargetSdk(
-        apkOptimizations.getUncompressedDexTargetSdk());
+    setEnableUncompressedDexOptimization(appBundle, apkGenerationConfiguration);
+
     apkGenerationConfiguration.setEnableSparseEncodingVariant(
         bundleConfig
             .getOptimizations()
@@ -347,10 +346,13 @@ public final class BuildApksManager {
                     installLocation.equals("auto") || installLocation.equals("preferExternal"))
             .orElse(false));
 
-    apkGenerationConfiguration.setMasterPinnedResourceIds(appBundle.getMasterPinnedResourceIds());
+    apkGenerationConfiguration.setMasterPinnedResourceIds(
+        bundleConfig.getMasterResources().getResourceIdsList().stream()
+            .map(ResourceId::create)
+            .collect(toImmutableSet()));
 
     apkGenerationConfiguration.setMasterPinnedResourceNames(
-        appBundle.getMasterPinnedResourceNames());
+        ImmutableSet.copyOf(bundleConfig.getMasterResources().getResourceNamesList()));
 
     apkGenerationConfiguration.setSuffixStrippings(apkOptimizations.getSuffixStrippings());
 
@@ -361,21 +363,18 @@ public final class BuildApksManager {
         .getMinSdkForAdditionalVariantWithV3Rotation()
         .ifPresent(apkGenerationConfiguration::setMinSdkForAdditionalVariantWithV3Rotation);
 
+
     return apkGenerationConfiguration;
   }
 
-  private boolean getEnableUncompressedDexOptimization(AppBundle appBundle) {
+  private void setEnableUncompressedDexOptimization(
+      AppBundle appBundle, ApkGenerationConfiguration.Builder builder) {
     if (appBundle.getUncompressedDexOptOut()) {
-      return false;
+      builder.setEnableDexCompressionSplitter(false);
+      return;
     }
-    if (appBundle.getBundleConfig().getOptimizations().hasUncompressDexFiles()) {
-      // If uncompressed dex is specified in the BundleConfig it will be honoured.
-      return appBundle.getBundleConfig().getOptimizations().getUncompressDexFiles().getEnabled();
-    }
-    // This is the default value of the optimisation. Depends on the bundletool version.
-    boolean enableUncompressedDexOptimization = apkOptimizations.getUncompressDexFiles();
-
-    return enableUncompressedDexOptimization;
+    builder.setEnableDexCompressionSplitter(apkOptimizations.getUncompressDexFiles());
+    builder.setDexCompressionSplitterForTargetSdk(apkOptimizations.getUncompressedDexTargetSdk());
   }
 
   private ApkGenerationConfiguration getAssetSliceGenerationConfiguration() {

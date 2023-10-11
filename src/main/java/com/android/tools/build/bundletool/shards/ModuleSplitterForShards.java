@@ -28,6 +28,7 @@ import com.android.tools.build.bundletool.mergers.SameTargetingMerger;
 import com.android.tools.build.bundletool.model.BundleModule;
 import com.android.tools.build.bundletool.model.ModuleSplit;
 import com.android.tools.build.bundletool.model.OptimizationDimension;
+import com.android.tools.build.bundletool.model.ResourceTableEntry;
 import com.android.tools.build.bundletool.model.version.Version;
 import com.android.tools.build.bundletool.splitters.AbiApexImagesSplitter;
 import com.android.tools.build.bundletool.splitters.AbiNativeLibrariesSplitter;
@@ -41,6 +42,7 @@ import com.google.common.base.Predicates;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import java.util.Optional;
+import java.util.function.Predicate;
 import javax.inject.Inject;
 
 /** Splits bundle modules into module splits that are next merged into standalone APKs. */
@@ -158,7 +160,17 @@ public class ModuleSplitterForShards {
     }
 
     if (shardingDimensions.contains(OptimizationDimension.LANGUAGE) && shouldSplitByLanguage()) {
-      resourceSplitters.add(new LanguageResourcesSplitter());
+      ImmutableSet<Integer> pinnedResourceIds =
+          ImmutableSet.copyOf(bundleConfig.getMasterResources().getResourceIdsList());
+      ImmutableSet<String> pinnedResourceNames =
+          ImmutableSet.copyOf(bundleConfig.getMasterResources().getResourceNamesList());
+
+      Predicate<ResourceTableEntry> pinLangResourceToMaster =
+          Predicates.or(
+              // Resources that are unconditionally in the master split.
+              entry -> pinnedResourceIds.contains(entry.getResourceId().getFullResourceId()),
+              entry -> pinnedResourceNames.contains(entry.getEntry().getName()));
+      resourceSplitters.add(new LanguageResourcesSplitter(pinLangResourceToMaster));
     }
 
     return new SplittingPipeline(resourceSplitters.build());

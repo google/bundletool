@@ -19,7 +19,7 @@ package com.android.tools.build.bundletool.model;
 import static com.android.tools.build.bundletool.model.ModuleDeliveryType.ALWAYS_INITIAL_INSTALL;
 import static com.android.tools.build.bundletool.model.ModuleDeliveryType.CONDITIONAL_INITIAL_INSTALL;
 import static com.android.tools.build.bundletool.model.ModuleDeliveryType.NO_INITIAL_INSTALL;
-import static com.android.tools.build.bundletool.model.utils.Versions.ANDROID_T_API_VERSION;
+import static com.android.tools.build.bundletool.model.utils.Versions.ANDROID_U_API_VERSION;
 import static com.android.tools.build.bundletool.model.version.VersionGuardedFeature.NAMESPACE_ON_INCLUDE_ATTRIBUTE_REQUIRED;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
@@ -142,6 +142,8 @@ public abstract class AndroidManifest {
   public static final String PATH_PATTERN_NAME = "pathPattern";
   public static final String SCHEME_NAME = "scheme";
   public static final String HOST_NAME = "host";
+  public static final String SPLIT_TYPES_ATTRIBUTE_NAME = "splitTypes";
+  public static final String REQUIRED_SPLIT_TYPES_ATTRIBUTE_NAME = "requiredSplitTypes";
 
   public static final String SDK_PATCH_VERSION_ATTRIBUTE_NAME =
       "com.android.vending.sdk.version.patch";
@@ -156,7 +158,7 @@ public abstract class AndroidManifest {
       "com.google.wear.watchface.format.version";
 
   public static final String REQUIRED_ATTRIBUTE_NAME = "required";
-  public static final int SDK_SANDBOX_MIN_VERSION = ANDROID_T_API_VERSION;
+  public static final int SDK_SANDBOX_MIN_VERSION = ANDROID_U_API_VERSION;
   public static final String USES_SDK_LIBRARY_ELEMENT_NAME = "uses-sdk-library";
   public static final String CERTIFICATE_DIGEST_ATTRIBUTE_NAME = "certDigest";
   public static final String TARGET_SANDBOX_VERSION_ATTRIBUTE_NAME = "targetSandboxVersion";
@@ -242,6 +244,8 @@ public abstract class AndroidManifest {
   public static final int PATH_PREFIX_RESOURCE_ID = 0x0101002b;
   public static final int SCHEME_RESOURCE_ID = 0x01010027;
   public static final int HOST_RESOURCE_ID = 0x01010028;
+  public static final int SPLIT_TYPES_RESOURCE_ID = 0x0101064f;
+  public static final int REQUIRED_SPLIT_TYPES_RESOURCE_ID = 0x0101064e;
 
   // Matches the value of android.os.Build.VERSION_CODES.CUR_DEVELOPMENT, used when turning
   // a manifest attribute which references a prerelease API version (e.g., "Q") into an integer.
@@ -639,6 +643,39 @@ public abstract class AndroidManifest {
     return getOnDemandAttribute().isPresent();
   }
 
+  /**
+   * Returns whether this module will be present in all app installations.
+   *
+   * <p>This does not differentiate between fused and unfused modules. Fused modules are considered
+   * to be "installed" even though that is as part of another module.
+   */
+  public boolean isAlwaysInstalledModule() {
+    boolean hasDeliveryDeclaration =
+        getManifestDeliveryElement().isPresent()
+            && getManifestDeliveryElement().get().isWellFormed();
+    boolean isLegacyOnDemand =
+        getOnDemandAttribute().map(XmlProtoAttribute::getValueAsBoolean).orElse(false);
+
+    if (!hasDeliveryDeclaration) {
+      // The presence of a legacy on-demand attribute to fall back to (with no delivery element)
+      // implies that this module is not always present.
+      return !isLegacyOnDemand;
+    }
+
+    // If the module is removable or conditional then it's not always installed.
+    ManifestDeliveryElement manifestDeliveryElement = getManifestDeliveryElement().get();
+    if (manifestDeliveryElement.hasOnDemandElement()
+        || manifestDeliveryElement.hasFastFollowElement()
+        || manifestDeliveryElement.hasModuleConditions()
+        || manifestDeliveryElement.getInstallTimeRemovableValue().equals(Optional.of(true))) {
+      return false;
+    }
+
+    // Else, this module has no conditions, it's always present.
+    // Important! This module may be fused into the base module later.
+    return true;
+  }
+
   public Optional<Boolean> isInstantModule() {
     if (getInstantManifestDeliveryElement().isPresent()) {
       if (!getModuleType().equals(ModuleType.ASSET_MODULE)) {
@@ -666,6 +703,33 @@ public abstract class AndroidManifest {
    */
   public Optional<Boolean> getExtractNativeLibsValue() {
     return getApplicationAttributeAsBoolean(EXTRACT_NATIVE_LIBS_RESOURCE_ID);
+  }
+
+  /**
+   * Extracts the 'android:isSplitRequired' value from the {@code <application>} tag.
+   *
+   * <p>Warning: this value is not read by the system and is provided for legacy install verifiers
+   * only.
+   *
+   * @return An optional containing the value of the 'isSplitRequired' attribute if set, or an empty
+   *     optional if not set.
+   */
+  public Optional<Boolean> getSplitsRequiredValue() {
+    return getApplicationAttributeAsBoolean(IS_SPLIT_REQUIRED_RESOURCE_ID);
+  }
+
+  /** Extracts the 'android:splitTypes' value from the {@code <manifest>} tag. */
+  public Optional<ImmutableList<String>> getProvidedSplitTypesValue() {
+    return getManifestElement()
+        .getAttribute(DISTRIBUTION_NAMESPACE_URI, SPLIT_TYPES_ATTRIBUTE_NAME)
+        .map(value -> ImmutableList.copyOf(COMMA_SPLITTER.split(value.getValueAsString())));
+  }
+
+  /** Extracts the 'android:requiredSplitTypes' value from the {@code <manifest>} tag. */
+  public Optional<ImmutableList<String>> getRequiredSplitTypesValue() {
+    return getManifestElement()
+        .getAttribute(DISTRIBUTION_NAMESPACE_URI, REQUIRED_SPLIT_TYPES_ATTRIBUTE_NAME)
+        .map(value -> ImmutableList.copyOf(COMMA_SPLITTER.split(value.getValueAsString())));
   }
 
   /** Returns the string value of the 'installLocation' attribute if set. */

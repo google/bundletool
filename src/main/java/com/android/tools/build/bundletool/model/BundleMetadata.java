@@ -53,7 +53,13 @@ public abstract class BundleMetadata {
    */
   public abstract ImmutableMap<ZipPath, ByteSource> getFileContentMap();
 
-  public abstract Builder toBuilder();
+  public Builder toBuilder() {
+    Builder builder = autoToBuilder();
+    builder.fileContentMapBuilder().putAll(getFileContentMap());
+    return builder;
+  }
+
+  abstract Builder autoToBuilder();
 
   public static Builder builder() {
     return new AutoValue_BundleMetadata.Builder();
@@ -102,7 +108,8 @@ public abstract class BundleMetadata {
   @AutoValue.Builder
   public abstract static class Builder {
 
-    abstract ImmutableMap.Builder<ZipPath, ByteSource> fileContentMapBuilder();
+    private final ImmutableMap.Builder<ZipPath, ByteSource> fileContentMapBuilder =
+        ImmutableMap.builder();
 
     /** Adds metadata file {@code <namespaced-dir>/<file-name>}. */
     public Builder addFile(String namespacedDir, String fileName, ByteSource content) {
@@ -115,10 +122,29 @@ public abstract class BundleMetadata {
      * @param path path of the file inside the bundle metadata directory
      */
     public Builder addFile(ZipPath path, ByteSource content) {
-      fileContentMapBuilder().put(checkMetadataPath(path), content);
+      fileContentMapBuilder.put(checkMetadataPath(path), content);
       return this;
     }
 
-    public abstract BundleMetadata build();
+    /** Returns a builder for the file content map. */
+    public ImmutableMap.Builder<ZipPath, ByteSource> fileContentMapBuilder() {
+      return fileContentMapBuilder;
+    }
+
+    abstract Builder setFileContentMap(ImmutableMap<ZipPath, ByteSource> fileContentMap);
+
+    abstract BundleMetadata autoBuild();
+
+    /** Build the file content map, throwing an exception if any key was added more than once. */
+    public BundleMetadata build() {
+      setFileContentMap(fileContentMapBuilder.buildOrThrow());
+      return autoBuild();
+    }
+
+    /** Build the file content map, keeping the last entry if any key was added more than once. */
+    public BundleMetadata buildKeepingLast() {
+      setFileContentMap(fileContentMapBuilder.buildKeepingLast());
+      return autoBuild();
+    }
   }
 }

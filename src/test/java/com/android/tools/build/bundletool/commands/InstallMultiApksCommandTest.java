@@ -86,9 +86,9 @@ public class InstallMultiApksCommandTest {
   private static final String PKG_NAME_1 = "com.example.a";
   private static final String PKG_NAME_2 = "com.example.b";
   private static final String NONUPDATABLE_PKG_NAME_1 = "com.google.android.permissionconfig";
-  private static final String NONUPDATABLE_PKG_NAME_2 = "com.google.android.ext.service";
+  private static final String NONUPDATABLE_PKG_NAME_2 = "com.google.android.ext.services";
   private static final String NONUPDATABLE_PKG_NAME_3 = "com.google.android.permissioncontroller";
-  private static final String NONUPDATABLE_PKG_NAME_4 = "com.google.android.extservice";
+  private static final String NONUPDATABLE_PKG_NAME_4 = "com.google.android.extservices";
   private static final String NONUPDATABLE_PKG_NAME_5 = "com.google.android.permission";
 
   @Rule public TemporaryFolder tmp = new TemporaryFolder();

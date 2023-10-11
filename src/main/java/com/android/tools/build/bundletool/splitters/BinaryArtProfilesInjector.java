@@ -15,6 +15,12 @@
  */
 package com.android.tools.build.bundletool.splitters;
 
+import static com.android.tools.build.bundletool.model.BinaryArtProfileConstants.LEGACY_PROFILE_METADATA_NAMESPACE;
+import static com.android.tools.build.bundletool.model.BinaryArtProfileConstants.PROFILE_APK_LOCATION;
+import static com.android.tools.build.bundletool.model.BinaryArtProfileConstants.PROFILE_FILENAME;
+import static com.android.tools.build.bundletool.model.BinaryArtProfileConstants.PROFILE_METADATA_FILENAME;
+import static com.android.tools.build.bundletool.model.BinaryArtProfileConstants.PROFILE_METADATA_NAMESPACE;
+
 import com.android.tools.build.bundletool.model.AppBundle;
 import com.android.tools.build.bundletool.model.BundleMetadata;
 import com.android.tools.build.bundletool.model.ModuleEntry;
@@ -27,20 +33,12 @@ import java.util.Optional;
 /** Copies the binary art profiles from AAB's metadata into main APK of base module. */
 public final class BinaryArtProfilesInjector {
 
-  static final String APK_LOCATION = "assets/dexopt";
-  static final String METADATA_NAMESPACE = "com.android.tools.build.profiles";
-  static final String LEGACY_METADATA_NAMESPACE = "assets.dexopt";
-
-  static final String BINARY_ART_PROFILE_NAME = "baseline.prof";
-  static final String BINARY_ART_PROFILE_METADATA_NAME = "baseline.profm";
-
   private final Optional<ByteSource> binaryArtProfile;
   private final Optional<ByteSource> binaryArtProfileMetadata;
 
   public BinaryArtProfilesInjector(AppBundle appBundle) {
-    binaryArtProfile = extract(appBundle.getBundleMetadata(), BINARY_ART_PROFILE_NAME);
-    binaryArtProfileMetadata =
-        extract(appBundle.getBundleMetadata(), BINARY_ART_PROFILE_METADATA_NAME);
+    binaryArtProfile = extract(appBundle.getBundleMetadata(), PROFILE_FILENAME);
+    binaryArtProfileMetadata = extract(appBundle.getBundleMetadata(), PROFILE_METADATA_FILENAME);
   }
 
   public ModuleSplit inject(ModuleSplit split) {
@@ -58,7 +56,7 @@ public final class BinaryArtProfilesInjector {
                 ModuleEntry.builder()
                     .setForceUncompressed(true)
                     .setContent(content)
-                    .setPath(ZipPath.create(APK_LOCATION).resolve(BINARY_ART_PROFILE_NAME))
+                    .setPath(ZipPath.create(PROFILE_APK_LOCATION).resolve(PROFILE_FILENAME))
                     .build()));
     binaryArtProfileMetadata.ifPresent(
         content ->
@@ -66,7 +64,8 @@ public final class BinaryArtProfilesInjector {
                 ModuleEntry.builder()
                     .setForceUncompressed(true)
                     .setContent(content)
-                    .setPath(ZipPath.create(APK_LOCATION).resolve(BINARY_ART_PROFILE_METADATA_NAME))
+                    .setPath(
+                        ZipPath.create(PROFILE_APK_LOCATION).resolve(PROFILE_METADATA_FILENAME))
                     .build()));
     return builder.build();
   }
@@ -77,9 +76,10 @@ public final class BinaryArtProfilesInjector {
   }
 
   private static Optional<ByteSource> extract(BundleMetadata metadata, String entryName) {
-    Optional<ByteSource> entry = metadata.getFileAsByteSource(METADATA_NAMESPACE, entryName);
+    Optional<ByteSource> entry =
+        metadata.getFileAsByteSource(PROFILE_METADATA_NAMESPACE, entryName);
     return entry.isPresent()
         ? entry
-        : metadata.getFileAsByteSource(LEGACY_METADATA_NAMESPACE, entryName);
+        : metadata.getFileAsByteSource(LEGACY_PROFILE_METADATA_NAMESPACE, entryName);
   }
 }

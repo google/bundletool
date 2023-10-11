@@ -293,7 +293,7 @@ public class FusingAndroidManifestMerger implements AndroidManifestMerger {
   private static ImmutableMap<BundleModuleName, AndroidManifest> ensureOneManifestPerModule(
       SetMultimap<BundleModuleName, AndroidManifest> manifests) {
     ImmutableMap.Builder<BundleModuleName, AndroidManifest> builder = ImmutableMap.builder();
-    for (BundleModuleName moduleName : manifests.keys()) {
+    for (BundleModuleName moduleName : manifests.keySet()) {
       Set<AndroidManifest> moduleManifests = manifests.get(moduleName);
       if (moduleManifests.size() != 1) {
         throw CommandExecutionException.builder()

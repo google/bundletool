@@ -54,8 +54,10 @@ import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.crea
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withActivityAlias;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withCustomThemeActivity;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withFastFollowDelivery;
+import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withFeatureCondition;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withFusingAttribute;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withInstallTimeDelivery;
+import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withInstallTimeRemovableElement;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withInstant;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withInstantInstallTimeDelivery;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withInstantOnDemandDelivery;
@@ -1514,5 +1516,81 @@ public class AndroidManifestTest {
     AndroidManifest androidManifest = AndroidManifest.create(xmlNode(xmlElement("manifest")));
 
     assertThat(androidManifest.getUsesFeatureElement("featureName")).isEmpty();
+  }
+
+  @Test
+  public void isAlwaysInstalledModule_legacyOnDemandTrue_returnsFalse() {
+    AndroidManifest manifest =
+        AndroidManifest.create(androidManifest("com.test.app", withOnDemandAttribute(true)));
+    assertThat(manifest.isAlwaysInstalledModule()).isFalse();
+  }
+
+  @Test
+  public void isAlwaysInstalledModule_legacyOnDemandFalse_returnsTrue() {
+    AndroidManifest manifest =
+        AndroidManifest.create(androidManifest("com.test.app", withOnDemandAttribute(false)));
+    assertThat(manifest.isAlwaysInstalledModule()).isTrue();
+  }
+
+  @Test
+  public void isAlwaysInstalledModule_noDeliveryElements_returnsTrue() {
+    AndroidManifest manifest = AndroidManifest.create(xmlNode(xmlElement("manifest")));
+    assertThat(manifest.isAlwaysInstalledModule()).isTrue();
+  }
+
+  @Test
+  public void isAlwaysInstalledModule_moduleConditions_returnsFalse() {
+    AndroidManifest manifest =
+        AndroidManifest.create(
+            androidManifest("com.test.app", withFeatureCondition("com.feature1")));
+    assertThat(manifest.isAlwaysInstalledModule()).isFalse();
+  }
+
+  @Test
+  public void isAlwaysInstalledModule_minSdkCondition_returnsFalse() {
+    AndroidManifest manifest =
+        AndroidManifest.create(androidManifest("com.test.app", withMinSdkCondition(21)));
+    assertThat(manifest.isAlwaysInstalledModule()).isFalse();
+  }
+
+  @Test
+  public void isAlwaysInstalledModule_onDemandElement_returnsFalse() {
+    AndroidManifest manifest =
+        AndroidManifest.create(androidManifest("com.test.app", withOnDemandDelivery()));
+    assertThat(manifest.isAlwaysInstalledModule()).isFalse();
+  }
+
+  @Test
+  public void isAlwaysInstalledModule_fastFollow_returnsFalse() {
+    AndroidManifest manifest =
+        AndroidManifest.create(
+            androidManifest(
+                "com.test.app",
+                withTypeAttribute(MODULE_TYPE_ASSET_VALUE),
+                withFastFollowDelivery()));
+    assertThat(manifest.isAlwaysInstalledModule()).isFalse();
+  }
+
+  @Test
+  public void isAlwaysInstalledModule_installTimeRemovableFalse_returnsTrue() {
+    AndroidManifest manifest =
+        AndroidManifest.create(
+            androidManifest("com.test.app", withInstallTimeRemovableElement(false)));
+    assertThat(manifest.isAlwaysInstalledModule()).isTrue();
+  }
+
+  @Test
+  public void isAlwaysInstalledModule_installTimeRemovableTrue_returnsFalse() {
+    AndroidManifest manifest =
+        AndroidManifest.create(
+            androidManifest("com.test.app", withInstallTimeRemovableElement(true)));
+    assertThat(manifest.isAlwaysInstalledModule()).isFalse();
+  }
+
+  @Test
+  public void isAlwaysInstalledModule_installTimeNoRemovable_returnsTrue() {
+    AndroidManifest manifest =
+        AndroidManifest.create(androidManifest("com.test.app", withInstallTimeDelivery()));
+    assertThat(manifest.isAlwaysInstalledModule()).isTrue();
   }
 }

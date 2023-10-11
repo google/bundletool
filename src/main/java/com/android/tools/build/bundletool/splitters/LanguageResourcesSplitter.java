@@ -56,10 +56,6 @@ public class LanguageResourcesSplitter extends SplitterForOneTargetingDimension 
 
   private final Predicate<ResourceTableEntry> pinResourceToMaster;
 
-  public LanguageResourcesSplitter() {
-    this(/* pinResourceToMaster= */ Predicates.alwaysFalse());
-  }
-
   public LanguageResourcesSplitter(Predicate<ResourceTableEntry> pinResourceToMaster) {
     this.pinResourceToMaster = pinResourceToMaster;
   }

@@ -21,13 +21,13 @@ import static com.android.tools.build.bundletool.mergers.AndroidManifestMerger.f
 import static com.android.tools.build.bundletool.model.BundleModule.DEX_DIRECTORY;
 import static com.android.tools.build.bundletool.model.version.VersionGuardedFeature.FUSE_APPLICATION_ELEMENTS_FROM_FEATURE_MANIFESTS;
 import static com.android.tools.build.bundletool.model.version.VersionGuardedFeature.MERGE_INSTALL_TIME_MODULES_INTO_BASE;
+import static com.android.tools.build.bundletool.model.version.VersionGuardedFeature.RESPECT_LEGACY_ON_DEMAND_ATTRIBUTE_FOR_INSTALL_MODULES_MERGING;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.ImmutableListMultimap.flatteningToImmutableListMultimap;
 import static com.google.common.collect.ImmutableSet.toImmutableSet;
 import static com.google.common.collect.Multimaps.toMultimap;
 
 import com.android.aapt.Resources.ResourceTable;
-import com.android.bundle.Config.BundleConfig;
 import com.android.bundle.Files.ApexImages;
 import com.android.bundle.Files.Assets;
 import com.android.bundle.Files.NativeLibraries;
@@ -65,10 +65,7 @@ public class BundleModuleMerger {
         Stream.concat(
                 Stream.of(appBundle.getBaseModule()),
                 appBundle.getFeatureModules().values().stream()
-                    .filter(
-                        module ->
-                            shouldMerge(
-                                module, appBundle.getBundleConfig(), overrideBundleToolVersion)))
+                    .filter(module -> shouldMerge(module, appBundle, overrideBundleToolVersion)))
             .collect(toImmutableSet());
 
     // If only base module should be fused there is nothing to do.
@@ -110,27 +107,28 @@ public class BundleModuleMerger {
   }
 
   private static boolean shouldMerge(
-      BundleModule module, BundleConfig bundleConfig, boolean overrideBundleToolVersion) {
+      BundleModule module, AppBundle appBundle, boolean overrideBundleToolVersion) {
     if (module.getModuleType() != ModuleType.FEATURE_MODULE) {
       return false;
     }
+    // Modules in AABs with isolated splits should never be merged.
+    if (appBundle.getBaseModule().getAndroidManifest().getIsolatedSplits().orElse(false)) {
+      return false;
+    }
 
-    return module
-        .getAndroidManifest()
-        .getManifestDeliveryElement()
-        .map(
-            manifestDeliveryElement -> {
-              Version bundleToolVersion =
-                  BundleToolVersion.getVersionFromBundleConfig(bundleConfig);
-              // Only override for bundletool version < 1.0.0
-              if (overrideBundleToolVersion
-                  && !MERGE_INSTALL_TIME_MODULES_INTO_BASE.enabledForVersion(bundleToolVersion)) {
-                return manifestDeliveryElement.hasInstallTimeElement()
-                    && !manifestDeliveryElement.hasModuleConditions();
-              }
-              return !manifestDeliveryElement.isInstallTimeRemovable(bundleToolVersion);
-            })
-        .orElse(false);
+    Version bundleToolVersion =
+        BundleToolVersion.getVersionFromBundleConfig(appBundle.getBundleConfig());
+    if (!overrideBundleToolVersion
+        && !MERGE_INSTALL_TIME_MODULES_INTO_BASE.enabledForVersion(bundleToolVersion)) {
+      return false;
+    }
+
+    boolean isAlwaysInstalledModule = module.getAndroidManifest().isAlwaysInstalledModule();
+    return RESPECT_LEGACY_ON_DEMAND_ATTRIBUTE_FOR_INSTALL_MODULES_MERGING.enabledForVersion(
+            bundleToolVersion)
+        ? isAlwaysInstalledModule
+        : isAlwaysInstalledModule
+            && module.getAndroidManifest().getManifestDeliveryElement().isPresent();
   }
 
   private static ImmutableSet<ModuleEntry> getAllEntriesExceptDexAndSpecial(

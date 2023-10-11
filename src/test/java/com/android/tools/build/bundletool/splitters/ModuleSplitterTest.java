@@ -27,6 +27,8 @@ import static com.android.tools.build.bundletool.model.AndroidManifest.PERMISSIO
 import static com.android.tools.build.bundletool.model.AndroidManifest.PROPERTY_ELEMENT_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.SDK_SANDBOX_MIN_VERSION;
 import static com.android.tools.build.bundletool.model.AndroidManifest.SPLIT_NAME_RESOURCE_ID;
+import static com.android.tools.build.bundletool.model.BinaryArtProfileConstants.PROFILE_FILENAME;
+import static com.android.tools.build.bundletool.model.BinaryArtProfileConstants.PROFILE_METADATA_NAMESPACE;
 import static com.android.tools.build.bundletool.model.ManifestMutator.withExtractNativeLibs;
 import static com.android.tools.build.bundletool.model.OptimizationDimension.ABI;
 import static com.android.tools.build.bundletool.model.OptimizationDimension.COUNTRY_SET;
@@ -2303,9 +2305,7 @@ public class ModuleSplitterTest {
         new AppBundleBuilder()
             .addModule(BASE_MODULE)
             .addMetadataFile(
-                BinaryArtProfilesInjector.METADATA_NAMESPACE,
-                BinaryArtProfilesInjector.BINARY_ART_PROFILE_NAME,
-                ByteSource.wrap(new byte[] {1, 2, 3}))
+                PROFILE_METADATA_NAMESPACE, PROFILE_FILENAME, ByteSource.wrap(new byte[] {1, 2, 3}))
             .build();
     ImmutableList<ModuleSplit> splits =
         createAbiAndDensitySplitter(testModule, appBundle).splitModule();

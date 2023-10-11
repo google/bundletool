@@ -227,7 +227,8 @@ public final class TestUtils {
 
   public static ZipBuilder createZipBuilderForSdkAsar(SdkMetadata sdkMetadata) {
     return new ZipBuilder()
-        .addFileWithProtoContent(ZipPath.create(SDK_METADATA_FILE_NAME), sdkMetadata);
+        .addFileWithProtoContent(ZipPath.create(SDK_METADATA_FILE_NAME), sdkMetadata)
+        .addFileWithContent(ZipPath.create(SDK_INTERFACE_DESCRIPTORS_FILE_NAME), TEST_CONTENT);
   }
 
   public static ZipBuilder createZipBuilderForModules() {

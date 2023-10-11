@@ -59,6 +59,7 @@ import static com.android.tools.build.bundletool.model.AndroidManifest.REMOVABLE
 import static com.android.tools.build.bundletool.model.AndroidManifest.REQUIRED_ATTRIBUTE_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.REQUIRED_BY_PRIVACY_SANDBOX_SDK_ATTRIBUTE_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.REQUIRED_RESOURCE_ID;
+import static com.android.tools.build.bundletool.model.AndroidManifest.REQUIRED_SPLIT_TYPES_ATTRIBUTE_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.RESOURCE_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.ROUND_ICON_ATTRIBUTE_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.ROUND_ICON_RESOURCE_ID;
@@ -68,6 +69,7 @@ import static com.android.tools.build.bundletool.model.AndroidManifest.SDK_PROVI
 import static com.android.tools.build.bundletool.model.AndroidManifest.SDK_VERSION_MAJOR_ATTRIBUTE_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.SERVICE_ELEMENT_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.SPLIT_NAME_RESOURCE_ID;
+import static com.android.tools.build.bundletool.model.AndroidManifest.SPLIT_TYPES_ATTRIBUTE_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.TARGET_SANDBOX_VERSION_ATTRIBUTE_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.TARGET_SANDBOX_VERSION_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.THEME_ATTRIBUTE_NAME;
@@ -292,6 +294,9 @@ public class ManifestEditor {
   /**
    * Sets a flag whether the app is able to run without any config splits.
    *
+   * <p>Warning: this value is not read by the system and is provided for legacy install verifiers
+   * only.
+   *
    * <p>The information is stored as:
    *
    * <ul>
@@ -308,6 +313,40 @@ public class ManifestEditor {
         createAndroidAttribute("value", VALUE_RESOURCE_ID).setValueAsBoolean(value));
     return setApplcationAttributeBoolean(
         IS_SPLIT_REQUIRED_ATTRIBUTE_NAME, IS_SPLIT_REQUIRED_RESOURCE_ID, value);
+  }
+
+  /**
+   * Sets the list of split types provided by this split.
+   *
+   * <p>Split types are arbitrary strings, stored comma-separated, and used along with {@code
+   * requiredSplitTypes} to perform validation at install time.
+   *
+   * <p>Note: this is currently set under `dist:splitTypes` rather than as the Android attribute.
+   * This will be replaced once the verifier implementation has been validated.
+   */
+  @CanIgnoreReturnValue
+  public ManifestEditor setSplitTypes(ImmutableList<String> splitTypes) {
+    manifestElement
+        .getOrCreateAttribute(DISTRIBUTION_NAMESPACE_URI, SPLIT_TYPES_ATTRIBUTE_NAME)
+        .setValueAsString(splitTypes.stream().sorted().collect(joining(",")));
+    return this;
+  }
+
+  /**
+   * Sets the list of required split types for this split.
+   *
+   * <p>Split types are arbitrary strings, stored comma-separated, and reference the split types
+   * provided by {@code splitTypes} in splits.
+   *
+   * <p>Note: this is currently set under `dist:requiredSplitTypes` rather than as the Android
+   * attribute. This will be replaced once the verifier implementation has been validated.
+   */
+  @CanIgnoreReturnValue
+  public ManifestEditor setRequiredSplitTypes(ImmutableList<String> splitTypes) {
+    manifestElement
+        .getOrCreateAttribute(DISTRIBUTION_NAMESPACE_URI, REQUIRED_SPLIT_TYPES_ATTRIBUTE_NAME)
+        .setValueAsString(splitTypes.stream().sorted().collect(joining(",")));
+    return this;
   }
 
   /** Adds an empty {@code <application>} element in the manifest if none is present. */

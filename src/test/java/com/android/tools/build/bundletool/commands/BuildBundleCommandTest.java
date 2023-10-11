@@ -292,6 +292,67 @@ public class BuildBundleCommandTest {
   }
 
   @Test
+  public void module_riscV64Arch() throws Exception {
+    XmlNode manifest = androidManifest(PKG_NAME, withHasCode(true));
+    ResourceTable resourceTable =
+        new ResourceTableBuilder()
+            .addPackage(PKG_NAME)
+            .addDrawableResource("icon", "res/drawable/icon.png")
+            .build();
+    Path module =
+        new ZipBuilder()
+            .addFileWithContent(ZipPath.create("dex/classes.dex"), "dex".getBytes(UTF_8))
+            .addFileWithContent(ZipPath.create("lib/armeabi-v7a/libX.so"), "arm32".getBytes(UTF_8))
+            .addFileWithContent(ZipPath.create("lib/arm64-v8a/libX.so"), "arm64".getBytes(UTF_8))
+            .addFileWithContent(ZipPath.create("lib/riscv64/libX.so"), "riscv64".getBytes(UTF_8))
+            .addFileWithProtoContent(ZipPath.create("manifest/AndroidManifest.xml"), manifest)
+            .addFileWithContent(ZipPath.create("res/drawable/icon.png"), "image".getBytes(UTF_8))
+            .addFileWithProtoContent(ZipPath.create("resources.pb"), resourceTable)
+            .writeTo(tmpDir.resolve("base.zip"));
+    NativeLibraries nativeLibraries =
+        NativeLibraries.newBuilder()
+            .addDirectory(
+                TargetedNativeDirectory.newBuilder()
+                    .setPath("lib/armeabi-v7a")
+                    .setTargeting(
+                        NativeDirectoryTargeting.newBuilder()
+                            .setAbi(Abi.newBuilder().setAlias(ARMEABI_V7A))))
+            .addDirectory(
+                TargetedNativeDirectory.newBuilder()
+                    .setPath("lib/arm64-v8a")
+                    .setTargeting(
+                        NativeDirectoryTargeting.newBuilder()
+                            .setAbi(Abi.newBuilder().setAlias(ARM64_V8A))))
+            .addDirectory(
+                TargetedNativeDirectory.newBuilder()
+                    .setPath("lib/riscv64")
+                    .setTargeting(
+                        NativeDirectoryTargeting.newBuilder()
+                            .setAbi(Abi.newBuilder().setAlias(AbiAlias.RISCV64))))
+            .build();
+    BuildBundleCommand.builder()
+        .setOutputPath(bundlePath)
+        .setModulesPaths(ImmutableList.of(module))
+        .build()
+        .execute();
+
+    try (ZipFile bundle = new ZipFile(bundlePath.toFile())) {
+      assertThat(bundle).hasFile("base/dex/classes.dex").withContent("dex".getBytes(UTF_8));
+      assertThat(bundle)
+          .hasFile("base/lib/armeabi-v7a/libX.so")
+          .withContent("arm32".getBytes(UTF_8));
+      assertThat(bundle).hasFile("base/lib/arm64-v8a/libX.so").withContent("arm64".getBytes(UTF_8));
+      assertThat(bundle).hasFile("base/lib/riscv64/libX.so").withContent("riscv64".getBytes(UTF_8));
+      assertThat(bundle)
+          .hasFile("base/manifest/AndroidManifest.xml")
+          .withContent(manifest.toByteArray());
+      assertThat(bundle).hasFile("base/res/drawable/icon.png").withContent("image".getBytes(UTF_8));
+      assertThat(bundle).hasFile("base/resources.pb").withContent(resourceTable.toByteArray());
+      assertThat(bundle).hasFile("base/native.pb").withContent(nativeLibraries.toByteArray());
+    }
+  }
+
+  @Test
   public void validApexModule() throws Exception {
     XmlNode manifest = androidManifest(PKG_NAME, withHasCode(false));
     ImmutableSet<AbiAlias> targetedAbis = ImmutableSet.of(X86_64, X86, ARM64_V8A, ARMEABI_V7A);

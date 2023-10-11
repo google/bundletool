@@ -17,7 +17,7 @@
 package com.android.tools.build.bundletool.splitters;
 
 import static com.android.tools.build.bundletool.model.BundleModule.DEX_DIRECTORY;
-import static com.android.tools.build.bundletool.model.utils.Versions.ANDROID_Q_API_VERSION;
+import static com.android.tools.build.bundletool.model.utils.Versions.ANDROID_P_API_VERSION;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.ImmutableSet.toImmutableSet;
 
@@ -47,8 +47,8 @@ public class DexCompressionSplitter implements ModuleSplitSplitter {
       return ImmutableList.of(moduleSplit);
     }
 
-    // Only APKs targeting devices below Android Q should have dex entries compressed.
-    boolean forceUncompressed = targetsAtLeastQ(moduleSplit);
+    // Only APKs targeting devices below Android P should have dex entries compressed.
+    boolean forceUncompressed = targetsAtLeastP(moduleSplit);
     return ImmutableList.of(
         createModuleSplit(
             moduleSplit, mergeAndSetCompression(dexEntries, moduleSplit, forceUncompressed)));
@@ -73,14 +73,14 @@ public class DexCompressionSplitter implements ModuleSplitSplitter {
         .build();
   }
 
-  private static boolean targetsAtLeastQ(ModuleSplit moduleSplit) {
+  private static boolean targetsAtLeastP(ModuleSplit moduleSplit) {
     int sdkVersion =
         Iterables.getOnlyElement(
                 moduleSplit.getVariantTargeting().getSdkVersionTargeting().getValueList())
             .getMin()
             .getValue();
 
-    return sdkVersion >= ANDROID_Q_API_VERSION;
+    return sdkVersion >= ANDROID_P_API_VERSION;
   }
 
   private static ModuleSplit createModuleSplit(
