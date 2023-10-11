@@ -1,26 +1,16 @@
 import com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar
 
-buildscript {
-    repositories {
-        mavenCentral()
-        maven {
-            url "https://plugins.gradle.org/m2/"
-        }
-    }
-    dependencies {
-        classpath "com.google.protobuf:protobuf-gradle-plugin:0.8.13"
-        classpath "gradle.plugin.com.github.johnrengelman:shadow:7.1.1"
-    }
+plugins {
+    id "com.github.johnrengelman.shadow" version "7.1.1"
+    id "com.google.protobuf" version "0.8.13"
+    id "java"
+    id "maven-publish"
 }
-
-apply plugin: "com.github.johnrengelman.shadow"
-apply plugin: "com.google.protobuf"
-apply plugin: "java"
-apply plugin: "maven-publish"
 
 repositories {
     mavenCentral()
     google()
+    gradlePluginPortal()
 }
 
 configurations {
@@ -71,13 +61,12 @@ dependencies {
     testImplementation "com.google.protobuf:protobuf-java:3.19.2"
     testImplementation "com.google.protobuf:protobuf-java-util:3.19.2"
     testImplementation "org.mockito:mockito-core:2.18.3"
-    testImplementation "junit:junit:4.12"
+    testImplementation 'junit:junit:4.13.1'
     testImplementation "org.bouncycastle:bcprov-jdk15on:1.56"
     testImplementation "org.bouncycastle:bcpkix-jdk15on:1.56"
-    testImplementation "org.junit.jupiter:junit-jupiter-api:5.2.0"
-    testImplementation "org.junit.vintage:junit-vintage-engine:5.2.0"
-    testRuntimeOnly "org.junit.jupiter:junit-jupiter-engine:5.2.0"
-    testImplementation "org.junit.platform:junit-platform-runner:1.2.0"
+    testImplementation "org.junit.jupiter:junit-jupiter-api:5.9.2"
+    testImplementation "org.junit.vintage:junit-vintage-engine:5.9.2"
+    testRuntimeOnly "org.junit.jupiter:junit-jupiter-engine:5.9.2"
     testImplementation "com.google.dagger:dagger:2.28.3"
     testAnnotationProcessor "com.google.dagger:dagger-compiler:2.28.3"
     testImplementation "javax.inject:javax.inject:1"
@@ -120,8 +109,12 @@ test {
     }
 
     reports {
-        html.enabled = false
+        html.configure {
+            required = false
+        }
     }
+
+    useJUnitPlatform()
 }
 
 protobuf {
@@ -175,8 +168,8 @@ publishing {
 
 // Artifact released to Maven.
 shadowJar {
-    baseName = 'bundletool'
-    classifier = ''
+    archiveBaseName = 'bundletool'
+    archiveClassifier = ''
 
     // Package all the Android Gradle plugin dependencies that are compiled from
     // source.
@@ -210,9 +203,9 @@ shadowJar {
 }
 
 // Artifact to use as standalone command line tool.
-task executableJar(type: ShadowJar) {
-    baseName = 'bundletool'
-    classifier = 'all'
+tasks.register('executableJar', ShadowJar) {
+    archiveBaseName = 'bundletool'
+    archiveClassifier = 'all'
     from sourceSets.main.output
     from({ zipTree(project.configurations.implementationWindows.singleFile) }) { into 'windows/' }
     from({ zipTree(project.configurations.implementationMacOs.singleFile) }) { into 'macos/' }
@@ -230,7 +223,7 @@ task executableJar(type: ShadowJar) {
 }
 
 // Unzip the aapt2 dependency jar.
-task unzipAapt2Jar(type: Copy) {
+tasks.register('unzipAapt2Jar', Copy) {
     if (osName.contains("linux")) {
         from zipTree(project.configurations.implementationLinux.singleFile)
         into('build/resources/main/linux')
@@ -247,8 +240,15 @@ task unzipAapt2Jar(type: Copy) {
     }
 }
 
-task uploadShadow {
+tasks.register('uploadShadow') {
     dependsOn ':publishShadowPublicationToMavenRepository'
 }
 
 compileTestJava.dependsOn(unzipAapt2Jar)
+jar.dependsOn(unzipAapt2Jar)
+
+tasks.configureEach { task ->
+    if (task.name.contains("extractIncludeTestProto")) {
+        task.dependsOn(unzipAapt2Jar)
+    }
+}
