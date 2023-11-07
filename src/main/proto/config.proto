@@ -173,6 +173,22 @@ message ResourceOptimizations {
 
 message UncompressNativeLibraries {
   bool enabled = 1;
+
+  enum PageAlignment {
+    PAGE_ALIGNMENT_UNSPECIFIED = 0;
+    PAGE_ALIGNMENT_4K = 1;
+    PAGE_ALIGNMENT_16K = 2;
+    PAGE_ALIGNMENT_64K = 3;
+  }
+
+  // This is an experimental setting. It's behavior might be changed or
+  // completely removed.
+  //
+  // Alignment used for uncompressed native libraries inside APKs generated
+  // by bundletool.
+  //
+  // PAGE_ALIGNMENT_4K by default.
+  PageAlignment alignment = 2;
 }
 
 message UncompressDexFiles {

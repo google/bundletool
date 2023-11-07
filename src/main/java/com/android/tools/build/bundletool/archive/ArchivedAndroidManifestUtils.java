@@ -35,11 +35,13 @@ import com.android.tools.build.bundletool.model.ManifestEditor;
 import com.android.tools.build.bundletool.model.manifestelements.Activity;
 import com.android.tools.build.bundletool.model.manifestelements.IntentFilter;
 import com.android.tools.build.bundletool.model.manifestelements.Receiver;
+import com.android.tools.build.bundletool.model.utils.xmlproto.XmlProtoAttribute;
 import com.android.tools.build.bundletool.model.utils.xmlproto.XmlProtoElementBuilder;
 import com.android.tools.build.bundletool.model.utils.xmlproto.XmlProtoNode;
 import com.android.tools.build.bundletool.model.version.BundleToolVersion;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import java.util.Optional;
 
 /** Utility methods for creation of archived manifest. */
 public final class ArchivedAndroidManifestUtils {
@@ -91,7 +93,7 @@ public final class ArchivedAndroidManifestUtils {
           AndroidManifest.PERMISSION_TREE_ELEMENT_NAME);
 
   public static AndroidManifest createArchivedManifest(
-      AndroidManifest manifest, boolean createDifferentThemesForTvAndPhone) {
+      AndroidManifest manifest, boolean removeTvIconCloud) {
     checkNotNull(manifest);
 
     ManifestEditor editor =
@@ -131,7 +133,7 @@ public final class ArchivedAndroidManifestUtils {
     CHILDREN_ELEMENTS_TO_KEEP.forEach(
         elementName -> editor.copyChildrenElements(manifest, elementName));
 
-    if (createDifferentThemesForTvAndPhone) {
+    if (removeTvIconCloud) {
       if (manifest.hasMainActivity()) {
         editor.addActivity(
             createReactivateActivity(
@@ -146,7 +148,9 @@ public final class ArchivedAndroidManifestUtils {
                 IntentFilter.builder()
                     .addActionName(MAIN_ACTION_NAME)
                     .addCategoryName(LEANBACK_LAUNCHER_CATEGORY_NAME)
-                    .build()));
+                    .build(),
+                manifest.getIconAttribute().map(XmlProtoAttribute::getValueAsRefId),
+                manifest.getRoundIconAttribute().map(XmlProtoAttribute::getValueAsRefId)));
       }
     } else {
       editor.addActivity(createReactivateActivity(manifest));
@@ -168,7 +172,7 @@ public final class ArchivedAndroidManifestUtils {
   public static AndroidManifest updateArchivedIconsAndTheme(
       AndroidManifest manifest,
       ImmutableMap<String, Integer> resourceNameToIdMap,
-      boolean createDifferentThemesForTvAndPhone) {
+      boolean removeTvIconCloud) {
     ManifestEditor archivedManifestEditor = manifest.toEditor();
 
     if (manifest.getIconAttribute().isPresent()
@@ -182,20 +186,9 @@ public final class ArchivedAndroidManifestUtils {
           resourceNameToIdMap.get(ARCHIVED_ROUND_ICON_DRAWABLE_NAME));
     }
 
-    if (createDifferentThemesForTvAndPhone) {
-      if (manifest.hasMainActivity()) {
-        archivedManifestEditor.setActivityTheme(
-            REACTIVATE_ACTIVITY_NAME,
-            LAUNCHER_CATEGORY_NAME,
-            HOLO_LIGHT_NO_ACTION_BAR_FULSCREEN_THEME_RESOURCE_ID);
-      }
-      if (manifest.hasMainTvActivity()) {
-        archivedManifestEditor.setActivityTheme(
-            REACTIVATE_ACTIVITY_NAME,
-            LEANBACK_LAUNCHER_CATEGORY_NAME,
-            checkNotNull(resourceNameToIdMap.get(ArchivedResourcesHelper.ARCHIVED_TV_THEME_NAME))
-                .intValue());
-      }
+    if (removeTvIconCloud) {
+      archivedManifestEditor.setApplicationTheme(
+          resourceNameToIdMap.get(ArchivedResourcesHelper.ARCHIVED_TV_THEME_NAME));
     } else {
       archivedManifestEditor.setActivityTheme(
           REACTIVATE_ACTIVITY_NAME,
@@ -205,15 +198,19 @@ public final class ArchivedAndroidManifestUtils {
     return archivedManifestEditor.save();
   }
 
-  private static Activity createReactivateActivity(IntentFilter intentFilter) {
-    return Activity.builder()
+
+  private static Activity createReactivateActivity(
+      IntentFilter intentFilter, Optional<Integer> icon, Optional<Integer> roundIcon) {
+    return getCommonActivityBuilder()
         .setName(REACTIVATE_ACTIVITY_NAME)
-        .setExported(true)
-        .setExcludeFromRecents(true)
-        .setStateNotNeeded(true)
-        .setNoHistory(true)
         .setIntentFilter(intentFilter)
+        .setIcon(icon)
+        .setRoundIcon(roundIcon)
         .build();
+  }
+
+  private static Activity createReactivateActivity(IntentFilter intentFilter) {
+    return getCommonActivityBuilder().setIntentFilter(intentFilter).build();
   }
 
   private static Activity createReactivateActivity(AndroidManifest manifest) {
@@ -237,6 +234,15 @@ public final class ArchivedAndroidManifestUtils {
         .setNoHistory(true)
         .setIntentFilter(intentFilterBuilder.build())
         .build();
+  }
+
+  private static Activity.Builder getCommonActivityBuilder() {
+    return Activity.builder()
+        .setName(REACTIVATE_ACTIVITY_NAME)
+        .setExported(true)
+        .setExcludeFromRecents(true)
+        .setStateNotNeeded(true)
+        .setNoHistory(true);
   }
 
   private static Receiver createUpdateBroadcastReceiver() {

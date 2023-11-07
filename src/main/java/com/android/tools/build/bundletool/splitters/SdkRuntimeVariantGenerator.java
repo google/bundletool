@@ -15,16 +15,16 @@
  */
 package com.android.tools.build.bundletool.splitters;
 
+import static com.android.tools.build.bundletool.model.AndroidManifest.SDK_SANDBOX_MIN_VERSION;
 import static com.android.tools.build.bundletool.model.utils.TargetingProtoUtils.sdkVersionFrom;
-import static com.android.tools.build.bundletool.model.utils.Versions.ANDROID_T_API_VERSION;
 import static com.google.common.collect.ImmutableSet.toImmutableSet;
 
 import com.android.bundle.Targeting.SdkVersion;
 import com.android.bundle.Targeting.SdkVersionTargeting;
 import com.android.bundle.Targeting.VariantTargeting;
+import com.android.tools.build.bundletool.model.AndroidManifest;
 import com.android.tools.build.bundletool.model.AppBundle;
 import com.android.tools.build.bundletool.model.utils.TargetingProtoUtils;
-import com.android.tools.build.bundletool.model.utils.Versions;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Streams;
 import java.util.stream.Stream;
@@ -49,8 +49,8 @@ public final class SdkRuntimeVariantGenerator {
    *
    * <p>This method generates a new {@link VariantTargeting} for each element of {@code
    * sdkVersionVariantTargetings} that targets SDK version higher than {@link
-   * Versions#ANDROID_T_API_VERSION}, as well as one variant targeting {@link
-   * Versions#ANDROID_T_API_VERSION}.
+   * AndroidManifest#SDK_SANDBOX_MIN_VERSION}, as well as one variant targeting {@link
+   * AndroidManifest#SDK_SANDBOX_MIN_VERSION}.
    *
    * <p>For example, if {@code sdkVersionVariantTargetings} contains 2 variants: targeting Android S
    * API and Android U API, the method will return 2 new variants: targeting Android T API and
@@ -64,7 +64,7 @@ public final class SdkRuntimeVariantGenerator {
 
     ImmutableSet<SdkVersion> sdkVersions =
         Streams.concat(
-                Stream.of(sdkVersionFrom(ANDROID_T_API_VERSION)),
+                Stream.of(sdkVersionFrom(SDK_SANDBOX_MIN_VERSION)),
                 sdkVersionVariantTargetings.stream()
                     .filter(
                         variantTargeting ->
@@ -73,7 +73,7 @@ public final class SdkRuntimeVariantGenerator {
                                     .getValue(0)
                                     .getMin()
                                     .getValue()
-                                > ANDROID_T_API_VERSION)
+                                > SDK_SANDBOX_MIN_VERSION)
                     .map(VariantTargeting::getSdkVersionTargeting)
                     .flatMap(sdkVersionTargeting -> sdkVersionTargeting.getValueList().stream()))
             .collect(toImmutableSet());

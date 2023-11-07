@@ -127,6 +127,8 @@ public abstract class BuildSdkApksCommand {
   public abstract Optional<Integer> getFirstVariantNumber();
 
 
+  public abstract Optional<Integer> getMinSdkVersion();
+
   /** Creates a builder for the {@link BuildSdkApksCommand} with some default settings. */
   public static BuildSdkApksCommand.Builder builder() {
     return new AutoValue_BuildSdkApksCommand.Builder()
@@ -135,6 +137,8 @@ public abstract class BuildSdkApksCommand {
         .setVersionCode(DEFAULT_SDK_VERSION_CODE)
         .setVerbose(false);
   }
+
+  public abstract Builder toBuilder();
 
   /** Builder for the {@link BuildSdkApksCommand}. */
   @AutoValue.Builder
@@ -230,6 +234,9 @@ public abstract class BuildSdkApksCommand {
      */
     public abstract Builder setFirstVariantNumber(int firstVariantNumber);
 
+
+    /** Overrides value of android:minSdkVersion attribute in the generated APKs. */
+    public abstract Builder setMinSdkVersion(int minSdkVersion);
 
     abstract BuildSdkApksCommand autoBuild();
 

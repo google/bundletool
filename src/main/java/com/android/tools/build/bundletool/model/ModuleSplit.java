@@ -378,6 +378,13 @@ public abstract class ModuleSplit {
     return this;
   }
 
+  /** Overrides value of android:minSdkVersion attribute in the manifest. */
+  public ModuleSplit overrideMinSdkVersion(int minSdkVersion) {
+    AndroidManifest apkManifest =
+        getAndroidManifest().toEditor().setMinSdkVersion(minSdkVersion).save();
+    return toBuilder().setAndroidManifest(apkManifest).build();
+  }
+
   /** Writes the SDK Patch version to a new <meta-data> element. */
   public ModuleSplit writePatchVersion(int patchVersion) {
     AndroidManifest apkManifest =

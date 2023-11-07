@@ -19,7 +19,7 @@ package com.android.tools.build.bundletool.archive;
 import static com.google.common.base.Preconditions.checkNotNull;
 
 import com.android.aapt.Resources.ResourceTable;
-import com.android.tools.build.bundletool.commands.BuildApksModule.DifferentThemesForTvAndPhone;
+import com.android.tools.build.bundletool.commands.BuildApksModule.RemoveTvIconCloud;
 import com.android.tools.build.bundletool.io.ResourceReader;
 import com.android.tools.build.bundletool.model.AndroidManifest;
 import com.android.tools.build.bundletool.model.AppBundle;
@@ -49,13 +49,13 @@ import javax.inject.Inject;
 public final class ArchivedApksGenerator {
   private final ResourceReader resourceReader;
   private final ArchivedResourcesHelper archivedResourcesHelper;
-  private final boolean createDifferentThemesForTvAndPhone;
+  private final boolean removeTvIconCloud;
 
   @Inject
-  ArchivedApksGenerator(@DifferentThemesForTvAndPhone boolean createDifferentThemesForTvAndPhone) {
+  ArchivedApksGenerator(@RemoveTvIconCloud boolean removeTvIconCloud) {
     resourceReader = new ResourceReader();
     archivedResourcesHelper = new ArchivedResourcesHelper(resourceReader);
-    this.createDifferentThemesForTvAndPhone = createDifferentThemesForTvAndPhone;
+    this.removeTvIconCloud = removeTvIconCloud;
   }
 
   public ModuleSplit generateArchivedApk(
@@ -66,7 +66,7 @@ public final class ArchivedApksGenerator {
 
     AndroidManifest archivedManifest =
         ArchivedAndroidManifestUtils.createArchivedManifest(
-            baseModule.getAndroidManifest(), createDifferentThemesForTvAndPhone);
+            baseModule.getAndroidManifest(), removeTvIconCloud);
     ResourceTable archivedResourceTable =
         getArchivedResourceTable(appBundle, baseModule, archivedManifest);
 
@@ -91,7 +91,7 @@ public final class ArchivedApksGenerator {
 
     archivedManifest =
         ArchivedAndroidManifestUtils.updateArchivedIconsAndTheme(
-            archivedManifest, extraResourceNameToIdMap, createDifferentThemesForTvAndPhone);
+            archivedManifest, extraResourceNameToIdMap, removeTvIconCloud);
 
     ModuleSplit moduleSplit =
         ModuleSplit.forArchive(

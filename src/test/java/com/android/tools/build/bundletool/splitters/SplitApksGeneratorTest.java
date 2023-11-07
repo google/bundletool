@@ -24,7 +24,7 @@ import static com.android.tools.build.bundletool.model.AndroidManifest.SPLIT_TYP
 import static com.android.tools.build.bundletool.model.utils.Versions.ANDROID_L_API_VERSION;
 import static com.android.tools.build.bundletool.model.utils.Versions.ANDROID_M_API_VERSION;
 import static com.android.tools.build.bundletool.model.utils.Versions.ANDROID_Q_API_VERSION;
-import static com.android.tools.build.bundletool.model.utils.Versions.ANDROID_T_API_VERSION;
+import static com.android.tools.build.bundletool.model.utils.Versions.ANDROID_U_API_VERSION;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifest;
 import static com.android.tools.build.bundletool.testing.ResourcesTableFactory.HDPI;
 import static com.android.tools.build.bundletool.testing.ResourcesTableFactory.USER_PACKAGE_OFFSET;
@@ -610,7 +610,7 @@ public class SplitApksGeneratorTest {
     assertThat(
             moduleSplits.stream().map(ModuleSplit::getVariantTargeting).collect(toImmutableList()))
         .containsExactly(
-            lPlusVariantTargeting(), sdkRuntimeVariantTargeting(ANDROID_T_API_VERSION));
+            lPlusVariantTargeting(), sdkRuntimeVariantTargeting(ANDROID_U_API_VERSION));
     ImmutableMap<VariantTargeting, ModuleSplit> moduleSplitMap =
         Maps.uniqueIndex(moduleSplits, ModuleSplit::getVariantTargeting);
     assertThat(
@@ -621,7 +621,7 @@ public class SplitApksGeneratorTest {
         .isEmpty();
     assertThat(
             moduleSplitMap
-                .get(sdkRuntimeVariantTargeting(ANDROID_T_API_VERSION))
+                .get(sdkRuntimeVariantTargeting(ANDROID_U_API_VERSION))
                 .getAndroidManifest()
                 .getUsesSdkLibraryElements())
         .hasSize(1);
@@ -664,7 +664,7 @@ public class SplitApksGeneratorTest {
     assertThat(
             moduleSplits.stream().map(ModuleSplit::getVariantTargeting).collect(toImmutableSet()))
         .containsExactly(
-            lPlusVariantTargeting(), sdkRuntimeVariantTargeting(ANDROID_T_API_VERSION));
+            lPlusVariantTargeting(), sdkRuntimeVariantTargeting(ANDROID_U_API_VERSION));
     ImmutableMap<VariantTargeting, Collection<ModuleSplit>> moduleSplitMap =
         moduleSplits.stream()
             .collect(toImmutableListMultimap(ModuleSplit::getVariantTargeting, Function.identity()))
@@ -675,9 +675,9 @@ public class SplitApksGeneratorTest {
                 .map(ModuleSplit::getModuleName)
                 .map(BundleModuleName::getName))
         .containsExactly("base", "comTestSdk");
-    assertThat(moduleSplitMap.get(sdkRuntimeVariantTargeting(ANDROID_T_API_VERSION))).hasSize(1);
+    assertThat(moduleSplitMap.get(sdkRuntimeVariantTargeting(ANDROID_U_API_VERSION))).hasSize(1);
     assertThat(
-            moduleSplitMap.get(sdkRuntimeVariantTargeting(ANDROID_T_API_VERSION)).stream()
+            moduleSplitMap.get(sdkRuntimeVariantTargeting(ANDROID_U_API_VERSION)).stream()
                 .map(ModuleSplit::getModuleName)
                 .map(BundleModuleName::getName))
         .containsExactly("base");
@@ -753,7 +753,7 @@ public class SplitApksGeneratorTest {
     assertThat(
             moduleSplits.stream().map(ModuleSplit::getVariantTargeting).collect(toImmutableSet()))
         .containsExactly(
-            lPlusVariantTargeting(), sdkRuntimeVariantTargeting(ANDROID_T_API_VERSION));
+            lPlusVariantTargeting(), sdkRuntimeVariantTargeting(ANDROID_U_API_VERSION));
     ImmutableMap<VariantTargeting, Collection<ModuleSplit>> moduleSplitMap =
         moduleSplits.stream()
             .collect(toImmutableListMultimap(ModuleSplit::getVariantTargeting, Function.identity()))
@@ -780,13 +780,13 @@ public class SplitApksGeneratorTest {
     // 1 main split + 7 config splits: 1 per each screen density.
     assertThat(nonSdkRuntimeVariantBaseModuleSplits).hasSize(8);
     assertThat(
-            moduleSplitMap.get(sdkRuntimeVariantTargeting(ANDROID_T_API_VERSION)).stream()
+            moduleSplitMap.get(sdkRuntimeVariantTargeting(ANDROID_U_API_VERSION)).stream()
                 .map(ModuleSplit::getModuleName)
                 .map(BundleModuleName::getName)
                 .distinct())
         .containsExactly("base");
     ImmutableSet<ModuleSplit> sdkRuntimeVariantSplits =
-        moduleSplitMap.get(sdkRuntimeVariantTargeting(ANDROID_T_API_VERSION)).stream()
+        moduleSplitMap.get(sdkRuntimeVariantTargeting(ANDROID_U_API_VERSION)).stream()
             .filter(moduleSplit -> moduleSplit.getModuleName().getName().equals("base"))
             .collect(toImmutableSet());
     // 1 main split + 7 config splits: 1 per each screen density.
@@ -879,7 +879,7 @@ public class SplitApksGeneratorTest {
     assertThat(
             moduleSplits.stream().map(ModuleSplit::getVariantTargeting).collect(toImmutableSet()))
         .containsExactly(
-            lPlusVariantTargeting(), sdkRuntimeVariantTargeting(ANDROID_T_API_VERSION));
+            lPlusVariantTargeting(), sdkRuntimeVariantTargeting(ANDROID_U_API_VERSION));
     ImmutableMap<VariantTargeting, Collection<ModuleSplit>> moduleSplitMap =
         moduleSplits.stream()
             .collect(toImmutableListMultimap(ModuleSplit::getVariantTargeting, Function.identity()))
@@ -925,7 +925,7 @@ public class SplitApksGeneratorTest {
 
     // T+ runtime enabled
     Collection<ModuleSplit> tPlusVariantSplits =
-        moduleSplitMap.get(sdkRuntimeVariantTargeting(ANDROID_T_API_VERSION));
+        moduleSplitMap.get(sdkRuntimeVariantTargeting(ANDROID_U_API_VERSION));
     ImmutableSet<ModuleSplit> tPlusSdkModuleSplits =
         lPlusVariantSplits.stream()
             .filter(moduleSplit -> moduleSplit.getModuleName().getName().equals("comtestsdk"))

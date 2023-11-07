@@ -50,7 +50,7 @@ import static com.android.tools.build.bundletool.model.utils.Versions.ANDROID_P_
 import static com.android.tools.build.bundletool.model.utils.Versions.ANDROID_Q_API_VERSION;
 import static com.android.tools.build.bundletool.model.utils.Versions.ANDROID_S_API_VERSION;
 import static com.android.tools.build.bundletool.model.utils.Versions.ANDROID_S_V2_API_VERSION;
-import static com.android.tools.build.bundletool.model.utils.Versions.ANDROID_T_API_VERSION;
+import static com.android.tools.build.bundletool.model.utils.Versions.ANDROID_U_API_VERSION;
 import static com.android.tools.build.bundletool.testing.ApkSetUtils.extractFromApkSetFile;
 import static com.android.tools.build.bundletool.testing.ApkSetUtils.extractTocFromApkSetFile;
 import static com.android.tools.build.bundletool.testing.ApkSetUtils.parseTocFromFile;
@@ -7238,7 +7238,7 @@ public class BuildApksManagerTest {
     assertThat(sdkRuntimeVariant.getVariantNumber()).isEqualTo(1);
     assertThat(sdkRuntimeVariant.getTargeting())
         .isEqualTo(
-            sdkRuntimeVariantTargeting(ANDROID_T_API_VERSION).toBuilder()
+            sdkRuntimeVariantTargeting(ANDROID_U_API_VERSION).toBuilder()
                 .setSdkRuntimeTargeting(
                     SdkRuntimeTargeting.newBuilder().setRequiresSdkRuntime(true))
                 .build());

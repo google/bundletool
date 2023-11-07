@@ -19,8 +19,12 @@ package com.android.tools.build.bundletool.model.manifestelements;
 import static com.android.tools.build.bundletool.model.AndroidManifest.ACTIVITY_ELEMENT_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.EXPORTED_ATTRIBUTE_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.EXPORTED_RESOURCE_ID;
+import static com.android.tools.build.bundletool.model.AndroidManifest.ICON_ATTRIBUTE_NAME;
+import static com.android.tools.build.bundletool.model.AndroidManifest.ICON_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.NAME_ATTRIBUTE_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.NAME_RESOURCE_ID;
+import static com.android.tools.build.bundletool.model.AndroidManifest.ROUND_ICON_ATTRIBUTE_NAME;
+import static com.android.tools.build.bundletool.model.AndroidManifest.ROUND_ICON_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.THEME_ATTRIBUTE_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.THEME_RESOURCE_ID;
 
@@ -62,6 +66,10 @@ public abstract class Activity {
 
   abstract Optional<IntentFilter> getIntentFilter();
 
+  abstract Optional<Integer> getIcon();
+
+  abstract Optional<Integer> getRoundIcon();
+
   public static Builder builder() {
     return new AutoValue_Activity.Builder();
   }
@@ -76,6 +84,8 @@ public abstract class Activity {
     setStateNotNeeded(elementBuilder);
     setNoHistory(elementBuilder);
     setIntentFilterElement(elementBuilder);
+    setIconAttribute(elementBuilder);
+    setRoundIconAttribute(elementBuilder);
     return elementBuilder.build();
   }
 
@@ -134,6 +144,22 @@ public abstract class Activity {
     }
   }
 
+  private void setIconAttribute(XmlProtoElementBuilder elementBuilder) {
+    if (getIcon().isPresent()) {
+      elementBuilder
+          .getOrCreateAndroidAttribute(ICON_ATTRIBUTE_NAME, ICON_RESOURCE_ID)
+          .setValueAsRefId(getIcon().get());
+    }
+  }
+
+  private void setRoundIconAttribute(XmlProtoElementBuilder elementBuilder) {
+    if (getRoundIcon().isPresent()) {
+      elementBuilder
+          .getOrCreateAndroidAttribute(ROUND_ICON_ATTRIBUTE_NAME, ROUND_ICON_RESOURCE_ID)
+          .setValueAsRefId(getRoundIcon().get());
+    }
+  }
+
   /** Builder for Activity. */
   @AutoValue.Builder
   public abstract static class Builder {
@@ -150,6 +176,10 @@ public abstract class Activity {
     public abstract Builder setNoHistory(boolean noHistory);
 
     public abstract Builder setIntentFilter(IntentFilter intentFilter);
+
+    public abstract Builder setIcon(Optional<Integer> iconResId);
+
+    public abstract Builder setRoundIcon(Optional<Integer> roundIconResId);
 
     public abstract Activity build();
   }

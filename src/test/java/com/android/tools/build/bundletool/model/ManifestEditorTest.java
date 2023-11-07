@@ -1653,6 +1653,31 @@ public class ManifestEditorTest {
   }
 
   @Test
+  public void setApplicationTheme_succeeds() {
+    XmlNode application = xmlNode(xmlElement(APPLICATION_ELEMENT_NAME));
+    AndroidManifest androidManifest =
+        AndroidManifest.create(xmlNode(xmlElement("manifest", application)));
+
+    AndroidManifest edited = androidManifest.toEditor().setApplicationTheme(1).save();
+
+    AndroidManifest expected =
+        AndroidManifest.create(
+            xmlNode(
+                xmlElement(
+                    "manifest",
+                    xmlNode(
+                        xmlElement(
+                            APPLICATION_ELEMENT_NAME,
+                            ImmutableList.of(
+                                xmlResourceReferenceAttribute(
+                                    ANDROID_NAMESPACE_URI,
+                                    THEME_ATTRIBUTE_NAME,
+                                    THEME_RESOURCE_ID,
+                                    /* valueResourceId= */ 1)))))));
+    assertThat(edited).isEqualTo(expected);
+  }
+
+  @Test
   public void updateApplicationElement_succeeds() {
     XmlNode oldApplication =
         xmlNode(xmlElement(APPLICATION_ELEMENT_NAME, xmlNode(xmlElement(ACTIVITY_ELEMENT_NAME))));

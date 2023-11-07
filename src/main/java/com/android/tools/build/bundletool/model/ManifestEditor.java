@@ -457,6 +457,15 @@ public class ManifestEditor {
     return this;
   }
 
+  @CanIgnoreReturnValue
+  public ManifestEditor setApplicationTheme(int themeResId) {
+    manifestElement
+        .getOrCreateChildElement(APPLICATION_ELEMENT_NAME)
+        .getOrCreateAndroidAttribute(THEME_ATTRIBUTE_NAME, THEME_RESOURCE_ID)
+        .setValueAsRefId(themeResId);
+    return this;
+  }
+
   /**
    * Sets the theme of an activity that has an action with the name mainActionCategoryName to the
    * given themeResId. This method assumes such activity exists.

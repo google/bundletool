@@ -174,11 +174,11 @@ public final class BuildApksModule {
 
   @CommandScoped
   @Provides
-  @DifferentThemesForTvAndPhone
-  static boolean provideDifferentThemesForTvAndPhone(BuildApksCommand command) {
+  @RemoveTvIconCloud
+  static boolean provideRemoveTvIconCloud(BuildApksCommand command) {
     @SuppressWarnings("unused")
-    boolean differentThemesForTvAndPhone = false;
-    return differentThemesForTvAndPhone;
+    boolean removeTvIconCloud = false;
+    return removeTvIconCloud;
   }
 
   /**
@@ -207,13 +207,10 @@ public final class BuildApksModule {
   @Retention(RUNTIME)
   public @interface ApkSigningConfigProvider {}
 
-  /**
-   * Qualifying annotation of a {@code boolean} to enable usage of different themes for tv and
-   * phone.
-   */
+  /** Qualifying annotation of a {@code boolean} to enable removing the icon's cloud for TV. */
   @Qualifier
   @Retention(RUNTIME)
-  public @interface DifferentThemesForTvAndPhone {}
+  public @interface RemoveTvIconCloud {}
 
   private BuildApksModule() {}
 }

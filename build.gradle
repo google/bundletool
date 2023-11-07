@@ -120,7 +120,9 @@ test {
     }
 
     reports {
-        html.enabled = false
+        html {
+            enabled false
+        }
     }
 }
 
@@ -175,8 +177,8 @@ publishing {
 
 // Artifact released to Maven.
 shadowJar {
-    baseName = 'bundletool'
-    classifier = ''
+    archiveBaseName = 'bundletool'
+    archiveClassifier = ''
 
     // Package all the Android Gradle plugin dependencies that are compiled from
     // source.
@@ -211,8 +213,8 @@ shadowJar {
 
 // Artifact to use as standalone command line tool.
 task executableJar(type: ShadowJar) {
-    baseName = 'bundletool'
-    classifier = 'all'
+    archiveBaseName = 'bundletool'
+    archiveClassifier = 'all'
     from sourceSets.main.output
     from({ zipTree(project.configurations.implementationWindows.singleFile) }) { into 'windows/' }
     from({ zipTree(project.configurations.implementationMacOs.singleFile) }) { into 'macos/' }

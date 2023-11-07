@@ -70,6 +70,7 @@ public class ModuleSplitSerializer extends ApkSerializer {
   private final ListeningExecutorService executorService;
   private final boolean use7ZipCompression;
   private final Optional<P7ZipCommand> p7ZipCommand;
+  private final int nativeLibraryAlignment;
 
   @Inject
   ModuleSplitSerializer(
@@ -97,6 +98,7 @@ public class ModuleSplitSerializer extends ApkSerializer {
     this.bundletoolVersion = bundletoolVersion;
     this.executorService = executorService;
     this.p7ZipCommand = p7ZipCommand;
+    this.nativeLibraryAlignment = getNativeLibraryAlignment(bundleConfig);
   }
 
   /**
@@ -105,6 +107,7 @@ public class ModuleSplitSerializer extends ApkSerializer {
    * <p>Returns {@link ApkDescription} for each serialized split keyed by relative path of module
    * split.
    */
+  @Override
   public ImmutableMap<ZipPath, ApkDescription> serialize(
       Path outputDirectory, ImmutableMap<ZipPath, ModuleSplit> splitsByRelativePath) {
     // Prepare original splits by:
@@ -301,12 +304,13 @@ public class ModuleSplitSerializer extends ApkSerializer {
    * <p>Uncompressed native libraries inside APK must be aligned by 4096 and all other uncompressed
    * entries aligned by 4 bytes.
    */
-  private static long alignmentForEntry(
-      ModuleEntry entry, ModuleEntriesPack uncompressedEntriesPack) {
+  private long alignmentForEntry(ModuleEntry entry, ModuleEntriesPack uncompressedEntriesPack) {
     if (!uncompressedEntriesPack.hasEntry(entry)) {
       return 0;
     }
-    return entry.getPath().toString().endsWith(NATIVE_LIBRARIES_SUFFIX) ? 4096 : 4;
+    return entry.getPath().toString().endsWith(NATIVE_LIBRARIES_SUFFIX)
+        ? nativeLibraryAlignment
+        : 4;
   }
 
   /**
@@ -407,5 +411,19 @@ public class ModuleSplitSerializer extends ApkSerializer {
       return uncompressedSize == 0 || (compressedSize + compressedSize / 10 > uncompressedSize);
     }
     return compressedSize >= uncompressedSize;
+  }
+
+  private int getNativeLibraryAlignment(BundleConfig bundleConfig) {
+    switch (bundleConfig.getOptimizations().getUncompressNativeLibraries().getAlignment()) {
+      case PAGE_ALIGNMENT_16K:
+        return 16384;
+      case PAGE_ALIGNMENT_64K:
+        return 65536;
+      case PAGE_ALIGNMENT_UNSPECIFIED:
+      case PAGE_ALIGNMENT_4K:
+      case UNRECOGNIZED:
+        return 4096;
+    }
+    throw new IllegalArgumentException("Wrong native libraries alignment.");
   }
 }

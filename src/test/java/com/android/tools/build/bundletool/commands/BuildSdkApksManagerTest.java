@@ -21,6 +21,7 @@ import static com.android.tools.build.bundletool.model.AndroidManifest.SDK_SANDB
 import static com.android.tools.build.bundletool.model.AndroidManifest.VERSION_CODE_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.VERSION_MAJOR_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.VERSION_NAME_RESOURCE_ID;
+import static com.android.tools.build.bundletool.model.utils.Versions.ANDROID_T_API_VERSION;
 import static com.android.tools.build.bundletool.testing.ApkSetUtils.extractFromApkSetFile;
 import static com.android.tools.build.bundletool.testing.ApkSetUtils.extractTocFromSdkApkSetFile;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifest;
@@ -221,6 +222,41 @@ public class BuildSdkApksManagerTest {
     // <property> mutations.
     assertThat(manifest.getSdkProviderClassNameProperty()).hasValue(sdkProviderClassName);
     assertThat(manifest.getCompatSdkProviderClassNameProperty()).isEmpty();
+  }
+
+  @Test
+  public void manifestIsMutated_nonDefaultMinSdkVersionSetInCommand() throws Exception {
+    Integer versionCode = 1253;
+    String packageName = "com.ads.foo";
+    int major = 15;
+    int minor = 0;
+    int patch = 5;
+    String sdkProviderClassName = "com.example.sandboxservice.MyNewAdsSdkEntryPoint";
+    SdkBundle sdkBundle =
+        new SdkBundleBuilder()
+            .setVersionCode(versionCode)
+            .setSdkModulesConfig(
+                createSdkModulesConfig()
+                    .setSdkPackageName(packageName)
+                    .setSdkVersion(
+                        RuntimeEnabledSdkVersion.newBuilder()
+                            .setMajor(major)
+                            .setMinor(minor)
+                            .setPatch(patch))
+                    .setSdkProviderClassName(sdkProviderClassName)
+                    .build())
+            .build();
+
+    execute(sdkBundle, createCommand().toBuilder().setMinSdkVersion(ANDROID_T_API_VERSION).build());
+
+    ZipFile apkSetFile = new ZipFile(outputFilePath.toFile());
+    BuildSdkApksResult result = extractTocFromSdkApkSetFile(apkSetFile, tmpDir);
+    Variant variant = result.getVariant(0);
+    ApkDescription apkDescription = variant.getApkSet(0).getApkDescription(0);
+    File apkFile = extractFromApkSetFile(apkSetFile, apkDescription.getPath(), tmpDir);
+    AndroidManifest manifest = extractAndroidManifest(apkFile, tmpDir);
+
+    assertThat(manifest.getMinSdkVersion()).hasValue(ANDROID_T_API_VERSION);
   }
 
   @Test

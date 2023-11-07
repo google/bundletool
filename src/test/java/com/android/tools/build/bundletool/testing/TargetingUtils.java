@@ -16,6 +16,7 @@
 
 package com.android.tools.build.bundletool.testing;
 
+import static com.android.tools.build.bundletool.model.AndroidManifest.SDK_SANDBOX_MIN_VERSION;
 import static com.android.tools.build.bundletool.model.utils.ProtoUtils.mergeFromProtos;
 import static com.google.common.base.Predicates.alwaysTrue;
 import static com.google.common.collect.ImmutableList.toImmutableList;
@@ -969,7 +970,7 @@ public final class TargetingUtils {
   }
 
   public static VariantTargeting sdkRuntimeVariantTargeting() {
-    return sdkRuntimeVariantTargeting(Versions.ANDROID_T_API_VERSION);
+    return sdkRuntimeVariantTargeting(SDK_SANDBOX_MIN_VERSION);
   }
 
   public static VariantTargeting sdkRuntimeVariantTargeting(SdkVersion androidSdkVersion) {

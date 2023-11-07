@@ -99,12 +99,19 @@ public class BuildSdkApksManager {
                 moduleSplit.writeSdkLibraryElement(
                     sdkBundle.getPackageName(), sdkBundle.getSdkAndroidVersionMajor()))
         .map(ModuleSplit::overrideMinSdkVersionForSdkSandbox)
+        .map(moduleSplit -> overrideMinSdkVersion(moduleSplit))
         .map(moduleSplit -> moduleSplit.writePatchVersion(sdkBundle.getPatchVersion()))
         .map(moduleSplit -> moduleSplit.writeSdkProviderClassName(sdkBundle.getProviderClassName()))
         .map(this::writeCompatSdkProviderClassNameIfPresent)
         .map(StandaloneApksGenerator::setVariantTargetingAndSplitType)
         .map(this::addSdkRuntimeTargeting)
         .collect(toImmutableList());
+  }
+
+  private ModuleSplit overrideMinSdkVersion(ModuleSplit moduleSplit) {
+    return command.getMinSdkVersion().isPresent()
+        ? moduleSplit.overrideMinSdkVersion(command.getMinSdkVersion().get())
+        : moduleSplit.overrideMinSdkVersionForSdkSandbox();
   }
 
   private ModuleSplit writeCompatSdkProviderClassNameIfPresent(ModuleSplit moduleSplit) {
