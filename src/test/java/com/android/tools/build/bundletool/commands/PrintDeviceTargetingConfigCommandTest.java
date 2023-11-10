@@ -29,6 +29,8 @@ import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
 import java.io.Reader;
 import java.nio.file.Path;
+import java.util.Locale;
+
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
@@ -46,6 +48,7 @@ public class PrintDeviceTargetingConfigCommandTest {
   @Before
   public void setUp() {
     Path tmpDir = tmp.getRoot().toPath();
+    Locale.setDefault(Locale.forLanguageTag("en-US"));
     deviceTargetingConfigPath = tmpDir.resolve("config.json");
   }
 
