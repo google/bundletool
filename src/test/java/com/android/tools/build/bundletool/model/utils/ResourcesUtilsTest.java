@@ -246,10 +246,13 @@ public class ResourcesUtilsTest {
   public void resourcesLocaleConversions_oldLanguageCodes() {
     // This documents that our converter will use old ISO-639 language codes for backward
     // compatibility.
+    // Since Java SE 17, this is no longer the case.
 
-    assertThat(ResourcesUtils.convertLocaleToLanguage("he")).isEqualTo("iw");
-    assertThat(ResourcesUtils.convertLocaleToLanguage("yi")).isEqualTo("ji");
-    assertThat(ResourcesUtils.convertLocaleToLanguage("id")).isEqualTo("in");
+    if (System.getProperty("java.version").compareTo("17") < 0) {
+      assertThat(ResourcesUtils.convertLocaleToLanguage("he")).isEqualTo("iw");
+      assertThat(ResourcesUtils.convertLocaleToLanguage("yi")).isEqualTo("ji");
+      assertThat(ResourcesUtils.convertLocaleToLanguage("id")).isEqualTo("in");
+    }
   }
 
   @Test
