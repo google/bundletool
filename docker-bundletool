@@ -1,0 +1,56 @@
+#!/bin/bash
+#
+# This script will attempt to mirror the host paths by using volumes for the
+# following paths:
+#   * $(pwd)
+#   * $(dirname $DOCKER_FILE) if it's set
+#   * $HOME if it's set
+#
+# You can add additional volumes (or any docker run options) using
+# the $DOCKER_OPTIONS environment variable.
+#
+
+
+set -e
+
+IMAGE="yongjhih/bundletool"
+
+
+# Setup options for connecting to docker host
+if [ -z "$DOCKER_HOST" ]; then
+    DOCKER_HOST="/var/run/docker.sock"
+fi
+if [ -S "$DOCKER_HOST" ]; then
+    DOCKER_ADDR="-v $DOCKER_HOST:$DOCKER_HOST -e DOCKER_HOST"
+else
+    DOCKER_ADDR="-e DOCKER_HOST -e DOCKER_TLS_VERIFY -e DOCKER_CERT_PATH"
+fi
+
+
+# Setup volume mounts for compose config and context
+if [ "$(pwd)" != '/' ]; then
+    VOLUMES="-v $(pwd):$(pwd)"
+fi
+if [ -n "$DOCKER_FILE" ]; then
+    docker_dir=$(dirname $DOCKER_FILE)
+fi
+# TODO: also check --file argument
+if [ -n "$docker_dir" ]; then
+    VOLUMES="$VOLUMES -v $docker_dir:$docker_dir"
+fi
+if [ -n "$HOME" ]; then
+    #VOLUMES="$VOLUMES -v $HOME:$HOME -v $HOME:/root" # mount $HOME in /root to share docker.config
+    VOLUMES="$VOLUMES -v $HOME:$HOME" # mount $HOME in /root to share docker.config
+fi
+
+# Only allocate tty if we detect one
+if [ -t 1 ]; then
+    DOCKER_RUN_OPTIONS="-t"
+fi
+if [ -t 0 ]; then
+    DOCKER_RUN_OPTIONS="$DOCKER_RUN_OPTIONS -i"
+fi
+
+#exec docker run --rm $DOCKER_RUN_OPTIONS $DOCKER_ADDR $DOCKER_OPTIONS $VOLUMES -w "$(pwd)" -u $uid:$UID -e HOME=$HOME $IMAGE "$@"
+# ?/.gradle
+exec docker run --rm $DOCKER_RUN_OPTIONS $DOCKER_ADDR $DOCKER_OPTIONS $VOLUMES -w "$(pwd)" $IMAGE "$@"
