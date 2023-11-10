@@ -45,6 +45,8 @@ import com.android.tools.build.bundletool.model.version.Version;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.io.ByteSource;
+
+import java.io.File;
 import java.io.IOException;
 import java.net.URISyntaxException;
 import java.nio.file.Path;
@@ -99,7 +101,9 @@ public final class ArchivedResourcesHelper {
               ArchivedResourcesHelper.ARCHIVED_CLASSES_DEX_PATH_PREFIX);
       ImmutableList<Version> availableVersions =
           allResources.stream()
-              .map(dir -> dir.getFileName().toString().replace('_', '.'))
+              .map(dir -> dir.getFileName().toString()
+                      .replace(File.separator, "")
+                      .replace('_', '.'))
               .map(Version::of)
               .sorted(reverseOrder())
               .collect(toImmutableList());
