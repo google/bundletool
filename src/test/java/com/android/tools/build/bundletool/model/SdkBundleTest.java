@@ -20,7 +20,7 @@ import static com.android.tools.build.bundletool.model.utils.BundleParser.EXTRAC
 import static com.android.tools.build.bundletool.testing.TestUtils.createZipBuilderForModules;
 import static com.android.tools.build.bundletool.testing.TestUtils.createZipBuilderForSdkAsarWithModules;
 import static com.android.tools.build.bundletool.testing.TestUtils.createZipBuilderForSdkBundleWithModules;
-import static com.google.common.truth.Truth8.assertThat;
+import static com.google.common.truth.Truth.assertThat;
 
 import com.android.tools.build.bundletool.io.ZipBuilder;
 import java.nio.file.Path;

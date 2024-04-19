@@ -16,13 +16,13 @@
 
 package com.android.tools.build.bundletool.device;
 
-import static com.android.tools.build.bundletool.model.AndroidManifest.SDK_SANDBOX_MIN_VERSION;
 import static com.android.tools.build.bundletool.testing.DeviceFactory.abis;
 import static com.android.tools.build.bundletool.testing.DeviceFactory.density;
 import static com.android.tools.build.bundletool.testing.DeviceFactory.deviceFeatures;
 import static com.android.tools.build.bundletool.testing.DeviceFactory.glExtensions;
 import static com.android.tools.build.bundletool.testing.DeviceFactory.locales;
 import static com.android.tools.build.bundletool.testing.DeviceFactory.mergeSpecs;
+import static com.android.tools.build.bundletool.testing.DeviceFactory.sdkRuntimeSupported;
 import static com.android.tools.build.bundletool.testing.DeviceFactory.sdkVersion;
 import static com.google.common.truth.Truth.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -434,14 +434,18 @@ public class DeviceAnalyzerTest {
   }
 
   @Test
-  public void getDeviceSpec_deviceVersionIsSandboxMin_sdkRuntimeSupported() {
+  public void getDeviceSpec_sdkRuntimeSupported() {
     String deviceId = "id1";
     FakeDevice fakeDevice =
         FakeDevice.fromDeviceSpec(
             deviceId,
             DeviceState.ONLINE,
             mergeSpecs(
-                density(240), locales("en-US"), abis("x86"), sdkVersion(SDK_SANDBOX_MIN_VERSION)));
+                density(240),
+                locales("en-US"),
+                abis("x86"),
+                sdkVersion(34),
+                sdkRuntimeSupported(true)));
     FakeAdbServer fakeAdbServer =
         new FakeAdbServer(
             /* hasInitialDeviceList= */ true, /* devices= */ ImmutableList.of(fakeDevice));
@@ -454,7 +458,7 @@ public class DeviceAnalyzerTest {
   }
 
   @Test
-  public void getDeviceSpec_deviceVersionNotSandboxMin_sdkRuntimeNotSupported() {
+  public void getDeviceSpec_sdkRuntimeNotSupported() {
     String deviceId = "id1";
     FakeDevice fakeDevice =
         FakeDevice.fromDeviceSpec(
@@ -464,7 +468,8 @@ public class DeviceAnalyzerTest {
                 density(240),
                 locales("en-US"),
                 abis("x86"),
-                sdkVersion(SDK_SANDBOX_MIN_VERSION - 1)));
+                sdkVersion(33),
+                sdkRuntimeSupported(false)));
     FakeAdbServer fakeAdbServer =
         new FakeAdbServer(
             /* hasInitialDeviceList= */ true, /* devices= */ ImmutableList.of(fakeDevice));

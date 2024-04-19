@@ -98,7 +98,7 @@ public class SdkAndroidManifestValidatorTest {
   public void manifest_withPreferExternal_throws() {
     BundleModule module =
         new BundleModuleBuilder(BASE_MODULE_NAME)
-            .setManifest(androidManifest(PKG_NAME, withInstallLocation("preferExternal")))
+            .setManifest(androidManifest(PKG_NAME, withInstallLocation(2)))
             .build();
 
     Throwable exception =

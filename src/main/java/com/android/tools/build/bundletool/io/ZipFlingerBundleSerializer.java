@@ -119,6 +119,13 @@ public final class ZipFlingerBundleSerializer {
                   module.getApexConfig().get(),
                   DEFAULT_COMPRESSION_LEVEL));
         }
+        if (module.getRuntimeEnabledSdkConfig().isPresent()) {
+          zipArchive.add(
+              protoToSource(
+                  moduleDir.resolve(SpecialModuleEntry.RUNTIME_ENABLED_SDK_CONFIG.getPath()),
+                  module.getRuntimeEnabledSdkConfig().get(),
+                  DEFAULT_COMPRESSION_LEVEL));
+        }
       }
     }
   }

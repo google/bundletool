@@ -628,11 +628,18 @@ public final class ManifestProtoUtils {
               XmlProtoAttributeBuilder.createAndroidAttribute(NAME_ATTRIBUTE_NAME, NAME_RESOURCE_ID)
                   .setValueAsString("android.intent.action.VIEW"));
 
-      intentFilter
-          .getOrCreateChildElement(CATEGORY_ELEMENT_NAME)
-          .addAttribute(
-              XmlProtoAttributeBuilder.createAndroidAttribute(NAME_ATTRIBUTE_NAME, NAME_RESOURCE_ID)
-                  .setValueAsString("android.intent.category.BROWSABLE"));
+      intentFilter.addChildElement(
+          XmlProtoElementBuilder.create(CATEGORY_ELEMENT_NAME)
+              .addAttribute(
+                  XmlProtoAttributeBuilder.createAndroidAttribute(
+                          NAME_ATTRIBUTE_NAME, NAME_RESOURCE_ID)
+                      .setValueAsString("android.intent.category.DEFAULT")));
+      intentFilter.addChildElement(
+          XmlProtoElementBuilder.create(CATEGORY_ELEMENT_NAME)
+              .addAttribute(
+                  XmlProtoAttributeBuilder.createAndroidAttribute(
+                          NAME_ATTRIBUTE_NAME, NAME_RESOURCE_ID)
+                      .setValueAsString("android.intent.category.BROWSABLE")));
 
       intentFilter
           .getOrCreateChildElement(DATA_ELEMENT_NAME)
@@ -642,10 +649,7 @@ public final class ManifestProtoUtils {
           .addAttribute(
               XmlProtoAttributeBuilder.createAndroidAttribute(HOST_NAME, HOST_RESOURCE_ID)
                   .setValueAsString(host))
-          .addAttribute(pathAttributeBuilder)
-          .addAttribute(
-              XmlProtoAttributeBuilder.createAndroidAttribute(SCHEME_NAME, SCHEME_RESOURCE_ID)
-                  .setValueAsString(scheme));
+          .addAttribute(pathAttributeBuilder);
     };
   }
 
@@ -759,12 +763,12 @@ public final class ManifestProtoUtils {
             .setValueAsString(versionName);
   }
 
-  public static ManifestMutator withInstallLocation(String installLocation) {
+  public static ManifestMutator withInstallLocation(int installLocation) {
     return manifestElement ->
         manifestElement
             .getOrCreateAndroidAttribute(
                 INSTALL_LOCATION_ATTRIBUTE_NAME, INSTALL_LOCATION_RESOURCE_ID)
-            .setValueAsString(installLocation);
+            .setValueAsDecimalInteger(installLocation);
   }
 
   public static ManifestMutator withUsesSplit(String... splitIds) {

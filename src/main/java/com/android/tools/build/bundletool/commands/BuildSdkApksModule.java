@@ -22,8 +22,7 @@ import com.android.bundle.SdkModulesConfigOuterClass.SdkModulesConfig;
 import com.android.tools.build.bundletool.androidtools.Aapt2Command;
 import com.android.tools.build.bundletool.androidtools.P7ZipCommand;
 import com.android.tools.build.bundletool.commands.BuildApksCommand.ApkBuildMode;
-import com.android.tools.build.bundletool.io.ApkSerializer;
-import com.android.tools.build.bundletool.io.ModuleSplitSerializer;
+import com.android.tools.build.bundletool.io.ApkSerializerModule;
 import com.android.tools.build.bundletool.io.TempDirectory;
 import com.android.tools.build.bundletool.model.ApkListener;
 import com.android.tools.build.bundletool.model.ApkModifier;
@@ -42,7 +41,7 @@ import dagger.Provides;
 import java.util.Optional;
 
 /** Dagger module for the build-sdk-apks command. */
-@Module
+@Module(includes = {ApkSerializerModule.class})
 public abstract class BuildSdkApksModule {
 
   @Provides
@@ -128,7 +127,4 @@ public abstract class BuildSdkApksModule {
   static boolean provideVerbose(BuildSdkApksCommand command) {
     return command.getVerbose();
   }
-
-  @Binds
-  abstract ApkSerializer apkSerializerHelper(ModuleSplitSerializer apkSerializerHelper);
 }

@@ -17,7 +17,7 @@
 package com.android.tools.build.bundletool.commands;
 
 import static com.google.common.base.StandardSystemProperty.USER_HOME;
-import static com.google.common.truth.Truth8.assertThat;
+import static com.google.common.truth.Truth.assertThat;
 
 import com.android.tools.build.bundletool.model.utils.files.FileUtils;
 import com.android.tools.build.bundletool.testing.FakeSystemEnvironmentProvider;

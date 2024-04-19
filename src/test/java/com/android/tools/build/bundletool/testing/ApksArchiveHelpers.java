@@ -137,7 +137,13 @@ public final class ApksArchiveHelpers {
   }
 
   public static Variant createVariant(VariantTargeting variantTargeting, ApkSet... apkSets) {
+    return createVariant(/* variantNumber= */ 0, variantTargeting, apkSets);
+  }
+
+  public static Variant createVariant(
+      int variantNumber, VariantTargeting variantTargeting, ApkSet... apkSets) {
     return Variant.newBuilder()
+        .setVariantNumber(variantNumber)
         .setTargeting(variantTargeting)
         .addAllApkSet(Arrays.asList(apkSets))
         .build();

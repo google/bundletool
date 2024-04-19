@@ -33,6 +33,7 @@ import com.android.bundle.Commands.DefaultTargetingValue;
 import com.android.bundle.Commands.ExtractApksResult;
 import com.android.bundle.Commands.ExtractedApk;
 import com.android.bundle.Commands.LocalTestingInfoForMetadata;
+import com.android.bundle.Commands.Variant;
 import com.android.bundle.Config.SplitDimension.Value;
 import com.android.bundle.Devices.DeviceSpec;
 import com.android.tools.build.bundletool.commands.CommandHelp.CommandDescription;
@@ -52,6 +53,7 @@ import com.google.auto.value.AutoValue;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.Sets;
 import com.google.common.io.ByteStreams;
 import com.google.protobuf.Int32Value;
 import com.google.protobuf.StringValue;
@@ -203,9 +205,9 @@ public abstract class ExtractApksCommand {
     validateInput();
 
     BuildApksResult toc = ResultUtils.readTableOfContents(getApksArchivePath());
-    Optional<ImmutableSet<String>> requestedModuleNames =
-        getModules().map(modules -> resolveRequestedModules(modules, toc));
     DeviceSpec deviceSpec = applyDefaultsToDeviceSpec(getDeviceSpec(), toc);
+    Optional<ImmutableSet<String>> requestedModuleNames =
+        getModules().map(modules -> resolveRequestedModules(modules, toc, deviceSpec));
 
     ApkMatcher apkMatcher =
         new ApkMatcher(
@@ -233,10 +235,10 @@ public abstract class ExtractApksCommand {
   }
 
   static ImmutableSet<String> resolveRequestedModules(
-      ImmutableSet<String> requestedModules, BuildApksResult toc) {
+      ImmutableSet<String> requestedModules, BuildApksResult toc, DeviceSpec deviceSpec) {
     return requestedModules.contains(ALL_MODULES_SHORTCUT)
         ? Stream.concat(
-                toc.getVariantList().stream()
+                getVariantsMatchingSdkRuntimeTargeting(toc, deviceSpec).stream()
                     .flatMap(variant -> variant.getApkSetList().stream())
                     .map(apkSet -> apkSet.getModuleMetadata().getName()),
                 toc.getAssetSliceSetList().stream()
@@ -244,6 +246,20 @@ public abstract class ExtractApksCommand {
                     .map(AssetModuleMetadata::getName))
             .collect(toImmutableSet())
         : requestedModules;
+  }
+
+  private static ImmutableSet<Variant> getVariantsMatchingSdkRuntimeTargeting(
+      BuildApksResult toc, DeviceSpec deviceSpec) {
+    ImmutableSet<Variant> sdkRuntimeVariants =
+        toc.getVariantList().stream()
+            .filter(
+                variant -> variant.getTargeting().getSdkRuntimeTargeting().getRequiresSdkRuntime())
+            .collect(toImmutableSet());
+    if (deviceSpec.getSdkRuntime().getSupported() && !sdkRuntimeVariants.isEmpty()) {
+      return sdkRuntimeVariants;
+    }
+    return Sets.difference(ImmutableSet.copyOf(toc.getVariantList()), sdkRuntimeVariants)
+        .immutableCopy();
   }
 
   private void validateInput() {

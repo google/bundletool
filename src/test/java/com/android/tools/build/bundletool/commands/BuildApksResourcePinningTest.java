@@ -161,7 +161,12 @@ public class BuildApksResourcePinningTest {
             .build();
 
     TestComponent.useTestModule(
-        this, TestModule.builder().withAppBundle(appBundle).withOutputPath(outputFilePath).build());
+        this,
+        TestModule.builder()
+            .withEnableRequiredSplitTypes(false)
+            .withAppBundle(appBundle)
+            .withOutputPath(outputFilePath)
+            .build());
 
     buildApksManager.execute();
     ZipFile apkSetFile = new ZipFile(outputFilePath.toFile());

@@ -144,6 +144,7 @@ public abstract class AndroidManifest {
   public static final String HOST_NAME = "host";
   public static final String SPLIT_TYPES_ATTRIBUTE_NAME = "splitTypes";
   public static final String REQUIRED_SPLIT_TYPES_ATTRIBUTE_NAME = "requiredSplitTypes";
+  public static final String AUTO_VERIFY_NAME = "autoVerify";
 
   public static final String SDK_PATCH_VERSION_ATTRIBUTE_NAME =
       "com.android.vending.sdk.version.patch";
@@ -244,8 +245,10 @@ public abstract class AndroidManifest {
   public static final int PATH_PREFIX_RESOURCE_ID = 0x0101002b;
   public static final int SCHEME_RESOURCE_ID = 0x01010027;
   public static final int HOST_RESOURCE_ID = 0x01010028;
+  public static final int PORT_RESOURCE_ID = 0x01010029;
   public static final int SPLIT_TYPES_RESOURCE_ID = 0x0101064f;
   public static final int REQUIRED_SPLIT_TYPES_RESOURCE_ID = 0x0101064e;
+  public static final int AUTO_VERIFY_RESOURCE_ID = 0x010104ee;
 
   // Matches the value of android.os.Build.VERSION_CODES.CUR_DEVELOPMENT, used when turning
   // a manifest attribute which references a prerelease API version (e.g., "Q") into an integer.
@@ -736,7 +739,20 @@ public abstract class AndroidManifest {
   public Optional<String> getInstallLocationValue() {
     return getManifestElement()
         .getAndroidAttribute(INSTALL_LOCATION_RESOURCE_ID)
-        .map(XmlProtoAttribute::getValueAsString);
+        .map(this::getInstallLocation);
+  }
+
+  private String getInstallLocation(XmlProtoAttribute installLocationValue) {
+    switch (installLocationValue.getValueAsInteger()) {
+      case 0:
+        return "auto";
+      case 1:
+        return "internalOnly";
+      case 2:
+        return "preferExternal";
+      default:
+        return "unspecified";
+    }
   }
 
   /**

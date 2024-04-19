@@ -55,11 +55,11 @@ import static com.google.common.collect.ImmutableListMultimap.toImmutableListMul
 import static com.google.common.collect.ImmutableSet.toImmutableSet;
 import static com.google.common.collect.MoreCollectors.onlyElement;
 import static com.google.common.truth.Truth.assertThat;
-import static com.google.common.truth.Truth8.assertThat;
 import static com.google.common.truth.extensions.proto.ProtoTruth.assertThat;
 
 import com.android.aapt.ConfigurationOuterClass.Configuration;
 import com.android.aapt.Resources.ResourceTable;
+import com.android.bundle.FeatureModulesConfigProto.FeatureModulesCustomConfig;
 import com.android.bundle.RuntimeEnabledSdkConfigProto.RuntimeEnabledSdk;
 import com.android.bundle.RuntimeEnabledSdkConfigProto.RuntimeEnabledSdkConfig;
 import com.android.bundle.SdkModulesConfigOuterClass.SdkModulesConfig;
@@ -200,8 +200,7 @@ public class SplitApksGeneratorTest {
 
     ImmutableList<ModuleSplit> moduleSplits =
         splitApksGenerator.generateSplits(
-            bundleModule,
-            ApkGenerationConfiguration.builder().setEnableRequiredSplitTypes(true).build());
+            bundleModule, ApkGenerationConfiguration.getDefaultInstance());
 
     assertThat(moduleSplits).hasSize(2);
     ImmutableMap<String, ModuleSplit> moduleSplitMap =
@@ -214,6 +213,66 @@ public class SplitApksGeneratorTest {
     ModuleSplit testModule = moduleSplitMap.get("test");
     assertThat(getRequiredSplitTypes(testModule)).isEmpty();
     assertThat(getProvidedSplitTypes(testModule)).containsExactly("test__module");
+
+    assertConsistentRequiredSplitTypes(moduleSplits);
+  }
+
+  @Test
+  public void simpleMultipleModules_withRequiredSplitTypes_experimentalTPlusVariant()
+      throws Exception {
+    TestComponent.useTestModule(this, TestModule.builder().build());
+    ImmutableList<BundleModule> bundleModule =
+        ImmutableList.of(
+            new BundleModuleBuilder("base")
+                .addFile("assets/leftover.txt")
+                .setManifest(androidManifest("com.test.app"))
+                .build(),
+            new BundleModuleBuilder("test")
+                .addFile("assets/test.txt")
+                .setManifest(androidManifest("com.test.app"))
+                .build());
+
+    ImmutableList<ModuleSplit> moduleSplits =
+        splitApksGenerator.generateSplits(
+            bundleModule,
+            ApkGenerationConfiguration.builder().setEnableRequiredSplitTypes(true).build());
+
+    assertThat(moduleSplits).hasSize(4);
+    ImmutableMap<String, ModuleSplit> moduleSplitMap =
+        Maps.uniqueIndex(
+            moduleSplits,
+            split ->
+                String.format(
+                    "%s:%s",
+                    split.getModuleName().getName(),
+                    split
+                        .getVariantTargeting()
+                        .getSdkVersionTargeting()
+                        .getValue(0)
+                        .getMin()
+                        .getValue()));
+
+    assertThat(moduleSplitMap.keySet()).containsExactly("base:21", "test:21", "base:33", "test:33");
+
+    ModuleSplit baseModule = moduleSplitMap.get("base:21");
+    assertThat(baseModule).isNotNull();
+    assertThat(getRequiredSplitTypes(baseModule)).containsExactly("test__module");
+    assertThat(getProvidedSplitTypes(baseModule)).isEmpty();
+
+    ModuleSplit testModule = moduleSplitMap.get("test:21");
+    assertThat(testModule).isNotNull();
+    assertThat(getRequiredSplitTypes(testModule)).isEmpty();
+    assertThat(getProvidedSplitTypes(testModule)).containsExactly("test__module");
+
+    // TODO(b/199376532): Remove once system required split type attributes are enabled.
+    ModuleSplit baseModuleTPlus = moduleSplitMap.get("base:33");
+    assertThat(baseModuleTPlus).isNotNull();
+    assertThat(getRequiredSplitTypes(baseModuleTPlus)).containsExactly("test__module");
+    assertThat(getProvidedSplitTypes(baseModuleTPlus)).isEmpty();
+    ModuleSplit testModuleTPlus = moduleSplitMap.get("test:33");
+    assertThat(testModuleTPlus).isNotNull();
+    assertThat(getRequiredSplitTypes(testModuleTPlus)).isEmpty();
+    assertThat(getProvidedSplitTypes(testModuleTPlus)).containsExactly("test__module");
 
     assertConsistentRequiredSplitTypes(moduleSplits);
   }
@@ -277,7 +336,6 @@ public class SplitApksGeneratorTest {
             bundleModule,
             ApkGenerationConfiguration.builder()
                 .setEnableUncompressedNativeLibraries(true)
-                .setEnableRequiredSplitTypes(true)
                 .build());
 
     VariantTargeting lVariantTargeting =
@@ -352,7 +410,6 @@ public class SplitApksGeneratorTest {
             bundleModule,
             ApkGenerationConfiguration.builder()
                 .setOptimizationDimensions(ImmutableSet.of(OptimizationDimension.ABI))
-                .setEnableRequiredSplitTypes(true)
                 .build());
 
     ApkTargeting minSdkLTargeting = apkMinSdkTargeting(/* minSdkVersion= */ ANDROID_L_API_VERSION);
@@ -873,7 +930,6 @@ public class SplitApksGeneratorTest {
             appBundleWithRuntimeEnabledSdkDeps.getModules().values().asList(),
             ApkGenerationConfiguration.builder()
                 .setOptimizationDimensions(ImmutableSet.of(OptimizationDimension.SCREEN_DENSITY))
-                .setEnableRequiredSplitTypes(true)
                 .build());
 
     assertThat(
@@ -1054,7 +1110,6 @@ public class SplitApksGeneratorTest {
                         OptimizationDimension.TEXTURE_COMPRESSION_FORMAT,
                         OptimizationDimension.DEVICE_TIER,
                         OptimizationDimension.COUNTRY_SET))
-                .setEnableRequiredSplitTypes(true)
                 .build());
 
     ModuleSplit baseModule = getModuleSplit(moduleSplits, "base", Optional.empty());
@@ -1108,6 +1163,119 @@ public class SplitApksGeneratorTest {
     assertThat(getProvidedSplitTypes(languageSplit)).isEmpty();
 
     assertConsistentRequiredSplitTypes(moduleSplits);
+  }
+
+  @Test
+  public void appBundle_withAllSplitTargeting_andFeatureModulesConfig() {
+    ResourceTable appResourceTable =
+        resourceTable(
+            pkg(
+                USER_PACKAGE_OFFSET,
+                "com.test.app",
+                type(
+                    0x01,
+                    "drawable",
+                    entry(
+                        0x01,
+                        "title_image",
+                        fileReference("res/drawable-hdpi/title_image.jpg", HDPI),
+                        fileReference(
+                            "res/drawable/title_image.jpg", Configuration.getDefaultInstance())))));
+    AppBundle appBundle =
+        new AppBundleBuilder()
+            .addModule(
+                new BundleModuleBuilder("base")
+                    .setManifest(androidManifest("com.test.app"))
+                    .setResourceTable(appResourceTable)
+                    .setResourcesPackageId(2)
+                    .addFile("assets/languages#lang_es/strings.xml")
+                    .addFile("assets/textures#tcf_atc/textures.dat")
+                    .addFile("assets/textures#tier_0/textures.dat")
+                    .addFile("assets/content#countries_latam/strings.xml")
+                    .setAssetsConfig(
+                        assets(
+                            targetedAssetsDirectory(
+                                "assets/languages#lang_es",
+                                assetsDirectoryTargeting(languageTargeting("es"))),
+                            targetedAssetsDirectory(
+                                "assets/textures#tcf_atc",
+                                assetsDirectoryTargeting(
+                                    textureCompressionTargeting(
+                                        TextureCompressionFormatAlias.ATC))),
+                            targetedAssetsDirectory(
+                                "assets/textures#tier_0",
+                                assetsDirectoryTargeting(deviceTierTargeting(/* value= */ 0))),
+                            targetedAssetsDirectory(
+                                "assets/content#countries_latam",
+                                assetsDirectoryTargeting(countrySetTargeting("latam")))))
+                    .setNativeConfig(
+                        nativeLibraries(
+                            targetedNativeDirectory(
+                                "lib/x86_64", nativeDirectoryTargeting(AbiAlias.X86_64))))
+                    .build())
+            .addModule(
+                new BundleModuleBuilder("test")
+                    .addFile("assets/test.txt")
+                    .setManifest(androidManifest("com.test.app"))
+                    .addFile("assets/languages#lang_es/strings.xml")
+                    .addFile("assets/textures#tcf_atc/textures.dat")
+                    .addFile("assets/textures#tier_0/textures.dat")
+                    .addFile("assets/content#countries_latam/strings.xml")
+                    .setAssetsConfig(
+                        assets(
+                            targetedAssetsDirectory(
+                                "assets/languages#lang_es",
+                                assetsDirectoryTargeting(languageTargeting("es"))),
+                            targetedAssetsDirectory(
+                                "assets/textures#tcf_atc",
+                                assetsDirectoryTargeting(
+                                    textureCompressionTargeting(
+                                        TextureCompressionFormatAlias.ATC))),
+                            targetedAssetsDirectory(
+                                "assets/textures#tier_0",
+                                assetsDirectoryTargeting(deviceTierTargeting(/* value= */ 0))),
+                            targetedAssetsDirectory(
+                                "assets/content#countries_latam",
+                                assetsDirectoryTargeting(countrySetTargeting("latam")))))
+                    .setNativeConfig(
+                        nativeLibraries(
+                            targetedNativeDirectory(
+                                "lib/x86_64", nativeDirectoryTargeting(AbiAlias.X86_64))))
+                    .build())
+            .build();
+    FeatureModulesCustomConfig featureModulesCustomConfig =
+        FeatureModulesCustomConfig.newBuilder().addDisableConfigSplitsModules("test").build();
+    TestComponent.useTestModule(
+        this,
+        TestModule.builder()
+            .withAppBundle(appBundle)
+            .withFeatureModulesCustomConfig(Optional.of(featureModulesCustomConfig))
+            .build());
+
+    ImmutableList<ModuleSplit> moduleSplits =
+        splitApksGenerator.generateSplits(
+            appBundle.getModules().values().asList(),
+            ApkGenerationConfiguration.builder()
+                .setOptimizationDimensions(
+                    ImmutableSet.of(
+                        OptimizationDimension.SCREEN_DENSITY,
+                        OptimizationDimension.ABI,
+                        OptimizationDimension.LANGUAGE,
+                        OptimizationDimension.TEXTURE_COMPRESSION_FORMAT,
+                        OptimizationDimension.DEVICE_TIER,
+                        OptimizationDimension.COUNTRY_SET))
+                .build());
+
+    ImmutableList<ModuleSplit> testModuleSplits =
+        moduleSplits.stream()
+            .filter(moduleSplit -> moduleSplit.getModuleName().getName().equals("test"))
+            .collect(toImmutableList());
+    ImmutableList<ModuleSplit> baseModuleSplits =
+        moduleSplits.stream()
+            .filter(moduleSplit -> moduleSplit.getModuleName().getName().equals("base"))
+            .collect(toImmutableList());
+    assertThat(testModuleSplits).hasSize(1);
+    assertThat(baseModuleSplits.size()).isGreaterThan(1);
   }
 
   private static ModuleSplit getModuleSplit(

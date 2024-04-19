@@ -24,7 +24,6 @@ import static com.android.tools.build.bundletool.testing.TargetingUtils.nativeDi
 import static com.android.tools.build.bundletool.testing.TargetingUtils.nativeLibraries;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.targetedNativeDirectory;
 import static com.google.common.truth.Truth.assertThat;
-import static com.google.common.truth.Truth8.assertThat;
 import static com.google.common.truth.extensions.proto.ProtoTruth.assertThat;
 
 import com.android.bundle.Files.NativeLibraries;
@@ -103,9 +102,7 @@ public class ModuleAbiSanitizerTest {
     BundleModule sanitizedModule = new ModuleAbiSanitizer().sanitize(testModule);
 
     assertThat(
-            sanitizedModule
-                .getEntries()
-                .stream()
+            sanitizedModule.getEntries().stream()
                 .map(ModuleEntry::getPath)
                 .filter(entryPath -> entryPath.startsWith(ZipPath.create("lib")))
                 .map(ZipPath::toString))

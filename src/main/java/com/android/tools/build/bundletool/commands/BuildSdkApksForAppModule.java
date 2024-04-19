@@ -21,8 +21,7 @@ import com.android.bundle.Devices.DeviceSpec;
 import com.android.tools.build.bundletool.androidtools.Aapt2Command;
 import com.android.tools.build.bundletool.androidtools.P7ZipCommand;
 import com.android.tools.build.bundletool.commands.BuildApksCommand.ApkBuildMode;
-import com.android.tools.build.bundletool.io.ApkSerializer;
-import com.android.tools.build.bundletool.io.ModuleSplitSerializer;
+import com.android.tools.build.bundletool.io.ApkSerializerModule;
 import com.android.tools.build.bundletool.io.TempDirectory;
 import com.android.tools.build.bundletool.model.ApkListener;
 import com.android.tools.build.bundletool.model.ApkModifier;
@@ -38,13 +37,12 @@ import com.android.tools.build.bundletool.model.version.Version;
 import com.android.tools.build.bundletool.optimizations.ApkOptimizations;
 import com.google.common.collect.ImmutableList;
 import com.google.common.util.concurrent.ListeningExecutorService;
-import dagger.Binds;
 import dagger.Module;
 import dagger.Provides;
 import java.util.Optional;
 
 /** Dagger module for build-sdk-apks-for-app command. */
-@Module
+@Module(includes = {ApkSerializerModule.class})
 public abstract class BuildSdkApksForAppModule {
 
   @Provides
@@ -137,7 +135,4 @@ public abstract class BuildSdkApksForAppModule {
         .setPackageNameOptional(module.getAndroidManifest().getPackageName())
         .build();
   }
-
-  @Binds
-  abstract ApkSerializer apkSerializerHelper(ModuleSplitSerializer apkSerializerHelper);
 }

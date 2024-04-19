@@ -6,7 +6,7 @@ option java_package = "com.android.bundle";
 
 // Specifies integrity protection options that should be applied to an app
 // bundle.
-// Next tag: 8.
+// Next tag: 9.
 message AppIntegrityConfig {
   bool enabled = 1;
   LicenseCheck license_check = 2;
@@ -17,6 +17,7 @@ message AppIntegrityConfig {
   // config.
   DexProtectionConfig dex_protection_config = 6;
   string version_label = 7;
+  Telemetry telemetry = 8;
 }
 
 // Next tag: 4.
@@ -74,4 +75,9 @@ message DexProtectionConfig {
     TARGETING_MODE_PROPOSED_ONLY = 2;
   }
   TargetingMode targeting_mode = 3;
+}
+
+message Telemetry {
+  // Whether telemetry is enabled for this Android App Bundle.
+  bool enabled = 1;
 }

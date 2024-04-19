@@ -17,7 +17,6 @@
 package com.android.tools.build.bundletool.device;
 
 import static com.google.common.truth.Truth.assertThat;
-import static com.google.common.truth.Truth8.assertThat;
 
 import com.android.bundle.DeviceGroup;
 import com.android.bundle.DeviceProperties;

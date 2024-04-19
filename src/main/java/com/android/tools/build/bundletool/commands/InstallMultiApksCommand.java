@@ -60,6 +60,7 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableListMultimap;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.ImmutableSetMultimap;
 import com.google.common.collect.Streams;
 import com.google.common.io.ByteStreams;
 import com.google.errorprone.annotations.CanIgnoreReturnValue;
@@ -70,6 +71,7 @@ import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
+import java.util.Collections;
 import java.util.Locale;
 import java.util.Optional;
 import java.util.concurrent.TimeoutException;
@@ -89,10 +91,15 @@ public abstract class InstallMultiApksCommand {
 
   public static final String COMMAND_NAME = "install-multi-apks";
 
-  public static final ImmutableMap<String, String> NONUPDATABLE_PACKAGES_PAIRS =
-      ImmutableMap.of(
-          "com.google.android.ext.services", "com.google.android.extservices",
-          "com.google.android.permissioncontroller", "com.google.android.permission");
+  public static final ImmutableSetMultimap<String, String> NONUPDATABLE_PACKAGES_PAIRS =
+      ImmutableSetMultimap.<String, String>builder()
+          .put("com.google.android.ext.services", "com.google.android.go.extservices")
+          .put("com.google.android.ext.services", "com.google.android.extservices")
+          .put("com.google.android.go.extservices", "com.google.android.extservices")
+          .put("com.google.android.permissioncontroller", "com.google.android.go.permission")
+          .put("com.google.android.permissioncontroller", "com.google.android.permission")
+          .put("com.google.android.go.permission", "com.google.android.permission")
+          .build();
 
   private static final Flag<Path> ADB_PATH_FLAG = Flag.path("adb");
   private static final Flag<ImmutableList<Path>> APKS_ARCHIVES_FLAG = Flag.pathList("apks");
@@ -518,25 +525,28 @@ public abstract class InstallMultiApksCommand {
             .collect(toImmutableSet());
 
     return unfilteredResults.stream()
-        .filter(result -> !isRedundantNonUpdatablePackage(result.getPackageName(), packageNames))
+        .filter(result -> !isRedundantPackage(result.getPackageName(), packageNames))
         .collect(toImmutableList());
   }
 
   /**
-   * Check for the non-updatable package. If an updatable and non-updatable versions are present in
-   * the package list, only use the updatable version for the installation.
+   * If any two or more packages among big Android updatable, Go package and big android
+   * non-updatable versions are present in the package list, only package with the highest priority
+   * in the order of the list can be installed. Install Order: (Big Android Updatable, Go, Big
+   * Android Non-updatable)
    */
-  static boolean isRedundantNonUpdatablePackage(
-      String packageName, ImmutableSet<String> packageNames) {
+  static boolean isRedundantPackage(String packageName, ImmutableSet<String> packageNames) {
 
-    /* If non-updatable package and it's updatable pair is not present, return false. */
+    /* If the package does not have multiple versions, or the package is Big Android updatable
+    package, it is not redundant. */
     if (!NONUPDATABLE_PACKAGES_PAIRS.containsKey(packageName)) {
       return false;
     }
 
-    /* If updatable pair is present in the Apks list, return it for installation. */
-    String name = NONUPDATABLE_PACKAGES_PAIRS.get(packageName);
-    return packageNames.contains(name);
+    /* If the package may have different versions with higher priority, check if the high priority
+    version is in the package list, too. */
+    ImmutableSet<String> names = NONUPDATABLE_PACKAGES_PAIRS.get(packageName);
+    return !Collections.disjoint(names, packageNames);
   }
 
   public static CommandHelp help() {

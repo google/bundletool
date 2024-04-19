@@ -17,7 +17,6 @@
 package com.android.tools.build.bundletool.device.activitymanager;
 
 import static com.google.common.truth.Truth.assertThat;
-import static com.google.common.truth.Truth8.assertThat;
 
 import com.android.tools.build.bundletool.device.activitymanager.ResourceConfigParser.ResourceConfigHandler;
 import com.google.auto.value.AutoValue;

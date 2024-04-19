@@ -54,7 +54,6 @@ import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.ImmutableSet.toImmutableSet;
 import static com.google.common.collect.MoreCollectors.onlyElement;
 import static com.google.common.truth.Truth.assertThat;
-import static com.google.common.truth.Truth8.assertThat;
 import static com.google.common.truth.extensions.proto.ProtoTruth.assertThat;
 import static junit.framework.TestCase.fail;
 
@@ -80,7 +79,6 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Sets;
-import com.google.common.truth.Truth8;
 import com.google.protobuf.ByteString;
 import java.util.Collection;
 import java.util.List;
@@ -620,7 +618,7 @@ public class ScreenDensityResourcesSplitterTest {
     ModuleSplit xxhdpiSplit =
         findModuleSplitWithScreenDensityTargeting(
             densitySplits, ScreenDensity.newBuilder().setDensityAlias(DensityAlias.XXHDPI).build());
-    Truth8.assertThat(xxhdpiSplit.getResourceTable()).isPresent();
+    assertThat(xxhdpiSplit.getResourceTable()).isPresent();
     ResourceTable xxHdpiResourceTable = xxhdpiSplit.getResourceTable().get();
 
     assertThat(xxHdpiResourceTable)

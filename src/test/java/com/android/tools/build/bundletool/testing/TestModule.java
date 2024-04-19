@@ -21,6 +21,7 @@ import static com.google.common.base.Preconditions.checkArgument;
 import com.android.bundle.Config.BundleConfig;
 import com.android.bundle.Config.Bundletool;
 import com.android.bundle.Devices.DeviceSpec;
+import com.android.bundle.FeatureModulesConfigProto.FeatureModulesCustomConfig;
 import com.android.tools.build.bundletool.commands.BuildApksCommand;
 import com.android.tools.build.bundletool.commands.BuildApksCommand.ApkBuildMode;
 import com.android.tools.build.bundletool.commands.BuildSdkApksCommand;
@@ -41,12 +42,14 @@ import com.android.tools.build.bundletool.model.SourceStamp;
 import com.android.tools.build.bundletool.model.version.BundleToolVersion;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.util.concurrent.ListeningExecutorService;
+import com.google.errorprone.annotations.CanIgnoreReturnValue;
 import dagger.Module;
 import dagger.Provides;
 import java.io.IOException;
 import java.io.PrintStream;
 import java.io.UncheckedIOException;
 import java.nio.file.Path;
+import java.util.Optional;
 import java.util.function.Consumer;
 import java.util.zip.ZipFile;
 import javax.annotation.Nullable;
@@ -135,6 +138,7 @@ public class TestModule {
     @Nullable private SourceStamp sourceStamp;
     private Boolean enableRequiredSplitTypes = true;
     private BundleMetadata bundleMetadata = DEFAULT_BUNDLE_METADATA;
+    Optional<FeatureModulesCustomConfig> featureModulesCustomConfig = Optional.empty();
 
     public Builder withAppBundle(AppBundle appBundle) {
       this.bundle = appBundle;
@@ -267,6 +271,13 @@ public class TestModule {
       return this;
     }
 
+    @CanIgnoreReturnValue
+    public Builder withFeatureModulesCustomConfig(
+        Optional<FeatureModulesCustomConfig> featureModulesCustomConfig) {
+      this.featureModulesCustomConfig = featureModulesCustomConfig;
+      return this;
+    }
+
     public TestModule build() {
       try {
         if (tempDirectory == null) {
@@ -324,7 +335,8 @@ public class TestModule {
             BuildApksCommand.builder()
                 .setAapt2Command(Aapt2Helper.getAapt2Command())
                 .setBundlePath(bundlePath)
-                .setOutputFile(outputPath);
+                .setOutputFile(outputPath)
+                .setFeatureModulesCustomConfig(featureModulesCustomConfig);
 
         BuildSdkApksCommand.Builder sdkCommand =
             BuildSdkApksCommand.builder()

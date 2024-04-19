@@ -46,11 +46,13 @@ import static com.android.tools.build.bundletool.model.AndroidManifest.REQUIRED_
 import static com.android.tools.build.bundletool.model.AndroidManifest.REQUIRED_BY_PRIVACY_SANDBOX_SDK_ATTRIBUTE_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.REQUIRED_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.REQUIRED_SPLIT_TYPES_ATTRIBUTE_NAME;
+import static com.android.tools.build.bundletool.model.AndroidManifest.REQUIRED_SPLIT_TYPES_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.SDK_VERSION_MAJOR_ATTRIBUTE_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.SERVICE_ELEMENT_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.SPLIT_NAME_ATTRIBUTE_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.SPLIT_NAME_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.SPLIT_TYPES_ATTRIBUTE_NAME;
+import static com.android.tools.build.bundletool.model.AndroidManifest.SPLIT_TYPES_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.TARGET_SANDBOX_VERSION_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.THEME_ATTRIBUTE_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.THEME_RESOURCE_ID;
@@ -74,7 +76,6 @@ import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.xmlN
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.xmlResourceReferenceAttribute;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.truth.Truth.assertThat;
-import static com.google.common.truth.Truth8.assertThat;
 import static com.google.common.truth.extensions.proto.ProtoTruth.assertThat;
 
 import com.android.aapt.Resources.XmlAttribute;
@@ -531,10 +532,18 @@ public class ManifestEditorTest {
   public void setSplitTypes() throws Exception {
     AndroidManifest androidManifest = createManifestWithApplicationElement();
 
-    AndroidManifest editedManifest = androidManifest.toEditor().setSplitTypes(SPLIT_NAMES).save();
+    AndroidManifest editedManifest =
+        androidManifest
+            .toEditor()
+            .setSplitTypes(SPLIT_NAMES, /* enableSystemAttribute= */ true)
+            .save();
 
     assertThat(editedManifest.getManifestElement().getAttributes())
         .containsExactly(
+            XmlProtoAttributeBuilder.createAndroidAttribute(
+                    SPLIT_TYPES_ATTRIBUTE_NAME, SPLIT_TYPES_RESOURCE_ID)
+                .setValueAsString("config,language")
+                .build(),
             XmlProtoAttributeBuilder.create(DISTRIBUTION_NAMESPACE_URI, SPLIT_TYPES_ATTRIBUTE_NAME)
                 .setValueAsString("config,language")
                 .build());
@@ -545,10 +554,18 @@ public class ManifestEditorTest {
     AndroidManifest androidManifest = createManifestWithApplicationElement();
 
     AndroidManifest editedManifest =
-        androidManifest.toEditor().setSplitTypes(SPLIT_NAMES).setSplitTypes(SPLIT_NAMES).save();
+        androidManifest
+            .toEditor()
+            .setSplitTypes(SPLIT_NAMES, /* enableSystemAttribute= */ true)
+            .setSplitTypes(SPLIT_NAMES, /* enableSystemAttribute= */ true)
+            .save();
 
     assertThat(editedManifest.getManifestElement().getAttributes())
         .containsExactly(
+            XmlProtoAttributeBuilder.createAndroidAttribute(
+                    SPLIT_TYPES_ATTRIBUTE_NAME, SPLIT_TYPES_RESOURCE_ID)
+                .setValueAsString("config,language")
+                .build(),
             XmlProtoAttributeBuilder.create(DISTRIBUTION_NAMESPACE_URI, SPLIT_TYPES_ATTRIBUTE_NAME)
                 .setValueAsString("config,language")
                 .build());
@@ -559,10 +576,18 @@ public class ManifestEditorTest {
     AndroidManifest androidManifest = createManifestWithApplicationElement();
 
     AndroidManifest editedManifest =
-        androidManifest.toEditor().setSplitTypes(ImmutableList.of("language", "config")).save();
+        androidManifest
+            .toEditor()
+            .setSplitTypes(
+                ImmutableList.of("language", "config"), /* enableSystemAttribute= */ true)
+            .save();
 
     assertThat(editedManifest.getManifestElement().getAttributes())
         .containsExactly(
+            XmlProtoAttributeBuilder.createAndroidAttribute(
+                    SPLIT_TYPES_ATTRIBUTE_NAME, SPLIT_TYPES_RESOURCE_ID)
+                .setValueAsString("config,language")
+                .build(),
             XmlProtoAttributeBuilder.create(DISTRIBUTION_NAMESPACE_URI, SPLIT_TYPES_ATTRIBUTE_NAME)
                 .setValueAsString("config,language")
                 .build());
@@ -575,12 +600,16 @@ public class ManifestEditorTest {
     AndroidManifest editedManifest =
         androidManifest
             .toEditor()
-            .setSplitTypes(ImmutableList.of("base,feature"))
-            .setSplitTypes(SPLIT_NAMES)
+            .setSplitTypes(ImmutableList.of("base,feature"), /* enableSystemAttribute= */ true)
+            .setSplitTypes(SPLIT_NAMES, /* enableSystemAttribute= */ true)
             .save();
 
     assertThat(editedManifest.getManifestElement().getAttributes())
         .containsExactly(
+            XmlProtoAttributeBuilder.createAndroidAttribute(
+                    SPLIT_TYPES_ATTRIBUTE_NAME, SPLIT_TYPES_RESOURCE_ID)
+                .setValueAsString("config,language")
+                .build(),
             XmlProtoAttributeBuilder.create(DISTRIBUTION_NAMESPACE_URI, SPLIT_TYPES_ATTRIBUTE_NAME)
                 .setValueAsString("config,language")
                 .build());
@@ -591,10 +620,17 @@ public class ManifestEditorTest {
     AndroidManifest androidManifest = createManifestWithApplicationElement();
 
     AndroidManifest editedManifest =
-        androidManifest.toEditor().setRequiredSplitTypes(SPLIT_NAMES).save();
+        androidManifest
+            .toEditor()
+            .setRequiredSplitTypes(SPLIT_NAMES, /* enableSystemAttribute= */ true)
+            .save();
 
     assertThat(editedManifest.getManifestElement().getAttributes())
         .containsExactly(
+            XmlProtoAttributeBuilder.createAndroidAttribute(
+                    REQUIRED_SPLIT_TYPES_ATTRIBUTE_NAME, REQUIRED_SPLIT_TYPES_RESOURCE_ID)
+                .setValueAsString("config,language")
+                .build(),
             XmlProtoAttributeBuilder.create(
                     DISTRIBUTION_NAMESPACE_URI, REQUIRED_SPLIT_TYPES_ATTRIBUTE_NAME)
                 .setValueAsString("config,language")
@@ -608,12 +644,16 @@ public class ManifestEditorTest {
     AndroidManifest editedManifest =
         androidManifest
             .toEditor()
-            .setRequiredSplitTypes(SPLIT_NAMES)
-            .setRequiredSplitTypes(SPLIT_NAMES)
+            .setRequiredSplitTypes(SPLIT_NAMES, /* enableSystemAttribute= */ true)
+            .setRequiredSplitTypes(SPLIT_NAMES, /* enableSystemAttribute= */ true)
             .save();
 
     assertThat(editedManifest.getManifestElement().getAttributes())
         .containsExactly(
+            XmlProtoAttributeBuilder.createAndroidAttribute(
+                    REQUIRED_SPLIT_TYPES_ATTRIBUTE_NAME, REQUIRED_SPLIT_TYPES_RESOURCE_ID)
+                .setValueAsString("config,language")
+                .build(),
             XmlProtoAttributeBuilder.create(
                     DISTRIBUTION_NAMESPACE_URI, REQUIRED_SPLIT_TYPES_ATTRIBUTE_NAME)
                 .setValueAsString("config,language")
@@ -627,11 +667,16 @@ public class ManifestEditorTest {
     AndroidManifest editedManifest =
         androidManifest
             .toEditor()
-            .setRequiredSplitTypes(ImmutableList.of("language", "config"))
+            .setRequiredSplitTypes(
+                ImmutableList.of("language", "config"), /* enableSystemAttribute= */ true)
             .save();
 
     assertThat(editedManifest.getManifestElement().getAttributes())
         .containsExactly(
+            XmlProtoAttributeBuilder.createAndroidAttribute(
+                    REQUIRED_SPLIT_TYPES_ATTRIBUTE_NAME, REQUIRED_SPLIT_TYPES_RESOURCE_ID)
+                .setValueAsString("config,language")
+                .build(),
             XmlProtoAttributeBuilder.create(
                     DISTRIBUTION_NAMESPACE_URI, REQUIRED_SPLIT_TYPES_ATTRIBUTE_NAME)
                 .setValueAsString("config,language")
@@ -645,12 +690,17 @@ public class ManifestEditorTest {
     AndroidManifest editedManifest =
         androidManifest
             .toEditor()
-            .setRequiredSplitTypes(ImmutableList.of("base,feature"))
-            .setRequiredSplitTypes(SPLIT_NAMES)
+            .setRequiredSplitTypes(
+                ImmutableList.of("base,feature"), /* enableSystemAttribute= */ true)
+            .setRequiredSplitTypes(SPLIT_NAMES, /* enableSystemAttribute= */ true)
             .save();
 
     assertThat(editedManifest.getManifestElement().getAttributes())
         .containsExactly(
+            XmlProtoAttributeBuilder.createAndroidAttribute(
+                    REQUIRED_SPLIT_TYPES_ATTRIBUTE_NAME, REQUIRED_SPLIT_TYPES_RESOURCE_ID)
+                .setValueAsString("config,language")
+                .build(),
             XmlProtoAttributeBuilder.create(
                     DISTRIBUTION_NAMESPACE_URI, REQUIRED_SPLIT_TYPES_ATTRIBUTE_NAME)
                 .setValueAsString("config,language")

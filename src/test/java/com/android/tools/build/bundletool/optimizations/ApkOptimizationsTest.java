@@ -110,6 +110,52 @@ public class ApkOptimizationsTest {
   }
 
   @Test
+  public void
+      getDefaultOptimizations_1_15_7_onlySplitsByAbiDensityTextureLanguageUncompressNativeLibsUncompressedDexDeviceTiersCountrySet() {
+    ApkOptimizations defaultOptimizations =
+        ApkOptimizations.getDefaultOptimizationsForVersion(Version.of("1.15.7"));
+    assertThat(defaultOptimizations)
+        .isEqualTo(
+            ApkOptimizations.builder()
+                .setSplitDimensions(
+                    ImmutableSet.of(
+                        ABI,
+                        SCREEN_DENSITY,
+                        TEXTURE_COMPRESSION_FORMAT,
+                        LANGUAGE,
+                        DEVICE_TIER,
+                        COUNTRY_SET))
+                .setUncompressNativeLibraries(true)
+                .setStandaloneDimensions(ImmutableSet.of(ABI, SCREEN_DENSITY))
+                .setUncompressDexFiles(true)
+                .setUncompressedDexTargetSdk(UncompressedDexTargetSdk.SDK_31)
+                .build());
+  }
+
+  @Test
+  public void
+      getDefaultOptimizations_1_16_0_sameAs_1_15_7_uncompressedDexOnQPlus() {
+    ApkOptimizations defaultOptimizations =
+        ApkOptimizations.getDefaultOptimizationsForVersion(Version.of("1.16.0"));
+    assertThat(defaultOptimizations)
+        .isEqualTo(
+            ApkOptimizations.builder()
+                .setSplitDimensions(
+                    ImmutableSet.of(
+                        ABI,
+                        SCREEN_DENSITY,
+                        TEXTURE_COMPRESSION_FORMAT,
+                        LANGUAGE,
+                        DEVICE_TIER,
+                        COUNTRY_SET))
+                .setUncompressNativeLibraries(true)
+                .setStandaloneDimensions(ImmutableSet.of(ABI, SCREEN_DENSITY))
+                .setUncompressDexFiles(true)
+                .setUncompressedDexTargetSdk(UncompressedDexTargetSdk.UNSPECIFIED)
+                .build());
+  }
+
+  @Test
   public void getSplitDimensionsForAssetModules_returnsDimensionsSupportedByAssetModules() {
     ApkOptimizations optimizations =
         ApkOptimizations.builder()

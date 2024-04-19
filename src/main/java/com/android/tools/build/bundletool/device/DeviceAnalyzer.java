@@ -16,7 +16,6 @@
 
 package com.android.tools.build.bundletool.device;
 
-import static com.android.tools.build.bundletool.model.AndroidManifest.SDK_SANDBOX_MIN_VERSION;
 import static com.google.common.base.Preconditions.checkState;
 
 import com.android.bundle.Devices.DeviceSpec;
@@ -81,7 +80,7 @@ public class DeviceAnalyzer {
       checkState(!supportedAbis.isEmpty(), "Error retrieving device ABIs. Please try again.");
 
       SdkRuntime sdkRuntime =
-          SdkRuntime.newBuilder().setSupported(deviceSdkVersion >= SDK_SANDBOX_MIN_VERSION).build();
+          SdkRuntime.newBuilder().setSupported(device.supportsPrivacySandbox()).build();
 
       DeviceSpec.Builder builder =
           DeviceSpec.newBuilder()

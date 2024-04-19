@@ -41,6 +41,7 @@ import com.android.apksig.apk.ApkFormatException;
 import com.android.apksig.util.DataSource;
 import com.android.apksig.util.DataSources;
 import com.android.bundle.Devices.DeviceSpec;
+import com.android.bundle.FeatureModulesConfigProto.FeatureModulesCustomConfig;
 import com.android.bundle.RuntimeEnabledSdkConfigProto.LocalDeploymentRuntimeEnabledSdkConfig;
 import com.android.bundle.RuntimeEnabledSdkConfigProto.RuntimeEnabledSdk;
 import com.android.tools.build.bundletool.androidtools.Aapt2Command;
@@ -313,6 +314,10 @@ public abstract class BuildApksCommand {
 
   public abstract boolean getEnableBaseModuleMinSdkAsDefaultTargeting();
 
+  public abstract Optional<FeatureModulesCustomConfig> getFeatureModulesCustomConfig();
+
+  public abstract Optional<Integer> getMinModulesToEnableFeatureModulesConfig();
+
   public static Builder builder() {
     return new AutoValue_BuildApksCommand.Builder()
         .setOverwriteOutput(false)
@@ -581,6 +586,18 @@ public abstract class BuildApksCommand {
      * module.
      */
     public abstract Builder setEnableBaseModuleMinSdkAsDefaultTargeting(boolean value);
+
+    /**
+     * Custom configurations for feature modules.
+     *
+     * <p>Used to disable split apk generation for certain feature modules.
+     */
+    public abstract Builder setFeatureModulesCustomConfig(
+        Optional<FeatureModulesCustomConfig> featureModulesCustomConfig);
+
+    /** Minimum number of modules in a variant to enable feature modules config. */
+    public abstract Builder setMinModulesToEnableFeatureModulesConfig(
+        int minModulesToEnableFeatureModulesConfig);
 
     abstract BuildApksCommand autoBuild();
 

@@ -266,8 +266,7 @@ public final class TestUtils {
   }
 
   public static XmlNode createInvalidSdkAndroidManifest() {
-    return androidManifest(
-        PACKAGE_NAME, withMinSdkVersion(32), withInstallLocation("preferExternal"));
+    return androidManifest(PACKAGE_NAME, withMinSdkVersion(32), withInstallLocation(2));
   }
 
   private static SdkMetadata getSdkMetadata() {

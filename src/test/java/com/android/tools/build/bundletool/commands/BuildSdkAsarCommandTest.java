@@ -25,7 +25,6 @@ import static com.android.tools.build.bundletool.testing.TestUtils.createZipBuil
 import static com.android.tools.build.bundletool.testing.TestUtils.expectMissingRequiredBuilderPropertyException;
 import static com.android.tools.build.bundletool.testing.TestUtils.expectMissingRequiredFlagException;
 import static com.google.common.truth.Truth.assertThat;
-import static com.google.common.truth.Truth8.assertThat;
 import static java.util.Arrays.stream;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 

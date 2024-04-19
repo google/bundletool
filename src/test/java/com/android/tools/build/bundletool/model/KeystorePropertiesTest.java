@@ -21,7 +21,6 @@ import static com.android.tools.build.bundletool.model.KeystoreProperties.KEYSTO
 import static com.android.tools.build.bundletool.model.KeystoreProperties.KEY_ALIAS_PROPERTY_NAME;
 import static com.android.tools.build.bundletool.model.KeystoreProperties.KEY_PASSWORD_PROPERTY_NAME;
 import static com.google.common.truth.Truth.assertThat;
-import static com.google.common.truth.Truth8.assertThat;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 

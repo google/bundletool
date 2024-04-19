@@ -75,6 +75,8 @@ public abstract class Device {
 
   public abstract void pull(ImmutableList<FilePullParams> files);
 
+  public abstract boolean supportsPrivacySandbox();
+
   /** Options related to APK installation. */
   @Immutable
   @AutoValue

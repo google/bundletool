@@ -68,7 +68,8 @@ public final class RequiredSplitTypesInjectorTest {
         ImmutableList.of(baseSplit.getModuleName(), featureSplit.getModuleName());
     ImmutableList<ModuleSplit> allSplits = ImmutableList.of(baseSplit, featureSplit);
     ImmutableList<ModuleSplit> newSplits =
-        RequiredSplitTypesInjector.injectSplitTypeValidation(allSplits, requiredModules);
+        RequiredSplitTypesInjector.injectSplitTypeValidation(
+            allSplits, requiredModules, /* enableSystemAttribute= */ true);
 
     baseSplit = newSplits.get(0);
     assertThat(getProvidedSplitTypes(baseSplit)).isEmpty();
@@ -113,7 +114,8 @@ public final class RequiredSplitTypesInjectorTest {
       ImmutableList<BundleModuleName> requiredModules = ImmutableList.of(baseSplit.getModuleName());
       ImmutableList<ModuleSplit> allSplits = ImmutableList.of(baseSplit, otherSplit);
       ImmutableList<ModuleSplit> newSplits =
-          RequiredSplitTypesInjector.injectSplitTypeValidation(allSplits, requiredModules);
+          RequiredSplitTypesInjector.injectSplitTypeValidation(
+              allSplits, requiredModules, /* enableSystemAttribute= */ true);
 
       baseSplit = newSplits.get(0);
       assertThat(getProvidedSplitTypes(baseSplit)).isEmpty();

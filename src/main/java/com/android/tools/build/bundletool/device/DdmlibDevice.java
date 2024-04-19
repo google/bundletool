@@ -240,6 +240,11 @@ public class DdmlibDevice extends Device {
     }
   }
 
+  @Override
+  public boolean supportsPrivacySandbox() {
+    return device.services().containsKey("sdk_sandbox");
+  }
+
   private void pushFiles(
       RemoteCommandExecutor executor, String splitsPath, ImmutableList<Path> files)
       throws IOException, SyncException, TimeoutException, AdbCommandRejectedException,

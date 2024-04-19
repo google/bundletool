@@ -33,7 +33,6 @@ import static com.android.tools.build.bundletool.testing.TestUtils.addKeyToKeyst
 import static com.android.tools.build.bundletool.testing.TestUtils.createKeystore;
 import static com.android.tools.build.bundletool.testing.TestUtils.extractAndroidManifest;
 import static com.google.common.truth.Truth.assertThat;
-import static com.google.common.truth.Truth8.assertThat;
 import static com.google.common.truth.extensions.proto.ProtoTruth.assertThat;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.util.Arrays.stream;

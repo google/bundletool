@@ -21,7 +21,9 @@ import static com.google.common.primitives.Ints.max;
 
 import com.android.bundle.Targeting.ApkTargeting;
 import com.android.bundle.Targeting.VariantTargeting;
+import com.android.tools.build.bundletool.model.ModuleSplit.SplitType;
 import com.google.auto.value.AutoValue;
+import java.util.Optional;
 
 /** Allows clients to provide a {@link SigningConfiguration} for each generated APK. */
 public interface SigningConfigurationProvider {
@@ -48,6 +50,24 @@ public interface SigningConfigurationProvider {
     /** Targeting of the variant. */
     public abstract VariantTargeting getVariantTargeting();
 
+    /** Version code of APK. */
+    public abstract Optional<Integer> getVersionCode();
+
+    /** Variant/Derived id of APK. */
+    public abstract Optional<String> getVariantId();
+
+    /** Module name of split. */
+    public abstract String getModuleName();
+
+    /** Package name of app. */
+    public abstract String getPackageName();
+
+    /** The split type being represented by this split. */
+    public abstract SplitType getSplitType();
+
+    /** Split/Asset name of the split/AssetPack. */
+    public abstract Optional<String> getSplitName();
+
     /**
      * Minimum platform API version that the APK will be installed on. This is derived as the
      * highest version out of the minSdkVersion (from Android manifest), the ApkTargeting, and the
@@ -61,11 +81,16 @@ public interface SigningConfigurationProvider {
     }
 
     public static ApkDescription fromModuleSplit(ModuleSplit moduleSplit) {
-      int minSdkVersionFromManifest = moduleSplit.getAndroidManifest().getEffectiveMinSdkVersion();
+      AndroidManifest androidManifest = moduleSplit.getAndroidManifest();
       return builder()
-          .setMinSdkVersionFromManifest(minSdkVersionFromManifest)
+          .setMinSdkVersionFromManifest(androidManifest.getEffectiveMinSdkVersion())
           .setApkTargeting(moduleSplit.getApkTargeting())
           .setVariantTargeting(moduleSplit.getVariantTargeting())
+          .setVersionCode(androidManifest.getVersionCode())
+          .setModuleName(moduleSplit.getModuleName().getName())
+          .setSplitType(moduleSplit.getSplitType())
+          .setSplitName(androidManifest.getSplitId())
+          .setPackageName(androidManifest.getPackageName())
           .build();
     }
 
@@ -81,6 +106,18 @@ public interface SigningConfigurationProvider {
       public abstract Builder setApkTargeting(ApkTargeting apkTargeting);
 
       public abstract Builder setVariantTargeting(VariantTargeting variantTargeting);
+
+      public abstract Builder setVersionCode(Optional<Integer> versionCode);
+
+      public abstract Builder setModuleName(String moduleName);
+
+      public abstract Builder setPackageName(String packageName);
+
+      public abstract Builder setVariantId(Optional<String> variantId);
+
+      public abstract Builder setSplitType(SplitType splitType);
+
+      public abstract Builder setSplitName(Optional<String> splitName);
 
       public abstract ApkDescription build();
     }

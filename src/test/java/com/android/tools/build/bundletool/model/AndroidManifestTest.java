@@ -27,6 +27,7 @@ import static com.android.tools.build.bundletool.model.AndroidManifest.DEVELOPME
 import static com.android.tools.build.bundletool.model.AndroidManifest.HAS_CODE_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.ICON_ATTRIBUTE_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.ICON_RESOURCE_ID;
+import static com.android.tools.build.bundletool.model.AndroidManifest.INSTALL_LOCATION_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.IS_FEATURE_SPLIT_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.LABEL_ATTRIBUTE_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.LABEL_RESOURCE_ID;
@@ -83,7 +84,6 @@ import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.xmlN
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.xmlNode;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.xmlResourceReferenceAttribute;
 import static com.google.common.truth.Truth.assertThat;
-import static com.google.common.truth.Truth8.assertThat;
 import static com.google.common.truth.extensions.proto.ProtoTruth.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
@@ -385,6 +385,19 @@ public class AndroidManifestTest {
                         ANDROID_NAMESPACE_URI, "versionCode", VERSION_CODE_RESOURCE_ID, 123),
                     xmlNode(xmlElement("application")))));
     assertThat(androidManifest.getVersionCode()).hasValue(123);
+  }
+
+  @Test
+  public void getInstallLocation() {
+    AndroidManifest androidManifest =
+        AndroidManifest.create(
+            xmlNode(
+                xmlElement(
+                    "manifest",
+                    xmlDecimalIntegerAttribute(
+                        ANDROID_NAMESPACE_URI, "installLocation", INSTALL_LOCATION_RESOURCE_ID, 0),
+                    xmlNode(xmlElement("application")))));
+    assertThat(androidManifest.getInstallLocationValue()).hasValue("auto");
   }
 
   @Test

@@ -21,7 +21,6 @@ import static com.android.tools.build.bundletool.testing.TestUtils.DEFAULT_SDK_M
 import static com.android.tools.build.bundletool.testing.TestUtils.createZipBuilderForModules;
 import static com.android.tools.build.bundletool.testing.TestUtils.createZipBuilderForSdkAsarWithModules;
 import static com.google.common.truth.Truth.assertThat;
-import static com.google.common.truth.Truth8.assertThat;
 import static com.google.common.truth.extensions.proto.ProtoTruth.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 

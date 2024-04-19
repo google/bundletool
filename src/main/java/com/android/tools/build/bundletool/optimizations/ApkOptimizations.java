@@ -98,6 +98,39 @@ public abstract class ApkOptimizations {
                       .setUncompressDexFiles(true)
                       .setUncompressedDexTargetSdk(UncompressedDexTargetSdk.SDK_31)
                       .build())
+              .put(
+                  Version.of("1.15.7"),
+                  ApkOptimizations.builder()
+                      .setSplitDimensions(
+                          ImmutableSet.of(
+                              ABI,
+                              SCREEN_DENSITY,
+                              TEXTURE_COMPRESSION_FORMAT,
+                              LANGUAGE,
+                              DEVICE_TIER,
+                              COUNTRY_SET))
+                      .setUncompressNativeLibraries(true)
+                      .setStandaloneDimensions(ImmutableSet.of(ABI, SCREEN_DENSITY))
+                      .setUncompressDexFiles(true)
+                      .setUncompressedDexTargetSdk(UncompressedDexTargetSdk.SDK_31)
+                      .build())
+              .put(
+                  Version.of("1.16.0"),
+                  ApkOptimizations.builder()
+                      .setSplitDimensions(
+                          ImmutableSet.of(
+                              ABI,
+                              SCREEN_DENSITY,
+                              TEXTURE_COMPRESSION_FORMAT,
+                              LANGUAGE,
+                              DEVICE_TIER,
+                              COUNTRY_SET))
+                      .setUncompressNativeLibraries(true)
+                      .setStandaloneDimensions(ImmutableSet.of(ABI, SCREEN_DENSITY))
+                      .setUncompressDexFiles(true)
+                      // UNSPECIFIED here means SDK 29+ (Android Q+)
+                      .setUncompressedDexTargetSdk(UncompressedDexTargetSdk.UNSPECIFIED)
+                      .build())
               .buildOrThrow();
 
   /** List of dimensions supported by asset modules. */

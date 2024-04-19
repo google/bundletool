@@ -285,7 +285,7 @@ public abstract class InstallApksCommand {
             .map(AssetModuleMetadata::getName)
             .collect(toImmutableSet());
     getModules()
-        .map(modules -> ExtractApksCommand.resolveRequestedModules(modules, toc))
+        .map(modules -> ExtractApksCommand.resolveRequestedModules(modules, toc, deviceSpec))
         .map(modules -> Sets.difference(modules, dynamicAssetModules).immutableCopy())
         .ifPresent(extractApksCommand::setModules);
     return extractApksCommand.build().execute();
@@ -323,7 +323,7 @@ public abstract class InstallApksCommand {
             .collect(toImmutableSet());
     ImmutableSet<String> allModules =
         ExtractApksCommand.resolveRequestedModules(
-            ImmutableSet.of(ExtractApksCommand.ALL_MODULES_SHORTCUT), toc);
+            ImmutableSet.of(ExtractApksCommand.ALL_MODULES_SHORTCUT), toc, deviceSpec);
 
     // We exclude install-time asset modules from the list of requested modules and also force
     // the extract-apk layer to skip them explicitly.

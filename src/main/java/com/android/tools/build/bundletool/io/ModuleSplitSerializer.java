@@ -29,6 +29,7 @@ import com.android.bundle.Config.BundleConfig;
 import com.android.bundle.Config.Compression.ApkCompressionAlgorithm;
 import com.android.tools.build.bundletool.androidtools.P7ZipCommand;
 import com.android.tools.build.bundletool.commands.BuildApksModule.VerboseLogs;
+import com.android.tools.build.bundletool.io.ApkSerializerModule.NativeLibrariesAlignmentInBytes;
 import com.android.tools.build.bundletool.model.ApkListener;
 import com.android.tools.build.bundletool.model.BundleModule.SpecialModuleEntry;
 import com.android.tools.build.bundletool.model.ModuleEntry;
@@ -81,7 +82,8 @@ public class ModuleSplitSerializer extends ApkSerializer {
       BundleConfig bundleConfig,
       Version bundletoolVersion,
       ListeningExecutorService executorService,
-      Optional<P7ZipCommand> p7ZipCommand) {
+      Optional<P7ZipCommand> p7ZipCommand,
+      @NativeLibrariesAlignmentInBytes int nativeLibrariesAlignment) {
     super(apkListener, verbose);
     this.aapt2ResourceConverter = aapt2ResourceConverterFactory;
     this.apkSigner = apkSigner;
@@ -98,7 +100,7 @@ public class ModuleSplitSerializer extends ApkSerializer {
     this.bundletoolVersion = bundletoolVersion;
     this.executorService = executorService;
     this.p7ZipCommand = p7ZipCommand;
-    this.nativeLibraryAlignment = getNativeLibraryAlignment(bundleConfig);
+    this.nativeLibraryAlignment = nativeLibrariesAlignment;
   }
 
   /**
@@ -411,19 +413,5 @@ public class ModuleSplitSerializer extends ApkSerializer {
       return uncompressedSize == 0 || (compressedSize + compressedSize / 10 > uncompressedSize);
     }
     return compressedSize >= uncompressedSize;
-  }
-
-  private int getNativeLibraryAlignment(BundleConfig bundleConfig) {
-    switch (bundleConfig.getOptimizations().getUncompressNativeLibraries().getAlignment()) {
-      case PAGE_ALIGNMENT_16K:
-        return 16384;
-      case PAGE_ALIGNMENT_64K:
-        return 65536;
-      case PAGE_ALIGNMENT_UNSPECIFIED:
-      case PAGE_ALIGNMENT_4K:
-      case UNRECOGNIZED:
-        return 4096;
-    }
-    throw new IllegalArgumentException("Wrong native libraries alignment.");
   }
 }

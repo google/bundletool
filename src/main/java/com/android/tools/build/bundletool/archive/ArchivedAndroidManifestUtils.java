@@ -198,7 +198,6 @@ public final class ArchivedAndroidManifestUtils {
     return archivedManifestEditor.save();
   }
 
-
   private static Activity createReactivateActivity(
       IntentFilter intentFilter, Optional<Integer> icon, Optional<Integer> roundIcon) {
     return getCommonActivityBuilder()
@@ -263,7 +262,6 @@ public final class ArchivedAndroidManifestUtils {
     editor.addUsesFeatureElement(LEANBACK_FEATURE_NAME, /* isRequired= */ false);
     editor.addUsesFeatureElement(TOUCHSCREEN_FEATURE_NAME, /* isRequired= */ false);
   }
-
 
   private ArchivedAndroidManifestUtils() {}
 }

@@ -60,6 +60,7 @@ import static com.android.tools.build.bundletool.model.AndroidManifest.REQUIRED_
 import static com.android.tools.build.bundletool.model.AndroidManifest.REQUIRED_BY_PRIVACY_SANDBOX_SDK_ATTRIBUTE_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.REQUIRED_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.REQUIRED_SPLIT_TYPES_ATTRIBUTE_NAME;
+import static com.android.tools.build.bundletool.model.AndroidManifest.REQUIRED_SPLIT_TYPES_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.RESOURCE_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.ROUND_ICON_ATTRIBUTE_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.ROUND_ICON_RESOURCE_ID;
@@ -70,6 +71,7 @@ import static com.android.tools.build.bundletool.model.AndroidManifest.SDK_VERSI
 import static com.android.tools.build.bundletool.model.AndroidManifest.SERVICE_ELEMENT_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.SPLIT_NAME_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.SPLIT_TYPES_ATTRIBUTE_NAME;
+import static com.android.tools.build.bundletool.model.AndroidManifest.SPLIT_TYPES_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.TARGET_SANDBOX_VERSION_ATTRIBUTE_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.TARGET_SANDBOX_VERSION_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.THEME_ATTRIBUTE_NAME;
@@ -320,12 +322,16 @@ public class ManifestEditor {
    *
    * <p>Split types are arbitrary strings, stored comma-separated, and used along with {@code
    * requiredSplitTypes} to perform validation at install time.
-   *
-   * <p>Note: this is currently set under `dist:splitTypes` rather than as the Android attribute.
-   * This will be replaced once the verifier implementation has been validated.
    */
   @CanIgnoreReturnValue
-  public ManifestEditor setSplitTypes(ImmutableList<String> splitTypes) {
+  public ManifestEditor setSplitTypes(
+      ImmutableList<String> splitTypes, boolean enableSystemAttribute) {
+    if (enableSystemAttribute) {
+      manifestElement
+          .getOrCreateAndroidAttribute(SPLIT_TYPES_ATTRIBUTE_NAME, SPLIT_TYPES_RESOURCE_ID)
+          .setValueAsString(splitTypes.stream().sorted().collect(joining(",")));
+    }
+    // TODO(b/199376532): Remove once the system attribute is fully rolled out.
     manifestElement
         .getOrCreateAttribute(DISTRIBUTION_NAMESPACE_URI, SPLIT_TYPES_ATTRIBUTE_NAME)
         .setValueAsString(splitTypes.stream().sorted().collect(joining(",")));
@@ -337,12 +343,17 @@ public class ManifestEditor {
    *
    * <p>Split types are arbitrary strings, stored comma-separated, and reference the split types
    * provided by {@code splitTypes} in splits.
-   *
-   * <p>Note: this is currently set under `dist:requiredSplitTypes` rather than as the Android
-   * attribute. This will be replaced once the verifier implementation has been validated.
    */
   @CanIgnoreReturnValue
-  public ManifestEditor setRequiredSplitTypes(ImmutableList<String> splitTypes) {
+  public ManifestEditor setRequiredSplitTypes(
+      ImmutableList<String> splitTypes, boolean enableSystemAttribute) {
+    if (enableSystemAttribute) {
+      manifestElement
+          .getOrCreateAndroidAttribute(
+              REQUIRED_SPLIT_TYPES_ATTRIBUTE_NAME, REQUIRED_SPLIT_TYPES_RESOURCE_ID)
+          .setValueAsString(splitTypes.stream().sorted().collect(joining(",")));
+    }
+    // TODO(b/199376532): Remove once the system attribute is fully rolled out.
     manifestElement
         .getOrCreateAttribute(DISTRIBUTION_NAMESPACE_URI, REQUIRED_SPLIT_TYPES_ATTRIBUTE_NAME)
         .setValueAsString(splitTypes.stream().sorted().collect(joining(",")));

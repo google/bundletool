@@ -16,7 +16,6 @@
 
 package com.android.tools.build.bundletool.model;
 
-import com.google.common.collect.ImmutableList;
 import com.google.errorprone.annotations.Immutable;
 import java.util.function.Consumer;
 
@@ -32,15 +31,5 @@ public interface ManifestMutator extends Consumer<ManifestEditor> {
   /** Add the {@code isSplitRequired} attribute to the manifest. */
   static ManifestMutator withSplitsRequired(boolean value) {
     return manifestEditor -> manifestEditor.setSplitsRequired(value);
-  }
-
-  /** Add the {@code splitTypes} attribute to a manifest. */
-  static ManifestMutator withProvidedSplitTypes(ImmutableList<String> splitTypes) {
-    return manifestEditor -> manifestEditor.setSplitTypes(splitTypes);
-  }
-
-  /** Add the {@code requiredSplitTypes} attribute to a manifest. */
-  static ManifestMutator withRequiredSplitTypes(ImmutableList<String> splitTypes) {
-    return manifestEditor -> manifestEditor.setRequiredSplitTypes(splitTypes);
   }
 }

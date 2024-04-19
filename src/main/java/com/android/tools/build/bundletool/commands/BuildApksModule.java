@@ -20,6 +20,7 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
 import com.android.bundle.Config.BundleConfig;
 import com.android.bundle.Devices.DeviceSpec;
+import com.android.bundle.FeatureModulesConfigProto.FeatureModulesCustomConfig;
 import com.android.bundle.RuntimeEnabledSdkConfigProto.LocalDeploymentRuntimeEnabledSdkConfig;
 import com.android.tools.build.bundletool.androidtools.P7ZipCommand;
 import com.android.tools.build.bundletool.commands.BuildApksCommand.ApkBuildMode;
@@ -181,6 +182,20 @@ public final class BuildApksModule {
     return removeTvIconCloud;
   }
 
+  @CommandScoped
+  @Provides
+  static Optional<FeatureModulesCustomConfig> provideFeatureModulesCustomConfig(
+      BuildApksCommand command) {
+    return command.getFeatureModulesCustomConfig();
+  }
+
+  @CommandScoped
+  @MinModulesToEnableFeatureModulesConfig
+  @Provides
+  static Optional<Integer> provideMinModulesToEnableFeatureModulesConfig(BuildApksCommand command) {
+    return command.getMinModulesToEnableFeatureModulesConfig();
+  }
+
   /**
    * Qualifying annotation of an {@code Optional<Integer>} for the first variant number to use when
    * numbering the generated variants.
@@ -211,6 +226,14 @@ public final class BuildApksModule {
   @Qualifier
   @Retention(RUNTIME)
   public @interface RemoveTvIconCloud {}
+
+  /**
+   * Qualifying annotation of an {@code Optional<Integer>} for the minimum number of modules in a
+   * variant to enable feature modules config.
+   */
+  @Qualifier
+  @Retention(RUNTIME)
+  public @interface MinModulesToEnableFeatureModulesConfig {}
 
   private BuildApksModule() {}
 }

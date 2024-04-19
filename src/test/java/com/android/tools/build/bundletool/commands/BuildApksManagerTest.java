@@ -50,6 +50,7 @@ import static com.android.tools.build.bundletool.model.utils.Versions.ANDROID_P_
 import static com.android.tools.build.bundletool.model.utils.Versions.ANDROID_Q_API_VERSION;
 import static com.android.tools.build.bundletool.model.utils.Versions.ANDROID_S_API_VERSION;
 import static com.android.tools.build.bundletool.model.utils.Versions.ANDROID_S_V2_API_VERSION;
+import static com.android.tools.build.bundletool.model.utils.Versions.ANDROID_T_API_VERSION;
 import static com.android.tools.build.bundletool.model.utils.Versions.ANDROID_U_API_VERSION;
 import static com.android.tools.build.bundletool.testing.ApkSetUtils.extractFromApkSetFile;
 import static com.android.tools.build.bundletool.testing.ApkSetUtils.extractTocFromApkSetFile;
@@ -129,7 +130,6 @@ import static com.google.common.collect.Iterables.getOnlyElement;
 import static com.google.common.collect.MoreCollectors.onlyElement;
 import static com.google.common.collect.Multimaps.transformValues;
 import static com.google.common.truth.Truth.assertThat;
-import static com.google.common.truth.Truth8.assertThat;
 import static com.google.common.truth.extensions.proto.ProtoTruth.assertThat;
 import static java.util.Comparator.comparing;
 import static java.util.function.Function.identity;
@@ -297,6 +297,7 @@ public class BuildApksManagerTest {
   private static final SdkVersion P_SDK_VERSION = sdkVersionFrom(ANDROID_P_API_VERSION);
   private static final SdkVersion Q_SDK_VERSION = sdkVersionFrom(ANDROID_Q_API_VERSION);
   private static final SdkVersion S_SDK_VERSION = sdkVersionFrom(ANDROID_S_API_VERSION);
+  private static final SdkVersion T_SDK_VERSION = sdkVersionFrom(ANDROID_T_API_VERSION);
   private static final SdkVersion S2_V2_SDK_VERSION = sdkVersionFrom(ANDROID_S_V2_API_VERSION);
 
   @Rule public final TemporaryFolder tmp = new TemporaryFolder();
@@ -322,7 +323,7 @@ public class BuildApksManagerTest {
   @Inject BuildApksCommand command;
 
   protected TestModule.Builder createTestModuleBuilder() {
-    return TestModule.builder();
+    return TestModule.builder().withEnableRequiredSplitTypes(false);
   }
 
   @BeforeClass
@@ -2227,6 +2228,7 @@ public class BuildApksManagerTest {
         .containsExactly(L_SDK_VERSION);
   }
 
+
   @Test
   public void buildApksCommand_splitApks_targetMinSdkVersion() throws Exception {
     AppBundle appBundle =
@@ -2870,7 +2872,7 @@ public class BuildApksManagerTest {
                         .setNativeConfig(
                             nativeLibraries(
                                 targetedNativeDirectory("lib/x86", nativeDirectoryTargeting(X86))))
-                        .setManifest(androidManifest("com.test.app", withInstallLocation("auto"))))
+                        .setManifest(androidManifest("com.test.app", withInstallLocation(0))))
             .setBundleConfig(
                 BundleConfigBuilder.create()
                     .setUncompressNativeLibraries(true)
@@ -3025,7 +3027,8 @@ public class BuildApksManagerTest {
             .setBundleConfig(BundleConfigBuilder.create().setUncompressDexFiles(true).build())
             .build();
     TestComponent.useTestModule(
-        this, TestModule.builder().withAppBundle(appBundle).withOutputPath(outputFilePath).build());
+        this,
+        createTestModuleBuilder().withAppBundle(appBundle).withOutputPath(outputFilePath).build());
 
     buildApksManager.execute();
 
@@ -3039,15 +3042,15 @@ public class BuildApksManagerTest {
   }
 
   @Test
-  public void dexCompressionIsNotSet_enabledByDefault() throws Exception {
-    SdkVersion expectedDefaultUncompressedDexSdk = S_SDK_VERSION;
+  public void noUncompressDexInBundleConfig_1_12_0_uncompressedDexByDefaultForSPlus()
+      throws Exception {
     AppBundle appBundle =
         new AppBundleBuilder()
+            .setBundleConfig(BundleConfigBuilder.create().setVersion("1.12.0").build())
             .addModule(
                 "base",
                 builder ->
                     builder.addFile("dex/classes.dex").setManifest(androidManifest("com.test.app")))
-            .setBundleConfig(BundleConfig.getDefaultInstance())
             .build();
     TestComponent.useTestModule(
         this,
@@ -3063,18 +3066,40 @@ public class BuildApksManagerTest {
             splitApkVariants.stream()
                 .map(variant -> variant.getTargeting().getSdkVersionTargeting()))
         .containsExactly(
-            sdkVersionTargeting(
-                L_SDK_VERSION,
-                ImmutableSet.of(LOWEST_SDK_VERSION, expectedDefaultUncompressedDexSdk)),
-            sdkVersionTargeting(
-                expectedDefaultUncompressedDexSdk,
-                ImmutableSet.of(LOWEST_SDK_VERSION, L_SDK_VERSION)));
+            sdkVersionTargeting(L_SDK_VERSION, ImmutableSet.of(LOWEST_SDK_VERSION, S_SDK_VERSION)),
+            sdkVersionTargeting(S_SDK_VERSION, ImmutableSet.of(LOWEST_SDK_VERSION, L_SDK_VERSION)));
     Variant uncompressedDexVariant =
         splitApkVariants.stream()
             .filter(variant -> variant.getVariantProperties().getUncompressedDex())
             .collect(onlyElement());
     assertThat(uncompressedDexVariant.getTargeting().getSdkVersionTargeting().getValue(0))
-        .isEqualTo(expectedDefaultUncompressedDexSdk);
+        .isEqualTo(S_SDK_VERSION);
+  }
+
+  @Test
+  public void noUncompressDexInBundleConfig_1_11_0_noUncompressedDexByDefault() throws Exception {
+    AppBundle appBundle =
+        new AppBundleBuilder()
+            .setBundleConfig(BundleConfigBuilder.create().setVersion("1.11.0").build())
+            .addModule(
+                "base",
+                builder ->
+                    builder.addFile("dex/classes.dex").setManifest(androidManifest("com.test.app")))
+            .build();
+    TestComponent.useTestModule(
+        this,
+        createTestModuleBuilder().withAppBundle(appBundle).withOutputPath(outputFilePath).build());
+
+    buildApksManager.execute();
+
+    ZipFile apkSetFile = openZipFile(outputFilePath.toFile());
+    BuildApksResult result = extractTocFromApkSetFile(apkSetFile, outputDir);
+
+    ImmutableList<Variant> splitApkVariants = splitApkVariants(result);
+    assertThat(
+            splitApkVariants.stream()
+                .map(variant -> variant.getTargeting().getSdkVersionTargeting()))
+        .containsExactly(sdkVersionTargeting(L_SDK_VERSION, ImmutableSet.of(LOWEST_SDK_VERSION)));
   }
 
   @Test

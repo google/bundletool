@@ -1,0 +1,12 @@
+syntax = "proto3";
+
+package android.bundle;
+
+option java_package = "com.android.bundle";
+option java_outer_classname = "FeatureModulesConfigProto";
+
+// Custom configutations for feature modules of the App Bundle.
+message FeatureModulesCustomConfig {
+  // Specifies feature modules which are not split on split dimensions.
+  repeated string disable_config_splits_modules = 1;
+}

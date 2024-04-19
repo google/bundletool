@@ -22,6 +22,7 @@ import com.android.apksig.ApkSigner.SignerConfig;
 import com.android.apksig.apk.ApkFormatException;
 import com.android.bundle.Commands.SigningDescription;
 import com.android.tools.build.bundletool.commands.BuildApksModule.ApkSigningConfigProvider;
+import com.android.tools.build.bundletool.io.ApkSerializerModule.NativeLibrariesAlignmentInBytes;
 import com.android.tools.build.bundletool.model.ApksigSigningConfiguration;
 import com.android.tools.build.bundletool.model.ModuleEntry;
 import com.android.tools.build.bundletool.model.ModuleSplit;
@@ -53,15 +54,18 @@ class ApkSigner {
   private final Optional<SigningConfigurationProvider> signingConfigProvider;
   private final Optional<SourceStamp> sourceStampSigningConfig;
   private final TempDirectory tempDirectory;
+  private final int nativeLibrariesAlignment;
 
   @Inject
   ApkSigner(
       @ApkSigningConfigProvider Optional<SigningConfigurationProvider> signingConfigProvider,
       Optional<SourceStamp> sourceStampSigningConfig,
-      TempDirectory tempDirectory) {
+      TempDirectory tempDirectory,
+      @NativeLibrariesAlignmentInBytes int nativeLibrariesAlignment) {
     this.signingConfigProvider = signingConfigProvider;
     this.sourceStampSigningConfig = sourceStampSigningConfig;
     this.tempDirectory = tempDirectory;
+    this.nativeLibrariesAlignment = nativeLibrariesAlignment;
   }
 
   public Optional<SigningDescription> signApk(Path apkPath, ModuleSplit split) {

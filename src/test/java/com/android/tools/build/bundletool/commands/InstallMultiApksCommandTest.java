@@ -32,7 +32,6 @@ import static com.android.tools.build.bundletool.testing.FakeSystemEnvironmentPr
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.ImmutableMap.toImmutableMap;
 import static com.google.common.truth.Truth.assertThat;
-import static com.google.common.truth.Truth8.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.android.bundle.Commands.ApkDescription;
@@ -90,6 +89,8 @@ public class InstallMultiApksCommandTest {
   private static final String NONUPDATABLE_PKG_NAME_3 = "com.google.android.permissioncontroller";
   private static final String NONUPDATABLE_PKG_NAME_4 = "com.google.android.extservices";
   private static final String NONUPDATABLE_PKG_NAME_5 = "com.google.android.permission";
+  private static final String NONUPDATABLE_PKG_NAME_6 = "com.google.android.go.extservices";
+  private static final String NONUPDATABLE_PKG_NAME_7 = "com.google.android.go.permission";
 
   @Rule public TemporaryFolder tmp = new TemporaryFolder();
 
@@ -627,6 +628,64 @@ public class InstallMultiApksCommandTest {
                 NONUPDATABLE_PKG_NAME_3,
                 NONUPDATABLE_PKG_NAME_4,
                 NONUPDATABLE_PKG_NAME_5));
+    device.injectShellCommandOutput("pm list packages --apex-only --show-versioncode", () -> "");
+    command.execute();
+    assertAdbCommandExecuted();
+  }
+
+  @Test
+  public void execute_installBigAndroidUpdatablePackageOnly() throws Exception {
+    BuildApksResult tableOfContents4 = fakeTableOfContents(NONUPDATABLE_PKG_NAME_4);
+    Path apksPath4 = createApksArchiveFile(tableOfContents4, tmpDir.resolve("package4.apks"));
+    BuildApksResult tableOfContents5 = fakeTableOfContents(NONUPDATABLE_PKG_NAME_5);
+    Path apksPath5 = createApksArchiveFile(tableOfContents5, tmpDir.resolve("package5.apks"));
+    BuildApksResult tableOfContents6 = fakeTableOfContents(NONUPDATABLE_PKG_NAME_6);
+    Path apksPath6 = createApksArchiveFile(tableOfContents6, tmpDir.resolve("package6.apks"));
+    BuildApksResult tableOfContents7 = fakeTableOfContents(NONUPDATABLE_PKG_NAME_7);
+    Path apksPath7 = createApksArchiveFile(tableOfContents7, tmpDir.resolve("package7.apks"));
+
+    InstallMultiApksCommand command =
+        InstallMultiApksCommand.builder()
+            .setAdbServer(fakeServerOneDevice(device))
+            .setDeviceId(DEVICE_ID)
+            .setAdbPath(adbPath)
+            .setApksArchivePaths(ImmutableList.of(apksPath4, apksPath5, apksPath6, apksPath7))
+            .setAapt2Command(
+                createFakeAapt2Command(
+                    ImmutableMap.of(
+                        NONUPDATABLE_PKG_NAME_4,
+                        1L,
+                        NONUPDATABLE_PKG_NAME_5,
+                        1L,
+                        NONUPDATABLE_PKG_NAME_6,
+                        1L,
+                        NONUPDATABLE_PKG_NAME_7,
+                        1L)))
+            .setAdbCommand(
+                // EXPECT two packages to be installed.
+                createFakeAdbCommand(
+                    ImmutableListMultimap.<String, String>builder()
+                        .putAll(expectedInstallApks(NONUPDATABLE_PKG_NAME_4, tableOfContents4))
+                        .putAll(expectedInstallApks(NONUPDATABLE_PKG_NAME_5, tableOfContents5))
+                        .build(),
+                    /* expectedStaged= */ false,
+                    /* expectedEnableRollback= */ false,
+                    Optional.of(DEVICE_ID)))
+            .build();
+
+    // EXPECT to filter out the go packages which have big Android updatable versions available.
+    device.injectShellCommandOutput(
+        "pm list packages --show-versioncode",
+        () ->
+            String.format(
+                "package:%s versionCode:1\n"
+                    + "package:%s versionCode:1\n"
+                    + "package:%s versionCode:1\n"
+                    + "package:%s versionCode:1",
+                NONUPDATABLE_PKG_NAME_4,
+                NONUPDATABLE_PKG_NAME_5,
+                NONUPDATABLE_PKG_NAME_6,
+                NONUPDATABLE_PKG_NAME_7));
     device.injectShellCommandOutput("pm list packages --apex-only --show-versioncode", () -> "");
     command.execute();
     assertAdbCommandExecuted();

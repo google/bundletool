@@ -18,6 +18,8 @@ package com.android.tools.build.bundletool.commands;
 
 import static com.android.bundle.Targeting.Abi.AbiAlias.X86;
 import static com.android.bundle.Targeting.Abi.AbiAlias.X86_64;
+import static com.android.tools.build.bundletool.model.utils.Versions.ANDROID_L_API_VERSION;
+import static com.android.tools.build.bundletool.model.utils.Versions.ANDROID_U_API_VERSION;
 import static com.android.tools.build.bundletool.testing.ApksArchiveHelpers.createApkDescription;
 import static com.android.tools.build.bundletool.testing.ApksArchiveHelpers.createApksArchiveFile;
 import static com.android.tools.build.bundletool.testing.ApksArchiveHelpers.createApksDirectory;
@@ -28,9 +30,11 @@ import static com.android.tools.build.bundletool.testing.ApksArchiveHelpers.crea
 import static com.android.tools.build.bundletool.testing.ApksArchiveHelpers.splitApkDescription;
 import static com.android.tools.build.bundletool.testing.DeviceFactory.abis;
 import static com.android.tools.build.bundletool.testing.DeviceFactory.density;
+import static com.android.tools.build.bundletool.testing.DeviceFactory.deviceWithSdk;
 import static com.android.tools.build.bundletool.testing.DeviceFactory.lDeviceWithLocales;
 import static com.android.tools.build.bundletool.testing.DeviceFactory.locales;
 import static com.android.tools.build.bundletool.testing.DeviceFactory.mergeSpecs;
+import static com.android.tools.build.bundletool.testing.DeviceFactory.sdkRuntimeSupported;
 import static com.android.tools.build.bundletool.testing.DeviceFactory.sdkVersion;
 import static com.android.tools.build.bundletool.testing.FakeSystemEnvironmentProvider.ANDROID_HOME;
 import static com.android.tools.build.bundletool.testing.FakeSystemEnvironmentProvider.ANDROID_SERIAL;
@@ -41,13 +45,13 @@ import static com.android.tools.build.bundletool.testing.TargetingUtils.apkDevic
 import static com.android.tools.build.bundletool.testing.TargetingUtils.apkLanguageTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.countrySetTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.deviceTierTargeting;
+import static com.android.tools.build.bundletool.testing.TargetingUtils.sdkRuntimeVariantTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.sdkVersionFrom;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.variantSdkTargeting;
 import static com.android.tools.build.bundletool.testing.TestUtils.expectMissingRequiredBuilderPropertyException;
 import static com.android.tools.build.bundletool.testing.TestUtils.expectMissingRequiredFlagException;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.truth.Truth.assertThat;
-import static com.google.common.truth.Truth8.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.android.bundle.Commands.AssetModuleMetadata;
@@ -1623,6 +1627,126 @@ public class InstallApksCommandTest {
 
     assertThat(getFileNames(installedApks))
         .containsExactly(baseMasterApk.toString(), baseSeaApk.toString());
+  }
+
+  @Test
+  public void appWithRuntimeEnabledSdkDep_sdkRuntimeVariantMatched_noSdkSplitsInstalled()
+      throws Exception {
+    ZipPath baseMasterApk = ZipPath.create("base-master.apk");
+    ZipPath sdkSplitApk1 = ZipPath.create("sdk1-master.apk");
+    ZipPath sdkSplitApk2 = ZipPath.create("sdk2-master.apk");
+    ZipPath baseMaster2Apk = ZipPath.create("base-master_2.apk");
+    BuildApksResult buildApksResult =
+        BuildApksResult.newBuilder()
+            .setBundletool(
+                Bundletool.newBuilder()
+                    .setVersion(BundleToolVersion.getCurrentVersion().toString()))
+            .addVariant(
+                createVariant(
+                    /* variantNumber= */ 1,
+                    variantSdkTargeting(
+                        sdkVersionFrom(21), ImmutableSet.of(SdkVersion.getDefaultInstance())),
+                    createSplitApkSet(
+                        /* moduleName= */ "base",
+                        createMasterApkDescription(
+                            ApkTargeting.getDefaultInstance(), baseMasterApk)),
+                    createSplitApkSet(
+                        /* moduleName= */ "sdk1",
+                        createMasterApkDescription(
+                            ApkTargeting.getDefaultInstance(), sdkSplitApk1)),
+                    createSplitApkSet(
+                        /* moduleName= */ "sdk2",
+                        createMasterApkDescription(
+                            ApkTargeting.getDefaultInstance(), sdkSplitApk2))))
+            .addVariant(
+                createVariant(
+                    /* variantNumber= */ 2,
+                    sdkRuntimeVariantTargeting(),
+                    createSplitApkSet(
+                        "base",
+                        createMasterApkDescription(
+                            ApkTargeting.getDefaultInstance(), baseMaster2Apk))))
+            .build();
+
+    Path apksFile = createApksArchiveFile(buildApksResult, tmpDir.resolve("bundle.apks"));
+    List<Path> installedApks = new ArrayList<>();
+    FakeDevice fakeDevice =
+        FakeDevice.fromDeviceSpec(
+            DEVICE_ID,
+            DeviceState.ONLINE,
+            mergeSpecs(deviceWithSdk(ANDROID_U_API_VERSION), sdkRuntimeSupported(true)));
+    fakeDevice.setInstallApksSideEffect((apks, installOptions) -> installedApks.addAll(apks));
+    AdbServer adbServer =
+        new FakeAdbServer(/* hasInitialDeviceList= */ true, ImmutableList.of(fakeDevice));
+
+    InstallApksCommand.builder()
+        .setApksArchivePath(apksFile)
+        .setAdbPath(adbPath)
+        .setAdbServer(adbServer)
+        .build()
+        .execute();
+
+    assertThat(getFileNames(installedApks)).containsExactly(baseMaster2Apk.toString());
+  }
+
+  @Test
+  public void appWithRuntimeEnabledSdkDep_backwardsCompatVariantMatched_sdkSplitsInstalled()
+      throws Exception {
+    ZipPath baseMasterApk = ZipPath.create("base-master.apk");
+    ZipPath sdkSplitApk1 = ZipPath.create("sdk1-master.apk");
+    ZipPath sdkSplitApk2 = ZipPath.create("sdk2-master.apk");
+    ZipPath baseMaster2Apk = ZipPath.create("base-master_2.apk");
+    BuildApksResult buildApksResult =
+        BuildApksResult.newBuilder()
+            .setBundletool(
+                Bundletool.newBuilder()
+                    .setVersion(BundleToolVersion.getCurrentVersion().toString()))
+            .addVariant(
+                createVariant(
+                    /* variantNumber= */ 1,
+                    variantSdkTargeting(
+                        sdkVersionFrom(21), ImmutableSet.of(SdkVersion.getDefaultInstance())),
+                    createSplitApkSet(
+                        /* moduleName= */ "base",
+                        createMasterApkDescription(
+                            ApkTargeting.getDefaultInstance(), baseMasterApk)),
+                    createSplitApkSet(
+                        /* moduleName= */ "sdk1",
+                        createMasterApkDescription(
+                            ApkTargeting.getDefaultInstance(), sdkSplitApk1)),
+                    createSplitApkSet(
+                        /* moduleName= */ "sdk2",
+                        createMasterApkDescription(
+                            ApkTargeting.getDefaultInstance(), sdkSplitApk2))))
+            .addVariant(
+                createVariant(
+                    /* variantNumber= */ 2,
+                    sdkRuntimeVariantTargeting(),
+                    createSplitApkSet(
+                        "base",
+                        createMasterApkDescription(
+                            ApkTargeting.getDefaultInstance(), baseMaster2Apk))))
+            .build();
+
+    Path apksFile = createApksArchiveFile(buildApksResult, tmpDir.resolve("bundle.apks"));
+    List<Path> installedApks = new ArrayList<>();
+    FakeDevice fakeDevice =
+        FakeDevice.fromDeviceSpec(
+            DEVICE_ID, DeviceState.ONLINE, deviceWithSdk(ANDROID_L_API_VERSION));
+    fakeDevice.setInstallApksSideEffect((apks, installOptions) -> installedApks.addAll(apks));
+    AdbServer adbServer =
+        new FakeAdbServer(/* hasInitialDeviceList= */ true, ImmutableList.of(fakeDevice));
+
+    InstallApksCommand.builder()
+        .setApksArchivePath(apksFile)
+        .setAdbPath(adbPath)
+        .setAdbServer(adbServer)
+        .build()
+        .execute();
+
+    assertThat(getFileNames(installedApks))
+        .containsExactly(
+            baseMasterApk.toString(), sdkSplitApk1.toString(), sdkSplitApk2.toString());
   }
 
   @Test

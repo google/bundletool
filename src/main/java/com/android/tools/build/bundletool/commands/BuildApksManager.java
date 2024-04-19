@@ -27,6 +27,7 @@ import com.android.bundle.Commands.LocalTestingInfo;
 import com.android.bundle.Config.BundleConfig;
 import com.android.bundle.Config.ResourceOptimizations.SparseEncoding;
 import com.android.bundle.Config.StandaloneConfig.FeatureModulesMode;
+import com.android.bundle.Config.UncompressDexFiles;
 import com.android.bundle.Devices.DeviceSpec;
 import com.android.tools.build.bundletool.archive.ArchivedApksGenerator;
 import com.android.tools.build.bundletool.commands.BuildApksCommand.ApkBuildMode;
@@ -373,6 +374,19 @@ public final class BuildApksManager {
       builder.setEnableDexCompressionSplitter(false);
       return;
     }
+    // If uncompressed dex is specified in the BundleConfig it will be honoured.
+    if (appBundle.getBundleConfig().getOptimizations().hasUncompressDexFiles()) {
+      UncompressDexFiles uncompressedDexFiles =
+          appBundle.getBundleConfig().getOptimizations().getUncompressDexFiles();
+      builder.setEnableDexCompressionSplitter(uncompressedDexFiles.getEnabled());
+      builder.setDexCompressionSplitterForTargetSdk(
+          uncompressedDexFiles.getUncompressedDexTargetSdk());
+      return;
+    }
+    // Otherwise we rely on default for bundletool version used to build this AAB:
+    // * no uncompressed dex for bundletool < 1.12.0;
+    // * uncompressed dex for Android S+ for bundletool [1.12.0, 1.16.0);
+    // * uncompressed dex for Android Q+ for bundletool >= 1.16.0.
     builder.setEnableDexCompressionSplitter(apkOptimizations.getUncompressDexFiles());
     builder.setDexCompressionSplitterForTargetSdk(apkOptimizations.getUncompressedDexTargetSdk());
   }

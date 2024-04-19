@@ -61,6 +61,7 @@ public class FakeDevice extends Device {
   private final String serialNumber;
   private final ImmutableMap<String, String> properties;
   private final Map<String, FakeShellCommandAction> commandInjections = new HashMap<>();
+  private final boolean hasPrivacySandbox;
   private Optional<SideEffect<InstallOptions>> installApksSideEffect = Optional.empty();
   private Optional<SideEffect<PushOptions>> pushSideEffect = Optional.empty();
   private Optional<RemoveRemotePathSideEffect> removeRemotePathSideEffect = Optional.empty();
@@ -78,7 +79,8 @@ public class FakeDevice extends Device {
       ImmutableList<String> features,
       ImmutableList<String> glExtensions,
       ImmutableMap<String, String> properties,
-      Optional<String> androidVersionCodeName) {
+      Optional<String> androidVersionCodeName,
+      boolean hasPrivacySandbox) {
     this.state = state;
     this.androidVersion = new AndroidVersion(sdkVersion, androidVersionCodeName.orElse(null));
     this.abis = abis;
@@ -87,6 +89,7 @@ public class FakeDevice extends Device {
     this.properties = properties;
     this.glExtensions = glExtensions;
     this.features = features;
+    this.hasPrivacySandbox = hasPrivacySandbox;
   }
 
   public static FakeDevice fromDeviceSpecWithProperties(
@@ -106,7 +109,8 @@ public class FakeDevice extends Device {
             properties,
             deviceSpec.getCodename().isEmpty()
                 ? Optional.empty()
-                : Optional.of(deviceSpec.getCodename()));
+                : Optional.of(deviceSpec.getCodename()),
+            deviceSpec.getSdkRuntime().getSupported());
     device.injectShellCommandOutput(
         "pm list features",
         () ->
@@ -181,7 +185,8 @@ public class FakeDevice extends Device {
         ImmutableList.of(),
         ImmutableList.of(),
         ImmutableMap.of(),
-        Optional.empty());
+        Optional.empty(),
+        /* hasPrivacySandbox= */ false);
   }
 
   @Override
@@ -282,6 +287,11 @@ public class FakeDevice extends Device {
         throw new UncheckedIOException(e);
       }
     }
+  }
+
+  @Override
+  public boolean supportsPrivacySandbox() {
+    return hasPrivacySandbox;
   }
 
   public void setInstallApksSideEffect(SideEffect<InstallOptions> sideEffect) {

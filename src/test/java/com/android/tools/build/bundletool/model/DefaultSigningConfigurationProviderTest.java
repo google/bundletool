@@ -23,7 +23,6 @@ import static com.android.tools.build.bundletool.testing.CertificateFactory.buil
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifest;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withMinSdkVersion;
 import static com.google.common.truth.Truth.assertThat;
-import static com.google.common.truth.Truth8.assertThat;
 
 import com.android.apksig.SigningCertificateLineage;
 import com.android.bundle.Targeting.ApkTargeting;

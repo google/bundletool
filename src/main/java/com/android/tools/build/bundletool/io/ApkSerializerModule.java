@@ -15,8 +15,14 @@
  */
 package com.android.tools.build.bundletool.io;
 
+import static java.lang.annotation.RetentionPolicy.RUNTIME;
+
+import com.android.bundle.Config.BundleConfig;
 import dagger.Binds;
 import dagger.Module;
+import dagger.Provides;
+import java.lang.annotation.Retention;
+import javax.inject.Qualifier;
 
 /** Dagger module responsible for choosing the {@link ApkSerializer}. */
 @Module
@@ -24,6 +30,29 @@ public abstract class ApkSerializerModule {
 
   @Binds
   abstract ApkSerializer provideApkSerializer(ModuleSplitSerializer moduleSplitSerializerProvider);
+
+  @Provides
+  @NativeLibrariesAlignmentInBytes
+  static int provideNativeLibrariesAlignmentInBytes(BundleConfig bundleConfig) {
+    switch (bundleConfig.getOptimizations().getUncompressNativeLibraries().getAlignment()) {
+      case PAGE_ALIGNMENT_16K:
+        return 16384;
+      case PAGE_ALIGNMENT_64K:
+        return 65536;
+      case PAGE_ALIGNMENT_UNSPECIFIED:
+      case PAGE_ALIGNMENT_4K:
+      case UNRECOGNIZED:
+        return 4096;
+    }
+    throw new IllegalArgumentException("Wrong native libraries alignment.");
+  }
+
+  /**
+   * Qualifying annotation of a {@code int} for alignment that should be used for native libraries.
+   */
+  @Qualifier
+  @Retention(RUNTIME)
+  @interface NativeLibrariesAlignmentInBytes {}
 
   private ApkSerializerModule() {}
 }
