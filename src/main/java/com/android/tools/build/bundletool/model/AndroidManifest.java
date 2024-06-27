@@ -183,7 +183,10 @@ public abstract class AndroidManifest {
 
   public static final String MODULE_TYPE_FEATURE_VALUE = "feature";
   public static final String MODULE_TYPE_ASSET_VALUE = "asset-pack";
+  // A feature module that contains ML models. This is the legacy way to package ML models.
   public static final String MODULE_TYPE_ML_VALUE = "ml-pack";
+  // An asset pack that contains ML models. This is the preferred way to package ML models.
+  public static final String MODULE_TYPE_AI_VALUE = "ai-pack";
   public static final String MODULE_TYPE_SDK_VALUE = "sdk";
 
   /** <meta-data> name that specifies native library for native activity */
@@ -503,6 +506,7 @@ public abstract class AndroidManifest {
       case MODULE_TYPE_FEATURE_VALUE:
         return ModuleType.FEATURE_MODULE;
       case MODULE_TYPE_ASSET_VALUE:
+      case MODULE_TYPE_AI_VALUE:
         return ModuleType.ASSET_MODULE;
       case MODULE_TYPE_ML_VALUE:
         return ModuleType.ML_MODULE;
@@ -516,12 +520,15 @@ public abstract class AndroidManifest {
   }
 
   public Optional<ModuleType> getOptionalModuleType() {
-    Optional<String> typeAttributeValue =
-        getManifestElement()
-            .getOptionalChildElement(DISTRIBUTION_NAMESPACE_URI, "module")
-            .flatMap(module -> module.getAttribute(DISTRIBUTION_NAMESPACE_URI, "type"))
-            .map(XmlProtoAttribute::getValueAsString);
+    Optional<String> typeAttributeValue = getOptionalModuleTypeAttributeValue();
     return typeAttributeValue.map(AndroidManifest::getModuleTypeFromAttributeValue);
+  }
+
+  public Optional<String> getOptionalModuleTypeAttributeValue() {
+    return getManifestElement()
+        .getOptionalChildElement(DISTRIBUTION_NAMESPACE_URI, "module")
+        .flatMap(module -> module.getAttribute(DISTRIBUTION_NAMESPACE_URI, "type"))
+        .map(XmlProtoAttribute::getValueAsString);
   }
 
   public ModuleType getModuleType() {
@@ -1111,12 +1118,14 @@ public abstract class AndroidManifest {
     return getApplicationElementChildElements(USES_SDK_LIBRARY_ELEMENT_NAME);
   }
 
+  public ImmutableList<XmlProtoElement> getAllContentProviders() {
+    return getApplicationElementChildElements(PROVIDER_ELEMENT_NAME);
+  }
+
   private ImmutableList<XmlProtoElement> getApplicationElementChildElements(
       String childElementName) {
-    return getManifestRoot()
-        .getElement()
-        .getChildElement(APPLICATION_ELEMENT_NAME)
-        .getChildrenElements()
+    return stream(getManifestRoot().getElement().getOptionalChildElement(APPLICATION_ELEMENT_NAME))
+        .flatMap(app -> app.getChildrenElements())
         .filter(element -> element.getName().equals(childElementName))
         .collect(toImmutableList());
   }

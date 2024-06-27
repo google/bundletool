@@ -26,7 +26,7 @@ import com.google.common.base.Strings;
  */
 public final class BundleToolVersion {
 
-  private static final String CURRENT_VERSION = "1.16.0";
+  private static final String CURRENT_VERSION = "1.17.0";
 
 
   /** Returns the version of BundleTool being run. */

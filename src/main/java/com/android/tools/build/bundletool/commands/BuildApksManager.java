@@ -383,7 +383,7 @@ public final class BuildApksManager {
           uncompressedDexFiles.getUncompressedDexTargetSdk());
       return;
     }
-    // Otherwise we rely on default for bundletool version used to build this AAB:
+    // Depending on bundletool version used to build this AAB:
     // * no uncompressed dex for bundletool < 1.12.0;
     // * uncompressed dex for Android S+ for bundletool [1.12.0, 1.16.0);
     // * uncompressed dex for Android Q+ for bundletool >= 1.16.0.

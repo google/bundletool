@@ -142,6 +142,24 @@ public class DeviceTargetingConfigEvaluatorTest {
     assertThat(matchingGroups).isEmpty();
   }
 
+  @Test
+  public void excludedBrand_deviceNotMatchedWithGroup() throws Exception {
+    ImmutableSet<DeviceGroup> matchingGroups =
+        getMatchingDeviceGroups(
+            "selector_with_excluded_device_brand.json", "very_high_ram_device_properties.json");
+
+    assertThat(matchingGroups).isEmpty();
+  }
+
+  @Test
+  public void includedBrand_deviceMatchedWithGroup() throws Exception {
+    ImmutableSet<DeviceGroup> matchingGroups =
+        getMatchingDeviceGroups(
+            "selector_with_included_device_brand.json", "very_high_ram_device_properties.json");
+
+    assertThat(matchingGroups).hasSize(1);
+  }
+
   private Optional<DeviceTier> getSelectedDeviceTier(
       String deviceTierConfigFileName, String devicePropertiesFileName) throws Exception {
     DeviceTierConfig deviceTierConfig = loadDeviceTierConfig(deviceTierConfigFileName);

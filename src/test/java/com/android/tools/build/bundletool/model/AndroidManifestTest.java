@@ -33,6 +33,7 @@ import static com.android.tools.build.bundletool.model.AndroidManifest.LABEL_ATT
 import static com.android.tools.build.bundletool.model.AndroidManifest.LABEL_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.LOCALE_CONFIG_ATTRIBUTE_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.LOCALE_CONFIG_RESOURCE_ID;
+import static com.android.tools.build.bundletool.model.AndroidManifest.MODULE_TYPE_AI_VALUE;
 import static com.android.tools.build.bundletool.model.AndroidManifest.MODULE_TYPE_ASSET_VALUE;
 import static com.android.tools.build.bundletool.model.AndroidManifest.MODULE_TYPE_FEATURE_VALUE;
 import static com.android.tools.build.bundletool.model.AndroidManifest.NAME_ATTRIBUTE_NAME;
@@ -633,6 +634,17 @@ public class AndroidManifestTest {
 
     assertThat(manifest.getOptionalModuleType()).isPresent();
     assertThat(manifest.getOptionalModuleType()).hasValue(ASSET_MODULE);
+    assertThat(manifest.getModuleType()).isEqualTo(ASSET_MODULE);
+  }
+
+  @Test
+  public void moduleTypeAttribute_aiPack() {
+    AndroidManifest manifest =
+        AndroidManifest.create(
+            androidManifestForAssetModule("com.test.app", withTypeAttribute(MODULE_TYPE_AI_VALUE)));
+
+    assertThat(manifest.getOptionalModuleType()).hasValue(ASSET_MODULE);
+    assertThat(manifest.getOptionalModuleTypeAttributeValue()).hasValue(MODULE_TYPE_AI_VALUE);
     assertThat(manifest.getModuleType()).isEqualTo(ASSET_MODULE);
   }
 

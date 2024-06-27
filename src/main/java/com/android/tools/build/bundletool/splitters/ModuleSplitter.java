@@ -492,7 +492,9 @@ public class ModuleSplitter {
 
   private SplittingPipeline createDexSplittingPipeline() {
     ImmutableList.Builder<ModuleSplitSplitter> dexSplitters = ImmutableList.builder();
-    if (apkGenerationConfiguration.getEnableDexCompressionSplitter()) {
+    if (apkGenerationConfiguration.getEnableDexCompressionSplitter()
+        && getMinSdk(variantTargeting.getSdkVersionTargeting())
+            >= apkGenerationConfiguration.getMinimalSdkTargetingForUncompressedDex()) {
       dexSplitters.add(new DexCompressionSplitter());
     }
 

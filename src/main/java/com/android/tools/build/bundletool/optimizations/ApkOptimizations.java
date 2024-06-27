@@ -25,6 +25,7 @@ import static com.google.common.base.Preconditions.checkNotNull;
 
 import com.android.bundle.Config.SuffixStripping;
 import com.android.bundle.Config.UncompressDexFiles.UncompressedDexTargetSdk;
+import com.android.bundle.Config.UncompressNativeLibraries.PageAlignment;
 import com.android.tools.build.bundletool.model.OptimizationDimension;
 import com.android.tools.build.bundletool.model.version.Version;
 import com.google.auto.value.AutoValue;
@@ -131,6 +132,24 @@ public abstract class ApkOptimizations {
                       // UNSPECIFIED here means SDK 29+ (Android Q+)
                       .setUncompressedDexTargetSdk(UncompressedDexTargetSdk.UNSPECIFIED)
                       .build())
+              .put(
+                  Version.of("1.17.0"),
+                  ApkOptimizations.builder()
+                      .setSplitDimensions(
+                          ImmutableSet.of(
+                              ABI,
+                              SCREEN_DENSITY,
+                              TEXTURE_COMPRESSION_FORMAT,
+                              LANGUAGE,
+                              DEVICE_TIER,
+                              COUNTRY_SET))
+                      .setUncompressNativeLibraries(true)
+                      .setPageAlignment(PageAlignment.PAGE_ALIGNMENT_16K)
+                      .setStandaloneDimensions(ImmutableSet.of(ABI, SCREEN_DENSITY))
+                      .setUncompressDexFiles(true)
+                      // UNSPECIFIED here means SDK 29+ (Android Q+)
+                      .setUncompressedDexTargetSdk(UncompressedDexTargetSdk.UNSPECIFIED)
+                      .build())
               .buildOrThrow();
 
   /** List of dimensions supported by asset modules. */
@@ -145,6 +164,8 @@ public abstract class ApkOptimizations {
   }
 
   public abstract boolean getUncompressNativeLibraries();
+
+  public abstract PageAlignment getPageAlignment();
 
   public abstract boolean getUncompressDexFiles();
 
@@ -161,6 +182,7 @@ public abstract class ApkOptimizations {
         .setUncompressNativeLibraries(false)
         .setUncompressDexFiles(false)
         .setUncompressedDexTargetSdk(UncompressedDexTargetSdk.UNSPECIFIED)
+        .setPageAlignment(PageAlignment.PAGE_ALIGNMENT_UNSPECIFIED)
         .setSuffixStrippings(ImmutableMap.of());
   }
 
@@ -170,6 +192,8 @@ public abstract class ApkOptimizations {
     public abstract Builder setSplitDimensions(ImmutableSet<OptimizationDimension> splitDimensions);
 
     public abstract Builder setUncompressNativeLibraries(boolean enable);
+
+    public abstract Builder setPageAlignment(PageAlignment pageAlignment);
 
     public abstract Builder setUncompressDexFiles(boolean enable);
 

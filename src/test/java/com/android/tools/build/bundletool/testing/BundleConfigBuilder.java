@@ -26,6 +26,7 @@ import com.android.bundle.Config.StandaloneConfig.DexMergingStrategy;
 import com.android.bundle.Config.StandaloneConfig.FeatureModulesMode;
 import com.android.bundle.Config.SuffixStripping;
 import com.android.bundle.Config.UncompressDexFiles.UncompressedDexTargetSdk;
+import com.android.bundle.Config.UncompressNativeLibraries.PageAlignment;
 import com.android.bundle.Config.UnsignedEmbeddedApkConfig;
 import com.android.tools.build.bundletool.model.version.BundleToolVersion;
 import com.google.errorprone.annotations.CanIgnoreReturnValue;
@@ -80,6 +81,14 @@ public class BundleConfigBuilder {
 
   public BundleConfigBuilder setUncompressNativeLibraries(boolean enabled) {
     builder.getOptimizationsBuilder().getUncompressNativeLibrariesBuilder().setEnabled(enabled);
+    return this;
+  }
+
+  public BundleConfigBuilder setPageAlignment(PageAlignment pageAlignment) {
+    builder
+        .getOptimizationsBuilder()
+        .getUncompressNativeLibrariesBuilder()
+        .setAlignment(pageAlignment);
     return this;
   }
 

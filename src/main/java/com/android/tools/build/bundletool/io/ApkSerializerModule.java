@@ -17,7 +17,7 @@ package com.android.tools.build.bundletool.io;
 
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
-import com.android.bundle.Config.BundleConfig;
+import com.android.tools.build.bundletool.optimizations.ApkOptimizations;
 import dagger.Binds;
 import dagger.Module;
 import dagger.Provides;
@@ -33,8 +33,8 @@ public abstract class ApkSerializerModule {
 
   @Provides
   @NativeLibrariesAlignmentInBytes
-  static int provideNativeLibrariesAlignmentInBytes(BundleConfig bundleConfig) {
-    switch (bundleConfig.getOptimizations().getUncompressNativeLibraries().getAlignment()) {
+  static int provideNativeLibrariesAlignmentInBytes(ApkOptimizations apkOptimizations) {
+    switch (apkOptimizations.getPageAlignment()) {
       case PAGE_ALIGNMENT_16K:
         return 16384;
       case PAGE_ALIGNMENT_64K:

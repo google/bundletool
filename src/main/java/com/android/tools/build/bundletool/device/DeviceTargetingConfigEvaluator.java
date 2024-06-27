@@ -119,8 +119,10 @@ public class DeviceTargetingConfigEvaluator {
   private static boolean devicePropertiesMatchDeviceSelector(
       DeviceProperties deviceProperties, DeviceSelector deviceSelector) {
     return devicePropertiesMatchRamRule(deviceProperties, deviceSelector.getDeviceRam())
-        && deviceIdInList(deviceProperties.getDeviceId(), deviceSelector.getIncludedDeviceIdsList())
-        && !deviceSelector.getExcludedDeviceIdsList().contains(deviceProperties.getDeviceId())
+        && deviceIdIncluded(
+            deviceProperties.getDeviceId(), deviceSelector.getIncludedDeviceIdsList())
+        && !deviceIdExcluded(
+            deviceProperties.getDeviceId(), deviceSelector.getExcludedDeviceIdsList())
         && deviceProperties
             .getSystemFeaturesList()
             .containsAll(deviceSelector.getRequiredSystemFeaturesList())
@@ -135,13 +137,21 @@ public class DeviceTargetingConfigEvaluator {
     return minBytes <= deviceProperties.getRam() && deviceProperties.getRam() < maxBytes;
   }
 
-  private static boolean deviceIdInList(DeviceId deviceId, List<DeviceId> deviceIdList) {
+  private static boolean deviceIdExcluded(DeviceId deviceId, List<DeviceId> deviceIdList) {
+    DeviceId deviceOnlyBrand =
+        DeviceId.newBuilder().setBuildBrand(deviceId.getBuildBrand()).build();
+    return deviceIdList.contains(deviceId) || deviceIdList.contains(deviceOnlyBrand);
+  }
+
+  private static boolean deviceIdIncluded(DeviceId deviceId, List<DeviceId> deviceIdList) {
     // If the deviceIdList is empty, it means that the targeting configuration is not specifying any
     // DeviceId in particular. This means that any DeviceId provided satisfies the
     // included_device_ids rule in the DeviceSelector. Hence, we return true in this case.
     if (deviceIdList.isEmpty()) {
       return true;
     }
-    return deviceIdList.contains(deviceId);
+    DeviceId deviceOnlyBrand =
+        DeviceId.newBuilder().setBuildBrand(deviceId.getBuildBrand()).build();
+    return deviceIdList.contains(deviceId) || deviceIdList.contains(deviceOnlyBrand);
   }
 }

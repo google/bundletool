@@ -191,6 +191,9 @@ message AssetModuleMetadata {
 
   // Deprecated. Use delivery_type.
   bool on_demand_deprecated = 2 [deprecated = true];
+
+  // Type of asset module.
+  AssetModuleType asset_module_type = 5;
 }
 
 message InstantMetadata {
@@ -216,6 +219,12 @@ enum FeatureModuleType {
   FEATURE_MODULE = 1;
   ML_MODULE = 2;
   SDK_MODULE = 3;
+}
+
+enum AssetModuleType {
+  UNKNOWN_ASSET_TYPE = 0;
+  DEFAULT_ASSET_TYPE = 1;
+  AI_PACK_TYPE = 2;
 }
 
 message ApkDescription {

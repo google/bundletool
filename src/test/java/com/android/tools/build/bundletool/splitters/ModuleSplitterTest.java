@@ -41,6 +41,7 @@ import static com.android.tools.build.bundletool.model.SourceStampConstants.STAM
 import static com.android.tools.build.bundletool.model.SourceStampConstants.STAMP_TYPE_METADATA_KEY;
 import static com.android.tools.build.bundletool.model.utils.Versions.ANDROID_L_API_VERSION;
 import static com.android.tools.build.bundletool.model.utils.Versions.ANDROID_M_API_VERSION;
+import static com.android.tools.build.bundletool.model.utils.Versions.ANDROID_P_API_VERSION;
 import static com.android.tools.build.bundletool.model.utils.Versions.ANDROID_Q_API_VERSION;
 import static com.android.tools.build.bundletool.model.utils.Versions.ANDROID_R_API_VERSION;
 import static com.android.tools.build.bundletool.model.utils.Versions.ANDROID_S_V2_API_VERSION;
@@ -1091,7 +1092,7 @@ public class ModuleSplitterTest {
   }
 
   @Test
-  public void nativeSplits_pPlusTargeting_withDexCompressionSplitter() throws Exception {
+  public void nativeSplits_qPlusTargeting_withDexCompressionSplitter() throws Exception {
     BundleModule testModule =
         new BundleModuleBuilder("testModule")
             .addFile("dex/classes.dex")
@@ -1183,6 +1184,32 @@ public class ModuleSplitterTest {
     assertThat(moduleSplit.getSplitType()).isEqualTo(SplitType.SPLIT);
     assertThat(moduleSplit.getVariantTargeting())
         .isEqualTo(variantMinSdkTargeting(ANDROID_L_API_VERSION));
+    assertThat(moduleSplit.findEntry("dex/classes.dex").get().getForceUncompressed()).isFalse();
+  }
+
+  @Test
+  public void nativeSplits_pPlusTargeting_withDexCompressionSplitter() throws Exception {
+    BundleModule testModule =
+        new BundleModuleBuilder("testModule")
+            .addFile("dex/classes.dex")
+            .setManifest(androidManifest("com.test.app"))
+            .build();
+
+    ModuleSplitter moduleSplitter =
+        ModuleSplitter.createNoStamp(
+            testModule,
+            BUNDLETOOL_VERSION,
+            APP_BUNDLE,
+            ApkGenerationConfiguration.builder().setEnableDexCompressionSplitter(true).build(),
+            variantMinSdkTargeting(ANDROID_P_API_VERSION),
+            ImmutableSet.of("base", "testModule"));
+
+    ImmutableList<ModuleSplit> splits = moduleSplitter.splitModule();
+    assertThat(splits).hasSize(1);
+    ModuleSplit moduleSplit = Iterables.getOnlyElement(splits);
+    assertThat(moduleSplit.getSplitType()).isEqualTo(SplitType.SPLIT);
+    assertThat(moduleSplit.getVariantTargeting())
+        .isEqualTo(variantMinSdkTargeting(ANDROID_P_API_VERSION));
     assertThat(moduleSplit.findEntry("dex/classes.dex").get().getForceUncompressed()).isFalse();
   }
 

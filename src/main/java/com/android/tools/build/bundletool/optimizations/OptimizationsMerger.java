@@ -24,6 +24,7 @@ import com.android.bundle.Config.SplitDimension;
 import com.android.bundle.Config.SplitDimension.Value;
 import com.android.bundle.Config.SuffixStripping;
 import com.android.bundle.Config.UncompressDexFiles.UncompressedDexTargetSdk;
+import com.android.bundle.Config.UncompressNativeLibraries.PageAlignment;
 import com.android.tools.build.bundletool.model.OptimizationDimension;
 import com.android.tools.build.bundletool.model.utils.EnumMapper;
 import com.android.tools.build.bundletool.model.version.BundleToolVersion;
@@ -104,6 +105,12 @@ public final class OptimizationsMerger {
             ? requestedOptimizations.getUncompressNativeLibraries().getEnabled()
             : defaultOptimizations.getUncompressNativeLibraries();
 
+    PageAlignment pageAlignment =
+        requestedOptimizations.getUncompressNativeLibraries().getAlignment()
+                != PageAlignment.PAGE_ALIGNMENT_UNSPECIFIED
+            ? requestedOptimizations.getUncompressNativeLibraries().getAlignment()
+            : defaultOptimizations.getPageAlignment();
+
     boolean uncompressDexFiles;
     UncompressedDexTargetSdk uncompressedDexTargetSdk;
 
@@ -123,6 +130,7 @@ public final class OptimizationsMerger {
     return ApkOptimizations.builder()
         .setSplitDimensions(splitDimensions)
         .setUncompressNativeLibraries(uncompressNativeLibraries)
+        .setPageAlignment(pageAlignment)
         .setUncompressDexFiles(uncompressDexFiles)
         .setUncompressedDexTargetSdk(uncompressedDexTargetSdk)
         .setStandaloneDimensions(standaloneDimensions)

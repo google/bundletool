@@ -23,6 +23,7 @@ import static com.google.common.truth.Truth.assertThat;
 
 import com.android.bundle.Config.SplitDimension;
 import com.android.bundle.Config.UncompressDexFiles.UncompressedDexTargetSdk;
+import com.android.bundle.Config.UncompressNativeLibraries.PageAlignment;
 import com.android.tools.build.bundletool.model.OptimizationDimension;
 import com.android.tools.build.bundletool.model.version.Version;
 import com.android.tools.build.bundletool.testing.BundleConfigBuilder;
@@ -263,6 +264,91 @@ public class OptimizationsMergerTest {
     assertThat(apkOptimizations.getUncompressDexFiles()).isFalse();
     assertThat(apkOptimizations.getStandaloneDimensions())
         .isEqualTo(Sets.difference(DEFAULT_STANDALONE_DIMENSIONS, ImmutableSet.of(ABI)));
+  }
+
+  @Test
+  public void mergeOptimizations_pageAlignmentDefaultUnspecifiedBefore_1_17_0() {
+    ApkOptimizations apkOptimizations =
+        new OptimizationsMerger()
+            .mergeWithDefaults(
+                createBundleConfigBuilder()
+                    .setVersion("1.16.0")
+                    .clearOptimizations()
+                    .setPageAlignment(PageAlignment.PAGE_ALIGNMENT_UNSPECIFIED)
+                    .build());
+
+    assertThat(apkOptimizations.getPageAlignment())
+        .isEqualTo(PageAlignment.PAGE_ALIGNMENT_UNSPECIFIED);
+  }
+
+  @Test
+  public void mergeOptimizations_pageAlignmentDefault16KAt_1_17_0() {
+    ApkOptimizations apkOptimizations =
+        new OptimizationsMerger()
+            .mergeWithDefaults(
+                createBundleConfigBuilder()
+                    .setVersion("1.17.0")
+                    .clearOptimizations()
+                    .setPageAlignment(PageAlignment.PAGE_ALIGNMENT_UNSPECIFIED)
+                    .build());
+
+    assertThat(apkOptimizations.getPageAlignment()).isEqualTo(PageAlignment.PAGE_ALIGNMENT_16K);
+  }
+
+  @Test
+  public void mergeOptimizations_pageAlignmentDefault16KAfter_1_17_0() {
+    ApkOptimizations apkOptimizations =
+        new OptimizationsMerger()
+            .mergeWithDefaults(
+                createBundleConfigBuilder()
+                    .setVersion("1.18.0")
+                    .clearOptimizations()
+                    .setPageAlignment(PageAlignment.PAGE_ALIGNMENT_UNSPECIFIED)
+                    .build());
+
+    assertThat(apkOptimizations.getPageAlignment()).isEqualTo(PageAlignment.PAGE_ALIGNMENT_16K);
+  }
+
+  @Test
+  public void mergeOptimizations_pageAlignmentRespectsRequestedBefore_1_17_0() {
+    ApkOptimizations apkOptimizations =
+        new OptimizationsMerger()
+            .mergeWithDefaults(
+                createBundleConfigBuilder()
+                    .setVersion("1.16.0")
+                    .clearOptimizations()
+                    .setPageAlignment(PageAlignment.PAGE_ALIGNMENT_4K)
+                    .build());
+
+    assertThat(apkOptimizations.getPageAlignment()).isEqualTo(PageAlignment.PAGE_ALIGNMENT_4K);
+  }
+
+  @Test
+  public void mergeOptimizations_pageAlignmentRespectsRequestedAt_1_17_0() {
+    ApkOptimizations apkOptimizations =
+        new OptimizationsMerger()
+            .mergeWithDefaults(
+                createBundleConfigBuilder()
+                    .setVersion("1.17.0")
+                    .clearOptimizations()
+                    .setPageAlignment(PageAlignment.PAGE_ALIGNMENT_4K)
+                    .build());
+
+    assertThat(apkOptimizations.getPageAlignment()).isEqualTo(PageAlignment.PAGE_ALIGNMENT_4K);
+  }
+
+  @Test
+  public void mergeOptimizations_pageAlignmentRespectsRequestedAfter_1_17_0() {
+    ApkOptimizations apkOptimizations =
+        new OptimizationsMerger()
+            .mergeWithDefaults(
+                createBundleConfigBuilder()
+                    .setVersion("1.18.0")
+                    .clearOptimizations()
+                    .setPageAlignment(PageAlignment.PAGE_ALIGNMENT_4K)
+                    .build());
+
+    assertThat(apkOptimizations.getPageAlignment()).isEqualTo(PageAlignment.PAGE_ALIGNMENT_4K);
   }
 
   private static BundleConfigBuilder createBundleConfigBuilder() {

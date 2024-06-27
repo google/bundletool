@@ -16,6 +16,8 @@
 package com.android.tools.build.bundletool.io;
 
 import static com.android.tools.build.bundletool.commands.BuildApksCommand.ApkBuildMode.SYSTEM;
+import static com.android.tools.build.bundletool.model.AndroidManifest.MODULE_TYPE_AI_VALUE;
+import static com.android.tools.build.bundletool.model.AndroidManifest.MODULE_TYPE_ASSET_VALUE;
 import static com.android.tools.build.bundletool.model.BundleModule.DEX_DIRECTORY;
 import static com.android.tools.build.bundletool.model.utils.CollectorUtils.groupingByDeterministic;
 import static com.android.tools.build.bundletool.model.utils.CollectorUtils.groupingBySortedKeys;
@@ -31,6 +33,7 @@ import static java.util.stream.Collectors.mapping;
 import com.android.bundle.Commands.ApkDescription;
 import com.android.bundle.Commands.ApkSet;
 import com.android.bundle.Commands.AssetModuleMetadata;
+import com.android.bundle.Commands.AssetModuleType;
 import com.android.bundle.Commands.AssetModulesInfo;
 import com.android.bundle.Commands.AssetSliceSet;
 import com.android.bundle.Commands.BuildApksResult;
@@ -393,6 +396,11 @@ public class ApkSerializerManager {
     AndroidManifest manifest = module.getAndroidManifest();
     AssetModuleMetadata.Builder metadataBuilder =
         AssetModuleMetadata.newBuilder().setName(module.getName().getName());
+    metadataBuilder.setAssetModuleType(
+        manifest
+            .getOptionalModuleTypeAttributeValue()
+            .map(ApkSerializerManager::getAssetModuleType)
+            .orElse(AssetModuleType.UNKNOWN_ASSET_TYPE));
     Optional<ManifestDeliveryElement> persistentDelivery = manifest.getManifestDeliveryElement();
     metadataBuilder.setDeliveryType(
         persistentDelivery
@@ -417,6 +425,17 @@ public class ApkSerializerManager {
     }
     metadataBuilder.setInstantMetadata(instantMetadataBuilder.build());
     return metadataBuilder.build();
+  }
+
+  private static AssetModuleType getAssetModuleType(String value) {
+    switch (value) {
+      case MODULE_TYPE_ASSET_VALUE:
+        return AssetModuleType.DEFAULT_ASSET_TYPE;
+      case MODULE_TYPE_AI_VALUE:
+        return AssetModuleType.AI_PACK_TYPE;
+      default:
+        return AssetModuleType.UNKNOWN_ASSET_TYPE;
+    }
   }
 
   private static void validateInput(GeneratedApks generatedApks, ApkBuildMode apkBuildMode) {

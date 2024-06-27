@@ -170,6 +170,7 @@ import com.android.bundle.Config.SplitDimension.Value;
 import com.android.bundle.Config.StandaloneConfig;
 import com.android.bundle.Config.StandaloneConfig.FeatureModulesMode;
 import com.android.bundle.Config.UncompressDexFiles.UncompressedDexTargetSdk;
+import com.android.bundle.Config.UncompressNativeLibraries.PageAlignment;
 import com.android.bundle.Files.ApexImages;
 import com.android.bundle.Files.Assets;
 import com.android.bundle.RuntimeEnabledSdkConfigProto.RuntimeEnabledSdk;
@@ -217,6 +218,7 @@ import com.android.tools.build.bundletool.testing.FileUtils;
 import com.android.tools.build.bundletool.testing.ResourceTableBuilder;
 import com.android.tools.build.bundletool.testing.TestModule;
 import com.android.tools.build.bundletool.testing.truth.zip.TruthZip;
+import com.android.zipflinger.Entry;
 import com.android.zipflinger.ZipMap;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableListMultimap;
@@ -299,6 +301,9 @@ public class BuildApksManagerTest {
   private static final SdkVersion S_SDK_VERSION = sdkVersionFrom(ANDROID_S_API_VERSION);
   private static final SdkVersion T_SDK_VERSION = sdkVersionFrom(ANDROID_T_API_VERSION);
   private static final SdkVersion S2_V2_SDK_VERSION = sdkVersionFrom(ANDROID_S_V2_API_VERSION);
+
+  private static final int ALIGNMENT_4K = 4096;
+  private static final int ALIGNMENT_16K = 16384;
 
   @Rule public final TemporaryFolder tmp = new TemporaryFolder();
 
@@ -3002,6 +3007,36 @@ public class BuildApksManagerTest {
         .containsExactly(sdkVersionTargeting(L_SDK_VERSION, ImmutableSet.of(LOWEST_SDK_VERSION)));
   }
 
+  @Test
+  public void bundleConfigDexCompressionUnset_1_16_0_uncompressedDexQVariant() throws Exception {
+    AppBundle appBundle =
+        new AppBundleBuilder()
+            .setBundleConfig(BundleConfigBuilder.create().setVersion("1.16.0").build())
+            .addModule(
+                "base",
+                builder ->
+                    builder.addFile("dex/classes.dex").setManifest(androidManifest("com.test.app")))
+            .build();
+    TestComponent.useTestModule(
+        this,
+        createTestModuleBuilder()
+            .withAppBundle(appBundle)
+            .withOutputPath(outputFilePath)
+            .build());
+
+    buildApksManager.execute();
+
+    ZipFile apkSetFile = openZipFile(outputFilePath.toFile());
+    BuildApksResult result = extractTocFromApkSetFile(apkSetFile, outputDir);
+
+    ImmutableList<Variant> splitApkVariants = splitApkVariants(result);
+    assertThat(
+            splitApkVariants.stream()
+                .map(variant -> variant.getTargeting().getSdkVersionTargeting()))
+        .containsExactly(
+            sdkVersionTargeting(L_SDK_VERSION, ImmutableSet.of(LOWEST_SDK_VERSION, Q_SDK_VERSION)),
+            sdkVersionTargeting(Q_SDK_VERSION, ImmutableSet.of(LOWEST_SDK_VERSION, L_SDK_VERSION)));
+  }
 
   @Test
   public void
@@ -4881,6 +4916,146 @@ public class BuildApksManagerTest {
                 .collect(toImmutableSet()))
         .containsExactly(
             sdkVersionTargeting(sdkVersionFrom(DEVELOPMENT_SDK_VERSION), ImmutableSet.of()));
+  }
+
+  @Test
+  public void buildApksCommand_pageAlignmentDefaultTo4KBefore_1_17_0_success() throws Exception {
+    AppBundle appBundle =
+        new AppBundleBuilder()
+            .addModule(
+                "base",
+                builder ->
+                    builder
+                        .addFile("dex/classes.dex")
+                        .addFile("lib/x86/libsome.so")
+                        .setNativeConfig(
+                            nativeLibraries(
+                                targetedNativeDirectory("lib/x86", nativeDirectoryTargeting(X86))))
+                        .setManifest(androidManifest("com.test.app")))
+            .setBundleConfig(
+                BundleConfigBuilder.create()
+                    .setVersion("0.7.0")
+                    .setUncompressNativeLibraries(true)
+                    .build())
+            .build();
+    TestComponent.useTestModule(
+        this,
+        createTestModuleBuilder().withAppBundle(appBundle).withOutputPath(outputFilePath).build());
+
+    buildApksManager.execute();
+
+    ZipFile apkSetFile = openZipFile(outputFilePath.toFile());
+    File file = extractFromApkSetFile(apkSetFile, "splits/base-x86.apk", outputDir);
+    Entry libEntry = ZipMap.from(file.toPath()).getEntries().get("lib/x86/libsome.so");
+
+    assertThat(libEntry.isCompressed()).isFalse();
+    assertThat(libEntry.getPayloadLocation().first % ALIGNMENT_4K).isEqualTo(0);
+  }
+
+  @Test
+  public void buildApksCommand_pageAlignmentRequestedBefore_1_17_0_respected() throws Exception {
+    AppBundle appBundle =
+        new AppBundleBuilder()
+            .addModule(
+                "base",
+                builder ->
+                    builder
+                        .addFile("dex/classes.dex")
+                        .addFile("lib/x86/libsome.so")
+                        .setNativeConfig(
+                            nativeLibraries(
+                                targetedNativeDirectory("lib/x86", nativeDirectoryTargeting(X86))))
+                        .setManifest(androidManifest("com.test.app")))
+            .setBundleConfig(
+                BundleConfigBuilder.create()
+                    .setVersion("0.7.0")
+                    .setUncompressNativeLibraries(true)
+                    .setPageAlignment(PageAlignment.PAGE_ALIGNMENT_16K)
+                    .build())
+            .build();
+
+    TestComponent.useTestModule(
+        this,
+        createTestModuleBuilder().withAppBundle(appBundle).withOutputPath(outputFilePath).build());
+
+    buildApksManager.execute();
+
+    ZipFile apkSetFile = openZipFile(outputFilePath.toFile());
+    File file = extractFromApkSetFile(apkSetFile, "splits/base-x86.apk", outputDir);
+    Entry libEntry = ZipMap.from(file.toPath()).getEntries().get("lib/x86/libsome.so");
+
+    assertThat(libEntry.isCompressed()).isFalse();
+    assertThat(libEntry.getPayloadLocation().first % ALIGNMENT_16K).isEqualTo(0);
+  }
+
+  @Test
+  public void buildApksCommand_pageAlignmentDefaultTo16KAfter_1_17_0_success() throws Exception {
+    AppBundle appBundle =
+        new AppBundleBuilder()
+            .addModule(
+                "base",
+                builder ->
+                    builder
+                        .addFile("dex/classes.dex")
+                        .addFile("lib/x86/libsome.so")
+                        .setNativeConfig(
+                            nativeLibraries(
+                                targetedNativeDirectory("lib/x86", nativeDirectoryTargeting(X86))))
+                        .setManifest(androidManifest("com.test.app")))
+            .setBundleConfig(
+                BundleConfigBuilder.create()
+                    .setVersion("1.17.0")
+                    .setUncompressNativeLibraries(true)
+                    .build())
+            .build();
+    TestComponent.useTestModule(
+        this,
+        createTestModuleBuilder().withAppBundle(appBundle).withOutputPath(outputFilePath).build());
+
+    buildApksManager.execute();
+
+    ZipFile apkSetFile = openZipFile(outputFilePath.toFile());
+    File file = extractFromApkSetFile(apkSetFile, "splits/base-x86.apk", outputDir);
+    Entry libEntry = ZipMap.from(file.toPath()).getEntries().get("lib/x86/libsome.so");
+
+    assertThat(libEntry.isCompressed()).isFalse();
+    assertThat(libEntry.getPayloadLocation().first % ALIGNMENT_16K).isEqualTo(0);
+  }
+
+  @Test
+  public void buildApksCommand_pageAlignmentRequestedAfter_1_17_0_respected() throws Exception {
+    AppBundle appBundle =
+        new AppBundleBuilder()
+            .addModule(
+                "base",
+                builder ->
+                    builder
+                        .addFile("dex/classes.dex")
+                        .addFile("lib/x86/libsome.so")
+                        .setNativeConfig(
+                            nativeLibraries(
+                                targetedNativeDirectory("lib/x86", nativeDirectoryTargeting(X86))))
+                        .setManifest(androidManifest("com.test.app")))
+            .setBundleConfig(
+                BundleConfigBuilder.create()
+                    .setVersion("1.17.0")
+                    .setUncompressNativeLibraries(true)
+                    .setPageAlignment(PageAlignment.PAGE_ALIGNMENT_4K)
+                    .build())
+            .build();
+
+    TestComponent.useTestModule(
+        this,
+        createTestModuleBuilder().withAppBundle(appBundle).withOutputPath(outputFilePath).build());
+
+    buildApksManager.execute();
+
+    ZipFile apkSetFile = openZipFile(outputFilePath.toFile());
+    File file = extractFromApkSetFile(apkSetFile, "splits/base-x86.apk", outputDir);
+    Entry libEntry = ZipMap.from(file.toPath()).getEntries().get("lib/x86/libsome.so");
+
+    assertThat(libEntry.isCompressed()).isFalse();
+    assertThat(libEntry.getPayloadLocation().first % ALIGNMENT_4K).isEqualTo(0);
   }
 
   @Test

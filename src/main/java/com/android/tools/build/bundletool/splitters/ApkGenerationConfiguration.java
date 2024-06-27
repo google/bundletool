@@ -16,6 +16,9 @@
 
 package com.android.tools.build.bundletool.splitters;
 
+import static com.android.tools.build.bundletool.model.utils.Versions.ANDROID_Q_API_VERSION;
+import static com.android.tools.build.bundletool.model.utils.Versions.ANDROID_S_API_VERSION;
+
 import com.android.bundle.Config.SuffixStripping;
 import com.android.bundle.Config.UncompressDexFiles.UncompressedDexTargetSdk;
 import com.android.bundle.Targeting.Abi;
@@ -70,6 +73,17 @@ public abstract class ApkGenerationConfiguration {
   public boolean shouldStripTargetingSuffix(OptimizationDimension dimension) {
     return getSuffixStrippings().containsKey(dimension)
         && getSuffixStrippings().get(dimension).getEnabled();
+  }
+
+  public int getMinimalSdkTargetingForUncompressedDex() {
+    switch (getDexCompressionSplitterForTargetSdk()) {
+      case SDK_31:
+        return ANDROID_S_API_VERSION;
+      default:
+        // Uncompressed dex are supported starting from Android P, but only starting from Android Q
+        // the performance impact is negligible compared to a compressed dex.
+        return ANDROID_Q_API_VERSION;
+    }
   }
 
   /**

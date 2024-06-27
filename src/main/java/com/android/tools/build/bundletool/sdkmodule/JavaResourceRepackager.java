@@ -58,9 +58,15 @@ public class JavaResourceRepackager extends ModuleEntriesMutator {
   }
 
   private ModuleEntry updateJavaResourceEntryPath(ModuleEntry javaResourceEntry) {
-    String javaResourceFileName = javaResourceEntry.getPath().getFileName().toString();
+    ZipPath javaResourceEntryPath = javaResourceEntry.getPath();
+    if (javaResourceEntryPath.getNameCount() < 2) {
+      throw new IllegalStateException(
+          "Unexpected path to a Java resource entry: " + javaResourceEntryPath);
+    }
+    String javaResourceFilePath =
+        javaResourceEntryPath.subpath(1, javaResourceEntryPath.getNameCount()).toString();
     return javaResourceEntry.toBuilder()
-        .setPath(ZipPath.create(getNewJavaResourceDirectoryPath() + "/" + javaResourceFileName))
+        .setPath(ZipPath.create(getNewJavaResourceDirectoryPath() + "/" + javaResourceFilePath))
         .build();
   }
 

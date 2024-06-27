@@ -1,0 +1,16 @@
+{
+  "device_groups":[
+    {
+      "name":"not_google",
+      "device_selectors":[
+        {
+          "included_device_ids":[
+            {
+              "build_brand":"google"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
