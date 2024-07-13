@@ -33,7 +33,7 @@ configurations {
 dependencies {
     implementation "com.android.tools:common:31.3.0-alpha14"
     implementation "com.android.tools:r8:3.3.28"
-    implementation "com.android.tools.build:apksig:4.2.0-alpha13"
+    implementation "com.android.tools.build:apksig:8.5.1"
     implementation "com.android.tools.ddms:ddmlib:31.3.0-alpha14"
     implementation "com.android:zipflinger:7.1.0-alpha07"
 
