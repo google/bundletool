@@ -98,6 +98,7 @@ public abstract class AndroidManifest {
   public static final String MAIN_ACTION_ELEMENT_NAME = "action";
   public static final String DATA_ELEMENT_NAME = "data";
 
+  public static final String APP_CATEGORY_ATTRIBUTE_NAME = "appCategory";
   public static final String DEBUGGABLE_ATTRIBUTE_NAME = "debuggable";
   public static final String EXTRACT_NATIVE_LIBS_ATTRIBUTE_NAME = "extractNativeLibs";
   public static final String ICON_ATTRIBUTE_NAME = "icon";
@@ -192,6 +193,7 @@ public abstract class AndroidManifest {
   /** <meta-data> name that specifies native library for native activity */
   public static final String NATIVE_ACTIVITY_LIB_NAME = "android.app.lib_name";
 
+  public static final int APP_CATEGORY_RESOURCE_ID = 0x01010545;
   public static final int DEBUGGABLE_RESOURCE_ID = 0x0101000f;
   public static final int EXTRACT_NATIVE_LIBS_RESOURCE_ID = 0x10104ea;
   public static final int REQUIRED_RESOURCE_ID = 0x0101028e;
@@ -371,6 +373,17 @@ public abstract class AndroidManifest {
       manifestMutator.accept(manifestEditor);
     }
     return manifestEditor.save();
+  }
+
+  /**
+   * Extracts value of the {@code <application android:appCategory>} attribute.
+   *
+   * @return An optional containing the value of the {@code appCategory} attribute if set, or an
+   *     empty optional if not set.
+   */
+  public Optional<String> getApplicationAppCategory() {
+    return getApplicationAttribute(APP_CATEGORY_RESOURCE_ID)
+        .map(XmlProtoAttribute::getValueAsString);
   }
 
   /**

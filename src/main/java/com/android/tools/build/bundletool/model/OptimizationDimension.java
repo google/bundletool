@@ -23,5 +23,6 @@ public enum OptimizationDimension {
   LANGUAGE,
   TEXTURE_COMPRESSION_FORMAT,
   DEVICE_TIER,
-  COUNTRY_SET
+  COUNTRY_SET,
+  AI_MODEL_VERSION
 }

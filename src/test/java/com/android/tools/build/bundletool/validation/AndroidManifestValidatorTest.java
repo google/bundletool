@@ -722,7 +722,7 @@ public class AndroidManifestValidatorTest {
   }
 
   @Test
-  public void assetModule_withApplication_throws() throws Exception {
+  public void assetModule_withApplication_ok() throws Exception {
     BundleModule module =
         new BundleModuleBuilder("asset_module")
             .setManifest(
@@ -730,13 +730,7 @@ public class AndroidManifestValidatorTest {
                     "com.test.app", withOnDemandDelivery(), withApplication()))
             .build();
 
-    Throwable exception =
-        assertThrows(
-            InvalidBundleException.class,
-            () -> new AndroidManifestValidator().validateModule(module));
-    assertThat(exception)
-        .hasMessageThat()
-        .matches("Unexpected element declaration in manifest of asset pack 'asset_module'.");
+    new AndroidManifestValidator().validateModule(module);
   }
 
   @DataPoints("sdkMutators")

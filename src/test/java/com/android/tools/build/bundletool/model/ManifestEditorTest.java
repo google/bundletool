@@ -20,6 +20,8 @@ import static com.android.tools.build.bundletool.model.AndroidManifest.ACTIVITY_
 import static com.android.tools.build.bundletool.model.AndroidManifest.ALLOW_BACKUP_ATTRIBUTE_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.ALLOW_BACKUP_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.APPLICATION_ELEMENT_NAME;
+import static com.android.tools.build.bundletool.model.AndroidManifest.APP_CATEGORY_ATTRIBUTE_NAME;
+import static com.android.tools.build.bundletool.model.AndroidManifest.APP_CATEGORY_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.CATEGORY_ELEMENT_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.CERTIFICATE_DIGEST_ATTRIBUTE_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.DELIVERY_ELEMENT_NAME;
@@ -384,6 +386,21 @@ public class ManifestEditorTest {
         .containsExactly(
             xmlDecimalIntegerAttribute(
                 ANDROID_NAMESPACE_URI, "versionCode", VERSION_CODE_RESOURCE_ID, 123));
+  }
+
+  @Test
+  public void setAppCategory() {
+    AndroidManifest androidManifest = createManifestWithApplicationElement();
+
+    AndroidManifest editedManifest = androidManifest.toEditor().setAppCategory("game").save();
+
+    assertThat(getApplicationElement(editedManifest).getAttributeList())
+        .containsExactly(
+            xmlAttribute(
+                ANDROID_NAMESPACE_URI,
+                APP_CATEGORY_ATTRIBUTE_NAME,
+                APP_CATEGORY_RESOURCE_ID,
+                "game"));
   }
 
   @Test

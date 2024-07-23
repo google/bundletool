@@ -16,6 +16,7 @@
 
 package com.android.tools.build.bundletool.model;
 
+import static com.android.tools.build.bundletool.model.AndroidManifest.APP_CATEGORY_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.APP_COMPONENT_FACTORY_ATTRIBUTE_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.APP_COMPONENT_FACTORY_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.AUTHORITIES_ATTRIBUTE_NAME;
@@ -147,6 +148,24 @@ public class AndroidManifestTest {
 
     assertThat(androidManifest.hasMainTvActivity()).isTrue();
     assertThat(androidManifest.hasMainActivity()).isTrue();
+  }
+
+  @Test
+  public void getApplicationAppCategory_equalsGame() {
+    AndroidManifest androidManifest =
+        AndroidManifest.create(
+            xmlNode(
+                xmlElement(
+                    "manifest",
+                    xmlNode(
+                        xmlElement(
+                            "application",
+                            xmlAttribute(
+                                ANDROID_NAMESPACE_URI,
+                                "appCategory",
+                                APP_CATEGORY_RESOURCE_ID,
+                                "game"))))));
+    assertThat(androidManifest.getApplicationAppCategory()).hasValue("game");
   }
 
   @Test

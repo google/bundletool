@@ -384,7 +384,13 @@ public class AndroidManifestValidator extends SubValidator {
 
   private static void validateAssetModuleManifest(BundleModule module) {
     ImmutableMultimap<String, String> allowedManifestElementChildren =
-        ImmutableMultimap.of(DISTRIBUTION_NAMESPACE_URI, "module", NO_NAMESPACE_URI, "uses-split");
+        ImmutableMultimap.of(
+            DISTRIBUTION_NAMESPACE_URI,
+            "module",
+            NO_NAMESPACE_URI,
+            "uses-split",
+            NO_NAMESPACE_URI,
+            "application");
 
     AndroidManifest manifest = module.getAndroidManifest();
     if (!manifest.getModuleType().equals(ModuleType.ASSET_MODULE)) {

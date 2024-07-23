@@ -208,6 +208,16 @@ public class ManifestEditor {
   }
 
   @CanIgnoreReturnValue
+  public ManifestEditor setAppCategory(String appCategory) {
+    manifestElement
+        .getOrCreateChildElement(APPLICATION_ELEMENT_NAME)
+        .getOrCreateAndroidAttribute(
+            AndroidManifest.APP_CATEGORY_ATTRIBUTE_NAME, AndroidManifest.APP_CATEGORY_RESOURCE_ID)
+        .setValueAsString(appCategory);
+    return this;
+  }
+
+  @CanIgnoreReturnValue
   public ManifestEditor addMetaDataString(String key, String value) {
     return addMetaDataValue(
         key, createAndroidAttribute("value", VALUE_RESOURCE_ID).setValueAsString(value));
