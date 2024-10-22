@@ -22,6 +22,7 @@ import static com.android.tools.build.bundletool.model.utils.BundleParser.SDK_IN
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifest;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withInstallLocation;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withMinSdkVersion;
+import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withTargetSdkVersion;
 import static com.android.tools.build.bundletool.testing.SdkBundleBuilder.DEFAULT_SDK_MODULES_CONFIG;
 import static com.android.tools.build.bundletool.testing.SdkBundleBuilder.PACKAGE_NAME;
 import static com.google.common.collect.ImmutableList.toImmutableList;
@@ -262,7 +263,7 @@ public final class TestUtils {
   }
 
   public static XmlNode createSdkAndroidManifest() {
-    return androidManifest(PACKAGE_NAME, withMinSdkVersion(32));
+    return androidManifest(PACKAGE_NAME, withMinSdkVersion(32), withTargetSdkVersion(34));
   }
 
   public static XmlNode createInvalidSdkAndroidManifest() {

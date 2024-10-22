@@ -37,8 +37,6 @@ import static com.android.tools.build.bundletool.model.AndroidManifest.INCLUDE_A
 import static com.android.tools.build.bundletool.model.AndroidManifest.INSTALL_TIME_ELEMENT_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.INTENT_FILTER_ELEMENT_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.IS_FEATURE_SPLIT_RESOURCE_ID;
-import static com.android.tools.build.bundletool.model.AndroidManifest.IS_SPLIT_REQUIRED_ATTRIBUTE_NAME;
-import static com.android.tools.build.bundletool.model.AndroidManifest.IS_SPLIT_REQUIRED_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.LOCALE_CONFIG_ATTRIBUTE_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.LOCALE_CONFIG_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.METADATA_KEY_SDK_PATCH_VERSION_PREFIX;
@@ -208,12 +206,12 @@ public class ManifestEditor {
   }
 
   @CanIgnoreReturnValue
-  public ManifestEditor setAppCategory(String appCategory) {
+  public ManifestEditor setAppCategory(int appCategory) {
     manifestElement
         .getOrCreateChildElement(APPLICATION_ELEMENT_NAME)
         .getOrCreateAndroidAttribute(
             AndroidManifest.APP_CATEGORY_ATTRIBUTE_NAME, AndroidManifest.APP_CATEGORY_RESOURCE_ID)
-        .setValueAsString(appCategory);
+        .setValueAsDecimalInteger(appCategory);
     return this;
   }
 
@@ -314,17 +312,13 @@ public class ManifestEditor {
    * <ul>
    *   <li>{@code <meta-data android:name="..." android:value="..."/>} element inside the {@code
    *       <application>} element (read by the PlayCore library).
-   *   <li>{@code <application android:isSplitRequired="..."/>} attribute (read by the Android
-   *       Platform since Q).
    * </ul>
    */
   @CanIgnoreReturnValue
   public ManifestEditor setSplitsRequired(boolean value) {
-    setMetadataValue(
+    return setMetadataValue(
         META_DATA_KEY_SPLITS_REQUIRED,
         createAndroidAttribute("value", VALUE_RESOURCE_ID).setValueAsBoolean(value));
-    return setApplcationAttributeBoolean(
-        IS_SPLIT_REQUIRED_ATTRIBUTE_NAME, IS_SPLIT_REQUIRED_RESOURCE_ID, value);
   }
 
   /**
@@ -334,16 +328,9 @@ public class ManifestEditor {
    * requiredSplitTypes} to perform validation at install time.
    */
   @CanIgnoreReturnValue
-  public ManifestEditor setSplitTypes(
-      ImmutableList<String> splitTypes, boolean enableSystemAttribute) {
-    if (enableSystemAttribute) {
-      manifestElement
-          .getOrCreateAndroidAttribute(SPLIT_TYPES_ATTRIBUTE_NAME, SPLIT_TYPES_RESOURCE_ID)
-          .setValueAsString(splitTypes.stream().sorted().collect(joining(",")));
-    }
-    // TODO(b/199376532): Remove once the system attribute is fully rolled out.
+  public ManifestEditor setSplitTypes(ImmutableList<String> splitTypes) {
     manifestElement
-        .getOrCreateAttribute(DISTRIBUTION_NAMESPACE_URI, SPLIT_TYPES_ATTRIBUTE_NAME)
+        .getOrCreateAndroidAttribute(SPLIT_TYPES_ATTRIBUTE_NAME, SPLIT_TYPES_RESOURCE_ID)
         .setValueAsString(splitTypes.stream().sorted().collect(joining(",")));
     return this;
   }
@@ -355,17 +342,10 @@ public class ManifestEditor {
    * provided by {@code splitTypes} in splits.
    */
   @CanIgnoreReturnValue
-  public ManifestEditor setRequiredSplitTypes(
-      ImmutableList<String> splitTypes, boolean enableSystemAttribute) {
-    if (enableSystemAttribute) {
-      manifestElement
-          .getOrCreateAndroidAttribute(
-              REQUIRED_SPLIT_TYPES_ATTRIBUTE_NAME, REQUIRED_SPLIT_TYPES_RESOURCE_ID)
-          .setValueAsString(splitTypes.stream().sorted().collect(joining(",")));
-    }
-    // TODO(b/199376532): Remove once the system attribute is fully rolled out.
+  public ManifestEditor setRequiredSplitTypes(ImmutableList<String> splitTypes) {
     manifestElement
-        .getOrCreateAttribute(DISTRIBUTION_NAMESPACE_URI, REQUIRED_SPLIT_TYPES_ATTRIBUTE_NAME)
+        .getOrCreateAndroidAttribute(
+            REQUIRED_SPLIT_TYPES_ATTRIBUTE_NAME, REQUIRED_SPLIT_TYPES_RESOURCE_ID)
         .setValueAsString(splitTypes.stream().sorted().collect(joining(",")));
     return this;
   }

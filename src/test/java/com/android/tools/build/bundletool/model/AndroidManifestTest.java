@@ -160,12 +160,12 @@ public class AndroidManifestTest {
                     xmlNode(
                         xmlElement(
                             "application",
-                            xmlAttribute(
+                            xmlDecimalIntegerAttribute(
                                 ANDROID_NAMESPACE_URI,
                                 "appCategory",
                                 APP_CATEGORY_RESOURCE_ID,
-                                "game"))))));
-    assertThat(androidManifest.getApplicationAppCategory()).hasValue("game");
+                                0))))));
+    assertThat(androidManifest.getApplicationAppCategory()).hasValue(0);
   }
 
   @Test

@@ -46,6 +46,7 @@ public class SdkAndroidManifestValidator extends SubValidator {
     validateNoSharedUserId(manifest);
     validateNoComponents(manifest);
     validateNoSplitId(manifest);
+    validateTargetSdkVersion(manifest);
   }
 
   private void validateNoSdkLibraryElement(AndroidManifest manifest) {
@@ -130,6 +131,14 @@ public class SdkAndroidManifestValidator extends SubValidator {
     if (manifest.getSplitId().isPresent()) {
       throw InvalidBundleException.builder()
           .withUserMessage("'split' attribute cannot be used in the manifest of an SDK bundle.")
+          .build();
+    }
+  }
+
+  private static void validateTargetSdkVersion(AndroidManifest manifest) {
+    if (!manifest.getTargetSdkVersion().isPresent() || manifest.getTargetSdkVersion().get() < 34) {
+      throw InvalidBundleException.builder()
+          .withUserMessage("The 'targetSdkVersion' of an SDK bundle should be 34 or higher.")
           .build();
     }
   }

@@ -17,6 +17,7 @@
 package com.android.tools.build.bundletool.model;
 
 import static com.android.tools.build.bundletool.model.AndroidManifest.CODE_ATTRIBUTE_NAME;
+import static com.android.tools.build.bundletool.model.AndroidManifest.CONDITIONS_ELEMENT_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.CONDITION_DEVICE_FEATURE_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.CONDITION_DEVICE_GROUPS_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.CONDITION_MAX_SDK_VERSION_NAME;
@@ -26,13 +27,18 @@ import static com.android.tools.build.bundletool.model.AndroidManifest.COUNTRY_E
 import static com.android.tools.build.bundletool.model.AndroidManifest.DEVICE_GROUP_ELEMENT_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.DISTRIBUTION_NAMESPACE_URI;
 import static com.android.tools.build.bundletool.model.AndroidManifest.EXCLUDE_ATTRIBUTE_NAME;
+import static com.android.tools.build.bundletool.model.AndroidManifest.FAST_FOLLOW_ELEMENT_NAME;
+import static com.android.tools.build.bundletool.model.AndroidManifest.INSTALL_TIME_ELEMENT_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.NAME_ATTRIBUTE_NAME;
+import static com.android.tools.build.bundletool.model.AndroidManifest.ON_DEMAND_ELEMENT_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.VALUE_ATTRIBUTE_NAME;
 import static com.android.tools.build.bundletool.model.utils.CollectorUtils.groupingByDeterministic;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static java.util.stream.Collectors.counting;
 
 import com.android.aapt.Resources.XmlNode;
+import com.android.bundle.Targeting.AssetModuleTargeting;
+import com.android.tools.build.bundletool.model.BundleModule.ModuleType;
 import com.android.tools.build.bundletool.model.exceptions.InvalidBundleException;
 import com.android.tools.build.bundletool.model.utils.DeviceTargetingUtils;
 import com.android.tools.build.bundletool.model.utils.xmlproto.XmlProtoAttribute;
@@ -46,9 +52,7 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.errorprone.annotations.Immutable;
-import java.util.LinkedHashSet;
 import java.util.Optional;
-import java.util.Set;
 import java.util.stream.Collectors;
 
 /** Parses and provides business logic utilities for <dist:delivery> element. */
@@ -58,10 +62,16 @@ import java.util.stream.Collectors;
 public abstract class ManifestDeliveryElement {
 
   private static final String VERSION_ATTRIBUTE_NAME = "version";
-  private static final ImmutableList<String> KNOWN_DELIVERY_MODES =
-      ImmutableList.of("install-time", "on-demand", "fast-follow");
+  private static final ImmutableList<String> ASSET_MODULE_DELIVERY_ELEMENTS =
+      ImmutableList.of(
+          INSTALL_TIME_ELEMENT_NAME,
+          ON_DEMAND_ELEMENT_NAME,
+          FAST_FOLLOW_ELEMENT_NAME,
+          CONDITIONS_ELEMENT_NAME);
+  private static final ImmutableList<String> FEATURE_MODULE_DELIVERY_ELEMENTS =
+      ImmutableList.of(INSTALL_TIME_ELEMENT_NAME, ON_DEMAND_ELEMENT_NAME);
   private static final ImmutableList<String> KNOWN_INSTALL_TIME_ATTRIBUTES =
-      ImmutableList.of("conditions", "removable");
+      ImmutableList.of(CONDITIONS_ELEMENT_NAME, "removable");
   private static final ImmutableList<String> CONDITIONS_ALLOWED_ONLY_ONCE =
       ImmutableList.of(
           CONDITION_MIN_SDK_VERSION_NAME,
@@ -71,7 +81,7 @@ public abstract class ManifestDeliveryElement {
 
   abstract XmlProtoElement getDeliveryElement();
 
-  abstract boolean isFastFollowAllowed();
+  abstract ModuleType getModuleType();
 
   /**
    * Returns if this <dist:delivery> element is well-formed.
@@ -82,7 +92,7 @@ public abstract class ManifestDeliveryElement {
   public boolean isWellFormed() {
     return hasOnDemandElement()
         || hasInstallTimeElement()
-        || (isFastFollowAllowed() && hasFastFollowElement());
+        || (getModuleType() == ModuleType.ASSET_MODULE && hasFastFollowElement());
   }
 
   public boolean hasModuleConditions() {
@@ -92,21 +102,24 @@ public abstract class ManifestDeliveryElement {
   @Memoized
   public boolean hasOnDemandElement() {
     return getDeliveryElement()
-        .getOptionalChildElement(DISTRIBUTION_NAMESPACE_URI, "on-demand")
+        .getOptionalChildElement(DISTRIBUTION_NAMESPACE_URI, ON_DEMAND_ELEMENT_NAME)
         .isPresent();
   }
 
   public boolean hasFastFollowElement() {
     return getDeliveryElement()
-        .getOptionalChildElement(DISTRIBUTION_NAMESPACE_URI, "fast-follow")
+        .getOptionalChildElement(DISTRIBUTION_NAMESPACE_URI, FAST_FOLLOW_ELEMENT_NAME)
         .isPresent();
   }
 
   @Memoized
   public boolean hasInstallTimeElement() {
+    return getInstallTimeElement().isPresent();
+  }
+
+  private Optional<XmlProtoElement> getInstallTimeElement() {
     return getDeliveryElement()
-        .getOptionalChildElement(DISTRIBUTION_NAMESPACE_URI, "install-time")
-        .isPresent();
+        .getOptionalChildElement(DISTRIBUTION_NAMESPACE_URI, INSTALL_TIME_ELEMENT_NAME);
   }
 
   /**
@@ -117,8 +130,7 @@ public abstract class ManifestDeliveryElement {
    * removable.
    */
   public Optional<Boolean> getInstallTimeRemovableValue() {
-    return getDeliveryElement()
-        .getOptionalChildElement(DISTRIBUTION_NAMESPACE_URI, "install-time")
+    return getInstallTimeElement()
         .flatMap(
             installTime ->
                 installTime
@@ -136,38 +148,16 @@ public abstract class ManifestDeliveryElement {
                                                 + " namespace is also set."))));
   }
 
-  /**
-   * Returns all module conditions.
-   *
-   * <p>We support <dist:min-sdk-version>, <dist:device-feature> and <dist:user-countries>
-   * conditions today. Any other conditions types are not supported and will result in {@link
-   * InvalidBundleException}.
-   */
+  /** Returns all module conditions for install-time feature modules. */
   @Memoized
   public ModuleConditions getModuleConditions() {
-    ImmutableList<XmlProtoElement> conditionElements = getModuleConditionElements();
-
-    ImmutableMap<String, Long> conditionCounts =
-        conditionElements.stream()
-            .collect(groupingByDeterministic(XmlProtoElement::getName, counting()));
-    for (String conditionName : CONDITIONS_ALLOWED_ONLY_ONCE) {
-      if (conditionCounts.getOrDefault(conditionName, 0L) > 1) {
-        throw InvalidBundleException.builder()
-            .withUserMessage("Multiple '<dist:%s>' conditions are not supported.", conditionName)
-            .build();
-      }
-    }
+    ImmutableList<XmlProtoElement> conditionElements =
+        getModuleConditionElements(getInstallTimeElement());
+    verifyUniqueConditions(conditionElements);
 
     ModuleConditions.Builder moduleConditions = ModuleConditions.builder();
     for (XmlProtoElement conditionElement : conditionElements) {
-      if (!conditionElement.getNamespaceUri().equals(DISTRIBUTION_NAMESPACE_URI)) {
-        throw InvalidBundleException.builder()
-            .withUserMessage(
-                "Invalid namespace found in the module condition element. "
-                    + "Expected '%s'; found '%s'.",
-                DISTRIBUTION_NAMESPACE_URI, conditionElement.getNamespaceUri())
-            .build();
-      }
+      verifyDistributionNamespace(conditionElement);
       switch (conditionElement.getName()) {
         case CONDITION_DEVICE_FEATURE_NAME:
           moduleConditions.addDeviceFeatureCondition(parseDeviceFeatureCondition(conditionElement));
@@ -208,6 +198,59 @@ public abstract class ManifestDeliveryElement {
     }
 
     return processedModuleConditions;
+  }
+
+  /** Returns all module conditions for asset modules. */
+  public AssetModuleTargeting getAssetModuleConditions() {
+    ImmutableList<XmlProtoElement> conditionElements =
+        getModuleConditionElements(Optional.of(getDeliveryElement()));
+    verifyUniqueConditions(conditionElements);
+
+    AssetModuleTargeting.Builder targetingBuilder = AssetModuleTargeting.newBuilder();
+    for (XmlProtoElement conditionElement : conditionElements) {
+      verifyDistributionNamespace(conditionElement);
+      switch (conditionElement.getName()) {
+        case CONDITION_USER_COUNTRIES_NAME:
+          targetingBuilder.setUserCountriesTargeting(
+              parseUserCountriesCondition(conditionElement).toTargeting());
+          break;
+        case CONDITION_DEVICE_GROUPS_NAME:
+          targetingBuilder.setDeviceGroupTargeting(
+              parseDeviceGroupsCondition(conditionElement).toTargeting());
+          break;
+        default:
+          throw InvalidBundleException.builder()
+              .withUserMessage("Unrecognized module condition: '%s'", conditionElement.getName())
+              .build();
+      }
+    }
+
+    return targetingBuilder.build();
+  }
+
+  private static void verifyDistributionNamespace(XmlProtoElement conditionElement) {
+    if (!conditionElement.getNamespaceUri().equals(DISTRIBUTION_NAMESPACE_URI)) {
+      throw InvalidBundleException.builder()
+          .withUserMessage(
+              "Invalid namespace found in the module condition element. "
+                  + "Expected '%s'; found '%s'.",
+              DISTRIBUTION_NAMESPACE_URI, conditionElement.getNamespaceUri())
+          .build();
+    }
+  }
+
+  /** Verifies that unique delivery conditions are only specified once. */
+  private static void verifyUniqueConditions(ImmutableList<XmlProtoElement> conditionElements) {
+    ImmutableMap<String, Long> conditionCounts =
+        conditionElements.stream()
+            .collect(groupingByDeterministic(XmlProtoElement::getName, counting()));
+    for (String conditionName : CONDITIONS_ALLOWED_ONLY_ONCE) {
+      if (conditionCounts.getOrDefault(conditionName, 0L) > 1) {
+        throw InvalidBundleException.builder()
+            .withUserMessage("Multiple '<dist:%s>' conditions are not supported.", conditionName)
+            .build();
+      }
+    }
   }
 
   private UserCountriesCondition parseUserCountriesCondition(XmlProtoElement conditionElement) {
@@ -284,37 +327,40 @@ public abstract class ManifestDeliveryElement {
   }
 
   private static void validateDeliveryElement(
-      XmlProtoElement deliveryElement, boolean isFastFollowAllowed) {
-    validateDeliveryElementChildren(deliveryElement, isFastFollowAllowed);
+      XmlProtoElement deliveryElement, ModuleType moduleType) {
+    validateDeliveryElementChildren(deliveryElement, moduleType);
     validateInstallTimeElement(
-        deliveryElement.getOptionalChildElement(DISTRIBUTION_NAMESPACE_URI, "install-time"));
+        deliveryElement.getOptionalChildElement(
+            DISTRIBUTION_NAMESPACE_URI, INSTALL_TIME_ELEMENT_NAME));
     validateOnDemandElement(
-        deliveryElement.getOptionalChildElement(DISTRIBUTION_NAMESPACE_URI, "on-demand"));
-    if (isFastFollowAllowed) {
+        deliveryElement.getOptionalChildElement(
+            DISTRIBUTION_NAMESPACE_URI, ON_DEMAND_ELEMENT_NAME));
+    if (moduleType == ModuleType.ASSET_MODULE) {
       validateFastFollowElement(
-          deliveryElement.getOptionalChildElement(DISTRIBUTION_NAMESPACE_URI, "fast-follow"));
+          deliveryElement.getOptionalChildElement(
+              DISTRIBUTION_NAMESPACE_URI, FAST_FOLLOW_ELEMENT_NAME));
     }
   }
 
   private static void validateDeliveryElementChildren(
-      XmlProtoElement deliveryElement, boolean isFastFollowAllowed) {
-    Set<String> allowedDeliveryModes = new LinkedHashSet<>(KNOWN_DELIVERY_MODES);
-    if (!isFastFollowAllowed) {
-      allowedDeliveryModes.remove("fast-follow");
-    }
+      XmlProtoElement deliveryElement, ModuleType moduleType) {
+    ImmutableList<String> allowedDeliveryElements =
+        moduleType == ModuleType.ASSET_MODULE
+            ? ASSET_MODULE_DELIVERY_ELEMENTS
+            : FEATURE_MODULE_DELIVERY_ELEMENTS;
     Optional<XmlProtoElement> offendingElement =
         deliveryElement
             .getChildrenElements(
                 child ->
                     !(child.getNamespaceUri().equals(DISTRIBUTION_NAMESPACE_URI)
-                        && allowedDeliveryModes.contains(child.getName())))
+                        && allowedDeliveryElements.contains(child.getName())))
             .findAny();
 
     if (offendingElement.isPresent()) {
       throw InvalidBundleException.builder()
           .withUserMessage(
               "Expected <dist:delivery> element to contain only %s elements but found: %s",
-              allowedDeliveryModes.stream()
+              allowedDeliveryElements.stream()
                   .map(name -> String.format("<dist:%s>", name))
                   .collect(Collectors.joining(", ")),
               printElement(offendingElement.get()))
@@ -367,13 +413,13 @@ public abstract class ManifestDeliveryElement {
     }
   }
 
-  private ImmutableList<XmlProtoElement> getModuleConditionElements() {
-    Optional<XmlProtoElement> installTimeElement =
-        getDeliveryElement().getOptionalChildElement(DISTRIBUTION_NAMESPACE_URI, "install-time");
-    return installTimeElement
+  private ImmutableList<XmlProtoElement> getModuleConditionElements(
+      Optional<XmlProtoElement> parentElement) {
+    return parentElement
         .flatMap(
             installTime ->
-                installTime.getOptionalChildElement(DISTRIBUTION_NAMESPACE_URI, "conditions"))
+                installTime.getOptionalChildElement(
+                    DISTRIBUTION_NAMESPACE_URI, CONDITIONS_ELEMENT_NAME))
         .map(conditions -> conditions.getChildrenElements().collect(toImmutableList()))
         .orElse(ImmutableList.of());
   }
@@ -426,19 +472,19 @@ public abstract class ManifestDeliveryElement {
    * contains the <dist:delivery> element.
    */
   public static Optional<ManifestDeliveryElement> fromManifestElement(
-      XmlProtoElement manifestElement, boolean isFastFollowAllowed) {
-    return fromManifestElement(manifestElement, "delivery", isFastFollowAllowed);
+      XmlProtoElement manifestElement, ModuleType moduleType) {
+    return fromManifestElement(manifestElement, "delivery", moduleType);
   }
 
   private static Optional<ManifestDeliveryElement> fromManifestElement(
-      XmlProtoElement manifestElement, String deliveryTag, boolean isFastFollowAllowed) {
+      XmlProtoElement manifestElement, String deliveryTag, ModuleType moduleType) {
     return manifestElement
         .getOptionalChildElement(DISTRIBUTION_NAMESPACE_URI, "module")
         .flatMap(elem -> elem.getOptionalChildElement(DISTRIBUTION_NAMESPACE_URI, deliveryTag))
         .map(
             (XmlProtoElement elem) -> {
-              validateDeliveryElement(elem, isFastFollowAllowed);
-              return new AutoValue_ManifestDeliveryElement(elem, isFastFollowAllowed);
+              validateDeliveryElement(elem, moduleType);
+              return new AutoValue_ManifestDeliveryElement(elem, moduleType);
             });
   }
 
@@ -447,19 +493,19 @@ public abstract class ManifestDeliveryElement {
    * the <dist:instant-delivery> element.
    */
   public static Optional<ManifestDeliveryElement> instantFromManifestElement(
-      XmlProtoElement manifestElement, boolean isFastFollowAllowed) {
-    return fromManifestElement(manifestElement, "instant-delivery", isFastFollowAllowed);
+      XmlProtoElement manifestElement, ModuleType moduleType) {
+    return fromManifestElement(manifestElement, "instant-delivery", moduleType);
   }
 
   @VisibleForTesting
   static Optional<ManifestDeliveryElement> fromManifestRootNode(
-      XmlNode xmlNode, boolean isFastFollowAllowed) {
-    return fromManifestElement(new XmlProtoNode(xmlNode).getElement(), isFastFollowAllowed);
+      XmlNode xmlNode, ModuleType moduleType) {
+    return fromManifestElement(new XmlProtoNode(xmlNode).getElement(), moduleType);
   }
 
   @VisibleForTesting
   static Optional<ManifestDeliveryElement> instantFromManifestRootNode(
-      XmlNode xmlNode, boolean isFastFollowAllowed) {
-    return instantFromManifestElement(new XmlProtoNode(xmlNode).getElement(), isFastFollowAllowed);
+      XmlNode xmlNode, ModuleType moduleType) {
+    return instantFromManifestElement(new XmlProtoNode(xmlNode).getElement(), moduleType);
   }
 }

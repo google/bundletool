@@ -136,7 +136,6 @@ public class TestModule {
     @Nullable private PrintStream printStream;
     @Nullable private Boolean localTestingEnabled;
     @Nullable private SourceStamp sourceStamp;
-    private Boolean enableRequiredSplitTypes = true;
     private BundleMetadata bundleMetadata = DEFAULT_BUNDLE_METADATA;
     Optional<FeatureModulesCustomConfig> featureModulesCustomConfig = Optional.empty();
 
@@ -263,11 +262,6 @@ public class TestModule {
 
     public Builder withSdkBundle(SdkBundle sdkBundle) {
       this.bundle = sdkBundle;
-      return this;
-    }
-
-    public Builder withEnableRequiredSplitTypes(boolean enableRequiredSplitTypes) {
-      this.enableRequiredSplitTypes = enableRequiredSplitTypes;
       return this;
     }
 

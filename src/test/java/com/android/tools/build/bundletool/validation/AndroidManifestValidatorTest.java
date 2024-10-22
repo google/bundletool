@@ -32,6 +32,7 @@ import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.with
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withMinSdkVersion;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withOnDemandAttribute;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withOnDemandDelivery;
+import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withSharedUserId;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withSplitId;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withSupportsGlTexture;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withTargetSandboxVersion;
@@ -42,6 +43,8 @@ import static com.google.common.truth.Truth.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.android.bundle.Config.BundleConfig;
+import com.android.bundle.RuntimeEnabledSdkConfigProto.RuntimeEnabledSdk;
+import com.android.bundle.RuntimeEnabledSdkConfigProto.RuntimeEnabledSdkConfig;
 import com.android.tools.build.bundletool.model.BundleModule;
 import com.android.tools.build.bundletool.model.exceptions.InvalidBundleException;
 import com.android.tools.build.bundletool.model.utils.xmlproto.XmlProtoAttributeBuilder;
@@ -1102,5 +1105,31 @@ public class AndroidManifestValidatorTest {
             "<uses-sdk-library> element not allowed in the manifest of App Bundle. An App Bundle"
                 + " should depend on a runtime-enabled SDK by specifying its details in the"
                 + " runtime_enabled_sdk_config.pb, not in its manifest.");
+  }
+
+  @Test
+  public void sharedUserIdAndRuntimeEnabledSdkBothPresent_throws() {
+    BundleModule module =
+        new BundleModuleBuilder(BASE_MODULE_NAME)
+            .setRuntimeEnabledSdkConfig(
+                RuntimeEnabledSdkConfig.newBuilder()
+                    .addRuntimeEnabledSdk(
+                        RuntimeEnabledSdk.newBuilder()
+                            .setPackageName("com.test.sdk")
+                            .setVersionMajor(1)
+                            .setVersionMinor(2)
+                            .setCertificateDigest("cert-digest")
+                            .setResourcesPackageId(2))
+                    .build())
+            .setManifest(androidManifest(PKG_NAME, withSharedUserId("com.test.shared")))
+            .build();
+
+    InvalidBundleException exception =
+        assertThrows(
+            InvalidBundleException.class,
+            () -> new AndroidManifestValidator().validateAllModules(ImmutableList.of(module)));
+    assertThat(exception)
+        .hasMessageThat()
+        .contains("'sharedUserId' cannot be used with runtime-enabled SDKs.");
   }
 }

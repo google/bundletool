@@ -281,6 +281,7 @@ message SplitDimension {
     DEVICE_TIER = 6;
     COUNTRY_SET = 7;
     AI_MODEL_VERSION = 8;
+    DEVICE_GROUP = 9;
   }
   Value value = 1;
 

@@ -26,11 +26,15 @@ message ApkTargeting {
   TextureCompressionFormatTargeting texture_compression_format_targeting = 6;
   MultiAbiTargeting multi_abi_targeting = 7;
   SanitizerTargeting sanitizer_targeting = 8;
-  DeviceTierTargeting device_tier_targeting = 9;
-  CountrySetTargeting country_set_targeting = 10;
+  // TODO: b/372902482 - Prefer device_group_targeting.
+  DeviceTierTargeting device_tier_targeting = 9 [deprecated = true];
+  // TODO: b/372902482 - remove.
+  CountrySetTargeting country_set_targeting = 10 [deprecated = true];
+  DeviceGroupTargeting device_group_targeting = 11;
 }
 
 // Targeting on the module level.
+// Used for conditional feature modules.
 // The semantic of the targeting is the "AND" rule on all immediate values.
 message ModuleTargeting {
   SdkVersionTargeting sdk_version_targeting = 1;
@@ -39,6 +43,15 @@ message ModuleTargeting {
   DeviceGroupModuleTargeting device_group_targeting = 5;
 
   reserved 4;
+}
+
+// Targeting for conditionally delivered AssetModules.
+// It's not used for variant-based targeting of AssetModules, see
+// AssetsDirectoryTargeting instead.
+// The semantic of the targeting is the "AND" rule on all immediate values.
+message AssetModuleTargeting {
+  UserCountriesTargeting user_countries_targeting = 1;
+  DeviceGroupModuleTargeting device_group_targeting = 2;
 }
 
 // User Countries targeting describing an inclusive/exclusive list of country
@@ -131,8 +144,11 @@ message AssetsDirectoryTargeting {
   reserved 2;  // was GraphicsApiTargeting
   TextureCompressionFormatTargeting texture_compression_format = 3;
   LanguageTargeting language = 4;
-  DeviceTierTargeting device_tier = 5;
-  CountrySetTargeting country_set = 6;
+  // TODO: b/372902482 - Prefer device_group.
+  DeviceTierTargeting device_tier = 5 [deprecated = true];
+  // TODO: b/372902482 - remove.
+  CountrySetTargeting country_set = 6 [deprecated = true];
+  DeviceGroupTargeting device_group = 7;
 }
 
 // Targeting specific for directories under lib/.
@@ -232,6 +248,14 @@ message CountrySetTargeting {
   // Country set name defined in device tier config.
   repeated string value = 1;
   // Targeting of other sibling directories that were in the Bundle.
+  repeated string alternatives = 2;
+}
+
+// Targets assets and APKs to a concrete device group.
+message DeviceGroupTargeting {
+  // Device group name defined in device tier config.
+  repeated string value = 1;
+  // Targeting of other sibling directories that are in the Bundle.
   repeated string alternatives = 2;
 }
 

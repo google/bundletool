@@ -17,7 +17,6 @@
 package com.android.tools.build.bundletool.model;
 
 import static com.android.tools.build.bundletool.model.ManifestMutator.withExtractNativeLibs;
-import static com.android.tools.build.bundletool.model.ManifestMutator.withSplitsRequired;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifest;
 import static com.google.common.truth.Truth.assertThat;
 
@@ -41,18 +40,5 @@ public class ManifestMutatorTest {
 
     editedManifest = editedManifest.applyMutators(ImmutableList.of(withExtractNativeLibs(true)));
     assertThat(editedManifest.getExtractNativeLibsValue()).hasValue(true);
-  }
-
-  @Test
-  public void setSplitsRequiredValue() throws Exception {
-    AndroidManifest manifest = AndroidManifest.create(androidManifest("com.test.app"));
-    assertThat(manifest.getSplitsRequiredValue()).isEmpty();
-
-    AndroidManifest editedManifest =
-        manifest.applyMutators(ImmutableList.of(withSplitsRequired(false)));
-    assertThat(editedManifest.getSplitsRequiredValue()).hasValue(false);
-
-    editedManifest = editedManifest.applyMutators(ImmutableList.of(withSplitsRequired(true)));
-    assertThat(editedManifest.getSplitsRequiredValue()).hasValue(true);
   }
 }

@@ -18,7 +18,6 @@ package com.android.tools.build.bundletool.commands;
 
 import static com.android.tools.build.bundletool.model.utils.BundleParser.EXTRACTED_SDK_MODULES_FILE_NAME;
 import static com.android.tools.build.bundletool.model.utils.FileNames.TABLE_OF_CONTENTS_FILE;
-import static com.android.tools.build.bundletool.model.utils.Versions.ANDROID_L_API_VERSION;
 import static com.android.tools.build.bundletool.testing.Aapt2Helper.AAPT2_PATH;
 import static com.android.tools.build.bundletool.testing.FakeSystemEnvironmentProvider.ANDROID_HOME;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifest;
@@ -601,8 +600,7 @@ public class BuildSdkApksForAppCommandTest {
         new AppBundleBuilder()
             .addModule(
                 new BundleModuleBuilder("base")
-                    .setManifest(
-                        androidManifest("com.test.app", withMinSdkVersion(ANDROID_L_API_VERSION)))
+                    .setManifest(androidManifest("com.test.app", withMinSdkVersion(33)))
                     .setRuntimeEnabledSdkConfig(
                         RuntimeEnabledSdkConfig.newBuilder()
                             .addRuntimeEnabledSdk(
@@ -655,8 +653,7 @@ public class BuildSdkApksForAppCommandTest {
         new AppBundleBuilder()
             .addModule(
                 new BundleModuleBuilder("base")
-                    .setManifest(
-                        androidManifest("com.test.app", withMinSdkVersion(ANDROID_L_API_VERSION)))
+                    .setManifest(androidManifest("com.test.app", withMinSdkVersion(33)))
                     .setRuntimeEnabledSdkConfig(
                         RuntimeEnabledSdkConfig.newBuilder()
                             .addRuntimeEnabledSdk(

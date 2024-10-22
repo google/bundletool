@@ -19,14 +19,19 @@ package com.android.tools.build.bundletool.commands;
 import static com.android.bundle.Targeting.Abi.AbiAlias.X86;
 import static com.android.bundle.Targeting.Abi.AbiAlias.X86_64;
 import static com.android.tools.build.bundletool.model.AndroidManifest.ACTIVITY_ELEMENT_NAME;
+import static com.android.tools.build.bundletool.model.AndroidManifest.ANDROID_NAMESPACE_URI;
 import static com.android.tools.build.bundletool.model.AndroidManifest.APPLICATION_ELEMENT_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.PERMISSION_ELEMENT_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.PROVIDER_ELEMENT_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.RECEIVER_ELEMENT_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.SERVICE_ELEMENT_NAME;
+import static com.android.tools.build.bundletool.model.AndroidManifest.TARGET_SDK_VERSION_ATTRIBUTE_NAME;
+import static com.android.tools.build.bundletool.model.AndroidManifest.TARGET_SDK_VERSION_RESOURCE_ID;
+import static com.android.tools.build.bundletool.model.AndroidManifest.USES_SDK_ELEMENT_NAME;
 import static com.android.tools.build.bundletool.model.RuntimeEnabledSdkVersionEncoder.VERSION_MAJOR_MAX_VALUE;
-import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifest;
+import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifestForSdkBundle;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withSplitId;
+import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.xmlDecimalIntegerAttribute;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.xmlElement;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.xmlNode;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.assetsDirectoryTargeting;
@@ -683,7 +688,7 @@ public class BuildSdkBundleCommandTest {
 
   @Test
   public void validModule() throws Exception {
-    XmlNode manifest = androidManifest(PKG_NAME);
+    XmlNode manifest = androidManifestForSdkBundle(PKG_NAME);
     ResourceTable resourceTable =
         new ResourceTableBuilder()
             .addPackage(PKG_NAME)
@@ -748,7 +753,7 @@ public class BuildSdkBundleCommandTest {
 
   @Test
   public void assetsTargeting_generated() throws Exception {
-    XmlNode manifest = androidManifest(PKG_NAME);
+    XmlNode manifest = androidManifestForSdkBundle(PKG_NAME);
     Path module =
         new ZipBuilder()
             .addFileWithProtoContent(ZipPath.create("manifest/AndroidManifest.xml"), manifest)
@@ -804,7 +809,7 @@ public class BuildSdkBundleCommandTest {
 
   @Test
   public void nativeTargeting_generated() throws Exception {
-    XmlNode manifest = androidManifest(PKG_NAME);
+    XmlNode manifest = androidManifestForSdkBundle(PKG_NAME);
     Path module =
         new ZipBuilder()
             .addFileWithProtoContent(ZipPath.create("manifest/AndroidManifest.xml"), manifest)
@@ -857,7 +862,7 @@ public class BuildSdkBundleCommandTest {
 
   @Test
   public void sdkBundleConfig_isSaved() throws Exception {
-    XmlNode manifest = androidManifest(PKG_NAME);
+    XmlNode manifest = androidManifestForSdkBundle(PKG_NAME);
     Path module =
         new ZipBuilder()
             .addFileWithProtoContent(ZipPath.create("manifest/AndroidManifest.xml"), manifest)
@@ -887,6 +892,14 @@ public class BuildSdkBundleCommandTest {
                 xmlNode(xmlElement(PERMISSION_ELEMENT_NAME)),
                 xmlNode(
                     xmlElement(
+                        USES_SDK_ELEMENT_NAME,
+                        xmlDecimalIntegerAttribute(
+                            ANDROID_NAMESPACE_URI,
+                            TARGET_SDK_VERSION_ATTRIBUTE_NAME,
+                            TARGET_SDK_VERSION_RESOURCE_ID,
+                            34))),
+                xmlNode(
+                    xmlElement(
                         APPLICATION_ELEMENT_NAME,
                         xmlNode(xmlElement(ACTIVITY_ELEMENT_NAME)),
                         xmlNode(xmlElement(SERVICE_ELEMENT_NAME)),
@@ -908,7 +921,18 @@ public class BuildSdkBundleCommandTest {
         .execute();
 
     XmlNode sanitizedManifest =
-        xmlNode(xmlElement("manifest", xmlNode(xmlElement(APPLICATION_ELEMENT_NAME))));
+        xmlNode(
+            xmlElement(
+                "manifest",
+                xmlNode(
+                    xmlElement(
+                        USES_SDK_ELEMENT_NAME,
+                        xmlDecimalIntegerAttribute(
+                            ANDROID_NAMESPACE_URI,
+                            TARGET_SDK_VERSION_ATTRIBUTE_NAME,
+                            TARGET_SDK_VERSION_RESOURCE_ID,
+                            34))),
+                xmlNode(xmlElement(APPLICATION_ELEMENT_NAME))));
     try (ZipFile bundle = new ZipFile(bundlePath.toFile())) {
       ZipEntry modulesEntry = bundle.getEntry("modules.resm");
       Path modulesPath = tmpDir.resolve("modules.resm");
@@ -948,7 +972,7 @@ public class BuildSdkBundleCommandTest {
   private Path createSimpleBaseModule() throws IOException {
     return new ZipBuilder()
         .addFileWithProtoContent(
-            ZipPath.create("manifest/AndroidManifest.xml"), androidManifest(PKG_NAME))
+            ZipPath.create("manifest/AndroidManifest.xml"), androidManifestForSdkBundle(PKG_NAME))
         .writeTo(tmpDir.resolve("base.zip"));
   }
 
@@ -966,7 +990,7 @@ public class BuildSdkBundleCommandTest {
     return new ZipBuilder()
         .addFileWithProtoContent(
             ZipPath.create("manifest/AndroidManifest.xml"),
-            androidManifest(PKG_NAME, manifestMutators))
+            androidManifestForSdkBundle(PKG_NAME, manifestMutators))
         .writeTo(tmpDir.resolve(fileName + ".zip"));
   }
 

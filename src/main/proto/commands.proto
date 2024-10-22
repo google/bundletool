@@ -194,6 +194,13 @@ message AssetModuleMetadata {
 
   // Type of asset module.
   AssetModuleType asset_module_type = 5;
+
+  // Used for conditional delivery of asset modules which controls the overall
+  // delivery of asset modules as a single boolean.
+  // Note that this is different from the AssetsDirectoryTargeting on the asset
+  // slice level. That targeting decides which slice/variant of the asset module
+  // to serve.
+  AssetModuleTargeting targeting = 6;
 }
 
 message InstantMetadata {
@@ -227,6 +234,9 @@ enum AssetModuleType {
   AI_PACK_TYPE = 2;
 }
 
+// This message name is misleading, as it's not exclusively used to describe
+// APKs. It's also used to describe slices of asset modules, which aren't always
+// APKs.
 message ApkDescription {
   ApkTargeting targeting = 1;
 

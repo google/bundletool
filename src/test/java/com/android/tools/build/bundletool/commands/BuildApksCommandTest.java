@@ -27,7 +27,6 @@ import static com.android.tools.build.bundletool.model.OptimizationDimension.ABI
 import static com.android.tools.build.bundletool.model.OptimizationDimension.SCREEN_DENSITY;
 import static com.android.tools.build.bundletool.model.OptimizationDimension.TEXTURE_COMPRESSION_FORMAT;
 import static com.android.tools.build.bundletool.model.utils.BundleParser.EXTRACTED_SDK_MODULES_FILE_NAME;
-import static com.android.tools.build.bundletool.model.utils.Versions.ANDROID_L_API_VERSION;
 import static com.android.tools.build.bundletool.testing.Aapt2Helper.AAPT2_PATH;
 import static com.android.tools.build.bundletool.testing.DeviceFactory.abis;
 import static com.android.tools.build.bundletool.testing.DeviceFactory.createDeviceSpecFile;
@@ -39,6 +38,7 @@ import static com.android.tools.build.bundletool.testing.FakeSystemEnvironmentPr
 import static com.android.tools.build.bundletool.testing.FakeSystemEnvironmentProvider.ANDROID_SERIAL;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifest;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withMinSdkVersion;
+import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withTargetSdkVersion;
 import static com.android.tools.build.bundletool.testing.SdkBundleBuilder.createSdkModulesConfig;
 import static com.android.tools.build.bundletool.testing.TestUtils.addKeyToKeystore;
 import static com.android.tools.build.bundletool.testing.TestUtils.createDebugKeystore;
@@ -1537,7 +1537,6 @@ public class BuildApksCommandTest {
     assertThat(commandViaBuilder.build()).isEqualTo(commandViaFlags);
   }
 
-
   @Test
   public void missingBundleFile_throws() throws Exception {
     Path bundlePath = tmpDir.resolve("bundle.aab");
@@ -2745,6 +2744,65 @@ public class BuildApksCommandTest {
   }
 
   @Test
+  public void appBundleHasSdkDeps_badSdkMinSdkVersion_runsBundleWithSdkModulesValidations_throws()
+      throws Exception {
+    AppBundleBuilder appBundle =
+        new AppBundleBuilder()
+            .addModule(
+                "base",
+                module ->
+                    module
+                        .setManifest(androidManifest("com.app", withMinSdkVersion(31)))
+                        .setRuntimeEnabledSdkConfig(
+                            RuntimeEnabledSdkConfig.newBuilder()
+                                .addRuntimeEnabledSdk(
+                                    RuntimeEnabledSdk.newBuilder()
+                                        .setPackageName("com.test.sdk1")
+                                        .setVersionMajor(1)
+                                        .setVersionMinor(2)
+                                        .setCertificateDigest(VALID_CERT_FINGERPRINT)
+                                        .setResourcesPackageId(2))
+                                .build())
+                        .build());
+    createAppBundle(bundlePath, appBundle.build());
+
+    new SdkBundleSerializer()
+        .writeToDisk(
+            new SdkBundleBuilder()
+                .setSdkModulesConfig(
+                    createSdkModulesConfig()
+                        .setSdkPackageName("com.test.sdk1")
+                        .setSdkVersion(
+                            RuntimeEnabledSdkVersion.newBuilder().setMajor(1).setMinor(2))
+                        .build())
+                .setModule(
+                    new BundleModuleBuilder("base")
+                        .setManifest(
+                            androidManifest(
+                                "com.test.sdk1", withMinSdkVersion(32), withTargetSdkVersion(34)))
+                        .build())
+                .build(),
+            sdkBundlePath1);
+
+    BuildApksCommand command =
+        BuildApksCommand.fromFlags(
+            new FlagParser()
+                .parse(
+                    "--bundle=" + bundlePath,
+                    "--output=" + outputFilePath,
+                    "--sdk-bundles=" + sdkBundlePath1),
+            fakeAdbServer);
+
+    Exception e = assertThrows(InvalidBundleException.class, command::execute);
+    assertThat(e)
+        .hasMessageThat()
+        .contains(
+            "Runtime-enabled SDKs must have a minSdkVersion lower than the app, but found  SDK"
+                + " 'com.test.sdk1' with minSdkVersion (32) higher than the app's minSdkVersion"
+                + " (31).");
+  }
+
+  @Test
   public void buildApks_fromAppBundleWithRuntimeEnabledSdkDeps_succeeds() throws Exception {
     createSdkBundle(sdkBundlePath1, "com.test.sdk1", /* majorVersion= */ 1, /* minorVersion= */ 2);
     createSdkBundle(sdkBundlePath2, "com.test.sdk2", /* majorVersion= */ 2, /* minorVersion= */ 0);
@@ -2783,7 +2841,7 @@ public class BuildApksCommandTest {
 
     Variant nonSdkRuntimeVariant = buildApksResult.getVariant(0);
     assertThat(nonSdkRuntimeVariant.getTargeting())
-        .isEqualTo(TargetingUtils.variantSdkTargeting(ANDROID_L_API_VERSION));
+        .isEqualTo(TargetingUtils.variantSdkTargeting(33));
     // non-sdk-runtime variant contains additional modules - one per SDK dependency.
     assertThat(nonSdkRuntimeVariant.getApkSetCount()).isEqualTo(3);
     assertThat(
@@ -2869,8 +2927,7 @@ public class BuildApksCommandTest {
                 "base",
                 module ->
                     module
-                        .setManifest(
-                            androidManifest("com.app", withMinSdkVersion(ANDROID_L_API_VERSION)))
+                        .setManifest(androidManifest("com.app", withMinSdkVersion(33)))
                         .setRuntimeEnabledSdkConfig(runtimeEnabledSdkConfig)
                         .build());
     createAppBundle(path, appBundle.build());

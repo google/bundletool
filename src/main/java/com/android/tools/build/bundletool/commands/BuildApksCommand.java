@@ -920,6 +920,7 @@ public abstract class BuildApksCommand {
       bundleValidator.validate(appBundle);
       ImmutableMap<String, BundleModule> sdkBundleModules =
           getValidatedSdkModules(closer, tempDir, appBundle);
+      bundleValidator.validateBundleWithSdkModules(appBundle, sdkBundleModules);
 
       AppBundlePreprocessorManager appBundlePreprocessorManager =
           DaggerAppBundlePreprocessorComponent.builder()

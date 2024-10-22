@@ -20,43 +20,57 @@ import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import com.android.tools.build.bundletool.model.exceptions.CommandExecutionException;
 import com.android.tools.build.bundletool.model.utils.files.BufferedIo;
 import com.google.common.collect.ImmutableList;
-import com.google.common.io.CharStreams;
+import com.google.common.io.LineReader;
 import java.io.BufferedReader;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.PrintStream;
 import java.io.UncheckedIOException;
+import java.lang.ProcessBuilder.Redirect;
+import java.util.ArrayList;
+import java.util.List;
 
 /** Helper to execute native commands. */
 public final class DefaultCommandExecutor implements CommandExecutor {
 
   @Override
   public void execute(ImmutableList<String> command, CommandOptions options) {
-    executeImpl(command, options);
+    ImmutableList<String> capturedOutput = executeImpl(command, options);
+    printOutput(capturedOutput, System.out);
   }
 
   @Override
   public ImmutableList<String> executeAndCapture(
       ImmutableList<String> command, CommandOptions options) {
-    return captureOutput(executeImpl(command, options));
+    return executeImpl(command, options);
   }
 
-  private static Process executeImpl(ImmutableList<String> command, CommandOptions options) {
+  private static ImmutableList<String> executeImpl(
+      ImmutableList<String> command, CommandOptions options) {
     try {
-      Process process = new ProcessBuilder(command).redirectErrorStream(true).start();
+      Process process =
+          new ProcessBuilder(command)
+              .redirectOutput(Redirect.PIPE)
+              .redirectErrorStream(true)
+              .start();
+
+      OutputCapturer outputCapturer = OutputCapturer.startCapture(process.getInputStream());
+
       if (!process.waitFor(options.getTimeout().toMillis(), MILLISECONDS)) {
-        printOutput(process);
+        printOutput(outputCapturer.getOutput(/* interrupt= */ true), System.err);
         throw CommandExecutionException.builder()
             .withInternalMessage("Command timed out: %s", command)
             .build();
       }
       if (process.exitValue() != 0) {
-        printOutput(process);
+        printOutput(outputCapturer.getOutput(/* interrupt= */ true), System.err);
         throw CommandExecutionException.builder()
             .withInternalMessage(
                 "Command '%s' didn't terminate successfully (exit code: %d). Check the logs.",
                 command, process.exitValue())
             .build();
       }
-      return process;
+      return outputCapturer.getOutput(/* interrupt= */ false);
     } catch (IOException | InterruptedException e) {
       throw CommandExecutionException.builder()
           .withInternalMessage("Error when executing command: %s", command)
@@ -65,22 +79,48 @@ public final class DefaultCommandExecutor implements CommandExecutor {
     }
   }
 
-  private static ImmutableList<String> captureOutput(Process process) {
-    try (BufferedReader outputReader = BufferedIo.reader(process.getInputStream())) {
-      return ImmutableList.copyOf(CharStreams.readLines(outputReader));
-    } catch (IOException e) {
-      throw new UncheckedIOException(e);
+  static class OutputCapturer {
+    private final Thread thread;
+    private final List<String> output;
+    private final InputStream stream;
+
+    private OutputCapturer(Thread thread, List<String> output, InputStream stream) {
+      this.thread = thread;
+      this.output = output;
+      this.stream = stream;
+    }
+
+    static OutputCapturer startCapture(InputStream stream) {
+      List<String> output = new ArrayList<>();
+      Thread thread =
+          new Thread(
+              () -> {
+                try (BufferedReader reader = BufferedIo.reader(stream)) {
+                  LineReader lineReader = new LineReader(reader);
+                  String line;
+                  while ((line = lineReader.readLine()) != null) {
+                    output.add(line);
+                  }
+                } catch (IOException e) {
+                  throw new UncheckedIOException(e);
+                }
+              });
+      thread.start();
+      return new OutputCapturer(thread, output, stream);
+    }
+
+    ImmutableList<String> getOutput(boolean interrupt) throws InterruptedException, IOException {
+      if (interrupt) {
+        stream.close();
+      }
+      thread.join();
+      return ImmutableList.copyOf(output);
     }
   }
 
-  private static void printOutput(Process process) {
-    try (BufferedReader outputReader = BufferedIo.reader(process.getInputStream())) {
-      String line;
-      while ((line = outputReader.readLine()) != null) {
-        System.err.println(line);
-      }
-    } catch (IOException e) {
-      System.err.println("Error when printing output of command:" + e.getMessage());
+  private static void printOutput(List<String> output, PrintStream stream) {
+    for (String line : output) {
+      stream.println(line);
     }
   }
 }

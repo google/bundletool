@@ -619,7 +619,6 @@ public class BuildSdkApksCommandTest {
     assertThat(command.getVerbose()).isFalse();
   }
 
-
   private ParsedFlags getDefaultFlagsWithAdditionalFlags(String... additionalFlags) {
     String[] flags =
         Stream.concat(getDefaultFlagList().stream(), stream(additionalFlags))

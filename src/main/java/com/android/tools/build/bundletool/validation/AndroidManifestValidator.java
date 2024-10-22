@@ -58,6 +58,7 @@ public class AndroidManifestValidator extends SubValidator {
     validateTargetSandboxVersion(modules);
     validateTcfTargetingNotMixedWithSupportsGlTexture(modules);
     validateConditionalModulesAreRemovable(modules);
+    validateSharedUserId(modules);
     if (!BundleValidationUtils.isAssetOnlyBundle(modules)) {
       validateInstant(modules);
       validateMinSdk(modules);
@@ -201,6 +202,16 @@ public class AndroidManifestValidator extends SubValidator {
     if (hasConditionalAndPermanent) {
       throw InvalidBundleException.builder()
           .withUserMessage("Conditional modules cannot be set to non-removable.")
+          .build();
+    }
+  }
+
+  /** Checks that sharedUserId is not used in a runtime-enabled app. */
+  private static void validateSharedUserId(ImmutableList<BundleModule> modules) {
+    if (modules.stream().anyMatch(module -> module.getAndroidManifest().hasSharedUserId())
+        && modules.stream().anyMatch(module -> module.getRuntimeEnabledSdkConfig().isPresent())) {
+      throw InvalidBundleException.builder()
+          .withUserMessage("'sharedUserId' cannot be used with runtime-enabled SDKs.")
           .build();
     }
   }

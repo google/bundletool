@@ -22,6 +22,7 @@ import static com.google.common.base.Predicates.not;
 
 import com.android.tools.build.bundletool.model.ZipPath;
 import com.google.common.base.Optional;
+import com.google.common.collect.ImmutableList;
 import com.google.common.io.ByteSource;
 import java.io.IOException;
 import java.io.InputStream;
@@ -30,12 +31,27 @@ import java.nio.file.Path;
 import java.util.stream.Stream;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
+import java.util.zip.ZipInputStream;
 
 /** Misc utilities for working with zip files. */
 public final class ZipUtils {
 
   public static Stream<ZipPath> allFileEntriesPaths(ZipFile zipFile) {
     return allFileEntries(zipFile).map(zipEntry -> ZipPath.create(zipEntry.getName()));
+  }
+
+  public static ImmutableList<ZipPath> allFileEntriesPaths(ZipInputStream zipInputStream) {
+    ImmutableList.Builder<ZipPath> listBuilder = new ImmutableList.Builder<>();
+    try {
+      ZipEntry zipEntry;
+      while ((zipEntry = zipInputStream.getNextEntry()) != null) {
+        listBuilder.add(ZipPath.create(zipEntry.getName()));
+      }
+    } catch (IOException e) {
+      throw new UncheckedIOException(
+          String.format("Error reading zip file '%s'.", zipInputStream), e);
+    }
+    return listBuilder.build();
   }
 
   public static Stream<? extends ZipEntry> allFileEntries(ZipFile zipFile) {

@@ -364,7 +364,6 @@ public final class BuildApksManager {
         .getMinSdkForAdditionalVariantWithV3Rotation()
         .ifPresent(apkGenerationConfiguration::setMinSdkForAdditionalVariantWithV3Rotation);
 
-
     return apkGenerationConfiguration;
   }
 

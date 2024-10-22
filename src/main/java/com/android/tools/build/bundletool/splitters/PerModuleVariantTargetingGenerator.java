@@ -74,7 +74,6 @@ public final class PerModuleVariantTargetingGenerator {
         unused -> Stream.of(lPlusVariantTargeting()),
         new NativeLibsCompressionVariantGenerator(apkGenerationConfiguration),
         new DexCompressionVariantGenerator(apkGenerationConfiguration),
-        new RequiredSplitTypesVariantGenerator(apkGenerationConfiguration),
         new SigningConfigurationVariantGenerator(apkGenerationConfiguration),
         new SparseEncodingVariantGenerator(apkGenerationConfiguration));
   }

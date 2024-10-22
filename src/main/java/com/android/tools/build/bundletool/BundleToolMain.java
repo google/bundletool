@@ -25,6 +25,7 @@ import com.android.tools.build.bundletool.commands.BuildSdkBundleCommand;
 import com.android.tools.build.bundletool.commands.CheckTransparencyCommand;
 import com.android.tools.build.bundletool.commands.CommandHelp;
 import com.android.tools.build.bundletool.commands.DumpCommand;
+import com.android.tools.build.bundletool.commands.DumpSdkBundleCommand;
 import com.android.tools.build.bundletool.commands.EvaluateDeviceTargetingConfigCommand;
 import com.android.tools.build.bundletool.commands.ExtractApksCommand;
 import com.android.tools.build.bundletool.commands.GetDeviceSpecCommand;
@@ -47,7 +48,7 @@ import java.util.Optional;
  *
  * <p>Consider running with -Dsun.zip.disableMemoryMapping when dealing with large bundles.
  */
-public class BundleToolMain {
+public final class BundleToolMain {
 
   public static final String HELP_CMD = "help";
 
@@ -127,6 +128,9 @@ public class BundleToolMain {
           break;
         case DumpCommand.COMMAND_NAME:
           DumpCommand.fromFlags(flags).execute();
+          break;
+        case DumpSdkBundleCommand.COMMAND_NAME:
+          DumpSdkBundleCommand.fromFlags(flags).execute();
           break;
         case GetSizeCommand.COMMAND_NAME:
           GetSizeCommand.fromFlags(flags).execute();
@@ -259,4 +263,6 @@ public class BundleToolMain {
 
     commandHelp.printDetails(System.out);
   }
+
+  private BundleToolMain() {}
 }

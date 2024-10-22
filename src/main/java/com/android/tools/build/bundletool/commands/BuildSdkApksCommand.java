@@ -98,7 +98,7 @@ public abstract class BuildSdkApksCommand {
 
   abstract Optional<Path> getSdkArchivePath();
 
-  abstract Integer getVersionCode();
+  abstract int getVersionCode();
 
   abstract Path getOutputFile();
 
@@ -126,7 +126,6 @@ public abstract class BuildSdkApksCommand {
 
   public abstract Optional<Integer> getFirstVariantNumber();
 
-
   public abstract Optional<Integer> getMinSdkVersion();
 
   /** Creates a builder for the {@link BuildSdkApksCommand} with some default settings. */
@@ -150,7 +149,7 @@ public abstract class BuildSdkApksCommand {
     public abstract Builder setSdkArchivePath(Path sdkArchivePath);
 
     /** Sets the SDK version code */
-    public abstract Builder setVersionCode(Integer versionCode);
+    public abstract Builder setVersionCode(int versionCode);
 
     /**
      * Sets path to the output produced by the command. Depends on the output format:
@@ -233,7 +232,6 @@ public abstract class BuildSdkApksCommand {
      * here, the variants will be numbered from {@code firstVariantNumber} and up.
      */
     public abstract Builder setFirstVariantNumber(int firstVariantNumber);
-
 
     /** Overrides value of android:minSdkVersion attribute in the generated APKs. */
     public abstract Builder setMinSdkVersion(int minSdkVersion);

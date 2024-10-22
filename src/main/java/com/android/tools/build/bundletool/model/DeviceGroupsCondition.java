@@ -15,6 +15,7 @@
  */
 package com.android.tools.build.bundletool.model;
 
+import com.android.bundle.Targeting.DeviceGroupModuleTargeting;
 import com.google.auto.value.AutoValue;
 import com.google.common.collect.ImmutableSet;
 import com.google.errorprone.annotations.Immutable;
@@ -27,5 +28,9 @@ public abstract class DeviceGroupsCondition {
 
   public static DeviceGroupsCondition create(ImmutableSet<String> deviceGroups) {
     return new AutoValue_DeviceGroupsCondition(deviceGroups);
+  }
+
+  public DeviceGroupModuleTargeting toTargeting() {
+    return DeviceGroupModuleTargeting.newBuilder().addAllValue(getDeviceGroups()).build();
   }
 }

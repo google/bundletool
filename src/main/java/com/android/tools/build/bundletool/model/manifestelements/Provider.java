@@ -24,11 +24,13 @@ import static com.android.tools.build.bundletool.model.AndroidManifest.NAME_ATTR
 import static com.android.tools.build.bundletool.model.AndroidManifest.NAME_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.AndroidManifest.PROVIDER_ELEMENT_NAME;
 
+import com.android.tools.build.bundletool.model.utils.xmlproto.XmlProtoAttribute;
 import com.android.tools.build.bundletool.model.utils.xmlproto.XmlProtoElement;
 import com.android.tools.build.bundletool.model.utils.xmlproto.XmlProtoElementBuilder;
 import com.google.auto.value.AutoValue;
 import com.google.auto.value.extension.memoized.Memoized;
 import com.google.common.collect.ImmutableList;
+import com.google.errorprone.annotations.CanIgnoreReturnValue;
 import com.google.errorprone.annotations.Immutable;
 import java.util.Optional;
 
@@ -47,8 +49,10 @@ public abstract class Provider {
 
   abstract Optional<ImmutableList<String>> getAuthorities();
 
+  abstract ImmutableList<XmlProtoAttribute> getExtraAttributes();
+
   public static Builder builder() {
-    return new AutoValue_Provider.Builder();
+    return new AutoValue_Provider.Builder().setExtraAttributes(ImmutableList.of());
   }
 
   @Memoized
@@ -57,6 +61,7 @@ public abstract class Provider {
     setNameAttribute(elementBuilder);
     setExportedAttribute(elementBuilder);
     setAuthoritiesAttribute(elementBuilder);
+    addExtraAttributes(elementBuilder);
     return elementBuilder.build();
   }
 
@@ -84,6 +89,11 @@ public abstract class Provider {
     }
   }
 
+  @CanIgnoreReturnValue
+  private XmlProtoElementBuilder addExtraAttributes(XmlProtoElementBuilder elementBuilder) {
+    return elementBuilder.addAllAttribute(getExtraAttributes());
+  }
+
   /** Builder for Activity. */
   @AutoValue.Builder
   public abstract static class Builder {
@@ -92,6 +102,8 @@ public abstract class Provider {
     public abstract Builder setExported(boolean exported);
 
     public abstract Builder setAuthorities(ImmutableList<String> authorities);
+
+    public abstract Builder setExtraAttributes(ImmutableList<XmlProtoAttribute> attributes);
 
     public abstract Provider build();
   }

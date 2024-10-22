@@ -102,6 +102,7 @@ import com.android.aapt.Resources.XmlElement;
 import com.android.aapt.Resources.XmlNamespace;
 import com.android.aapt.Resources.XmlNode;
 import com.android.bundle.Commands.DeliveryType;
+import com.android.bundle.Targeting.AssetModuleTargeting;
 import com.android.tools.build.bundletool.model.AndroidManifest;
 import com.android.tools.build.bundletool.model.utils.xmlproto.XmlProtoAttributeBuilder;
 import com.android.tools.build.bundletool.model.utils.xmlproto.XmlProtoElementBuilder;
@@ -313,6 +314,16 @@ public final class ManifestProtoUtils {
       manifestMutator.accept(xmlProtoNode.getElement());
     }
     return xmlProtoNode.build().getProto();
+  }
+
+  public static XmlNode androidManifestForSdkBundle(
+      String packageName, ManifestMutator... manifestMutators) {
+    return androidManifest(
+        packageName,
+        ObjectArrays.concat(
+            new ManifestMutator[] {withTargetSdkVersion(34)},
+            manifestMutators,
+            ManifestMutator.class));
   }
 
   public static XmlNode androidManifestForFeature(
@@ -535,6 +546,32 @@ public final class ManifestProtoUtils {
       default:
         return withEmptyDeliveryElement();
     }
+  }
+
+  public static ManifestMutator withAssetModuleTargeting(AssetModuleTargeting targeting) {
+    return manifestElement ->
+        manifestElement
+            .getOrCreateChildElement(DISTRIBUTION_NAMESPACE_URI, "module")
+            .getOrCreateChildElement(DISTRIBUTION_NAMESPACE_URI, "delivery")
+            .getOrCreateChildElement(DISTRIBUTION_NAMESPACE_URI, "conditions")
+            .addChildElement(
+                createDeviceGroupElement(
+                    ImmutableList.copyOf(targeting.getDeviceGroupTargeting().getValueList())))
+            .addChildElement(
+                createUserCountriesCondition(
+                    ImmutableList.copyOf(
+                        targeting.getUserCountriesTargeting().getCountryCodesList()),
+                    Optional.of(targeting.getUserCountriesTargeting().getExclude())));
+  }
+
+  public static ManifestMutator withUnsupportedAssetModuleTargeting() {
+    return manifestElement ->
+        manifestElement
+            .getOrCreateChildElement(DISTRIBUTION_NAMESPACE_URI, "module")
+            .getOrCreateChildElement(DISTRIBUTION_NAMESPACE_URI, "delivery")
+            .getOrCreateChildElement(DISTRIBUTION_NAMESPACE_URI, "conditions")
+            .addChildElement(
+                XmlProtoElementBuilder.create(DISTRIBUTION_NAMESPACE_URI, "unsupportedCondition"));
   }
 
   /** Adds the instant attribute under the dist:module tag. */
@@ -917,6 +954,19 @@ public final class ManifestProtoUtils {
   }
 
   public static ManifestMutator withDeviceGroupsCondition(ImmutableList<String> deviceGroups) {
+    XmlProtoElementBuilder deviceGroupsElement = createDeviceGroupElement(deviceGroups);
+
+    return manifestElement ->
+        manifestElement
+            .getOrCreateChildElement(DISTRIBUTION_NAMESPACE_URI, "module")
+            .getOrCreateChildElement(DISTRIBUTION_NAMESPACE_URI, "delivery")
+            .getOrCreateChildElement(DISTRIBUTION_NAMESPACE_URI, "install-time")
+            .getOrCreateChildElement(DISTRIBUTION_NAMESPACE_URI, "conditions")
+            .addChildElement(deviceGroupsElement);
+  }
+
+  private static XmlProtoElementBuilder createDeviceGroupElement(
+      ImmutableList<String> deviceGroups) {
     XmlProtoElementBuilder deviceGroupsElement =
         XmlProtoElementBuilder.create(DISTRIBUTION_NAMESPACE_URI, CONDITION_DEVICE_GROUPS_NAME);
 
@@ -927,14 +977,7 @@ public final class ManifestProtoUtils {
                   XmlProtoAttributeBuilder.create(DISTRIBUTION_NAMESPACE_URI, NAME_ATTRIBUTE_NAME)
                       .setValueAsString(deviceGroup)));
     }
-
-    return manifestElement ->
-        manifestElement
-            .getOrCreateChildElement(DISTRIBUTION_NAMESPACE_URI, "module")
-            .getOrCreateChildElement(DISTRIBUTION_NAMESPACE_URI, "delivery")
-            .getOrCreateChildElement(DISTRIBUTION_NAMESPACE_URI, "install-time")
-            .getOrCreateChildElement(DISTRIBUTION_NAMESPACE_URI, "conditions")
-            .addChildElement(deviceGroupsElement);
+    return deviceGroupsElement;
   }
 
   /**
@@ -971,6 +1014,19 @@ public final class ManifestProtoUtils {
 
   private static ManifestMutator withUserCountriesConditionInternal(
       ImmutableList<String> codes, Optional<Boolean> exclude) {
+    XmlProtoElementBuilder userCountries = createUserCountriesCondition(codes, exclude);
+
+    return manifestElement ->
+        manifestElement
+            .getOrCreateChildElement(DISTRIBUTION_NAMESPACE_URI, "module")
+            .getOrCreateChildElement(DISTRIBUTION_NAMESPACE_URI, "delivery")
+            .getOrCreateChildElement(DISTRIBUTION_NAMESPACE_URI, "install-time")
+            .getOrCreateChildElement(DISTRIBUTION_NAMESPACE_URI, "conditions")
+            .addChildElement(userCountries);
+  }
+
+  private static XmlProtoElementBuilder createUserCountriesCondition(
+      ImmutableList<String> codes, Optional<Boolean> exclude) {
     XmlProtoElementBuilder userCountries =
         XmlProtoElementBuilder.create(DISTRIBUTION_NAMESPACE_URI, "user-countries");
 
@@ -987,14 +1043,7 @@ public final class ManifestProtoUtils {
                   XmlProtoAttributeBuilder.create(DISTRIBUTION_NAMESPACE_URI, "code")
                       .setValueAsString(countryCode)));
     }
-
-    return manifestElement ->
-        manifestElement
-            .getOrCreateChildElement(DISTRIBUTION_NAMESPACE_URI, "module")
-            .getOrCreateChildElement(DISTRIBUTION_NAMESPACE_URI, "delivery")
-            .getOrCreateChildElement(DISTRIBUTION_NAMESPACE_URI, "install-time")
-            .getOrCreateChildElement(DISTRIBUTION_NAMESPACE_URI, "conditions")
-            .addChildElement(userCountries);
+    return userCountries;
   }
 
   public static ManifestMutator withUnsupportedCondition() {

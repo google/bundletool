@@ -109,10 +109,8 @@ public final class SplitApksGenerator {
             .map(BundleModule::getName)
             .collect(toImmutableList());
 
-    // Feature flag for enabling the system validation on T+. Remove after b/199376532.
-    boolean enableSystemAttribute = commonApkGenerationConfiguration.getEnableRequiredSplitTypes();
     return RequiredSplitTypesInjector.injectSplitTypeValidation(
-        splits.build(), nonRemovableModules, enableSystemAttribute);
+        splits.build(), nonRemovableModules);
   }
 
   private ImmutableList<BundleModule> getModulesForVariant(

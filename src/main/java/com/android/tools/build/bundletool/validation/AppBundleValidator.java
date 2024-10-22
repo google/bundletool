@@ -17,8 +17,10 @@
 package com.android.tools.build.bundletool.validation;
 
 import com.android.tools.build.bundletool.model.AppBundle;
+import com.android.tools.build.bundletool.model.BundleModule;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 import java.util.zip.ZipFile;
 
 /** Validates the files and configuration for the bundle. */
@@ -63,6 +65,7 @@ public class AppBundleValidator {
           new AssetModuleFilesValidator(),
           new CodeTransparencyValidator(),
           new RuntimeEnabledSdkConfigValidator(),
+          new RuntimeEnabledSdkManifestCompatibilityValidator(),
           new DeclarativeWatchFaceBundleValidator(),
           new StandaloneFeatureModulesValidator());
 
@@ -95,7 +98,7 @@ public class AppBundleValidator {
   }
 
   /**
-   * Validates the given App Bundle zip file.
+   * Validates the given app bundle zip file.
    *
    * <p>Note that this method performs different checks than {@link #validate(AppBundle)}.
    */
@@ -104,7 +107,7 @@ public class AppBundleValidator {
   }
 
   /**
-   * Validates the given App Bundle.
+   * Validates the given app bundle.
    *
    * <p>Note that this method performs different checks than {@link #validateFile(ZipFile)}.
    *
@@ -112,5 +115,13 @@ public class AppBundleValidator {
    */
   public void validate(AppBundle bundle) {
     new ValidatorRunner(allBundleSubValidators).validateBundle(bundle);
+  }
+
+  /**
+   * Validates the given app bundle in combination with the SDK bundles/archives the app depends on.
+   */
+  public void validateBundleWithSdkModules(
+      AppBundle bundle, ImmutableMap<String, BundleModule> sdkModules) {
+    new ValidatorRunner(allBundleSubValidators).validateBundleWithSdkModules(bundle, sdkModules);
   }
 }

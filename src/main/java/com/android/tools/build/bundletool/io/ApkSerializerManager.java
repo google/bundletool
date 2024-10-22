@@ -406,6 +406,10 @@ public class ApkSerializerManager {
         persistentDelivery
             .map(delivery -> getDeliveryType(delivery))
             .orElse(DeliveryType.INSTALL_TIME));
+    persistentDelivery
+        .map(ManifestDeliveryElement::getAssetModuleConditions)
+        .ifPresent(metadataBuilder::setTargeting);
+
     // The module is instant if either the dist:instant attribute is true or the
     // dist:instant-delivery element is present.
     boolean isInstantModule = module.isInstantModule();

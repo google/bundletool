@@ -26,6 +26,7 @@ import com.android.bundle.Targeting.AbiTargeting;
 import com.android.bundle.Targeting.ApkTargeting;
 import com.android.bundle.Targeting.AssetsDirectoryTargeting;
 import com.android.bundle.Targeting.CountrySetTargeting;
+import com.android.bundle.Targeting.DeviceGroupTargeting;
 import com.android.bundle.Targeting.DeviceTierTargeting;
 import com.android.bundle.Targeting.LanguageTargeting;
 import com.android.bundle.Targeting.MultiAbi;
@@ -99,6 +100,10 @@ public final class TargetingNormalizer {
       normalized.setCountrySetTargeting(
           normalizeCountrySetTargeting(targeting.getCountrySetTargeting()));
     }
+    if (targeting.hasDeviceGroupTargeting()) {
+      normalized.setDeviceGroupTargeting(
+          normalizeDeviceGroupTargeting(targeting.getDeviceGroupTargeting()));
+    }
     return normalized.build();
   }
 
@@ -144,6 +149,9 @@ public final class TargetingNormalizer {
     if (targeting.hasTextureCompressionFormat()) {
       normalized.setTextureCompressionFormat(
           normalizeTextureCompressionFormatTargeting(targeting.getTextureCompressionFormat()));
+    }
+    if (targeting.hasDeviceGroup()) {
+      normalized.setDeviceGroup(normalizeDeviceGroupTargeting(targeting.getDeviceGroup()));
     }
     return normalized.build();
   }
@@ -229,6 +237,14 @@ public final class TargetingNormalizer {
 
   private static CountrySetTargeting normalizeCountrySetTargeting(CountrySetTargeting targeting) {
     return CountrySetTargeting.newBuilder()
+        .addAllValue(sortedCopyOf(targeting.getValueList()))
+        .addAllAlternatives(sortedCopyOf(targeting.getAlternativesList()))
+        .build();
+  }
+
+  private static DeviceGroupTargeting normalizeDeviceGroupTargeting(
+      DeviceGroupTargeting targeting) {
+    return DeviceGroupTargeting.newBuilder()
         .addAllValue(sortedCopyOf(targeting.getValueList()))
         .addAllAlternatives(sortedCopyOf(targeting.getAlternativesList()))
         .build();

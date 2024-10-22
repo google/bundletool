@@ -44,7 +44,7 @@ public abstract class ValidateBundleCommand {
 
   public abstract Path getBundlePath();
 
-  public abstract Boolean getPrintOutput();
+  public abstract boolean getPrintOutput();
 
   public static Builder builder() {
     return new AutoValue_ValidateBundleCommand.Builder().setPrintOutput(false);
@@ -55,7 +55,7 @@ public abstract class ValidateBundleCommand {
   public abstract static class Builder {
     public abstract Builder setBundlePath(Path bundlePath);
 
-    public abstract Builder setPrintOutput(Boolean printOutput);
+    public abstract Builder setPrintOutput(boolean printOutput);
 
     public abstract ValidateBundleCommand build();
   }

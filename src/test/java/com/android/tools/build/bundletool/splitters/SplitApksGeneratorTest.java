@@ -16,10 +16,8 @@
 
 package com.android.tools.build.bundletool.splitters;
 
-import static com.android.tools.build.bundletool.model.AndroidManifest.DISTRIBUTION_NAMESPACE_URI;
 import static com.android.tools.build.bundletool.model.AndroidManifest.REQUIRED_SPLIT_TYPES_ATTRIBUTE_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.REQUIRED_SPLIT_TYPES_RESOURCE_ID;
-import static com.android.tools.build.bundletool.model.AndroidManifest.SPLIT_TYPES_ATTRIBUTE_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.SPLIT_TYPES_RESOURCE_ID;
 import static com.android.tools.build.bundletool.model.utils.Versions.ANDROID_L_API_VERSION;
 import static com.android.tools.build.bundletool.model.utils.Versions.ANDROID_M_API_VERSION;
@@ -215,102 +213,6 @@ public class SplitApksGeneratorTest {
     assertThat(getProvidedSplitTypes(testModule)).containsExactly("test__module");
 
     assertConsistentRequiredSplitTypes(moduleSplits);
-  }
-
-  @Test
-  public void simpleMultipleModules_withRequiredSplitTypes_experimentalTPlusVariant()
-      throws Exception {
-    TestComponent.useTestModule(this, TestModule.builder().build());
-    ImmutableList<BundleModule> bundleModule =
-        ImmutableList.of(
-            new BundleModuleBuilder("base")
-                .addFile("assets/leftover.txt")
-                .setManifest(androidManifest("com.test.app"))
-                .build(),
-            new BundleModuleBuilder("test")
-                .addFile("assets/test.txt")
-                .setManifest(androidManifest("com.test.app"))
-                .build());
-
-    ImmutableList<ModuleSplit> moduleSplits =
-        splitApksGenerator.generateSplits(
-            bundleModule,
-            ApkGenerationConfiguration.builder().setEnableRequiredSplitTypes(true).build());
-
-    assertThat(moduleSplits).hasSize(4);
-    ImmutableMap<String, ModuleSplit> moduleSplitMap =
-        Maps.uniqueIndex(
-            moduleSplits,
-            split ->
-                String.format(
-                    "%s:%s",
-                    split.getModuleName().getName(),
-                    split
-                        .getVariantTargeting()
-                        .getSdkVersionTargeting()
-                        .getValue(0)
-                        .getMin()
-                        .getValue()));
-
-    assertThat(moduleSplitMap.keySet()).containsExactly("base:21", "test:21", "base:33", "test:33");
-
-    ModuleSplit baseModule = moduleSplitMap.get("base:21");
-    assertThat(baseModule).isNotNull();
-    assertThat(getRequiredSplitTypes(baseModule)).containsExactly("test__module");
-    assertThat(getProvidedSplitTypes(baseModule)).isEmpty();
-
-    ModuleSplit testModule = moduleSplitMap.get("test:21");
-    assertThat(testModule).isNotNull();
-    assertThat(getRequiredSplitTypes(testModule)).isEmpty();
-    assertThat(getProvidedSplitTypes(testModule)).containsExactly("test__module");
-
-    // TODO(b/199376532): Remove once system required split type attributes are enabled.
-    ModuleSplit baseModuleTPlus = moduleSplitMap.get("base:33");
-    assertThat(baseModuleTPlus).isNotNull();
-    assertThat(getRequiredSplitTypes(baseModuleTPlus)).containsExactly("test__module");
-    assertThat(getProvidedSplitTypes(baseModuleTPlus)).isEmpty();
-    ModuleSplit testModuleTPlus = moduleSplitMap.get("test:33");
-    assertThat(testModuleTPlus).isNotNull();
-    assertThat(getRequiredSplitTypes(testModuleTPlus)).isEmpty();
-    assertThat(getProvidedSplitTypes(testModuleTPlus)).containsExactly("test__module");
-
-    assertConsistentRequiredSplitTypes(moduleSplits);
-  }
-
-  @Test
-  public void simpleMultipleModules_withoutRequiredSplitTypes() throws Exception {
-    TestComponent.useTestModule(this, TestModule.builder().build());
-    ImmutableList<BundleModule> bundleModule =
-        ImmutableList.of(
-            new BundleModuleBuilder("base")
-                .addFile("assets/leftover.txt")
-                .setManifest(androidManifest("com.test.app"))
-                .build(),
-            new BundleModuleBuilder("test")
-                .addFile("assets/test.txt")
-                .setManifest(androidManifest("com.test.app"))
-                .build());
-
-    ImmutableList<ModuleSplit> moduleSplits =
-        splitApksGenerator.generateSplits(
-            bundleModule,
-            ApkGenerationConfiguration.builder().setEnableRequiredSplitTypes(false).build());
-
-    assertThat(moduleSplits).hasSize(2);
-    for (ModuleSplit moduleSplit : moduleSplits) {
-      assertThat(
-              moduleSplit
-                  .getAndroidManifest()
-                  .getManifestElement()
-                  .getAndroidAttribute(SPLIT_TYPES_RESOURCE_ID))
-          .isEmpty();
-      assertThat(
-              moduleSplit
-                  .getAndroidManifest()
-                  .getManifestElement()
-                  .getAndroidAttribute(REQUIRED_SPLIT_TYPES_RESOURCE_ID))
-          .isEmpty();
-    }
   }
 
   @Test
@@ -804,132 +706,6 @@ public class SplitApksGeneratorTest {
             appBundleWithRuntimeEnabledSdkDeps.getModules().values().asList(),
             ApkGenerationConfiguration.builder()
                 .setOptimizationDimensions(ImmutableSet.of(OptimizationDimension.SCREEN_DENSITY))
-                .setEnableRequiredSplitTypes(false)
-                .build());
-
-    assertThat(
-            moduleSplits.stream().map(ModuleSplit::getVariantTargeting).collect(toImmutableSet()))
-        .containsExactly(
-            lPlusVariantTargeting(), sdkRuntimeVariantTargeting(ANDROID_U_API_VERSION));
-    ImmutableMap<VariantTargeting, Collection<ModuleSplit>> moduleSplitMap =
-        moduleSplits.stream()
-            .collect(toImmutableListMultimap(ModuleSplit::getVariantTargeting, Function.identity()))
-            .asMap();
-    assertThat(
-            moduleSplitMap.get(lPlusVariantTargeting()).stream()
-                .map(ModuleSplit::getModuleName)
-                .map(BundleModuleName::getName)
-                .distinct())
-        .containsExactly("base", "comtestsdk");
-    ImmutableSet<ModuleSplit> sdkModuleSplits =
-        moduleSplitMap.get(lPlusVariantTargeting()).stream()
-            .filter(moduleSplit -> moduleSplit.getModuleName().getName().equals("comtestsdk"))
-            .collect(toImmutableSet());
-    // Only main split for SDK dependency module - no config splits.
-    assertThat(sdkModuleSplits).hasSize(1);
-    assertThat(
-            Iterables.getOnlyElement(sdkModuleSplits).getApkTargeting().hasScreenDensityTargeting())
-        .isFalse();
-    ImmutableSet<ModuleSplit> nonSdkRuntimeVariantBaseModuleSplits =
-        moduleSplitMap.get(lPlusVariantTargeting()).stream()
-            .filter(moduleSplit -> moduleSplit.getModuleName().getName().equals("base"))
-            .collect(toImmutableSet());
-    // 1 main split + 7 config splits: 1 per each screen density.
-    assertThat(nonSdkRuntimeVariantBaseModuleSplits).hasSize(8);
-    assertThat(
-            moduleSplitMap.get(sdkRuntimeVariantTargeting(ANDROID_U_API_VERSION)).stream()
-                .map(ModuleSplit::getModuleName)
-                .map(BundleModuleName::getName)
-                .distinct())
-        .containsExactly("base");
-    ImmutableSet<ModuleSplit> sdkRuntimeVariantSplits =
-        moduleSplitMap.get(sdkRuntimeVariantTargeting(ANDROID_U_API_VERSION)).stream()
-            .filter(moduleSplit -> moduleSplit.getModuleName().getName().equals("base"))
-            .collect(toImmutableSet());
-    // 1 main split + 7 config splits: 1 per each screen density.
-    assertThat(sdkRuntimeVariantSplits).hasSize(8);
-
-    for (ModuleSplit moduleSplit : moduleSplits) {
-      assertThat(
-              moduleSplit
-                  .getAndroidManifest()
-                  .getManifestElement()
-                  .getAndroidAttribute(SPLIT_TYPES_RESOURCE_ID))
-          .isEmpty();
-      assertThat(
-              moduleSplit
-                  .getAndroidManifest()
-                  .getManifestElement()
-                  .getAndroidAttribute(REQUIRED_SPLIT_TYPES_RESOURCE_ID))
-          .isEmpty();
-    }
-  }
-
-  @Test
-  public void
-      appBundleWithSdkDependencyModuleAndDensityTargeting_noDensitySplitsForSdkModule_requiredSplitTypesSet() {
-    ResourceTable appResourceTable =
-        resourceTable(
-            pkg(
-                USER_PACKAGE_OFFSET,
-                "com.test.app",
-                type(
-                    0x01,
-                    "drawable",
-                    entry(
-                        0x01,
-                        "title_image",
-                        fileReference("res/drawable-hdpi/title_image.jpg", HDPI),
-                        fileReference(
-                            "res/drawable/title_image.jpg", Configuration.getDefaultInstance())))));
-    ResourceTable sdkResourceTable =
-        resourceTable(
-            pkg(
-                USER_PACKAGE_OFFSET + 1,
-                "com.test.sdk",
-                type(
-                    0x01,
-                    "drawable",
-                    entry(
-                        0x01,
-                        "title_image",
-                        fileReference("res/drawable-hdpi/title_image.jpg", HDPI),
-                        fileReference(
-                            "res/drawable/title_image.jpg", Configuration.getDefaultInstance())))));
-    AppBundle appBundleWithRuntimeEnabledSdkDeps =
-        new AppBundleBuilder()
-            .addModule(
-                new BundleModuleBuilder("base")
-                    .setManifest(androidManifest("com.test.app"))
-                    .setResourceTable(appResourceTable)
-                    .setRuntimeEnabledSdkConfig(
-                        RuntimeEnabledSdkConfig.newBuilder()
-                            .addRuntimeEnabledSdk(
-                                RuntimeEnabledSdk.newBuilder()
-                                    .setPackageName("com.test.sdk")
-                                    .setVersionMajor(1)
-                                    .setCertificateDigest("AA:BB:CC")
-                                    .setResourcesPackageId(2))
-                            .build())
-                    .setResourcesPackageId(2)
-                    .build())
-            .addModule(
-                new BundleModuleBuilder("comtestsdk")
-                    .setModuleType(ModuleType.SDK_DEPENDENCY_MODULE)
-                    .setSdkModulesConfig(SdkModulesConfig.getDefaultInstance())
-                    .setResourcesPackageId(2)
-                    .setManifest(androidManifest("com.test.sdk"))
-                    .setResourceTable(sdkResourceTable)
-                    .build())
-            .build();
-    TestComponent.useTestModule(
-        this, TestModule.builder().withAppBundle(appBundleWithRuntimeEnabledSdkDeps).build());
-
-    ImmutableList<ModuleSplit> moduleSplits =
-        splitApksGenerator.generateSplits(
-            appBundleWithRuntimeEnabledSdkDeps.getModules().values().asList(),
-            ApkGenerationConfiguration.builder()
-                .setOptimizationDimensions(ImmutableSet.of(OptimizationDimension.SCREEN_DENSITY))
                 .build());
 
     assertThat(
@@ -1338,10 +1114,10 @@ public class SplitApksGeneratorTest {
         moduleSplit
             .getAndroidManifest()
             .getManifestElement()
-            .getAttribute(DISTRIBUTION_NAMESPACE_URI, REQUIRED_SPLIT_TYPES_ATTRIBUTE_NAME)
+            .getAndroidAttribute(REQUIRED_SPLIT_TYPES_RESOURCE_ID)
             .orElse(
-                XmlProtoAttribute.create(
-                    DISTRIBUTION_NAMESPACE_URI, REQUIRED_SPLIT_TYPES_ATTRIBUTE_NAME))
+                XmlProtoAttribute.createAndroidAttribute(
+                    REQUIRED_SPLIT_TYPES_ATTRIBUTE_NAME, REQUIRED_SPLIT_TYPES_RESOURCE_ID))
             .getValueAsString();
     if (value.isEmpty()) {
       return ImmutableList.of();
@@ -1354,7 +1130,7 @@ public class SplitApksGeneratorTest {
         moduleSplit
             .getAndroidManifest()
             .getManifestElement()
-            .getAttribute(DISTRIBUTION_NAMESPACE_URI, SPLIT_TYPES_ATTRIBUTE_NAME)
+            .getAndroidAttribute(SPLIT_TYPES_RESOURCE_ID)
             .get()
             .getValueAsString();
     if (value.isEmpty()) {

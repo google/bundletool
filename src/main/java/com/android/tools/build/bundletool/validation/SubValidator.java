@@ -21,6 +21,7 @@ import com.android.tools.build.bundletool.model.BundleModule;
 import com.android.tools.build.bundletool.model.SdkBundle;
 import com.android.tools.build.bundletool.model.ZipPath;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 
@@ -32,23 +33,29 @@ import java.util.zip.ZipFile;
  */
 public abstract class SubValidator {
 
-  // Validations of the App Bundle module zip file.
+  // Validations of the app bundle module zip file.
 
   public void validateModuleZipFile(ZipFile moduleFile) {}
 
-  // Validations of the Bundle zip file.
+  // Validations of the bundle zip file.
 
   public void validateBundleZipFile(ZipFile bundleFile) {}
 
   public void validateBundleZipEntry(ZipFile bundleFile, ZipEntry zipEntry) {}
 
-  /** Validates the given SDK Modules zip file. */
+  /** Validates the given SDK modules zip file. */
   public void validateSdkModulesZipFile(ZipFile modulesFile) {}
 
   // Validations of the AppBundle object and its internals.
 
   /** Validates an AppBundle object. */
   public void validateBundle(AppBundle bundle) {}
+
+  /**
+   * Validates an AppBundle object in combination with the SDK bundles/archives the app depends on.
+   */
+  public void validateBundleWithSdkModules(
+      AppBundle bundle, ImmutableMap<String, BundleModule> sdkModules) {}
 
   public void validateAllModules(ImmutableList<BundleModule> modules) {}
 

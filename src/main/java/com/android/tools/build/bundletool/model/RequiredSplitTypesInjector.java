@@ -16,7 +16,6 @@
 
 package com.android.tools.build.bundletool.model;
 
-import static com.android.tools.build.bundletool.model.utils.Versions.ANDROID_T_API_VERSION;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 
 import com.android.bundle.Targeting.ApkTargeting;
@@ -35,31 +34,23 @@ public class RequiredSplitTypesInjector {
    */
   @CheckReturnValue
   public static ImmutableList<ModuleSplit> injectSplitTypeValidation(
-      ImmutableList<ModuleSplit> splits,
-      ImmutableList<BundleModuleName> requiredModules,
-      boolean enableSystemAttribute) {
+      ImmutableList<ModuleSplit> splits, ImmutableList<BundleModuleName> requiredModules) {
     return splits.stream()
         .map(
             split -> {
-              // During the validation rollout, only inject system split types attribute for splits
-              // targeting T+.
-              boolean includeSystemAttribute = enableSystemAttribute && isTargetingAtLeastT(split);
-
               ManifestEditor apkManifest = split.getAndroidManifest().toEditor();
 
               apkManifest.setSplitTypes(
                   getProvidedSplitTypes(split).stream()
                       .map(RequiredSplitTypeName::toAttributeValue)
-                      .collect(toImmutableList()),
-                  includeSystemAttribute);
+                      .collect(toImmutableList()));
 
               // Only base/feature modules have required split types.
               if (split.isMasterSplit()) {
                 apkManifest.setRequiredSplitTypes(
                     getRequiredSplitTypes(splits, requiredModules, split).stream()
                         .map(RequiredSplitTypeName::toAttributeValue)
-                        .collect(toImmutableList()),
-                    includeSystemAttribute);
+                        .collect(toImmutableList()));
               }
 
               return split.toBuilder().setAndroidManifest(apkManifest.save()).build();
@@ -137,14 +128,6 @@ public class RequiredSplitTypesInjector {
     }
 
     return splitTypes.build();
-  }
-
-  private static boolean isTargetingAtLeastT(ModuleSplit split) {
-    return split.getVariantTargeting().getSdkVersionTargeting().getValueList().stream()
-            .mapToInt(sdkVersion -> sdkVersion.getMin().getValue())
-            .min()
-            .orElse(1)
-        >= ANDROID_T_API_VERSION;
   }
 
   private RequiredSplitTypesInjector() {}

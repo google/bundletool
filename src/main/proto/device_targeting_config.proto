@@ -113,6 +113,10 @@ message DeviceSelector {
   // A device that has any of these system features is excluded by
   // this selector, even if it matches all other conditions.
   repeated SystemFeature forbidden_system_features = 5;
+
+  // The SoCs included by this selector.
+  // Only works for Android S+ devices.
+  repeated SystemOnChip system_on_chips = 6;
 }
 
 // Conditions about a device's RAM capabilities.
@@ -137,6 +141,22 @@ message DeviceId {
 message SystemFeature {
   // The name of the feature.
   string name = 1;
+}
+
+// Representation of a System-on-Chip (SoC) of an Android device.
+// Can be used to target S+ devices.
+message SystemOnChip {
+  // The designer of the SoC, eg. "Google"
+  // Value of build property "ro.soc.manufacturer"
+  // https://developer.android.com/reference/android/os/Build#SOC_MANUFACTURER
+  // Required.
+  string manufacturer = 1;
+
+  // The model of the SoC, eg. "Tensor"
+  // Value of build property "ro.soc.model"
+  // https://developer.android.com/reference/android/os/Build#SOC_MODEL
+  // Required.
+  string model = 2;
 }
 
 // Properties of a particular device.

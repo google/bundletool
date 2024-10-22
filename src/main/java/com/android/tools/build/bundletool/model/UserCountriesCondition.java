@@ -16,6 +16,7 @@
 
 package com.android.tools.build.bundletool.model;
 
+import com.android.bundle.Targeting.UserCountriesTargeting;
 import com.google.auto.value.AutoValue;
 import com.google.common.collect.ImmutableList;
 import com.google.errorprone.annotations.Immutable;
@@ -38,5 +39,12 @@ public abstract class UserCountriesCondition {
   public static UserCountriesCondition create(
       ImmutableList<String> countryCodeList, boolean exclude) {
     return new AutoValue_UserCountriesCondition(countryCodeList, exclude);
+  }
+
+  public UserCountriesTargeting toTargeting() {
+    return UserCountriesTargeting.newBuilder()
+        .addAllCountryCodes(getCountries())
+        .setExclude(getExclude())
+        .build();
   }
 }

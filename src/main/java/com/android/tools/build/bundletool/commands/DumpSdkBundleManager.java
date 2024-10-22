@@ -19,9 +19,7 @@ import static com.google.common.collect.ImmutableList.toImmutableList;
 
 import com.android.aapt.Resources.ResourceTable;
 import com.android.aapt.Resources.XmlNode;
-import com.android.bundle.Config.BundleConfig;
-import com.android.bundle.RuntimeEnabledSdkConfigProto.RuntimeEnabledSdkConfig;
-import com.android.tools.build.bundletool.model.AppBundle;
+import com.android.bundle.SdkModulesConfigOuterClass.SdkModulesConfig;
 import com.android.tools.build.bundletool.model.BundleModule.SpecialModuleEntry;
 import com.android.tools.build.bundletool.model.BundleModuleName;
 import com.android.tools.build.bundletool.model.ResourceTableEntry;
@@ -29,7 +27,6 @@ import com.android.tools.build.bundletool.model.ZipPath;
 import com.android.tools.build.bundletool.model.utils.ZipUtils;
 import com.android.tools.build.bundletool.model.utils.xmlproto.XmlProtoNode;
 import com.google.common.collect.ImmutableList;
-import com.google.protobuf.util.JsonFormat;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.io.PrintStream;
@@ -37,25 +34,28 @@ import java.io.UncheckedIOException;
 import java.nio.file.Path;
 import java.util.Optional;
 import java.util.function.Predicate;
+import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
+import java.util.zip.ZipInputStream;
 
-final class DumpManager {
+final class DumpSdkBundleManager {
 
   private final PrintStream printStream;
   private final Path bundlePath;
 
-  DumpManager(OutputStream outputStream, Path bundlePath) {
+  DumpSdkBundleManager(OutputStream outputStream, Path bundlePath) {
     this.printStream = new PrintStream(outputStream);
     this.bundlePath = bundlePath;
   }
 
-  void printManifest(BundleModuleName moduleName, Optional<String> xPathExpression) {
+  void printManifest(Optional<String> xPathExpression) {
     // Extract the manifest from the bundle.
     ZipPath manifestPath =
-        ZipPath.create(moduleName.getName()).resolve(SpecialModuleEntry.ANDROID_MANIFEST.getPath());
+        ZipPath.create(BundleModuleName.BASE_MODULE_NAME.getName())
+            .resolve(SpecialModuleEntry.ANDROID_MANIFEST.getPath());
     XmlProtoNode manifestProto =
         new XmlProtoNode(
-            DumpManagerUtils.extractAndParseFromAppBundle(
+            DumpManagerUtils.extractAndParseFromSdkBundle(
                 bundlePath, manifestPath, XmlNode::parseFrom));
 
     DumpManagerUtils.printManifest(manifestProto, xPathExpression, printStream);
@@ -64,40 +64,26 @@ final class DumpManager {
   void printResources(Predicate<ResourceTableEntry> resourcePredicate, boolean printValues) {
     ImmutableList<ResourceTable> resourceTables;
     try (ZipFile zipFile = new ZipFile(bundlePath.toFile())) {
+      ZipEntry zipEntry = zipFile.getEntry("modules.resm");
       resourceTables =
-          ZipUtils.allFileEntriesPaths(zipFile)
+          ZipUtils.allFileEntriesPaths(new ZipInputStream(zipFile.getInputStream(zipEntry)))
+              .stream()
               .filter(path -> path.endsWith(SpecialModuleEntry.RESOURCE_TABLE.getPath()))
               .map(
-                  path -> DumpManagerUtils.extractAndParse(zipFile, path, ResourceTable::parseFrom))
+                  path ->
+                      DumpManagerUtils.extractAndParseFromSdkBundle(
+                          bundlePath, path, ResourceTable::parseFrom))
               .collect(toImmutableList());
     } catch (IOException e) {
       throw new UncheckedIOException("Error occurred when reading the bundle.", e);
     }
-
     DumpManagerUtils.printResources(resourcePredicate, printValues, resourceTables, printStream);
   }
 
   void printBundleConfig() {
-    try (ZipFile zipFile = new ZipFile(bundlePath.toFile())) {
-      BundleConfig bundleConfig =
-          DumpManagerUtils.extractAndParse(
-              zipFile, ZipPath.create("BundleConfig.pb"), BundleConfig::parseFrom);
-      DumpManagerUtils.printBundleConfig(bundleConfig, printStream);
-    } catch (IOException e) {
-      throw new UncheckedIOException("Error occurred when reading the bundle.", e);
-    }
-  }
-
-  void printRuntimeEnabledSdkConfig() {
-    try (ZipFile zipFile = new ZipFile(bundlePath.toFile())) {
-      AppBundle appBundle = AppBundle.buildFromZip(zipFile);
-      RuntimeEnabledSdkConfig allRuntimeEnabledSdks =
-          RuntimeEnabledSdkConfig.newBuilder()
-              .addAllRuntimeEnabledSdk(appBundle.getRuntimeEnabledSdkDependencies().values())
-              .build();
-      printStream.println(JsonFormat.printer().print(allRuntimeEnabledSdks));
-    } catch (IOException e) {
-      throw new UncheckedIOException("Error occurred when reading the bundle.", e);
-    }
+    SdkModulesConfig bundleConfig =
+        DumpManagerUtils.extractAndParseFromSdkBundle(
+            bundlePath, ZipPath.create("SdkModulesConfig.pb"), SdkModulesConfig::parseFrom);
+    DumpManagerUtils.printBundleConfig(bundleConfig, printStream);
   }
 }

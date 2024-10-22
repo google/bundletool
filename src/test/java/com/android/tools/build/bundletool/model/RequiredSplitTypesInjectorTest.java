@@ -16,9 +16,9 @@
 
 package com.android.tools.build.bundletool.model;
 
-import static com.android.tools.build.bundletool.model.AndroidManifest.DISTRIBUTION_NAMESPACE_URI;
 import static com.android.tools.build.bundletool.model.AndroidManifest.REQUIRED_SPLIT_TYPES_ATTRIBUTE_NAME;
-import static com.android.tools.build.bundletool.model.AndroidManifest.SPLIT_TYPES_ATTRIBUTE_NAME;
+import static com.android.tools.build.bundletool.model.AndroidManifest.REQUIRED_SPLIT_TYPES_RESOURCE_ID;
+import static com.android.tools.build.bundletool.model.AndroidManifest.SPLIT_TYPES_RESOURCE_ID;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifest;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.apkAbiTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.apkCountrySetTargeting;
@@ -68,8 +68,7 @@ public final class RequiredSplitTypesInjectorTest {
         ImmutableList.of(baseSplit.getModuleName(), featureSplit.getModuleName());
     ImmutableList<ModuleSplit> allSplits = ImmutableList.of(baseSplit, featureSplit);
     ImmutableList<ModuleSplit> newSplits =
-        RequiredSplitTypesInjector.injectSplitTypeValidation(
-            allSplits, requiredModules, /* enableSystemAttribute= */ true);
+        RequiredSplitTypesInjector.injectSplitTypeValidation(allSplits, requiredModules);
 
     baseSplit = newSplits.get(0);
     assertThat(getProvidedSplitTypes(baseSplit)).isEmpty();
@@ -114,8 +113,7 @@ public final class RequiredSplitTypesInjectorTest {
       ImmutableList<BundleModuleName> requiredModules = ImmutableList.of(baseSplit.getModuleName());
       ImmutableList<ModuleSplit> allSplits = ImmutableList.of(baseSplit, otherSplit);
       ImmutableList<ModuleSplit> newSplits =
-          RequiredSplitTypesInjector.injectSplitTypeValidation(
-              allSplits, requiredModules, /* enableSystemAttribute= */ true);
+          RequiredSplitTypesInjector.injectSplitTypeValidation(allSplits, requiredModules);
 
       baseSplit = newSplits.get(0);
       assertThat(getProvidedSplitTypes(baseSplit)).isEmpty();
@@ -132,10 +130,10 @@ public final class RequiredSplitTypesInjectorTest {
         moduleSplit
             .getAndroidManifest()
             .getManifestElement()
-            .getAttribute(DISTRIBUTION_NAMESPACE_URI, REQUIRED_SPLIT_TYPES_ATTRIBUTE_NAME)
+            .getAndroidAttribute(REQUIRED_SPLIT_TYPES_RESOURCE_ID)
             .orElse(
-                XmlProtoAttribute.create(
-                    DISTRIBUTION_NAMESPACE_URI, REQUIRED_SPLIT_TYPES_ATTRIBUTE_NAME))
+                XmlProtoAttribute.createAndroidAttribute(
+                    REQUIRED_SPLIT_TYPES_ATTRIBUTE_NAME, REQUIRED_SPLIT_TYPES_RESOURCE_ID))
             .getValueAsString();
     if (value.isEmpty()) {
       return ImmutableList.of();
@@ -148,7 +146,7 @@ public final class RequiredSplitTypesInjectorTest {
         moduleSplit
             .getAndroidManifest()
             .getManifestElement()
-            .getAttribute(DISTRIBUTION_NAMESPACE_URI, SPLIT_TYPES_ATTRIBUTE_NAME)
+            .getAndroidAttribute(SPLIT_TYPES_RESOURCE_ID)
             .get()
             .getValueAsString();
     if (value.isEmpty()) {

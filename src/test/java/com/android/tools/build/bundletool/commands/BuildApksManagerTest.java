@@ -50,7 +50,6 @@ import static com.android.tools.build.bundletool.model.utils.Versions.ANDROID_P_
 import static com.android.tools.build.bundletool.model.utils.Versions.ANDROID_Q_API_VERSION;
 import static com.android.tools.build.bundletool.model.utils.Versions.ANDROID_S_API_VERSION;
 import static com.android.tools.build.bundletool.model.utils.Versions.ANDROID_S_V2_API_VERSION;
-import static com.android.tools.build.bundletool.model.utils.Versions.ANDROID_T_API_VERSION;
 import static com.android.tools.build.bundletool.model.utils.Versions.ANDROID_U_API_VERSION;
 import static com.android.tools.build.bundletool.testing.ApkSetUtils.extractFromApkSetFile;
 import static com.android.tools.build.bundletool.testing.ApkSetUtils.extractTocFromApkSetFile;
@@ -299,7 +298,6 @@ public class BuildApksManagerTest {
   private static final SdkVersion P_SDK_VERSION = sdkVersionFrom(ANDROID_P_API_VERSION);
   private static final SdkVersion Q_SDK_VERSION = sdkVersionFrom(ANDROID_Q_API_VERSION);
   private static final SdkVersion S_SDK_VERSION = sdkVersionFrom(ANDROID_S_API_VERSION);
-  private static final SdkVersion T_SDK_VERSION = sdkVersionFrom(ANDROID_T_API_VERSION);
   private static final SdkVersion S2_V2_SDK_VERSION = sdkVersionFrom(ANDROID_S_V2_API_VERSION);
 
   private static final int ALIGNMENT_4K = 4096;
@@ -328,7 +326,7 @@ public class BuildApksManagerTest {
   @Inject BuildApksCommand command;
 
   protected TestModule.Builder createTestModuleBuilder() {
-    return TestModule.builder().withEnableRequiredSplitTypes(false);
+    return TestModule.builder();
   }
 
   @BeforeClass
@@ -2232,7 +2230,6 @@ public class BuildApksManagerTest {
                 .collect(toImmutableList()))
         .containsExactly(L_SDK_VERSION);
   }
-
 
   @Test
   public void buildApksCommand_splitApks_targetMinSdkVersion() throws Exception {

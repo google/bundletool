@@ -25,6 +25,7 @@ import static com.android.tools.build.bundletool.model.AndroidManifest.SDK_LIBRA
 import static com.android.tools.build.bundletool.model.AndroidManifest.SDK_PATCH_VERSION_ATTRIBUTE_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.SHARED_USER_ID_ATTRIBUTE_NAME;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifest;
+import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifestForSdkBundle;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withInstallLocation;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withMainActivity;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withPermission;
@@ -35,6 +36,7 @@ import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.with
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withSharedUserId;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withSplitId;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withSplitNameService;
+import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withTargetSdkVersion;
 import static com.google.common.truth.Truth.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
@@ -56,7 +58,7 @@ public class SdkAndroidManifestValidatorTest {
     BundleModule module =
         new BundleModuleBuilder(BASE_MODULE_NAME)
             .setManifest(
-                androidManifest(
+                androidManifestForSdkBundle(
                     PKG_NAME, withSdkLibraryElement(PKG_NAME, /* versionMajor= */ 13499)))
             .build();
 
@@ -77,7 +79,8 @@ public class SdkAndroidManifestValidatorTest {
     BundleModule module =
         new BundleModuleBuilder(BASE_MODULE_NAME)
             .setManifest(
-                androidManifest(PKG_NAME, withSdkPatchVersionMetadata(/* patchVersion= */ 14)))
+                androidManifestForSdkBundle(
+                    PKG_NAME, withSdkPatchVersionMetadata(/* patchVersion= */ 14)))
             .build();
 
     Throwable exception =
@@ -98,7 +101,7 @@ public class SdkAndroidManifestValidatorTest {
   public void manifest_withPreferExternal_throws() {
     BundleModule module =
         new BundleModuleBuilder(BASE_MODULE_NAME)
-            .setManifest(androidManifest(PKG_NAME, withInstallLocation(2)))
+            .setManifest(androidManifestForSdkBundle(PKG_NAME, withInstallLocation(2)))
             .build();
 
     Throwable exception =
@@ -117,7 +120,7 @@ public class SdkAndroidManifestValidatorTest {
   public void manifest_withPermission_throws() {
     BundleModule module =
         new BundleModuleBuilder(BASE_MODULE_NAME)
-            .setManifest(androidManifest(PKG_NAME, withPermission()))
+            .setManifest(androidManifestForSdkBundle(PKG_NAME, withPermission()))
             .build();
 
     Throwable exception =
@@ -136,7 +139,7 @@ public class SdkAndroidManifestValidatorTest {
   public void manifest_withPermissionGroup_throws() {
     BundleModule module =
         new BundleModuleBuilder(BASE_MODULE_NAME)
-            .setManifest(androidManifest(PKG_NAME, withPermissionGroup()))
+            .setManifest(androidManifestForSdkBundle(PKG_NAME, withPermissionGroup()))
             .build();
 
     Throwable exception =
@@ -155,7 +158,7 @@ public class SdkAndroidManifestValidatorTest {
   public void manifest_withPermissionTree_throws() {
     BundleModule module =
         new BundleModuleBuilder(BASE_MODULE_NAME)
-            .setManifest(androidManifest(PKG_NAME, withPermissionTree()))
+            .setManifest(androidManifestForSdkBundle(PKG_NAME, withPermissionTree()))
             .build();
 
     Throwable exception =
@@ -174,7 +177,7 @@ public class SdkAndroidManifestValidatorTest {
   public void manifest_withSharedUserId_throws() {
     BundleModule module =
         new BundleModuleBuilder(BASE_MODULE_NAME)
-            .setManifest(androidManifest(PKG_NAME, withSharedUserId("sharedUserId")))
+            .setManifest(androidManifestForSdkBundle(PKG_NAME, withSharedUserId("sharedUserId")))
             .build();
 
     Throwable exception =
@@ -193,7 +196,7 @@ public class SdkAndroidManifestValidatorTest {
   public void manifest_withActivityComponent_throws() {
     BundleModule module =
         new BundleModuleBuilder(BASE_MODULE_NAME)
-            .setManifest(androidManifest(PKG_NAME, withMainActivity("myFunActivity")))
+            .setManifest(androidManifestForSdkBundle(PKG_NAME, withMainActivity("myFunActivity")))
             .build();
 
     Throwable exception =
@@ -212,9 +215,8 @@ public class SdkAndroidManifestValidatorTest {
     BundleModule module =
         new BundleModuleBuilder(BASE_MODULE_NAME)
             .setManifest(
-                androidManifest(
-                    PKG_NAME,
-                    withSplitNameService("serviceName", "splitName")))
+                androidManifestForSdkBundle(
+                    PKG_NAME, withSplitNameService("serviceName", "splitName")))
             .build();
 
     Throwable exception =
@@ -232,7 +234,7 @@ public class SdkAndroidManifestValidatorTest {
   public void manifest_withSplitId_throws() {
     BundleModule module =
         new BundleModuleBuilder(BASE_MODULE_NAME)
-            .setManifest(androidManifest(PKG_NAME, withSplitId(BASE_MODULE_NAME)))
+            .setManifest(androidManifestForSdkBundle(PKG_NAME, withSplitId(BASE_MODULE_NAME)))
             .build();
 
     Throwable exception =
@@ -245,9 +247,41 @@ public class SdkAndroidManifestValidatorTest {
   }
 
   @Test
-  public void manifest_valid_ok() {
+  public void manifest_withoutTargetSdkVersion_throws() {
     BundleModule module =
         new BundleModuleBuilder(BASE_MODULE_NAME).setManifest(androidManifest(PKG_NAME)).build();
+
+    Throwable exception =
+        assertThrows(
+            InvalidBundleException.class,
+            () -> new SdkAndroidManifestValidator().validateModule(module));
+    assertThat(exception)
+        .hasMessageThat()
+        .contains("The 'targetSdkVersion' of an SDK bundle should be 34 or higher.");
+  }
+
+  @Test
+  public void manifest_withLowTargetSdkVersion_throws() {
+    BundleModule module =
+        new BundleModuleBuilder(BASE_MODULE_NAME)
+            .setManifest(androidManifest(PKG_NAME, withTargetSdkVersion(33)))
+            .build();
+
+    Throwable exception =
+        assertThrows(
+            InvalidBundleException.class,
+            () -> new SdkAndroidManifestValidator().validateModule(module));
+    assertThat(exception)
+        .hasMessageThat()
+        .contains("The 'targetSdkVersion' of an SDK bundle should be 34 or higher.");
+  }
+
+  @Test
+  public void manifest_valid_ok() {
+    BundleModule module =
+        new BundleModuleBuilder(BASE_MODULE_NAME)
+            .setManifest(androidManifestForSdkBundle(PKG_NAME))
+            .build();
 
     new SdkAndroidManifestValidator().validateModule(module);
   }

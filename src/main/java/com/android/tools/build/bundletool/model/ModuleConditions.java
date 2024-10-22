@@ -18,9 +18,7 @@ package com.android.tools.build.bundletool.model;
 
 import com.android.bundle.Targeting.DeviceFeature;
 import com.android.bundle.Targeting.DeviceFeatureTargeting;
-import com.android.bundle.Targeting.DeviceGroupModuleTargeting;
 import com.android.bundle.Targeting.ModuleTargeting;
-import com.android.bundle.Targeting.UserCountriesTargeting;
 import com.android.tools.build.bundletool.model.exceptions.InvalidBundleException;
 import com.android.tools.build.bundletool.model.utils.TargetingProtoUtils;
 import com.google.auto.value.AutoValue;
@@ -87,18 +85,11 @@ public abstract class ModuleConditions {
 
     if (getUserCountriesCondition().isPresent()) {
       UserCountriesCondition condition = getUserCountriesCondition().get();
-      moduleTargeting.setUserCountriesTargeting(
-          UserCountriesTargeting.newBuilder()
-              .addAllCountryCodes(condition.getCountries())
-              .setExclude(condition.getExclude())
-              .build());
+      moduleTargeting.setUserCountriesTargeting(condition.toTargeting());
     }
 
     if (getDeviceGroupsCondition().isPresent()) {
-      moduleTargeting.setDeviceGroupTargeting(
-          DeviceGroupModuleTargeting.newBuilder()
-              .addAllValue(getDeviceGroupsCondition().get().getDeviceGroups())
-              .build());
+      moduleTargeting.setDeviceGroupTargeting(getDeviceGroupsCondition().get().toTargeting());
     }
 
     return moduleTargeting.build();

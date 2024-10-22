@@ -94,8 +94,6 @@ public abstract class ApkGenerationConfiguration {
    */
   public abstract Optional<Integer> getMinSdkForAdditionalVariantWithV3Rotation();
 
-  public abstract boolean getEnableRequiredSplitTypes();
-
   public abstract Builder toBuilder();
 
   public static Builder builder() {
@@ -112,8 +110,7 @@ public abstract class ApkGenerationConfiguration {
         .setMasterPinnedResourceIds(ImmutableSet.of())
         .setMasterPinnedResourceNames(ImmutableSet.of())
         .setBaseManifestReachableResources(ImmutableSet.of())
-        .setSuffixStrippings(ImmutableMap.of())
-        .setEnableRequiredSplitTypes(false);
+        .setSuffixStrippings(ImmutableMap.of());
   }
 
   public static ApkGenerationConfiguration getDefaultInstance() {
@@ -157,8 +154,6 @@ public abstract class ApkGenerationConfiguration {
 
     public abstract Builder setEnableBaseModuleMinSdkAsDefaultTargeting(
         boolean enableBaseModuleMinSdkAsDefaultTargeting);
-
-    public abstract Builder setEnableRequiredSplitTypes(boolean enableRequiredSplitTypes);
 
     public abstract ApkGenerationConfiguration build();
   }

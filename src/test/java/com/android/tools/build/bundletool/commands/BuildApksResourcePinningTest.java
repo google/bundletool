@@ -161,12 +161,7 @@ public class BuildApksResourcePinningTest {
             .build();
 
     TestComponent.useTestModule(
-        this,
-        TestModule.builder()
-            .withEnableRequiredSplitTypes(false)
-            .withAppBundle(appBundle)
-            .withOutputPath(outputFilePath)
-            .build());
+        this, TestModule.builder().withAppBundle(appBundle).withOutputPath(outputFilePath).build());
 
     buildApksManager.execute();
     ZipFile apkSetFile = new ZipFile(outputFilePath.toFile());
@@ -210,7 +205,7 @@ public class BuildApksResourcePinningTest {
               baseModuleApks,
               apkDescription -> apkDescription.getSplitApkMetadata().getIsMasterSplit());
 
-      ApkDescription baseMaster = apkBaseMaster.get(/* isMasterSplit= */ true);
+      ApkDescription baseMaster = apkBaseMaster.get(true);
       File baseMasterFile = extractFromApkSetFile(apkSetFile, baseMaster.getPath(), outputDir);
       try (ZipFile baseMasterZip = new ZipFile(baseMasterFile)) {
         assertThat(filesUnderPath(baseMasterZip, ZipPath.create("res")))
@@ -220,7 +215,7 @@ public class BuildApksResourcePinningTest {
                 "res/drawable/image2.jpg",
                 "res/xml/splits0.xml");
 
-        ApkDescription baseFr = apkBaseMaster.get(/* isMasterSplit= */ false);
+        ApkDescription baseFr = apkBaseMaster.get(false);
         File baseFrFile = extractFromApkSetFile(apkSetFile, baseFr.getPath(), outputDir);
         try (ZipFile baseFrZip = new ZipFile(baseFrFile)) {
           assertThat(filesUnderPath(baseFrZip, ZipPath.create("res")))
@@ -234,7 +229,7 @@ public class BuildApksResourcePinningTest {
                 featureModuleApks,
                 apkDescription -> apkDescription.getSplitApkMetadata().getIsMasterSplit());
 
-        ApkDescription featureMaster = apkFeatureMaster.get(/* isMasterSplit= */ true);
+        ApkDescription featureMaster = apkFeatureMaster.get(true);
         File featureMasterFile =
             extractFromApkSetFile(apkSetFile, featureMaster.getPath(), outputDir);
         try (ZipFile featureMasterZip = new ZipFile(featureMasterFile)) {
@@ -245,7 +240,7 @@ public class BuildApksResourcePinningTest {
                   "res/drawable-fr/image4.jpg");
         }
 
-        ApkDescription featureFr = apkFeatureMaster.get(/* isMasterSplit= */ false);
+        ApkDescription featureFr = apkFeatureMaster.get(false);
         File featureFrFile = extractFromApkSetFile(apkSetFile, featureFr.getPath(), outputDir);
         try (ZipFile featureFrZip = new ZipFile(featureFrFile)) {
           assertThat(filesUnderPath(featureFrZip, ZipPath.create("res")))

@@ -24,6 +24,7 @@ import com.android.tools.build.bundletool.model.ModuleEntry;
 import com.android.tools.build.bundletool.model.SdkBundle;
 import com.android.tools.build.bundletool.model.ZipPath;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 import java.util.Enumeration;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
@@ -37,7 +38,7 @@ public class ValidatorRunner {
     this.subValidators = subValidators;
   }
 
-  /** Validates the given App Bundle zip file. */
+  /** Validates the given app bundle zip file. */
   public void validateBundleZipFile(ZipFile bundleFile) {
     subValidators.forEach(subValidator -> subValidator.validateBundleZipFile(bundleFile));
 
@@ -49,7 +50,7 @@ public class ValidatorRunner {
     }
   }
 
-  /** Validates the given App Bundle module zip file. */
+  /** Validates the given app bundle module zip file. */
   public void validateModuleZipFile(ZipFile moduleFile) {
     subValidators.forEach(subValidator -> subValidator.validateModuleZipFile(moduleFile));
   }
@@ -59,12 +60,25 @@ public class ValidatorRunner {
     subValidators.forEach(subValidator -> subValidator.validateSdkModulesZipFile(moduleFile));
   }
 
-  /** Validates the given App Bundle. */
+  /** Validates the given app bundle. */
   public void validateBundle(AppBundle bundle) {
     subValidators.forEach(subValidator -> validateBundleUsingSubValidator(bundle, subValidator));
   }
 
-  /** Validates the given SDK Bundle. */
+  /**
+   * Validates the given app bundle in combination with the SDK bundles/archives the app depends on.
+   */
+  public void validateBundleWithSdkModules(
+      AppBundle bundle, ImmutableMap<String, BundleModule> sdkModules) {
+    if (sdkModules.isEmpty()) {
+      return;
+    }
+
+    subValidators.forEach(
+        subValidator -> subValidator.validateBundleWithSdkModules(bundle, sdkModules));
+  }
+
+  /** Validates the given SDK bundle. */
   void validateSdkBundle(SdkBundle bundle) {
     subValidators.forEach(subValidator -> validateSdkBundleUsingSubValidator(bundle, subValidator));
   }

@@ -91,7 +91,10 @@ public abstract class AndroidManifest {
   public static final String USES_FEATURE_ELEMENT_NAME = "uses-feature";
   public static final String MODULE_ELEMENT_NAME = "module";
   public static final String DELIVERY_ELEMENT_NAME = "delivery";
+  public static final String CONDITIONS_ELEMENT_NAME = "conditions";
   public static final String INSTALL_TIME_ELEMENT_NAME = "install-time";
+  public static final String FAST_FOLLOW_ELEMENT_NAME = "fast-follow";
+  public static final String ON_DEMAND_ELEMENT_NAME = "on-demand";
   public static final String REMOVABLE_ELEMENT_NAME = "removable";
   public static final String FUSING_ELEMENT_NAME = "fusing";
   public static final String STYLE_ELEMENT_NAME = "style";
@@ -122,7 +125,6 @@ public abstract class AndroidManifest {
   public static final String SPLIT_NAME_ATTRIBUTE_NAME = "splitName";
   public static final String VERSION_NAME_ATTRIBUTE_NAME = "versionName";
   public static final String INSTALL_LOCATION_ATTRIBUTE_NAME = "installLocation";
-  public static final String IS_SPLIT_REQUIRED_ATTRIBUTE_NAME = "isSplitRequired";
   public static final String SHARED_USER_ID_ATTRIBUTE_NAME = "sharedUserId";
   public static final String SHARED_USER_LABEL_ATTRIBUTE_NAME = "sharedUserLabel";
   public static final String DESCRIPTION_ATTRIBUTE_NAME = "description";
@@ -178,6 +180,7 @@ public abstract class AndroidManifest {
   public static final String SRC_ATTRIBUTE_NAME = "src";
   public static final String APP_COMPONENT_FACTORY_ATTRIBUTE_NAME = "appComponentFactory";
   public static final String AUTHORITIES_ATTRIBUTE_NAME = "authorities";
+  public static final String PROCESS_ATTRIBUTE_NAME = "process";
 
   public static final String LEANBACK_FEATURE_NAME = "android.software.leanback";
   public static final String TOUCHSCREEN_FEATURE_NAME = "android.hardware.touchscreen";
@@ -214,7 +217,6 @@ public abstract class AndroidManifest {
   public static final int TARGET_SANDBOX_VERSION_RESOURCE_ID = 0x0101054c;
   public static final int SPLIT_NAME_RESOURCE_ID = 0x01010549;
   public static final int INSTALL_LOCATION_RESOURCE_ID = 0x010102b7;
-  public static final int IS_SPLIT_REQUIRED_RESOURCE_ID = 0x01010591;
   public static final int THEME_RESOURCE_ID = 0x01010000;
   public static final int ISOLATED_SPLITS_ID = 0x0101054b;
   public static final int SHARED_USER_ID_RESOURCE_ID = 0x0101000b;
@@ -254,6 +256,7 @@ public abstract class AndroidManifest {
   public static final int SPLIT_TYPES_RESOURCE_ID = 0x0101064f;
   public static final int REQUIRED_SPLIT_TYPES_RESOURCE_ID = 0x0101064e;
   public static final int AUTO_VERIFY_RESOURCE_ID = 0x010104ee;
+  public static final int PROCESS_RESOURCE_ID = 0x01010011;
 
   // Matches the value of android.os.Build.VERSION_CODES.CUR_DEVELOPMENT, used when turning
   // a manifest attribute which references a prerelease API version (e.g., "Q") into an integer.
@@ -289,16 +292,13 @@ public abstract class AndroidManifest {
 
   @Memoized
   public Optional<ManifestDeliveryElement> getManifestDeliveryElement() {
-    return ManifestDeliveryElement.fromManifestElement(
-        getManifestElement(),
-        /* isFastFollowAllowed= */ getModuleType().equals(ModuleType.ASSET_MODULE));
+    return ManifestDeliveryElement.fromManifestElement(getManifestElement(), getModuleType());
   }
 
   @Memoized
   public Optional<ManifestDeliveryElement> getInstantManifestDeliveryElement() {
     return ManifestDeliveryElement.instantFromManifestElement(
-        getManifestElement(),
-        /* isFastFollowAllowed= */ getModuleType().equals(ModuleType.ASSET_MODULE));
+        getManifestElement(), getModuleType());
   }
 
   /**
@@ -381,9 +381,9 @@ public abstract class AndroidManifest {
    * @return An optional containing the value of the {@code appCategory} attribute if set, or an
    *     empty optional if not set.
    */
-  public Optional<String> getApplicationAppCategory() {
+  public Optional<Integer> getApplicationAppCategory() {
     return getApplicationAttribute(APP_CATEGORY_RESOURCE_ID)
-        .map(XmlProtoAttribute::getValueAsString);
+        .map(XmlProtoAttribute::getValueAsDecimalInteger);
   }
 
   /**
@@ -427,12 +427,12 @@ public abstract class AndroidManifest {
     return getUsesSdkAttribute(MIN_SDK_VERSION_RESOURCE_ID);
   }
 
-  public Optional<Integer> getTargetingSdkVersion() {
+  public Optional<Integer> getTargetSdkVersion() {
     return getUsesSdkAttribute(TARGET_SDK_VERSION_RESOURCE_ID);
   }
 
-  public int getEffectiveTargetingSdkVersion() {
-    return getTargetingSdkVersion().orElse(getEffectiveMinSdkVersion());
+  public int getEffectiveTargetSdkVersion() {
+    return getTargetSdkVersion().orElse(getEffectiveMinSdkVersion());
   }
 
   public int getEffectiveMinSdkVersion() {
@@ -726,19 +726,6 @@ public abstract class AndroidManifest {
    */
   public Optional<Boolean> getExtractNativeLibsValue() {
     return getApplicationAttributeAsBoolean(EXTRACT_NATIVE_LIBS_RESOURCE_ID);
-  }
-
-  /**
-   * Extracts the 'android:isSplitRequired' value from the {@code <application>} tag.
-   *
-   * <p>Warning: this value is not read by the system and is provided for legacy install verifiers
-   * only.
-   *
-   * @return An optional containing the value of the 'isSplitRequired' attribute if set, or an empty
-   *     optional if not set.
-   */
-  public Optional<Boolean> getSplitsRequiredValue() {
-    return getApplicationAttributeAsBoolean(IS_SPLIT_REQUIRED_RESOURCE_ID);
   }
 
   /** Extracts the 'android:splitTypes' value from the {@code <manifest>} tag. */
