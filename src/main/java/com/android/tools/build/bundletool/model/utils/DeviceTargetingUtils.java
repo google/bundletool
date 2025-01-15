@@ -17,8 +17,12 @@ package com.android.tools.build.bundletool.model.utils;
 
 import static com.android.tools.build.bundletool.model.AndroidManifest.DEVICE_GROUP_ELEMENT_NAME;
 
+import com.android.bundle.DeviceGroup;
+import com.android.bundle.DeviceGroupConfig;
+import com.android.bundle.DeviceSelector;
 import com.android.tools.build.bundletool.model.exceptions.InvalidBundleException;
 import com.google.common.primitives.Ints;
+import java.util.Optional;
 import java.util.regex.Pattern;
 import javax.annotation.Nullable;
 
@@ -39,15 +43,61 @@ public class DeviceTargetingUtils {
     }
   }
 
+  public static void validateDeviceGroupForAssetsDirectory(String directory, String groupName) {
+    if (!DEVICE_GROUP_PATTERN.matcher(groupName).matches()) {
+      throw InvalidBundleException.builder()
+          .withUserMessage(
+              "Device group names should start with a letter "
+                  + "and contain only letters, numbers and underscores. "
+                  + "Found group named '%s' for directory '%s'.",
+              groupName, directory)
+          .build();
+    }
+  }
+
   public static void validateDeviceGroupForConditionalModule(String groupName) {
     if (!DEVICE_GROUP_PATTERN.matcher(groupName).matches()) {
       throw InvalidBundleException.builder()
           .withUserMessage(
-              "Device group names should start with a letter and contain only letters, numbers and"
-                  + " underscores. Found group named '%s' in '<dist:%s>' element.",
+              "Device group names should start with a letter "
+                  + "and contain only letters, numbers and underscores. "
+                  + "Found group named '%s' in '<dist:%s>' element.",
               groupName, DEVICE_GROUP_ELEMENT_NAME)
           .build();
     }
+  }
+
+  /**
+   * The catch-all device group which matches every device.
+   *
+   * <p>Added to the end of the priority-ordered list of device groups. It should not be explicitly
+   * defined in the DeviceGroupConfig metadata.
+   */
+  private static final String GROUP_OTHER_NAME = "other";
+
+  /** Ensures a "catch-all" device group, if relevant. */
+  public static DeviceGroupConfig addDeviceGroupOther(DeviceGroupConfig config) {
+    if (config.getDeviceGroupsList().isEmpty()) {
+      return config;
+    }
+    Optional<String> groupOther =
+        config.getDeviceGroupsList().stream()
+            .map(DeviceGroup::getName)
+            .filter(name -> name.equals(GROUP_OTHER_NAME))
+            .findFirst();
+      if (groupOther.isPresent()) {
+        throw InvalidBundleException.builder()
+            .withUserMessage(
+                "Device group '%s' is implicit. It must not be defined in the bundle metadata.",
+                GROUP_OTHER_NAME)
+            .build();
+      }
+    return config.toBuilder()
+        .addDeviceGroups(
+            DeviceGroup.newBuilder()
+                .setName(GROUP_OTHER_NAME)
+                .addDeviceSelectors(DeviceSelector.getDefaultInstance()))
+        .build();
   }
 
   // Do not instantiate.

@@ -107,7 +107,6 @@ public class BundleMetadataTest {
         .hasValue(
             ModuleEntry.builder()
                 .setContent(transparencyContents)
-                // TODO(b/186621568): Fix. Bundle location is ignored in ModuleEntry.equals.
                 .setFileLocation(
                     ModuleEntryLocationInZipSource.create(
                         Paths.get(""),

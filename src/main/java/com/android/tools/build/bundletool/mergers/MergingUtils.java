@@ -22,6 +22,8 @@ import static com.android.tools.build.bundletool.model.utils.TargetingProtoUtils
 import static com.android.tools.build.bundletool.model.utils.TargetingProtoUtils.countrySetValues;
 import static com.android.tools.build.bundletool.model.utils.TargetingProtoUtils.densityUniverse;
 import static com.android.tools.build.bundletool.model.utils.TargetingProtoUtils.densityValues;
+import static com.android.tools.build.bundletool.model.utils.TargetingProtoUtils.deviceGroupUniverse;
+import static com.android.tools.build.bundletool.model.utils.TargetingProtoUtils.deviceGroupValues;
 import static com.android.tools.build.bundletool.model.utils.TargetingProtoUtils.deviceTierUniverse;
 import static com.android.tools.build.bundletool.model.utils.TargetingProtoUtils.deviceTierValues;
 import static com.android.tools.build.bundletool.model.utils.TargetingProtoUtils.languageUniverse;
@@ -38,6 +40,7 @@ import com.android.bundle.Targeting.Abi;
 import com.android.bundle.Targeting.AbiTargeting;
 import com.android.bundle.Targeting.ApkTargeting;
 import com.android.bundle.Targeting.CountrySetTargeting;
+import com.android.bundle.Targeting.DeviceGroupTargeting;
 import com.android.bundle.Targeting.DeviceTierTargeting;
 import com.android.bundle.Targeting.LanguageTargeting;
 import com.android.bundle.Targeting.MultiAbi;
@@ -87,6 +90,7 @@ final class MergingUtils {
    *   <li>Screen density
    *   <li>Language
    *   <li>Texture compression format
+   *   <li>Device group
    *   <li>Device tier
    *   <li>Country Set
    * </ul>
@@ -119,6 +123,10 @@ final class MergingUtils {
         || targeting2.hasTextureCompressionFormatTargeting()) {
       merged.setTextureCompressionFormatTargeting(
           mergeTextureCompressionFormatTargetingsOf(targeting1, targeting2));
+    }
+
+    if (targeting1.hasDeviceGroupTargeting() || targeting2.hasDeviceGroupTargeting()) {
+      merged.setDeviceGroupTargeting(mergeDeviceGroupTargetingsOf(targeting1, targeting2));
     }
 
     if (targeting1.hasDeviceTierTargeting() || targeting2.hasDeviceTierTargeting()) {
@@ -159,14 +167,15 @@ final class MergingUtils {
             .clearScreenDensityTargeting()
             .clearLanguageTargeting()
             .clearTextureCompressionFormatTargeting()
+            .clearDeviceGroupTargeting()
             .clearDeviceTierTargeting()
             .clearCountrySetTargeting()
             .build();
     if (!targetingOtherThanSupportedDimensions.equals(ApkTargeting.getDefaultInstance())) {
       throw CommandExecutionException.builder()
           .withInternalMessage(
-              "Expecting only ABI, screen density, language, texture compression format, device"
-                  + " tier and country set targeting, got '%s'.",
+              "Expecting only ABI, screen density, language, texture compression format,"
+                  + " device tier, device group and country set targeting, got '%s'.",
               targeting)
           .build();
     }
@@ -225,6 +234,18 @@ final class MergingUtils {
     return TextureCompressionFormatTargeting.newBuilder()
         .addAllValue(values)
         .addAllAlternatives(Sets.difference(universe, values))
+        .build();
+  }
+
+  private static DeviceGroupTargeting mergeDeviceGroupTargetingsOf(
+      ApkTargeting targeting1, ApkTargeting targeting2) {
+    Set<String> universe =
+        Sets.union(deviceGroupUniverse(targeting1), deviceGroupUniverse(targeting2));
+    Set<String> values = Sets.union(deviceGroupValues(targeting1), deviceGroupValues(targeting2));
+    Set<String> alternatives = Sets.difference(universe, values);
+    return DeviceGroupTargeting.newBuilder()
+        .addAllValue(values)
+        .addAllAlternatives(alternatives)
         .build();
   }
 

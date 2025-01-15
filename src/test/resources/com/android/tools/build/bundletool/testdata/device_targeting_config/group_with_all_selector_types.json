@@ -31,6 +31,12 @@
             {
               "name":"android.hardware.greentooth"
             }
+          ],
+          "system_on_chips":[
+            {
+              "manufacturer":"Qualcomm",
+              "model":"SDM670"
+            }
           ]
         }
       ]

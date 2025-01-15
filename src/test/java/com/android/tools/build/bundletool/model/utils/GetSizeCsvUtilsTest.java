@@ -18,6 +18,7 @@ package com.android.tools.build.bundletool.model.utils;
 
 import static com.android.tools.build.bundletool.model.GetSizeRequest.Dimension.ABI;
 import static com.android.tools.build.bundletool.model.GetSizeRequest.Dimension.COUNTRY_SET;
+import static com.android.tools.build.bundletool.model.GetSizeRequest.Dimension.DEVICE_GROUP;
 import static com.android.tools.build.bundletool.model.GetSizeRequest.Dimension.DEVICE_TIER;
 import static com.android.tools.build.bundletool.model.GetSizeRequest.Dimension.LANGUAGE;
 import static com.android.tools.build.bundletool.model.GetSizeRequest.Dimension.SCREEN_DENSITY;
@@ -93,7 +94,7 @@ public class GetSizeCsvUtilsTest {
   }
 
   @Test
-  public void getSizeTotalOutputInCsv_withDimensionsAndCommasInConfiguration() {
+  public void getSizeTotalOutputInCsv_withDimensionsAndCommasInConfiguration_deviceTier() {
     assertThat(
             getSizeTotalOutputInCsv(
                 ConfigurationSizes.create(
@@ -135,6 +136,52 @@ public class GetSizeCsvUtilsTest {
             "SDK,ABI,SCREEN_DENSITY,LANGUAGE,TEXTURE_COMPRESSION_FORMAT,DEVICE_TIER,COUNTRY_SET,SDK_RUNTIME,MIN,MAX"
                 + CRLF
                 + "22,\"x86,armeabi-v7a\",480,\"en,fr\",\"ASTC,ETC2\",1,latam,Not Required,1,6"
+                + CRLF);
+  }
+
+  @Test
+  public void getSizeTotalOutputInCsv_withDimensionsAndCommasInConfiguration_deviceGroup() {
+    assertThat(
+            getSizeTotalOutputInCsv(
+                ConfigurationSizes.create(
+                    ImmutableMap.of(
+                        SizeConfiguration.builder()
+                            .setSdkVersion("22")
+                            .setAbi("x86,armeabi-v7a")
+                            .setScreenDensity("480")
+                            .setLocale("en,fr")
+                            .setTextureCompressionFormat("ASTC,ETC2")
+                            .setDeviceGroup("b")
+                            .setCountrySet("latam")
+                            .setSdkRuntime("Not Required")
+                            .build(),
+                        1L),
+                    ImmutableMap.of(
+                        SizeConfiguration.builder()
+                            .setSdkVersion("22")
+                            .setAbi("x86,armeabi-v7a")
+                            .setScreenDensity("480")
+                            .setLocale("en,fr")
+                            .setTextureCompressionFormat("ASTC,ETC2")
+                            .setDeviceGroup("b")
+                            .setCountrySet("latam")
+                            .setSdkRuntime("Not Required")
+                            .build(),
+                        6L)),
+                ImmutableSet.of(
+                    SCREEN_DENSITY,
+                    ABI,
+                    LANGUAGE,
+                    SDK,
+                    TEXTURE_COMPRESSION_FORMAT,
+                    DEVICE_GROUP,
+                    COUNTRY_SET,
+                    SDK_RUNTIME),
+                SizeFormatter.rawFormatter()))
+        .isEqualTo(
+            "SDK,ABI,SCREEN_DENSITY,LANGUAGE,TEXTURE_COMPRESSION_FORMAT,DEVICE_GROUP,COUNTRY_SET,SDK_RUNTIME,MIN,MAX"
+                + CRLF
+                + "22,\"x86,armeabi-v7a\",480,\"en,fr\",\"ASTC,ETC2\",b,latam,Not Required,1,6"
                 + CRLF);
   }
 }

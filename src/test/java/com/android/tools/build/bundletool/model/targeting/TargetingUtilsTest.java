@@ -27,6 +27,7 @@ import static com.android.tools.build.bundletool.testing.TargetingUtils.alternat
 import static com.android.tools.build.bundletool.testing.TargetingUtils.alternativeTextureCompressionTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.assetsDirectoryTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.countrySetTargeting;
+import static com.android.tools.build.bundletool.testing.TargetingUtils.deviceGroupTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.deviceTierTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.languageTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.mergeAssetsTargeting;
@@ -96,6 +97,14 @@ public class TargetingUtilsTest {
     assertThat(
             TargetingUtils.getTargetingDimensions(assetsDirectoryTargeting(deviceTierTargeting(0))))
         .containsExactly(TargetingDimension.DEVICE_TIER);
+  }
+
+  @Test
+  public void getDimensions_deviceGroup() {
+    assertThat(
+            TargetingUtils.getTargetingDimensions(
+                assetsDirectoryTargeting(deviceGroupTargeting("highRam"))))
+        .containsExactly(TargetingDimension.DEVICE_GROUP);
   }
 
   @Test
@@ -228,7 +237,7 @@ public class TargetingUtilsTest {
   }
 
   @Test
-  public void extractDimensionTargeting_countrySetTexture() {
+  public void extractDimensionTargeting_countrySetTextureDeviceTier() {
     AssetsDirectoryTargeting targeting =
         AssetsDirectoryTargeting.newBuilder()
             .setCountrySet(countrySetTargeting("latam"))
@@ -260,6 +269,40 @@ public class TargetingUtilsTest {
   }
 
   @Test
+  public void extractDimensionTargeting_countrySetTextureDeviceGroup() {
+    AssetsDirectoryTargeting targeting =
+        AssetsDirectoryTargeting.newBuilder()
+            .setCountrySet(countrySetTargeting("latam"))
+            .setTextureCompressionFormat(
+                textureCompressionTargeting(TextureCompressionFormatAlias.ASTC))
+            .setDeviceGroup(deviceGroupTargeting("highRam"))
+            .build();
+
+    assertThat(TargetingUtils.extractDimensionTargeting(targeting, TargetingDimension.COUNTRY_SET))
+        .hasValue(
+            AssetsDirectoryTargeting.newBuilder()
+                .setCountrySet(countrySetTargeting("latam"))
+                .build());
+    assertThat(
+            TargetingUtils.extractDimensionTargeting(
+                targeting, TargetingDimension.TEXTURE_COMPRESSION_FORMAT))
+        .hasValue(
+            AssetsDirectoryTargeting.newBuilder()
+                .setTextureCompressionFormat(
+                    textureCompressionTargeting(TextureCompressionFormatAlias.ASTC))
+                .build());
+    assertThat(TargetingUtils.extractDimensionTargeting(targeting, TargetingDimension.DEVICE_GROUP))
+        .hasValue(
+            AssetsDirectoryTargeting.newBuilder()
+                .setDeviceGroup(deviceGroupTargeting("highRam"))
+                .build());
+    assertThat(TargetingUtils.extractDimensionTargeting(targeting, TargetingDimension.ABI))
+        .isEmpty();
+    assertThat(TargetingUtils.extractDimensionTargeting(targeting, TargetingDimension.LANGUAGE))
+        .isEmpty();
+  }
+
+  @Test
   public void extractDimensionTargeting_empty() {
     AssetsDirectoryTargeting targeting = AssetsDirectoryTargeting.getDefaultInstance();
 
@@ -268,6 +311,8 @@ public class TargetingUtilsTest {
     assertThat(
             TargetingUtils.extractDimensionTargeting(
                 targeting, TargetingDimension.TEXTURE_COMPRESSION_FORMAT))
+        .isEmpty();
+    assertThat(TargetingUtils.extractDimensionTargeting(targeting, TargetingDimension.DEVICE_GROUP))
         .isEmpty();
     assertThat(TargetingUtils.extractDimensionTargeting(targeting, TargetingDimension.DEVICE_TIER))
         .isEmpty();
@@ -284,6 +329,7 @@ public class TargetingUtilsTest {
             .addFile("assets/img1#countries_latam#tcf_astc/image.jpg")
             .addFile("assets/img1#tcf_astc/image.jpg")
             .addFile("assets/img1#tcf_pvrtc/image.jpg")
+            .addFile("assets/img1#group_highRam/image.jpg")
             .addFile("assets/img1/image.jpg")
             .addFile("assets/file.txt")
             .addFile("foo/bar/file.txt")
@@ -295,6 +341,7 @@ public class TargetingUtilsTest {
             ZipPath.create("assets/img1#countries_latam#tcf_astc"),
             ZipPath.create("assets/img1#tcf_astc"),
             ZipPath.create("assets/img1#tcf_pvrtc"),
+            ZipPath.create("assets/img1#group_highRam"),
             ZipPath.create("assets/img1"),
             ZipPath.create("assets"));
   }

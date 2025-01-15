@@ -17,13 +17,16 @@
 package com.android.tools.build.bundletool.device;
 
 import static com.android.tools.build.bundletool.testing.DeviceFactory.abis;
+import static com.android.tools.build.bundletool.testing.DeviceFactory.branding;
 import static com.android.tools.build.bundletool.testing.DeviceFactory.density;
 import static com.android.tools.build.bundletool.testing.DeviceFactory.deviceFeatures;
 import static com.android.tools.build.bundletool.testing.DeviceFactory.glExtensions;
 import static com.android.tools.build.bundletool.testing.DeviceFactory.locales;
 import static com.android.tools.build.bundletool.testing.DeviceFactory.mergeSpecs;
+import static com.android.tools.build.bundletool.testing.DeviceFactory.ramBytes;
 import static com.android.tools.build.bundletool.testing.DeviceFactory.sdkRuntimeSupported;
 import static com.android.tools.build.bundletool.testing.DeviceFactory.sdkVersion;
+import static com.android.tools.build.bundletool.testing.DeviceFactory.soc;
 import static com.google.common.truth.Truth.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
@@ -329,6 +332,38 @@ public class DeviceAnalyzerTest {
     DeviceSpec deviceSpec = analyzer.getDeviceSpec(Optional.empty());
     assertThat(deviceSpec.getGlExtensionsList())
         .containsExactly("GL_EXT_extension1", "GL_EXT_extension2");
+  }
+
+  @Test
+  public void extractsDeviceGroupTargetingDetails() {
+    long ramBytes = 12L * 1024 * 1024 * 1024;
+    FakeDevice fakeDevice =
+        FakeDevice.fromDeviceSpec(
+            "id1",
+            DeviceState.ONLINE,
+            mergeSpecs(
+                density(240),
+                locales("en-US"),
+                abis("x86"),
+                sdkVersion(21),
+                branding("brand-name", "device-name"),
+                soc("soc-manufacturer", "soc-model"),
+                ramBytes(ramBytes),
+                glExtensions("GL_EXT_extension1", "GL_EXT_extension2")));
+
+    FakeAdbServer fakeAdbServer =
+        new FakeAdbServer(
+            /* hasInitialDeviceList= */ true, /* devices= */ ImmutableList.of(fakeDevice));
+    fakeAdbServer.init(Paths.get("path/to/adb"));
+
+    DeviceAnalyzer analyzer = new DeviceAnalyzer(fakeAdbServer);
+    DeviceSpec deviceSpec = analyzer.getDeviceSpec(Optional.empty());
+
+    assertThat(deviceSpec.getBuildBrand()).isEqualTo("brand-name");
+    assertThat(deviceSpec.getBuildDevice()).isEqualTo("device-name");
+    assertThat(deviceSpec.getSocManufacturer()).isEqualTo("soc-manufacturer");
+    assertThat(deviceSpec.getSocModel()).isEqualTo("soc-model");
+    assertThat(deviceSpec.getRamBytes()).isEqualTo(ramBytes);
   }
 
   @Test

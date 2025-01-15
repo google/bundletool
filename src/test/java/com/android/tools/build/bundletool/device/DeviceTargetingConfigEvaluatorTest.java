@@ -160,6 +160,24 @@ public class DeviceTargetingConfigEvaluatorTest {
     assertThat(matchingGroups).hasSize(1);
   }
 
+  @Test
+  public void defaultSelector_matchesEverything() throws Exception {
+    ImmutableSet<DeviceGroup> matchingGroups =
+        getMatchingDeviceGroups(
+            "default_selector.json", "very_low_ram_device_properties.json");
+
+    assertThat(matchingGroups).hasSize(1);
+  }
+
+  @Test
+  public void soc_deviceMatchedWithGroup() throws Exception {
+    ImmutableSet<DeviceGroup> matchingGroups =
+        getMatchingDeviceGroups(
+            "selector_with_soc.json", "very_high_ram_device_properties.json");
+
+    assertThat(matchingGroups).hasSize(1);
+  }
+
   private Optional<DeviceTier> getSelectedDeviceTier(
       String deviceTierConfigFileName, String devicePropertiesFileName) throws Exception {
     DeviceTierConfig deviceTierConfig = loadDeviceTierConfig(deviceTierConfigFileName);
@@ -172,7 +190,7 @@ public class DeviceTargetingConfigEvaluatorTest {
     DeviceTierConfig deviceTierConfig = loadDeviceTierConfig(deviceTierConfigFileName);
     DeviceProperties deviceProperties = loadDeviceProperties(devicePropertiesFileName);
     return DeviceTargetingConfigEvaluator.getMatchingDeviceGroups(
-        deviceTierConfig, deviceProperties);
+        deviceTierConfig.getDeviceGroupsList(), deviceProperties);
   }
 
   private DeviceProperties loadDeviceProperties(String devicePropertiesFileName) throws Exception {

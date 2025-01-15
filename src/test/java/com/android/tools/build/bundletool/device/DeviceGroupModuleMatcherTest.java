@@ -29,7 +29,7 @@ import org.junit.runners.JUnit4;
 public class DeviceGroupModuleMatcherTest {
 
   @Test
-  public void matchesTargeting_specifiedDeviceTier() {
+  public void matchesTargeting_specifiedDeviceGroup() {
     DeviceGroupModuleMatcher matcher =
         new DeviceGroupModuleMatcher(deviceGroups("highRam", "mediumRam"));
 
@@ -45,7 +45,7 @@ public class DeviceGroupModuleMatcherTest {
   }
 
   @Test
-  public void matchesTargeting_noTierInDeviceSpec() {
+  public void matchesTargeting_noDeviceGroupInDeviceSpec() {
     DeviceGroupModuleMatcher matcher =
         new DeviceGroupModuleMatcher(DeviceSpec.getDefaultInstance());
 

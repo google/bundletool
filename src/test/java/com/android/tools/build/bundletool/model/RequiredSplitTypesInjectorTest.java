@@ -23,6 +23,7 @@ import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.andr
 import static com.android.tools.build.bundletool.testing.TargetingUtils.apkAbiTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.apkCountrySetTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.apkDensityTargeting;
+import static com.android.tools.build.bundletool.testing.TargetingUtils.apkDeviceGroupTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.apkDeviceTierTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.apkTextureTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.lPlusVariantTargeting;
@@ -31,6 +32,7 @@ import static com.google.common.truth.Truth.assertThat;
 import com.android.bundle.Targeting.AbiTargeting;
 import com.android.bundle.Targeting.ApkTargeting;
 import com.android.bundle.Targeting.CountrySetTargeting;
+import com.android.bundle.Targeting.DeviceGroupTargeting;
 import com.android.bundle.Targeting.DeviceTierTargeting;
 import com.android.bundle.Targeting.ScreenDensityTargeting;
 import com.android.bundle.Targeting.TextureCompressionFormatTargeting;
@@ -85,6 +87,8 @@ public final class RequiredSplitTypesInjectorTest {
             "base__abi",
             apkDensityTargeting(ScreenDensityTargeting.getDefaultInstance()),
             "base__density",
+            apkDeviceGroupTargeting(DeviceGroupTargeting.getDefaultInstance()),
+            "base__group",
             apkDeviceTierTargeting(DeviceTierTargeting.getDefaultInstance()),
             "base__tier",
             apkCountrySetTargeting(CountrySetTargeting.getDefaultInstance()),

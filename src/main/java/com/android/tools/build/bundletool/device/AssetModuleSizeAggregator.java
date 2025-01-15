@@ -22,6 +22,7 @@ import com.android.bundle.Commands.ApkDescription;
 import com.android.bundle.Commands.AssetSliceSet;
 import com.android.bundle.Targeting.AbiTargeting;
 import com.android.bundle.Targeting.CountrySetTargeting;
+import com.android.bundle.Targeting.DeviceGroupTargeting;
 import com.android.bundle.Targeting.DeviceTierTargeting;
 import com.android.bundle.Targeting.LanguageTargeting;
 import com.android.bundle.Targeting.ScreenDensityTargeting;
@@ -86,7 +87,9 @@ public class AssetModuleSizeAggregator extends AbstractSizeAggregator {
         variantTargeting.hasTextureCompressionFormatTargeting()
             ? ImmutableSet.of(variantTargeting.getTextureCompressionFormatTargeting())
             : getAllTextureCompressionFormatTargetings(apkDescriptions);
-    ImmutableSet<DeviceTierTargeting> devicetierTargetingOptions =
+    ImmutableSet<DeviceGroupTargeting> deviceGroupTargetingOptions =
+        getAllDeviceGroupTargetings(apkDescriptions);
+    ImmutableSet<DeviceTierTargeting> deviceTierTargetingOptions =
         getAllDeviceTierTargetings(apkDescriptions);
     ImmutableSet<CountrySetTargeting> countrySetTargetingOptions =
         getAllCountrySetTargetings(apkDescriptions);
@@ -97,7 +100,8 @@ public class AssetModuleSizeAggregator extends AbstractSizeAggregator {
         languageTargetingOptions,
         screenDensityTargetingOptions,
         textureCompressionFormatTargetingOptions,
-        devicetierTargetingOptions,
+        deviceGroupTargetingOptions,
+        deviceTierTargetingOptions,
         countrySetTargetingOptions,
         variantTargeting.getSdkRuntimeTargeting());
   }
@@ -109,6 +113,7 @@ public class AssetModuleSizeAggregator extends AbstractSizeAggregator {
       ScreenDensityTargeting screenDensityTargeting,
       LanguageTargeting languageTargeting,
       TextureCompressionFormatTargeting textureTargeting,
+      DeviceGroupTargeting deviceGroupTargeting,
       DeviceTierTargeting deviceTierTargeting,
       CountrySetTargeting countrySetTargeting,
       SdkRuntimeTargeting sdkRuntimeTargeting) {
@@ -120,6 +125,7 @@ public class AssetModuleSizeAggregator extends AbstractSizeAggregator {
                 screenDensityTargeting,
                 languageTargeting,
                 textureTargeting,
+                deviceGroupTargeting,
                 deviceTierTargeting,
                 countrySetTargeting,
                 sdkRuntimeTargeting),

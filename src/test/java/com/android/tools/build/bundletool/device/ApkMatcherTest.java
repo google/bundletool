@@ -41,6 +41,7 @@ import static com.android.tools.build.bundletool.testing.ApksArchiveHelpers.mult
 import static com.android.tools.build.bundletool.testing.ApksArchiveHelpers.splitApkDescription;
 import static com.android.tools.build.bundletool.testing.ApksArchiveHelpers.standaloneVariant;
 import static com.android.tools.build.bundletool.testing.DeviceFactory.abis;
+import static com.android.tools.build.bundletool.testing.DeviceFactory.countrySet;
 import static com.android.tools.build.bundletool.testing.DeviceFactory.density;
 import static com.android.tools.build.bundletool.testing.DeviceFactory.deviceFeatures;
 import static com.android.tools.build.bundletool.testing.DeviceFactory.deviceGroups;
@@ -57,9 +58,13 @@ import static com.android.tools.build.bundletool.testing.DeviceFactory.sdkVersio
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifest;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.apkAbiTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.apkAlternativeLanguageTargeting;
+import static com.android.tools.build.bundletool.testing.TargetingUtils.apkCountrySetTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.apkDensityTargeting;
+import static com.android.tools.build.bundletool.testing.TargetingUtils.apkDeviceGroupTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.apkLanguageTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.apkTextureTargeting;
+import static com.android.tools.build.bundletool.testing.TargetingUtils.countrySetTargeting;
+import static com.android.tools.build.bundletool.testing.TargetingUtils.deviceGroupTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.mergeApkTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.mergeModuleTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.mergeVariantTargeting;
@@ -755,6 +760,127 @@ public class ApkMatcherTest {
         .containsExactly(baseMatchedApk(apk));
   }
 
+  // CountrySet splits.
+
+  @Test
+  public void apkMatch_countrySetSplit() {
+    ZipPath apk = ZipPath.create("master-latam.apk");
+    BuildApksResult buildApksResult =
+        buildApksResult(
+            oneApkSplitApkVariant(
+                variantSdkTargeting(sdkVersionFrom(Versions.ANDROID_L_API_VERSION)),
+                apkCountrySetTargeting(countrySetTargeting("latam")),
+                apk));
+
+    DeviceSpec deviceSpec = mergeSpecs(lDevice(), countrySet("latam"));
+    assertThat(new ApkMatcher(deviceSpec).getMatchingApks(buildApksResult))
+        .containsExactly(baseMatchedApk(apk));
+  }
+
+  @Test
+  public void apkMatch_countrySetSplit_alternatives() {
+    ZipPath seaApk = ZipPath.create("master-sea.apk");
+    ZipPath latamApk = ZipPath.create("master-latam.apk");
+    BuildApksResult buildApksResult =
+        buildApksResult(
+            createVariant(
+                variantSdkTargeting(sdkVersionFrom(Versions.ANDROID_L_API_VERSION)),
+                splitApkSet(
+                    "base",
+                    splitApkDescription(
+                        apkCountrySetTargeting(
+                            countrySetTargeting("sea", ImmutableList.of("latam"))),
+                        seaApk)),
+                splitApkSet(
+                    "base",
+                    splitApkDescription(
+                        apkCountrySetTargeting(
+                            countrySetTargeting("latam", ImmutableList.of("sea"))),
+                        latamApk))));
+
+    DeviceSpec deviceSpec = mergeSpecs(lDevice(), countrySet("latam"));
+    assertThat(new ApkMatcher(deviceSpec).getMatchingApks(buildApksResult))
+        .containsExactly(baseMatchedApk(latamApk));
+  }
+
+  @Test
+  public void apkMatch_noCountrySetMatch_throws() {
+    ZipPath apk = ZipPath.create("master-latam.apk");
+    BuildApksResult buildApksResult =
+        buildApksResult(
+            oneApkSplitApkVariant(
+                variantSdkTargeting(sdkVersionFrom(Versions.ANDROID_L_API_VERSION)),
+                apkCountrySetTargeting(countrySetTargeting("latam")),
+                apk));
+
+    DeviceSpec deviceSpec = mergeSpecs(lDevice(), countrySet("sea"));
+    IllegalArgumentException e =
+        assertThrows(
+            IllegalArgumentException.class,
+            () -> new ApkMatcher(deviceSpec).getMatchingApks(buildApksResult));
+    assertThat(e)
+        .hasMessageThat()
+        .contains(
+            "The specified country set 'sea' does not match any of the available values: latam");
+  }
+
+  // Device Group splits.
+
+  @Test
+  public void apkMatch_deviceGroupSplit() {
+    ZipPath apk = ZipPath.create("master-highRam.apk");
+    BuildApksResult buildApksResult =
+        buildApksResult(
+            oneApkSplitApkVariant(
+                variantSdkTargeting(sdkVersionFrom(Versions.ANDROID_L_API_VERSION)),
+                apkDeviceGroupTargeting(deviceGroupTargeting("highRam")),
+                apk));
+
+    DeviceSpec deviceSpec = mergeSpecs(lDevice(), deviceGroups("highRam"));
+    assertThat(new ApkMatcher(deviceSpec).getMatchingApks(buildApksResult))
+        .containsExactly(baseMatchedApk(apk));
+  }
+
+  @Test
+  public void apkMatch_deviceGroupSplit_alternatives() {
+    ZipPath lowApk = ZipPath.create("master-lowRam.apk");
+    ZipPath highApk = ZipPath.create("master-highRam.apk");
+    BuildApksResult buildApksResult =
+        buildApksResult(
+            createVariant(
+                variantSdkTargeting(sdkVersionFrom(Versions.ANDROID_L_API_VERSION)),
+                splitApkSet(
+                    "base",
+                    splitApkDescription(
+                        apkDeviceGroupTargeting(
+                            deviceGroupTargeting("lowRam", ImmutableList.of("highRam"))),
+                        lowApk)),
+                splitApkSet(
+                    "base",
+                    splitApkDescription(
+                        apkDeviceGroupTargeting(
+                            deviceGroupTargeting("highRam", ImmutableList.of("lowRam"))),
+                        highApk))));
+
+    DeviceSpec deviceSpec = mergeSpecs(lDevice(), deviceGroups("highRam"));
+    assertThat(new ApkMatcher(deviceSpec).getMatchingApks(buildApksResult))
+        .containsExactly(baseMatchedApk(highApk));
+  }
+
+  @Test
+  public void apkNoMatch_noDeviceGroupMatch() {
+    ZipPath apk = ZipPath.create("master-highRam.apk");
+    BuildApksResult buildApksResult =
+        buildApksResult(
+            oneApkSplitApkVariant(
+                variantSdkTargeting(sdkVersionFrom(Versions.ANDROID_L_API_VERSION)),
+                apkDeviceGroupTargeting(deviceGroupTargeting("highRam")),
+                apk));
+
+    DeviceSpec deviceSpec = mergeSpecs(lDevice(), deviceGroups("lowRam"));
+    assertThat(new ApkMatcher(deviceSpec).getMatchingApks(buildApksResult)).isEmpty();
+  }
+
   // Texture variants
 
   @Test
@@ -966,6 +1092,7 @@ public class ApkMatcherTest {
     assertThat(new ApkMatcher(lDevice()).getMatchingApks(buildApksResult))
         .containsExactly(baseMatchedApk(apk));
   }
+
   // Module name filtering.
 
   @Test
@@ -1136,14 +1263,14 @@ public class ApkMatcherTest {
     assertThat(createMatcher(device, feature2ModuleOnly).getMatchingApks(buildApksResult))
         .containsExactly(
             baseMatchedApk(baseApk),
-            matchedApk(feature1Apk, /* moduleName=*/ "feature1", ON_DEMAND),
-            matchedApk(feature2Apk, /* moduleName=*/ "feature2", ON_DEMAND));
+            matchedApk(feature1Apk, /* moduleName= */ "feature1", ON_DEMAND),
+            matchedApk(feature2Apk, /* moduleName= */ "feature2", ON_DEMAND));
 
     Optional<ImmutableSet<String>> feature1ModuleOnly = Optional.of(ImmutableSet.of("feature1"));
     assertThat(createMatcher(device, feature1ModuleOnly).getMatchingApks(buildApksResult))
         .containsExactly(
             baseMatchedApk(baseApk),
-            matchedApk(feature1Apk, /* moduleName=*/ "feature1", ON_DEMAND));
+            matchedApk(feature1Apk, /* moduleName= */ "feature1", ON_DEMAND));
   }
 
   @Test
@@ -1191,17 +1318,17 @@ public class ApkMatcherTest {
     assertThat(createMatcher(device, feature4ModuleOnly).getMatchingApks(buildApksResult))
         .containsExactly(
             baseMatchedApk(baseApk),
-            matchedApk(feature1Apk, /* moduleName=*/ "feature1", ON_DEMAND),
-            matchedApk(feature2Apk, /* moduleName=*/ "feature2", ON_DEMAND),
-            matchedApk(feature3Apk, /* moduleName=*/ "feature3", ON_DEMAND),
-            matchedApk(feature4Apk, /* moduleName=*/ "feature4", ON_DEMAND));
+            matchedApk(feature1Apk, /* moduleName= */ "feature1", ON_DEMAND),
+            matchedApk(feature2Apk, /* moduleName= */ "feature2", ON_DEMAND),
+            matchedApk(feature3Apk, /* moduleName= */ "feature3", ON_DEMAND),
+            matchedApk(feature4Apk, /* moduleName= */ "feature4", ON_DEMAND));
 
     Optional<ImmutableSet<String>> feature2ModuleOnly = Optional.of(ImmutableSet.of("feature2"));
     assertThat(createMatcher(device, feature2ModuleOnly).getMatchingApks(buildApksResult))
         .containsExactly(
             baseMatchedApk(baseApk),
-            matchedApk(feature1Apk, /* moduleName=*/ "feature1", ON_DEMAND),
-            matchedApk(feature2Apk, /* moduleName=*/ "feature2", ON_DEMAND));
+            matchedApk(feature1Apk, /* moduleName= */ "feature1", ON_DEMAND),
+            matchedApk(feature2Apk, /* moduleName= */ "feature2", ON_DEMAND));
   }
 
   @Test
@@ -1238,37 +1365,42 @@ public class ApkMatcherTest {
     Optional<ImmutableSet<String>> allModules = Optional.empty();
     assertThat(createMatcher(device, allModules).getMatchingApks(buildApksResult))
         .containsExactly(
-            matchedApk(baseApk, /* moduleName=*/ "base", INSTALL_TIME),
-            matchedApk(installTimeFeatureApk, /* moduleName=*/ "installTimeFeature", INSTALL_TIME));
+            matchedApk(baseApk, /* moduleName= */ "base", INSTALL_TIME),
+            matchedApk(
+                installTimeFeatureApk, /* moduleName= */ "installTimeFeature", INSTALL_TIME));
 
     Optional<ImmutableSet<String>> baseModuleOnly = Optional.of(ImmutableSet.of("base"));
     assertThat(createMatcher(device, baseModuleOnly).getMatchingApks(buildApksResult))
         .containsExactly(
-            matchedApk(baseApk, /* moduleName=*/ "base", INSTALL_TIME),
-            matchedApk(installTimeFeatureApk, /* moduleName=*/ "installTimeFeature", INSTALL_TIME));
+            matchedApk(baseApk, /* moduleName= */ "base", INSTALL_TIME),
+            matchedApk(
+                installTimeFeatureApk, /* moduleName= */ "installTimeFeature", INSTALL_TIME));
 
     Optional<ImmutableSet<String>> installTimeModuleOnly =
         Optional.of(ImmutableSet.of("installTimeFeature"));
     assertThat(createMatcher(device, installTimeModuleOnly).getMatchingApks(buildApksResult))
         .containsExactly(
-            matchedApk(baseApk, /* moduleName=*/ "base", INSTALL_TIME),
-            matchedApk(installTimeFeatureApk, /* moduleName=*/ "installTimeFeature", INSTALL_TIME));
+            matchedApk(baseApk, /* moduleName= */ "base", INSTALL_TIME),
+            matchedApk(
+                installTimeFeatureApk, /* moduleName= */ "installTimeFeature", INSTALL_TIME));
 
     Optional<ImmutableSet<String>> onDemandModuleOnly =
         Optional.of(ImmutableSet.of("onDemandFeature"));
     assertThat(createMatcher(device, onDemandModuleOnly).getMatchingApks(buildApksResult))
         .containsExactly(
-            matchedApk(baseApk, /* moduleName=*/ "base", INSTALL_TIME),
-            matchedApk(onDemandFeatureApk, /* moduleName=*/ "onDemandFeature", ON_DEMAND),
-            matchedApk(installTimeFeatureApk, /* moduleName=*/ "installTimeFeature", INSTALL_TIME));
+            matchedApk(baseApk, /* moduleName= */ "base", INSTALL_TIME),
+            matchedApk(onDemandFeatureApk, /* moduleName= */ "onDemandFeature", ON_DEMAND),
+            matchedApk(
+                installTimeFeatureApk, /* moduleName= */ "installTimeFeature", INSTALL_TIME));
 
     Optional<ImmutableSet<String>> fastFollowModuleOnly =
         Optional.of(ImmutableSet.of("fastFollowFeature"));
     assertThat(createMatcher(device, fastFollowModuleOnly).getMatchingApks(buildApksResult))
         .containsExactly(
-            matchedApk(baseApk, /* moduleName=*/ "base", INSTALL_TIME),
-            matchedApk(fastFollowFeatureApk, /* moduleName=*/ "fastFollowFeature", FAST_FOLLOW),
-            matchedApk(installTimeFeatureApk, /* moduleName=*/ "installTimeFeature", INSTALL_TIME));
+            matchedApk(baseApk, /* moduleName= */ "base", INSTALL_TIME),
+            matchedApk(fastFollowFeatureApk, /* moduleName= */ "fastFollowFeature", FAST_FOLLOW),
+            matchedApk(
+                installTimeFeatureApk, /* moduleName= */ "installTimeFeature", INSTALL_TIME));
   }
 
   @Test
@@ -1350,7 +1482,9 @@ public class ApkMatcherTest {
 
   @Test
   public void splitApk_conditionalModule_deviceNotEligible() {
-    DeviceSpec device = mergeSpecs(deviceWithSdk(21), deviceFeatures("reqGlEsVersion=0x30000"));
+    DeviceSpec device =
+        mergeSpecs(
+            deviceWithSdk(21), deviceFeatures("reqGlEsVersion=0x30000"), deviceGroups("lowRam"));
 
     ZipPath baseApk = ZipPath.create("base-master.apk");
     ZipPath feature1Apk = ZipPath.create("ar-master.apk");
@@ -1479,8 +1613,8 @@ public class ApkMatcherTest {
         .containsExactly(
             baseMatchedApk(baseMasterSplitApk),
             baseMatchedApk(baseX86SplitApk),
-            matchedApk(screenMdpiApk, /* moduleName=*/ "screen", INSTALL_TIME),
-            matchedApk(langsEnSplitApk, /* moduleName=*/ "langs", INSTALL_TIME));
+            matchedApk(screenMdpiApk, /* moduleName= */ "screen", INSTALL_TIME),
+            matchedApk(langsEnSplitApk, /* moduleName= */ "langs", INSTALL_TIME));
 
     // MIPS ABI is not supported by the app.
     DeviceSpec preLMipsDevice =
@@ -1728,7 +1862,7 @@ public class ApkMatcherTest {
   }
 
   private static GeneratedApk baseMatchedApk(ZipPath path) {
-    return matchedApk(path, /* moduleName=*/ "base", INSTALL_TIME);
+    return matchedApk(path, /* moduleName= */ "base", INSTALL_TIME);
   }
 
   private static ApkMatcher createMatcher(DeviceSpec spec, Optional<ImmutableSet<String>> modules) {

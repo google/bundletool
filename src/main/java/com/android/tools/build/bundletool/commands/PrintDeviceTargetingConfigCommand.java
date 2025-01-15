@@ -213,10 +213,17 @@ public abstract class PrintDeviceTargetingConfigCommand {
             SystemFeature::getName,
             isFirstSelectorRule,
             indent);
+    isFirstSelectorRule =
+        printListRule(
+            /* operator= */ "device HAS NO FEATURES IN",
+            deviceSelector.getForbiddenSystemFeaturesList(),
+            SystemFeature::getName,
+            isFirstSelectorRule,
+            indent);
     printListRule(
-        /* operator= */ "device HAS NO FEATURES IN",
-        deviceSelector.getForbiddenSystemFeaturesList(),
-        SystemFeature::getName,
+        /* operator= */ "soc IN",
+        deviceSelector.getSystemOnChipsList(),
+        soc -> soc.getManufacturer() + " " + soc.getModel(),
         isFirstSelectorRule,
         indent);
   }

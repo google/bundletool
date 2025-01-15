@@ -165,11 +165,6 @@ public class LocaleConfigXmlInjector {
 
   private static ImmutableSet<String> getLocalesFromBaseModuleSplits(
       ImmutableList<ModuleSplit> splits) {
-    // TODO("b/213543969"): Bundletool is infeasible to detect the set of languages a developer
-    // explicitly supports if the app has dependencies which themselves provide extra resources
-    // from libraries such as Android X or Jetpack in many languages. The bug is created for the
-    // gradle to add a separate file with the resource source information, rather than including it
-    // in the ResourceTable.
     return splits.stream()
         // Only inject a locales_config.xml to the base module splits
         .filter(ModuleSplit::isBaseModuleSplit)

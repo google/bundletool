@@ -58,8 +58,8 @@ public final class RuntimeEnabledSdkManifestCompatibilityValidator extends SubVa
                   > baseMinSdk) {
                 throw InvalidBundleException.builder()
                     .withUserMessage(
-                        "Runtime-enabled SDKs must have a minSdkVersion lower than the app, but"
-                            + " found  SDK '%s' with minSdkVersion (%d) higher than the app's"
+                        "Runtime-enabled SDKs must not have a minSdkVersion greater than the app,"
+                            + " but found SDK '%s' with minSdkVersion (%d) higher than the app's"
                             + " minSdkVersion (%d).",
                         sdkModule.getKey(),
                         sdkModule.getValue().getAndroidManifest().getEffectiveMinSdkVersion(),

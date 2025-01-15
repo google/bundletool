@@ -44,11 +44,13 @@ public class AppBundleValidator {
           new ModuleNamesValidator(),
           new AndroidManifestValidator(),
           new BundleConfigValidator(),
+          new DeviceGroupConfigValidator(),
           // More specific file validations.
           new EntryClashValidator(),
           new NestedTargetingValidator(),
           new AbiParityValidator(),
           new TextureCompressionFormatParityValidator(),
+          new DeviceGroupParityValidator(),
           new DeviceTierParityValidator(),
           new CountrySetParityValidator(),
           new DexFilesValidator(),
@@ -57,6 +59,7 @@ public class AppBundleValidator {
           // Targeting validations.
           new AssetsTargetingValidator(),
           new NativeTargetingValidator(),
+          new DeviceGroupTargetingValidator(),
           // Other.
           new ArchiveEntriesValidator(),
           new ModuleDependencyValidator(),

@@ -248,6 +248,65 @@ public final class ConfigurationSizesMergerTest {
   }
 
   @Test
+  public void merge_configurationSizes_deviceGroup() throws Exception {
+    // Arrange
+    final long config1DefaultMin = 1 << 0;
+    final long config1SeaMin = 1 << 1;
+    final long config1DefaultMax = 1 << 2;
+    final long config1SeaMax = 1 << 3;
+    final long config2DefaultMin = 1 << 4;
+    final long config2SeaMin = 1 << 5;
+    final long config2DefaultMax = 1 << 6;
+    final long config2SeaMax = 1 << 7;
+    ConfigurationSizes configurationSizes1 =
+        ConfigurationSizes.create(
+            ImmutableMap.of(
+                SizeConfiguration.builder().setDeviceGroup("lowRam").build(),
+                config1DefaultMin,
+                SizeConfiguration.builder().setDeviceGroup("highRam").build(),
+                config1SeaMin),
+            ImmutableMap.of(
+                SizeConfiguration.builder().setDeviceGroup("lowRam").build(),
+                config1DefaultMax,
+                SizeConfiguration.builder().setDeviceGroup("highRam").build(),
+                config1SeaMax));
+    ConfigurationSizes configurationSizes2 =
+        ConfigurationSizes.create(
+            ImmutableMap.of(
+                SizeConfiguration.builder().setDeviceGroup("lowRam").build(),
+                config2DefaultMin,
+                SizeConfiguration.builder().setDeviceGroup("highRam").build(),
+                config2SeaMin),
+            ImmutableMap.of(
+                SizeConfiguration.builder().setDeviceGroup("lowRam").build(),
+                config2DefaultMax,
+                SizeConfiguration.builder().setDeviceGroup("highRam").build(),
+                config2SeaMax));
+    ConfigurationSizes expectedMergedConfigurationSizes =
+        ConfigurationSizes.create(
+            ImmutableMap.of(
+                SizeConfiguration.builder().setDeviceGroup("lowRam").build(),
+                config1DefaultMin + config2DefaultMin,
+                SizeConfiguration.builder().setDeviceGroup("highRam").build(),
+                config1SeaMin + config2SeaMin),
+            ImmutableMap.of(
+                SizeConfiguration.builder().setDeviceGroup("lowRam").build(),
+                config1DefaultMax + config2DefaultMax,
+                SizeConfiguration.builder().setDeviceGroup("highRam").build(),
+                config1SeaMax + config2SeaMax));
+
+    // Act
+    ConfigurationSizes actualMergedConfigurationSizes =
+        ConfigurationSizesMerger.merge(configurationSizes1, configurationSizes2);
+
+    // Assert
+    assertThat(actualMergedConfigurationSizes.getMinSizeConfigurationMap())
+        .isEqualTo(expectedMergedConfigurationSizes.getMinSizeConfigurationMap());
+    assertThat(actualMergedConfigurationSizes.getMaxSizeConfigurationMap())
+        .isEqualTo(expectedMergedConfigurationSizes.getMaxSizeConfigurationMap());
+  }
+
+  @Test
   public void merge_sdkRuntimeWithDensity_allCombinations() {
     final long runtimeEnabledMin = 1;
     final long compatMin = 1 << 1;

@@ -158,6 +158,18 @@ public final class DeviceFactory {
         .build();
   }
 
+  public static DeviceSpec branding(String brand, String device) {
+    return DeviceSpec.newBuilder().setBuildBrand(brand).setBuildDevice(device).build();
+  }
+
+  public static DeviceSpec soc(String manufacturer, String model) {
+    return DeviceSpec.newBuilder().setSocManufacturer(manufacturer).setSocModel(model).build();
+  }
+
+  public static DeviceSpec ramBytes(long ramBytes) {
+    return DeviceSpec.newBuilder().setRamBytes(ramBytes).build();
+  }
+
   public static DeviceSpec mergeSpecs(DeviceSpec deviceSpec, DeviceSpec... specParts) {
     return mergeFromProtos(deviceSpec, specParts);
   }

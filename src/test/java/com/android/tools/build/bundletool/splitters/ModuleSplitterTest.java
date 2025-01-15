@@ -32,6 +32,7 @@ import static com.android.tools.build.bundletool.model.BinaryArtProfileConstants
 import static com.android.tools.build.bundletool.model.ManifestMutator.withExtractNativeLibs;
 import static com.android.tools.build.bundletool.model.OptimizationDimension.ABI;
 import static com.android.tools.build.bundletool.model.OptimizationDimension.COUNTRY_SET;
+import static com.android.tools.build.bundletool.model.OptimizationDimension.DEVICE_GROUP;
 import static com.android.tools.build.bundletool.model.OptimizationDimension.DEVICE_TIER;
 import static com.android.tools.build.bundletool.model.OptimizationDimension.LANGUAGE;
 import static com.android.tools.build.bundletool.model.OptimizationDimension.SCREEN_DENSITY;
@@ -74,6 +75,7 @@ import static com.android.tools.build.bundletool.testing.TargetingUtils.apkAbiTa
 import static com.android.tools.build.bundletool.testing.TargetingUtils.apkAlternativeLanguageTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.apkCountrySetTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.apkDensityTargeting;
+import static com.android.tools.build.bundletool.testing.TargetingUtils.apkDeviceGroupTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.apkDeviceTierTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.apkLanguageTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.apkMinSdkTargeting;
@@ -81,6 +83,7 @@ import static com.android.tools.build.bundletool.testing.TargetingUtils.apkTextu
 import static com.android.tools.build.bundletool.testing.TargetingUtils.assets;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.assetsDirectoryTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.countrySetTargeting;
+import static com.android.tools.build.bundletool.testing.TargetingUtils.deviceGroupTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.deviceTierTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.getSplitsWithTargetingEqualTo;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.lPlusVariantTargeting;
@@ -297,13 +300,9 @@ public class ModuleSplitterTest {
             .build();
 
     List<ModuleSplit> splits = createAbiDensityAndLanguageSplitter(bundleModule).splitModule();
-    assertThat(splits.stream().map(ModuleSplit::getSplitType).distinct().collect(toImmutableSet()))
+    assertThat(splits.stream().map(ModuleSplit::getSplitType).collect(toImmutableSet()))
         .containsExactly(SplitType.SPLIT);
-    assertThat(
-            splits.stream()
-                .map(ModuleSplit::getVariantTargeting)
-                .distinct()
-                .collect(toImmutableSet()))
+    assertThat(splits.stream().map(ModuleSplit::getVariantTargeting).collect(toImmutableSet()))
         .containsExactly(lPlusVariantTargeting());
     Map<String, ModuleSplit> splitsBySuffix = Maps.uniqueIndex(splits, ModuleSplit::getSuffix);
 
@@ -427,13 +426,9 @@ public class ModuleSplitterTest {
             .build();
 
     List<ModuleSplit> splits = createAbiDensityAndLanguageSplitter(bundleModule).splitModule();
-    assertThat(splits.stream().map(ModuleSplit::getSplitType).distinct().collect(toImmutableSet()))
+    assertThat(splits.stream().map(ModuleSplit::getSplitType).collect(toImmutableSet()))
         .containsExactly(SplitType.SPLIT);
-    assertThat(
-            splits.stream()
-                .map(ModuleSplit::getVariantTargeting)
-                .distinct()
-                .collect(toImmutableSet()))
+    assertThat(splits.stream().map(ModuleSplit::getVariantTargeting).collect(toImmutableSet()))
         .containsExactly(lPlusVariantTargeting());
 
     Map<String, ModuleSplit> splitsBySuffix = Maps.uniqueIndex(splits, ModuleSplit::getSuffix);
@@ -549,13 +544,9 @@ public class ModuleSplitterTest {
             .build();
 
     List<ModuleSplit> splits = createAbiDensityAndLanguageSplitter(bundleModule).splitModule();
-    assertThat(splits.stream().map(ModuleSplit::getSplitType).distinct().collect(toImmutableSet()))
+    assertThat(splits.stream().map(ModuleSplit::getSplitType).collect(toImmutableSet()))
         .containsExactly(SplitType.SPLIT);
-    assertThat(
-            splits.stream()
-                .map(ModuleSplit::getVariantTargeting)
-                .distinct()
-                .collect(toImmutableSet()))
+    assertThat(splits.stream().map(ModuleSplit::getVariantTargeting).collect(toImmutableSet()))
         .containsExactly(lPlusVariantTargeting());
 
     Map<String, ModuleSplit> splitsBySuffix = Maps.uniqueIndex(splits, ModuleSplit::getSuffix);
@@ -746,13 +737,9 @@ public class ModuleSplitterTest {
             .build();
 
     ImmutableList<ModuleSplit> splits = createAbiAndDensitySplitter(testModule).splitModule();
-    assertThat(splits.stream().map(ModuleSplit::getSplitType).distinct().collect(toImmutableSet()))
+    assertThat(splits.stream().map(ModuleSplit::getSplitType).collect(toImmutableSet()))
         .containsExactly(SplitType.SPLIT);
-    assertThat(
-            splits.stream()
-                .map(ModuleSplit::getVariantTargeting)
-                .distinct()
-                .collect(toImmutableSet()))
+    assertThat(splits.stream().map(ModuleSplit::getVariantTargeting).collect(toImmutableSet()))
         .containsExactly(lPlusVariantTargeting());
 
     Optional<ResourceTable> masterTable =
@@ -775,13 +762,9 @@ public class ModuleSplitterTest {
             .build();
 
     ImmutableList<ModuleSplit> splits = createAbiAndDensitySplitter(bundleModule).splitModule();
-    assertThat(splits.stream().map(ModuleSplit::getSplitType).distinct().collect(toImmutableSet()))
+    assertThat(splits.stream().map(ModuleSplit::getSplitType).collect(toImmutableSet()))
         .containsExactly(SplitType.SPLIT);
-    assertThat(
-            splits.stream()
-                .map(ModuleSplit::getVariantTargeting)
-                .distinct()
-                .collect(toImmutableSet()))
+    assertThat(splits.stream().map(ModuleSplit::getVariantTargeting).collect(toImmutableSet()))
         .containsExactly(lPlusVariantTargeting());
 
     assertThat(splits).isNotEmpty();
@@ -805,13 +788,9 @@ public class ModuleSplitterTest {
             .build();
 
     ImmutableList<ModuleSplit> splits = createAbiAndDensitySplitter(testModule).splitModule();
-    assertThat(splits.stream().map(ModuleSplit::getSplitType).distinct().collect(toImmutableSet()))
+    assertThat(splits.stream().map(ModuleSplit::getSplitType).collect(toImmutableSet()))
         .containsExactly(SplitType.SPLIT);
-    assertThat(
-            splits.stream()
-                .map(ModuleSplit::getVariantTargeting)
-                .distinct()
-                .collect(toImmutableSet()))
+    assertThat(splits.stream().map(ModuleSplit::getVariantTargeting).collect(toImmutableSet()))
         .containsExactly(lPlusVariantTargeting());
 
     assertThat(splits).hasSize(2);
@@ -861,7 +840,7 @@ public class ModuleSplitterTest {
     List<ModuleSplit> splits = moduleSplitter.splitModule();
     // Base + X86 Split
     assertThat(splits).hasSize(2);
-    assertThat(splits.stream().map(ModuleSplit::getSplitType).distinct().collect(toImmutableSet()))
+    assertThat(splits.stream().map(ModuleSplit::getSplitType).collect(toImmutableSet()))
         .containsExactly(SplitType.SPLIT);
     assertThat(splits.stream().map(split -> split.getVariantTargeting()).collect(toImmutableSet()))
         .containsExactly(variantMinSdkTargeting(ANDROID_L_API_VERSION));
@@ -900,7 +879,7 @@ public class ModuleSplitterTest {
     List<ModuleSplit> splits = moduleSplitter.splitModule();
     // Base + X86 Split
     assertThat(splits).hasSize(2);
-    assertThat(splits.stream().map(ModuleSplit::getSplitType).distinct().collect(toImmutableSet()))
+    assertThat(splits.stream().map(ModuleSplit::getSplitType).collect(toImmutableSet()))
         .containsExactly(SplitType.SPLIT);
     assertThat(splits.stream().map(split -> split.getVariantTargeting()).collect(toImmutableSet()))
         .containsExactly(variantMinSdkTargeting(ANDROID_M_API_VERSION));
@@ -956,13 +935,9 @@ public class ModuleSplitterTest {
             .build();
 
     ImmutableList<ModuleSplit> splits = createAbiAndDensitySplitter(testModule).splitModule();
-    assertThat(splits.stream().map(ModuleSplit::getSplitType).distinct().collect(toImmutableSet()))
+    assertThat(splits.stream().map(ModuleSplit::getSplitType).collect(toImmutableSet()))
         .containsExactly(SplitType.SPLIT);
-    assertThat(
-            splits.stream()
-                .map(ModuleSplit::getVariantTargeting)
-                .distinct()
-                .collect(toImmutableSet()))
+    assertThat(splits.stream().map(ModuleSplit::getVariantTargeting).collect(toImmutableSet()))
         .containsExactly(lPlusVariantTargeting());
 
     assertThat(splits).hasSize(1); // the example has nothing to split on.
@@ -1021,13 +996,9 @@ public class ModuleSplitterTest {
     // expected 6 splits: etc1_rgb8 (with 2 sets of alternatives), s3tc (2 sets of alternatives),
     // atc and the master split.
     assertThat(splits).hasSize(6);
-    assertThat(splits.stream().map(ModuleSplit::getSplitType).distinct().collect(toImmutableSet()))
+    assertThat(splits.stream().map(ModuleSplit::getSplitType).collect(toImmutableSet()))
         .containsExactly(SplitType.SPLIT);
-    assertThat(
-            splits.stream()
-                .map(ModuleSplit::getVariantTargeting)
-                .distinct()
-                .collect(toImmutableSet()))
+    assertThat(splits.stream().map(ModuleSplit::getVariantTargeting).collect(toImmutableSet()))
         .containsExactly(lPlusVariantTargeting());
 
     ImmutableList<ModuleSplit> defaultSplits =
@@ -1234,13 +1205,9 @@ public class ModuleSplitterTest {
     ImmutableList<ModuleSplit> splits =
         createAbiDensityAndLanguageSplitter(testModule).splitModule();
     assertThat(splits).hasSize(3); // FR, CZ and the master split.
-    assertThat(splits.stream().map(ModuleSplit::getSplitType).distinct().collect(toImmutableSet()))
+    assertThat(splits.stream().map(ModuleSplit::getSplitType).collect(toImmutableSet()))
         .containsExactly(SplitType.SPLIT);
-    assertThat(
-            splits.stream()
-                .map(ModuleSplit::getVariantTargeting)
-                .distinct()
-                .collect(toImmutableSet()))
+    assertThat(splits.stream().map(ModuleSplit::getVariantTargeting).collect(toImmutableSet()))
         .containsExactly(lPlusVariantTargeting());
 
     ImmutableList<ModuleSplit> masterSplits =
@@ -1294,13 +1261,9 @@ public class ModuleSplitterTest {
         createAbiDensityAndLanguageSplitter(testModule).splitModule();
     // FR, CZ, non-CZ-or-FR and the master split.
     assertThat(splits).hasSize(4);
-    assertThat(splits.stream().map(ModuleSplit::getSplitType).distinct().collect(toImmutableSet()))
+    assertThat(splits.stream().map(ModuleSplit::getSplitType).collect(toImmutableSet()))
         .containsExactly(SplitType.SPLIT);
-    assertThat(
-            splits.stream()
-                .map(ModuleSplit::getVariantTargeting)
-                .distinct()
-                .collect(toImmutableSet()))
+    assertThat(splits.stream().map(ModuleSplit::getVariantTargeting).collect(toImmutableSet()))
         .containsExactly(lPlusVariantTargeting());
 
     ImmutableList<ModuleSplit> masterSplits =
@@ -1375,13 +1338,9 @@ public class ModuleSplitterTest {
 
     // expected 3 splits: low tier, medium tier and the master split.
     assertThat(splits).hasSize(3);
-    assertThat(splits.stream().map(ModuleSplit::getSplitType).distinct().collect(toImmutableSet()))
+    assertThat(splits.stream().map(ModuleSplit::getSplitType).collect(toImmutableSet()))
         .containsExactly(SplitType.SPLIT);
-    assertThat(
-            splits.stream()
-                .map(ModuleSplit::getVariantTargeting)
-                .distinct()
-                .collect(toImmutableSet()))
+    assertThat(splits.stream().map(ModuleSplit::getVariantTargeting).collect(toImmutableSet()))
         .containsExactly(lPlusVariantTargeting());
 
     ImmutableList<ModuleSplit> defaultSplits =
@@ -1413,6 +1372,67 @@ public class ModuleSplitterTest {
   }
 
   @Test
+  public void deviceGroupAsset_splitting_and_merging() {
+    BundleModule testModule =
+        new BundleModuleBuilder("testModule")
+            .addFile("assets/main#group_a/image.jpg")
+            .addFile("assets/main#group_b/image.jpg")
+            .addFile("dex/classes.dex")
+            .setAssetsConfig(
+                assets(
+                    targetedAssetsDirectory(
+                        "assets/main#group_a",
+                        assetsDirectoryTargeting(
+                            deviceGroupTargeting(
+                                /* value= */ "a", /* alternatives= */ ImmutableList.of("b")))),
+                    targetedAssetsDirectory(
+                        "assets/main#group_b",
+                        assetsDirectoryTargeting(
+                            deviceGroupTargeting(
+                                /* value= */ "b", /* alternatives= */ ImmutableList.of("a"))))))
+            .setManifest(androidManifest("com.test.app"))
+            .build();
+
+    ImmutableList<ModuleSplit> splits = createDeviceGroupSplitter(testModule).splitModule();
+
+    // expected 3 splits: group a, group b and the master split.
+    assertThat(splits).hasSize(3);
+    assertThat(splits.stream().map(ModuleSplit::getSplitType).collect(toImmutableSet()))
+        .containsExactly(SplitType.SPLIT);
+    assertThat(splits.stream().map(ModuleSplit::getVariantTargeting).collect(toImmutableSet()))
+        .containsExactly(lPlusVariantTargeting());
+
+    ImmutableList<ModuleSplit> defaultSplits =
+        getSplitsWithTargetingEqualTo(splits, DEFAULT_MASTER_SPLIT_SDK_TARGETING);
+    assertThat(defaultSplits).hasSize(1);
+    assertThat(extractPaths(defaultSplits.get(0).getEntries())).containsExactly("dex/classes.dex");
+
+    ImmutableList<ModuleSplit> groupASplits =
+        getSplitsWithTargetingEqualTo(
+            splits,
+            mergeApkTargeting(
+                DEFAULT_MASTER_SPLIT_SDK_TARGETING,
+                apkDeviceGroupTargeting(
+                    deviceGroupTargeting(
+                        /* value= */ "a", /* alternatives= */ ImmutableList.of("b")))));
+    assertThat(groupASplits).hasSize(1);
+    assertThat(extractPaths(groupASplits.get(0).getEntries()))
+        .containsExactly("assets/main#group_a/image.jpg");
+
+    ImmutableList<ModuleSplit> groupBSplits =
+        getSplitsWithTargetingEqualTo(
+            splits,
+            mergeApkTargeting(
+                DEFAULT_MASTER_SPLIT_SDK_TARGETING,
+                apkDeviceGroupTargeting(
+                    deviceGroupTargeting(
+                        /* value= */ "b", /* alternatives= */ ImmutableList.of("a")))));
+    assertThat(groupBSplits).hasSize(1);
+    assertThat(extractPaths(groupBSplits.get(0).getEntries()))
+        .containsExactly("assets/main#group_b/image.jpg");
+  }
+
+  @Test
   public void countrySetAsset_splitting_and_merging() {
     BundleModule testModule =
         new BundleModuleBuilder("testModule")
@@ -1438,13 +1458,9 @@ public class ModuleSplitterTest {
 
     // expected 3 splits: latam, sea and the master split.
     assertThat(splits).hasSize(3);
-    assertThat(splits.stream().map(ModuleSplit::getSplitType).distinct().collect(toImmutableSet()))
+    assertThat(splits.stream().map(ModuleSplit::getSplitType).collect(toImmutableSet()))
         .containsExactly(SplitType.SPLIT);
-    assertThat(
-            splits.stream()
-                .map(ModuleSplit::getVariantTargeting)
-                .distinct()
-                .collect(toImmutableSet()))
+    assertThat(splits.stream().map(ModuleSplit::getVariantTargeting).collect(toImmutableSet()))
         .containsExactly(lPlusVariantTargeting());
 
     ImmutableList<ModuleSplit> defaultSplits =
@@ -2670,6 +2686,16 @@ public class ModuleSplitterTest {
         BUNDLETOOL_VERSION,
         APP_BUNDLE,
         withOptimizationDimensions(ImmutableSet.of(DEVICE_TIER)),
+        lPlusVariantTargeting(),
+        ImmutableSet.of(module.getName().getName()));
+  }
+
+  private static ModuleSplitter createDeviceGroupSplitter(BundleModule module) {
+    return ModuleSplitter.createNoStamp(
+        module,
+        BUNDLETOOL_VERSION,
+        APP_BUNDLE,
+        withOptimizationDimensions(ImmutableSet.of(DEVICE_GROUP)),
         lPlusVariantTargeting(),
         ImmutableSet.of(module.getName().getName()));
   }

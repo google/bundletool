@@ -41,6 +41,7 @@ import static com.android.tools.build.bundletool.testing.DeviceFactory.abis;
 import static com.android.tools.build.bundletool.testing.DeviceFactory.createDeviceSpecFile;
 import static com.android.tools.build.bundletool.testing.DeviceFactory.density;
 import static com.android.tools.build.bundletool.testing.DeviceFactory.deviceFeatures;
+import static com.android.tools.build.bundletool.testing.DeviceFactory.deviceGroups;
 import static com.android.tools.build.bundletool.testing.DeviceFactory.deviceWithSdk;
 import static com.android.tools.build.bundletool.testing.DeviceFactory.lDevice;
 import static com.android.tools.build.bundletool.testing.DeviceFactory.lDeviceWithLocales;
@@ -52,9 +53,11 @@ import static com.android.tools.build.bundletool.testing.TargetingUtils.alternat
 import static com.android.tools.build.bundletool.testing.TargetingUtils.apkAbiTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.apkCountrySetTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.apkDensityTargeting;
+import static com.android.tools.build.bundletool.testing.TargetingUtils.apkDeviceGroupTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.apkDeviceTierTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.apkLanguageTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.countrySetTargeting;
+import static com.android.tools.build.bundletool.testing.TargetingUtils.deviceGroupTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.deviceTierTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.mergeModuleTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.moduleFeatureTargeting;
@@ -2015,6 +2018,70 @@ public class ExtractApksCommandTest {
 
   @Theory
   @Test
+  public void extractAssetModules_deviceGroup(TocFormat tocFormat) throws Exception {
+    String installTimeModule = "installtime_assetmodule";
+    ZipPath installTimeMasterApk = ZipPath.create(installTimeModule + "-master.apk");
+    ZipPath installTimeHighApk = ZipPath.create(installTimeModule + "-group_high.apk");
+    ZipPath installTimeLowApk = ZipPath.create(installTimeModule + "-group_low.apk");
+    ZipPath baseApk = ZipPath.create("base-master.apk");
+    BuildApksResult buildApksResult =
+        BuildApksResult.newBuilder()
+            .setBundletool(
+                Bundletool.newBuilder()
+                    .setVersion(BundleToolVersion.getCurrentVersion().toString()))
+            .addVariant(
+                createVariant(
+                    variantSdkTargeting(
+                        sdkVersionFrom(21), ImmutableSet.of(SdkVersion.getDefaultInstance())),
+                    createSplitApkSet(
+                        "base",
+                        createMasterApkDescription(ApkTargeting.getDefaultInstance(), baseApk))))
+            .addAssetSliceSet(
+                AssetSliceSet.newBuilder()
+                    .setAssetModuleMetadata(
+                        AssetModuleMetadata.newBuilder()
+                            .setName(installTimeModule)
+                            .setDeliveryType(DeliveryType.INSTALL_TIME))
+                    .addApkDescription(
+                        splitApkDescription(
+                            ApkTargeting.getDefaultInstance(), installTimeMasterApk))
+                    .addApkDescription(
+                        splitApkDescription(
+                            apkDeviceGroupTargeting(
+                                deviceGroupTargeting("high", ImmutableList.of("low"))),
+                            installTimeHighApk))
+                    .addApkDescription(
+                        splitApkDescription(
+                            apkDeviceGroupTargeting(
+                                deviceGroupTargeting("low", ImmutableList.of("high"))),
+                            installTimeLowApk)))
+            .build();
+
+    Path apksArchiveFile =
+        createApksArchiveFile(buildApksResult, tmpDir.resolve("bundle.apks"), tocFormat);
+
+    DeviceSpec deviceSpec = mergeSpecs(lDevice(), deviceGroups("high"));
+
+    ImmutableList<Path> matchedApks =
+        ExtractApksCommand.builder()
+            .setApksArchivePath(apksArchiveFile)
+            .setDeviceSpec(deviceSpec)
+            .setOutputDirectory(tmpDir)
+            .build()
+            .execute();
+
+    assertThat(matchedApks)
+        .containsExactly(
+            inOutputDirectory(installTimeMasterApk),
+            inOutputDirectory(installTimeHighApk),
+            inOutputDirectory(baseApk));
+    for (Path matchedApk : matchedApks) {
+      checkFileExistsAndReadable(tmpDir.resolve(matchedApk));
+    }
+  }
+
+  @Theory
+  @Test
   public void bundleWithDeviceTierTargeting_noDeviceTierSpecified_usesDefaults(TocFormat tocFormat)
       throws Exception {
     ZipPath baseMasterApk = ZipPath.create("base-master.apk");
@@ -2197,6 +2264,95 @@ public class ExtractApksCommandTest {
             .execute();
 
     // Master and high tier splits for base and asset module.
+    assertThat(matchedApks)
+        .containsExactly(
+            inOutputDirectory(baseMasterApk),
+            inOutputDirectory(baseHighApk),
+            inOutputDirectory(asset1MasterApk),
+            inOutputDirectory(asset1HighApk));
+    for (Path matchedApk : matchedApks) {
+      checkFileExistsAndReadable(tmpDir.resolve(matchedApk));
+    }
+  }
+
+  @Theory
+  @Test
+  public void bundleWithDeviceGroupTargeting_deviceGroupSet_filtersByDeviceGroup(
+      TocFormat tocFormat) throws Exception {
+    ZipPath baseMasterApk = ZipPath.create("base-master.apk");
+    ZipPath baseLowApk = ZipPath.create("base-group_low.apk");
+    ZipPath baseHighApk = ZipPath.create("base-group_high.apk");
+    ZipPath asset1MasterApk = ZipPath.create("asset1-master.apk");
+    ZipPath asset1LowApk = ZipPath.create("asset1-group_low.apk");
+    ZipPath asset1HighApk = ZipPath.create("asset1-group_high.apk");
+    BuildApksResult buildApksResult =
+        BuildApksResult.newBuilder()
+            .setBundletool(
+                Bundletool.newBuilder()
+                    .setVersion(BundleToolVersion.getCurrentVersion().toString()))
+            .addVariant(
+                createVariant(
+                    variantSdkTargeting(
+                        sdkVersionFrom(21), ImmutableSet.of(SdkVersion.getDefaultInstance())),
+                    createSplitApkSet(
+                        "base",
+                        createMasterApkDescription(
+                            ApkTargeting.getDefaultInstance(), baseMasterApk),
+                        splitApkDescription(
+                            apkDeviceGroupTargeting(
+                                deviceGroupTargeting(
+                                    /* value= */ "low",
+                                    /* alternatives= */ ImmutableList.of("high"))),
+                            baseLowApk),
+                        splitApkDescription(
+                            apkDeviceGroupTargeting(
+                                deviceGroupTargeting(
+                                    /* value= */ "high",
+                                    /* alternatives= */ ImmutableList.of("low"))),
+                            baseHighApk))))
+            .addAssetSliceSet(
+                AssetSliceSet.newBuilder()
+                    .setAssetModuleMetadata(
+                        AssetModuleMetadata.newBuilder()
+                            .setName("asset1")
+                            .setDeliveryType(DeliveryType.INSTALL_TIME))
+                    .addApkDescription(
+                        createMasterApkDescription(
+                            ApkTargeting.getDefaultInstance(), asset1MasterApk))
+                    .addApkDescription(
+                        splitApkDescription(
+                            apkDeviceGroupTargeting(
+                                deviceGroupTargeting(
+                                    /* value= */ "low",
+                                    /* alternatives= */ ImmutableList.of("high"))),
+                            asset1LowApk))
+                    .addApkDescription(
+                        splitApkDescription(
+                            apkDeviceGroupTargeting(
+                                deviceGroupTargeting(
+                                    /* value= */ "high",
+                                    /* alternatives= */ ImmutableList.of("low"))),
+                            asset1HighApk)))
+            .addDefaultTargetingValue(
+                DefaultTargetingValue.newBuilder()
+                    .setDimension(Value.DEVICE_GROUP)
+                    .setDefaultValue("low"))
+            .build();
+
+    Path apksArchiveFile =
+        createApksArchiveFile(buildApksResult, tmpDir.resolve("bundle.apks"), tocFormat);
+
+    DeviceSpec deviceSpec = lDevice().toBuilder().addDeviceGroups("high").build();
+
+    ImmutableList<Path> matchedApks =
+        ExtractApksCommand.builder()
+            .setApksArchivePath(apksArchiveFile)
+            .setDeviceSpec(deviceSpec)
+            .setOutputDirectory(tmpDir)
+            .build()
+            .execute();
+
+    // Master and "high" group splits for base and asset module.
     assertThat(matchedApks)
         .containsExactly(
             inOutputDirectory(baseMasterApk),

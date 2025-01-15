@@ -46,6 +46,12 @@ public abstract class BundleMetadata {
 
   public static final String TRANSPARENCY_SIGNED_FILE_NAME = "code_transparency_signed.jwt";
 
+  public static final String DEVICE_GROUP_CONFIG_JSON_FILE_NAME = "DeviceGroupConfig.json";
+  public static final String DEVICE_GROUP_CONFIG_PB_FILE_NAME = "DeviceGroupConfig.pb";
+
+  // For existing references in external test code.
+  public static final String DEVICE_GROUP_CONFIG_FILE_NAME = DEVICE_GROUP_CONFIG_JSON_FILE_NAME;
+
   /**
    * Returns the raw metadata map.
    *
@@ -77,7 +83,6 @@ public abstract class BundleMetadata {
             transparencySignedFileContent ->
                 ModuleEntry.builder()
                     .setContent(transparencySignedFileContent)
-                    // TODO(b/186621568): Set bundle path.
                     .setFileLocation(
                         ModuleEntryLocationInZipSource.create(
                             Paths.get(""),

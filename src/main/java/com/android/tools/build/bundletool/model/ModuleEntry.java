@@ -131,7 +131,6 @@ public abstract class ModuleEntry {
 
     public abstract Builder setShouldSign(boolean shouldSign);
 
-    // TODO(b/185874979): This should also clear the bundle location.
     public abstract Builder setContent(ByteSource content);
 
     public Builder setContent(Path path) {

@@ -533,7 +533,7 @@ public class ManifestEditor {
   /** Adds uses-sdk-library tag to the manifest. */
   @CanIgnoreReturnValue
   public ManifestEditor addUsesSdkLibraryElement(
-      String name, long versionMajor, String certDigest) {
+      String name, int versionMajor, String certDigest) {
     manifestElement
         .getOrCreateChildElement(APPLICATION_ELEMENT_NAME)
         .addChildElement(
@@ -544,7 +544,7 @@ public class ManifestEditor {
                 .addAttribute(
                     createAndroidAttribute(
                             SDK_VERSION_MAJOR_ATTRIBUTE_NAME, VERSION_MAJOR_RESOURCE_ID)
-                        .setValueAsString(String.valueOf(versionMajor)))
+                        .setValueAsDecimalInteger(versionMajor))
                 .addAttribute(
                     createAndroidAttribute(
                             CERTIFICATE_DIGEST_ATTRIBUTE_NAME, CERTIFICATE_DIGEST_RESOURCE_ID)

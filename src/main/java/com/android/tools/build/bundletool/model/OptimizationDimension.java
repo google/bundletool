@@ -22,8 +22,12 @@ public enum OptimizationDimension {
   SCREEN_DENSITY,
   LANGUAGE,
   TEXTURE_COMPRESSION_FORMAT,
+  /**
+   * @deprecated use DEVICE_GROUP instead.
+   */
+  @Deprecated
   DEVICE_TIER,
+  DEVICE_GROUP,
   COUNTRY_SET,
-  AI_MODEL_VERSION,
-  DEVICE_GROUP
+  AI_MODEL_VERSION
 }

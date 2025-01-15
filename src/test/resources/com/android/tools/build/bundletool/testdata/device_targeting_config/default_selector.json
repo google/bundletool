@@ -1,0 +1,10 @@
+{
+  "device_groups": [
+    {
+      "name": "other",
+      "device_selectors": [
+        {}
+      ]
+    }
+  ]
+}

@@ -17,6 +17,7 @@ package com.android.tools.build.bundletool.optimizations;
 
 import static com.android.tools.build.bundletool.model.OptimizationDimension.ABI;
 import static com.android.tools.build.bundletool.model.OptimizationDimension.COUNTRY_SET;
+import static com.android.tools.build.bundletool.model.OptimizationDimension.DEVICE_GROUP;
 import static com.android.tools.build.bundletool.model.OptimizationDimension.DEVICE_TIER;
 import static com.android.tools.build.bundletool.model.OptimizationDimension.LANGUAGE;
 import static com.android.tools.build.bundletool.model.OptimizationDimension.SCREEN_DENSITY;
@@ -150,11 +151,30 @@ public abstract class ApkOptimizations {
                       // UNSPECIFIED here means SDK 29+ (Android Q+)
                       .setUncompressedDexTargetSdk(UncompressedDexTargetSdk.UNSPECIFIED)
                       .build())
+              .put(
+                  Version.of("1.18.0"),
+                  ApkOptimizations.builder()
+                      .setSplitDimensions(
+                          ImmutableSet.of(
+                              ABI,
+                              SCREEN_DENSITY,
+                              TEXTURE_COMPRESSION_FORMAT,
+                              LANGUAGE,
+                              DEVICE_TIER,
+                              DEVICE_GROUP,
+                              COUNTRY_SET))
+                      .setUncompressNativeLibraries(true)
+                      .setPageAlignment(PageAlignment.PAGE_ALIGNMENT_16K)
+                      .setStandaloneDimensions(ImmutableSet.of(ABI, SCREEN_DENSITY))
+                      .setUncompressDexFiles(true)
+                      // UNSPECIFIED here means SDK 29+ (Android Q+)
+                      .setUncompressedDexTargetSdk(UncompressedDexTargetSdk.UNSPECIFIED)
+                      .build())
               .buildOrThrow();
 
   /** List of dimensions supported by asset modules. */
   private static final ImmutableSet<OptimizationDimension> DIMENSIONS_SUPPORTED_BY_ASSET_MODULES =
-      ImmutableSet.of(LANGUAGE, TEXTURE_COMPRESSION_FORMAT, DEVICE_TIER, COUNTRY_SET);
+      ImmutableSet.of(LANGUAGE, TEXTURE_COMPRESSION_FORMAT, DEVICE_TIER, DEVICE_GROUP, COUNTRY_SET);
 
   public abstract ImmutableSet<OptimizationDimension> getSplitDimensions();
 

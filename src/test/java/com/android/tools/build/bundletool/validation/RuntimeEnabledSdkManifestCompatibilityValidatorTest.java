@@ -60,7 +60,7 @@ public final class RuntimeEnabledSdkManifestCompatibilityValidatorTest {
     assertThat(exception)
         .hasMessageThat()
         .contains(
-            "Runtime-enabled SDKs must have a minSdkVersion lower than the app, but found  SDK"
+            "Runtime-enabled SDKs must not have a minSdkVersion greater than the app, but found SDK"
                 + " 'sdk1' with minSdkVersion (32) higher than the app's minSdkVersion (31).");
   }
 
@@ -96,7 +96,7 @@ public final class RuntimeEnabledSdkManifestCompatibilityValidatorTest {
     assertThat(exception)
         .hasMessageThat()
         .contains(
-            "Runtime-enabled SDKs must have a minSdkVersion lower than the app, but found  SDK"
+            "Runtime-enabled SDKs must not have a minSdkVersion greater than the app, but found SDK"
                 + " 'sdk2' with minSdkVersion (32) higher than the app's minSdkVersion (31).");
   }
 

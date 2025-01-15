@@ -28,10 +28,12 @@ import static com.android.tools.build.bundletool.model.AndroidManifest.SDK_LIBRA
 import static com.android.tools.build.bundletool.model.AndroidManifest.SDK_PATCH_VERSION_ATTRIBUTE_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.SERVICE_ELEMENT_NAME;
 import static com.android.tools.build.bundletool.model.AndroidManifest.SHARED_USER_ID_ATTRIBUTE_NAME;
+import static com.android.tools.build.bundletool.model.version.VersionGuardedFeature.VALIDATE_TARGET_SDK_VERSION_IN_SDK_BUNDLES;
 
 import com.android.tools.build.bundletool.model.AndroidManifest;
 import com.android.tools.build.bundletool.model.BundleModule;
 import com.android.tools.build.bundletool.model.exceptions.InvalidBundleException;
+import com.android.tools.build.bundletool.model.version.Version;
 
 /** Validates {@code AndroidManifest.xml} file for the SDK module. */
 public class SdkAndroidManifestValidator extends SubValidator {
@@ -46,7 +48,7 @@ public class SdkAndroidManifestValidator extends SubValidator {
     validateNoSharedUserId(manifest);
     validateNoComponents(manifest);
     validateNoSplitId(manifest);
-    validateTargetSdkVersion(manifest);
+    validateTargetSdkVersion(manifest, module.getBundletoolVersion());
   }
 
   private void validateNoSdkLibraryElement(AndroidManifest manifest) {
@@ -135,7 +137,12 @@ public class SdkAndroidManifestValidator extends SubValidator {
     }
   }
 
-  private static void validateTargetSdkVersion(AndroidManifest manifest) {
+  private static void validateTargetSdkVersion(
+      AndroidManifest manifest, Version bundletoolVersion) {
+    if (!VALIDATE_TARGET_SDK_VERSION_IN_SDK_BUNDLES.enabledForVersion(bundletoolVersion)) {
+      return;
+    }
+
     if (!manifest.getTargetSdkVersion().isPresent() || manifest.getTargetSdkVersion().get() < 34) {
       throw InvalidBundleException.builder()
           .withUserMessage("The 'targetSdkVersion' of an SDK bundle should be 34 or higher.")

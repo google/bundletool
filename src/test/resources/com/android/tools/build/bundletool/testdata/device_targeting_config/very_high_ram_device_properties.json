@@ -11,5 +11,9 @@
     {
       "name":"android.hardware.camera"
     }
-  ]
+  ],
+  "system_on_chip": {
+    "manufacturer":"Qualcomm",
+    "model":"SDM670"
+  }
 }

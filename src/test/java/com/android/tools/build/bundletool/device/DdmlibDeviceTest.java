@@ -50,6 +50,7 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 import org.mockito.ArgumentCaptor;
+import org.mockito.Captor;
 import org.mockito.Mock;
 import org.mockito.Mockito;
 import org.mockito.MockitoAnnotations;
@@ -61,6 +62,8 @@ public final class DdmlibDeviceTest {
   private static final Path APK_PATH_2 = Paths.get("/tmp/app2.apk");
 
   @Mock private IDevice mockDevice;
+
+  @Captor ArgumentCaptor<List<String>> extraArgsCaptor;
 
   @Before
   public void setUp() {
@@ -90,7 +93,6 @@ public final class DdmlibDeviceTest {
     verify(mockDevice).installPackage(eq(APK_PATH.toString()), anyBoolean(), eq("-d"));
   }
 
-  @SuppressWarnings("unchecked")
   @Test
   public void allowDowngrade_postL() throws Exception {
     when(mockDevice.getVersion()).thenReturn(new AndroidVersion(VersionCodes.LOLLIPOP));
@@ -99,7 +101,6 @@ public final class DdmlibDeviceTest {
     ddmlibDevice.installApks(
         ImmutableList.of(APK_PATH), InstallOptions.builder().setAllowDowngrade(true).build());
 
-    ArgumentCaptor<List<String>> extraArgsCaptor = ArgumentCaptor.forClass((Class) List.class);
     verify(mockDevice)
         .installPackages(
             eq(ImmutableList.of(APK_PATH.toFile())),
@@ -131,7 +132,6 @@ public final class DdmlibDeviceTest {
         ImmutableList.of(APK_PATH),
         InstallOptions.builder().setGrantRuntimePermissions(true).build());
 
-    ArgumentCaptor<List<String>> extraArgsCaptor = ArgumentCaptor.forClass((Class) List.class);
     verify(mockDevice)
         .installPackages(
             eq(ImmutableList.of(APK_PATH.toFile())),
@@ -151,7 +151,6 @@ public final class DdmlibDeviceTest {
         ImmutableList.of(APK_PATH),
         InstallOptions.builder().setGrantRuntimePermissions(true).build());
 
-    ArgumentCaptor<List<String>> extraArgsCaptor = ArgumentCaptor.forClass((Class) List.class);
     verify(mockDevice)
         .installPackages(
             eq(ImmutableList.of(APK_PATH.toFile())),

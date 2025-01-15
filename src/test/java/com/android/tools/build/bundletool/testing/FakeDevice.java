@@ -16,6 +16,7 @@
 
 package com.android.tools.build.bundletool.testing;
 
+import static com.android.tools.build.bundletool.device.DeviceAnalyzer.GET_MEMORY_KIB_SHELL_COMMAND;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.collect.ImmutableList.toImmutableList;
@@ -97,6 +98,14 @@ public class FakeDevice extends Device {
       DeviceState deviceState,
       DeviceSpec deviceSpec,
       ImmutableMap<String, String> properties) {
+    ImmutableMap<String, String> allProperties =
+        ImmutableMap.<String, String>builder()
+            .putAll(properties)
+            .put("ro.product.brand", deviceSpec.getBuildBrand())
+            .put("ro.product.device", deviceSpec.getBuildDevice())
+            .put("ro.soc.manufacturer", deviceSpec.getSocManufacturer())
+            .put("ro.soc.model", deviceSpec.getSocModel())
+            .buildOrThrow();
     FakeDevice device =
         new FakeDevice(
             deviceId,
@@ -106,7 +115,7 @@ public class FakeDevice extends Device {
             deviceSpec.getScreenDensity(),
             ImmutableList.copyOf(deviceSpec.getDeviceFeaturesList()),
             ImmutableList.copyOf(deviceSpec.getGlExtensionsList()),
-            properties,
+            allProperties,
             deviceSpec.getCodename().isEmpty()
                 ? Optional.empty()
                 : Optional.of(deviceSpec.getCodename()),
@@ -138,6 +147,8 @@ public class FakeDevice extends Device {
                     "EGL implementation : 1.4",
                     "GLES: FakeDevice, OpenGL ES 3.0",
                     DASH_JOINER.join(deviceSpec.getGlExtensionsList()))));
+    device.injectShellCommandOutput(
+        GET_MEMORY_KIB_SHELL_COMMAND, () -> String.format("%d", deviceSpec.getRamBytes() / 1024));
     return device;
   }
 

@@ -216,6 +216,7 @@ public class ApkSerializerManager {
         moduleName ->
             apksResult.addPermanentlyFusedModules(
                 PermanentlyFusedModule.newBuilder().setName(moduleName.getName())));
+    ((AppBundle) bundle).getDeviceGroupConfig().ifPresent(apksResult::setDeviceGroupConfig);
     return apksResult.build();
   }
 
@@ -249,9 +250,7 @@ public class ApkSerializerManager {
     // To avoid filtering of unmatched language splits we skip device filtering for system mode.
     Predicate<ModuleSplit> deviceFilter =
         deviceSpec.isPresent() && !apkBuildMode.equals(SYSTEM)
-            ? new ApkMatcher(
-                    addDefaultCountrySetIfNecessary(
-                        addDefaultDeviceTierIfNecessary(deviceSpec.get())))
+            ? new ApkMatcher(addDefaultsIfNecessary(deviceSpec.get()))
                 ::matchesModuleSplitByTargeting
             : alwaysTrue();
 
@@ -335,9 +334,7 @@ public class ApkSerializerManager {
 
     Predicate<ModuleSplit> deviceFilter =
         deviceSpec.isPresent()
-            ? new ApkMatcher(
-                    addDefaultCountrySetIfNecessary(
-                        addDefaultDeviceTierIfNecessary(deviceSpec.get())))
+            ? new ApkMatcher(addDefaultsIfNecessary(deviceSpec.get()))
                 ::matchesModuleSplitByTargeting
             : alwaysTrue();
 
@@ -558,6 +555,14 @@ public class ApkSerializerManager {
     return DeliveryType.INSTALL_TIME;
   }
 
+  private DeviceSpec addDefaultsIfNecessary(DeviceSpec deviceSpec) {
+    DeviceSpec result = deviceSpec;
+    result = addDefaultCountrySetIfNecessary(result);
+    result = addDefaultDeviceTierIfNecessary(result);
+    result = addDefaultDeviceGroupIfNecessary(result);
+    return result;
+  }
+
   /**
    * Adds a default device tier to the given {@link DeviceSpec} if it has none.
    *
@@ -588,6 +593,26 @@ public class ApkSerializerManager {
                                 : Integer.parseInt(suffix.getDefaultSuffix()))
                     .orElse(0)))
         .build();
+  }
+
+  /**
+   * Adds a default device group to the given {@link DeviceSpec} if it has none.
+   *
+   * <p>The default device group is taken from the optimization settings in the {@link
+   * com.android.bundle.Config.BundleConfig}.
+   */
+  private DeviceSpec addDefaultDeviceGroupIfNecessary(DeviceSpec deviceSpec) {
+    if (deviceSpec.getDeviceGroupsCount() > 0) {
+      return deviceSpec;
+    }
+    Optional<String> defaultDeviceGroup =
+        Optional.ofNullable(
+                apkOptimizations.getSuffixStrippings().get(OptimizationDimension.DEVICE_GROUP))
+            .map(SuffixStripping::getDefaultSuffix);
+    if (!defaultDeviceGroup.isPresent()) {
+      return deviceSpec;
+    }
+    return deviceSpec.toBuilder().addDeviceGroups(defaultDeviceGroup.get()).build();
   }
 
   /**

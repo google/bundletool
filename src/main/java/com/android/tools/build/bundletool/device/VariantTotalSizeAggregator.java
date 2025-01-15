@@ -24,6 +24,7 @@ import com.android.bundle.Commands.ApkDescription;
 import com.android.bundle.Commands.Variant;
 import com.android.bundle.Targeting.AbiTargeting;
 import com.android.bundle.Targeting.CountrySetTargeting;
+import com.android.bundle.Targeting.DeviceGroupTargeting;
 import com.android.bundle.Targeting.DeviceTierTargeting;
 import com.android.bundle.Targeting.LanguageTargeting;
 import com.android.bundle.Targeting.ScreenDensityTargeting;
@@ -77,6 +78,7 @@ public class VariantTotalSizeAggregator extends AbstractSizeAggregator {
       ScreenDensityTargeting screenDensityTargeting,
       LanguageTargeting languageTargeting,
       TextureCompressionFormatTargeting textureTargeting,
+      DeviceGroupTargeting deviceGroupTargeting,
       DeviceTierTargeting deviceTierTargeting,
       CountrySetTargeting countrySetTargeting,
       SdkRuntimeTargeting sdkRuntimeTargeting) {
@@ -88,6 +90,7 @@ public class VariantTotalSizeAggregator extends AbstractSizeAggregator {
                 screenDensityTargeting,
                 languageTargeting,
                 textureTargeting,
+                deviceGroupTargeting,
                 deviceTierTargeting,
                 countrySetTargeting,
                 sdkRuntimeTargeting),
@@ -113,6 +116,8 @@ public class VariantTotalSizeAggregator extends AbstractSizeAggregator {
         getAllScreenDensityTargetings(apkDescriptions);
     ImmutableSet<TextureCompressionFormatTargeting> textureCompressionFormatTargetingOptions =
         getAllTextureCompressionFormatTargetings(apkDescriptions);
+    ImmutableSet<DeviceGroupTargeting> deviceGroupTargetingOptions =
+        getAllDeviceGroupTargetings(apkDescriptions);
     ImmutableSet<DeviceTierTargeting> deviceTierTargetingOptions =
         getAllDeviceTierTargetings(apkDescriptions);
     ImmutableSet<CountrySetTargeting> countrySetTargetingOptions =
@@ -124,6 +129,7 @@ public class VariantTotalSizeAggregator extends AbstractSizeAggregator {
         languageTargetingOptions,
         screenDensityTargetingOptions,
         textureCompressionFormatTargetingOptions,
+        deviceGroupTargetingOptions,
         deviceTierTargetingOptions,
         countrySetTargetingOptions,
         variant.getTargeting().getSdkRuntimeTargeting());
@@ -149,6 +155,7 @@ public class VariantTotalSizeAggregator extends AbstractSizeAggregator {
                 variantTargeting.getScreenDensityTargeting(),
                 LanguageTargeting.getDefaultInstance(),
                 variantTargeting.getTextureCompressionFormatTargeting(),
+                DeviceGroupTargeting.getDefaultInstance(),
                 DeviceTierTargeting.getDefaultInstance(),
                 CountrySetTargeting.getDefaultInstance(),
                 variantTargeting.getSdkRuntimeTargeting()),

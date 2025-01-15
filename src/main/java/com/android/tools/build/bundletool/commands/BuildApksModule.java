@@ -147,6 +147,12 @@ public final class BuildApksModule {
                       .setDeviceTier(Int32Value.of(command.getDeviceTier().get()))
                       .build());
     }
+    if (command.getDeviceGroup().isPresent()) {
+      checkState(deviceSpec.isPresent(), "Device group specified but no device was provided");
+      deviceSpec =
+          deviceSpec.map(
+              spec -> spec.toBuilder().addDeviceGroups(command.getDeviceGroup().get()).build());
+    }
     if (command.getCountrySet().isPresent()) {
       checkState(deviceSpec.isPresent(), "Country set specified but no device was provided");
       deviceSpec =

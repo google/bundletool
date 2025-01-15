@@ -28,6 +28,7 @@ import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.with
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.withUsesSplit;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.apexImages;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.assetsDirectoryTargeting;
+import static com.android.tools.build.bundletool.testing.TargetingUtils.deviceGroupTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.deviceTierTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.mergeAssetsTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.multiAbiTargeting;
@@ -471,7 +472,7 @@ public class BuildBundleCommandTest {
   }
 
   @Test
-  public void assetsTargeting_generated() throws Exception {
+  public void assetsTargeting_generated_deviceTier() throws Exception {
     XmlNode manifest = androidManifest(PKG_NAME, withHasCode(true));
     Assets assetsConfig =
         Assets.newBuilder()
@@ -508,6 +509,53 @@ public class BuildBundleCommandTest {
       assertThat(bundle).hasFile("base/assets/anything.dat").withContent("any".getBytes(UTF_8));
       assertThat(bundle)
           .hasFile("base/assets/texture#tcf_atc/device#tier_0/file.dat")
+          .withContent("any2".getBytes(UTF_8));
+      assertThat(bundle).hasFile("base/dex/classes.dex").withContent("dex".getBytes(UTF_8));
+      assertThat(bundle)
+          .hasFile("base/manifest/AndroidManifest.xml")
+          .withContent(manifest.toByteArray());
+      assertThat(bundle).hasFile("base/assets.pb").withContent(assetsConfig.toByteArray());
+    }
+  }
+
+  @Test
+  public void assetsTargeting_generated_deviceGroup() throws Exception {
+    XmlNode manifest = androidManifest(PKG_NAME, withHasCode(true));
+    Assets assetsConfig =
+        Assets.newBuilder()
+            .addDirectory(
+                TargetedAssetsDirectory.newBuilder()
+                    .setPath("assets")
+                    .setTargeting(AssetsDirectoryTargeting.getDefaultInstance()))
+            .addDirectory(
+                TargetedAssetsDirectory.newBuilder()
+                    .setPath("assets/texture#tcf_atc/device#group_a")
+                    .setTargeting(
+                        mergeAssetsTargeting(
+                            assetsDirectoryTargeting(
+                                textureCompressionTargeting(TextureCompressionFormatAlias.ATC)),
+                            assetsDirectoryTargeting(deviceGroupTargeting("a")))))
+            .build();
+    Path module =
+        new ZipBuilder()
+            .addFileWithContent(ZipPath.create("assets/anything.dat"), "any".getBytes(UTF_8))
+            .addFileWithContent(
+                ZipPath.create("assets/texture#tcf_atc/device#group_a/file.dat"),
+                "any2".getBytes(UTF_8))
+            .addFileWithContent(ZipPath.create("dex/classes.dex"), "dex".getBytes(UTF_8))
+            .addFileWithProtoContent(ZipPath.create("manifest/AndroidManifest.xml"), manifest)
+            .writeTo(tmpDir.resolve("base.zip"));
+
+    BuildBundleCommand.builder()
+        .setOutputPath(bundlePath)
+        .setModulesPaths(ImmutableList.of(module))
+        .build()
+        .execute();
+
+    try (ZipFile bundle = new ZipFile(bundlePath.toFile())) {
+      assertThat(bundle).hasFile("base/assets/anything.dat").withContent("any".getBytes(UTF_8));
+      assertThat(bundle)
+          .hasFile("base/assets/texture#tcf_atc/device#group_a/file.dat")
           .withContent("any2".getBytes(UTF_8));
       assertThat(bundle).hasFile("base/dex/classes.dex").withContent("dex".getBytes(UTF_8));
       assertThat(bundle)

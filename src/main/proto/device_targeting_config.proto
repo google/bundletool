@@ -6,6 +6,13 @@ option java_package = "com.android.bundle";
 option java_multiple_files = true;
 
 // Configuration describing device targeting criteria for the content of an app.
+// Supplied in the App Bundle as bundle metadata.
+message DeviceGroupConfig {
+  // Definition of device groups for the app.
+  repeated DeviceGroup device_groups = 1;
+}
+
+// Configuration describing device targeting criteria for the content of an app.
 message DeviceTierConfig {
   // Definition of device groups for the app.
   repeated DeviceGroup device_groups = 1;
@@ -169,4 +176,7 @@ message DeviceProperties {
 
   // System features in device.
   repeated SystemFeature system_features = 3;
+
+  // SoC
+  SystemOnChip system_on_chip = 4;
 }

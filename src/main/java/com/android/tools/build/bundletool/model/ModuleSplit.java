@@ -26,6 +26,9 @@ import static com.android.tools.build.bundletool.model.BundleModule.ROOT_DIRECTO
 import static com.android.tools.build.bundletool.model.RuntimeEnabledSdkVersionEncoder.encodeSdkMajorAndMinorVersion;
 import static com.android.tools.build.bundletool.model.SourceStampConstants.STAMP_SOURCE_METADATA_KEY;
 import static com.android.tools.build.bundletool.model.SourceStampConstants.STAMP_TYPE_METADATA_KEY;
+import static com.android.tools.build.bundletool.model.targeting.TargetedDirectorySegment.COUNTRY_SET_KEY;
+import static com.android.tools.build.bundletool.model.targeting.TargetedDirectorySegment.DEVICE_GROUP_KEY;
+import static com.android.tools.build.bundletool.model.targeting.TargetedDirectorySegment.DEVICE_TIER_KEY;
 import static com.android.tools.build.bundletool.model.utils.ResourcesUtils.SCREEN_DENSITY_TO_PROTO_VALUE_MAP;
 import static com.android.tools.build.bundletool.model.utils.TargetingNormalizer.normalizeApkTargeting;
 import static com.android.tools.build.bundletool.model.utils.TargetingNormalizer.normalizeVariantTargeting;
@@ -55,7 +58,6 @@ import com.android.bundle.Targeting.TextureCompressionFormatTargeting;
 import com.android.bundle.Targeting.VariantTargeting;
 import com.android.tools.build.bundletool.model.BundleModule.ModuleType;
 import com.android.tools.build.bundletool.model.SourceStampConstants.StampType;
-import com.android.tools.build.bundletool.model.targeting.TargetedDirectorySegment;
 import com.android.tools.build.bundletool.model.utils.ResourcesUtils;
 import com.google.auto.value.AutoValue;
 import com.google.auto.value.extension.memoized.Memoized;
@@ -224,14 +226,18 @@ public abstract class ModuleSplit {
     getApkTargeting()
         .getDeviceTierTargeting()
         .getValueList()
-        .forEach(value -> suffixJoiner.add("tier_" + value.getValue()));
+        .forEach(value -> suffixJoiner.add(DEVICE_TIER_KEY + "_" + value.getValue()));
+
+    getApkTargeting()
+        .getDeviceGroupTargeting()
+        .getValueList()
+        .forEach(value -> suffixJoiner.add(DEVICE_GROUP_KEY + "_" + value));
 
     CountrySetTargeting countrySetTargeting = getApkTargeting().getCountrySetTargeting();
     if (!countrySetTargeting.getValueList().isEmpty()) {
       countrySetTargeting
           .getValueList()
-          .forEach(
-              value -> suffixJoiner.add(TargetedDirectorySegment.COUNTRY_SET_KEY + "_" + value));
+          .forEach(value -> suffixJoiner.add(COUNTRY_SET_KEY + "_" + value));
     } else if (!countrySetTargeting.getAlternativesList().isEmpty()) {
       suffixJoiner.add("other_countries");
     }
@@ -792,11 +798,12 @@ public abstract class ModuleSplit {
                 // was enabled, a default targeting suffix was used.
                 .clearTextureCompressionFormatTargeting()
                 .clearDeviceTierTargeting()
+                .clearDeviceGroupTargeting()
                 .clearCountrySetTargeting()
                 .build()
                 .equals(ApkTargeting.getDefaultInstance()),
             "Master split cannot have any targeting other than SDK version, Texture"
-                + " Compression Format, Device Tier and Country Set.");
+                + " Compression Format, Device Tier, Device Group and Country Set.");
       }
       return moduleSplit;
     }

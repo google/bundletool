@@ -1,0 +1,114 @@
+directory: {
+  path: "assets/textures#countries_latam#group_a"
+  targeting: {
+    device_group: {
+      value: ["a"]
+      alternatives: ["b", "c"]
+    }
+    country_set: {
+      value: ["latam"]
+      alternatives: ["sea"]
+    }
+  }
+}
+directory: {
+  path: "assets/textures#countries_latam#group_b"
+  targeting: {
+    device_group: {
+      value: ["b"]
+      alternatives: ["a", "c"]
+    }
+    country_set: {
+      value: ["latam"]
+      alternatives: ["sea"]
+    }
+  }
+}
+directory: {
+  path: "assets/textures#countries_latam#group_c"
+  targeting: {
+    device_group: {
+      value: ["c"]
+      alternatives: ["a", "b"]
+    }
+    country_set: {
+      value: ["latam"]
+      alternatives: ["sea"]
+    }
+  }
+}
+directory: {
+  path: "assets/textures#countries_sea#group_a"
+  targeting: {
+    device_group: {
+      value: ["a"]
+      alternatives: ["b", "c"]
+    }
+    country_set: {
+      value: ["sea"]
+      alternatives: ["latam"]
+    }
+  }
+}
+directory: {
+  path: "assets/textures#countries_sea#group_b"
+  targeting: {
+    device_group: {
+      value: ["b"]
+      alternatives: ["a", "c"]
+    }
+    country_set: {
+      value: ["sea"]
+      alternatives: ["latam"]
+    }
+  }
+}
+directory: {
+  path: "assets/textures#countries_sea#group_c"
+  targeting: {
+    device_group: {
+      value: ["c"]
+      alternatives: ["a", "b"]
+    }
+    country_set: {
+      value: ["sea"]
+      alternatives: ["latam"]
+    }
+  }
+}
+directory: {
+  path: "assets/textures#group_a"
+  targeting: {
+    device_group: {
+      value: ["a"]
+      alternatives: ["b", "c"]
+    }
+    country_set: {
+      alternatives: ["latam", "sea"]
+    }
+  }
+}
+directory: {
+  path: "assets/textures#group_b"
+  targeting: {
+    device_group: {
+      value: ["b"]
+      alternatives: ["a", "c"]
+    }
+    country_set: {
+      alternatives: ["latam", "sea"]
+    }
+  }
+}
+directory: {
+  path: "assets/textures#group_c"
+  targeting: {
+    device_group: {
+      value: ["c"]
+      alternatives: ["a", "b"]
+    }
+    country_set: {
+      alternatives: ["latam", "sea"]
+    }
+  }
+}

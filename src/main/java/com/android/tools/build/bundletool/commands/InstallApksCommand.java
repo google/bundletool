@@ -470,7 +470,7 @@ public abstract class InstallApksCommand {
         .addFlag(
             FlagDescription.builder()
                 .setFlagName(DEVICE_TIER_FLAG.getName())
-                .setExampleValue("high")
+                .setExampleValue("1")
                 .setOptional(true)
                 .setDescription(
                     "Device tier of the given device. This value will be used to match the correct"
@@ -487,7 +487,7 @@ public abstract class InstallApksCommand {
                     "Device groups the given device belongs to. This value will be used to match"
                         + " the correct device group conditional modules to this device."
                         + " This flag is only relevant if the bundle uses device group targeting"
-                        + " in conditional modules and should be set in that case.")
+                        + " and should be set in that case.")
                 .build())
         .addFlag(
             FlagDescription.builder()

@@ -3,6 +3,7 @@ syntax = "proto3";
 package android.bundle;
 
 import "config.proto";
+import "device_targeting_config.proto";
 import "targeting.proto";
 
 option java_package = "com.android.bundle";
@@ -34,6 +35,10 @@ message BuildApksResult {
   // Information about permanently fused install-time modules, which were
   // presented in original bundle but fused into base in all variants.
   repeated PermanentlyFusedModule permanently_fused_modules = 8;
+
+  // Definitions for device groups and user country sets.
+  // Only set if DeviceGroupConfig is supplied as bundle metadata.
+  DeviceGroupConfig device_group_config = 9;
 }
 
 message BuildSdkApksResult {

@@ -30,6 +30,11 @@ public interface GetSizeRequest {
     SCREEN_DENSITY,
     LANGUAGE,
     TEXTURE_COMPRESSION_FORMAT,
+    DEVICE_GROUP,
+    /**
+     * @deprecated use DEVICE_GROUP instead.
+     */
+    @Deprecated
     DEVICE_TIER,
     COUNTRY_SET,
     SDK_RUNTIME,

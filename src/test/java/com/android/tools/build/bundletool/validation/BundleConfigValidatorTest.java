@@ -209,7 +209,7 @@ public final class BundleConfigValidatorTest {
         .hasMessageThat()
         .contains(
             "Suffix stripping was enabled for an unsupported dimension. Supported dimensions are:"
-                + " TEXTURE_COMPRESSION_FORMAT, DEVICE_TIER, COUNTRY_SET.");
+                + " TEXTURE_COMPRESSION_FORMAT, DEVICE_TIER, DEVICE_GROUP, COUNTRY_SET.");
   }
 
   @Test
@@ -350,6 +350,42 @@ public final class BundleConfigValidatorTest {
                 new BundleModuleBuilder("a")
                     .addFile("assets/textures#countries_latam/level1.assets")
                     .addFile("assets/textures#countries_sea/level1.assets")
+                    .setManifest(androidManifest("com.test.app"))
+                    .build());
+
+    new BundleConfigValidator().validateBundle(appBundleBuilder.build());
+  }
+
+  @Test
+  public void optimizations_defaultDeviceGroup_targeted_specified_success() throws Exception {
+    AppBundleBuilder appBundleBuilder =
+        new AppBundleBuilder()
+            .setBundleConfig(
+                BundleConfigBuilder.create()
+                    .addSplitDimension(Value.DEVICE_GROUP, false, true, "a")
+                    .build())
+            .addModule(
+                new BundleModuleBuilder("base")
+                    .addFile("assets/textures#group_a/level1.assets")
+                    .addFile("assets/textures#group_b/level1.assets")
+                    .setManifest(androidManifest("com.test.app"))
+                    .build());
+
+    new BundleConfigValidator().validateBundle(appBundleBuilder.build());
+  }
+
+  @Test
+  public void optimizations_defaultDeviceGroup_targeted_unspecified_success() throws Exception {
+    AppBundleBuilder appBundleBuilder =
+        new AppBundleBuilder()
+            .addModule(
+                new BundleModuleBuilder("base")
+                    .setManifest(androidManifest("com.test.app"))
+                    .build())
+            .addModule(
+                new BundleModuleBuilder("a")
+                    .addFile("assets/textures#group_a/level1.assets")
+                    .addFile("assets/textures#group_b/level1.assets")
                     .setManifest(androidManifest("com.test.app"))
                     .build());
 

@@ -112,7 +112,10 @@ public enum VersionGuardedFeature {
    *
    * <p>Previously onDemand=false would not be respected and modules may not have been merged.
    */
-  RESPECT_LEGACY_ON_DEMAND_ATTRIBUTE_FOR_INSTALL_MODULES_MERGING("1.15.4");
+  RESPECT_LEGACY_ON_DEMAND_ATTRIBUTE_FOR_INSTALL_MODULES_MERGING("1.15.4"),
+
+  /** Whether to enable the validation that SDK bundles must target SDK 34 or higher. */
+  VALIDATE_TARGET_SDK_VERSION_IN_SDK_BUNDLES("1.17.2");
 
   /** Version from which the given feature should be enabled by default. */
   private final Version enabledSinceVersion;

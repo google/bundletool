@@ -26,9 +26,7 @@ message ApkTargeting {
   TextureCompressionFormatTargeting texture_compression_format_targeting = 6;
   MultiAbiTargeting multi_abi_targeting = 7;
   SanitizerTargeting sanitizer_targeting = 8;
-  // TODO: b/372902482 - Prefer device_group_targeting.
   DeviceTierTargeting device_tier_targeting = 9 [deprecated = true];
-  // TODO: b/372902482 - remove.
   CountrySetTargeting country_set_targeting = 10 [deprecated = true];
   DeviceGroupTargeting device_group_targeting = 11;
 }
@@ -144,9 +142,7 @@ message AssetsDirectoryTargeting {
   reserved 2;  // was GraphicsApiTargeting
   TextureCompressionFormatTargeting texture_compression_format = 3;
   LanguageTargeting language = 4;
-  // TODO: b/372902482 - Prefer device_group.
   DeviceTierTargeting device_tier = 5 [deprecated = true];
-  // TODO: b/372902482 - remove.
   CountrySetTargeting country_set = 6 [deprecated = true];
   DeviceGroupTargeting device_group = 7;
 }

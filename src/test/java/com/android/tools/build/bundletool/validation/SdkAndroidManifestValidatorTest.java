@@ -40,8 +40,10 @@ import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.with
 import static com.google.common.truth.Truth.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
+import com.android.bundle.Config.BundleConfig;
 import com.android.tools.build.bundletool.model.BundleModule;
 import com.android.tools.build.bundletool.model.exceptions.InvalidBundleException;
+import com.android.tools.build.bundletool.testing.BundleConfigBuilder;
 import com.android.tools.build.bundletool.testing.BundleModuleBuilder;
 import org.junit.Test;
 import org.junit.experimental.theories.Theories;
@@ -274,6 +276,17 @@ public class SdkAndroidManifestValidatorTest {
     assertThat(exception)
         .hasMessageThat()
         .contains("The 'targetSdkVersion' of an SDK bundle should be 34 or higher.");
+  }
+
+  @Test
+  public void manifest_withLowTargetSdkVersion_withOldBundletoolVersion_ok() {
+    BundleConfig bundleConfig = BundleConfigBuilder.create().setVersion("1.17.1").build();
+    BundleModule module =
+        new BundleModuleBuilder(BASE_MODULE_NAME, bundleConfig)
+            .setManifest(androidManifest(PKG_NAME, withTargetSdkVersion(33)))
+            .build();
+
+    new SdkAndroidManifestValidator().validateModule(module);
   }
 
   @Test

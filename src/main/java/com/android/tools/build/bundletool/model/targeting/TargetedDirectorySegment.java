@@ -22,12 +22,14 @@ import static java.util.stream.Collectors.joining;
 
 import com.android.bundle.Targeting.AssetsDirectoryTargeting;
 import com.android.bundle.Targeting.CountrySetTargeting;
+import com.android.bundle.Targeting.DeviceGroupTargeting;
 import com.android.bundle.Targeting.DeviceTierTargeting;
 import com.android.bundle.Targeting.LanguageTargeting;
 import com.android.tools.build.bundletool.model.exceptions.InvalidBundleException;
 import com.android.tools.build.bundletool.model.utils.DeviceTargetingUtils;
 import com.android.tools.build.bundletool.model.utils.TextureCompressionUtils;
 import com.google.auto.value.AutoValue;
+import com.google.common.base.Ascii;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
@@ -48,6 +50,9 @@ import java.util.regex.Pattern;
 public abstract class TargetedDirectorySegment {
 
   public static final String COUNTRY_SET_KEY = "countries";
+  public static final String DEVICE_TIER_KEY = "tier";
+  public static final String DEVICE_GROUP_KEY = "group";
+
   private static final String COUNTRY_SET_NAME_REGEX_STRING = "^[a-zA-Z][a-zA-Z0-9_]*$";
 
   private static final String SEGMENT_SPLIT_CHARACTER = "#";
@@ -56,12 +61,12 @@ public abstract class TargetedDirectorySegment {
 
   private static final String LANG_KEY = "lang";
   private static final String TCF_KEY = "tcf";
-  private static final String DEVICE_TIER_KEY = "tier";
 
   private static final ImmutableSet<TargetingDimension> ALLOWED_NESTING_DIMENSIONS =
       ImmutableSet.of(
           TargetingDimension.COUNTRY_SET,
           TargetingDimension.DEVICE_TIER,
+          TargetingDimension.DEVICE_GROUP,
           TargetingDimension.TEXTURE_COMPRESSION_FORMAT);
   private static final int MAXIMUM_NESTING_DEPTH_ALLOWED = 2;
 
@@ -69,9 +74,10 @@ public abstract class TargetedDirectorySegment {
       ImmutableMap.<String, TargetingDimension>builder()
           .put(COUNTRY_SET_KEY, TargetingDimension.COUNTRY_SET)
           .put(DEVICE_TIER_KEY, TargetingDimension.DEVICE_TIER)
+          .put(DEVICE_GROUP_KEY, TargetingDimension.DEVICE_GROUP)
           .put(LANG_KEY, TargetingDimension.LANGUAGE)
           .put(TCF_KEY, TargetingDimension.TEXTURE_COMPRESSION_FORMAT)
-          .build();
+          .buildOrThrow();
   private static final ImmutableSetMultimap<TargetingDimension, String> DIMENSION_TO_KEY =
       KEY_TO_DIMENSION.asMultimap().inverse();
 
@@ -100,6 +106,9 @@ public abstract class TargetedDirectorySegment {
       newTargeting.clearTextureCompressionFormat();
     } else if (dimension.equals(TargetingDimension.DEVICE_TIER) && getTargeting().hasDeviceTier()) {
       newTargeting.clearDeviceTier();
+    } else if (dimension.equals(TargetingDimension.DEVICE_GROUP)
+        && getTargeting().hasDeviceGroup()) {
+      newTargeting.clearDeviceGroup();
     } else if (dimension.equals(TargetingDimension.COUNTRY_SET) && getTargeting().hasCountrySet()) {
       newTargeting.clearCountrySet();
     } else {
@@ -207,6 +216,8 @@ public abstract class TargetedDirectorySegment {
         return targeting.getDeviceTier().getValueList().stream()
             .map(tier -> Integer.toString(tier.getValue()))
             .findFirst();
+      case DEVICE_GROUP:
+        return targeting.getDeviceGroup().getValueList().stream().findFirst();
       case LANGUAGE:
         return targeting.getLanguage().getValueList().stream().findFirst();
       case TEXTURE_COMPRESSION_FORMAT:
@@ -298,6 +309,8 @@ public abstract class TargetedDirectorySegment {
         return parseCountrySet(name, value);
       case DEVICE_TIER:
         return parseDeviceTier(name, value);
+      case DEVICE_GROUP:
+        return parseDeviceGroup(name, value);
       case LANGUAGE:
         return parseLanguage(name, value);
       case TEXTURE_COMPRESSION_FORMAT:
@@ -333,7 +346,7 @@ public abstract class TargetedDirectorySegment {
           .build();
     }
     return AssetsDirectoryTargeting.newBuilder()
-        .setLanguage(LanguageTargeting.newBuilder().addValue(value.toLowerCase()))
+        .setLanguage(LanguageTargeting.newBuilder().addValue(Ascii.toLowerCase(value)))
         .build();
   }
 
@@ -342,6 +355,13 @@ public abstract class TargetedDirectorySegment {
     return AssetsDirectoryTargeting.newBuilder()
         .setDeviceTier(
             DeviceTierTargeting.newBuilder().addValue(Int32Value.of(Integer.parseInt(value))))
+        .build();
+  }
+
+  private static AssetsDirectoryTargeting parseDeviceGroup(String name, String value) {
+    DeviceTargetingUtils.validateDeviceGroupForAssetsDirectory(name, value);
+    return AssetsDirectoryTargeting.newBuilder()
+        .setDeviceGroup(DeviceGroupTargeting.newBuilder().addValue(value))
         .build();
   }
 

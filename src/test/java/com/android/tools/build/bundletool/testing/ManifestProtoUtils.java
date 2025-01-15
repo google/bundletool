@@ -648,14 +648,13 @@ public final class ManifestProtoUtils {
       boolean addToActivityAlias) {
     return manifestElement -> {
       XmlProtoElementBuilder activityElement =
-          manifestElement
-              .getOrCreateChildElement(APPLICATION_ELEMENT_NAME)
-              .getOrCreateChildElement(
+          XmlProtoElementBuilder.create(
                   addToActivityAlias ? ACTIVITY_ELEMENT_NAME : ACTIVITY_ALIAS_ELEMENT_NAME)
               .addAttribute(
                   XmlProtoAttributeBuilder.createAndroidAttribute(
                           NAME_ATTRIBUTE_NAME, NAME_RESOURCE_ID)
                       .setValueAsString(activityName));
+
       XmlProtoElementBuilder intentFilter =
           activityElement.getOrCreateChildElement(INTENT_FILTER_ELEMENT_NAME);
 
@@ -687,6 +686,10 @@ public final class ManifestProtoUtils {
               XmlProtoAttributeBuilder.createAndroidAttribute(HOST_NAME, HOST_RESOURCE_ID)
                   .setValueAsString(host))
           .addAttribute(pathAttributeBuilder);
+
+      manifestElement
+          .getOrCreateChildElement(APPLICATION_ELEMENT_NAME)
+          .addChildElement(activityElement);
     };
   }
 
@@ -1224,7 +1227,7 @@ public final class ManifestProtoUtils {
                     .setValueAsString(sdkPackageName))
             .addAttribute(
                 createAndroidAttribute(SDK_VERSION_MAJOR_ATTRIBUTE_NAME, VERSION_MAJOR_RESOURCE_ID)
-                    .setValueAsString(String.valueOf(versionMajor)))
+                    .setValueAsDecimalInteger(versionMajor))
             .addAttribute(
                 createAndroidAttribute(
                         CERTIFICATE_DIGEST_ATTRIBUTE_NAME, CERTIFICATE_DIGEST_RESOURCE_ID)

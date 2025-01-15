@@ -49,7 +49,11 @@ import javax.inject.Inject;
 public class ModuleSplitterForShards {
 
   private static final ImmutableSet<SplitDimension.Value> SUFFIX_STRIPPING_DIMENSIONS =
-      ImmutableSet.of(Value.TEXTURE_COMPRESSION_FORMAT, Value.DEVICE_TIER, Value.COUNTRY_SET);
+      ImmutableSet.of(
+          Value.TEXTURE_COMPRESSION_FORMAT,
+          Value.DEVICE_GROUP,
+          Value.DEVICE_TIER,
+          Value.COUNTRY_SET);
 
   private final Version bundleVersion;
   private final BundleConfig bundleConfig;

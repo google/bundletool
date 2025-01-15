@@ -22,11 +22,13 @@ import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.andr
 import static com.android.tools.build.bundletool.testing.TargetingUtils.alternativeCountrySetTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.alternativeTextureCompressionTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.apkCountrySetTargeting;
+import static com.android.tools.build.bundletool.testing.TargetingUtils.apkDeviceGroupTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.apkDeviceTierTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.apkTextureTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.assets;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.assetsDirectoryTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.countrySetTargeting;
+import static com.android.tools.build.bundletool.testing.TargetingUtils.deviceGroupTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.deviceTierTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.targetedAssetsDirectory;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.textureCompressionTargeting;
@@ -296,6 +298,99 @@ public class SuffixStripperTest {
     // Check that the APK and Variant targeting were applied.
     assertThat(strippedSplit.getApkTargeting())
         .isEqualTo(apkDeviceTierTargeting(deviceTierTargeting(0)));
+    assertThat(strippedSplit.getVariantTargeting()).isEqualToDefaultInstance();
+  }
+
+  @Test
+  public void applySuffixStripping_deviceGroup_suffixStrippingEnabled() {
+    ModuleSplit split =
+        ModuleSplit.builder()
+            .setModuleName(BundleModuleName.create("base"))
+            .setApkTargeting(ApkTargeting.getDefaultInstance())
+            .setVariantTargeting(VariantTargeting.getDefaultInstance())
+            .setAndroidManifest(AndroidManifest.create(androidManifest("com.test.app")))
+            .setMasterSplit(true)
+            .setEntries(
+                ImmutableList.of(
+                    createModuleEntryForFile("assets/img#group_a/low_res_image.dat", TEST_CONTENT),
+                    createModuleEntryForFile(
+                        "assets/img#group_b/high_res_image.dat", TEST_CONTENT)))
+            .setAssetsConfig(
+                assets(
+                    targetedAssetsDirectory(
+                        "assets/img#group_a",
+                        assetsDirectoryTargeting(
+                            deviceGroupTargeting("a", /* alternatives= */ ImmutableList.of("b")))),
+                    targetedAssetsDirectory(
+                        "assets/img#group_b",
+                        assetsDirectoryTargeting(
+                            deviceGroupTargeting("b", /* alternatives= */ ImmutableList.of("a"))))))
+            .build();
+
+    ModuleSplit strippedSplit =
+        SuffixStripper.createForDimension(TargetingDimension.DEVICE_GROUP)
+            .applySuffixStripping(
+                split, SuffixStripping.newBuilder().setDefaultSuffix("a").setEnabled(true).build());
+
+    // Check that the group_b sibling folder has been excluded
+    assertThat(strippedSplit.getEntries()).hasSize(1);
+    assertThat(strippedSplit.getEntries().get(0).getPath())
+        .isEqualTo(ZipPath.create("assets/img/low_res_image.dat"));
+
+    assertThat(strippedSplit.getAssetsConfig().get().getDirectoryCount()).isEqualTo(1);
+    assertThat(strippedSplit.getAssetsConfig().get().getDirectory(0).getPath())
+        .isEqualTo("assets/img");
+
+    // Check that the APK and Variant targeting were applied.
+    assertThat(strippedSplit.getApkTargeting())
+        .isEqualTo(apkDeviceGroupTargeting(deviceGroupTargeting("a")));
+    assertThat(strippedSplit.getVariantTargeting()).isEqualToDefaultInstance();
+  }
+
+  @Test
+  public void applySuffixStripping_deviceGroup_suffixStrippingDisabled_nonDefaultValuesExcluded() {
+    ModuleSplit split =
+        ModuleSplit.builder()
+            .setModuleName(BundleModuleName.create("base"))
+            .setApkTargeting(ApkTargeting.getDefaultInstance())
+            .setVariantTargeting(VariantTargeting.getDefaultInstance())
+            .setAndroidManifest(AndroidManifest.create(androidManifest("com.test.app")))
+            .setMasterSplit(true)
+            .setEntries(
+                ImmutableList.of(
+                    createModuleEntryForFile("assets/img#group_a/low_res_image.dat", TEST_CONTENT),
+                    createModuleEntryForFile(
+                        "assets/img#group_b/high_res_image.dat", TEST_CONTENT)))
+            .setAssetsConfig(
+                assets(
+                    targetedAssetsDirectory(
+                        "assets/img#group_a",
+                        assetsDirectoryTargeting(
+                            deviceGroupTargeting("a", /* alternatives= */ ImmutableList.of("b")))),
+                    targetedAssetsDirectory(
+                        "assets/img#group_b",
+                        assetsDirectoryTargeting(
+                            deviceGroupTargeting("b", /* alternatives= */ ImmutableList.of("a"))))))
+            .build();
+
+    ModuleSplit strippedSplit =
+        SuffixStripper.createForDimension(TargetingDimension.DEVICE_GROUP)
+            .applySuffixStripping(
+                split,
+                SuffixStripping.newBuilder().setDefaultSuffix("a").setEnabled(false).build());
+
+    // Check that the group_b sibling folder has been excluded
+    assertThat(strippedSplit.getEntries()).hasSize(1);
+    assertThat(strippedSplit.getEntries().get(0).getPath())
+        .isEqualTo(ZipPath.create("assets/img#group_a/low_res_image.dat"));
+
+    assertThat(strippedSplit.getAssetsConfig().get().getDirectoryCount()).isEqualTo(1);
+    assertThat(strippedSplit.getAssetsConfig().get().getDirectory(0).getPath())
+        .isEqualTo("assets/img#group_a");
+
+    // Check that the APK and Variant targeting were applied.
+    assertThat(strippedSplit.getApkTargeting())
+        .isEqualTo(apkDeviceGroupTargeting(deviceGroupTargeting("a")));
     assertThat(strippedSplit.getVariantTargeting()).isEqualToDefaultInstance();
   }
 

@@ -1,0 +1,17 @@
+{
+  "device_groups":[
+    {
+      "name":"soc",
+      "device_selectors":[
+        {
+          "system_on_chips":[
+            {
+              "manufacturer":"Qualcomm",
+              "model":"SDM670"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

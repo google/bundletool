@@ -25,6 +25,7 @@ import com.android.bundle.Devices.SdkRuntime;
 import com.android.bundle.Targeting.AbiTargeting;
 import com.android.bundle.Targeting.CountrySetTargeting;
 import com.android.bundle.Targeting.DeviceFeatureTargeting;
+import com.android.bundle.Targeting.DeviceGroupTargeting;
 import com.android.bundle.Targeting.DeviceTierTargeting;
 import com.android.bundle.Targeting.LanguageTargeting;
 import com.android.bundle.Targeting.ScreenDensityTargeting;
@@ -70,6 +71,10 @@ public final class DeviceSpecUtils {
 
   public static boolean isDeviceTierMissing(DeviceSpec deviceSpec) {
     return !deviceSpec.hasDeviceTier();
+  }
+
+  public static boolean isDeviceGroupsMissing(DeviceSpec deviceSpec) {
+    return deviceSpec.getDeviceGroupsList().isEmpty();
   }
 
   public static boolean isCountrySetMissing(DeviceSpec deviceSpec) {
@@ -185,6 +190,15 @@ public final class DeviceSpecUtils {
       if (!deviceTierTargeting.equals(DeviceTierTargeting.getDefaultInstance())) {
         deviceSpec.setDeviceTier(
             Int32Value.of(Iterables.getOnlyElement(deviceTierTargeting.getValueList()).getValue()));
+      }
+      return this;
+    }
+
+    @CanIgnoreReturnValue
+    DeviceSpecFromTargetingBuilder setDeviceGroup(DeviceGroupTargeting deviceGroupTargeting) {
+      if (!deviceGroupTargeting.equals(DeviceGroupTargeting.getDefaultInstance())) {
+        deviceSpec.addDeviceGroups(
+            Iterables.getOnlyElement(deviceGroupTargeting.getValueList(), ""));
       }
       return this;
     }

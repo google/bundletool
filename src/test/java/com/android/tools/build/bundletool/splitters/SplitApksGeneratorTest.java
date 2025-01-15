@@ -36,6 +36,7 @@ import static com.android.tools.build.bundletool.testing.TargetingUtils.apkMinSd
 import static com.android.tools.build.bundletool.testing.TargetingUtils.assets;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.assetsDirectoryTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.countrySetTargeting;
+import static com.android.tools.build.bundletool.testing.TargetingUtils.deviceGroupTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.deviceTierTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.lPlusVariantTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.languageTargeting;
@@ -820,6 +821,7 @@ public class SplitApksGeneratorTest {
                     .setResourcesPackageId(2)
                     .addFile("assets/languages#lang_es/strings.xml")
                     .addFile("assets/textures#tcf_atc/textures.dat")
+                    .addFile("assets/textures#group_a/textures.dat")
                     .addFile("assets/textures#tier_0/textures.dat")
                     .addFile("assets/content#countries_latam/strings.xml")
                     .setAssetsConfig(
@@ -832,6 +834,9 @@ public class SplitApksGeneratorTest {
                                 assetsDirectoryTargeting(
                                     textureCompressionTargeting(
                                         TextureCompressionFormatAlias.ATC))),
+                            targetedAssetsDirectory(
+                                "assets/textures#group_a",
+                                assetsDirectoryTargeting(deviceGroupTargeting(/* value= */ "a"))),
                             targetedAssetsDirectory(
                                 "assets/textures#tier_0",
                                 assetsDirectoryTargeting(deviceTierTargeting(/* value= */ 0))),
@@ -849,6 +854,7 @@ public class SplitApksGeneratorTest {
                     .setManifest(androidManifest("com.test.app"))
                     .addFile("assets/languages#lang_es/strings.xml")
                     .addFile("assets/textures#tcf_atc/textures.dat")
+                    .addFile("assets/textures#group_a/textures.dat")
                     .addFile("assets/textures#tier_0/textures.dat")
                     .addFile("assets/content#countries_latam/strings.xml")
                     .setAssetsConfig(
@@ -861,6 +867,9 @@ public class SplitApksGeneratorTest {
                                 assetsDirectoryTargeting(
                                     textureCompressionTargeting(
                                         TextureCompressionFormatAlias.ATC))),
+                            targetedAssetsDirectory(
+                                "assets/textures#group_a",
+                                assetsDirectoryTargeting(deviceGroupTargeting(/* value= */ "a"))),
                             targetedAssetsDirectory(
                                 "assets/textures#tier_0",
                                 assetsDirectoryTargeting(deviceTierTargeting(/* value= */ 0))),
@@ -884,6 +893,7 @@ public class SplitApksGeneratorTest {
                         OptimizationDimension.ABI,
                         OptimizationDimension.LANGUAGE,
                         OptimizationDimension.TEXTURE_COMPRESSION_FORMAT,
+                        OptimizationDimension.DEVICE_GROUP,
                         OptimizationDimension.DEVICE_TIER,
                         OptimizationDimension.COUNTRY_SET))
                 .build());
@@ -895,6 +905,7 @@ public class SplitApksGeneratorTest {
             "base__abi",
             "base__countries",
             "base__density",
+            "base__group",
             "base__textures",
             "base__tier",
             "test__module");
@@ -902,28 +913,23 @@ public class SplitApksGeneratorTest {
     ModuleSplit testModule = getModuleSplit(moduleSplits, "test", Optional.empty());
     assertThat(getProvidedSplitTypes(testModule)).containsExactly("test__module");
     assertThat(getRequiredSplitTypes(testModule))
-        .containsExactly("test__abi", "test__countries", "test__textures", "test__tier");
+        .containsExactly(
+            "test__abi", "test__countries", "test__group", "test__textures", "test__tier");
 
     ImmutableMap<String, String> expectedProvidedSplitTypes =
-        ImmutableMap.of(
-            "base.countries_latam",
-            "base__countries",
-            "base.ldpi",
-            "base__density",
-            "base.x86_64",
-            "base__abi",
-            "base.atc",
-            "base__textures",
-            "base.tier_0",
-            "base__tier",
-            "test.countries_latam",
-            "test__countries",
-            "test.x86_64",
-            "test__abi",
-            "test.atc",
-            "test__textures",
-            "test.tier_0",
-            "test__tier");
+        ImmutableMap.<String, String>builder()
+            .put("base.countries_latam", "base__countries")
+            .put("base.ldpi", "base__density")
+            .put("base.x86_64", "base__abi")
+            .put("base.atc", "base__textures")
+            .put("base.group_a", "base__group")
+            .put("base.tier_0", "base__tier")
+            .put("test.countries_latam", "test__countries")
+            .put("test.x86_64", "test__abi")
+            .put("test.atc", "test__textures")
+            .put("test.group_a", "test__group")
+            .put("test.tier_0", "test__tier")
+            .buildOrThrow();
 
     expectedProvidedSplitTypes.forEach(
         (splitId, splitType) -> {
@@ -966,6 +972,7 @@ public class SplitApksGeneratorTest {
                     .setResourcesPackageId(2)
                     .addFile("assets/languages#lang_es/strings.xml")
                     .addFile("assets/textures#tcf_atc/textures.dat")
+                    .addFile("assets/textures#group_a/textures.dat")
                     .addFile("assets/textures#tier_0/textures.dat")
                     .addFile("assets/content#countries_latam/strings.xml")
                     .setAssetsConfig(
@@ -978,6 +985,9 @@ public class SplitApksGeneratorTest {
                                 assetsDirectoryTargeting(
                                     textureCompressionTargeting(
                                         TextureCompressionFormatAlias.ATC))),
+                            targetedAssetsDirectory(
+                                "assets/textures#group_a",
+                                assetsDirectoryTargeting(deviceGroupTargeting(/* value= */ "a"))),
                             targetedAssetsDirectory(
                                 "assets/textures#tier_0",
                                 assetsDirectoryTargeting(deviceTierTargeting(/* value= */ 0))),
@@ -995,6 +1005,7 @@ public class SplitApksGeneratorTest {
                     .setManifest(androidManifest("com.test.app"))
                     .addFile("assets/languages#lang_es/strings.xml")
                     .addFile("assets/textures#tcf_atc/textures.dat")
+                    .addFile("assets/textures#group_a/textures.dat")
                     .addFile("assets/textures#tier_0/textures.dat")
                     .addFile("assets/content#countries_latam/strings.xml")
                     .setAssetsConfig(
@@ -1007,6 +1018,9 @@ public class SplitApksGeneratorTest {
                                 assetsDirectoryTargeting(
                                     textureCompressionTargeting(
                                         TextureCompressionFormatAlias.ATC))),
+                            targetedAssetsDirectory(
+                                "assets/textures#group_a",
+                                assetsDirectoryTargeting(deviceGroupTargeting(/* value= */ "a"))),
                             targetedAssetsDirectory(
                                 "assets/textures#tier_0",
                                 assetsDirectoryTargeting(deviceTierTargeting(/* value= */ 0))),
@@ -1038,6 +1052,7 @@ public class SplitApksGeneratorTest {
                         OptimizationDimension.ABI,
                         OptimizationDimension.LANGUAGE,
                         OptimizationDimension.TEXTURE_COMPRESSION_FORMAT,
+                        OptimizationDimension.DEVICE_GROUP,
                         OptimizationDimension.DEVICE_TIER,
                         OptimizationDimension.COUNTRY_SET))
                 .build());

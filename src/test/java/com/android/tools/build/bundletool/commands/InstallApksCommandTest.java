@@ -41,9 +41,11 @@ import static com.android.tools.build.bundletool.testing.FakeSystemEnvironmentPr
 import static com.android.tools.build.bundletool.testing.TargetingUtils.alternativeCountrySetTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.apkAbiTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.apkCountrySetTargeting;
+import static com.android.tools.build.bundletool.testing.TargetingUtils.apkDeviceGroupTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.apkDeviceTierTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.apkLanguageTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.countrySetTargeting;
+import static com.android.tools.build.bundletool.testing.TargetingUtils.deviceGroupTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.deviceTierTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.sdkRuntimeVariantTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.sdkVersionFrom;
@@ -64,6 +66,7 @@ import com.android.bundle.Config.Bundletool;
 import com.android.bundle.Config.SplitDimension.Value;
 import com.android.bundle.Devices.DeviceSpec;
 import com.android.bundle.Targeting.ApkTargeting;
+import com.android.bundle.Targeting.DeviceGroupTargeting;
 import com.android.bundle.Targeting.ScreenDensity.DensityAlias;
 import com.android.bundle.Targeting.SdkVersion;
 import com.android.bundle.Targeting.VariantTargeting;
@@ -284,6 +287,27 @@ public class InstallApksCommandTest {
             .setAdbServer(fromFlags.getAdbServer())
             .setDeviceId(DEVICE_ID)
             .setDeviceTier(1)
+            .build();
+
+    assertThat(fromBuilder).isEqualTo(fromFlags);
+  }
+
+  @Test
+  public void fromFlagsEquivalentToBuilder_deviceGroup() throws Exception {
+    InstallApksCommand fromFlags =
+        InstallApksCommand.fromFlags(
+            new FlagParser()
+                .parse("--apks=" + simpleApksPath, "--adb=" + adbPath, "--device-groups=high,low"),
+            systemEnvironmentProvider,
+            fakeServerOneDevice(lDeviceWithLocales("en-US")));
+
+    InstallApksCommand fromBuilder =
+        InstallApksCommand.builder()
+            .setApksArchivePath(simpleApksPath)
+            .setAdbPath(adbPath)
+            .setAdbServer(fromFlags.getAdbServer())
+            .setDeviceId(DEVICE_ID)
+            .setDeviceGroups(ImmutableSet.of("low", "high"))
             .build();
 
     assertThat(fromBuilder).isEqualTo(fromFlags);
@@ -1444,6 +1468,233 @@ public class InstallApksCommandTest {
     assertThat(getFileNames(pushedFiles))
         .containsExactly(
             baseHighApk.toString(), asset1MasterApk.toString(), asset1HighApk.toString());
+  }
+
+  @Test
+  @Theory
+  public void bundleWithDeviceGroupTargeting_deviceGroupsSet_filtersByGroup(
+      @FromDataPoints("apksInDirectory") boolean apksInDirectory) throws Exception {
+    DeviceGroupTargeting targetLow = deviceGroupTargeting("low", ImmutableList.of("high"));
+    DeviceGroupTargeting targetHigh = deviceGroupTargeting("high", ImmutableList.of("low"));
+    ZipPath baseMasterApk = ZipPath.create("base-master.apk");
+    ZipPath baseLowApk = ZipPath.create("base-group_low.apk");
+    ZipPath baseHighApk = ZipPath.create("base-group_high.apk");
+    ZipPath asset1MasterApk = ZipPath.create("asset1-master.apk");
+    ZipPath asset1LowApk = ZipPath.create("asset1-group_low.apk");
+    ZipPath asset1HighApk = ZipPath.create("asset1-group_high.apk");
+    BuildApksResult tableOfContent =
+        BuildApksResult.newBuilder()
+            .setPackageName(PKG_NAME)
+            .setBundletool(
+                Bundletool.newBuilder()
+                    .setVersion(BundleToolVersion.getCurrentVersion().toString()))
+            .addVariant(
+                createVariant(
+                    variantSdkTargeting(
+                        sdkVersionFrom(21), ImmutableSet.of(SdkVersion.getDefaultInstance())),
+                    createSplitApkSet(
+                        "base",
+                        createMasterApkDescription(
+                            ApkTargeting.getDefaultInstance(), baseMasterApk),
+                        splitApkDescription(apkDeviceGroupTargeting(targetLow), baseLowApk),
+                        splitApkDescription(apkDeviceGroupTargeting(targetHigh), baseHighApk))))
+            .addAssetSliceSet(
+                AssetSliceSet.newBuilder()
+                    .setAssetModuleMetadata(
+                        AssetModuleMetadata.newBuilder()
+                            .setName("asset1")
+                            .setDeliveryType(DeliveryType.ON_DEMAND))
+                    .addApkDescription(
+                        createMasterApkDescription(
+                            ApkTargeting.getDefaultInstance(), asset1MasterApk))
+                    .addApkDescription(
+                        splitApkDescription(apkDeviceGroupTargeting(targetLow), asset1LowApk))
+                    .addApkDescription(
+                        splitApkDescription(apkDeviceGroupTargeting(targetHigh), asset1HighApk)))
+            // Add local testing info to check that pushed APKs are also filtered by device group.
+            .setLocalTestingInfo(
+                LocalTestingInfo.newBuilder().setEnabled(true).setLocalTestingPath("local_testing"))
+            .addDefaultTargetingValue(
+                DefaultTargetingValue.newBuilder()
+                    .setDimension(Value.DEVICE_GROUP)
+                    .setDefaultValue("low"))
+            .build();
+
+    Path apksFile = createApks(tableOfContent, apksInDirectory);
+
+    List<Path> installedApks = new ArrayList<>();
+    List<Path> pushedFiles = new ArrayList<>();
+    FakeDevice fakeDevice =
+        FakeDevice.fromDeviceSpec(DEVICE_ID, DeviceState.ONLINE, lDeviceWithLocales("en-US"));
+    AdbServer adbServer =
+        new FakeAdbServer(/* hasInitialDeviceList= */ true, ImmutableList.of(fakeDevice));
+    fakeDevice.setInstallApksSideEffect((apks, installOptions) -> installedApks.addAll(apks));
+    fakeDevice.setPushSideEffect((files, installOptions) -> pushedFiles.addAll(files));
+
+    InstallApksCommand.builder()
+        .setApksArchivePath(apksFile)
+        .setAdbPath(adbPath)
+        .setAdbServer(adbServer)
+        .setDeviceGroups(ImmutableSet.of("high"))
+        .build()
+        .execute();
+
+    // Base only, the on demand asset is not installed. Group "low" splits are filtered out.
+    assertThat(getFileNames(installedApks))
+        .containsExactly(baseMasterApk.toString(), baseHighApk.toString());
+    // Base config splits and on-demand assets. Group "low" splits are filtered out.
+    assertThat(getFileNames(pushedFiles))
+        .containsExactly(
+            baseHighApk.toString(), asset1MasterApk.toString(), asset1HighApk.toString());
+  }
+
+  @Test
+  @Theory
+  public void bundleWithDeviceGroupTargeting_noDeviceGroupsSet_usesDefaultValue(
+      @FromDataPoints("apksInDirectory") boolean apksInDirectory) throws Exception {
+    DeviceGroupTargeting targetLow = deviceGroupTargeting("low", ImmutableList.of("high"));
+    DeviceGroupTargeting targetHigh = deviceGroupTargeting("high", ImmutableList.of("low"));
+    ZipPath baseMasterApk = ZipPath.create("base-master.apk");
+    ZipPath baseLowApk = ZipPath.create("base-group_low.apk");
+    ZipPath baseHighApk = ZipPath.create("base-group_high.apk");
+    ZipPath asset1MasterApk = ZipPath.create("asset1-master.apk");
+    ZipPath asset1LowApk = ZipPath.create("asset1-group_low.apk");
+    ZipPath asset1HighApk = ZipPath.create("asset1-group_high.apk");
+    BuildApksResult tableOfContent =
+        BuildApksResult.newBuilder()
+            .setPackageName(PKG_NAME)
+            .setBundletool(
+                Bundletool.newBuilder()
+                    .setVersion(BundleToolVersion.getCurrentVersion().toString()))
+            .addVariant(
+                createVariant(
+                    variantSdkTargeting(
+                        sdkVersionFrom(21), ImmutableSet.of(SdkVersion.getDefaultInstance())),
+                    createSplitApkSet(
+                        "base",
+                        createMasterApkDescription(
+                            ApkTargeting.getDefaultInstance(), baseMasterApk),
+                        splitApkDescription(apkDeviceGroupTargeting(targetLow), baseLowApk),
+                        splitApkDescription(apkDeviceGroupTargeting(targetHigh), baseHighApk))))
+            .addAssetSliceSet(
+                AssetSliceSet.newBuilder()
+                    .setAssetModuleMetadata(
+                        AssetModuleMetadata.newBuilder()
+                            .setName("asset1")
+                            .setDeliveryType(DeliveryType.ON_DEMAND))
+                    .addApkDescription(
+                        createMasterApkDescription(
+                            ApkTargeting.getDefaultInstance(), asset1MasterApk))
+                    .addApkDescription(
+                        splitApkDescription(apkDeviceGroupTargeting(targetLow), asset1LowApk))
+                    .addApkDescription(
+                        splitApkDescription(apkDeviceGroupTargeting(targetHigh), asset1HighApk)))
+            // Add local testing info to check that pushed APKs are also filtered by device group.
+            .setLocalTestingInfo(
+                LocalTestingInfo.newBuilder().setEnabled(true).setLocalTestingPath("local_testing"))
+            .addDefaultTargetingValue(
+                DefaultTargetingValue.newBuilder()
+                    .setDimension(Value.DEVICE_GROUP)
+                    .setDefaultValue("low"))
+            .build();
+
+    Path apksFile = createApks(tableOfContent, apksInDirectory);
+
+    List<Path> installedApks = new ArrayList<>();
+    List<Path> pushedFiles = new ArrayList<>();
+    FakeDevice fakeDevice =
+        FakeDevice.fromDeviceSpec(DEVICE_ID, DeviceState.ONLINE, lDeviceWithLocales("en-US"));
+    AdbServer adbServer =
+        new FakeAdbServer(/* hasInitialDeviceList= */ true, ImmutableList.of(fakeDevice));
+    fakeDevice.setInstallApksSideEffect((apks, installOptions) -> installedApks.addAll(apks));
+    fakeDevice.setPushSideEffect((files, installOptions) -> pushedFiles.addAll(files));
+
+    InstallApksCommand.builder()
+        .setApksArchivePath(apksFile)
+        .setAdbPath(adbPath)
+        .setAdbServer(adbServer)
+        .build()
+        .execute();
+
+    // Base only, the on demand asset is not installed. Group "high" splits are filtered out.
+    assertThat(getFileNames(installedApks))
+        .containsExactly(baseMasterApk.toString(), baseLowApk.toString());
+    // Base config splits and on-demand assets. Group "high" splits are filtered out.
+    assertThat(getFileNames(pushedFiles))
+        .containsExactly(
+            baseLowApk.toString(), asset1MasterApk.toString(), asset1LowApk.toString());
+  }
+
+  @Test
+  @Theory
+  public void bundleWithDeviceGroupTargeting_noDeviceGroupsSetNorDefault_filtersAllGroups(
+      @FromDataPoints("apksInDirectory") boolean apksInDirectory) throws Exception {
+    DeviceGroupTargeting targetLow = deviceGroupTargeting("low", ImmutableList.of("high"));
+    DeviceGroupTargeting targetHigh = deviceGroupTargeting("high", ImmutableList.of("low"));
+    ZipPath baseMasterApk = ZipPath.create("base-master.apk");
+    ZipPath baseLowApk = ZipPath.create("base-group_low.apk");
+    ZipPath baseHighApk = ZipPath.create("base-group_high.apk");
+    ZipPath asset1MasterApk = ZipPath.create("asset1-master.apk");
+    ZipPath asset1LowApk = ZipPath.create("asset1-group_low.apk");
+    ZipPath asset1HighApk = ZipPath.create("asset1-group_high.apk");
+    BuildApksResult tableOfContent =
+        BuildApksResult.newBuilder()
+            .setPackageName(PKG_NAME)
+            .setBundletool(
+                Bundletool.newBuilder()
+                    .setVersion(BundleToolVersion.getCurrentVersion().toString()))
+            .addVariant(
+                createVariant(
+                    variantSdkTargeting(
+                        sdkVersionFrom(21), ImmutableSet.of(SdkVersion.getDefaultInstance())),
+                    createSplitApkSet(
+                        "base",
+                        createMasterApkDescription(
+                            ApkTargeting.getDefaultInstance(), baseMasterApk),
+                        splitApkDescription(apkDeviceGroupTargeting(targetLow), baseLowApk),
+                        splitApkDescription(apkDeviceGroupTargeting(targetHigh), baseHighApk))))
+            .addAssetSliceSet(
+                AssetSliceSet.newBuilder()
+                    .setAssetModuleMetadata(
+                        AssetModuleMetadata.newBuilder()
+                            .setName("asset1")
+                            .setDeliveryType(DeliveryType.ON_DEMAND))
+                    .addApkDescription(
+                        createMasterApkDescription(
+                            ApkTargeting.getDefaultInstance(), asset1MasterApk))
+                    .addApkDescription(
+                        splitApkDescription(apkDeviceGroupTargeting(targetLow), asset1LowApk))
+                    .addApkDescription(
+                        splitApkDescription(apkDeviceGroupTargeting(targetHigh), asset1HighApk)))
+            // Add local testing info to check that pushed APKs are also filtered by device group.
+            .setLocalTestingInfo(
+                LocalTestingInfo.newBuilder().setEnabled(true).setLocalTestingPath("local_testing"))
+            .addDefaultTargetingValue(
+                DefaultTargetingValue.newBuilder().setDimension(Value.DEVICE_GROUP))
+            .build();
+
+    Path apksFile = createApks(tableOfContent, apksInDirectory);
+
+    List<Path> installedApks = new ArrayList<>();
+    List<Path> pushedFiles = new ArrayList<>();
+    FakeDevice fakeDevice =
+        FakeDevice.fromDeviceSpec(DEVICE_ID, DeviceState.ONLINE, lDeviceWithLocales("en-US"));
+    AdbServer adbServer =
+        new FakeAdbServer(/* hasInitialDeviceList= */ true, ImmutableList.of(fakeDevice));
+    fakeDevice.setInstallApksSideEffect((apks, installOptions) -> installedApks.addAll(apks));
+    fakeDevice.setPushSideEffect((files, installOptions) -> pushedFiles.addAll(files));
+
+    InstallApksCommand.builder()
+        .setApksArchivePath(apksFile)
+        .setAdbPath(adbPath)
+        .setAdbServer(adbServer)
+        .build()
+        .execute();
+
+    // Base only, the on demand asset is not installed. Group splits are filtered out.
+    assertThat(getFileNames(installedApks)).containsExactly(baseMasterApk.toString());
+    // Base config splits and on-demand assets. Group splits are filtered out.
+    assertThat(getFileNames(pushedFiles)).containsExactly(asset1MasterApk.toString());
   }
 
   @Test

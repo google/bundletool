@@ -96,7 +96,7 @@ public class ModuleMatcherTest {
   }
 
   @Test
-  public void matchesModuleTargeting_negative_wrongDeviceTier() {
+  public void matchesModuleTargeting_negative_wrongDeviceGroup() {
     ModuleTargeting targeting =
         mergeModuleTargeting(
             moduleMinSdkVersionTargeting(21),

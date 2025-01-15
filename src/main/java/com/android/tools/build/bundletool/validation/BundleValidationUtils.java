@@ -24,6 +24,7 @@ import com.android.bundle.Targeting.Abi;
 import com.android.bundle.Targeting.Abi.AbiAlias;
 import com.android.bundle.Targeting.AbiTargeting;
 import com.android.bundle.Targeting.CountrySetTargeting;
+import com.android.bundle.Targeting.DeviceGroupTargeting;
 import com.android.bundle.Targeting.LanguageTargeting;
 import com.android.bundle.Targeting.TextureCompressionFormat;
 import com.android.bundle.Targeting.TextureCompressionFormat.TextureCompressionFormatAlias;
@@ -74,6 +75,16 @@ public final class BundleValidationUtils {
     if (targeting.getValueCount() == 0 && targeting.getAlternativesCount() == 0) {
       throw InvalidBundleException.builder()
           .withUserMessage("Directory '%s' has set but empty Country Set targeting.", directoryPath)
+          .build();
+    }
+  }
+
+  public static void checkHasSingleValue(DeviceGroupTargeting targeting, String directoryPath) {
+    if (targeting.getValueCount() != 1) {
+      throw InvalidBundleException.builder()
+          .withUserMessage(
+              "Directory '%s' must have exactly one device group, but found %s.",
+              directoryPath, targeting.getValueList())
           .build();
     }
   }
@@ -141,6 +152,22 @@ public final class BundleValidationUtils {
           .withUserMessage(
               "Expected targeting values and alternatives to be mutually exclusive, but directory"
                   + " '%s' has country set targeting that contains %s in both.",
+              directoryPath, intersection)
+          .build();
+    }
+  }
+
+  public static void checkValuesAndAlternativeHaveNoOverlap(
+      DeviceGroupTargeting targeting, String directoryPath) {
+    SetView<String> intersection =
+        Sets.intersection(
+            ImmutableSet.copyOf(targeting.getValueList()),
+            ImmutableSet.copyOf(targeting.getAlternativesList()));
+    if (!intersection.isEmpty()) {
+      throw InvalidBundleException.builder()
+          .withUserMessage(
+              "Expected targeting values and alternatives to be mutually exclusive, but directory"
+                  + " '%s' has device group targeting that contains %s in both.",
               directoryPath, intersection)
           .build();
     }

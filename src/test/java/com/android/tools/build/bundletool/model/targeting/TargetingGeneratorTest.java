@@ -22,6 +22,7 @@ import static com.android.tools.build.bundletool.testing.TargetingUtils.alternat
 import static com.android.tools.build.bundletool.testing.TargetingUtils.alternativeTextureCompressionTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.assetsDirectoryTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.countrySetTargeting;
+import static com.android.tools.build.bundletool.testing.TargetingUtils.deviceGroupTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.deviceTierTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.languageTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.mergeAssetsTargeting;
@@ -581,6 +582,85 @@ public class TargetingGeneratorTest {
                             assetsDirectoryTargeting(
                                 deviceTierTargeting(
                                     /* value= */ 2, /* alternatives= */ ImmutableList.of(0, 1)))))
+                .build());
+  }
+
+  @Test
+  public void generateTargetingForAssets_deviceGroupTargeting() {
+    Assets assetsConfig =
+        new TargetingGenerator()
+            .generateTargetingForAssets(
+                ImmutableList.of(
+                    ZipPath.create("assets/img#group_a"),
+                    ZipPath.create("assets/img#group_b"),
+                    ZipPath.create("assets/img#group_c")));
+    assertThat(assetsConfig)
+        .ignoringRepeatedFieldOrder()
+        .isEqualTo(
+            Assets.newBuilder()
+                .addDirectory(
+                    TargetedAssetsDirectory.newBuilder()
+                        .setPath("assets/img#group_a")
+                        .setTargeting(
+                            assetsDirectoryTargeting(
+                                deviceGroupTargeting(
+                                    /* value= */ "a",
+                                    /* alternatives= */ ImmutableList.of("b", "c")))))
+                .addDirectory(
+                    TargetedAssetsDirectory.newBuilder()
+                        .setPath("assets/img#group_b")
+                        .setTargeting(
+                            assetsDirectoryTargeting(
+                                deviceGroupTargeting(
+                                    /* value= */ "b",
+                                    /* alternatives= */ ImmutableList.of("a", "c")))))
+                .addDirectory(
+                    TargetedAssetsDirectory.newBuilder()
+                        .setPath("assets/img#group_c")
+                        .setTargeting(
+                            assetsDirectoryTargeting(
+                                deviceGroupTargeting(
+                                    /* value= */ "c",
+                                    /* alternatives= */ ImmutableList.of("a", "b")))))
+                .build());
+  }
+
+  @Test
+  public void generateTargetingForAssets_countrySetTargeting() {
+    Assets assetsConfig =
+        new TargetingGenerator()
+            .generateTargetingForAssets(
+                ImmutableList.of(
+                    ZipPath.create("assets/img#countries_sea"),
+                    ZipPath.create("assets/img#countries_latam"),
+                    ZipPath.create("assets/img")));
+    assertThat(assetsConfig)
+        .ignoringRepeatedFieldOrder()
+        .isEqualTo(
+            Assets.newBuilder()
+                .addDirectory(
+                    TargetedAssetsDirectory.newBuilder()
+                        .setPath("assets/img#countries_sea")
+                        .setTargeting(
+                            assetsDirectoryTargeting(
+                                countrySetTargeting(
+                                    /* value= */ "sea",
+                                    /* alternatives= */ ImmutableList.of("latam")))))
+                .addDirectory(
+                    TargetedAssetsDirectory.newBuilder()
+                        .setPath("assets/img#countries_latam")
+                        .setTargeting(
+                            assetsDirectoryTargeting(
+                                countrySetTargeting(
+                                    /* value= */ "latam",
+                                    /* alternatives= */ ImmutableList.of("sea")))))
+                .addDirectory(
+                    TargetedAssetsDirectory.newBuilder()
+                        .setPath("assets/img")
+                        .setTargeting(
+                            assetsDirectoryTargeting(
+                                alternativeCountrySetTargeting(
+                                    /* alternatives= */ ImmutableList.of("sea", "latam")))))
                 .build());
   }
 

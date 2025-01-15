@@ -22,6 +22,7 @@ import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.andr
 import static com.android.tools.build.bundletool.testing.TargetingUtils.abiTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.assets;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.assetsDirectoryTargeting;
+import static com.android.tools.build.bundletool.testing.TargetingUtils.deviceGroupTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.languageTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.targetedAssetsDirectory;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.textureCompressionTargeting;
@@ -34,6 +35,7 @@ import com.android.bundle.Targeting.Abi.AbiAlias;
 import com.android.bundle.Targeting.AbiTargeting;
 import com.android.bundle.Targeting.AssetsDirectoryTargeting;
 import com.android.bundle.Targeting.CountrySetTargeting;
+import com.android.bundle.Targeting.DeviceGroupTargeting;
 import com.android.bundle.Targeting.LanguageTargeting;
 import com.android.bundle.Targeting.TextureCompressionFormat;
 import com.android.bundle.Targeting.TextureCompressionFormat.TextureCompressionFormatAlias;
@@ -41,6 +43,7 @@ import com.android.bundle.Targeting.TextureCompressionFormatTargeting;
 import com.android.tools.build.bundletool.model.BundleModule;
 import com.android.tools.build.bundletool.model.exceptions.InvalidBundleException;
 import com.android.tools.build.bundletool.testing.BundleModuleBuilder;
+import com.google.common.collect.ImmutableList;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
@@ -261,6 +264,56 @@ public class AssetsTargetingValidatorTest {
   }
 
   @Test
+  public void validateModule_defaultInstanceOfDeviceGroupTargeting_throws() throws Exception {
+    Assets config =
+        assets(
+            targetedAssetsDirectory(
+                "assets/dir#group_a",
+                assetsDirectoryTargeting(DeviceGroupTargeting.getDefaultInstance())));
+    BundleModule module =
+        new BundleModuleBuilder("testModule")
+            .addFile("assets/dir#group_a/raw.dat")
+            .setAssetsConfig(config)
+            .setManifest(androidManifestForAssetModule("com.test.app"))
+            .build();
+
+    InvalidBundleException e =
+        assertThrows(
+            InvalidBundleException.class,
+            () -> new AssetsTargetingValidator().validateModule(module));
+
+    assertThat(e).hasMessageThat().contains("must have exactly one device group, but found []");
+  }
+
+  @Test
+  public void validateModule_deviceGroupTargeting_noValue_throws() throws Exception {
+    Assets config =
+        assets(
+            targetedAssetsDirectory(
+                "assets/dir#group_a", assetsDirectoryTargeting(deviceGroupTargeting("a"))),
+            targetedAssetsDirectory(
+                "assets/dir",
+                assetsDirectoryTargeting(
+                    DeviceGroupTargeting.newBuilder()
+                        .addAllAlternatives(ImmutableList.of("a"))
+                        .build())));
+    BundleModule module =
+        new BundleModuleBuilder("testModule")
+            .addFile("assets/dir#group_a/raw.dat")
+            .addFile("assets/dir/raw.dat")
+            .setAssetsConfig(config)
+            .setManifest(androidManifestForAssetModule("com.test.app"))
+            .build();
+
+    InvalidBundleException e =
+        assertThrows(
+            InvalidBundleException.class,
+            () -> new AssetsTargetingValidator().validateModule(module));
+
+    assertThat(e).hasMessageThat().contains("'assets/dir' must have exactly one device group");
+  }
+
+  @Test
   public void conflictingValuesAndAlternatives_abi() {
     Assets config =
         assets(
@@ -361,6 +414,35 @@ public class AssetsTargetingValidatorTest {
             "Expected targeting values and alternatives to be mutually exclusive, but directory"
                 + " 'assets/dir' has texture compression format targeting that contains [ASTC] in"
                 + " both.");
+  }
+
+  @Test
+  public void conflictingValuesAndAlternatives_deviceGroup() {
+    Assets config =
+        assets(
+            targetedAssetsDirectory(
+                "assets/dir#group_a",
+                AssetsDirectoryTargeting.newBuilder()
+                    .setDeviceGroup(
+                        DeviceGroupTargeting.newBuilder().addValue("a").addAlternatives("a"))
+                    .build()));
+    BundleModule module =
+        new BundleModuleBuilder("testModule")
+            .addFile("assets/dir#group_a/raw.dat")
+            .setAssetsConfig(config)
+            .setManifest(androidManifestForAssetModule("com.test.app"))
+            .build();
+
+    InvalidBundleException e =
+        assertThrows(
+            InvalidBundleException.class,
+            () -> new AssetsTargetingValidator().validateModule(module));
+
+    assertThat(e)
+        .hasMessageThat()
+        .contains(
+            "Expected targeting values and alternatives to be mutually exclusive, but directory"
+                + " 'assets/dir#group_a' has device group targeting that contains [a] in both.");
   }
 
   @Test

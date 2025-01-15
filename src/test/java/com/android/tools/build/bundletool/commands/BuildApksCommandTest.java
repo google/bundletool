@@ -653,6 +653,45 @@ public class BuildApksCommandTest {
   }
 
   @Test
+  public void buildingViaFlagsAndBuilderHasSameResult_optionalDeviceGroup() throws Exception {
+    Path deviceSpecPath =
+        createDeviceSpecFile(
+            mergeSpecs(sdkVersion(28), density(DensityAlias.HDPI), abis("x86"), locales("en")),
+            tmpDir.resolve("device.json"));
+    final String deviceGroup = "highRam";
+    ByteArrayOutputStream output = new ByteArrayOutputStream();
+    BuildApksCommand commandViaFlags =
+        BuildApksCommand.fromFlags(
+            new FlagParser()
+                .parse(
+                    "--bundle=" + bundlePath,
+                    "--output=" + outputFilePath,
+                    "--aapt2=" + AAPT2_PATH,
+                    // Optional values.
+                    "--device-spec=" + deviceSpecPath,
+                    "--device-group=" + deviceGroup),
+            new PrintStream(output),
+            systemEnvironmentProvider,
+            fakeAdbServer);
+    BuildApksCommand.Builder commandViaBuilder =
+        BuildApksCommand.builder()
+            .setBundlePath(bundlePath)
+            .setOutputFile(outputFilePath)
+            // Optional values.
+            .setDeviceSpec(deviceSpecPath)
+            .setDeviceGroup(deviceGroup)
+            // Must copy instance of the internal executor service.
+            .setAapt2Command(commandViaFlags.getAapt2Command().get())
+            .setExecutorServiceInternal(commandViaFlags.getExecutorService())
+            .setExecutorServiceCreatedByBundleTool(true)
+            .setOutputPrintStream(commandViaFlags.getOutputPrintStream().get());
+    DebugKeystoreUtils.getDebugSigningConfiguration(systemEnvironmentProvider)
+        .ifPresent(commandViaBuilder::setSigningConfiguration);
+
+    assertThat(commandViaBuilder.build()).isEqualTo(commandViaFlags);
+  }
+
+  @Test
   public void buildingViaFlagsAndBuilderHasSameResult_optionalDeviceTier() throws Exception {
     Path deviceSpecPath =
         createDeviceSpecFile(
@@ -2797,7 +2836,7 @@ public class BuildApksCommandTest {
     assertThat(e)
         .hasMessageThat()
         .contains(
-            "Runtime-enabled SDKs must have a minSdkVersion lower than the app, but found  SDK"
+            "Runtime-enabled SDKs must not have a minSdkVersion greater than the app, but found SDK"
                 + " 'com.test.sdk1' with minSdkVersion (32) higher than the app's minSdkVersion"
                 + " (31).");
   }

@@ -16,6 +16,9 @@
 
 package com.android.tools.build.bundletool.model;
 
+import static com.android.tools.build.bundletool.model.BundleMetadata.BUNDLETOOL_NAMESPACE;
+import static com.android.tools.build.bundletool.model.BundleMetadata.DEVICE_GROUP_CONFIG_JSON_FILE_NAME;
+import static com.android.tools.build.bundletool.model.BundleMetadata.DEVICE_GROUP_CONFIG_PB_FILE_NAME;
 import static com.android.tools.build.bundletool.model.utils.BundleParser.extractModules;
 import static com.android.tools.build.bundletool.model.utils.BundleParser.readBundleConfig;
 import static com.android.tools.build.bundletool.model.utils.BundleParser.readBundleMetadata;
@@ -25,18 +28,21 @@ import static com.google.common.collect.ImmutableListMultimap.toImmutableListMul
 import static com.google.common.collect.ImmutableMap.toImmutableMap;
 import static com.google.common.collect.ImmutableSet.toImmutableSet;
 import static com.google.common.collect.MoreCollectors.onlyElement;
+import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.util.function.Function.identity;
 
 import com.android.bundle.Config.ApexConfig;
 import com.android.bundle.Config.BundleConfig;
 import com.android.bundle.Config.BundleConfig.BundleType;
 import com.android.bundle.Config.StandaloneConfig.DexMergingStrategy;
+import com.android.bundle.DeviceGroupConfig;
 import com.android.bundle.Files.TargetedNativeDirectory;
 import com.android.bundle.RuntimeEnabledSdkConfigProto.RuntimeEnabledSdk;
 import com.android.bundle.Targeting.Abi;
 import com.android.bundle.Targeting.NativeDirectoryTargeting;
 import com.android.tools.build.bundletool.model.BundleModule.ModuleType;
 import com.android.tools.build.bundletool.model.exceptions.InvalidBundleException;
+import com.android.tools.build.bundletool.model.utils.DeviceTargetingUtils;
 import com.android.tools.build.bundletool.model.version.Version;
 import com.google.auto.value.AutoValue;
 import com.google.common.collect.ImmutableList;
@@ -44,7 +50,13 @@ import com.google.common.collect.ImmutableListMultimap;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Maps;
+import com.google.common.io.ByteSource;
+import com.google.errorprone.annotations.CanIgnoreReturnValue;
 import com.google.errorprone.annotations.Immutable;
+import com.google.protobuf.InvalidProtocolBufferException;
+import com.google.protobuf.util.JsonFormat;
+import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.util.Collection;
 import java.util.Optional;
 import java.util.stream.Stream;
@@ -120,6 +132,7 @@ public abstract class AppBundle implements Bundle {
         .setModules(Maps.uniqueIndex(modules, BundleModule::getName))
         .setBundleConfig(bundleConfig)
         .setBundleMetadata(bundleMetadata)
+        .setDeviceGroupConfig(deviceGroupConfigFromMetadata(bundleMetadata))
         .setRuntimeEnabledSdkDependencies(
             runtimeEnabledSdkDependencies.values().stream()
                 .collect(toImmutableMap(RuntimeEnabledSdk::getPackageName, identity())))
@@ -133,6 +146,8 @@ public abstract class AppBundle implements Bundle {
 
   @Override
   public abstract BundleMetadata getBundleMetadata();
+
+  public abstract Optional<DeviceGroupConfig> getDeviceGroupConfig();
 
   abstract Optional<String> getPackageNameOptional();
 
@@ -287,12 +302,14 @@ public abstract class AppBundle implements Bundle {
     public abstract Builder setModules(ImmutableMap<BundleModuleName, BundleModule> modules);
 
     /** Convenience method to extract module names and set module map. */
+    @CanIgnoreReturnValue
     public Builder setRawModules(Collection<BundleModule> bundleModules) {
       setModules(bundleModules.stream().collect(toImmutableMap(BundleModule::getName, identity())));
       return this;
     }
 
     /** Convenience method to add extra modules to the builder. */
+    @CanIgnoreReturnValue
     public Builder addRawModules(Collection<BundleModule> bundleModules) {
       modulesBuilder()
           .putAll(
@@ -300,6 +317,7 @@ public abstract class AppBundle implements Bundle {
       return this;
     }
 
+    @CanIgnoreReturnValue
     public Builder addRawModule(BundleModule bundleModule) {
       modulesBuilder().put(bundleModule.getName(), bundleModule);
       return this;
@@ -308,6 +326,8 @@ public abstract class AppBundle implements Bundle {
     public abstract Builder setBundleConfig(BundleConfig bundleConfig);
 
     public abstract Builder setBundleMetadata(BundleMetadata bundleMetadata);
+
+    public abstract Builder setDeviceGroupConfig(Optional<DeviceGroupConfig> deviceGroupConfig);
 
     public abstract Builder setRuntimeEnabledSdkDependencies(
         ImmutableMap<String, RuntimeEnabledSdk> runtimeEnabledSdkDependencies);
@@ -337,5 +357,58 @@ public abstract class AppBundle implements Bundle {
                     .build();
               }
             });
+  }
+
+  private static Optional<DeviceGroupConfig> deviceGroupConfigFromMetadata(
+      BundleMetadata bundleMetadata) {
+    Optional<DeviceGroupConfig> config = deviceGroupConfigFromJsonMetadata(bundleMetadata);
+    if (!config.isPresent()) {
+        config = deviceGroupConfigFromPbMetadata(bundleMetadata);
+    }
+    return config.map(DeviceTargetingUtils::addDeviceGroupOther);
+  }
+
+  private static Optional<DeviceGroupConfig> deviceGroupConfigFromJsonMetadata(
+      BundleMetadata bundleMetadata) {
+    Optional<ByteSource> jsonBytes =
+        bundleMetadata.getFileAsByteSource(
+            BUNDLETOOL_NAMESPACE, DEVICE_GROUP_CONFIG_JSON_FILE_NAME);
+    if (!jsonBytes.isPresent()) {
+      return Optional.empty();
+    }
+    DeviceGroupConfig.Builder builder = DeviceGroupConfig.newBuilder();
+    try {
+      JsonFormat.parser()
+          .ignoringUnknownFields()
+          .merge(jsonBytes.get().asCharSource(UTF_8).read(), builder);
+    } catch (Exception e) {
+      throw InvalidBundleException.builder()
+          .withUserMessage("Cannot parse the device group config metadata as JSON.")
+          .withCause(e)
+          .build();
+    }
+    return Optional.of(builder.build());
+  }
+
+  private static Optional<DeviceGroupConfig> deviceGroupConfigFromPbMetadata(
+      BundleMetadata bundleMetadata) {
+    Optional<ByteSource> protoBytes =
+        bundleMetadata.getFileAsByteSource(
+            BUNDLETOOL_NAMESPACE, DEVICE_GROUP_CONFIG_PB_FILE_NAME);
+    if (!protoBytes.isPresent()) {
+      return Optional.empty();
+    }
+
+    try {
+      return Optional.of(DeviceGroupConfig.parseFrom(protoBytes.get().read()));
+    } catch (InvalidProtocolBufferException e) {
+      throw InvalidBundleException.builder()
+          .withCause(e)
+          .withUserMessage("Cannot parse the device group config metadata as a binary protobuf.")
+          .build();
+    } catch (IOException e) {
+      throw new UncheckedIOException(
+          String.format("Error reading file '%s'.", DEVICE_GROUP_CONFIG_PB_FILE_NAME), e);
+    }
   }
 }

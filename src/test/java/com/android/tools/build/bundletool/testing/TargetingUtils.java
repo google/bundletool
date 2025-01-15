@@ -39,6 +39,7 @@ import com.android.bundle.Targeting.CountrySetTargeting;
 import com.android.bundle.Targeting.DeviceFeature;
 import com.android.bundle.Targeting.DeviceFeatureTargeting;
 import com.android.bundle.Targeting.DeviceGroupModuleTargeting;
+import com.android.bundle.Targeting.DeviceGroupTargeting;
 import com.android.bundle.Targeting.DeviceTierTargeting;
 import com.android.bundle.Targeting.LanguageTargeting;
 import com.android.bundle.Targeting.ModuleTargeting;
@@ -121,6 +122,11 @@ public final class TargetingUtils {
   public static AssetsDirectoryTargeting assetsDirectoryTargeting(
       DeviceTierTargeting deviceTierTargeting) {
     return AssetsDirectoryTargeting.newBuilder().setDeviceTier(deviceTierTargeting).build();
+  }
+
+  public static AssetsDirectoryTargeting assetsDirectoryTargeting(
+      DeviceGroupTargeting deviceGroupTargeting) {
+    return AssetsDirectoryTargeting.newBuilder().setDeviceGroup(deviceGroupTargeting).build();
   }
 
   public static AssetsDirectoryTargeting assetsDirectoryTargeting(
@@ -380,6 +386,10 @@ public final class TargetingUtils {
 
   public static ApkTargeting apkDeviceTierTargeting(DeviceTierTargeting deviceTierTargeting) {
     return ApkTargeting.newBuilder().setDeviceTierTargeting(deviceTierTargeting).build();
+  }
+
+  public static ApkTargeting apkDeviceGroupTargeting(DeviceGroupTargeting deviceGroupTargeting) {
+    return ApkTargeting.newBuilder().setDeviceGroupTargeting(deviceGroupTargeting).build();
   }
 
   public static ApkTargeting apkCountrySetTargeting(CountrySetTargeting countrySetTargeting) {
@@ -871,6 +881,21 @@ public final class TargetingUtils {
       ImmutableList<Integer> alternatives) {
     return DeviceTierTargeting.newBuilder()
         .addAllAlternatives(alternatives.stream().map(Int32Value::of).collect(toImmutableList()))
+        .build();
+  }
+
+  // Device Group targeting.
+  // Note: no alternativeDeviceGroupTargeting() because there must always be a value.
+
+  public static DeviceGroupTargeting deviceGroupTargeting(String value) {
+    return DeviceGroupTargeting.newBuilder().addValue(value).build();
+  }
+
+  public static DeviceGroupTargeting deviceGroupTargeting(
+      String value, ImmutableList<String> alternatives) {
+    return DeviceGroupTargeting.newBuilder()
+        .addValue(value)
+        .addAllAlternatives(alternatives)
         .build();
   }
 

@@ -15,6 +15,7 @@
  */
 package com.android.tools.build.bundletool.sdkmodule;
 
+import static com.android.tools.build.bundletool.model.utils.ResourcesUtils.isAndroidResourceId;
 import static com.android.tools.build.bundletool.model.utils.ResourcesUtils.remapPackageIdInResourceId;
 import static com.google.common.base.Preconditions.checkArgument;
 
@@ -234,6 +235,10 @@ final class ResourceTablePackageIdRemapper {
   }
 
   private void remapInReference(Reference.Builder reference) {
+    // Do not change resource IDs of Android framework attributes.
+    if (isAndroidResourceId(reference.getId())) {
+      return;
+    }
     reference.setId(remapPackageIdInResourceId(reference.getId(), newPackageId));
   }
 }

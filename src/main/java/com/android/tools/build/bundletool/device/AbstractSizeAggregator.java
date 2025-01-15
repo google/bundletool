@@ -18,6 +18,7 @@ package com.android.tools.build.bundletool.device;
 
 import static com.android.tools.build.bundletool.device.DeviceSpecUtils.getDeviceSupportedTextureCompressionFormats;
 import static com.android.tools.build.bundletool.device.DeviceSpecUtils.isAbiMissing;
+import static com.android.tools.build.bundletool.device.DeviceSpecUtils.isDeviceGroupsMissing;
 import static com.android.tools.build.bundletool.device.DeviceSpecUtils.isDeviceTierMissing;
 import static com.android.tools.build.bundletool.device.DeviceSpecUtils.isLocalesMissing;
 import static com.android.tools.build.bundletool.device.DeviceSpecUtils.isScreenDensityMissing;
@@ -26,6 +27,7 @@ import static com.android.tools.build.bundletool.device.DeviceSpecUtils.isSdkVer
 import static com.android.tools.build.bundletool.device.DeviceSpecUtils.isTextureCompressionFormatMissing;
 import static com.android.tools.build.bundletool.model.GetSizeRequest.Dimension.ABI;
 import static com.android.tools.build.bundletool.model.GetSizeRequest.Dimension.COUNTRY_SET;
+import static com.android.tools.build.bundletool.model.GetSizeRequest.Dimension.DEVICE_GROUP;
 import static com.android.tools.build.bundletool.model.GetSizeRequest.Dimension.DEVICE_TIER;
 import static com.android.tools.build.bundletool.model.GetSizeRequest.Dimension.LANGUAGE;
 import static com.android.tools.build.bundletool.model.GetSizeRequest.Dimension.SCREEN_DENSITY;
@@ -41,6 +43,7 @@ import com.android.bundle.Devices.DeviceSpec;
 import com.android.bundle.Targeting.AbiTargeting;
 import com.android.bundle.Targeting.ApkTargeting;
 import com.android.bundle.Targeting.CountrySetTargeting;
+import com.android.bundle.Targeting.DeviceGroupTargeting;
 import com.android.bundle.Targeting.DeviceTierTargeting;
 import com.android.bundle.Targeting.LanguageTargeting;
 import com.android.bundle.Targeting.ScreenDensityTargeting;
@@ -94,6 +97,7 @@ public abstract class AbstractSizeAggregator {
       ScreenDensityTargeting screenDensityTargeting,
       LanguageTargeting languageTargeting,
       TextureCompressionFormatTargeting textureTargeting,
+      DeviceGroupTargeting deviceGroupTargeting,
       DeviceTierTargeting deviceTierTargeting,
       CountrySetTargeting countrySetTargeting,
       SdkRuntimeTargeting sdkRuntimeTargeting);
@@ -158,6 +162,16 @@ public abstract class AbstractSizeAggregator {
         DeviceTierTargeting.getDefaultInstance());
   }
 
+  protected ImmutableSet<DeviceGroupTargeting> getAllDeviceGroupTargetings(
+      ImmutableList<ApkDescription> apkDescriptions) {
+    return getAllTargetings(
+        apkDescriptions,
+        DeviceSpecUtils::isDeviceGroupsMissing,
+        ApkTargeting::hasDeviceGroupTargeting,
+        ApkTargeting::getDeviceGroupTargeting,
+        DeviceGroupTargeting.getDefaultInstance());
+  }
+
   protected ImmutableSet<CountrySetTargeting> getAllCountrySetTargetings(
       ImmutableList<ApkDescription> apkDescriptions) {
     return getAllTargetings(
@@ -198,6 +212,7 @@ public abstract class AbstractSizeAggregator {
       ImmutableSet<LanguageTargeting> languageTargetingOptions,
       ImmutableSet<ScreenDensityTargeting> screenDensityTargetingOptions,
       ImmutableSet<TextureCompressionFormatTargeting> textureCompressionFormatTargetingOptions,
+      ImmutableSet<DeviceGroupTargeting> deviceGroupTargetingOptions,
       ImmutableSet<DeviceTierTargeting> deviceTierTargetingOptions,
       ImmutableSet<CountrySetTargeting> countrySetTargetingOptions,
       // We use a single value instead of a set for SdkRuntimeTargeting since one variant can only
@@ -212,36 +227,40 @@ public abstract class AbstractSizeAggregator {
           for (LanguageTargeting languageTargeting : languageTargetingOptions) {
             for (TextureCompressionFormatTargeting textureCompressionFormatTargeting :
                 textureCompressionFormatTargetingOptions) {
-              for (DeviceTierTargeting deviceTierTargeting : deviceTierTargetingOptions) {
-                for (CountrySetTargeting countrySetTargeting : countrySetTargetingOptions) {
+              for (DeviceGroupTargeting deviceGroupTargeting : deviceGroupTargetingOptions) {
+                for (DeviceTierTargeting deviceTierTargeting : deviceTierTargetingOptions) {
+                  for (CountrySetTargeting countrySetTargeting : countrySetTargetingOptions) {
 
-                  SizeConfiguration configuration =
-                      mergeWithDeviceSpec(
-                          getSizeConfiguration(
-                              sdkVersionTargeting,
-                              abiTargeting,
-                              screenDensityTargeting,
-                              languageTargeting,
-                              textureCompressionFormatTargeting,
-                              deviceTierTargeting,
-                              countrySetTargeting,
-                              sdkRuntimeTargeting),
-                          getSizeRequest.getDeviceSpec());
+                    SizeConfiguration configuration =
+                        mergeWithDeviceSpec(
+                            getSizeConfiguration(
+                                sdkVersionTargeting,
+                                abiTargeting,
+                                screenDensityTargeting,
+                                languageTargeting,
+                                textureCompressionFormatTargeting,
+                                deviceGroupTargeting,
+                                deviceTierTargeting,
+                                countrySetTargeting,
+                                sdkRuntimeTargeting),
+                            getSizeRequest.getDeviceSpec());
 
-                  long compressedSize =
-                      getCompressedSize(
-                          getMatchingApks(
-                              sdkVersionTargeting,
-                              abiTargeting,
-                              screenDensityTargeting,
-                              languageTargeting,
-                              textureCompressionFormatTargeting,
-                              deviceTierTargeting,
-                              countrySetTargeting,
-                              sdkRuntimeTargeting));
+                    long compressedSize =
+                        getCompressedSize(
+                            getMatchingApks(
+                                sdkVersionTargeting,
+                                abiTargeting,
+                                screenDensityTargeting,
+                                languageTargeting,
+                                textureCompressionFormatTargeting,
+                                deviceGroupTargeting,
+                                deviceTierTargeting,
+                                countrySetTargeting,
+                                sdkRuntimeTargeting));
 
-                  minSizeByConfiguration.merge(configuration, compressedSize, Math::min);
-                  maxSizeByConfiguration.merge(configuration, compressedSize, Math::max);
+                    minSizeByConfiguration.merge(configuration, compressedSize, Math::min);
+                    maxSizeByConfiguration.merge(configuration, compressedSize, Math::max);
+                  }
                 }
               }
             }
@@ -261,6 +280,7 @@ public abstract class AbstractSizeAggregator {
       ScreenDensityTargeting screenDensityTargeting,
       LanguageTargeting languageTargeting,
       TextureCompressionFormatTargeting textureCompressionFormatTargeting,
+      DeviceGroupTargeting deviceGroupTargeting,
       DeviceTierTargeting deviceTierTargeting,
       CountrySetTargeting countrySetTargeting,
       SdkRuntimeTargeting sdkRuntimeTargeting) {
@@ -295,6 +315,11 @@ public abstract class AbstractSizeAggregator {
           .ifPresent(sizeConfiguration::setDeviceTier);
     }
 
+    if (dimensions.contains(DEVICE_GROUP)) {
+      SizeConfiguration.getDeviceGroupName(deviceGroupTargeting)
+          .ifPresent(sizeConfiguration::setDeviceGroup);
+    }
+
     if (dimensions.contains(COUNTRY_SET)) {
       SizeConfiguration.getCountrySetName(countrySetTargeting)
           .ifPresent(sizeConfiguration::setCountrySet);
@@ -314,6 +339,7 @@ public abstract class AbstractSizeAggregator {
       ScreenDensityTargeting screenDensityTargeting,
       LanguageTargeting languageTargeting,
       TextureCompressionFormatTargeting textureTargeting,
+      DeviceGroupTargeting deviceGroupTargeting,
       DeviceTierTargeting deviceTierTargeting,
       CountrySetTargeting countrySetTargeting,
       SdkRuntimeTargeting sdkRuntimeTargeting) {
@@ -324,6 +350,7 @@ public abstract class AbstractSizeAggregator {
         .setScreenDensity(screenDensityTargeting)
         .setSupportedLocales(languageTargeting)
         .setSupportedTextureCompressionFormats(textureTargeting)
+        .setDeviceGroup(deviceGroupTargeting)
         .setDeviceTier(deviceTierTargeting)
         .setCountrySet(countrySetTargeting)
         .setSdkRuntime(sdkRuntimeTargeting)
@@ -362,6 +389,10 @@ public abstract class AbstractSizeAggregator {
 
     if (dimensions.contains(DEVICE_TIER) && !isDeviceTierMissing(deviceSpec)) {
       mergedSizeConfiguration.setDeviceTier(deviceSpec.getDeviceTier().getValue());
+    }
+
+    if (dimensions.contains(DEVICE_GROUP) && !isDeviceGroupsMissing(deviceSpec)) {
+      mergedSizeConfiguration.setDeviceGroup(deviceSpec.getDeviceGroups(0));
     }
 
     if (dimensions.contains(SDK_RUNTIME) && !isSdkRuntimeUnspecified(deviceSpec)) {

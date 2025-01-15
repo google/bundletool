@@ -46,6 +46,7 @@ import com.android.tools.build.bundletool.model.ModuleSplit;
 import com.android.tools.build.bundletool.model.ModuleSplit.SplitType;
 import com.android.tools.build.bundletool.model.ZipPath;
 import com.android.tools.build.bundletool.model.exceptions.CommandExecutionException;
+import com.android.tools.build.bundletool.model.exceptions.InvalidBundleException;
 import com.android.tools.build.bundletool.model.utils.Versions;
 import com.android.tools.build.bundletool.model.version.Version;
 import com.google.common.annotations.VisibleForTesting;
@@ -393,12 +394,16 @@ public class ModuleSplitsToShardMerger {
   private static void mergeEntries(
       Map<ZipPath, ModuleEntry> mergedEntriesByPath, ModuleSplit split, ModuleEntry entry) {
     ModuleEntry existingEntry = mergedEntriesByPath.putIfAbsent(entry.getPath(), entry);
-    // Any conflicts of plain entries should be caught by bundle validations.
-    checkState(
-        existingEntry == null || existingEntry.equals(entry),
-        "Module '%s' and some other module(s) contain entry '%s' with different contents.",
-        split.getModuleName(),
-        entry.getPath());
+    // Any conflicts of plain entries should be caught by bundle validations in EntryClashValidator.
+    // However, EntryClashValidator does not check for conflicts when isolated splits are enabled in
+    // the manifest. Hence, we check for conflicts here and throw a more specific error message.
+    if (existingEntry != null && !existingEntry.equals(entry)) {
+      throw InvalidBundleException.builder()
+          .withUserMessage(
+              "Module '%s' and some other module(s) contain entry '%s' with different contents.",
+              split.getModuleName(), entry.getPath())
+          .build();
+    }
   }
 
   private Optional<ResourceTable> mergeResourceTables(

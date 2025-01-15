@@ -171,97 +171,49 @@ public final class BundleToolMain {
     runtime.exit(0);
   }
 
+  private static final ImmutableList<CommandHelp> COMMAND_HELPS =
+      ImmutableList.of(
+          BuildBundleCommand.help(),
+          BuildApksCommand.help(),
+          BuildSdkBundleCommand.help(),
+          BuildSdkApksCommand.help(),
+          BuildSdkApksForAppCommand.help(),
+          BuildSdkAsarCommand.help(),
+          PrintDeviceTargetingConfigCommand.help(),
+          EvaluateDeviceTargetingConfigCommand.help(),
+          ExtractApksCommand.help(),
+          GetDeviceSpecCommand.help(),
+          InstallApksCommand.help(),
+          InstallMultiApksCommand.help(),
+          ValidateBundleCommand.help(),
+          DumpCommand.help(),
+          DumpSdkBundleCommand.help(),
+          GetSizeCommand.help(),
+          VersionCommand.help(),
+          AddTransparencyCommand.help(),
+          CheckTransparencyCommand.help());
+
+
   /** Displays a general help. */
   public static void help() {
-    ImmutableList<CommandHelp> commandHelps =
-        ImmutableList.of(
-            BuildBundleCommand.help(),
-            BuildApksCommand.help(),
-            BuildSdkBundleCommand.help(),
-            BuildSdkApksCommand.help(),
-            BuildSdkApksForAppCommand.help(),
-            BuildSdkAsarCommand.help(),
-            PrintDeviceTargetingConfigCommand.help(),
-            EvaluateDeviceTargetingConfigCommand.help(),
-            ExtractApksCommand.help(),
-            GetDeviceSpecCommand.help(),
-            InstallApksCommand.help(),
-            InstallMultiApksCommand.help(),
-            ValidateBundleCommand.help(),
-            DumpCommand.help(),
-            GetSizeCommand.help(),
-            VersionCommand.help());
-
     System.out.println("Synopsis: bundletool <command> ...");
     System.out.println();
     System.out.println("Use 'bundletool help <command>' to learn more about the given command.");
     System.out.println();
-    commandHelps.forEach(commandHelp -> commandHelp.printSummary(System.out));
+    COMMAND_HELPS.forEach(commandHelp -> commandHelp.printSummary(System.out));
   }
 
   /** Displays help about a given command. */
   public static void help(String commandName, Runtime runtime) {
-    CommandHelp commandHelp;
-    switch (commandName) {
-      case BuildBundleCommand.COMMAND_NAME:
-        commandHelp = BuildBundleCommand.help();
-        break;
-      case BuildApksCommand.COMMAND_NAME:
-        commandHelp = BuildApksCommand.help();
-        break;
-      case BuildSdkBundleCommand.COMMAND_NAME:
-        commandHelp = BuildSdkBundleCommand.help();
-        break;
-      case BuildSdkApksCommand.COMMAND_NAME:
-        commandHelp = BuildSdkApksCommand.help();
-        break;
-      case BuildSdkApksForAppCommand.COMMAND_NAME:
-        commandHelp = BuildSdkApksForAppCommand.help();
-        break;
-      case BuildSdkAsarCommand.COMMAND_NAME:
-        commandHelp = BuildSdkAsarCommand.help();
-        break;
-      case PrintDeviceTargetingConfigCommand.COMMAND_NAME:
-        commandHelp = PrintDeviceTargetingConfigCommand.help();
-        break;
-      case EvaluateDeviceTargetingConfigCommand.COMMAND_NAME:
-        commandHelp = EvaluateDeviceTargetingConfigCommand.help();
-        break;
-      case ExtractApksCommand.COMMAND_NAME:
-        commandHelp = ExtractApksCommand.help();
-        break;
-      case GetDeviceSpecCommand.COMMAND_NAME:
-        commandHelp = GetDeviceSpecCommand.help();
-        break;
-      case InstallApksCommand.COMMAND_NAME:
-        commandHelp = InstallApksCommand.help();
-        break;
-      case InstallMultiApksCommand.COMMAND_NAME:
-        commandHelp = InstallMultiApksCommand.help();
-        break;
-      case ValidateBundleCommand.COMMAND_NAME:
-        commandHelp = ValidateBundleCommand.help();
-        break;
-      case DumpCommand.COMMAND_NAME:
-        commandHelp = DumpCommand.help();
-        break;
-      case GetSizeCommand.COMMAND_NAME:
-        commandHelp = GetSizeCommand.help();
-        break;
-      case AddTransparencyCommand.COMMAND_NAME:
-        commandHelp = AddTransparencyCommand.help();
-        break;
-      case CheckTransparencyCommand.COMMAND_NAME:
-        commandHelp = CheckTransparencyCommand.help();
-        break;
-      default:
-        System.err.printf("Error: Unrecognized command '%s'.%n%n%n", commandName);
-        help();
-        runtime.exit(1);
+    for (CommandHelp commandHelp : COMMAND_HELPS) {
+      if (commandHelp.getCommandName().equals(commandName)) {
+        commandHelp.printDetails(System.out);
         return;
+      }
     }
-
-    commandHelp.printDetails(System.out);
+    System.err.printf("Error: Unrecognized command '%s'.%n%n%n", commandName);
+    help();
+    runtime.exit(1);
   }
 
   private BundleToolMain() {}

@@ -49,7 +49,7 @@ public abstract class CommandHelp {
   private static final Comparator<FlagDescription> FLAG_ORDER =
       Comparator.comparing(FlagDescription::isOptional).thenComparing(FlagDescription::getFlagName);
 
-  abstract String getCommandName();
+  public abstract String getCommandName();
 
   abstract ImmutableList<String> getSubCommandNames();
 

@@ -16,6 +16,9 @@
 
 package com.android.tools.build.bundletool.model;
 
+import static com.android.tools.build.bundletool.model.BundleMetadata.BUNDLETOOL_NAMESPACE;
+import static com.android.tools.build.bundletool.model.BundleMetadata.DEVICE_GROUP_CONFIG_JSON_FILE_NAME;
+import static com.android.tools.build.bundletool.model.BundleMetadata.DEVICE_GROUP_CONFIG_PB_FILE_NAME;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifest;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifestForAssetModule;
 import static com.android.tools.build.bundletool.testing.ManifestProtoUtils.androidManifestForFeature;
@@ -26,11 +29,14 @@ import static com.android.tools.build.bundletool.testing.TargetingUtils.targeted
 import static com.android.tools.build.bundletool.testing.TargetingUtils.toAbi;
 import static com.google.common.truth.Truth.assertThat;
 import static com.google.common.truth.extensions.proto.ProtoTruth.assertThat;
+import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.android.aapt.Resources.XmlNode;
 import com.android.bundle.Config.BundleConfig;
 import com.android.bundle.Config.BundleConfig.BundleType;
+import com.android.bundle.DeviceGroup;
+import com.android.bundle.DeviceGroupConfig;
 import com.android.bundle.RuntimeEnabledSdkConfigProto.RuntimeEnabledSdk;
 import com.android.bundle.RuntimeEnabledSdkConfigProto.RuntimeEnabledSdkConfig;
 import com.android.bundle.Targeting.Abi.AbiAlias;
@@ -603,6 +609,148 @@ public class AppBundleTest {
     assertThat(e)
         .hasMessageThat()
         .contains("Found multiple dependencies on the same runtime-enabled SDK 'com.test.sdk'.");
+  }
+
+  @Test
+  public void deviceGroupConfigMetadata_invalidJson_buildThrows() {
+    BundleModule module = new BundleModuleBuilder("base").setManifest(MANIFEST).build();
+
+    Throwable e =
+        assertThrows(
+            InvalidBundleException.class,
+            () ->
+                AppBundle.buildFromModules(
+                    ImmutableList.of(module),
+                    BundleConfig.getDefaultInstance(),
+                    BundleMetadata.builder()
+                        .addFile(
+                            BUNDLETOOL_NAMESPACE,
+                            DEVICE_GROUP_CONFIG_JSON_FILE_NAME,
+                            ByteSource.wrap("{[bad".getBytes(UTF_8)))
+                        .build()));
+    assertThat(e)
+        .hasMessageThat()
+        .contains("Cannot parse the device group config metadata as JSON.");
+  }
+
+  @Test
+  public void deviceGroupConfigMetadata_groupOtherDefined_buildThrows() {
+    BundleModule module = new BundleModuleBuilder("base").setManifest(MANIFEST).build();
+    String deviceGroupConfig =
+        "{ \"device_groups\": [ {\"name\": \"high\"}, {\"name\": \"other\"} ] }";
+
+    Throwable e =
+        assertThrows(
+            InvalidBundleException.class,
+            () ->
+                AppBundle.buildFromModules(
+                    ImmutableList.of(module),
+                    BundleConfig.getDefaultInstance(),
+                    BundleMetadata.builder()
+                        .addFile(
+                            BUNDLETOOL_NAMESPACE,
+                            DEVICE_GROUP_CONFIG_JSON_FILE_NAME,
+                            ByteSource.wrap(deviceGroupConfig.getBytes(UTF_8)))
+                        .build()));
+    assertThat(e).hasMessageThat().contains("Device group 'other' is implicit.");
+  }
+
+  @Test
+  public void deviceGroupConfigJsonMetadata_addsOther() {
+    BundleModule module = new BundleModuleBuilder("base").setManifest(MANIFEST).build();
+    String deviceGroupConfig =
+        "{ \"device_groups\": [ {\"name\": \"high\"}, {\"name\": \"low\"} ] }";
+
+    AppBundle appBundle =
+        AppBundle.buildFromModules(
+            ImmutableList.of(module),
+            BundleConfig.getDefaultInstance(),
+            BundleMetadata.builder()
+                .addFile(
+                    BUNDLETOOL_NAMESPACE,
+                    DEVICE_GROUP_CONFIG_JSON_FILE_NAME,
+                    ByteSource.wrap(deviceGroupConfig.getBytes(UTF_8)))
+                .build());
+
+    assertThat(
+            appBundle.getDeviceGroupConfig().get().getDeviceGroupsList().stream()
+                .map(DeviceGroup::getName))
+        .containsExactly("high", "low", "other")
+        .inOrder();
+  }
+
+  @Test
+  public void deviceGroupConfigPbMetadata_invalidProto_buildThrows() {
+    BundleModule module = new BundleModuleBuilder("base").setManifest(MANIFEST).build();
+
+    Throwable e =
+        assertThrows(
+            InvalidBundleException.class,
+            () ->
+                AppBundle.buildFromModules(
+                    ImmutableList.of(module),
+                    BundleConfig.getDefaultInstance(),
+                    BundleMetadata.builder()
+                        .addFile(
+                            BUNDLETOOL_NAMESPACE,
+                            DEVICE_GROUP_CONFIG_PB_FILE_NAME,
+                            ByteSource.wrap("{[bad".getBytes(UTF_8)))
+                        .build()));
+    assertThat(e)
+        .hasMessageThat()
+        .contains("Cannot parse the device group config metadata as a binary protobuf.");
+  }
+
+  @Test
+  public void deviceGroupConfigPbMetadata_groupOtherDefined_buildThrows() {
+    BundleModule module = new BundleModuleBuilder("base").setManifest(MANIFEST).build();
+    DeviceGroupConfig deviceGroupConfig =
+        DeviceGroupConfig.newBuilder()
+            .addDeviceGroups(DeviceGroup.newBuilder().setName("high"))
+            .addDeviceGroups(DeviceGroup.newBuilder().setName("other"))
+            .build();
+
+    Throwable e =
+        assertThrows(
+            InvalidBundleException.class,
+            () ->
+                AppBundle.buildFromModules(
+                    ImmutableList.of(module),
+                    BundleConfig.getDefaultInstance(),
+                    BundleMetadata.builder()
+                        .addFile(
+                            BUNDLETOOL_NAMESPACE,
+                            DEVICE_GROUP_CONFIG_PB_FILE_NAME,
+                            ByteSource.wrap(deviceGroupConfig.toByteArray()))
+                        .build()));
+    assertThat(e).hasMessageThat().contains("Device group 'other' is implicit.");
+  }
+
+  @Test
+  public void deviceGroupConfigPbMetadata_addsOther() {
+    BundleModule module = new BundleModuleBuilder("base").setManifest(MANIFEST).build();
+    DeviceGroupConfig deviceGroupConfig =
+        DeviceGroupConfig.newBuilder()
+            .addDeviceGroups(DeviceGroup.newBuilder().setName("high"))
+            .addDeviceGroups(DeviceGroup.newBuilder().setName("low"))
+            .build();
+
+    AppBundle appBundle =
+        AppBundle.buildFromModules(
+            ImmutableList.of(module),
+            BundleConfig.getDefaultInstance(),
+            BundleMetadata.builder()
+                .addFile(
+                    BUNDLETOOL_NAMESPACE,
+                    DEVICE_GROUP_CONFIG_PB_FILE_NAME,
+                    ByteSource.wrap(deviceGroupConfig.toByteArray()))
+                .build());
+
+    assertThat(
+            appBundle.getDeviceGroupConfig().get().getDeviceGroupsList().stream()
+                .map(DeviceGroup::getName))
+        .containsExactly("high", "low", "other")
+        .inOrder();
   }
 
   private static ZipBuilder createBasicZipBuilder(BundleConfig config) {

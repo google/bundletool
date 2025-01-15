@@ -399,6 +399,18 @@ public abstract class ExtractApksCommand {
               .orElse("");
       builder.setCountrySet(StringValue.of(defaultCountrySet));
     }
+    if (deviceSpec.getDeviceGroupsCount() == 0) {
+      String defaultDeviceGroup =
+          toc.getDefaultTargetingValueList().stream()
+              .filter(
+                  defaultTargetingValue ->
+                      defaultTargetingValue.getDimension().equals(Value.DEVICE_GROUP))
+              .map(DefaultTargetingValue::getDefaultValue)
+              .filter(defaultValue -> !defaultValue.isEmpty())
+              .collect(toOptional())
+              .orElse("");
+      builder.addDeviceGroups(defaultDeviceGroup);
+    }
     if (!deviceSpec.hasSdkRuntime()) {
       builder
           .getSdkRuntimeBuilder()

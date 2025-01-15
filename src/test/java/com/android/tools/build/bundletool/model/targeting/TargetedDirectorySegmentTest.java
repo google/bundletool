@@ -19,6 +19,7 @@ package com.android.tools.build.bundletool.model.targeting;
 import static com.android.tools.build.bundletool.model.targeting.TargetedDirectorySegment.constructTargetingSegmentPath;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.assetsDirectoryTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.countrySetTargeting;
+import static com.android.tools.build.bundletool.testing.TargetingUtils.deviceGroupTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.deviceTierTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.languageTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.textureCompressionTargeting;
@@ -202,6 +203,27 @@ public class TargetedDirectorySegmentTest {
   public void testTargeting_deviceTier_invalidTierName_notAnInt() {
     assertThrows(
         InvalidBundleException.class, () -> TargetedDirectorySegment.parse("test#tier_1.5"));
+  }
+
+  @Test
+  public void testTargeting_deviceGroup() {
+    TargetedDirectorySegment segment = TargetedDirectorySegment.parse("test#group_s7");
+    assertThat(segment.getName()).isEqualTo("test");
+    assertThat(segment.getTargetingDimensions()).contains(TargetingDimension.DEVICE_GROUP);
+    assertThat(segment.getTargeting())
+        .isEqualTo(assetsDirectoryTargeting(deviceGroupTargeting("s7")));
+  }
+
+  @Test
+  public void testTargeting_deviceGroup_invalidGroupName_startsWithDigit() {
+    assertThrows(
+        InvalidBundleException.class, () -> TargetedDirectorySegment.parse("test#group_1"));
+  }
+
+  @Test
+  public void testTargeting_deviceGroup_invalidGroupName_specialCharacters() {
+    assertThrows(
+        InvalidBundleException.class, () -> TargetedDirectorySegment.parse("test#group_xyz$%@"));
   }
 
   @Test

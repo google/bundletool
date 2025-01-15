@@ -30,12 +30,12 @@ import com.android.bundle.DeviceId;
 import com.android.bundle.DeviceProperties;
 import com.android.bundle.DeviceTier;
 import com.android.bundle.DeviceTierConfig;
+import com.android.bundle.Devices.DeviceSpec;
 import com.android.bundle.SystemFeature;
+import com.android.bundle.SystemOnChip;
 import com.android.tools.build.bundletool.commands.CommandHelp.CommandDescription;
 import com.android.tools.build.bundletool.commands.CommandHelp.FlagDescription;
 import com.android.tools.build.bundletool.device.AdbServer;
-import com.android.tools.build.bundletool.device.AdbShellCommandTask;
-import com.android.tools.build.bundletool.device.Device;
 import com.android.tools.build.bundletool.device.DeviceAnalyzer;
 import com.android.tools.build.bundletool.flags.Flag;
 import com.android.tools.build.bundletool.flags.ParsedFlags;
@@ -79,15 +79,6 @@ public abstract class EvaluateDeviceTargetingConfigCommand {
 
   private static final SystemEnvironmentProvider DEFAULT_PROVIDER =
       new DefaultSystemEnvironmentProvider();
-
-  private static final String BRAND_NAME = "ro.product.brand";
-
-  private static final String DEVICE_NAME = "ro.product.device";
-
-  private static final String GET_MEMORY_SHELL_COMMAND =
-      "cat /proc/meminfo | grep -i 'MemTotal' | grep -oE '[0-9]+'";
-
-  private static final int FROM_KIB_TO_BYTES = 1024;
 
   abstract Optional<AdbServer> getAdbServer();
 
@@ -214,7 +205,7 @@ public abstract class EvaluateDeviceTargetingConfigCommand {
       DeviceProperties deviceProperties = devicePropertiesBuilder.build();
 
       printTier(getSelectedDeviceTier(config, deviceProperties), out);
-      printGroups(getMatchingDeviceGroups(config, deviceProperties), out);
+      printGroups(getMatchingDeviceGroups(config.getDeviceGroupsList(), deviceProperties), out);
       if (getCountryCode().isPresent()) {
         printCountrySet(getMatchingCountrySet(config, getCountryCode().get()), out);
       }
@@ -228,21 +219,21 @@ public abstract class EvaluateDeviceTargetingConfigCommand {
 
     AdbServer adb = getAdbServer().get();
     adb.init(pathToAdb);
-    Device device = new DeviceAnalyzer(adb).getAndValidateDevice(getDeviceId());
+    DeviceSpec deviceSpec = new DeviceAnalyzer(adb).getDeviceSpec(getDeviceId());
     return DeviceProperties.newBuilder()
         .setDeviceId(
             DeviceId.newBuilder()
-                .setBuildBrand(device.getProperty(BRAND_NAME).orElse(""))
-                .setBuildDevice(device.getProperty(DEVICE_NAME).orElse(""))
-                .build())
+                .setBuildBrand(deviceSpec.getBuildBrand())
+                .setBuildDevice(deviceSpec.getBuildDevice()))
         .addAllSystemFeatures(
-            device.getDeviceFeatures().stream()
+            deviceSpec.getDeviceFeaturesList().stream()
                 .map(feature -> SystemFeature.newBuilder().setName(feature).build())
                 .collect(toImmutableList()))
-        .setRam(
-            Long.parseLong(
-                    new AdbShellCommandTask(device, GET_MEMORY_SHELL_COMMAND).execute().get(0))
-                * FROM_KIB_TO_BYTES);
+        .setRam(deviceSpec.getRamBytes())
+        .setSystemOnChip(
+            SystemOnChip.newBuilder()
+                .setManufacturer(deviceSpec.getSocManufacturer())
+                .setModel(deviceSpec.getSocModel()));
   }
 
   private void printTier(Optional<DeviceTier> selectedTier, PrintStream out) {

@@ -73,6 +73,9 @@ public final class TargetingUtils {
     if (targeting.hasDeviceTier()) {
       dimensions.add(TargetingDimension.DEVICE_TIER);
     }
+    if (targeting.hasDeviceGroup()) {
+      dimensions.add(TargetingDimension.DEVICE_GROUP);
+    }
     if (targeting.hasCountrySet()) {
       dimensions.add(TargetingDimension.COUNTRY_SET);
     }
@@ -96,6 +99,12 @@ public final class TargetingUtils {
       return Optional.of(
           AssetsDirectoryTargeting.newBuilder()
               .setDeviceTier(directoryTargeting.getDeviceTier())
+              .build());
+    } else if (dimension.equals(TargetingDimension.DEVICE_GROUP)
+        && directoryTargeting.hasDeviceGroup()) {
+      return Optional.of(
+          AssetsDirectoryTargeting.newBuilder()
+              .setDeviceGroup(directoryTargeting.getDeviceGroup())
               .build());
     } else if (dimension.equals(TargetingDimension.LANGUAGE) && directoryTargeting.hasLanguage()) {
       return Optional.of(
@@ -316,6 +325,28 @@ public final class TargetingUtils {
                 targeting.getDeviceTier().getValueList().stream()
                     .map(Int32Value::getValue)
                     .collect(toOptional()));
+  }
+
+  /**
+   * Extracts all the device groups used in the targeted directories.
+   *
+   * <p>This is only useful when BundleModule assets config is not yet generated (which is the case
+   * when validators are run). Prefer using {@link BundleModule#getAssetsConfig} for all other
+   * cases.
+   */
+  public static ImmutableSet<String> extractDeviceGroups(
+      ImmutableSet<TargetedDirectory> targetedDirectories) {
+    return targetedDirectories.stream()
+        .map(TargetingUtils::extractDeviceGroup)
+        .flatMap(Streams::stream)
+        .collect(toImmutableSet());
+  }
+
+  public static Optional<String> extractDeviceGroup(TargetedDirectory targetedDirectory) {
+    return targetedDirectory
+        .getTargeting(TargetingDimension.DEVICE_GROUP)
+        .flatMap(
+            targeting -> targeting.getDeviceGroup().getValueList().stream().collect(toOptional()));
   }
 
   /**

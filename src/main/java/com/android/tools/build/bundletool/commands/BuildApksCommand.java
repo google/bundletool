@@ -180,6 +180,7 @@ public abstract class BuildApksCommand {
       Flag.booleanFlag("fuse-only-device-matching-modules");
   private static final Flag<ImmutableSet<SystemApkOption>> SYSTEM_APK_OPTIONS =
       Flag.enumSet("system-apk-options", SystemApkOption.class);
+  private static final Flag<String> DEVICE_GROUP_FLAG = Flag.string("device-group");
   private static final Flag<Integer> DEVICE_TIER_FLAG = Flag.nonNegativeInteger("device-tier");
   private static final Flag<String> COUNTRY_SET_FLAG = Flag.string("country-set");
 
@@ -243,6 +244,8 @@ public abstract class BuildApksCommand {
   public abstract Optional<DeviceSpec> getDeviceSpec();
 
   public abstract boolean getFuseOnlyDeviceMatchingModules();
+
+  public abstract Optional<String> getDeviceGroup();
 
   public abstract Optional<Integer> getDeviceTier();
 
@@ -402,6 +405,12 @@ public abstract class BuildApksCommand {
     }
 
     public abstract Builder setFuseOnlyDeviceMatchingModules(boolean enabled);
+
+    /**
+     * Sets the device group to use for APK matching. This will override the device group of the
+     * given device spec.
+     */
+    public abstract Builder setDeviceGroup(String deviceGroup);
 
     /**
      * Sets the device tier to use for APK matching. This will override the device tier of the given
@@ -692,6 +701,16 @@ public abstract class BuildApksCommand {
             .build();
       }
 
+      if (command.getDeviceGroup().isPresent()
+          && !command.getGenerateOnlyForConnectedDevice()
+          && !command.getDeviceSpec().isPresent()) {
+        throw InvalidCommandException.builder()
+            .withInternalMessage(
+                "Setting --device-group requires using either the --connected-device or the"
+                    + " --device-spec flag.")
+            .build();
+      }
+
       if (command.getDeviceTier().isPresent()
           && !command.getGenerateOnlyForConnectedDevice()
           && !command.getDeviceSpec().isPresent()) {
@@ -845,6 +864,7 @@ public abstract class BuildApksCommand {
         .getValue(flags)
         .map(deviceSpecParser)
         .ifPresent(buildApksCommand::setDeviceSpec);
+    DEVICE_GROUP_FLAG.getValue(flags).ifPresent(buildApksCommand::setDeviceGroup);
     DEVICE_TIER_FLAG.getValue(flags).ifPresent(buildApksCommand::setDeviceTier);
     COUNTRY_SET_FLAG.getValue(flags).ifPresent(buildApksCommand::setCountrySet);
     MODULES_FLAG.getValue(flags).ifPresent(buildApksCommand::setModules);
@@ -1488,8 +1508,20 @@ public abstract class BuildApksCommand {
                 .build())
         .addFlag(
             FlagDescription.builder()
+                .setFlagName(DEVICE_GROUP_FLAG.getName())
+                .setExampleValue("highRam")
+                .setOptional(true)
+                .setDescription(
+                    "Device group to use for APK matching. This flag should only be set with"
+                        + " --%s or --%s flags. If a device spec with a device group is provided,"
+                        + " the value specified here will override the value set in the device"
+                        + " spec.",
+                    DEVICE_SPEC_FLAG.getName(), CONNECTED_DEVICE_FLAG.getName())
+                .build())
+        .addFlag(
+            FlagDescription.builder()
                 .setFlagName(DEVICE_TIER_FLAG.getName())
-                .setExampleValue("low")
+                .setExampleValue("0")
                 .setOptional(true)
                 .setDescription(
                     "Device tier to use for APK matching. This flag should only be set with"

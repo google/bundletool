@@ -33,6 +33,7 @@ import static com.android.tools.build.bundletool.testing.DeviceFactory.sdkVersio
 import static com.android.tools.build.bundletool.testing.TargetingUtils.abiTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.alternativeCountrySetTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.countrySetTargeting;
+import static com.android.tools.build.bundletool.testing.TargetingUtils.deviceGroupTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.deviceTierTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.languageTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.screenDensityTargeting;
@@ -176,6 +177,17 @@ public class DeviceSpecUtilsTest {
             .build();
 
     assertThat(deviceSpec.getDeviceTier().getValue()).isEqualTo(2);
+  }
+
+  @Test
+  public void deviceSpecFromTargetingBuilder_setDeviceGroups() {
+    DeviceSpec deviceSpec =
+        new DeviceSpecFromTargetingBuilder(DeviceSpec.getDefaultInstance())
+            .setDeviceGroup(
+                deviceGroupTargeting(/* value= */ "c", /* alternatives= */ ImmutableList.of("b")))
+            .build();
+
+    assertThat(deviceSpec.getDeviceGroupsList()).containsExactly("c");
   }
 
   @Test

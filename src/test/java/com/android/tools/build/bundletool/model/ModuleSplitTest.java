@@ -36,12 +36,14 @@ import static com.android.tools.build.bundletool.testing.TargetingUtils.alternat
 import static com.android.tools.build.bundletool.testing.TargetingUtils.apkAbiTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.apkCountrySetTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.apkDensityTargeting;
+import static com.android.tools.build.bundletool.testing.TargetingUtils.apkDeviceGroupTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.apkDeviceTierTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.apkLanguageTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.apkMultiAbiTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.apkSanitizerTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.apkTextureTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.countrySetTargeting;
+import static com.android.tools.build.bundletool.testing.TargetingUtils.deviceGroupTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.deviceTierTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.lPlusVariantTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.languageTargeting;
@@ -242,6 +244,21 @@ public class ModuleSplitTest {
             .build();
     resSplit = resSplit.writeSplitIdInManifest(resSplit.getSuffix());
     assertThat(resSplit.getAndroidManifest().getSplitId()).hasValue("config.other_abis");
+  }
+
+  @Test
+  public void moduleDeviceGroupSplitSuffixAndName() {
+    ModuleSplit deviceGroupSplit =
+        ModuleSplit.builder()
+            .setModuleName(BundleModuleName.create("base"))
+            .setVariantTargeting(lPlusVariantTargeting())
+            .setApkTargeting(
+                apkDeviceGroupTargeting(deviceGroupTargeting("a", ImmutableList.of("b", "c"))))
+            .setMasterSplit(false)
+            .setAndroidManifest(AndroidManifest.create(androidManifest("com.test.app")))
+            .build();
+    deviceGroupSplit = deviceGroupSplit.writeSplitIdInManifest(deviceGroupSplit.getSuffix());
+    assertThat(deviceGroupSplit.getAndroidManifest().getSplitId()).hasValue("config.group_a");
   }
 
   @Test

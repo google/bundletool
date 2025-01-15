@@ -28,6 +28,7 @@ import com.android.bundle.DeviceRam;
 import com.android.bundle.DeviceSelector;
 import com.android.bundle.DeviceTier;
 import com.android.bundle.DeviceTierConfig;
+import com.android.bundle.SystemOnChip;
 import com.android.bundle.UserCountrySet;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
@@ -76,7 +77,13 @@ public class DeviceTargetingConfigEvaluator {
   /** Gets the set of {@link DeviceGroup}s that match the provided {@link DeviceProperties}. */
   public static ImmutableSet<DeviceGroup> getMatchingDeviceGroups(
       DeviceTierConfig config, DeviceProperties deviceProperties) {
-    return config.getDeviceGroupsList().stream()
+    return getMatchingDeviceGroups(config.getDeviceGroupsList(), deviceProperties);
+  }
+
+  /** Gets the set of {@link DeviceGroup}s that match the provided {@link DeviceProperties}. */
+  public static ImmutableSet<DeviceGroup> getMatchingDeviceGroups(
+      List<DeviceGroup> deviceGroups, DeviceProperties deviceProperties) {
+    return deviceGroups.stream()
         .filter(group -> devicePropertiesMatchDeviceGroup(deviceProperties, group))
         .collect(toImmutableSet());
   }
@@ -127,7 +134,9 @@ public class DeviceTargetingConfigEvaluator {
             .getSystemFeaturesList()
             .containsAll(deviceSelector.getRequiredSystemFeaturesList())
         && deviceSelector.getForbiddenSystemFeaturesList().stream()
-            .noneMatch(deviceProperties.getSystemFeaturesList()::contains);
+            .noneMatch(deviceProperties.getSystemFeaturesList()::contains)
+        && systemOnChipIncluded(
+            deviceProperties.getSystemOnChip(), deviceSelector.getSystemOnChipsList());
   }
 
   private static boolean devicePropertiesMatchRamRule(
@@ -153,5 +162,13 @@ public class DeviceTargetingConfigEvaluator {
     DeviceId deviceOnlyBrand =
         DeviceId.newBuilder().setBuildBrand(deviceId.getBuildBrand()).build();
     return deviceIdList.contains(deviceId) || deviceIdList.contains(deviceOnlyBrand);
+  }
+
+  private static boolean systemOnChipIncluded(
+      SystemOnChip systemOnChip, List<SystemOnChip> systemOnChipList) {
+    // If the systemOnChipList is empty, it means that the targeting configuration is not specifying
+    // any SystemOnChip in particular. This means that any SystemOnChip provided satisfies the
+    // included_device_ids rule in the DeviceSelector. Hence, we return true in this case.
+    return systemOnChipList.isEmpty() || systemOnChipList.contains(systemOnChip);
   }
 }

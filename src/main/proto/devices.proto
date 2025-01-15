@@ -41,6 +41,25 @@ message DeviceSpec {
 
   // Country set.
   google.protobuf.StringValue country_set = 11;
+
+  // Device RAM in bytes.
+  int64 ram_bytes = 12;
+
+  // Value of build property "ro.product.brand"
+  // https://developer.android.com/reference/android/os/Build#BRAND
+  string build_brand = 13;
+
+  // Value of build property "ro.product.device"
+  // https://developer.android.com/reference/android/os/Build#DEVICE
+  string build_device = 14;
+
+  // Value of build property "ro.soc.manufacturer"
+  // https://developer.android.com/reference/android/os/Build#SOC_MANUFACTURER
+  string soc_manufacturer = 15;
+
+  // Value of build property "ro.soc.model"
+  // https://developer.android.com/reference/android/os/Build#SOC_MODEL
+  string soc_model = 16;
 }
 
 message SdkRuntime {

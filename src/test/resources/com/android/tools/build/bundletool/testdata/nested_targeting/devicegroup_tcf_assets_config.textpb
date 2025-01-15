@@ -1,0 +1,153 @@
+directory: {
+  path: "assets/textures#group_a#tcf_astc"
+  targeting: {
+    texture_compression_format: {
+      value: {
+        alias: ASTC
+      }
+      alternatives: {
+        alias: PVRTC
+      }
+    }
+    device_group: {
+      value: ["a"]
+      alternatives: ["b", "c"]
+    }
+  }
+}
+directory: {
+  path: "assets/textures#group_a#tcf_pvrtc"
+  targeting: {
+    texture_compression_format: {
+      value: {
+        alias: PVRTC
+      }
+      alternatives: {
+        alias: ASTC
+      }
+    }
+    device_group: {
+      value: ["a"]
+      alternatives: ["b", "c"]
+    }
+  }
+}
+directory: {
+  path: "assets/textures#group_a"
+  targeting: {
+    texture_compression_format: {
+      alternatives: {
+        alias: ASTC
+      }
+      alternatives: {
+        alias: PVRTC
+      }
+    }
+    device_group: {
+      value: ["a"]
+      alternatives: ["b", "c"]
+    }
+  }
+}
+directory: {
+  path: "assets/textures#group_b#tcf_astc"
+  targeting: {
+    texture_compression_format: {
+      value: {
+        alias: ASTC
+      }
+      alternatives: {
+        alias: PVRTC
+      }
+    }
+    device_group: {
+      value: ["b"]
+      alternatives: ["a", "c"]
+    }
+  }
+}
+directory: {
+  path: "assets/textures#group_b#tcf_pvrtc"
+  targeting: {
+    texture_compression_format: {
+      value: {
+        alias: PVRTC
+      }
+      alternatives: {
+        alias: ASTC
+      }
+    }
+    device_group: {
+      value: ["b"]
+      alternatives: ["a", "c"]
+    }
+  }
+}
+directory: {
+  path: "assets/textures#group_b"
+  targeting: {
+    texture_compression_format: {
+      alternatives: {
+        alias: ASTC
+      }
+      alternatives: {
+        alias: PVRTC
+      }
+    }
+    device_group: {
+      value: ["b"]
+      alternatives: ["a", "c"]
+    }
+  }
+}
+directory: {
+  path: "assets/textures#group_c#tcf_astc"
+  targeting: {
+    texture_compression_format: {
+      value: {
+        alias: ASTC
+      }
+      alternatives: {
+        alias: PVRTC
+      }
+    }
+    device_group: {
+      value: ["c"]
+      alternatives: ["a", "b"]
+    }
+  }
+}
+directory: {
+  path: "assets/textures#group_c#tcf_pvrtc"
+  targeting: {
+    texture_compression_format: {
+      value: {
+        alias: PVRTC
+      }
+      alternatives: {
+        alias: ASTC
+      }
+    }
+    device_group: {
+      value: ["c"]
+      alternatives: ["a", "b"]
+    }
+  }
+}
+directory: {
+  path: "assets/textures#group_c"
+  targeting: {
+    texture_compression_format: {
+      alternatives: {
+        alias: ASTC
+      }
+      alternatives: {
+        alias: PVRTC
+      }
+    }
+    device_group: {
+      value: ["c"]
+      alternatives: ["a", "b"]
+    }
+  }
+}

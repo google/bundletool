@@ -76,6 +76,9 @@ public class RequiredSplitTypesInjector {
     if (apkTargeting.hasDeviceTierTargeting()) {
       splitTypes.add(RequiredSplitTypeName.create(moduleName, RequiredSplitType.DEVICE_TIER));
     }
+    if (apkTargeting.hasDeviceGroupTargeting()) {
+      splitTypes.add(RequiredSplitTypeName.create(moduleName, RequiredSplitType.DEVICE_GROUP));
+    }
     if (apkTargeting.hasCountrySetTargeting()) {
       splitTypes.add(RequiredSplitTypeName.create(moduleName, RequiredSplitType.COUNTRY_SET));
     }
@@ -113,6 +116,9 @@ public class RequiredSplitTypesInjector {
       if (apkTargeting.hasDeviceTierTargeting()) {
         splitTypes.add(RequiredSplitTypeName.create(moduleName, RequiredSplitType.DEVICE_TIER));
       }
+      if (apkTargeting.hasDeviceGroupTargeting()) {
+        splitTypes.add(RequiredSplitTypeName.create(moduleName, RequiredSplitType.DEVICE_GROUP));
+      }
       if (apkTargeting.hasCountrySetTargeting()) {
         splitTypes.add(RequiredSplitTypeName.create(moduleName, RequiredSplitType.COUNTRY_SET));
       }
@@ -136,7 +142,12 @@ public class RequiredSplitTypesInjector {
     ABI("abi"),
     DENSITY("density"),
     TEXTURE_FORMAT("textures"),
+    /**
+     * @deprecated use DEVICE_GROUP instead.
+     */
+    @Deprecated
     DEVICE_TIER("tier"),
+    DEVICE_GROUP("group"),
     COUNTRY_SET("countries"),
     MODULE("module");
 

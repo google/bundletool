@@ -23,10 +23,12 @@ import static com.android.tools.build.bundletool.testing.TargetingUtils.abiTarge
 import static com.android.tools.build.bundletool.testing.TargetingUtils.apkAbiTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.apkAlternativeLanguageTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.apkDensityTargeting;
+import static com.android.tools.build.bundletool.testing.TargetingUtils.apkDeviceGroupTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.apkDeviceTierTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.apkLanguageTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.apkMinSdkTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.apkTextureTargeting;
+import static com.android.tools.build.bundletool.testing.TargetingUtils.deviceGroupTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.deviceTierTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.languageTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.mergeApkTargeting;
@@ -61,8 +63,8 @@ public class MergingUtilsTest {
     assertThat(exception)
         .hasMessageThat()
         .contains(
-            "Expecting only ABI, screen density, language, texture compression format, device tier"
-                + " and country set targeting");
+            "Expecting only ABI, screen density, language, texture compression format,"
+                + " device tier, device group and country set targeting");
   }
 
   @Test
@@ -77,8 +79,8 @@ public class MergingUtilsTest {
     assertThat(exception)
         .hasMessageThat()
         .contains(
-            "Expecting only ABI, screen density, language, texture compression format, device tier"
-                + " and country set targeting");
+            "Expecting only ABI, screen density, language, texture compression format,"
+                + " device tier, device group and country set targeting");
   }
 
   @Test
@@ -138,6 +140,14 @@ public class MergingUtilsTest {
   }
 
   @Test
+  public void mergeShardTargetings_equalDeviceGroup_ok() {
+    ApkTargeting targeting =
+        apkDeviceGroupTargeting(deviceGroupTargeting("a", ImmutableList.of("b")));
+
+    assertThat(MergingUtils.mergeShardTargetings(targeting, targeting)).isEqualTo(targeting);
+  }
+
+  @Test
   public void mergeShardTargetings_differentAbis_ok() {
     ApkTargeting targeting1 =
         apkAbiTargeting(AbiAlias.X86, ImmutableSet.of(AbiAlias.X86_64, AbiAlias.MIPS));
@@ -192,6 +202,17 @@ public class MergingUtilsTest {
         .isEqualTo(
             apkTextureTargeting(
                 textureCompressionTargeting(S3TC, ImmutableSet.of(ETC1_RGB8, ATC))));
+  }
+
+  @Test
+  public void mergeShardTargetings_differentDeviceGroups_ok() {
+    ApkTargeting targeting1 =
+        apkDeviceGroupTargeting(deviceGroupTargeting("a", ImmutableList.of("b")));
+    ApkTargeting targeting2 =
+        apkDeviceGroupTargeting(deviceGroupTargeting("a", ImmutableList.of("c")));
+
+    assertThat(MergingUtils.mergeShardTargetings(targeting1, targeting2))
+        .isEqualTo(apkDeviceGroupTargeting(deviceGroupTargeting("a", ImmutableList.of("b", "c"))));
   }
 
   @Test

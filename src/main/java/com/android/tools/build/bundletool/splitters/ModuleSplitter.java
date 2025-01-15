@@ -481,6 +481,14 @@ public class ModuleSplitter {
     }
     if (apkGenerationConfiguration
         .getOptimizationDimensions()
+        .contains(OptimizationDimension.DEVICE_GROUP)) {
+      assetsSplitters.add(
+          DeviceGroupAssetsSplitter.create(
+              apkGenerationConfiguration.shouldStripTargetingSuffix(
+                  OptimizationDimension.DEVICE_GROUP)));
+    }
+    if (apkGenerationConfiguration
+        .getOptimizationDimensions()
         .contains(OptimizationDimension.COUNTRY_SET)) {
       assetsSplitters.add(
           CountrySetAssetsSplitter.create(

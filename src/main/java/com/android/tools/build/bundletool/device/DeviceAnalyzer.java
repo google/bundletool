@@ -33,6 +33,15 @@ public class DeviceAnalyzer {
 
   private final AdbServer adb;
 
+  private static final String BRAND_PROPERTY = "ro.product.brand";
+  private static final String DEVICE_PROPERTY = "ro.product.device";
+  private static final String SOC_MANUFACTURER_PROPERTY = "ro.soc.manufacturer";
+  private static final String SOC_MODEL_PROPERTY = "ro.soc.model";
+
+  public static final String GET_MEMORY_KIB_SHELL_COMMAND =
+      "cat /proc/meminfo | grep -i 'MemTotal' | grep -oE '[0-9]+'";
+  private static final int FROM_KIB_TO_BYTES = 1024;
+
   // For API M+.
   private static final String LOCALE_PROPERTY_SYS = "persist.sys.locale";
   private static final String LOCALE_PROPERTY_PRODUCT = "ro.product.locale";
@@ -82,6 +91,11 @@ public class DeviceAnalyzer {
       SdkRuntime sdkRuntime =
           SdkRuntime.newBuilder().setSupported(device.supportsPrivacySandbox()).build();
 
+      Optional<String> buildBrand = device.getProperty(BRAND_PROPERTY);
+      Optional<String> buildDevice = device.getProperty(DEVICE_PROPERTY);
+      Optional<String> socManufacturer = device.getProperty(SOC_MANUFACTURER_PROPERTY);
+      Optional<String> socModel = device.getProperty(SOC_MODEL_PROPERTY);
+
       DeviceSpec.Builder builder =
           DeviceSpec.newBuilder()
               .setSdkVersion(deviceSdkVersion)
@@ -94,6 +108,16 @@ public class DeviceAnalyzer {
       if (codename != null) {
         builder.setCodename(codename);
       }
+
+      builder.setRamBytes(
+          Long.parseLong(new AdbShellCommandTask(device, GET_MEMORY_KIB_SHELL_COMMAND).execute().get(0))
+              * FROM_KIB_TO_BYTES);
+
+      buildBrand.ifPresent(builder::setBuildBrand);
+      buildDevice.ifPresent(builder::setBuildDevice);
+      socManufacturer.ifPresent(builder::setSocManufacturer);
+      socModel.ifPresent(builder::setSocModel);
+
       return builder.build();
     } catch (TimeoutException e) {
       throw CommandExecutionException.builder()

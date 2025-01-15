@@ -55,6 +55,7 @@ public class BundleModulesValidator {
           new NestedTargetingValidator(),
           new AbiParityValidator(),
           new TextureCompressionFormatParityValidator(),
+          new DeviceGroupParityValidator(),
           new DeviceTierParityValidator(),
           new CountrySetParityValidator(),
           new DexFilesValidator(),

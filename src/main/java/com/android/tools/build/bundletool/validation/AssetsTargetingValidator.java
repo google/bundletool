@@ -17,6 +17,7 @@
 package com.android.tools.build.bundletool.validation;
 
 import static com.android.tools.build.bundletool.model.BundleModule.ASSETS_DIRECTORY;
+import static com.android.tools.build.bundletool.validation.BundleValidationUtils.checkHasSingleValue;
 import static com.android.tools.build.bundletool.validation.BundleValidationUtils.checkHasValuesOrAlternatives;
 import static com.android.tools.build.bundletool.validation.BundleValidationUtils.checkValuesAndAlternativeHaveNoOverlap;
 import static com.google.common.collect.ImmutableSet.toImmutableSet;
@@ -94,6 +95,9 @@ public class AssetsTargetingValidator extends SubValidator {
     if (targeting.hasCountrySet()) {
       checkHasValuesOrAlternatives(targeting.getCountrySet(), targetedDirectory.getPath());
     }
+    if (targeting.hasDeviceGroup()) {
+      checkHasSingleValue(targeting.getDeviceGroup(), targetedDirectory.getPath());
+    }
   }
 
   private static void checkNoOverlapInValuesAndAlternatives(
@@ -104,5 +108,6 @@ public class AssetsTargetingValidator extends SubValidator {
     checkValuesAndAlternativeHaveNoOverlap(
         targeting.getTextureCompressionFormat(), targetedDirectory.getPath());
     checkValuesAndAlternativeHaveNoOverlap(targeting.getCountrySet(), targetedDirectory.getPath());
+    checkValuesAndAlternativeHaveNoOverlap(targeting.getDeviceGroup(), targetedDirectory.getPath());
   }
 }

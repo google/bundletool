@@ -26,6 +26,7 @@ import com.android.bundle.Files.TargetedAssetsDirectory;
 import com.android.bundle.Targeting.ApkTargeting;
 import com.android.bundle.Targeting.AssetsDirectoryTargeting;
 import com.android.bundle.Targeting.CountrySetTargeting;
+import com.android.bundle.Targeting.DeviceGroupTargeting;
 import com.android.bundle.Targeting.DeviceTierTargeting;
 import com.android.bundle.Targeting.VariantTargeting;
 import com.android.tools.build.bundletool.model.ModuleEntry;
@@ -60,6 +61,8 @@ public final class SuffixStripper {
         return createForDimension(TargetingDimension.TEXTURE_COMPRESSION_FORMAT);
       case DEVICE_TIER:
         return createForDimension(TargetingDimension.DEVICE_TIER);
+      case DEVICE_GROUP:
+        return createForDimension(TargetingDimension.DEVICE_GROUP);
       case COUNTRY_SET:
         return createForDimension(TargetingDimension.COUNTRY_SET);
       default:
@@ -73,6 +76,8 @@ public final class SuffixStripper {
         return new SuffixStripper(dimension, new TextureCompressionFormatDimensionHandler());
       case DEVICE_TIER:
         return new SuffixStripper(dimension, new DeviceTierDimensionHandler());
+      case DEVICE_GROUP:
+        return new SuffixStripper(dimension, new DeviceGroupDimensionHandler());
       case COUNTRY_SET:
         return new SuffixStripper(dimension, new CountrySetDimensionHandler());
       default:
@@ -386,6 +391,51 @@ public final class SuffixStripper {
           Integer.toString(
               Iterables.getOnlyElement(targeting.getDeviceTier().getValueList()).getValue());
       return !searchedValueWithDefault.equals(targetingValue);
+    }
+  }
+
+  /** {@link TargetingDimensionHandler} for device group targeting. */
+  private static final class DeviceGroupDimensionHandler implements TargetingDimensionHandler {
+    @Override
+    public boolean hasTargetingDimension(AssetsDirectoryTargeting directoryTargeting) {
+      return directoryTargeting.hasDeviceGroup();
+    }
+
+    @Override
+    public AssetsDirectoryTargeting clearTargetingDimension(
+        AssetsDirectoryTargeting directoryTargeting) {
+      return directoryTargeting.toBuilder().clearDeviceGroup().build();
+    }
+
+    @Override
+    public ApkTargeting setTargetingDimension(ApkTargeting apkTargeting, String value) {
+      return apkTargeting.toBuilder()
+          .setDeviceGroupTargeting(DeviceGroupTargeting.newBuilder().addValue(value))
+          .build();
+    }
+
+    @Override
+    public VariantTargeting setTargetingDimension(VariantTargeting variantTargeting, String value) {
+      // No device group variant targeting.
+      return variantTargeting;
+    }
+
+    @Override
+    public boolean isDirectoryTargetingOtherValue(
+        TargetedAssetsDirectory directory, String searchedValue) {
+      AssetsDirectoryTargeting targeting = directory.getTargeting();
+
+      if (!targeting.hasDeviceGroup()) {
+        // The directory is not even targeting the specified dimension,
+        // so it's not targeting another value for this dimension.
+        return false;
+      }
+
+      // The value list can be empty for default directory for device groups.
+      // In which case, the device group name is "", targeting all other devices.
+      String targetingValue =
+          Iterables.getOnlyElement(targeting.getDeviceGroup().getValueList(), "");
+      return !searchedValue.equals(targetingValue);
     }
   }
 

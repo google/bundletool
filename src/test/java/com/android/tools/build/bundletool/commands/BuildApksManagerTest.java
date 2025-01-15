@@ -32,11 +32,14 @@ import static com.android.tools.build.bundletool.commands.BuildApksCommand.ApkBu
 import static com.android.tools.build.bundletool.commands.BuildApksCommand.OutputFormat.DIRECTORY;
 import static com.android.tools.build.bundletool.commands.ExtractApksCommand.ALL_MODULES_SHORTCUT;
 import static com.android.tools.build.bundletool.model.AndroidManifest.DEVELOPMENT_SDK_VERSION;
+import static com.android.tools.build.bundletool.model.BundleMetadata.BUNDLETOOL_NAMESPACE;
+import static com.android.tools.build.bundletool.model.BundleMetadata.DEVICE_GROUP_CONFIG_JSON_FILE_NAME;
 import static com.android.tools.build.bundletool.model.BundleModule.ASSETS_DIRECTORY;
 import static com.android.tools.build.bundletool.model.OptimizationDimension.ABI;
 import static com.android.tools.build.bundletool.model.OptimizationDimension.LANGUAGE;
 import static com.android.tools.build.bundletool.model.OptimizationDimension.TEXTURE_COMPRESSION_FORMAT;
 import static com.android.tools.build.bundletool.model.SourceStampConstants.STAMP_SOURCE_METADATA_KEY;
+import static com.android.tools.build.bundletool.model.utils.DeviceTargetingUtils.addDeviceGroupOther;
 import static com.android.tools.build.bundletool.model.utils.ResourcesUtils.MDPI_VALUE;
 import static com.android.tools.build.bundletool.model.utils.ResultUtils.apexApkVariants;
 import static com.android.tools.build.bundletool.model.utils.ResultUtils.archivedApkVariants;
@@ -57,6 +60,7 @@ import static com.android.tools.build.bundletool.testing.ApkSetUtils.parseTocFro
 import static com.android.tools.build.bundletool.testing.CodeTransparencyTestUtils.createJwsToken;
 import static com.android.tools.build.bundletool.testing.DeviceFactory.abis;
 import static com.android.tools.build.bundletool.testing.DeviceFactory.density;
+import static com.android.tools.build.bundletool.testing.DeviceFactory.deviceGroups;
 import static com.android.tools.build.bundletool.testing.DeviceFactory.deviceTier;
 import static com.android.tools.build.bundletool.testing.DeviceFactory.locales;
 import static com.android.tools.build.bundletool.testing.DeviceFactory.mergeSpecs;
@@ -100,6 +104,7 @@ import static com.android.tools.build.bundletool.testing.TargetingUtils.apkLangu
 import static com.android.tools.build.bundletool.testing.TargetingUtils.apkMultiAbiTargetingFromAllTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.assets;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.assetsDirectoryTargeting;
+import static com.android.tools.build.bundletool.testing.TargetingUtils.deviceGroupTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.deviceTierTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.languageTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.mergeVariantTargeting;
@@ -130,6 +135,7 @@ import static com.google.common.collect.MoreCollectors.onlyElement;
 import static com.google.common.collect.Multimaps.transformValues;
 import static com.google.common.truth.Truth.assertThat;
 import static com.google.common.truth.extensions.proto.ProtoTruth.assertThat;
+import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.util.Comparator.comparing;
 import static java.util.function.Function.identity;
 import static junit.framework.TestCase.fail;
@@ -170,6 +176,7 @@ import com.android.bundle.Config.StandaloneConfig;
 import com.android.bundle.Config.StandaloneConfig.FeatureModulesMode;
 import com.android.bundle.Config.UncompressDexFiles.UncompressedDexTargetSdk;
 import com.android.bundle.Config.UncompressNativeLibraries.PageAlignment;
+import com.android.bundle.DeviceGroupConfig;
 import com.android.bundle.Files.ApexImages;
 import com.android.bundle.Files.Assets;
 import com.android.bundle.RuntimeEnabledSdkConfigProto.RuntimeEnabledSdk;
@@ -178,6 +185,7 @@ import com.android.bundle.Targeting.Abi;
 import com.android.bundle.Targeting.Abi.AbiAlias;
 import com.android.bundle.Targeting.ApkTargeting;
 import com.android.bundle.Targeting.AssetsDirectoryTargeting;
+import com.android.bundle.Targeting.DeviceGroupTargeting;
 import com.android.bundle.Targeting.DeviceTierTargeting;
 import com.android.bundle.Targeting.LanguageTargeting;
 import com.android.bundle.Targeting.ScreenDensity;
@@ -238,6 +246,7 @@ import com.google.common.util.concurrent.ListeningExecutorService;
 import com.google.common.util.concurrent.MoreExecutors;
 import com.google.protobuf.Int32Value;
 import com.google.protobuf.TextFormat;
+import com.google.protobuf.util.JsonFormat;
 import dagger.Component;
 import java.io.File;
 import java.io.FileOutputStream;
@@ -314,6 +323,7 @@ public class BuildApksManagerTest {
   private Path outputDir;
   private Path outputFilePath;
   private Closer openedZipFiles;
+  private ByteSource testConfigJson;
 
   private final AdbServer fakeAdbServer =
       new FakeAdbServer(/* hasInitialDeviceList= */ true, /* devices= */ ImmutableList.of());
@@ -359,6 +369,12 @@ public class BuildApksManagerTest {
     keystore.store(new FileOutputStream(keystorePath.toFile()), KEYSTORE_PASSWORD.toCharArray());
 
     fakeAdbServer.init(Paths.get("path/to/adb"));
+
+    // device group config
+    testConfigJson =
+        ByteSource.wrap(
+            TestData.readBytes(
+                "testdata/device_targeting_config/BuildApksManagerTest_default.json"));
   }
 
   @After
@@ -2515,6 +2531,8 @@ public class BuildApksManagerTest {
                         /* stripSuffix= */ true,
                         /* defaultSuffix= */ "astc")
                     .build())
+            .addMetadataFile(
+                BUNDLETOOL_NAMESPACE, DEVICE_GROUP_CONFIG_JSON_FILE_NAME, testConfigJson)
             .build();
 
     TestComponent.useTestModule(
@@ -2580,6 +2598,8 @@ public class BuildApksManagerTest {
                         /* stripSuffix= */ true,
                         /* defaultSuffix= */ "astc")
                     .build())
+            .addMetadataFile(
+                BUNDLETOOL_NAMESPACE, DEVICE_GROUP_CONFIG_JSON_FILE_NAME, testConfigJson)
             .build();
 
     TestComponent.useTestModule(
@@ -2645,6 +2665,8 @@ public class BuildApksManagerTest {
                         /* stripSuffix= */ true,
                         /* defaultSuffix= */ "0")
                     .build())
+            .addMetadataFile(
+                BUNDLETOOL_NAMESPACE, DEVICE_GROUP_CONFIG_JSON_FILE_NAME, testConfigJson)
             .build();
 
     TestComponent.useTestModule(
@@ -2655,6 +2677,140 @@ public class BuildApksManagerTest {
     BuildApksResult.Builder expectedBuildApksResultBuilder = BuildApksResult.newBuilder();
     TextFormat.merge(
         TestData.openReader("testdata/nested_targeting/country_tier_toc.textpb"),
+        expectedBuildApksResultBuilder);
+    BuildApksResult expectedBuildApksResult = expectedBuildApksResultBuilder.build();
+    ZipFile apkSetFile = openZipFile(outputFilePath.toFile());
+    BuildApksResult generatedBuildApksResult = extractTocFromApkSetFile(apkSetFile, outputDir);
+    assertThat(generatedBuildApksResult)
+        .comparingExpectedFieldsOnly()
+        .isEqualTo(expectedBuildApksResult);
+    expectedBuildApksResult.getAssetSliceSetList().stream()
+        .flatMap(assetSliceSet -> assetSliceSet.getApkDescriptionList().stream())
+        .forEach(assetSlice -> assertThat(apkSetFile).hasFile(assetSlice.getPath()));
+    expectedBuildApksResult.getVariantList().stream()
+        .flatMap(variant -> variant.getApkSetList().stream())
+        .flatMap(apkSet -> apkSet.getApkDescriptionList().stream())
+        .forEach(splitApk -> assertThat(apkSetFile).hasFile(splitApk.getPath()));
+  }
+
+  @Test
+  public void buildApksCommand_splitApks_nestedTargeting_deviceGroupAndTexture() throws Exception {
+    Assets.Builder assetsConfigBuilder = Assets.newBuilder();
+    TextFormat.merge(
+        TestData.openReader("testdata/nested_targeting/devicegroup_tcf_assets_config.textpb"),
+        assetsConfigBuilder);
+    AppBundle appBundle =
+        new AppBundleBuilder()
+            .addModule("base", builder -> builder.setManifest(androidManifest("com.test.app")))
+            .addModule(
+                "assetpack1",
+                builder ->
+                    builder
+                        .addFile("assets/textures#group_c#tcf_astc/texture.dat")
+                        .addFile("assets/textures#group_c#tcf_pvrtc/texture.dat")
+                        .addFile("assets/textures#group_c/texture.dat")
+                        .addFile("assets/textures#group_b#tcf_astc/texture.dat")
+                        .addFile("assets/textures#group_b#tcf_pvrtc/texture.dat")
+                        .addFile("assets/textures#group_b/texture.dat")
+                        .addFile("assets/textures#group_a#tcf_astc/texture.dat")
+                        .addFile("assets/textures#group_a#tcf_pvrtc/texture.dat")
+                        .addFile("assets/textures#group_a/texture.dat")
+                        .setAssetsConfig(assetsConfigBuilder.build())
+                        .setManifest(
+                            androidManifestForAssetModule(
+                                "com.test.app", withInstallTimeDelivery())))
+            .setBundleConfig(
+                BundleConfigBuilder.create()
+                    .addSplitDimension(
+                        Value.DEVICE_GROUP,
+                        /* negate= */ false,
+                        /* stripSuffix= */ true,
+                        /* defaultSuffix= */ "a")
+                    .addSplitDimension(
+                        Value.TEXTURE_COMPRESSION_FORMAT,
+                        /* negate= */ false,
+                        /* stripSuffix= */ true,
+                        /* defaultSuffix= */ "astc")
+                    .build())
+            .addMetadataFile(
+                BUNDLETOOL_NAMESPACE, DEVICE_GROUP_CONFIG_JSON_FILE_NAME, testConfigJson)
+            .build();
+
+    TestComponent.useTestModule(
+        this,
+        createTestModuleBuilder().withAppBundle(appBundle).withOutputPath(outputFilePath).build());
+    buildApksManager.execute();
+
+    BuildApksResult.Builder expectedBuildApksResultBuilder = BuildApksResult.newBuilder();
+    TextFormat.merge(
+        TestData.openReader("testdata/nested_targeting/devicegroup_tcf_toc.textpb"),
+        expectedBuildApksResultBuilder);
+    BuildApksResult expectedBuildApksResult = expectedBuildApksResultBuilder.build();
+    ZipFile apkSetFile = openZipFile(outputFilePath.toFile());
+    BuildApksResult generatedBuildApksResult = extractTocFromApkSetFile(apkSetFile, outputDir);
+    assertThat(generatedBuildApksResult)
+        .comparingExpectedFieldsOnly()
+        .isEqualTo(expectedBuildApksResult);
+    expectedBuildApksResult.getAssetSliceSetList().stream()
+        .flatMap(assetSliceSet -> assetSliceSet.getApkDescriptionList().stream())
+        .forEach(assetSlice -> assertThat(apkSetFile).hasFile(assetSlice.getPath()));
+    expectedBuildApksResult.getVariantList().stream()
+        .flatMap(variant -> variant.getApkSetList().stream())
+        .flatMap(apkSet -> apkSet.getApkDescriptionList().stream())
+        .forEach(splitApk -> assertThat(apkSetFile).hasFile(splitApk.getPath()));
+  }
+
+  @Test
+  public void buildApksCommand_splitApks_nestedTargeting_countryAndDeviceGroup() throws Exception {
+    Assets.Builder assetsConfigBuilder = Assets.newBuilder();
+    TextFormat.merge(
+        TestData.openReader("testdata/nested_targeting/country_devicegroup_assets_config.textpb"),
+        assetsConfigBuilder);
+    AppBundle appBundle =
+        new AppBundleBuilder()
+            .addModule("base", builder -> builder.setManifest(androidManifest("com.test.app")))
+            .addModule(
+                "assetpack1",
+                builder ->
+                    builder
+                        .addFile("assets/textures#countries_latam#group_c/texture.dat")
+                        .addFile("assets/textures#countries_latam#group_b/texture.dat")
+                        .addFile("assets/textures#countries_latam#group_a/texture.dat")
+                        .addFile("assets/textures#countries_sea#group_c/texture.dat")
+                        .addFile("assets/textures#countries_sea#group_b/texture.dat")
+                        .addFile("assets/textures#countries_sea#group_a/texture.dat")
+                        .addFile("assets/textures#group_c/texture.dat")
+                        .addFile("assets/textures#group_b/texture.dat")
+                        .addFile("assets/textures#group_a/texture.dat")
+                        .setAssetsConfig(assetsConfigBuilder.build())
+                        .setManifest(
+                            androidManifestForAssetModule(
+                                "com.test.app", withInstallTimeDelivery())))
+            .setBundleConfig(
+                BundleConfigBuilder.create()
+                    .addSplitDimension(
+                        Value.COUNTRY_SET,
+                        /* negate= */ false,
+                        /* stripSuffix= */ true,
+                        /* defaultSuffix= */ "latam")
+                    .addSplitDimension(
+                        Value.DEVICE_GROUP,
+                        /* negate= */ false,
+                        /* stripSuffix= */ true,
+                        /* defaultSuffix= */ "a")
+                    .build())
+            .addMetadataFile(
+                BUNDLETOOL_NAMESPACE, DEVICE_GROUP_CONFIG_JSON_FILE_NAME, testConfigJson)
+            .build();
+
+    TestComponent.useTestModule(
+        this,
+        createTestModuleBuilder().withAppBundle(appBundle).withOutputPath(outputFilePath).build());
+    buildApksManager.execute();
+
+    BuildApksResult.Builder expectedBuildApksResultBuilder = BuildApksResult.newBuilder();
+    TextFormat.merge(
+        TestData.openReader("testdata/nested_targeting/country_devicegroup_toc.textpb"),
         expectedBuildApksResultBuilder);
     BuildApksResult expectedBuildApksResult = expectedBuildApksResultBuilder.build();
     ZipFile apkSetFile = openZipFile(outputFilePath.toFile());
@@ -3016,10 +3172,7 @@ public class BuildApksManagerTest {
             .build();
     TestComponent.useTestModule(
         this,
-        createTestModuleBuilder()
-            .withAppBundle(appBundle)
-            .withOutputPath(outputFilePath)
-            .build());
+        createTestModuleBuilder().withAppBundle(appBundle).withOutputPath(outputFilePath).build());
 
     buildApksManager.execute();
 
@@ -4649,6 +4802,8 @@ public class BuildApksManagerTest {
                         /* stripSuffix= */ true,
                         /* defaultSuffix= */ "0")
                     .build())
+            .addMetadataFile(
+                BUNDLETOOL_NAMESPACE, DEVICE_GROUP_CONFIG_JSON_FILE_NAME, testConfigJson)
             .build();
     TestComponent.useTestModule(
         this,
@@ -4665,17 +4820,76 @@ public class BuildApksManagerTest {
 
     // Check APK content
     assertThat(apkSetFile).hasFile(shard.getPath());
-    try (ZipFile shardZip =
-        new ZipFile(extractFromApkSetFile(apkSetFile, shard.getPath(), outputDir))) {
-      assertThat(shardZip).hasFile("assets/img/asset_low.dat");
-      assertThat(shardZip).doesNotHaveFile("assets/img/asset_high.dat");
-      assertThat(shardZip).doesNotHaveFile("assets/img#tier_0/asset_low.dat");
-      assertThat(shardZip).doesNotHaveFile("assets/img#tier_1/asset_high.dat");
-    }
+    assertThat(filesInApk(shard, apkSetFile, "assets/"))
+        .containsExactly("assets/img/asset_low.dat");
 
     // Check that default device tier targeting was applied to the APK
     assertThat(shard.getTargeting().getDeviceTierTargeting().getValueList())
         .containsExactly(Int32Value.of(0));
+  }
+
+  @Test
+  public void buildApksCommand_standalone_deviceGroupTargetingWithSuffixStripped()
+      throws Exception {
+    AppBundle appBundle =
+        new AppBundleBuilder()
+            .addModule(
+                "base",
+                builder ->
+                    builder
+                        .setManifest(androidManifest("com.test.app"))
+                        .setResourceTable(resourceTableWithTestLabel("Test feature")))
+            .addModule(
+                "device_group_assets",
+                builder ->
+                    builder
+                        .addFile("assets/img#group_low/asset_low.dat")
+                        .addFile("assets/img#group_high/asset_high.dat")
+                        .setAssetsConfig(
+                            assets(
+                                targetedAssetsDirectory(
+                                    "assets/img#group_low",
+                                    assetsDirectoryTargeting(
+                                        deviceGroupTargeting("low", ImmutableList.of("high")))),
+                                targetedAssetsDirectory(
+                                    "assets/img#group_high",
+                                    assetsDirectoryTargeting(
+                                        deviceGroupTargeting("high", ImmutableList.of("low"))))))
+                        .setManifest(
+                            androidManifestForAssetModule(
+                                "com.test.app", withInstallTimeDelivery())))
+            .setBundleConfig(
+                BundleConfigBuilder.create()
+                    .addSplitDimension(
+                        Value.DEVICE_GROUP,
+                        /* negate= */ false,
+                        /* stripSuffix= */ true,
+                        /* defaultSuffix= */ "low")
+                    .build())
+            .addMetadataFile(
+                BUNDLETOOL_NAMESPACE, DEVICE_GROUP_CONFIG_JSON_FILE_NAME, testConfigJson)
+            .build();
+    TestComponent.useTestModule(
+        this,
+        createTestModuleBuilder().withAppBundle(appBundle).withOutputPath(outputFilePath).build());
+
+    buildApksManager.execute();
+
+    ZipFile apkSetFile = openZipFile(outputFilePath.toFile());
+    BuildApksResult result = extractTocFromApkSetFile(apkSetFile, outputDir);
+
+    assertThat(standaloneApkVariants(result)).hasSize(1);
+    assertThat(apkDescriptions(standaloneApkVariants(result))).hasSize(1);
+    ApkDescription shard = apkDescriptions(standaloneApkVariants(result)).get(0);
+
+    // Check APK content
+    assertThat(apkSetFile).hasFile(shard.getPath());
+    assertThat(filesInApk(shard, apkSetFile, "assets/"))
+        .containsExactly("assets/img/asset_low.dat");
+
+    // Check that default device tier targeting was applied to the APK
+    assertThat(shard.getTargeting().getDeviceGroupTargeting().getValueList())
+        .containsExactly("low");
   }
 
   @Test
@@ -5273,6 +5487,109 @@ public class BuildApksManagerTest {
     assertThat(apkDescription.getAssetSliceMetadata().getIsMasterSplit()).isTrue();
 
     assertThat(result.getAssetModulesInfo()).isEqualTo(assetModulesInfo);
+  }
+
+  @Test
+  public void buildApksCommand_featureAndAssetModulesDeviceGroupTargeting_generatesAssetSlices()
+      throws Exception {
+    DeviceGroupTargeting targetGroupA = deviceGroupTargeting("a", ImmutableList.of("other"));
+    DeviceGroupTargeting targetOther = deviceGroupTargeting("other", ImmutableList.of("a"));
+    AppBundle appBundle =
+        new AppBundleBuilder()
+            .addModule(
+                "base",
+                builder ->
+                    builder
+                        .addFile("dex/classes.dex")
+                        .setManifest(
+                            androidManifest(
+                                "com.test.app", withMinSdkVersion(ANDROID_Q_API_VERSION)))
+                        .setResourceTable(resourceTableWithTestLabel("Test feature")))
+            .addModule(
+                "asset_module",
+                builder ->
+                    builder
+                        .setManifest(
+                            androidManifestForAssetModule("com.test.app", withOnDemandDelivery()))
+                        .addFile("assets/images#group_a/image.jpg")
+                        .addFile("assets/images#group_other/image.jpg")
+                        .setAssetsConfig(
+                            assets(
+                                targetedAssetsDirectory(
+                                    "assets/images#group_a",
+                                    assetsDirectoryTargeting(targetGroupA)),
+                                targetedAssetsDirectory(
+                                    "assets/images#group_other",
+                                    assetsDirectoryTargeting(targetOther)))))
+            .addMetadataFile(
+                BUNDLETOOL_NAMESPACE, DEVICE_GROUP_CONFIG_JSON_FILE_NAME, testConfigJson)
+            .build();
+    TestComponent.useTestModule(
+        this,
+        createTestModuleBuilder().withAppBundle(appBundle).withOutputPath(outputFilePath).build());
+
+    buildApksManager.execute();
+
+    ZipFile apkSetFile = openZipFile(outputFilePath.toFile());
+    BuildApksResult result = extractTocFromApkSetFile(apkSetFile, outputDir);
+
+    // Variants
+    ImmutableList<Variant> variants = splitApkVariants(result);
+    assertThat(variants).hasSize(1);
+    Variant splitApkVariant = variants.get(0);
+    List<ApkSet> apks = splitApkVariant.getApkSetList();
+    assertThat(apks).hasSize(1);
+
+    ApkSet baseSplits = apks.get(0);
+    assertThat(baseSplits.getModuleMetadata().getName()).isEqualTo("base");
+    assertThat(baseSplits.getModuleMetadata().getDeliveryType())
+        .isEqualTo(DeliveryType.INSTALL_TIME);
+    assertThat(baseSplits.getApkDescriptionList()).hasSize(1);
+    assertThat(apkSetFile).hasFile(baseSplits.getApkDescription(0).getPath());
+
+    // Asset Slices
+    List<AssetSliceSet> sliceSets = result.getAssetSliceSetList();
+    assertThat(sliceSets).hasSize(1);
+
+    AssetSliceSet sliceSet = sliceSets.get(0);
+
+    assertThat(sliceSet.getAssetModuleMetadata().getName()).isEqualTo("asset_module");
+    assertThat(sliceSet.getAssetModuleMetadata().getInstantMetadata()).isEqualToDefaultInstance();
+
+    List<ApkDescription> apkDescriptions = sliceSet.getApkDescriptionList();
+    apkDescriptions.forEach(
+        apkDescription -> assertThat(apkSetFile).hasFile(apkDescription.getPath()));
+
+    ImmutableMap<DeviceGroupTargeting, ApkDescription> slicesByGroupTargeting =
+        Maps.uniqueIndex(
+            sliceSet.getApkDescriptionList(),
+            slice -> slice.getTargeting().getDeviceGroupTargeting());
+
+    ApkDescription defaultSlice =
+        slicesByGroupTargeting.get(DeviceGroupTargeting.getDefaultInstance());
+    assertThat(defaultSlice.getPath()).isEqualTo("asset-slices/asset_module-master.apk");
+    assertThat(defaultSlice.hasAssetSliceMetadata()).isTrue();
+    assertThat(defaultSlice.getAssetSliceMetadata().getIsMasterSplit()).isTrue();
+
+    ApkDescription sliceA = slicesByGroupTargeting.get(targetGroupA);
+    assertThat(sliceA.getPath()).isEqualTo("asset-slices/asset_module-group_a.apk");
+    assertThat(sliceA.hasAssetSliceMetadata()).isTrue();
+    assertThat(sliceA.getAssetSliceMetadata().getIsMasterSplit()).isFalse();
+
+    ApkDescription sliceB = slicesByGroupTargeting.get(targetOther);
+    assertThat(sliceB.getPath()).isEqualTo("asset-slices/asset_module-group_other.apk");
+    assertThat(sliceB.hasAssetSliceMetadata()).isTrue();
+    assertThat(sliceB.getAssetSliceMetadata().getIsMasterSplit()).isFalse();
+
+    assertThat(sliceSet.getApkDescriptionList()).hasSize(3);
+
+    // device group config
+    DeviceGroupConfig.Builder configFromJson = DeviceGroupConfig.newBuilder();
+    JsonFormat.parser()
+        .ignoringUnknownFields()
+        .merge(testConfigJson.asCharSource(UTF_8).read(), configFromJson);
+    assertThat(result.getDeviceGroupConfig())
+        .isEqualTo(addDeviceGroupOther(configFromJson.build()));
   }
 
   /**
@@ -6392,6 +6709,303 @@ public class BuildApksManagerTest {
   }
 
   @Test
+  public void deviceGroupAssets_inBaseModule() throws Exception {
+    DeviceGroupTargeting targetGroupA =
+        deviceGroupTargeting(/* value= */ "a", /* alternatives= */ ImmutableList.of("b"));
+    DeviceGroupTargeting targetGroupB =
+        deviceGroupTargeting(/* value= */ "b", /* alternatives= */ ImmutableList.of("a"));
+    AppBundle appBundle =
+        new AppBundleBuilder()
+            .addModule(
+                "base",
+                builder ->
+                    builder
+                        .addFile("assets/images#group_a/image.jpg")
+                        .addFile("assets/images#group_b/image.jpg")
+                        .setManifest(androidManifest("com.test.app"))
+                        .setAssetsConfig(
+                            assets(
+                                targetedAssetsDirectory(
+                                    "assets/images#group_a",
+                                    assetsDirectoryTargeting(targetGroupA)),
+                                targetedAssetsDirectory(
+                                    "assets/images#group_b",
+                                    assetsDirectoryTargeting(targetGroupB)))))
+            .setBundleConfig(
+                BundleConfigBuilder.create()
+                    .addSplitDimension(
+                        Value.DEVICE_GROUP,
+                        /* negate= */ false,
+                        /* stripSuffix= */ false,
+                        /* defaultSuffix= */ "a")
+                    .build())
+            .addMetadataFile(
+                BUNDLETOOL_NAMESPACE, DEVICE_GROUP_CONFIG_JSON_FILE_NAME, testConfigJson)
+            .build();
+    TestComponent.useTestModule(
+        this,
+        createTestModuleBuilder().withAppBundle(appBundle).withOutputPath(outputFilePath).build());
+
+    buildApksManager.execute();
+
+    ZipFile apkSetFile = openZipFile(outputFilePath.toFile());
+    BuildApksResult result = extractTocFromApkSetFile(apkSetFile, outputDir);
+
+    ImmutableList<Variant> splitApkVariants = splitApkVariants(result);
+    ImmutableList<ApkDescription> splitApks = apkDescriptions(splitApkVariants);
+
+    assertThat(splitApkVariants(result)).hasSize(1);
+    Variant splitApkVariant = splitApkVariants(result).get(0);
+
+    // Check that apks for groups a and b have been created
+    assertThat(splitApkVariant.getApkSetList()).hasSize(1);
+    ImmutableList<ApkDescription> deviceGroupSplits =
+        splitApks.stream()
+            .filter(apkDesc -> apkDesc.getTargeting().hasDeviceGroupTargeting())
+            .collect(toImmutableList());
+    assertThat(apkNamesInApkDescriptions(deviceGroupSplits))
+        .containsExactly("base-group_a.apk", "base-group_b.apk");
+
+    // Check the content of the APKs
+    ImmutableMap<DeviceGroupTargeting, ApkDescription> deviceGroupSplitsByTargeting =
+        Maps.uniqueIndex(deviceGroupSplits, apk -> apk.getTargeting().getDeviceGroupTargeting());
+    ApkDescription groupASplit = deviceGroupSplitsByTargeting.get(targetGroupA);
+    assertThat(ZipPath.create(groupASplit.getPath()).getFileName().toString())
+        .isEqualTo("base-group_a.apk");
+    assertThat(filesInApk(groupASplit, apkSetFile, "assets/"))
+        .containsExactly("assets/images#group_a/image.jpg");
+
+    ApkDescription groupBSplit = deviceGroupSplitsByTargeting.get(targetGroupB);
+    assertThat(ZipPath.create(groupBSplit.getPath()).getFileName().toString())
+        .isEqualTo("base-group_b.apk");
+    assertThat(filesInApk(groupBSplit, apkSetFile, "assets/"))
+        .containsExactly("assets/images#group_b/image.jpg");
+
+    assertThat(result.getDefaultTargetingValueList())
+        .containsExactly(
+            DefaultTargetingValue.newBuilder()
+                .setDimension(Value.DEVICE_GROUP)
+                .setDefaultValue("a")
+                .build());
+  }
+
+  @Test
+  public void deviceGroupAssets_inAssetModule() throws Exception {
+    DeviceGroupTargeting targetGroupA =
+        deviceGroupTargeting(/* value= */ "a", /* alternatives= */ ImmutableList.of("b"));
+    DeviceGroupTargeting targetGroupB =
+        deviceGroupTargeting(/* value= */ "b", /* alternatives= */ ImmutableList.of("a"));
+    AppBundle appBundle =
+        new AppBundleBuilder()
+            .addModule("base", builder -> builder.setManifest(androidManifest("com.test.app")))
+            .addModule(
+                "assetmodule",
+                builder ->
+                    builder
+                        .addFile("assets/images#group_a/image.jpg")
+                        .addFile("assets/images#group_b/image.jpg")
+                        .setManifest(androidManifestForAssetModule("com.test.app"))
+                        .setAssetsConfig(
+                            assets(
+                                targetedAssetsDirectory(
+                                    "assets/images#group_a",
+                                    assetsDirectoryTargeting(targetGroupA)),
+                                targetedAssetsDirectory(
+                                    "assets/images#group_b",
+                                    assetsDirectoryTargeting(targetGroupB)))))
+            .setBundleConfig(
+                BundleConfigBuilder.create()
+                    .addSplitDimension(
+                        Value.DEVICE_GROUP,
+                        /* negate= */ false,
+                        /* stripSuffix= */ false,
+                        /* defaultSuffix= */ "a")
+                    .build())
+            .addMetadataFile(
+                BUNDLETOOL_NAMESPACE, DEVICE_GROUP_CONFIG_JSON_FILE_NAME, testConfigJson)
+            .build();
+    TestComponent.useTestModule(
+        this,
+        createTestModuleBuilder()
+            .withAppBundle(appBundle)
+            .withOutputPath(outputFilePath)
+            .withOutputPrintStream(System.err)
+            .build());
+
+    buildApksManager.execute();
+
+    ZipFile apkSetFile = openZipFile(outputFilePath.toFile());
+    BuildApksResult result = extractTocFromApkSetFile(apkSetFile, outputDir);
+
+    assertThat(result.getAssetSliceSetList()).hasSize(1);
+    List<ApkDescription> assetSlices = result.getAssetSliceSet(0).getApkDescriptionList();
+
+    // Check that apks for groups a and b have been created
+    ImmutableList<ApkDescription> deviceGroupSplits =
+        assetSlices.stream()
+            .filter(apkDesc -> apkDesc.getTargeting().hasDeviceGroupTargeting())
+            .collect(toImmutableList());
+    assertThat(apkNamesInApkDescriptions(deviceGroupSplits))
+        .containsExactly("assetmodule-group_a.apk", "assetmodule-group_b.apk");
+
+    // Check the content of the APKs
+    ImmutableMap<DeviceGroupTargeting, ApkDescription> deviceGroupSplitsByTargeting =
+        Maps.uniqueIndex(deviceGroupSplits, apk -> apk.getTargeting().getDeviceGroupTargeting());
+
+    ApkDescription groupASplit = deviceGroupSplitsByTargeting.get(targetGroupA);
+    assertThat(ZipPath.create(groupASplit.getPath()).getFileName().toString())
+        .isEqualTo("assetmodule-group_a.apk");
+    assertThat(filesInApk(groupASplit, apkSetFile, "assets/"))
+        .containsExactly("assets/images#group_a/image.jpg");
+
+    ApkDescription groupBSplit = deviceGroupSplitsByTargeting.get(targetGroupB);
+    assertThat(ZipPath.create(groupBSplit.getPath()).getFileName().toString())
+        .isEqualTo("assetmodule-group_b.apk");
+    assertThat(filesInApk(groupBSplit, apkSetFile, "assets/"))
+        .containsExactly("assets/images#group_b/image.jpg");
+  }
+
+  @Test
+  public void deviceGroupAssets_withDeviceSpec_deviceGroupSet() throws Exception {
+    DeviceGroupTargeting targetGroupA =
+        deviceGroupTargeting(/* value= */ "a", /* alternatives= */ ImmutableList.of("b"));
+    DeviceGroupTargeting targetGroupB =
+        deviceGroupTargeting(/* value= */ "b", /* alternatives= */ ImmutableList.of("a"));
+    AppBundle appBundle =
+        new AppBundleBuilder()
+            .addModule(
+                "base",
+                builder ->
+                    builder
+                        .addFile("assets/images#group_a/image.jpg")
+                        .addFile("assets/images#group_b/image.jpg")
+                        .setManifest(androidManifest("com.test.app"))
+                        .setAssetsConfig(
+                            assets(
+                                targetedAssetsDirectory(
+                                    "assets/images#group_a",
+                                    assetsDirectoryTargeting(targetGroupA)),
+                                targetedAssetsDirectory(
+                                    "assets/images#group_b",
+                                    assetsDirectoryTargeting(targetGroupB)))))
+            .setBundleConfig(
+                BundleConfigBuilder.create()
+                    .addSplitDimension(
+                        Value.DEVICE_GROUP,
+                        /* negate= */ false,
+                        /* stripSuffix= */ false,
+                        /* defaultSuffix= */ "a")
+                    .build())
+            .addMetadataFile(
+                BUNDLETOOL_NAMESPACE, DEVICE_GROUP_CONFIG_JSON_FILE_NAME, testConfigJson)
+            .build();
+    TestComponent.useTestModule(
+        this,
+        createTestModuleBuilder()
+            .withAppBundle(appBundle)
+            .withOutputPath(outputFilePath)
+            .withDeviceSpec(
+                mergeSpecs(
+                    sdkVersion(29),
+                    abis("x86"),
+                    density(DensityAlias.MDPI),
+                    locales("en-US"),
+                    deviceGroups("b")))
+            .build());
+
+    buildApksManager.execute();
+
+    ZipFile apkSetFile = openZipFile(outputFilePath.toFile());
+    BuildApksResult result = extractTocFromApkSetFile(apkSetFile, outputDir);
+
+    ImmutableList<Variant> splitApkVariants = splitApkVariants(result);
+    ImmutableList<ApkDescription> splitApks = apkDescriptions(splitApkVariants);
+
+    // Check that only an APK for group b has been created, not for group a
+    ImmutableList<ApkDescription> deviceGroupSplits =
+        splitApks.stream()
+            .filter(apkDesc -> apkDesc.getTargeting().hasDeviceGroupTargeting())
+            .collect(toImmutableList());
+    assertThat(apkNamesInApkDescriptions(deviceGroupSplits)).containsExactly("base-group_b.apk");
+
+    // Check the content of the APK
+    ImmutableMap<DeviceGroupTargeting, ApkDescription> deviceGroupSplitsByTargeting =
+        Maps.uniqueIndex(deviceGroupSplits, apk -> apk.getTargeting().getDeviceGroupTargeting());
+
+    ApkDescription groupBSplit = deviceGroupSplitsByTargeting.get(targetGroupB);
+    assertThat(filesInApk(groupBSplit, apkSetFile, "assets/"))
+        .containsExactly("assets/images#group_b/image.jpg");
+  }
+
+  @Test
+  public void deviceGroupAssets_withDeviceSpec_deviceGroupNotSet_defaultIsUsed() throws Exception {
+    DeviceGroupTargeting targetGroupA =
+        deviceGroupTargeting(/* value= */ "a", /* alternatives= */ ImmutableList.of("b"));
+    DeviceGroupTargeting targetGroupB =
+        deviceGroupTargeting(/* value= */ "b", /* alternatives= */ ImmutableList.of("a"));
+    AppBundle appBundle =
+        new AppBundleBuilder()
+            .addModule(
+                "base",
+                builder ->
+                    builder
+                        .addFile("assets/images#group_a/image.jpg")
+                        .addFile("assets/images#group_b/image.jpg")
+                        .setManifest(androidManifest("com.test.app"))
+                        .setAssetsConfig(
+                            assets(
+                                targetedAssetsDirectory(
+                                    "assets/images#group_a",
+                                    assetsDirectoryTargeting(targetGroupA)),
+                                targetedAssetsDirectory(
+                                    "assets/images#group_b",
+                                    assetsDirectoryTargeting(targetGroupB)))))
+            .setBundleConfig(
+                BundleConfigBuilder.create()
+                    .addSplitDimension(
+                        Value.DEVICE_GROUP,
+                        /* negate= */ false,
+                        /* stripSuffix= */ false,
+                        /* defaultSuffix= */ "a")
+                    .build())
+            .addMetadataFile(
+                BUNDLETOOL_NAMESPACE, DEVICE_GROUP_CONFIG_JSON_FILE_NAME, testConfigJson)
+            .build();
+    TestComponent.useTestModule(
+        this,
+        createTestModuleBuilder()
+            .withAppBundle(appBundle)
+            .withOutputPath(outputFilePath)
+            .withDeviceSpec(
+                mergeSpecs(
+                    sdkVersion(29), abis("x86"), density(DensityAlias.MDPI), locales("en-US")))
+            .build());
+
+    buildApksManager.execute();
+
+    ZipFile apkSetFile = openZipFile(outputFilePath.toFile());
+    BuildApksResult result = extractTocFromApkSetFile(apkSetFile, outputDir);
+
+    ImmutableList<Variant> splitApkVariants = splitApkVariants(result);
+    ImmutableList<ApkDescription> splitApks = apkDescriptions(splitApkVariants);
+
+    // Check that only an APK for group a has been created, not for group b
+    ImmutableList<ApkDescription> deviceGroupSplits =
+        splitApks.stream()
+            .filter(apkDesc -> apkDesc.getTargeting().hasDeviceGroupTargeting())
+            .collect(toImmutableList());
+    assertThat(apkNamesInApkDescriptions(deviceGroupSplits)).containsExactly("base-group_a.apk");
+
+    // Check the content of the APK
+    ImmutableMap<DeviceGroupTargeting, ApkDescription> deviceGroupSplitsByTargeting =
+        Maps.uniqueIndex(deviceGroupSplits, apk -> apk.getTargeting().getDeviceGroupTargeting());
+
+    ApkDescription groupSplit = deviceGroupSplitsByTargeting.get(targetGroupA);
+    assertThat(filesInApk(groupSplit, apkSetFile, "assets/"))
+        .containsExactly("assets/images#group_a/image.jpg");
+  }
+
+  @Test
   public void deviceGroupTargetedConditionalModule() throws Exception {
     AppBundle appBundle =
         new AppBundleBuilder()
@@ -6402,14 +7016,16 @@ public class BuildApksManagerTest {
                         .setManifest(androidManifest("com.test"))
                         .setResourceTable(resourceTableWithTestLabel("Test feature")))
             .addModule(
-                "device_tier_feature",
+                "device_group_feature",
                 builder ->
                     builder.setManifest(
                         androidManifest(
                             "com.test",
                             withTitle("@string/test_label", TEST_LABEL_RESOURCE_ID),
                             withFusingAttribute(false),
-                            withDeviceGroupsCondition(ImmutableList.of("group1", "group2")))))
+                            withDeviceGroupsCondition(ImmutableList.of("a", "b")))))
+            .addMetadataFile(
+                BUNDLETOOL_NAMESPACE, DEVICE_GROUP_CONFIG_JSON_FILE_NAME, testConfigJson)
             .build();
 
     TestComponent.useTestModule(
@@ -6421,15 +7037,14 @@ public class BuildApksManagerTest {
     ZipFile apkSetFile = openZipFile(outputFilePath.toFile());
     BuildApksResult result = extractTocFromApkSetFile(apkSetFile, outputDir);
 
-    ModuleMetadata deviceTierModule =
+    ModuleMetadata deviceGroupModule =
         result.getVariantList().stream()
             .flatMap(variant -> variant.getApkSetList().stream())
             .map(ApkSet::getModuleMetadata)
-            .filter(moduleMetadata -> moduleMetadata.getName().equals("device_tier_feature"))
+            .filter(moduleMetadata -> moduleMetadata.getName().equals("device_group_feature"))
             .distinct()
             .collect(onlyElement());
-    assertThat(deviceTierModule.getTargeting())
-        .isEqualTo(moduleDeviceGroupsTargeting("group1", "group2"));
+    assertThat(deviceGroupModule.getTargeting()).isEqualTo(moduleDeviceGroupsTargeting("a", "b"));
   }
 
   @Test
@@ -7512,19 +8127,28 @@ public class BuildApksManagerTest {
         .forEach(FilePreconditions::checkFileExistsAndReadable);
   }
 
-  /** Extracts names of files inside the APK described by {@code apkDesc}. */
+  /**
+   * Extracts names of files inside the APK described by {@code apkDesc}, optionally filtering by
+   * prefix.
+   */
   private ImmutableSet<String> filesInApk(ApkDescription apkDesc, ZipFile apkSetFile) {
+    return filesInApk(apkDesc, apkSetFile, /* prefix= */ "");
+  }
+
+  private ImmutableSet<String> filesInApk(
+      ApkDescription apkDesc, ZipFile apkSetFile, String prefix) {
     try {
-      return filesInApk(extractFromApkSetFile(apkSetFile, apkDesc.getPath(), outputDir));
+      return filesInApk(extractFromApkSetFile(apkSetFile, apkDesc.getPath(), outputDir), prefix);
     } catch (Exception e) {
       throw new RuntimeException("Failed to verify files in APK.", e);
     }
   }
 
-  private ImmutableSet<String> filesInApk(File apkFile) throws Exception {
+  private ImmutableSet<String> filesInApk(File apkFile, String prefix) throws Exception {
     try (ZipFile apkZip = new ZipFile(apkFile)) {
       return Collections.list(apkZip.entries()).stream()
           .map(ZipEntry::getName)
+          .filter(name -> name.startsWith(prefix))
           .collect(toImmutableSet());
     }
   }

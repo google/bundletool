@@ -21,6 +21,11 @@ public enum TargetingDimension {
   ABI,
   LANGUAGE,
   TEXTURE_COMPRESSION_FORMAT,
+  /**
+   * @deprecated use DEVICE_GROUP instead.
+   */
+  @Deprecated
   DEVICE_TIER,
+  DEVICE_GROUP,
   COUNTRY_SET;
 }

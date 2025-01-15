@@ -140,6 +140,9 @@ public final class TargetingNormalizer {
     if (targeting.hasCountrySet()) {
       normalized.setCountrySet(normalizeCountrySetTargeting(targeting.getCountrySet()));
     }
+    if (targeting.hasDeviceGroup()) {
+      normalized.setDeviceGroup(normalizeDeviceGroupTargeting(targeting.getDeviceGroup()));
+    }
     if (targeting.hasDeviceTier()) {
       normalized.setDeviceTier(normalizeDeviceTierTargeting(targeting.getDeviceTier()));
     }

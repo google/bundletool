@@ -26,6 +26,7 @@ import static com.android.bundle.Targeting.TextureCompressionFormat.TextureCompr
 import static com.android.bundle.Targeting.TextureCompressionFormat.TextureCompressionFormatAlias.PVRTC;
 import static com.android.tools.build.bundletool.model.SizeConfiguration.getAbiName;
 import static com.android.tools.build.bundletool.model.SizeConfiguration.getCountrySetName;
+import static com.android.tools.build.bundletool.model.SizeConfiguration.getDeviceGroupName;
 import static com.android.tools.build.bundletool.model.SizeConfiguration.getDeviceTierLevel;
 import static com.android.tools.build.bundletool.model.SizeConfiguration.getLocaleName;
 import static com.android.tools.build.bundletool.model.SizeConfiguration.getScreenDensityName;
@@ -35,6 +36,7 @@ import static com.android.tools.build.bundletool.model.SizeConfiguration.getText
 import static com.android.tools.build.bundletool.testing.TargetingUtils.abiTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.alternativeCountrySetTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.countrySetTargeting;
+import static com.android.tools.build.bundletool.testing.TargetingUtils.deviceGroupTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.deviceTierTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.languageTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.screenDensityTargeting;
@@ -162,6 +164,15 @@ public class SizeConfigurationTest {
             getDeviceTierLevel(
                 deviceTierTargeting(/* value= */ 1, /* alternatives= */ ImmutableList.of(0))))
         .hasValue(1);
+  }
+
+  @Test
+  public void getDeviceGroup_singleDeviceGroupTargeting() {
+    assertThat(getDeviceGroupName(deviceGroupTargeting("a"))).hasValue("a");
+    assertThat(
+            getDeviceGroupName(
+                deviceGroupTargeting(/* value= */ "b", /* alternatives= */ ImmutableList.of("a"))))
+        .hasValue("b");
   }
 
   @Test

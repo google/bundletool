@@ -22,6 +22,7 @@ import static com.android.tools.build.bundletool.model.targeting.TargetingUtils.
 
 import com.android.bundle.Targeting.AbiTargeting;
 import com.android.bundle.Targeting.CountrySetTargeting;
+import com.android.bundle.Targeting.DeviceGroupTargeting;
 import com.android.bundle.Targeting.DeviceTierTargeting;
 import com.android.bundle.Targeting.LanguageTargeting;
 import com.android.bundle.Targeting.ScreenDensity;
@@ -53,6 +54,8 @@ public abstract class SizeConfiguration {
   public abstract Optional<String> getSdkVersion();
 
   public abstract Optional<String> getTextureCompressionFormat();
+
+  public abstract Optional<String> getDeviceGroup();
 
   public abstract Optional<Integer> getDeviceTier();
 
@@ -121,6 +124,13 @@ public abstract class SizeConfiguration {
             Iterables.getOnlyElement(textureCompressionFormatTargeting.getValueList()).getAlias()));
   }
 
+  public static Optional<String> getDeviceGroupName(DeviceGroupTargeting deviceGroupTargeting) {
+    if (deviceGroupTargeting.getValueList().isEmpty()) {
+      return Optional.empty();
+    }
+    return Optional.of(Iterables.getOnlyElement(deviceGroupTargeting.getValueList()));
+  }
+
   public static Optional<Integer> getDeviceTierLevel(DeviceTierTargeting deviceTierTargeting) {
     if (deviceTierTargeting.getValueList().isEmpty()) {
       return Optional.empty();
@@ -158,6 +168,8 @@ public abstract class SizeConfiguration {
     public abstract Builder setSdkVersion(String sdkVersion);
 
     public abstract Builder setTextureCompressionFormat(String textureCompressionFormat);
+
+    public abstract Builder setDeviceGroup(String deviceGroup);
 
     public abstract Builder setDeviceTier(Integer deviceTier);
 

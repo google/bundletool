@@ -1,0 +1,72 @@
+{
+  "comment": "all the names used in BuildApksManagerTest",
+  "device_groups": [
+    {
+      "name": "high",
+      "device_selectors": [
+        {
+          "device_ram": {
+            "min_bytes": 7516192768
+          }
+        }
+      ]
+    },
+    {
+      "name": "medium",
+      "device_selectors": [
+        {
+          "device_ram": {
+            "min_bytes": 4294967296,
+            "max_bytes": 7516192768
+          }
+        }
+      ]
+    },
+    {
+      "name": "low",
+      "device_selectors": [
+        {
+          "device_ram": {
+            "max_bytes": 4294967296
+          }
+        }
+      ]
+    },
+    {
+      "name": "a",
+      "device_selectors": [
+        {
+          "required_system_features": [
+            {
+              "name": "A"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "b",
+      "device_selectors": [
+        {
+          "required_system_features": [
+            {
+              "name": "B"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "c",
+      "device_selectors": [
+        {
+          "required_system_features": [
+            {
+              "name": "C"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -48,11 +48,13 @@ import static com.android.tools.build.bundletool.testing.DeviceFactory.deviceWit
 import static com.android.tools.build.bundletool.testing.TargetingUtils.apkAbiTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.apkCountrySetTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.apkDensityTargeting;
+import static com.android.tools.build.bundletool.testing.TargetingUtils.apkDeviceGroupTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.apkDeviceTierTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.apkLanguageTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.apkSdkTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.apkTextureTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.countrySetTargeting;
+import static com.android.tools.build.bundletool.testing.TargetingUtils.deviceGroupTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.deviceTierTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.lPlusVariantTargeting;
 import static com.android.tools.build.bundletool.testing.TargetingUtils.mergeApkTargeting;
@@ -1524,7 +1526,7 @@ public final class GetSizeCommandTest {
   }
 
   @Test
-  public void getSizeTotal_withDeviceTier_withDeviceTier() throws Exception {
+  public void getSizeTotal_withDeviceTier_withDeviceSpec() throws Exception {
     Variant lVariant =
         createVariant(
             lPlusVariantTargeting(),
@@ -1569,6 +1571,100 @@ public final class GetSizeCommandTest {
         .containsExactly(
             "SDK,DEVICE_TIER,MIN,MAX",
             String.format("%s,%s,%d,%d", "25", "1", 2 * compressedApkSize, 2 * compressedApkSize));
+  }
+
+  @Test
+  public void getSizeTotal_withDeviceGroup() throws Exception {
+    Variant lVariant =
+        createVariant(
+            lPlusVariantTargeting(),
+            createSplitApkSet(
+                /* moduleName= */ "base",
+                createMasterApkDescription(
+                    ApkTargeting.getDefaultInstance(), ZipPath.create("base-master.apk")),
+                splitApkDescription(
+                    apkDeviceGroupTargeting(
+                        deviceGroupTargeting(
+                            /* value= */ "a", /* alternatives= */ ImmutableList.of("b"))),
+                    ZipPath.create("base-group_a.apk")),
+                splitApkDescription(
+                    apkDeviceGroupTargeting(
+                        deviceGroupTargeting(
+                            /* value= */ "b", /* alternatives= */ ImmutableList.of("a"))),
+                    ZipPath.create("base-group_b.apk"))));
+
+    BuildApksResult tableOfContentsProto =
+        BuildApksResult.newBuilder()
+            .setBundletool(
+                Bundletool.newBuilder()
+                    .setVersion(BundleToolVersion.getCurrentVersion().toString()))
+            .addVariant(lVariant)
+            .build();
+    Path apksArchiveFile =
+        createApksArchiveFile(tableOfContentsProto, tmpDir.resolve("bundle.apks"));
+
+    ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+
+    GetSizeCommand.builder()
+        .setGetSizeSubCommand(GetSizeSubcommand.TOTAL)
+        .setApksArchivePath(apksArchiveFile)
+        .setDimensions(ImmutableSet.of(Dimension.DEVICE_GROUP, Dimension.SDK))
+        .setDeviceSpec(DeviceSpec.newBuilder().setSdkVersion(25).addDeviceGroups("b").build())
+        .build()
+        .getSizeTotal(new PrintStream(outputStream));
+
+    assertThat(new String(outputStream.toByteArray(), UTF_8).split(CRLF))
+        .asList()
+        .containsExactly(
+            "SDK,DEVICE_GROUP,MIN,MAX",
+            String.format("%s,%s,%d,%d", "25", "b", 2 * compressedApkSize, 2 * compressedApkSize));
+  }
+
+  @Test
+  public void getSizeTotal_withDeviceGroup_withDeviceSpec() throws Exception {
+    Variant lVariant =
+        createVariant(
+            lPlusVariantTargeting(),
+            createSplitApkSet(
+                /* moduleName= */ "base",
+                createMasterApkDescription(
+                    ApkTargeting.getDefaultInstance(), ZipPath.create("base-master.apk")),
+                splitApkDescription(
+                    apkDeviceGroupTargeting(
+                        deviceGroupTargeting(
+                            /* value= */ "a", /* alternatives= */ ImmutableList.of("b"))),
+                    ZipPath.create("base-group_a.apk")),
+                splitApkDescription(
+                    apkDeviceGroupTargeting(
+                        deviceGroupTargeting(
+                            /* value= */ "b", /* alternatives= */ ImmutableList.of("a"))),
+                    ZipPath.create("base-group_b.apk"))));
+
+    BuildApksResult tableOfContentsProto =
+        BuildApksResult.newBuilder()
+            .setBundletool(
+                Bundletool.newBuilder()
+                    .setVersion(BundleToolVersion.getCurrentVersion().toString()))
+            .addVariant(lVariant)
+            .build();
+    Path apksArchiveFile =
+        createApksArchiveFile(tableOfContentsProto, tmpDir.resolve("bundle.apks"));
+
+    ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+
+    GetSizeCommand.builder()
+        .setGetSizeSubCommand(GetSizeSubcommand.TOTAL)
+        .setApksArchivePath(apksArchiveFile)
+        .setDimensions(ImmutableSet.of(Dimension.DEVICE_GROUP, Dimension.SDK))
+        .build()
+        .getSizeTotal(new PrintStream(outputStream));
+
+    assertThat(new String(outputStream.toByteArray(), UTF_8).split(CRLF))
+        .asList()
+        .containsExactly(
+            "SDK,DEVICE_GROUP,MIN,MAX",
+            String.format("%s,%s,%d,%d", "21-", "a", 2 * compressedApkSize, 2 * compressedApkSize),
+            String.format("%s,%s,%d,%d", "21-", "b", 2 * compressedApkSize, 2 * compressedApkSize));
   }
 
   @Test
