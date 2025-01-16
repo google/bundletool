@@ -26,6 +26,7 @@ import com.android.tools.build.bundletool.model.AppBundle;
 import com.android.tools.build.bundletool.model.BundleModule;
 import com.android.tools.build.bundletool.model.ModuleEntry;
 import com.android.tools.build.bundletool.model.exceptions.InvalidBundleException;
+import com.android.tools.build.bundletool.model.version.BundleToolVersion;
 import com.google.common.collect.ImmutableList;
 import com.google.common.hash.Hashing;
 import com.google.common.io.ByteSource;
@@ -51,8 +52,13 @@ public final class CodeTransparencyFactory {
         CodeTransparency.newBuilder()
             .setVersion(CodeTransparencyVersion.getCurrentVersion())
             .addAllCodeRelatedFile(codeRelatedFiles);
-
     if (bundle.getStoreArchive().orElse(true)) {
+      if (BundleToolVersion.getCurrentVersion().compareTo(bundle.getVersion()) <= 0) {
+        throw InvalidBundleException.builder()
+                .withUserMessage("This bundletool version is lower than the one that is used to build the app bundle. " +
+                        "Please use a bundletool with version >= " + bundle.getVersion())
+                .build();
+      }
       codeTransparencyBuilder.addCodeRelatedFile(createArchivedCodeRelatedFile(bundle));
     }
 
