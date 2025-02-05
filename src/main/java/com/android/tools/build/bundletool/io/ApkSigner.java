@@ -73,8 +73,9 @@ class ApkSigner {
       return Optional.empty();
     }
 
+    ApkDescription apkDescription = ApkDescription.fromModuleSplit(split);
     ApksigSigningConfiguration signingConfig =
-        signingConfigProvider.get().getSigningConfiguration(ApkDescription.fromModuleSplit(split));
+        signingConfigProvider.get().getSigningConfiguration(apkDescription);
 
     try (TempDirectory tempDirectory = new TempDirectory(getClass().getSimpleName())) {
       Path signedApkPath = tempDirectory.getPath().resolve("signed.apk");
@@ -89,7 +90,7 @@ class ApkSigner {
               .setV2SigningEnabled(signingConfig.getV2SigningEnabled())
               .setV3SigningEnabled(signingConfig.getV3SigningEnabled())
               .setOtherSignersSignaturesPreserved(false)
-              .setMinSdkVersion(split.getAndroidManifest().getEffectiveMinSdkVersion());
+              .setMinSdkVersion(apkDescription.getMinSdkVersionTargeting());
       signingConfig
           .getSigningCertificateLineage()
           .ifPresent(apkSigner::setSigningCertificateLineage);
