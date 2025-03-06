@@ -519,6 +519,34 @@ public class BuildBundleCommandTest {
   }
 
   @Test
+  public void assetsTargeting_invalidDeviceGroupName_throws() throws Exception {
+    XmlNode manifest = androidManifest(PKG_NAME, withHasCode(true));
+    Path module =
+        new ZipBuilder()
+            .addFileWithContent(ZipPath.create("assets/anything.dat"), "any".getBytes(UTF_8))
+            .addFileWithContent(
+                ZipPath.create("assets/texture#tcf_atc/device#group_@$%!/file.dat"),
+                "any2".getBytes(UTF_8))
+            .addFileWithContent(ZipPath.create("dex/classes.dex"), "dex".getBytes(UTF_8))
+            .addFileWithProtoContent(ZipPath.create("manifest/AndroidManifest.xml"), manifest)
+            .writeTo(tmpDir.resolve("base.zip"));
+
+    InvalidBundleException exception =
+        assertThrows(
+            InvalidBundleException.class,
+            () ->
+                BuildBundleCommand.builder()
+                    .setOutputPath(bundlePath)
+                    .setModulesPaths(ImmutableList.of(module))
+                    .build()
+                    .execute());
+
+    assertThat(exception)
+        .hasMessageThat()
+        .contains("Device group names should start with a letter");
+  }
+
+  @Test
   public void assetsTargeting_generated_deviceGroup() throws Exception {
     XmlNode manifest = androidManifest(PKG_NAME, withHasCode(true));
     Assets assetsConfig =

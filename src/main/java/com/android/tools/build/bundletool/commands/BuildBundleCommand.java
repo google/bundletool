@@ -43,6 +43,7 @@ import com.android.tools.build.bundletool.model.exceptions.InvalidCommandExcepti
 import com.android.tools.build.bundletool.model.utils.files.BufferedIo;
 import com.android.tools.build.bundletool.model.utils.files.FileUtils;
 import com.android.tools.build.bundletool.model.version.BundleToolVersion;
+import com.android.tools.build.bundletool.validation.AppBundleValidator;
 import com.android.tools.build.bundletool.validation.BundleModulesValidator;
 import com.google.auto.value.AutoValue;
 import com.google.common.collect.ImmutableList;
@@ -255,6 +256,9 @@ public abstract class BuildBundleCommand {
       AppBundle appBundle =
           AppBundle.buildFromModules(
               modulesWithTargeting.build(), bundleConfig, getBundleMetadata());
+
+      // Validate the bundle content before writing it to disk.
+      AppBundleValidator.create().validate(appBundle);
 
       Path outputDirectory = getOutputPath().toAbsolutePath().getParent();
       if (Files.notExists(outputDirectory)) {
