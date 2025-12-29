@@ -33,12 +33,20 @@ import com.android.tools.build.bundletool.model.ConfigurationSizes;
 import com.android.tools.build.bundletool.model.SizeConfiguration;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
+import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 
+import java.util.Locale;
+
 @RunWith(JUnit4.class)
 public class GetSizeCsvUtilsTest {
+
+  @Before
+  public void setUp() {
+    Locale.setDefault(Locale.forLanguageTag("en-US"));
+  }
 
   @Test
   public void getSizeTotalOutputInCsv_emptyDimensions() {

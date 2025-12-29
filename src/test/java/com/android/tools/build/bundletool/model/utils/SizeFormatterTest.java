@@ -17,12 +17,21 @@ package com.android.tools.build.bundletool.model.utils;
 
 import static com.google.common.truth.Truth.assertThat;
 
+import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 
+import java.nio.file.Path;
+import java.util.Locale;
+
 @RunWith(JUnit4.class)
 public class SizeFormatterTest {
+
+  @Before
+  public void setUp() {
+    Locale.setDefault(Locale.forLanguageTag("en-US"));
+  }
 
   @Test
   public void rawFormatter() {
