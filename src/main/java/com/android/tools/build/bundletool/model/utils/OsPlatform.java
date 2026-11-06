@@ -20,16 +20,27 @@ public enum OsPlatform {
   WINDOWS,
   MACOS,
   LINUX,
+  LINUX_ARM64,
   OTHER;
 
-  /** Returns the OS platform this JVM is running on, relying on the "os.name" property name. */
+  /** Returns the OS platform this JVM is running on, relying on "os.name" and "os.arch". */
   public static OsPlatform getCurrentPlatform() {
-    String os = System.getProperty("os.name");
-    if (os.startsWith("Mac OS")) {
+    return getPlatform(
+        System.getProperty("os.name", ""),
+        System.getProperty("os.arch", ""));
+  }
+
+  static OsPlatform getPlatform(String osName, String osArch) {
+    String os = osName.toLowerCase();
+    String arch = osArch.toLowerCase();
+    if (os.startsWith("mac os")) {
       return MACOS;
-    } else if (os.startsWith("Windows")) {
+    } else if (os.startsWith("windows")) {
       return WINDOWS;
-    } else if (os.startsWith("Linux")) {
+    } else if (os.startsWith("linux")) {
+      if (arch.equals("aarch64") || arch.equals("arm64")) {
+        return LINUX_ARM64;
+      }
       return LINUX;
     } else {
       return OTHER;
