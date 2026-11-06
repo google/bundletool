@@ -167,8 +167,9 @@ public final class SdkToolsLocator {
         return "/windows";
       case MACOS:
         return "/macos";
+      case LINUX_ARM64:
+        return "/linux_arm64";
       case LINUX:
-        return "/linux";
       case OTHER:
         // Unrecognized OS; let's try Linux.
         return "/linux";

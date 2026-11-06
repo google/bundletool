@@ -27,6 +27,7 @@ configurations {
     implementationWindows
     implementationMacOs
     implementationLinux
+    implementationLinuxArm64
 }
 
 // The repackaging rules are defined in the "shadowJar" task below.
@@ -52,9 +53,11 @@ dependencies {
     }
     shadow "org.slf4j:slf4j-api:1.7.30"
 
-    implementationWindows "com.android.tools.build:aapt2:8.0.0-alpha07-9193536:windows"
-    implementationMacOs "com.android.tools.build:aapt2:8.0.0-alpha07-9193536:osx"
-    implementationLinux "com.android.tools.build:aapt2:8.0.0-alpha07-9193536:linux"
+    def aapt2Version = "9.5.0-alpha08-16409357"
+    implementationWindows "com.android.tools.build:aapt2:${aapt2Version}:windows"
+    implementationMacOs "com.android.tools.build:aapt2:${aapt2Version}:osx"
+    implementationLinux "com.android.tools.build:aapt2:${aapt2Version}:linux"
+    implementationLinuxArm64 "com.android.tools.build:aapt2:${aapt2Version}:linux_arm64"
 
     compileOnly "org.bouncycastle:bcprov-jdk15on:1.56"
     compileOnly "org.bouncycastle:bcpkix-jdk15on:1.56"
@@ -92,6 +95,8 @@ dependencies {
 }
 
 def osName = System.getProperty("os.name").toLowerCase()
+def osArch = System.getProperty("os.arch").toLowerCase()
+def isLinuxArm64 = osName.contains("linux") && (osArch.contains("aarch64") || osArch.contains("arm64"))
 
 // Use utf-8 instead of the platform default encoding.
 compileJava.options.encoding = "UTF-8"
@@ -104,7 +109,11 @@ if (JavaVersion.current() != JavaVersion.VERSION_1_8) {
 
 test {
     if (osName.contains("linux")) {
-        environment "AAPT2_PATH", "build/resources/main/linux/aapt2"
+        if (isLinuxArm64) {
+            environment "AAPT2_PATH", "build/resources/main/linux_arm64/aapt2"
+        } else {
+            environment "AAPT2_PATH", "build/resources/main/linux/aapt2"
+        }
     }
 
     if (osName.contains("windows")) {
@@ -219,6 +228,7 @@ task executableJar(type: ShadowJar) {
     from({ zipTree(project.configurations.implementationWindows.singleFile) }) { into 'windows/' }
     from({ zipTree(project.configurations.implementationMacOs.singleFile) }) { into 'macos/' }
     from({ zipTree(project.configurations.implementationLinux.singleFile) }) { into 'linux/' }
+    from({ zipTree(project.configurations.implementationLinuxArm64.singleFile) }) { into 'linux_arm64/' }
     configurations = [
             project.configurations.shadow,
             project.configurations.runtimeClasspath
@@ -234,8 +244,13 @@ task executableJar(type: ShadowJar) {
 // Unzip the aapt2 dependency jar.
 task unzipAapt2Jar(type: Copy) {
     if (osName.contains("linux")) {
-        from zipTree(project.configurations.implementationLinux.singleFile)
-        into('build/resources/main/linux')
+        if (isLinuxArm64) {
+            from zipTree(project.configurations.implementationLinuxArm64.singleFile)
+            into('build/resources/main/linux_arm64')
+        } else {
+            from zipTree(project.configurations.implementationLinux.singleFile)
+            into('build/resources/main/linux')
+        }
     }
 
     if (osName.contains("windows")) {
